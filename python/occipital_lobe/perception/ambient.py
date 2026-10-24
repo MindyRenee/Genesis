@@ -40,6 +40,8 @@ from collections import deque
 from collections.abc import Callable
 from typing import Any
 
+from genesis_client.threads import call_on_named_thread, named_thread
+
 __all__ = ["AmbientListener", "contains_wake_word", "strip_wake_word"]
 
 logger = logging.getLogger(__name__)
@@ -144,6 +146,10 @@ class AmbientListener:
 
         self._running = False
         self._thread: threading.Thread | None = None
+        # Serializes start/stop — without it a start racing a stop
+        # loses the old thread's handle while the old loop resumes on
+        # the cleared flag, leaving a phantom second listener alive.
+        self._lifecycle_lock = threading.Lock()
         self._vosk_model = None
         self._initialized = False
         self._init_error: str | None = None
@@ -177,6 +183,10 @@ class AmbientListener:
             return self._init_vosk()
         return self._vosk_model is not None
 
+    # How long start() waits for a predecessor thread that is still
+    # exiting before refusing to spawn a second worker. Tests shrink it.
+    _START_JOIN_TIMEOUT_S = 5.0
+
     @property
     def init_error(self) -> str | None:
         """Error message from the last Vosk initialization attempt, or None if no error."""
@@ -187,22 +197,32 @@ class AmbientListener:
         if not self.available:
             logger.error(f"Ambient listener cannot start: {self._init_error}")
             return False
-        if self._running:
-            return True
-        self._running = True
-        self._thread = threading.Thread(
-            target=self._listen_loop, daemon=True, name="ambient-listener"
-        )
-        self._thread.start()
+        with self._lifecycle_lock:
+            if self._running:
+                return True
+            if self._thread is not None and self._thread.is_alive():
+                # A stop() join may have timed out — wait for the old
+                # loop to finish rather than spawn beside it.
+                self._thread.join(timeout=self._START_JOIN_TIMEOUT_S)
+                if self._thread.is_alive():
+                    logger.error(
+                        "Ambient listener: previous thread still alive after join — "
+                        "refusing to start a second one"
+                    )
+                    return False
+            self._running = True
+            self._thread = named_thread("ambient-listener", self._listen_loop, comm="g-ambient")
+            self._thread.start()
         logger.info("Ambient listener started — listening to the room")
         return True
 
     def stop(self) -> None:
         """Stop the listener."""
-        self._running = False
-        if self._thread:
-            self._thread.join(timeout=3.0)
-            self._thread = None
+        with self._lifecycle_lock:
+            self._running = False
+            if self._thread:
+                self._thread.join(timeout=3.0)
+                self._thread = None
         logger.info("Ambient listener stopped")
 
     @property
@@ -252,34 +272,43 @@ class AmbientListener:
         # silence_blocks is the energy-gate counter (see _audio_callback).
         speech_state = {"active": False, "last_partial": "", "silence_blocks": 0}
 
-        audio_callback = self._make_audio_callback(
-            recognizer, final_queue, speech_state
-        )
+        audio_callback = self._make_audio_callback(recognizer, final_queue, speech_state)
 
         try:
-            with sd.RawInputStream(
-                samplerate=self.sample_rate,
-                blocksize=1024,
-                dtype="int16",
-                channels=1,
-                callback=audio_callback,
-            ):
+            # Open AND start the capture stream on an io-named thread:
+            # the PortAudio callback worker is born in whichever of
+            # OpenStream/StartStream runs first for the backend, and it
+            # keeps that thread's comm name for life — doing both here
+            # labels it g-ambient-io instead of a second g-ambient.
+            def _open_capture() -> sd.RawInputStream:
+                s = sd.RawInputStream(
+                    samplerate=self.sample_rate,
+                    blocksize=1024,
+                    dtype="int16",
+                    channels=1,
+                    callback=audio_callback,
+                )
+                s.start()
+                return s
+
+            stream = call_on_named_thread("ambient-io", _open_capture, comm="g-ambient-io")
+            try:
                 while self._running:
                     # Check for final results from Vosk's VAD
                     try:
                         text = final_queue.get(timeout=0.1)
                         self._emit(text)
                         speech_state["active"] = False
-                    except queue.Empty as e:
-                        logger.debug(f"no speech detected this interval: {e}")
+                    except queue.Empty:
+                        continue
+            finally:
+                stream.close()
 
         except Exception as e:
             logger.exception(f"Ambient listener crashed: {e}")
             self._running = False
 
-    def _make_audio_callback(
-        self, recognizer, final_queue: queue.Queue[str], speech_state: dict
-    ):
+    def _make_audio_callback(self, recognizer, final_queue: queue.Queue[str], speech_state: dict):
         """Build the sounddevice callback bound to this recognizer.
 
         Process incoming audio: feed to Vosk and queue final results.
@@ -294,9 +323,7 @@ class AmbientListener:
         """
         import numpy as _np
 
-        def audio_callback(
-            indata: bytes, frames: int, time_info: object, status: object
-        ) -> None:
+        def audio_callback(indata: bytes, frames: int, time_info: object, status: object) -> None:
             data = indata.tobytes() if hasattr(indata, "tobytes") else bytes(indata)
 
             # Mute the mic while she is speaking to prevent her from
@@ -309,7 +336,7 @@ class AmbientListener:
             # neural network on ~99% of blocks (silence), cutting
             # the ambient listener's CPU usage dramatically.
             samples = _np.frombuffer(data, dtype=_np.int16).astype(_np.float32)
-            rms = _np.sqrt(_np.mean(samples ** 2)) if len(samples) > 0 else 0.0
+            rms = _np.sqrt(_np.mean(samples**2)) if len(samples) > 0 else 0.0
             if rms < _SILENCE_RMS_THRESHOLD:
                 # Even in silence, we must call AcceptWaveform
                 # periodically so Vosk's internal VAD can finalize
@@ -346,16 +373,11 @@ class AmbientListener:
             word_results = final.get("result", [])
             accept = True
             if word_results:
-                confs = [
-                    w.get("conf", 1.0)
-                    for w in word_results
-                    if isinstance(w, dict)
-                ]
+                confs = [w.get("conf", 1.0) for w in word_results if isinstance(w, dict)]
                 avg_conf = sum(confs) / len(confs) if confs else 0.0
                 if avg_conf < _MIN_TRANSCRIPTION_CONFIDENCE:
                     logger.debug(
-                        f"Ambient: low-confidence ({avg_conf:.2f}) "
-                        f"transcription filtered: '{text}'"
+                        f"Ambient: low-confidence ({avg_conf:.2f}) transcription filtered: '{text}'"
                     )
                     accept = False
             if accept:
@@ -383,7 +405,7 @@ class AmbientListener:
             return
 
         # Log it
-        logger.info(f"Ambient heard: \"{text}\"")
+        logger.info(f'Ambient heard: "{text}"')
         with self._recent_lock:
             self._recent.append(text)
 

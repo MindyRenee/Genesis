@@ -204,7 +204,12 @@ head_ "Verification"
 cd "${PROJECT_ROOT}/python" || exit 1
 "$PY" - <<'PYEOF'
 import sys
+# The repo layout needs both roots: python/ holds the brain-region
+# packages, the repo root holds genesis_client/infrastructure —
+# importing one without the other turns a working install into
+# false "capability unavailable" reports.
 sys.path.insert(0, ".")
+sys.path.insert(0, "..")
 
 rows = []
 
@@ -261,7 +266,7 @@ def drawing():
 
 def ions():
     from genesis_client.protocol import GET_ION_SUMMARY
-    from neurochemical.electrochemistry import interpret_ions
+    from brainstem.electrochemistry import interpret_ions
     interpret_ions(None)
     return f"opcode {GET_ION_SUMMARY}, neutral ctx ok"
 

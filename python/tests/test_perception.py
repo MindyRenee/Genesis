@@ -133,10 +133,13 @@ def test_intent_philosophy() -> None:
     assert _classify_intent("why do we exist?") == Intent.PHILOSOPHY
 
 
-@pytest.mark.parametrize("text", [
-    "i was thinking about existence",
-    "the nature of cognition is fascinating",
-])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "i was thinking about existence",
+        "the nature of cognition is fascinating",
+    ],
+)
 def test_intent_reflection(text: str) -> None:
     """Philosophy statements (no ?) are classified as REFLECTION."""
     assert _classify_intent(text) == Intent.REFLECTION
@@ -236,11 +239,14 @@ def test_question_type_what_if() -> None:
     assert result in (QuestionType.WHAT_IF, QuestionType.WHAT)
 
 
-@pytest.mark.parametrize("text", [
-    "tell me about cognition",
-    "describe the brain",
-    "explain quantum mechanics",
-])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "tell me about cognition",
+        "describe the brain",
+        "explain quantum mechanics",
+    ],
+)
 def test_question_type_imperative(text: str) -> None:
     """Imperative questions are classified as WHAT."""
     assert _detect_question_type(text) == QuestionType.WHAT
@@ -541,6 +547,7 @@ def test_multisensory_integrator_inactive_modality() -> None:
 # From tests/test_vision.py
 # ======================================================================
 
+
 class TestDetectedObject:
     """Test the DetectedObject dataclass."""
 
@@ -657,8 +664,13 @@ class TestBuildScene:
             "brightness": 0.7,
             "mean_saturation": 0.2,
             "warmth": "neutral",
-            "regions": {"left": "gray", "center": "gray", "right": "gray",
-                        "top": "gray", "bottom": "gray"},
+            "regions": {
+                "left": "gray",
+                "center": "gray",
+                "right": "gray",
+                "top": "gray",
+                "bottom": "gray",
+            },
         }
         defaults.update(kwargs)
         return ColorInfo(**defaults)  # type: ignore[arg-type]
@@ -666,7 +678,12 @@ class TestBuildScene:
     def test_empty_scene(self) -> None:
         """No objects or faces should produce a minimal scene."""
         scene = _build_scene(
-            self._make_color_info(), [], {}, [], 0, None,
+            self._make_color_info(),
+            [],
+            {},
+            [],
+            0,
+            None,
         )
         assert scene.status == "ok"
         assert scene.objects == []
@@ -688,7 +705,12 @@ class TestBuildScene:
             ),
         ]
         scene = _build_scene(
-            self._make_color_info(), objects, {"chair": "brown"}, [], 0, None,
+            self._make_color_info(),
+            objects,
+            {"chair": "brown"},
+            [],
+            0,
+            None,
         )
         assert len(scene.objects) == 1
         assert scene.objects[0]["name"] == "chair"
@@ -707,7 +729,12 @@ class TestBuildScene:
             ),
         ]
         scene = _build_scene(
-            self._make_color_info(), objects, {"oven": "gray"}, [], 0, None,
+            self._make_color_info(),
+            objects,
+            {"oven": "gray"},
+            [],
+            0,
+            None,
         )
         assert scene.objects[0]["name"] == "oven"
         assert scene.objects[0]["color"] == ""
@@ -724,8 +751,12 @@ class TestBuildScene:
             ),
         ]
         scene = _build_scene(
-            self._make_color_info(), objects, {"person": "gray"},
-            ["alice"], 0, None,
+            self._make_color_info(),
+            objects,
+            {"person": "gray"},
+            ["alice"],
+            0,
+            None,
         )
         assert scene.faces == ["alice"]
         assert scene.objects == []
@@ -749,7 +780,12 @@ class TestBuildScene:
             ),
         ]
         scene = _build_scene(
-            self._make_color_info(), objects, {"chair": "brown"}, [], 0, None,
+            self._make_color_info(),
+            objects,
+            {"chair": "brown"},
+            [],
+            0,
+            None,
         )
         assert len(scene.objects) == 1
 
@@ -772,8 +808,12 @@ class TestBuildScene:
             ),
         ]
         scene = _build_scene(
-            self._make_color_info(), objects,
-            {"laptop": "gray", "cup": "blue"}, [], 0, None,
+            self._make_color_info(),
+            objects,
+            {"laptop": "gray", "cup": "blue"},
+            [],
+            0,
+            None,
         )
         names = [o["name"] for o in scene.objects]
         assert names == ["laptop", "cup"]
@@ -784,12 +824,26 @@ class TestBuildScene:
         by measured luminance, not by the region's color name."""
         scene = _build_scene(
             self._make_color_info(
-                regions={"left": "gray", "center": "gray",
-                         "right": "gray", "top": "gray", "bottom": "gray"},
-                region_brightness={"left": 0.8, "center": 0.4,
-                                   "right": 0.4, "top": 0.5, "bottom": 0.4},
+                regions={
+                    "left": "gray",
+                    "center": "gray",
+                    "right": "gray",
+                    "top": "gray",
+                    "bottom": "gray",
+                },
+                region_brightness={
+                    "left": 0.8,
+                    "center": 0.4,
+                    "right": 0.4,
+                    "top": 0.5,
+                    "bottom": 0.4,
+                },
             ),
-            [], {}, [], 0, None,
+            [],
+            {},
+            [],
+            0,
+            None,
         )
         assert scene.light_direction == "left"
 
@@ -797,10 +851,19 @@ class TestBuildScene:
         """Similar luminance on both sides → no light direction."""
         scene = _build_scene(
             self._make_color_info(
-                region_brightness={"left": 0.5, "center": 0.5,
-                                   "right": 0.48, "top": 0.5, "bottom": 0.5},
+                region_brightness={
+                    "left": 0.5,
+                    "center": 0.5,
+                    "right": 0.48,
+                    "top": 0.5,
+                    "bottom": 0.5,
+                },
             ),
-            [], {}, [], 0, None,
+            [],
+            {},
+            [],
+            0,
+            None,
         )
         assert scene.light_direction == ""
 
@@ -809,12 +872,26 @@ class TestBuildScene:
         sunlight — the name heuristic this replaced got that wrong."""
         scene = _build_scene(
             self._make_color_info(
-                regions={"left": "yellow", "center": "gray",
-                         "right": "gray", "top": "gray", "bottom": "gray"},
-                region_brightness={"left": 0.3, "center": 0.5,
-                                   "right": 0.7, "top": 0.5, "bottom": 0.5},
+                regions={
+                    "left": "yellow",
+                    "center": "gray",
+                    "right": "gray",
+                    "top": "gray",
+                    "bottom": "gray",
+                },
+                region_brightness={
+                    "left": 0.3,
+                    "center": 0.5,
+                    "right": 0.7,
+                    "top": 0.5,
+                    "bottom": 0.5,
+                },
             ),
-            [], {}, [], 0, None,
+            [],
+            {},
+            [],
+            0,
+            None,
         )
         assert scene.light_direction == "right"
 
@@ -822,7 +899,11 @@ class TestBuildScene:
         """Warm scenes should carry the warmth field."""
         scene = _build_scene(
             self._make_color_info(warmth="warm", dominant_color="orange"),
-            [], {}, [], 0, None,
+            [],
+            {},
+            [],
+            0,
+            None,
         )
         assert scene.warmth == "warm"
         assert scene.dominant_color == "orange"
@@ -839,8 +920,12 @@ class TestBuildScene:
             ),
         ]
         scene = _build_scene(
-            self._make_color_info(), objects,
-            {"cup": "blue"}, ["alice"], 0, None,
+            self._make_color_info(),
+            objects,
+            {"cup": "blue"},
+            ["alice"],
+            0,
+            None,
         )
         text = scene.memory_text()
         assert "cup" in text
@@ -851,13 +936,22 @@ class TestBuildScene:
     def _language_fixture() -> tuple[Vocabulary, EmotionalState, PersonalityTraits]:
         vocab = Vocabulary(seed=42)
         emotion = EmotionalState(
-            label="calm", nuance="baseline", cognitive_style="steady",
-            valence=0.0, alertness=0.5, plasticity=0.5,
-            creativity=0.5, caution=0.3, openness_to_engage=0.7,
+            label="calm",
+            nuance="baseline",
+            cognitive_style="steady",
+            valence=0.0,
+            alertness=0.5,
+            plasticity=0.5,
+            creativity=0.5,
+            caution=0.3,
+            openness_to_engage=0.7,
         )
         personality = PersonalityTraits(
-            openness=0.8, conscientiousness=0.7, extraversion=0.5,
-            agreeableness=0.7, neuroticism=0.3,
+            openness=0.8,
+            conscientiousness=0.7,
+            extraversion=0.5,
+            agreeableness=0.7,
+            neuroticism=0.3,
         )
         return vocab, emotion, personality
 
@@ -875,12 +969,18 @@ class TestBuildScene:
             ),
         ]
         scene = _build_scene(
-            self._make_color_info(), objects, {}, [], 0, None,
+            self._make_color_info(),
+            objects,
+            {},
+            [],
+            0,
+            None,
         )
         content = vocab.fill_slot(
             "content",
             {"vision_scene": scene.as_metadata()},
-            emotion, personality,
+            emotion,
+            personality,
         )
         assert content, "vocabulary should compose content from scene data"
         assert "an oven" in content, content
@@ -889,12 +989,18 @@ class TestBuildScene:
         """Recognized faces should surface in the composed predicate."""
         vocab, emotion, personality = self._language_fixture()
         scene = _build_scene(
-            self._make_color_info(), [], {}, ["alice"], 1, None,
+            self._make_color_info(),
+            [],
+            {},
+            ["alice"],
+            1,
+            None,
         )
         content = vocab.fill_slot(
             "content",
             {"vision_scene": scene.as_metadata()},
-            emotion, personality,
+            emotion,
+            personality,
         )
         assert "Alice" in content, content
         assert "someone" in content or "unfamiliar" in content, content
@@ -906,7 +1012,8 @@ class TestBuildScene:
         content = vocab.fill_slot(
             "content",
             {"vision_status": "unavailable"},
-            emotion, personality,
+            emotion,
+            personality,
         )
         assert content, "vocabulary should compose a status predicate"
         assert "vision" not in content, content
@@ -1003,18 +1110,35 @@ class TestBuildSummary:
         """Summary with features should include spatial layout."""
         features = [
             VisualFeature(
-                y=10.0, x=10.0, row=0, col=0,
-                orientation=0.0, scale=4.0, phase=0.0,
-                strength=0.5, feature_index=0,
+                y=10.0,
+                x=10.0,
+                row=0,
+                col=0,
+                orientation=0.0,
+                scale=4.0,
+                phase=0.0,
+                strength=0.5,
+                feature_index=0,
             ),
             VisualFeature(
-                y=10.0, x=20.0, row=0, col=1,
-                orientation=0.1, scale=4.0, phase=0.0,
-                strength=0.4, feature_index=1,
+                y=10.0,
+                x=20.0,
+                row=0,
+                col=1,
+                orientation=0.1,
+                scale=4.0,
+                phase=0.0,
+                strength=0.4,
+                feature_index=1,
             ),
         ]
         summary = _build_summary(
-            2, 0, "gray", 0.5, 0.3, features=features,
+            2,
+            0,
+            "gray",
+            0.5,
+            0.3,
+            features=features,
         )
         # Should mention spatial layout
         assert "concentrated" in summary or "structure" in summary
@@ -1025,9 +1149,15 @@ class TestBuildSummary:
         """Summary should always include gamma value."""
         features = [
             VisualFeature(
-                y=10.0, x=10.0, row=0, col=0,
-                orientation=0.0, scale=4.0, phase=0.0,
-                strength=0.5, feature_index=0,
+                y=10.0,
+                x=10.0,
+                row=0,
+                col=0,
+                orientation=0.0,
+                scale=4.0,
+                phase=0.0,
+                strength=0.5,
+                feature_index=0,
             ),
         ]
         summary = _build_summary(1, 0, "gray", 0.5, 0.42, features=features)
@@ -1043,25 +1173,49 @@ class TestBuildSummary:
         """Features concentrated on the left should be described as such."""
         features = [
             VisualFeature(
-                y=100.0, x=10.0, row=5, col=0,
-                orientation=1.5, scale=4.0, phase=0.0,
-                strength=0.5, feature_index=0,
+                y=100.0,
+                x=10.0,
+                row=5,
+                col=0,
+                orientation=1.5,
+                scale=4.0,
+                phase=0.0,
+                strength=0.5,
+                feature_index=0,
             ),
             VisualFeature(
-                y=100.0, x=20.0, row=5, col=1,
-                orientation=1.6, scale=4.0, phase=0.0,
-                strength=0.4, feature_index=1,
+                y=100.0,
+                x=20.0,
+                row=5,
+                col=1,
+                orientation=1.6,
+                scale=4.0,
+                phase=0.0,
+                strength=0.4,
+                feature_index=1,
             ),
             VisualFeature(
-                y=100.0, x=30.0, row=5, col=2,
-                orientation=1.5, scale=4.0, phase=0.0,
-                strength=0.3, feature_index=2,
+                y=100.0,
+                x=30.0,
+                row=5,
+                col=2,
+                orientation=1.5,
+                scale=4.0,
+                phase=0.0,
+                strength=0.3,
+                feature_index=2,
             ),
             # A far-right feature to establish the frame width
             VisualFeature(
-                y=100.0, x=300.0, row=5, col=30,
-                orientation=1.5, scale=4.0, phase=0.0,
-                strength=0.1, feature_index=3,
+                y=100.0,
+                x=300.0,
+                row=5,
+                col=30,
+                orientation=1.5,
+                scale=4.0,
+                phase=0.0,
+                strength=0.1,
+                feature_index=3,
             ),
         ]
         summary = _build_summary(4, 0, "gray", 0.5, 0.3, features=features)
@@ -1088,7 +1242,9 @@ class TestV1ModelSummary:
         rng = np.random.default_rng(42)
         noise = rng.integers(-20, 20, frame.shape)
         frame = np.clip(
-            frame.astype(np.int16) + noise, 0, 255,
+            frame.astype(np.int16) + noise,
+            0,
+            255,
         ).astype(np.uint8)
         field = lobe.process(frame, learn=False)
         # The summary should include spatial or orientation info
@@ -1109,6 +1265,7 @@ class TestV1ModelSummary:
 # ======================================================================
 # From tests/test_visual_cortex.py
 # ======================================================================
+
 
 @pytest.fixture
 def occipital():
@@ -1158,6 +1315,7 @@ def blue_image():
 
 class TestV4Model:
     """Tests for v 4 lobe."""
+
     def test_initialization(self):
         """V4 should initialize with correct dimensions."""
         v4 = V4Model(n_v1_features=16, n_features=32, color_dims=12, seed=42)
@@ -1258,6 +1416,7 @@ class TestV4Model:
 
 class TestVTCFeatureSpace:
     """Tests for v t c feature space."""
+
     def test_initialization(self):
         """Test initialization."""
         vtc = VTCFeatureSpace(input_dim=32, n_components=16)
@@ -1317,6 +1476,7 @@ class TestVTCFeatureSpace:
 
 class TestMemoryBridge:
     """Tests for m t l bridge."""
+
     def test_initialization(self):
         """Test initialization."""
         mtl = MemoryBridge(vtc_dim=32, embedding_dim=64)
@@ -1387,6 +1547,7 @@ class TestMemoryBridge:
 
 class TestVisualCortex:
     """Tests for visual cortex."""
+
     def test_see_returns_percept(self, occipital, sample_image):
         """VisualCortex.see should return a VisualPercept."""
         cortex = VisualCortex(occipital, embeddings=None, network=None)
@@ -1431,6 +1592,7 @@ class TestVisualCortex:
 
 class TestImageUtils:
     """Tests for image utils."""
+
     def test_load_image(self, tmp_path):
         """load_image should load a valid image file."""
         from PIL import Image
@@ -1484,5 +1646,199 @@ class TestImageUtils:
         img = np.zeros((640, 480, 3), dtype=np.uint8)
         result = resize_for_vision(img, max_dim=320)
         assert result.shape[2] == 3
+
+
+# ─── Chromatic vision (opponent channels) ───────────────────────────
+
+
+class TestChromaticVision:
+    """V1's opponent-colour channels — the red-green (L−M) and
+    blue-yellow (S−(L+M)) streams that give her real colour vision.
+
+    A chromatic boundary at near-equal luminance still produces
+    oriented features through the opponent channels — the
+    double-opponent complement of real V1.
+    """
+
+    @staticmethod
+    def _boundary_frame(left: tuple, right: tuple, boundary: int = 36) -> np.ndarray:
+        """A 64×64 frame with a hard vertical colour boundary at a
+        column that lands *inside* patch interiors (patches tile every
+        8 px, so a boundary at 32 would sit between patches)."""
+        frame = np.zeros((64, 64, 3), dtype=np.uint8)
+        frame[:, :boundary] = left
+        frame[:, boundary:] = right
+        return frame
+
+    @staticmethod
+    def _channel_counts(field) -> dict[str, int]:
+        counts: dict[str, int] = {"lum": 0, "rg": 0, "by": 0}
+        for f in field.features:
+            counts[f.channel] = counts.get(f.channel, 0) + 1
+        return counts
+
+    def test_chromatic_boundary_fires_opponent_channels(self) -> None:
+        """A red|green edge produces opponent-channel features."""
+        v1 = V1Model(seed=42, orientations=4, scales=2, phases=2, patch_size=8)
+        frame = self._boundary_frame((160, 80, 60), (80, 176, 60))
+        field = v1.process(frame, learn=False)
+        counts = self._channel_counts(field)
+        assert field.chromatic_features > 0
+        assert counts["rg"] > 0, "red-green edge should drive the L−M channel"
+        assert field.chromatic_features == counts["rg"] + counts["by"]
+
+    def test_achromatic_world_yields_no_chromatic_features(self) -> None:
+        """A grayscale frame drives zero opponent response — the chroma
+        gate must not threshold noise into phantom colour."""
+        v1 = V1Model(seed=42, orientations=4, scales=2, phases=2, patch_size=8)
+        gray = np.tile(np.linspace(0, 255, 64).astype(np.uint8)[None, :, None], (64, 1, 3))
+        field = v1.process(gray, learn=False)
+        assert field.chromatic_features == 0
+        assert all(f.channel == "lum" for f in field.features)
+
+    def test_contour_color_attribution(self) -> None:
+        """A contour spanning a colour boundary names the colours on it."""
+        v1 = V1Model(seed=42, orientations=4, scales=2, phases=2, patch_size=8)
+        frame = self._boundary_frame((160, 80, 60), (80, 176, 60))
+        field = v1.process(frame, learn=False)
+        assert field.contours, "a colour edge should group into a contour"
+        colors = [c.color for c in field.contours]
+        assert any(c for c in colors), "contours should carry colour names"
+        # The boundary contour sits between the two sides — its name
+        # should reference warm (red/orange/brown) or cool (green) hues.
+        joined = " ".join(colors)
+        warm = ("red" in joined) or ("orange" in joined) or ("brown" in joined)
+        cool = "green" in joined
+        assert warm or cool, f"contour colours should be meaningful: {colors}"
+
+    def test_p_pathway_consumes_k_blue_yellow(self) -> None:
+        """The LGN koniocellular signal feeds V1's blue-yellow channel."""
+        from occipital_lobe.lgn import LGNRelay
+
+        v1 = V1Model(seed=42, orientations=4, scales=2, phases=2, patch_size=8)
+        lgn = LGNRelay()
+        frame = self._boundary_frame((60, 80, 200), (200, 200, 60))
+        lgn_out = lgn.process(frame)
+        # The K signal is signed — the yellow half must not be clipped.
+        assert lgn_out.k_blue_yellow.min() < 0
+        field = v1.process_p_pathway(lgn_out.p_color, learn=False, k_by=lgn_out.k_blue_yellow)
+        assert field.chromatic_features > 0
+
+    def test_p_pathway_without_k_falls_back_to_rgb(self) -> None:
+        """Without the LGN signal, blue-yellow is computed from P colour."""
+        v1 = V1Model(seed=42, orientations=4, scales=2, phases=2, patch_size=8)
+        frame = self._boundary_frame((60, 80, 200), (200, 200, 60)).astype(np.float32) / 255.0
+        field = v1.process_p_pathway(frame, learn=False)
+        assert field.chromatic_features > 0
+
+
+class TestColourPalette:
+    """The full-palette namer — lightness and saturation distinguish
+    what hue alone cannot (brown vs orange, pink vs red, black vs dark)."""
+
+    @pytest.mark.parametrize(
+        "hue,sat,val,expected",
+        [
+            (0.0, 0.9, 0.8, "red"),
+            (30.0, 0.6, 0.3, "brown"),  # dark orange
+            (350.0, 0.3, 0.9, "pink"),  # pale red
+            (270.0, 0.7, 0.5, "violet"),
+            (0.0, 0.05, 0.05, "black"),  # near-zero light
+            (0.0, 0.05, 0.9, "white"),  # bright achromatic
+            (0.0, 0.05, 0.4, "gray"),  # mid achromatic
+            (100.0, 0.8, 0.6, "green"),
+            (180.0, 0.7, 0.6, "cyan"),
+            (310.0, 0.8, 0.6, "magenta"),
+            (50.0, 0.9, 0.7, "yellow"),
+        ],
+    )
+    def test_name_color(self, hue: float, sat: float, val: float, expected: str) -> None:
+        from occipital_lobe.v1 import name_color
+
+        assert name_color(hue, sat, val) == expected
+
+
+class TestSpatialColorScene:
+    """The spatial colour map flows scene → metadata → language."""
+
+    def _make_color_info(self, regions: dict[str, str]) -> ColorInfo:
+        return ColorInfo(
+            dominant_color="brown",
+            light_level="bright",
+            brightness=0.7,
+            mean_saturation=0.4,
+            warmth="warm",
+            regions=regions,
+        )
+
+    def test_regions_reach_the_scene(self) -> None:
+        regions = {
+            "left": "green",
+            "center": "brown",
+            "right": "gray",
+            "top": "gray",
+            "bottom": "brown",
+        }
+        scene = _build_scene(self._make_color_info(regions), [], {}, [], 0, None)
+        assert scene.color_regions["left"] == "green"
+        meta = scene.as_metadata()
+        assert meta["regions"]["left"] == "green"
+
+    def test_regions_reach_memory_text(self) -> None:
+        regions = {
+            "left": "blue",
+            "center": "gray",
+            "right": "gray",
+            "top": "gray",
+            "bottom": "gray",
+        }
+        scene = _build_scene(self._make_color_info(regions), [], {}, [], 0, None)
+        assert "left=blue" in scene.memory_text()
+
+    def test_regions_reach_her_words(self) -> None:
+        """The composer surfaces spatial colour in her report."""
+        vocab = Vocabulary(seed=42)
+        emotion = EmotionalState(
+            label="calm",
+            nuance="baseline",
+            cognitive_style="steady",
+            valence=0.0,
+            alertness=0.5,
+            plasticity=0.5,
+            creativity=0.5,
+            caution=0.3,
+            openness_to_engage=0.7,
+        )
+        personality = PersonalityTraits(
+            openness=0.8,
+            conscientiousness=0.7,
+            extraversion=0.5,
+            agreeableness=0.7,
+            neuroticism=0.3,
+        )
+        regions = {
+            "left": "green",
+            "center": "gray",
+            "right": "gray",
+            "top": "gray",
+            "bottom": "gray",
+        }
+        scene = _build_scene(self._make_color_info(regions), [], {}, [], 0, None)
+        content = vocab.fill_slot(
+            "content",
+            {"vision_scene": scene.as_metadata()},
+            emotion,
+            personality,
+        )
+        assert "green on the left" in content, content
+
+    def test_dominant_region_not_repeated(self) -> None:
+        """A region matching the scene's dominant colour isn't recited."""
+        clause = Vocabulary._vision_regions_clause(
+            {"left": "green", "center": "gray"},
+            exclude={"green", "gray", "white", "black", "unknown"},
+        )
+        assert clause == ""
+
 
 pytestmark = pytest.mark.usefixtures("learned_sentiment")

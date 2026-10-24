@@ -446,14 +446,16 @@ impl ActiveZones {
 // Served by its own additive command (GET_ZONE_TRANSITIONS) for the
 // same reason as the sensor mask: the BodyState layouts are pinned by
 // desc_len arithmetic, so a new field is a new layout and a protocol
-// bump. A `u32` count per zone plus a `u64` total is 48 bytes on the
-// wire and changes nothing existing.
+// bump. A `u32` count plus a `u64` total per tracked state — twelve
+// bytes each — rides behind a count byte and changes nothing existing.
 
-/// How many distinct zones/phases are tracked. Sized to the
-/// `CognitiveZone` and `MentalPhase` discriminants; an index beyond
-/// this is ignored rather than panicking, since a new variant must not
-/// be able to fault the telemetry path.
-pub const TRACKED_STATES: usize = 8;
+/// How many distinct zones/phases are tracked. Sized to the wider of
+/// the two enums: `CognitiveZone` runs to `Sleeping = 8`, so nine slots
+/// are needed; `MentalPhase` tops out at `Overwhelmed = 7` and leaves
+/// index 8 unused. An index beyond this is ignored rather than
+/// panicking, since a new variant must not be able to fault the
+/// telemetry path.
+pub const TRACKED_STATES: usize = 9;
 
 /// Transition counts and accumulated dwell time, per state index.
 ///

@@ -549,91 +549,59 @@ class ProblemSolver:
         if problem.goal_type == GoalType.RESOLVE:
             # To resolve a contradiction, understand both sides first.
             if not self._concept_is_well_understood(problem.goal):
-                subproblems.append(Problem(
-                    goal=problem.goal,
-                    goal_type=GoalType.UNDERSTAND,
-                    reason=f"understand both sides of contradiction with {problem.secondary_goal}",
-                    secondary_goal="",
-                ))
+                subproblems.append(
+                    Problem(
+                        goal=problem.goal,
+                        goal_type=GoalType.UNDERSTAND,
+                        reason=(
+                            f"understand both sides of contradiction with {problem.secondary_goal}"
+                        ),
+                        secondary_goal="",
+                    )
+                )
             if problem.secondary_goal and not self._concept_is_well_understood(
                 problem.secondary_goal
             ):
-                subproblems.append(Problem(
-                    goal=problem.secondary_goal,
-                    goal_type=GoalType.UNDERSTAND,
-                    reason=f"understand both sides of contradiction with {problem.goal}",
-                    secondary_goal="",
-                ))
+                subproblems.append(
+                    Problem(
+                        goal=problem.secondary_goal,
+                        goal_type=GoalType.UNDERSTAND,
+                        reason=f"understand both sides of contradiction with {problem.goal}",
+                        secondary_goal="",
+                    )
+                )
             return subproblems
 
         if problem.goal_type == GoalType.COMPARE:
             # To compare, understand both concepts first.
             if not self._concept_is_well_understood(problem.goal):
-                subproblems.append(Problem(
-                    goal=problem.goal,
-                    goal_type=GoalType.UNDERSTAND,
-                    reason=(
-                        f"understand {problem.goal} for comparison "
-                        f"with {problem.secondary_goal}"
-                    ),
-                ))
+                subproblems.append(
+                    Problem(
+                        goal=problem.goal,
+                        goal_type=GoalType.UNDERSTAND,
+                        reason=(
+                            f"understand {problem.goal} for comparison "
+                            f"with {problem.secondary_goal}"
+                        ),
+                    )
+                )
             if problem.secondary_goal and not self._concept_is_well_understood(
                 problem.secondary_goal
             ):
-                subproblems.append(Problem(
-                    goal=problem.secondary_goal,
-                    goal_type=GoalType.UNDERSTAND,
-                    reason=(
-                        f"understand {problem.secondary_goal} for "
-                        f"comparison with {problem.goal}"
-                    ),
-                ))
+                subproblems.append(
+                    Problem(
+                        goal=problem.secondary_goal,
+                        goal_type=GoalType.UNDERSTAND,
+                        reason=(
+                            f"understand {problem.secondary_goal} for "
+                            f"comparison with {problem.goal}"
+                        ),
+                    )
+                )
             return subproblems
 
         # UNDERSTAND, ACHIEVE, EXPLAIN: find prerequisites.
-        # DEPENDS_ON edges (outgoing): the goal depends on these.
-        for edge in self.network.get_edges(problem.goal, "out"):
-            if edge.relation == RelationType.DEPENDS_ON:
-                if not self._concept_is_well_understood(edge.target):
-                    subproblems.append(Problem(
-                        goal=edge.target,
-                        goal_type=GoalType.UNDERSTAND,
-                        reason=f"{problem.goal} depends on understanding {edge.target}",
-                    ))
-
-        # ENABLES edges (incoming): these concepts enable the goal.
-        for edge in self.network.get_edges(problem.goal, "in"):
-            if edge.relation == RelationType.ENABLES:
-                if not self._concept_is_well_understood(edge.source):
-                    subproblems.append(Problem(
-                        goal=edge.source,
-                        goal_type=GoalType.UNDERSTAND,
-                        reason=f"{edge.source} enables {problem.goal}",
-                    ))
-
-        # For ACHIEVE goals: find causes (the means to the goal).
-        if problem.goal_type == GoalType.ACHIEVE:
-            for edge in self.network.get_edges(problem.goal, "in"):
-                if edge.relation in (RelationType.CAUSES, RelationType.LEADS_TO):
-                    if not self._concept_is_well_understood(edge.source):
-                        subproblems.append(Problem(
-                            goal=edge.source,
-                            goal_type=GoalType.UNDERSTAND,
-                            reason=(
-                                f"{edge.source} causes {problem.goal} — "
-                                f"understanding it is the means"
-                            ),
-                        ))
-
-        # For EXPLAIN goals: find causes (the explanations).
-        if problem.goal_type == GoalType.EXPLAIN:
-            for edge in self.network.get_edges(problem.goal, "in"):
-                if edge.relation == RelationType.CAUSES:
-                    subproblems.append(Problem(
-                        goal=edge.source,
-                        goal_type=GoalType.UNDERSTAND,
-                        reason=f"{edge.source} is a possible cause of {problem.goal}",
-                    ))
+        self._decompose_prerequisites(problem, subproblems)
 
         # Deduplicate by goal.
         seen: set[str] = set()
@@ -643,6 +611,68 @@ class ProblemSolver:
                 seen.add(sub.goal)
                 unique.append(sub)
         return unique
+
+    def _decompose_prerequisites(
+        self,
+        problem: Problem,
+        subproblems: list[Problem],
+    ) -> None:
+        """Append unsatisfied prerequisites found via network edges.
+
+        DEPENDS_ON edges (outgoing): the goal depends on these.
+        ENABLES edges (incoming): these concepts enable the goal.
+        For ACHIEVE goals, causes are the means to the goal; for
+        EXPLAIN goals, causes are the explanations.
+        """
+        for edge in self.network.get_edges(problem.goal, "out"):
+            if edge.relation == RelationType.DEPENDS_ON:
+                if not self._concept_is_well_understood(edge.target):
+                    subproblems.append(
+                        Problem(
+                            goal=edge.target,
+                            goal_type=GoalType.UNDERSTAND,
+                            reason=f"{problem.goal} depends on understanding {edge.target}",
+                        )
+                    )
+
+        for edge in self.network.get_edges(problem.goal, "in"):
+            if edge.relation == RelationType.ENABLES:
+                if not self._concept_is_well_understood(edge.source):
+                    subproblems.append(
+                        Problem(
+                            goal=edge.source,
+                            goal_type=GoalType.UNDERSTAND,
+                            reason=f"{edge.source} enables {problem.goal}",
+                        )
+                    )
+
+        # For ACHIEVE goals: find causes (the means to the goal).
+        if problem.goal_type == GoalType.ACHIEVE:
+            for edge in self.network.get_edges(problem.goal, "in"):
+                if edge.relation in (RelationType.CAUSES, RelationType.LEADS_TO):
+                    if not self._concept_is_well_understood(edge.source):
+                        subproblems.append(
+                            Problem(
+                                goal=edge.source,
+                                goal_type=GoalType.UNDERSTAND,
+                                reason=(
+                                    f"{edge.source} causes {problem.goal} — "
+                                    f"understanding it is the means"
+                                ),
+                            )
+                        )
+
+        # For EXPLAIN goals: find causes (the explanations).
+        if problem.goal_type == GoalType.EXPLAIN:
+            for edge in self.network.get_edges(problem.goal, "in"):
+                if edge.relation == RelationType.CAUSES:
+                    subproblems.append(
+                        Problem(
+                            goal=edge.source,
+                            goal_type=GoalType.UNDERSTAND,
+                            reason=f"{edge.source} is a possible cause of {problem.goal}",
+                        )
+                    )
 
     # ─── Operator application ─────────────────────────────────────
 
@@ -682,7 +712,9 @@ class ProblemSolver:
             try:
                 available = list(ReasoningStrategy)
                 selected_strategy = self.meta_reasoning.meta_reason(
-                    problem.goal, available, confidence=0.5,
+                    problem.goal,
+                    available,
+                    confidence=0.5,
                 )
             except Exception:  # noqa: BLE001
                 selected_strategy = None
@@ -693,11 +725,15 @@ class ProblemSolver:
             if reason_step is not None:
                 # Boost confidence if MetaReasoning selected deductive/analogical.
                 if selected_strategy is not None and selected_strategy.value in (
-                    "deductive", "analogical",
+                    "deductive",
+                    "analogical",
                 ):
                     reason_step.confidence = min(1.0, reason_step.confidence + 0.1)
                 steps.append(reason_step)
-                self._record_meta(problem, "reason", reason_step.confidence, True)
+                # reason_about composes deductive/causal/analogical/
+                # abductive passes — no single strategy names it, so
+                # record it as synthesis.
+                self._record_meta(problem, "synthesis", reason_step.confidence, True)
 
         # Operator 2: Find prerequisites.
         prereq_step = self._op_find_prerequisites(problem)
@@ -735,7 +771,9 @@ class ProblemSolver:
 
         # Operator 6+: Conditional operators (goal-type-dependent).
         self._apply_conditional_operators(
-            problem, steps, selected_strategy,
+            problem,
+            steps,
+            selected_strategy,
         )
 
         return steps
@@ -779,7 +817,9 @@ class ProblemSolver:
 
         # Operator 10: Counterfactual analysis (if available).
         if self.counterfactual is not None and problem.goal_type in (
-            GoalType.UNDERSTAND, GoalType.EXPLAIN, GoalType.ACHIEVE,
+            GoalType.UNDERSTAND,
+            GoalType.EXPLAIN,
+            GoalType.ACHIEVE,
         ):
             cf_step = self._op_counterfactual(problem)
             if cf_step is not None:
@@ -789,17 +829,28 @@ class ProblemSolver:
                 self._record_meta(problem, "counterfactual", cf_step.confidence, True)
 
     def _record_meta(
-        self, problem: Problem, strategy: str, confidence: float, success: bool,
+        self,
+        problem: Problem,
+        strategy: str,
+        confidence: float,
+        success: bool,
     ) -> None:
         """Record a reasoning attempt in MetaReasoning for learning."""
         if self.meta_reasoning is None:
             return
+        strategy_enum = ReasoningStrategy._value2member_map_.get(strategy)
+        if not isinstance(strategy_enum, ReasoningStrategy):
+            # Telemetry for a strategy the enum doesn't model — a
+            # learning-signal miss, not a failure.
+            return
         try:
-            strategy_enum = ReasoningStrategy(strategy)
             self.meta_reasoning.record_result(
-                strategy_enum, problem.goal, confidence, success,
+                strategy_enum,
+                problem.goal,
+                confidence,
+                success,
             )
-        except (ValueError, Exception) as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "reasoning.problem_solving._record_meta",
                 e,
@@ -940,34 +991,23 @@ class ProblemSolver:
                 RelationType.CONTRADICTS,
                 RelationType.OPPOSITE_OF,
             ):
-                evidence.append(
-                    f"{edge.source} {edge.relation.value} {edge.target}"
-                )
+                evidence.append(f"{edge.source} {edge.relation.value} {edge.target}")
 
         knowledge: list[tuple[str, str, float]] = []
         if support_a > support_b:
-            knowledge.append(
-                ("stronger_than", problem.secondary_goal, support_a - support_b)
-            )
-            result = (
-                f"{problem.goal} is better supported "
-                f"({support_a:.2f} vs {support_b:.2f})"
-            )
+            knowledge.append(("stronger_than", problem.secondary_goal, support_a - support_b))
+            result = f"{problem.goal} is better supported ({support_a:.2f} vs {support_b:.2f})"
         elif support_b > support_a:
-            knowledge.append(
-                ("weaker_than", problem.secondary_goal, support_b - support_a)
-            )
+            knowledge.append(("weaker_than", problem.secondary_goal, support_b - support_a))
             result = (
-                f"{problem.secondary_goal} is better supported "
-                f"({support_b:.2f} vs {support_a:.2f})"
+                f"{problem.secondary_goal} is better supported ({support_b:.2f} vs {support_a:.2f})"
             )
         else:
             result = f"both sides equally supported ({support_a:.2f})"
 
         return SolutionStep(
             description=(
-                f"resolve contradiction between {problem.goal} "
-                f"and {problem.secondary_goal}"
+                f"resolve contradiction between {problem.goal} and {problem.secondary_goal}"
             ),
             operator="resolve_contradiction",
             result=result,
@@ -1016,11 +1056,11 @@ class ProblemSolver:
                 continue
             try:
                 belief = self.probabilistic.get_belief(
-                    problem.goal, edge.relation.value, edge.target,
+                    problem.goal,
+                    edge.relation.value,
+                    edge.target,
                 )
-                knowledge.append(
-                    (edge.relation.value, edge.target, belief.mean)
-                )
+                knowledge.append((edge.relation.value, edge.target, belief.mean))
                 evidence.append(
                     f"{problem.goal} {edge.relation.value} {edge.target} "
                     f"(p={belief.mean:.2f}, conf={belief.confidence:.2f})"

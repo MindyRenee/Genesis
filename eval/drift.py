@@ -115,20 +115,30 @@ def compare_snapshots(baseline: Snapshot, current: Snapshot) -> DriftReport:
     for name, base_val in baseline.chemicals.items():
         cur_val = current.chemicals.get(name)
         if cur_val is None:
-            report.entries.append(DriftEntry(
-                field=f"chem.{name}", baseline=base_val,
-                current="missing", delta="missing", severity="fail",
-            ))
+            report.entries.append(
+                DriftEntry(
+                    field=f"chem.{name}",
+                    baseline=base_val,
+                    current="missing",
+                    delta="missing",
+                    severity="fail",
+                )
+            )
             continue
         delta = cur_val - base_val
         if name in CIRCADIAN_SENSITIVE:
             sev = _band(delta, _CIRCADIAN_WARN[name], _CIRCADIAN_FAIL[name])
         else:
             sev = _band(delta, _CHEM_WARN, _CHEM_FAIL)
-        report.entries.append(DriftEntry(
-            field=f"chem.{name}", baseline=_fmt(base_val),
-            current=_fmt(cur_val), delta=_fmt(delta), severity=sev,
-        ))
+        report.entries.append(
+            DriftEntry(
+                field=f"chem.{name}",
+                baseline=_fmt(base_val),
+                current=_fmt(cur_val),
+                delta=_fmt(delta),
+                severity=sev,
+            )
+        )
 
     for sig, (warn, fail) in _SCALAR_BANDS.items():
         base_sig = getattr(baseline, sig, None)
@@ -136,20 +146,30 @@ def compare_snapshots(baseline: Snapshot, current: Snapshot) -> DriftReport:
         if base_sig is None or cur_sig is None:
             continue
         delta = cur_sig - base_sig
-        report.entries.append(DriftEntry(
-            field=sig, baseline=_fmt(base_sig), current=_fmt(cur_sig),
-            delta=_fmt(delta), severity=_band(delta, warn, fail),
-        ))
+        report.entries.append(
+            DriftEntry(
+                field=sig,
+                baseline=_fmt(base_sig),
+                current=_fmt(cur_sig),
+                delta=_fmt(delta),
+                severity=_band(delta, warn, fail),
+            )
+        )
 
     # Phase must match exactly — a resting-phase flip means the
     # threshold classifier or the underlying dynamics moved.
     phase_sev = "ok" if baseline.phase == current.phase else "fail"
     base_phase = PHASE_NAMES.get(baseline.phase, str(baseline.phase))
     cur_phase = PHASE_NAMES.get(current.phase, str(current.phase))
-    report.entries.append(DriftEntry(
-        field="phase", baseline=base_phase, current=cur_phase,
-        delta="changed" if phase_sev == "fail" else "same", severity=phase_sev,
-    ))
+    report.entries.append(
+        DriftEntry(
+            field="phase",
+            baseline=base_phase,
+            current=cur_phase,
+            delta="changed" if phase_sev == "fail" else "same",
+            severity=phase_sev,
+        )
+    )
 
     report.passed = not report.failures
     return report
@@ -161,10 +181,15 @@ def check_snapshot_vs_defaults(snapshot: Snapshot) -> DriftReport:
     for name, default in DEFAULT_BASELINES.items():
         cur = snapshot.chemicals.get(name)
         if cur is None:
-            report.entries.append(DriftEntry(
-                field=f"chem.{name}", baseline=default,
-                current="missing", delta="missing", severity="fail",
-            ))
+            report.entries.append(
+                DriftEntry(
+                    field=f"chem.{name}",
+                    baseline=default,
+                    current="missing",
+                    delta="missing",
+                    severity="fail",
+                )
+            )
             continue
         if default == 0.0:
             # Stress hormones rest at zero; anything above the cap
@@ -175,15 +200,24 @@ def check_snapshot_vs_defaults(snapshot: Snapshot) -> DriftReport:
             tol = _SANITY_CIRCADIAN_TOL.get(name, _SANITY_TOL)
             delta = cur - default
             sev = _band(delta, tol / 2.0, tol)
-        report.entries.append(DriftEntry(
-            field=f"chem.{name}", baseline=default,
-            current=_fmt(cur), delta=_fmt(delta), severity=sev,
-        ))
+        report.entries.append(
+            DriftEntry(
+                field=f"chem.{name}",
+                baseline=default,
+                current=_fmt(cur),
+                delta=_fmt(delta),
+                severity=sev,
+            )
+        )
     if snapshot.coupling_drift >= 0.08:
-        report.entries.append(DriftEntry(
-            field="coupling_drift", baseline=0.0,
-            current=_fmt(snapshot.coupling_drift), delta=_fmt(snapshot.coupling_drift),
-            severity="fail",
-        ))
+        report.entries.append(
+            DriftEntry(
+                field="coupling_drift",
+                baseline=0.0,
+                current=_fmt(snapshot.coupling_drift),
+                delta=_fmt(snapshot.coupling_drift),
+                severity="fail",
+            )
+        )
     report.passed = not report.failures
     return report

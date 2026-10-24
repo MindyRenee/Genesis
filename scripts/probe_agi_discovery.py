@@ -56,13 +56,8 @@ def make_trial(domain: str, target: str, feature_value: bool) -> Trial:
     return Trial(domain, target, feature_value, actions)
 
 
-def environment_step(
-    rule: HiddenRule, trial: Trial, action: str
-) -> dict[str, Any]:
-    expected_prefix = (
-        rule.true_action_prefix if trial.feature_value
-        else rule.false_action_prefix
-    )
+def environment_step(rule: HiddenRule, trial: Trial, action: str) -> dict[str, Any]:
+    expected_prefix = rule.true_action_prefix if trial.feature_value else rule.false_action_prefix
     expected_action = f"{expected_prefix}{trial.target}"
     success = action == expected_action
     # The environment exposes only consequences, never the hidden rule.
@@ -104,9 +99,7 @@ def explore(
         # Genesis receives positive and negative evidence rather than being
         # handed the answer.
         for action in trial.actions:
-            before = {
-                rule.feature_key: trial.feature_value
-            }
+            before = {rule.feature_key: trial.feature_value}
             outcome = environment_step(rule, trial, action)
             after = dict(outcome["state"])
             transition = competence.record_transition(
@@ -129,25 +122,29 @@ def explore(
                     goal_conditions=(GoalCondition("solved", "eq", True),),
                     verification="external",
                 )
-                results.append({
+                results.append(
+                    {
+                        "domain": trial.domain,
+                        "target": trial.target,
+                        "feature_value": trial.feature_value,
+                        "action": action,
+                        "success": True,
+                        "transition_score": transition.score,
+                        "skill_created": skill is not None,
+                    }
+                )
+                break
+            results.append(
+                {
                     "domain": trial.domain,
                     "target": trial.target,
                     "feature_value": trial.feature_value,
                     "action": action,
-                    "success": True,
+                    "success": False,
                     "transition_score": transition.score,
-                    "skill_created": skill is not None,
-                })
-                break
-            results.append({
-                "domain": trial.domain,
-                "target": trial.target,
-                "feature_value": trial.feature_value,
-                "action": action,
-                "success": False,
-                "transition_score": transition.score,
-                "skill_created": False,
-            })
+                    "skill_created": False,
+                }
+            )
     return results
 
 
@@ -160,8 +157,10 @@ def held_out_exploitation(
     predictions = {}
     for action in trial.actions:
         predictions[action] = [
-            p.to_dict() for p in competence.predict(
-                context, action,
+            p.to_dict()
+            for p in competence.predict(
+                context,
+                action,
                 {rule.feature_key: trial.feature_value},
             )
         ]
@@ -172,10 +171,7 @@ def held_out_exploitation(
     # hidden answer.
     selected = None
     for action, preds in predictions.items():
-        if any(
-            p["key"] == "solved" and p["expected"] is True
-            for p in preds
-        ):
+        if any(p["key"] == "solved" and p["expected"] is True for p in preds):
             selected = action
             break
 
@@ -213,9 +209,7 @@ def main() -> None:
     exploration = explore(competence, rule, training)
 
     # Held-out binding in the same rule family.
-    held_out = held_out_exploitation(
-        competence, rule, make_trial("lattice", "merek", True)
-    )
+    held_out = held_out_exploitation(competence, rule, make_trial("lattice", "merek", True))
 
     # Cross-domain test. The environment has an analogous rule, but the
     # surface action/state vocabulary is different.
@@ -234,9 +228,7 @@ def main() -> None:
 
     # Persistence is tested without retaining the Python object.
     restored = TaskCompetence.from_dict(competence.to_dict())
-    restored_held_out = held_out_exploitation(
-        restored, rule, make_trial("lattice", "nema", True)
-    )
+    restored_held_out = held_out_exploitation(restored, rule, make_trial("lattice", "nema", True))
 
     report = {
         "probe": "agi-trajectory-discovery-v2",
@@ -248,9 +240,7 @@ def main() -> None:
         "held_out": held_out,
         "cross_domain_transfer": {
             "matches": transfer_matches,
-            "available": any(
-                m["source_domain"] != "archive" for m in transfer_matches
-            ),
+            "available": any(m["source_domain"] != "archive" for m in transfer_matches),
             "surface_vocabularies_disjoint": True,
         },
         "restored_held_out": restored_held_out,

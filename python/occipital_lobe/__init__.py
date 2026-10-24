@@ -351,11 +351,18 @@ Top-level modules referenced by this subsystem:
     (perception/) retina.py
         Retina — zero-copy access to the Rust retina shared-memory
         camera feed. This is the eye: the retina captures photons
-        (camera frames) and passes them to V1 for processing.
+        (camera frames) and passes them to the LGN for processing.
         Anatomically the retina is not part of the occipital subsystem
         (it's in the eye), but functionally it's the input to the
-        visual pathway. The LGN (lateral geniculate nucleus) relay
-        is not separately modeled — the retina feeds V1 directly.
+        visual pathway.
+
+    (perception/) lgn.py
+        LGN (Lateral Geniculate Nucleus) — thalamic visual relay with
+        parallel M/P/K pathway separation. Receives retinal input and
+        separates it into magnocellular (motion/luminance), parvocellular
+        (color/detail), and koniocellular (blue-yellow) streams. Each
+        pathway projects to different layers of V1, matching the biological
+        organization of the primate LGN.
 
     (perception/) vision.py
         Vision — the bridge between the raw camera feed (retina.py)
@@ -385,9 +392,30 @@ from __future__ import annotations
 from _views import view_getattr
 
 from .image_utils import decode_image_bytes, load_image, resize_for_vision
+from .lgn import LGNOutput, LGNRelay, lgn_from_retina
 from .v1 import V1Model, VisualContour, VisualFeature, VisualField
 from .v4 import V4Model
 from .visual_cortex import VisualCortex, VisualPercept
+from .visual_pathway import VisualPathway, VisualPathwayOutput, create_visual_pathway
+
+__all__ = [
+    "LGNOutput",
+    "LGNRelay",
+    "V1Model",
+    "V4Model",
+    "VisualContour",
+    "VisualCortex",
+    "VisualFeature",
+    "VisualField",
+    "VisualPathway",
+    "VisualPathwayOutput",
+    "VisualPercept",
+    "create_visual_pathway",
+    "decode_image_bytes",
+    "lgn_from_retina",
+    "load_image",
+    "resize_for_vision",
+]
 
 # The ventral "what" stream spans the occipital-temporal boundary: V1
 # and V4 are occipital, but VTC and the MTL bridge are anatomically
@@ -409,6 +437,12 @@ _EXPORTS: dict[str, str] = {
     "MotionField": "occipital_lobe.motion",
     "MotionProcessor": "occipital_lobe.motion",
     "MotionRegion": "occipital_lobe.motion",
+    # MSTd — two-view geometry across successive looks (epipolar
+    # constraint, essential/homography estimation, heading and
+    # depth-from-parallax). Co-claimed with parietal_lobe, the
+    # dorsal stream it feeds.
+    "EpipolarProcessor": "occipital_lobe.epipolar",
+    "TwoViewReport": "occipital_lobe.epipolar",
     "MemoryBridge": "temporal_lobe.mtl_bridge",
     "Retina": "occipital_lobe.perception.retina",
     "TrainingExample": "temporal_lobe.mtl_bridge",
@@ -424,23 +458,57 @@ _EXPORTS: dict[str, str] = {
     "DetectedFace": "occipital_lobe.perception.recognition",
     "FaceRecognizer": "occipital_lobe.perception.recognition",
     "KnownFace": "occipital_lobe.perception.recognition",
+    # The ocular media — one eye, one aperture: pupil→irradiance
+    # (troland), aperture+focus→defocus, lid transmission.
+    "OpticalResult": "occipital_lobe.perception.optics",
+    "defocus_sigma": "occipital_lobe.perception.optics",
+    "irradiance_gain": "occipital_lobe.perception.optics",
+    "retinal_irradiance": "occipital_lobe.perception.optics",
+    # The illuminant/reflectance split — retinex E/ρ decomposition,
+    # von Kries chromatic adaptation, light direction, shadow
+    # candidates. The LGN/retina computation cortex inherits.
+    "Illumination": "occipital_lobe.perception.illumination",
+    # The cone transduction cascade — photoreceptor biochemistry
+    # behind the afferent signal.
+    "PhototransductionCascade": "occipital_lobe.perception.phototransduction",
+    "PhototransductionParams": "occipital_lobe.perception.phototransduction",
+    "PhototransductionState": "occipital_lobe.perception.phototransduction",
     # The region itself — the ventral visual stream as one object
     "OccipitalLobe": "occipital_lobe.occipital",
+    # LGN — thalamic visual relay with M/P/K pathway separation
+    "LGNOutput": "occipital_lobe.lgn",
+    "LGNRelay": "occipital_lobe.lgn",
+    "lgn_from_retina": "occipital_lobe.lgn",
+    # V4 — mid-level visual cortex (chromatic, shape processing)
+    "V4Model": "occipital_lobe.v4",
+    # Visual pathway orchestrator — retina → LGN → V1 → dorsal/ventral streams
+    "VisualPathway": "occipital_lobe.visual_pathway",
+    "VisualPathwayOutput": "occipital_lobe.visual_pathway",
+    "create_visual_pathway": "occipital_lobe.visual_pathway",
 }
 
 __all__ = [
     "DetectedFace",
+    "EpipolarProcessor",
     "FaceRecognizer",
+    "Illumination",
     "KnownFace",
+    "LGNOutput",
+    "LGNRelay",
     "MemoryBridge",
     "MotionCell",
     "MotionField",
     "MotionProcessor",
     "MotionRegion",
     "OccipitalLobe",
+    "OpticalResult",
     "PGOWave",
+    "PhototransductionCascade",
+    "PhototransductionParams",
+    "PhototransductionState",
     "Retina",
     "TrainingExample",
+    "TwoViewReport",
     "V1Model",
     "V4Model",
     "VTCFeatureSpace",
@@ -449,10 +517,17 @@ __all__ = [
     "VisualCortex",
     "VisualFeature",
     "VisualField",
+    "VisualPathway",
+    "VisualPathwayOutput",
     "VisualPercept",
+    "create_visual_pathway",
     "decode_image_bytes",
+    "defocus_sigma",
+    "irradiance_gain",
+    "lgn_from_retina",
     "load_image",
     "resize_for_vision",
+    "retinal_irradiance",
 ]
 
 __getattr__ = view_getattr(_EXPORTS, __name__)

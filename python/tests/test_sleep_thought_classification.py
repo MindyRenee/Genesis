@@ -146,9 +146,7 @@ def test_live_event_carries_the_dream_flag() -> None:
     """
     from frontal_lobe.inner_life import _LiveEvent
 
-    assert "is_dream" in _LiveEvent.__slots__, (
-        "the receiver reads is_dream off this object"
-    )
+    assert "is_dream" in _LiveEvent.__slots__, "the receiver reads is_dream off this object"
     assert _LiveEvent("x", "dream", True).is_dream is True
     assert _LiveEvent("x", "thought").is_dream is False
 
@@ -178,7 +176,8 @@ def test_describe_recent_thoughts_labels_both_populations() -> None:
     il = _inner_life()
     emotion = _emotion()
     il._record_thought(
-        SpontaneousThought(content="awake", trigger="spontaneous"), emotion,
+        SpontaneousThought(content="awake", trigger="spontaneous"),
+        emotion,
     )
     dream = SpontaneousThought(content="asleep", trigger="dream")
     dream.is_dream = True
@@ -276,9 +275,7 @@ def test_failed_summary_read_does_not_disable_sleep_detection() -> None:
     il._get_current_summary = lambda: None  # type: ignore[method-assign]
 
     il._is_mind_sleeping = lambda: True
-    assert il._sleep_state() is True, (
-        "no summary + mind says asleep must be asleep, not awake"
-    )
+    assert il._sleep_state() is True, "no summary + mind says asleep must be asleep, not awake"
 
     il._is_mind_sleeping = lambda: False
     assert il._sleep_state() is False
@@ -480,16 +477,12 @@ def test_agency_filter_uses_the_learning_flag() -> None:
 
     dream_reflection = _Item(["alpha"], is_dream=False, is_learning_target=False)
     assert il._absorb_subliminal(_GW([dream_reflection])) == 0
-    assert il.agency_topics == [], (
-        f"a dream reflection reached the learner: {il.agency_topics}"
-    )
+    assert il.agency_topics == [], f"a dream reflection reached the learner: {il.agency_topics}"
 
     in_sleep_dream = _Item(["beta"], is_dream=True, is_learning_target=False)
     hypnagogic = _Item(["gamma"], is_dream=False, is_learning_target=True)
     assert il._absorb_subliminal(_GW([in_sleep_dream, hypnagogic])) == 1
-    assert il.agency_topics == ["gamma"], (
-        "only the hypnagogic topic may reach the learner"
-    )
+    assert il.agency_topics == ["gamma"], "only the hypnagogic topic may reach the learner"
 
 
 def test_absorb_subliminal_permits_content_with_no_flag() -> None:
@@ -511,3 +504,42 @@ def test_absorb_subliminal_permits_content_with_no_flag() -> None:
 
     assert il._absorb_subliminal(_GW()) == 1
     assert il.agency_topics == ["alpha"]
+
+
+def test_dream_chain_walks_past_its_anchor(monkeypatch) -> None:
+    """Regression: seeded dream steps used to re-seed their own anchor.
+
+    `_extract_concepts_from_thought` finds the anchor concept first —
+    it leads the thought text — so re-seeding with the raw list meant
+    every step generated another thought about the same concept: the
+    dream loop (chains of "Cat is the creator...", "Soccer is a
+    sport..." forever). The re-seed now drops the thought's anchor so
+    the walk follows the association it just made.
+    """
+    import frontal_lobe.inner_life as il_mod
+    from thalamus.brain_waves import SleepStage
+
+    monkeypatch.setattr(il_mod, "CHAIN_THOUGHT_DELAY", 0.0)
+    il = _inner_life()
+    il._get_emotion = lambda: _emotion()
+
+    # Deterministic walk: alpha -> beta -> gamma via the test edges.
+    monkeypatch.setattr(il._rng, "random", lambda: 0.5)
+    il._current_chain_concepts = ["alpha"]
+    il._continue_dream_chain(
+        _emotion(),
+        is_lucid=False,
+        is_rem=False,
+        stage=SleepStage.N1,
+        pgo=None,
+        chain_id=0,
+        max_len=4,
+    )
+
+    with il._thoughts_lock:
+        topics = [t.metadata.get("topic") for t in il._thoughts]
+
+    assert len(topics) >= 2, f"chain too short to observe a walk: {topics}"
+    assert not all(t == "alpha" for t in topics), (
+        f"dream chain pinned to its anchor — the re-seed loop: {topics}"
+    )

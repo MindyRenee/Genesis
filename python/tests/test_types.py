@@ -14,6 +14,7 @@ from genesis_client.types import (
     BodyState,
     CoreState,
     Episode,
+    FieldProbeSignature,
     MemoryStats,
     NeuroSummary,
     PhaseInfo,
@@ -101,17 +102,17 @@ def test_memory_stats_too_short() -> None:
 def test_plasticity_profile_unpack() -> None:
     """A 40-byte buffer unpacks correctly."""
     data = bytearray()
-    data.extend(_F32.pack(0.72))   # plasticity_gate
-    data.extend(_F32.pack(0.65))   # bdnf_effective
-    data.extend(_F32.pack(0.60))   # bdnf_tonic
-    data.extend(_F32.pack(0.20))   # cortisol_effective
-    data.extend(_F32.pack(0.18))   # cortisol_tonic
-    data.extend(_F32.pack(0.55))   # dopamine_effective
-    data.extend(_F32.pack(0.50))   # serotonin_effective
+    data.extend(_F32.pack(0.72))  # plasticity_gate
+    data.extend(_F32.pack(0.65))  # bdnf_effective
+    data.extend(_F32.pack(0.60))  # bdnf_tonic
+    data.extend(_F32.pack(0.20))  # cortisol_effective
+    data.extend(_F32.pack(0.18))  # cortisol_tonic
+    data.extend(_F32.pack(0.55))  # dopamine_effective
+    data.extend(_F32.pack(0.50))  # serotonin_effective
     data.extend(_F32.pack(0.003))  # coupling_drift
-    data.extend(_F32.pack(0.98))   # mean_receptor_sensitivity
-    data.append(2)                 # emergent_phase (flow)
-    data.extend(b"\x00\x00\x00")   # _pad
+    data.extend(_F32.pack(0.98))  # mean_receptor_sensitivity
+    data.append(2)  # emergent_phase (flow)
+    data.extend(b"\x00\x00\x00")  # _pad
 
     profile = PlasticityProfile.unpack(bytes(data))
     assert approx_equal(profile.plasticity_gate, 0.72)
@@ -139,16 +140,16 @@ def test_plasticity_profile_too_short() -> None:
 def test_plasticity_profile_posture_receptive() -> None:
     """High plasticity gate + low cortisol tonic → RECEPTIVE."""
     data = bytearray()
-    data.extend(_F32.pack(0.70))   # plasticity_gate (high)
-    data.extend(_F32.pack(0.65))   # bdnf_effective
-    data.extend(_F32.pack(0.60))   # bdnf_tonic
-    data.extend(_F32.pack(0.03))   # cortisol_effective
-    data.extend(_F32.pack(0.03))   # cortisol_tonic (low — envelope is ~0.02 rest/0.08 peak)
-    data.extend(_F32.pack(0.55))   # dopamine_effective
-    data.extend(_F32.pack(0.50))   # serotonin_effective
-    data.extend(_F32.pack(0.0))    # coupling_drift
-    data.extend(_F32.pack(0.98))   # mean_receptor_sensitivity
-    data.append(2)                 # emergent_phase
+    data.extend(_F32.pack(0.70))  # plasticity_gate (high)
+    data.extend(_F32.pack(0.65))  # bdnf_effective
+    data.extend(_F32.pack(0.60))  # bdnf_tonic
+    data.extend(_F32.pack(0.03))  # cortisol_effective
+    data.extend(_F32.pack(0.03))  # cortisol_tonic (low — envelope is ~0.02 rest/0.08 peak)
+    data.extend(_F32.pack(0.55))  # dopamine_effective
+    data.extend(_F32.pack(0.50))  # serotonin_effective
+    data.extend(_F32.pack(0.0))  # coupling_drift
+    data.extend(_F32.pack(0.98))  # mean_receptor_sensitivity
+    data.append(2)  # emergent_phase
     data.extend(b"\x00\x00\x00")
 
     profile = PlasticityProfile.unpack(bytes(data))
@@ -158,16 +159,16 @@ def test_plasticity_profile_posture_receptive() -> None:
 def test_plasticity_profile_posture_protective() -> None:
     """High cortisol tonic + low plasticity gate → PROTECTIVE."""
     data = bytearray()
-    data.extend(_F32.pack(0.25))   # plasticity_gate (low)
-    data.extend(_F32.pack(0.15))   # bdnf_effective
-    data.extend(_F32.pack(0.12))   # bdnf_tonic
-    data.extend(_F32.pack(0.08))   # cortisol_effective (peak of the reachable envelope)
-    data.extend(_F32.pack(0.07))   # cortisol_tonic (high — chronic stress, ~83% of envelope)
-    data.extend(_F32.pack(0.30))   # dopamine_effective
-    data.extend(_F32.pack(0.25))   # serotonin_effective
-    data.extend(_F32.pack(0.01))   # coupling_drift
-    data.extend(_F32.pack(0.85))   # mean_receptor_sensitivity
-    data.append(3)                 # emergent_phase (stress)
+    data.extend(_F32.pack(0.25))  # plasticity_gate (low)
+    data.extend(_F32.pack(0.15))  # bdnf_effective
+    data.extend(_F32.pack(0.12))  # bdnf_tonic
+    data.extend(_F32.pack(0.08))  # cortisol_effective (peak of the reachable envelope)
+    data.extend(_F32.pack(0.07))  # cortisol_tonic (high — chronic stress, ~83% of envelope)
+    data.extend(_F32.pack(0.30))  # dopamine_effective
+    data.extend(_F32.pack(0.25))  # serotonin_effective
+    data.extend(_F32.pack(0.01))  # coupling_drift
+    data.extend(_F32.pack(0.85))  # mean_receptor_sensitivity
+    data.append(3)  # emergent_phase (stress)
     data.extend(b"\x00\x00\x00")
 
     profile = PlasticityProfile.unpack(bytes(data))
@@ -177,16 +178,16 @@ def test_plasticity_profile_posture_protective() -> None:
 def test_plasticity_profile_posture_recovering() -> None:
     """Mid plasticity gate + dropping cortisol + BDNF rising → RECOVERING."""
     data = bytearray()
-    data.extend(_F32.pack(0.40))   # plasticity_gate (mid)
-    data.extend(_F32.pack(0.35))   # bdnf_effective
-    data.extend(_F32.pack(0.35))   # bdnf_tonic (rising)
-    data.extend(_F32.pack(0.04))   # cortisol_effective
-    data.extend(_F32.pack(0.04))   # cortisol_tonic (dropping below stress, ~33% of envelope)
-    data.extend(_F32.pack(0.40))   # dopamine_effective
-    data.extend(_F32.pack(0.45))   # serotonin_effective
+    data.extend(_F32.pack(0.40))  # plasticity_gate (mid)
+    data.extend(_F32.pack(0.35))  # bdnf_effective
+    data.extend(_F32.pack(0.35))  # bdnf_tonic (rising)
+    data.extend(_F32.pack(0.04))  # cortisol_effective
+    data.extend(_F32.pack(0.04))  # cortisol_tonic (dropping below stress, ~33% of envelope)
+    data.extend(_F32.pack(0.40))  # dopamine_effective
+    data.extend(_F32.pack(0.45))  # serotonin_effective
     data.extend(_F32.pack(0.005))  # coupling_drift
-    data.extend(_F32.pack(0.90))   # mean_receptor_sensitivity
-    data.append(0)                 # emergent_phase (active)
+    data.extend(_F32.pack(0.90))  # mean_receptor_sensitivity
+    data.append(0)  # emergent_phase (active)
     data.extend(b"\x00\x00\x00")
 
     profile = PlasticityProfile.unpack(bytes(data))
@@ -196,16 +197,16 @@ def test_plasticity_profile_posture_recovering() -> None:
 def test_plasticity_profile_posture_neutral() -> None:
     """Mid-range values that don't match any specific posture → NEUTRAL."""
     data = bytearray()
-    data.extend(_F32.pack(0.45))   # plasticity_gate (mid)
-    data.extend(_F32.pack(0.40))   # bdnf_effective
-    data.extend(_F32.pack(0.20))   # bdnf_tonic (low — not recovering)
-    data.extend(_F32.pack(0.05))   # cortisol_effective
+    data.extend(_F32.pack(0.45))  # plasticity_gate (mid)
+    data.extend(_F32.pack(0.40))  # bdnf_effective
+    data.extend(_F32.pack(0.20))  # bdnf_tonic (low — not recovering)
+    data.extend(_F32.pack(0.05))  # cortisol_effective
     data.extend(_F32.pack(0.045))  # cortisol_tonic (mid-envelope, ~42%)
-    data.extend(_F32.pack(0.40))   # dopamine_effective
-    data.extend(_F32.pack(0.40))   # serotonin_effective
-    data.extend(_F32.pack(0.0))    # coupling_drift
-    data.extend(_F32.pack(0.95))   # mean_receptor_sensitivity
-    data.append(0)                 # emergent_phase
+    data.extend(_F32.pack(0.40))  # dopamine_effective
+    data.extend(_F32.pack(0.40))  # serotonin_effective
+    data.extend(_F32.pack(0.0))  # coupling_drift
+    data.extend(_F32.pack(0.95))  # mean_receptor_sensitivity
+    data.append(0)  # emergent_phase
     data.extend(b"\x00\x00\x00")
 
     profile = PlasticityProfile.unpack(bytes(data))
@@ -369,7 +370,7 @@ def test_similar_results_valid() -> None:
 def test_core_state_unpack() -> None:
     """A 3480-byte buffer unpacks the key fields correctly.
 
-    Tests the v4 schema (18 chemicals, 3480 bytes). The offsets are:
+    Tests the v5 schema (18 chemicals, 3480 bytes). The offsets are:
     - Header: 0-55 (56 bytes)
     - NeurochemicalVector: 56-2471 (2416 bytes)
       - chemicals[18]: 56-1063 (1008 bytes, 18 × 56 each)
@@ -392,10 +393,10 @@ def test_core_state_unpack() -> None:
     data = bytearray(3480)
 
     # Header fields
-    struct.pack_into("<Q", data, 16, 1000)   # created_at
-    struct.pack_into("<Q", data, 24, 2000)   # last_updated
-    struct.pack_into("<Q", data, 32, 42)     # heartbeat
-    struct.pack_into("<Q", data, 48, 99)     # instance_id
+    struct.pack_into("<Q", data, 16, 1000)  # created_at
+    struct.pack_into("<Q", data, 24, 2000)  # last_updated
+    struct.pack_into("<Q", data, 32, 42)  # heartbeat
+    struct.pack_into("<Q", data, 48, 99)  # instance_id
 
     # NeurochemicalVector derived fields
     # effective_levels[18] at offset 2360 (56 + 1008 + 1296)
@@ -411,11 +412,11 @@ def test_core_state_unpack() -> None:
     data[2473] = 2  # emergent_phase (flow)
 
     # MemoryPointers
-    struct.pack_into("<I", data, 2584, 15)     # stm_count
-    struct.pack_into("<Q", data, 2600, 200)    # ltm_episode_count
-    struct.pack_into("<f", data, 2632, 0.55)   # encoding_weight
-    struct.pack_into("<f", data, 2636, 0.54)   # consolidation_weight
-    struct.pack_into("<f", data, 2640, 0.60)   # retrieval_weight
+    struct.pack_into("<I", data, 2584, 15)  # stm_count
+    struct.pack_into("<Q", data, 2600, 200)  # ltm_episode_count
+    struct.pack_into("<f", data, 2632, 0.55)  # encoding_weight
+    struct.pack_into("<f", data, 2636, 0.54)  # consolidation_weight
+    struct.pack_into("<f", data, 2640, 0.60)  # retrieval_weight
 
     state = CoreState.unpack(bytes(data))
     assert state.heartbeat == 42
@@ -454,11 +455,11 @@ def test_core_state_reads_inference_signals_from_the_v5_offset() -> None:
         struct.pack_into("<f", data, off, 9.99)
     # Field offsets are relative to 3416: 14 f32s in declaration order,
     # then inference_tick_count (u32) at +56, then policy_authority.
-    struct.pack_into("<f", data, 3416, 0.1111)   # surprise_ema
-    struct.pack_into("<f", data, 3420, 0.2222)   # free_energy
-    struct.pack_into("<f", data, 3428, 0.7777)   # allostasis_load
-    struct.pack_into("<f", data, 3468, 0.6666)   # model_maturity
-    struct.pack_into("<I", data, 3472, 4242)     # inference_tick_count
+    struct.pack_into("<f", data, 3416, 0.1111)  # surprise_ema
+    struct.pack_into("<f", data, 3420, 0.2222)  # free_energy
+    struct.pack_into("<f", data, 3428, 0.7777)  # allostasis_load
+    struct.pack_into("<f", data, 3468, 0.6666)  # model_maturity
+    struct.pack_into("<I", data, 3472, 4242)  # inference_tick_count
 
     state = CoreState.unpack(bytes(data))
     assert state.inference is not None
@@ -501,21 +502,21 @@ def run_all() -> bool:
 def test_body_state_unpack_normal() -> None:
     """A normal body state unpacks correctly."""
     data = bytearray()
-    data.extend(_F32.pack(52.0))    # cpu_temp_c
-    data.extend(_F32.pack(0.52))    # temperature
-    data.extend(_F32.pack(0.7))     # arousal_freq
-    data.extend(_F32.pack(0.4))     # cognitive_load
-    data.extend(_F32.pack(0.1))     # io_activity
-    data.extend(_F32.pack(0.2))     # stress_load
-    data.extend(_F32.pack(1.0))     # energy_reserve
-    data.append(1)                  # on_ac_power
-    data.extend(_U32.pack(8))       # num_cores
-    data.append(0)                  # distressed
-    data.extend(_F32.pack(3.5))     # autonomic_rate
-    data.extend(_F32.pack(0.6))     # thermoregulatory_effort
-    data.extend(_F32.pack(0.2))     # metabolic_rate
-    data.extend(_F32.pack(0.92))    # core_voltage
-    data.extend(_F32.pack(12.6))    # supply_voltage
+    data.extend(_F32.pack(52.0))  # cpu_temp_c
+    data.extend(_F32.pack(0.52))  # temperature
+    data.extend(_F32.pack(0.7))  # arousal_freq
+    data.extend(_F32.pack(0.4))  # cognitive_load
+    data.extend(_F32.pack(0.1))  # io_activity
+    data.extend(_F32.pack(0.2))  # stress_load
+    data.extend(_F32.pack(1.0))  # energy_reserve
+    data.append(1)  # on_ac_power
+    data.extend(_U32.pack(8))  # num_cores
+    data.append(0)  # distressed
+    data.extend(_F32.pack(3.5))  # autonomic_rate
+    data.extend(_F32.pack(0.6))  # thermoregulatory_effort
+    data.extend(_F32.pack(0.2))  # metabolic_rate
+    data.extend(_F32.pack(0.92))  # core_voltage
+    data.extend(_F32.pack(12.6))  # supply_voltage
     desc = "Running normally."
     data.extend(_U32.pack(len(desc)))  # desc_len
     data.extend(desc.encode("utf-8"))
@@ -542,21 +543,21 @@ def test_body_state_unpack_normal() -> None:
 def test_body_state_unpack_distressed() -> None:
     """A distressed body state unpacks correctly."""
     data = bytearray()
-    data.extend(_F32.pack(92.0))    # cpu_temp_c
-    data.extend(_F32.pack(0.95))    # temperature
-    data.extend(_F32.pack(0.3))     # arousal_freq
-    data.extend(_F32.pack(0.92))    # cognitive_load
-    data.extend(_F32.pack(0.05))    # io_activity
-    data.extend(_F32.pack(1.5))     # stress_load
-    data.extend(_F32.pack(0.15))    # energy_reserve
-    data.append(0)                  # on_ac_power (battery)
-    data.extend(_U32.pack(4))       # num_cores
-    data.append(1)                  # distressed
-    data.extend(_F32.pack(8.0))     # autonomic_rate (fast — stressed)
-    data.extend(_F32.pack(0.02))    # thermoregulatory_effort (low)
-    data.extend(_F32.pack(0.9))     # metabolic_rate (high)
-    data.extend(_F32.pack(1.30))    # core_voltage (Vcore maxed under stress)
-    data.extend(_F32.pack(10.2))    # supply_voltage (critically low battery)
+    data.extend(_F32.pack(92.0))  # cpu_temp_c
+    data.extend(_F32.pack(0.95))  # temperature
+    data.extend(_F32.pack(0.3))  # arousal_freq
+    data.extend(_F32.pack(0.92))  # cognitive_load
+    data.extend(_F32.pack(0.05))  # io_activity
+    data.extend(_F32.pack(1.5))  # stress_load
+    data.extend(_F32.pack(0.15))  # energy_reserve
+    data.append(0)  # on_ac_power (battery)
+    data.extend(_U32.pack(4))  # num_cores
+    data.append(1)  # distressed
+    data.extend(_F32.pack(8.0))  # autonomic_rate (fast — stressed)
+    data.extend(_F32.pack(0.02))  # thermoregulatory_effort (low)
+    data.extend(_F32.pack(0.9))  # metabolic_rate (high)
+    data.extend(_F32.pack(1.30))  # core_voltage (Vcore maxed under stress)
+    data.extend(_F32.pack(10.2))  # supply_voltage (critically low battery)
     desc = "I'm overheating and overwhelmed."
     data.extend(_U32.pack(len(desc)))
     data.extend(desc.encode("utf-8"))
@@ -577,22 +578,22 @@ def test_body_state_unpack_distressed() -> None:
 def test_body_state_unpack_empty_description() -> None:
     """Body state with empty description unpacks correctly."""
     data = bytearray()
-    data.extend(_F32.pack(45.0))    # cpu_temp_c
-    data.extend(_F32.pack(0.45))    # temperature
-    data.extend(_F32.pack(0.5))     # arousal_freq
-    data.extend(_F32.pack(0.3))     # cognitive_load
-    data.extend(_F32.pack(0.2))     # io_activity
-    data.extend(_F32.pack(0.1))     # stress_load
-    data.extend(_F32.pack(0.9))     # energy_reserve
-    data.append(1)                  # on_ac_power
-    data.extend(_U32.pack(2))       # num_cores
-    data.append(0)                  # distressed
-    data.extend(_F32.pack(1.5))     # autonomic_rate
-    data.extend(_F32.pack(0.1))     # thermoregulatory_effort
-    data.extend(_F32.pack(0.05))    # metabolic_rate
-    data.extend(_F32.pack(0.88))    # core_voltage
-    data.extend(_F32.pack(12.5))    # supply_voltage
-    data.extend(_U32.pack(0))       # desc_len = 0
+    data.extend(_F32.pack(45.0))  # cpu_temp_c
+    data.extend(_F32.pack(0.45))  # temperature
+    data.extend(_F32.pack(0.5))  # arousal_freq
+    data.extend(_F32.pack(0.3))  # cognitive_load
+    data.extend(_F32.pack(0.2))  # io_activity
+    data.extend(_F32.pack(0.1))  # stress_load
+    data.extend(_F32.pack(0.9))  # energy_reserve
+    data.append(1)  # on_ac_power
+    data.extend(_U32.pack(2))  # num_cores
+    data.append(0)  # distressed
+    data.extend(_F32.pack(1.5))  # autonomic_rate
+    data.extend(_F32.pack(0.1))  # thermoregulatory_effort
+    data.extend(_F32.pack(0.05))  # metabolic_rate
+    data.extend(_F32.pack(0.88))  # core_voltage
+    data.extend(_F32.pack(12.5))  # supply_voltage
+    data.extend(_U32.pack(0))  # desc_len = 0
 
     body = BodyState.unpack(bytes(data))
     assert body.description == ""
@@ -621,39 +622,39 @@ def test_body_state_unpack_v3_pulse_layer() -> None:
     for the v1 desc_len at 54 or the v2 desc_len at 74.
     """
     data = bytearray()
-    data.extend(_F32.pack(63.0))    # cpu_temp_c
-    data.extend(_F32.pack(0.63))    # temperature
-    data.extend(_F32.pack(0.8))     # arousal_freq
-    data.extend(_F32.pack(0.5))     # cognitive_load
-    data.extend(_F32.pack(0.3))     # io_activity
-    data.extend(_F32.pack(0.6))     # stress_load
-    data.extend(_F32.pack(0.9))     # energy_reserve
-    data.append(1)                  # on_ac_power
-    data.extend(_U32.pack(4))       # num_cores
-    data.append(0)                  # distressed
-    data.extend(_F32.pack(2.0))     # autonomic_rate
-    data.extend(_F32.pack(0.3))     # thermoregulatory_effort
-    data.extend(_F32.pack(0.15))    # metabolic_rate
-    data.extend(_F32.pack(0.92))    # core_voltage
-    data.extend(_F32.pack(12.5))    # supply_voltage
+    data.extend(_F32.pack(63.0))  # cpu_temp_c
+    data.extend(_F32.pack(0.63))  # temperature
+    data.extend(_F32.pack(0.8))  # arousal_freq
+    data.extend(_F32.pack(0.5))  # cognitive_load
+    data.extend(_F32.pack(0.3))  # io_activity
+    data.extend(_F32.pack(0.6))  # stress_load
+    data.extend(_F32.pack(0.9))  # energy_reserve
+    data.append(1)  # on_ac_power
+    data.extend(_U32.pack(4))  # num_cores
+    data.append(0)  # distressed
+    data.extend(_F32.pack(2.0))  # autonomic_rate
+    data.extend(_F32.pack(0.3))  # thermoregulatory_effort
+    data.extend(_F32.pack(0.15))  # metabolic_rate
+    data.extend(_F32.pack(0.92))  # core_voltage
+    data.extend(_F32.pack(12.5))  # supply_voltage
     # v2 silicon layer
-    data.extend(_F32.pack(0.4))     # core_activity
-    data.extend(_F32.pack(0.2))     # uncore_activity
-    data.extend(_F32.pack(0.5))     # dram_activity
-    data.extend(_F32.pack(0.03))    # cache_miss_rate
-    data.extend(_F32.pack(0.02))    # branch_miss_rate
+    data.extend(_F32.pack(0.4))  # core_activity
+    data.extend(_F32.pack(0.2))  # uncore_activity
+    data.extend(_F32.pack(0.5))  # dram_activity
+    data.extend(_F32.pack(0.03))  # cache_miss_rate
+    data.extend(_F32.pack(0.02))  # branch_miss_rate
     # v3 timing/involuntary/senescence layer
     data.extend(_F32.pack(4100.0))  # pulse_hz — cores beating
-    data.extend(_F32.pack(0.9))     # pulse (normalized)
-    data.extend(_F32.pack(0.25))    # throttle_state — mild throttle
-    data.extend(_F32.pack(0.55))    # top_freq_share
-    data.extend(_F32.pack(0.12))    # psi_cpu
-    data.extend(_F32.pack(0.04))    # psi_io
-    data.extend(_F32.pack(0.08))    # psi_mem
-    data.extend(_F32.pack(361.0))   # battery_cycles
-    data.extend(_F32.pack(1.0))     # entropy_level
-    data.append(1)                  # clocksource = tsc
-    data.append(3)                  # suspend_caps = mem + wakealarm
+    data.extend(_F32.pack(0.9))  # pulse (normalized)
+    data.extend(_F32.pack(0.25))  # throttle_state — mild throttle
+    data.extend(_F32.pack(0.55))  # top_freq_share
+    data.extend(_F32.pack(0.12))  # psi_cpu
+    data.extend(_F32.pack(0.04))  # psi_io
+    data.extend(_F32.pack(0.08))  # psi_mem
+    data.extend(_F32.pack(361.0))  # battery_cycles
+    data.extend(_F32.pack(1.0))  # entropy_level
+    data.append(1)  # clocksource = tsc
+    data.append(3)  # suspend_caps = mem + wakealarm
     desc = "Pulse steady, mild throttle."
     data.extend(_U32.pack(len(desc)))  # desc_len at offset 112
     data.extend(desc.encode("utf-8"))
@@ -687,42 +688,42 @@ def test_body_state_unpack_v3_with_zeroed_silicon_fields() -> None:
     Exact `==` matching prevents the collision.
     """
     data = bytearray()
-    data.extend(_F32.pack(61.0))    # cpu_temp_c
-    data.extend(_F32.pack(0.61))    # temperature
-    data.extend(_F32.pack(0.5))     # arousal_freq
-    data.extend(_F32.pack(0.4))     # cognitive_load
-    data.extend(_F32.pack(0.1))     # io_activity
-    data.extend(_F32.pack(0.3))     # stress_load
-    data.extend(_F32.pack(1.0))     # energy_reserve
-    data.append(1)                  # on_ac_power
-    data.extend(_U32.pack(4))       # num_cores
-    data.append(0)                  # distressed
-    data.extend(_F32.pack(1.0))     # autonomic_rate
-    data.extend(_F32.pack(0.2))     # thermoregulatory_effort
-    data.extend(_F32.pack(0.1))     # metabolic_rate
-    data.extend(_F32.pack(0.9))     # core_voltage
-    data.extend(_F32.pack(12.6))    # supply_voltage
+    data.extend(_F32.pack(61.0))  # cpu_temp_c
+    data.extend(_F32.pack(0.61))  # temperature
+    data.extend(_F32.pack(0.5))  # arousal_freq
+    data.extend(_F32.pack(0.4))  # cognitive_load
+    data.extend(_F32.pack(0.1))  # io_activity
+    data.extend(_F32.pack(0.3))  # stress_load
+    data.extend(_F32.pack(1.0))  # energy_reserve
+    data.append(1)  # on_ac_power
+    data.extend(_U32.pack(4))  # num_cores
+    data.append(0)  # distressed
+    data.extend(_F32.pack(1.0))  # autonomic_rate
+    data.extend(_F32.pack(0.2))  # thermoregulatory_effort
+    data.extend(_F32.pack(0.1))  # metabolic_rate
+    data.extend(_F32.pack(0.9))  # core_voltage
+    data.extend(_F32.pack(12.6))  # supply_voltage
     # Silicon layer entirely 0.0 — the no-powercap machine. Its
     # first field sits at offset 54 where the v1 probe reads a
     # candidate desc_len: f32 0.0 == u32 0 used to falsely match.
-    data.extend(_F32.pack(0.0))     # core_activity   (offset 54)
-    data.extend(_F32.pack(0.0))     # uncore_activity
-    data.extend(_F32.pack(0.0))     # dram_activity
-    data.extend(_F32.pack(0.0))     # cache_miss_rate
-    data.extend(_F32.pack(0.0))     # branch_miss_rate
+    data.extend(_F32.pack(0.0))  # core_activity   (offset 54)
+    data.extend(_F32.pack(0.0))  # uncore_activity
+    data.extend(_F32.pack(0.0))  # dram_activity
+    data.extend(_F32.pack(0.0))  # cache_miss_rate
+    data.extend(_F32.pack(0.0))  # branch_miss_rate
     # v3 layer — nonzero so detection is proven by these fields.
     data.extend(_F32.pack(3910.0))  # pulse_hz
-    data.extend(_F32.pack(0.98))    # pulse
-    data.extend(_F32.pack(0.0))     # throttle_state
-    data.extend(_F32.pack(0.5))     # top_freq_share
-    data.extend(_F32.pack(0.02))    # psi_cpu
-    data.extend(_F32.pack(0.01))    # psi_io
-    data.extend(_F32.pack(0.03))    # psi_mem
-    data.extend(_F32.pack(354.0))   # battery_cycles
-    data.extend(_F32.pack(1.0))     # entropy_level
-    data.append(1)                  # clocksource = tsc
-    data.append(3)                  # suspend_caps
-    data.extend(_U32.pack(0))       # desc_len = 0 at offset 112
+    data.extend(_F32.pack(0.98))  # pulse
+    data.extend(_F32.pack(0.0))  # throttle_state
+    data.extend(_F32.pack(0.5))  # top_freq_share
+    data.extend(_F32.pack(0.02))  # psi_cpu
+    data.extend(_F32.pack(0.01))  # psi_io
+    data.extend(_F32.pack(0.03))  # psi_mem
+    data.extend(_F32.pack(354.0))  # battery_cycles
+    data.extend(_F32.pack(1.0))  # entropy_level
+    data.append(1)  # clocksource = tsc
+    data.append(3)  # suspend_caps
+    data.extend(_U32.pack(0))  # desc_len = 0 at offset 112
 
     body = BodyState.unpack(bytes(data))
     assert approx_equal(body.pulse_hz, 3910.0)
@@ -753,11 +754,11 @@ def test_body_state_unpack_v2_with_zeroed_silicon_fields() -> None:
     data.extend(_F32.pack(0.1))
     data.extend(_F32.pack(0.9))
     data.extend(_F32.pack(12.6))
-    data.extend(_F32.pack(0.0))     # core_activity — 0.0, offset 54
+    data.extend(_F32.pack(0.0))  # core_activity — 0.0, offset 54
     data.extend(_F32.pack(0.0))
     data.extend(_F32.pack(0.0))
     data.extend(_F32.pack(0.0))
-    data.extend(_F32.pack(0.0))     # branch_miss_rate (offset 70)
+    data.extend(_F32.pack(0.0))  # branch_miss_rate (offset 70)
     desc = "quiet silicon"
     data.extend(_U32.pack(len(desc)))  # desc_len at offset 74
     data.extend(desc.encode("utf-8"))
@@ -798,6 +799,97 @@ def test_body_state_unpack_v2_fields_default_on_v1() -> None:
     assert body.battery_cycles == 0.0
     assert body.clocksource == 0
     assert body.suspend_caps == 0
+
+
+def _v3_packet(*, desc: str = "") -> bytes:
+    data = bytearray()
+    data.extend(_F32.pack(60.0))  # cpu_temp_c
+    data.extend(_F32.pack(0.6))  # temperature
+    data.extend(_F32.pack(0.7))  # arousal_freq
+    data.extend(_F32.pack(0.4))  # cognitive_load
+    data.extend(_F32.pack(0.2))  # io_activity
+    data.extend(_F32.pack(0.5))  # stress_load
+    data.extend(_F32.pack(1.0))  # energy_reserve
+    data.append(1)  # on_ac_power
+    data.extend(_U32.pack(4))  # num_cores
+    data.append(0)  # distressed
+    data.extend(_F32.pack(2.0))  # autonomic_rate
+    data.extend(_F32.pack(0.2))  # thermoregulatory_effort
+    data.extend(_F32.pack(0.1))  # metabolic_rate
+    data.extend(_F32.pack(0.9))  # core_voltage
+    data.extend(_F32.pack(12.6))  # supply_voltage
+    for _ in range(5):  # v2 silicon layer
+        data.extend(_F32.pack(0.0))
+    for _ in range(9):  # v3 f32 layer
+        data.extend(_F32.pack(0.0))
+    data.append(1)  # clocksource
+    data.append(0)  # suspend_caps
+    data.extend(_U32.pack(len(desc)))  # desc_len at offset 112
+    data.extend(desc.encode("utf-8"))
+    return bytes(data)
+
+
+def _v4_packet(*, desc: str = "", rest: float = 0.0, temp_trend: float = 0.0) -> bytes:
+    """A v3 packet plus the v4 parasympathetic tail."""
+    data = bytearray(_v3_packet(desc=""))
+    # Rebuild rather than splice: the v3 helper put desc_len at 112;
+    # v4 needs rest/temp_trend there and desc_len at 120.
+    del data[112:]
+    data.extend(_F32.pack(rest))  # rest (offset 112)
+    data.extend(_F32.pack(temp_trend))  # temp_trend (offset 116)
+    data.extend(_U32.pack(len(desc)))  # desc_len at offset 120
+    data.extend(desc.encode("utf-8"))
+    return bytes(data)
+
+
+def test_body_state_unpack_v4_parasympathetic_layer() -> None:
+    """A v4 packet decodes the parasympathetic tail and its
+    description — and does not leak the tail into v3 fields."""
+    body = BodyState.unpack(_v4_packet(rest=0.85, temp_trend=-0.4, desc="body at rest"))
+    assert approx_equal(body.rest, 0.85)
+    assert approx_equal(body.temp_trend, -0.4)
+    assert body.description == "body at rest"
+    # The v3 layer is intact — v4 is a strict tail, not a layout change.
+    assert approx_equal(body.cpu_temp_c, 60.0)
+    assert body.clocksource == 1
+
+
+def test_body_state_unpack_v4_tail_defaults_on_v3() -> None:
+    """A v3 packet unpacks with rest/temp_trend defaulting to zero —
+    append-only compatibility in the backward direction."""
+    body = BodyState.unpack(_v3_packet(desc="v3 era body"))
+    assert body.rest == 0.0
+    assert body.temp_trend == 0.0
+    assert body.description == "v3 era body"
+
+
+def test_body_state_unpack_v4_not_misdetected_as_v1() -> None:
+    """The v4 packet's desc_len sits at 120; its rest field at 112
+    must never satisfy the v3 desc_len probe at 112 either — rest
+    is clamped [0, 1] whose bits are 0 or ≥ 2³¹-ish, never a small
+    trailer length."""
+    body = BodyState.unpack(_v4_packet(rest=0.5, temp_trend=0.1))
+    assert approx_equal(body.rest, 0.5)
+    assert approx_equal(body.temp_trend, 0.1)
+    assert body.description == ""
+
+
+def test_sensor_presence_unpack_u32() -> None:
+    """GET_SENSOR_PRESENCE widened to u32 when bit 16 (cpuidle) was
+    added. A 4-byte payload decodes the high bit; a 2-byte payload
+    from an older daemon still decodes its low bits."""
+    from genesis_client.protocol import SENSOR_CPUIDLE, SENSOR_TEMPERATURE
+    from genesis_client.types import SensorPresence
+
+    presence = SensorPresence.unpack(struct.pack("<I", SENSOR_CPUIDLE | SENSOR_TEMPERATURE))
+    assert presence.has(SENSOR_CPUIDLE)
+    assert presence.has(SENSOR_TEMPERATURE)
+    assert "cpuidle state counters" in presence.present
+
+    # Old u16 payload: decodes, new channels read as absent.
+    old = SensorPresence.unpack(struct.pack("<H", SENSOR_TEMPERATURE))
+    assert old.has(SENSOR_TEMPERATURE)
+    assert not old.has(SENSOR_CPUIDLE)
 
 
 # ─── BodyControlState tests ───────────────────────────────────
@@ -937,9 +1029,215 @@ if __name__ == "__main__":
 
 
 def test_core_state_reads_the_network_sleep_pressure() -> None:
-    """The network's homeostatic variable h is sleep_network[4] at offset 3256.
-    The mind reads it as a fraction of the source's hmax (323.88)."""
+    """The homeostat h is sleep_network[4] at offset 3256; the mind
+    reads it as a fraction of the source's hmax (323.88)."""
     data = bytearray(3480)
     struct.pack_into("<d", data, 3256, 161.94)
     state = CoreState.unpack(bytes(data))
     assert approx_equal(state.sleep_pressure, 0.5)
+
+
+def _v3_field_probe_body() -> bytearray:
+    """A v3 field-probe wire body (195 bytes) laid out per
+    `src/daemon/field_probe.rs`."""
+    body = bytearray(195)
+    body[0] = 3
+    struct.pack_into("<20f", body, 1, *[0.125] * 20)
+    struct.pack_into("<5f", body, 81, 1.0e6, 0.5, 100.0, 7000.0, 10.0)
+    body[101] = 1  # samples_ok
+    struct.pack_into("<3f", body, 102, 0.3, 1.0, 0.7)
+    struct.pack_into("<10f", body, 114, *[0.2] * 10)  # power bands
+    struct.pack_into("<6f", body, 154, 20.9, 89.0, 12.947, 1.5, 0.02, 0.4)
+    body[178] = 0b111  # power + volts + amps present
+    struct.pack_into("<4f", body, 179, 0.97, 7.17e-4, 6.76e-9, 1.81e-34)
+    return body
+
+
+def test_field_probe_v3_unpacks_electrical_and_maxwell() -> None:
+    """The v3 tail decodes real electrical channels and the Maxwell
+    estimates through the presence mask."""
+    sig = FieldProbeSignature.unpack(bytes(_v3_field_probe_body()))
+    assert sig.power_watts is not None
+    assert sig.power_sensor_hz is not None
+    assert sig.rail_volts is not None
+    assert sig.supply_amps is not None
+    assert sig.power_lag is not None
+    assert sig.power_coherence is not None
+    assert sig.carrier_current_a is not None
+    assert approx_equal(sig.power_watts, 20.9, 1e-2)
+    assert approx_equal(sig.power_sensor_hz, 89.0, 1e-2)
+    assert approx_equal(sig.rail_volts, 12.947, 1e-3)
+    assert approx_equal(sig.supply_amps, 1.5, 1e-6)
+    assert sig.power_bands is not None and len(sig.power_bands) == 10
+    assert approx_equal(sig.power_lag, 0.02, 1e-6)
+    assert approx_equal(sig.power_coherence, 0.4, 1e-6)
+    assert approx_equal(sig.carrier_current_a, 0.97, 1e-6)
+    assert sig.radiated_pwr_w is not None and sig.radiated_pwr_w < 1e-30
+
+
+def test_field_probe_v3_absent_sensors_decode_none() -> None:
+    """Mask bits clear → absent channels are None, never zero."""
+    body = _v3_field_probe_body()
+    body[178] = 0
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.power_watts is None
+    assert sig.power_bands is None
+    assert sig.rail_volts is None
+    assert sig.supply_amps is None
+    assert sig.power_lag is None
+    assert sig.b_est_ut is None
+
+
+def test_field_probe_v4_unpacks_radio_tail() -> None:
+    """The v4 tail decodes the radio sense through its presence mask:
+    WLAN flux + RSSI envelopes, wireless IRQ flux, HCI counters."""
+    body = _v3_field_probe_body()
+    body[0] = 4
+    body += struct.pack("<10f", *[0.3] * 10)  # rf flux bands
+    body += struct.pack("<10f", *[0.2] * 10)  # rf rssi bands
+    body += struct.pack("<8f", 4200.0, -71.0, -95.0, 33.0, 4.0, 120.0, 18.0, -3.0)
+    body.append(0x7F)  # all radio channels present
+    assert len(body) == 308
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.rf_flux_bands is not None and len(sig.rf_flux_bands) == 10
+    assert all(approx_equal(v, 0.3, 1e-6) for v in sig.rf_flux_bands)
+    assert sig.rf_rssi_bands is not None and len(sig.rf_rssi_bands) == 10
+    assert all(approx_equal(v, 0.2, 1e-6) for v in sig.rf_rssi_bands)
+    assert (
+        sig.rf_bytes_s is not None
+        and sig.rf_rssi_dbm is not None
+        and sig.rf_noise_dbm is not None
+        and sig.rf_irq_rate is not None
+        and sig.rf_sensor_hz is not None
+        and sig.bt_bytes_s is not None
+        and sig.bt_events_s is not None
+        and sig.bt_rssi_dbm is not None
+    )
+    assert approx_equal(sig.rf_bytes_s, 4200.0, 1e-2)
+    assert approx_equal(sig.rf_rssi_dbm, -71.0, 1e-6)
+    assert approx_equal(sig.rf_noise_dbm, -95.0, 1e-6)
+    assert approx_equal(sig.rf_irq_rate, 33.0, 1e-6)
+    assert approx_equal(sig.rf_sensor_hz, 4.0, 1e-6)
+    assert approx_equal(sig.bt_bytes_s, 120.0, 1e-6)
+    assert approx_equal(sig.bt_events_s, 18.0, 1e-6)
+    assert approx_equal(sig.bt_rssi_dbm, -3.0, 1e-6)
+    assert sig.rf_present == 0x7F
+
+
+def test_field_probe_v4_partial_presence_gates_fields() -> None:
+    """Only masked channels decode — an iface with no RSSI reports
+    flux but None for field strength."""
+    body = _v3_field_probe_body()
+    body[0] = 4
+    body += b"\x00" * 80
+    body += b"\x00" * 33
+    body[307] = 0x01  # wlan only
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.rf_flux_bands is not None
+    assert sig.rf_bytes_s is not None
+    assert sig.rf_rssi_bands is None
+    assert sig.rf_rssi_dbm is None
+    assert sig.bt_bytes_s is None
+
+
+def test_field_probe_v5_unpacks_station_tail() -> None:
+    """The v5 tail decodes iw station telemetry through presence
+    bit 7: link-strain rates and PHY link-adaptation bitrates."""
+    body = _v3_field_probe_body()
+    body[0] = 5
+    body += struct.pack("<10f", *[0.3] * 10)  # rf flux bands
+    body += struct.pack("<10f", *[0.2] * 10)  # rf rssi bands
+    body += struct.pack("<8f", 4200.0, -55.0, -95.0, 33.0, 1.0, 120.0, 18.0, -3.0)
+    body.append(0xFF)  # all channels present incl. iw station
+    body += struct.pack("<5f", 12.0, 0.4, 0.1, 72.2, 65.0)
+    assert len(body) == 328
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.rf_rssi_dbm is not None and approx_equal(sig.rf_rssi_dbm, -55.0, 1e-6)
+    assert sig.rf_retry_rate is not None
+    assert sig.rf_fail_rate is not None
+    assert sig.rf_beacon_loss_rate is not None
+    assert sig.rf_tx_mbps is not None
+    assert sig.rf_rx_mbps is not None
+    assert approx_equal(sig.rf_retry_rate, 12.0, 1e-6)
+    assert approx_equal(sig.rf_fail_rate, 0.4, 1e-6)
+    assert approx_equal(sig.rf_beacon_loss_rate, 0.1, 1e-6)
+    assert approx_equal(sig.rf_tx_mbps, 72.2, 1e-4)
+    assert approx_equal(sig.rf_rx_mbps, 65.0, 1e-6)
+
+
+def test_field_probe_v5_iw_absent_decodes_none() -> None:
+    """v5 with the iw bit clear → station fields are None, not 0."""
+    body = _v3_field_probe_body()
+    body[0] = 5
+    body += b"\x00" * 80  # band energies
+    body += b"\x00" * 32  # scalars
+    body.append(0x01)  # wlan only
+    body += struct.pack("<5f", 9.0, 9.0, 9.0, 9.0, 9.0)  # ignored tail
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.rf_retry_rate is None
+    assert sig.rf_fail_rate is None
+    assert sig.rf_beacon_loss_rate is None
+    assert sig.rf_tx_mbps is None
+    assert sig.rf_rx_mbps is None
+
+
+def test_field_probe_v6_unpacks_flux_phasors() -> None:
+    """The v6 tail decodes flux-envelope phase + coherence through
+    the wlan presence bit — the entrainment path's raw material."""
+    phases = [0.1 * i - 1.0 for i in range(10)]
+    coh = [0.05 * i for i in range(10)]
+    body = _v3_field_probe_body()
+    body[0] = 6
+    body += struct.pack("<10f", *[0.3] * 10)  # rf flux bands
+    body += struct.pack("<10f", *[0.2] * 10)  # rf rssi bands
+    body += struct.pack("<8f", 4200.0, -55.0, -95.0, 33.0, 1.0, 120.0, 18.0, -3.0)
+    body.append(0xFF)
+    body += struct.pack("<5f", 12.0, 0.4, 0.1, 72.2, 65.0)
+    body += struct.pack("<10f", *phases)
+    body += struct.pack("<10f", *coh)
+    assert len(body) == 408
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.rf_flux_phases is not None and len(sig.rf_flux_phases) == 10
+    assert sig.rf_flux_phase_coherence is not None
+    assert all(approx_equal(v, e, 1e-6) for v, e in zip(sig.rf_flux_phases, phases, strict=True))
+    assert all(
+        approx_equal(v, e, 1e-6) for v, e in zip(sig.rf_flux_phase_coherence, coh, strict=True)
+    )
+
+
+def test_field_probe_v6_no_wlan_decodes_no_phasors() -> None:
+    """v6 with the wlan bit clear → phasor fields are None."""
+    body = _v3_field_probe_body()
+    body[0] = 6
+    body += b"\x00" * 113  # v4 radio tail, all-zero
+    body += struct.pack("<5f", 0.0, 0.0, 0.0, 0.0, 0.0)
+    body += struct.pack("<10f", *[9.9] * 10)  # ignored phasor tail
+    body += struct.pack("<10f", *[9.9] * 10)
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.rf_flux_phases is None
+    assert sig.rf_flux_phase_coherence is None
+
+
+def test_field_probe_v2_still_decodes() -> None:
+    """A v2 (114-byte) body keeps working — electrical fields absent."""
+    body = bytearray(114)
+    body[0] = 2
+    struct.pack_into("<20f", body, 1, *[0.125] * 20)
+    struct.pack_into("<5f", body, 81, 1.0, 2.0, 3.0, 4.0, 5.0)
+    body[101] = 1
+    struct.pack_into("<3f", body, 102, 0.1, 0.2, 0.3)
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.carrier_lag is not None
+    assert approx_equal(sig.carrier_lag, 0.1, 1e-6)
+    assert sig.power_watts is None
+    assert sig.power_bands is None
+
+
+def test_core_state_rejects_truncated_body() -> None:
+    """A short body is a refusal, not a misread."""
+    data = bytearray(3400)
+    try:
+        CoreState.unpack(bytes(data))
+        raise AssertionError()
+    except ValueError as e:
+        logger.debug(repr(e))

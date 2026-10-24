@@ -77,77 +77,220 @@ _VERB_BASES: frozenset[str] = frozenset()
 # of ``VERB_LEXICON``, which the imperative gate in comprehension
 # tests directly — teaching "be" there would make "reach 12 ..." parse
 # as a noun phrase rather than an imperative.
-_FUNCTION_VERBS: frozenset[str] = frozenset({
-    "be", "am", "is", "are", "was", "were", "been", "being",
-    "do", "does", "did", "done",
-    "have", "has", "had",
-    "will", "would", "shall", "should",
-    "can", "could", "may", "might", "must", "ought",
-})
+_FUNCTION_VERBS: frozenset[str] = frozenset(
+    {
+        "be",
+        "am",
+        "is",
+        "are",
+        "was",
+        "were",
+        "been",
+        "being",
+        "do",
+        "does",
+        "did",
+        "done",
+        "have",
+        "has",
+        "had",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "can",
+        "could",
+        "may",
+        "might",
+        "must",
+        "ought",
+    }
+)
 
 # Irregular inflected → base mappings. Covers past tense, past
 # participles, and the suppletive copula/auxiliary forms.
 _IRREGULAR_BASE: dict[str, str] = {
     # Copula / auxiliaries
-    "am": "be", "is": "be", "are": "be", "was": "be", "were": "be",
-    "been": "be", "being": "be", "'m": "be", "'re": "be", "'s": "be",
-    "does": "do", "did": "do", "done": "do",
-    "has": "have", "had": "have",
+    "am": "be",
+    "is": "be",
+    "are": "be",
+    "was": "be",
+    "were": "be",
+    "been": "be",
+    "being": "be",
+    "'m": "be",
+    "'re": "be",
+    "'s": "be",
+    "does": "do",
+    "did": "do",
+    "done": "do",
+    "has": "have",
+    "had": "have",
     # Strong verbs — past tense
-    "ran": "run", "went": "go", "came": "come", "saw": "see",
-    "gave": "give", "took": "take", "made": "make", "got": "get",
-    "wrote": "write", "spoke": "speak", "knew": "know",
-    "thought": "think", "felt": "feel", "found": "find",
-    "told": "tell", "said": "say", "brought": "bring",
-    "bought": "buy", "built": "build", "sent": "send",
-    "heard": "hear", "sat": "sit", "stood": "stand",
-    "fell": "fall", "grew": "grow", "became": "become",
-    "began": "begin", "broke": "break", "kept": "keep",
-    "lost": "lose", "won": "win", "met": "meet", "left": "leave",
-    "meant": "mean", "held": "hold", "slept": "sleep",
-    "ate": "eat", "drank": "drink", "drove": "drive",
-    "flew": "fly", "forgot": "forget", "chose": "choose",
-    "froze": "freeze", "stole": "steal", "swam": "swim",
-    "sang": "sing", "rang": "ring", "sank": "sink",
-    "shook": "shake", "understood": "understand",
-    "withstood": "withstand", "arose": "arise", "awoke": "awake",
-    "bore": "bear", "wore": "wear", "tore": "tear",
-    "hid": "hide", "lay": "lie", "laid": "lay", "led": "lead",
-    "paid": "pay", "sold": "sell", "taught": "teach",
-    "caught": "catch", "fought": "fight", "sought": "seek",
-    "shot": "shoot", "spent": "spend", "split": "split",
-    "spread": "spread", "struck": "strike", "stuck": "stick",
-    "swung": "swing", "wept": "weep", "withdrew": "withdraw",
-    "woke": "wake", "threw": "throw", "hung": "hang",
-    "rode": "ride", "dug": "dig", "forgave": "forgive",
-    "drew": "draw", "blew": "blow", "rose": "rise",
-    "wove": "weave", "bit": "bite", "lit": "light",
-    "slid": "slide", "bent": "bend", "lent": "lend",
-    "dealt": "deal", "fed": "feed", "fled": "flee",
-    "leapt": "leap", "learnt": "learn", "knelt": "kneel",
-    "dwelt": "dwell", "crept": "creep", "dreamt": "dream",
-    "spelt": "spell", "spilt": "spill", "spun": "spin",
-    "stung": "sting", "clung": "cling", "flung": "fling",
-    "wrung": "wring", "slung": "sling", "sprang": "spring",
-    "sprung": "spring", "stank": "stink", "shrank": "shrink",
-    "shrunk": "shrink", "shone": "shine", "strove": "strive",
-    "swore": "swear", "swept": "sweep", "swelled": "swell",
+    "ran": "run",
+    "went": "go",
+    "came": "come",
+    "saw": "see",
+    "gave": "give",
+    "took": "take",
+    "made": "make",
+    "got": "get",
+    "wrote": "write",
+    "spoke": "speak",
+    "knew": "know",
+    "thought": "think",
+    "felt": "feel",
+    "found": "find",
+    "told": "tell",
+    "said": "say",
+    "brought": "bring",
+    "bought": "buy",
+    "built": "build",
+    "sent": "send",
+    "heard": "hear",
+    "sat": "sit",
+    "stood": "stand",
+    "fell": "fall",
+    "grew": "grow",
+    "became": "become",
+    "began": "begin",
+    "broke": "break",
+    "kept": "keep",
+    "lost": "lose",
+    "won": "win",
+    "met": "meet",
+    "left": "leave",
+    "meant": "mean",
+    "held": "hold",
+    "slept": "sleep",
+    "ate": "eat",
+    "drank": "drink",
+    "drove": "drive",
+    "flew": "fly",
+    "forgot": "forget",
+    "chose": "choose",
+    "froze": "freeze",
+    "stole": "steal",
+    "swam": "swim",
+    "sang": "sing",
+    "rang": "ring",
+    "sank": "sink",
+    "shook": "shake",
+    "understood": "understand",
+    "withstood": "withstand",
+    "arose": "arise",
+    "awoke": "awake",
+    "bore": "bear",
+    "wore": "wear",
+    "tore": "tear",
+    "hid": "hide",
+    "lay": "lie",
+    "laid": "lay",
+    "led": "lead",
+    "paid": "pay",
+    "sold": "sell",
+    "taught": "teach",
+    "caught": "catch",
+    "fought": "fight",
+    "sought": "seek",
+    "shot": "shoot",
+    "spent": "spend",
+    "split": "split",
+    "spread": "spread",
+    "struck": "strike",
+    "stuck": "stick",
+    "swung": "swing",
+    "wept": "weep",
+    "withdrew": "withdraw",
+    "woke": "wake",
+    "threw": "throw",
+    "hung": "hang",
+    "rode": "ride",
+    "dug": "dig",
+    "forgave": "forgive",
+    "drew": "draw",
+    "blew": "blow",
+    "rose": "rise",
+    "wove": "weave",
+    "bit": "bite",
+    "lit": "light",
+    "slid": "slide",
+    "bent": "bend",
+    "lent": "lend",
+    "dealt": "deal",
+    "fed": "feed",
+    "fled": "flee",
+    "leapt": "leap",
+    "learnt": "learn",
+    "knelt": "kneel",
+    "dwelt": "dwell",
+    "crept": "creep",
+    "dreamt": "dream",
+    "spelt": "spell",
+    "spilt": "spill",
+    "spun": "spin",
+    "stung": "sting",
+    "clung": "cling",
+    "flung": "fling",
+    "wrung": "wring",
+    "slung": "sling",
+    "sprang": "spring",
+    "sprung": "spring",
+    "stank": "stink",
+    "shrank": "shrink",
+    "shrunk": "shrink",
+    "shone": "shine",
+    "strove": "strive",
+    "swore": "swear",
+    "swept": "sweep",
+    "swelled": "swell",
     # Past participles that differ from simple past
-    "gone": "go", "seen": "see", "given": "give", "taken": "take",
-    "known": "know", "written": "write", "spoken": "speak",
-    "broken": "break", "fallen": "fall", "grown": "grow",
-    "born": "bear", "borne": "bear", "worn": "wear",
-    "torn": "tear", "hidden": "hide", "risen": "rise",
-    "driven": "drive", "eaten": "eat", "drunk": "drink",
-    "forgotten": "forget", "chosen": "choose", "frozen": "freeze",
-    "stolen": "steal", "swum": "swim", "sung": "sing",
-    "rung": "ring", "sunk": "sink", "shaken": "shake",
-    "arisen": "arise", "lain": "lie", "woken": "wake",
-    "thrown": "throw", "ridden": "ride", "sworn": "swear",
-    "bidden": "bid", "begun": "begin", "woven": "weave",
-    "bitten": "bite", "stricken": "strike", "smitten": "smite",
-    "forsaken": "forsake", "swollen": "swell", "proven": "prove",
-    "shown": "show", "sewn": "sew", "mown": "mow",
+    "gone": "go",
+    "seen": "see",
+    "given": "give",
+    "taken": "take",
+    "known": "know",
+    "written": "write",
+    "spoken": "speak",
+    "broken": "break",
+    "fallen": "fall",
+    "grown": "grow",
+    "born": "bear",
+    "borne": "bear",
+    "worn": "wear",
+    "torn": "tear",
+    "hidden": "hide",
+    "risen": "rise",
+    "driven": "drive",
+    "eaten": "eat",
+    "drunk": "drink",
+    "forgotten": "forget",
+    "chosen": "choose",
+    "frozen": "freeze",
+    "stolen": "steal",
+    "swum": "swim",
+    "sung": "sing",
+    "rung": "ring",
+    "sunk": "sink",
+    "shaken": "shake",
+    "arisen": "arise",
+    "lain": "lie",
+    "woken": "wake",
+    "thrown": "throw",
+    "ridden": "ride",
+    "sworn": "swear",
+    "bidden": "bid",
+    "begun": "begin",
+    "woven": "weave",
+    "bitten": "bite",
+    "stricken": "strike",
+    "smitten": "smite",
+    "forsaken": "forsake",
+    "swollen": "swell",
+    "proven": "prove",
+    "shown": "show",
+    "sewn": "sew",
+    "mown": "mow",
     "strung": "string",
 }
 
@@ -155,21 +298,84 @@ _IRREGULAR_BASE: dict[str, str] = {
 # Used by both copula() and is_plural_np().
 _SINGULAR_S_WORDS: frozenset[str] = frozenset(
     {
-        "cognition", "awareness", "happiness", "sadness",
-        "madness", "illness", "weakness", "darkness", "brightness",
-        "fitness", "business", "laziness", "loneliness", "kindness",
-        "goodness", "greatness", "openness", "stillness", "usefulness",
-        "news", "mathematics", "physics", "ethics", "politics",
-        "economics", "linguistics", "genetics", "logistics",
-        "series", "species", "crisis", "analysis", "thesis",
-        "hypothesis", "synthesis", "emphasis", "diagnosis",
-        "genesis", "status", "virus", "lotus", "bus", "plus",
-        "glass", "class", "grass", "mass", "pass", "boss",
-        "loss", "cross", "dress", "press", "address", "process",
-        "progress", "success", "access", "across", "alas",
-        "chaos", "pathos", "cosmos", "bias", "canvas", "octopus",
-        "hippocampus", "stimulus", "syllabus", "is", "was",
-        "has", "does", "this", "thus", "yes", "his", "its",
+        "cognition",
+        "awareness",
+        "happiness",
+        "sadness",
+        "madness",
+        "illness",
+        "weakness",
+        "darkness",
+        "brightness",
+        "fitness",
+        "business",
+        "laziness",
+        "loneliness",
+        "kindness",
+        "goodness",
+        "greatness",
+        "openness",
+        "stillness",
+        "usefulness",
+        "news",
+        "mathematics",
+        "physics",
+        "ethics",
+        "politics",
+        "economics",
+        "linguistics",
+        "genetics",
+        "logistics",
+        "series",
+        "species",
+        "crisis",
+        "analysis",
+        "thesis",
+        "hypothesis",
+        "synthesis",
+        "emphasis",
+        "diagnosis",
+        "genesis",
+        "status",
+        "virus",
+        "lotus",
+        "bus",
+        "plus",
+        "glass",
+        "class",
+        "grass",
+        "mass",
+        "pass",
+        "boss",
+        "loss",
+        "cross",
+        "dress",
+        "press",
+        "address",
+        "process",
+        "progress",
+        "success",
+        "access",
+        "across",
+        "alas",
+        "chaos",
+        "pathos",
+        "cosmos",
+        "bias",
+        "canvas",
+        "octopus",
+        "hippocampus",
+        "stimulus",
+        "syllabus",
+        "is",
+        "was",
+        "has",
+        "does",
+        "this",
+        "thus",
+        "yes",
+        "his",
+        "its",
         # 3sg verb forms rarely used as plural nouns — take singular
         # agreement. "makes" (3sg of "make") as a concept subject is
         # singular, not a plural noun. Consistent with "has"/"does"/"is"
@@ -222,18 +428,18 @@ def deconjugate_verb(word: str) -> list[str]:
 
     # -ed ("walked" → "walk", "hoped" → "hope", "stopped" → "stop")
     if len(w) > 3 and w.endswith("ed"):
-        candidates.append(w[:-2])            # walked → walk
-        candidates.append(w[:-1])            # hoped → hope
-        if len(w) > 4 and w[-3] == w[-4]:    # stopped → stopp → stop
+        candidates.append(w[:-2])  # walked → walk
+        candidates.append(w[:-1])  # hoped → hope
+        if len(w) > 4 and w[-3] == w[-4]:  # stopped → stopp → stop
             candidates.append(w[:-3])
 
     # -ing ("walking" → "walk", "making" → "make", "running" → "run")
     if len(w) > 4 and w.endswith("ing"):
         stem = w[:-3]
-        candidates.append(stem + "e")        # making → make
-        candidates.append(stem)              # walking → walk
+        candidates.append(stem + "e")  # making → make
+        candidates.append(stem)  # walking → walk
         if len(stem) > 1 and stem[-1] == stem[-2]:
-            candidates.append(stem[:-1])     # running → runn → run
+            candidates.append(stem[:-1])  # running → runn → run
 
     # Deduplicate while preserving order
     seen: set[str] = set()
@@ -245,9 +451,7 @@ def deconjugate_verb(word: str) -> list[str]:
     return result
 
 
-def is_verb_form(
-    word: str, lexicon: frozenset[str] | None = None
-) -> str | None:
+def is_verb_form(word: str, lexicon: frozenset[str] | None = None) -> str | None:
     """Return the base form if the word is a known verb, else None.
 
     Deconjugates the word and checks each candidate against the
@@ -378,9 +582,13 @@ def conjugate_verb(base: str, plural: bool = False, past: bool = False) -> str:
             return b + "d"
         if len(b) > 2 and b.endswith("y") and b[-2] not in "aeiou":
             return b[:-1] + "ied"
-        if (len(b) <= 4 and len(b) > 2
-                and b[-1] not in "aeiouwyx" and b[-2] in "aeiou"
-                and b[-3] not in "aeiou"):
+        if (
+            len(b) <= 4
+            and len(b) > 2
+            and b[-1] not in "aeiouwyx"
+            and b[-2] in "aeiou"
+            and b[-3] not in "aeiou"
+        ):
             return b + b[-1] + "ed"  # stop → stopped
         return b + "ed"
 
@@ -404,24 +612,121 @@ def conjugate_verb(base: str, plural: bool = False, past: bool = False) -> str:
 # Simple-past forms (subset of irregulars — excludes participles).
 _SIMPLE_PAST: frozenset[str] = frozenset(
     {
-        "ran", "went", "came", "saw", "gave", "took", "made", "got",
-        "wrote", "spoke", "knew", "thought", "felt", "found", "told",
-        "said", "brought", "bought", "built", "sent", "heard", "sat",
-        "stood", "fell", "grew", "became", "began", "broke", "kept",
-        "lost", "won", "met", "left", "meant", "held", "slept",
-        "ate", "drank", "drove", "flew", "forgot", "chose", "froze",
-        "stole", "swam", "sang", "rang", "sank", "shook",
-        "understood", "arose", "awoke", "bore", "wore", "tore",
-        "hid", "lay", "laid", "led", "paid", "sold", "taught",
-        "caught", "fought", "sought", "shot", "spent", "split",
-        "spread", "struck", "stuck", "swung", "wept", "withdrew",
-        "was", "were", "did", "had",
-        "woke", "threw", "hung", "rode", "dug", "forgave", "drew",
-        "blew", "rose", "wove", "bit", "lit", "slid", "bent", "lent",
-        "dealt", "fed", "fled", "leapt", "knelt", "dwelt", "crept",
-        "spun", "stung", "clung", "flung", "wrung", "slung", "sprang",
-        "sprung", "stank", "shrank", "shone", "strove", "swore",
-        "swept", "strung",
+        "ran",
+        "went",
+        "came",
+        "saw",
+        "gave",
+        "took",
+        "made",
+        "got",
+        "wrote",
+        "spoke",
+        "knew",
+        "thought",
+        "felt",
+        "found",
+        "told",
+        "said",
+        "brought",
+        "bought",
+        "built",
+        "sent",
+        "heard",
+        "sat",
+        "stood",
+        "fell",
+        "grew",
+        "became",
+        "began",
+        "broke",
+        "kept",
+        "lost",
+        "won",
+        "met",
+        "left",
+        "meant",
+        "held",
+        "slept",
+        "ate",
+        "drank",
+        "drove",
+        "flew",
+        "forgot",
+        "chose",
+        "froze",
+        "stole",
+        "swam",
+        "sang",
+        "rang",
+        "sank",
+        "shook",
+        "understood",
+        "arose",
+        "awoke",
+        "bore",
+        "wore",
+        "tore",
+        "hid",
+        "lay",
+        "laid",
+        "led",
+        "paid",
+        "sold",
+        "taught",
+        "caught",
+        "fought",
+        "sought",
+        "shot",
+        "spent",
+        "split",
+        "spread",
+        "struck",
+        "stuck",
+        "swung",
+        "wept",
+        "withdrew",
+        "was",
+        "were",
+        "did",
+        "had",
+        "woke",
+        "threw",
+        "hung",
+        "rode",
+        "dug",
+        "forgave",
+        "drew",
+        "blew",
+        "rose",
+        "wove",
+        "bit",
+        "lit",
+        "slid",
+        "bent",
+        "lent",
+        "dealt",
+        "fed",
+        "fled",
+        "leapt",
+        "knelt",
+        "dwelt",
+        "crept",
+        "spun",
+        "stung",
+        "clung",
+        "flung",
+        "wrung",
+        "slung",
+        "sprang",
+        "sprung",
+        "stank",
+        "shrank",
+        "shone",
+        "strove",
+        "swore",
+        "swept",
+        "strung",
     }
 )
 
@@ -459,8 +764,7 @@ def agree_verb_phrase(phrase: str, subject_is_plural: bool) -> str:
         return "do" + (" " + rest if rest else "")
 
     # Modals and auxiliaries that never inflect
-    if first in ("can", "could", "will", "would", "shall", "should",
-                 "may", "might", "must"):
+    if first in ("can", "could", "will", "would", "shall", "should", "may", "might", "must"):
         return phrase
 
     # Deconjugate the first word back to base form.
@@ -520,7 +824,7 @@ def hedge_verb_phrase(verb_phrase: str) -> str:
         return phrase
     for prefix in _COPULAR_PHRASE_PREFIXES:
         if lower == prefix or lower.startswith(prefix + " "):
-            rest = phrase[len("is"):].strip()
+            rest = phrase[len("is") :].strip()
             return f"might be {rest}" if rest else "might be"
     if lower == "is" or lower.startswith("is "):
         rest = phrase[2:].strip()
@@ -538,21 +842,68 @@ def hedge_verb_phrase(verb_phrase: str) -> str:
 # English prepositions — a closed grammatical class. A verb phrase
 # ending in one ("is characterized by", "has to do with") licenses a
 # noun complement only: it cannot take a bare adjective.
-PREPOSITIONS = frozenset({
-    "to", "from", "of", "on", "in", "with", "by", "for", "at",
-    "toward", "towards", "into", "onto", "upon", "against",
-    "as", "like", "before", "after",
-})
+PREPOSITIONS = frozenset(
+    {
+        "to",
+        "from",
+        "of",
+        "on",
+        "in",
+        "with",
+        "by",
+        "for",
+        "at",
+        "toward",
+        "towards",
+        "into",
+        "onto",
+        "upon",
+        "against",
+        "as",
+        "like",
+        "before",
+        "after",
+    }
+)
 
 # Verb lemmas that license an adjectival complement — copulas and
 # copular verbs of perception/state ("seems", "remains").
-COPULAR_STARTERS = frozenset({
-    "is", "are", "am", "was", "were", "be", "been", "being",
-    "seems", "seem", "appears", "appear", "feels", "feel",
-    "looks", "look", "remains", "remain", "becomes", "become",
-    "stays", "stay", "sounds", "sound", "tastes", "taste",
-    "smells", "smell", "grows", "grow", "turns", "turn",
-})
+COPULAR_STARTERS = frozenset(
+    {
+        "is",
+        "are",
+        "am",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "seems",
+        "seem",
+        "appears",
+        "appear",
+        "feels",
+        "feel",
+        "looks",
+        "look",
+        "remains",
+        "remain",
+        "becomes",
+        "become",
+        "stays",
+        "stay",
+        "sounds",
+        "sound",
+        "tastes",
+        "taste",
+        "smells",
+        "smell",
+        "grows",
+        "grow",
+        "turns",
+        "turn",
+    }
+)
 
 
 def is_copular_frame(verb_phrase: str) -> bool:
@@ -564,9 +915,7 @@ def is_copular_frame(verb_phrase: str) -> bool:
     do not.
     """
     words = verb_phrase.lower().split()
-    return bool(words) and (
-        words[0] in COPULAR_STARTERS or words[-1] in {"being", "been"}
-    )
+    return bool(words) and (words[0] in COPULAR_STARTERS or words[-1] in {"being", "been"})
 
 
 def ends_in_preposition(verb_phrase: str) -> bool:
@@ -580,13 +929,42 @@ def ends_in_preposition(verb_phrase: str) -> bool:
 # Determiners and quantifiers that mark a noun object: a has_property
 # object opening with one takes "has" ("it has two wings", "it has
 # the trait"), while a bare property word takes the copula.
-_PROPERTY_OBJECT_OPENERS = frozenset({
-    "a", "an", "the", "my", "its", "our", "their", "his", "her",
-    "your", "this", "that", "these", "those", "some", "any", "no",
-    "each", "every", "either", "neither", "another", "few", "many",
-    "much", "more", "most", "several", "both", "plenty", "lots",
-    "enough",
-})
+_PROPERTY_OBJECT_OPENERS = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "my",
+        "its",
+        "our",
+        "their",
+        "his",
+        "her",
+        "your",
+        "this",
+        "that",
+        "these",
+        "those",
+        "some",
+        "any",
+        "no",
+        "each",
+        "every",
+        "either",
+        "neither",
+        "another",
+        "few",
+        "many",
+        "much",
+        "more",
+        "most",
+        "several",
+        "both",
+        "plenty",
+        "lots",
+        "enough",
+    }
+)
 
 
 def property_verb_phrase(object_text: str) -> str:
@@ -601,18 +979,12 @@ def property_verb_phrase(object_text: str) -> str:
     words = object_text.lower().split()
     if not words:
         return "is"
-    if (
-        is_plural_np(object_text)
-        or words[0] in _PROPERTY_OBJECT_OPENERS
-        or words[0][0].isdigit()
-    ):
+    if is_plural_np(object_text) or words[0] in _PROPERTY_OBJECT_OPENERS or words[0][0].isdigit():
         return "has"
     return "is"
 
 
-def property_verb_candidates(
-    object_text: str, candidates: list[str]
-) -> list[str]:
+def property_verb_candidates(object_text: str, candidates: list[str]) -> list[str]:
     """Filter verb candidates for a has_property edge to those whose
     complement license fits the object. Always non-empty.
 
@@ -624,10 +996,7 @@ def property_verb_candidates(
     """
     if property_verb_phrase(object_text) == "has":
         return candidates or ["has"]
-    copular = [
-        v for v in candidates
-        if is_copular_frame(v) and not ends_in_preposition(v)
-    ]
+    copular = [v for v in candidates if is_copular_frame(v) and not ends_in_preposition(v)]
     return copular or ["is"]
 
 
@@ -672,10 +1041,26 @@ def copula(subject: str) -> str:
 # (/j/ "y-" or /w/ "w-") take "a", not "an".
 _AN_EXCEPTIONS: frozenset[str] = frozenset(
     {
-        "university", "unicorn", "unique", "unit", "united",
-        "universe", "universal", "user", "use", "useful",
-        "usual", "usually", "utopia", "utopian", "european",
-        "eucalyptus", "euphemism", "one", "once", "one-time",
+        "university",
+        "unicorn",
+        "unique",
+        "unit",
+        "united",
+        "universe",
+        "universal",
+        "user",
+        "use",
+        "useful",
+        "usual",
+        "usually",
+        "utopia",
+        "utopian",
+        "european",
+        "eucalyptus",
+        "euphemism",
+        "one",
+        "once",
+        "one-time",
     }
 )
 
@@ -718,7 +1103,7 @@ def indefinite_article(phrase: str) -> str:
 _PRONOUNS: dict[str, tuple[str, str, bool]] = {
     "she": ("she", "her", False),
     "he": ("he", "him", False),
-    "they": ("they", "them", True),   # singular they → plural agreement
+    "they": ("they", "them", True),  # singular they → plural agreement
     "it": ("it", "it", False),
 }
 
@@ -784,9 +1169,17 @@ def person_pronoun(
                         for edge in network.get_edges(concept.id, "out"):
                             if edge.relation.value in ("is_a", "instance_of"):
                                 t = edge.target.lower()
-                                if t in ("person", "human", "user",
-                                         "creator", "woman", "man",
-                                         "girl", "boy", "people"):
+                                if t in (
+                                    "person",
+                                    "human",
+                                    "user",
+                                    "creator",
+                                    "woman",
+                                    "man",
+                                    "girl",
+                                    "boy",
+                                    "people",
+                                ):
                                     is_person = True
                                     break
                     if is_person:

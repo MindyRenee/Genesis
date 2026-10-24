@@ -44,9 +44,7 @@ REGIONS = (
     "basal_forebrain",
 )
 
-REGION_MODULES = {
-    name: importlib.import_module(name) for name in REGIONS
-}
+REGION_MODULES = {name: importlib.import_module(name) for name in REGIONS}
 
 
 def _claims(region: str) -> dict[str, str]:
@@ -181,14 +179,10 @@ _OWNERSHIP_PINS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
 
 
 @pytest.mark.parametrize(("symbol", "must", "must_not"), _OWNERSHIP_PINS)
-def test_ownership_pins(
-    symbol: str, must: tuple[str, ...], must_not: tuple[str, ...]
-) -> None:
+def test_ownership_pins(symbol: str, must: tuple[str, ...], must_not: tuple[str, ...]) -> None:
     """The load-bearing regional ownership decisions hold."""
     for region in must:
-        assert symbol in REGION_MODULES[region].__all__, (
-            f"{symbol} must be claimed by {region}"
-        )
+        assert symbol in REGION_MODULES[region].__all__, f"{symbol} must be claimed by {region}"
     for region in must_not:
         assert symbol not in REGION_MODULES[region].__all__, (
             f"{symbol} must NOT be claimed by {region}"
@@ -207,18 +201,22 @@ _ALLOWLIST: dict[str, str] = {
     "infrastructure": "support layer (persistence, config, journal)",
     "eval": "baseline/drift/assay harness",
     "parietal_lobe.arc": "ARC-3 task-environment adapter, not a brain function",
+    "parietal_lobe.arc_cabinet": "X11 input surface for the ARC adapter, not a brain function",
     "parietal_lobe.arc_web": "web task-environment adapter, not a brain function",
     "parietal_lobe.arc_baseline": "ARC evidence script, not a brain function",
     "parietal_lobe.discord_showcase": "platform adapter, not a brain function",
     "frontal_lobe.krita_studio": "Krita plugin bridge — platform adapter, not a brain function",
     "commitment": "top-level support module",
     "discord_feed": "platform adapter",
+    "play": "ARC engine smoke script, not a brain function",
     "setup_embeddings": "one-off embedding setup script",
     "_views": "the view machinery itself",
     # Constant tables — no class/function to carry __module__, but the
     # file is brainstem's autonomic setpoints
     "brainstem.thresholds": "autonomic setpoints — constants owned by brainstem",
     "parietal_lobe.motion": "compatibility projection of occipitotemporal MT/V5",
+    "parietal_lobe.epipolar": "compatibility projection of occipital MSTd",
+    "frontal_lobe.tools.charter": "a prose letter to the organism — no code, nothing to claim",
 }
 
 _FUNCTIONAL_PACKAGES = (
@@ -301,9 +299,7 @@ def test_allowlist_entries_exist() -> None:
     for module in _ALLOWLIST:
         found = any(
             os.path.exists(os.path.join(root, *module.split(".")) + ".py")
-            or os.path.exists(
-                os.path.join(root, *module.split("."), "__init__.py")
-            )
+            or os.path.exists(os.path.join(root, *module.split("."), "__init__.py"))
             for root in (os.path.join(REPO, "python"), REPO)
         )
         assert found, f"allowlist entry {module} points at nothing"
@@ -338,9 +334,14 @@ def test_volition_workers_run_below_foreground_priority() -> None:
 
     holder = MagicMock()
     import threading
+
     holder._volition_lock = threading.Lock()
     holder._volition_active = {"probe"}
     holder._volition_sem = threading.Semaphore(1)
     holder._volition_sem.acquire()
+    # The wrapper drops work when the mind is suppressed or stopping —
+    # this probe must still run, so the holder reads as live.
+    holder._suppress_volition = False
+    holder._running = True
     vol.VolitionMixin._run_volition_action(holder, "probe", probe)
     assert seen["nice"] >= vol._VOLITION_NICE - 1

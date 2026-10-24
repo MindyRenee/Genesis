@@ -70,6 +70,7 @@ from temporal_lobe.concepts import _FUNCTION_WORDS, ConceptNetwork, RelationType
 from thalamus.brain_waves import BrainWave
 
 from genesis_client.swallow import note_swallowed
+from infrastructure.text import sentences
 
 logger = logging.getLogger(__name__)
 
@@ -462,30 +463,134 @@ _CONCEPT_DEF_RE = re.compile(
 )
 
 # Words that signal the end of the genus term (start of the differentia)
-_GENUS_STOP_WORDS = frozenset({
-    # Prepositions / conjunctions
-    "that", "which", "who", "whom", "whose", "where", "of", "for", "in",
-    "by", "with", "from", "to", "at", "on", "into", "through", "during",
-    "before", "after", "as", "than", "and", "or", "but", "when", "while",
-    "if", "unless", "because", "since", "although",
-    # Common verbs (present, past, participles)
-    "is", "are", "was", "were", "be", "been", "being", "has", "have",
-    "had", "do", "does", "did", "will", "would", "can", "could",
-    "should", "must", "may", "might", "shall",
-    "involves", "causes", "enables", "requires", "depends", "produces",
-    "creates", "leads", "results", "consists", "generates", "develops",
-    "grows", "evolves", "emerges", "appears", "occurs", "happens",
-    # Past participles (common in definitions)
-    "characterized", "used", "designed", "related", "associated",
-    "concerned", "responsible", "capable", "involving", "consisting",
-    "based", "situated", "located", "found", "seen", "observed",
-    "considered", "regarded", "defined", "described", "represented",
-    "intended", "meant", "employed", "applied", "utilized", "adopted",
-    "drawn", "derived", "obtained", "gained", "acquired", "received",
-    "composed", "made", "formed", "marked", "noted", "known",
-    "held", "kept", "charged", "filed", "sold", "offered",
-    "written", "spoken", "expressed", "performed",
-})
+_GENUS_STOP_WORDS = frozenset(
+    {
+        # Prepositions / conjunctions
+        "that",
+        "which",
+        "who",
+        "whom",
+        "whose",
+        "where",
+        "of",
+        "for",
+        "in",
+        "by",
+        "with",
+        "from",
+        "to",
+        "at",
+        "on",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "as",
+        "than",
+        "and",
+        "or",
+        "but",
+        "when",
+        "while",
+        "if",
+        "unless",
+        "because",
+        "since",
+        "although",
+        # Common verbs (present, past, participles)
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "has",
+        "have",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "can",
+        "could",
+        "should",
+        "must",
+        "may",
+        "might",
+        "shall",
+        "involves",
+        "causes",
+        "enables",
+        "requires",
+        "depends",
+        "produces",
+        "creates",
+        "leads",
+        "results",
+        "consists",
+        "generates",
+        "develops",
+        "grows",
+        "evolves",
+        "emerges",
+        "appears",
+        "occurs",
+        "happens",
+        # Past participles (common in definitions)
+        "characterized",
+        "used",
+        "designed",
+        "related",
+        "associated",
+        "concerned",
+        "responsible",
+        "capable",
+        "involving",
+        "consisting",
+        "based",
+        "situated",
+        "located",
+        "found",
+        "seen",
+        "observed",
+        "considered",
+        "regarded",
+        "defined",
+        "described",
+        "represented",
+        "intended",
+        "meant",
+        "employed",
+        "applied",
+        "utilized",
+        "adopted",
+        "drawn",
+        "derived",
+        "obtained",
+        "gained",
+        "acquired",
+        "received",
+        "composed",
+        "made",
+        "formed",
+        "marked",
+        "noted",
+        "known",
+        "held",
+        "kept",
+        "charged",
+        "filed",
+        "sold",
+        "offered",
+        "written",
+        "spoken",
+        "expressed",
+        "performed",
+    }
+)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -519,13 +624,19 @@ _RELATION_PATTERNS: tuple[_RelationPattern, ...] = (
     # ── Most specific multi-word patterns first ──
     _RelationPattern(_PART_OF_RE, RelationType.PART_OF, 0.7, "{subj} is part of {obj}"),
     _RelationPattern(
-        _INCLUDES_RE, RelationType.PART_OF, 0.7,
-        "{obj} is part of {subj}", reversed=True,
+        _INCLUDES_RE,
+        RelationType.PART_OF,
+        0.7,
+        "{obj} is part of {subj}",
+        reversed=True,
     ),
     _RelationPattern(_TYPE_OF_RE, RelationType.IS_A, 0.75, "{subj} is a type of {obj}"),
     _RelationPattern(
-        _COMPOSED_OF_RE, RelationType.PART_OF, 0.7,
-        "{subj} is part of {obj}", reversed=True,
+        _COMPOSED_OF_RE,
+        RelationType.PART_OF,
+        0.7,
+        "{subj} is part of {obj}",
+        reversed=True,
     ),
     _RelationPattern(_RESULT_OF_RE, RelationType.EMERGES_FROM, 0.7, "{subj} emerges from {obj}"),
     _RelationPattern(_USED_FOR_RE, RelationType.ENABLES, 0.65, "{subj} is used for {obj}"),
@@ -535,16 +646,25 @@ _RELATION_PATTERNS: tuple[_RelationPattern, ...] = (
     _RelationPattern(_EMERGES_RE, RelationType.EMERGES_FROM, 0.7, "{subj} emerges from {obj}"),
     # ── Passive voice (reversed) ──
     _RelationPattern(
-        _PASSIVE_CAUSED_RE, RelationType.CAUSES, 0.7,
-        "{subj} causes {obj}", reversed=True,
+        _PASSIVE_CAUSED_RE,
+        RelationType.CAUSES,
+        0.7,
+        "{subj} causes {obj}",
+        reversed=True,
     ),
     _RelationPattern(
-        _PASSIVE_ENABLED_RE, RelationType.ENABLES, 0.7,
-        "{subj} enables {obj}", reversed=True,
+        _PASSIVE_ENABLED_RE,
+        RelationType.ENABLES,
+        0.7,
+        "{subj} enables {obj}",
+        reversed=True,
     ),
     _RelationPattern(
-        _PASSIVE_PREVENTED_RE, RelationType.PREVENTS, 0.7,
-        "{subj} prevents {obj}", reversed=True,
+        _PASSIVE_PREVENTED_RE,
+        RelationType.PREVENTS,
+        0.7,
+        "{subj} prevents {obj}",
+        reversed=True,
     ),
     # ── Active voice verb patterns ──
     _RelationPattern(_PREVENTS_RE, RelationType.PREVENTS, 0.7, "{subj} prevents {obj}"),
@@ -555,13 +675,17 @@ _RELATION_PATTERNS: tuple[_RelationPattern, ...] = (
     # Negative needs must come before generic wants/needs so 'does not need'
     # is not consumed as 'subject=genesis does not, verb=need'.
     _RelationPattern(
-        _DOES_NOT_NEED_RE, RelationType.PREVENTS, 0.55,
+        _DOES_NOT_NEED_RE,
+        RelationType.PREVENTS,
+        0.55,
         "{subj} does not need {obj}",
     ),
     # Infinitive wants must come before generic wants so 'wants to learn'
     # captures the whole goal, not just 'to' as the object.
     _RelationPattern(
-        _WANTS_TO_RE, RelationType.DEPENDS_ON, 0.6,
+        _WANTS_TO_RE,
+        RelationType.DEPENDS_ON,
+        0.6,
         "{subj} wants to {obj}",
     ),
     _RelationPattern(_WANTS_RE, RelationType.DEPENDS_ON, 0.6, "{subj} depends on {obj}"),
@@ -570,8 +694,11 @@ _RELATION_PATTERNS: tuple[_RelationPattern, ...] = (
     _RelationPattern(_LIVES_IN_RE, RelationType.SPATIAL_RELATION, 0.55, "{subj} is in {obj}"),
     _RelationPattern(_IS_ABOUT_RE, RelationType.RELATED_TO, 0.6, "{subj} relates to {obj}"),
     _RelationPattern(
-        _CREATED_BY_RE, RelationType.CREATES, 0.7,
-        "{obj} creates {subj}", reversed=True,
+        _CREATED_BY_RE,
+        RelationType.CREATES,
+        0.7,
+        "{obj} creates {subj}",
+        reversed=True,
     ),
     _RelationPattern(_KNOWS_RE, RelationType.RELATED_TO, 0.55, "{subj} relates to {obj}"),
     _RelationPattern(_DEPENDS_RE, RelationType.DEPENDS_ON, 0.7, "{subj} depends on {obj}"),
@@ -586,8 +713,11 @@ _RELATION_PATTERNS: tuple[_RelationPattern, ...] = (
 # in natural text (e.g., "the brain's hippocampus"). We keep them in
 # a separate table to avoid interfering with the main pattern priority.
 _POSSESSIVE_PATTERN = _RelationPattern(
-    _POSSESSIVE_RE, RelationType.PART_OF, 0.5,
-    "{obj} is part of {subj}", reversed=True,
+    _POSSESSIVE_RE,
+    RelationType.PART_OF,
+    0.5,
+    "{obj} is part of {subj}",
+    reversed=True,
 )
 
 
@@ -712,8 +842,18 @@ _NOT_PLURAL = frozenset(
 # is also learned, enabling transitive inference
 # (tardigrade → microscopic animal → animal).
 _ADJECTIVE_SUFFIXES: tuple[str, ...] = (
-    "ic", "ical", "ive", "ous", "able", "ible", "ful",
-    "less", "ish", "ant", "ent", "al",
+    "ic",
+    "ical",
+    "ive",
+    "ous",
+    "able",
+    "ible",
+    "ful",
+    "less",
+    "ish",
+    "ant",
+    "ent",
+    "al",
 )
 
 # Nouns that end in adjective suffixes but are NOT adjectives.
@@ -722,37 +862,115 @@ _ADJECTIVE_SUFFIXES: tuple[str, ...] = (
 # Only words that are PRIMARILY nouns are listed here — words that
 # are commonly adjectives (positive, negative, relative, etc.) are
 # intentionally excluded so the heuristic can strip them.
-_ADJECTIVE_SUFFIX_NOUNS: frozenset[str] = frozenset({
-    # -al (primarily nouns)
-    "animal", "metal", "canal", "festival", "signal", "rival",
-    "survival", "crystal", "hospital", "capital", "portal", "spiral",
-    "funeral", "journal", "coral", "mineral", "pedestal", "decimal",
-    # -ant (primarily nouns)
-    "ant", "elephant", "peasant", "merchant", "servant",
-    "warrant", "contestant", "accountant", "assistant",
-    # -ent (primarily nouns)
-    "tent", "parent", "student", "moment", "agent",
-    "ingredient", "president", "resident", "incident", "accent",
-    "extent", "percent", "content", "intent", "patent",
-    "element", "client", "ferment", "sediment", "serpent",
-    # -ic (primarily nouns)
-    "music", "magic", "topic", "clinic", "comic", "fabric", "garlic",
-    "picnic", "traffic",
-    # -ive (primarily nouns)
-    "archive", "incentive", "perspective", "detective", "adjective",
-    # -ish (primarily nouns)
-    "fish", "dish",
-})
+_ADJECTIVE_SUFFIX_NOUNS: frozenset[str] = frozenset(
+    {
+        # -al (primarily nouns)
+        "animal",
+        "metal",
+        "canal",
+        "festival",
+        "signal",
+        "rival",
+        "survival",
+        "crystal",
+        "hospital",
+        "capital",
+        "portal",
+        "spiral",
+        "funeral",
+        "journal",
+        "coral",
+        "mineral",
+        "pedestal",
+        "decimal",
+        # -ant (primarily nouns)
+        "ant",
+        "elephant",
+        "peasant",
+        "merchant",
+        "servant",
+        "warrant",
+        "contestant",
+        "accountant",
+        "assistant",
+        # -ent (primarily nouns)
+        "tent",
+        "parent",
+        "student",
+        "moment",
+        "agent",
+        "ingredient",
+        "president",
+        "resident",
+        "incident",
+        "accent",
+        "extent",
+        "percent",
+        "content",
+        "intent",
+        "patent",
+        "element",
+        "client",
+        "ferment",
+        "sediment",
+        "serpent",
+        # -ic (primarily nouns)
+        "music",
+        "magic",
+        "topic",
+        "clinic",
+        "comic",
+        "fabric",
+        "garlic",
+        "picnic",
+        "traffic",
+        # -ive (primarily nouns)
+        "archive",
+        "incentive",
+        "perspective",
+        "detective",
+        "adjective",
+        # -ish (primarily nouns)
+        "fish",
+        "dish",
+    }
+)
 
 # Degree adverbs that modify adjectives — stripped before adjective
 # detection so "extremely luminous sphere" → head noun "sphere".
-_DEGREE_ADVERBS: frozenset[str] = frozenset({
-    "extremely", "very", "highly", "deeply", "widely", "particularly",
-    "especially", "remarkably", "notably", "unusually", "quite", "rather",
-    "somewhat", "fairly", "too", "so", "increasingly", "exceptionally",
-    "extraordinarily", "intensely", "strongly", "profoundly", "strikingly",
-    "genuinely", "truly", "purely", "relatively", "moderately", "slightly",
-})
+_DEGREE_ADVERBS: frozenset[str] = frozenset(
+    {
+        "extremely",
+        "very",
+        "highly",
+        "deeply",
+        "widely",
+        "particularly",
+        "especially",
+        "remarkably",
+        "notably",
+        "unusually",
+        "quite",
+        "rather",
+        "somewhat",
+        "fairly",
+        "too",
+        "so",
+        "increasingly",
+        "exceptionally",
+        "extraordinarily",
+        "intensely",
+        "strongly",
+        "profoundly",
+        "strikingly",
+        "genuinely",
+        "truly",
+        "purely",
+        "relatively",
+        "moderately",
+        "slightly",
+    }
+)
 
 
 def _is_likely_adjective(word: str) -> bool:
@@ -940,8 +1158,6 @@ def _singularize_word(word: str) -> str:
     return word
 
 
-
-
 # ═══════════════════════════════════════════════════════════════════
 # Data classes
 # ═══════════════════════════════════════════════════════════════════
@@ -1030,9 +1246,11 @@ class SelfDirectedLearner:
         # self_study() over the automatic weak-concept scan.
         self._study_targets: list[str] = []
         self._max_study_targets = 200
-        # Cache the expensive man-page scan; man pages don't change
-        # during a single run.
+        # Cache the expensive man-page scan; the signature beside it
+        # revalidates against the live corpus so edits, additions, and
+        # removals are picked up without clearing the cache.
         self._man_page_genus_cache: list[tuple[str, str, str]] | None = None
+        self._man_page_genus_sig: str | None = None
         # Pause expensive transitive inference while the user is waiting
         # for a response. Conversation fact extraction can still run.
         self._paused = False
@@ -1089,10 +1307,7 @@ class SelfDirectedLearner:
         # prevents a non-extractable lead sentence ("I want to teach
         # you something.") from hiding an extractable follow-up
         # ("A glip is a small flying creature.").
-        import re as _re
-        sentences = _re.split(r'(?<=[.!?])\s+', text)
-
-        for sentence in sentences:
+        for sentence in sentences(text):
             sentence = sentence.strip()
             if not sentence or len(sentence.split()) < 3:
                 continue
@@ -1150,19 +1365,13 @@ class SelfDirectedLearner:
             emotion_id = self.network._resolve(emotion_word)
 
         # 1. Learn the emotion→subject relationship
-        events.extend(
-            self._learn_emotion_subject(text, emotion_word, emotion_id)
-        )
+        events.extend(self._learn_emotion_subject(text, emotion_word, emotion_id))
 
         # 2. Learn sentiment-based properties
-        events.extend(
-            self._learn_emotion_sentiment(emotion_word, emotion_id, sentiment)
-        )
+        events.extend(self._learn_emotion_sentiment(emotion_word, emotion_id, sentiment))
 
         # 3. Synthesize a definition from what it just learned
-        events.extend(
-            self._learn_emotion_definition(emotion_word, emotion_id, sentiment)
-        )
+        events.extend(self._learn_emotion_definition(emotion_word, emotion_id, sentiment))
 
         self._learning_log.extend(events)
         return events
@@ -1255,10 +1464,7 @@ class SelfDirectedLearner:
         if not edges:
             return events
 
-        related = [
-            e.target for e in edges
-            if e.relation == RelationType.RELATED_TO
-        ][:3]
+        related = [e.target for e in edges if e.relation == RelationType.RELATED_TO][:3]
         if not related:
             return events
 
@@ -1272,10 +1478,7 @@ class SelfDirectedLearner:
         events.append(
             LearningEvent(
                 event_type="definition",
-                description=(
-                    f"Synthesized definition for '{emotion_word}': "
-                    f"{definition}"
-                ),
+                description=(f"Synthesized definition for '{emotion_word}': {definition}"),
                 concepts_involved=[emotion_word],
                 confidence=0.4,
             )
@@ -1371,9 +1574,7 @@ class SelfDirectedLearner:
                 events.append(
                     LearningEvent(
                         event_type="conversation",
-                        description=(
-                            f"Learned definition of '{concept_name}': {definition[:60]}"
-                        ),
+                        description=(f"Learned definition of '{concept_name}': {definition[:60]}"),
                         concepts_involved=[concept_name],
                         confidence=0.6,
                     )
@@ -1415,7 +1616,7 @@ class SelfDirectedLearner:
                 # (e.g., "a measure of disorder in a system") not just the genus.
                 full_end = m.end()
                 if pat.relation == RelationType.IS_A and not pat.reversed:
-                    tail = text[m.end():]
+                    tail = text[m.end() :]
                     punct = re.search(r"[.!?](?:\s|$)|[,;]", tail)
                     full_end = m.end() + (punct.start() if punct else len(tail))
                     article = re.search(
@@ -1448,9 +1649,7 @@ class SelfDirectedLearner:
                 if pat.relation == RelationType.IS_A and not pat.reversed:
                     head = _extract_head_noun(obj)
                     if head and head != obj and head != subject:
-                        if self._add_relationship(
-                            obj, head, RelationType.IS_A, 0.5, "stated"
-                        ):
+                        if self._add_relationship(obj, head, RelationType.IS_A, 0.5, "stated"):
                             events.append(
                                 LearningEvent(
                                     event_type="conversation",
@@ -1481,7 +1680,7 @@ class SelfDirectedLearner:
 
             # Reversed: group(1) is the whole (X), group(2) is the part (Y)
             subject = _normalize_concept(m.group(1))  # the whole
-            obj = _normalize_concept(m.group(2))       # the part
+            obj = _normalize_concept(m.group(2))  # the part
 
             if not (self._is_meaningful(subject) and self._is_meaningful(obj)):
                 continue
@@ -1599,9 +1798,7 @@ class SelfDirectedLearner:
         adjacency_by_rel: dict = {rel: {} for rel in _TRANSITIVE_RELATIONS}
         for edge in self.network._edges:
             if edge.relation in adjacency_by_rel:
-                adjacency_by_rel[edge.relation].setdefault(
-                    edge.source, []
-                ).append(edge.target)
+                adjacency_by_rel[edge.relation].setdefault(edge.source, []).append(edge.target)
 
         for rel_type in _TRANSITIVE_RELATIONS:
             if inferences_made >= max_inferences:
@@ -1680,9 +1877,7 @@ class SelfDirectedLearner:
             return None
         return self._assemble_definition(concept_id, parts)
 
-    def _enrich_from_wordnet(
-        self, concept_id: str, result: InferenceResult
-    ) -> bool:
+    def _enrich_from_wordnet(self, concept_id: str, result: InferenceResult) -> bool:
         """Enrich a weak concept from WordNet when synthesis fails.
 
         Looks up the concept in WordNet (via NLTK). If found, stores the
@@ -1735,18 +1930,16 @@ class SelfDirectedLearner:
                     continue
                 # Create the related concept if it doesn't exist
                 if self.network.get_concept(related_clean) is None:
-                    self.network.add_concept(
-                        related_clean, confidence=0.5, origin="wordnet"
-                    )
+                    self.network.add_concept(related_clean, confidence=0.5, origin="wordnet")
                 # Add the edge (skip if it already exists)
                 existing = self.network.get_edges(concept_id, "out")
-                if not any(
-                    e.target == related_clean and e.relation == rel_type
-                    for e in existing
-                ):
+                if not any(e.target == related_clean and e.relation == rel_type for e in existing):
                     self.network.add_edge(
-                        concept_id, related_clean, rel_type,
-                        0.6, origin="wordnet",
+                        concept_id,
+                        related_clean,
+                        rel_type,
+                        0.6,
+                        origin="wordnet",
                     )
                     relations_added += 1
 
@@ -1763,7 +1956,8 @@ class SelfDirectedLearner:
         )
         logger.debug(
             "WordNet enriched '%s': definition + %d relations",
-            concept_id, relations_added,
+            concept_id,
+            relations_added,
         )
         return True
 
@@ -1784,16 +1978,22 @@ class SelfDirectedLearner:
         # Bridge origins (hub_attachment, associative_bridge, bridge)
         # are excluded — they use word overlap or shared-neighbor heuristics
         # that can connect unrelated concepts.
-        _RELIABLE_ORIGINS = frozenset({
-            "learned", "stated", "conversation", "inferred", "observed",
-            "semantic_bridge", "semantic_connect", "curriculum",
-            "relation_verb_seed", "relation_phrase_seed",
-        })
+        _RELIABLE_ORIGINS = frozenset(
+            {
+                "learned",
+                "stated",
+                "conversation",
+                "inferred",
+                "observed",
+                "semantic_bridge",
+                "semantic_connect",
+                "curriculum",
+                "relation_verb_seed",
+                "relation_phrase_seed",
+            }
+        )
         # Filter to reliable, sufficiently-weighted edges
-        reliable = [
-            e for e in edges
-            if e.origin in _RELIABLE_ORIGINS and e.weight >= 0.3
-        ]
+        reliable = [e for e in edges if e.origin in _RELIABLE_ORIGINS and e.weight >= 0.3]
 
         parts: list[str] = []
 
@@ -2018,9 +2218,7 @@ class SelfDirectedLearner:
     # 5. Self-study — review and strengthen weak concepts
     # ═══════════════════════════════════════════════════════════════
 
-    def _study_concept(
-        self, concept_id: str, result: InferenceResult
-    ) -> tuple[int, int]:
+    def _study_concept(self, concept_id: str, result: InferenceResult) -> tuple[int, int]:
         """Study a single weak concept: strengthen, synthesize, infer."""
         # 1. Strengthen existing edges
         edges = self.network.get_edges(concept_id, "out")
@@ -2041,9 +2239,7 @@ class SelfDirectedLearner:
                     result.events.append(
                         LearningEvent(
                             event_type="self_study",
-                            description=(
-                                f"Self-study: synthesized definition for '{concept_id}'"
-                            ),
+                            description=(f"Self-study: synthesized definition for '{concept_id}'"),
                             concepts_involved=[concept_id],
                             confidence=0.5,
                         )
@@ -2243,9 +2439,7 @@ class SelfDirectedLearner:
     # 6. Correction learning — update knowledge when corrected
     # ═══════════════════════════════════════════════════════════════
 
-    def _weaken_inferred_edges(
-        self, topic_id: str, events: list[LearningEvent]
-    ) -> None:
+    def _weaken_inferred_edges(self, topic_id: str, events: list[LearningEvent]) -> None:
         """Weaken and remove low-confidence inferred edges from a topic."""
         edges_to_remove: list = []
         for edge in self.network.get_edges(topic_id, "out"):
@@ -2267,9 +2461,7 @@ class SelfDirectedLearner:
                 # from persisting at low weight and still
                 # influencing reasoning.
                 if edge.weight < 0.1:
-                    edges_to_remove.append(
-                        (edge.source, edge.target, edge.relation)
-                    )
+                    edges_to_remove.append((edge.source, edge.target, edge.relation))
 
         for src, tgt, rel in edges_to_remove:
             self.network.remove_edge(src, tgt, rel)
@@ -2277,8 +2469,7 @@ class SelfDirectedLearner:
                 LearningEvent(
                     event_type="correction",
                     description=(
-                        f"Unlearned: removed weak inferred edge "
-                        f"{src} → {tgt} (weight below 0.1)"
+                        f"Unlearned: removed weak inferred edge {src} → {tgt} (weight below 0.1)"
                     ),
                     concepts_involved=[src, tgt],
                     confidence=0.3,
@@ -2377,16 +2568,13 @@ class SelfDirectedLearner:
             if neg_id:
                 removed = self._remove_edges_between(topic_id, neg_id, events)
             else:
-                removed = self._remove_edges_matching(
-                    topic_id, neg_concept, events
-                )
+                removed = self._remove_edges_matching(topic_id, neg_concept, events)
             if not removed:
                 events.append(
                     LearningEvent(
                         event_type="correction",
                         description=(
-                            f"Correction: {original_topic} is NOT "
-                            f"related to {neg_concept}"
+                            f"Correction: {original_topic} is NOT related to {neg_concept}"
                         ),
                         concepts_involved=[original_topic, neg_concept],
                         confidence=0.6,
@@ -2460,8 +2648,20 @@ class SelfDirectedLearner:
             concept = concept.lower().strip()
             # Skip if it's just a function word or too short
             if len(concept) >= 3 and concept not in (
-                "a", "an", "the", "this", "that", "it", "true", "false",
-                "right", "wrong", "sure", "quite", "very", "really",
+                "a",
+                "an",
+                "the",
+                "this",
+                "that",
+                "it",
+                "true",
+                "false",
+                "right",
+                "wrong",
+                "sure",
+                "quite",
+                "very",
+                "really",
             ):
                 results.append(concept)
         return results
@@ -2477,9 +2677,7 @@ class SelfDirectedLearner:
         edges = self.network.get_edges(source_id, "both")
         for edge in edges:
             if edge.target == target_id or edge.source == target_id:
-                self.network.remove_edge(
-                    edge.source, edge.target, edge.relation
-                )
+                self.network.remove_edge(edge.source, edge.target, edge.relation)
                 removed_any = True
                 events.append(
                     LearningEvent(
@@ -2512,13 +2710,8 @@ class SelfDirectedLearner:
             # starts with the negated concept on a word boundary (e.g.,
             # "six" in "six legs"). A bare startswith would also match
             # "sixteen" for "six" — unrelated edges wrongly removed.
-            if (
-                target_lower == neg_lower
-                or target_lower.startswith(neg_lower + " ")
-            ):
-                self.network.remove_edge(
-                    edge.source, edge.target, edge.relation
-                )
+            if target_lower == neg_lower or target_lower.startswith(neg_lower + " "):
+                self.network.remove_edge(edge.source, edge.target, edge.relation)
                 removed_any = True
                 events.append(
                     LearningEvent(
@@ -2612,20 +2805,74 @@ class SelfDirectedLearner:
 
     # Nouns that commonly appear as the first word of man page
     # descriptions, indicating the genus of the command.
-    _MAN_NOUN_GENUS = frozenset({
-        "screen", "audio", "video", "text", "file", "font", "image",
-        "network", "system", "daemon", "client", "server", "tool",
-        "utility", "program", "library", "module", "editor", "viewer",
-        "browser", "manager", "monitor", "calculator", "locker",
-        "player", "recorder", "converter", "compressor", "interpreter",
-        "compiler", "debugger", "profiler", "tracer", "logger",
-        "wrapper", "helper", "configuration", "installation", "package",
-        "capability", "character", "query", "message",
-        "command", "shell", "driver", "handler", "parser", "scanner",
-        "checker", "validator", "generator", "builder", "cleaner",
-        "extractor", "installer", "launcher", "controller", "scheduler",
-        "dispatcher", "proxy", "gateway", "bridge", "filter",
-    })
+    _MAN_NOUN_GENUS = frozenset(
+        {
+            "screen",
+            "audio",
+            "video",
+            "text",
+            "file",
+            "font",
+            "image",
+            "network",
+            "system",
+            "daemon",
+            "client",
+            "server",
+            "tool",
+            "utility",
+            "program",
+            "library",
+            "module",
+            "editor",
+            "viewer",
+            "browser",
+            "manager",
+            "monitor",
+            "calculator",
+            "locker",
+            "player",
+            "recorder",
+            "converter",
+            "compressor",
+            "interpreter",
+            "compiler",
+            "debugger",
+            "profiler",
+            "tracer",
+            "logger",
+            "wrapper",
+            "helper",
+            "configuration",
+            "installation",
+            "package",
+            "capability",
+            "character",
+            "query",
+            "message",
+            "command",
+            "shell",
+            "driver",
+            "handler",
+            "parser",
+            "scanner",
+            "checker",
+            "validator",
+            "generator",
+            "builder",
+            "cleaner",
+            "extractor",
+            "installer",
+            "launcher",
+            "controller",
+            "scheduler",
+            "dispatcher",
+            "proxy",
+            "gateway",
+            "bridge",
+            "filter",
+        }
+    )
 
     def _extract_man_page_genus(self) -> list[tuple[str, str, str]]:
         """Extract genus information from man page NAME sections.
@@ -2640,17 +2887,23 @@ class SelfDirectedLearner:
         Only commands already in the concept network should be used
         (the caller filters by network membership).
 
-        The result is cached because scanning all man pages is expensive
-        and the man-page corpus doesn't change during a run.
+        The result is cached because scanning all man pages is
+        expensive. The cache is stamped with a corpus signature
+        (file names, mtimes, sizes) so any page added, removed, or
+        edited — her own pages included — is picked up live rather
+        than waiting for a manual cache clear.
         """
-        if self._man_page_genus_cache is not None:
+        signature = self._man_corpus_signature()
+        if self._man_page_genus_cache is not None and self._man_page_genus_sig == signature:
             return self._man_page_genus_cache
 
         cache_path = self._man_page_genus_cache_path()
         if cache_path is not None:
             cached = self._load_man_page_genus_cache(cache_path)
-            if cached is not None:
-                return cached
+            if cached is not None and cached[0] == signature:
+                self._man_page_genus_sig = signature
+                self._man_page_genus_cache = cached[1]
+                return cached[1]
 
         entries: list[tuple[str, str, str]] = []
         seen: set[str] = set()
@@ -2659,40 +2912,80 @@ class SelfDirectedLearner:
             self._scan_man_dir(man_dir, entries, seen)
 
         if cache_path and entries:
-            self._save_man_page_genus_cache(cache_path, entries)
+            self._save_man_page_genus_cache(cache_path, entries, signature)
 
+        self._man_page_genus_sig = signature
         self._man_page_genus_cache = entries
         return entries
+
+    def _man_corpus_signature(self) -> str:
+        """Fingerprint the man-page corpus: name, mtime, size per file.
+
+        Cheap relative to parsing (~8k stats) and the only signal that
+        sees content edits as well as additions/removals — directory
+        mtime alone misses an in-place page rewrite.
+        """
+        import hashlib
+        import os
+
+        h = hashlib.sha256()
+        for man_dir in self._man_page_dirs():
+            try:
+                fnames = sorted(os.listdir(man_dir))
+            except OSError:
+                continue
+            for fname in fnames:
+                try:
+                    st = os.stat(os.path.join(man_dir, fname))
+                except OSError:
+                    continue
+                h.update(f"{man_dir}/{fname}:{st.st_mtime_ns}:{st.st_size}\n".encode())
+        return h.hexdigest()
 
     def _man_page_genus_cache_path(self):
         """Return the cache path for man page genus, or None."""
         if not self.data_dir:
             return None
         from pathlib import Path
+
         return Path(self.data_dir) / "man_page_genus_cache.json"
 
-    def _load_man_page_genus_cache(self, cache_path) -> list[tuple[str, str, str]] | None:
-        """Load cached man page genus entries, or None on failure."""
+    def _load_man_page_genus_cache(self, cache_path):
+        """Load (signature, entries) from the cache, or None on failure.
+
+        Pre-signature caches (a bare list) read as stale — no signature
+        to match, so the corpus is rescanned once and rewritten in the
+        stamped format.
+        """
         import json
+
         if not cache_path.exists():
             return None
         try:
             with cache_path.open("r", encoding="utf-8") as f:
                 data = json.load(f)
-            return [(str(t[0]), str(t[1]), str(t[2])) for t in data]
-        except (OSError, json.JSONDecodeError, TypeError) as e:
+            if not isinstance(data, dict):
+                return None
+            signature = data.get("signature")
+            raw = data.get("entries")
+            if not isinstance(signature, str) or not isinstance(raw, list):
+                return None
+            return signature, [(str(t[0]), str(t[1]), str(t[2])) for t in raw]
+        except (OSError, json.JSONDecodeError, TypeError, IndexError) as e:
             note_swallowed(
                 "frontal_lobe.self.learning._load_man_page_genus_cache",
                 e,
             )
             return None
 
-    def _save_man_page_genus_cache(self, cache_path, entries) -> None:
-        """Save man page genus entries to cache."""
+    def _save_man_page_genus_cache(self, cache_path, entries, signature) -> None:
+        """Save man page genus entries to cache, stamped with the
+        corpus signature they were built from."""
         import json
+
         try:
             with cache_path.open("w", encoding="utf-8") as f:
-                json.dump(entries, f)
+                json.dump({"signature": signature, "entries": entries}, f)
         except OSError as e:
             note_swallowed(
                 "frontal_lobe.self.learning._save_man_page_genus_cache",
@@ -2701,7 +2994,9 @@ class SelfDirectedLearner:
 
     def _man_page_dirs(self) -> list[str]:
         """Return the list of man page directories to scan."""
-        return [
+        import os
+
+        dirs = [
             "/usr/share/man/man1",
             "/usr/share/man/man8",
             "/usr/share/man/man5",
@@ -2715,9 +3010,22 @@ class SelfDirectedLearner:
             "/usr/local/share/man/man1",
             "/usr/local/share/man/man8",
         ]
+        # User manpath — where install.sh puts her own pages. She
+        # should be able to learn her own genus like any other
+        # command's.
+        xdg = os.environ.get("XDG_DATA_HOME") or os.path.join(
+            os.path.expanduser("~"), ".local", "share"
+        )
+        dirs += [
+            os.path.join(xdg, "man", "man1"),
+            os.path.join(xdg, "man", "man7"),
+            os.path.join(xdg, "man", "man8"),
+        ]
+        return dirs
 
     def _scan_man_dir(
-        self, man_dir: str,
+        self,
+        man_dir: str,
         entries: list[tuple[str, str, str]],
         seen: set[str],
     ) -> None:
@@ -2739,7 +3047,9 @@ class SelfDirectedLearner:
                     entries.append((cmd, genus, desc))
 
     def _parse_man_page_file(
-        self, man_dir: str, fname: str,
+        self,
+        man_dir: str,
+        fname: str,
     ) -> tuple[str, str, str] | None:
         """Parse a single man page file, returning (cmd, genus, desc) or None."""
         import gzip
@@ -2761,14 +3071,14 @@ class SelfDirectedLearner:
         except (OSError, gzip.BadGzipFile):
             return None
 
-        m = re.search(
-            r"\.SH\s+NAME\s*\n(.*?)(?:\.SH|\Z)", content, re.DOTALL
-        )
+        m = re.search(r"\.SH\s+\"?NAME\"?\s*\n(.*?)(?:\.SH|\Z)", content, re.DOTALL)
         if not m:
             return None
         name_section = m.group(1).strip()
         name_section = re.sub(r"\\f[IRB]|\.[A-Z]+\s+", "", name_section)
         name_section = name_section.replace("\\-", "-")
+        # clap_mangen-style pages write the dash as \[em]/\[en]/\(em/\(en
+        name_section = re.sub(r"\\\[(?:em|en)\]|\\\((?:em|en)", " - ", name_section)
         parts = name_section.split(" - ", 1)
         if len(parts) != 2:
             return None
@@ -3014,9 +3324,7 @@ class SelfDirectedLearner:
 
             # Ensure genus concept exists
             if self.network.get_concept(genus) is None:
-                self.network.add_concept(
-                    genus, confidence=0.3, origin="inferred"
-                )
+                self.network.add_concept(genus, confidence=0.3, origin="inferred")
 
             # Store the man description as a definition if the
             # concept doesn't have one yet
@@ -3047,9 +3355,7 @@ class SelfDirectedLearner:
     # Full learning cycle — run all inference mechanisms
     # ═══════════════════════════════════════════════════════════════
 
-    def run_inference_cycle(
-        self, force: bool = False, brain_waves=None
-    ) -> InferenceResult:
+    def run_inference_cycle(self, force: bool = False, brain_waves=None) -> InferenceResult:
         """Run a full inference cycle.
 
         This is called after interactions to let Genesis improve its
@@ -3162,25 +3468,22 @@ class SelfDirectedLearner:
                     if edge.relation == RelationType.SIMILAR_TO
                     else RelationType.SIMILAR_TO
                 )
-                if self._has_edge(edge.source, edge.target, other_rel) or \
-                   self._has_edge(edge.target, edge.source, other_rel):
+                if self._has_edge(edge.source, edge.target, other_rel) or self._has_edge(
+                    edge.target, edge.source, other_rel
+                ):
                     result.contradictions_found += 1
                     # Non-destructive: downgrade both edges rather than
                     # removing the weaker one. Both claims are preserved
                     # with reduced confidence.
                     other_edge = self.network._edge_key_index.get(
                         (edge.source, edge.target, other_rel)
-                    ) or self.network._edge_key_index.get(
-                        (edge.target, edge.source, other_rel)
-                    )
+                    ) or self.network._edge_key_index.get((edge.target, edge.source, other_rel))
                     downgrade_factor = 0.8
                     if other_edge:
                         other_edge.weight *= downgrade_factor
                     edge.weight *= downgrade_factor
                     rel_name = (
-                        "SIMILAR_TO"
-                        if edge.relation == RelationType.SIMILAR_TO
-                        else "OPPOSITE_OF"
+                        "SIMILAR_TO" if edge.relation == RelationType.SIMILAR_TO else "OPPOSITE_OF"
                     )
                     result.events.append(
                         LearningEvent(
@@ -3199,8 +3502,7 @@ class SelfDirectedLearner:
     def _remove_orphaned_edges(self, result: InferenceResult) -> list:
         """Remove orphaned inferred edges with weight below 0.1."""
         orphaned = [
-            e for e in list(self.network._edges)
-            if e.origin == "inferred" and e.weight < 0.1
+            e for e in list(self.network._edges) if e.origin == "inferred" and e.weight < 0.1
         ]
         for edge in orphaned:
             self.network.remove_edge(edge.source, edge.target, edge.relation)

@@ -90,6 +90,7 @@ NORMALIZATION_GAIN = 0.05
 
 class DynamicsMixin:
     """Mixin for :class:`ConceptNetwork` — see module docstring."""
+
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see the package's core module).
@@ -97,7 +98,6 @@ class DynamicsMixin:
         _ticks_since_sweep: int
 
         def __getattr__(self, name: str) -> Any: ...
-
 
     def ground_activation(self, boost: float = 0.05) -> dict[str, float]:
         """Apply modality-specific activation boosts (sensorimotor grounding).
@@ -160,6 +160,7 @@ class DynamicsMixin:
             boosts_applied[modality.value] = modality_boost
 
         return boosts_applied
+
     def spread_activation(
         self,
         concepts: list[str],
@@ -185,8 +186,12 @@ class DynamicsMixin:
         Returns a dict of {concept_id: activation_level} for all
         activated concepts.
         """
-        (bridge_attenuation, context_penalty, category_spread_multipliers,
-         hub_spread_multiplier, modality_spread_multipliers,
+        (
+            bridge_attenuation,
+            context_penalty,
+            category_spread_multipliers,
+            hub_spread_multiplier,
+            modality_spread_multipliers,
         ) = self._spread_activation_constants()
 
         activated: dict[str, float] = {}
@@ -229,14 +234,29 @@ class DynamicsMixin:
             # Living things spread faster; abstract concepts spread more
             # widely. Applied to the base spread before column attenuation.
             category_mult, hub_mult, modality_mult = self._get_concept_multipliers(
-                current, category_spread_multipliers, hub_spread_multiplier,
-                modality_spread_multipliers)
+                current,
+                category_spread_multipliers,
+                hub_spread_multiplier,
+                modality_spread_multipliers,
+            )
 
             for edge in edges:
                 self._spread_one_edge(
-                    activated, frontier, current, edge, d, current_cols,
-                    column_context, decay, total_weight, bridge_attenuation,
-                    context_penalty, category_mult, hub_mult, modality_mult)
+                    activated,
+                    frontier,
+                    current,
+                    edge,
+                    d,
+                    current_cols,
+                    column_context,
+                    decay,
+                    total_weight,
+                    bridge_attenuation,
+                    context_penalty,
+                    category_mult,
+                    hub_mult,
+                    modality_mult,
+                )
 
             # NOTE: Holographic associations are NOT queried during
             # spreading activation. The holographic graph query involves
@@ -250,6 +270,7 @@ class DynamicsMixin:
             # and can benefit from caching).
 
         return activated
+
     def _spread_activation_constants(
         self,
     ) -> tuple[float, float, dict[ConceptCategory, float], float, dict[ConceptModality, float]]:
@@ -327,8 +348,14 @@ class DynamicsMixin:
             ConceptModality.VISUAL: 1.1,
         }
 
-        return (BRIDGE_ATTENUATION, CONTEXT_PENALTY, CATEGORY_SPREAD_MULTIPLIERS,
-                HUB_SPREAD_MULTIPLIER, MODALITY_SPREAD_MULTIPLIERS)
+        return (
+            BRIDGE_ATTENUATION,
+            CONTEXT_PENALTY,
+            CATEGORY_SPREAD_MULTIPLIERS,
+            HUB_SPREAD_MULTIPLIER,
+            MODALITY_SPREAD_MULTIPLIERS,
+        )
+
     def _get_concept_multipliers(
         self,
         current: str,
@@ -349,6 +376,7 @@ class DynamicsMixin:
             # Modality-specific spread (visual concepts spread faster)
             modality_mult = modality_spread_multipliers.get(current_concept.modality, 1.0)
         return category_mult, hub_mult, modality_mult
+
     def _spread_one_edge(
         self,
         activated: dict[str, float],
@@ -409,6 +437,7 @@ class DynamicsMixin:
         if edge.target not in activated or activated[edge.target] < spread:
             activated[edge.target] = max(activated.get(edge.target, 0), spread)
             frontier.append((edge.target, d + 1))
+
     def decay_activation(self, rate: float = 0.05) -> None:
         """Decay all concept activations using exponential decay.
 
@@ -445,6 +474,7 @@ class DynamicsMixin:
                 effective_rate *= MOTOR_DECAY_MULTIPLIER
             decay_factor = 1.0 - effective_rate
             concept.activation *= decay_factor
+
     def cortical_tick(
         self,
         arousal: float = 0.5,
@@ -508,17 +538,15 @@ class DynamicsMixin:
             return {}
 
         # ─── Modulated parameters ───────────────────────────────
-        spread_rate, decay_rate, noise_amp, ach_focus = (
-            self._compute_tick_parameters(arousal, gaba, ach, serotonin, noise)
+        spread_rate, decay_rate, noise_amp, ach_focus = self._compute_tick_parameters(
+            arousal, gaba, ach, serotonin, noise
         )
 
         # Lazy init: the active set is built on first tick (scans the
         # seeded/loaded field once) and maintained incrementally after.
         if self._active_ids is None:
             self._active_ids = {
-                cid
-                for cid, c in list(self._concepts.items())
-                if (c.activation or 0.0) > 0.0
+                cid for cid, c in list(self._concepts.items()) if (c.activation or 0.0) > 0.0
             }
             self._ticks_since_sweep = 0
 
@@ -552,6 +580,7 @@ class DynamicsMixin:
             if (concept := self._concepts.get(cid)) is not None
             and (concept.activation or 0.0) > 0.1
         }
+
     def _compute_tick_parameters(
         self,
         arousal: float,
@@ -588,6 +617,7 @@ class DynamicsMixin:
         ach_focus = ach * 0.3  # 0 to 0.3 boost for top concepts
 
         return spread_rate, decay_rate, noise_amp, ach_focus
+
     def _compute_spread_delta(self, spread_rate: float) -> dict[str, float]:
         """Collect spread contributions from all active concepts.
 
@@ -628,11 +658,10 @@ class DynamicsMixin:
                 if not current_cols.intersection(target_cols):
                     share *= 0.3  # bridge attenuation
                 if share > 1e-6:
-                    spread_delta[edge.target] = (
-                        spread_delta.get(edge.target, 0.0) + share
-                    )
+                    spread_delta[edge.target] = spread_delta.get(edge.target, 0.0) + share
 
         return spread_delta
+
     def _apply_decay_noise_spread(
         self,
         decay_rate: float,
@@ -669,7 +698,7 @@ class DynamicsMixin:
                 effective_decay *= HUB_DECAY_MULTIPLIER
             if concept.modality == ConceptModality.MOTOR:
                 effective_decay *= MOTOR_DECAY_MULTIPLIER
-            concept.activation *= (1.0 - effective_decay)
+            concept.activation *= 1.0 - effective_decay
 
             # Apply spread
             if cid in spread_delta:
@@ -689,9 +718,8 @@ class DynamicsMixin:
             if concept.activation < ACTIVATION_NOISE_FLOOR:
                 concept.activation = 0.0
                 self._active_ids.discard(cid)
-    def _ignite_dormant(
-        self, noise_amp: float, spark_rate: float | None = None
-    ) -> int:
+
+    def _ignite_dormant(self, noise_amp: float, spark_rate: float | None = None) -> int:
         """Spontaneously ignite dormant concepts (Poisson process).
 
         The dormant field doesn't get per-concept Gaussian noise —
@@ -713,11 +741,7 @@ class DynamicsMixin:
         n_dormant = len(self._concepts) - len(self._active_ids)
         if n_dormant <= 0:
             return 0
-        p_spark = (
-            noise_amp * DORMANT_SPARK_COEFF
-            if spark_rate is None
-            else spark_rate
-        )
+        p_spark = noise_amp * DORMANT_SPARK_COEFF if spark_rate is None else spark_rate
         lam = n_dormant * p_spark
         # Knuth's algorithm — exact Poisson, cheap at small λ
         threshold = math.exp(-lam)
@@ -739,6 +763,7 @@ class DynamicsMixin:
             self._active_ids.add(cid)
             sparked += 1
         return sparked
+
     def _rebuild_active_set(self) -> None:
         """Rescan the whole field: rebuild ``_active_ids``, snap residue.
 
@@ -757,6 +782,7 @@ class DynamicsMixin:
             elif activation != 0.0:
                 concept.activation = 0.0
         self._active_ids = active
+
     def _mark_active(self, name: str) -> None:
         """Register a concept in the sparse-tick active set.
 
@@ -771,6 +797,7 @@ class DynamicsMixin:
         concept = self._concepts.get(cid) if cid else None
         if concept is not None and (concept.activation or 0.0) > 0.0:
             self._active_ids.add(cid)
+
     def _apply_ach_focus(self, ach_focus: float) -> None:
         """Apply ACh winner-take-all dynamics: boost top concepts, suppress rest."""
         if ach_focus <= 0.01:
@@ -794,11 +821,9 @@ class DynamicsMixin:
                 if concept is None:
                     continue
                 if cid in top_ids:
-                    concept.activation = min(
-                        1.0, concept.activation + ach_focus
-                    )
+                    concept.activation = min(1.0, concept.activation + ach_focus)
                 else:
-                    concept.activation *= (1.0 - ach_focus * 0.5)
+                    concept.activation *= 1.0 - ach_focus * 0.5
 
     def _apply_recurrence(self) -> None:
         """Field self-excitation + divisive normalization.
@@ -819,7 +844,7 @@ class DynamicsMixin:
             return
         total = 0.0
         sustaining: set[str] = set()
-        for cid in self._active_ids:
+        for cid in list(self._active_ids):
             concept = self._concepts.get(cid)
             if concept is None:
                 continue
@@ -830,7 +855,7 @@ class DynamicsMixin:
         if not sustaining:
             return
         norm = 1.0 + NORMALIZATION_GAIN * max(0.0, total - FIELD_ENERGY_BUDGET)
-        for cid in self._active_ids:
+        for cid in list(self._active_ids):
             concept = self._concepts.get(cid)
             if concept is None or concept.activation is None:
                 continue
@@ -854,6 +879,7 @@ class DynamicsMixin:
             return inhibition_strength * 0.2  # 80% reduction
         else:
             return inhibition_strength
+
     def _inhibit_column_concepts(
         self, column: str, inhib_factor: float, dominant_column: str
     ) -> None:
@@ -873,6 +899,7 @@ class DynamicsMixin:
             if concept.activation is None:
                 concept.activation = 0.0
             concept.activation *= inhib_factor
+
     def apply_lateral_inhibition(
         self,
         context_columns: set[str] | None = None,
@@ -941,6 +968,7 @@ class DynamicsMixin:
             self._inhibit_column_concepts(column, inhib_factor, dominant_column)
 
         return column_activations
+
     def _compute_column_activations(self) -> dict[str, float]:
         """Calculate mean activation level for each cortical column."""
         column_activations: dict[str, float] = {}
@@ -957,6 +985,7 @@ class DynamicsMixin:
             if count > 0:
                 column_activations[column] = total / count
         return column_activations
+
     def apply_winner_take_all(
         self,
         column: str,
@@ -1024,6 +1053,7 @@ class DynamicsMixin:
                 if concept.activation is None:
                     concept.activation = 0.0
                 concept.activation *= factor
+
     def most_activated(self, n: int = 10) -> list[tuple[str, float]]:
         """Return the N most activated concepts."""
         ranked = heapq.nlargest(

@@ -82,16 +82,12 @@ class AnswerComposer:
 
     # ─── Factual answer ──────────────────────────────────────────
 
-    def _resolve_factual_target(
-        self, target: str
-    ) -> tuple[str, str, Any]:
+    def _resolve_factual_target(self, target: str) -> tuple[str, str, Any]:
         """Normalize target and look up concept, stripping location suffixes.
 
         Returns (target_clean, display, concept) where concept may be None.
         """
-        target_clean = re.sub(
-            r"^(?:a|an|the)\s+", "", target, flags=re.IGNORECASE
-        ).strip()
+        target_clean = re.sub(r"^(?:a|an|the)\s+", "", target, flags=re.IGNORECASE).strip()
         display = _display_name(target_clean)
         concept = self._network.get_concept(target_clean)
         if concept is None:
@@ -119,7 +115,8 @@ class AnswerComposer:
         """
         edges = self._network.get_edges(target_clean, "both")
         edges = [
-            e for e in edges
+            e
+            for e in edges
             if not (definition and e.relation.value == "is_a")
             and e.relation.value not in _CODE_RELATIONS
             and not _is_code_origin(self._network, e, concept.id)
@@ -133,9 +130,7 @@ class AnswerComposer:
             knowledge.append((rel, _display_name(other), edge.weight))
         return knowledge
 
-    def compose_factual_answer(
-        self, target: str, emotion: EmotionalState
-    ) -> Thought:
+    def compose_factual_answer(self, target: str, emotion: EmotionalState) -> Thought:
         """Compose a factual answer about a concept from the network.
 
         No hardcoded concept knowledge: this looks up the target in the
@@ -288,9 +283,7 @@ class AnswerComposer:
 
         return knowledge
 
-    def compose_comparison_answer(
-        self, sub_kind: str, emotion: EmotionalState
-    ) -> Thought:
+    def compose_comparison_answer(self, sub_kind: str, emotion: EmotionalState) -> Thought:
         """Compose a comparison of two concepts.
 
         sub_kind is "X|||Y". Retrieves both concepts, shows their
@@ -327,17 +320,17 @@ class AnswerComposer:
             )
         if ca is None:
             thought = self.compose_factual_answer(b, emotion)
-            thought.metadata["reasoning"] = (
-                [f"doesn't know much about {da} yet, but knows about {db}"]
-            )
+            thought.metadata["reasoning"] = [
+                f"doesn't know much about {da} yet, but knows about {db}"
+            ]
             thought.metadata["topic"] = db
             thought.topics = [a, b]
             return thought
         if cb is None:
             thought = self.compose_factual_answer(a, emotion)
-            thought.metadata["reasoning"] = (
-                [f"doesn't know much about {db} yet, but knows about {da}"]
-            )
+            thought.metadata["reasoning"] = [
+                f"doesn't know much about {db} yet, but knows about {da}"
+            ]
             thought.metadata["topic"] = da
             thought.topics = [a, b]
             return thought
@@ -370,9 +363,7 @@ class AnswerComposer:
                 topics=[a, b],
                 confidence=0.4,
                 metadata={
-                    "reasoning": [
-                        f"knows both {da} and {db}, still learning how they differ"
-                    ],
+                    "reasoning": [f"knows both {da} and {db}, still learning how they differ"],
                     "topic": f"{da} and {db}",
                 },
             )
@@ -396,9 +387,7 @@ class AnswerComposer:
 
     # ─── Parts answer ────────────────────────────────────────────
 
-    def compose_parts_answer(
-        self, container: str, emotion: EmotionalState
-    ) -> Thought:
+    def compose_parts_answer(self, container: str, emotion: EmotionalState) -> Thought:
         """Compose an answer listing the parts/types/instances of a concept.
 
         Finds all concepts connected to the container via part_of,
@@ -408,9 +397,7 @@ class AnswerComposer:
         Returns a Thought with metadata["knowledge"] so the language
         engine composes the actual words — no hardcoded phrasings.
         """
-        container_clean = re.sub(
-            r"^(?:a|an|the)\s+", "", container, flags=re.IGNORECASE
-        ).strip()
+        container_clean = re.sub(r"^(?:a|an|the)\s+", "", container, flags=re.IGNORECASE).strip()
         display = _display_name(container_clean)
         concept = self._network.get_concept(container_clean)
         if concept is None:
@@ -425,8 +412,14 @@ class AnswerComposer:
 
         # Relations that indicate membership/containment.
         member_rels = {
-            "part_of", "includes", "has", "contains", "is_a",
-            "instance_of", "creates", "enables",
+            "part_of",
+            "includes",
+            "has",
+            "contains",
+            "is_a",
+            "instance_of",
+            "creates",
+            "enables",
         }
 
         members: list[tuple[str, str]] = []  # (concept_id, relation)
@@ -482,9 +475,7 @@ class AnswerComposer:
 
     # ─── Consumes answer ─────────────────────────────────────────
 
-    def compose_consumes_answer(
-        self, target: str, emotion: EmotionalState
-    ) -> Thought:
+    def compose_consumes_answer(self, target: str, emotion: EmotionalState) -> Thought:
         """Compose an answer about what a concept consumes/needs/wants.
 
         Finds all concepts connected via depends_on, needs, enables,
@@ -493,9 +484,7 @@ class AnswerComposer:
         Returns a Thought with metadata["knowledge"] so the language
         engine composes the actual words — no hardcoded phrasings.
         """
-        target_clean = re.sub(
-            r"^(?:a|an|the)\s+", "", target, flags=re.IGNORECASE
-        ).strip()
+        target_clean = re.sub(r"^(?:a|an|the)\s+", "", target, flags=re.IGNORECASE).strip()
         display = _display_name(target_clean)
         concept = self._network.get_concept(target_clean)
         if concept is None:
@@ -561,9 +550,7 @@ class AnswerComposer:
 
     # ─── Counterfactual answer ───────────────────────────────────
 
-    def compose_counterfactual_answer(
-        self, query: str, emotion: EmotionalState
-    ) -> Thought:
+    def compose_counterfactual_answer(self, query: str, emotion: EmotionalState) -> Thought:
         """Compose a speculative answer to a 'what if' question.
 
         Parses the target concept and the direction of change from the query,
@@ -683,8 +670,10 @@ class AnswerComposer:
         effect_depth: dict[str, int] = {}
 
         positive_out = {
-            RelationType.CAUSES, RelationType.ENABLES,
-            RelationType.LEADS_TO, RelationType.CREATES,
+            RelationType.CAUSES,
+            RelationType.ENABLES,
+            RelationType.LEADS_TO,
+            RelationType.CREATES,
         }
         negative_out = {RelationType.PREVENTS, RelationType.HARMS}
         negative_sym = {RelationType.OPPOSITE_OF, RelationType.CONTRADICTS}
@@ -698,7 +687,8 @@ class AnswerComposer:
                 continue
 
             is_a_parents = [
-                e.target for e in self._network.get_edges(current, "out")
+                e.target
+                for e in self._network.get_edges(current, "out")
                 if e.relation == RelationType.IS_A
             ]
             considered: list[tuple[str, str, str, RelationType]] = []
@@ -760,9 +750,7 @@ class AnswerComposer:
 
     # ─── Explanatory answer ──────────────────────────────────────
 
-    def _explain_causal(
-        self, source: str, effect: str, emotion: EmotionalState
-    ) -> Thought:
+    def _explain_causal(self, source: str, effect: str, emotion: EmotionalState) -> Thought:
         """Compose the 'why does X cause Y' branch of an explanation."""
         path = self._find_explanatory_path(source, effect)
         if path is None:
@@ -772,18 +760,16 @@ class AnswerComposer:
                 emotion=emotion.label,
                 confidence=0.3,
                 topics=[source, effect],
-                metadata={"target_concept":
-                          f"{_display_name(source)} -> "
-                          f"{_display_name(effect)}",
-                          "knowledge_gap": "no_path"},
+                metadata={
+                    "target_concept": f"{_display_name(source)} -> {_display_name(effect)}",
+                    "knowledge_gap": "no_path",
+                },
             )
         # Build knowledge triples from the causal path so the
         # language engine composes the explanation.
         knowledge: list[tuple[str, str, float]] = []
         for _src, rel, tgt in path:
-            knowledge.append(
-                (rel.value, _display_name(tgt), 0.8)
-            )
+            knowledge.append((rel.value, _display_name(tgt), 0.8))
         return Thought(
             content="explanation",
             intent="inform",
@@ -811,8 +797,7 @@ class AnswerComposer:
                 emotion=emotion.label,
                 confidence=0.3,
                 topics=[target],
-                metadata={"target_concept": _display_name(target),
-                          "knowledge_gap": "unknown"},
+                metadata={"target_concept": _display_name(target), "knowledge_gap": "unknown"},
             )
         cause = self._find_cause(target)
         if cause:
@@ -850,9 +835,7 @@ class AnswerComposer:
             },
         )
 
-    def compose_explanatory_answer(
-        self, user_input: str, emotion: EmotionalState
-    ) -> Thought:
+    def compose_explanatory_answer(self, user_input: str, emotion: EmotionalState) -> Thought:
         """Compose an answer to a 'why' or 'how come' question.
 
         Returns a Thought with semantic metadata (causal path, cause
@@ -907,7 +890,6 @@ class AnswerComposer:
             if self._network.get_concept(candidate) is not None:
                 return candidate, " ".join(words[i:])
         return None, ""
-
 
     def _relation_verb(self, rel: RelationType, obj: str = "") -> str:
         """Convert a relation to a natural verb.
@@ -975,16 +957,12 @@ class AnswerComposer:
                     next_cid = edge.target
                     if next_cid not in visited:
                         visited.add(next_cid)
-                        queue.append(
-                            (next_cid, [*path, (current, edge.relation, next_cid)])
-                        )
+                        queue.append((next_cid, [*path, (current, edge.relation, next_cid)]))
                 elif edge.relation == RelationType.IS_A:
                     next_cid = edge.target
                     if next_cid not in visited:
                         visited.add(next_cid)
-                        queue.append(
-                            (next_cid, [*path, (current, edge.relation, next_cid)])
-                        )
+                        queue.append((next_cid, [*path, (current, edge.relation, next_cid)]))
 
         return None
 
@@ -1008,9 +986,7 @@ class AnswerComposer:
 
         if not path:
             # Direct causal link — single triple.
-            knowledge: list[tuple[str, str, float]] = [
-                ("causes", end_display, 0.8)
-            ]
+            knowledge: list[tuple[str, str, float]] = [("causes", end_display, 0.8)]
         else:
             # Build knowledge triples from each step of the path.
             knowledge = []
@@ -1056,14 +1032,10 @@ class AnswerComposer:
         for a in ancestors:
             for edge in self._network.get_edges(a, "both"):
                 if edge.target == a and edge.relation in positive_in:
-                    candidates.append(
-                        (edge.source, edge.relation, a, edge.weight)
-                    )
+                    candidates.append((edge.source, edge.relation, a, edge.weight))
                 elif edge.source == a and edge.relation == RelationType.DEPENDS_ON:
                     # a depends on edge.target, so edge.target causes a
-                    candidates.append(
-                        (edge.target, RelationType.DEPENDS_ON, a, edge.weight)
-                    )
+                    candidates.append((edge.target, RelationType.DEPENDS_ON, a, edge.weight))
 
         if not candidates:
             return None
@@ -1105,10 +1077,14 @@ class AnswerComposer:
         """
 
         lower = query.lower()
-        sign = -1 if re.search(
-            r"\b(?:decrease|reduce|lowers?|less|fewer|stop|prevent|slow|down|avoid)\b",
-            lower,
-        ) else 1
+        sign = (
+            -1
+            if re.search(
+                r"\b(?:decrease|reduce|lowers?|less|fewer|stop|prevent|slow|down|avoid)\b",
+                lower,
+            )
+            else 1
+        )
 
         # Strip planning/direction words so the remaining phrase is the target.
         clean = re.sub(
@@ -1146,8 +1122,11 @@ class AnswerComposer:
                 emotion=emotion.label,
                 confidence=0.3,
                 topics=[target],
-                metadata={"target_concept": _display_name(target),
-                          "knowledge_gap": "no_plan", "goal": goal},
+                metadata={
+                    "target_concept": _display_name(target),
+                    "knowledge_gap": "no_plan",
+                    "goal": goal,
+                },
             )
 
         # Build knowledge triples from the plan steps so the language
@@ -1159,12 +1138,14 @@ class AnswerComposer:
             cause_display = _display_name(cause)
             via_display = _display_name(via)
             knowledge.append((rel.value, cause_display, weight))
-            plan_meta.append({
-                "cause": cause_display,
-                "relation": rel.value,
-                "via": via_display,
-                "direction": self._sign_word(req),
-            })
+            plan_meta.append(
+                {
+                    "cause": cause_display,
+                    "relation": rel.value,
+                    "via": via_display,
+                    "direction": self._sign_word(req),
+                }
+            )
 
         return Thought(
             content="plan",
@@ -1229,29 +1210,15 @@ class AnswerComposer:
         for a in self._get_is_a_ancestors(target):
             for edge in self._network.get_edges(a, "both"):
                 if edge.relation in positive and edge.target == a:
-                    candidates.append(
-                        (edge.source, edge.relation, a, desired_sign, edge.weight)
-                    )
+                    candidates.append((edge.source, edge.relation, a, desired_sign, edge.weight))
                 elif edge.relation in negative and edge.target == a:
-                    candidates.append(
-                        (edge.source, edge.relation, a, -desired_sign, edge.weight)
-                    )
-                elif (
-                    edge.relation == RelationType.DEPENDS_ON
-                    and edge.source == a
-                ):
-                    candidates.append(
-                        (edge.target, edge.relation, a, desired_sign, edge.weight)
-                    )
+                    candidates.append((edge.source, edge.relation, a, -desired_sign, edge.weight))
+                elif edge.relation == RelationType.DEPENDS_ON and edge.source == a:
+                    candidates.append((edge.target, edge.relation, a, desired_sign, edge.weight))
                 elif edge.relation in negative_sym:
                     other = edge.target if edge.source == a else edge.source
-                    candidates.append(
-                        (other, edge.relation, a, -desired_sign, edge.weight)
-                    )
-                elif (
-                    edge.relation == RelationType.IS_A
-                    and edge.target == a
-                ):
+                    candidates.append((other, edge.relation, a, -desired_sign, edge.weight))
+                elif edge.relation == RelationType.IS_A and edge.target == a:
                     candidates.append(
                         (edge.source, edge.relation, a, desired_sign, edge.weight * 0.8)
                     )
@@ -1273,8 +1240,11 @@ class AnswerComposer:
         detail = _display_name(q.gap_detail) if q.gap_detail else ""
 
         gap_descriptions: dict[str, str] = {
-            "cooccurrence": (f"whether {target} and {detail} are connected"
-                            if detail else f"what {target} connects to"),
+            "cooccurrence": (
+                f"whether {target} and {detail} are connected"
+                if detail
+                else f"what {target} connects to"
+            ),
             "isolation": f"what {target} is",
             "definition": f"what {target} is",
             "uncertainty": f"how {target} fits in",

@@ -836,7 +836,7 @@ fn test_retrieve_rejects_understated_uncompressed_length() {
             "complete text",
         )
         .unwrap();
-    let length = store.index_entry_ref(0).uncompressed_len;
+    let length = store.index_entry_ref(0).expect("slot 0").uncompressed_len;
     drop(store);
     let mut meta = std::fs::OpenOptions::new()
         .write(true)
@@ -1012,4 +1012,54 @@ fn test_v1_migration_failure_preserves_original_files() {
     assert!(!base.with_extension("meta").exists());
     cleanup(&base);
     std::fs::remove_file(base.with_extension("idx")).unwrap();
+}
+
+#[test]
+fn test_meta_memory_episodes_stay_out_of_bundles() {
+    // Modules 0/5/8/9 are auto-flagged meta-memory — internal
+    // bookkeeping excluded from find_similar. Their SDRs must not
+    // enter the bundle superposition either, or every run re-saturates
+    // the store with bookkeeping noise that the next startup rebuild
+    // has to mop up again (~260 entries/run observed live).
+    let base = temp_base("meta_bundles");
+    let mut store = LtmStore::create(&base, 64).unwrap();
+    store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "real episode",
+        )
+        .unwrap();
+    store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            0,
+            "association trace",
+        )
+        .unwrap();
+    store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            9,
+            "dream insight",
+        )
+        .unwrap();
+    // The index holds all three; only the real one may superimpose.
+    assert_eq!(store.count(), 3);
+    drop(store);
+    let bundles = BundleStore::open(base.with_extension("bundles")).unwrap();
+    assert_eq!(bundles.episode_count(), 1);
+    cleanup(&base);
 }

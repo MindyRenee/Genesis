@@ -61,6 +61,9 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from infrastructure.text import is_blank
+from infrastructure.text import sentences as _sentences
+
 from .pragmatics import PragmaticAnalysis, PragmaticReasoner
 
 __all__ = ["MonitorResult", "RepairAction", "SelfMonitor"]
@@ -222,7 +225,7 @@ class SelfMonitor:
             A MonitorResult with the repaired text and repair details.
         """
         context = context or {}
-        if not text or not text.strip():
+        if is_blank(text):
             return MonitorResult(text=text, passed=True, issues_found=0)
 
         self._check_count += 1
@@ -288,13 +291,15 @@ class SelfMonitor:
         # Fix repeated punctuation (e.g. "??" → "?")
         new = _REPEATED_PUNCT_RE.sub(r"\1", current)
         if new != current:
-            repairs.append(RepairAction(
-                check_type="grammar",
-                issue="repeated punctuation detected",
-                repair="collapsed to single mark",
-                original=current,
-                fixed=new,
-            ))
+            repairs.append(
+                RepairAction(
+                    check_type="grammar",
+                    issue="repeated punctuation detected",
+                    repair="collapsed to single mark",
+                    original=current,
+                    fixed=new,
+                )
+            )
             current = new
 
         # Fix subject-verb agreement for common cases
@@ -335,9 +340,7 @@ class SelfMonitor:
 
     # ─── Check 1.5: Inner speech (Levelt's perceptual loop) ─────
 
-    def _check_inner_speech(
-        self, text: str
-    ) -> tuple[str, list[RepairAction]]:
+    def _check_inner_speech(self, text: str) -> tuple[str, list[RepairAction]]:
         """Reparse planned output through the comprehension system.
 
         This is the inner loop in Levelt's perceptual loop theory:
@@ -356,11 +359,7 @@ class SelfMonitor:
         if self._comprehension is None:
             return text, repairs
 
-        sentences = [
-            s.strip()
-            for s in re.split(r"(?<=[.!?])\s+", text.strip())
-            if s.strip()
-        ]
+        sentences = [s for s in _sentences(text) if s.strip()]
         if not sentences:
             return text, repairs
 
@@ -403,10 +402,7 @@ class SelfMonitor:
             repairs.append(
                 RepairAction(
                     check_type="grammar",
-                    issue=(
-                        "inner-loop reparse found verbless clause(s): "
-                        + "; ".join(dropped)
-                    ),
+                    issue=("inner-loop reparse found verbless clause(s): " + "; ".join(dropped)),
                     repair="removed unparseable sentence(s)",
                     original=text,
                     fixed=new,
@@ -433,6 +429,7 @@ class SelfMonitor:
         Returns the repaired text and a RepairAction if a repeat was
         found, or the original text and None otherwise.
         """
+
         def _replace_repeated(m: re.Match) -> str:
             """Return the single word from a repeated-word match."""
             return m.group(1)
@@ -448,9 +445,7 @@ class SelfMonitor:
             )
         return text, None
 
-    def _fix_subject_verb_agreement(
-        self, text: str
-    ) -> tuple[str, list[RepairAction]]:
+    def _fix_subject_verb_agreement(self, text: str) -> tuple[str, list[RepairAction]]:
         """Fix common subject-verb agreement errors (e.g. "I are" → "I am").
 
         Returns the repaired text and a list of RepairActions, one per
@@ -499,9 +494,7 @@ class SelfMonitor:
             )
         return text, None
 
-    def _fix_space_before_punctuation(
-        self, text: str
-    ) -> tuple[str, RepairAction | None]:
+    def _fix_space_before_punctuation(self, text: str) -> tuple[str, RepairAction | None]:
         """Remove spaces that appear before punctuation marks.
 
         Returns the repaired text and a RepairAction if a space-before-
@@ -518,9 +511,7 @@ class SelfMonitor:
             )
         return text, None
 
-    def _fix_boundary_artifacts(
-        self, text: str
-    ) -> tuple[str, RepairAction | None]:
+    def _fix_boundary_artifacts(self, text: str) -> tuple[str, RepairAction | None]:
         """Repair punctuation artifacts left by emptied slot fills.
 
         Two defect shapes:
@@ -542,9 +533,7 @@ class SelfMonitor:
             )
         return text, None
 
-    def _drop_degenerate_sentences(
-        self, text: str
-    ) -> tuple[str, list[RepairAction]]:
+    def _drop_degenerate_sentences(self, text: str) -> tuple[str, list[RepairAction]]:
         """Drop sentences that articulate nothing.
 
         A sentence made only of pronouns and copulas ("I.", "I'm I.",
@@ -557,37 +546,35 @@ class SelfMonitor:
         from .generator import _is_degenerate_sentence
 
         repairs: list[RepairAction] = []
-        sentences = [
-            s.strip()
-            for s in re.split(r"(?<=[.!?])\s+", text.strip())
-            if s.strip()
-        ]
+        sentences = [s for s in _sentences(text) if s.strip()]
         if len(sentences) < 2:
             if sentences and _is_degenerate_sentence(sentences[0]):
-                repairs.append(RepairAction(
-                    check_type="grammar",
-                    issue=f"degenerate utterance: '{sentences[0]}'",
-                    repair="noted — sentence articulates no content",
-                    original=text,
-                    fixed=text,
-                ))
+                repairs.append(
+                    RepairAction(
+                        check_type="grammar",
+                        issue=f"degenerate utterance: '{sentences[0]}'",
+                        repair="noted — sentence articulates no content",
+                        original=text,
+                        fixed=text,
+                    )
+                )
             return text, repairs
         kept = [s for s in sentences if not _is_degenerate_sentence(s)]
         if 0 < len(kept) < len(sentences):
             new = " ".join(kept)
-            repairs.append(RepairAction(
-                check_type="grammar",
-                issue="degenerate sentence(s) in output",
-                repair="dropped content-free sentence(s)",
-                original=text,
-                fixed=new,
-            ))
+            repairs.append(
+                RepairAction(
+                    check_type="grammar",
+                    issue="degenerate sentence(s) in output",
+                    repair="dropped content-free sentence(s)",
+                    original=text,
+                    fixed=new,
+                )
+            )
             return new, repairs
         return text, repairs
 
-    def _ensure_sentence_punctuation(
-        self, text: str
-    ) -> tuple[str, RepairAction | None]:
+    def _ensure_sentence_punctuation(self, text: str) -> tuple[str, RepairAction | None]:
         """Ensure the text ends with sentence-ending punctuation.
 
         If the stripped text lacks terminal punctuation, a period is
@@ -630,6 +617,7 @@ class SelfMonitor:
             # otherwise flag the issue without a hardcoded replacement.
             if self._language is not None:
                 from temporal_lobe.base import Thought
+
                 repair_thought = Thought(
                     content="unable to respond meaningfully",
                     intent="reflect",
@@ -747,12 +735,10 @@ class SelfMonitor:
         engine — this is monitoring, not recomposition).
         """
         repairs: list[RepairAction] = []
-        if not user_input or not user_input.strip():
+        if is_blank(user_input):
             return repairs
 
-        analysis = self._pragmatic_reasoner.analyze_pragmatics(
-            user_input, conversation_context
-        )
+        analysis = self._pragmatic_reasoner.analyze_pragmatics(user_input, conversation_context)
         self._last_pragmatic_analysis = analysis
 
         response_lower = response.lower().strip()
@@ -763,34 +749,46 @@ class SelfMonitor:
             # it, not ask another question back (unless clarifying, but
             # a full response ending with "?" is suspicious).
             if response_lower.endswith("?"):
-                repairs.append(RepairAction(
-                    check_type="pragmatics",
-                    issue="user asked a question but response is also a question",
-                    repair="noted — response should answer the question",
-                    original=response,
-                    fixed=response,
-                ))
+                repairs.append(
+                    RepairAction(
+                        check_type="pragmatics",
+                        issue="user asked a question but response is also a question",
+                        repair="noted — response should answer the question",
+                        original=response,
+                        fixed=response,
+                    )
+                )
         elif analysis.speech_act == "request":
             # The user made a request — the response should acknowledge
             # it. These markers detect acknowledgment phrasing that the
             # language engine would naturally produce; they are not
             # hardcoded response templates.
             acknowledgment_markers = {
-                "yes", "sure", "of course", "i can", "i will", "i'll",
-                "let me", "here's", "here is", "certainly", "absolutely",
-                "i'd be happy", "gladly",
+                "yes",
+                "sure",
+                "of course",
+                "i can",
+                "i will",
+                "i'll",
+                "let me",
+                "here's",
+                "here is",
+                "certainly",
+                "absolutely",
+                "i'd be happy",
+                "gladly",
             }
-            has_acknowledgment = any(
-                marker in response_lower for marker in acknowledgment_markers
-            )
+            has_acknowledgment = any(marker in response_lower for marker in acknowledgment_markers)
             if not has_acknowledgment:
-                repairs.append(RepairAction(
-                    check_type="pragmatics",
-                    issue="user made a request but response does not acknowledge it",
-                    repair="noted — response should address the request",
-                    original=response,
-                    fixed=response,
-                ))
+                repairs.append(
+                    RepairAction(
+                        check_type="pragmatics",
+                        issue="user made a request but response does not acknowledge it",
+                        repair="noted — response should address the request",
+                        original=response,
+                        fixed=response,
+                    )
+                )
 
         # Implicature awareness: if the user's utterance has high
         # context sensitivity, the implied meaning may differ from the
@@ -799,17 +797,19 @@ class SelfMonitor:
             analysis.context_sensitivity > 0.6
             and analysis.implied_meaning != analysis.literal_meaning
         ):
-            repairs.append(RepairAction(
-                check_type="pragmatics",
-                issue=(
-                    f"user's utterance has high context sensitivity "
-                    f"({analysis.context_sensitivity:.1f}) — implied "
-                    f"meaning may differ from literal"
-                ),
-                repair=f"noted — implied meaning: {analysis.implied_meaning}",
-                original=response,
-                fixed=response,
-            ))
+            repairs.append(
+                RepairAction(
+                    check_type="pragmatics",
+                    issue=(
+                        f"user's utterance has high context sensitivity "
+                        f"({analysis.context_sensitivity:.1f}) — implied "
+                        f"meaning may differ from literal"
+                    ),
+                    repair=f"noted — implied meaning: {analysis.implied_meaning}",
+                    original=response,
+                    fixed=response,
+                )
+            )
 
         return repairs
 
@@ -869,9 +869,7 @@ class SelfMonitor:
             )
         return None
 
-    def _soften_aggressive_language(
-        self, text: str
-    ) -> tuple[str, RepairAction | None]:
+    def _soften_aggressive_language(self, text: str) -> tuple[str, RepairAction | None]:
         """Soften overly aggressive language (e.g. "stupid" → "not well thought out").
 
         Only the first aggressive word found is softened per pass.
@@ -969,9 +967,7 @@ class SelfMonitor:
 
     # ─── Check 5: Semantic consistency ─────────────────────────
 
-    def _check_network_claims(
-        self, text: str
-    ) -> tuple[str, list[RepairAction]]:
+    def _check_network_claims(self, text: str) -> tuple[str, list[RepairAction]]:
         """Verify articulated claims against the concept network.
 
         The perceptual loop reparses planned output into propositions;
@@ -1007,17 +1003,17 @@ class SelfMonitor:
                 if obj_id is not None and e.target == obj_id
             ]
             relation = self._asserted_relation(prop.predicate)
-            issue = self._claim_contradiction(
-                prop, relation, pair_edges, subj_concept.id, obj_id
-            )
+            issue = self._claim_contradiction(prop, relation, pair_edges, subj_concept.id, obj_id)
             if issue:
-                repairs.append(RepairAction(
-                    check_type="factual",
-                    issue=issue,
-                    repair="noted — claim conflicts with concept network",
-                    original=text,
-                    fixed=text,
-                ))
+                repairs.append(
+                    RepairAction(
+                        check_type="factual",
+                        issue=issue,
+                        repair="noted — claim conflicts with concept network",
+                        original=text,
+                        fixed=text,
+                    )
+                )
         return text, repairs
 
     @staticmethod
@@ -1083,7 +1079,14 @@ class SelfMonitor:
         if not pred:
             return None
         if pred.split()[0] in (
-            "is", "are", "was", "were", "be", "been", "being", "am",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "am",
         ):
             return "copular"
         from temporal_lobe.morphology import deconjugate_verb
@@ -1117,9 +1120,17 @@ class SelfMonitor:
         from temporal_lobe.concepts import RelationType as RT
 
         positive = {
-            RT.IS_A, RT.HAS_PROPERTY, RT.INSTANCE_OF, RT.PART_OF,
-            RT.CAUSES, RT.ENABLES, RT.LEADS_TO, RT.CREATES,
-            RT.DEPENDS_ON, RT.SIMILAR_TO, RT.EMERGES_FROM,
+            RT.IS_A,
+            RT.HAS_PROPERTY,
+            RT.INSTANCE_OF,
+            RT.PART_OF,
+            RT.CAUSES,
+            RT.ENABLES,
+            RT.LEADS_TO,
+            RT.CREATES,
+            RT.DEPENDS_ON,
+            RT.SIMILAR_TO,
+            RT.EMERGES_FROM,
         }
         adversarial = {RT.OPPOSITE_OF, RT.CONTRADICTS}
         facilitative = {RT.CAUSES, RT.ENABLES, RT.LEADS_TO, RT.CREATES}
@@ -1132,28 +1143,18 @@ class SelfMonitor:
             hits = pair_relations & positive
             if hits:
                 rel = sorted(hits, key=lambda r: r.value)[0].value
-                return (
-                    f"output denies '{subj}–{obj}' but the network "
-                    f"asserts {rel}"
-                )
+                return f"output denies '{subj}–{obj}' but the network asserts {rel}"
             return None
 
         hits = pair_relations & adversarial
         if hits:
             rel = sorted(hits, key=lambda r: r.value)[0].value
-            return (
-                f"output claims '{subj}–{obj}' but the network "
-                f"marks them {rel}"
-            )
+            return f"output claims '{subj}–{obj}' but the network marks them {rel}"
         if relation in facilitative and pair_relations & inhibitory:
-            rel = sorted(
-                pair_relations & inhibitory, key=lambda r: r.value
-            )[0].value
+            rel = sorted(pair_relations & inhibitory, key=lambda r: r.value)[0].value
             return f"output claims '{subj}–{obj}' but the network asserts {rel}"
         if relation in inhibitory and pair_relations & facilitative:
-            rel = sorted(
-                pair_relations & facilitative, key=lambda r: r.value
-            )[0].value
+            rel = sorted(pair_relations & facilitative, key=lambda r: r.value)[0].value
             return f"output claims '{subj}–{obj}' but the network asserts {rel}"
 
         # Antonym two-hop for attributive claims: "water is dry"

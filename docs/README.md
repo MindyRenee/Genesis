@@ -9,9 +9,16 @@ state the design rationale inline.
 - [`ARC-AGI-3.md`](ARC-AGI-3.md) — the ARC evaluation trust boundary:
   what the adapter exposes, what counts as evidence, and why local
   runs are diagnostics rather than official scores.
+- [`ARC-GRID-EVIDENCE.md`](ARC-GRID-EVIDENCE.md) — ARC-AGI-1 live-play
+  evidence from the games curriculum: per-task results, verbatim
+  traces, and the learning curve underneath, with scope stated plainly.
 - [`EMERGENCE.md`](EMERGENCE.md) — the emergence evidence catalog:
   measured behaviors, each pointing at a file, a recorded artifact, or
   a reproducible command.
+- [`../paper/`](../paper/) — the architecture white paper
+  (`genesis.tex` → `genesis.pdf`): the revised edition covering every
+  subsystem as of schema v5. The Zenodo record
+  (10.5281/zenodo.22817337) archives the September 2026 snapshot.
 
 ## Elsewhere in the repository
 

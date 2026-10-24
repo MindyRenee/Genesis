@@ -116,10 +116,7 @@ class QuestionComposer:
         # Find low-confidence connections — things it's unsure about.
         # Scaffold neighbors (internal category hubs) can't be asked
         # about — their "definition" is bookkeeping, not knowledge.
-        uncertain = [
-            e for e in outgoing
-            if e.weight < 0.6 and is_world_concept(e.target)
-        ]
+        uncertain = [e for e in outgoing if e.weight < 0.6 and is_world_concept(e.target)]
         if uncertain:
             edge = self._rng.choice(uncertain)
             return {
@@ -188,9 +185,9 @@ class QuestionComposer:
             # randomize among them so it doesn't always ask about
             # the same one.
             multi = [
-                neighbor for neighbor, count in connection_count.items()
-                if count >= 2 and neighbor != topic
-                and is_world_concept(neighbor)
+                neighbor
+                for neighbor, count in connection_count.items()
+                if count >= 2 and neighbor != topic and is_world_concept(neighbor)
             ]
             if multi:
                 neighbor = self._rng.choice(multi)

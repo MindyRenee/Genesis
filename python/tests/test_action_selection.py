@@ -43,9 +43,7 @@ def test_selector_raises_threshold_under_high_conflict() -> None:
     # which is the behavioural point of the hyperdirect pathway.
     lopsided = selector.select([ActionBid("answer", 0.9), ActionBid("ask", 0.2)])
     assert lopsided.selected is not None
-    lopsided_margin = (
-        lopsided.disinhibition[lopsided.selected] - lopsided.effective_threshold
-    )
+    lopsided_margin = lopsided.disinhibition[lopsided.selected] - lopsided.effective_threshold
     assert margin < lopsided_margin
 
 
@@ -115,6 +113,4 @@ def test_selector_rejects_non_finite_salience(bids: list[ActionBid]) -> None:
 
 def test_selector_rejects_duplicate_actions() -> None:
     with pytest.raises(ValueError):
-        BasalGanglia().select(
-            [ActionBid("answer", 0.5), ActionBid("answer", 0.4)]
-        )
+        BasalGanglia().select([ActionBid("answer", 0.5), ActionBid("answer", 0.4)])

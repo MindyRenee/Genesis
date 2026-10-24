@@ -1,4 +1,5 @@
 """Regression tests for concept-network restore caches."""
+
 from temporal_lobe.concepts import ConceptNetwork
 
 

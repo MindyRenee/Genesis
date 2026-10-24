@@ -68,14 +68,21 @@ from enum import Enum
 from typing import Any
 
 from limbic_system.sentiment import analyze_sentiment
+from occipital_lobe.perception.core import is_plausible_name
 
 __all__ = ["KnowledgeLevel", "TheoryOfMind", "UserBelief", "UserModel"]
 
 # Words/phrases that indicate a statement is addressed to Genesis or
 # is a conversational response, not a genuine preference/self-concept.
-_ADDRESS_WORDS = frozenset({
-    "you", "u", "your", "yours", "genesis",
-})
+_ADDRESS_WORDS = frozenset(
+    {
+        "you",
+        "u",
+        "your",
+        "yours",
+        "genesis",
+    }
+)
 
 
 class KnowledgeLevel(Enum):
@@ -195,6 +202,7 @@ _EXPERTISE_INDICATORS: frozenset[str] = frozenset(
         "stochastic",
     }
 )
+
 
 def _contains_question_indicator(text: str) -> bool:
     """Return whether text contains a question indicator as a word/phrase.
@@ -528,11 +536,21 @@ class TheoryOfMind:
         # preference or self-concept.
         # Phrases that indicate a conversational/emotional statement
         # rather than a genuine self-concept.
-        _SELF_CONCEPT_NOISE = frozenset({
-            "proud of you", "here with you", "right here with you",
-            "sorry", "glad", "happy", "sad", "angry",
-            "not very good at writing code",
-        })
+        _SELF_CONCEPT_NOISE = frozenset(
+            {
+                "proud of you",
+                "here",
+                "right here",
+                "here with you",
+                "right here with you",
+                "sorry",
+                "glad",
+                "happy",
+                "sad",
+                "angry",
+                "not very good at writing code",
+            }
+        )
         for pattern, concept, _verb in patterns:
             for match in re.finditer(pattern, lower):
                 value = match.group(1).strip()
@@ -569,7 +587,9 @@ class TheoryOfMind:
             lower,
         )
         if name_match:
-            self._user_profile.set_name(name_match.group(1).strip().title())
+            candidate = name_match.group(1).strip()
+            if is_plausible_name(candidate):
+                self._user_profile.set_name(candidate.title())
 
         # Extract explicit goal statements and store in the user
         # profile. Goals are distinct from "wants" preferences —
@@ -770,6 +790,4 @@ class TheoryOfMind:
             if topic and isinstance(topic, str):
                 key = topic.lower().strip()
                 if key:
-                    self._concept_history[key] = (
-                        self._concept_history.get(key, 0) + 1
-                    )
+                    self._concept_history[key] = self._concept_history.get(key, 0) + 1

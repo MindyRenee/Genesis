@@ -33,6 +33,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from itertools import pairwise
 
+from infrastructure.text import canon_text, is_blank
+
 __all__ = ["NGramModel", "StatisticalLanguageLearner"]
 
 # ─── Pre-compiled regex patterns ──────────────────────────────────
@@ -232,7 +234,7 @@ class StatisticalLanguageLearner:
         Args:
             text: The user's input text to learn from.
         """
-        if not text or not text.strip():
+        if is_blank(text):
             return
 
         # Split into sentences
@@ -376,9 +378,7 @@ class StatisticalLanguageLearner:
             prefix = (first,)
             context_count = self._bigrams.context_counts.get(prefix, 0)
             if context_count:
-                supported.append(
-                    self._bigrams.counts.get((first, second), 0) / context_count
-                )
+                supported.append(self._bigrams.counts.get((first, second), 0) / context_count)
 
         if not supported:
             return 0.5
@@ -414,7 +414,7 @@ class StatisticalLanguageLearner:
     def _tokenize(text: str) -> list[str]:
         """Tokenize text into lowercase words, stripping punctuation."""
         # Remove punctuation and split on whitespace
-        cleaned = _PUNCT_RE.sub(" ", text)
+        cleaned = _PUNCT_RE.sub(" ", canon_text(text))
         cleaned = _MULTI_SPACE_RE.sub(" ", cleaned).strip()
         if not cleaned:
             return []

@@ -187,9 +187,7 @@ class SelfComposer:
         ]
         return filtered
 
-    def _identity_name_parts(
-        self, self_model: SelfModel
-    ) -> list[tuple[str, str, float]]:
+    def _identity_name_parts(self, self_model: SelfModel) -> list[tuple[str, str, float]]:
         """Build the name part for identity composition.
 
         Returns just the name — a semantic anchor. Personality
@@ -435,9 +433,7 @@ class SelfComposer:
             parts.append(("comp", f"feeling {emotion.label}", 0.7))
         return parts
 
-    def _identity_vulnerability_parts(
-        self, self_model: SelfModel
-    ) -> list[tuple[str, str, float]]:
+    def _identity_vulnerability_parts(self, self_model: SelfModel) -> list[tuple[str, str, float]]:
         """Build vulnerability parts for identity composition.
 
         Returns semantic descriptions — the language engine composes
@@ -469,7 +465,7 @@ class SelfComposer:
         if network is not None:
             emotion_words = network.find_emotion_words(emotion.label)
             if emotion_words:
-                word = self._rng.choice(emotion_words[:5]).replace('_', ' ')
+                word = self._rng.choice(emotion_words[:5]).replace("_", " ")
                 parts.append(("comp", f"feeling {word}"))
             # If no words learned, it can't name the feeling — omit it
 
@@ -480,7 +476,7 @@ class SelfComposer:
         if network is not None and emotion.cognitive_style:
             mode_words = network.find_cognitive_mode_words(emotion.cognitive_style)
             if mode_words:
-                word = self._rng.choice(mode_words[:3]).replace('_', ' ')
+                word = self._rng.choice(mode_words[:3]).replace("_", " ")
                 parts.append(("clause", f"my thinking is {word}"))
 
         # 4. Brain wave state (if available)
@@ -498,7 +494,7 @@ class SelfComposer:
             if network is not None:
                 plat_words = network.find_plasticity_words("closed")
                 if plat_words:
-                    word = self._rng.choice(plat_words[:3]).replace('_', ' ')
+                    word = self._rng.choice(plat_words[:3]).replace("_", " ")
                     parts.append(("clause", f"my learning is {word}"))
                 else:
                     parts.append(("marker", "[plasticity_gate:closed]"))
@@ -508,7 +504,7 @@ class SelfComposer:
             if network is not None:
                 plat_words = network.find_plasticity_words("low")
                 if plat_words:
-                    word = self._rng.choice(plat_words[:3]).replace('_', ' ')
+                    word = self._rng.choice(plat_words[:3]).replace("_", " ")
                     parts.append(("clause", f"my learning is {word}"))
                 else:
                     parts.append(("marker", "[plasticity_gate:low]"))
@@ -553,9 +549,8 @@ class SelfComposer:
         discovered: list[str] = []
         if network is not None:
             from temporal_lobe.concepts import is_seed_origin
-            ability_edges = network.get_exact_neighbors(
-                "genesis", RelationType.RELATED_TO
-            )
+
+            ability_edges = network.get_exact_neighbors("genesis", RelationType.RELATED_TO)
             for target, _rel, _weight in ability_edges:
                 concept = network.get_concept(target)
                 if concept is None or is_seed_origin(concept.origin):
@@ -650,9 +645,7 @@ class SelfComposer:
 
         # Filter by trust level
         filtered: list[tuple[str, str]] = [
-            (kind, text)
-            for kind, text, sensitivity in parts
-            if trust_level >= sensitivity
+            (kind, text) for kind, text, sensitivity in parts if trust_level >= sensitivity
         ]
 
         if not filtered:
@@ -661,9 +654,7 @@ class SelfComposer:
 
         return filtered
 
-    def _discover_creator_name(
-        self, self_model: SelfModel, network: ConceptNetwork
-    ) -> str:
+    def _discover_creator_name(self, self_model: SelfModel, network: ConceptNetwork) -> str:
         """Discover the creator name from self-knowledge or concept network."""
         creator_name = self_model.self_knowledge.get("creator_name", "")
 
@@ -803,14 +794,12 @@ class SelfComposer:
         parts.append(("comp", "still becoming", 0.7))
 
         # Filter by trust level
-        return [
-            (kind, text)
-            for kind, text, sensitivity in parts
-            if trust_level >= sensitivity
-        ]
+        return [(kind, text) for kind, text, sensitivity in parts if trust_level >= sensitivity]
 
     def insight_predicates(
-        self, reflection: Reflection, topics: list[str] | None = None,
+        self,
+        reflection: Reflection,
+        topics: list[str] | None = None,
     ) -> list[tuple[str, str]]:
         """Select reflective-insight fragments for a reflective coda.
 
@@ -850,9 +839,7 @@ class SelfComposer:
         # topics is None (not provided — e.g. direct test calls),
         # the original behaviour is preserved (surface most recent).
         if topics is not None:
-            topics_lower = {
-                t.lower().strip() for t in topics if t.strip()
-            }
+            topics_lower = {t.lower().strip() for t in topics if t.strip()}
             filtered: list[Insight] = []
             for insight in candidates:
                 if insight.type == "self_correction":
@@ -962,9 +949,7 @@ class SelfComposer:
                     return [("clause", content)]
                 return []
             detail = content.split(": ", 1)[1].strip()
-            names = [
-                self._display_detail(t) for t in detail.split(",")
-            ]
+            names = [self._display_detail(t) for t in detail.split(",")]
             names = [n for n in names if n]
             if not names:
                 return []
@@ -987,9 +972,7 @@ class SelfComposer:
             return [("clause", f"my mood has been trending {direction}")]
         return []
 
-    def _pattern_predicates(
-        self, content: str
-    ) -> list[tuple[str, str]]:
+    def _pattern_predicates(self, content: str) -> list[tuple[str, str]]:
         """Predicate fragments for "pattern" insights — connections
         noticed ("A ↔ B") or repetition diagnostics."""
         # Inner-life insights are stored as "A ↔ B" semantic
@@ -1008,16 +991,14 @@ class SelfComposer:
         # Repetition diagnostics: "repeating response pattern: X"
         # / "overusing response pattern: X (7/10)" — the counts are
         # bookkeeping; the pattern name is the content.
-        for marker in ("repeating response pattern",
-                       "overusing response pattern"):
+        for marker in ("repeating response pattern", "overusing response pattern"):
             if content.startswith(marker) and ": " in content:
                 detail = content.split(": ", 1)[1].strip()
                 # Strip the "(7/10)"-style occurrence counts.
                 detail = detail.split("(")[0].strip()
                 if not detail:
                     return []
-                verb = ("repeating" if marker.startswith("repeating")
-                        else "overusing")
+                verb = "repeating" if marker.startswith("repeating") else "overusing"
                 return [
                     ("pred", f"keep {verb} the '{detail}' response pattern"),
                     ("pred", f"notice I keep {verb} the '{detail}' pattern"),
@@ -1055,12 +1036,14 @@ class SelfComposer:
 
         # 1. What it knows (from concept network) — surface level
         if network.total_concept_count > 0:
-            parts.append((
-                "pred",
-                f"have {network.total_concept_count} concepts and "
-                f"{network.edge_count} relationships in understanding",
-                0.0,
-            ))
+            parts.append(
+                (
+                    "pred",
+                    f"have {network.total_concept_count} concepts and "
+                    f"{network.edge_count} relationships in understanding",
+                    0.0,
+                )
+            )
 
         # 2. What it's learned (from reflection insights) — personal level.
         # Insights become predicate fragments via _insight_predicates —
@@ -1182,11 +1165,10 @@ class SelfComposer:
             else:
                 from frontal_lobe.graph_walk import _RELATION_VERB_SEEDS
                 from temporal_lobe.morphology import hedge_verb_phrase
+
                 seeds = _RELATION_VERB_SEEDS.get(relation.value) or []
                 verb_phrase = seeds[0] if seeds else rel_str
-                known_facts.append(
-                    f"cognition {hedge_verb_phrase(verb_phrase)} {target}"
-                )
+                known_facts.append(f"cognition {hedge_verb_phrase(verb_phrase)} {target}")
 
         if known_facts:
             parts.append(("pred", f"know that {self._join_facts(known_facts)}"))
@@ -1231,13 +1213,25 @@ class SelfComposer:
             return True
         base = target.split("#")[0].lower()
         # Programming language names and code-structure words
-        if base in ("python", "rust", "code", "class", "function",
-                    "module", "method", "crate", "binary", "daemon"):
+        if base in (
+            "python",
+            "rust",
+            "code",
+            "class",
+            "function",
+            "module",
+            "method",
+            "crate",
+            "binary",
+            "daemon",
+        ):
             return True
         return False
 
     def _neurochemistry_fragments(
-        self, emotion: EmotionalState, network: ConceptNetwork | None = None,
+        self,
+        emotion: EmotionalState,
+        network: ConceptNetwork | None = None,
     ) -> list[tuple[str, str]]:
         """Select neurochemical state fragments, in learned words.
 
@@ -1266,7 +1260,7 @@ class SelfComposer:
         if network is not None:
             alert_words = network.find_alertness_words(alert_state)
             if alert_words:
-                word = self._rng.choice(alert_words[:3]).replace('_', ' ')
+                word = self._rng.choice(alert_words[:3]).replace("_", " ")
                 parts.append(("pred", f"feel mentally {word}"))
             else:
                 parts.append(("marker", f"[alertness:{alert_state}]"))
@@ -1288,7 +1282,7 @@ class SelfComposer:
         if network is not None:
             val_words = network.find_valence_words(val_state)
             if val_words:
-                word = self._rng.choice(val_words[:3]).replace('_', ' ')
+                word = self._rng.choice(val_words[:3]).replace("_", " ")
                 parts.append(("pred", f"feel {word}"))
             else:
                 parts.append(("marker", f"[valence:{val_state}]"))

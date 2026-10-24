@@ -143,11 +143,11 @@ fn release_ordering_matches_the_data() {
     assert!(r[2] < 0.02, "NE should be silent in REM, got {}", r[2]);
 }
 
-/// Process S must clear when the *network* is asleep, not only when the
-/// mind's zone says Sleeping. `zone_sleeping` is set from a snapshot taken
-/// before the tick, so when the network has crossed into sleep while the
-/// zone still reads awake (idle-deferral, a stalled mind, any desync),
-/// adenosine would otherwise keep accumulating during actual sleep.
+/// Process S clears when the *network* is asleep — the body's own state,
+/// not the mind's zone, is the sleep signal. When the network has crossed
+/// into sleep while the zone still reads awake (idle-deferral, a stalled
+/// mind, any desync), adenosine would otherwise keep accumulating during
+/// actual sleep.
 #[test]
 fn adenosine_clears_when_the_network_sleeps() {
     let tick = |net: NetworkLevels| {
@@ -155,7 +155,6 @@ fn adenosine_clears_when_the_network_sleeps() {
         v.get_mut(NeurochemicalId::Adenosine).unwrap().level = 0.80;
         let params = NeuroTickParams {
             maturation_level: 1.0,
-            zone_sleeping: false,
             network_levels: Some(net),
             ..NeuroTickParams::COMPRESSED
         };

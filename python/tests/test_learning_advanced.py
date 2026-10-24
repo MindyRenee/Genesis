@@ -240,9 +240,7 @@ def test_user_affect_negation_flips_sentiment():
         f"'not bad' ({est_negated.valence}) should be more positive "
         f"than 'bad' ({est_plain_bad.valence})"
     )
-    assert est_negated.valence > 0.0, (
-        f"'not bad' should be positive: {est_negated.valence}"
-    )
+    assert est_negated.valence > 0.0, f"'not bad' should be positive: {est_negated.valence}"
 
 
 def test_user_affect_negation_flips_positive():
@@ -253,9 +251,7 @@ def test_user_affect_negation_flips_positive():
         f"'not good' ({est_negated.valence}) should be less positive "
         f"than 'good' ({est_plain_good.valence})"
     )
-    assert est_negated.valence < 0.0, (
-        f"'not good' should be negative: {est_negated.valence}"
-    )
+    assert est_negated.valence < 0.0, f"'not good' should be negative: {est_negated.valence}"
 
 
 def test_user_affect_intensifier_amplifies():
@@ -326,9 +322,7 @@ def test_user_affect_dont_like_is_negative():
     The old heuristic matched 'like' and scored it positive.
     """
     est = UserAffectEstimate.from_message("I don't like this")
-    assert est.valence < 0.0, (
-        f"'I don't like this' should be negative: {est.valence}"
-    )
+    assert est.valence < 0.0, f"'I don't like this' should be negative: {est.valence}"
 
 
 def test_user_affect_mixed_sentiment():
@@ -350,9 +344,7 @@ def test_user_affect_neutral_stays_neutral():
     """Messages with no sentiment words should stay near zero."""
     for msg in ["The sky is blue", "def foo(x):", "hello world", "running"]:
         est = UserAffectEstimate.from_message(msg)
-        assert abs(est.valence) < 0.2, (
-            f"'{msg}' should be near-neutral: valence={est.valence}"
-        )
+        assert abs(est.valence) < 0.2, f"'{msg}' should be near-neutral: valence={est.valence}"
 
 
 # ─── ActiveInferenceReader ────────────────────────────────────
@@ -451,9 +443,7 @@ def test_reader_read_nascent():
 
 def test_reader_dyadic_uncoupled():
     """Low attunement should produce an UNCOUPLED dyadic state."""
-    signals = InferenceSummary.unpack(
-        _pack_inference_summary(attunement=0.1, dyadic_synchrony=0.0)
-    )
+    signals = InferenceSummary.unpack(_pack_inference_summary(attunement=0.1, dyadic_synchrony=0.0))
     client = _make_mock_client(signals)
     reader = ActiveInferenceReader(client)
     reading = reader.read()
@@ -464,9 +454,7 @@ def test_reader_dyadic_uncoupled():
 
 def test_reader_dyadic_synchronized():
     """High attunement + high synchrony should produce SYNCHRONIZED."""
-    signals = InferenceSummary.unpack(
-        _pack_inference_summary(attunement=0.5, dyadic_synchrony=0.6)
-    )
+    signals = InferenceSummary.unpack(_pack_inference_summary(attunement=0.5, dyadic_synchrony=0.6))
     client = _make_mock_client(signals)
     reader = ActiveInferenceReader(client)
     reading = reader.read()
@@ -491,9 +479,7 @@ def test_reader_dyadic_discordant():
 
 def test_reader_dyadic_attuned():
     """High attunement + neutral synchrony should produce ATTUNED."""
-    signals = InferenceSummary.unpack(
-        _pack_inference_summary(attunement=0.5, dyadic_synchrony=0.1)
-    )
+    signals = InferenceSummary.unpack(_pack_inference_summary(attunement=0.5, dyadic_synchrony=0.1))
     client = _make_mock_client(signals)
     reader = ActiveInferenceReader(client)
     reading = reader.read()
@@ -515,9 +501,7 @@ def test_reader_cognitive_effort_tracks_free_energy():
 
 def test_reader_self_confidence_tracks_precision_and_maturity():
     """Self-confidence should be precision × model_maturity."""
-    signals = InferenceSummary.unpack(
-        _pack_inference_summary(precision=0.8, model_maturity=0.5)
-    )
+    signals = InferenceSummary.unpack(_pack_inference_summary(precision=0.8, model_maturity=0.5))
     client = _make_mock_client(signals)
     reader = ActiveInferenceReader(client)
     reading = reader.read()
@@ -528,9 +512,7 @@ def test_reader_self_confidence_tracks_precision_and_maturity():
 
 def test_reader_social_presence_tracks_attunement():
     """Social presence should track attunement (plus synchrony boost)."""
-    signals = InferenceSummary.unpack(
-        _pack_inference_summary(attunement=0.4, dyadic_synchrony=0.5)
-    )
+    signals = InferenceSummary.unpack(_pack_inference_summary(attunement=0.4, dyadic_synchrony=0.5))
     client = _make_mock_client(signals)
     reader = ActiveInferenceReader(client)
     reading = reader.read()
@@ -589,8 +571,10 @@ def test_reader_update_user_affect_success():
 
     assert result is True
     client.update_user_affect.assert_called_once_with(
-        valence=0.5, arousal=0.6, engagement=0.7, confidence=0.8,
-        speaker=None, authenticated=False, merge_alias=None,
+        valence=0.5,
+        arousal=0.6,
+        engagement=0.7,
+        confidence=0.8,
     )
 
 
@@ -645,9 +629,7 @@ def test_user_affect_kind_is_positive_sentiment():
     valence estimate.
     """
     est = UserAffectEstimate.from_message("you are kind")
-    assert est.valence > 0.0, (
-        f"'kind' should be positive sentiment: {est.valence}"
-    )
+    assert est.valence > 0.0, f"'kind' should be positive sentiment: {est.valence}"
 
 
 def test_user_affect_kind_of_still_works():
@@ -1263,6 +1245,7 @@ def test_neurochemical_callback_not_triggered_for_low_error() -> None:
 
 def test_neurochemical_callback_error_handled() -> None:
     """Neurochemical callback errors are handled gracefully."""
+
     def callback(chem: int, magnitude: float) -> None:
         """Raise OSError to simulate a callback failure."""
         raise OSError("connection lost")
@@ -1335,8 +1318,9 @@ _FILLER_FACTS = [
 ]
 
 
-def _check_fact_learned(mind, concept_name, expected_substrings,
-                        expected_rel_type, expected_rel_target):
+def _check_fact_learned(
+    mind, concept_name, expected_substrings, expected_rel_type, expected_rel_target
+):
     """Check if a fact was learned: concept exists, definition contains
     expected substrings, and optionally the expected relation exists."""
     net = mind.brain.frontal.network
@@ -1352,23 +1336,18 @@ def _check_fact_learned(mind, concept_name, expected_substrings,
     def_lower = definition.lower()
     for sub in expected_substrings:
         if sub.lower() not in def_lower:
-            return False, (
-                f"definition '{definition}' missing '{sub}'"
-            )
+            return False, (f"definition '{definition}' missing '{sub}'")
 
     # Check relation if expected
     if expected_rel_type is not None and expected_rel_target is not None:
         edges = net.get_edges(concept_name, direction="out")
         found_rel = False
         for edge in edges:
-            if (edge.relation == expected_rel_type and
-                    edge.target == expected_rel_target):
+            if edge.relation == expected_rel_type and edge.target == expected_rel_target:
                 found_rel = True
                 break
         if not found_rel:
-            return False, (
-                f"no {expected_rel_type} edge to '{expected_rel_target}'"
-            )
+            return False, (f"no {expected_rel_type} edge to '{expected_rel_target}'")
 
     return True, "ok"
 
@@ -1396,8 +1375,7 @@ def test_learning_fidelity_immediate_recall():
             results.append((concept_name, ok, detail))
 
         accuracy = correct / len(_TEACH_FACTS)
-        print(f"\n  Immediate recall: {correct}/{len(_TEACH_FACTS)} "
-              f"({accuracy:.1%})")
+        print(f"\n  Immediate recall: {correct}/{len(_TEACH_FACTS)} ({accuracy:.1%})")
         for name, ok, detail in results:
             status = "✓" if ok else "✗"
             print(f"    {status} {name}: {detail}")
@@ -1422,9 +1400,7 @@ def test_learning_fidelity_delayed_recall_after_interference():
         # Phase B: Immediate recall
         immediate_correct = 0
         for _, concept_name, expected_subs, rel_type, rel_target in _TEACH_FACTS:
-            ok, _ = _check_fact_learned(
-                mind, concept_name, expected_subs, rel_type, rel_target
-            )
+            ok, _ = _check_fact_learned(mind, concept_name, expected_subs, rel_type, rel_target)
             if ok:
                 immediate_correct += 1
 
@@ -1448,10 +1424,8 @@ def test_learning_fidelity_delayed_recall_after_interference():
         delayed_accuracy = delayed_correct / len(_TEACH_FACTS)
         drift = immediate_accuracy - delayed_accuracy
 
-        print(f"\n  Immediate: {immediate_correct}/{len(_TEACH_FACTS)} "
-              f"({immediate_accuracy:.1%})")
-        print(f"  Delayed:   {delayed_correct}/{len(_TEACH_FACTS)} "
-              f"({delayed_accuracy:.1%})")
+        print(f"\n  Immediate: {immediate_correct}/{len(_TEACH_FACTS)} ({immediate_accuracy:.1%})")
+        print(f"  Delayed:   {delayed_correct}/{len(_TEACH_FACTS)} ({delayed_accuracy:.1%})")
         print(f"  Drift:     {drift:.1%}")
         for name, ok, detail in results:
             status = "✓" if ok else "✗"
@@ -1483,15 +1457,12 @@ def test_learning_fidelity_persistence_across_save_load():
 
         correct = 0
         for _, concept_name, expected_subs, rel_type, rel_target in _TEACH_FACTS:
-            ok, _ = _check_fact_learned(
-                mind2, concept_name, expected_subs, rel_type, rel_target
-            )
+            ok, _ = _check_fact_learned(mind2, concept_name, expected_subs, rel_type, rel_target)
             if ok:
                 correct += 1
 
         accuracy = correct / len(_TEACH_FACTS)
-        print(f"\n  After save/load: {correct}/{len(_TEACH_FACTS)} "
-              f"({accuracy:.1%})")
+        print(f"\n  After save/load: {correct}/{len(_TEACH_FACTS)} ({accuracy:.1%})")
 
         assert accuracy >= 0.5, (
             f"Recall after save/load too low: {accuracy:.1%}. "
@@ -1595,8 +1566,7 @@ def test_throttled_delay_multiplier_is_reasonable():
     throttled_delay = RATE_LIMIT_DELAY * THROTTLED_DELAY_MULTIPLIER
     # Throttled delay should be at least 30 seconds (vs 8s normal)
     assert throttled_delay >= 30.0, (
-        f"Throttled delay too short: {throttled_delay}s, "
-        "must be >= 30s to reduce CPU load"
+        f"Throttled delay too short: {throttled_delay}s, must be >= 30s to reduce CPU load"
     )
 
 
@@ -1647,8 +1617,7 @@ def test_regulator_throttles_after_sustained_cpu_stress():
             regulator._is_throttled = True
 
     assert len(throttle_calls) == 1, (
-        f"Expected 1 throttle call after 3 consecutive detections, "
-        f"got {len(throttle_calls)}"
+        f"Expected 1 throttle call after 3 consecutive detections, got {len(throttle_calls)}"
     )
     assert regulator._is_throttled
 
@@ -1660,17 +1629,11 @@ def test_regulator_does_not_throttle_on_single_spike():
     # Simulate just 1 high-CPU detection
     regulator._cpu_streak = 1
     # Check the condition — should NOT throttle with only 1
-    if (
-        regulator._cpu_streak >= 3
-        and not regulator._is_throttled
-        and regulator._throttle_callback
-    ):
+    if regulator._cpu_streak >= 3 and not regulator._is_throttled and regulator._throttle_callback:
         regulator._throttle_callback()
         regulator._is_throttled = True
 
-    assert len(throttle_calls) == 0, (
-        "Single CPU spike should not trigger throttling"
-    )
+    assert len(throttle_calls) == 0, "Single CPU spike should not trigger throttling"
     assert not regulator._is_throttled
 
 
@@ -1691,8 +1654,7 @@ def test_regulator_unthrottles_after_sustained_recovery():
             break
 
     assert len(unthrottle_calls) == 1, (
-        f"Expected 1 unthrottle call after 3 consecutive recoveries, "
-        f"got {len(unthrottle_calls)}"
+        f"Expected 1 unthrottle call after 3 consecutive recoveries, got {len(unthrottle_calls)}"
     )
     assert not regulator._is_throttled
 
@@ -1736,14 +1698,11 @@ def test_mind_wires_throttle_callbacks():
         # Calling the throttle callback should throttle the learner
         assert not mind.learner._throttled
         mind.regulator._throttle_callback()
-        assert mind.learner._throttled, (
-            "Throttle callback should throttle the learner"
-        )
+        assert mind.learner._throttled, "Throttle callback should throttle the learner"
 
         # Calling the unthrottle callback should unthrottle the learner
         mind.regulator._unthrottle_callback()
-        assert not mind.learner._throttled, (
-            "Unthrottle callback should unthrottle the learner"
-        )
+        assert not mind.learner._throttled, "Unthrottle callback should unthrottle the learner"
+
 
 pytestmark = pytest.mark.usefixtures("learned_sentiment")

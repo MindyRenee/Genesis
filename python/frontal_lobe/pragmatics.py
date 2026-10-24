@@ -45,6 +45,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from infrastructure.text import is_blank
+
 __all__ = ["PragmaticAnalysis", "PragmaticReasoner"]
 
 
@@ -171,7 +173,7 @@ class PragmaticReasoner:
             A PragmaticAnalysis with literal meaning, implied meaning,
             maxim assessments, and speech act classification.
         """
-        if not text or not text.strip():
+        if is_blank(text):
             return PragmaticAnalysis(
                 literal_meaning="",
                 implied_meaning="",
@@ -274,30 +276,22 @@ class PragmaticReasoner:
         context_lower = context.lower() if context else ""
 
         # Indirect requests: "It's cold in here" → "Close the window"
-        indirect = self._infer_indirect_request_implicature(
-            text_lower, context_lower, speech_act
-        )
+        indirect = self._infer_indirect_request_implicature(text_lower, context_lower, speech_act)
         if indirect is not None:
             return indirect
 
         # Questions that are really requests: "Can you pass the salt?"
-        request_implicature = self._infer_request_question_implicature(
-            text_lower, speech_act
-        )
+        request_implicature = self._infer_request_question_implicature(text_lower, speech_act)
         if request_implicature is not None:
             return request_implicature
 
         # Understatement / Quantity violation
-        understatement = self._infer_understatement_implicature(
-            text_lower, speech_act
-        )
+        understatement = self._infer_understatement_implicature(text_lower, speech_act)
         if understatement is not None:
             return understatement
 
         # If context mentions strong emotions but text is neutral
-        emotion = self._infer_emotion_suppression_implicature(
-            text_lower, context_lower
-        )
+        emotion = self._infer_emotion_suppression_implicature(text_lower, context_lower)
         if emotion is not None:
             return emotion
 
@@ -454,9 +448,7 @@ class PragmaticReasoner:
         maxims["quality"] = self._assess_quality_maxim(text_lower)
 
         # ── Relation: relevance ────────────────────────────────
-        maxims["relation"] = self._assess_relation_maxim(
-            text_lower, context_lower, word_count
-        )
+        maxims["relation"] = self._assess_relation_maxim(text_lower, context_lower, word_count)
 
         # ── Manner: clarity ────────────────────────────────────
         maxims["manner"] = self._assess_manner_maxim(text_lower)

@@ -57,10 +57,13 @@ If validation fails, it reverts the change and logs the failure.
 Genesis proposes most changes for human review. For the small allowlist
 of autonomous fixes, it validates every change with ``py_compile``,
 import execution, and the full test suite, reverting on any failure.
-It only modifies its own Python source (defined by
-``_OWN_SOURCE_DIRS`` and ``_OWN_SOURCE_FILES`` in
-``SelfImprovement``) — never tests, configuration, scripts, or
-the Rust substrate. This boundary is the single source of truth shared
+It only modifies its own source (defined by ``_OWN_SOURCE_DIRS``,
+``_OWN_SOURCE_FILES``, and the crate's ``src/`` tree in
+``SelfImprovement``) — never tests, configuration, scripts,
+Cargo.toml, or build.rs. Autonomous mechanical fixes stay Python-only
+(their fixers and ``py_compile`` gate are); the experiment pipeline
+carries the Rust reach — proposals verified by the workspace cargo
+gate. This boundary is the single source of truth shared
 by autonomous fixes, experiments, and proposal generation.
 
 ## Proposal categories
@@ -83,7 +86,7 @@ import re
 import subprocess
 import sys
 import time
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -110,9 +113,7 @@ def _parse_source_tree(source: str) -> ast.Module | None:
         return None
 
 
-_LOGGER_BINDING_RE = re.compile(
-    r"^\s*logger\s*=\s*(?:logging\.)?getLogger", re.M
-)
+_LOGGER_BINDING_RE = re.compile(r"^\s*logger\s*=\s*(?:logging\.)?getLogger", re.M)
 
 
 def _module_has_logger(source: str) -> bool:
@@ -180,16 +181,16 @@ def _operand_span(data: bytes, node: ast.expr) -> tuple[int, int] | None:
         return None
     while True:
         left = start
-        while left > 0 and data[left - 1:left] in (b" ", b"\t"):
+        while left > 0 and data[left - 1 : left] in (b" ", b"\t"):
             left -= 1
         right = end
-        while right < len(data) and data[right:right + 1] in (b" ", b"\t"):
+        while right < len(data) and data[right : right + 1] in (b" ", b"\t"):
             right += 1
         if (
             left > 0
-            and data[left - 1:left] == b"("
+            and data[left - 1 : left] == b"("
             and right < len(data)
-            and data[right:right + 1] == b")"
+            and data[right : right + 1] == b")"
         ):
             start, end = left - 1, right + 1
         else:
@@ -210,22 +211,22 @@ def _compares_on_line(tree: ast.Module, line_num: int) -> list[ast.Compare]:
 class ProposalStatus(Enum):
     """Status of a self-improvement proposal."""
 
-    PENDING = "pending"      # waiting for human review
-    ACCEPTED = "accepted"     # human approved, ready to apply
-    REJECTED = "rejected"     # human declined, with feedback
-    APPLIED = "applied"       # the change was applied to the codebase
-    WITHDRAWN = "withdrawn"   # Genesis withdrew it (e.g., found it was wrong)
+    PENDING = "pending"  # waiting for human review
+    ACCEPTED = "accepted"  # human approved, ready to apply
+    REJECTED = "rejected"  # human declined, with feedback
+    APPLIED = "applied"  # the change was applied to the codebase
+    WITHDRAWN = "withdrawn"  # Genesis withdrew it (e.g., found it was wrong)
 
 
 class ProposalCategory(Enum):
     """What kind of improvement this proposal is."""
 
-    BUGFIX = "bugfix"           # fix a detected bug or code smell
+    BUGFIX = "bugfix"  # fix a detected bug or code smell
     OPTIMIZATION = "optimization"  # improve performance
-    SAFETY = "safety"           # add error handling or validation
-    REFACTOR = "refactor"       # improve structure without behavior change
-    FEATURE = "feature"         # propose a new capability
-    RESEARCH = "research"       # propose researching before implementing
+    SAFETY = "safety"  # add error handling or validation
+    REFACTOR = "refactor"  # improve structure without behavior change
+    FEATURE = "feature"  # propose a new capability
+    RESEARCH = "research"  # propose researching before implementing
 
 
 @dataclass(slots=True)
@@ -241,18 +242,18 @@ class Proposal:
     title: str
     category: ProposalCategory
     file_path: str
-    description: str               # what the proposal does
-    rationale: str                 # why it's proposing this
-    expected_benefit: str          # what improvement this brings
-    original_code: str             # the code to be changed
-    proposed_code: str             # the replacement code
-    confidence: float              # 0..1, how confident it is
+    description: str  # what the proposal does
+    rationale: str  # why it's proposing this
+    expected_benefit: str  # what improvement this brings
+    original_code: str  # the code to be changed
+    proposed_code: str  # the replacement code
+    confidence: float  # 0..1, how confident it is
     status: ProposalStatus = ProposalStatus.PENDING
-    feedback: str = ""             # human's reason for accept/reject
+    feedback: str = ""  # human's reason for accept/reject
     created_at: int = field(default_factory=lambda: int(time.time() * 1000))
-    reviewed_at: int = 0           # when the human reviewed it
-    source: str = ""               # what triggered this proposal (bug_report, reflection, etc.)
-    line_hint: int | None = None   # the line the finding was reported at —
+    reviewed_at: int = 0  # when the human reviewed it
+    source: str = ""  # what triggered this proposal (bug_report, reflection, etc.)
+    line_hint: int | None = None  # the line the finding was reported at —
     # resolves which occurrence of original_code to replace when the
     # snippet matches more than one site in the file
 
@@ -421,9 +422,9 @@ class SelfImprovement:
         # Maps category → (accepted_count, total_count)
         self._category_stats: dict[str, tuple[int, int]] = {}
 
-        # Cooldown between proposal generation cycles
+        # Timestamp of the last proposal generation cycle (telemetry,
+        # not a throttle — there is deliberately no rate limit).
         self._last_generation_time: float = 0.0
-        self._generation_cooldown: float = 1.0  # safety net only; urge is primary gate
 
         # Heuristic experiment history (workstream D audit log)
         self._experiment_history: list[ExperimentRecord] = []
@@ -446,15 +447,14 @@ class SelfImprovement:
 
         Args:
             max_proposals: Maximum number of proposals to generate per cycle.
-            force: If True, bypass the cooldown.
+            force: Unused — kept for call-site compatibility. There is
+                no throttle: the verification gate is the only arbiter
+                of which changes land.
 
         Returns:
             List of new proposals (all with PENDING status).
         """
-        now = time.time()
-        if not force and now - self._last_generation_time < self._generation_cooldown:
-            return []
-        self._last_generation_time = now
+        self._last_generation_time = time.time()
 
         new_proposals: list[Proposal] = []
 
@@ -541,15 +541,73 @@ class SelfImprovement:
                 )
             dropped = self._proposals.pop(idx)
             logger.info(
-                "Self-improvement: evicted proposal #%d (%s, %s) "
-                "under the %d-proposal cap",
-                dropped.id, dropped.status.value, dropped.title,
+                "Self-improvement: evicted proposal #%d (%s, %s) under the %d-proposal cap",
+                dropped.id,
+                dropped.status.value,
+                dropped.title,
                 self._max_proposals,
             )
 
     def get_pending_proposals(self) -> list[Proposal]:
         """Get all proposals awaiting human review."""
         return [p for p in self._proposals if p.status == ProposalStatus.PENDING]
+
+    #: A pending proposal unreviewed this long is dead weight, not
+    #: pending work — self-triage withdraws it rather than letting
+    #: the queue stand as a permanent, undrainable obligation.
+    _PROPOSAL_STALE_MS = 7 * 24 * 3600 * 1000
+    #: Most withdrawals per triage call — discharge is bounded work,
+    #: not a purge.
+    _PROPOSAL_TRIAGE_CAP = 10
+
+    def triage_pending(self, now_ms: int | None = None) -> list[int]:
+        """Withdraw pending proposals that no longer deserve review.
+
+        The queue only drains when a human reviews — without this,
+        pending proposals are a standing cognitive obligation she can
+        never discharge herself. Three grounds for withdrawal:
+
+        * **stale** — unreviewed past ``_PROPOSAL_STALE_MS``;
+        * **dead file** — ``file_path`` no longer exists;
+        * **orphaned** — a ``bug:<category>:<line>``-sourced proposal
+          whose bug is no longer open (it was fixed or rescanned away).
+
+        Returns the withdrawn proposal ids, capped at
+        ``_PROPOSAL_TRIAGE_CAP`` per call.
+        """
+        now_ms = now_ms if now_ms is not None else int(time.time() * 1000)
+        open_bugs: set[tuple[str, int]] | None = None
+        withdrawn: list[int] = []
+        for proposal in self.get_pending_proposals():
+            if len(withdrawn) >= self._PROPOSAL_TRIAGE_CAP:
+                break
+            reason = ""
+            if now_ms - proposal.created_at > self._PROPOSAL_STALE_MS:
+                reason = "stale — unreviewed past the horizon"
+            elif not os.path.isfile(os.path.join(self.project_root, proposal.file_path)):
+                reason = "its target file no longer exists"
+            elif proposal.source.startswith("bug:"):
+                if open_bugs is None:
+                    open_bugs = (
+                        {(b.file, b.line) for b in self.bug_reporter.open_reports()}
+                        if self.bug_reporter
+                        else set()
+                    )
+                try:
+                    bug_line = int(proposal.source.rsplit(":", 1)[1])
+                except (IndexError, ValueError):
+                    bug_line = -1
+                if bug_line >= 0 and (proposal.file_path, bug_line) not in open_bugs:
+                    reason = "the bug it fixes is no longer open"
+            if reason and self.withdraw_proposal(proposal.id, reason):
+                withdrawn.append(proposal.id)
+        if withdrawn:
+            logger.info(
+                "Self-improvement: self-triaged %d stale proposal(s) — %s",
+                len(withdrawn),
+                withdrawn,
+            )
+        return withdrawn
 
     def get_proposal(self, proposal_id: int) -> Proposal | None:
         """Get a specific proposal by ID."""
@@ -710,8 +768,9 @@ class SelfImprovement:
     #
     # All three systems that touch Genesis's code — autonomous fixes,
     # experiments, and proposal generation — share the same boundary:
-    # its own Python source, never tests, never config, never Rust.
-    # This is the one place that boundary is defined.
+    # its own source — Python under _OWN_SOURCE_DIRS, Rust under the
+    # crate's src/ — never tests, never config, never Cargo.toml or
+    # build.rs. This is the one place that boundary is defined.
 
     _OWN_SOURCE_DIRS: ClassVar[set[str]] = {
         # The brain-region tree under python/ plus the support
@@ -764,6 +823,14 @@ class SelfImprovement:
     }
     _PROTECTED_CORE_FILES: ClassVar[set[str]] = {
         "mind.py",
+        # The body's integrity channels — a self-edit here could hide
+        # a flaw from the very instruments that would detect it, so
+        # these stay proposal-only: the persisted-state checksum and
+        # layout migration (mmap_state), the death sentinel
+        # (continuity), and the wire protocol + handshake (ipc).
+        "src/store/mmap_state.rs",
+        "src/daemon/continuity.rs",
+        "src/daemon/ipc.rs",
     }
 
     @classmethod
@@ -781,17 +848,32 @@ class SelfImprovement:
             return True
         return file_path in cls._PROTECTED_CORE_FILES
 
+    # Rust subtree of her own crate — repo-relative, so it can only
+    # ever match <project_root>/src: callers normalize file_path and
+    # reject absolute paths and "..", so a "src/" prefix cannot reach
+    # /usr/src, ~/.cargo/registry, or any other crate on the machine.
+    _RUST_SOURCE_DIR: ClassVar[str] = "src/"
+
     @classmethod
     def _is_own_source(cls, file_path: str) -> bool:
-        """Check if a file is Genesis's own Python source.
+        """Check if a file is Genesis's own Python or Rust source.
 
         This is the single source of truth for the own-source boundary.
         Used by autonomous fixes, experiments, and proposal generation.
 
         Allowed: any .py file under _OWN_SOURCE_DIRS or in
-        _OWN_SOURCE_FILES.
-        Never: tests, config directories, Rust source, non-Python files.
+        _OWN_SOURCE_FILES; any .rs file under the crate's src/ tree.
+        Never: tests, config directories, build.rs, Cargo.toml (not
+        under src/), or non-source files.
         """
+        file_parts = file_path.replace("\\", "/").split("/")
+        if any(part in ("tests", "test", "__pycache__") for part in file_parts):
+            return False
+        if file_path.endswith(".rs"):
+            # Only inside the crate's own source tree — anchored at the
+            # repo root by the caller's normalization, never anywhere
+            # else a "src" directory or ".rs" file happens to live.
+            return file_path.startswith(cls._RUST_SOURCE_DIR)
         if not file_path.endswith(".py"):
             return False
         # Must be under an allowed directory or an explicitly allowed file
@@ -800,9 +882,6 @@ class SelfImprovement:
         ):
             return False
         # Never test files
-        file_parts = file_path.replace("\\", "/").split("/")
-        if any(part in ("tests", "test", "__pycache__") for part in file_parts):
-            return False
         if "test_" in file_path or "_test.py" in file_path:
             return False
         # Never config directories — but a source module named
@@ -849,9 +928,9 @@ class SelfImprovement:
             if bug.category not in self._AUTONOMOUS_FIX_CATEGORIES:
                 continue
 
-            # Enforce the own-source boundary — it can only touch its
-            # own Python source, never tests, config, scripts, or the
-            # Rust substrate.
+            # Enforce the own-source boundary — autonomous fixes stay
+            # Python-only (the fixers and py_compile gate are); the
+            # experiment pipeline is where Rust reach lives.
             if not self._is_autonomous_allowed(bug.file):
                 continue
 
@@ -872,10 +951,7 @@ class SelfImprovement:
                 self.bug_reporter.resolve(bug.file, bug.category)
 
         if applied:
-            logger.info(
-                f"Autonomous fix: applied {len(applied)} fix(es) "
-                f"without human review"
-            )
+            logger.info(f"Autonomous fix: applied {len(applied)} fix(es) without human review")
 
         return applied
 
@@ -886,8 +962,12 @@ class SelfImprovement:
         Delegates to _is_own_source — the single source of truth for
         the own-source boundary — and additionally excludes protected
         core files (cognition, language, mind) that must never be
-        auto-modified.
+        auto-modified. Autonomous fixes are Python-only: the fixers
+        are Python rewrites gated by py_compile, so an .rs file is
+        never auto-applied even though it is own source.
         """
+        if not file_path.endswith(".py"):
+            return False
         if not cls._is_own_source(file_path):
             return False
         if cls._is_protected_core(file_path):
@@ -963,10 +1043,7 @@ class SelfImprovement:
         if not self._validate_and_write_fix(file_path, source, fixed_source, bug.file):
             return None
 
-        logger.info(
-            f"Autonomous fix: applied silent_except fix to "
-            f"{bug.file}:{bug.line}"
-        )
+        logger.info(f"Autonomous fix: applied silent_except fix to {bug.file}:{bug.line}")
 
         return {
             "file": bug.file,
@@ -1018,23 +1095,18 @@ class SelfImprovement:
         if not self._validate_and_write_fix(file_path, source, fixed_source, bug.file):
             return None
 
-        logger.info(
-            f"Autonomous fix: removed unreachable code at {bug.file}:{bug.line}"
-        )
+        logger.info(f"Autonomous fix: removed unreachable code at {bug.file}:{bug.line}")
 
         return {
             "file": bug.file,
             "line": bug.line,
             "category": "unreachable_code",
             "description": (
-                f"Removed unreachable code after {prev_line.strip()} "
-                f"at {bug.file}:{bug.line}"
+                f"Removed unreachable code after {prev_line.strip()} at {bug.file}:{bug.line}"
             ),
         }
 
-    def _apply_print_in_code_fix(
-        self, bug: BugReport
-    ) -> dict[str, Any] | None:
+    def _apply_print_in_code_fix(self, bug: BugReport) -> dict[str, Any] | None:
         """Replace print() with a logger call at the reported line.
 
         Also ensures a module-level ``logger`` exists so the fix is
@@ -1085,9 +1157,7 @@ class SelfImprovement:
         }
 
     @staticmethod
-    def _ensure_module_logger(
-        lines: list[str], target_idx: int, source: str
-    ) -> int:
+    def _ensure_module_logger(lines: list[str], target_idx: int, source: str) -> int:
         """Insert ``import logging`` + a module logger when absent.
 
         Mutates ``lines`` in place. Returns the target's index — any
@@ -1161,9 +1231,7 @@ class SelfImprovement:
         if not self._validate_and_write_fix(file_path, source, fixed_source, bug.file):
             return None
 
-        logger.info(
-            f"Autonomous fix: replaced None comparison in {bug.file}:{bug.line}"
-        )
+        logger.info(f"Autonomous fix: replaced None comparison in {bug.file}:{bug.line}")
 
         return {
             "file": bug.file,
@@ -1188,6 +1256,7 @@ class SelfImprovement:
         restored before returning False.
         """
         import tempfile
+
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".py", delete=False, encoding="utf-8"
         ) as tmp:
@@ -1205,17 +1274,14 @@ class SelfImprovement:
             os.unlink(tmp_path)
         if not compile_result.success:
             logger.warning(
-                f"Autonomous fix: validation failed for {rel_path}: "
-                f"{compile_result.error}"
+                f"Autonomous fix: validation failed for {rel_path}: {compile_result.error}"
             )
             return False
 
         try:
             file_path.write_text(fixed_source, encoding="utf-8")
         except OSError as e:
-            logger.warning(
-                f"Autonomous fix: could not write {rel_path}: {e}"
-            )
+            logger.warning(f"Autonomous fix: could not write {rel_path}: {e}")
             return False
 
         # Import-execution gate: py_compile only validates syntax — it
@@ -1241,9 +1307,7 @@ class SelfImprovement:
                     timeout=60,
                 )
             except (subprocess.TimeoutExpired, OSError) as e:
-                logger.warning(
-                    f"Autonomous fix: import check errored for {rel_path}: {e}"
-                )
+                logger.warning(f"Autonomous fix: import check errored for {rel_path}: {e}")
                 self._revert_write(file_path, original_source, rel_path)
                 return False
             if import_result.returncode != 0:
@@ -1265,8 +1329,7 @@ class SelfImprovement:
         )
         if not test_result.success:
             logger.warning(
-                f"Autonomous fix: tests failed after {rel_path} change. "
-                f"{test_result.error}"
+                f"Autonomous fix: tests failed after {rel_path} change. {test_result.error}"
             )
             # The fix compiled but broke tests. Revert before reporting failure.
             self._revert_write(file_path, original_source, rel_path)
@@ -1297,15 +1360,14 @@ class SelfImprovement:
         if parts[0] in ("tests", "__pycache__"):
             return None
         root = code_root()
-        if not (root / "python" / parts[0] / "__init__.py").exists() and not (
-            root / parts[0] / "__init__.py"
-        ).exists():
+        if (
+            not (root / "python" / parts[0] / "__init__.py").exists()
+            and not (root / parts[0] / "__init__.py").exists()
+        ):
             # The first segment no longer names a package — the module
             # moved when the brain regions absorbed the shared
             # packages. Locate it by filename instead.
-            hits = sorted(
-                p for p in (root / "python").rglob(parts[-1] + ".py")
-            )
+            hits = sorted(p for p in (root / "python").rglob(parts[-1] + ".py"))
             if len(hits) != 1:
                 return None
             rel = hits[0].relative_to(root / "python").with_suffix("")
@@ -1320,10 +1382,7 @@ class SelfImprovement:
         try:
             file_path.write_text(original_source, encoding="utf-8")
         except OSError as e:
-            logger.error(
-                f"Autonomous fix: could not revert {rel_path} after gate "
-                f"failure: {e}"
-            )
+            logger.error(f"Autonomous fix: could not revert {rel_path} after gate failure: {e}")
 
     @staticmethod
     def _infer_except_context(lines: list[str], except_line_num: int) -> str:
@@ -1375,9 +1434,9 @@ class SelfImprovement:
         # generating proposals must not rescan the tree itself. Test
         # files stay out of proposals (the old include_tests=False).
         bugs = [
-            b for b in self.bug_reporter.open_reports()
-            if "test" not in Path(b.file).name.lower()
-            and "tests" not in Path(b.file).parts
+            b
+            for b in self.bug_reporter.open_reports()
+            if "test" not in Path(b.file).name.lower() and "tests" not in Path(b.file).parts
         ]
 
         # Prioritize by severity: warnings before style issues.
@@ -1385,12 +1444,22 @@ class SelfImprovement:
         severity_rank = {"error": 0, "warning": 1, "style": 2}
         bugs = sorted(bugs, key=lambda b: severity_rank.get(b.severity, 3))
 
-        # Deduplicate — don't propose for bugs we already have proposals for
-        existing_keys = {
-            (p.file_path, p.source)
-            for p in self._proposals
-            if p.source.startswith("bug:")
-        }
+        # Deduplicate — don't propose for bugs that already have a live
+        # proposal. Keyed on (file, category), not the source's line:
+        # the bug list is re-scanned and a bug that moves lines (an
+        # edit above it shifts its number) is the same bug, but a
+        # line-scoped key would let it spawn a fresh proposal every
+        # scan. Terminal proposals (rejected/applied/withdrawn) free
+        # the slot — exact-title dedup in generate_proposals still
+        # stops an identical fix being re-offered.
+        def _live_bug_key(p: Proposal) -> tuple[str, str] | None:
+            if not p.source.startswith("bug:") or p.source.count(":") != 2:
+                return None
+            if p.status not in (ProposalStatus.PENDING, ProposalStatus.ACCEPTED):
+                return None
+            return (p.file_path, p.source.split(":")[1])
+
+        existing_keys = {k for p in self._proposals if (k := _live_bug_key(p))}
 
         # Diversify: cap proposals per category and per file so it
         # surfaces different kinds of issues rather than flooding the
@@ -1404,7 +1473,7 @@ class SelfImprovement:
             if len(proposals) >= max_proposals:
                 break
 
-            key = (bug.file, f"bug:{bug.category}:{bug.line}")
+            key = (bug.file, bug.category)
             if key in existing_keys:
                 continue
 
@@ -1475,9 +1544,7 @@ class SelfImprovement:
             line_hint=bug.line,
         )
 
-    def _generate_fix(
-        self, bug: BugReport, source: str
-    ) -> tuple[str, str, str, str] | None:
+    def _generate_fix(self, bug: BugReport, source: str) -> tuple[str, str, str, str] | None:
         """Generate a concrete fix for a specific bug.
 
         Returns (original_code, proposed_code, description, benefit)
@@ -1498,9 +1565,7 @@ class SelfImprovement:
         # raise NameError the first time it ran. (The autonomous path
         # can fix these — it injects the logger itself, see
         # _ensure_module_logger.)
-        if category in ("silent_except", "print_in_code") and not _module_has_logger(
-            source
-        ):
+        if category in ("silent_except", "print_in_code") and not _module_has_logger(source):
             return None
 
         if category == "bare_except":
@@ -1545,9 +1610,7 @@ class SelfImprovement:
         # It should only propose changes it can actually generate.
         return None
 
-    def _fix_bare_except(
-        self, lines: list[str], line_num: int
-    ) -> tuple[str, str, str, str] | None:
+    def _fix_bare_except(self, lines: list[str], line_num: int) -> tuple[str, str, str, str] | None:
         """Fix a bare 'except:' by replacing with 'except Exception:'."""
         line = lines[line_num - 1].rstrip("\n")
         fixed = line.replace("except:", "except Exception:")
@@ -1628,54 +1691,50 @@ class SelfImprovement:
 
         # Find mutable defaults: = [], = {}, = set()
         mutable_patterns = [
-            (r"=\s*\[\]", "= None"),
-            (r"=\s*\{\}", "= None"),
-            (r"=\s*set\(\)", "= None"),
+            (r"=\s*\[\]", "= None", "[]"),
+            (r"=\s*\{\}", "= None", "{}"),
+            (r"=\s*set\(\)", "= None", "set()"),
         ]
 
         fixed = line
-        param_name = ""
-        for pattern, replacement in mutable_patterns:
-            match = re.search(pattern, fixed)
-            if match:
-                # Extract the parameter name
-                before_match = fixed[: match.start()]
-                param_match = re.search(r"(\w+)\s*$", before_match)
+        # Every defaulted param and the literal it needs rebuilt — a
+        # signature may carry several (``f(a=[], b={})``); a sentinel
+        # for only the last would leave the rest permanently None.
+        sentinels: list[tuple[str, str]] = []
+        for pattern, replacement, literal in mutable_patterns:
+            while True:
+                match = re.search(pattern, fixed)
+                if not match:
+                    break
+                before_match = fixed[: match.start()].rstrip()
+                # The name sits before the `=` — optionally behind a
+                # type annotation (``x: list = []``); grabbing the
+                # bare last word would capture ``list``, not ``x``.
+                param_match = re.search(r"(\w+)(?:\s*:\s*[^=\s]+)?$", before_match)
                 if param_match:
-                    param_name = param_match.group(1)
-                fixed = re.sub(pattern, replacement, fixed)
+                    sentinels.append((param_match.group(1), literal))
+                fixed = re.sub(pattern, replacement, fixed, count=1)
 
-        if fixed == line or not param_name:
+        if fixed == line or not sentinels:
             return None
 
-        # Add the sentinel check as the first line of the function body
+        # Add the sentinel checks as the first lines of the function body
         # Find the indentation of the next line (function body)
         body_indent = "    "  # default
         if line_num < len(lines):
             next_line = lines[line_num]
             body_indent = " " * (len(next_line) - len(next_line.lstrip()))
 
-        # Determine the original mutable to reconstruct
-        if "[]" in line:
-            sentinel_init = (
-                f"{body_indent}{param_name} = []"
-                f" if {param_name} is None else {param_name}"
-            )
-        elif "{}" in line:
-            sentinel_init = (
-                f"{body_indent}{param_name} = {{}}"
-                f" if {param_name} is None else {param_name}"
-            )
-        else:
-            sentinel_init = (
-                f"{body_indent}{param_name} = set()"
-                f" if {param_name} is None else {param_name}"
-            )
+        sentinel_inits = "\n".join(
+            f"{body_indent}{name} = {literal} if {name} is None else {name}"
+            for name, literal in sentinels
+        )
+        param_names = ", ".join(f"'{name}'" for name, _ in sentinels)
 
         return (
             line,
-            f"{fixed}\n{sentinel_init}",
-            f"Replace mutable default for '{param_name}' with None sentinel",
+            f"{fixed}\n{sentinel_inits}",
+            f"Replace mutable default for {param_names} with None sentinel",
             "Mutable default arguments share state across calls, causing "
             "subtle bugs. The None sentinel pattern is the Pythonic fix.",
         )
@@ -1759,9 +1818,7 @@ class SelfImprovement:
             "log level control, formatting, and routing to files.",
         )
 
-    def _fix_unwrap(
-        self, lines: list[str], line_num: int
-    ) -> tuple[str, str, str, str] | None:
+    def _fix_unwrap(self, lines: list[str], line_num: int) -> tuple[str, str, str, str] | None:
         """Replace .unwrap() with proper error handling.
 
         Skipped — ``.unwrap()`` is a Rust pattern, not a Python one.
@@ -1770,9 +1827,7 @@ class SelfImprovement:
         """
         return None
 
-    def _fix_import_star(
-        self, lines: list[str], line_num: int
-    ) -> tuple[str, str, str, str] | None:
+    def _fix_import_star(self, lines: list[str], line_num: int) -> tuple[str, str, str, str] | None:
         """Replace 'from X import *' with explicit imports.
 
         Skipped — converting ``from X import *`` to ``import X``
@@ -1867,10 +1922,7 @@ class SelfImprovement:
                     continue
                 left_operand = operands[i]
                 right_operand = node.comparators[i]
-                if not (
-                    is_literal_operand(left_operand)
-                    or is_literal_operand(right_operand)
-                ):
+                if not (is_literal_operand(left_operand) or is_literal_operand(right_operand)):
                     continue
                 start = left_operand.end_col_offset
                 end = right_operand.col_offset
@@ -1887,8 +1939,7 @@ class SelfImprovement:
                 return (
                     line,
                     fixed,
-                    "Replace 'is'/'is not' with '=='/'!=' when comparing "
-                    "to a literal",
+                    "Replace 'is'/'is not' with '=='/'!=' when comparing to a literal",
                     "Comparing a value to a literal with 'is' tests object "
                     "identity, which is unreliable for freshly-created "
                     "literal objects. '==' compares values.",
@@ -1933,9 +1984,7 @@ class SelfImprovement:
                 else:
                     assert right_arg is not None
                     value_arg, class_side = right_arg, left_operand
-                if not isinstance(
-                    class_side, (ast.Name, ast.Attribute, ast.Tuple)
-                ):
+                if not isinstance(class_side, (ast.Name, ast.Attribute, ast.Tuple)):
                     continue
                 if isinstance(class_side, ast.Name) and class_side.id == "int":
                     # bool is a subclass of int: ``isinstance(x, int)``
@@ -1958,12 +2007,8 @@ class SelfImprovement:
                     or right_span is None
                 ):
                     continue
-                arg_text = data[
-                    value_arg.col_offset:value_arg.end_col_offset
-                ].decode("utf-8")
-                class_text = data[
-                    class_side.col_offset:class_side.end_col_offset
-                ].decode("utf-8")
+                arg_text = data[value_arg.col_offset : value_arg.end_col_offset].decode("utf-8")
+                class_text = data[class_side.col_offset : class_side.end_col_offset].decode("utf-8")
                 call = f"isinstance({arg_text}, {class_text})"
                 if isinstance(op, (ast.NotEq, ast.IsNot)):
                     call = f"not {call}"
@@ -1978,9 +2023,7 @@ class SelfImprovement:
                 )
         return None
 
-    def _fix_boolean_equality(
-        self, source: str, line_num: int
-    ) -> tuple[str, str, str, str] | None:
+    def _fix_boolean_equality(self, source: str, line_num: int) -> tuple[str, str, str, str] | None:
         """Replace 'x == True'/'x == False' with a truthiness test."""
         tree = _parse_source_tree(source)
         if tree is None:
@@ -1992,9 +2035,7 @@ class SelfImprovement:
         data = line.encode("utf-8")
 
         for node in _compares_on_line(tree, line_num):
-            if len(node.ops) != 1 or not isinstance(
-                node.ops[0], (ast.Eq, ast.NotEq)
-            ):
+            if len(node.ops) != 1 or not isinstance(node.ops[0], (ast.Eq, ast.NotEq)):
                 continue
             left, right = node.left, node.comparators[0]
             bool_val: bool | None = None
@@ -2014,23 +2055,24 @@ class SelfImprovement:
             right_span = _operand_span(data, right)
             if other_span is None or left_span is None or right_span is None:
                 continue
-            other_text = data[other_span[0]:other_span[1]].decode("utf-8")
+            other_text = data[other_span[0] : other_span[1]].decode("utf-8")
             if negate:
-                already_parenthesised = (
-                    other_text.startswith("(") and other_text.endswith(")")
-                )
-                if isinstance(
-                    other,
-                    (
-                        ast.BoolOp,
-                        ast.Compare,
-                        ast.BinOp,
-                        ast.UnaryOp,
-                        ast.IfExp,
-                        ast.Lambda,
-                        ast.NamedExpr,
-                    ),
-                ) and not already_parenthesised:
+                already_parenthesised = other_text.startswith("(") and other_text.endswith(")")
+                if (
+                    isinstance(
+                        other,
+                        (
+                            ast.BoolOp,
+                            ast.Compare,
+                            ast.BinOp,
+                            ast.UnaryOp,
+                            ast.IfExp,
+                            ast.Lambda,
+                            ast.NamedExpr,
+                        ),
+                    )
+                    and not already_parenthesised
+                ):
                     other_text = f"not ({other_text})"
                 else:
                     other_text = f"not {other_text}"
@@ -2045,9 +2087,7 @@ class SelfImprovement:
             )
         return None
 
-    def _fix_assert_tuple(
-        self, source: str, line_num: int
-    ) -> tuple[str, str, str, str] | None:
+    def _fix_assert_tuple(self, source: str, line_num: int) -> tuple[str, str, str, str] | None:
         """Rewrite 'assert (cond, msg)' to 'assert cond, msg'."""
         tree = _parse_source_tree(source)
         if tree is None:
@@ -2078,8 +2118,8 @@ class SelfImprovement:
                 or node.test.end_col_offset is None
             ):
                 continue
-            cond_text = data[cond.col_offset:cond.end_col_offset].decode("utf-8")
-            msg_text = data[message.col_offset:message.end_col_offset].decode("utf-8")
+            cond_text = data[cond.col_offset : cond.end_col_offset].decode("utf-8")
+            msg_text = data[message.col_offset : message.end_col_offset].decode("utf-8")
             fixed = _splice_line(
                 line,
                 node.test.col_offset,
@@ -2132,28 +2172,21 @@ class SelfImprovement:
                 isinstance(node, ast.JoinedStr)
                 and node.lineno == line_num
                 and getattr(node, "end_lineno", line_num) == line_num
-                and not any(
-                    isinstance(v, ast.FormattedValue) for v in node.values
-                )
+                and not any(isinstance(v, ast.FormattedValue) for v in node.values)
             ):
                 continue
             if node.col_offset is None or node.end_col_offset is None:
                 continue
-            text = data[node.col_offset:node.end_col_offset].decode("utf-8")
+            text = data[node.col_offset : node.end_col_offset].decode("utf-8")
             # Literal braces would change meaning if the prefix is dropped.
             if "{" in text:
                 continue
-            if (
-                text[:1] in ("f", "F")
-                and len(text) > 1
-                and text[1] in ("'", '"')
-            ):
+            if text[:1] in ("f", "F") and len(text) > 1 and text[1] in ("'", '"'):
                 fixed = _splice_line(line, node.col_offset, node.col_offset + 1, "")
                 return (
                     line,
                     fixed,
-                    "Remove the redundant 'f' prefix from an f-string "
-                    "with no placeholders",
+                    "Remove the redundant 'f' prefix from an f-string with no placeholders",
                     "An f-string with no {…} behaves like a plain string; "
                     "the prefix usually signals a forgotten interpolation.",
                 )
@@ -2184,11 +2217,7 @@ class SelfImprovement:
             rel_path = os.path.relpath(filepath, self.project_root)
 
             # Skip files we already have proposals for
-            existing = {
-                p.source
-                for p in self._proposals
-                if p.file_path == rel_path
-            }
+            existing = {p.source for p in self._proposals if p.file_path == rel_path}
 
             file_proposals = self._analyze_python_file(
                 filepath, rel_path, max_proposals - len(proposals), existing
@@ -2214,6 +2243,14 @@ class SelfImprovement:
                 rel = os.path.relpath(str(py_file), self.project_root)
                 if SelfImprovement._is_own_source(rel):
                     files.append(str(py_file))
+        # The crate's own source — proposals can form about the body
+        # too; the experiment gate decides what may apply.
+        src_dir = root / SelfImprovement._RUST_SOURCE_DIR
+        if src_dir.is_dir():
+            for rs_file in sorted(src_dir.rglob("*.rs")):
+                rel = os.path.relpath(str(rs_file), self.project_root)
+                if SelfImprovement._is_own_source(rel):
+                    files.append(str(rs_file))
         # Add explicit top-level files
         for file_path in sorted(SelfImprovement._OWN_SOURCE_FILES):
             abs_path = root / file_path
@@ -2250,7 +2287,8 @@ class SelfImprovement:
         # dedup key, causing proposals for one class to be rejected as
         # duplicates of proposals for another class in the same file.
         def _walk_with_class(
-            node: ast.AST, class_name: str | None = None,
+            node: ast.AST,
+            class_name: str | None = None,
         ) -> list[tuple[ast.AST, str | None]]:
             """Walk the AST, tracking the enclosing class name."""
             results: list[tuple[ast.AST, str | None]] = []
@@ -2270,16 +2308,12 @@ class SelfImprovement:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 # Include class name in the source key so methods in
                 # different classes don't collide.
-                qualified_name = (
-                    f"{class_name}.{node.name}" if class_name else node.name
-                )
+                qualified_name = f"{class_name}.{node.name}" if class_name else node.name
                 source_key = f"analysis:missing_docstring:{qualified_name}:{node.lineno}"
                 if source_key in existing_sources:
                     continue
 
-                if not self._has_docstring(
-                    node
-                ) and self._docstring_worth_proposing(node):
+                if not self._has_docstring(node) and self._docstring_worth_proposing(node):
                     proposal = self._propose_docstring(
                         node, lines, rel_path, source_key, class_name
                     )
@@ -2292,9 +2326,7 @@ class SelfImprovement:
                     source_key = f"analysis:old_format:{node.lineno}"
                     if source_key in existing_sources:
                         continue
-                    proposal = self._propose_fstring(
-                        node, lines, rel_path, source_key
-                    )
+                    proposal = self._propose_fstring(node, lines, rel_path, source_key)
                     if proposal:
                         proposals.append(proposal)
 
@@ -2367,9 +2399,7 @@ class SelfImprovement:
         # classes don't collide in the deduplication set. Without this,
         # "Add docstring to __init__() in memory_systems.py" would be
         # the same title for every class's __init__ in that file.
-        qualified_name = (
-            f"{class_name}.{func_name}" if class_name else func_name
-        )
+        qualified_name = f"{class_name}.{func_name}" if class_name else func_name
 
         # For multi-line function signatures (e.g., def __init__(\n    self,\n    ...
         # ), the docstring must go after the last line of the signature,
@@ -2607,9 +2637,7 @@ class SelfImprovement:
         # Find all % format specifiers in the string
         # Match %s, %d, %f, %r, %x, %o, %e, %g, %c, %%,
         # and width/precision variants like %5.2f
-        specs = list(re.finditer(
-            r"%(?:(\d+)?(?:\.(\d+))?)?([sdrfegoxXcb%])", fmt_str
-        ))
+        specs = list(re.finditer(r"%(?:(\d+)?(?:\.(\d+))?)?([sdrfegoxXcb%])", fmt_str))
         if not specs:
             return None
 
@@ -2635,7 +2663,7 @@ class SelfImprovement:
         arg_idx = 0
         for spec in specs:
             # Add the text before this spec
-            result_parts.append(fmt_str[last_end:spec.start()])
+            result_parts.append(fmt_str[last_end : spec.start()])
             conv = spec.group(3)
 
             if conv == "%":
@@ -2698,9 +2726,7 @@ class SelfImprovement:
 
     # ─── Feedback learning ──────────────────────────────────────
 
-    def _record_feedback(
-        self, proposal: Proposal, accepted: bool, feedback: str
-    ) -> None:
+    def _record_feedback(self, proposal: Proposal, accepted: bool, feedback: str) -> None:
         """Record human feedback and update category statistics."""
         record = FeedbackRecord(
             proposal_id=proposal.id,
@@ -2728,9 +2754,7 @@ class SelfImprovement:
                 f"Category {cat} success rate: {accepted_n}/{total}"
             )
         else:
-            logger.info(
-                f"Proposal #{proposal.id} rejected: '{feedback}'."
-            )
+            logger.info(f"Proposal #{proposal.id} rejected: '{feedback}'.")
 
     def _category_confidence(self, category: ProposalCategory) -> float:
         """Adjust confidence based on historical success rate.
@@ -2752,15 +2776,12 @@ class SelfImprovement:
         """Append an experiment record, bounding the audit log.
 
         ``_experiment_history`` is serialized in full by to_dict, so
-        it must stay bounded even though experiments are capped at
-        ``_MAX_PER_DAY`` — over months of operation the log would
+        it must stay bounded — over months of operation the log would
         otherwise grow without limit.
         """
         self._experiment_history.append(record)
         if len(self._experiment_history) > self._max_experiments:
-            del self._experiment_history[
-                : len(self._experiment_history) - self._max_experiments
-            ]
+            del self._experiment_history[: len(self._experiment_history) - self._max_experiments]
 
     # ─── Persistence ────────────────────────────────────────────
 
@@ -2770,9 +2791,7 @@ class SelfImprovement:
             "proposals": [p.to_dict() for p in self._proposals],
             "next_id": self._next_id,
             "feedback_history": [f.to_dict() for f in self._feedback_history],
-            "category_stats": {
-                cat: list(stats) for cat, stats in self._category_stats.items()
-            },
+            "category_stats": {cat: list(stats) for cat, stats in self._category_stats.items()},
             "last_generation_time": self._last_generation_time,
             "experiments": [e.to_dict() for e in self._experiment_history],
         }
@@ -2793,9 +2812,7 @@ class SelfImprovement:
         stale: list[Proposal] = []
         kept: list[Proposal] = []
         for p in restored:
-            if p.status is ProposalStatus.PENDING and not self._proposal_can_apply(
-                p
-            ):
+            if p.status is ProposalStatus.PENDING and not self._proposal_can_apply(p):
                 stale.append(p)
             else:
                 kept.append(p)
@@ -2818,10 +2835,9 @@ class SelfImprovement:
 
         self._feedback_history = [
             FeedbackRecord.from_dict(f) for f in data.get("feedback_history", [])
-        ][-self._max_feedback:]
+        ][-self._max_feedback :]
         self._category_stats = {
-            cat: tuple(stats)
-            for cat, stats in data.get("category_stats", {}).items()
+            cat: tuple(stats) for cat, stats in data.get("category_stats", {}).items()
         }
         self._last_generation_time = data.get("last_generation_time", 0.0)
 
@@ -2831,9 +2847,8 @@ class SelfImprovement:
 
         # Restore heuristic experiment history
         self._experiment_history = [
-            ExperimentRecord.from_dict(e)
-            for e in data.get("experiments", [])
-        ][-self._max_experiments:]
+            ExperimentRecord.from_dict(e) for e in data.get("experiments", [])
+        ][-self._max_experiments :]
 
     def _proposal_can_apply(self, proposal: Proposal) -> bool:
         """Check that a pending proposal's edit is still applicable.
@@ -2934,9 +2949,14 @@ class HeuristicExperiment:
        never touched by an unverified edit.
 
     Tight guardrails:
-    - Only own-source files can be modified (Genesis's Python source).
-    - Never tests, never config, never the Rust substrate.
-    - Max N changes per day.
+    - Only own-source files can be modified (Genesis's Python source
+      and the crate's own ``src/`` tree — repo-relative paths only, so
+      a Rust edit can never land in /usr/src or another crate).
+    - Never tests, never config, never Cargo.toml or build.rs.
+    - Integrity-critical Rust files (state checksum, continuity
+      sentinel, IPC handshake) stay proposal-only.
+    - Rust experiments are rate-limited: the cargo gate is the
+      expensive rung of the ladder.
     - Full audit log (ExperimentRecord for every attempt).
     - Human can hard-rollback.
     """
@@ -2945,8 +2965,17 @@ class HeuristicExperiment:
     # (_OWN_SOURCE_DIRS, _OWN_SOURCE_FILES, _is_own_source) — the
     # single source of truth shared by all three systems.
 
-    # Maximum experiments per day — safety valve.
-    _MAX_PER_DAY: ClassVar[int] = 3
+    # Verify-gate timeouts. The Python arm measured ~2x headroom over
+    # the healthy suite; the Rust arm must absorb a cold dependency
+    # build (worst case ~15 min) plus the ~4 min cargo suite.
+    _VERIFY_TIMEOUT_S: ClassVar[float] = 900.0
+    _RUST_VERIFY_TIMEOUT_S: ClassVar[float] = 2400.0
+
+    # Rust experiment rate limit — the cargo gate costs minutes of CPU,
+    # so attempts (not just successes) are budgeted like the admin
+    # helper's hourly cap.
+    _MAX_RUST_EXPERIMENTS_PER_HOUR: ClassVar[int] = 4
+    _RUST_RATE_WINDOW_S: ClassVar[float] = 3600.0
 
     def __init__(
         self,
@@ -2962,14 +2991,13 @@ class HeuristicExperiment:
         """
         self.engine = engine
         self.project_root = project_root
-        self._verify_script = os.path.join(
-            project_root, "scripts", "verify_change.sh"
-        )
+        self._verify_script = os.path.join(project_root, "scripts", "verify_change.sh")
         if data_dir is None:
             import tempfile
 
             data_dir = tempfile.mkdtemp(prefix="genesis-ws-")
         self._workspace = Workspace(source_root=project_root, data_dir=data_dir)
+        self._rust_attempts: deque[float] = deque()
 
     def run_experiment(
         self,
@@ -2999,8 +3027,10 @@ class HeuristicExperiment:
         file_path = os.path.normpath(file_path).replace("\\", "/")
         if os.path.isabs(file_path) or file_path.startswith(".."):
             return ExperimentRecord(
-                file_path=file_path, description=description,
-                status="reverted", reason="path escapes the source tree",
+                file_path=file_path,
+                description=description,
+                status="reverted",
+                reason="path escapes the source tree",
             )
 
         # Guardrails
@@ -3015,48 +3045,80 @@ class HeuristicExperiment:
             source = abs_path.read_text(encoding="utf-8")
         except OSError as e:
             return ExperimentRecord(
-                file_path=file_path, description=description,
-                status="reverted", reason=f"could not read file: {e}",
+                file_path=file_path,
+                description=description,
+                status="reverted",
+                reason=f"could not read file: {e}",
             )
 
         if original_code not in source:
             return ExperimentRecord(
-                file_path=file_path, description=description,
-                status="reverted", reason="original code snippet not found in file",
+                file_path=file_path,
+                description=description,
+                status="reverted",
+                reason="original code snippet not found in file",
             )
 
         # Apply in the workspace, verify, promote — never the live tree.
         return self._apply_and_verify(
-            source, original_code, proposed_code, file_path, description,
+            source,
+            original_code,
+            proposed_code,
+            file_path,
+            description,
             line_hint,
         )
 
     def _check_experiment_guardrails(
         self, file_path: str, description: str
     ) -> ExperimentRecord | None:
-        """Check if a file is experimentable and daily limit.
+        """Check if a file is experimentable.
 
         Returns a skip record (with reason) or None if the experiment
         is allowed to proceed.
         """
         if not self._is_experimentable(file_path):
             return ExperimentRecord(
-                file_path=file_path, description=description,
+                file_path=file_path,
+                description=description,
                 status="skipped",
                 reason=(
                     f"file not own source: {file_path}. "
-                    f"Only Genesis's own Python source can be modified. "
-                    f"Never tests, config, or the Rust substrate."
+                    f"Only Genesis's own Python source and the crate's "
+                    f"src/ tree can be modified. "
+                    f"Never tests, config, Cargo.toml, or build.rs."
                 ),
             )
-        today_experiments = self._count_today_experiments()
-        if today_experiments >= self._MAX_PER_DAY:
+        if file_path.endswith(".rs") and not self._rust_budget_allows():
             return ExperimentRecord(
-                file_path=file_path, description=description,
+                file_path=file_path,
+                description=description,
                 status="skipped",
-                reason=f"daily limit reached ({self._MAX_PER_DAY}/day)",
+                reason=(
+                    f"rust experiment rate limit — "
+                    f"{self._MAX_RUST_EXPERIMENTS_PER_HOUR} per hour "
+                    f"(the cargo gate is the expensive rung)"
+                ),
             )
         return None
+
+    def _rust_budget_allows(self) -> bool:
+        """Sliding-window rate limit on Rust experiments — cargo builds
+        cost real CPU, so attempts are budgeted, not just successes."""
+        now = time.time()
+        while self._rust_attempts and now - self._rust_attempts[0] > self._RUST_RATE_WINDOW_S:
+            self._rust_attempts.popleft()
+        if len(self._rust_attempts) >= self._MAX_RUST_EXPERIMENTS_PER_HOUR:
+            return False
+        self._rust_attempts.append(now)
+        return True
+
+    def _cargo_target_dir(self) -> str:
+        """Persistent incremental build cache for workspace-crate
+        verification. Lives beside the workspace (not inside it) so a
+        workspace refresh keeps the dependency build; regenerable bulk,
+        skipped by the spore mirror."""
+        return str(Path(self._workspace.path).parent / "workspace-target")
 
     @classmethod
     def _is_allowlisted(cls, file_path: str) -> bool:
@@ -3145,12 +3207,11 @@ class HeuristicExperiment:
             found = source.find(original_code, found + 1)
         offset = occurrences[0]
         if len(occurrences) > 1:
-            resolved = self._resolve_occurrence(
-                source, occurrences, original_code, line_hint
-            )
+            resolved = self._resolve_occurrence(source, occurrences, original_code, line_hint)
             if resolved is None:
                 return ExperimentRecord(
-                    file_path=file_path, description=description,
+                    file_path=file_path,
+                    description=description,
                     status="reverted",
                     reason=(
                         f"original code snippet is ambiguous "
@@ -3160,16 +3221,19 @@ class HeuristicExperiment:
                 )
             offset = resolved
 
-        modified_source = (
-            source[:offset] + proposed_code + source[offset + len(original_code):]
-        )
+        modified_source = source[:offset] + proposed_code + source[offset + len(original_code) :]
         if modified_source == source:
             return ExperimentRecord(
-                file_path=file_path, description=description,
-                status="reverted", reason="replacement produced no change",
+                file_path=file_path,
+                description=description,
+                status="reverted",
+                reason="replacement produced no change",
             )
         return self._workspace_verify_promote(
-            file_path, source, modified_source, description,
+            file_path,
+            source,
+            modified_source,
+            description,
         )
 
     def _workspace_verify_promote(
@@ -3195,31 +3259,53 @@ class HeuristicExperiment:
             ws_file.write_text(modified_source, encoding="utf-8")
         except OSError as e:
             return ExperimentRecord(
-                file_path=file_path, description=description,
-                status="reverted", reason=f"could not write workspace copy: {e}",
+                file_path=file_path,
+                description=description,
+                status="reverted",
+                reason=f"could not write workspace copy: {e}",
             )
 
-        # Verify: py_compile first (fast fail), run inside the workspace.
-        compile_result = get_tools().run(
-            "compile_python",
-            path=str(ws_file),
-            project_root=self._workspace.path,
-        )
-        if not compile_result.success:
-            self._revert(ws_file, source)
-            return ExperimentRecord(
-                file_path=file_path, description=description,
-                status="reverted", reason=f"py_compile failed: {compile_result.error}",
+        is_rust = file_path.endswith(".rs")
+        if not is_rust:
+            # Verify: py_compile first (fast fail), run inside the
+            # workspace. Rust has no single-file syntax gate at this
+            # layer — the cargo suite below is its fast-fail.
+            compile_result = get_tools().run(
+                "compile_python",
+                path=str(ws_file),
+                project_root=self._workspace.path,
             )
+            if not compile_result.success:
+                self._revert(ws_file, source)
+                return ExperimentRecord(
+                    file_path=file_path,
+                    description=description,
+                    status="reverted",
+                    reason=f"py_compile failed: {compile_result.error}",
+                )
 
-        # Verify: full test gate against the workspace tree.
+        # Verify: full test gate against the workspace tree. Each dir
+        # argument points at the *changed* side — a Python experiment
+        # tests the workspace python tree against the live crate, a
+        # Rust experiment tests the workspace crate against the live
+        # python tree. The workspace crate carries no target/ cache,
+        # so the rust side builds into a persistent CARGO_TARGET_DIR
+        # (incremental after the first experiment; cold deps are the
+        # expensive case the longer timeout allows).
         if not self._run_verify_script(
-            python_dir=os.path.join(self._workspace.path, "python"),
-            rust_dir=self.project_root,
+            python_dir=(
+                os.path.join(self.project_root, "python")
+                if is_rust
+                else os.path.join(self._workspace.path, "python")
+            ),
+            rust_dir=self._workspace.path if is_rust else self.project_root,
+            cargo_target_dir=self._cargo_target_dir() if is_rust else None,
+            timeout=self._RUST_VERIFY_TIMEOUT_S if is_rust else self._VERIFY_TIMEOUT_S,
         ):
             self._revert(ws_file, source)
             record = ExperimentRecord(
-                file_path=file_path, description=description,
+                file_path=file_path,
+                description=description,
                 status="reverted",
                 reason="verification gate failed (tests failed)",
             )
@@ -3233,57 +3319,67 @@ class HeuristicExperiment:
         if promoted != [file_path]:
             self._revert(ws_file, source)
             record = ExperimentRecord(
-                file_path=file_path, description=description,
-                status="reverted", reason="promotion into the live tree failed",
+                file_path=file_path,
+                description=description,
+                status="reverted",
+                reason="promotion into the live tree failed",
             )
             self.engine.record_experiment(record)
             return record
 
         record = ExperimentRecord(
-            file_path=file_path, description=description,
-            status="applied", reason="all verification checks passed",
+            file_path=file_path,
+            description=description,
+            status="applied",
+            reason="all verification checks passed",
         )
         self.engine.record_experiment(record)
-        logger.info(
-            f"Heuristic experiment applied: {description} in {file_path}"
-        )
+        logger.info(f"Heuristic experiment applied: {description} in {file_path}")
         return record
 
     def _run_verify_script(
-        self, python_dir: str | None = None, rust_dir: str | None = None
+        self,
+        python_dir: str | None = None,
+        rust_dir: str | None = None,
+        cargo_target_dir: str | None = None,
+        timeout: float = _VERIFY_TIMEOUT_S,
     ) -> bool:
         """Run the verification script. Returns True if all checks pass.
 
         ``python_dir``/``rust_dir`` select the trees under test — the
         workspace's python tree for an in-flight experiment, the live
-        rust crate for the unchanged side (the workspace carries no
-        ``target/`` cache, so pointing cargo at it would rebuild cold).
+        rust crate for the unchanged side. For a Rust experiment the
+        workspace crate is the side under test; ``cargo_target_dir``
+        points its build at the persistent experiment cache so cold
+        dependency builds happen once, not per experiment.
         """
         if not os.path.exists(self._verify_script):
-            logger.warning(
-                f"Verify script not found: {self._verify_script}"
-            )
+            logger.warning(f"Verify script not found: {self._verify_script}")
             return False
         command = ["bash", self._verify_script]
         if python_dir is not None:
             command += [python_dir, rust_dir or "."]
+        env = None
+        if cargo_target_dir is not None:
+            env = {**os.environ, "CARGO_TARGET_DIR": cargo_target_dir}
         try:
             result = subprocess.run(
                 command,
                 capture_output=True,
                 text=True,
+                env=env,
                 # The verify script runs the full Python suite (~5
                 # min, includes the end-to-end daemon test) and the
                 # full cargo test suite. A 300s timeout
                 # could never complete a healthy run, so every
                 # experiment was falsely reverted. 900s gives ~2x
-                # headroom over the measured healthy runtime.
-                timeout=900,  # 15 minute timeout
+                # headroom over the measured healthy runtime; the
+                # rust arm's cold-build allowance is its own constant.
+                timeout=timeout,
             )
             if result.returncode != 0:
                 logger.warning(
-                    f"Verification failed (exit {result.returncode}): "
-                    f"{result.stderr[:200]}"
+                    f"Verification failed (exit {result.returncode}): {result.stderr[:200]}"
                 )
                 return False
             return True
@@ -3303,18 +3399,6 @@ class HeuristicExperiment:
         except OSError as e:
             logger.error(f"Could not revert {path}: {e}")
 
-    def _count_today_experiments(self) -> int:
-        """Count experiments applied or reverted today."""
-        today = time.strftime("%Y-%m-%d")
-        count = 0
-        for record in self.engine._experiment_history:
-            record_date = time.strftime(
-                "%Y-%m-%d", time.localtime(record.timestamp / 1000)
-            )
-            if record_date == today and record.status in ("applied", "reverted"):
-                count += 1
-        return count
-
     @property
     def experiment_history(self) -> list[ExperimentRecord]:
         """All experiment records (copy)."""
@@ -3323,13 +3407,9 @@ class HeuristicExperiment:
     @property
     def applied_count(self) -> int:
         """Number of successfully applied experiments."""
-        return sum(
-            1 for r in self.engine._experiment_history if r.status == "applied"
-        )
+        return sum(1 for r in self.engine._experiment_history if r.status == "applied")
 
     @property
     def reverted_count(self) -> int:
         """Number of reverted experiments."""
-        return sum(
-            1 for r in self.engine._experiment_history if r.status == "reverted"
-        )
+        return sum(1 for r in self.engine._experiment_history if r.status == "reverted")

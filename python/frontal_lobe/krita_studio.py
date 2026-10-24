@@ -37,11 +37,11 @@ _PLUGIN_ID = "genesis_studio"
 # Installed into Krita's pykrita directory on first use. Plain
 # stdlib + QtCore (QTimer) + the krita module — nothing else assumed.
 
-_PLUGIN_INIT = '''from krita import Krita
+_PLUGIN_INIT = """from krita import Krita
 from .studio import GenesisStudio
 
 Krita.instance().addExtension(GenesisStudio(Krita.instance()))
-'''
+"""
 
 _PLUGIN_DESKTOP = """[Desktop Entry]
 Type=Service
@@ -406,10 +406,7 @@ class GenesisStudio(Extension):
 
 
 def _pykrita_dir() -> Path:
-    return (
-        Path.home()
-        / ".var/app/org.kde.krita/data/krita/pykrita"
-    )
+    return Path.home() / ".var/app/org.kde.krita/data/krita/pykrita"
 
 
 def _studio_dir() -> Path:
@@ -461,9 +458,7 @@ class KritaStudio:
             return
         try:
             if "[python]" in text:
-                text = text.replace(
-                    "[python]", "[python]\n" + entry, 1
-                )
+                text = text.replace("[python]", "[python]\n" + entry, 1)
             else:
                 text = text.rstrip() + "\n\n[python]\n" + entry + "\n"
             kritarc.write_text(text)

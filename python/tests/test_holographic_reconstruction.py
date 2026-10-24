@@ -24,9 +24,7 @@ def test_holographic_fidelity_does_not_retain_evaluation_edges() -> None:
     graph.add("a", "rel", "b")
 
     before = graph.edge_count
-    metrics = graph.association_fidelity(
-        [("a", "rel", "b", 1.0)], top_k=1
-    )
+    metrics = graph.association_fidelity([("a", "rel", "b", 1.0)], top_k=1)
 
     assert metrics["n_evaluated"] == 1.0
     assert graph.edge_count == before

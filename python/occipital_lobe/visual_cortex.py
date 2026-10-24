@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class VisualPercept:
     """A complete visual percept from the full hierarchy.
@@ -33,6 +34,7 @@ class VisualPercept:
     something — the result of the full V1→V4→VTC→MTL pipeline
     plus the predictive coding errors at each level.
     """
+
     # Recognized concept (if any)
     concept: str | None = None
     confidence: float = 0.0
@@ -314,8 +316,7 @@ class VisualCortex:
                 self.see(frame, learn=True)
                 if (i + 1) % 10 == 0:
                     logger.info(
-                        f"  pretrain iter {iteration+1}/{n_iters} "
-                        f"image {i+1}/{len(frames)}"
+                        f"  pretrain iter {iteration + 1}/{n_iters} image {i + 1}/{len(frames)}"
                     )
         self._save_all()
         logger.info("Pre-training complete")

@@ -43,11 +43,11 @@ import json
 import os
 import subprocess
 import tempfile
-import threading
 import time
 from typing import TYPE_CHECKING, Any, cast
 
 from genesis_client.swallow import note_swallowed
+from genesis_client.threads import named_thread
 
 from .arc import ArcResult
 
@@ -110,9 +110,7 @@ class _Browser:
         self.responses: dict[str, str] = {}
         self.bodies: dict[str, Any] = {}
         self._loop = asyncio.new_event_loop()
-        self._thread = threading.Thread(
-            target=self._loop.run_forever, daemon=True
-        )
+        self._thread = named_thread("arc-web-loop", self._loop.run_forever, comm="g-arc-web")
         self._thread.start()
         self._run(self._connect())
 
@@ -132,9 +130,7 @@ class _Browser:
         # Bounded: a dead socket or hung page must surface as an
         # error, not freeze her world loop on a pending future
         # that can never resolve.
-        return asyncio.run_coroutine_threadsafe(
-            coro, self._loop
-        ).result(timeout=15)
+        return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout=15)
 
     def reconnect(self) -> None:
         """Re-attach to the live page target.
@@ -169,9 +165,7 @@ class _Browser:
             try:
                 import urllib.request
 
-                with urllib.request.urlopen(
-                    f"http://localhost:{port}/json", timeout=2
-                ) as r:
+                with urllib.request.urlopen(f"http://localhost:{port}/json", timeout=2) as r:
                     tabs = json.loads(r.read())
                 pages = [t for t in tabs if t.get("type") == "page"]
                 if pages:
@@ -201,9 +195,7 @@ class _Browser:
 
     def _dispatch(self, msg: dict) -> None:
         if msg.get("method") == "Network.responseReceived":
-            self.responses[msg["params"]["requestId"]] = msg["params"][
-                "response"
-            ]["url"]
+            self.responses[msg["params"]["requestId"]] = msg["params"]["response"]["url"]
         elif msg.get("method") == "Network.loadingFinished":
             rid = msg["params"]["requestId"]
             if self.responses.get(rid, "").find("/api/cmd/") >= 0:
@@ -211,9 +203,7 @@ class _Browser:
                 # deadlock — the response to it arrives through
                 # this very loop. Spawn it; the pending-future
                 # resolution below is what completes it.
-                asyncio.get_event_loop().create_task(
-                    self._fetch_body(rid)
-                )
+                asyncio.get_event_loop().create_task(self._fetch_body(rid))
         elif "id" in msg and msg["id"] in self._pending:
             self._pending.pop(msg["id"]).set_result(msg)
 
@@ -230,9 +220,7 @@ class _Browser:
         self._mid += 1
         fut = asyncio.get_event_loop().create_future()
         self._pending[self._mid] = fut
-        await self._ws.send(
-            json.dumps({"id": self._mid, "method": method, "params": params})
-        )
+        await self._ws.send(json.dumps({"id": self._mid, "method": method, "params": params}))
         msg = await fut
         if "error" in msg:
             raise RuntimeError(f"CDP {method}: {msg['error']}")
@@ -250,10 +238,12 @@ class _Browser:
         return out.get("result", {}).get("value")
 
     def navigate(self, url: str) -> None:
+        """Navigate the page to ``url`` over the DevTools protocol."""
         self.call("Page.enable")
         self.call("Page.navigate", url=url)
 
     def key(self, name: str, code: int) -> None:
+        """Send a keypress to the page — ``rawKeyDown`` then ``keyUp`` events."""
         for kind in ("rawKeyDown", "keyUp"):
             self.call(
                 "Input.dispatchKeyEvent",
@@ -290,9 +280,7 @@ class ArcWebPractice:
 
     def _latest_frame(self) -> dict[str, Any] | None:
         """Most recent FrameDataRaw the page itself received."""
-        frames = [
-            b for b in self._browser.bodies.values() if "frame" in b
-        ]
+        frames = [b for b in self._browser.bodies.values() if "frame" in b]
         return frames[-1] if frames else None
 
     def _wait_frame(self, marker: int, timeout: float = 6.0) -> dict | None:
@@ -321,8 +309,7 @@ class ArcWebPractice:
         deadline = time.time() + 30
         while time.time() < deadline:
             if self._browser.js(
-                "!![...document.querySelectorAll('button')]"
-                ".find(b=>/start/i.test(b.innerText))"
+                "!![...document.querySelectorAll('button')].find(b=>/start/i.test(b.innerText))"
             ):
                 self._browser.js(
                     "[...document.querySelectorAll('button')]"
@@ -371,17 +358,10 @@ class ArcWebPractice:
         if "x" in desc and "y" in desc:
             # Coordinate action — click the cell inside the canvas.
             x, y = desc["x"], desc["y"]
-            if (
-                type(x) is not int
-                or type(y) is not int
-                or not (0 <= x < 64 and 0 <= y < 64)
-            ):
-                raise ValueError(
-                    "Coordinate actions require integer x,y in [0, 63]"
-                )
+            if type(x) is not int or type(y) is not int or not (0 <= x < 64 and 0 <= y < 64):
+                raise ValueError("Coordinate actions require integer x,y in [0, 63]")
             box = self._browser.js(
-                "JSON.stringify(document.querySelectorAll('canvas')[0]"
-                ".getBoundingClientRect())"
+                "JSON.stringify(document.querySelectorAll('canvas')[0].getBoundingClientRect())"
             )
             if box:
                 r = json.loads(box)
@@ -499,9 +479,7 @@ class ArcWebPractice:
                 result.state = str(obs.get("state", "BUDGET"))
                 if result.state == "NOT_FINISHED":
                     result.state = "BUDGET"
-        result.prior_learning = getattr(
-            self._mind, "_world_learning_loaded", "none"
-        )
+        result.prior_learning = getattr(self._mind, "_world_learning_loaded", "none")
         return result
 
     def _web_turn(
@@ -526,11 +504,12 @@ class ArcWebPractice:
         if self._instructions and game_id not in self._info_sent:
             info["instructions"] = self._instructions
             self._info_sent.add(game_id)
+        strip = list(obs.get("frame") or [])
         desc = self._mind.world_step(
-            obs["frame"][-1],
+            strip[-1] if strip else obs["frame"],
+            through=strip[:-1],
             available_actions=[
-                {"action": int(a), "label": self._action_label(int(a))}
-                for a in available
+                {"action": int(a), "label": self._action_label(int(a))} for a in available
             ],
             info=info,
         )
@@ -538,17 +517,13 @@ class ArcWebPractice:
             return None, "NO_ACTION"
         aid = int(desc["action"])
         if aid != 0 and aid not in {int(a) for a in available}:
-            raise ValueError(
-                "Chosen action is not available in this observation"
-            )
+            raise ValueError("Chosen action is not available in this observation")
         result.steps += 1
         if aid == 0:
             result.resets += 1
         decision = getattr(self._mind, "game_decision", None) or {}
         source = str(decision.get("source", "unknown"))
-        result.decision_sources[source] = (
-            result.decision_sources.get(source, 0) + 1
-        )
+        result.decision_sources[source] = result.decision_sources.get(source, 0) + 1
         marker = len(self._browser.bodies)
         self._act(desc)
         next_obs = self._wait_frame(marker)

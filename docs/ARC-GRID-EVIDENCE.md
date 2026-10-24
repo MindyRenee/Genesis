@@ -2,7 +2,7 @@
 
 Generated 2026-10-15 13:41 from `/home/mindy/.local/share/genesis` at repo `605598a` by `scripts/arc_play_evidence.py`.
 
-Genesis plays public **ARC-AGI-1 training tasks** inside her games curriculum (`python/frontal_lobe/games/`). Each task is offered with its train pairs and test inputs; her spatial reasoner searches compositions of grid transforms, verifies candidates on train, and guesses on the held-out test input. The stored test answer is used for scoring only — `solve()` receives train pairs and test inputs (`play.py:1238-1246`); `expected` never enters the search. Mastery 1.00 requires every test cell exact.
+Genesis plays public **ARC-AGI-1 training tasks** inside her games curriculum (`python/frontal_lobe/games/`). Each task is offered with its train pairs and test inputs; her spatial reasoner searches compositions of grid transforms, verifies candidates on train, and guesses on the held-out test input. The stored test answer is used for scoring only — `solve()` receives train pairs and test inputs (`play.py:1366-1375`); `expected` never enters the search — it only scores the guesses afterward (`play.py:1380-1388`). Mastery 1.00 requires every test cell exact.
 
 **Scope, stated plainly:** these are *training-set* tasks — the easiest public ARC split — solved in live play, not under the official evaluator. This is evidence of real program synthesis and skill transfer, not a claim that Genesis passed ARC-AGI.
 

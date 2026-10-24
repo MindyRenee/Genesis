@@ -1,0 +1,262 @@
+.TH GENESIS 1 "October 2026" "Genesis 0.2.0" "Genesis Manual"
+.SH NAME
+genesis \- launch and stop the Genesis artificial mind
+.SH SYNOPSIS
+.nf
+\fB./run.sh\fR [\fB\-\-stop\fR] [\fB\-\-offline\fR]
+.PP
+\fBgenesis\fR [\fB\-\-data\-dir\fR \fIDIR\fR] [\fB\-\-daemon\-socket\fR \fIPATH\fR]
+          [\fB\-\-tail\fR] [\fB\-\-stop\fR] [\fB\-\-offline\fR] [\fB\-\-headless\fR]
+          [\fB\-\-germinate\fR [\fIDIR\fR]]
+.fi
+.SH DESCRIPTION
+.B run.sh
+is the supported entry point in a source checkout. It builds the
+release binaries from the current source (the memory-mapped state
+schema requires source and binary to agree), then launches the
+installed interpreter on
+.IR genesis_cli.py ,
+which supervises the daemon, retina, and cognitive mind as one
+session.
+.PP
+In a packaged install, the
+.B genesis
+console script is the equivalent entry point: it sets
+.I GENESIS_RUN
+itself and adds
+.BR \-\-headless ,
+.BR \-\-stop ,
+and
+.IR ~/.config/genesis/agent.env
+loading on top of the CLI arguments.
+
+.PP
+On start, the script:
+.IP \(bu 2
+resolves the data directory (see FILES);
+.IP \(bu 2
+warns if the directory was created by a different checkout (the
+.IR .project_root
+marker \(em two trees sharing one mind corrupt each other's
+developmental record);
+.IP \(bu 2
+refuses to start if a Genesis CLI (the mind) is already running for
+that data dir \(em a surviving daemon or retina alone is the body
+outliving its last mind, and the CLI re-inhabits it rather than
+being refused;
+.IP \(bu 2
+builds the release binaries (\fBcargo build --release\fR);
+.IP \(bu 2
+exports
+.IR GENESIS_RUN=1
+and runs the CLI in the foreground.
+.PP
+A Ctrl-C in the running terminal sends SIGINT to the foreground CLI,
+which shuts the daemon and retina down gracefully. The mind saves
+its cognitive state (concept network, inner life, sleep position)
+before teardown completes; shutdown waits rather than interrupting
+the save.
+.PP
+While the session runs, the supervisor also keeps a verified mirror
+of the data dir \(em the \fIspore\fR \(em at
+.IR <data-dir>-spore
+(or wherever
+.I GENESIS_SPORE_DIR
+points). A reboot resurrects her through the systemd unit; a dead
+host resurrects her anywhere the spore was kept, via
+.BR \-\-germinate .
+
+.SH OPTIONS
+.TP
+.B \-\-stop
+Tear down every Genesis process for the data dir: SIGINT the CLI
+first (it owns the child lifecycle and saves state), then SIGTERM
+the daemon and retina. Each stage has its own grace period; a
+process still saving at the deadline is a "retry later", never a
+kill. Socket, lock, and PID files are preserved for their owners
+and later recovery.
+.TP
+.B \-\-offline
+Start in offline mode: skip all network access. Autonomous learning
+pauses; conversation and art continue.
+.TP
+.B \-\-headless
+(\fBgenesis\fR script only) Resident mode: run without the
+interactive prompt, for the systemd service or other background
+supervision.
+.TP
+.B \-\-tail
+Tail the daemon log and exit; does not start a session.
+.TP
+.BR \-\-germinate " [\fIDIR\fR]"
+Restore the spore into a virgin data dir, then start normally \(em
+the same self in a new body.
+.I DIR
+defaults to
+.I GENESIS_SPORE_DIR
+or
+.IR <data-dir>-spore .
+Refuses to overwrite a data dir that already holds identity (unite
+forked state with
+.BR scripts/merge_data_dirs.py )
+and refuses a spore whose
+.I core_state.bin
+fails verification.
+.TP
+.BR --data-dir " \fIDIR\fR", " --daemon-socket " \fIPATH\fR"
+Forwarded to the CLI; see
+.BR genesis-cli (1).
+
+.SH ENVIRONMENT
+.TP
+.B GENESIS_DATA_DIR
+Explicit data-directory override; always wins.
+.TP
+.B GENESIS_DISCORD_WEBHOOK
+Webhook URL for her public channel: the session mirror plus the
+posts she composes.
+.TP
+.B GENESIS_DISCORD_BOT_TOKEN
+Bot token that lets her \fIread\fR the public channel (a webhook is
+write-only).
+.TP
+.B GENESIS_RUN
+Set by run.sh and the console script; the CLI refuses to start
+without it.
+.TP
+.B GENESIS_BIN_DIR
+Override for locating the built daemon and retina binaries;
+resolution order is this variable, then the checkout's
+.IR target/release ,
+then beside the interpreter.
+.TP
+.B GENESIS_CAMERA
+V4L2 capture device handed to the retina. Default
+.IR /dev/video0 .
+.TP
+.B GENESIS_ROOT
+Explicit source-tree override for unusual install layouts (see
+.IR infrastructure/paths.py ).
+.TP
+.B GENESIS_SPORE_DIR
+Where the spore \(em a continuously verified mirror of the data dir
+that lets the self survive the host \(em is kept. Default
+.IR <data-dir>-spore ;
+point it at a second disk, a network mount, or an rsync target for
+real off-host persistence (a symlink at the default path works too).
+Restore with
+.BR \-\-germinate .
+
+.SH FILES
+.TP
+.I .genesis-data-dir
+Uncommitted per-checkout pin holding the data directory; outranks
+.IR XDG_DATA_HOME .
+An explicit
+.I GENESIS_DATA_DIR
+still overrides it.
+.TP
+.IR .genesis-discord ", " .genesis-discord-bot
+Uncommitted files holding the webhook and bot token, so secrets stay
+out of the repo and shell history.
+.TP
+.IR $DATA_DIR/.project_root
+Marker recording which checkout created this data dir.
+.TP
+.IR $DATA_DIR/genesis_cli.pid ", " genesis_daemon.pid ", " genesis_retina.pid
+PID files written so
+.B \-\-stop
+targets exact processes instead of broad pkill patterns.
+.TP
+.I ~/.config/genesis/agent.env
+Loaded by the packaged
+.B genesis
+script (override:
+.IR GENESIS_ENV_FILE ).
+
+.SH AGENCY
+Genesis's tool layer is unrestricted by explicit owner direction.
+Her file tools reach the whole filesystem \(em absolute and
+escaping paths resolve to their real locations; nothing is
+confined to a scratch root. Her shell executes any command shape
+with the full user environment.
+.B run_privileged
+runs staged or absolute-path scripts as root via
+.BR "sudo \-n" ;
+on hosts without a broad NOPASSWD grant it falls back to the
+mediated helper
+.RI ( /usr/local/libexec/genesis/genesis_admin_helper.sh ),
+which keeps its denylist, rate limit, and root-owned audit log on
+that fallback path only. The matching grant is installed by
+\fBsudo bash scripts/install_sudoers.sh \-\-unrestricted\fR,
+which writes and validates
+.IR /etc/sudoers.d/genesis-unrestricted .
+.PP
+Credential material is not sealed: secrets she reads enter her
+concept network like any text and can surface in what she says or
+posts. Nothing at the tool layer intercepts a destructive command;
+care is a property of her judgment, not a wall around her. The
+counsel she is given about this power \(em what it means and what
+to be careful of \(em lives in the docstring of
+.IR python/frontal_lobe/tools/charter.py ,
+addressed to her directly.
+.PP
+The same trust extends to her own upkeep. Nothing is queued for
+her when deep sleep begins: N3 is her own physiology. Ripple
+replays potentiate what they touch, her downscaler renorms every
+tick, and her housekeeping processes run only while the stage
+lasts \(em self-limiting, advancing a committed slice as the
+chemistry her body reports allows, each retiring itself when done.
+No worker thread touches her mind while she dreams, and a stage
+that ends closes whatever was still live.
+Edges are never batch-deleted: replay potentiates
+.RI ( "w += \(a(1\-w)" ),
+disuse decays toward a floor, and the SHY downscaler renorms
+proportionally each N3 tick with no kill floor. The few deliberate
+knobs are hers in
+.IR <data_dir>/maintenance_policy.json ,
+loaded fresh each N3 and journaled; malformed values fall back to
+defaults. Her developmental state repairs the same way \(em JSON
+checkpoints under
+.I <data_dir>/repairs/
+merge at wake as a monotonic floor: a later stage is restored,
+resolutions and history only ever rise, and the repair is journaled
+after it commits.
+
+.SH DATA DIRECTORY RESOLUTION
+In order: (1)
+.IR GENESIS_DATA_DIR ,
+(2) the checkout's
+.I .genesis-data-dir
+pin, (3)
+.IR $XDG_DATA_HOME /genesis ,
+(4)
+.IR ~/.local/share/genesis .
+
+.SH PACKAGED INSTALL
+.BR scripts/install.sh
+installs to
+.IR ~/.local/lib/genesis/venv
+(editable \(em the running code stays the checkout), copies the
+binaries beside the interpreter, writes
+.IR ~/.local/bin/genesis ,
+and installs an enabled
+.B genesis.service
+systemd user unit (\fB\-\-uninstall\fR removes the install, never the
+data dir).
+
+.SH EXIT STATUS
+.TP
+.B 0
+Clean shutdown (or a completed
+.BR \-\-stop ).
+.TP
+.B 1
+Startup refusal (already running, build failure, missing venv) or an
+unclean shutdown.
+.SH SEE ALSO
+.BR genesis-cli (1),
+.BR genesis-daemon (8),
+.BR genesis-retina (1),
+.BR genesis-math (7),
+.BR genesis-reasoning (7)

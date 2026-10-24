@@ -40,7 +40,7 @@ Model for Sentiment Analysis of Social Media Text. Proceedings of the
 
 from __future__ import annotations
 
-import re
+from infrastructure.text import words
 
 # ─── Lexicon ──────────────────────────────────────────────────────
 # Seed lexicon REMOVED by request — Genesis learns sentiment the
@@ -93,17 +93,41 @@ def has_learned_sentiment(word: str) -> bool:
     """True when the word has a learned (non-seed) sentiment score."""
     return word.lower().strip() in LEARNED_LEXICON
 
+
 # ─── Negation words ───────────────────────────────────────────────
 # These flip the sentiment of the following sentiment-bearing word.
 # "not good" → -good, "don't like" → -like, "never great" → -great.
 
-NEGATIONS: frozenset[str] = frozenset({
-    "not", "no", "never", "none", "nobody", "nothing",
-    "neither", "nor", "nowhere", "dont", "cant",
-    "cannot", "wont", "wouldnt", "shouldnt", "couldnt",
-    "isnt", "wasnt", "arent", "werent", "doesnt", "didnt",
-    "hasnt", "havent", "hadnt", "without",
-})
+NEGATIONS: frozenset[str] = frozenset(
+    {
+        "not",
+        "no",
+        "never",
+        "none",
+        "nobody",
+        "nothing",
+        "neither",
+        "nor",
+        "nowhere",
+        "dont",
+        "cant",
+        "cannot",
+        "wont",
+        "wouldnt",
+        "shouldnt",
+        "couldnt",
+        "isnt",
+        "wasnt",
+        "arent",
+        "werent",
+        "doesnt",
+        "didnt",
+        "hasnt",
+        "havent",
+        "hadnt",
+        "without",
+    }
+)
 
 # ─── Intensifiers ─────────────────────────────────────────────────
 # These amplify the sentiment of the following word.
@@ -111,13 +135,27 @@ NEGATIONS: frozenset[str] = frozenset({
 # Values are multipliers.
 
 INTENSIFIERS: dict[str, float] = {
-    "very": 1.5, "extremely": 1.8, "really": 1.4, "so": 1.3,
-    "too": 1.3, "completely": 1.7, "absolutely": 1.8,
-    "totally": 1.7, "utterly": 1.8, "highly": 1.6,
-    "deeply": 1.6, "incredibly": 1.7, "remarkably": 1.5,
-    "particularly": 1.4, "especially": 1.4, "exceptionally": 1.7,
-    "super": 1.5, "truly": 1.4, "terribly": 1.5,
-    "awfully": 1.5, "hugely": 1.5,
+    "very": 1.5,
+    "extremely": 1.8,
+    "really": 1.4,
+    "so": 1.3,
+    "too": 1.3,
+    "completely": 1.7,
+    "absolutely": 1.8,
+    "totally": 1.7,
+    "utterly": 1.8,
+    "highly": 1.6,
+    "deeply": 1.6,
+    "incredibly": 1.7,
+    "remarkably": 1.5,
+    "particularly": 1.4,
+    "especially": 1.4,
+    "exceptionally": 1.7,
+    "super": 1.5,
+    "truly": 1.4,
+    "terribly": 1.5,
+    "awfully": 1.5,
+    "hugely": 1.5,
 }
 
 # ─── Diminishers ──────────────────────────────────────────────────
@@ -128,11 +166,21 @@ INTENSIFIERS: dict[str, float] = {
 # not as a single token.
 
 DIMINISHERS: dict[str, float] = {
-    "slightly": 0.5, "somewhat": 0.6, "kinda": 0.7,
-    "sort": 0.7, "barely": 0.4, "hardly": 0.4,
-    "scarcely": 0.4, "marginally": 0.5, "mildly": 0.6,
-    "moderately": 0.7, "fairly": 0.8, "rather": 0.8,
-    "bit": 0.7, "little": 0.7, "less": 0.6,
+    "slightly": 0.5,
+    "somewhat": 0.6,
+    "kinda": 0.7,
+    "sort": 0.7,
+    "barely": 0.4,
+    "hardly": 0.4,
+    "scarcely": 0.4,
+    "marginally": 0.5,
+    "mildly": 0.6,
+    "moderately": 0.7,
+    "fairly": 0.8,
+    "rather": 0.8,
+    "bit": 0.7,
+    "little": 0.7,
+    "less": 0.6,
 }
 
 # ─── Multi-word modifier phrases ──────────────────────────────────
@@ -166,10 +214,19 @@ MODIFIER_PHRASES: dict[tuple[str, ...], tuple[str, float]] = {
 # boosting the sentiment of words that come after "but" and reducing
 # the weight of words that came before.
 
-CONTRASTIVES: frozenset[str] = frozenset({
-    "but", "however", "although", "though", "yet",
-    "still", "nevertheless", "nonetheless", "except",
-})
+CONTRASTIVES: frozenset[str] = frozenset(
+    {
+        "but",
+        "however",
+        "although",
+        "though",
+        "yet",
+        "still",
+        "nevertheless",
+        "nonetheless",
+        "except",
+    }
+)
 
 # ─── Negation window ──────────────────────────────────────────────
 # How many non-sentiment words can appear between a negation and the
@@ -201,12 +258,18 @@ def _capitalization_boost(word: str) -> float:
 
 # ─── Tokenization ─────────────────────────────────────────────────
 
+
 def _tokenize(text: str) -> list[str]:
     """Split text into word tokens, preserving original case for the
-    capitalization boost. Lowercasing happens later in ``_normalize``."""
-    # Match words including contractions (don't, can't, won't)
-    tokens = re.findall(r"[a-zA-Z]+(?:'[a-zA-Z]+)?", text)
-    return tokens
+    capitalization boost. Lowercasing happens later in ``_normalize``.
+
+    Uses the canonical word boundary: Unicode letters (not just ASCII —
+    "gérard" is one token, not "g"+"rard") and apostrophe variants
+    folded, so "don’t" tokenizes whole instead of fragmenting into
+    "don","t" — which used to silently drop the negation and flip the
+    message's valence.
+    """
+    return words(text)
 
 
 def _normalize(token: str) -> str:
@@ -220,6 +283,7 @@ def _normalize(token: str) -> str:
 
 
 # ─── Sentiment analysis ───────────────────────────────────────────
+
 
 def _score_sentiment_word(
     raw_token: str,
@@ -263,7 +327,8 @@ def _score_sentiment_word(
 
 
 def _match_modifier_phrase(
-    tokens: list[str], index: int,
+    tokens: list[str],
+    index: int,
 ) -> tuple[int, str, float] | None:
     """Match a multi-word modifier phrase starting at ``index``.
 
@@ -298,11 +363,13 @@ def _score_sentiment_token(
     new_diminisher_mult, new_negation_active). The caller appends
     base_score to the scores and contrastive lists.
     """
-    base_score, intensifier_mult, diminisher_mult, negation_active = (
-        _score_sentiment_word(
-            raw_token, token, intensifier_mult, diminisher_mult,
-            negation_active, negation_distance,
-        )
+    base_score, intensifier_mult, diminisher_mult, negation_active = _score_sentiment_word(
+        raw_token,
+        token,
+        intensifier_mult,
+        diminisher_mult,
+        negation_active,
+        negation_distance,
     )
     pos_delta = base_score if base_score > 0 else 0.0
     neg_delta = abs(base_score) if base_score < 0 else 0.0
@@ -311,8 +378,12 @@ def _score_sentiment_token(
     if pending_negation:
         negation_active = True
     return (
-        base_score, pos_delta, neg_delta,
-        intensifier_mult, diminisher_mult, negation_active,
+        base_score,
+        pos_delta,
+        neg_delta,
+        intensifier_mult,
+        diminisher_mult,
+        negation_active,
     )
 
 
@@ -447,46 +518,114 @@ def _score_tokens(
             continue
 
         # Check if this word has sentiment (learned first, seed fallback)
-        if lookup_sentiment(token) is not None:
-            (
-                base_score, pos_delta, neg_delta,
-                intensifier_mult, diminisher_mult, negation_active,
-            ) = _score_sentiment_token(
-                raw_token, token, intensifier_mult, diminisher_mult,
-                negation_active, negation_distance, pending_negation,
-            )
-
-            scores.append(base_score)
-            sentiment_count += 1
-            pos_sum += pos_delta
-            neg_sum += neg_delta
-
-            # Track pre/post contrastive
-            if seen_contrastive:
-                post_contrastive_scores.append(base_score)
-            else:
-                pre_contrastive_scores.append(base_score)
-        else:
-            # Non-sentiment word: reset modifiers (they only affect
-            # the immediately following sentiment word, per VADER).
-            intensifier_mult, diminisher_mult, negation_active, negation_distance = (
-                _advance_non_sentiment(
-                    intensifier_mult, diminisher_mult,
-                    negation_active, negation_distance,
-                )
-            )
+        contrastive_bucket = post_contrastive_scores if seen_contrastive else pre_contrastive_scores
+        (
+            scored,
+            pos_delta,
+            neg_delta,
+            intensifier_mult,
+            diminisher_mult,
+            negation_active,
+            negation_distance,
+        ) = _accumulate_token(
+            raw_token,
+            token,
+            intensifier_mult,
+            diminisher_mult,
+            negation_active,
+            negation_distance,
+            pending_negation,
+            scores,
+            contrastive_bucket,
+        )
+        sentiment_count += scored
+        pos_sum += pos_delta
+        neg_sum += neg_delta
 
         i += 1
 
     return (
-        scores, pos_sum, neg_sum, sentiment_count,
-        pre_contrastive_scores, post_contrastive_scores, seen_contrastive,
+        scores,
+        pos_sum,
+        neg_sum,
+        sentiment_count,
+        pre_contrastive_scores,
+        post_contrastive_scores,
+        seen_contrastive,
+    )
+
+
+def _accumulate_token(
+    raw_token: str,
+    token: str,
+    intensifier_mult: float,
+    diminisher_mult: float,
+    negation_active: bool,
+    negation_distance: int,
+    pending_negation: bool,
+    scores: list[float],
+    contrastive_bucket: list[float],
+) -> tuple[bool, float, float, float, float, bool, int]:
+    """Score one non-modifier token and update the running state.
+
+    Sentiment words append their score to ``scores`` and the active
+    pre/post-contrastive bucket; non-sentiment words just decay the
+    modifier state (they only affect the immediately following
+    sentiment word, per VADER).
+
+    Returns (scored, pos_delta, neg_delta, intensifier_mult,
+    diminisher_mult, negation_active, negation_distance).
+    """
+    if lookup_sentiment(token) is not None:
+        (
+            base_score,
+            pos_delta,
+            neg_delta,
+            intensifier_mult,
+            diminisher_mult,
+            negation_active,
+        ) = _score_sentiment_token(
+            raw_token,
+            token,
+            intensifier_mult,
+            diminisher_mult,
+            negation_active,
+            negation_distance,
+            pending_negation,
+        )
+        scores.append(base_score)
+        contrastive_bucket.append(base_score)
+        return (
+            True,
+            pos_delta,
+            neg_delta,
+            intensifier_mult,
+            diminisher_mult,
+            negation_active,
+            negation_distance,
+        )
+    intensifier_mult, diminisher_mult, negation_active, negation_distance = _advance_non_sentiment(
+        intensifier_mult,
+        diminisher_mult,
+        negation_active,
+        negation_distance,
+    )
+    return (
+        False,
+        0.0,
+        0.0,
+        intensifier_mult,
+        diminisher_mult,
+        negation_active,
+        negation_distance,
     )
 
 
 def _compute_proportions(
-    pos_sum: float, neg_sum: float,
-    sentiment_count: int, total_tokens: int,
+    pos_sum: float,
+    neg_sum: float,
+    sentiment_count: int,
+    total_tokens: int,
 ) -> tuple[float, float, float]:
     """Compute VADER-style positive/negative/neutral proportions."""
     neutral_count = total_tokens - sentiment_count
@@ -516,19 +655,30 @@ def analyze_sentiment(text: str) -> dict:
     tokens = _tokenize(text)
     if not tokens:
         return {
-            "compound": 0.0, "positive": 0.0, "negative": 0.0,
-            "neutral": 1.0, "sentiment_words": 0,
+            "compound": 0.0,
+            "positive": 0.0,
+            "negative": 0.0,
+            "neutral": 1.0,
+            "sentiment_words": 0,
         }
 
     (
-        scores, pos_sum, neg_sum, sentiment_count,
-        pre_contrastive, post_contrastive, seen_contrastive,
+        scores,
+        pos_sum,
+        neg_sum,
+        sentiment_count,
+        pre_contrastive,
+        post_contrastive,
+        seen_contrastive,
     ) = _score_tokens(tokens)
 
     if not scores:
         return {
-            "compound": 0.0, "positive": 0.0, "negative": 0.0,
-            "neutral": 1.0, "sentiment_words": 0,
+            "compound": 0.0,
+            "positive": 0.0,
+            "negative": 0.0,
+            "neutral": 1.0,
+            "sentiment_words": 0,
         }
 
     # Apply contrastive weighting: post-contrastive scores get 1.5x weight

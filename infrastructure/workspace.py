@@ -41,19 +41,21 @@ __all__ = ["Workspace", "WorkspaceStats"]
 # Never copied into the workspace: build output, dependency trees,
 # caches, and her own runtime state. All of it is regenerable, all of it
 # is large, and none of it is source she edits.
-_EXCLUDED_DIRS = frozenset({
-    ".git",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".ruff_cache",
-    ".venv",
-    ".venv-arc3",
-    "__pycache__",
-    "callgraph",
-    "node_modules",
-    "target",
-    "voices",
-})
+_EXCLUDED_DIRS = frozenset(
+    {
+        ".git",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+        ".venv-arc3",
+        "__pycache__",
+        "callgraph",
+        "node_modules",
+        "target",
+        "voices",
+    }
+)
 _EXCLUDED_SUFFIXES = (".pyc", ".pyo", ".so", ".rlib", ".rmeta")
 
 # Excluded by path from the repo root, because the directory name alone
@@ -61,25 +63,29 @@ _EXCLUDED_SUFFIXES = (".pyc", ".pyo", ".so", ".rlib", ".rmeta")
 # contents are bulk data she reads through other tools rather than
 # source she edits — TTS voice models, downloaded benchmark corpora, and
 # recorded eval output.
-_EXCLUDED_PATHS = frozenset({
-    "benchmarks/results",
-    "evals/arc_official",
-    "evals/arc3_envs",
-    "evals/arc_tasks",
-    "evals/babi_tasks",
-    "evals/results",
-})
+_EXCLUDED_PATHS = frozenset(
+    {
+        "benchmarks/results",
+        "evals/arc_official",
+        "evals/arc3_envs",
+        "evals/arc_tasks",
+        "evals/babi_tasks",
+        "evals/results",
+    }
+)
 
 # Her live runtime state lives outside the source tree, but a stray
 # data dir inside a checkout must not be copied either.
-_EXCLUDED_NAMES = frozenset({
-    "concept_archive.db",
-    "concept_archive.db-wal",
-    "concept_archive.db-shm",
-    "drawings",
-    "genesis_data",
-    "source_cache",
-})
+_EXCLUDED_NAMES = frozenset(
+    {
+        "concept_archive.db",
+        "concept_archive.db-wal",
+        "concept_archive.db-shm",
+        "drawings",
+        "genesis_data",
+        "source_cache",
+    }
+)
 
 
 def _is_excluded(rel: Path) -> bool:

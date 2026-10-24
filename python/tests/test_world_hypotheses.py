@@ -43,12 +43,8 @@ def test_mechanic_hypothesis_verifies_on_repeated_support():
     ledger = HypothesisLedger()
     # ACTION1 keeps decrementing the count — the world obeys the rule.
     for _ in range(4):
-        ledger.abduce_mechanics(
-            "1", {"objects.count": 5}, {"objects.count": 4}
-        )
-        ledger.observe_transition(
-            "1", {"objects.count": 4}, {"objects.count": 3}
-        )
+        ledger.abduce_mechanics("1", {"objects.count": 5}, {"objects.count": 4})
+        ledger.observe_transition("1", {"objects.count": 4}, {"objects.count": 3})
     hyps = [h for h in ledger.hypotheses.values() if h.kind == "mechanic"]
     assert hyps
     # The delta-rule should be standing and verified.
@@ -58,17 +54,11 @@ def test_mechanic_hypothesis_verifies_on_repeated_support():
 
 def test_mechanic_hypothesis_falsified_when_effect_absent():
     ledger = HypothesisLedger()
-    ledger.abduce_mechanics(
-        "1", {"objects.count": 5}, {"objects.count": 4}
-    )
+    ledger.abduce_mechanics("1", {"objects.count": 5}, {"objects.count": 4})
     # The "delta == -1" rule then fails three times straight.
     for _ in range(3):
-        ledger.observe_transition(
-            "1", {"objects.count": 4}, {"objects.count": 4}
-        )
-    refuted = [
-        h for h in ledger.hypotheses.values() if h.status == "refuted"
-    ]
+        ledger.observe_transition("1", {"objects.count": 4}, {"objects.count": 4})
+    refuted = [h for h in ledger.hypotheses.values() if h.status == "refuted"]
     assert refuted
 
 
@@ -113,9 +103,7 @@ def test_loss_abduces_avoid_and_scores_against_state():
 def test_competence_records_and_abduces():
     competence = TaskCompetence()
     ctx = _ctx(competence, {"objects.count": 2, "avatar.r": 1})
-    competence.record_transition(
-        ctx, "1", {"objects.count": 2}, {"objects.count": 1}
-    )
+    competence.record_transition(ctx, "1", {"objects.count": 2}, {"objects.count": 1})
     competence.record_episode(
         ctx,
         steps=(),
@@ -137,9 +125,7 @@ def test_goal_score_and_predicted_gain():
     ctx = _ctx(competence, {"objects.count": 2})
     # Teach the effect model that ACTION1 decrements the count.
     for _ in range(6):
-        competence.record_transition(
-            ctx, "1", {"objects.count": 2}, {"objects.count": 1}
-        )
+        competence.record_transition(ctx, "1", {"objects.count": 2}, {"objects.count": 1})
     competence.record_episode(
         ctx,
         steps=(),
@@ -152,9 +138,7 @@ def test_goal_score_and_predicted_gain():
     # Goal hyp "objects.count eq 0" standing → satisfaction now and
     # predicted gain for the action that moves toward it.
     assert competence.goal_score(ctx, {"objects.count": 0}) > 0.0
-    gain = competence.predicted_goal_gain(
-        ctx, "1", {"objects.count": 1}
-    )
+    gain = competence.predicted_goal_gain(ctx, "1", {"objects.count": 1})
     assert gain > 0.0
 
 
@@ -162,9 +146,7 @@ def test_epistemic_bonus_targets_undecided_rules():
     competence = TaskCompetence()
     ctx = _ctx(competence, {"objects.count": 2})
     # One observation abduces a proposed mechanic hypothesis for "1".
-    competence.record_transition(
-        ctx, "1", {"objects.count": 2}, {"objects.count": 1}
-    )
+    competence.record_transition(ctx, "1", {"objects.count": 2}, {"objects.count": 1})
     bonus = competence.epistemic_bonus(ctx, "1", {"objects.count": 2})
     assert bonus > 0.0
     # An action with no hypothesis on trial gets nothing.
@@ -200,9 +182,7 @@ def test_schema_serialization_carries_hypotheses():
 
     competence = TaskCompetence()
     ctx = _ctx(competence, {"objects.count": 2})
-    competence.record_transition(
-        ctx, "1", {"objects.count": 2}, {"objects.count": 1}
-    )
+    competence.record_transition(ctx, "1", {"objects.count": 2}, {"objects.count": 1})
     data = ctx.schema.to_dict()
     restored = TaskSchema.from_dict(data)
     assert restored.hypotheses is not None

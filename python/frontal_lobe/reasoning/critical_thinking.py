@@ -314,12 +314,18 @@ class CriticalThinker:
 
         # 5. Revise confidence.
         revised = self._revise_confidence(
-            result.confidence, supporting, disconfirming, fallacies,
+            result.confidence,
+            supporting,
+            disconfirming,
+            fallacies,
         )
 
         # 6. Recommend.
         recommendation = self._recommend(
-            revised, supporting, disconfirming, fallacies,
+            revised,
+            supporting,
+            disconfirming,
+            fallacies,
         )
 
         # Build notes.
@@ -327,9 +333,7 @@ class CriticalThinker:
         if not supporting:
             notes.append("no supporting evidence found")
         if disconfirming:
-            notes.append(
-                f"{len(disconfirming)} disconfirming evidence items"
-            )
+            notes.append(f"{len(disconfirming)} disconfirming evidence items")
         if fallacies:
             notes.append(f"{len(fallacies)} fallacy flags")
 
@@ -358,7 +362,8 @@ class CriticalThinker:
         return assessment
 
     def evaluate_batch(
-        self, results: list[ReasoningResult],
+        self,
+        results: list[ReasoningResult],
     ) -> list[tuple[ReasoningResult, CriticalAssessment]]:
         """Evaluate a batch of reasoning results.
 
@@ -384,7 +389,8 @@ class CriticalThinker:
     # ─── Evidence gathering ───────────────────────────────────────
 
     def _gather_supporting_evidence(
-        self, result: ReasoningResult,
+        self,
+        result: ReasoningResult,
     ) -> list[EvidenceItem]:
         """Gather supporting evidence from the result's knowledge triples.
 
@@ -405,15 +411,17 @@ class CriticalThinker:
             if key in seen_pairs:
                 continue
             seen_pairs.add(key)
-            evidence.append(EvidenceItem(
-                source_concept=edge.source,
-                relation=rel_str,
-                target_concept=edge.target,
-                raw_weight=edge.weight,
-                source_reliability=self._source_reliability(edge.origin),
-                origin=edge.origin,
-                supports=True,
-            ))
+            evidence.append(
+                EvidenceItem(
+                    source_concept=edge.source,
+                    relation=rel_str,
+                    target_concept=edge.target,
+                    raw_weight=edge.weight,
+                    source_reliability=self._source_reliability(edge.origin),
+                    origin=edge.origin,
+                    supports=True,
+                )
+            )
         # knowledge is a language/composition payload: its triples omit
         # the source concept by design. It is therefore not provenance and
         # must not be treated as evidence here. Doing so would either invent
@@ -437,19 +445,22 @@ class CriticalThinker:
                         and e.relation == rel
                         for e in evidence
                     ):
-                        evidence.append(EvidenceItem(
-                            source_concept=edge.source,
-                            relation=rel,
-                            target_concept=edge.target,
-                            raw_weight=edge.weight,
-                            source_reliability=reliability,
-                            origin=origin,
-                            supports=True,
-                        ))
+                        evidence.append(
+                            EvidenceItem(
+                                source_concept=edge.source,
+                                relation=rel,
+                                target_concept=edge.target,
+                                raw_weight=edge.weight,
+                                source_reliability=reliability,
+                                origin=origin,
+                                supports=True,
+                            )
+                        )
         return evidence
 
     def _search_disconfirmation(
-        self, result: ReasoningResult,
+        self,
+        result: ReasoningResult,
     ) -> list[EvidenceItem]:
         """Search for evidence that contradicts the conclusion.
 
@@ -491,28 +502,26 @@ class CriticalThinker:
                 for edge in self.network.get_edges(src_id, "both"):
                     if edge.relation not in contradicting_rels:
                         continue
-                    other = (
-                        edge.target if edge.source == src_id else edge.source
-                    )
+                    other = edge.target if edge.source == src_id else edge.source
                     if other != tgt_id:
                         continue  # must be the same pair
                     reliability = self._source_reliability(edge.origin)
-                    disconfirming.append(EvidenceItem(
-                        source_concept=other,
-                        relation=edge.relation.value,
-                        target_concept=tgt_id,
-                        raw_weight=edge.weight,
-                        source_reliability=reliability,
-                        origin=edge.origin,
-                        supports=False,
-                    ))
+                    disconfirming.append(
+                        EvidenceItem(
+                            source_concept=other,
+                            relation=edge.relation.value,
+                            target_concept=tgt_id,
+                            raw_weight=edge.weight,
+                            source_reliability=reliability,
+                            origin=edge.origin,
+                            supports=False,
+                        )
+                    )
             # 2. Direct CONTRADICTS between the claim's source and target.
             for edge in self.network.get_edges(src_id, "both"):
                 if edge.relation != RelationType.CONTRADICTS:
                     continue
-                other = (
-                    edge.target if edge.source == src_id else edge.source
-                )
+                other = edge.target if edge.source == src_id else edge.source
                 if other != tgt_id:
                     continue  # must be the same pair
                 # Don't double-count if already found above.
@@ -524,15 +533,17 @@ class CriticalThinker:
                 ):
                     continue
                 reliability = self._source_reliability(edge.origin)
-                disconfirming.append(EvidenceItem(
-                    source_concept=other,
-                    relation="contradicts",
-                    target_concept=tgt_id,
-                    raw_weight=edge.weight,
-                    source_reliability=reliability,
-                    origin=edge.origin,
-                    supports=False,
-                ))
+                disconfirming.append(
+                    EvidenceItem(
+                        source_concept=other,
+                        relation="contradicts",
+                        target_concept=tgt_id,
+                        raw_weight=edge.weight,
+                        source_reliability=reliability,
+                        origin=edge.origin,
+                        supports=False,
+                    )
+                )
         return disconfirming
 
     # ─── Fallacy detection ────────────────────────────────────────
@@ -601,7 +612,8 @@ class CriticalThinker:
     # ─── Evidence quality assessment ──────────────────────────────
 
     def _assess_evidence_quality(
-        self, supporting: list[EvidenceItem],
+        self,
+        supporting: list[EvidenceItem],
     ) -> float:
         """Assess the quality of supporting evidence (0..1).
 
@@ -647,9 +659,7 @@ class CriticalThinker:
         # Evidence quality adjustment.
         if supporting:
             n_sources = len({e.origin for e in supporting})
-            avg_reliability = (
-                sum(e.source_reliability for e in supporting) / len(supporting)
-            )
+            avg_reliability = sum(e.source_reliability for e in supporting) / len(supporting)
             if n_sources >= _MIN_SOURCES_FOR_STRONG and avg_reliability > 0.6:
                 # Strong evidence — boost.
                 revised = min(1.0, revised + _STRONG_EVIDENCE_BOOST)
@@ -662,9 +672,7 @@ class CriticalThinker:
 
         # Disconfirmation penalty.
         if disconfirming:
-            disconfirm_weight = sum(
-                d.adjusted_weight for d in disconfirming
-            )
+            disconfirm_weight = sum(d.adjusted_weight for d in disconfirming)
             revised = max(0.0, revised - disconfirm_weight * _DISCONFIRMATION_PENALTY)
 
         # Fallacy penalties.
@@ -706,8 +714,7 @@ class CriticalThinker:
 
         # Reject: serious fallacies on an already-low-confidence claim.
         has_serious_fallacy = (
-            "unsupported_assertion" in fallacies
-            or "circular_reasoning" in fallacies
+            "unsupported_assertion" in fallacies or "circular_reasoning" in fallacies
         )
         if fallacies and has_serious_fallacy and revised_confidence < 0.3:
             return AssessmentRecommendation.REJECT
@@ -730,7 +737,10 @@ class CriticalThinker:
         return _SOURCE_RELIABILITY.get(origin, _DEFAULT_RELIABILITY)
 
     def _find_edge(
-        self, result: ReasoningResult, rel_str: str, target: str,
+        self,
+        result: ReasoningResult,
+        rel_str: str,
+        target: str,
     ) -> Edge | None:
         """Find the network edge corresponding to a knowledge triple."""
         try:
@@ -744,7 +754,10 @@ class CriticalThinker:
         return None
 
     def _find_edge_by_parts(
-        self, source: str, rel_str: str, target: str,
+        self,
+        source: str,
+        rel_str: str,
+        target: str,
     ) -> Edge | None:
         """Find an edge by source, relation, and target."""
         try:
@@ -761,7 +774,8 @@ class CriticalThinker:
         return None
 
     def _parse_evidence_string(
-        self, evidence: str,
+        self,
+        evidence: str,
     ) -> tuple[str, str, str] | None:
         """Parse an evidence string like 'A causes B' into (A, causes, B).
 
@@ -815,19 +829,14 @@ class CriticalThinker:
         downgraded = data.get("downgraded_count", 0)
         rejected = data.get("rejected_count", 0)
         fallacy = data.get("fallacy_count", 0)
-        self._downgraded_count = (
-            int(downgraded) if isinstance(downgraded, (int, float)) else 0
-        )
-        self._rejected_count = (
-            int(rejected) if isinstance(rejected, (int, float)) else 0
-        )
-        self._fallacy_count = (
-            int(fallacy) if isinstance(fallacy, (int, float)) else 0
-        )
+        self._downgraded_count = int(downgraded) if isinstance(downgraded, (int, float)) else 0
+        self._rejected_count = int(rejected) if isinstance(rejected, (int, float)) else 0
+        self._fallacy_count = int(fallacy) if isinstance(fallacy, (int, float)) else 0
 
 
 def _with_confidence(
-    result: ReasoningResult, confidence: float,
+    result: ReasoningResult,
+    confidence: float,
 ) -> ReasoningResult:
     """Return a copy of a ReasoningResult with revised confidence.
 

@@ -20,8 +20,8 @@ from thalamus.relay import (
     unpack,
 )
 
-MOD_A = 6   # sensory
-MOD_B = 4   # language
+MOD_A = 6  # sensory
+MOD_B = 4  # language
 
 
 def _mod(module_id: int, task_id: int) -> SimpleNamespace:
@@ -218,10 +218,7 @@ def test_once_under_contention_fires_once() -> None:
         return True
 
     ch.once(MOD_A, _take)
-    threads = [
-        threading.Thread(target=ch.post, args=(MOD_A, KIND_SPOKE, i))
-        for i in range(8)
-    ]
+    threads = [threading.Thread(target=ch.post, args=(MOD_A, KIND_SPOKE, i)) for i in range(8)]
     for t in threads:
         t.start()
     for t in threads:

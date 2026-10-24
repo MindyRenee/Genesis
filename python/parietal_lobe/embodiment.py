@@ -4,8 +4,8 @@ The dual of the conversation loop. ``respond()`` ingests a sentence
 and emits a sentence; ``observe()`` ingests a perceived scene and
 ``act()`` emits an action. The same organism sits inside both loops:
 perception, the world model, volition, episodic memory, and felt
-consequences. Idle faculties (sleep, proposals, code learning,
-autonomous web learning) are not part of this loop — they fire from
+consequences. Idle faculties (sleep, proposals, autonomous web
+learning) are not part of this loop — they fire from
 the heartbeat and CLI, which an environment harness never drives.
 
 What runs here is the embodied half of cognition:
@@ -79,11 +79,21 @@ _WORLD_VOICE_CAP = 12
 # arc_agi.rendering.COLOR_MAP, alpha dropped). Kept here rather than
 # imported so the mind layer stays free of the adapter's package.
 _GAME_PALETTE: tuple[tuple[int, int, int], ...] = (
-    (0xFF, 0xFF, 0xFF), (0xCC, 0xCC, 0xCC), (0x99, 0x99, 0x99),
-    (0x66, 0x66, 0x66), (0x33, 0x33, 0x33), (0x00, 0x00, 0x00),
-    (0xE5, 0x3A, 0xA3), (0xFF, 0x7B, 0xCC), (0xF9, 0x3C, 0x31),
-    (0x1E, 0x93, 0xFF), (0x88, 0xD8, 0xF1), (0xFF, 0xDC, 0x00),
-    (0xFF, 0x85, 0x1B), (0x92, 0x12, 0x31), (0x4F, 0xCC, 0x30),
+    (0xFF, 0xFF, 0xFF),
+    (0xCC, 0xCC, 0xCC),
+    (0x99, 0x99, 0x99),
+    (0x66, 0x66, 0x66),
+    (0x33, 0x33, 0x33),
+    (0x00, 0x00, 0x00),
+    (0xE5, 0x3A, 0xA3),
+    (0xFF, 0x7B, 0xCC),
+    (0xF9, 0x3C, 0x31),
+    (0x1E, 0x93, 0xFF),
+    (0x88, 0xD8, 0xF1),
+    (0xFF, 0xDC, 0x00),
+    (0xFF, 0x85, 0x1B),
+    (0x92, 0x12, 0x31),
+    (0x4F, 0xCC, 0x30),
     (0xA3, 0x56, 0xD6),
 )
 
@@ -129,13 +139,44 @@ _OBJECTIVE_STALE_S = 120.0
 # level boundaries always get through.
 _WORLD_VISION_PERIOD = 4
 
+# Glyph-level vision — exemplar tiles through the ventral stream.
+# A recognition only binds at this cosine floor; below it a tile
+# mints its own concept instead of stealing a maybe-wrong name.
+_GLYPH_MATCH_FLOOR = 0.55
+# New concepts taught per frame — the whole alphabet arrives at
+# once but teaching is a drip, not a batch.
+_GLYPH_TEACH_MAX = 8
+
+# Deliberation — vicarious trial and error. When the arbitrated
+# field's top-two margin falls below this, the first choice was a
+# near-guess: cognition settles once more while the forward model
+# weighs each candidate's simulated consequence onto the field
+# (theta sweeps at the choice point, Johnson & Redish 2007), and
+# the basal ganglia arbitrates again with that evidence in.
+_DELIBERATE_MARGIN = 0.05
+# A simulated step's pull on the second arbitration — per cell of
+# progress toward a valued end, plus a floor premium for a move the
+# forward model says does anything at all.
+_DELIBERATE_GAIN = 0.15
+_DELIBERATE_MOVE = 0.05
+
+# Impasse dynamics — an unchanging world is evidence, not just
+# boredom. Confusion (the epistemic emotion of a violated model,
+# D'Mello & Graesser) fires at _DRY_CONFUSE dry frames; the "stuck"
+# verdict waits for _world_patience(), which stretches while
+# untried actions still promise information — serotonin's
+# confidence that patience will be rewarded (Miyazaki 2018).
+_DRY_CONFUSE = 8
+_DRY_BASE = 20
+_DRY_LEARN_BONUS = 15
+
 # Episodic recall cadence — a pass every this many world ticks, plus
 # immediately on any salient event (the moments a decision is up for
 # grabs). Bounded retrieval keeps the body loop cheap.
 _RECALL_PERIOD = 8
-_RECALL_LIMIT = 6      # candidates scanned per pass
-_RECALL_FETCH = 4      # how many get full text retrieval
-_RECALL_DIST = 20      # SimHash association threshold — the daemon's own
+_RECALL_LIMIT = 6  # candidates scanned per pass
+_RECALL_FETCH = 4  # how many get full text retrieval
+_RECALL_DIST = 20  # SimHash association threshold — the daemon's own
 
 # Her own event vocabulary is the recall key: the outcome words she
 # stored a memory with are the words that decode its valence.
@@ -194,9 +235,7 @@ class EmbodimentMixin:
         # weight, and where she stood. Her own trace of what she
         # did and why, kept across the episode so a policy that
         # circles is visible as circling.
-        self._world_decision_log: deque[dict[str, Any]] = deque(
-            maxlen=400
-        )
+        self._world_decision_log: deque[dict[str, Any]] = deque(maxlen=400)
         # Parietal imagery workspace — transform skills applied to
         # internal copies of the scene; recognition explains global
         # change that entity tracking cannot express.
@@ -245,6 +284,9 @@ class EmbodimentMixin:
         self._world_levels = 0
         self._world_dry = 0
         self._world_deaths = 0
+        # The action ids the engaged world last offered — patience
+        # counts untried physics against this set.
+        self._world_ids: list[str] = []
         self._world_voiced = 0
         self._world_last_voiced: str | None = None
         self._last_world_step = 0.0
@@ -260,12 +302,18 @@ class EmbodimentMixin:
         # what it remembered, for telemetry.
         self._world_recall_tick = -1
         self._world_last_recall: dict[int, float] = {}
+        # Glyph-vision bookkeeping — tiles already run through the
+        # ventral stream (teach once) and tiles it failed to name
+        # (retried only after new concepts change the bridge).
+        self._glyph_seen: set[tuple[tuple[int, ...], ...]] = set()
+        self._glyph_neg: set[tuple[tuple[int, ...], ...]] = set()
 
     def observe(
         self,
         frame: Any = None,
         info: dict[str, Any] | None = None,
         background: int | None = None,
+        through: list[Any] | None = None,
     ) -> list[WorldEvent]:
         """Take in one observation of the world; return what changed.
 
@@ -276,10 +324,31 @@ class EmbodimentMixin:
         environment supplies them. ``background`` is the empty-cell
         value when the caller knows it — a perceptual convention,
         like exposure — otherwise the frame's modal color is used.
+
+        ``through`` carries the animation strip when an environment
+        renders a consequence across several frames: each one is
+        tracked as motion (the world model's pursuit channel) but
+        only ``frame`` opens a trial — saccadic masking, done in the
+        visual pathway rather than at the camera.
         """
+        for mid in through or ():
+            mid_scene = self._frame_to_scene(mid, background=background)
+            if mid_scene is not None:
+                self.world_model.pursue(mid_scene)
         scene = self._frame_to_scene(frame, background=background)
         if scene is None:
             return []
+        # The exemplar session speaks the shared competence protocol
+        # itself — hand it the substrate before its own tick runs
+        # inside world_model.observe. Same for the ventral-stream
+        # probe: installed once, self-guarding when vision is absent.
+        sess = self.world_model.exemplars
+        if sess.competence is None:
+            sess.competence = getattr(self.brain.frontal, "task_competence", None)
+        if sess.network is None:
+            sess.network = getattr(self.brain.frontal, "network", None)
+        if sess.inductor.glyph_probe is None:
+            sess.inductor.set_glyph_probe(self._glyph_probe)
         # The action whose outcome this frame carries — captured
         # before _resolve_world_action clears it.
         pending = self._pending_world_action
@@ -295,6 +364,7 @@ class EmbodimentMixin:
         self._map_world(scene)
         self._resolve_world_action()
         self._learn_world_hypotheses(pending, events)
+        self._bridge_exemplar(events)
         for event in events:
             self._feel_world_event(event)
             if event.salience >= _STORE_SALIENCE:
@@ -355,14 +425,9 @@ class EmbodimentMixin:
                 if active is not self._held_objective:
                     self._held_objective = active
                     self._held_since = time.time()
-                if (
-                    active is None
-                    or time.time() - self._held_since > _OBJECTIVE_STALE_S
-                ):
+                if active is None or time.time() - self._held_since > _OBJECTIVE_STALE_S:
                     if active is not None:
-                        executive.revise_intention(
-                            active, reason="held too long unanswered"
-                        )
+                        executive.revise_intention(active, reason="held too long unanswered")
                     executive.select_intention(
                         list(executive.actionable_intentions),
                         allowed_kinds=_WORLD_OBJECTIVE_KINDS,
@@ -371,9 +436,7 @@ class EmbodimentMixin:
                     self._held_since = time.time()
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"executive objective select failed: {e}")
-        choice = self._world_policy.choose(
-            ids, field=motor, executive=executive
-        )
+        choice = self._world_policy.choose(ids, field=motor, executive=executive)
         self._pending_objective = None
         if choice is not None:
             action = str(choice["action"])
@@ -381,8 +444,7 @@ class EmbodimentMixin:
             self._pending_world_action = (action, expected)
             self._pending_objective = (
                 executive.active_intention
-                if executive is not None
-                and choice.get("source") == "intention"
+                if executive is not None and choice.get("source") == "intention"
                 else None
             )
             # The cell rides with the action — a distal act is
@@ -391,9 +453,7 @@ class EmbodimentMixin:
             try:
                 self.self_model.record_intention(
                     action,
-                    intended_outcome=(
-                        f"move {expected}" if expected else f"act {action}"
-                    ),
+                    intended_outcome=(f"move {expected}" if expected else f"act {action}"),
                 )
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"agency intention record failed: {e}")
@@ -418,9 +478,7 @@ class EmbodimentMixin:
         try:
             self.self_model.record_intention(
                 action,
-                intended_outcome=(
-                    f"move {expected}" if expected else f"act {action}"
-                ),
+                intended_outcome=(f"move {expected}" if expected else f"act {action}"),
             )
         except Exception as e:  # noqa: BLE001
             logger.debug(f"agency intention record failed: {e}")
@@ -522,13 +580,9 @@ class EmbodimentMixin:
             executive = getattr(self.brain.frontal, "executive", None)
             if executive is not None:
                 try:
-                    executive.set_inhibition_threshold(
-                        self._exec_prev_inhibition
-                    )
+                    executive.set_inhibition_threshold(self._exec_prev_inhibition)
                 except Exception as e:  # noqa: BLE001
-                    logger.debug(
-                        f"executive inhibition restore failed: {e}"
-                    )
+                    logger.debug(f"executive inhibition restore failed: {e}")
             self._exec_prev_inhibition = None
 
     def world_engagement(self) -> float:
@@ -653,9 +707,7 @@ class EmbodimentMixin:
         try:
             path = self._world_learning_file(self._world_context)
             if path.exists():
-                self.world_model.import_learning(
-                    json.loads(path.read_text())
-                )
+                self.world_model.import_learning(json.loads(path.read_text()))
                 loaded = "loaded"
         except Exception:
             logger.debug("world learning load failed", exc_info=True)
@@ -712,6 +764,7 @@ class EmbodimentMixin:
         frame: Any,
         available_actions: list[Any] | None = None,
         info: dict[str, Any] | None = None,
+        through: list[Any] | None = None,
     ) -> dict[str, Any] | None:
         """One full turn in the engaged world — perceive, think, act.
 
@@ -748,7 +801,7 @@ class EmbodimentMixin:
             self._world_dry = 0
         self._world_levels = level
 
-        events = self._world_perceive(frame, game, level, info, advanced)
+        events = self._world_perceive(frame, game, level, info, advanced, through=through)
 
         # Think — the cognition slice a turn-based world would
         # otherwise never give her. And remember: the situation cues
@@ -771,13 +824,25 @@ class EmbodimentMixin:
             choice = None
         if choice is None:
             return None
+        # Deliberate — confidence gates effort, not the reverse. A
+        # flat field margin means the first arbitration was a
+        # near-guess: settle once more, let the forward model weigh
+        # each candidate's imagined consequence onto the field, and
+        # arbitrate again with that evidence present.
+        if self._world_margin() < _DELIBERATE_MARGIN:
+            disposition = self._deliberate_world(avail)
+            if disposition:
+                self._impulse_world(CHEM_ACETYLCHOLINE, 0.006)
+                self._world_cognition_tick()
+                try:
+                    choice = self.act(avail, recommended=disposition) or choice
+                except Exception as e:  # noqa: BLE001
+                    note_swallowed("mind.world_step.deliberate", e)
         return self._world_commit(choice, avail, game)
 
     # ─── World-turn internals ───────────────────────────────────
 
-    def _world_onboard(
-        self, game: str, level: int, info: dict[str, Any]
-    ) -> None:
+    def _world_onboard(self, game: str, level: int, info: dict[str, Any]) -> None:
         """First contact with a game — engagement signature plus the
         world's spoken instruction broadcast as context, so her
         cognition meets the stream already knowing the genre."""
@@ -788,10 +853,7 @@ class EmbodimentMixin:
             self._world_levels = level
             self._impulse_world(CHEM_ACETYLCHOLINE, 0.004)
             self._world_wave(BrainWave.BETA2, 0.15)
-            self._world_say(
-                {"kind": "start", "game": game,
-                 "goal": info.get("instructions", "")}
-            )
+            self._world_say({"kind": "start", "game": game, "goal": info.get("instructions", "")})
             if info.get("instructions"):
                 self._world_bridge.broadcast_observation(
                     f"{game} instructions: {info['instructions']}",
@@ -807,17 +869,25 @@ class EmbodimentMixin:
         level: int,
         info: dict[str, Any],
         advanced: bool,
+        through: list[Any] | None = None,
     ) -> Any:
         """The frame enters through her embodied stack alone — the
         world model, the cognitive map, imagery, the workspace — and
         the change measure couples to dopamine (hers to compute, not
         a delegate's report). Returns the frame's events."""
         prev_grid = self._prev_world_grid
+        errs_before = self.world_model.exemplars.writer.errors
         events = self.observe(
             frame,
-            info={**info, "game": game, "level": level,
-                  **({"win": True} if advanced else {})},
+            info={**info, "game": game, "level": level, **({"win": True} if advanced else {})},
+            through=through,
         )
+        # A falsified motor prediction is an orienting signal — the
+        # exemplar writer counts its misses, and surprise couples to
+        # norepinephrine, not reward.
+        errs = self.world_model.exemplars.writer.errors - errs_before
+        if errs > 0:
+            self._impulse_world(CHEM_NOREPINEPHRINE, min(0.01, 0.004 * errs))
         change = self._frame_change(prev_grid)
         vision_novel = (
             self._see_game_frame(frame)
@@ -834,9 +904,7 @@ class EmbodimentMixin:
         # larger ones arrive as the estimates they are.
         n_others = self.world_model.count_others()
         count_text = (
-            str(n_others)
-            if self.world_model.number.subitizes(n_others)
-            else f"about {n_others}"
+            str(n_others) if self.world_model.number.subitizes(n_others) else f"about {n_others}"
         )
         self._world_bridge.broadcast_observation(
             f"game {game}: level {level}/{info.get('win_levels', '?')}, "
@@ -847,11 +915,7 @@ class EmbodimentMixin:
             metadata={
                 "game": game,
                 "level": level,
-                **(
-                    {"vision_novel": vision_novel}
-                    if vision_novel is not None
-                    else {}
-                ),
+                **({"vision_novel": vision_novel} if vision_novel is not None else {}),
             },
         )
 
@@ -869,23 +933,28 @@ class EmbodimentMixin:
             )
         if change < 0.005:
             self._world_dry += 1
-            if self._world_dry == 20:
+            # Confusion before boredom: sustained impasse is
+            # unexpected uncertainty — noradrenaline plus
+            # acetylcholine (Yu & Dayan 2005), and the held
+            # objective comes up for revision while the model is
+            # still falsified.
+            if self._world_dry == _DRY_CONFUSE:
+                self._impulse_world(CHEM_NOREPINEPHRINE, 0.012)
+                self._impulse_world(CHEM_ACETYLCHOLINE, 0.008)
+                self._world_confuse(game)
+            if self._world_dry == self._world_patience():
                 self._world_say({"kind": "stuck", "game": game})
         else:
             self._world_dry = 0
         return events
 
-    def _world_commit(
-        self, choice: dict[str, Any], avail: list[Any], game: str
-    ) -> dict[str, Any]:
+    def _world_commit(self, choice: dict[str, Any], avail: list[Any], game: str) -> dict[str, Any]:
         """Ship her chosen action to the world — broadcast, record
         the decision basis, build the step descriptor."""
         action = int(choice["action"])
         if action == 0:
             self._world_bridge.broadcast_action(0, metadata={"game": game})
-            self._record_world_decision(
-                "RESET", choice, avail
-            )
+            self._record_world_decision("RESET", choice, avail)
             return {"action": 0}
         desc: dict[str, Any] = {"action": action}
         cell = choice.get("cell")
@@ -914,11 +983,7 @@ class EmbodimentMixin:
         ``observe`` and the heartbeat's round.
         """
         now = time.monotonic()
-        dt = (
-            min(5.0, max(0.0, now - self._last_world_step))
-            if self._last_world_step
-            else 0.2
-        )
+        dt = min(5.0, max(0.0, now - self._last_world_step)) if self._last_world_step else 0.2
         self._last_world_step = now
         try:
             language = getattr(self.brain.frontal, "language", None)
@@ -964,9 +1029,7 @@ class EmbodimentMixin:
         language system from the event, never recited."""
         if self._world_voiced >= _WORLD_VOICE_CAP:
             return
-        vocab = getattr(
-            getattr(self.brain.frontal, "language", None), "vocabulary", None
-        )
+        vocab = getattr(getattr(self.brain.frontal, "language", None), "vocabulary", None)
         if vocab is None:
             return
         try:
@@ -991,9 +1054,7 @@ class EmbodimentMixin:
                     if noted is not None:
                         return
                 except Exception as e:  # noqa: BLE001
-                    note_swallowed(
-                        "parietal_lobe.embodiment.play_moment", e
-                    )
+                    note_swallowed("parietal_lobe.embodiment.play_moment", e)
             self._emit_live_thought("play", text)
 
     def _impulse_world(self, chem: int, amount: float) -> None:
@@ -1020,11 +1081,7 @@ class EmbodimentMixin:
         which drive the striatum honored, how decisive her own
         disposition field was, what else contended. ``note`` carries
         her inner voice only when a moment was actually voiced."""
-        rec = (
-            dict(self._world_motor.action_scores)
-            if self._world_motor is not None
-            else {}
-        )
+        rec = dict(self._world_motor.action_scores) if self._world_motor is not None else {}
         scored = sorted(
             (
                 (
@@ -1042,9 +1099,7 @@ class EmbodimentMixin:
             "source": (choice or {}).get("source", "unknown"),
             "weight": (choice or {}).get("weight"),
             "confidence": round(min(1.0, max(0.0, top - second) / 2.0), 3),
-            "alternatives": [
-                f"ACTION{a}" for score, a in scored[1:3] if score > 0
-            ],
+            "alternatives": [f"ACTION{a}" for score, a in scored[1:3] if score > 0],
             "note": self._world_last_voiced,
         }
         # Where she stood when she decided — the position half of
@@ -1068,6 +1123,105 @@ class EmbodimentMixin:
             }
         )
 
+    def _world_margin(self) -> float:
+        """Decisiveness of the last arbitration — the motor field's
+        top-two separation, the same quantity the decision journal
+        reports as confidence. A flat field is a guess, and a guess
+        is what deliberation is for."""
+        if self._world_motor is None:
+            return 1.0
+        scores = sorted(self._world_motor.action_scores.values(), reverse=True)
+        top = scores[0] if scores else 0.0
+        second = scores[1] if len(scores) > 1 else 0.0
+        return min(1.0, max(0.0, top - second) / 2.0)
+
+    def _deliberate_world(self, avail: list[Any]) -> dict[str, float]:
+        """Mental simulation at the choice point.
+
+        Sweeps each offered action one step through learned physics
+        and lets the imagined outcome bid — the forward-replay half
+        of vicarious trial and error. Returns a disposition
+        ``{action_id: pull}`` written onto the field for a second
+        arbitration; empty when the model has nothing to imagine
+        with, so early play and coordinate interfaces stay out of
+        the loop.
+        """
+        try:
+            start = self.world_model.start_state()
+            if start is None:
+                return {}
+            valued = self._world_policy.valued_cells()
+
+            def dist(cells: Any) -> float:
+                if not valued:
+                    return 0.0
+                return min(abs(r - vr) + abs(c - vc) for r, c in cells for vr, vc in valued)
+
+            base = dist(start.cells)
+            out: dict[str, float] = {}
+            for item in avail:
+                aid = str(item.get("action") if isinstance(item, dict) else item)
+                sim = self.world_model.simulate(start, aid)
+                if sim is None or sim.cells == start.cells:
+                    # Unknown physics, a refused move, or a hazard —
+                    # the forward model offers it no voice.
+                    continue
+                gain = (base - dist(sim.cells)) * _DELIBERATE_GAIN
+                gain += _DELIBERATE_MOVE
+                if gain > 0:
+                    out[aid] = gain
+            return out
+        except Exception as e:  # noqa: BLE001 — deliberation is advisory
+            logger.debug(f"world deliberation failed: {e}")
+            return {}
+
+    def _world_patience(self) -> int:
+        """How long a static world gets before she calls it stuck.
+
+        Patience tracks remaining epistemic value: while untried
+        actions still promise physics to learn, staying engaged is
+        buying information — serotonin's confidence that effort now
+        pays later. Once every offered action has a measured effect
+        the base count stands.
+        """
+        ids = self._world_ids
+        if not ids:
+            return _DRY_BASE
+        try:
+            unlearned = sum(1 for a in ids if self.world_model.effect_of(a) is None)
+        except Exception:  # noqa: BLE001 — patience is advisory
+            return _DRY_BASE
+        return _DRY_BASE + round(_DRY_LEARN_BONUS * unlearned / len(ids))
+
+    def _world_confuse(self, game: str) -> None:
+        """Impasse made felt — confusion, the epistemic emotion that
+        says 'my model of this is wrong.'
+
+        Broadcast so the workspace can recruit a restructure, and
+        the executive's held objective put up for revision — the
+        monitor (uncertainty) and the adjuster (strategy change) are
+        different acts; this is the adjuster firing.
+        """
+        try:
+            self._world_bridge.broadcast_observation(
+                f"{game}: the world stopped answering {self._world_dry} "
+                f"turns ago — my model of it may be wrong",
+                topics=["game", game],
+                salience=0.7,
+                metadata={"game": game, "impasse": self._world_dry},
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"confusion broadcast failed: {e}")
+        executive = getattr(self.brain.frontal, "executive", None)
+        held = self._held_objective
+        if executive is None or held is None:
+            return
+        try:
+            executive.revise_intention(held, reason="the world stopped answering — rethink")
+            self._held_objective = None
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"confusion revision failed: {e}")
+
     # ─── Internals ──────────────────────────────────────────────
 
     def _map_world(self, scene: Scene) -> None:
@@ -1081,25 +1235,19 @@ class EmbodimentMixin:
         """
         me = self.world_model.self_entity
         position = me.centroid if me is not None and not me.gone else None
-        action = (
-            self._pending_world_action[0]
-            if self._pending_world_action is not None
-            else None
-        )
+        action = self._pending_world_action[0] if self._pending_world_action is not None else None
         entities = [
             (e.color, e.cells)
             for e in self.world_model.entities.values()
-            if not e.gone and not e.is_self and not e.part_of_self
+            if not e.gone
+            and not e.is_self
+            and not e.part_of_self
             and e.color not in self.world_model.terrain_kinds
         ]
         # When the allocentric fix is missing, self-reported velocity
         # feeds dead reckoning so the position estimate still tracks
         # her motion (corrected on the next fix).
-        delta = (
-            me.velocity
-            if position is None and me is not None and not me.gone
-            else None
-        )
+        delta = me.velocity if position is None and me is not None and not me.gone else None
         try:
             map_events = self.cognitive_map.observe(
                 position,
@@ -1115,45 +1263,7 @@ class EmbodimentMixin:
         for event in map_events:
             self._emit_live_thought("world", event.text)
             if event.salience >= _STORE_SALIENCE:
-                self._store_world_event(
-                    WorldEvent(event.kind, event.text, event.salience)
-                )
-        try:
-            self._bias_gaze_toward_goal(scene)
-        except Exception as e:  # noqa: BLE001 — attention bias is advisory
-            logger.debug(f"goal bias failed: {e}")
-
-    def _bias_gaze_toward_goal(self, scene: Scene) -> None:
-        """Top-down attention: learned goal entities draw her gaze.
-
-        The world model's affordance ledger records which colors are
-        goals (win) or valuable (collect). When such an entity is on
-        screen, its centroid biases the saliency map — the frontal
-        contribution to LIP-style priority. Cleared when nothing with
-        a learned value is visible.
-        """
-        best = None
-        best_score = 0.0
-        for e in self.world_model.entities.values():
-            if e.gone or e.is_self or e.part_of_self or not e.cells:
-                continue
-            aff = self.world_model.affordances.get(e.color)
-            if not aff:
-                continue
-            score = (
-                aff.get(OUT_WIN, 0) * 2.0
-                + aff.get(OUT_COLLECT, 0)
-                - aff.get(OUT_HAZARD, 0) * 2.0
-            )
-            if score > best_score:
-                best, best_score = e, score
-        if best is None:
-            self.vision.clear_attention_bias()
-            return
-        self.vision.bias_attention_toward(
-            best.centroid[0], best.centroid[1],
-            scene.grid.height, scene.grid.width,
-        )
+                self._store_world_event(WorldEvent(event.kind, event.text, event.salience))
 
     def _recognize_scene_change(self, scene: Scene) -> list[WorldEvent]:
         """Scene-level change recognition — what did the world do?
@@ -1265,9 +1375,7 @@ class EmbodimentMixin:
         except Exception as e:  # noqa: BLE001 — grounding is advisory
             logger.debug(f"unexplained-change grounding failed: {e}")
 
-    def _frame_to_scene(
-        self, frame: Any, background: int | None = None
-    ) -> Scene | None:
+    def _frame_to_scene(self, frame: Any, background: int | None = None) -> Scene | None:
         """Normalize an observation into a Scene via the substrate."""
         from parietal_lobe.grid import Grid
         from parietal_lobe.scene import Scene, perceive
@@ -1288,9 +1396,7 @@ class EmbodimentMixin:
                         background=background,
                     )
                 if frame.ndim == 3:
-                    return self.vision.perceive_scene(
-                        frame, network=self.brain.frontal.network
-                    )
+                    return self.vision.perceive_scene(frame, network=self.brain.frontal.network)
         except ImportError as e:
             logger.debug(f"numpy frame normalization unavailable: {e}")
         if isinstance(frame, (list, tuple)) and frame:
@@ -1373,10 +1479,7 @@ class EmbodimentMixin:
         """Episodic memory: salient world changes become recallable."""
         try:
             chem = self.client.get_state()
-            tag = [
-                float(chem.chemicals.get(CHEM_NAMES[i], 0.0))
-                for i in range(EMOTIONAL_TAG_SIZE)
-            ]
+            tag = [float(chem.chemicals.get(CHEM_NAMES[i], 0.0)) for i in range(EMOTIONAL_TAG_SIZE)]
             self.client.store_event(
                 timestamp=int(time.time() * 1000),
                 event_type=0,  # Input — something she perceived
@@ -1430,13 +1533,9 @@ class EmbodimentMixin:
         action = pending[0] if pending is not None else None
         try:
             if self._prev_world_state is not None and action is not None:
-                check = competence.record_transition(
-                    ctx, action, self._prev_world_state, state
-                )
+                check = competence.record_transition(ctx, action, self._prev_world_state, state)
                 self._world_episode_changes = check.observed_changes
-            terminal = next(
-                (e for e in events if e.kind in ("win", "reset")), None
-            )
+            terminal = next((e for e in events if e.kind in ("win", "reset")), None)
             if terminal is not None:
                 competence.record_episode(
                     ctx,
@@ -1451,6 +1550,184 @@ class EmbodimentMixin:
         except Exception as e:  # noqa: BLE001 — hypotheses are advisory
             logger.debug(f"world hypothesis update failed: {e}")
         self._prev_world_state = state
+
+    # ─── Exemplar → memory bridge ─────────────────────────────
+
+    def _bridge_exemplar(self, events: list[WorldEvent]) -> None:
+        """Wire the exemplar session into the mind's memory systems.
+
+        The session (parietal) owns its domain protocol — this layer
+        only supplies the handles it can't reach: episode verdicts
+        from world events, the episodic store for its milestones,
+        and the ventral stream for its tiles.
+        """
+        sess = self.world_model.exemplars
+        terminal = next((e for e in events if e.kind in ("win", "reset")), None)
+        if terminal is not None:
+            sess.end_episode(success=terminal.kind == "win")
+        for text, salience in sess.drain_milestones():
+            self._store_exemplar_event(text, salience)
+        self._see_glyphs(sess)
+
+    def _store_exemplar_event(self, text: str, salience: float) -> None:
+        """Episodic memory: what the demonstration format did becomes
+        recallable — the same channel world events already take."""
+        game = self._world_context or "the world"
+        try:
+            chem = self.client.get_state()
+            tag = [float(chem.chemicals.get(CHEM_NAMES[i], 0.0)) for i in range(EMOTIONAL_TAG_SIZE)]
+            self.client.store_event(
+                timestamp=int(time.time() * 1000),
+                event_type=0,  # Input — something she perceived
+                source_module=MODULE_SENSORY,
+                salience=salience,
+                emotional_tag=tag,
+                text=f"{game}: {text}",
+            )
+        except Exception as e:  # noqa: BLE001 — memory loss must not crash the loop
+            logger.debug(f"failed to store exemplar event: {e}")
+
+    def _see_glyphs(self, sess: Any) -> None:
+        """Teach the ventral stream the committed exemplar tiles.
+
+        Whole game frames already flow through ``_see_game_frame``;
+        this is the same channel at glyph granularity — a tile's
+        identity becomes a concept the MTL bridge can recognize
+        later, in this world or another. Only committed pair
+        evidence is taught; unverified tiles never mint concepts.
+        """
+        cortex = getattr(self, "visual_cortex", None)
+        if cortex is None or not sess.inductor.store.pairs:
+            return
+        taught = 0
+        for tile in sess.glyph_tiles():
+            key = tile.rows()
+            if key in sess.glyph_ids or key in self._glyph_seen:
+                continue
+            if taught >= _GLYPH_TEACH_MAX:
+                break
+            self._glyph_seen.add(key)
+            rgb = self._glyph_rgb(tile)
+            if rgb is None:
+                continue
+            try:
+                percept = cortex.see(rgb, learn=True)
+            except Exception as e:  # noqa: BLE001 — vision is advisory
+                note_swallowed("mind.world_step.see_glyph", e)
+                break
+            taught += 1
+            concept = getattr(percept, "concept", None)
+            conf = float(getattr(percept, "confidence", 0.0) or 0.0)
+            if concept is not None and conf >= _GLYPH_MATCH_FLOOR:
+                # The ventral stream already knows this shape — bind,
+                # don't mint a synonym.
+                sess.glyph_ids[key] = concept
+            elif self._mint_glyph(tile, rgb):
+                sess.glyph_ids[key] = self._glyph_name(tile)
+        if taught:
+            # New associations can reclassify earlier misses.
+            self._glyph_neg.clear()
+            self._ground_glyph_pairs(sess)
+
+    def _glyph_name(self, tile: Any) -> str:
+        """The shape concept's name — content-addressed: the same
+        tile in any world is the same glyph."""
+        import hashlib
+
+        digest = hashlib.sha256(repr(tile.rows()).encode()).hexdigest()[:12]
+        return f"glyph:{digest}"
+
+    def _glyph_rgb(self, tile: Any) -> Any | None:
+        """A tile crop through the palette at resolvable resolution.
+
+        The V1 patch size (8) can't resolve a 5×5 glyph — scale the
+        palette render up so at least one full patch exists (nearest
+        neighbor; the glyph's structure, not interpolated detail)."""
+        try:
+            import numpy as np
+
+            idx = np.asarray(tile.to_lists(), dtype=np.int64) & 0xF
+            side = min(tile.height, tile.width)
+            k = max(1, -(-10 // side))  # ceil(10/side)
+            rgb = np.asarray(_GAME_PALETTE, dtype=np.uint8)[idx]
+            return np.repeat(np.repeat(rgb, k, axis=0), k, axis=1)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.world_step.glyph_rgb", e)
+            return None
+
+    def _mint_glyph(self, tile: Any, rgb: Any) -> bool:
+        """Register a new shape concept and bind the crop to it.
+
+        The concept joins the network (``IS_A glyph``) so the
+        association is semantic content, not an opaque classifier
+        entry — she can in principle say what she has seen.
+        """
+        name = self._glyph_name(tile)
+        network = getattr(self.brain.frontal, "network", None)
+        cortex = getattr(self, "visual_cortex", None)
+        if cortex is None:
+            return False
+        try:
+            if network is not None:
+                network.add_concept(
+                    name,
+                    origin="perception",
+                    properties={
+                        "kind": "glyph",
+                        "shape": f"{tile.height}x{tile.width}",
+                    },
+                )
+                network.add_edge(name, "glyph", RelationType.IS_A, origin="perception")
+            return bool(cortex.learn_from_image(rgb, name))
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.world_step.mint_glyph", e)
+            return False
+
+    def _ground_glyph_pairs(self, sess: Any) -> None:
+        """Pair relations as concept edges — "this glyph substitutes
+        to that glyph" is learned relational knowledge, grounded the
+        same way consolidated skills are."""
+        network = getattr(self.brain.frontal, "network", None)
+        if network is None:
+            return
+        try:
+            for ante, cons in sess.glyph_pairs():
+                a_name = sess.glyph_ids.get(ante.rows())
+                c_name = sess.glyph_ids.get(cons.rows())
+                if a_name and c_name and a_name != c_name:
+                    network.add_edge(a_name, c_name, RelationType.RELATED_TO, origin="perception")
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.world_step.ground_glyphs", e)
+
+    def _glyph_probe(self, tile: Any) -> str | None:
+        """The ventral stream's name for a tile — the recognition
+        assist the substitution matcher may consult. Positive
+        recognitions persist on the session; misses are ephemeral
+        (a later-taught concept could reclassify them)."""
+        sess = self.world_model.exemplars
+        key = tile.rows()
+        name = sess.glyph_ids.get(key)
+        if name:
+            return name
+        if key in self._glyph_neg:
+            return None
+        cortex = getattr(self, "visual_cortex", None)
+        if cortex is None:
+            return None
+        rgb = self._glyph_rgb(tile)
+        if rgb is None:
+            return None
+        try:
+            percept = cortex.see(rgb, learn=False)
+        except Exception:  # noqa: BLE001 — recognition is advisory
+            return None
+        name = getattr(percept, "concept", None)
+        conf = float(getattr(percept, "confidence", 0.0) or 0.0)
+        if name and conf >= _GLYPH_MATCH_FLOOR:
+            sess.glyph_ids[key] = name
+            return name
+        self._glyph_neg.add(key)
+        return None
 
     def _recall_world(self, game: str, events: list[WorldEvent]) -> None:
         """Cue-driven episodic recall — the situation summons its past.
@@ -1499,9 +1776,7 @@ class EmbodimentMixin:
                 color = int(match.group(1))
                 sign = _RECALL_OUTCOME_VALENCE[match.group(2)]
                 weight = assoc * max(0.2, hit.salience) * sign
-                valence[color] = max(
-                    -1.0, min(1.0, valence.get(color, 0.0) + weight)
-                )
+                valence[color] = max(-1.0, min(1.0, valence.get(color, 0.0) + weight))
         self._world_last_recall = dict(valence)
         self.world_model.recalled_valence = valence
         if valence:
@@ -1538,9 +1813,7 @@ class EmbodimentMixin:
             aff = self.world_model.affordance_of(e.color)
             for outcome in (OUT_WIN, OUT_COLLECT, OUT_HAZARD):
                 if aff.get(outcome, 0) > 0:
-                    relations.append(
-                        (f"entity:{e.color}", "affords", outcome)
-                    )
+                    relations.append((f"entity:{e.color}", "affords", outcome))
                     break
             if len(relations) >= 4:
                 break
@@ -1551,14 +1824,8 @@ class EmbodimentMixin:
             salience=salience,
             shape=grid.shape,
             metadata={
-                "events": [
-                    {"kind": e.kind, "salience": e.salience} for e in events
-                ],
-                "entities": sum(
-                    1
-                    for e in self.world_model.entities.values()
-                    if not e.gone
-                ),
+                "events": [{"kind": e.kind, "salience": e.salience} for e in events],
+                "entities": sum(1 for e in self.world_model.entities.values() if not e.gone),
                 "embodied": me is not None and not me.gone,
                 "relations": relations,
             },
@@ -1620,9 +1887,8 @@ class EmbodimentMixin:
         try:
             from basal_ganglia.motor_field import compose_motor_fields
 
-            motor = compose_motor_fields(
-                self.world_model, ids, grid.height, grid.width
-            )
+            motor = compose_motor_fields(self.world_model, ids, grid.height, grid.width)
+            self._world_ids = ids
             # Cognition writes onto the field before basal ganglia
             # read it: inferred goals add a disposition toward what
             # satisfies them, undecided mechanic hypotheses add pull
@@ -1639,13 +1905,10 @@ class EmbodimentMixin:
                     )
             if recommended:
                 for a in ids:
-                    motor.action_scores[a] = (
-                        motor.action_scores.get(a, 0.0)
-                        + recommended.get(a, 0.0)
+                    motor.action_scores[a] = motor.action_scores.get(a, 0.0) + recommended.get(
+                        a, 0.0
                     )
-            self._world_bridge.publish_motor_fields(
-                motor.spatial, motor.action_scores
-            )
+            self._world_bridge.publish_motor_fields(motor.spatial, motor.action_scores)
             return motor
         except Exception as e:  # noqa: BLE001 — fields are advisory
             logger.debug(f"motor field composition failed: {e}")
@@ -1667,12 +1930,7 @@ class EmbodimentMixin:
         h, w = cur.height, cur.width
         if prev_grid.height != h or prev_grid.width != w:
             return 1.0
-        diff = sum(
-            1
-            for r in range(h)
-            for c in range(w)
-            if prev_grid.at(r, c) != cur.at(r, c)
-        )
+        diff = sum(1 for r in range(h) for c in range(w) if prev_grid.at(r, c) != cur.at(r, c))
         return diff / (h * w) if h and w else 0.0
 
     def _broadcast_world_action(self, choice: dict[str, Any], motor: Any) -> None:
@@ -1681,14 +1939,11 @@ class EmbodimentMixin:
         cell = choice.get("cell")
         self._world_bridge.broadcast_action(
             choice["action"],
-            cell=(
-                {"row": cell[0], "col": cell[1]} if cell is not None else None
-            ),
+            cell=({"row": cell[0], "col": cell[1]} if cell is not None else None),
             metadata={
                 "predicted_effect": (
                     list(self._pending_world_action[1])
-                    if self._pending_world_action
-                    and self._pending_world_action[1] is not None
+                    if self._pending_world_action and self._pending_world_action[1] is not None
                     else None
                 ),
                 "field_peak": motor.peak if motor is not None else None,

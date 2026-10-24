@@ -12,34 +12,27 @@ from temporal_lobe.memory.semantic import SemanticMemory
 
 
 def _objects(memory: SemanticMemory, text: str, relation: str) -> list[str]:
-    return [
-        f.object
-        for f in memory.extract_facts(text)
-        if f.relation == relation
-    ]
+    return [f.object for f in memory.extract_facts(text) if f.relation == relation]
 
 
 def test_plural_is_a_does_not_eat_leading_a() -> None:
     memory = SemanticMemory()
-    objects = _objects(
-        memory, "Lists are also created purely for entertainment.", "is_a"
-    )
+    objects = _objects(memory, "Lists are also created purely for entertainment.", "is_a")
     assert objects == ["also created purely for entertainment"]
     assert all(not o.startswith("lso") for o in objects)
 
 
 def test_plural_is_a_preserves_among() -> None:
     memory = SemanticMemory()
-    objects = _objects(
-        memory, "Ferrets are among the most intelligent pets.", "is_a"
-    )
+    objects = _objects(memory, "Ferrets are among the most intelligent pets.", "is_a")
     assert objects == ["among the most intelligent pets"]
 
 
 def test_has_does_not_eat_an_of_an() -> None:
     memory = SemanticMemory()
     objects = _objects(
-        memory, "The ferret has an excellent somatosensory system.",
+        memory,
+        "The ferret has an excellent somatosensory system.",
         "has_property",
     )
     assert objects == ["excellent somatosensory system"]
@@ -47,22 +40,15 @@ def test_has_does_not_eat_an_of_an() -> None:
 
 def test_legitimate_articles_still_strip() -> None:
     memory = SemanticMemory()
-    facts = {
-        (f.subject, f.relation, f.object)
-        for f in memory.extract_facts("Cats are mammals.")
-    }
+    facts = {(f.subject, f.relation, f.object) for f in memory.extract_facts("Cats are mammals.")}
     assert ("cats", "is_a", "mammals") in facts
 
     memory = SemanticMemory()
-    facts = {
-        (f.subject, f.relation, f.object)
-        for f in memory.extract_facts("A cat has a tail.")
-    }
+    facts = {(f.subject, f.relation, f.object) for f in memory.extract_facts("A cat has a tail.")}
     assert ("cat", "has_property", "tail") in facts
 
     memory = SemanticMemory()
     facts = {
-        (f.subject, f.relation, f.object)
-        for f in memory.extract_facts("The brain has the cortex.")
+        (f.subject, f.relation, f.object) for f in memory.extract_facts("The brain has the cortex.")
     }
     assert ("brain", "has_property", "cortex") in facts

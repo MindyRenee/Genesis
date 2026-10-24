@@ -60,14 +60,17 @@ def test_acting_loop_registers_with_existing_executive() -> None:
             return super().form_intention(*args, **kwargs)
 
     with TemporaryDirectory() as tmp:
-        data = Path(tmp) / 'data'
-        repo = Path(tmp) / 'repo'
+        data = Path(tmp) / "data"
+        repo = Path(tmp) / "repo"
         data.mkdir()
         repo.mkdir()
         executive = CountingExecutive()
         loop = ActingLoop(
-            network=ConceptNetwork(), tools=ToolRegistry(),
-            data_dir=str(data), project_root=str(repo), offline=True,
+            network=ConceptNetwork(),
+            tools=ToolRegistry(),
+            data_dir=str(data),
+            project_root=str(repo),
+            offline=True,
             get_agency_topic=lambda: "photosynthesis",
             executive=executive,
         )
@@ -77,6 +80,7 @@ def test_acting_loop_registers_with_existing_executive() -> None:
         assert result.executive_intention.objective == "learn:photosynthesis"
         assert executive.intentions
         assert executive.form_calls == 1
+
 
 def test_executive_round_trips_persistent_intentions() -> None:
     executive = ExecutiveFunction()
@@ -144,12 +148,16 @@ def test_acting_loop_arbitrates_existing_objective(tmp_path) -> None:
 def test_advisory_internal_signal_is_persistent_but_not_actuator_action() -> None:
     """Internal pressure can inform the executive without becoming a fake file action."""
     executive = ExecutiveFunction()
-    items = executive.ingest_candidates([{
-        "topic": "body_distress",
-        "mode": "distress",
-        "salience": 0.9,
-        "source": "internal_need",
-    }])
+    items = executive.ingest_candidates(
+        [
+            {
+                "topic": "body_distress",
+                "mode": "distress",
+                "salience": 0.9,
+                "source": "internal_need",
+            }
+        ]
+    )
     assert len(items) == 1
     assert items[0].actionable is False
     assert items[0] not in executive.actionable_intentions
@@ -158,22 +166,24 @@ def test_advisory_internal_signal_is_persistent_but_not_actuator_action() -> Non
 
 def test_world_and_improvement_signals_map_to_real_actuators() -> None:
     executive = ExecutiveFunction()
-    items = executive.ingest_candidates([
-        {
-            "topic": "photosynthesis",
-            "mode": "environment",
-            "kind": "learn",
-            "salience": 0.8,
-            "source": "world_event",
-        },
-        {
-            "topic": "python/frontal_lobe/executive.py",
-            "mode": "improvement",
-            "kind": "inspect",
-            "salience": 0.7,
-            "source": "self_improvement:review",
-        },
-    ])
+    items = executive.ingest_candidates(
+        [
+            {
+                "topic": "photosynthesis",
+                "mode": "environment",
+                "kind": "learn",
+                "salience": 0.8,
+                "source": "world_event",
+            },
+            {
+                "topic": "python/frontal_lobe/executive.py",
+                "mode": "improvement",
+                "kind": "inspect",
+                "salience": 0.7,
+                "source": "self_improvement:review",
+            },
+        ]
+    )
     assert {i.objective for i in items} == {
         "learn:photosynthesis",
         "inspect:python/frontal_lobe/executive.py",
@@ -207,7 +217,9 @@ def test_failing_intention_is_abandoned_after_max_attempts() -> None:
     for _ in range(5):
         executive.select_intention([intention])
         executive.observe_intention(
-            intention, actual_outcome="unreadable", success=False,
+            intention,
+            actual_outcome="unreadable",
+            success=False,
         )
         executive.revise_intention(intention, reason="unreadable")
     assert intention.status == "abandoned"
@@ -223,7 +235,9 @@ def test_terminal_intention_is_not_resurrected_by_signal() -> None:
     intention = executive.form_intention("inspect:arc.py", priority=0.7)
     executive.select_intention([intention])
     executive.observe_intention(
-        intention, actual_outcome="observed", success=True,
+        intention,
+        actual_outcome="observed",
+        success=True,
     )
     assert intention.status == "completed"
 

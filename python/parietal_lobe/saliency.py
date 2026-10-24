@@ -45,21 +45,21 @@ _IOR_RADIUS = 4.0  # map cells
 class AttendedLocation:
     """A winner-take-all selection on the priority map."""
 
-    y: float          # pixel-space row
-    x: float          # pixel-space column
-    map_y: int        # map-space row
-    map_x: int        # map-space column
-    salience: float   # priority value that won
-    feature: str      # which feature map contributed most here
+    y: float  # pixel-space row
+    x: float  # pixel-space column
+    map_y: int  # map-space row
+    map_x: int  # map-space column
+    salience: float  # priority value that won
+    feature: str  # which feature map contributed most here
 
 
 @dataclass(slots=True)
 class SaliencyResult:
     """What the dorsal priority map made of one frame."""
 
-    priority: np.ndarray            # (H, W) normalized priority map
+    priority: np.ndarray  # (H, W) normalized priority map
     attended: AttendedLocation | None = None
-    scene_salience: float = 0.0     # scalar summary (kept for callers)
+    scene_salience: float = 0.0  # scalar summary (kept for callers)
     feature_weights: dict[str, float] = field(default_factory=dict)
 
 
@@ -72,8 +72,7 @@ def _normalize(map_: np.ndarray) -> np.ndarray:
     # Approximate the local-maxima count with a 3x3 max filter.
     padded = np.pad(m, 1, mode="edge")
     local_max = np.maximum.reduce(
-        [padded[i:i + m.shape[0], j:j + m.shape[1]]
-         for i in range(3) for j in range(3)]
+        [padded[i : i + m.shape[0], j : j + m.shape[1]] for i in range(3) for j in range(3)]
     )
     n_maxima = int(((m == local_max) & (m > 0.1)).sum())
     return m * (1.0 + (1.0 - 1.0 / max(1, n_maxima)))
@@ -92,10 +91,13 @@ def _center_surround(map_: np.ndarray) -> np.ndarray:
                 w = -0.5
             else:
                 continue
-            out += w * padded[
-                _SURROUND_R + dy:_SURROUND_R + dy + map_.shape[0],
-                _SURROUND_R + dx:_SURROUND_R + dx + map_.shape[1],
-            ]
+            out += (
+                w
+                * padded[
+                    _SURROUND_R + dy : _SURROUND_R + dy + map_.shape[0],
+                    _SURROUND_R + dx : _SURROUND_R + dx + map_.shape[1],
+                ]
+            )
     return np.clip(out, 0.0, None)
 
 
@@ -125,7 +127,7 @@ class SaliencyMap:
         out = np.zeros((_MAP_H, _MAP_W), dtype=np.float32)
         for i in range(_MAP_H):
             for j in range(_MAP_W):
-                block = channel[ys[i]:ys[i + 1], xs[j]:xs[j + 1]]
+                block = channel[ys[i] : ys[i + 1], xs[j] : xs[j + 1]]
                 if block.size:
                     out[i, j] = float(block.mean())
         return out
@@ -198,17 +200,15 @@ class SaliencyMap:
         """Build the combined priority map for one frame."""
         maps = self._feature_maps(rgb, v1, motion)
         normed = {name: _normalize(m) for name, m in maps.items()}
-        weights = {
-            name: float(m.sum()) for name, m in normed.items()
-        }
+        weights = {name: float(m.sum()) for name, m in normed.items()}
         total_w = sum(weights.values()) or 1.0
         priority = np.zeros((_MAP_H, _MAP_W), dtype=np.float32)
         for name in normed:
             priority += normed[name] * np.float32(weights[name] / total_w)
         if self._goal_map is not None:
-            priority = (
-                priority * np.float32(0.6) + self._goal_map * np.float32(0.4)
-            ).astype(np.float32)
+            priority = (priority * np.float32(0.6) + self._goal_map * np.float32(0.4)).astype(
+                np.float32
+            )
 
         # Inhibition of return — recently attended cells are suppressed.
         now = time.monotonic()
@@ -216,7 +216,7 @@ class SaliencyMap:
         for my, mx, _ in self._ior:
             yy, xx = np.mgrid[0:_MAP_H, 0:_MAP_W]
             d2 = (yy - my) ** 2 + (xx - mx) ** 2
-            priority *= 1.0 - 0.9 * np.exp(-d2 / (2 * _IOR_RADIUS ** 2))
+            priority *= 1.0 - 0.9 * np.exp(-d2 / (2 * _IOR_RADIUS**2))
 
         result = SaliencyResult(
             priority=priority,
@@ -227,7 +227,9 @@ class SaliencyMap:
         return result
 
     def attend_next(
-        self, result: SaliencyResult | None = None, frame_shape: tuple[int, int] | None = None,
+        self,
+        result: SaliencyResult | None = None,
+        frame_shape: tuple[int, int] | None = None,
     ) -> AttendedLocation | None:
         """Winner-take-all: pick the max, stamp inhibition of return."""
         result = result or self.last
@@ -245,9 +247,10 @@ class SaliencyMap:
 
         h, w = frame_shape or (480, 640)
         attended = AttendedLocation(
-            y=(my + 0.5) / _MAP_H * h,
-            x=(mx + 0.5) / _MAP_W * w,
-            map_y=int(my), map_x=int(mx),
+            y=float((my + 0.5) / _MAP_H * h),
+            x=float((mx + 0.5) / _MAP_W * w),
+            map_y=int(my),
+            map_x=int(mx),
             salience=peak,
             feature=feature,
         )

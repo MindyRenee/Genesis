@@ -56,10 +56,10 @@ canonical measurement site, not the sole locus. The claim here is
 the site-of-action claim, not an exclusivity claim.
 
 In Genesis: ``neurochemical/adenosine.py`` is the chemical model;
-the daemon integrates its level with wake time. ``brainstem/
-thresholds.py`` AUTO_SLEEP_ADENOSINE is the setpoint the flip-flop
-reads — the threshold lives with the switch, the signal is claimed
-here.
+the daemon integrates its level with wake time and the sleep-wake
+network's homeostat reads it for onset — the signal is claimed here;
+the mind's voluntary half is the self-sleep urge floor
+(``SLEEP_URGE_ADENOSINE_FLOOR`` in ``brainstem/thresholds.py``).
 
 
 ════════════════════════════════════════════════════════════════════════

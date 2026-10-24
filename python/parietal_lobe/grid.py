@@ -75,6 +75,7 @@ class Grid:
                 yield r, c, v
 
     def cells_with(self, value: int) -> frozenset[tuple[int, int]]:
+        """Positions of every cell holding ``value``."""
         return frozenset((r, c) for r, c, v in self.iter_cells() if v == value)
 
     def non_zero_cells(self) -> frozenset[tuple[int, int]]:
@@ -111,9 +112,7 @@ class Grid:
 
     def reflect_diag(self) -> Grid:
         """Transpose along the main diagonal."""
-        return Grid(
-            tuple(tuple(self._rows[r][c] for r in range(self._h)) for c in range(self._w))
-        )
+        return Grid(tuple(tuple(self._rows[r][c] for r in range(self._h)) for c in range(self._w)))
 
     def scale(self, factor: int) -> Grid:
         """Scale each cell to a factor×factor block."""
@@ -128,17 +127,12 @@ class Grid:
 
     def recolor(self, mapping: dict[int, int]) -> Grid:
         """Rewrite cell values via a color map; unmapped values keep."""
-        return Grid(
-            tuple(tuple(mapping.get(v, v) for v in row) for row in self._rows)
-        )
+        return Grid(tuple(tuple(mapping.get(v, v) for v in row) for row in self._rows))
 
     def subgrid(self, top: int, left: int, height: int, width: int) -> Grid:
         """Extract a rectangular region."""
         return Grid(
-            tuple(
-                tuple(self._rows[r][left : left + width])
-                for r in range(top, top + height)
-            )
+            tuple(tuple(self._rows[r][left : left + width]) for r in range(top, top + height))
         )
 
     def crop_to_cells(self, cells: frozenset[tuple[int, int]]) -> Grid:

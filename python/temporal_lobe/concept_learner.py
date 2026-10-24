@@ -81,13 +81,46 @@ _PLASTICITY_PATTERNS = [
 ]
 
 _LABELING_SKIP_WORDS = {
-    "a", "an", "the", "this", "that", "it", "so",
-    "very", "really", "quite", "just", "not", "now",
-    "here", "there", "welcome", "good", "okay", "ok",
-    "fine", "yes", "no", "sure", "right", "wrong",
-    "doing", "going", "being", "having", "making",
-    "talking", "thinking", "learning", "feeling", "experiencing",
-    "about", "with", "from", "into", "through",
+    "a",
+    "an",
+    "the",
+    "this",
+    "that",
+    "it",
+    "so",
+    "very",
+    "really",
+    "quite",
+    "just",
+    "not",
+    "now",
+    "here",
+    "there",
+    "welcome",
+    "good",
+    "okay",
+    "ok",
+    "fine",
+    "yes",
+    "no",
+    "sure",
+    "right",
+    "wrong",
+    "doing",
+    "going",
+    "being",
+    "having",
+    "making",
+    "talking",
+    "thinking",
+    "learning",
+    "feeling",
+    "experiencing",
+    "about",
+    "with",
+    "from",
+    "into",
+    "through",
 }
 
 
@@ -100,18 +133,14 @@ class ConceptLearner:
     SIMILAR_TO edges so it learns that "content" and "calm" are related.
     """
 
-    def __init__(
-        self, network: ConceptNetwork, synapses: SynapticStore | None = None
-    ) -> None:
+    def __init__(self, network: ConceptNetwork, synapses: SynapticStore | None = None) -> None:
         """Wire the learner to semantic and learned synaptic substrates."""
         self._network = network
         self._synapses = synapses
 
     # ─── Word labeling ───────────────────────────────────────────
 
-    def learn_word_from_labeling(
-        self, user_input: str, emotion: EmotionalState
-    ) -> None:
+    def learn_word_from_labeling(self, user_input: str, emotion: EmotionalState) -> None:
         """Learn state words when the user labels its experience.
 
         When the user says something like "you seem stressed" or
@@ -138,9 +167,7 @@ class ConceptLearner:
 
         skip_words = _LABELING_SKIP_WORDS
 
-        def _try_learn(
-            patterns: list[str], kind: str, category_value: str
-        ) -> bool:
+        def _try_learn(patterns: list[str], kind: str, category_value: str) -> bool:
             """Try each pattern against the input; learn the first match."""
             if not category_value:
                 return False
@@ -150,21 +177,15 @@ class ConceptLearner:
                     word = match.group(1)
                     if word in skip_words or len(word) < 3:
                         continue
-                    self.connect_word_to_category(
-                        word, kind, category_value
-                    )
+                    self.connect_word_to_category(word, kind, category_value)
                     return True
             return False
 
         learned = _try_learn(_EMOTION_PATTERNS, "emotion", emotion.label)
         if not learned:
-            learned = _try_learn(
-                _MODE_PATTERNS, "mode", emotion.cognitive_style
-            )
+            learned = _try_learn(_MODE_PATTERNS, "mode", emotion.cognitive_style)
         if not learned and emotion.has_cause:
-            learned = _try_learn(
-                _CAUSE_PATTERNS, "cause", emotion.cause
-            )
+            learned = _try_learn(_CAUSE_PATTERNS, "cause", emotion.cause)
         if not learned:
             if emotion.plasticity <= 0.1:
                 _try_learn(_PLASTICITY_PATTERNS, "plasticity", "closed")
@@ -184,8 +205,15 @@ class ConceptLearner:
         # Affect words are learnable here (unlike emotion labeling,
         # which skips them to avoid "you seem good" mislabels).
         valence_skip = skip_words - {
-            "good", "okay", "ok", "fine", "yes", "no", "sure",
-            "right", "wrong",
+            "good",
+            "okay",
+            "ok",
+            "fine",
+            "yes",
+            "no",
+            "sure",
+            "right",
+            "wrong",
         }
         valence_positive_patterns = [
             r"(\w+) means good",
@@ -249,9 +277,7 @@ class ConceptLearner:
                 return True
         return False
 
-    def connect_word_to_valence(
-        self, word: str, valence_state: str, score: float
-    ) -> None:
+    def connect_word_to_valence(self, word: str, valence_state: str, score: float) -> None:
         """Learn a word's sentiment polarity (positive/negative).
 
         Writes to BOTH substrates:
@@ -281,23 +307,22 @@ class ConceptLearner:
 
         hub_id = f"_cat:valence:{valence_state}"
         if self._network.get_concept(hub_id) is None:
-            self._network.add_concept(
-                hub_id, confidence=0.8, origin="structural"
-            )
+            self._network.add_concept(hub_id, confidence=0.8, origin="structural")
         existing = self._network.get_exact_neighbors(w, RelationType.EXPRESSES)
         if not any(n[0] == hub_id for n in existing):
             self._network.add_edge(
-                w, hub_id, RelationType.EXPRESSES,
-                weight=0.8, origin="valence_labeling",
+                w,
+                hub_id,
+                RelationType.EXPRESSES,
+                weight=0.8,
+                origin="valence_labeling",
             )
 
         try:
             existing_words = self._network.find_valence_words(valence_state)
         except AttributeError:
             existing_words = []
-        similar_neighbors = self._network.get_exact_neighbors(
-            w, RelationType.SIMILAR_TO
-        )
+        similar_neighbors = self._network.get_exact_neighbors(w, RelationType.SIMILAR_TO)
         similar_targets = {n[0] for n in similar_neighbors}
         for other_word in existing_words:
             if other_word == w or other_word not in similar_targets:
@@ -306,8 +331,11 @@ class ConceptLearner:
                 if other_word in similar_targets:
                     continue
                 self._network.add_edge(
-                    w, other_word, RelationType.SIMILAR_TO,
-                    weight=0.7, origin="valence_labeling",
+                    w,
+                    other_word,
+                    RelationType.SIMILAR_TO,
+                    weight=0.7,
+                    origin="valence_labeling",
                 )
 
     def learn_verb(self, base: str) -> None:
@@ -332,19 +360,18 @@ class ConceptLearner:
             return
         hub_id = "_cat:relation_verb:learned"
         if self._network.get_concept(hub_id) is None:
-            self._network.add_concept(
-                hub_id, confidence=0.8, origin="structural"
-            )
+            self._network.add_concept(hub_id, confidence=0.8, origin="structural")
         existing = self._network.get_exact_neighbors(b, RelationType.EXPRESSES)
         if not any(n[0] == hub_id for n in existing):
             self._network.add_edge(
-                b, hub_id, RelationType.EXPRESSES,
-                weight=0.8, origin="verb_labeling",
+                b,
+                hub_id,
+                RelationType.EXPRESSES,
+                weight=0.8,
+                origin="verb_labeling",
             )
 
-    def connect_word_to_category(
-        self, word: str, kind: str, category_value: str
-    ) -> None:
+    def connect_word_to_category(self, word: str, kind: str, category_value: str) -> None:
         """Connect a learned word to a category hub via EXPRESSES edge.
 
         Creates the word concept if it doesn't exist, sets the
@@ -359,9 +386,7 @@ class ConceptLearner:
             self._network.add_concept(word, origin="learned")
             concept = self._network.get_concept(word)
         if concept is None:
-            logger.warning(
-                "word_learn: failed to create concept '%s'", word
-            )
+            logger.warning("word_learn: failed to create concept '%s'", word)
             return
 
         prop_key = {
@@ -379,8 +404,11 @@ class ConceptLearner:
         existing = self._network.get_exact_neighbors(word, RelationType.EXPRESSES)
         if not any(n[0] == hub_id for n in existing):
             self._network.add_edge(
-                word, hub_id, RelationType.EXPRESSES,
-                weight=0.8, origin="labeling",
+                word,
+                hub_id,
+                RelationType.EXPRESSES,
+                weight=0.8,
+                origin="labeling",
             )
 
         if kind == "emotion":
@@ -399,8 +427,11 @@ class ConceptLearner:
                 continue
             if other_word not in similar_targets:
                 self._network.add_edge(
-                    word, other_word, RelationType.SIMILAR_TO,
-                    weight=0.7, origin=f"{kind}_labeling",
+                    word,
+                    other_word,
+                    RelationType.SIMILAR_TO,
+                    weight=0.7,
+                    origin=f"{kind}_labeling",
                 )
 
     # ─── Concept activation ──────────────────────────────────────
@@ -446,9 +477,7 @@ class ConceptLearner:
                 ).items():
                     concept = self._network.get_concept(target)
                     if concept is not None:
-                        concept.activation = min(
-                            1.0, (concept.activation or 0.0) + activation
-                        )
+                        concept.activation = min(1.0, (concept.activation or 0.0) + activation)
                         self._network._mark_active(target)
 
         column_activations = self._network.apply_lateral_inhibition(
@@ -457,6 +486,7 @@ class ConceptLearner:
 
         if perception.topics and column_activations:
             dominant_column = max(
-                column_activations, key=lambda col: column_activations[col],
+                column_activations,
+                key=lambda col: column_activations[col],
             )
             self._network.apply_winner_take_all(dominant_column, top_k=5)

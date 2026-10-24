@@ -28,6 +28,7 @@ import logging
 import os
 import sys
 import threading
+import time
 from collections.abc import Callable
 
 from genesis_client.protocol import (
@@ -42,6 +43,7 @@ from genesis_client.protocol import (
     MODULE_REASONING,
     MODULE_SENSORY,
 )
+from genesis_client.threads import named_thread
 
 logger = logging.getLogger(__name__)
 
@@ -187,10 +189,15 @@ def _module_for_frame(frame) -> int | None:
     frame, the module that initiated the call. Anything else → None
     (thread parked in stdlib — no Genesis code executing).
     """
-    leaf_mod = _module_of_filename(frame.f_code.co_filename)
+    filename = frame.f_code.co_filename
+    # Pseudo-filenames ("<frozen importlib._bootstrap>", "<string>")
+    # and empty names are not paths — relpath raises "no path
+    # specified" on them. They can never attribute to a module.
+    if not filename or filename.startswith("<"):
+        return None
+    leaf_mod = _module_of_filename(filename)
     if leaf_mod is not None:
         return leaf_mod
-    filename = frame.f_code.co_filename
     if not os.path.relpath(filename, _CLIENT_DIR).startswith(".."):
         # Leaf is inside the IPC client — the caller's subsystem owns it.
         f = frame.f_back
@@ -224,9 +231,7 @@ class ModuleSampler:
         if self._thread is not None and self._thread.is_alive():
             return
         self._stop.clear()
-        self._thread = threading.Thread(
-            target=self._run, name="module-sampler", daemon=True
-        )
+        self._thread = named_thread("module-sampler", self._run, comm="g-sampler")
         self._thread.start()
 
     def stop(self) -> None:
@@ -237,13 +242,22 @@ class ModuleSampler:
             self._thread = None
 
     def _run(self) -> None:
-        """Sample running frames at a fixed rate until stopped."""
+        """Sample running frames until stopped, crediting real elapsed.
+
+        The credited dt is the measured interval between samples, not
+        the nominal period — ``Event.wait`` only promises to block *at
+        least* that long, so crediting the nominal value systematically
+        undercounts the wall time the sampled frames actually occupied.
+        """
         interval = 1.0 / self.SAMPLE_HZ
+        last = time.monotonic()
         while not self._stop.wait(interval):
+            now = time.monotonic()
             try:
-                self._sample(interval)
+                self._sample(now - last)
             except Exception as e:  # noqa: BLE001 — telemetry must never kill the loop
                 logger.debug(f"module sample failed: {e}")
+            last = now
 
     def _sample(self, dt: float) -> None:
         """One sample tick: credit each executing thread's module dt."""

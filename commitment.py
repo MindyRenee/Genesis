@@ -104,10 +104,7 @@ class CommitmentBoundary:
                 self._crossed_at = None
             return self._committed
 
-        if (
-            signal <= self.release
-            and now - self._committed_at >= self.refractory_s
-        ):
+        if signal <= self.release and now - self._committed_at >= self.refractory_s:
             self._committed = False
             self.just_released = True
         return self._committed

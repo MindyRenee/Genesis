@@ -194,8 +194,7 @@ class SleepCycleTracker:
                 # current stage is N3.
                 self.time_in_stage = duration
                 self.time_in_cycle = sum(
-                    self._stage_duration(s, i)
-                    for i, s in enumerate(_CYCLE_STAGES[:2])
+                    self._stage_duration(s, i) for i, s in enumerate(_CYCLE_STAGES[:2])
                 )
                 self._stage_slot = 2  # boundary immediately after N2
                 break
@@ -216,9 +215,7 @@ class SleepCycleTracker:
                 self.time_in_cycle = self.time_in_stage
                 # If the surplus is large enough to span into the new
                 # cycle, keep consuming; otherwise we're done.
-                if self.time_in_stage < self._stage_duration(
-                    self.current_stage, 0
-                ):
+                if self.time_in_stage < self._stage_duration(self.current_stage, 0):
                     break
 
         return self.current_stage
@@ -304,6 +301,12 @@ class SynapticDownscaler:
 
     synaptic_load: float = 0.0  # accumulated during wakefulness [0, ∞)
     total_downscaling: float = 0.0  # cumulative weight removed during N3
+    # The body's homeostatic sleep pressure (Process S — adenosine),
+    # fed in from the daemon's CoreState each sleep tick by the mind.
+    # The SHY discharge rate is driven by sleep pressure (Tononi &
+    # Cirelli, 2014): even when the cognitive load accumulator is
+    # quiet, a body that still needs sleep renormalises faster.
+    body_pressure: float = 0.0
     # Bounded history of synaptic load snapshots for introspection.
     load_history: deque[float] = field(default_factory=lambda: deque(maxlen=200))
     _lock: threading.Lock = field(default_factory=threading.Lock)
@@ -346,13 +349,21 @@ class SynapticDownscaler:
             The total weight reduction applied this call.
         """
         with self._lock:
-            if dt <= 0.0 or self.synaptic_load <= 0.0:
+            # The effective load is the greater of the cognitive
+            # accumulator and the body's own sleep pressure (Process
+            # S, scaled onto the load axis). Borbély's two-process
+            # model makes S the master signal for SWS depth; SHY makes
+            # the same pressure drive the downscaling rate. A body
+            # that still needs sleep renormalises even when the
+            # cognitive load tally is thin.
+            effective_load = max(self.synaptic_load, 4.0 * self.body_pressure)
+            if dt <= 0.0 or effective_load <= 0.0:
                 return 0.0
 
-            # Downscaling rate per second, gated by synaptic load.
+            # Downscaling rate per second, gated by effective load.
             # A higher load → faster renormalisation, but bounded so a
             # single tick never strips the network.
-            rate = min(0.05, 0.01 * self.synaptic_load)
+            rate = min(0.05, 0.01 * effective_load)
 
             total_removed = 0.0
             for edge in network.edges:
@@ -520,7 +531,6 @@ class HippocampalReplay:
             A list of the ``ReplayItem``s that were replayed this call.
         """
 
-
         if dt <= 0.0 or not self._queue:
             return []
 
@@ -546,9 +556,7 @@ class HippocampalReplay:
             self._replay_history[sig] = self._replay_history.get(sig, 0) + 1
             # Evict least-replayed entries if history grows too large.
             if len(self._replay_history) > self._REPLAY_HISTORY_MAX:
-                sorted_items = sorted(
-                    self._replay_history.items(), key=lambda kv: kv[1]
-                )
+                sorted_items = sorted(self._replay_history.items(), key=lambda kv: kv[1])
                 excess = len(self._replay_history) - self._REPLAY_HISTORY_MAX
                 for key, _ in sorted_items[:excess]:
                     del self._replay_history[key]

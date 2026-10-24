@@ -149,12 +149,14 @@ def snapshot(network: ConceptNetwork, engine: CognitionEngine) -> dict[str, Any]
         target = getattr(edge, "target", None)
         relation = getattr(edge, "relation", None)
         if source is not None and target is not None:
-            edges.append({
-                "source": str(source),
-                "relation": getattr(relation, "value", str(relation)),
-                "target": str(target),
-                "weight": getattr(edge, "weight", None),
-            })
+            edges.append(
+                {
+                    "source": str(source),
+                    "relation": getattr(relation, "value", str(relation)),
+                    "target": str(target),
+                    "weight": getattr(edge, "weight", None),
+                }
+            )
 
     return {
         "concept_count": network.size,
@@ -162,8 +164,7 @@ def snapshot(network: ConceptNetwork, engine: CognitionEngine) -> dict[str, Any]
         "nib_present": network.get_concept("nib") is not None,
         "vesh_present": network.get_concept("vesh") is not None,
         "learned_edges": [
-            e for e in edges
-            if e["source"] in {"nib", "vesh"} or e["target"] in {"nib", "vesh"}
+            e for e in edges if e["source"] in {"nib", "vesh"} or e["target"] in {"nib", "vesh"}
         ],
         "conversation_turns": len(engine.memory.conversation),
     }
@@ -223,11 +224,13 @@ def run_condition(
 
         for statement in experience:
             response, state = engine.think(statement)
-            experience_results.append({
-                "input": statement,
-                "response": response,
-                "state": state_summary(state),
-            })
+            experience_results.append(
+                {
+                    "input": statement,
+                    "response": response,
+                    "state": state_summary(state),
+                }
+            )
 
         before_target = snapshot(network, engine)
         reload_report: dict[str, Any] | None = None
@@ -266,8 +269,7 @@ def run_condition(
                 "concept_count": after_target["concept_count"] - before_target["concept_count"],
                 "edge_count": after_target["edge_count"] - before_target["edge_count"],
                 "conversation_turns": (
-                    after_target["conversation_turns"]
-                    - before_target["conversation_turns"]
+                    after_target["conversation_turns"] - before_target["conversation_turns"]
                 ),
             },
         }

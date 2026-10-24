@@ -65,10 +65,8 @@ def _publishes_evidence(skill: LearnedSkill) -> bool:
     "support" axis (fraction of an option's constraints satisfied)
     that foreign adapters can rebind onto their own affordance.
     """
-    return any(
-        isinstance(step.parameters.get("support"), int | float)
-        for step in skill.steps
-    )
+    return any(isinstance(step.parameters.get("support"), int | float) for step in skill.steps)
+
 
 # How an episode's success was established, weakest to strongest:
 # - "reported": a caller asserted success; nothing checked it.
@@ -121,13 +119,8 @@ def _flatten_state(state: State, prefix: str = "") -> dict[str, Scalar]:
         name = f"{prefix}.{key}" if prefix else str(key)
         if isinstance(value, Mapping):
             flat.update(_flatten_state(value, name))
-        elif isinstance(value, Sequence) and not isinstance(
-            value, str | bytes | bytearray
-        ):
-            if all(
-                item is None or isinstance(item, str | int | float | bool)
-                for item in value
-            ):
+        elif isinstance(value, Sequence) and not isinstance(value, str | bytes | bytearray):
+            if all(item is None or isinstance(item, str | int | float | bool) for item in value):
                 flat[name] = _canonical(list(value))
             else:
                 for i, item in enumerate(value):
@@ -300,6 +293,7 @@ class GoalCondition:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> GoalCondition:
+        """Reconstruct a GoalCondition from a serialized mapping."""
         return cls(
             key=str(data["key"]),
             op=str(data.get("op", "eq")),
@@ -332,11 +326,7 @@ class TaskSignature:
         """Structural similarity across state, affordances, and goals."""
         # Roles only count when at least one side claims them — two
         # role-less signatures are not thereby identical.
-        role_overlap = (
-            _jaccard(self.roles, other.roles)
-            if self.roles or other.roles
-            else 0.0
-        )
+        role_overlap = _jaccard(self.roles, other.roles) if self.roles or other.roles else 0.0
         score = (
             0.35 * _jaccard(self.state, other.state)
             + 0.16 * _jaccard(self.actions, other.actions)
@@ -372,6 +362,7 @@ class TaskSignature:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> TaskSignature:
+        """Reconstruct a TaskSignature from a serialized mapping."""
         return cls(
             domain=str(data.get("domain", "general")),
             state=frozenset(str(v) for v in data.get("state", [])),
@@ -466,18 +457,14 @@ class EffectModel:
         reliability = min(1.0, self.observations / _RELIABILITY_OBSERVATIONS)
         if self.unchanged >= self.changed:
             confidence = (self.unchanged / self.observations) * reliability
-            return EffectPrediction(
-                self.key, "unchanged", before, confidence, delta=0.0
-            )
+            return EffectPrediction(self.key, "unchanged", before, confidence, delta=0.0)
         outcome, count = max(self.to_counts.items(), key=lambda kv: kv[1])
         confidence = (count / self.observations) * reliability
         if outcome.startswith("delta:"):
             delta = self.delta_sum / max(1, self.numeric_changes)
             b_num = _as_float(before)
             expected: Scalar = None if b_num is None else b_num + delta
-            return EffectPrediction(
-                self.key, "delta", expected, confidence, delta=delta
-            )
+            return EffectPrediction(self.key, "delta", expected, confidence, delta=delta)
         return EffectPrediction(
             self.key,
             outcome.split(":", 1)[0],
@@ -499,6 +486,7 @@ class EffectModel:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EffectModel:
+        """Reconstruct an EffectModel from a serialized mapping."""
         return cls(
             key=str(data["key"]),
             observations=int(data.get("observations", 0)),
@@ -506,12 +494,8 @@ class EffectModel:
             changed=int(data.get("changed", 0)),
             numeric_changes=int(data.get("numeric_changes", 0)),
             delta_sum=float(data.get("delta_sum", 0.0)),
-            to_counts={
-                str(k): int(v) for k, v in data.get("to_counts", {}).items()
-            },
-            to_values={
-                str(k): _scalar(v) for k, v in data.get("to_values", {}).items()
-            },
+            to_counts={str(k): int(v) for k, v in data.get("to_counts", {}).items()},
+            to_values={str(k): _scalar(v) for k, v in data.get("to_values", {}).items()},
         )
 
 
@@ -532,9 +516,7 @@ class OperatorModel:
     successes: int = 0
     failures: int = 0
     effects: dict[str, EffectModel] = field(default_factory=dict)
-    conditional: dict[str, dict[str, EffectModel]] = field(
-        default_factory=dict
-    )
+    conditional: dict[str, dict[str, EffectModel]] = field(default_factory=dict)
 
     @property
     def confidence(self) -> float:
@@ -555,6 +537,7 @@ class OperatorModel:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> OperatorModel:
+        """Reconstruct an OperatorModel from a serialized mapping."""
         op = cls(
             action=str(data["action"]),
             uses=int(data.get("uses", 0)),
@@ -594,9 +577,7 @@ class TaskSchema:
     # that state shape. This is the induction layer — "align_* solves
     # when the flag is true" learned from outcomes, so held-out
     # bindings like ``align_merek`` inherit a prediction.
-    lifted: dict[tuple[str, str], OperatorModel] = field(
-        default_factory=dict
-    )
+    lifted: dict[tuple[str, str], OperatorModel] = field(default_factory=dict)
     # Which proposal families solved tasks of this schema — the
     # learned search prior. "Learning to search": the solver's
     # proposal ordering adapts per task family, not just globally.
@@ -632,13 +613,12 @@ class TaskSchema:
                 for (pattern, shape), model in self.lifted.items()
             ],
             "family_priors": dict(self.family_priors),
-            "hypotheses": (
-                self.hypotheses.to_dict() if self.hypotheses is not None else None
-            ),
+            "hypotheses": (self.hypotheses.to_dict() if self.hypotheses is not None else None),
         }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> TaskSchema:
+        """Reconstruct a TaskSchema from a serialized mapping."""
         schema = cls(
             schema_id=str(data["schema_id"]),
             signature=TaskSignature.from_dict(data.get("signature", {})),
@@ -647,17 +627,12 @@ class TaskSchema:
             failures=int(data.get("failures", 0)),
             skill_ids=[str(s) for s in data.get("skill_ids", [])],
             last_score=float(data.get("last_score", 0.0)),
-            family_priors={
-                str(k): int(v)
-                for k, v in dict(data.get("family_priors", {})).items()
-            },
+            family_priors={str(k): int(v) for k, v in dict(data.get("family_priors", {})).items()},
         )
         for op_data in data.get("operators", []):
             op = OperatorModel.from_dict(op_data)
             schema.operators[op.action] = op
-        schema.action_order = [
-            str(a) for a in data.get("action_order", [])
-        ]
+        schema.action_order = [str(a) for a in data.get("action_order", [])]
         for lifted_data in data.get("lifted", []):
             model = OperatorModel.from_dict(lifted_data.get("model", {}))
             schema.lifted[
@@ -713,6 +688,7 @@ class ProcedureStep:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> ProcedureStep:
+        """Reconstruct a ProcedureStep from a serialized mapping."""
         position = data.get("position")
         return cls(
             action=str(data["action"]),
@@ -768,15 +744,13 @@ class LearnedSkill:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> LearnedSkill:
+        """Reconstruct a LearnedSkill from a serialized mapping."""
         return cls(
             skill_id=str(data["skill_id"]),
             signature=TaskSignature.from_dict(data.get("signature", {})),
-            steps=tuple(
-                ProcedureStep.from_dict(s) for s in data.get("steps", [])
-            ),
+            steps=tuple(ProcedureStep.from_dict(s) for s in data.get("steps", [])),
             success_conditions=tuple(
-                GoalCondition.from_dict(g)
-                for g in data.get("success_conditions", [])
+                GoalCondition.from_dict(g) for g in data.get("success_conditions", [])
             ),
             uses=int(data.get("uses", 1)),
             successes=int(data.get("successes", 1)),
@@ -850,7 +824,7 @@ class TaskCompetence:
         try:
             return max(0.0, min(1.0, float(self.salience_getter())))
         except Exception:  # noqa: BLE001 — a broken gauge must not
-            return 1.0     # block consolidation; treat as unmodulated
+            return 1.0  # block consolidation; treat as unmodulated
 
     def make_signature(
         self,
@@ -863,8 +837,7 @@ class TaskCompetence:
         roles: Iterable[str] = (),
     ) -> TaskSignature:
         goals = frozenset(
-            g.descriptor() if isinstance(g, GoalCondition) else str(g)
-            for g in goal_conditions
+            g.descriptor() if isinstance(g, GoalCondition) else str(g) for g in goal_conditions
         )
         # Goal *shape* is schema-level vocabulary: "drive a variable
         # to equality" matches across domains even when the variable
@@ -933,9 +906,7 @@ class TaskCompetence:
             action_order=ordered_actions,
         )
 
-    def skill_matches(
-        self, signature: TaskSignature, *, limit: int = 4
-    ) -> list[SkillMatch]:
+    def skill_matches(self, signature: TaskSignature, *, limit: int = 4) -> list[SkillMatch]:
         """Retrieve reusable skills, vocabulary-aligned first.
 
         Skills that clear full-signature similarity are offered
@@ -967,9 +938,7 @@ class TaskCompetence:
             if skill.signature.domain == signature.domain:
                 continue
             overlap = _jaccard(signature.roles, skill.signature.roles)
-            if overlap < _CROSS_DOMAIN_ROLES or not _publishes_evidence(
-                skill
-            ):
+            if overlap < _CROSS_DOMAIN_ROLES or not _publishes_evidence(skill):
                 continue
             score = 0.68 * overlap + 0.32 * skill.confidence
             score *= verification_weight(skill.verification)
@@ -1024,9 +993,7 @@ class TaskCompetence:
             predictions = self._rebound_predictions(context, action)
         return tuple(predictions)
 
-    def _lifted_operator(
-        self, context: TaskContext, action: str
-    ) -> OperatorModel | None:
+    def _lifted_operator(self, context: TaskContext, action: str) -> OperatorModel | None:
         """The induced pattern model for an unobserved action name.
 
         A lifted model exists only where ≥2 concrete actions share a
@@ -1049,9 +1016,7 @@ class TaskCompetence:
                 best = model
         return best
 
-    def _rebound_predictions(
-        self, context: TaskContext, action: str
-    ) -> list[EffectPrediction]:
+    def _rebound_predictions(self, context: TaskContext, action: str) -> list[EffectPrediction]:
         """Predictions from a foreign skill rebound by position.
 
         A retrieved cross-domain skill is weaker evidence than learned
@@ -1123,8 +1088,7 @@ class TaskCompetence:
                 correct += 1
             else:
                 mismatches.append(
-                    f"{prediction.key}: expected {prediction.expected!r}, "
-                    f"observed {actual!r}"
+                    f"{prediction.key}: expected {prediction.expected!r}, observed {actual!r}"
                 )
         missed = [k for k in observed_changes if k not in predicted_keys]
         mismatches.extend(f"{k}: unpredicted change" for k in missed)
@@ -1157,8 +1121,7 @@ class TaskCompetence:
             for i in range(len(tokens)):
                 pattern = (*tokens[:i], "*", *tokens[i + 1 :])
                 if not any(
-                    name != action
-                    and _pattern_matches(_action_tokens(name), pattern)
+                    name != action and _pattern_matches(_action_tokens(name), pattern)
                     for name in context.schema.operators
                 ):
                     continue
@@ -1240,17 +1203,13 @@ class TaskCompetence:
         """Satisfaction of inferred goals minus avoid conditions."""
         return self._ledger(context.schema).goal_score(state)
 
-    def epistemic_bonus(
-        self, context: TaskContext, action: str, state: State
-    ) -> float:
+    def epistemic_bonus(self, context: TaskContext, action: str, state: State) -> float:
         """Exploration pull toward actions that would test an
         undecided mechanic hypothesis — directed curiosity rather
         than undirected novelty."""
         return self._ledger(context.schema).epistemic_bonus(action, state)
 
-    def predicted_goal_gain(
-        self, context: TaskContext, action: str, state: State
-    ) -> float:
+    def predicted_goal_gain(self, context: TaskContext, action: str, state: State) -> float:
         """Goal-score change predicted for ``action`` by the schema's
         effect models — means-ends evaluation through the learned
         transition model, not through the grid."""
@@ -1318,11 +1277,7 @@ class TaskCompetence:
                 success, final_state, changed_last=terminal_changes
             )
 
-        if (
-            not success
-            or verification_score < 0.999
-            or salience < _SALIENCE_FLOOR
-        ):
+        if not success or verification_score < 0.999 or salience < _SALIENCE_FLOOR:
             return None
 
         if verification not in _VERIFICATION_RANK:
@@ -1378,12 +1333,8 @@ class TaskCompetence:
         if existing is not None:
             existing.uses += 1
             existing.successes += 1
-            existing.verification_score = max(
-                existing.verification_score, schema.last_score
-            )
-            if verification_rank(verification) > verification_rank(
-                existing.verification
-            ):
+            existing.verification_score = max(existing.verification_score, schema.last_score)
+            if verification_rank(verification) > verification_rank(existing.verification):
                 existing.verification = verification
             existing.updated_at = time.time()
             skill = existing
@@ -1401,9 +1352,7 @@ class TaskCompetence:
             schema.skill_ids.append(skill_id)
         return skill
 
-    def _ground_skill(
-        self, context: TaskContext, skill: LearnedSkill
-    ) -> None:
+    def _ground_skill(self, context: TaskContext, skill: LearnedSkill) -> None:
         """Write a consolidated skill into the concept network.
 
         A skill is something the system can *do* — grounding it lets
@@ -1431,9 +1380,7 @@ class TaskCompetence:
                 },
             )
             domain = f"domain:{context.signature.domain}"
-            self.network.add_edge(
-                name, domain, RelationType.PART_OF, origin="perception"
-            )
+            self.network.add_edge(name, domain, RelationType.PART_OF, origin="perception")
             for goal in sorted(context.signature.goals):
                 # "The procedure aims to achieve this condition" —
                 # teleological, not causal.
@@ -1466,9 +1413,23 @@ class TaskCompetence:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> TaskCompetence:
+    def from_dict(
+        cls,
+        data: Mapping[str, Any],
+        *,
+        network: ConceptNetwork | None = None,
+        salience_getter: Callable[[], float] | None = None,
+    ) -> TaskCompetence:
+        """Reconstruct a TaskCompetence from a serialized mapping.
+
+        ``network``/``salience_getter`` are runtime hooks the file
+        cannot carry — pass them back in or the restored ledger loses
+        concept grounding and neuromodulatory gating even though its
+        schemas and skills survive."""
         competence = cls(
-            match_threshold=float(data.get("match_threshold", _MATCH_THRESHOLD))
+            match_threshold=float(data.get("match_threshold", _MATCH_THRESHOLD)),
+            network=network,
+            salience_getter=salience_getter,
         )
         for schema_data in data.get("schemas", []):
             schema = TaskSchema.from_dict(schema_data)

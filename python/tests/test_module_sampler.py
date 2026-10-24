@@ -79,35 +79,25 @@ def test_directory_attribution():
     assert _module_of_filename(_p("eval", "harness.py")) == MODULE_METACOGNITION
     # Language production inside the executive region keeps its
     # language attribution; self-status reporting is metacognition.
-    assert _module_of_filename(_p("frontal_lobe", "answer_composer.py")) == (
-        MODULE_LANGUAGE
-    )
-    assert _module_of_filename(_p("frontal_lobe", "status.py")) == (
-        MODULE_METACOGNITION
-    )
+    assert _module_of_filename(_p("frontal_lobe", "answer_composer.py")) == (MODULE_LANGUAGE)
+    assert _module_of_filename(_p("frontal_lobe", "status.py")) == (MODULE_METACOGNITION)
 
 
 def test_mind_file_attribution():
     """mind.py attributes to metacognition; region-filed files keep pins."""
     assert _module_of_filename(_p("mind.py")) == MODULE_METACOGNITION
     assert _module_of_filename(_p("brainstem", "sleep.py")) == MODULE_DREAMING
-    assert _module_of_filename(_p("basal_ganglia", "volition.py")) == (
-        MODULE_INTENTION
-    )
+    assert _module_of_filename(_p("basal_ganglia", "volition.py")) == (MODULE_INTENTION)
     assert _module_of_filename(_p("brainstem", "heartbeat.py")) == MODULE_EMOTION
 
 
 def test_top_level_files():
     """Top-level module files resolve individually."""
-    assert _module_of_filename(_p("limbic_system", "emotional_regulator.py")) == (
-        MODULE_EMOTION
-    )
+    assert _module_of_filename(_p("limbic_system", "emotional_regulator.py")) == (MODULE_EMOTION)
     assert _module_of_filename(_p("temporal_lobe", "speech.py")) == MODULE_MOTOR
     assert _module_of_filename(_p("parietal_lobe", "attention.py")) == MODULE_ATTENTION
     assert _module_of_filename(_p("infrastructure", "persistence.py")) == MODULE_MEMORY
-    assert _module_of_filename(_p("brainstem", "module_sampler.py")) == (
-        MODULE_METACOGNITION
-    )
+    assert _module_of_filename(_p("brainstem", "module_sampler.py")) == (MODULE_METACOGNITION)
 
 
 def test_foreign_files_unattributed():

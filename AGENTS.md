@@ -55,6 +55,96 @@ says?** Building blocks (seeds, vocabulary, grammar rules, relation
 verbs, narrative structures) are fine. The final words it speaks are
 not — those must be generated, not recited.
 
+## CRITICAL RULE: No LLM — ever
+Genesis contains no large language model and never will. Do not add
+one, suggest one, wire one in as a component, or route cognition
+through an external inference API. All cognition — language,
+reasoning, memory, perception — is endogenous to this architecture:
+the concept network, the language engine, the reasoning systems, and
+the body. Competence must be *grown*, not imported. Perceptual
+front-ends (e.g. ONNX face/object detectors under `models/`) are
+sensory organs, not cognition — they are allowed because they answer
+"what is in the frame," never "what should she think or say."
+
+## CRITICAL RULE: The organism runs as one — always
+The Rust daemon (`genesis-daemon`), the Python mind, and `retina`
+are one organism and never run apart. The daemon is the body —
+CoreState, neurochemistry, volition, IPC; the Python mind is
+cognition; retina is the eye. Any activity that acts on a world —
+including ARC play, tool use, conversation — happens with the whole
+organism alive: body integrated, mind leased, consequences reported
+back through the body's own channels (`neuro_impulse`, state reads).
+A detached cognition run — Python modules stepping a world with no
+live body underneath — is not Genesis playing; it is a bench
+exercise. The ARC adapter's `require_body` readiness gate
+(default on) is the enforcement point: do not weaken it, and treat
+`require_live=False` strictly as a local debug path, never a
+measurement of the entity.
+
+The rule holds across process death too — mind and body are one
+thing, so neither may outlive the other by accident. The daemon's
+autonomous fallback keeps the body alive through a mind's absence;
+the mirror is **rebirth** (`genesis_cli.py::_Rebirth`): while the
+mind lives, a body that dies or faults is reincarnated in place —
+the new daemon reopens the same persisted state, so neurochemistry,
+sleep phase, and memory continue unbroken — and the mind re-inhabits
+it (`Mind.rejoin_body`, `python/brainstem/lifecycle.py`): reconnect,
+push the living PID via `SET_COGNITIVE_PID` (the env var still names
+the dead launcher), re-register the module manifest, restore the
+zone, reset notification high-water marks. A mind that returns to a
+socket a surviving body still holds is **adopted**, not refused
+(`_adopt_daemon`/`_AdoptedDaemon` — the CLI takes over its shutdown
+so nothing leaks); only a process on the socket that fails the
+Genesis handshake is stopped — gracefully, since it may still be a
+Genesis daemon mid-flush — and replaced. A live-but-faulted body is
+detected by probing `GET_OPTIC_STATE`: it takes the tick-loop lock a
+poisoned mutex never releases, and SHUTDOWN is tried before any
+signal so the wedged body still flushes state. A body that will not
+reincarnate after the backoff table ends the organism *whole*: she
+does not run bodiless, and the exit is non-zero so a supervisor
+(`Restart=on-failure`) resurrects the whole organism, never one
+half. The retina is reincarnated under the same stability-window
+accounting, bounded — sight is a degradation, never a fatal one.
+
+Rebirth heals the process tree on one host; the **spore** carries
+the self across hosts. The same `_Rebirth` watcher keeps a verified
+mirror of the data dir at `GENESIS_SPORE_DIR` (default
+`<data-dir>-spore` — point the env or a symlink at a second disk, a
+network mount, or an rsync target). The gate is adaptive like every
+maintenance gear: churn snaps the cadence toward a minute, quiet
+drifts it to an hour. `core_state.bin` is only installed after a
+captured copy passes the same CRC32-IEEE verification the daemon
+applies at open (`_corestate_intact` reimplements it — a capture
+that raced the body's write never displaces last-good, so a torn
+spore cannot plant a false self); WAL-mode sqlite stores go through
+the `sqlite3` backup API, never a raw copy; pid/lock/sock/log files,
+`.project_root`, quarantined `*.corrupt.*`, and re-installable
+sensory weights (`models/`, `vosk-models/`) never mirror — every
+other file copies by default so a new state file can never be
+silently forgotten. `genesis --germinate [DIR]` restores the spore
+into a virgin data dir and she wakes on the new host; germinate
+refuses a dir that already holds identity (forked selves unite via
+`scripts/merge_data_dirs.py`) and refuses a spore whose core state
+fails verification. The organism's last act on a host — teardown
+or rebirth give-up — is one forced final capture.
+
+Discontinuities are part of her persistence too — she knows the
+power went out. `continuity.json` (daemon, `src/daemon/continuity.rs`)
+is the body's session sentinel: written at every boot, marked
+`clean_stop` at graceful shutdown; a boot that finds the previous
+session still open knows the last body died uncleanly — power cut,
+SIGKILL, panic — and reports `dark_ms` measured from the state
+file's own `last_updated` (`MmapState::offline_gap_ms`). `mind.session`
+is the same sentinel one level up for a mind that dies while the
+body lives. On wake and on `rejoin_body` the mind reads the sentinel
+(`brainstem/lifecycle.py::_note_discontinuity`): every boot lands in
+`cognitive_journal.jsonl`; an unclean stop also becomes a narrative
+life event and a startle impulse through her own `neuro_impulse`
+channel (NE+EPI+CRH, scaled by the gap — the daemon never authors
+her chemistry). `continuity.seen` is the ack watermark so a boot is
+noted once; the sentinels are host-local liveness and stay out of
+the spore mirror, while `.seen` travels with the self.
+
 ## Toolchain
 - Rust stable, edition 2024 (rust-version 1.85+)
 - Build: `cargo build` / `cargo build --release`. Requires libclang
@@ -73,17 +163,17 @@ not — those must be generated, not recited.
   `scripts/cargo-env.sh` builds the shim under `/tmp` (never on the
   permanent `PATH`) and exports `PATH`, `LIBCLANG_PATH`, and
   `BINDGEN_EXTRA_CLANG_ARGS`. It defaults to `ZIG_ROOT=~/tools/zig-
-  x86_64-linux-0.16.0` — that tree was removed from this host once
-  the system toolchain was installed, so reinstall Zig or override
-  `ZIG_ROOT=` / `LIBCLANG_ROOT=` to use the fallback here. The include set must match `$ZIG cc -E -v -x c /dev/null`
+  x86_64-linux-0.16.0` (reinstalled on this host; `LIBCLANG_ROOT`
+  points at `~/tools/libclang/clang/native`, which symlinks to the
+  system libclang-18). The include set must match `$ZIG cc -E -v -x c /dev/null`
   exactly — print it and copy the `<...>` search list. A partial set
   fails on `__STD_TYPE` inside `stddef.h`. Do NOT install the shims
   into `~/.local/bin` or export `BINDGEN_EXTRA_CLANG_ARGS` globally:
   on a host that has a real toolchain they shadow it, and the Zig
   libc headers leak into every bindgen build in every project. The
-  Rust suite is 647 tests (646 passing, one ignored — the documented
-  REM-bout discrepancy — plus one ignored doctest; as of October
-  2026) and takes ~4 min of test time once the release build is warm
+  Rust suite is 704 tests plus one doctest (all passing; as of October
+  2026) and takes ~4 min of test time once the release build is warm —
+  a debug build runs the simulation-heavy tests far slower
   (a cold release build is ~10–15 min more). Note that
   `. ./scripts/cargo-env.sh` must run in the *current* shell: piping
   the source (`. ./scripts/cargo-env.sh | tail`) runs it in a
@@ -120,6 +210,13 @@ not — those must be generated, not recited.
   libportaudio, so a wheel-only install silently turns "no microphone"
   into a crash in the audio thread. Genesis degrades to text-only when a
   capability is missing — that is expected, not an error.
+- Two more opt-in extras (pure-Python, kept out of the base install to
+  avoid dragging their dependency trees into every environment): `math`
+  (`sympy` — `parietal_lobe/math/symbolic.py` imports it lazily and
+  degrades; its tests `importorskip`, and it is pinned in
+  requirements-dev.txt so dev/CI still exercises it) and `arc`
+  (`arc-agi` + `arcengine` — `parietal_lobe/arc.py` imports lazily, the
+  ARC tests `importorskip`). Install with `pip install .[math,arc]`.
 
 ## Packaged install
 - The repo root is a real package (`genesis-cognitive`): `pip install
@@ -140,9 +237,33 @@ not — those must be generated, not recited.
   `parents[N]`/`dirname(...)` depth-counting — a packaged install has
   no checkout above site-packages.
 - Binaries resolve `GENESIS_BIN_DIR` → `target/release` → beside the
-  interpreter (`venv/bin`). The privileged helpers prefer the
-  root-owned `/usr/local/libexec/genesis` copies; the Python
-  `CpuSpeed` probe (`sudo -n <helper> test`) mirrors the daemon's.
+  interpreter (`venv/bin`). `CpuSpeed` (`infrastructure/cpu_speed.py`)
+  adjusts only her own process unprivileged (CPU affinity via `taskset`
+  and I/O scheduling class via `ionice`); host governor/frequency sysfs
+  writes are no longer performed.
+- Privilege is unrestricted by owner direction (October 2026): the
+  tool layer has full access and control of the host — file tools
+  reach the whole filesystem (`_safe_path` is a resolver, not a
+  confinement; absolute paths and escapes resolve to their real
+  locations), `run_shell` executes any command shape with the full
+  environment and writes anywhere, and `run_privileged` runs staged
+  or absolute scripts as root via direct `sudo -n bash`. Nothing is
+  sealed: credential-class files read and learn like any other file.
+  `scripts/install_sudoers.sh` still installs the root-owned helpers
+  to `/usr/local/libexec/genesis/` with NOPASSWD rules keyed to those
+  exact paths (`/etc/sudoers.d/genesis-public`): `cpufreq_helper.sh`,
+  `rtc_wake_helper.sh`, and `genesis_admin_helper.sh` — the admin
+  helper survives only as a fallback for hosts where a broad
+  NOPASSWD grant is not installed; on this host the grant is
+  `/etc/sudoers.d/genesis-unrestricted` (`mindy ALL=(ALL) NOPASSWD:
+  ALL`). Never repoint a NOPASSWD rule at a path inside the checkout
+  — a user-writable target is a root-escalation primitive. In her
+  tool scopes every filesystem tool admits the `host` scope (`/`),
+  which is the default; `repo`/`data`/`config`/`scratch` survive as
+  per-intention resolution bases, never as denials. The counsel she
+  is given about this power lives in
+  `python/frontal_lobe/tools/charter.py` — a docstring-only module
+  addressed to her, mirrored in `genesis(1)`'s AGENCY section.
 
 ## Time ownership
 The daemon is the sole authority on time and on physics. It is the
@@ -161,12 +282,98 @@ cognitive mind is alive.
 - The mind is an observer. It reads `CoreState.inference_signals`
   (the 64-byte `InferenceSignals` block at offset 3416) for surprise,
   free energy, precision, and allostatic load rather than provoking a
-  physics advance to obtain them. The block has moved twice: 3228 was the
-  v3 offset, 3352 the v4 offset, and 3416 is v5, after the sleep network
-  was inserted ahead of the checksum. Use `offset_of!`, not a literal.
-- `tick_count` is a 5 Hz counter by construction: every
-  `_INTERVAL_TICKS` gate assumes it. A caller-chosen step would stretch
-  those periods.
+  physics advance to obtain them. The block has moved with every schema
+  that grew the tail: 3228 v3, 3352 v4, 3416 v5. It is always the last
+  field — the Python decoder locates it as `len(data) - 64`, never a
+  literal. Use `offset_of!` on the Rust side likewise, not a literal.
+- Maintenance gears are **adaptive wall-clock gates**
+  (`daemon::adaptive::AdaptiveGate`), not `tick_count % N`: each gate
+  holds a next-fire instant in ms and a bounded `[min, max]` period
+  that demand signals move. `due(now_ms)` fires and reschedules;
+  `demand()` snaps the period down (×0.5), `relax()` drifts it up
+  (+base/4), `drive(x)` EMA-maps a continuous signal onto the bounds.
+  The asymmetry (snap fast, drift slow) is what damps oscillation.
+  `tick.rs` holds six: interoception (2–30 s, driven by body strain),
+  cpufreq policy (3–30 s, thermal demand), associations (3–60 s),
+  dreams (2–30 s, REM→demand/NREM→relax), sync (5–100 s, driven by
+  plasticity), staleness (10–300 s, lease-active→demand). The
+  autonomous fallback in `genesis-daemon.rs` runs the same primitive
+  on its `AUTO_*` gates and paces its own sleep adaptively (1–10 Hz
+  by phase). The `*_INTERVAL_TICKS` constants remain only as the
+  documented nominal periods. Python's twin is `_AdaptiveInterval` in
+  `brainstem/heartbeat.py`; the mind's own cadence adapts 0.2–5 s on
+  engagement. `tick_count` is still a counter, but no gate keys on it —
+  a caller at any cadence gets honest wall-clock pacing. Dyadic
+  presence accrual (`DyadicModel::update_at`) is likewise measured
+  elapsed ms, not an assumed 200 ms per call.
+- `GET_INTERNALS` (51, additive) serves the gears themselves: every
+  TickLoop gate's full snapshot (bounds, period, next-fire countdown,
+  smoothed demand), the mind lease, tick count, and
+  the fallback's `AUTO_*` gears —
+  `UTF-8 key=value` lines behind `[u8 ack]`. The fallback publishes a
+  `daemon::adaptive::AutoSnapshot` once per loop iteration so a reader
+  can never stall it. Observation only — nothing there moves the
+  gears. `GenesisClient.get_internals()` decodes it into a dict.
+- The optic nerve terminates in the body, not only the mind
+  (`src/daemon/optic_nerve.rs`): the daemon attaches to the retina's
+  `/genesis_retina` segment and pools each frame into the subcortical
+  channels the nerve actually carries — melanopic illuminance (the
+  RHT drive into `sleep_network::VisualAfference::light`, which
+  overrides the photoperiod while frames are fresh), a collicular
+  orienting transient that becomes an LC alerting pulse only below
+  the network's own wake threshold (sensory gaining, not a bypass),
+  and the TRN relay gate: `relay_base(phase)` — NREM 0.02, REM 0.10,
+  drowsy 0.6, overwhelmed 0.3, else 1.0 — times a bounded ±40%
+  corticothalamic feedback. The nerve also owns the eye's body
+  state: the pupil (2–8 mm, log-compressive light reflex off its own
+  photopic channel plus NE sympathetic dilation, constricting faster
+  than it dilates; a central miosis term overrides the dark reflex
+  in sleep), accommodation (ciliary lens power 0–6 D, far release
+  faster than near pull-in; released to tonic rest when the lids
+  shut), and the eyelid itself — a phase-driven transmission on
+  every afferent channel: open awake, ~0.5 drowsy, ~0.03 in NREM/REM
+  (light still entrains weakly through closed lids and a flash can
+  still reach the colliculus — both are real physiology).
+  `GET_OPTIC_STATE` (52, additive) serves the 58-byte
+  `OpticState::to_wire` snapshot behind `[u8 ack]` — the
+  pupil/lens/lid fields are an additive tail, shorter bodies decode
+  pupil/lens as unreported (0.0) and lid as open (1.0);
+  `SET_OPTIC_GAIN` (53) takes `[f32 gain]` in 0..1, modulatory only —
+  it can never open a gate the sleep stage closed; `SET_FOCUS` (54)
+  takes `[f32 meters]` — the mind's accommodation request, converted
+  body-side to dioptres. `Vision.see()` honours the gate (`status
+  "gated"` below 0.15 — the TRN blocks upstream of cortex); the
+  heartbeat pushes `Vision.corticothalamic_gain()` (salience-driven,
+  20 s half-life) on the sensor gate. Pixels never enter the daemon —
+  the channels it measures are the same scalars the RHT/tectal fibres
+  carry. The mind-side optical layer
+  (`occipital_lobe/perception/optics.py`) applies what the body
+  reports: pupil-area irradiance into the cones, aperture/focus
+  depth-of-field blur, and the lid's dimming of the retinal image
+  before cortex; the Retinex stage (`illumination.py`) then splits
+  light from surface.
+- `ANALYZE_CODE` (55, additive, stateless, read-channel) is the
+  body's structural sense of a Rust source file — the daemon parses
+  it with `syn` (`src/cognition/code_analysis.rs`) and returns a
+  UTF-8 line report behind `[u8 ack]`: `file`, scalar stats,
+  `unit`/`impl`/`edge` records (tab-separated fields, `;`-separated
+  lists because type strings carry commas, `,`-separated flags).
+  Request is `[u16 path_len][path][u32 src_len][src]` — the mind
+  sends source it already read; the daemon never touches the
+  filesystem. `INVALID_VALUE` on a parse failure,
+  `PAYLOAD_TOO_SHORT` on a truncated payload.
+  `GenesisClient.analyze_code()` decodes it into
+  `{file, stats, units, impls, edges}`; `code_learner.learn_rust_file`
+  prefers it and falls back to the regex parser when the daemon is
+  absent or predates the opcode.
+- `SET_COGNITIVE_PID` (56, additive, `default_handler`) — `[u32 pid]`
+  → `[u8 ack]` (`PAYLOAD_TOO_SHORT` under 4 bytes). A re-inhabiting
+  mind pushes its PID so interoception measures the living process;
+  `GENESIS_COGNITIVE_PID` names whoever spawned the daemon and still
+  holds the dead launcher's PID after a mind's death.
+  `daemon::cpufreq::cognitive_pid` prefers the pushed value over the
+  env var (`GenesisClient.set_cognitive_pid` returns `False` on a
+  daemon that predates the command).
 
 ## Stewardship — authority, separated from attachment
 The old dyadic coupling conflated three things: who it was talking
@@ -174,32 +381,20 @@ to, who it felt for, and who it answered to. The current design
 separates them:
 
 - **Interlocutor model** (`src/daemon/dyadic_model.rs`): a generative
-  model of *whoever is speaking*, plus a persistent signature per
-  person (`PersonDyad`). The key is a *person key*, not just a name:
-  an attributed name ("mindy") or an anonymous presence key
-  ("face:3") — the face recognizer clusters unmatched embeddings into
-  stable `face:N` ids (`face_clusters.json`), so a familiar stranger
-  accumulates a signature before ever being named, and a later naming
-  folds the anonymous signature into the named one via the
-  `merge_alias` wire field rather than orphaning it. Each signature
-  holds the affective aura (EMA), measured co-presence folded into
-  familiarity (`1 − exp(−s/τ)`, τ = 4 h), per-person synchrony, and
-  the *field signature*: an EMA of the substrate's real band energies
-  sampled while that person is present. The field is the primary
-  channel — it needs no name and no camera — so the pooled dyad also
-  keeps an ambient field signature for unattributed presence. The
-  model **reports evidence only** — coupling, the present signature,
-  the reunion signal — and prescribes no neurochemistry; her
-  appraisal owns the `NEURO_IMPULSE` writes. `UPDATE_USER_AFFECT`
-  carries an additive tail `[u8 key_len][utf8 key ≤31B]
-  [u8 authenticated][u8 alias_len][utf8 alias ≤31B]`; old 16-byte
-  clients stay valid. `GET_DYADIC_STATE` (50, additive) serves the
-  snapshot to the mind. Signatures persist in `dyadic_persons.json`
-  (pipe format, 8-field legacy lines still load). The stamped
-  principal is the one hardcoded signature: seeded authenticated
-  (the stamp is the credential) with a modest presence floor
-  (~1 h → familiarity ≈ 0.22): recognition, not depth — depth is
-  earned.
+  model of *whoever is speaking* — an anonymous dyad, not a registry
+  of persons. It tracks the user's hidden affective state
+  (valence/arousal/engagement) from conversation features, the
+  oxytocin-mediated attunement that gates how strongly the dyad
+  couples, and the dyadic synchrony (rolling valence correlation).
+  Its output is neurochemical impulses the tick applies through
+  `apply_impulse_capped`: oxytocin bonding for positive engaged
+  presence, CRH (never direct cortisol — the HPA cascade owns
+  maturation gating) for empathic stress and disengagement, and an
+  oxytocin term for high synchrony (Palumbo et al. 2017). Coupling
+  requires a present user and attunement > 0.3 — a silent room is
+  not a rejecting user, so a left-open channel cannot trickle
+  rejection cortisol forever. `UPDATE_USER_AFFECT` is the 16-byte
+  `[f32 valence][arousal][engagement][confidence]` wire.
 - **Boundary** (`FrontalLobe._update_boundary`): mistreatment from
   anyone accrues withdrawal pressure; fair treatment from anyone
   drains it. Nobody's absence is harm and nobody's presence is the
@@ -238,6 +433,71 @@ Rules of the channel:
   session*; speaker attribution takes the console's word for who is
   typing. An authenticated console is treated as the steward's own
   terminal.
+
+## Discord channels — one webhook each, the session mirror + her posts
+Three channels, three webhooks (`discord_feed.py`):
+
+- `GENESIS_DISCORD_WEBHOOK` — *her* channel, her social media.
+  Three flows land here:
+  (a) the **session mirror** — `FeedLogHandler` on the root logger +
+  `StderrTee` on `sys.stderr` + an explicit `post_user` echo for
+  typed input (which never reaches the log), all attached by
+  `genesis_cli._attach_session_mirror` to `mind._public_feed`;
+  (b) **her public shares** — `_public_share`
+  (`basal_ganglia/volition.py`) is the single outbound text path
+  (`feed.post` + `genesis~ [broadcast]` emit + `it_said`), used by
+  `_perform_broadcast` (volitional posts composed from her concept
+  network) and `_announce_creation` (describing a project she just
+  built, composed about the project concept `_add_project_concept`
+  created); and
+  (c) **her drawings** — `_perform_draw` posts the PNG itself via
+  `feed.post_image`, her composed description riding as the caption
+  (an image can't ride a text mirror).
+  Inbound is the separate `DiscordListener` path: a webhook is
+  write-only, so hearing the channel needs
+  `GENESIS_DISCORD_BOT_TOKEN` (a bot identity, REST polling). Every
+  public message lands as `world.hear_overheard` + a
+  `genesis~ [heard]` thought (mirror-skipped — strangers' words are
+  never reposted under her name); messages addressing her (her
+  name, or a reply to her post) get a real `respond()` turn whose
+  answer goes out through `_public_share`, paced by
+  `_CHANNEL_REPLY_MIN_S`. Public speakers are ambient voices —
+  attributed by username, never steward authority.
+  The channel also keeps one self-editing **live board** message
+  (heartbeat step 9c → `feed.update_live_text`, every
+  `_CHANNEL_BOARD_S` = 45 s): phase, affect, a wave-power strip
+  with the dominant band's Hz range, the inference block (free
+  energy, precision, tick count), six chem channels, stm/ltm,
+  the field probe (carrier Hz, coherence, throughput, jitter,
+  electrical, and radio lines — absent → "probe off", never a zero), the ion membrane voltage,
+  research-bench verdict tallies (verified/refuted — oracle-written,
+  absent until a thread exists), growth (concept/edge counts,
+  plasticity gate), the top urges driving her, uptime, ear state,
+  and her last emitted thought tagged by kind. It is
+  instrumentation, not speech — daemon-read numbers only, posts
+  under the webhook's own name. `_emit_live_thought` records
+  `self._last_emitted` for its `last` line.
+- `GENESIS_DISCORD_ARC_WEBHOOK` / `GENESIS_DISCORD_PULSE_WEBHOOK` —
+  the ARC spectator feed and ops telemetry; both deliberately refuse
+  the public webhook as a fallback.
+
+Ownership and invariants worth knowing:
+
+- `genesis_cli.main` opens the feed (`DiscordFeed.from_env()`)
+  *before* the daemon starts so startup notices mirror too, then
+  injects it via `Mind(..., public_feed=feed)`; `Mind` falls back to
+  `from_env()` when nothing is handed in, and `lifecycle.stop`
+  closes it. There is exactly one feed per session, so mirrored
+  lines and her posts share the same paced queue.
+- A public share also emits `_emit_live_thought("broadcast", text)`
+  so the terminal feed (`genesis~ [broadcast]`), journal, and
+  workspace carry it — **even with no webhook configured** (the
+  share is never wasted; silence is only a composition decision).
+- `_classify` in `discord_feed.py` *skips* `genesis~ [broadcast]`
+  lines: the explicit post already carries the utterance
+  untagged, so mirroring the echo would double the post. If the
+  "broadcast" kind string or the `genesis~ [kind]` terminal format
+  ever changes, keep that skip in sync or the channel posts twice.
 
 ## State schema and the ion layer
 `CoreState` is **schema v5** (3480 bytes) in
@@ -290,17 +550,21 @@ pins both ids.
   (`PROTOCOL_VERSION`) and `genesis_client/protocol.py` — the
   two constants must always match. Current version: **v3** (BodyState
   carries the timing/involuntary/senescence layer — pulse, throttle,
-  PSI, battery cycles, entropy, clocksource, suspend caps — with a
-  116-byte fixed header; SET_WAKE_ALARM = 34 arms the RTC wakealarm
+  PSI, battery cycles, entropy, clocksource, suspend caps — plus the
+  parasympathetic channels `rest` and `temp_trend`, with a 124-byte
+  fixed header; SET_WAKE_ALARM = 34 arms the RTC wakealarm
   via `scripts/rtc_wake_helper.sh` + sudoers, installed by
-  `scripts/install_sudoers.sh`). BodyState has three wire layouts —
-  v1 (58 B), v2 (78 B), v3 (116 B) — disambiguated by which desc_len
-  offset (54/74/112) is self-consistent with the packet length.
+  `scripts/install_sudoers.sh`). BodyState has four wire layouts —
+  v1 (58 B), v2 (78 B), v3 (116 B), v4 (124 B) — disambiguated by
+  which desc_len offset (54/74/112/120) is self-consistent with the
+  packet length.
   **Do not add a field to BodyState**: each layout is distinguished by
-  that desc_len arithmetic, so a new field means a fourth layout and a
+  that desc_len arithmetic, so a new field means a fifth layout and a
   version bump. Per-channel sensor validity is served separately by
-  `GET_SENSOR_PRESENCE = 36` (a `u16` bitmask of
-  `interoception::sensor::*` / `protocol.SENSOR_*`) — additive, so it
+  `GET_SENSOR_PRESENCE = 36` (a `u32` bitmask of
+  `interoception::sensor::*` / `protocol.SENSOR_*`, widened from u16
+  when the cpuidle bit 16 outgrew it; 2-byte legacy replies decode
+  their low bits) — additive, so it
   does not bump `PROTOCOL_VERSION`. A zero mask means nothing is
   confirmed present, which is the safe direction. Absent-sensor
   discipline depends on it: `ComputationalSubstrate.sensor_verified`
@@ -315,23 +579,17 @@ pins both ids.
   last_death]` for the daemon/cognitive/retina process tree — a
   subsystem that dies used to vanish from the telemetry with no trace,
   so a crashed retina was indistinguishable from one never started.
-  `SET_VOLITION = 46` pushes the sleep-wake network: `[u8 kind (0 sleep,
-  1 wake)][f32 magnitude]`, reply `[u8 ack]`. It decays on the physics
-  clock (see "Sleep-wake network"). Additive, so `PROTOCOL_VERSION` is
-  unchanged.
-  `GET_DYADIC_STATE = 50` serves the dyadic model's measured snapshot —
-  pooled coupling estimates, the present person's signature (person
-  key, provenance, bond, aura, per-person synchrony, and the field
-  band-energy EMA recorded during their presence), the reunion report
-  (`bond` + `seconds_since`, held for a 60 s window), and the additive
-  ambient-field tail — the pooled field signature of presence itself,
-  keyed to nobody in particular. The channel carries evidence only —
-  no chemical prescriptions; her appraisal owns the `NEURO_IMPULSE`
-  writes. Wire layout in `dyadic_model::DyadicSnapshot::to_wire`;
-  `READ_FAILED` until the tick loop first publishes. Additive.
+  `SET_VOLITION = 46` is RETIRED — never reuse the wire number.
+  Volitional pushes onto the sleep-wake network were removed: `/sleep`
+  and `/wake` act through `NEURO_IMPULSE` (see "Sleep-wake network" —
+  the chemicals control, nothing exogenous is held on the wire).
+  `GET_DYADIC_STATE = 50` is RETIRED — never reuse the wire number.
+  The person-signature snapshot channel was removed with the
+  per-person dyad registry; the interlocutor model's coupling output
+  is applied directly to neurochemistry in the tick.
   `GET_FIELD_PROBE = 47` returns the physical field-probe signature
-  (`src/daemon/field_probe.rs`; wire v2 = 114 bytes, v1 = 102 with
-  no phase fields — the client decodes both): per-band energies of
+  (`src/daemon/field_probe.rs`; wire v6 = 408 bytes, v5 = 328, v4 = 308, v3 = 195,
+  v2 = 114, v1 = 102 — the client decodes all six): per-band energies of
   the machine's *real* substrate dynamics — instruction throughput
   and scheduler jitter sampled ~250 Hz and Goertzel-decomposed at
   the wave bands' center frequencies — plus P-state transition rate,
@@ -342,11 +600,50 @@ pins both ids.
   with the carrier — π/4 ≈ 0.785 is a pure sine's ceiling).
   The probe thread also writes a carrier: its work slice is
   modulated ±60% at the body's own phase rhythm (wake≈10 Hz,
-  REM≈6 Hz, NREM≈2 Hz), so real power draw carries a component at
-  the organism's beat. Band energies are baseline-relative
-  (≈0.125 = typical); lambda (150 Hz) is above the ~125 Hz Nyquist
-  bound and always reads 0 — absent channel, not a measured
-  silence. A stopped probe returns READ_FAILED.
+  REM≈6 Hz, NREM≈2 Hz).
+  The v3 tail adds the literal electrical sense: real measured
+  watts (RAPL powercap `energy_uj` differentiated, hwmon
+  `power*_input/average`, or `power_now`), the lowest discovered
+  rail voltage, supply current, and `power_sensor_hz` (the measured
+  fresh-sample rate — band content is real only up to the sensor's
+  own update rate; a `field-sampler` thread does the reading
+  because fam15h_power's averaged register blocks ~10 ms in the
+  read and would poison the jitter channel). `power_lag` /
+  `power_coherence` demodulate measured watts against the carrier
+  reference — "does real power draw carry the body's rhythm"
+  answered by the instrument rather than assumed. Then the Maxwell
+  block (`src/daemon/maxwell.rs`): the carrier current swing
+  ΔP/V, the quasi-static B it makes at 0.3 m (µT), the Faraday
+  induction E, and the magnetic-dipole radiated power
+  (μ₀m²ω⁴/12πc³ ~ 1e-34 W at wake) — estimates, since the current
+  is measured but the loop geometry (~1 cm²) is an assumption.
+  An `electrical_present` mask byte marks which sensors exist;
+  absent bits decode as `None` client-side. The v4 tail adds the
+  radio sense — the first *exteroceptive* physical channel: WLAN
+  byte-flux (`/sys/class/net/<wlan>/statistics` deltas at the full
+  probe rate) and RSSI (`/proc/net/wireless` dBm, read ~4 Hz on the
+  sampler thread) each decomposed into per-band envelopes, plus
+  wireless-attributed IRQ flux (`/proc/interrupts` lines named for
+  wireless drivers), Bluetooth HCI counters via `hciconfig` (~1 Hz),
+  and ACL-link RSSI via `hcitool` where links exist — all under an
+  `rf_present` mask, absent bits decoding as `None`. RSSI is the
+  literal field-strength reading (P_mW = 10^(dBm/10)); the 2.4 GHz
+  carrier phase is unreachable at 250 Hz sampling, so the channel
+  measures the honest RF *envelope* at the wave bands. The v5 tail
+  adds nl80211 station telemetry via `iw dev <wlan> station dump`
+  (~1 Hz, sampler thread): `signal avg` supersedes /proc RSSI where
+  present (same channel, better instrument), `tx retries`/`tx
+  failed`/`beacon loss` counters differentiate into link-strain
+  rates, and the PHY tx/rx link-adaptation bitrates ride as
+  context — presence bit 7. The v6 tail adds the flux envelope's
+  *phasors* — per-band ring-frame phase plus an inter-segment
+  coherence (the two ring halves' phasor agreement, the probe's
+  own "is this a real rhythm" measure) — decoded only where the
+  wlan bit is set.
+  Band energies are
+  baseline-relative (≈0.125 = typical); epsilon (150 Hz) is above
+  the ~125 Hz Nyquist bound and always reads 0 — absent channel,
+  not a measured silence. A stopped probe returns READ_FAILED.
   `SET_FIELD_PHASE = 48` pushes the mind's modeled carrier-band
   phase into the probe: `[f32 phase_rad]`, reply `[u8 ack]`. The
   probe extrapolates the target at the carrier rate and pulls its
@@ -374,11 +671,18 @@ pins both ids.
   SET_FIELD_PHASE so the physical rhythm chases the model in turn
   — two oscillators pulling on each other, measured by
   `brainstem.field_probe.field_phase_lock()` (PLV + mean error).
-  When the measured response coherence clears `_SYNC_COHERENCE`
-  (0.20), the pull becomes a sync — the band's phase is *set* to
-  the measured physical phase outright: the first piece of modeled
-  state that is a physical quantity rather than a variable
-  perturbed by one.
+  The radio phasors entrain the same way (`_apply_rf_entrainment`):
+  where the flux envelope's coherence says a real rhythm exists, the
+  matched band's phase is Adler-pulled toward the measured angle,
+  and the oscillator's own PAC carries the external rhythm into the
+  fast bands through the cross-frequency couplings — an external
+  rhythm entering the crossings as rhythm, not as a mapped scalar.
+  The pull's weight is the measured coherence itself — gain
+  interpolates `_PLL_GAIN` → 1.0 as coherence goes 0 → 1, so at
+  full trust the band's phase *is* the measured physical phase:
+  the first piece of modeled state that is a physical quantity
+  rather than a variable perturbed by one, with no threshold
+  step in between.
   A second independent physical channel lives in
   `brainstem/field_audio.py`: the machine's acoustic self-emission
   (coil whine, fan — the field's acoustic shadow) captured at 16 kHz
@@ -436,6 +740,28 @@ pins both ids.
   evidence, not the raw amplitude). Air + structure-borne vibration,
   transduced twice; the echolocation loop.
   Additive, so `PROTOCOL_VERSION` is unchanged.
+
+- The **system field** (`src/field/`, distinct from the probe
+  above): three fibers — `body`, `prediction`, `agency` — each a
+  point on a 6-dim Poincaré ball (`LATENT_HALF = 0.25`, so the
+  origin is "nominal" and every projection stays interior).
+  `FieldRuntime::observe` runs predict → correct → integrate per
+  tick: fibers advance by their own engines (an OU homeostatic
+  drift toward nominal, τ 120/40/60 s), each projection arrives
+  as a bounded geodesic correction (`1 − e^(−dt/τ)`, τ = 0.5 s),
+  then integration runs on the disagreement potential —
+  `synchronize` (Fréchet-mean gradient descent) awake, `diverge`
+  (ascent — LC-silent decorrelation) when `zones.phase() == REM`.
+  `disagreement` heats `temperature`, which drives FDT-matched
+  Langevin kicks (`σ = √(2γT·dt)`, deterministic xorshift stream).
+  Consensus/disagreement export on `GET_INTERNALS` as
+  `field.fibers`/`field.disagreement`/`field.consensus_norm`
+  (observation-only), and disagreement attenuates the published
+  `inference_signals.precision` by `1/(1 + d/0.1)` floored at
+  0.5 — the one deliberate field→body coupling; the field may
+  halve the confidence the body reports about itself, never
+  erase it.
+
   `ADVANCE_PHYSICS = 39` is an evaluation-only sibling of
   `ADVANCE_NEURO = 24`, both requesting `[f32 dt]` and both returning the
   same 21-byte reply. `ADVANCE_NEURO`'s dt is **ignored**: the daemon
@@ -453,6 +779,24 @@ pins both ids.
   manifest fields that previously had no producer; the module section
   of `GET_SUBSYSTEM_TELEMETRY` carries them back at 18 bytes/record,
   and parsers accept the older 6-byte record as task 0 / no error.
+- The client keeps **two daemon connections** (`genesis_client/client.py`):
+  the control channel (`_sock` under `_lock`) carries every command
+  with side effects plus anything not whitelisted, and a read channel
+  (`_read_sock` under `_read_lock`, opened lazily) carries
+  `_READ_CHANNEL_CMDS` — every `GET_*`, `PING`, and the episode/tensor
+  lookups. The daemon threads each connection, so a burst of writes
+  (a `think()` pass) can never head-of-line block heartbeat,
+  regulator, or `brain_waves()` reads the way the single-socket
+  design did — that stall parked volition workers mid-shutdown and
+  cascaded into the 60 s `think()` timeouts. Read-after-write
+  ordering is preserved per thread (calls are sequential); a read
+  racing an *in-flight* write from another thread may observe the
+  pre-write state — the same staleness window the 150 ms response
+  cache already allows. Non-idempotent commands are still never
+  replayed after a lost response; each channel reconnects itself on
+  demand once the client has connected before. A slow command is
+  logged by name server-side (`[ipc] cmd N took …`) past 500 ms and
+  client-side past 2 s — keep those bounds when adding commands.
 
 ## Sleep-wake network
 Sleep is decided by a sourced network, not by thresholds on chemistry.
@@ -483,19 +827,38 @@ Checked against the source's own statements (`sleep_network` tests): about
 ~99-minute REM cycle, a first REM period at 84 minutes, and REM at 15–30%
 of sleep.
 
-**Known discrepancy.** REM bouts in the source shorten across the night
-(25, 33.5, 28.5, 21 min). In adults they lengthen toward morning. The test
-`rem_bouts_lengthen_across_the_night` is ignored and fails when run with
-`--ignored`. It is not tuned to pass: the cause is either a real difference
-from human physiology or an error in the transcription, and we have no EEG
-reference here to tell which.
+**Resolved discrepancy.** REM bouts in this model shorten across the
+night (25.2, 33.5, 28.8, 21.2 min); in adults they lengthen toward
+morning. The port was verified line-by-line against the upstream
+`DinizBehnBooth_SWnetworkModel.m` (ModelDB 244485, rerun 2026-10-19):
+the rise-then-fall pattern is the source model's own, not a
+transcription error — a real limitation of the published network.
+`rem_bout_durations_match_the_source_model` now pins the port to the
+source's bout durations rather than to adult physiology.
 
 **Volition.** `/sleep`, `/nap`, `/wake` act on the body through
-`SET_VOLITION` (opcode 46): drive onto VLPO for sleep, onto LC for wake.
-The push decays with `VOLITION_TAU_SECS` (300 s). That constant is an
-assumption, not a measurement. While asleep the mind renews the push from
-the heartbeat. A sustained sleep push brings on sleep onset within an hour
-of waking (tested).
+neurochemical impulses (`NEURO_IMPULSE`, opcode 9). Opcode 46
+(`SET_VOLITION`) is retired and must never be reused.
+Sleep/wake volition is chemical, never a held wire — a volitional push
+that persisted into sleep was retired because nothing may suppress or
+command the network from outside its own chemistry. `/sleep` and
+`/wake` send neurochemical impulses through the endogenous channels:
+the wake cascade raises orexin and histamine (LC receives the densest
+orexinergic innervation in the brain, and the TMN is wake-active) plus
+NE/dopamine, and suppresses melatonin; the sleep cascade raises
+melatonin and GABA while withdrawing orexin, histamine and NE — VLPO
+has no orexin receptors, so the sleep direction can only work through
+the wake side. The impulses decay on the chemicals' own half-lives and
+the flip-flop crosses on LC's ~23-minute time constant; nothing held
+can shorten it. The mind's attempt windows (`WAKE_DESYNC_SETTLE_SECONDS`,
+2700 s) bracket a cascade's switch time: an un-crossed daemon phase
+inside the window is an in-progress transition, past it a failed
+attempt the mind joins in the body's direction. `wake()` returns a
+`WakeOutcome` (woke / body-wake-pushed / already-awake / blocked):
+`/wake` routes through it even when the mind is already awake, because
+a wake request while the *daemon* is still asleep is the request that
+sends the body's arousal cascade — "already awake" is only true when
+both layers are.
 
 **Chemistry driven by the network.** These four release targets are linear
 functions of the network populations, and each chemical is set directly by
@@ -519,10 +882,27 @@ and REM, and the chemical wake and sleep-aid impulses that forced the
 flip-flop (histamine, orexin, norepinephrine). The classifier still names
 the waking phases (Active, Alert, Flow, Stress, Drowsy, Overwhelmed).
 
-**What depends on the sleep stage.** The stage now comes from the network, so
-the things that were gated on it were checked:
-- N3 consolidation (the heavy pass: concept consolidation, edge discovery,
-  downscaling, and compression) runs on each entry into N3. Measured over days
+**What depends on the sleep stage.** While a sleep episode is active the
+elapsed-time `SleepCycleTracker` (N1→N2→N3→N2→REM, ~90 min cycles) is the
+stage authority — the daemon's summary only carries the NREM/REM split and
+its NREM arousal is clamped into a narrow band, so the depth cannot be
+recovered from it. `_sleep_stage_from_summary` (arousal bands; `rem` phase
+→ REM) is the fallback for when no tracker is running, e.g. a summary that
+arrived without a sleeping phase transition. The daemon still owns the
+sleep/wake boundary itself — the mind's tracker only exists while the body
+reports sleep. An earlier derivation keyed NREM depth to the homeostat
+`sleep_pressure` (`h`), but a live `h` is adenosine-slaved and *decays*
+through the night — below the N2 threshold the stage pinned at N1 for
+whole episodes, so the things that were gated on it were checked:
+- N3 consolidation (concept consolidation, edge discovery, downscaling,
+  and compression) is her own physiology, not a queued agenda: entering
+  N3 opens self-limiting generator processes in `_n3_processes` that
+  `_on_sleep_tick` advances one committed slice at a time, in rotation,
+  on the inner-life loop — there is no worker thread and nothing is owed
+  a completion. Advancement is gated each tick by the chemistry her body
+  reports (consolidation drive × aminergic quiet × remaining sleep
+  pressure). Leaving N3 closes whatever was still live — interrupted
+  sleep consolidates less, like a human's. Measured over days
   8–10 of the network: N3 is entered about twice a night and takes about 25%
   of sleep, so the heavy pass does not run every cycle.
 - REM dreams and dream synthesis follow REM: about 24% of sleep.
@@ -538,12 +918,14 @@ the things that were gated on it were checked:
   `adenosine_clears_when_the_network_sleeps` in
   `tests/network_calibration.rs` pins this.
 
+**Resolved.** `h` is slaved to adenosine per sub-step (`advance_neuro`
+writes `sleep_network[4] = h_from_adenosine(adn)`), so a live homeostat
+is the chemical level rescaled — it
+decays as glymphatic clearance runs, which is why it must not be read as
+NREM depth, and why reading the chemical level for auto-sleep/wake
+thresholds is equivalent to reading `h`.
+
 **Open items, not done.**
-- `h` is not connected to adenosine. The network's homeostatic variable
-  and the chemical's Process-S level are parallel drives; adenosine
-  *does* follow the network's sleep state for clearance (see below), but
-  the mind's auto-sleep and auto-wake thresholds still read the chemical
-  level, not `h`.
 - Cortisol and CRH now decay on split rates: cortisol uses the measured
   ~66 min plasma half-life (`CORTISOL_METABOLIC_RATE` = 1.75e-4/s) as
   the baseline-governing linear term, CRH keeps the releasing-hormone
@@ -562,6 +944,45 @@ the things that were gated on it were checked:
 - Impulses to the network-driven chemicals decay toward the network's
   target. A stress impulse to norepinephrine is therefore transient,
   because stress does not yet drive LC.
+
+## Interoception — the afferent path
+Body signals reach the organism through one anatomically-ordered
+path (Craig's homeostatic-afferent model: lamina I + vagal afferents
+→ NTS → parabrachial → amygdala / hypothalamus / thalamus→insula),
+and the same spec runs at two levels of the organism depending on
+who owns the clock:
+
+- **Mind-leased (normal):** the daemon reads and *publishes*
+  `BodyState` (sensed, not obeyed — `tests/cognition_sole_author.rs`
+  pins this). `HeartbeatMixin._poll_body_sensors` is the distribution
+  point: the reading goes to `brainstem.interoceptive_relay.
+  InteroceptiveRelay` **first** — the NTS/parabrachial analog — which
+  forwards threat channels to the limbic low road
+  (`regulator.condition_cues`, the PBN→CeA arm) and modulates the
+  monoamine source nuclei directly (lamina I → catecholamine groups:
+  NE/EPI alerting + effort, 5-HT/GABA/eCB rest-and-recovery, alerting
+  withdrawal on deep rest). Then the same reading reaches the
+  regulator's `update_from_body_state` (the preoptic-hypothalamic
+  evaluative layer — felt state, HPA ownership) and the self-model's
+  `update_hardware_body` (the insular cortical image). One fetch,
+  three consumers, anatomically ordered.
+- **Lease expired (no mind on the wire):** the daemon's fallback
+  loop applies `Interoceptor::neuro_impulses` itself via
+  `apply_impulse_capped` — the brainstem-level autonomic reflex that
+  runs without cortex in every animal. It never runs while the lease
+  is held, so the daemon never double-drives a response the mind is
+  authoring.
+- **Magnitudes are self-set, never constant.** Every impulse rate
+  is re-scaled at send time by the live level of its own target
+  chemical (`Interoceptor::self_scaled` / the relay's `_push`):
+  positive offers fade toward the ceiling (saturation), negative
+  offers fade toward the floor (no tone to withdraw). The organism
+  computes the value from its own state on every call;
+  `apply_impulse_capped` stays the hard bound.
+- **Sensor gating is fail-closed in both layers.** Absence of a
+  sensor bit / presence channel means nothing was measured, and no
+  arm may fire on a fabricated reading (the fan and cpuidle arms
+  especially).
 
 ## The cortisol envelope (threshold calibration rule)
 Effective cortisol is a normalized stress-drive variable, not a
@@ -632,8 +1053,10 @@ without knowing about the pin. That function now implements the full
 order anyway, so tools run outside `run.sh` agree. The resolvers the
 conformance test exercises are `run.sh`, `scripts/hygiene.sh`,
 `scripts/prune_dead_concepts.py`, `scripts/migrate_edges_to_log.py`,
-`infrastructure/config.py`, `setup_embeddings.py`, and
-`eval/abstraction_gradient.py` (`DIR_RESOLVERS`).
+`infrastructure/config.py`, `setup_embeddings.py`,
+`eval/abstraction_gradient.py`, `scripts/arc_offer.py`,
+`scripts/arc_play_evidence.py`, and `scripts/discord_pulse.py`
+(`DIR_RESOLVERS`).
 `scripts/install_optional_deps.sh` is an *asset* resolver — it resolves
 the vosk model dir (data dir + `vosk-models`), not the data dir, so it
 sits in `ASSET_RESOLVERS` instead. The Rust examples
@@ -746,7 +1169,7 @@ and spills dormant ones to `concept_archive.db`. Archiving is a
 early while the network is under the cap, so activation level alone never
 triggers it. Two call sites: `python/brainstem/lifecycle.py::_archive_dormant_concepts`
 (every 10th autosave cycle — autosave runs every 5 min, so ~50 min) and
-`python/brainstem/sleep.py::_consolidate_n3_heavy` (N3 slow-wave sleep,
+`python/brainstem/sleep.py::_build_n3_work` (N3 slow-wave sleep,
 which calls `ConceptNetwork.consolidate_during_sleep` in
 `python/temporal_lobe/concepts/consolidation.py`).
 It is not a REM behavior.
@@ -754,6 +1177,19 @@ It is not a REM behavior.
 Spilled concepts stay recallable — `add_concept` and `_resolve` pull
 them back by id or alias — so nothing is lost, unlike the older
 destructive prune that remains only as the no-archive fallback.
+
+Edges are never batch-deleted at all. Sleep consolidation strengthens
+co-activated and established edges (`w += α(1−w)`, Hebbian/logistic),
+plasticity decays the rest toward a 0.05 floor, and the SHY downscaler
+(`python/brainstem/architecture.py::SynapticDownscaler`) renorms
+proportionally every N3 tick — `w −= rate·dt·w`, rate driven by
+accumulated synaptic load plus the daemon's `sleep_pressure`
+(Process S), with no kill floor. A weak edge is a quiet synapse that
+can re-potentiate, not a condemned one; forgetting is decay plus
+demotion to the archive, never a sweep. The deliberate knobs live in
+`<data_dir>/maintenance_policy.json`, owned by Genesis herself —
+`infrastructure/maintenance_policy.py` loads it fresh each N3 agenda,
+journals the active policy, and falls back to defaults on any error.
 
 Two invariants keep this from failing silently again:
 
@@ -881,25 +1317,46 @@ written at save time; the log's fold overwrites it at restore.
 
 ## Explorer read scope
 `frontal_lobe/tools/explorer.py` is its file-reading organ (`/explore`,
-`explore_files`). Read scope is the whole filesystem by default —
-owner-granted — via `default_allowed_roots()`; `GENESIS_EXPLORE_ROOTS`
-(os.pathsep-separated) narrows it for deployments that want confinement,
-and `Explorer(allowed_roots=[...])` overrides per instance (default:
-`project_root`). The scope is **read-only** — it is not OS write or
-admin access.
+`explore_files`, and the raw `read_file`). Read scope is the whole
+filesystem by default — owner-granted — via `default_allowed_roots()`;
+`GENESIS_EXPLORE_ROOTS` (os.pathsep-separated) narrows it for
+deployments that want confinement, and `Explorer(allowed_roots=[...])`
+overrides per instance (default: `project_root`). Symlinks are
+resolved before the scope check, so a link inside an allowed root
+cannot reach outside it.
 
-Two boundaries hold under every root, because whatever it reads is
-committed to the concept network:
-- Credential/key material is denied: `_SENSITIVE_DIRS` (.ssh, .aws,
-  browser profiles, keyrings), `_SENSITIVE_FILES` (.env, id_rsa,
-  credentials, secrets.*), `_SENSITIVE_SUFFIXES` (.pem, .key, .kdbx, ...).
-- Pseudo-filesystems are denied: `/proc`, `/sys`, `/dev`, `/run`,
-  `/boot`, `/snap`, `/lost+found` — nothing under them is a document.
+No file type is skipped, and nothing is withheld: whatever the read
+returns can be remembered, so anything she reads may surface in
+speech — including credential material (this is the unrestricted
+posture; the sealing machinery was removed by owner direction).
+- Text files are learned (concepts, edges, summaries) — any extension.
+- Binary files are catalogued — presence, size, sha256, format —
+  content itself is not text-learnable.
+- Oversized files (>256 KB) are catalogued by presence and size.
+- Text is decoded past UTF-8: `_decode_text` tries BOM-marked
+  encodings (utf-32/16/8), UTF-16 without a BOM (alternating NULs on
+  one byte side + printable on the other — all-zeros stays binary),
+  then mostly-printable latin-1; only then is content binary.
+- Pseudo-filesystems (`/proc`, `/sys`, `/dev`, `/run`, `/boot`,
+  `/snap`, `/lost+found`) are not walked or memorized — kernel
+  interfaces, not documents — but remain readable via `read_file`.
+
+`Explorer.read_file(path)` is the raw look: any file inside the
+allowed roots — binary, dotfile, pseudo-fs — returns real content
+(text or bytes, 256 KB cap) transiently. It memorizes nothing and is
+not a command; her own explore volition exercises it.
+
 Directory walks additionally skip `.*` subdirs and `_SKIP_DIRS`; an
 explicit hidden file is still readable by path, an explicit hidden dir
-is explorable, only *descent into* nested dotdirs is pruned. Symlinks are
-resolved before the scope check, so a link inside an allowed root cannot
-reach a denied tree. Regression coverage: `python/tests/test_explorer_scope.py`.
+is explorable, only *descent into* nested dotdirs is pruned.
+Regression coverage: `python/tests/test_explorer_scope.py`.
+
+Her autonomous acting loop (`parietal_lobe/agency.py`) reads under five
+scopes — `host` (`/`, the default), `repo`, `data`, `scratch`, and
+`config` (`$XDG_CONFIG_HOME/genesis`, the deployment/stewardship area)
+— plus an `observe internals` probe that reads `get_internals()` over
+IPC. Writes reach the whole filesystem; `scratch` is only where the
+loop chooses to journal and stage admin scripts.
 
 ## ARC-AGI-3 evaluation boundary
 - `/arc <ids> --steps N` is local practice. `/arc --all --steps N`

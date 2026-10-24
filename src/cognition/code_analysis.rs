@@ -317,6 +317,10 @@ pub struct FileAnalysis {
     pub total_traits: usize,
     /// Count of `impl` blocks in the file.
     pub total_impls: usize,
+    /// Impl relations as (self-type, trait) pairs — `None` trait means
+    /// an inherent impl block. The dependency graph only carries call
+    /// edges; impl relations are recorded here for the wire report.
+    pub impls: Vec<(String, Option<String>)>,
     /// Highest cyclomatic-complexity proxy across all units.
     pub max_complexity: usize,
     /// Mean cyclomatic-complexity proxy across all units.
@@ -372,6 +376,8 @@ struct UnitVisitor {
     /// Visibility of the trait currently being visited — trait items
     /// carry no visibility of their own, so they inherit the trait's.
     trait_is_pub: bool,
+    /// Impl relations collected alongside the units: (self-type, trait).
+    impls: Vec<(String, Option<String>)>,
 }
 
 impl UnitVisitor {
@@ -380,6 +386,7 @@ impl UnitVisitor {
             units: Vec::new(),
             current_module: Vec::new(),
             trait_is_pub: false,
+            impls: Vec::new(),
         }
     }
 
@@ -962,6 +969,14 @@ impl<'ast> Visit<'ast> for UnitVisitor {
             })
             .unwrap_or_else(|| self_name.clone());
 
+        let trait_name = node.trait_.as_ref().map(|(p, _)| {
+            p.segments
+                .last()
+                .map(|s| s.ident.to_string())
+                .unwrap_or_default()
+        });
+        self.impls.push((self_name.clone(), trait_name));
+
         let qualified = self.qualified_name(&format!("impl_{name}"));
         let line_start = if let syn::Type::Path(p) = &*node.self_ty {
             p.path
@@ -1266,6 +1281,7 @@ pub fn analyze_file(source: &str, file_path: &str) -> Result<FileAnalysis, Strin
         total_enums,
         total_traits,
         total_impls,
+        impls: visitor.impls,
         max_complexity,
         avg_complexity,
     })
@@ -1445,4 +1461,94 @@ pub fn find_refactoring_targets(analysis: &FileAnalysis) -> Vec<(String, String)
     }
 
     targets
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  Wire report — the daemon's structural sense, served to the mind
+// ─────────────────────────────────────────────────────────────────
+
+/// Serialize a [`FileAnalysis`] into the UTF-8 line report served over
+/// IPC (`ANALYZE_CODE`). Fields are tab-separated, list items are
+/// `;`-separated (Rust type strings can contain commas), and any stray
+/// tab/newline inside free text is flattened so each record stays one
+/// line. Record layout:
+///
+/// ```text
+/// file\t<path>
+/// lines|functions|structs|enums|traits|impls|max_complexity\t<n>
+/// avg_complexity\t<f>
+/// unit\t<kind>\t<name>\t<qualified>\t<start>-<end>\t<flags csv>
+///     \t<params;list>\t<ret>\t<calls;list>\t<refs;list>
+///     \t<branches>\t<loops>\t<stmts>\t<doc text>
+/// impl\t<self_type>\t<trait or ->
+/// edge\t<caller qualified>\t<callee qualified>
+/// ```
+pub fn analysis_to_wire(analysis: &FileAnalysis) -> Vec<u8> {
+    fn clean(s: &str) -> String {
+        s.replace(['\t', '\n', '\r'], " ")
+    }
+    fn list(items: &[String]) -> String {
+        items.iter().map(|s| clean(s)).collect::<Vec<_>>().join(";")
+    }
+
+    let mut out = String::with_capacity(4 * 1024);
+    use std::fmt::Write as _;
+    let _ = writeln!(out, "file\t{}", clean(&analysis.file_path));
+    let _ = writeln!(out, "lines\t{}", analysis.total_lines);
+    let _ = writeln!(out, "functions\t{}", analysis.total_functions);
+    let _ = writeln!(out, "structs\t{}", analysis.total_structs);
+    let _ = writeln!(out, "enums\t{}", analysis.total_enums);
+    let _ = writeln!(out, "traits\t{}", analysis.total_traits);
+    let _ = writeln!(out, "impls\t{}", analysis.total_impls);
+    let _ = writeln!(out, "max_complexity\t{}", analysis.max_complexity);
+    let _ = writeln!(out, "avg_complexity\t{}", analysis.avg_complexity);
+
+    for u in &analysis.units {
+        let mut flags = Vec::with_capacity(4);
+        if u.is_public {
+            flags.push("pub");
+        }
+        if u.is_async {
+            flags.push("async");
+        }
+        if u.is_unsafe {
+            flags.push("unsafe");
+        }
+        if u.has_body {
+            flags.push("body");
+        }
+        let _ = writeln!(
+            out,
+            "unit\t{}\t{}\t{}\t{}-{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            u.kind.as_str(),
+            clean(&u.name),
+            clean(&u.qualified_name),
+            u.line_start,
+            u.line_end,
+            flags.join(","),
+            list(&u.params),
+            u.return_type.as_deref().map(clean).unwrap_or_default(),
+            list(&u.calls),
+            list(&u.references),
+            u.branch_count,
+            u.loop_count,
+            u.statement_count,
+            clean(&u.doc_comments.join(" ")),
+        );
+    }
+    for (self_ty, trait_name) in &analysis.impls {
+        let _ = writeln!(
+            out,
+            "impl\t{}\t{}",
+            clean(self_ty),
+            trait_name
+                .as_deref()
+                .map(clean)
+                .unwrap_or_else(|| "-".into())
+        );
+    }
+    for e in &analysis.graph.edges {
+        let _ = writeln!(out, "edge\t{}\t{}", clean(&e.from), clean(&e.to));
+    }
+    out.into_bytes()
 }

@@ -74,10 +74,15 @@ _PRUNE_THRESHOLD = 0.05
 # Only inferred/discovered/dream-validated/analogy edges are prunable.
 # Stated, observed, and corrected edges are preserved even at low
 # weight — they represent direct knowledge, not inference.
-_PRUNABLE_ORIGINS = frozenset({
-    "inferred", "discovered", "dream-validated", "analogy",
-    "transferred",
-})
+_PRUNABLE_ORIGINS = frozenset(
+    {
+        "inferred",
+        "discovered",
+        "dream-validated",
+        "analogy",
+        "transferred",
+    }
+)
 
 
 @dataclass(slots=True)
@@ -235,7 +240,8 @@ class BeliefRevision:
         return records
 
     def revise_batch(
-        self, assessments: list[CriticalAssessment],
+        self,
+        assessments: list[CriticalAssessment],
     ) -> list[RevisionRecord]:
         """Apply a batch of critical assessments to the network.
 
@@ -332,7 +338,8 @@ class BeliefRevision:
         )
 
     def _prune_weak_edges(
-        self, records: list[RevisionRecord],
+        self,
+        records: list[RevisionRecord],
     ) -> list[RevisionRecord]:
         """Prune edges that fell below the threshold after revision.
 
@@ -353,24 +360,29 @@ class BeliefRevision:
                 continue
             # Find the edge and check if it's prunable.
             edge = self._find_edge(
-                record.concept, record.target,
+                record.concept,
+                record.target,
                 RelationType(record.relation),
             )
             if edge is None or edge.origin not in _PRUNABLE_ORIGINS:
                 continue
             self.network.remove_edge(
-                record.concept, record.target, edge.relation,
+                record.concept,
+                record.target,
+                edge.relation,
             )
             self._pruned_count += 1
-            pruned.append(RevisionRecord(
-                concept=record.concept,
-                relation=record.relation,
-                target=record.target,
-                old_weight=record.new_weight,
-                new_weight=0.0,
-                reason="pruned",
-                evidence_summary=f"pruned: weight fell below {_PRUNE_THRESHOLD}",
-            ))
+            pruned.append(
+                RevisionRecord(
+                    concept=record.concept,
+                    relation=record.relation,
+                    target=record.target,
+                    old_weight=record.new_weight,
+                    new_weight=0.0,
+                    reason="pruned",
+                    evidence_summary=f"pruned: weight fell below {_PRUNE_THRESHOLD}",
+                )
+            )
         return pruned
 
     # ─── Bayesian updating ────────────────────────────────────────
@@ -393,7 +405,11 @@ class BeliefRevision:
             return
         try:
             self.probabilistic.observe_evidence(
-                source, relation, target, positive, weight,
+                source,
+                relation,
+                target,
+                positive,
+                weight,
             )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
@@ -431,17 +447,17 @@ class BeliefRevision:
             old_weight = edge.weight
             new_weight = max(_MIN_WEIGHT, old_weight * _DOWNGRADE_FACTOR)
             edge.weight = new_weight
-            records.append(RevisionRecord(
-                concept=edge.source,
-                relation=edge.relation.value,
-                target=edge.target,
-                old_weight=old_weight,
-                new_weight=new_weight,
-                reason="contradiction_downgrade",
-                evidence_summary=(
-                    f"contradiction with {concept_b}: both sides downgraded"
-                ),
-            ))
+            records.append(
+                RevisionRecord(
+                    concept=edge.source,
+                    relation=edge.relation.value,
+                    target=edge.target,
+                    old_weight=old_weight,
+                    new_weight=new_weight,
+                    reason="contradiction_downgrade",
+                    evidence_summary=(f"contradiction with {concept_b}: both sides downgraded"),
+                )
+            )
             self._downgraded_count += 1
 
         self._records.extend(records)
@@ -450,7 +466,10 @@ class BeliefRevision:
     # ─── Helpers ─────────────────────────────────────────────────
 
     def _find_edge(
-        self, source: str, target: str, relation: RelationType,
+        self,
+        source: str,
+        target: str,
+        relation: RelationType,
     ) -> Edge | None:
         """Find an edge by source, target, and relation."""
         src_id = self.network._resolve(source)
@@ -492,12 +511,8 @@ class BeliefRevision:
         pruned = data.get("pruned_count", 0)
         downgraded = data.get("downgraded_count", 0)
         strengthened = data.get("strengthened_count", 0)
-        self._pruned_count = (
-            int(pruned) if isinstance(pruned, (int, float)) else 0
-        )
-        self._downgraded_count = (
-            int(downgraded) if isinstance(downgraded, (int, float)) else 0
-        )
+        self._pruned_count = int(pruned) if isinstance(pruned, (int, float)) else 0
+        self._downgraded_count = int(downgraded) if isinstance(downgraded, (int, float)) else 0
         self._strengthened_count = (
             int(strengthened) if isinstance(strengthened, (int, float)) else 0
         )

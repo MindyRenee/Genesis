@@ -83,13 +83,31 @@ pub fn resolve(env: &Env, repo_root: &std::path::Path) -> PathBuf {
     base_dir(env).join("genesis")
 }
 
-/// Resolve the live state directory, reading the process environment and
-/// treating the current working directory as the repository root.
+/// Resolve the live state directory, reading the process environment.
+///
+/// The pin is anchored to the checkout, not only the caller's working
+/// directory: Python finds `.genesis-data-dir` relative to its own
+/// source file, and `CARGO_MANIFEST_DIR` — the root of the checkout
+/// this binary was built from — is the Rust-side analogue. A binary
+/// launched from another directory would otherwise fall through to the
+/// XDG default and silently read a different state tree.
 ///
 /// `cargo run --example` runs with the package root as the working
-/// directory, which is where the pin lives.
+/// directory, so the two anchors normally name the same file.
 pub fn data_dir() -> PathBuf {
-    resolve(&Env::from_process(), std::path::Path::new("."))
+    let env = Env::from_process();
+    if let Some(explicit) = usable(env.data_dir.as_ref()) {
+        return PathBuf::from(explicit);
+    }
+    for root in [
+        std::path::Path::new("."),
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")),
+    ] {
+        if let Some(pinned) = read_pin(&root.join(PIN_FILE)) {
+            return pinned;
+        }
+    }
+    base_dir(&env).join("genesis")
 }
 
 /// Resolve against an explicit repository root, for callers that know it.

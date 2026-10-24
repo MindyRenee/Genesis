@@ -387,6 +387,7 @@ class DualSystemLearner:
             raise ValueError(f"unsupported dual-system state version: {data.get('version')}")
 
         def pattern_from(value: object) -> np.ndarray:
+            """Deserialize one stored pattern — right length, finite float32."""
             if not isinstance(value, list) or len(value) != self.pattern_dim:
                 raise ValueError("dual-system pattern has incorrect dimension")
             pattern = np.asarray(value, dtype=np.float32)
@@ -423,7 +424,7 @@ class DualSystemLearner:
             )
 
         with self._lock:
-            self._fast_store = fast[-self.fast_capacity:]
+            self._fast_store = fast[-self.fast_capacity :]
             self._slow_store = slow
             self.total_encoded = max(0, int(data.get("total_encoded", len(fast))))
             self.total_consolidated = max(0, int(data.get("total_consolidated", 0)))

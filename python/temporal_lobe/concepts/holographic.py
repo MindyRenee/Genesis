@@ -95,6 +95,7 @@ DEFAULT_BUCKETS = 16
 
 # ─── Vector operations ──────────────────────────────────────────
 
+
 def _seeded_unit_vector(seed: int, dim: int) -> np.ndarray:
     """Generate a deterministic random unit vector from a seed.
 
@@ -154,6 +155,7 @@ def circular_correlate(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 # ─── Holographic graph ──────────────────────────────────────────
+
 
 class HolographicGraph:
     """Fixed-size holographic associative memory for concept associations.
@@ -253,7 +255,8 @@ class HolographicGraph:
         """Get or create the address vector for a concept."""
         if concept_id not in self._addresses:
             self._addresses[concept_id] = _seeded_unit_vector(
-                _hash_to_seed(concept_id), self.dim,
+                _hash_to_seed(concept_id),
+                self.dim,
             )
             self._registered_concepts.add(concept_id)
         return self._addresses[concept_id]
@@ -262,12 +265,14 @@ class HolographicGraph:
         """Get or create the role vector for a relation type."""
         if relation not in self._roles:
             self._roles[relation] = _seeded_unit_vector(
-                _hash_to_seed(f"role:{relation}"), self.dim,
+                _hash_to_seed(f"role:{relation}"),
+                self.dim,
             )
             self._registered_relations.add(relation)
             # Initialize memory for this relation
             self._memory[relation] = np.zeros(
-                (self.n_buckets, self.dim), dtype=np.float32,
+                (self.n_buckets, self.dim),
+                dtype=np.float32,
             )
         return self._roles[relation]
 
@@ -453,19 +458,13 @@ class HolographicGraph:
 
             result_ids = {cid for cid, score in results}
             if target in result_ids:
-                target_similarities.append(
-                    next(score for cid, score in results if cid == target)
-                )
+                target_similarities.append(next(score for cid, score in results if cid == target))
             else:
                 role = self._roles.get(relation)
                 if role is not None:
                     bucket = self._bucket_index(source)
-                    recovered = circular_correlate(
-                        self._memory[relation][bucket], role
-                    )
-                    target_similarities.append(
-                        float(np.dot(recovered, self._addresses[target]))
-                    )
+                    recovered = circular_correlate(self._memory[relation][bucket], role)
+                    target_similarities.append(float(np.dot(recovered, self._addresses[target])))
 
         n = len(reciprocal_ranks)
         if n == 0:
@@ -567,7 +566,8 @@ class HolographicGraph:
         """
         for relation in self._memory:
             self._memory[relation] = np.zeros(
-                (self.n_buckets, self.dim), dtype=np.float32,
+                (self.n_buckets, self.dim),
+                dtype=np.float32,
             )
         self._addresses = {}
         self._roles = {}

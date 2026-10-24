@@ -27,10 +27,10 @@ from temporal_lobe.vocabulary import Vocabulary
 logger = logging.getLogger(__name__)
 
 
-
 # ======================================================================
 # From tests/test_generative_language.py
 # ======================================================================
+
 
 def _make_personality(**overrides) -> PersonalityTraits:
     """Construct a personality for tests."""
@@ -46,7 +46,6 @@ def _make_personality(**overrides) -> PersonalityTraits:
 
 
 def _make_self_model(**personality_overrides) -> SelfModel:
-
     """Construct a self model for tests."""
     return SelfModel(
         born_at=int(time.time() * 1000),
@@ -742,6 +741,7 @@ if __name__ == "__main__":
 # From tests/test_graph_walk.py
 # ======================================================================
 
+
 def _make_personality_gw(**overrides) -> PersonalityTraits:
     """Construct a personality gw for tests."""
     defaults = {
@@ -818,8 +818,9 @@ def test_graph_walk_generates_from_concept_with_edges() -> None:
     assert len(text) > 10, f"Generated text too short: {text!r}"
     # The text should mention the seed concept or a related concept
     lower = text.lower()
-    assert any(w in lower for w in ("cognition", "neural", "awareness")), \
+    assert any(w in lower for w in ("cognition", "neural", "awareness")), (
         f"Generated text doesn't mention the concept or its neighbors: {text!r}"
+    )
 
 
 def test_graph_walk_returns_none_for_isolated_concept() -> None:
@@ -836,8 +837,7 @@ def test_graph_walk_returns_none_for_isolated_concept() -> None:
         confidence=0.5,
     )
     text = gen.generate(thought, _make_emotion_gw())
-    assert text is None, \
-        f"Generator should return None for isolated concept, got: {text!r}"
+    assert text is None, f"Generator should return None for isolated concept, got: {text!r}"
 
 
 def test_graph_walk_returns_none_for_unknown_concept() -> None:
@@ -893,8 +893,9 @@ def test_graph_walk_high_creativity_deeper_walk() -> None:
     assert text_high is not None, "High creativity walk produced nothing"
     # High creativity should produce at least as much text as low
     # (deeper walk → more edges → more clauses)
-    assert len(text_high) >= len(text_low), \
+    assert len(text_high) >= len(text_low), (
         f"High creativity should produce >= text: low={len(text_low)}, high={len(text_high)}"
+    )
 
 
 def test_graph_walk_low_engagement_shorter_output() -> None:
@@ -926,8 +927,9 @@ def test_graph_walk_extracts_concept_from_topics() -> None:
     )
     text = gen.generate(thought, _make_emotion_gw())
     assert text is not None
-    assert "cognition" in text.lower() or "neural" in text.lower(), \
+    assert "cognition" in text.lower() or "neural" in text.lower(), (
         f"Should walk from topics[0], not content: {text!r}"
+    )
 
 
 def test_graph_walk_extracts_concept_from_content() -> None:
@@ -943,8 +945,9 @@ def test_graph_walk_extracts_concept_from_content() -> None:
     )
     text = gen.generate(thought, _make_emotion_gw())
     assert text is not None
-    assert "thinking" in text.lower() or "memory" in text.lower(), \
+    assert "thinking" in text.lower() or "memory" in text.lower(), (
         f"Should extract concept from content: {text!r}"
+    )
 
 
 # ─── Sentence structure ────────────────────────────────────────
@@ -984,8 +987,9 @@ def test_graph_walk_uses_relation_verbs() -> None:
     assert text is not None
     lower = text.lower()
     # The walk should use one of the EMERGES_FROM or IS_A verbs
-    assert any(v in lower for v in ("emerges", "grows", "arises", "is", "kind of", "type of")), \
+    assert any(v in lower for v in ("emerges", "grows", "arises", "is", "kind of", "type of")), (
         f"No relation verb found in output: {text!r}"
+    )
 
 
 # ─── Integration with GenerativeLanguage ─────────────────────────
@@ -1059,8 +1063,7 @@ def test_graph_walk_defers_to_knowledge_metadata() -> None:
         },
     )
     text = gen.generate(thought, _make_emotion_gw())
-    assert text is None, \
-        "Graph walk should defer to knowledge path when metadata is present"
+    assert text is None, "Graph walk should defer to knowledge path when metadata is present"
 
 
 # ─── Grammar correctness ────────────────────────────────────────
@@ -1100,8 +1103,7 @@ def test_graph_walk_opening_does_not_break_grammar_with_definition() -> None:
     # The fixed patterns are either:
     #   "Let me think about water. Water is a clear liquid." (two sentences)
     #   "There's something about water, water is a clear liquid." (comma-joined)
-    assert " is a clear liquid." in text, \
-        f"Definition should appear as a sentence: {text!r}"
+    assert " is a clear liquid." in text, f"Definition should appear as a sentence: {text!r}"
     # Check that no sentence contains the broken pattern: opener
     # directly prefixing a capitalized "is" clause with no comma/period
     # separator. The comma-joined form is acceptable.
@@ -1127,8 +1129,9 @@ def test_graph_walk_opening_does_not_break_grammar_with_definition() -> None:
                 r"my neurochemistry shifts with [A-Z]",
             ]
             for pat in broken_patterns:
-                assert not re.match(pat, s), \
+                assert not re.match(pat, s), (
                     f"Broken grammar — opener directly prefixes clause: {s!r}"
+                )
 
 
 def test_graph_walk_hedge_opening_works_as_prefix() -> None:
@@ -1288,6 +1291,7 @@ def test_graph_walk_rejects_express_emotion_intent() -> None:
 # ======================================================================
 # Hamiltonian flow field — numerical stability
 # ======================================================================
+
 
 def _make_flow_field(
     angle_matrix: np.ndarray,
@@ -1592,24 +1596,20 @@ def test_verb_shaped_noun_does_not_steal_predicate() -> None:
 
 
 def test_gapped_vp_coordination_expands() -> None:
-    """"put A in B and C in D" is two instructions sharing the
+    """ "put A in B and C in D" is two instructions sharing the
     verb — the second conjunct elides it."""
     props = _props(
-        "put the red star in the square hole "
-        "and the blue moon in the round hole"
+        "put the red star in the square hole and the blue moon in the round hole"
     ).propositions
     puts = [p for p in props if p.predicate == "put"]
     assert len(puts) == 2
-    locs = [
-        str(p.roles[next(iter(p.roles))]) if p.roles else ""
-        for p in puts
-    ]
+    locs = [str(p.roles[next(iter(p.roles))]) if p.roles else "" for p in puts]
     assert any("square" in loc for loc in locs)
     assert any("round" in loc for loc in locs)
 
 
 def test_shared_subject_coordination_unchanged() -> None:
-    """"I came and saw the water" still expands through the VP path."""
+    """ "I came and saw the water" still expands through the VP path."""
     props = _props("I came and saw the water").propositions
     preds = [p.predicate for p in props]
     assert "came" in preds and "saw" in preds
@@ -1638,9 +1638,7 @@ def _knowledge_engine() -> GenerativeLanguage:
     net = ConceptNetwork()
     for name in ("mammal", "warm blooded animal", "crisp"):
         net.add_concept(name, confidence=0.8)
-    net.add_edge(
-        "mammal", "warm blooded animal", RelationType.IS_A, 0.9
-    )
+    net.add_edge("mammal", "warm blooded animal", RelationType.IS_A, 0.9)
     net.add_edge("mammal", "crisp", RelationType.RELATED_TO, 0.5)
     # "crisp" needs its own content to be speakable (unspeakable
     # targets — no definition, no outgoing edges — are filtered as
@@ -1764,9 +1762,7 @@ def test_knowledge_metadata_composes_rather_than_passes_content_through() -> Non
     network.add_concept("animal", confidence=0.8)
     network.add_edge("dog", "animal", relation=RelationType.IS_A, weight=0.9)
 
-    composer = ThoughtComposer(
-        network=network, reasoner=Reasoner(network=network), seed=1
-    )
+    composer = ThoughtComposer(network=network, reasoner=Reasoner(network=network), seed=1)
     thought = composer.compose_about("dog", _make_emotion())
     assert thought is not None
 
@@ -1809,9 +1805,7 @@ def test_verbatim_fallback_is_last_resort_and_not_used_by_composer_paths() -> No
     # hand-rolled approximation — `_compose_knowledge_content` composes
     # from the conjunction of knowledge, definition and reasoning, and a
     # thinner dict legitimately falls through.
-    composer = ThoughtComposer(
-        network=network, reasoner=Reasoner(network=network), seed=1
-    )
+    composer = ThoughtComposer(network=network, reasoner=Reasoner(network=network), seed=1)
     thought = composer.compose_about("dog", emotion)
     assert thought is not None
     context = dict(thought.metadata)
@@ -1826,9 +1820,7 @@ def test_verbatim_fallback_is_last_resort_and_not_used_by_composer_paths() -> No
 
     # With no metadata at all, the fallback does fire — and is explicit
     # about being the degraded path.
-    assert vocab._verbatim_fallback("only prose here", {"intent": "inform"}) == [
-        "only prose here"
-    ]
+    assert vocab._verbatim_fallback("only prose here", {"intent": "inform"}) == ["only prose here"]
     assert vocab._verbatim_fallback("", {"intent": "inform"}) == []
 
 
@@ -1877,6 +1869,7 @@ def test_comprehension_full_parse_has_high_coverage() -> None:
     result = _props("the engine moves the piston")
     assert result.parse_coverage >= 0.8
     assert "low_parse_coverage" not in result.diagnostics
+
 
 pytestmark = [
     pytest.mark.usefixtures("learned_sentiment"),

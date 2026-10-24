@@ -9,10 +9,10 @@ at the next move and closes the window.
 import time
 from typing import ClassVar
 
-import frontal_lobe.games.play as play_mod
-from frontal_lobe.games.environment import GameObservation, GameOutcome
-from frontal_lobe.games.play import GamePlay
-from frontal_lobe.games.player import GamePlayer
+import basal_ganglia.play as play_mod
+from basal_ganglia.play import GamePlay
+from basal_ganglia.player import GamePlayer
+from worlds.environment import GameObservation, GameOutcome
 
 
 class _Env:
@@ -30,9 +30,7 @@ class _Env:
         return ["a", "b"]
 
     def act(self, action):
-        return GameOutcome(
-            observation=GameObservation(), reward=0.0, info={}
-        )
+        return GameOutcome(observation=GameObservation(), reward=0.0, info={})
 
     def done(self):
         return False
@@ -52,26 +50,20 @@ def test_should_stop_interrupts_episode():
         calls["n"] += 1
         return calls["n"] > 3
 
-    res = GamePlayer().play(
-        _Env(), max_steps=100, should_stop=stop_after_three
-    )
+    res = GamePlayer().play(_Env(), max_steps=100, should_stop=stop_after_three)
     assert res.cause == "interrupted"
     assert res.steps == 3
     assert not res.won
 
 
 def test_should_stop_before_first_move():
-    res = GamePlayer().play(
-        _Env(), max_steps=100, should_stop=lambda: True
-    )
+    res = GamePlayer().play(_Env(), max_steps=100, should_stop=lambda: True)
     assert res.cause == "interrupted"
     assert res.steps == 0
 
 
 def test_episode_runs_when_never_stopped():
-    res = GamePlayer().play(
-        _Env(), max_steps=7, should_stop=lambda: False
-    )
+    res = GamePlayer().play(_Env(), max_steps=7, should_stop=lambda: False)
     assert res.cause == "finished"
     assert res.steps == 7
 
@@ -83,22 +75,17 @@ def _game_play(tmp_path):
 def test_system_gap_gates_windowed_picks(tmp_path, monkeypatch):
     """While the desktop gap runs, system games leave the shelf."""
     gp = _game_play(tmp_path)
-    spec = {"name": "windowed_thing", "family": "system",
-            "command": "/x"}
+    spec = {"name": "windowed_thing", "family": "system", "command": "/x"}
     monkeypatch.setattr(gp, "_system_games", lambda: [spec])
     # Every internal game already mastered — a fresh system game
     # would dominate picks if the gate weren't there.
-    gp.mastery = {
-        str(t["name"]): 1.0 for t in play_mod.COLLECTION
-    }
+    gp.mastery = {str(t["name"]): 1.0 for t in play_mod.COLLECTION}
     assert gp.system_ready()
     gp._system_last_end = time.monotonic()
     assert not gp.system_ready()
     for _ in range(200):
         assert gp.pick(allow_system=False).get("family") != "system"
-    gp._system_last_end = (
-        time.monotonic() - play_mod._SYSTEM_GAP_SECONDS - 1
-    )
+    gp._system_last_end = time.monotonic() - play_mod._SYSTEM_GAP_SECONDS - 1
     assert gp.system_ready()
 
 
@@ -142,13 +129,14 @@ def _system_task(tmp_path, monkeypatch):
 def test_windowed_env_reused_between_episodes(tmp_path, monkeypatch):
     """One X11Game per game — no process pile-up across firings."""
     _FakeX11Game.instances.clear()
-    import frontal_lobe.games.windowed as win_mod
+    import worlds.windowed as win_mod
 
     monkeypatch.setattr(win_mod, "X11Game", _FakeX11Game)
     gp = _game_play(tmp_path)
     task = _system_task(tmp_path, monkeypatch)
     monkeypatch.setattr(
-        gp._player, "play",
+        gp._player,
+        "play",
         lambda env, **kw: _StubResult("finished"),
     )
     gp._attempt_system(task)
@@ -162,7 +150,7 @@ def test_windowed_env_reused_between_episodes(tmp_path, monkeypatch):
 def test_interrupt_kills_the_window(tmp_path, monkeypatch):
     """A user interrupt ends the session *and* the window."""
     _FakeX11Game.instances.clear()
-    import frontal_lobe.games.windowed as win_mod
+    import worlds.windowed as win_mod
 
     monkeypatch.setattr(win_mod, "X11Game", _FakeX11Game)
     gp = _game_play(tmp_path)

@@ -13,11 +13,14 @@ def sample_vectors():
     """Generate a small set of test vectors with known cluster structure."""
     rng = np.random.default_rng(42)
     # 3 clusters of 10 points each, 8 dimensions
-    centers = np.array([
-        [1, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 0, 0, 0, 0, 0],
-        [0, 0, 1, 0, 0, 0, 0, 0],
-    ], dtype=np.float32)
+    centers = np.array(
+        [
+            [1, 0, 0, 0, 0, 0, 0, 0],
+            [0, 1, 0, 0, 0, 0, 0, 0],
+            [0, 0, 1, 0, 0, 0, 0, 0],
+        ],
+        dtype=np.float32,
+    )
     vectors = []
     names = []
     for ci in range(3):
@@ -30,6 +33,7 @@ def sample_vectors():
 
 class TestVQCodebook:
     """Tests for v q codebook."""
+
     def test_fit_and_reconstruct(self, sample_vectors):
         """Codebook should train and reconstruct vectors with low error."""
         vectors, names = sample_vectors

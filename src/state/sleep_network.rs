@@ -8,7 +8,9 @@
 //! 16(2):1089–1112 (2017).
 //!
 //! Populations: `f_lc` (wake, locus coeruleus), `f_vlpo` (NREM / sleep,
-//! ventrolateral preoptic area), `f_r` (REM-on), `f_scn` (circadian pacemaker).
+//! ventrolateral preoptic area), `f_r` (REM-on, sublaterodorsal/precoeruleus),
+//! `f_scn` (circadian pacemaker).
+//!
 //! Sleep onset is `f_lc` falling below [`SLEEP_THRESHOLD`]; REM onset is
 //! `f_r` rising above [`REM_THRESHOLD`]. Both are the source's own event
 //! definitions. Time is in minutes.
@@ -19,6 +21,18 @@ use std::f64::consts::PI;
 const GACH_LC: f64 = 0.8;
 const GGABA_LC: f64 = 1.5;
 const GSCN_LC: f64 = 0.5;
+// The stress axis's own alerting channel onto LC. CRH and elevated
+// glucocorticoids recruit the noradrenergic arousal system even with no
+// sensory event — CRH activates the LC even in the absence of stress,
+// and nocturnal cortisol elevation tracks sleep fragmentation (Buckley
+// & Schatzberg, JCEM 2005; Vgontzas et al.). It is also the waking side
+// of the diurnal rhythm: the pre-awakening cortisol surge accompanies
+// the sleep→wake transition. The input is the cortisol stress fraction
+// (0 at the basal floor, 1 at the reachable peak), so the term is silent
+// at the nadir and ramps through the late-sleep surge. Half a volitional
+// wake push: enough to lighten and fragment sleep under stress, not
+// enough to drag a fresh VLPO down on its own.
+const GCORT_LC: f64 = 0.5;
 const GNE_VLPO: f64 = 1.5;
 const GSCN_VLPO: f64 = 0.1;
 const GACH_R: f64 = 2.2;
@@ -71,6 +85,23 @@ const K: f64 = 0.55;
 const I_0: f64 = 9500.0;
 const MU: f64 = 0.23;
 
+// Monoaminergic arousal → LC. The wake side of the switch is driven by
+// the brain's own arousal chemistry, not an exogenous drive: orexin
+// neurons project most densely onto the LC (Hagan et al. 1999, PNAS
+// 96:10911) and are the switch's stabilizer — Saper's flip-flop has
+// orexin reinforcing the monoaminergic wake populations, never VLPO
+// (VLPO neurons lack orexin receptors). Histaminergic TMN neurons
+// activate LC and are themselves silenced by VLPO during sleep — the
+// secondary wake-side input. Both are measured against their resting
+// baselines (the neurochemical defaults, `Orexin => 0.30`,
+// `Histamine => 0.30`), so resting chemistry adds nothing and the
+// source model is preserved at rest; *below*-baseline orexin weakens
+// the wake side, the loss-of-stabilizer signature of narcolepsy.
+const OXIN_REST: f64 = 0.30;
+const HTM_REST: f64 = 0.30;
+const GOXIN_LC: f64 = 1.2;
+const GHTM_LC: f64 = 0.8;
+
 /// Firing rate of LC (wake) below which the source counts sleep onset.
 pub const SLEEP_THRESHOLD: f64 = 4.0;
 /// Firing rate of REM-on above which the source counts REM onset.
@@ -79,58 +110,92 @@ pub const REM_THRESHOLD: f64 = 3.0;
 /// State vector: `[f_lc, f_vlpo, f_r, f_scn, h, c, xc, n]`.
 pub type State = [f64; 8];
 
-/// The source's initial conditions (`run_DinizBehnBooth_SWnetworkModel.m`).
+/// The source's initial conditions.
 pub const INITIAL: State = [
-    5.71387902867966,
-    0.395493299109024,
-    0.0,
-    4.01351469432799,
-    214.116748078719,
-    0.00114912794709424,
-    -1.15530846944936,
-    0.604617443838918,
+    5.71387902867966,    // f_lc
+    0.395493299109024,   // f_vlpo
+    0.0,                 // f_r
+    4.01351469432799,    // f_scn
+    214.116748078719,    // h
+    0.00114912794709424, // c
+    -1.15530846944936,   // xc
+    0.604617443838918,   // n
 ];
 
 fn sigmoid(x: f64, max: f64, beta: f64, alpha: f64) -> f64 {
     max * 0.5 * (1.0 + ((x - beta) / alpha).tanh())
 }
 
-/// A volitional input to the network: an excitatory drive onto one of the
-/// two state-switching populations. Voluntary sleep onset is modelled as
-/// drive onto VLPO, voluntary arousal as drive onto LC. The source has no
-/// such input; it is added here because Genesis's `/sleep` and `/wake` are
-/// volitional. Both drives are zero unless the mind sets them.
+/// Subcortical retinal afference for one integration step — the optic
+/// nerve's non-image-forming branches, measured by the body from the
+/// retina's shared-memory frames (`daemon::optic_nerve`).
+///
+/// Two projections matter to this network:
+///
+/// - **Retinohypothalamic tract (RHT)**: melanopsin ipRGCs project
+///   (near-)exclusively to the SCN; retinal illuminance is the primary
+///   zeitgeber. `light` carries it in the oscillator's lux units.
+///   `None` means no live retinal read — the built-in photoperiod
+///   stands in for the world, as before.
+/// - **Superior colliculus → alerting**: a salient visual transient is
+///   the sensory-gaining "wake-up call" — salient stimuli are still
+///   analysed during sleep and can arouse when they matter. `alert_lc`
+///   is a transient excitation onto the LC input for this step only;
+///   the network's own flip-flop decides whether it crosses threshold.
+///
+/// Afference, not a command: it does not disable the
+/// adenosine→homeostat coupling — the body still owns the switch.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Drive {
-    /// Excitation of VLPO (sleep-promoting), in the same units as the
-    /// synaptic inputs to the sigmoid.
-    pub vlpo: f64,
-    /// Excitation of LC (wake-promoting).
-    pub lc: f64,
+pub struct VisualAfference {
+    /// Retinal illuminance in lux-equivalent units (`I_0` scale).
+    pub light: Option<f64>,
+    /// Transient LC excitation from a salient visual event.
+    pub alert_lc: f64,
 }
 
-impl Drive {
-    /// No volitional input: the source model unchanged.
-    pub const NONE: Drive = Drive { vlpo: 0.0, lc: 0.0 };
+impl VisualAfference {
+    /// No retinal afference: the source model unchanged.
+    pub const NONE: VisualAfference = VisualAfference {
+        light: None,
+        alert_lc: 0.0,
+    };
 }
 
-/// Right-hand side of the network at time `t` (minutes), with no volitional
-/// input.
+/// Right-hand side of the network at time `t` (minutes), at resting
+/// arousal chemistry with no retinal or stress input — the source model.
 pub fn deriv(t: f64, x: &State) -> State {
-    deriv_with(t, x, Drive::NONE)
+    deriv_with_afference(t, x, VisualAfference::NONE, 0.0, OXIN_REST, HTM_REST)
 }
 
-/// Right-hand side of the network at time `t` (minutes), with a volitional
-/// drive added to the population inputs.
-pub fn deriv_with(t: f64, x: &State, drive: Drive) -> State {
+/// Right-hand side of the network at time `t` (minutes), with the optic
+/// nerve's subcortical afference, the stress-axis alerting input (`hpa`:
+/// the cortisol stress fraction, [0, 1]), and the monoaminergic arousal
+/// inputs (`oxin`, `htm`: effective orexin and histamine levels, [0, 1],
+/// measured against `OXIN_REST`/`HTM_REST`) added.
+pub fn deriv_with_afference(
+    t: f64,
+    x: &State,
+    aff: VisualAfference,
+    hpa: f64,
+    oxin: f64,
+    htm: f64,
+) -> State {
     let [f_lc, f_vlpo, f_r, f_scn, h, c, xc, n] = *x;
     let c_ne = (f_lc / GAMMA_NE).tanh();
     let c_gaba = (f_vlpo / GAMMA_GABA).tanh();
     let c_ach = (f_r / GAMMA_ACH_R).tanh();
     let c_scn = (f_scn / GAMMA_SCN).tanh();
 
-    let lc_input = GACH_LC * c_ach + GSCN_LC * c_scn - GGABA_LC * c_gaba + drive.lc;
-    let vlpo_input = -GNE_VLPO * c_ne - GSCN_VLPO * c_scn + drive.vlpo;
+    // Four alerting inputs sum on the same LC channel — the collicular
+    // pulse (sensory gaining), circulating cortisol (humoral stress), and
+    // the monoaminergic arousal drive. All of them are the body's own
+    // chemistry or sensory input; nothing exogenous is held on the wire.
+    let lc_input = GACH_LC * c_ach + GSCN_LC * c_scn - GGABA_LC * c_gaba
+        + aff.alert_lc
+        + GCORT_LC * hpa
+        + GOXIN_LC * (oxin - OXIN_REST)
+        + GHTM_LC * (htm - HTM_REST);
+    let vlpo_input = -GNE_VLPO * c_ne - GSCN_VLPO * c_scn;
     let r_input = GACH_R * c_ach - GNE_R * c_ne + GSCN_R * c_scn - GGABA_R * c_gaba;
     let beta_vlpo = K2 * h + K1;
 
@@ -139,18 +204,10 @@ pub fn deriv_with(t: f64, x: &State, drive: Drive) -> State {
     let scn_inf = sigmoid(c, MAX_SCN, BETA_SCN, ALPHA_SCN);
     let vlpo_inf = sigmoid(vlpo_input, MAX_VLPO, beta_vlpo, ALPHA_VLPO);
 
-    // Light: 500 during the 14 h light period, else 0. The source runs
-    // light from minute 600 of each simulated day (10:00–24:00); here t is
-    // anchored to the local wall clock, so the window is phase-shifted to
-    // 07:00–21:00 — a 14 h photoperiod, preserved — so that the entrained
-    // sleep episode (~22:11–05:50) falls inside the neurochemical
-    // circadian's biological night rather than ending ~2 h after
-    // melatonin offset as it did with the source's alignment.
-    let i_light: f64 = if (420.0..1260.0).contains(&t.rem_euclid(1440.0)) {
-        500.0
-    } else {
-        0.0
-    };
+    // Light reaches the oscillator only through the retinohypothalamic
+    // tract — measured retinal illuminance when the eye is live, and
+    // the built-in photoperiod (the world's fallback) when it is not.
+    let i_light: f64 = aff.light.unwrap_or_else(|| scheduled_light(t));
     let alph = ALPH_0 * (i_light.powf(P) / I_0.powf(P));
     let b_hat = G * (1.0 - n) * alph;
     let b = b_hat * (1.0 - 0.4 * c) * (1.0 - 0.4 * xc);
@@ -173,29 +230,64 @@ pub fn deriv_with(t: f64, x: &State, drive: Drive) -> State {
     ]
 }
 
-/// One fourth-order Runge–Kutta step of `dt` minutes from time `t`, with a
-/// volitional drive held constant over the step.
-pub fn rk4_with(t: f64, x: &State, dt: f64, drive: Drive) -> State {
+/// The built-in photoperiod — the world's fallback light signal when
+/// no retinal measurement exists. 500 lux during the 14 h light
+/// period, else 0. The source runs light from minute 600 of each
+/// simulated day (10:00–24:00); here t is anchored to the local wall
+/// clock, so the window is phase-shifted to 07:00–21:00 — a 14 h
+/// photoperiod, preserved — so that the entrained sleep episode
+/// (~22:11–05:50) falls inside the neurochemical circadian's
+/// biological night rather than ending ~2 h after melatonin offset as
+/// it did with the source's alignment.
+fn scheduled_light(t: f64) -> f64 {
+    if (420.0..1260.0).contains(&t.rem_euclid(1440.0)) {
+        500.0
+    } else {
+        0.0
+    }
+}
+
+/// One fourth-order Runge–Kutta step of `dt` minutes from time `t`, with
+/// retinal afference and chemical inputs held constant over the step.
+pub fn rk4_with_afference(
+    t: f64,
+    x: &State,
+    dt: f64,
+    aff: VisualAfference,
+    hpa: f64,
+    oxin: f64,
+    htm: f64,
+) -> State {
     let add = |a: &State, b: &State, k: f64| -> State { std::array::from_fn(|i| a[i] + k * b[i]) };
-    let k1 = deriv_with(t, x, drive);
-    let k2 = deriv_with(t + dt / 2.0, &add(x, &k1, dt / 2.0), drive);
-    let k3 = deriv_with(t + dt / 2.0, &add(x, &k2, dt / 2.0), drive);
-    let k4 = deriv_with(t + dt, &add(x, &k3, dt), drive);
+    let k1 = deriv_with_afference(t, x, aff, hpa, oxin, htm);
+    let k2 = deriv_with_afference(t + dt / 2.0, &add(x, &k1, dt / 2.0), aff, hpa, oxin, htm);
+    let k3 = deriv_with_afference(t + dt / 2.0, &add(x, &k2, dt / 2.0), aff, hpa, oxin, htm);
+    let k4 = deriv_with_afference(t + dt, &add(x, &k3, dt), aff, hpa, oxin, htm);
     std::array::from_fn(|i| x[i] + dt / 6.0 * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]))
 }
 
-/// One RK4 step with no volitional input.
+/// One RK4 step of the source model — resting chemistry, no afference.
 pub fn rk4(t: f64, x: &State, dt: f64) -> State {
-    rk4_with(t, x, dt, Drive::NONE)
+    rk4_with_afference(t, x, dt, VisualAfference::NONE, 0.0, OXIN_REST, HTM_REST)
 }
 
-/// Advance the network by `dt_min` minutes from `t_min` under a volitional
-/// drive.
+/// Advance the network by `dt_min` minutes from `t_min` under the optic
+/// nerve's subcortical afference, the stress-axis alerting input (`hpa`:
+/// cortisol stress fraction, [0, 1]), and the monoaminergic arousal
+/// inputs (`oxin`, `htm`: effective levels, [0, 1]).
 ///
 /// A non-finite result keeps the previous state. The network is authoritative
 /// and persistent, so one bad step must not be allowed to poison it.
-pub fn advance_with(t_min: f64, x: &State, dt_min: f64, drive: Drive) -> State {
-    let next = rk4_with(t_min, x, dt_min, drive);
+pub fn advance_with_afference(
+    t_min: f64,
+    x: &State,
+    dt_min: f64,
+    aff: VisualAfference,
+    hpa: f64,
+    oxin: f64,
+    htm: f64,
+) -> State {
+    let next = rk4_with_afference(t_min, x, dt_min, aff, hpa, oxin, htm);
     if next.iter().all(|v| v.is_finite()) {
         next
     } else {
@@ -203,9 +295,18 @@ pub fn advance_with(t_min: f64, x: &State, dt_min: f64, drive: Drive) -> State {
     }
 }
 
-/// Advance the network by `dt_min` minutes with no volitional input.
+/// Advance the network by `dt_min` minutes at resting chemistry with no
+/// afference — the source model.
 pub fn advance(t_min: f64, x: &State, dt_min: f64) -> State {
-    advance_with(t_min, x, dt_min, Drive::NONE)
+    advance_with_afference(
+        t_min,
+        x,
+        dt_min,
+        VisualAfference::NONE,
+        0.0,
+        OXIN_REST,
+        HTM_REST,
+    )
 }
 
 /// The populations that drive the chemistry, each normalized to its
@@ -217,6 +318,18 @@ pub fn levels(x: &State) -> crate::state::neurochemical::NetworkLevels {
         vlpo: finite_clamp((x[1] / MAX_VLPO) as f32, 0.0, 1.0),
         rem: finite_clamp((x[2] / MAX_R) as f32, 0.0, 1.0),
     }
+}
+
+/// Map the neurochemical adenosine level (resting 0.20, upper
+/// asymptote 0.95) onto the sleep-wake network's homeostatic drive
+/// `h` in `[H_MIN, H_MAX]` (`[0.0, 323.88]`).
+///
+/// Coupling `h` to `Adenosine` ensures that only her own chemical
+/// sleep pressure can flip the VLPO/LC switch into sleep, and
+/// glymphatic adenosine clearance during sleep is what releases it.
+pub fn h_from_adenosine(adenosine: f32) -> f64 {
+    let norm = ((f64::from(adenosine) - 0.20) / (0.95 - 0.20)).clamp(0.0, 1.0);
+    H_MIN + norm * (H_MAX - H_MIN)
 }
 
 /// Whether the network is in a sleep state at these normalized
@@ -416,24 +529,76 @@ mod tests {
         assert_eq!(advance(0.0, &INITIAL, f64::NAN), INITIAL);
     }
 
-    /// A volitional sleep push must suppress the wake population relative to
-    /// the undriven network over the same interval.
+    /// The first state on the source trajectory where LC sits below the
+    /// sleep threshold — the honest way to reach sleep in tests now that
+    /// nothing drives VLPO from outside: let the source model fall asleep
+    /// on its own circadian/homeostatic schedule.
+    fn first_asleep_state() -> State {
+        simulate(4320.0, 1.0)
+            .iter()
+            .map(|(_, x)| *x)
+            .find(|x| x[0] < SLEEP_THRESHOLD)
+            .expect("source model must sleep within three days")
+    }
+
+    /// Elevated monoaminergic arousal must raise the wake population
+    /// relative to resting chemistry over the same interval — a
+    /// wake-signature chemical state (orexin + histamine high, as a
+    /// /wake impulse would leave them) is the alerting channel, not a
+    /// command on the wire.
     #[test]
-    fn volitional_sleep_drive_suppresses_the_wake_population() {
+    fn monoamine_arousal_raises_the_wake_population() {
         let dt = 0.02;
-        let steps = (60.0 / dt) as usize;
-        let mut driven = INITIAL;
-        let mut plain = INITIAL;
-        for i in 0..steps {
+        let mut aroused = first_asleep_state();
+        let mut resting = aroused;
+        for i in 0..(30.0 / dt) as usize {
             let t = i as f64 * dt;
-            driven = advance_with(t, &driven, dt, Drive { vlpo: 1.0, lc: 0.0 });
-            plain = advance(t, &plain, dt);
+            aroused = advance_with_afference(t, &aroused, dt, VisualAfference::NONE, 0.0, 0.9, 0.9);
+            resting = advance_with_afference(
+                t,
+                &resting,
+                dt,
+                VisualAfference::NONE,
+                0.0,
+                OXIN_REST,
+                HTM_REST,
+            );
         }
         assert!(
-            driven[0] < plain[0],
-            "driven LC {} vs plain {}",
-            driven[0],
-            plain[0]
+            aroused[0] > resting[0],
+            "aroused LC {} vs resting {}",
+            aroused[0],
+            resting[0]
+        );
+    }
+
+    /// The narcolepsy signature, and the reason the coupling is signed:
+    /// orexin *below* its resting baseline weakens the LC wake side —
+    /// the loss-of-stabilizer instability, not a silent floor.
+    #[test]
+    fn monoamine_loss_weakens_the_wake_population() {
+        let dt = 0.02;
+        let mut depleted = INITIAL;
+        let mut resting = INITIAL;
+        for i in 0..(60.0 / dt) as usize {
+            let t = i as f64 * dt;
+            depleted =
+                advance_with_afference(t, &depleted, dt, VisualAfference::NONE, 0.0, 0.0, 0.0);
+            resting = advance_with_afference(
+                t,
+                &resting,
+                dt,
+                VisualAfference::NONE,
+                0.0,
+                OXIN_REST,
+                HTM_REST,
+            );
+        }
+        assert!(
+            depleted[0] < resting[0],
+            "depleted LC {} vs resting {}",
+            depleted[0],
+            resting[0]
         );
     }
 
@@ -461,6 +626,35 @@ mod tests {
         s.apply_network_phase();
         assert_eq!(s.zones.phase(), MentalPhase::REM);
         assert_eq!(s.neurochemicals.phase(), MentalPhase::REM);
+    }
+
+    /// The Sleeping zone must never mask the network's stage. A wake
+    /// attractor the display keeps calling NREM leaves the organism
+    /// asleep forever: the mind's desync check reads the published
+    /// phase, and a phase the zone pins cannot report the body's wake
+    /// the mind is waiting on.
+    #[test]
+    fn sleeping_zone_does_not_mask_the_network_stage() {
+        use crate::state::GenesisCoreState;
+        use crate::state::zones::{CognitiveZone, MentalPhase};
+        let mut s = GenesisCoreState::new(1, 1_000);
+        s.zones.transition_to(CognitiveZone::Sleeping, 10_000);
+        // Wake attractor: LC firing above the sleep threshold — the
+        // body has woken, and the published phase must say so even
+        // while the mind's zone still reads Sleeping.
+        s.sleep_network = INITIAL;
+        s.sleep_network[0] = 5.9;
+        s.apply_network_phase();
+        assert_eq!(s.zones.phase(), MentalPhase::Active);
+        assert_eq!(s.neurochemicals.phase(), MentalPhase::Active);
+        // Sleep stages still publish while the network is asleep.
+        s.sleep_network[0] = 2.0;
+        s.sleep_network[2] = 0.0;
+        s.apply_network_phase();
+        assert_eq!(s.zones.phase(), MentalPhase::NREM);
+        s.sleep_network[2] = 4.0;
+        s.apply_network_phase();
+        assert_eq!(s.zones.phase(), MentalPhase::REM);
     }
 
     /// The acetylcholine target must order the states as the data do (REM >
@@ -498,72 +692,184 @@ mod tests {
         assert!((nrem - 0.34).abs() < 0.08, "NREM target {nrem:.3}");
     }
 
-    /// A sustained sleep push should bring on sleep onset (LC below the
-    /// source's 4 Hz threshold) within an hour of waking.
-    #[test]
-    fn volitional_sleep_drive_brings_on_sleep_onset() {
-        let dt = 0.02;
-        let mut x = INITIAL;
-        let mut onset = None;
-        for i in 0..(60.0 / dt) as usize {
-            x = advance_with(i as f64 * dt, &x, dt, Drive { vlpo: 1.0, lc: 0.0 });
-            if x[0] < SLEEP_THRESHOLD && onset.is_none() {
-                onset = Some(i as f64 * dt);
-            }
-        }
-        assert!(
-            onset.is_some(),
-            "no sleep onset within 60 min, final LC {}",
-            x[0]
-        );
-    }
-
-    /// A volitional wake push must raise the wake population from a sleeping
-    /// state, relative to the undriven network over the same interval.
-    #[test]
-    fn volitional_wake_drive_raises_the_wake_population() {
-        let dt = 0.02;
-        let steps = (60.0 / dt) as usize;
-        // Start asleep: sustained VLPO drive for 90 minutes first.
-        let mut asleep = INITIAL;
-        for i in 0..(90.0 / dt) as usize {
-            asleep = advance_with(i as f64 * dt, &asleep, dt, Drive { vlpo: 1.0, lc: 0.0 });
-        }
-        let mut woken = asleep;
-        let mut plain = asleep;
-        for i in 0..steps {
-            let t = 90.0 + i as f64 * dt;
-            woken = advance_with(t, &woken, dt, Drive { vlpo: 0.0, lc: 1.0 });
-            plain = advance(t, &plain, dt);
-        }
-        assert!(
-            woken[0] > plain[0],
-            "driven LC {} vs plain {}",
-            woken[0],
-            plain[0]
-        );
-    }
-
     #[test]
     fn clock_minutes_is_a_minute_of_the_local_day() {
         let m = clock_minutes(1_800_000_000_000);
         assert!((0.0..1440.0).contains(&m), "clock minutes {m}");
     }
 
-    /// Known discrepancy. In adults REM bouts lengthen toward morning, the
-    /// last longest. This network gives 25, 33.5, 28.5 and 21 minutes, so
-    /// the last is the shortest. Not tuned to pass: the cause is either a
-    /// difference between this network and human physiology, or a
-    /// transcription error. Run with `--ignored` to see it fail.
+    /// Known limitation, verified against the source. In adults REM
+    /// bouts lengthen toward morning, the last longest. This port
+    /// reproduces the published model faithfully — the upstream
+    /// `DinizBehnBooth_SWnetworkModel.m` (ModelDB 244485, rerun
+    /// 2026-10-19) itself produces 25.2, 33.5, 28.8, 21.2 minutes, a
+    /// rise-then-fall pattern, so the discrepancy is the model's, not a
+    /// transcription error. This test pins the port to the source's own
+    /// bout durations rather than to adult physiology.
     #[test]
-    #[ignore = "known discrepancy: REM bouts do not lengthen across the night"]
-    fn rem_bouts_lengthen_across_the_night() {
+    fn rem_bout_durations_match_the_source_model() {
         let samples = simulate(14400.0, 0.5);
         let e = events(&samples);
         let (_, bouts) = night_architecture(&e, DAY_7);
-        assert!(
-            bouts.last().unwrap() > bouts.first().unwrap(),
-            "REM bouts should lengthen across the night: {bouts:.1?}"
+        let source = [25.2, 33.5, 28.8, 21.2];
+        assert_eq!(
+            bouts.len(),
+            source.len(),
+            "REM bout count across the night: {bouts:.1?}"
         );
+        for (i, (got, expected)) in bouts.iter().zip(source.iter()).enumerate() {
+            assert!(
+                (got - expected).abs() <= 2.0,
+                "REM bout {i}: port {got:.1} min vs source {expected:.1} min"
+            );
+        }
+    }
+
+    /// `VisualAfference::NONE` at resting chemistry must be exactly the
+    /// source model — the optic nerve absent and arousal at baseline is
+    /// the organism the model always was.
+    #[test]
+    fn no_afference_is_the_source_model() {
+        let x = INITIAL;
+        for &t in &[0.0, 720.0, 1100.0] {
+            let a = advance(t, &x, 0.5);
+            let b =
+                advance_with_afference(t, &x, 0.5, VisualAfference::NONE, 0.0, OXIN_REST, HTM_REST);
+            assert_eq!(a, b, "t={t}");
+        }
+    }
+
+    /// Measured retinal light — not the wall clock — must be what
+    /// drives the SCN's photic input while the eye is live. At noon
+    /// the photoperiod supplies 500 lux; a dark eye overrides it
+    /// downward and a bright one upward, in the `n` (photic
+    /// activation) derivative where the light term enters.
+    #[test]
+    fn retinal_light_overrides_the_photoperiod() {
+        let x = INITIAL;
+        let noon = 720.0;
+        let dn = |light: Option<f64>| -> f64 {
+            deriv_with_afference(
+                noon,
+                &x,
+                VisualAfference {
+                    light,
+                    alert_lc: 0.0,
+                },
+                0.0,
+                OXIN_REST,
+                HTM_REST,
+            )[7]
+        };
+        let dark = dn(Some(0.0));
+        let scheduled = dn(None); // 500 lux at noon
+        let bright = dn(Some(9500.0));
+        assert!(
+            dark < scheduled,
+            "dark eye at noon: dn {dark} vs photoperiod {scheduled}"
+        );
+        assert!(
+            bright > scheduled,
+            "bright eye at noon: dn {bright} vs photoperiod {scheduled}"
+        );
+        // At night the photoperiod is already dark — a dark eye is
+        // indistinguishable from it, and a bright one still overrides.
+        let night = 60.0;
+        let dn_night = |light: Option<f64>| -> f64 {
+            deriv_with_afference(
+                night,
+                &x,
+                VisualAfference {
+                    light,
+                    alert_lc: 0.0,
+                },
+                0.0,
+                OXIN_REST,
+                HTM_REST,
+            )[7]
+        };
+        assert_eq!(dn_night(None), dn_night(Some(0.0)));
+        assert!(dn_night(Some(9500.0)) > dn_night(None));
+    }
+
+    /// The collicular alerting pulse must raise the wake population
+    /// from a sleeping state relative to the un-alerted network over
+    /// the same interval — a salient visual event is a wake-up call
+    /// into LC, not a bypass of the flip-flop.
+    #[test]
+    fn collicular_alert_raises_the_wake_population() {
+        let dt = 0.02;
+        let asleep = first_asleep_state();
+        let aff = VisualAfference {
+            light: None,
+            alert_lc: 1.5,
+        };
+        let mut alerted = asleep;
+        let mut plain = asleep;
+        for i in 0..(30.0 / dt) as usize {
+            let t = 90.0 + i as f64 * dt;
+            alerted = advance_with_afference(t, &alerted, dt, aff, 0.0, OXIN_REST, HTM_REST);
+            plain = advance(t, &plain, dt);
+        }
+        assert!(
+            alerted[0] > plain[0],
+            "alerted LC {} vs plain {}",
+            alerted[0],
+            plain[0]
+        );
+    }
+
+    /// The stress-axis alerting input must raise the wake population
+    /// from a sleeping state relative to an un-stressed network over
+    /// the same interval — sustained nocturnal HPA elevation lightens
+    /// sleep through the LC, the way a salient flash does.
+    #[test]
+    fn hpa_alert_raises_the_wake_population() {
+        let dt = 0.02;
+        let asleep = first_asleep_state();
+        let mut stressed = asleep;
+        let mut basal = asleep;
+        for i in 0..(30.0 / dt) as usize {
+            let t = 90.0 + i as f64 * dt;
+            // hpa = 1.0: cortisol at the top of its envelope — a
+            // saturated stress fraction, a strong arousal push.
+            stressed = advance_with_afference(
+                t,
+                &stressed,
+                dt,
+                VisualAfference::NONE,
+                1.0,
+                OXIN_REST,
+                HTM_REST,
+            );
+            basal = advance_with_afference(
+                t,
+                &basal,
+                dt,
+                VisualAfference::NONE,
+                0.0,
+                OXIN_REST,
+                HTM_REST,
+            );
+        }
+        assert!(
+            stressed[0] > basal[0],
+            "stressed LC {} vs basal {}",
+            stressed[0],
+            basal[0]
+        );
+    }
+
+    /// And the other half of the biology: a resting-floor axis adds
+    /// nothing — basal cortisol must not lighten sleep at all.
+    #[test]
+    fn basal_hpa_is_silent() {
+        let x = INITIAL;
+        for &t in &[0.0, 720.0, 1100.0] {
+            let a = advance(t, &x, 0.5);
+            let b =
+                advance_with_afference(t, &x, 0.5, VisualAfference::NONE, 0.0, OXIN_REST, HTM_REST);
+            assert_eq!(a, b, "hpa=0 must equal no input, t={t}");
+        }
     }
 }

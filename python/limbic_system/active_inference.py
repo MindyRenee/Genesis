@@ -38,7 +38,8 @@ from enum import IntEnum
 
 from genesis_client import GenesisClient
 from genesis_client.swallow import note_swallowed
-from genesis_client.types import DyadicSnapshot, InferenceSummary
+from genesis_client.types import InferenceSummary
+from infrastructure.text import split_tokens
 
 __all__ = [
     "ActiveInferenceReader",
@@ -140,14 +141,6 @@ class SelfModelReading:
     # by the Damasio self hierarchy.
     state_label: str
 
-    # The dyadic model's measured snapshot: who is present (their
-    # signature — name, bond, aura, field), the reunion report if a
-    # known person just returned, and the live coupling strength.
-    # None when the daemon hasn't published yet — an absent channel,
-    # not a zero reading. Evidence for her own appraisal; the model
-    # prescribes no chemistry.
-    dyadic_snapshot: DyadicSnapshot | None = None
-
     @property
     def is_surprised(self) -> bool:
         """Whether the self-model is currently surprised."""
@@ -225,8 +218,9 @@ class UserAffectEstimate:
         from .sentiment import analyze_sentiment
 
         text = message.lower()
-        words = text.split()
-        word_count = len(words)
+        # Canonical whitespace tokens — invisible characters can
+        # neither fake a word count nor glue words together.
+        word_count = len(split_tokens(text))
 
         # ── Valence: VADER-style lexicon-based sentiment ──
         sentiment = analyze_sentiment(message)
@@ -333,19 +327,13 @@ class ActiveInferenceReader:
             )
             return None
 
-        # The dyadic model's measured snapshot — who is present, the
-        # reunion report, live coupling. None is an absent channel,
-        # handled as "no reading" downstream, never a zero.
-        snapshot = self.client.get_dyadic_state()
-
-        reading = self._interpret(signals, snapshot)
+        reading = self._interpret(signals)
         self._last_reading = reading
         return reading
 
     def _interpret(
         self,
         signals: InferenceSummary,
-        snapshot: DyadicSnapshot | None = None,
     ) -> SelfModelReading:
         """Interpret raw inference signals into a cognitive reading."""
 
@@ -394,11 +382,10 @@ class ActiveInferenceReader:
         # ── State label ──
         # This is a semantic label, not a canned sentence. It will be
         # composed into feelings by the Damasio self hierarchy.
-        state_label = self._derive_state_label(state, dyadic, signals, snapshot)
+        state_label = self._derive_state_label(state, dyadic, signals)
 
         return SelfModelReading(
             signals=signals,
-            dyadic_snapshot=snapshot,
             self_model_state=state,
             dyadic_state=dyadic,
             cognitive_effort=cognitive_effort,
@@ -413,7 +400,6 @@ class ActiveInferenceReader:
         state: SelfModelState,
         dyadic: DyadicState,
         signals: InferenceSummary,
-        snapshot: DyadicSnapshot | None = None,
     ) -> str:
         """Derive a semantic label for the current self-model state.
 
@@ -445,11 +431,6 @@ class ActiveInferenceReader:
         elif signals.prediction_error_cortisol > 0.05:
             parts.append("unexpected-stress")
 
-        # A known person just returned — a real event worth naming in
-        # the state label the feeling hierarchy composes from.
-        if snapshot is not None and snapshot.reunion is not None:
-            parts.append("reunion")
-
         return " ".join(parts)
 
     @property
@@ -457,19 +438,8 @@ class ActiveInferenceReader:
         """The last successful reading, or None if none yet."""
         return self._last_reading
 
-    def update_user_affect(
-        self,
-        estimate: UserAffectEstimate,
-        speaker: str | None = None,
-        authenticated: bool = False,
-        merge_alias: str | None = None,
-    ) -> bool:
+    def update_user_affect(self, estimate: UserAffectEstimate) -> bool:
         """Send a user affect estimate to the daemon's dyadic model.
-
-        ``speaker`` is the person key — a name or an anonymous
-        "face:N" cluster id. ``merge_alias`` reports once that an
-        earlier anonymous key resolved to this name, folding the
-        stranger's measured history into the named signature.
 
         Returns True if the update was accepted, False if the daemon
         couldn't be reached.
@@ -480,9 +450,6 @@ class ActiveInferenceReader:
                 arousal=estimate.arousal,
                 engagement=estimate.engagement,
                 confidence=estimate.confidence,
-                speaker=speaker,
-                authenticated=authenticated,
-                merge_alias=merge_alias,
             )
         except Exception as e:  # noqa: BLE001
             note_swallowed(

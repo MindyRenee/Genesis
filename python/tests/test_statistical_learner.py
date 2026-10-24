@@ -296,7 +296,9 @@ def test_vocabulary_word_frequency_biases_selection():
     picks: dict[str, int] = {}
     for _ in range(200):
         word = vocab._select_word(
-            ["cat", "dog"], emotion, personality
+            ["cat", "dog"],
+            emotion,
+            personality,
             # no prev_word → only unigram bias applies
         )
         picks[word] = picks.get(word, 0) + 1

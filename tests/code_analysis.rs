@@ -568,3 +568,84 @@ fn test_parse_error() {
     let result = analyze_file(source, "bad.rs");
     assert!(result.is_err());
 }
+
+// ─── Wire report (ANALYZE_CODE) ───────────────────────────────
+
+#[test]
+fn test_impls_pairs_collected() {
+    let source = r#"
+struct Config;
+trait Handler { fn handle(&self); }
+impl Handler for Config { fn handle(&self) {} }
+impl Config { pub fn new() -> Self { Config } }
+"#;
+    let analysis = analyze_file(source, "test.rs").expect("parse");
+    assert_eq!(analysis.impls.len(), 2);
+    assert!(
+        analysis
+            .impls
+            .contains(&("Config".to_string(), Some("Handler".to_string())))
+    );
+    assert!(analysis.impls.contains(&("Config".to_string(), None)));
+}
+
+#[test]
+fn test_analysis_to_wire_report() {
+    let source = r#"
+/// Adds two numbers.
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+fn caller() -> i32 {
+    add(1, 2)
+}
+
+struct Node { value: i32 }
+"#;
+    let analysis = analyze_file(source, "demo.rs").expect("parse");
+    let report = String::from_utf8(analysis_to_wire(&analysis)).expect("utf8");
+    let lines: Vec<&str> = report.lines().collect();
+
+    assert!(lines.contains(&"file\tdemo.rs"));
+    assert!(lines.contains(&"functions\t2"));
+    assert!(lines.contains(&"structs\t1"));
+
+    let add = lines
+        .iter()
+        .find(|l| l.starts_with("unit\tfunction\tadd\t"))
+        .expect("add unit line");
+    let fields: Vec<&str> = add.split('\t').collect();
+    assert_eq!(fields.len(), 14);
+    assert_eq!(fields[1], "function");
+    assert_eq!(fields[2], "add");
+    assert_eq!(fields[3], "add"); // qualified name at top level
+    assert!(fields[5].contains("pub"));
+    assert_eq!(fields[6], "i32;i32"); // params: `;`-separated type strings
+    assert_eq!(fields[7], "i32"); // return type
+    assert!(fields[13].contains("Adds two numbers")); // docs carried through
+
+    // The call edge: caller -> add (qualified names).
+    let edge = lines
+        .iter()
+        .find(|l| l.starts_with("edge\t"))
+        .expect("call edge line");
+    assert_eq!(*edge, "edge\tcaller\tadd");
+}
+
+#[test]
+fn test_analysis_to_wire_commas_safe() {
+    // Type strings can contain commas — the `;` separator must
+    // survive them intact.
+    let source = r#"
+fn build(map: std::collections::HashMap<String, Vec<u8>>, pair: (u8, u8)) {}
+"#;
+    let analysis = analyze_file(source, "demo.rs").expect("parse");
+    let report = String::from_utf8(analysis_to_wire(&analysis)).expect("utf8");
+    let unit = report
+        .lines()
+        .find(|l| l.starts_with("unit\tfunction\tbuild\t"))
+        .expect("build unit");
+    let fields: Vec<&str> = unit.split('\t').collect();
+    assert_eq!(fields[6].split(';').count(), 2, "two params, one record");
+}

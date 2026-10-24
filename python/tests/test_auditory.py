@@ -286,3 +286,56 @@ class TestAuditoryCortex:
         """recent_events should return empty list when nothing happened."""
         cortex = AuditoryCortex(callback=lambda e: None)
         assert cortex.recent_events() == []
+
+    def test_start_refuses_second_worker_while_predecessor_alive(self, monkeypatch) -> None:
+        """start() finding the predecessor still alive after its join
+        must not spawn a second worker — the race that produced
+        duplicate g-auditory threads."""
+        import sys
+        import threading
+        import types
+
+        fake_sd = types.ModuleType("sounddevice")
+        fake_sd.query_devices = lambda: []  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "sounddevice", fake_sd)
+        monkeypatch.setattr(AuditoryCortex, "_START_JOIN_TIMEOUT_S", 0.05)
+
+        cortex = AuditoryCortex(callback=lambda e: None)
+        hold = threading.Event()
+        zombie = threading.Thread(target=hold.wait, daemon=True)
+        zombie.start()
+        cortex._thread = zombie
+        try:
+            assert cortex.start() is False
+            assert cortex._thread is zombie
+            assert not cortex.running
+        finally:
+            hold.set()
+            zombie.join(timeout=5)
+
+
+def test_ambient_start_refuses_second_worker_while_predecessor_alive(
+    monkeypatch,
+) -> None:
+    """Same lifecycle guard on the ambient listener — a stop() join
+    that timed out must not let a fresh start() spawn beside the
+    still-living old loop."""
+    import threading
+
+    from occipital_lobe.perception.ambient import AmbientListener
+
+    monkeypatch.setattr(AmbientListener, "_START_JOIN_TIMEOUT_S", 0.05)
+    listener = AmbientListener(callback=lambda t: None)
+    listener._initialized = True
+    listener._vosk_model = object()  # pretend Vosk loaded
+    hold = threading.Event()
+    zombie = threading.Thread(target=hold.wait, daemon=True)
+    zombie.start()
+    listener._thread = zombie
+    try:
+        assert listener.start() is False
+        assert listener._thread is zombie
+        assert not listener.running
+    finally:
+        hold.set()
+        zombie.join(timeout=5)

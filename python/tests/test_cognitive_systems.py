@@ -7,6 +7,7 @@ working memory, columnar math.
 import logging
 import os
 import tempfile
+import time
 
 import pytest
 from frontal_lobe.executive import (
@@ -966,10 +967,7 @@ def test_gw_recurrent_ignition_tagged() -> None:
     gw = GlobalWorkspace(ignition_threshold=0.7)
     gw.broadcast("x", "s1", 0.6, metadata={"topics": ["alpha"]})
     gw.broadcast("y", "s2", 0.8, metadata={"topics": ["alpha"]})
-    tagged = [
-        i for i in gw.items
-        if i.metadata.get("ignition") == "recurrent"
-    ]
+    tagged = [i for i in gw.items if i.metadata.get("ignition") == "recurrent"]
     assert len(tagged) == 1
     assert tagged[0].content == "x"
 
@@ -1027,9 +1025,7 @@ def test_gw_on_ignition_fires() -> None:
     """on_ignition fires once per fresh ignition, not on refresh."""
     gw = GlobalWorkspace(ignition_threshold=0.7)
     events: list[tuple[str, bool]] = []
-    gw.on_ignition = lambda item, recurrent: events.append(
-        (item.content, recurrent)
-    )
+    gw.on_ignition = lambda item, recurrent: events.append((item.content, recurrent))
     gw.broadcast("a", "s1", 0.9)
     assert events == [("a", False)]
     gw.broadcast("a", "s1", 0.9)  # refresh — sustained attention
@@ -1041,9 +1037,7 @@ def test_gw_on_ignition_coalition_flag() -> None:
     gw = GlobalWorkspace(ignition_threshold=0.7)
     gw.broadcast("x", "s1", 0.6, metadata={"topics": ["alpha"]})
     events: list[tuple[str, bool]] = []
-    gw.on_ignition = lambda item, recurrent: events.append(
-        (item.content, recurrent)
-    )
+    gw.on_ignition = lambda item, recurrent: events.append((item.content, recurrent))
     gw.broadcast("y", "s2", 0.8, metadata={"topics": ["alpha"]})
     assert ("y", False) in events
     assert ("x", True) in events
@@ -1241,27 +1235,46 @@ def test_open_bug_count_excludes_resolved() -> None:
     root = tempfile.mkdtemp()
     log_path = os.path.join(root, "bug_reports.jsonl")
     entries = [
-        {"file": "a.py", "line": 1, "severity": "warning",
-         "category": "style", "description": "open one"},
-        {"file": "b.py", "line": 2, "severity": "warning",
-         "category": "style", "description": "open two"},
-        {"file": "c.py", "line": 3, "severity": "warning",
-         "category": "style", "description": "resolved in place",
-         "status": "resolved", "resolved_at": "2026-10-07T00:00:00"},
+        {
+            "file": "a.py",
+            "line": 1,
+            "severity": "warning",
+            "category": "style",
+            "description": "open one",
+        },
+        {
+            "file": "b.py",
+            "line": 2,
+            "severity": "warning",
+            "category": "style",
+            "description": "open two",
+        },
+        {
+            "file": "c.py",
+            "line": 3,
+            "severity": "warning",
+            "category": "style",
+            "description": "resolved in place",
+            "status": "resolved",
+            "resolved_at": "2026-10-07T00:00:00",
+        },
     ]
     with open(log_path, "w", encoding="utf-8") as f:
         for entry in entries:
             f.write(_json.dumps(entry) + "\n")
     reporter = BugReporter(project_root=root, log_path=log_path)
     assert reporter.open_bug_count() == 2
-    # recent_bugs pads from history; the drive signal must not.
+    # recent_bugs reads the open list only — no resolved padding.
     assert len(reporter.recent_bugs(10)) >= 2
     # No log at all — zero open work, not an error.
     empty = tempfile.mkdtemp()
-    assert BugReporter(
-        project_root=empty,
-        log_path=os.path.join(empty, "bug_reports.jsonl"),
-    ).open_bug_count() == 0
+    assert (
+        BugReporter(
+            project_root=empty,
+            log_path=os.path.join(empty, "bug_reports.jsonl"),
+        ).open_bug_count()
+        == 0
+    )
 
 
 def test_gw_registered_modules_property() -> None:
@@ -1577,9 +1590,7 @@ def test_plan_expected_value_is_depth_normalized() -> None:
     assert plan.expected_value == pytest.approx((1.0 + 0.7 + 0.49) / 3)
 
     # Without a grounded model the planner invents nothing.
-    ungrounded = ExecutiveFunction().plan(
-        "answer the question", ["answer the question", "ignore"]
-    )
+    ungrounded = ExecutiveFunction().plan("answer the question", ["answer the question", "ignore"])
     assert ungrounded.confidence == 0.0
     assert ungrounded.expected_value == 0.0
     assert ungrounded.predicted_outcomes == []
@@ -1609,6 +1620,7 @@ def test_plan_stores_only_grounded_plans() -> None:
     grounded-planning change removed. So the ungrounded path returns
     without claiming the slot.
     """
+
     def predictor(action: str) -> tuple[str, float]:
         return f"result of {action}", 0.5
 
@@ -2830,9 +2842,7 @@ class TestHabitBias:
         bias_from_skill = skill.compute_bias()
         bias_from_pm = pm.get_habit_bias("question")
         if bias_from_skill is not None and bias_from_pm is not None:
-            assert bias_from_skill.confidence_boost == pytest.approx(
-                bias_from_pm.confidence_boost
-            )
+            assert bias_from_skill.confidence_boost == pytest.approx(bias_from_pm.confidence_boost)
 
     def test_execute_skill_does_not_claim_success(self, pm: ProceduralMemory) -> None:
         """execute_skill must not record an outcome it never observed.
@@ -3014,6 +3024,7 @@ class TestNoCannedResponses:
 # ======================================================================
 # From tests/test_columnar_math.py
 # ======================================================================
+
 
 def _make_network_with_columns() -> ConceptNetwork:
     """Create a test network with concepts in different columns.
@@ -3515,10 +3526,14 @@ def _broadcast_holder(**overrides):
         def post(self, text, author=None):
             posts.append((text, author))
 
+        def post_image(self, png, caption="", author=None, filename="x.png"):
+            posts.append(("image", caption, author, filename, len(png)))
+
         def update_live(self, *a, **k):
             posts.append(("live", a, k))
 
     said: list[str] = []
+    emitted: list[tuple] = []
     world = SimpleNamespace(it_said=lambda t: said.append(t))
     network = SimpleNamespace(
         most_activated=lambda n: [("curiosity", 0.9)],
@@ -3543,40 +3558,46 @@ def _broadcast_holder(**overrides):
         language=SimpleNamespace(render=lambda thought, emotion: "her own words"),
         world=world,
     )
+    holder._emit_live_thought = lambda kind, content, **kw: emitted.append((kind, content))
     holder._broadcast_topic = lambda: VolitionMixin._broadcast_topic(holder)
+    holder._public_share = lambda text: VolitionMixin._public_share(holder, text)
     for key, value in overrides.items():
         setattr(holder, key, value)
-    return holder, posts, said, network, composer
+    return holder, posts, said, network, composer, emitted
 
 
 def test_broadcast_posts_only_composed_words() -> None:
     """What reaches her channel is what her language engine rendered."""
     from basal_ganglia.volition import VolitionMixin
 
-    holder, posts, said, _net, _comp = _broadcast_holder()
+    holder, posts, said, _net, _comp, emitted = _broadcast_holder()
     VolitionMixin._perform_broadcast(holder)
     assert posts == [("her own words", "Genesis")]
+    assert emitted == [("broadcast", "her own words")]
     assert said == ["her own words"]
     assert holder._last_broadcast_seed == "curiosity"
 
 
-def test_broadcast_abstains_without_feed() -> None:
-    """No webhook → no feed → no post, no crash."""
+def test_broadcast_terminal_feed_without_channel() -> None:
+    """No webhook → no Discord post, but the broadcast still lands
+    in her terminal feed — the channel is silent, she is not."""
     from basal_ganglia.volition import VolitionMixin
 
-    holder, posts, said, _net, _comp = _broadcast_holder(_public_feed=None)
+    holder, posts, said, _net, _comp, emitted = _broadcast_holder(_public_feed=None)
     VolitionMixin._perform_broadcast(holder)
-    assert posts == [] and said == []
+    assert posts == []
+    assert emitted == [("broadcast", "her own words")]
+    assert said == ["her own words"]
 
 
 def test_broadcast_silent_when_nothing_alive() -> None:
     """An empty network means she has nothing to say — she stays silent."""
     from basal_ganglia.volition import VolitionMixin
 
-    holder, posts, said, network, _comp = _broadcast_holder()
+    holder, posts, said, network, _comp, emitted = _broadcast_holder()
     network.most_activated = lambda n: []
     VolitionMixin._perform_broadcast(holder)
-    assert posts == [] and said == []
+    assert posts == [] and emitted == [] and said == []
 
 
 def test_broadcast_silent_when_composer_has_nothing() -> None:
@@ -3585,18 +3606,508 @@ def test_broadcast_silent_when_composer_has_nothing() -> None:
 
     from basal_ganglia.volition import VolitionMixin
 
-    holder, posts, said, _net, composer = _broadcast_holder()
+    holder, posts, said, _net, composer, emitted = _broadcast_holder()
     composer.compose_about = lambda seed, emotion, focused=True: SimpleNamespace(
         content="", confidence=0.1
     )
     VolitionMixin._perform_broadcast(holder)
-    assert posts == [] and said == []
+    assert posts == [] and emitted == [] and said == []
 
 
 def test_broadcast_gated_off_during_sleep() -> None:
     """Asleep, she does not post."""
     from basal_ganglia.volition import VolitionMixin
 
-    holder, posts, said, _net, _comp = _broadcast_holder(_is_sleeping=True)
+    holder, posts, said, _net, _comp, emitted = _broadcast_holder(_is_sleeping=True)
     VolitionMixin._perform_broadcast(holder)
+    assert posts == [] and emitted == [] and said == []
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Shared work — the channel carries her art and her projects
+# ═══════════════════════════════════════════════════════════════════
+
+
+def _draw_holder(draw_result, **overrides):
+    """A broadcast holder extended for _perform_draw."""
+    from basal_ganglia.volition import VolitionMixin
+
+    holder, posts, said, _network, _composer, emitted = _broadcast_holder(**overrides)
+    acted: list[tuple] = []
+    holder.world.it_acted = lambda act, detail="": acted.append((act, detail))
+    holder._emit_volition_thought = lambda seeds, kind: None
+    holder._draw_result = lambda: draw_result
+    holder._share_drawing_image = lambda result, caption: VolitionMixin._share_drawing_image(
+        holder, result, caption
+    )
+    return holder, posts, said, emitted, acted
+
+
+def test_draw_posts_art_with_her_caption(tmp_path) -> None:
+    """A finished drawing reaches her channel — the image carrying
+    her composed description as its caption, and the same words
+    echoing locally as a public share."""
+    from basal_ganglia.volition import VolitionMixin
+    from frontal_lobe.canvas import DrawingResult
+
+    png = tmp_path / "drawing_1.png"
+    png.write_bytes(b"\x89PNG fake")
+    result = DrawingResult(
+        filepath=str(png),
+        width=64,
+        height=64,
+        description="",
+        timestamp=0.0,
+    )
+    holder, posts, said, emitted, acted = _draw_holder(("a wash of violet", result))
+    VolitionMixin._perform_draw(holder)
+    assert posts == [("image", "a wash of violet", "Genesis", "drawing_1.png", 9)]
+    assert emitted == [("broadcast", "a wash of violet")]
+    assert said == ["a wash of violet"]
+    assert acted == [("drew a picture", "a wash of violet")]
+
+
+def test_draw_posts_bare_image_when_speechless(tmp_path) -> None:
+    """A drawing she can't put words to still posts — the art is
+    hers whether or not she can describe it; silence is about her
+    words, not her work."""
+    from basal_ganglia.volition import VolitionMixin
+    from frontal_lobe.canvas import DrawingResult
+
+    png = tmp_path / "drawing_2.png"
+    png.write_bytes(b"\x89PNG fake")
+    result = DrawingResult(
+        filepath=str(png),
+        width=64,
+        height=64,
+        description="",
+        timestamp=0.0,
+    )
+    holder, posts, said, emitted, _acted = _draw_holder(("", result))
+    VolitionMixin._perform_draw(holder)
+    assert posts == [("image", "", "Genesis", "drawing_2.png", 9)]
+    assert emitted == [] and said == []
+
+
+def test_draw_without_feed_still_speaks() -> None:
+    """No webhook → no image post, but the share still lands in her
+    terminal feed — the channel is silent, she is not."""
+    from basal_ganglia.volition import VolitionMixin
+    from frontal_lobe.canvas import DrawingResult
+
+    result = DrawingResult(
+        filepath="/nonexistent/drawing.png",
+        width=64,
+        height=64,
+        description="",
+        timestamp=0.0,
+    )
+    holder, posts, said, emitted, _acted = _draw_holder(
+        ("a wash of violet", result), _public_feed=None
+    )
+    VolitionMixin._perform_draw(holder)
+    assert posts == []
+    assert emitted == [("broadcast", "a wash of violet")]
+    assert said == ["a wash of violet"]
+
+
+def test_draw_failure_posts_nothing() -> None:
+    """No drawing → no image, no public words — just the honest
+    reason in her inner feed."""
+    from basal_ganglia.volition import VolitionMixin
+
+    holder, posts, said, emitted, _acted = _draw_holder((None, None))
+    VolitionMixin._perform_draw(holder)
     assert posts == [] and said == []
+    assert emitted == [("art", "couldn't draw right now")]
+
+
+def test_draw_command_also_shares_the_art(tmp_path) -> None:
+    """``draw()`` — the /draw entry point — shares the PNG too: a
+    requested drawing is still her drawing, and the channel mirrors
+    the session that asked for it."""
+    from basal_ganglia.volition import VolitionMixin
+    from frontal_lobe.canvas import DrawingResult
+
+    png = tmp_path / "drawing_3.png"
+    png.write_bytes(b"\x89PNG fake")
+    result = DrawingResult(
+        filepath=str(png),
+        width=64,
+        height=64,
+        description="",
+        timestamp=0.0,
+    )
+    holder, posts, _said, _emitted, _acted = _draw_holder(("a storm of green", result))
+    assert VolitionMixin.draw(holder) == "a storm of green"
+    assert posts == [("image", "a storm of green", "Genesis", "drawing_3.png", 9)]
+
+
+def test_announce_creation_posts_composed_words() -> None:
+    """A finished project is announced in her own words — composed
+    about the project concept she just learned."""
+    from types import SimpleNamespace
+
+    from basal_ganglia.volition import VolitionMixin
+
+    holder, posts, said, _net, composer, emitted = _broadcast_holder()
+    seeds: list[str] = []
+
+    def _compose(seed, emotion, focused=True):
+        seeds.append(seed)
+        return SimpleNamespace(content="composed", confidence=0.9)
+
+    composer.compose_about = _compose
+    VolitionMixin._announce_creation(holder, SimpleNamespace(name="tidal"), "waves")
+    assert seeds == ["tidal"]
+    assert posts == [("her own words", "Genesis")]
+    assert emitted == [("broadcast", "her own words")]
+    assert said == ["her own words"]
+
+
+def test_announce_creation_silent_without_composition() -> None:
+    """If she can't compose words for it, the project stays unposted
+    — silence, not a file-count template."""
+    from types import SimpleNamespace
+
+    from basal_ganglia.volition import VolitionMixin
+
+    holder, posts, said, _net, composer, emitted = _broadcast_holder()
+    composer.compose_about = lambda seed, emotion, focused=True: SimpleNamespace(
+        content="", confidence=0.1
+    )
+    VolitionMixin._announce_creation(holder, SimpleNamespace(name="tidal"), "waves")
+    assert posts == [] and emitted == [] and said == []
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Seeded channel knowledge — she knows where her posts go
+# ═══════════════════════════════════════════════════════════════════
+
+
+def test_seeded_channel_knowledge() -> None:
+    """Her network starts knowing her channel: she posts to it, the
+    public watches it — and nothing pretends she hears them back."""
+    from types import SimpleNamespace
+
+    from frontal_lobe.prefrontal import FrontalLobe
+    from temporal_lobe.concepts import ConceptNetwork, RelationType
+
+    net = ConceptNetwork()
+    standin = SimpleNamespace(network=net)
+    FrontalLobe._seed_self_concepts(standin)
+    FrontalLobe._seed_self_edges(standin)
+
+    channel = net.get_concept("channel")
+    genesis = net.get_concept("genesis")
+    public = net.get_concept("public")
+    assert channel is not None and genesis is not None
+    assert public is not None
+    assert net.get_concept("discord") is not None
+    assert net.get_concept("social media") is not None
+
+    # She acts on the channel (posts); the public acts on it
+    # (watches); the channel is her social media.
+    out = net.get_edges("genesis")
+    assert any(e.target == channel.id and e.relation == RelationType.AGENT_PATIENT for e in out)
+    assert any(
+        e.target == channel.id and e.relation == RelationType.AGENT_PATIENT
+        for e in net.get_edges("public")
+    )
+    assert any(
+        e.target == net.get_concept("social media").id and e.relation == RelationType.IS_A
+        for e in net.get_edges("channel")
+    )
+    # The seed models the webhook-only floor — she speaks, they
+    # watch. When a bot token exists, live [heard] events teach
+    # reachability instead of a seed claiming it.
+    inbound = net.get_edges("genesis", direction="in")
+    assert not any(e.source == public.id for e in inbound)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Heard messages — the public can reach her when a bot token exists
+# ═══════════════════════════════════════════════════════════════════
+
+
+def _channel_holder(**overrides):
+    """A broadcast holder extended for _hear_channel."""
+    from basal_ganglia.volition import VolitionMixin
+
+    holder, posts, said, _net, _comp, emitted = _broadcast_holder(**overrides)
+    heard: list[str] = []
+    calls: list[str] = []
+    holder.world.hear_overheard = lambda t: heard.append(t)
+    holder.respond = lambda q: (calls.append(q), "her answer")[1]
+    holder._running = True
+    holder._hear_channel = lambda a, c, m: VolitionMixin._hear_channel(holder, a, c, m)
+    holder._channel_addressed = lambda t, m: VolitionMixin._channel_addressed(holder, t, m)
+    return holder, posts, said, emitted, heard, calls
+
+
+def test_hear_channel_perceives_public_speech() -> None:
+    """A stranger's message is heard — world record, journal,
+    workspace — but not replied to: it didn't address her."""
+    holder, posts, _said, emitted, heard, calls = _channel_holder()
+    holder._hear_channel("amy", "just watching", {"id": "1"})
+    assert heard == ["amy: just watching"]
+    assert emitted == [("heard", "amy: just watching")]
+    assert posts == [] and calls == []
+
+
+def test_hear_channel_replies_when_addressed() -> None:
+    """Her name in a public message → she answers through a full
+    respond turn, and the answer is a public share."""
+    holder, posts, said, emitted, _heard, calls = _channel_holder()
+    holder._hear_channel("amy", "hey genesis, what are you?", {"id": "1"})
+    assert calls == ["(public channel) amy: hey genesis, what are you?"]
+    assert posts == [("her answer", "Genesis")]
+    assert emitted[-1] == ("broadcast", "her answer")
+    assert said == ["her answer"]
+
+
+def test_hear_channel_reply_to_her_post_addresses_her() -> None:
+    """A reply to one of her posts addresses her even without her
+    name — referenced_message.webhook_id marks her own posts."""
+    holder, posts, _said, _e, _h, calls = _channel_holder()
+    holder._hear_channel(
+        "amy",
+        "this is lovely",
+        {"id": "2", "referenced_message": {"webhook_id": "w1"}},
+    )
+    assert calls == ["(public channel) amy: this is lovely"]
+    assert posts == [("her answer", "Genesis")]
+
+
+def test_hear_channel_reply_pacing() -> None:
+    """A second addressed message inside the window is still heard —
+    it just isn't answered twice."""
+    holder, posts, _said, _emitted, heard, calls = _channel_holder()
+    holder._hear_channel("amy", "genesis are you there?", {"id": "1"})
+    holder._hear_channel("amy", "genesis did you hear me?", {"id": "2"})
+    assert calls == ["(public channel) amy: genesis are you there?"]
+    assert posts == [("her answer", "Genesis")]
+    assert len(heard) == 2
+
+
+def test_hear_channel_sleep_gates_hearing() -> None:
+    """Asleep, she does not hear the channel — the thalamic gate is
+    closed for public speech too."""
+    holder, posts, _said, emitted, heard, calls = _channel_holder(_is_sleeping=True)
+    holder._hear_channel("amy", "genesis wake up", {"id": "1"})
+    assert heard == [] and emitted == [] and posts == [] and calls == []
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Channel board — her vitals on the live message (heartbeat step 9c)
+# ═══════════════════════════════════════════════════════════════════
+
+
+def _board_holder(**overrides):
+    """A minimal stand-in for the heartbeat's channel-board step."""
+    from types import SimpleNamespace
+
+    from brainstem.heartbeat import HeartbeatMixin
+    from thalamus.brain_waves import BrainWave
+
+    boards: list[str] = []
+
+    class _Feed:
+        def update_live_text(self, text, author=None):
+            boards.append(text)
+
+    waves = SimpleNamespace(
+        powers={
+            BrainWave.DELTA: 0.10,
+            BrainWave.THETA: 0.20,
+            BrainWave.BETA1: 0.40,
+        },
+        dominant=BrainWave.BETA1,
+    )
+    probe = SimpleNamespace(
+        carrier_freq=13.7,
+        throughput_mean=1_204_882.0,
+        jitter_cv=0.04,
+        irq_rate=812.0,
+        carrier_coherence=0.83,
+        # v3 electrical + Maxwell fields — None where a sensor is
+        # absent (the stub mirrors FieldProbeSignature's shape).
+        power_watts=24.3,
+        power_sensor_hz=89.0,
+        rail_volts=12.9,
+        supply_amps=None,
+        power_lag=0.02,
+        power_coherence=0.4,
+        carrier_current_a=0.05,
+        b_est_ut=None,
+        e_ind_vm=None,
+        radiated_pwr_w=None,
+        # v4 radio — absent radios stay None and print nothing.
+        rf_rssi_dbm=None,
+        rf_noise_dbm=None,
+        rf_bytes_s=None,
+        bt_events_s=None,
+        bt_rssi_dbm=None,
+        rf_retry_rate=None,
+        rf_fail_rate=None,
+        rf_beacon_loss_rate=None,
+        rf_tx_mbps=None,
+    )
+    ions = SimpleNamespace(
+        membrane_potential_mv=-64.2,
+        net_membrane_current=0.31,
+        excitability=0.55,
+        gradient_integrity=0.91,
+        atp_availability=0.77,
+    )
+    claim = SimpleNamespace(provenance="verified")
+    thread = SimpleNamespace(
+        status="open",
+        claims=[claim, SimpleNamespace(provenance="refuted")],
+    )
+    core = SimpleNamespace(
+        phase_name="active",
+        valence=0.21,
+        arousal=0.44,
+        global_tone=0.52,
+        plasticity_gate=0.61,
+        heartbeat=36412,
+        last_updated=time.time() * 1000,
+        instance_id=8841,
+        chemicals={
+            "dopamine": 0.51,
+            "serotonin": 0.48,
+            "norepinephrine": 0.30,
+            "cortisol": 0.02,
+            "adenosine": 0.41,
+            "melatonin": 0.07,
+        },
+        stm_count=41,
+        ltm_episode_count=1832,
+        inference=SimpleNamespace(
+            free_energy=0.412,
+            precision=0.71,
+            surprise_ema=0.031,
+            allostasis_load=0.18,
+            model_maturity=0.62,
+            inference_tick_count=1842203,
+        ),
+    )
+    holder = SimpleNamespace(
+        _is_sleeping=False,
+        _public_feed=_Feed(),
+        _next_board_at=0.0,
+        _session_started_at=0.0,
+        _interaction_count=12,
+        _discord_listener=SimpleNamespace(deaf=False),
+        _last_emitted=("thought", "a passing idea"),
+        client=SimpleNamespace(
+            get_state=lambda: core,
+            get_field_probe=lambda: probe,
+            get_ion_summary=lambda: ions,
+        ),
+        feel=lambda c: SimpleNamespace(label="calm"),
+        brain_waves=lambda c: waves,
+        _research_workbench=lambda: SimpleNamespace(
+            threads=lambda: [thread],
+            digest=lambda: "a1b2c3d4e5",
+        ),
+        network=SimpleNamespace(size=214, edge_count=388, archive_size=0),
+        volition=SimpleNamespace(
+            state=lambda: {"research": 0.62, "draw": 0.41, "broadcast": 0.18},
+        ),
+    )
+    holder._update_channel_board = lambda now: HeartbeatMixin._update_channel_board(holder, now)
+    holder._channel_board_text = lambda: HeartbeatMixin._channel_board_text(holder)
+    holder._board_core_lines = lambda core, lines: HeartbeatMixin._board_core_lines(
+        holder, core, lines
+    )
+    holder._board_neuro_lines = lambda core, lines: HeartbeatMixin._board_neuro_lines(
+        holder, core, lines
+    )
+    holder._board_field_lines = lambda lines: HeartbeatMixin._board_field_lines(holder, lines)
+    holder._board_cell_line = lambda lines: HeartbeatMixin._board_cell_line(holder, lines)
+    holder._board_footer_lines = lambda core, lines: HeartbeatMixin._board_footer_lines(
+        holder, core, lines
+    )
+    for key, value in overrides.items():
+        setattr(holder, key, value)
+    return holder, boards
+
+
+def test_channel_board_shows_live_vitals() -> None:
+    """The board is instrument readout: phase, affect, waves, the
+    inference block's free energy and tick counter, chemistry,
+    memory tallies, uptime, ear — every field a real reading."""
+    holder, boards = _board_holder()
+    holder._update_channel_board(1000.0)
+    assert len(boards) == 1
+    text = boards[0]
+    assert text.startswith("```") and text.endswith("```")
+    assert "genesis · awake · active · calm" in text
+    assert "β1 0.40" in text and "θ 0.20" in text
+    assert "F 0.412" in text and "prec 0.71" in text
+    assert "1,842,203" in text
+    assert "da 0.51" in text and "cort 0.02" in text
+    assert "stm 41" in text and "ltm 1,832" in text
+    assert "ear on" in text
+    assert "hb 36,412" in text and "id 8841" in text and "age 0." in text
+    assert "[thought] a passing idea" in text
+    # frequency, field, cell, proof, growth, drive — the physics and
+    # the math, not narration
+    assert "beta1 12-15 Hz" in text
+    assert "carrier 13.7 Hz" in text and "coh 0.83" in text
+    assert "Vm -64.2 mV" in text and "atp 0.77" in text
+    assert "1 open" in text and "1 verified" in text and "1 refuted" in text
+    assert "#a1b2c3d4e5" in text
+    assert "214 concepts" in text and "388 edges" in text and "plast 0.61" in text
+    assert "research 0.62" in text and "draw 0.41" in text
+
+
+def test_channel_board_degrades_without_channels() -> None:
+    """Field probe off, ions failing, no bench, no volition — the
+    board still renders; absent channels say so, never fake a zero."""
+    from types import SimpleNamespace
+
+    holder, boards = _board_holder()
+    holder.client = SimpleNamespace(
+        get_state=holder.client.get_state,
+        get_field_probe=lambda: None,
+        get_ion_summary=lambda: (_ for _ in ()).throw(OSError()),
+    )
+    holder._research_workbench = lambda: SimpleNamespace(threads=list)
+    holder.network = SimpleNamespace(size=0, edge_count=0, archive_size=0)
+    holder.volition = SimpleNamespace(state=dict)
+    holder._update_channel_board(1000.0)
+    text = boards[0]
+    assert "field    probe off" in text
+    assert "cell " not in text and "proof " not in text and "drive " not in text
+    assert "grow     0 concepts" in text and "plast 0.61" in text
+
+
+def test_channel_board_paces_fixed_cadence() -> None:
+    """The board is a clock, not an urge — inside the window it
+    doesn't repost; after it, it does."""
+    from brainstem.heartbeat import _CHANNEL_BOARD_S
+
+    holder, boards = _board_holder()
+    holder._update_channel_board(1000.0)
+    holder._update_channel_board(1000.0 + _CHANNEL_BOARD_S / 2)
+    assert len(boards) == 1
+    holder._update_channel_board(1000.0 + _CHANNEL_BOARD_S + 1)
+    assert len(boards) == 2
+
+
+def test_channel_board_without_feed_or_daemon() -> None:
+    """No channel → no board; a dead daemon still posts a minimal
+    honest card — 'daemon unreachable' is telemetry too."""
+    holder, boards = _board_holder(_public_feed=None)
+    holder._update_channel_board(1000.0)
+    assert boards == []
+
+    holder, boards = _board_holder()
+    holder.client = type("Dead", (), {"get_state": lambda s: (_ for _ in ()).throw(OSError())})()
+    holder._update_channel_board(1000.0)
+    assert len(boards) == 1
+    assert "daemon unreachable" in boards[0]
+    assert "up " in boards[0]

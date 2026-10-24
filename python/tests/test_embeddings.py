@@ -347,7 +347,7 @@ class TestTfIdfVocabularyAlignment:
         fresh_tfidf_start = fresh_store._spectral_dim
         fresh_vec = fresh_store._concept_matrix[
             fresh_tree_idx,
-            fresh_tfidf_start:fresh_tfidf_start + fresh_store._tfidf_dim,
+            fresh_tfidf_start : fresh_tfidf_start + fresh_store._tfidf_dim,
         ]
 
         if target_word in fresh_store._tfidf_vocab:
@@ -375,9 +375,10 @@ class TestTfIdfVocabularyAlignment:
         tfidf_start = store._spectral_dim
 
         # Find a non-zero TF-IDF word and record its original value
-        initial_vec = store._concept_matrix[tree_idx, tfidf_start:tfidf_start + store._tfidf_dim]
+        initial_vec = store._concept_matrix[tree_idx, tfidf_start : tfidf_start + store._tfidf_dim]
         nonzero_words = [
-            (w, c) for w, c in store._tfidf_vocab.items()
+            (w, c)
+            for w, c in store._tfidf_vocab.items()
             if c < len(initial_vec) and initial_vec[c] != 0.0
         ]
         assert nonzero_words, "Test requires at least one non-zero TF-IDF word"
@@ -457,7 +458,7 @@ class TestTfIdfVocabularyAlignment:
         fresh_tree_idx = fresh_store._concept_to_idx.get("tree")
         fresh_tfidf_start = fresh_store._spectral_dim
         fresh_vec = fresh_store._concept_matrix[
-            fresh_tree_idx, fresh_tfidf_start:fresh_tfidf_start + fresh_store._tfidf_dim
+            fresh_tree_idx, fresh_tfidf_start : fresh_tfidf_start + fresh_store._tfidf_dim
         ]
 
         if target_word in fresh_store._tfidf_vocab:
@@ -525,9 +526,7 @@ class TestColdLayer:
         archive = open_archive(tmp_path / "archive")
         archive.archive_concept(
             "cactus",
-            self._archived_concept_data(
-                "cactus", "a spiny succulent plant that stores water"
-            ),
+            self._archived_concept_data("cactus", "a spiny succulent plant that stores water"),
             set(),
         )
         small_network.attach_archive(archive)
@@ -552,9 +551,7 @@ class TestColdLayer:
         archive = open_archive(tmp_path / "archive")
         archive.archive_concept(
             "cactus",
-            self._archived_concept_data(
-                "cactus", "a spiny succulent plant that stores water"
-            ),
+            self._archived_concept_data("cactus", "a spiny succulent plant that stores water"),
             set(),
         )
         small_network.attach_archive(archive)
@@ -566,9 +563,7 @@ class TestColdLayer:
         # k exceeds the hot network size, so the cold fallback must
         # fire to fill remaining results. "plant" is in the hot TF-IDF
         # vocabulary and in the archived concept's definition.
-        results = store.find_similar_to_text(
-            "spiny succulent plant", k=20, threshold=0.01
-        )
+        results = store.find_similar_to_text("spiny succulent plant", k=20, threshold=0.01)
         names = [name for name, _ in results]
         assert "cactus" in names
         archive.close()
@@ -583,9 +578,7 @@ class TestColdLayer:
         archive = open_archive(tmp_path / "archive")
         archive.archive_concept(
             "cactus",
-            self._archived_concept_data(
-                "cactus", "a spiny succulent plant that stores water"
-            ),
+            self._archived_concept_data("cactus", "a spiny succulent plant that stores water"),
             set(),
         )
         small_network.attach_archive(archive)
@@ -600,9 +593,7 @@ class TestColdLayer:
         recalled = small_network.get_concept("cactus")
         assert recalled is not None
 
-        results = store.find_similar_to_text(
-            "spiny succulent plant", k=20, threshold=0.0
-        )
+        results = store.find_similar_to_text("spiny succulent plant", k=20, threshold=0.0)
         names = [name for name, _ in results]
         assert names.count("cactus") <= 1
         archive.close()
@@ -617,9 +608,7 @@ class TestColdLayer:
         archive = open_archive(tmp_path / "archive")
         archive.archive_concept(
             "cactus",
-            self._archived_concept_data(
-                "cactus", "a spiny succulent plant that stores water"
-            ),
+            self._archived_concept_data("cactus", "a spiny succulent plant that stores water"),
             set(),
         )
         small_network.attach_archive(archive)
@@ -659,13 +648,9 @@ class TestColdLayer:
         assert computed is not None
         # Both paths agree on width, so a caller may batch them.
         assert computed.shape[0] == hot.shape[0] == store.dimensionality
-        assert (
-            np.mean([hot, computed], axis=0).shape[0] == store.dimensionality
-        )
+        assert np.mean([hot, computed], axis=0).shape[0] == store.dimensionality
 
-    def test_every_vector_width_agrees(
-        self, small_network: ConceptNetwork, tmp_path: Path
-    ) -> None:
+    def test_every_vector_width_agrees(self, small_network: ConceptNetwork, tmp_path: Path) -> None:
         """Hot, cold and computed vectors are all the same width."""
         store = EmbeddingStore(small_network, data_dir=str(tmp_path))
         store._ensure_loaded()

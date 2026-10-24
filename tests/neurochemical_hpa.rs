@@ -373,3 +373,67 @@ fn test_hpa_axis_remains_monotone_in_drive() {
         prev = acth;
     }
 }
+
+/// A living HPA axis is never silent: with no CRH drive at all, the
+/// circadian basal secretion must hold cortisol at a low nonzero
+/// resting floor — tonic presence, not distress. The floor must also
+/// stay below the stress gate so basal tone can never masquerade as
+/// a stressor.
+#[test]
+fn test_basal_hpa_drive_holds_nonzero_resting_cortisol() {
+    let mut neuro = NeurochemicalVector::new(0);
+    let params = NeuroTickParams {
+        maturation_level: 1.0,
+        noise_amplitude: 0.0,
+        ..NeuroTickParams::DEFAULT
+    };
+
+    // No CRH impulse anywhere — pure basal drive. Cortisol's
+    // production/clearance equilibrium takes ~100 s to converge;
+    // run 4000 ticks (400 s) to settle.
+    for _ in 0..4000 {
+        neuro.tick_with_params(&params);
+    }
+
+    let cortisol = neuro.chemicals[NeurochemicalId::Cortisol as usize].level;
+    assert!(
+        cortisol > 0.002,
+        "basal HPA drive must hold a nonzero resting floor, got {cortisol}"
+    );
+    assert!(
+        cortisol < 0.06,
+        "resting cortisol must stay below the stress gate (0.06), got {cortisol}"
+    );
+}
+
+/// The basal drive is circadian: the morning-surge phase must produce
+/// more cortisol than the pre-dawn nadir. Set the phase directly —
+/// the oscillator advances on a 24 h period, far too slow for ticks.
+#[test]
+fn test_basal_cortisol_is_circadian() {
+    let params = NeuroTickParams {
+        maturation_level: 1.0,
+        noise_amplitude: 0.0,
+        ..NeuroTickParams::DEFAULT
+    };
+
+    let settle = |phase: f32| -> f32 {
+        let mut neuro = NeurochemicalVector::new(0);
+        neuro.set_circadian_phase(phase);
+        for _ in 0..4000 {
+            // Pin the phase — the 24 h oscillator must not drift
+            // during a short settling window.
+            neuro.set_circadian_phase(phase);
+            neuro.tick_with_params(&params);
+        }
+        neuro.chemicals[NeurochemicalId::Cortisol as usize].level
+    };
+
+    let nadir = settle(0.0); // 00:00 — biological nadir
+    let peak = settle(0.375); // 09:00 — morning surge peak
+
+    assert!(
+        peak > 1.5 * nadir,
+        "morning surge must exceed the nadir: nadir={nadir}, peak={peak}"
+    );
+}

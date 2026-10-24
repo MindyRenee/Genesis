@@ -225,10 +225,7 @@ class Reasoner:
         # Without this filter, reasoning conclusions like "_utt:I've
         # been_thinking expresses _cat:utterance:reflection_opener"
         # leak into speech as raw concept IDs.
-        results = [
-            r for r in results
-            if not self._references_internal_concept(r)
-        ]
+        results = [r for r in results if not self._references_internal_concept(r)]
         return results
 
     @staticmethod
@@ -289,7 +286,9 @@ class Reasoner:
 
         for rel_type, base_conf in self._TRANSITIVE.items():
             for result in self._best_first_chains(
-                concept_id, depth, budget,
+                concept_id,
+                depth,
+                budget,
                 relations={rel_type},
                 step_conf=base_conf,
                 reasoning_type=ReasoningType.DEDUCTIVE,
@@ -313,15 +312,16 @@ class Reasoner:
         if budget is None:
             budget = _InferenceBudget(_expansions_for_depth(depth))
         return self._best_first_chains(
-            concept_id, depth, budget,
+            concept_id,
+            depth,
+            budget,
             relations={RelationType.CAUSES, RelationType.LEADS_TO},
             step_conf=0.7,
             reasoning_type=ReasoningType.CAUSAL,
             min_emit_depth=2,
             emit_conf=lambda hops, conf: conf,
             conclusion=lambda target, _via: (
-                f"{concept_id} ultimately leads to "
-                f"{target} through a causal chain"
+                f"{concept_id} ultimately leads to {target} through a causal chain"
             ),
         )
 
@@ -390,10 +390,7 @@ class Reasoner:
                         ReasoningResult(
                             conclusion=conclusion(edge.target, via),
                             reasoning_type=reasoning_type,
-                            evidence=[
-                                f"{src} {rel} {tgt}"
-                                for src, rel, tgt, _w in new_path
-                            ],
+                            evidence=[f"{src} {rel} {tgt}" for src, rel, tgt, _w in new_path],
                             confidence=min(1.0, emit_conf(len(new_path), hop_conf)),
                             knowledge=[(edge.relation.value, edge.target, hop_conf)],
                             path=list(new_path),
@@ -401,7 +398,8 @@ class Reasoner:
                         )
                     )
                 heapq.heappush(
-                    frontier, (-hop_conf, counter, edge.target, new_path),
+                    frontier,
+                    (-hop_conf, counter, edge.target, new_path),
                 )
                 counter += 1
 
@@ -477,9 +475,7 @@ class Reasoner:
                 # probability that at least one independent cause is
                 # active. A raw sum would exceed 1 and double-count
                 # redundant evidence.
-                conf = 1.0 - (1.0 - enables_targets[target]) * (
-                    1.0 - prevents_targets[target]
-                )
+                conf = 1.0 - (1.0 - enables_targets[target]) * (1.0 - prevents_targets[target])
                 results.append(
                     ReasoningResult(
                         conclusion=conclusion,
@@ -529,16 +525,12 @@ class Reasoner:
         # just their count.
         one_hop: dict[str, list[tuple[RelationType, float]]] = {}
         for edge in self.network.get_edges(concept_id, "out"):
-            one_hop.setdefault(edge.target, []).append(
-                (edge.relation, edge.weight)
-            )
+            one_hop.setdefault(edge.target, []).append((edge.relation, edge.weight))
 
         # candidate → paired first/second-hop evidence. Keeping the
         # first hop paired with its second hop prevents a different
         # relation from being selected when an intermediary has several.
-        two_hop: dict[
-            str, list[tuple[str, RelationType, float, RelationType, float]]
-        ] = {}
+        two_hop: dict[str, list[tuple[str, RelationType, float, RelationType, float]]] = {}
         for neighbor, first_edges in one_hop.items():
             for edge in self.network.get_edges(neighbor, "out"):
                 if edge.target != concept_id and edge.target not in one_hop:
@@ -592,9 +584,7 @@ class Reasoner:
         suggested_relation = self._predict_hypothesis_relation(path_relations)
         # Confidence: structural consistency (same relation both
         # hops), path strength, and independent support.
-        consistent_paths = sum(
-            1 for r1, r2 in path_relations if r1 == r2
-        )
+        consistent_paths = sum(1 for r1, r2 in path_relations if r1 == r2)
         base_conf = 0.2 + 0.4 * score
         if consistent_paths > 0:
             base_conf += 0.15 * min(consistent_paths, 2)
@@ -608,13 +598,13 @@ class Reasoner:
         # relation tokens are not verbs: "might be is_a" and
         # "might causes" are both ungrammatical.
         from frontal_lobe.graph_walk import _RELATION_VERB_SEEDS
+
         seeds = _RELATION_VERB_SEEDS.get(suggested_relation.value) or []
         verb_phrase = seeds[0] if seeds else suggested_relation.value.replace("_", " ")
         hedged = hedge_verb_phrase(verb_phrase)
         through = ", ".join(p[0] for p in paths)
         conclusion = (
-            f"{concept_id} {hedged} "
-            f"{candidate} (currently connected only through {through})"
+            f"{concept_id} {hedged} {candidate} (currently connected only through {through})"
         )
         evidence = [f"gap: no direct {concept_id} → {candidate}"]
         structured_path: list[tuple[str, str, str, float]] = []
@@ -622,9 +612,7 @@ class Reasoner:
             # Preserve the exact first hop paired with this second hop.
             evidence.append(f"{concept_id} → {inter}")
             evidence.append(f"{inter} {rel.value} {candidate}")
-            structured_path.append(
-                (concept_id, first_rel.value, inter, first_w1)
-            )
+            structured_path.append((concept_id, first_rel.value, inter, first_w1))
             structured_path.append((inter, rel.value, candidate, w2))
         return ReasoningResult(
             conclusion=conclusion,
@@ -661,6 +649,7 @@ class Reasoner:
 
         # Count how often each relation appears as the first or second edge
         from collections import Counter
+
         first_rels = Counter(r1 for r1, _ in path_relations)
         second_rels = Counter(r2 for _, r2 in path_relations)
 
@@ -728,11 +717,9 @@ class Reasoner:
                 ):
                     from frontal_lobe.graph_walk import _RELATION_VERB_SEEDS
                     from temporal_lobe.morphology import hedge_verb_phrase
+
                     seeds = _RELATION_VERB_SEEDS.get(s_edge.relation.value) or []
-                    verb_phrase = (
-                        seeds[0] if seeds
-                        else s_edge.relation.value.replace("_", " ")
-                    )
+                    verb_phrase = seeds[0] if seeds else s_edge.relation.value.replace("_", " ")
                     conclusion = (
                         f"{concept_id} {hedge_verb_phrase(verb_phrase)} "
                         f"{s_edge.target}, by analogy with {similar_concept}"
@@ -752,8 +739,10 @@ class Reasoner:
                             path=[
                                 (concept_id, "similar_to", similar_concept, edge_weight),
                                 (
-                                    similar_concept, s_edge.relation.value,
-                                    s_edge.target, s_edge.weight,
+                                    similar_concept,
+                                    s_edge.relation.value,
+                                    s_edge.target,
+                                    s_edge.weight,
                                 ),
                             ],
                         )
@@ -810,8 +799,7 @@ class Reasoner:
             for deeper_edge in self.network.get_edges(cause, "in"):
                 if deeper_edge.relation in (RelationType.CAUSES, RelationType.LEADS_TO):
                     evidence.append(
-                        f"{deeper_edge.source} {deeper_edge.relation.value} {cause} "
-                        f"(deeper cause)"
+                        f"{deeper_edge.source} {deeper_edge.relation.value} {cause} (deeper cause)"
                     )
                     break
 
@@ -1070,10 +1058,7 @@ class Reasoner:
             for edge in self.network.get_edges(subject, "in"):
                 if edge.relation == RelationType.RELATED_TO:
                     for role_edge in self.network.get_edges(edge.source, "out"):
-                        if (
-                            role_edge.relation == RelationType.IS_A
-                            and role_edge.target != subject
-                        ):
+                        if role_edge.relation == RelationType.IS_A and role_edge.target != subject:
                             agents.append(
                                 (edge.source, f"the {role_edge.target}", role_edge.weight)
                             )
@@ -1132,14 +1117,19 @@ class Reasoner:
             # English "what causes X?" is handled by `_answer_what_is`
             # which reports "X is caused by Y" from incoming edges.
             return self._multi_edge_answer(
-                subject, RelationType.CAUSES, "causes",
+                subject,
+                RelationType.CAUSES,
+                "causes",
             )
 
         elif question_type == "what_is_it_part_of":
             # "What is X part of?" → find larger things X belongs to.
             # These are outgoing PART_OF edges: X is part of Y.
             return self._multi_edge_answer(
-                subject, RelationType.PART_OF, "is part of", "part_of",
+                subject,
+                RelationType.PART_OF,
+                "is part of",
+                "part_of",
             )
 
         elif question_type == "what_emerges_from":
@@ -1201,10 +1191,7 @@ class Reasoner:
             )
         targets = [h[0] for h in hits]
         return ReasoningResult(
-            conclusion=(
-                f"{subject} {phrase} "
-                f"{', '.join(targets[:-1])}, and {targets[-1]}"
-            ),
+            conclusion=(f"{subject} {phrase} {', '.join(targets[:-1])}, and {targets[-1]}"),
             reasoning_type=ReasoningType.DEDUCTIVE,
             evidence=[f"{subject} {rel} {t}" for t in targets],
             confidence=sum(h[1] for h in hits) / len(hits),
@@ -1692,9 +1679,7 @@ class Reasoner:
                 return True
         return False
 
-    def _find_connecting_concepts(
-        self, enabled: list[str], subj_types: list[str]
-    ) -> list[str]:
+    def _find_connecting_concepts(self, enabled: list[str], subj_types: list[str]) -> list[str]:
         """Find concepts connecting enabled features to subject types."""
         connecting_concepts: list[str] = []
         connection_rels = (
@@ -1848,8 +1833,14 @@ class Reasoner:
 
         # Build the explanation
         return self._build_why_explanation(
-            subject, object_, subj_id, obj_id, obj_concept,
-            enabled, connecting_concepts, subj_types,
+            subject,
+            object_,
+            subj_id,
+            obj_id,
+            obj_concept,
+            enabled,
+            connecting_concepts,
+            subj_types,
         )
 
 
@@ -2605,9 +2596,7 @@ class MetaReasoning:
         )
         # Per-strategy usage counts — needed for the exploration bonus
         # so a strategy that won once early doesn't starve the rest.
-        self._strategy_uses: dict[ReasoningStrategy, int] = dict.fromkeys(
-            ReasoningStrategy, 0
-        )
+        self._strategy_uses: dict[ReasoningStrategy, int] = dict.fromkeys(ReasoningStrategy, 0)
         # Problem type → strategy preferences
         self._problem_preferences: dict[str, dict[ReasoningStrategy, float]] = {}
 
@@ -2656,9 +2645,7 @@ class MetaReasoning:
             # a diminishing boost so the selector keeps probing instead
             # of locking onto whichever strategy won first.
             uses = self._strategy_uses.get(strategy, 0)
-            explore_bonus = 0.12 * math.sqrt(
-                math.log1p(total_uses) / (1 + uses)
-            )
+            explore_bonus = 0.12 * math.sqrt(math.log1p(total_uses) / (1 + uses))
 
             # Confidence adjustment: high confidence favors simpler
             # strategies (deductive, analogical), low confidence favors

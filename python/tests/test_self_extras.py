@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 # From tests/test_growth_ledger.py
 # ======================================================================
 
+
 class TestGrowthMilestone:
     """Tests for the GrowthMilestone dataclass."""
 
@@ -46,14 +47,10 @@ class TestGrowthMilestone:
 
     def test_delta_property(self):
         """delta should compute value - previous."""
-        m = GrowthMilestone(
-            dimension="test", metric="test", value=100, previous=80, note=""
-        )
+        m = GrowthMilestone(dimension="test", metric="test", value=100, previous=80, note="")
         assert m.delta == 20
 
-        m2 = GrowthMilestone(
-            dimension="test", metric="test", value=50, previous=80, note=""
-        )
+        m2 = GrowthMilestone(dimension="test", metric="test", value=50, previous=80, note="")
         assert m2.delta == -30
 
     def test_from_dict_defaults(self):
@@ -334,6 +331,7 @@ class TestGrowthIntegration:
 # From tests/test_explorer.py
 # ======================================================================
 
+
 @pytest.fixture
 def temp_project() -> Generator[str, None, None]:
     """Create a temporary project directory with test files."""
@@ -573,7 +571,6 @@ def test_learn_python_file():
     assert learner.network.get_concept("python:network.ConceptNetwork.add_concept") is not None
 
 
-
 def test_python_structural_enrichment_uses_scoped_ids(tmp_path):
     """Complexity and call ownership enrich the concepts actually created."""
     target = tmp_path / "module.py"
@@ -595,11 +592,10 @@ def test_python_structural_enrichment_uses_scoped_ids(tmp_path):
     assert method.properties["complexity"] == 2
     assert method.properties["params"] == ["self", "value"]
 
-    edges = learner.network.get_edges(
-        "python:module.Worker.run", direction="out"
-    )
+    edges = learner.network.get_edges("python:module.Worker.run", direction="out")
     assert any(edge.relation == RelationType.CALLS for edge in edges)
     assert any(edge.target == "python:module.helper" for edge in edges)
+
 
 def test_python_class_concepts_are_module_scoped(tmp_path):
     """Same-named classes in different modules must remain distinct."""
@@ -633,6 +629,7 @@ def test_python_class_concepts_are_module_scoped(tmp_path):
     assert first_method.properties["file"] == "first.py"
     assert second_method.properties["file"] == "second.py"
 
+
 def test_learn_rust_file():
     """Analyzing a Rust file adds concepts and relationships."""
     learner = _make_learner(root=PROJECT_ROOT.parent)
@@ -648,6 +645,164 @@ def test_learn_rust_file():
 
     # Module concept present
     assert learner.network.get_concept("rust:manifest") is not None
+
+
+class _DaemonAnalysisClient:
+    """Minimal stand-in for GenesisClient on the code-analysis path.
+
+    Only ``analyze_code`` is exercised; ``store_event`` accepts and
+    discards the episode summary the learner banks afterward.
+    """
+
+    def __init__(self, analysis):
+        self._analysis = analysis
+        self.calls = []
+
+    def analyze_code(self, path, source):
+        self.calls.append((path, source))
+        return self._analysis
+
+    def store_event(self, **_kwargs):
+        return True
+
+
+def _rust_daemon_report():
+    """The decoded shape GenesisClient.analyze_code returns."""
+    return {
+        "file": "engine.rs",
+        "stats": {"lines": 12, "functions": 2, "structs": 1},
+        "units": [
+            {
+                "kind": "function",
+                "name": "ignite",
+                "qualified": "ignite",
+                "span": (4, 9),
+                "public": True,
+                "async_": False,
+                "unsafe_": False,
+                "body": True,
+                "params": ["fuel: Fuel"],
+                "return_type": "Spark",
+                "calls": ["compress"],
+                "refs": ["Fuel", "Spark"],
+                "branches": 1,
+                "loops": 0,
+                "stmts": 4,
+                "docs": "Starts the burn.",
+            },
+            {
+                "kind": "function",
+                "name": "compress",
+                "qualified": "compress",
+                "span": (10, 12),
+                "public": False,
+                "async_": False,
+                "unsafe_": False,
+                "body": True,
+                "params": [],
+                "return_type": None,
+                "calls": [],
+                "refs": [],
+                "branches": 0,
+                "loops": 0,
+                "stmts": 2,
+                "docs": "",
+            },
+            {
+                "kind": "struct",
+                "name": "Fuel",
+                "qualified": "Fuel",
+                "span": (1, 3),
+                "public": True,
+                "async_": False,
+                "unsafe_": False,
+                "body": True,
+                "params": [],
+                "return_type": None,
+                "calls": [],
+                "refs": [],
+                "branches": 0,
+                "loops": 0,
+                "stmts": 0,
+                "docs": "",
+            },
+        ],
+        "impls": [("Engine", "Ignition"), ("Fuel", None)],
+        "edges": [("ignite", "compress")],
+    }
+
+
+def test_learn_rust_file_prefers_daemon_analysis(tmp_path):
+    """The daemon's AST reading supplies edges regex cannot see."""
+    target = tmp_path / "engine.rs"
+    target.write_text(
+        "struct Fuel;\n\n"
+        "/// Starts the burn.\n"
+        "pub fn ignite(fuel: Fuel) -> Spark {\n"
+        "    if true { compress() }\n"
+        "    Spark\n"
+        "}\n\n"
+        "fn compress() {}\n",
+        encoding="utf-8",
+    )
+    client = _DaemonAnalysisClient(_rust_daemon_report())
+    learner = CodeLearner(network=ConceptNetwork(), client=client, project_root=str(tmp_path))
+
+    result = learner.learn_rust_file(str(target))
+
+    # The daemon answered — its analysis drove the read.
+    assert len(client.calls) == 1
+    assert result.functions == 2
+    assert result.classes == 1
+    assert result.language == "rust"
+
+    ignite = learner.network.get_concept("rust:engine.ignite")
+    assert ignite is not None
+    assert ignite.properties["span"] == "4-9"
+    assert ignite.properties["complexity"] == 2  # branches + loops + 1
+    assert ignite.properties["docs"] == "Starts the burn."
+    assert ignite.properties["public"] is True
+
+    # The call edge the regex path cannot see: ignite CALLS compress.
+    call_edges = learner.network.get_edges("rust:engine.ignite", direction="out")
+    assert any(e.relation == RelationType.CALLS and "compress" in str(e) for e in call_edges), [
+        str(e) for e in call_edges
+    ]
+
+    # Impl pairs: the trait impl wires Engine INSTANCE_OF Ignition;
+    # the bare impl wires the module DEFINES Fuel edge.
+    engine_impl = learner.network.get_edges("rust:engine.Engine", direction="out")
+    assert any(e.relation == RelationType.INSTANCE_OF for e in engine_impl), [
+        str(e) for e in engine_impl
+    ]
+    module_edges = learner.network.get_edges("rust:engine", direction="out")
+    assert any("fuel" in str(e).lower() for e in module_edges)
+
+
+def test_learn_rust_file_falls_back_when_daemon_returns_none(tmp_path):
+    """An unavailable analysis channel falls back to the regex parser."""
+    target = tmp_path / "fallback.rs"
+    target.write_text("fn solo() {}\n\nfn main() { solo() }\n", encoding="utf-8")
+    client = _DaemonAnalysisClient(None)
+    learner = CodeLearner(network=ConceptNetwork(), client=client, project_root=str(tmp_path))
+
+    result = learner.learn_rust_file(str(target))
+
+    assert len(client.calls) == 1  # the daemon was asked first
+    assert result.functions == 2
+    assert learner.network.get_concept("rust:fallback.solo") is not None
+
+
+def test_learn_rust_file_without_client_uses_regex(tmp_path):
+    """No daemon at all — the mind's own parser still reads the file."""
+    target = tmp_path / "alone.rs"
+    target.write_text("fn hermit() {}\n", encoding="utf-8")
+    learner = CodeLearner(network=ConceptNetwork(), client=None, project_root=str(tmp_path))
+
+    result = learner.learn_rust_file(str(target))
+
+    assert result.functions == 1
+    assert learner.network.get_concept("rust:alone.hermit") is not None
 
 
 def test_learn_codebase():
@@ -706,7 +861,6 @@ def test_relationships_are_typed():
     assert RelationType.DEFINES in relations
 
 
-
 def test_code_investigation_prefers_novel_evidence(tmp_path):
     """Autonomous study should prefer novel evidence over arbitrary file order."""
     first = tmp_path / "small.py"
@@ -760,6 +914,7 @@ def test_code_learning_restores_spaced_repetition_state(tmp_path):
     assert restored._spaced_repetition._review_counts[rel] == expected_reviews
     assert restored._spaced_repetition._importance[rel] == expected_importance
     assert restored._spaced_repetition.schedule_reanalysis(rel, expected_importance) > 0
+
 
 def test_code_learning_persists_investigation_evidence(tmp_path):
     """A fresh learner can recover the source fingerprint and uncertainty state."""

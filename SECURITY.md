@@ -17,8 +17,10 @@ permissions of the user running it.
 ## Network access
 
 Genesis can autonomously fetch public web content when network access is
-enabled. There is currently no domain allow-list in the default configuration.
-Run offline when that is not acceptable:
+enabled. A blocklist (`frontal_lobe/tools/web_search.py`) refuses known
+adult, malware, phishing, and tracking domains and adult-themed queries —
+it is a known-bad filter, not an allow-list: the rest of the open web is
+reachable. Run offline when that is not acceptable:
 
 ```bash
 ./run.sh --offline

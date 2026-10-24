@@ -73,26 +73,15 @@ class SensorimotorLayer:
         and an orthogonal landing (predicted right, went down) are
         both maximal surprises; a partial slide is partial error.
         """
-        miss = math.hypot(
-            observed[0] - expected[0], observed[1] - expected[1]
-        )
+        miss = math.hypot(observed[0] - expected[0], observed[1] - expected[1])
         norm = math.hypot(*expected)
         # A predicted refusal has no stride to normalize against —
         # graded on the miss alone: a body that stayed put confirmed
         # it, any motion at all is the whole surprise.
-        magnitude = (
-            (0.0 if observed == expected else 1.0)
-            if norm == 0
-            else min(1.0, miss / norm)
-        )
+        magnitude = (0.0 if observed == expected else 1.0) if norm == 0 else min(1.0, miss / norm)
         ema = self._error_ema.get(action, 0.0)
-        self._error_ema[action] = (
-            self._decay * magnitude + (1.0 - self._decay) * ema
-        )
-        if (
-            magnitude >= _MOTOR_NE_THRESHOLD
-            and self._on_neuro_impulse is not None
-        ):
+        self._error_ema[action] = self._decay * magnitude + (1.0 - self._decay) * ema
+        if magnitude >= _MOTOR_NE_THRESHOLD and self._on_neuro_impulse is not None:
             try:
                 self._on_neuro_impulse(
                     _CHEM_NOREPINEPHRINE,
@@ -109,10 +98,7 @@ class SensorimotorLayer:
         moves on trials, not on time — so a flagged action stays a
         recalibration question until the world answers otherwise.
         """
-        return (
-            self._error_ema.get(action, 0.0)
-            >= _MISCALIBRATION_THRESHOLD
-        )
+        return self._error_ema.get(action, 0.0) >= _MISCALIBRATION_THRESHOLD
 
     def error_of(self, action: str) -> float:
         """The action's running prediction-error estimate."""

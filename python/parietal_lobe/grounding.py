@@ -120,8 +120,6 @@ def scene_facts(scene: Scene, ns: str = "scene") -> list[tuple[str, str, str]]:
     return facts
 
 
-def scene_relations_for(
-    scene: Scene, obj_index: int, ns: str = "scene"
-) -> list[ObjectRelation]:
+def scene_relations_for(scene: Scene, obj_index: int, ns: str = "scene") -> list[ObjectRelation]:
     """All relations where the given object is the subject."""
     return [r for r in scene.relations if r.subject == obj_index]

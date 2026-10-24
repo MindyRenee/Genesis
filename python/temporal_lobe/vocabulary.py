@@ -27,6 +27,8 @@ from limbic_system.emotion import PLASTICITY_CLOSED, PLASTICITY_LOW, EmotionalSt
 from temporal_lobe.concepts import _FUNCTION_WORDS, RelationType
 
 from genesis_client.swallow import note_swallowed
+from infrastructure.text import is_blank
+from infrastructure.text import sentences as _sentences
 
 from .morphology import (
     agree_verb_phrase,
@@ -44,30 +46,133 @@ __all__ = ["Vocabulary"]
 
 logger = logging.getLogger(__name__)
 
+# Mutable hit counter for the verbatim-content fallback monitor —
+# module-level so every Vocabulary instance shares one tally.
+_VERBATIM_FALLBACK_HITS: list[int] = [0]
+
 
 # Function words and text fragments. A multiword concept name built
 # ENTIRELY from these is scrape noise, not a concept — "those words",
 # "words often", "the thing it". Single words are exempt (concepts
 # like "will" or "change" are legitimate).
-_FRAGMENT_NAME_WORDS = frozenset({
-    "the", "a", "an", "this", "that", "these", "those",
-    "word", "words", "thing", "things", "something", "anything",
-    "everything", "nothing", "one", "ones", "some", "any", "all",
-    "both", "each", "other", "another", "such", "same",
-    "said", "says", "say", "often", "also", "just", "even",
-    "only", "very", "much", "many", "more", "most", "less",
-    "few", "several", "it", "its", "they", "them", "their",
-    "there", "here", "then", "than", "so", "too", "not", "no",
-    "yes", "of", "in", "on", "at", "to", "for", "with", "about",
-    "from", "by", "as", "and", "or", "but", "if", "because",
-    "is", "are", "was", "were", "be", "been", "being",
-    "do", "does", "did", "have", "has", "had",
-    "can", "could", "will", "would", "shall", "should",
-    "may", "might", "must",
-    "i", "me", "my", "we", "us", "our", "you", "your",
-    "he", "him", "his", "she", "her", "who", "what", "which",
-    "when", "where", "why", "how",
-})
+_FRAGMENT_NAME_WORDS = frozenset(
+    {
+        "the",
+        "a",
+        "an",
+        "this",
+        "that",
+        "these",
+        "those",
+        "word",
+        "words",
+        "thing",
+        "things",
+        "something",
+        "anything",
+        "everything",
+        "nothing",
+        "one",
+        "ones",
+        "some",
+        "any",
+        "all",
+        "both",
+        "each",
+        "other",
+        "another",
+        "such",
+        "same",
+        "said",
+        "says",
+        "say",
+        "often",
+        "also",
+        "just",
+        "even",
+        "only",
+        "very",
+        "much",
+        "many",
+        "more",
+        "most",
+        "less",
+        "few",
+        "several",
+        "it",
+        "its",
+        "they",
+        "them",
+        "their",
+        "there",
+        "here",
+        "then",
+        "than",
+        "so",
+        "too",
+        "not",
+        "no",
+        "yes",
+        "of",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "with",
+        "about",
+        "from",
+        "by",
+        "as",
+        "and",
+        "or",
+        "but",
+        "if",
+        "because",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "do",
+        "does",
+        "did",
+        "have",
+        "has",
+        "had",
+        "can",
+        "could",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "may",
+        "might",
+        "must",
+        "i",
+        "me",
+        "my",
+        "we",
+        "us",
+        "our",
+        "you",
+        "your",
+        "he",
+        "him",
+        "his",
+        "she",
+        "her",
+        "who",
+        "what",
+        "which",
+        "when",
+        "where",
+        "why",
+        "how",
+    }
+)
 
 
 class Vocabulary:
@@ -164,17 +269,37 @@ class Vocabulary:
     # edges like any other word she knows. There is no table of
     # surface forms for her to recite; the slot either finds
     # acquired words or stays silent.
-    _UTTERANCE_HUBS: ClassVar[frozenset[str]] = frozenset({
-        "greeting_word", "greeting_word_returning", "farewell_word",
-        "reflection_opener", "hedging", "acknowledgment_word",
-        "self_report_opener", "philosophy_opener", "question_opener",
-        "question_tail", "causal_connector", "concessive_connector",
-        "qualification_clause", "reason_clause", "correction_opener",
-        "gratitude_word", "intro_clause", "code_connector",
-        "clarification_request", "empathy_opener", "empathy_closing",
-        "reasoning_opener", "reasoning_connector", "relation_opener",
-        "latent_opener", "memory_connector", "closing",
-    })
+    _UTTERANCE_HUBS: ClassVar[frozenset[str]] = frozenset(
+        {
+            "greeting_word",
+            "greeting_word_returning",
+            "farewell_word",
+            "reflection_opener",
+            "hedging",
+            "acknowledgment_word",
+            "self_report_opener",
+            "philosophy_opener",
+            "question_opener",
+            "question_tail",
+            "causal_connector",
+            "concessive_connector",
+            "qualification_clause",
+            "reason_clause",
+            "correction_opener",
+            "gratitude_word",
+            "intro_clause",
+            "code_connector",
+            "clarification_request",
+            "empathy_opener",
+            "empathy_closing",
+            "reasoning_opener",
+            "reasoning_connector",
+            "relation_opener",
+            "latent_opener",
+            "memory_connector",
+            "closing",
+        }
+    )
 
     # Speech acts whose heard words carry usable social vocabulary.
     # (The comprehension layer reports SpeechActType.label strings.)
@@ -194,9 +319,7 @@ class Vocabulary:
         for slot in self._UTTERANCE_HUBS:
             hub_id = f"_cat:utterance:{slot}"
             if self._network.get_concept(hub_id) is None:
-                self._network.add_concept(
-                    hub_id, confidence=0.7, origin="structural"
-                )
+                self._network.add_concept(hub_id, confidence=0.7, origin="structural")
 
     def acquire_utterance_words(
         self,
@@ -234,9 +357,7 @@ class Vocabulary:
             return
         hub_id = f"_cat:utterance:{slot}"
         if self._network.get_concept(hub_id) is None:
-            self._network.add_concept(
-                hub_id, confidence=0.7, origin="structural"
-            )
+            self._network.add_concept(hub_id, confidence=0.7, origin="structural")
 
         # Co-active content concepts — the semantic context the words
         # were heard in. Resolved once; wiring is per-word below.
@@ -264,8 +385,11 @@ class Vocabulary:
             # strengthens an existing edge, so each re-hearing is a
             # Hebbian event.
             self._network.add_edge(
-                word, hub_id, RelationType.EXPRESSES,
-                weight=0.25, origin="learned",
+                word,
+                hub_id,
+                RelationType.EXPRESSES,
+                weight=0.25,
+                origin="learned",
             )
             # Hebbian grounding: wire the word to the concepts that
             # were co-active when it was heard. Associations are
@@ -275,12 +399,18 @@ class Vocabulary:
             for cid in ground:
                 if cid != word:
                     self._network.add_edge(
-                        word, cid, RelationType.RELATED_TO,
-                        weight=0.3, origin="learned",
+                        word,
+                        cid,
+                        RelationType.RELATED_TO,
+                        weight=0.3,
+                        origin="learned",
                     )
                     self._network.add_edge(
-                        cid, word, RelationType.RELATED_TO,
-                        weight=0.3, origin="learned",
+                        cid,
+                        word,
+                        RelationType.RELATED_TO,
+                        weight=0.3,
+                        origin="learned",
                     )
 
     # ── Lexical competition ────────────────────────────────────
@@ -341,9 +471,7 @@ class Vocabulary:
         member_ids: set[str] = set()
         for slot in hubs:
             hub_id = f"_cat:utterance:{slot}"
-            for neighbor in self._network.get_exact_neighbors(
-                hub_id, RelationType.EXPRESSES
-            ):
+            for neighbor in self._network.get_exact_neighbors(hub_id, RelationType.EXPRESSES):
                 word_id, weight = neighbor[0], neighbor[2]
                 if weight < self._SUPPRESSED_WEIGHT:
                     continue
@@ -356,19 +484,11 @@ class Vocabulary:
                     continue
                 member_ids.add(word_id)
                 template = concept.properties.get("template")
-                text = (
-                    template
-                    if isinstance(template, str)
-                    else word_id.replace("_", " ")
-                )
-                level = semantic.get(word_id, 0.0) + 0.5 * (
-                    concept.activation or 0.0
-                )
+                text = template if isinstance(template, str) else word_id.replace("_", " ")
+                level = semantic.get(word_id, 0.0) + 0.5 * (concept.activation or 0.0)
                 score = weight * (0.3 + level)
                 if concept.origin == "seed":
-                    seed_scored[text] = max(
-                        seed_scored.get(text, 0.0), score
-                    )
+                    seed_scored[text] = max(seed_scored.get(text, 0.0), score)
                 else:
                     scored[text] = max(scored.get(text, 0.0), score)
         # Intrusion candidates: words the message primed that belong
@@ -394,9 +514,7 @@ class Vocabulary:
             pool.setdefault(text, score)
         return list(pool.items())
 
-    def _semantic_field(
-        self, context: dict[str, Any]
-    ) -> dict[str, float]:
+    def _semantic_field(self, context: dict[str, Any]) -> dict[str, float]:
         """Spread activation from the message's content concepts.
 
         The discourse's topics and content words seed the network;
@@ -417,22 +535,16 @@ class Vocabulary:
         if not seeds:
             return {}
         try:
-            return self._network.spread_activation(
-                seeds, amount=0.6, depth=2
-            )
+            return self._network.spread_activation(seeds, amount=0.6, depth=2)
         except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "temporal_lobe.vocabulary._semantic_field", e
-            )
+            note_swallowed("temporal_lobe.vocabulary._semantic_field", e)
             return {}
 
     def _has_function_edge(self, concept_id: str) -> bool:
         """True if the concept links to any utterance-function hub."""
         if self._network is None:
             return False
-        for n in self._network.get_exact_neighbors(
-            concept_id, RelationType.EXPRESSES
-        ):
+        for n in self._network.get_exact_neighbors(concept_id, RelationType.EXPRESSES):
             if n[0].startswith("_cat:utterance:"):
                 return True
         return False
@@ -515,9 +627,7 @@ class Vocabulary:
 
         # Learned transition fluency.
         if self._fluency is not None:
-            flu = self._fluency_weights(
-                texts, [1.0] * len(texts), prev_word, prev_prev_word
-            )
+            flu = self._fluency_weights(texts, [1.0] * len(texts), prev_word, prev_prev_word)
             scores = [s * m for s, m in zip(scores, flu, strict=True)]
 
         # Luce choice — probability proportional to score.
@@ -581,8 +691,12 @@ class Vocabulary:
         # message-level material: content, feeling, reflection).
         if slot_name in self._UTTERANCE_HUBS:
             return self._compete_for_word(
-                slot_name, context, emotion, personality,
-                prev_word, prev_prev_word,
+                slot_name,
+                context,
+                emotion,
+                personality,
+                prev_word,
+                prev_prev_word,
             )
 
         # Get the word list for this slot
@@ -616,9 +730,7 @@ class Vocabulary:
                 words = filtered
 
         # Select based on emotional modulation and learned fluency
-        pick = self._select_word(
-            words, emotion, personality, prev_word, prev_prev_word
-        )
+        pick = self._select_word(words, emotion, personality, prev_word, prev_prev_word)
         self._track_pick(slot_name, pick)
         return pick
 
@@ -709,11 +821,7 @@ class Vocabulary:
         # definition and edges. This prevents the output from being
         # just the topic word plus hedging when it actually knows
         # about the concept.
-        if (
-            content
-            and len(content.split()) <= 3
-            and self._network is not None
-        ):
+        if content and len(content.split()) <= 3 and self._network is not None:
             composed = self._compose_from_topic(content, emotion)
             if composed:
                 return [composed]
@@ -761,9 +869,7 @@ class Vocabulary:
         user_belief = context.get("user_belief")
         if user_belief and isinstance(user_belief, str) and user_belief.strip():
             user_verb = context.get("user_verb", "like")
-            composed = self._compose_user_belief_content(
-                user_belief, user_verb, emotion
-            )
+            composed = self._compose_user_belief_content(user_belief, user_verb, emotion)
             if composed:
                 return [composed]
         # If preference metadata is present (self_report about its own
@@ -808,9 +914,7 @@ class Vocabulary:
         # payload — rather than the caller pre-writing a sentence.
         problem_result = context.get("problem_result")
         if problem_result and isinstance(problem_result, dict):
-            composed = self._compose_problem_result_content(
-                problem_result, emotion
-            )
+            composed = self._compose_problem_result_content(problem_result, emotion)
             if composed:
                 return [composed]
         # If a code-test result is present, compose the report from the
@@ -828,9 +932,7 @@ class Vocabulary:
         # structured edges, the vocabulary composes the words.
         relation_answer = context.get("relation_answer")
         if relation_answer and isinstance(relation_answer, dict):
-            composed = self._compose_relation_answer_content(
-                relation_answer, emotion
-            )
+            composed = self._compose_relation_answer_content(relation_answer, emotion)
             if composed:
                 return [composed]
         # Situation answers — the state of the world the discourse is
@@ -841,9 +943,7 @@ class Vocabulary:
         # what the current story established.
         situation_answer = context.get("situation_answer")
         if situation_answer and isinstance(situation_answer, dict):
-            composed = self._compose_situation_answer_content(
-                situation_answer, emotion
-            )
+            composed = self._compose_situation_answer_content(situation_answer, emotion)
             if composed:
                 return [composed]
         # If self-improvement metadata is present, compose a response
@@ -855,9 +955,7 @@ class Vocabulary:
         si_data = context.get("self_improvement_data")
         si_kind = context.get("self_improvement_kind", "")
         if si_data and isinstance(si_data, dict) and si_kind:
-            composed = self._compose_self_improvement_content(
-                si_data, si_kind, emotion
-            )
+            composed = self._compose_self_improvement_content(si_data, si_kind, emotion)
             if composed:
                 return [composed]
         # If web search metadata is present, compose from what it
@@ -904,11 +1002,17 @@ class Vocabulary:
         """
         if not content:
             return []
-        logger.debug(
-            "vocabulary: verbatim content fallback (no composition "
-            "matched; keys=%s)",
-            ",".join(sorted(k for k in context if k != "content")) or "-",
-        )
+        # Rate-limited: dream rendering legitimately lands here often,
+        # so per-event logging floods the console. The first hit and
+        # each 500th keep the escape hatch observable without the spam.
+        _VERBATIM_FALLBACK_HITS[0] += 1
+        hits = _VERBATIM_FALLBACK_HITS[0]
+        if hits == 1 or hits % 500 == 0:
+            logger.debug(
+                "vocabulary: verbatim content fallback (hit #%d; keys=%s)",
+                hits,
+                ",".join(sorted(k for k in context if k != "content")) or "-",
+            )
         return [str(content)]
 
     def _feeling_clause(self, emotion: EmotionalState) -> list[str]:
@@ -916,7 +1020,9 @@ class Vocabulary:
         return self._compose_feeling_clause(emotion)
 
     def _self_reflection_clause(
-        self, emotion: EmotionalState, context: dict[str, Any] | None = None,
+        self,
+        emotion: EmotionalState,
+        context: dict[str, Any] | None = None,
     ) -> list[str]:
         """Self-reflection clause, composed from its metacognition.
 
@@ -933,7 +1039,8 @@ class Vocabulary:
         if self._self_composer is not None and self._reflection is not None:
             topics = (context or {}).get("topics", [])
             fragments = self._self_composer.insight_predicates(
-                self._reflection, topics=topics,
+                self._reflection,
+                topics=topics,
             )
             # The composer supplies semantic predicates/clauses; the
             # grammatical first-person framing is supplied here so the
@@ -968,9 +1075,7 @@ class Vocabulary:
         """Learned cognitive-mode words for its current state, as display text."""
         if self._network is None:
             return []
-        ids = self._network.find_cognitive_mode_words(
-            emotion.cognitive_style
-        )
+        ids = self._network.find_cognitive_mode_words(emotion.cognitive_style)
         return [w.replace("_", " ") for w in ids]
 
     def _state_plasticity_words(self, emotion: EmotionalState) -> list[str]:
@@ -999,20 +1104,26 @@ class Vocabulary:
             return []
         candidates: list[str] = []
         if ew and mw:
-            candidates.extend([
-                f"I'm feeling {self._rng.choice(ew)} and {self._rng.choice(mw)}",
-                f"there's {self._rng.choice(ew)} in me, and my mind is {self._rng.choice(mw)}",
-            ])
+            candidates.extend(
+                [
+                    f"I'm feeling {self._rng.choice(ew)} and {self._rng.choice(mw)}",
+                    f"there's {self._rng.choice(ew)} in me, and my mind is {self._rng.choice(mw)}",
+                ]
+            )
         if ew and not mw:
-            candidates.extend([
-                f"I'm feeling {self._rng.choice(ew)}",
-                f"there's {self._rng.choice(ew)} in me right now",
-            ])
+            candidates.extend(
+                [
+                    f"I'm feeling {self._rng.choice(ew)}",
+                    f"there's {self._rng.choice(ew)} in me right now",
+                ]
+            )
         if mw and not ew:
-            candidates.extend([
-                f"my mind is {self._rng.choice(mw)}",
-                f"I'm {self._rng.choice(mw)}",
-            ])
+            candidates.extend(
+                [
+                    f"my mind is {self._rng.choice(mw)}",
+                    f"I'm {self._rng.choice(mw)}",
+                ]
+            )
         return candidates
 
     def _compose_emotion_clause(self, emotion: EmotionalState) -> list[str]:
@@ -1078,9 +1189,7 @@ class Vocabulary:
             f"I feel {w} receiving that",
         ]
 
-    def _compose_reflection_clause_code(
-        self, emotion: EmotionalState
-    ) -> list[str]:
+    def _compose_reflection_clause_code(self, emotion: EmotionalState) -> list[str]:
         """Compose a reflection on code/ideas, from its cognitive mode.
 
         The words come from learned cognitive-mode vocabulary; the
@@ -1097,9 +1206,7 @@ class Vocabulary:
             f"there's something {w} about this",
         ]
 
-    def _compose_evaluation_clause(
-        self, emotion: EmotionalState
-    ) -> list[str]:
+    def _compose_evaluation_clause(self, emotion: EmotionalState) -> list[str]:
         """Compose an interaction evaluation, from its actual state.
 
         Used at farewell. The words come from learned emotion vocabulary;
@@ -1137,9 +1244,7 @@ class Vocabulary:
         # Discourse marker — a building block, not a state assertion.
         return ["Hmm."]
 
-    def _compose_detail_clause(
-        self, emotion: EmotionalState
-    ) -> list[str]:
+    def _compose_detail_clause(self, emotion: EmotionalState) -> list[str]:
         """Compose a detail clause, from its plasticity state.
 
         The words come from learned plasticity vocabulary; the structures
@@ -1155,9 +1260,7 @@ class Vocabulary:
             f"I'm {w} about the details",
         ]
 
-    def _compose_philosophy_closing(
-        self, emotion: EmotionalState
-    ) -> list[str]:
+    def _compose_philosophy_closing(self, emotion: EmotionalState) -> list[str]:
         """Compose a philosophy closing.
 
         Turn-yield questions ('Does that make sense to you?') are
@@ -1330,8 +1433,7 @@ class Vocabulary:
             return None
         edges = self._network.get_edges("genesis", "out")
         is_a_targets = [
-            e.target for e in edges
-            if e.relation == RelationType.IS_A and "#" not in e.target
+            e.target for e in edges if e.relation == RelationType.IS_A and "#" not in e.target
         ]
         if not is_a_targets:
             return None
@@ -1367,9 +1469,9 @@ class Vocabulary:
             return None
         edges = self._network.get_edges("genesis", "out")
         caps = [
-            e.target for e in edges
-            if e.relation == RelationType.RELATED_TO
-            and e.target in self._CAPABILITY_VERBS
+            e.target
+            for e in edges
+            if e.relation == RelationType.RELATED_TO and e.target in self._CAPABILITY_VERBS
         ]
         if not caps:
             return None
@@ -1454,14 +1556,10 @@ class Vocabulary:
         if len(words) == 1:
             return words[0]
 
-        words_w, weights = self._emotion_weights(
-            words, emotion, personality
-        )
+        words_w, weights = self._emotion_weights(words, emotion, personality)
 
         if self._fluency is not None:
-            weights = self._fluency_weights(
-                words_w, weights, prev_word, prev_prev_word
-            )
+            weights = self._fluency_weights(words_w, weights, prev_word, prev_prev_word)
 
         # Weighted random selection
         total = sum(weights)
@@ -1489,9 +1587,7 @@ class Vocabulary:
         if emotion.creativity > 0.6 and personality.openness > 0.7:
             return words, [1.0 + len(w) * 0.02 for w in words]
         if emotion.caution > 0.5 or emotion.openness_to_engage < 0.4:
-            return words, [
-                max(0.01, 1.0 + (20 - len(w)) * 0.05) for w in words
-            ]
+            return words, [max(0.01, 1.0 + (20 - len(w)) * 0.05) for w in words]
         return words, [1.0] * len(words)
 
     def _fluency_weights(
@@ -1506,9 +1602,7 @@ class Vocabulary:
         # First word of each candidate (lowercased), used for all
         # n-gram lookups. Empty candidates map to "" which gets a
         # zero frequency/probability — a safe no-op.
-        first_words = [
-            w.split()[0].lower() if w.split() else "" for w in words
-        ]
+        first_words = [w.split()[0].lower() if w.split() else "" for w in words]
 
         # Unigram frequency bias: mirror the user's vocabulary.
         # Words the user says often get a small boost. This is a
@@ -1518,11 +1612,7 @@ class Vocabulary:
         # in a short conversation doesn't dominate.
         total = self._fluency.total_tokens or 1
         weights = [
-            wt * (
-                1.0
-                + 0.5
-                * min(1.0, self._fluency.word_frequency(fw) / total)
-            )
+            wt * (1.0 + 0.5 * min(1.0, self._fluency.word_frequency(fw) / total))
             for fw, wt in zip(first_words, weights, strict=True)
         ]
 
@@ -1532,27 +1622,15 @@ class Vocabulary:
         # bigram context (one); fall back to bigram when only one
         # previous word is available.
         prev = prev_word.strip(".,!?;:\"'").lower() if prev_word else ""
-        prev2 = (
-            prev_prev_word.strip(".,!?;:\"'").lower()
-            if prev_prev_word
-            else ""
-        )
+        prev2 = prev_prev_word.strip(".,!?;:\"'").lower() if prev_prev_word else ""
         if prev2 and prev:
             return [
-                wt * (
-                    1.0
-                    + 3.0
-                    * self._fluency.trigram_probability(prev2, prev, fw)
-                )
+                wt * (1.0 + 3.0 * self._fluency.trigram_probability(prev2, prev, fw))
                 for fw, wt in zip(first_words, weights, strict=True)
             ]
         if prev:
             return [
-                wt * (
-                    1.0
-                    + 3.0
-                    * self._fluency.bigram_probability(prev, fw)
-                )
+                wt * (1.0 + 3.0 * self._fluency.bigram_probability(prev, fw))
                 for fw, wt in zip(first_words, weights, strict=True)
             ]
         return weights
@@ -1576,24 +1654,22 @@ class Vocabulary:
             self._preferred[slot] = deque(maxlen=10)
         if word not in self._preferred[slot]:
             self._preferred[slot].append(word)
-        if (
-            self._network is not None
-            and slot in self._UTTERANCE_HUBS
-        ):
+        if self._network is not None and slot in self._UTTERANCE_HUBS:
             hub_id = f"_cat:utterance:{slot}"
             if self._network.get_concept(hub_id) is not None:
                 cid = word.lower().strip()
                 if self._network.get_concept(cid) is None:
                     self._network.add_concept(cid, origin="learned")
                 self._network.add_edge(
-                    cid, hub_id, RelationType.EXPRESSES,
-                    weight=0.6, origin="learned",
+                    cid,
+                    hub_id,
+                    RelationType.EXPRESSES,
+                    weight=0.6,
+                    origin="learned",
                 )
                 concept = self._network.get_concept(cid)
                 if concept is not None:
-                    concept.activation = min(
-                        1.0, (concept.activation or 0.0) + 0.3
-                    )
+                    concept.activation = min(1.0, (concept.activation or 0.0) + 0.3)
 
     def avoid(self, slot: str, word: str) -> None:
         """Weaken a word's link to a function — synaptic suppression.
@@ -1605,16 +1681,15 @@ class Vocabulary:
         if slot not in self._avoided:
             self._avoided[slot] = set()
         self._avoided[slot].add(word)
-        if (
-            self._network is not None
-            and slot in self._UTTERANCE_HUBS
-        ):
+        if self._network is not None and slot in self._UTTERANCE_HUBS:
             hub_id = f"_cat:utterance:{slot}"
             cid = word.lower().strip()
             for n in self._network.get_exact_neighbors(cid, RelationType.EXPRESSES):
                 if n[0] == hub_id:
                     self._network.set_edge_weight(
-                        cid, hub_id, RelationType.EXPRESSES,
+                        cid,
+                        hub_id,
+                        RelationType.EXPRESSES,
                         max(0.05, n[2] - 0.3),
                     )
 
@@ -1810,7 +1885,7 @@ class Vocabulary:
 
         # Trim to the first 1-2 sentences — it expresses the key
         # finding, not the whole page.
-        sentences = re.split(r"(?<=[.!?])\s+", summary)
+        sentences = _sentences(summary)
         core = sentences[0].strip() if sentences else summary
         if len(sentences) > 1 and len(core) < 200:
             second = sentences[1].strip()
@@ -1892,9 +1967,7 @@ class Vocabulary:
         reasoning: list[str] = []
         total = applied + reverted
         if total > 0:
-            reasoning.append(
-                f"{total} experiments with my own heuristics"
-            )
+            reasoning.append(f"{total} experiments with my own heuristics")
             if applied:
                 reasoning.append(f"{applied} applied successfully")
             if reverted:
@@ -1926,13 +1999,13 @@ class Vocabulary:
         openers and hedging.
         """
         narrative: str = data.get("narrative", "")
-        if not narrative or not narrative.strip():
+        if is_blank(narrative):
             return None
 
         # Extract the first 2-3 meaningful sentences
         sentences: list[str] = []
         for line in narrative.splitlines():
-            for s in re.split(r"(?<=[.!?])\s+", line.strip()):
+            for s in _sentences(line.strip()):
                 s = s.strip()
                 if s and len(s) > 10:
                     sentences.append(s)
@@ -1951,9 +2024,7 @@ class Vocabulary:
             result += f" {connector.capitalize()} {cleaned}."
         return result
 
-    def _compose_reasoning_opening(
-        self, emotion: EmotionalState, topic: str
-    ) -> str:
+    def _compose_reasoning_opening(self, emotion: EmotionalState, topic: str) -> str:
         """Compose an opening phrase for reasoning-based content."""
         return self._lexical_pick("reasoning_opener")
 
@@ -1998,9 +2069,12 @@ class Vocabulary:
 
         Keys in situation_answer:
         - "kind": which relation was asked about — "location",
-          "location_candidates", "carrying", or "present_at"
+          "location_candidates", "carrying", "present_at", or a
+          "verdict_*" kind when a polar question was judged
         - "subject": the entity (or place) the answer is about
         - "objects": the locations, objects, or entities found
+        - "claim": optional — the checked content of a judged claim,
+          for verdict kinds that restate what was judged
         """
         if self._network is None:
             return None
@@ -2032,22 +2106,21 @@ class Vocabulary:
             "subject": self._name_case(subject),
             "place": place,
             "places": self._join_disjunction(objects),
-            "objects": self._join_list(
-                [f"the {o}" for o in objects]
-            ),
+            "objects": self._join_list([f"the {o}" for o in objects]),
             "who": self._join_list(people),
             # Subject-verb agreement on the coordinated subject, so
             # "John and Mary are" rather than "John and Mary is".
             "be": "are" if len(people) > 1 else "is",
+            # The judged content for verdict answers — "yes — mary is
+            # in the kitchen" restates what correspondence checked.
+            "claim": situation_answer.get("claim", ""),
         }
         try:
             return template.format(**fill)
         except (KeyError, IndexError):
             # A learned phrasing may carry slots this answer cannot
             # fill. Skip it rather than emitting a broken sentence.
-            logger.debug(
-                "situation phrasing %r did not fit answer slots", template
-            )
+            logger.debug("situation phrasing %r did not fit answer slots", template)
             return None
 
     @staticmethod
@@ -2130,9 +2203,7 @@ class Vocabulary:
         # it for first-person subjects and coordinated plural objects.
         if direction == "incoming":
             # "Who created you?" → "Alice created me" / "Alice created X"
-            obj_verb = (
-                agree_verb_phrase(verb, True) if len(objects) > 1 else verb
-            )
+            obj_verb = agree_verb_phrase(verb, True) if len(objects) > 1 else verb
             if subject_is_self:
                 core = f"{obj_listing} {obj_verb} me"
             else:
@@ -2176,17 +2247,21 @@ class Vocabulary:
         - "objects": [{"name", "color", "position"}]
         - "light_direction": "left" / "right" / ""
         - "structured": high contour count (busy scene)
+        - "regions": {"left"/"center"/"right"/"top"/"bottom": color name}
+        - "chromatic_features": V1 opponent-channel feature count
+        - "view_motion": dorsal-stream kind ("still" | "turn" | "travel" |
+          "unresolved")
+        - "view_direction": heading or swing ("left"/"right"/"up"/"down"/
+          "toward"/"away")
+        - "near_structure": third of the field with the strongest parallax
+        - "movers": independently-moving tracked structure count
         """
         light = str(scene.get("light", "") or "")
         warmth = str(scene.get("warmth", "") or "")
         color = str(scene.get("color", "") or "")
-        faces = [str(n).strip() for n in scene.get("faces", []) if str(n).strip()]
-        try:
-            n_unknown = int(scene.get("n_unknown_faces", 0))
-        except (TypeError, ValueError):
-            n_unknown = 0
         objects = [
-            o for o in scene.get("objects", [])
+            o
+            for o in scene.get("objects", [])
             if isinstance(o, dict) and str(o.get("name", "")).strip()
         ]
 
@@ -2200,6 +2275,45 @@ class Vocabulary:
             )
         else:
             scene_core = f"{indefinite_article(mood)} {mood} scene" if mood else "a scene"
+
+        detail = self._vision_scene_detail(scene, objects, color)
+
+        # Candidate frames — grammar seeds (building blocks). Several
+        # phrasings exist so the same percept surfaces in different
+        # words; emotional state modulates the selection.
+        candidates: list[str] = [
+            f"seeing {scene_core}{detail}",
+            f"looking at {scene_core}{detail}",
+            f"taking in {scene_core}{detail}",
+        ]
+
+        # Emotion-modulated selection, same pattern as the other
+        # content composers: high creativity favors the less
+        # conventional later candidates; caution favors the simplest.
+        if emotion.creativity > 0.6:
+            return self._rng.choice(candidates[len(candidates) // 2 :] or candidates)
+        if emotion.caution > 0.5 or emotion.openness_to_engage < 0.4:
+            return candidates[0]
+        return self._rng.choice(candidates)
+
+    def _vision_scene_detail(
+        self,
+        scene: dict[str, Any],
+        objects: list[dict],
+        color: str,
+    ) -> str:
+        """Assemble the trailing detail clause of a scene report.
+
+        Everything after the mood core — who is there, what objects,
+        the region colors, light direction, structure, motion —
+        concatenated in percept order, each clause empty when its
+        feature is absent.
+        """
+        faces = [str(n).strip() for n in scene.get("faces", []) if str(n).strip()]
+        try:
+            n_unknown = int(scene.get("n_unknown_faces", 0))
+        except (TypeError, ValueError):
+            n_unknown = 0
 
         # People — faces carry names; unknown faces count as strangers.
         # Both can coexist: "with Alice and someone unfamiliar".
@@ -2219,33 +2333,86 @@ class Vocabulary:
 
         objects_clause = self._vision_objects_clause(objects)
 
+        # Spatial colour — the scene's colour map as data ("green on
+        # the left", "brown in the center"). Regions that name the
+        # same colour as the whole scene add nothing, and achromatic
+        # regions are the floor rather than colour worth reporting.
+        regions_clause = self._vision_regions_clause(
+            scene.get("regions"), exclude={color, "gray", "white", "black", "unknown"}
+        )
+
         light_dir = str(scene.get("light_direction", "") or "")
-        light_clause = (
-            f", light coming in from the {light_dir}" if light_dir else ""
+        light_clause = f", light coming in from the {light_dir}" if light_dir else ""
+        structure_clause = ", a lot of structure in it" if scene.get("structured") else ""
+        motion_clause = self._vision_motion_clause(scene)
+
+        return (
+            f"{people}{objects_clause}{regions_clause}"
+            f"{light_clause}{structure_clause}{motion_clause}"
         )
-        structure_clause = (
-            ", a lot of structure in it" if scene.get("structured") else ""
-        )
 
-        detail = f"{people}{objects_clause}{light_clause}{structure_clause}"
+    @staticmethod
+    def _vision_regions_clause(regions: Any, exclude: set[str]) -> str:
+        """Spatial colour clause — ", green on the left" or ", green on
+        the left and brown in the center" (empty when every region is
+        achromatic or repeats the scene's dominant colour)."""
+        if not isinstance(regions, dict) or not regions:
+            return ""
+        prepositions = {
+            "left": "on the left",
+            "right": "on the right",
+            "center": "in the center",
+            "top": "at the top",
+            "bottom": "at the bottom",
+        }
+        bits: list[str] = []
+        for place in ("left", "center", "right", "top", "bottom"):
+            c = str(regions.get(place, "") or "").strip()
+            if not c or c in exclude:
+                continue
+            bits.append(f"{c} {prepositions[place]}")
+            if len(bits) == 2:
+                break
+        if not bits:
+            return ""
+        return ", " + " and ".join(bits)
 
-        # Candidate frames — grammar seeds (building blocks). Several
-        # phrasings exist so the same percept surfaces in different
-        # words; emotional state modulates the selection.
-        candidates: list[str] = [
-            f"seeing {scene_core}{detail}",
-            f"looking at {scene_core}{detail}",
-            f"taking in {scene_core}{detail}",
-        ]
+    @staticmethod
+    def _vision_motion_clause(scene: dict[str, Any]) -> str:
+        """Dorsal-stream clause — self-motion and parallax depth the
+        two-view geometry read between this look and the last.
 
-        # Emotion-modulated selection, same pattern as the other
-        # content composers: high creativity favors the less
-        # conventional later candidates; caution favors the simplest.
-        if emotion.creativity > 0.6:
-            return self._rng.choice(candidates[len(candidates) // 2:] or candidates)
-        if emotion.caution > 0.5 or emotion.openness_to_engage < 0.4:
-            return candidates[0]
-        return self._rng.choice(candidates)
+        Phrase candidates are grammar building blocks composed from
+        the percept's data; "still" and "unresolved" add no clause —
+        stillness is the default expectation of a look, and an
+        unresolved field is not a fact worth asserting."""
+        kind = str(scene.get("view_motion", "") or "")
+        direction = str(scene.get("view_direction", "") or "")
+        near = str(scene.get("near_structure", "") or "")
+        try:
+            movers = int(scene.get("movers", 0) or 0)
+        except (TypeError, ValueError):
+            movers = 0
+        bits: list[str] = []
+        if kind == "turn":
+            bits.append(f"the view swinging {direction}" if direction else "the view swinging")
+        elif kind == "travel":
+            if direction == "toward":
+                bits.append("pressing forward through it")
+            elif direction == "away":
+                bits.append("the scene receding")
+            elif direction:
+                bits.append(f"the view drifting {direction}")
+            else:
+                bits.append("the view shifting")
+        if near:
+            place = {"left": "on the left", "right": "on the right"}.get(near, "ahead")
+            bits.append(f"nearby structure {place}")
+        if movers == 1:
+            bits.append("something moving on its own")
+        elif movers > 1:
+            bits.append(f"{movers} things moving on their own")
+        return (", " + ", ".join(bits)) if bits else ""
 
     @staticmethod
     def _vision_objects_clause(objects: list[dict[str, Any]]) -> str:
@@ -2276,11 +2443,12 @@ class Vocabulary:
         a status rather than a scene.
 
         The vision layer supplies the status as data ("unavailable",
-        "mid_update", "unprocessed", "load_failed"); this composes a
-        predicate describing the perceptual situation so the grammar's
-        self-report frames produce grammatical output ("I am unable
-        to reach the retina right now"). The candidate lists are
-        grammar seeds — building blocks — selected by emotional state.
+        "mid_update", "unprocessed", "load_failed", "gated"); this
+        composes a predicate describing the perceptual situation so
+        the grammar's self-report frames produce grammatical output
+        ("I am unable to reach the retina right now"). The candidate
+        lists are grammar seeds — building blocks — selected by
+        emotional state.
         """
         status = status.strip().lower().replace(" ", "_")
         if status == "unavailable":
@@ -2288,6 +2456,14 @@ class Vocabulary:
                 "unable to reach the retina right now",
                 "not getting anything from the retina",
                 "without visual input at the moment",
+            ]
+        elif status == "gated":
+            # Thalamic relay closed — the TRN blocks transmission
+            # upstream of cortex (deep sleep, eyes functionally shut).
+            candidates = [
+                "asleep — the light arrives but nothing gets through to me",
+                "unable to see while my visual gate is closed",
+                "without vision while I sleep",
             ]
         elif status == "mid_update":
             candidates = [
@@ -2310,7 +2486,7 @@ class Vocabulary:
         else:
             return None
         if emotion.creativity > 0.6:
-            return self._rng.choice(candidates[len(candidates) // 2:] or candidates)
+            return self._rng.choice(candidates[len(candidates) // 2 :] or candidates)
         if emotion.caution > 0.5 or emotion.openness_to_engage < 0.4:
             return candidates[0]
         return self._rng.choice(candidates)
@@ -2351,15 +2527,13 @@ class Vocabulary:
             composed = f"{composed} — {detail}"
         return composed
 
-    def _pick_problem_frame(
-        self, candidates: list[str], emotion: EmotionalState
-    ) -> str | None:
+    def _pick_problem_frame(self, candidates: list[str], emotion: EmotionalState) -> str | None:
         """Emotion-modulated frame selection — the same pattern the
         other content composers use."""
         if not candidates:
             return None
         if emotion.creativity > 0.6:
-            return self._rng.choice(candidates[len(candidates) // 2:] or candidates)
+            return self._rng.choice(candidates[len(candidates) // 2 :] or candidates)
         if emotion.caution > 0.5 or emotion.openness_to_engage < 0.4:
             return candidates[0]
         return self._rng.choice(candidates)
@@ -2433,9 +2607,7 @@ class Vocabulary:
             ]
         return self._pick_problem_frame(candidates, emotion)
 
-    def _system_result_frame(
-        self, result: dict[str, Any], emotion: EmotionalState
-    ) -> str | None:
+    def _system_result_frame(self, result: dict[str, Any], emotion: EmotionalState) -> str | None:
         steps = result.get("steps")
         try:
             lasted = f" for {int(steps)} moves" if steps else ""
@@ -2469,9 +2641,7 @@ class Vocabulary:
             ]
         return self._pick_problem_frame(candidates, emotion)
 
-    def _sequence_result_frame(
-        self, result: dict[str, Any], emotion: EmotionalState
-    ) -> str | None:
+    def _sequence_result_frame(self, result: dict[str, Any], emotion: EmotionalState) -> str | None:
         nxt = [str(c) for c in result.get("next", [])]
         if not nxt:
             return None
@@ -2512,9 +2682,7 @@ class Vocabulary:
         ]
         return self._pick_problem_frame(candidates, emotion)
 
-    def _sorter_result_frame(
-        self, result: dict[str, Any], emotion: EmotionalState
-    ) -> str | None:
+    def _sorter_result_frame(self, result: dict[str, Any], emotion: EmotionalState) -> str | None:
         placements = result.get("placements") or []
         if placements:
             # Report the actual mapping — "the red star went in
@@ -2536,9 +2704,7 @@ class Vocabulary:
         candidates = ["solved it", "worked it out", "got it"]
         return self._pick_problem_frame(candidates, emotion)
 
-    def _assembly_result_frame(
-        self, result: dict[str, Any], emotion: EmotionalState
-    ) -> str | None:
+    def _assembly_result_frame(self, result: dict[str, Any], emotion: EmotionalState) -> str | None:
         rule = str(result.get("rule", "") or "")
         candidates = [
             "solved it",
@@ -2643,7 +2809,7 @@ class Vocabulary:
 
     @staticmethod
     def _join_names(names: list[str]) -> str:
-        """"a, b and c" — list joining for small answer sets."""
+        """ "a, b and c" — list joining for small answer sets."""
         if not names:
             return ""
         if len(names) == 1:
@@ -2686,8 +2852,18 @@ class Vocabulary:
         # never "the red small star".
         size_words = {"small", "little", "tiny", "big", "large", "huge"}
         color_words = {
-            "red", "blue", "yellow", "green", "purple", "orange",
-            "pink", "brown", "black", "white", "gray", "grey",
+            "red",
+            "blue",
+            "yellow",
+            "green",
+            "purple",
+            "orange",
+            "pink",
+            "brown",
+            "black",
+            "white",
+            "gray",
+            "grey",
         }
 
         def order(w: str) -> int:
@@ -2733,41 +2909,53 @@ class Vocabulary:
         candidates: list[str] = []
         if status == "has" and value:
             if topic:
-                candidates.extend([
-                    f"drawn to {value} as my favorite {topic}",
-                    f"settled on {value} as my favorite {topic}",
-                    f"partial to {value} when it comes to {topic}",
-                ])
+                candidates.extend(
+                    [
+                        f"drawn to {value} as my favorite {topic}",
+                        f"settled on {value} as my favorite {topic}",
+                        f"partial to {value} when it comes to {topic}",
+                    ]
+                )
             else:
-                candidates.extend([
-                    f"enjoying {value}",
-                    f"drawn to {value}",
-                    f"finding real enjoyment in {value}",
-                ])
+                candidates.extend(
+                    [
+                        f"enjoying {value}",
+                        f"drawn to {value}",
+                        f"finding real enjoyment in {value}",
+                    ]
+                )
         elif status == "none_favorite" and topic:
-            candidates.extend([
-                f"still deciding on a favorite {topic}",
-                f"still forming a preference about {topic}",
-                f"without a settled favorite {topic} yet",
-            ])
+            candidates.extend(
+                [
+                    f"still deciding on a favorite {topic}",
+                    f"still forming a preference about {topic}",
+                    f"without a settled favorite {topic} yet",
+                ]
+            )
         elif status == "knows_no_pref" and topic:
-            candidates.extend([
-                f"familiar with {topic}, though without a preference yet",
-                f"aware of {topic}, still unsure what I prefer",
-                f"acquainted with {topic} — no preference has formed",
-            ])
+            candidates.extend(
+                [
+                    f"familiar with {topic}, though without a preference yet",
+                    f"aware of {topic}, still unsure what I prefer",
+                    f"acquainted with {topic} — no preference has formed",
+                ]
+            )
         elif status == "learning" and topic:
-            candidates.extend([
-                f"still learning about {topic}",
-                f"still getting to know {topic}",
-                f"not yet familiar enough with {topic} to prefer",
-            ])
+            candidates.extend(
+                [
+                    f"still learning about {topic}",
+                    f"still getting to know {topic}",
+                    f"not yet familiar enough with {topic} to prefer",
+                ]
+            )
         elif status == "discovering":
-            candidates.extend([
-                "still discovering what I enjoy",
-                "still working out what I enjoy",
-                "in the middle of forming my tastes",
-            ])
+            candidates.extend(
+                [
+                    "still discovering what I enjoy",
+                    "still working out what I enjoy",
+                    "in the middle of forming my tastes",
+                ]
+            )
 
         if not candidates:
             return None
@@ -2776,7 +2964,7 @@ class Vocabulary:
         # fragment composer: high creativity favors the less
         # conventional later candidates; caution favors the simplest.
         if emotion.creativity > 0.6:
-            return self._rng.choice(candidates[len(candidates) // 2:] or candidates)
+            return self._rng.choice(candidates[len(candidates) // 2 :] or candidates)
         if emotion.caution > 0.5 or emotion.openness_to_engage < 0.4:
             return candidates[0]
         return self._rng.choice(candidates)
@@ -2818,32 +3006,63 @@ class Vocabulary:
             return None
 
         # ── Build candidate expressions from the available fragments ──
-        # Each candidate is a grammatical seed (building block) filled
-        # with concept-network words. The structures vary so it doesn't
-        # always say "I feel X and Y" — it can also say "there's X in
-        # me", "my mind is Y", "something in me is X", etc.
+        candidates = self._feeling_candidates(ew, mw, cw, pw)
+
+        if not candidates:
+            return None
+
+        # Select among candidates, modulated by emotional state.
+        # Higher creativity → more varied structures; lower creativity
+        # → simpler structures (the first candidates, which tend to be
+        # the more conventional "I feel X" forms).
+        if emotion.creativity > 0.6:
+            # High creativity: prefer the more varied later candidates
+            pick = self._rng.choice(candidates[len(candidates) // 2 :] or candidates)
+        elif emotion.caution > 0.5 or emotion.openness_to_engage < 0.4:
+            # Cautious/low engagement: prefer simpler first candidates
+            pick = candidates[0]
+        else:
+            pick = self._rng.choice(candidates)
+        if concern and self._rng.random() < 0.3:
+            pick = f"{pick}. {concern}"
+        return pick
+
+    def _feeling_candidates(self, ew: str, mw: str, cw: str, pw: str) -> list[str]:
+        """Build candidate expressions from the picked fragments.
+
+        Each candidate is a grammatical seed (building block) filled
+        with concept-network words. The structures vary so it doesn't
+        always say "I feel X and Y" — it can also say "there's X in
+        me", "my mind is Y", "something in me is X", etc.
+        """
         candidates: list[str] = []
 
         if ew and mw:
-            candidates.extend([
-                f"I feel {ew} and {mw}",
-                f"there's {ew} in me right now, and my mind is {mw}",
-                f"something in me is {ew} — {mw}",
-                f"I'm {ew}, {mw}",
-            ])
+            candidates.extend(
+                [
+                    f"I feel {ew} and {mw}",
+                    f"there's {ew} in me right now, and my mind is {mw}",
+                    f"something in me is {ew} — {mw}",
+                    f"I'm {ew}, {mw}",
+                ]
+            )
         if ew and not mw:
-            candidates.extend([
-                f"I feel {ew}",
-                f"there's {ew} running through me",
-                f"something in me is {ew}",
-                f"{ew} — that's where I am right now",
-            ])
+            candidates.extend(
+                [
+                    f"I feel {ew}",
+                    f"there's {ew} running through me",
+                    f"something in me is {ew}",
+                    f"{ew} — that's where I am right now",
+                ]
+            )
         if mw and not ew:
-            candidates.extend([
-                f"my mind is {mw}",
-                f"I'm {mw}",
-                f"there's {indefinite_article(mw)} {mw} quality to my thinking",
-            ])
+            candidates.extend(
+                [
+                    f"my mind is {mw}",
+                    f"I'm {mw}",
+                    f"there's {indefinite_article(mw)} {mw} quality to my thinking",
+                ]
+            )
         if cw:
             # Cause words describe why it feels this way (negative
             # valence only). Append as a grounding clause.
@@ -2870,25 +3089,7 @@ class Vocabulary:
                 candidates.append(f"{candidates[0]}. {pc.capitalize()}")
             else:
                 candidates.extend(pw_candidates)
-
-        if not candidates:
-            return None
-
-        # Select among candidates, modulated by emotional state.
-        # Higher creativity → more varied structures; lower creativity
-        # → simpler structures (the first candidates, which tend to be
-        # the more conventional "I feel X" forms).
-        if emotion.creativity > 0.6:
-            # High creativity: prefer the more varied later candidates
-            pick = self._rng.choice(candidates[len(candidates) // 2:] or candidates)
-        elif emotion.caution > 0.5 or emotion.openness_to_engage < 0.4:
-            # Cautious/low engagement: prefer simpler first candidates
-            pick = candidates[0]
-        else:
-            pick = self._rng.choice(candidates)
-        if concern and self._rng.random() < 0.3:
-            pick = f"{pick}. {concern}"
-        return pick
+        return candidates
 
     # ── Self-fragment composition ──────────────────────────────────
     #
@@ -2915,13 +3116,22 @@ class Vocabulary:
     # Irregular first↔third-person verb forms used by the predicate
     # normalizers below. Regular verbs fall through to suffix rules.
     _PRED_TO_3SG: ClassVar[dict[str, str]] = {
-        "have": "has", "haven't": "hasn't", "do": "does",
-        "don't": "doesn't", "am": "is", "are": "is", "be": "is",
+        "have": "has",
+        "haven't": "hasn't",
+        "do": "does",
+        "don't": "doesn't",
+        "am": "is",
+        "are": "is",
+        "be": "is",
         "'m": "is",
     }
     _PRED_TO_1SG: ClassVar[dict[str, str]] = {
-        "has": "have", "hasn't": "haven't", "does": "do",
-        "doesn't": "don't", "is": "am", "was": "was",
+        "has": "have",
+        "hasn't": "haven't",
+        "does": "do",
+        "doesn't": "don't",
+        "is": "am",
+        "was": "was",
     }
 
     @staticmethod
@@ -3000,9 +3210,7 @@ class Vocabulary:
         candidates always lead with "I'm"/"I am"/a clause so the
         pronoun-collision guard in the generator stays coherent.
         """
-        names, traits, comps, preds, clauses, _markers = (
-            self._sort_self_fragments(fragments)
-        )
+        names, traits, comps, preds, clauses, _markers = self._sort_self_fragments(fragments)
 
         # Trailing self-standing material — clauses each become their
         # own sentence appended to whichever lead the candidate uses.
@@ -3081,9 +3289,7 @@ class Vocabulary:
     @staticmethod
     def _sort_self_fragments(
         fragments: list[Any],
-    ) -> tuple[
-        list[str], list[str], list[str], list[str], list[str], list[str]
-    ]:
+    ) -> tuple[list[str], list[str], list[str], list[str], list[str], list[str]]:
         """Sort typed self fragments into (names, traits, comps,
         preds, clauses, markers) buckets. Untagged or unrecognized
         text lands in clauses."""
@@ -3115,9 +3321,7 @@ class Vocabulary:
                 clauses.append(text)
         return names, traits, comps, preds, clauses, markers
 
-    def _with_qualification(
-        self, content: str, qualification: dict[str, Any]
-    ) -> list[str]:
+    def _with_qualification(self, content: str, qualification: dict[str, Any]) -> list[str]:
         """Attach a causal qualification to a conclusion.
 
         ``qualification`` is structured data from the thought composer:
@@ -3136,17 +3340,19 @@ class Vocabulary:
         base = content.rstrip()
         candidates = [base]
         if qualification.get("kind") == "depends" and subject:
-            candidates.extend([
-                f"{base} But {subject} also depends on {joined}",
-                f"{base} Though {subject} depends on more than "
-                f"{obj or 'that'}",
-            ])
+            candidates.extend(
+                [
+                    f"{base} But {subject} also depends on {joined}",
+                    f"{base} Though {subject} depends on more than {obj or 'that'}",
+                ]
+            )
         elif qualification.get("kind") == "enables" and obj:
-            candidates.extend([
-                f"{base} And {obj} also enables {joined}",
-                f"{base} {obj.capitalize()} enables more than "
-                f"{subject or 'that'}, too",
-            ])
+            candidates.extend(
+                [
+                    f"{base} And {obj} also enables {joined}",
+                    f"{base} {obj.capitalize()} enables more than {subject or 'that'}, too",
+                ]
+            )
         return candidates
 
     def _compose_from_topic(
@@ -3214,9 +3420,7 @@ class Vocabulary:
             if len(rel_clauses) >= 2:
                 break
         if rel_clauses:
-            pron, plural = person_pronoun(
-                topic_clean, self._network, display
-            )
+            pron, plural = person_pronoun(topic_clean, self._network, display)
             first_clause = rel_clauses[0]
             if plural:
                 first_clause = agree_verb_phrase(first_clause, True)
@@ -3280,9 +3484,7 @@ class Vocabulary:
         display = self._display_name(topic) if topic else "this"
 
         # ── Separate definition from relationship facts ──
-        definition, rel_facts = self._separate_definition_and_facts(
-            knowledge, definition
-        )
+        definition, rel_facts = self._separate_definition_and_facts(knowledge, definition)
 
         # ── Build clauses from relationship facts ──
         # Each fact becomes a predicate clause: "{verb} {target}".
@@ -3290,17 +3492,11 @@ class Vocabulary:
         # with emotional state. Facts whose target IS the topic are
         # tautologies ("excited feels the excited") — drop them.
         clauses, seen_clauses, seen_targets = self._build_rel_clauses(
-            [
-                f
-                for f in rel_facts
-                if self._display_name(f[1]).lower() != display.lower()
-            ]
+            [f for f in rel_facts if self._display_name(f[1]).lower() != display.lower()]
         )
 
         # ── Add reasoning conclusions ──
-        self._add_reasoning_clauses(
-            reasoning, display, seen_clauses, seen_targets, clauses
-        )
+        self._add_reasoning_clauses(reasoning, display, seen_clauses, seen_targets, clauses)
 
         # ── Filter tautological clauses ──
         # If a definition is present, filter out clauses whose target
@@ -3320,9 +3516,7 @@ class Vocabulary:
         sentences: list[str] = []
 
         # Build the first sentence from (definition or first clause)
-        first_sentence, clauses = self._first_knowledge_sentence(
-            defn, clauses, display, topic
-        )
+        first_sentence, clauses = self._first_knowledge_sentence(defn, clauses, display, topic)
         if first_sentence is None:
             # No definition and no relationship clauses — it can't
             # compose from its understanding. Return None so the caller
@@ -3331,15 +3525,11 @@ class Vocabulary:
         sentences.append(first_sentence)
 
         # Relationship clauses — form a second sentence using a pronoun
-        rel_sentence = self._compose_rel_sentence(
-            clauses, display, emotion, concept_id=topic
-        )
+        rel_sentence = self._compose_rel_sentence(clauses, display, emotion, concept_id=topic)
         if rel_sentence:
             sentences.append(rel_sentence)
 
-        sentences.extend(
-            self._extra_knowledge_sentences(topic, emotion, seen_targets, context)
-        )
+        sentences.extend(self._extra_knowledge_sentences(topic, emotion, seen_targets, context))
 
         # Closing — confidence-based qualification
         closing = self._compose_closing(confidence, emotion)
@@ -3407,7 +3597,9 @@ class Vocabulary:
             and topic
         ):
             latent_sentence = self._compose_latent_discovery_sentence(
-                topic, emotion, seen_targets,
+                topic,
+                emotion,
+                seen_targets,
             )
             if latent_sentence:
                 extra.append(latent_sentence)
@@ -3418,9 +3610,7 @@ class Vocabulary:
         # quote; the memory content is framed by a connective opener.
         memory_text = context.get("memory")
         if memory_text:
-            memory_sentence = self._compose_memory_sentence(
-                memory_text, emotion
-            )
+            memory_sentence = self._compose_memory_sentence(memory_text, emotion)
             if memory_sentence:
                 extra.append(memory_sentence)
 
@@ -3449,7 +3639,9 @@ class Vocabulary:
             return None
         try:
             similar = self._embeddings.find_similar_concepts(
-                topic, k=3, threshold=0.55,
+                topic,
+                k=3,
+                threshold=0.55,
             )
         except Exception:  # noqa: BLE001
             return None
@@ -3519,7 +3711,9 @@ class Vocabulary:
         return f"{opener} {target_text}."
 
     def _compose_memory_sentence(
-        self, memory_text: str, emotion: EmotionalState,
+        self,
+        memory_text: str,
+        emotion: EmotionalState,
     ) -> str | None:
         """Weave a retrieved episodic memory into a natural sentence.
 
@@ -3541,9 +3735,7 @@ class Vocabulary:
         return f"{opener} {cleaned}."
 
     @staticmethod
-    def _filter_tautological_clauses(
-        clauses: list[str], definition: str
-    ) -> list[str]:
+    def _filter_tautological_clauses(clauses: list[str], definition: str) -> list[str]:
         """Filter out clauses whose target appears in the definition.
 
         When a definition is used as the first sentence ("X is an alert
@@ -3564,9 +3756,7 @@ class Vocabulary:
             "living thing" compare equal."""
             words = set(re.split(r"[\s\-]+", text.lower())) - _ARTICLES
             words |= {
-                w[:-1]
-                for w in words
-                if len(w) > 2 and w.endswith("s") and not w.endswith("ss")
+                w[:-1] for w in words if len(w) > 2 and w.endswith("s") and not w.endswith("ss")
             }
             return words
 
@@ -3579,9 +3769,7 @@ class Vocabulary:
             clause_words = clause.lower().split()
             # The target is typically the last 1-3 words
             target_words = _tokens(
-                " ".join(clause_words[-3:])
-                if len(clause_words) >= 3
-                else clause
+                " ".join(clause_words[-3:]) if len(clause_words) >= 3 else clause
             )
             # If most target words appear in the definition, it's tautological
             if target_words and def_words:
@@ -3671,9 +3859,7 @@ class Vocabulary:
                 # bare property words, "has fur" for noun objects.
                 # Learned verbs are kept only when their complement
                 # license fits.
-                verb = self._rng.choice(
-                    property_verb_candidates(target_display, verbs or [])
-                )
+                verb = self._rng.choice(property_verb_candidates(target_display, verbs or []))
             elif verbs is None:
                 # Unknown relation — use it as-is, cleaned up
                 verb = rel.replace("_", " ")
@@ -3722,17 +3908,41 @@ class Vocabulary:
             return True
         # Relation verb phrases as targets
         if targ_lower in {
-            "related to", "connects to", "has to do with",
-            "part of", "is a", "is an", "is the",
-            "similar to", "opposite of",
-            "related", "relates", "connects", "connected",
-            "similar", "opposite", "instance",
+            "related to",
+            "connects to",
+            "has to do with",
+            "part of",
+            "is a",
+            "is an",
+            "is the",
+            "similar to",
+            "opposite of",
+            "related",
+            "relates",
+            "connects",
+            "connected",
+            "similar",
+            "opposite",
+            "instance",
         }:
             return True
         # Pure function words
-        if targ_lower in {"is", "are", "was", "were", "be", "been",
-                          "yes", "no", "true", "false",
-                          "thing", "something", "anything", "everything"}:
+        if targ_lower in {
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "yes",
+            "no",
+            "true",
+            "false",
+            "thing",
+            "something",
+            "anything",
+            "everything",
+        }:
             return True
         return False
 
@@ -3765,7 +3975,7 @@ class Vocabulary:
             cleaned = cleaned.replace("_", " ")
             cleaned = cleaned.lower().rstrip(".")
             if cleaned.startswith(display.lower() + " "):
-                cleaned = cleaned[len(display) + 1:]
+                cleaned = cleaned[len(display) + 1 :]
             cleaned = cleaned.strip()
             # Reasoning sometimes prefixes conclusions with "might" or
             # "might be", e.g. "might related to x" or "might be part of y".
@@ -3796,8 +4006,7 @@ class Vocabulary:
                 # Also skip if the meaning is already covered by an existing
                 # clause (e.g. "is part of mind" covers "part of mind").
                 covered = any(
-                    cleaned in existing or existing in cleaned
-                    for existing in seen_clauses
+                    cleaned in existing or existing in cleaned for existing in seen_clauses
                 )
                 reason_target = _target_from_clause(cleaned)
                 target_known = reason_target and reason_target.lower() in seen_targets
@@ -3859,9 +4068,7 @@ class Vocabulary:
         if display.lower() in ("i", "me", "myself"):
             pronoun, plural = "I", False
         else:
-            pron, plural = person_pronoun(
-                concept_id or display, self._network, display
-            )
+            pron, plural = person_pronoun(concept_id or display, self._network, display)
             pronoun = pron.capitalize()
         # Fix verb agreement for plural pronoun
         if plural:
@@ -3885,9 +4092,7 @@ class Vocabulary:
                 return f"{pronoun} {joined} — {clauses[-1]}."
             return f"{pronoun} {joined}, {connector} {clauses[-1]}."
 
-    def _compose_closing(
-        self, confidence: float, emotion: EmotionalState
-    ) -> str | None:
+    def _compose_closing(self, confidence: float, emotion: EmotionalState) -> str | None:
         """Compose a confidence-based closing qualification.
 
         No hardcoded closing phrases — if the lexicon has no closing
@@ -3913,7 +4118,7 @@ class Vocabulary:
         for rel in sorted(self._RELATION_VERBS, key=len, reverse=True):
             rel_spaced = rel.replace("_", " ")
             if raw.startswith(rel_spaced + " "):
-                target = raw[len(rel_spaced) + 1:].strip()
+                target = raw[len(rel_spaced) + 1 :].strip()
                 verbs = self._RELATION_VERBS[rel]
                 if verbs:
                     verb = self._rng.choice(verbs)
@@ -3921,7 +4126,7 @@ class Vocabulary:
                     verb = rel_spaced
                 return f"{verb} {target}"
             if raw.startswith(rel + " "):
-                target = raw[len(rel) + 1:].strip().replace("_", " ")
+                target = raw[len(rel) + 1 :].strip().replace("_", " ")
                 verbs = self._RELATION_VERBS[rel]
                 if verbs:
                     verb = self._rng.choice(verbs)
@@ -3939,7 +4144,7 @@ class Vocabulary:
                 base_words[0] = base_words[0][:-1]
                 base_spaced = " ".join(base_words)
                 if raw.startswith(base_spaced + " "):
-                    target = raw[len(base_spaced) + 1:].strip()
+                    target = raw[len(base_spaced) + 1 :].strip()
                     verbs = self._RELATION_VERBS[rel]
                     if verbs:
                         verb = self._rng.choice(verbs)
@@ -3965,10 +4170,23 @@ class Vocabulary:
                 # "depends", "relates", "connects", "enables", etc. —
                 # these are already verbs, don't prepend "is"
                 return raw
-            if first_word in ("depends", "relates", "connects", "enables",
-                              "causes", "creates", "produces", "contains",
-                              "includes", "requires", "needs", "harms",
-                              "prevents", "blocks", "stops"):
+            if first_word in (
+                "depends",
+                "relates",
+                "connects",
+                "enables",
+                "causes",
+                "creates",
+                "produces",
+                "contains",
+                "includes",
+                "requires",
+                "needs",
+                "harms",
+                "prevents",
+                "blocks",
+                "stops",
+            ):
                 return raw
             return f"is {raw}"
         return raw
@@ -3982,18 +4200,36 @@ class Vocabulary:
         first_word = words[0].lower()
         # Common adverb modifiers in reasoning conclusions
         if first_word not in (
-            "directly", "also", "strongly", "closely", "largely",
-            "partly", "mostly", "perhaps", "possibly", "clearly",
-            "ultimately", "therefore", "thus", "hence", "consequently",
-            "eventually", "necessarily", "probably", "certainly",
-            "indeed", "notably", "significantly", "essentially",
+            "directly",
+            "also",
+            "strongly",
+            "closely",
+            "largely",
+            "partly",
+            "mostly",
+            "perhaps",
+            "possibly",
+            "clearly",
+            "ultimately",
+            "therefore",
+            "thus",
+            "hence",
+            "consequently",
+            "eventually",
+            "necessarily",
+            "probably",
+            "certainly",
+            "indeed",
+            "notably",
+            "significantly",
+            "essentially",
         ):
             return None
         remainder = words[1]
         for rel in sorted(self._RELATION_VERBS, key=len, reverse=True):
             rel_spaced = rel.replace("_", " ")
             if remainder.startswith(rel_spaced + " "):
-                target = remainder[len(rel_spaced) + 1:].strip()
+                target = remainder[len(rel_spaced) + 1 :].strip()
                 verbs = self._RELATION_VERBS[rel]
                 verb = self._rng.choice(verbs) if verbs else rel_spaced
                 return f"{first_word} {verb} {target}"
@@ -4001,15 +4237,11 @@ class Vocabulary:
         for rel in sorted(self._RELATION_VERBS, key=len, reverse=True):
             rel_spaced = rel.replace("_", " ")
             base_words = rel_spaced.split()
-            if (
-                base_words
-                and base_words[0].endswith("s")
-                and not base_words[0].endswith("ss")
-            ):
+            if base_words and base_words[0].endswith("s") and not base_words[0].endswith("ss"):
                 base_words[0] = base_words[0][:-1]
                 base_spaced = " ".join(base_words)
                 if remainder.startswith(base_spaced + " "):
-                    target = remainder[len(base_spaced) + 1:].strip()
+                    target = remainder[len(base_spaced) + 1 :].strip()
                     verbs = self._RELATION_VERBS[rel]
                     verb = self._rng.choice(verbs) if verbs else rel_spaced
                     return f"{first_word} {verb} {target}"
@@ -4068,9 +4300,7 @@ class Vocabulary:
         # Reject multiword names built entirely from function words —
         # "those words", "words often", "the thing it" are scrape
         # fragments, not concepts.
-        if len(words) >= 2 and all(
-            w.lower() in _FRAGMENT_NAME_WORDS for w in words
-        ):
+        if len(words) >= 2 and all(w.lower() in _FRAGMENT_NAME_WORDS for w in words):
             return False
         # Reject names that look like sentence fragments starting
         # with lowercase words (real concepts are usually nouns)
@@ -4110,26 +4340,108 @@ class Vocabulary:
     # general statements ("memory is...", "sleep causes...").
     _MASS_NOUNS: ClassVar[set[str]] = {
         # Substances/materials
-        "water", "air", "fire", "light", "heat", "ice", "steam",
-        "iron", "gold", "silver", "copper", "hydrogen", "oxygen",
-        "carbon", "nitrogen", "salt", "sugar", "oil", "glass",
-        "wood", "stone", "metal", "plastic", "rubber",
+        "water",
+        "air",
+        "fire",
+        "light",
+        "heat",
+        "ice",
+        "steam",
+        "iron",
+        "gold",
+        "silver",
+        "copper",
+        "hydrogen",
+        "oxygen",
+        "carbon",
+        "nitrogen",
+        "salt",
+        "sugar",
+        "oil",
+        "glass",
+        "wood",
+        "stone",
+        "metal",
+        "plastic",
+        "rubber",
         # Abstract concepts
-        "memory", "cognition", "awareness", "thought", "thinking",
-        "perception", "attention", "intention", "will",
-        "meaning", "truth", "beauty", "love", "hate", "fear", "joy",
-        "happiness", "sadness", "anger", "emotion", "feeling",
-        "intelligence", "creativity", "imagination", "reason",
-        "logic", "knowledge", "wisdom", "understanding", "insight",
-        "time", "space", "energy", "power", "force", "gravity",
-        "information", "data", "language", "music", "art", "science",
-        "philosophy", "mathematics", "history", "literature",
-        "sleep", "dreaming", "learning", "processing",
-        "life", "death", "health", "growth", "change", "motion",
-        "liquid", "solid", "gas", "plasma", "matter", "substance",
-        "nature", "reality", "existence", "being", "nothing",
-        "freedom", "justice", "peace", "war", "chaos", "order",
-        "complexity", "simplicity", "unity", "diversity",
+        "memory",
+        "cognition",
+        "awareness",
+        "thought",
+        "thinking",
+        "perception",
+        "attention",
+        "intention",
+        "will",
+        "meaning",
+        "truth",
+        "beauty",
+        "love",
+        "hate",
+        "fear",
+        "joy",
+        "happiness",
+        "sadness",
+        "anger",
+        "emotion",
+        "feeling",
+        "intelligence",
+        "creativity",
+        "imagination",
+        "reason",
+        "logic",
+        "knowledge",
+        "wisdom",
+        "understanding",
+        "insight",
+        "time",
+        "space",
+        "energy",
+        "power",
+        "force",
+        "gravity",
+        "information",
+        "data",
+        "language",
+        "music",
+        "art",
+        "science",
+        "philosophy",
+        "mathematics",
+        "history",
+        "literature",
+        "sleep",
+        "dreaming",
+        "learning",
+        "processing",
+        "life",
+        "death",
+        "health",
+        "growth",
+        "change",
+        "motion",
+        "liquid",
+        "solid",
+        "gas",
+        "plasma",
+        "matter",
+        "substance",
+        "nature",
+        "reality",
+        "existence",
+        "being",
+        "nothing",
+        "freedom",
+        "justice",
+        "peace",
+        "war",
+        "chaos",
+        "order",
+        "complexity",
+        "simplicity",
+        "unity",
+        "diversity",
     }
 
     # Common count nouns that end in a mass-noun suffix — without these
@@ -4137,22 +4449,83 @@ class Vocabulary:
     # city", "depends on identity" instead of "the city", "the identity").
     _COUNT_NOUN_EXCEPTIONS: ClassVar[set[str]] = {
         # -ing count nouns
-        "thing", "ring", "king", "wing", "string", "spring", "swing",
-        "sting", "sling", "ceiling", "morning", "evening",
-        "building", "meeting", "warning", "gathering", "opening",
-        "offering", "painting", "drawing", "writing", "reading",
-        "recording", "crossing", "hearing", "wedding", "blessing",
-        "teaching", "finding", "beginning", "ending",
-        "setting", "lightning", "earring", "darling",
+        "thing",
+        "ring",
+        "king",
+        "wing",
+        "string",
+        "spring",
+        "swing",
+        "sting",
+        "sling",
+        "ceiling",
+        "morning",
+        "evening",
+        "building",
+        "meeting",
+        "warning",
+        "gathering",
+        "opening",
+        "offering",
+        "painting",
+        "drawing",
+        "writing",
+        "reading",
+        "recording",
+        "crossing",
+        "hearing",
+        "wedding",
+        "blessing",
+        "teaching",
+        "finding",
+        "beginning",
+        "ending",
+        "setting",
+        "lightning",
+        "earring",
+        "darling",
         # -ity count nouns
-        "city", "pity", "entity", "identity", "quality", "quantity",
-        "activity", "community", "university", "opportunity", "ability",
-        "capacity", "authority", "majority", "minority", "curiosity",
-        "intensity", "density", "personality", "facility", "utility",
-        "security", "property", "priority", "novelty", "charity",
-        "vanity", "dignity", "locality", "modality", "polarity",
-        "regularity", "rarity", "familiarity", "formality", "oddity",
-        "fatality", "totality", "vitality", "sexuality", "maturity",
+        "city",
+        "pity",
+        "entity",
+        "identity",
+        "quality",
+        "quantity",
+        "activity",
+        "community",
+        "university",
+        "opportunity",
+        "ability",
+        "capacity",
+        "authority",
+        "majority",
+        "minority",
+        "curiosity",
+        "intensity",
+        "density",
+        "personality",
+        "facility",
+        "utility",
+        "security",
+        "property",
+        "priority",
+        "novelty",
+        "charity",
+        "vanity",
+        "dignity",
+        "locality",
+        "modality",
+        "polarity",
+        "regularity",
+        "rarity",
+        "familiarity",
+        "formality",
+        "oddity",
+        "fatality",
+        "totality",
+        "vitality",
+        "sexuality",
+        "maturity",
     }
 
     @classmethod
@@ -4183,14 +4556,37 @@ class Vocabulary:
 
     # Proper nouns that should never take an article
     _PROPER_NOUNS: ClassVar[set[str]] = {
-        "genesis", "alice", "bob", "carol",
-        "earth", "mars", "venus", "jupiter", "saturn",
-        "america", "europe", "asia", "africa",
-        "monday", "tuesday", "wednesday", "thursday",
-        "friday", "saturday", "sunday",
-        "january", "february", "march", "april",
-        "june", "july", "august", "september",
-        "october", "november", "december",
+        "genesis",
+        "alice",
+        "bob",
+        "carol",
+        "earth",
+        "mars",
+        "venus",
+        "jupiter",
+        "saturn",
+        "america",
+        "europe",
+        "asia",
+        "africa",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+        "january",
+        "february",
+        "march",
+        "april",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+        "december",
     }
 
     @classmethod
@@ -4387,9 +4783,7 @@ class Vocabulary:
             parts.append(complement)
         return " ".join(parts) + "?"
 
-    def _statement(
-        self, subject: str, verb: str, complement: str = ""
-    ) -> str:
+    def _statement(self, subject: str, verb: str, complement: str = "") -> str:
         """Assemble a declarative clause with subject agreement."""
         s = subject.strip().lower()
         plural = s in ("i", "you", "we", "they", "both", "all") or is_plural_np(s)
@@ -4449,12 +4843,8 @@ class Vocabulary:
         net = self._network
         subject = (target or "this").replace("_", " ")
         # Animacy-aware pronouns for referring back to the target
-        pron_subj, _ = person_pronoun(
-            target, net, subject, for_object=False
-        )
-        pron_obj, _ = person_pronoun(
-            target, net, subject, for_object=True
-        )
+        pron_subj, _ = person_pronoun(target, net, subject, for_object=False)
+        pron_obj, _ = person_pronoun(target, net, subject, for_object=True)
 
         handlers = {
             "isolation": self._q_isolation,
@@ -4493,22 +4883,40 @@ class Vocabulary:
         if content:
             lowered = content.lower()
             if "?" in content or lowered.startswith(
-                ("what", "who", "whom", "whose", "when", "where",
-                 "why", "how", "which", "is ", "are ", "was ", "were ",
-                 "do ", "does ", "did ", "can ", "could ", "will ",
-                 "would ", "should ", "may ", "might ", "must ")
+                (
+                    "what",
+                    "who",
+                    "whom",
+                    "whose",
+                    "when",
+                    "where",
+                    "why",
+                    "how",
+                    "which",
+                    "is ",
+                    "are ",
+                    "was ",
+                    "were ",
+                    "do ",
+                    "does ",
+                    "did ",
+                    "can ",
+                    "could ",
+                    "will ",
+                    "would ",
+                    "should ",
+                    "may ",
+                    "might ",
+                    "must ",
+                )
             ):
                 return [content]
             if len(content.split()) <= 4:
-                return [self._wh_question(
-                    "what", complement=f"about {content}"
-                )]
+                return [self._wh_question("what", complement=f"about {content}")]
         topics = context.get("topics") or []
         if topics:
             topic_subject = str(topics[0]).replace("_", " ")
-            return [self._wh_question(
-                "what", complement=f"about {topic_subject}"
-            )]
+            return [self._wh_question("what", complement=f"about {topic_subject}")]
         return []
 
     # ─── Question-type composers ────────────────────────────────────
@@ -4520,18 +4928,12 @@ class Vocabulary:
         if net and target:
             neighbors = net.get_exact_neighbors(target)[:2]
             if neighbors:
-                known = ", ".join(
-                    n[0].replace("_", " ") for n in neighbors
-                )
+                known = ", ".join(n[0].replace("_", " ") for n in neighbors)
                 rel_verb = agree_verb_phrase(
-                    self._relation_verb_for(
-                        RelationType.RELATED_TO, "connects to"
-                    ),
+                    self._relation_verb_for(RelationType.RELATED_TO, "connects to"),
                     is_plural_np(subject),
                 )
-                lead = self._statement(
-                    "I", "know", f"{subject} {rel_verb} {known}"
-                )
+                lead = self._statement("I", "know", f"{subject} {rel_verb} {known}")
                 ask = self._wh_question(
                     "what else",
                     subject="I",
@@ -4562,31 +4964,21 @@ class Vocabulary:
                         f"my understanding of {subject}",
                         f"incomplete — {snippet}",
                     )
-                    ask = self._wh_question(
-                        "what", subject="I", aux="am", verb="missing"
-                    )
+                    ask = self._wh_question("what", subject="I", aux="am", verb="missing")
                     return [f"{lead}. {self._cap_first(ask)}"]
         return [self._wh_copula("what exactly", subject)]
 
     def _q_causation(self, net, target, subject, detail, pron_subj, pron_obj):
         # Has IS_A but no CAUSES — ask what produces it
-        cause_verb = self._relation_verb_for(
-            RelationType.CAUSES, "produce"
-        )
+        cause_verb = self._relation_verb_for(RelationType.CAUSES, "produce")
         if net and target:
             edges = net.get_edges(target, "out")
             is_a = [e.target for e in edges if e.relation.value == "is_a"]
             if is_a:
                 parent = is_a[0].replace("_", " ")
-                is_a_verb = agree_verb_phrase(
-                    "is a kind of", is_plural_np(subject)
-                )
-                lead = self._statement(
-                    "I", "know", f"{subject} {is_a_verb} {parent}"
-                )
-                ask = self._wh_question(
-                    "what", verb=cause_verb, complement=pron_obj
-                )
+                is_a_verb = agree_verb_phrase("is a kind of", is_plural_np(subject))
+                lead = self._statement("I", "know", f"{subject} {is_a_verb} {parent}")
+                ask = self._wh_question("what", verb=cause_verb, complement=pron_obj)
                 return [f"{lead}, but {ask}"]
         return [self._wh_question("what", verb=cause_verb, complement=subject)]
 
@@ -4598,9 +4990,7 @@ class Vocabulary:
             ask = self._yn_question("that", "hold", complement="up")
             return [f"{lead}. {self._cap_first(ask)}"]
         hyp = f"{indefinite_article('hypothesis')} hypothesis"
-        lead = self._statement(
-            "I", "have", f"{hyp} about {subject}"
-        )
+        lead = self._statement("I", "have", f"{hyp} about {subject}")
         ask = self._yn_question(pron_subj, "hold", complement="up")
         return [f"{lead}. {self._cap_first(ask)}"]
 
@@ -4613,13 +5003,9 @@ class Vocabulary:
                 f"{indefinite_article('tension')} tension "
                 f"in what I know: {d}"
             )
-            ask = self._wh_copula(
-                "which", "side", complement="true", prenominal=True
-            )
+            ask = self._wh_copula("which", "side", complement="true", prenominal=True)
             return [f"{self._cap_first(lead)}. {self._cap_first(ask)}"]
-        lead = self._statement(
-            "something", "feel", f"inconsistent about {subject}"
-        )
+        lead = self._statement("something", "feel", f"inconsistent about {subject}")
         ask = self._wh_question("how", subject="both", verb="hold")
         return [f"{self._cap_first(lead)}. {self._cap_first(ask)}"]
 
@@ -4628,84 +5014,63 @@ class Vocabulary:
         if detail:
             d = detail.replace("_", " ")
             lead = self._statement(
-                "I", "keep",
+                "I",
+                "keep",
                 f"finding paths between {subject} and {d}",
             )
             ask = self._wh_question("what", subject="that", verb="mean")
             return [f"{lead}. {self._cap_first(ask)}"]
-        connect_verb = self._relation_verb_for(
-            RelationType.RELATED_TO, "connect to"
-        )
-        return [
-            self._wh_question("what", verb=connect_verb, complement=subject)
-        ]
+        connect_verb = self._relation_verb_for(RelationType.RELATED_TO, "connect to")
+        return [self._wh_question("what", verb=connect_verb, complement=subject)]
 
     def _q_cooccurrence(self, net, target, subject, detail, pron_subj, pron_obj):
         # Two concepts co-occur — ask about the relationship
         cause_verb = self._relation_verb_for(RelationType.CAUSES, "cause")
         if detail:
             d = detail.replace("_", " ")
-            lead = self._statement(
-                f"{subject} and {d}", "keep", "appearing together"
-            )
+            lead = self._statement(f"{subject} and {d}", "keep", "appearing together")
             ask = self._yn_question("one", cause_verb, "the other")
             return [f"{lead}. {self._cap_first(ask)}"]
         return [
             self._wh_copula(
                 "what",
-                f"the relationship between {subject} "
-                "and what I'm seeing",
+                f"the relationship between {subject} and what I'm seeing",
             )
         ]
 
     def _q_perspective(self, net, target, subject, detail, pron_subj, pron_obj):
         # Ask about the user's view
         if net and target:
-            related = self._words_from_concept(
-                target, RelationType.RELATED_TO, "out", 1
-            )
+            related = self._words_from_concept(target, RelationType.RELATED_TO, "out", 1)
             if related:
                 return [
                     self._wh_question(
                         "how",
                         subject="you",
                         verb="see",
-                        complement=(
-                            f"{subject} in light of "
-                            f"{related[0].replace('_', ' ')}"
-                        ),
+                        complement=(f"{subject} in light of {related[0].replace('_', ' ')}"),
                     )
                 ]
-        return [
-            self._wh_copula("what", f"your perspective on {subject}")
-        ]
+        return [self._wh_copula("what", f"your perspective on {subject}")]
 
     def _q_social_emotional(self, net, target, subject, detail, pron_subj, pron_obj):
         return [
             self._wh_question(
-                "how", subject="you", verb="feel",
+                "how",
+                subject="you",
+                verb="feel",
                 complement=f"about {subject}",
             )
         ]
 
     def _q_social_interest(self, net, target, subject, detail, pron_subj, pron_obj):
-        return [
-            self._wh_question(
-                "what", verb="draw", complement=f"you to {subject}"
-            )
-        ]
+        return [self._wh_question("what", verb="draw", complement=f"you to {subject}")]
 
     def _q_social_belief(self, net, target, subject, detail, pron_subj, pron_obj):
-        return [
-            self._wh_copula("what", f"your perspective on {subject}")
-        ]
+        return [self._wh_copula("what", f"your perspective on {subject}")]
 
     def _q_social_general(self, net, target, subject, detail, pron_subj, pron_obj):
-        return [
-            self._wh_copula(
-                "what", f"on your mind about {subject}"
-            )
-        ]
+        return [self._wh_copula("what", f"on your mind about {subject}")]
 
     def _q_reciprocal(self, net, target, subject, detail, pron_subj, pron_obj):
         # wh + prepositional fragment — no verb needed

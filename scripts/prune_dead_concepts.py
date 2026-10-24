@@ -58,15 +58,26 @@ logger = logging.getLogger(__name__)
 
 # Origins that represent deliberate seeding — never pruned even if
 # dormant. These are the structural foundation of its mind.
-_PROTECTED_ORIGINS = frozenset({
-    "identity", "introspection", "foundational", "seeded", "structural",
-})
+_PROTECTED_ORIGINS = frozenset(
+    {
+        "identity",
+        "introspection",
+        "foundational",
+        "seeded",
+        "structural",
+    }
+)
 
 # Origins that represent auto-generated bridge edges — in aggressive
 # mode, concepts whose ONLY edges are weak bridges are pruned.
-_BRIDGE_ORIGINS = frozenset({
-    "semantic_bridge", "hub_attachment", "associative_bridge", "bridge",
-})
+_BRIDGE_ORIGINS = frozenset(
+    {
+        "semantic_bridge",
+        "hub_attachment",
+        "associative_bridge",
+        "bridge",
+    }
+)
 
 # Weight threshold for "weak" bridge edges in aggressive mode.
 _WEAK_BRIDGE_THRESHOLD = 0.3
@@ -266,9 +277,8 @@ def _backup_state(state_path: str, keep: int = 5) -> str:
     logger.info("Backed up original state to %s", backup_path)
     # Retain newest `keep` timestamped backups.
     backups = sorted(
-        str(p) for p in Path(state_path).parent.glob(
-            Path(state_path).name + ".pre-prune-backup.*.xz"
-        )
+        str(p)
+        for p in Path(state_path).parent.glob(Path(state_path).name + ".pre-prune-backup.*.xz")
     )
     for stale in backups[:-keep] if len(backups) > keep else []:
         try:
@@ -374,9 +384,7 @@ def prune_state(
 
     original_concepts = len(concepts)
     original_edges = len(edges)
-    keep_ids, prune_by_origin = _classify_concepts(
-        concepts, edges, aggressive, learned_dormant
-    )
+    keep_ids, prune_by_origin = _classify_concepts(concepts, edges, aggressive, learned_dormant)
     kept_concepts, kept_edges = _filter_kept(concepts, edges, keep_ids)
 
     pruned_concepts = original_concepts - len(kept_concepts)
@@ -400,8 +408,13 @@ def prune_state(
 
     if dry_run:
         return _build_report(
-            original_concepts, original_edges, kept_concepts, kept_edges,
-            prune_by_origin, aggressive, learned_dormant,
+            original_concepts,
+            original_edges,
+            kept_concepts,
+            kept_edges,
+            prune_by_origin,
+            aggressive,
+            learned_dormant,
         )
 
     cn["concepts"] = kept_concepts
@@ -489,7 +502,7 @@ def main() -> int:
         "--learned-dormant",
         action="store_true",
         help="Prune ALL dormant learned-origin concepts regardless of edges. "
-             "Removes bulk-learning noise from the autonomous learner.",
+        "Removes bulk-learning noise from the autonomous learner.",
     )
     parser.add_argument("--verbose", action="store_true", help="Verbose logging.")
     args = parser.parse_args()

@@ -117,9 +117,7 @@ class MemoryStore:
         )
 
         if learning_events:
-            conv_count = sum(
-                1 for e in learning_events if e.event_type == "conversation"
-            )
+            conv_count = sum(1 for e in learning_events if e.event_type == "conversation")
             if conv_count > 0:
                 self._regulator.respond_to_learning(emotion, conv_count)
 

@@ -145,9 +145,7 @@ class GridCode:
         self._B: list[np.ndarray] = []
         for lam, theta in zip(scales, orientations, strict=True):
             b1 = lam * np.array([math.cos(theta), math.sin(theta)])
-            b2 = lam * np.array(
-                [math.cos(theta + math.pi / 3), math.sin(theta + math.pi / 3)]
-            )
+            b2 = lam * np.array([math.cos(theta + math.pi / 3), math.sin(theta + math.pi / 3)])
             basis = np.stack([b1, b2], axis=1)
             self._B.append(np.linalg.inv(basis))
 
@@ -156,9 +154,7 @@ class GridCode:
         p = np.array(pos, dtype=float)
         return np.concatenate([(B @ p) % 1.0 for B in self._B])
 
-    def advance(
-        self, code: np.ndarray, delta: tuple[float, float]
-    ) -> np.ndarray:
+    def advance(self, code: np.ndarray, delta: tuple[float, float]) -> np.ndarray:
         """Path integration: advance every module's phase by B·Δ."""
         d = np.array(delta, dtype=float)
         parts = []
@@ -167,9 +163,7 @@ class GridCode:
             parts.append((u + B @ d) % 1.0)
         return np.concatenate(parts)
 
-    def field(
-        self, module: int, pos: tuple[float, float], offset: np.ndarray
-    ) -> float:
+    def field(self, module: int, pos: tuple[float, float], offset: np.ndarray) -> float:
         """One grid cell's activity: hex field at preferred phase.
 
         The firing field is a sum of three plane waves at 120° — in
@@ -179,13 +173,7 @@ class GridCode:
         """
         u = (self._B[module] @ np.array(pos, dtype=float)) % 1.0
         du = u - offset
-        return float(
-            np.mean(
-                np.cos(
-                    2 * math.pi * np.array([du[0], du[1], du[0] + du[1]])
-                )
-            )
-        )
+        return float(np.mean(np.cos(2 * math.pi * np.array([du[0], du[1], du[0] + du[1]]))))
 
 
 @dataclass
@@ -203,9 +191,7 @@ class ContextMap:
     places: dict[int, Place] = field(default_factory=dict)
     next_place_id: int = 1
     # Directed edges: (from_place, action) → counts over to_place.
-    transitions: dict[tuple[int, str], Counter[int]] = field(
-        default_factory=dict
-    )
+    transitions: dict[tuple[int, str], Counter[int]] = field(default_factory=dict)
     # Object-location binding: what kind of thing occupies each place.
     contents: dict[int, Counter[int]] = field(default_factory=dict)
     anchors: dict[tuple[int, Cell], Anchor] = field(default_factory=dict)
@@ -254,9 +240,7 @@ class CognitiveMap:
         dead reckoning when no allocentric fix is available.
         """
         events: list[MapEvent] = []
-        if self._context is None or (
-            bounds is not None and self._context.bounds != bounds
-        ):
+        if self._context is None or (bounds is not None and self._context.bounds != bounds):
             if bounds is None:
                 return events
             # Context follows the domain of the observation — bounds
@@ -266,8 +250,7 @@ class CognitiveMap:
             events.append(
                 MapEvent(
                     "context",
-                    "a familiar place" if self._context.n_episodes > 1
-                    else "an unfamiliar place",
+                    "a familiar place" if self._context.n_episodes > 1 else "an unfamiliar place",
                     salience=0.5,
                 )
             )
@@ -284,9 +267,7 @@ class CognitiveMap:
             key = (color, (r, c))
             anchor = ctx.anchors.get(key)
             if anchor is None:
-                ctx.anchors[key] = Anchor(
-                    color=color, cell=(r, c), episodes={self._episode}
-                )
+                ctx.anchors[key] = Anchor(color=color, cell=(r, c), episodes={self._episode})
             else:
                 anchor.episodes.add(self._episode)
 
@@ -311,14 +292,8 @@ class CognitiveMap:
             assert place is not None
             place.visits += 1
             self._place = place
-            if (
-                prev_place is not None
-                and prev_pos is not None
-                and place.id != prev_place.id
-            ):
-                edge = ctx.transitions.setdefault(
-                    (prev_place.id, action or ""), Counter()
-                )
+            if prev_place is not None and prev_pos is not None and place.id != prev_place.id:
+                edge = ctx.transitions.setdefault((prev_place.id, action or ""), Counter())
                 edge[place.id] += 1
             elif prev_place is not None and place.id == prev_place.id:
                 # Stayed within one place — no edge.
@@ -376,11 +351,7 @@ class CognitiveMap:
                 overlap = 1.0  # identical opening scene — same place
             else:
                 union = len(signature | ctx.signature)
-                overlap = (
-                    len(signature & ctx.signature) / union
-                    if union
-                    else 0.0
-                )
+                overlap = len(signature & ctx.signature) / union if union else 0.0
             if overlap > best_overlap:
                 best, best_overlap = ctx, overlap
         if best is not None and best_overlap >= _CONTEXT_MATCH:
@@ -420,9 +391,7 @@ class CognitiveMap:
     def current_place(self) -> Place | None:
         return self._place
 
-    def transition_matrix(
-        self, ctx: ContextMap | None = None
-    ) -> tuple[list[int], np.ndarray]:
+    def transition_matrix(self, ctx: ContextMap | None = None) -> tuple[list[int], np.ndarray]:
         """P — row-normalized transition probabilities over places.
 
         Marginalizes the observed action distribution: P(s'|s) =
@@ -451,9 +420,7 @@ class CognitiveMap:
                 P[i] /= s
         return ids, P
 
-    def successor_map(
-        self, gamma: float = _SR_GAMMA
-    ) -> tuple[list[int], np.ndarray]:
+    def successor_map(self, gamma: float = _SR_GAMMA) -> tuple[list[int], np.ndarray]:
         """M = (I − γP)⁻¹ — the predictive occupancy map.
 
         Row s is place s's expected discounted future occupancy: the
@@ -466,9 +433,7 @@ class CognitiveMap:
         M = np.linalg.inv(np.eye(n) - gamma * P)
         return ids, M
 
-    def route(
-        self, from_place: int, to_place: int
-    ) -> list[tuple[int, str]] | None:
+    def route(self, from_place: int, to_place: int) -> list[tuple[int, str]] | None:
         """Shortest world-centered route between two places.
 
         BFS over the transition graph — what frontal planning over
@@ -501,9 +466,7 @@ class CognitiveMap:
                     queue.append(dst)
         return None
 
-    def boundary_vector(
-        self, pos: tuple[float, float] | None = None
-    ) -> np.ndarray:
+    def boundary_vector(self, pos: tuple[float, float] | None = None) -> np.ndarray:
         """Subicular boundary-vector activity at a position.
 
         For each preferred (distance, direction) pair: distance to the
@@ -591,9 +554,7 @@ class CognitiveMap:
             "episode": self._episode,
             "pos": list(self._pos) if self._pos is not None else None,
             "context_index": (
-                self.contexts.index(self._context)
-                if self._context in self.contexts
-                else None
+                self.contexts.index(self._context) if self._context in self.contexts else None
             ),
             "place_id": self._place.id if self._place is not None else None,
             "contexts": [self._save_context(c) for c in self.contexts],
@@ -616,11 +577,11 @@ class CognitiveMap:
                 for p in ctx.places.values()
             ],
             "transitions": [
-                {"from": src, "action": act, "to": dict(dst)}
+                {"from": src, "action": act, "to": {str(k): v for k, v in dst.items()}}
                 for (src, act), dst in ctx.transitions.items()
             ],
             "contents": {
-                str(pid): dict(cnt) for pid, cnt in ctx.contents.items()
+                str(pid): {str(k): v for k, v in cnt.items()} for pid, cnt in ctx.contents.items()
             },
             "anchors": [
                 {"color": a.color, "cell": list(a.cell), "episodes": sorted(a.episodes)}
@@ -668,16 +629,12 @@ class CognitiveMap:
         self._episode = int(data.get("episode", 0))
         idx = data.get("context_index")
         self._context = (
-            self.contexts[idx]
-            if idx is not None and 0 <= idx < len(self.contexts)
-            else None
+            self.contexts[idx] if idx is not None and 0 <= idx < len(self.contexts) else None
         )
         pos = data.get("pos")
         self._pos = tuple(pos) if pos is not None else None
         self._code = self.grid.encode(self._pos) if self._pos else None
         pid = data.get("place_id")
         self._place = (
-            self._context.places.get(pid)
-            if self._context is not None and pid is not None
-            else None
+            self._context.places.get(pid) if self._context is not None and pid is not None else None
         )

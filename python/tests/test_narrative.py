@@ -95,9 +95,7 @@ def test_milestone_creation() -> None:
 
 def test_life_script_find() -> None:
     """LifeScript.find returns milestones by name (case-insensitive)."""
-    script = LifeScript(
-        milestones=[Milestone("First Conversation", expected_age=1.0)]
-    )
+    script = LifeScript(milestones=[Milestone("First Conversation", expected_age=1.0)])
     found = script.find("first conversation")
     assert found is not None
     assert found.name == "First Conversation"
@@ -349,9 +347,7 @@ def test_retrieve_from_hierarchy_with_query() -> None:
     """retrieve_from_hierarchy filters by query."""
     engine = _make_engine()
     engine.record_event("learning about dogs", "test", _make_emotion())
-    nodes = engine.retrieve_from_hierarchy(
-        AutobiographicalLevel.EVENT_SPECIFIC, query="dogs"
-    )
+    nodes = engine.retrieve_from_hierarchy(AutobiographicalLevel.EVENT_SPECIFIC, query="dogs")
     assert all("dogs" in n.label.lower() for n in nodes)
 
 

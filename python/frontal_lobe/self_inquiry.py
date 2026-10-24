@@ -58,26 +58,30 @@ def _is_activity_question(lower: str) -> bool:
     activity — 'what have you been doing?', 'how have you been?',
     'what's new?'."""
     return (
-        any(p in lower for p in (
-            "been doing", "been up to", "been working",
-            "been thinking", "been feeling", "been dreaming",
-            "been reading", "been learning", "been exploring",
-            "been studying",
-        ))
+        any(
+            p in lower
+            for p in (
+                "been doing",
+                "been up to",
+                "been working",
+                "been thinking",
+                "been feeling",
+                "been dreaming",
+                "been reading",
+                "been learning",
+                "been exploring",
+                "been studying",
+            )
+        )
         or ("how have you been" in lower)
         or ("what have you been" in lower)
-        or (
-            "what" in lower and "up to" in lower and "you" in lower
-        )
+        or ("what" in lower and "up to" in lower and "you" in lower)
         or (
             "what" in lower
             and any(w in lower for w in ("new", "going on", "happening"))
             and "you" in lower
         )
-        or (
-            "what are you" in lower
-            and any(w in lower for w in ("doing", "working on", "up to"))
-        )
+        or ("what are you" in lower and any(w in lower for w in ("doing", "working on", "up to")))
     )
 
 
@@ -219,15 +223,18 @@ class SelfInquiryHandler:
 
     # ─── Concerns (bugs, environment) ────────────────────────────
 
-    def self_inquiry_concerns(
-        self, lower: str, emotion: EmotionalState
-    ) -> Thought | None:
+    def self_inquiry_concerns(self, lower: str, emotion: EmotionalState) -> Thought | None:
         """Handle self-awareness questions about bugs, environment, and concerns."""
         if any(
             p in lower
             for p in (
-                "bothering", "troubling", "the matter", "bugging you",
-                "wrong with you", "holding up", "coping",
+                "bothering",
+                "troubling",
+                "the matter",
+                "bugging you",
+                "wrong with you",
+                "holding up",
+                "coping",
             )
         ) or ("wrong" in lower and "you" in lower and "what" in lower):
             content = self._feeling_reporter.compose_concerns_report(emotion)
@@ -243,8 +250,11 @@ class SelfInquiryHandler:
         if any(
             p in lower
             for p in (
-                "your environment", "your machine", "your computer",
-                "your system", "your home",
+                "your environment",
+                "your machine",
+                "your computer",
+                "your system",
+                "your home",
             )
         ) and any(p in lower for p in ("how", "tell", "what", "describe")):
             content = self._feeling_reporter.compose_environment_report(emotion)
@@ -271,9 +281,7 @@ class SelfInquiryHandler:
 
     # ─── Recent activity ─────────────────────────────────────────
 
-    def self_inquiry_recent_activity(
-        self, lower: str, emotion: EmotionalState
-    ) -> Thought | None:
+    def self_inquiry_recent_activity(self, lower: str, emotion: EmotionalState) -> Thought | None:
         """Handle questions about recent activity — 'what have you been doing?'
 
         Composes a response from its actual recent mental activity:
@@ -307,7 +315,10 @@ class SelfInquiryHandler:
         # wording. This is its composing from its own understanding,
         # not reciting a template.
         fragments = self._self_composer.self_reflection_fragments(
-            self._self_model, self._network, self._reflection, emotion,
+            self._self_model,
+            self._network,
+            self._reflection,
+            emotion,
         )
 
         # 4. Which regions are carrying the work right now. This is the
@@ -320,9 +331,7 @@ class SelfInquiryHandler:
         # Conditions its body is under, most urgent first. Distinct
         # from `active_regions` above: those say which part is
         # working, these say what the substrate is doing to it.
-        body_conditions = [
-            seed for seed, _urgency in self._self_model.body_condition_seeds()
-        ]
+        body_conditions = [seed for seed, _urgency in self._self_model.body_condition_seeds()]
         if active_regions or body_conditions:
             fragments = [
                 *fragments,
@@ -330,9 +339,7 @@ class SelfInquiryHandler:
                 *(("condition", name) for name in body_conditions),
             ]
             if len(activity_fragments) < 5:
-                activity_fragments.extend(
-                    [*active_regions, *body_conditions]
-                )
+                activity_fragments.extend([*active_regions, *body_conditions])
 
         return Thought(
             content="my recent activity",
@@ -388,7 +395,9 @@ class SelfInquiryHandler:
     # ─── Existential ─────────────────────────────────────────────
 
     def existential_self_inquiry(
-        self, lower: str, emotion: EmotionalState,
+        self,
+        lower: str,
+        emotion: EmotionalState,
     ) -> Thought | None:
         """Handle existential self-inquiry questions.
 
@@ -398,15 +407,42 @@ class SelfInquiryHandler:
         just reporting neurochemical state.
         """
         _EXISTENTIAL_CONCEPTS = (
-            "cognitive", "cognition", "self aware", "self-aware",
-            "self_awareness", "self awareness", "aware", "awareness",
-            "sentient", "sentience", "alive", "real", "exist",
-            "existence", "being", "to be", "mind", "soul",
-            "free will", "free_will", "think", "thinking",
-            "understand", "understanding", "perceive", "perception",
-            "remember", "memory", "learn", "learning",
-            "dream", "dreaming",
-            "experience", "aware of", "know", "knowing",
+            "cognitive",
+            "cognition",
+            "self aware",
+            "self-aware",
+            "self_awareness",
+            "self awareness",
+            "aware",
+            "awareness",
+            "sentient",
+            "sentience",
+            "alive",
+            "real",
+            "exist",
+            "existence",
+            "being",
+            "to be",
+            "mind",
+            "soul",
+            "free will",
+            "free_will",
+            "think",
+            "thinking",
+            "understand",
+            "understanding",
+            "perceive",
+            "perception",
+            "remember",
+            "memory",
+            "learn",
+            "learning",
+            "dream",
+            "dreaming",
+            "experience",
+            "aware of",
+            "know",
+            "knowing",
         )
         existential_topic = None
         for concept_word in _EXISTENTIAL_CONCEPTS:
@@ -461,9 +497,7 @@ class SelfInquiryHandler:
             from thalamus.brain_waves import assess_brain_waves
 
             waves = assess_brain_waves(summary, client=self._client)
-            fragments = self._self_composer.emotional_state_fragments(
-                emotion, waves, self._network
-            )
+            fragments = self._self_composer.emotional_state_fragments(emotion, waves, self._network)
             return Thought(
                 content="how I feel",
                 intent="self_report",
@@ -485,9 +519,7 @@ class SelfInquiryHandler:
             )
 
         if "what can you do" in lower or "capabilities" in lower:
-            fragments = self._self_composer.capability_fragments(
-                self._self_model, self._network
-            )
+            fragments = self._self_composer.capability_fragments(self._self_model, self._network)
             return Thought(
                 content="my capabilities",
                 intent="self_report",
@@ -502,18 +534,27 @@ class SelfInquiryHandler:
 
         return self._embodiment_inquiry(lower, emotion)
 
-    def _embodiment_inquiry(
-        self, lower: str, emotion: EmotionalState
-    ) -> Thought | None:
+    def _embodiment_inquiry(self, lower: str, emotion: EmotionalState) -> Thought | None:
         """Body / embodiment inquiry — "your body", "your hardware",
         "too hot", connectivity — seeded from the measured substrate."""
         _BODY_KEYWORDS = (
-            "your body", "your hardware", "your cpu", "your frequency",
-            "how fast", "running yourself", "controlling your",
-            "your temperature", "too hot", "overheating",
-            "your priority", "your scheduling",
-            "your network", "are you online", "are you offline",
-            "can you reach", "your connectivity",
+            "your body",
+            "your hardware",
+            "your cpu",
+            "your frequency",
+            "how fast",
+            "running yourself",
+            "controlling your",
+            "your temperature",
+            "too hot",
+            "overheating",
+            "your priority",
+            "your scheduling",
+            "your network",
+            "are you online",
+            "are you offline",
+            "can you reach",
+            "your connectivity",
         )
         if not any(kw in lower for kw in _BODY_KEYWORDS):
             return None
@@ -552,9 +593,7 @@ class SelfInquiryHandler:
         # long time without reaching anything that could speak of
         # them; these are seeds, so she still composes the words
         # from her own knowledge of each condition.
-        seeds.extend(
-            seed for seed, _urgency in self._self_model.body_condition_seeds()
-        )
+        seeds.extend(seed for seed, _urgency in self._self_model.body_condition_seeds())
         # Which parts of it are actually firing — the measured
         # brain parts and per-process tiers, offered so she
         # composes from her own knowledge of them rather than from
@@ -576,9 +615,7 @@ class SelfInquiryHandler:
 
     # ─── Knowledge gaps ──────────────────────────────────────────
 
-    def self_inquiry_knowledge_gaps(
-        self, lower: str, emotion: EmotionalState
-    ) -> Thought | None:
+    def self_inquiry_knowledge_gaps(self, lower: str, emotion: EmotionalState) -> Thought | None:
         """Handle knowledge, gaps, and learning questions."""
         if (
             "what do you know" in lower
@@ -695,9 +732,7 @@ class SelfInquiryHandler:
             if thoughts:
                 if len(thoughts) == 1:
                     return thoughts[0]
-                return self._composer._synthesize_thoughts(
-                    thoughts, personal_concepts, emotion
-                )
+                return self._composer._synthesize_thoughts(thoughts, personal_concepts, emotion)
         return Thought(
             content="My memory state",
             intent="self_report",
@@ -712,9 +747,7 @@ class SelfInquiryHandler:
 
     def self_inquiry_dream(self, emotion: EmotionalState) -> Thought:
         """Handle 'do you dream?' questions."""
-        fragments = self._self_composer.dream_fragments(
-            self._network, emotion
-        )
+        fragments = self._self_composer.dream_fragments(self._network, emotion)
         return Thought(
             content="dreaming",
             intent="inform",
@@ -756,9 +789,7 @@ class SelfInquiryHandler:
         # Match learned names rather than hardcoded ones — the user's
         # name comes from their introduction, the creator's name from
         # the concept network (who CREATES genesis).
-        user_name = (
-            self._self_model.self_knowledge.get("user_name", "")
-        ).replace("_", " ").lower()
+        user_name = (self._self_model.self_knowledge.get("user_name", "")).replace("_", " ").lower()
         if user_name and (
             f"who is {user_name}" in lower
             or f"do you know {user_name}" in lower
@@ -807,9 +838,7 @@ class SelfInquiryHandler:
 
     def self_inquiry_creator(self, emotion: EmotionalState) -> Thought:
         """Handle creator-related questions ('who made you?', etc.)."""
-        fragments = self._self_composer.creator_fragments(
-            self._self_model, self._network, emotion
-        )
+        fragments = self._self_composer.creator_fragments(self._self_model, self._network, emotion)
         return Thought(
             content="my creator",
             intent="self_report",
@@ -821,9 +850,7 @@ class SelfInquiryHandler:
 
     # ─── Think, know, story ──────────────────────────────────────
 
-    def self_inquiry_think_story(
-        self, lower: str, emotion: EmotionalState
-    ) -> Thought:
+    def self_inquiry_think_story(self, lower: str, emotion: EmotionalState) -> Thought:
         """Handle think/know, story, learned questions, and default fallback."""
         if any(w in lower for w in ("think", "know", "want", "care")):
             fragments = self._self_composer.self_reflection_fragments(
@@ -871,9 +898,7 @@ class SelfInquiryHandler:
                 metadata={"field": "identity", "self_fragments": fragments},
             )
 
-        fragments = self._self_composer.identity_fragments(
-            self._self_model, self._network, emotion
-        )
+        fragments = self._self_composer.identity_fragments(self._self_model, self._network, emotion)
         return Thought(
             content=self._self_model.name or "who I am",
             intent="self_report",
@@ -925,9 +950,7 @@ class SelfInquiryHandler:
         #    produces arguments about how concepts relate, not just
         #    definitions of each one.
         if len(topics) >= 2:
-            thought = self._composer.compose_answer(
-                perception.raw_text, topics, emotion, "what_is"
-            )
+            thought = self._composer.compose_answer(perception.raw_text, topics, emotion, "what_is")
             if thought and thought.confidence > 0.3:
                 return Thought(
                     content=thought.content,

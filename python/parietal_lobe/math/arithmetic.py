@@ -29,7 +29,7 @@ from dataclasses import dataclass
 class CalcResult:
     """The outcome of a calculation."""
 
-    expression: str          # normalized expression text ("7 + 5")
+    expression: str  # normalized expression text ("7 + 5")
     value: float | int | None
     ok: bool
     error: str = ""
@@ -38,26 +38,58 @@ class CalcResult:
 # ── Number words ─────────────────────────────────────────────────
 
 _UNITS = {
-    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4,
-    "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
-    "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
-    "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
-    "eighteen": 18, "nineteen": 19,
+    "zero": 0,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
 }
 _TENS = {
-    "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
-    "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+    "twenty": 20,
+    "thirty": 30,
+    "forty": 40,
+    "fifty": 50,
+    "sixty": 60,
+    "seventy": 70,
+    "eighty": 80,
+    "ninety": 90,
 }
 _SCALES = {"hundred": 100, "thousand": 1000, "million": 1_000_000}
 
 _OPERATOR_WORDS = {
-    "plus": "+", "add": "+",
-    "minus": "-", "subtract": "-", "less": "-",
-    "times": "*", "multiplied": "*", "multiply": "*", "of": "*",
+    "plus": "+",
+    "add": "+",
+    "minus": "-",
+    "subtract": "-",
+    "less": "-",
+    "times": "*",
+    "multiplied": "*",
+    "multiply": "*",
+    "of": "*",
     "x": "*",
-    "divided": "/", "divide": "/", "over": "/", "quotient": "/",
-    "mod": "%", "modulo": "%",
-    "power": "**", "pow": "**",
+    "divided": "/",
+    "divide": "/",
+    "over": "/",
+    "quotient": "/",
+    "mod": "%",
+    "modulo": "%",
+    "power": "**",
+    "pow": "**",
 }
 _POSTFIX_WORDS = {"squared": "** 2", "cubed": "** 3", "square": "** 2", "cube": "** 3"}
 
@@ -177,9 +209,7 @@ def tokenize(text: str) -> list[str]:
             i += 1
             continue
         # "to the power of" / "raised to"
-        if tok == "power" or (
-            tok == "to" and raw[i + 1 : i + 4] == ["the", "power", "of"]
-        ):
+        if tok == "power" or (tok == "to" and raw[i + 1 : i + 4] == ["the", "power", "of"]):
             if tok == "to":
                 i += 3
             tokens.append("**")
@@ -192,9 +222,7 @@ def tokenize(text: str) -> list[str]:
                 i += 1
             # "of" is only an operator between math tokens; skip it
             # otherwise ("what is the color of ...")
-            if tok == "of" and not (
-                tokens and (tokens[-1][0].isdigit() or tokens[-1] in ")*")
-            ):
+            if tok == "of" and not (tokens and (tokens[-1][0].isdigit() or tokens[-1] in ")*")):
                 i += 1
                 continue
             tokens.append(op)
@@ -215,9 +243,13 @@ def tokenize(text: str) -> list[str]:
 # ── Recursive-descent evaluator ──────────────────────────────────
 
 _BINOPS = {
-    "+": operator.add, "-": operator.sub, "*": operator.mul,
-    "/": operator.truediv, "//": operator.floordiv,
-    "%": operator.mod, "**": operator.pow,
+    "+": operator.add,
+    "-": operator.sub,
+    "*": operator.mul,
+    "/": operator.truediv,
+    "//": operator.floordiv,
+    "%": operator.mod,
+    "**": operator.pow,
 }
 _MAX_POW_ABS = 10_000  # guard absurd exponent sizes
 
@@ -245,7 +277,7 @@ class _Parser:
         """Parse a complete expression and reject trailing tokens."""
         value = self._expr()
         if self.pos != len(self.toks):
-            raise ValueError(f"trailing tokens: {self.toks[self.pos:]}")
+            raise ValueError(f"trailing tokens: {self.toks[self.pos :]}")
         return value
 
     def _expr(self) -> float:
@@ -294,7 +326,7 @@ class _Parser:
             operand = self._unary()
             if operand < 0:
                 raise ValueError("square root of a negative number")
-            return operand ** 0.5
+            return operand**0.5
         return self._atom()
 
     def _atom(self) -> float:
@@ -315,9 +347,7 @@ class _Parser:
 def normalize(tokens: list[str]) -> str:
     """Render the token stream back as a clean expression string."""
     text = " ".join("^" if t == "**" else "sqrt" if t == "__sqrt__" else t for t in tokens)
-    return (
-        text.replace("( ", "(").replace(" )", ")").replace("sqrt (", "sqrt(")
-    )
+    return text.replace("( ", "(").replace(" )", ")").replace("sqrt (", "sqrt(")
 
 
 def evaluate(text: str) -> CalcResult:
@@ -340,8 +370,6 @@ def evaluate(text: str) -> CalcResult:
         # Negative base to a fractional power (e.g. (-1) ** 0.5) —
         # this engine is real-valued; report instead of crashing on
         # float(complex).
-        return CalcResult(
-            expr_text, None, False, "result is not a real number"
-        )
+        return CalcResult(expr_text, None, False, "result is not a real number")
     result: float | int = int(value) if float(value).is_integer() else value
     return CalcResult(expr_text, result, True)

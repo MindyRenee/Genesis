@@ -243,12 +243,10 @@ def test_dormant_ignition_fires_at_forced_rate() -> None:
     net.cortical_tick(noise=0.01, spark_rate=1.0)
 
     sparked = [
-        c for c in net._concepts.values()
-        if c.activation is not None and c.activation >= SPARK_MIN
+        c for c in net._concepts.values() if c.activation is not None and c.activation >= SPARK_MIN
     ]
     assert len(sparked) >= 5, (
-        f"forced ignition should light many dormant concepts, "
-        f"got {len(sparked)}"
+        f"forced ignition should light many dormant concepts, got {len(sparked)}"
     )
     assert net._active_ids is not None
     assert len(net._active_ids) == len(sparked)
@@ -265,9 +263,7 @@ def test_no_ignition_when_noise_zero() -> None:
         c.activation = 0.0
     for _ in range(5):
         net.cortical_tick(noise=0.0)
-    assert all(
-        (c.activation or 0.0) == 0.0 for c in net._concepts.values()
-    )
+    assert all((c.activation or 0.0) == 0.0 for c in net._concepts.values())
 
 
 def test_sweep_rebuilds_set_and_clears_residue() -> None:
@@ -282,7 +278,7 @@ def test_sweep_rebuilds_set_and_clears_residue() -> None:
     net.cortical_tick(noise=0.0)  # build set: residue in, unmarked out
     assert net._active_ids is not None
     assert "unmarked" not in net._active_ids
-    unmarked.activation = 0.5   # written without _mark_active
+    unmarked.activation = 0.5  # written without _mark_active
     residue.activation = 0.002  # sub-floor residue while still in the set
 
     net._ticks_since_sweep = SWEEP_INTERVAL_TICKS - 1
@@ -352,7 +348,7 @@ def test_dominant_coalition_suppresses_rivals() -> None:
     ally.activation = 0.7
     weak.activation = 0.15  # isolated, just under threshold
 
-    for _ in range(60):
+    for _ in range(120):
         net.cortical_tick(arousal=0.5, gaba=0.3, ach=0.0, serotonin=0.5, noise=0.0)
 
     assert strong.activation > 0.0

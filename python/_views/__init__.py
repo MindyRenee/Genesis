@@ -43,9 +43,7 @@ def view_getattr(exports: dict[str, str], package: str) -> Callable[[str], objec
     def __getattr__(name: str) -> object:
         target = exports.get(name)
         if target is None:
-            raise AttributeError(
-                f"module {package!r} has no attribute {name!r}"
-            )
+            raise AttributeError(f"module {package!r} has no attribute {name!r}")
         module = importlib.import_module(target)
         return getattr(module, name)
 

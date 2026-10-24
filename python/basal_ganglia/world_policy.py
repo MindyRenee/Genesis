@@ -227,9 +227,7 @@ class WorldPolicy:
         if not available:
             return None
         self._field = field
-        self._objective = (
-            executive.active_intention if executive is not None else None
-        )
+        self._objective = executive.active_intention if executive is not None else None
         bids = [
             b
             for b in (
@@ -237,6 +235,7 @@ class WorldPolicy:
                 self._bid_calibrate(available),
                 self._bid_plan(available),
                 self._bid_board(available),
+                self._bid_exemplar(available),
                 self._bid_intention(available),
                 self._bid_probe(available),
                 self._bid_reprobe(available),
@@ -253,11 +252,10 @@ class WorldPolicy:
         bids = [
             b
             for b in bids
-            if b["action"] not in self._model.coordinate_actions
-            or b.get("cell") is not None
+            if b["action"] not in self._model.coordinate_actions or b.get("cell") is not None
         ]
         if not bids:
-            return None
+            return self._forced_pick(available)
         start = self._model.start_state()
         if start is not None:
             gated = self._survival_gate(bids, available, start)
@@ -282,9 +280,7 @@ class WorldPolicy:
         suppressed = self._strength(winner) < _SELECT_THRESHOLD
         if not suppressed and executive is not None:
             try:
-                suppressed = executive.inhibit_response(
-                    self._strength(winner)
-                ).inhibited
+                suppressed = executive.inhibit_response(self._strength(winner)).inhibited
             except Exception:  # noqa: BLE001 — advisory machinery
                 suppressed = False
         if suppressed:
@@ -299,6 +295,25 @@ class WorldPolicy:
             self._persist = None
         self._persist = self._expected(winner)
         return winner
+
+    def _forced_pick(self, available: list[str]) -> dict[str, Any]:
+        """Mandatory-action fallback when no drive bid anything.
+
+        Mandatory-action worlds do not offer silence: returning
+        nothing ends the attempt more surely than any condemned
+        act does. When no drive has a question left — disembodied,
+        post-reset, a scene that answers nothing — the
+        least-explored offered act is still an experiment, the
+        same answer the survival gate reaches when every bid is
+        lethal.
+        """
+        action = self._explore_action(self._model.self_entity, available)
+        return {
+            "action": action,
+            "cell": self._cell_for(action),
+            "source": "forced",
+            "weight": 0.05,
+        }
 
     def _survival_gate(
         self,
@@ -319,10 +334,7 @@ class WorldPolicy:
         the gate itself must answer (``forced``), or None when no
         offered act survives the model's forecast.
         """
-        nonfatal = [
-            b for b in bids
-            if not self._model.action_fatal(start, str(b["action"]))
-        ]
+        nonfatal = [b for b in bids if not self._model.action_fatal(start, str(b["action"]))]
         # A predicted death is a veto, not a fallback candidate.
         # If every *bid* is lethal the repertoire itself may still
         # contain an escape — the drives do not have to have asked
@@ -330,13 +342,9 @@ class WorldPolicy:
         # action is fatal, the least-explored one is still the only
         # experiment a mandatory-action world leaves open.
         if not nonfatal:
-            escape_safe = [
-                a for a in available
-                if not self._model.action_fatal(start, str(a))
-            ]
+            escape_safe = [a for a in available if not self._model.action_fatal(start, str(a))]
             escape = [
-                a for a in escape_safe
-                if not self._known_failure(start, str(a))
+                a for a in escape_safe if not self._known_failure(start, str(a))
             ] or escape_safe
             if not escape:
                 # Some interfaces do not offer silence: returning
@@ -345,59 +353,54 @@ class WorldPolicy:
                 # condemned, the least-explored one is the only
                 # remaining experiment — uncertainty in the lethal
                 # forecast is preferable to certain forfeiture.
-                action = self._explore_action(
-                    self._model.self_entity, available
-                )
+                action = self._explore_action(self._model.self_entity, available)
                 return {
                     "action": action,
                     "cell": self._cell_for(action),
                     "source": "forced",
                     "weight": 0.05,
                 }
-            action = self._explore_action(
-                self._model.self_entity, escape
-            )
-            nonfatal = [{
-                "action": action,
-                "cell": self._cell_for(action),
-                "source": "evade",
-                "weight": 0.35,
-            }]
+            action = self._explore_action(self._model.self_entity, escape)
+            nonfatal = [
+                {
+                    "action": action,
+                    "cell": self._cell_for(action),
+                    "source": "evade",
+                    "weight": 0.35,
+                }
+            ]
         bids = nonfatal
-        viable = [
-            b for b in bids
-            if not self._known_failure(start, str(b["action"]))
-        ]
+        viable = [b for b in bids if not self._known_failure(start, str(b["action"]))]
         if viable:
             return viable
         alternates = [
-            a for a in available
+            a
+            for a in available
             if not self._model.action_fatal(start, str(a))
             and not self._known_failure(start, str(a))
         ]
         if not alternates:
-            waits = [
-                a for a in available
-                if not self._model.action_fatal(start, str(a))
-            ]
+            waits = [a for a in available if not self._model.action_fatal(start, str(a))]
             if not waits:
                 return None
             action = self._wait_action(waits)
-            return [{
+            return [
+                {
+                    "action": action,
+                    "cell": self._cell_for(action),
+                    "source": "wait",
+                    "weight": _SELECT_THRESHOLD + 0.01,
+                }
+            ]
+        action = self._explore_action(self._model.self_entity, alternates)
+        return [
+            {
                 "action": action,
                 "cell": self._cell_for(action),
-                "source": "wait",
-                "weight": _SELECT_THRESHOLD + 0.01,
-            }]
-        action = self._explore_action(
-            self._model.self_entity, alternates
-        )
-        return [{
-            "action": action,
-            "cell": self._cell_for(action),
-            "source": "evade",
-            "weight": 0.35,
-        }]
+                "source": "evade",
+                "weight": 0.35,
+            }
+        ]
 
     def _known_failure(self, start: SimState, action: str) -> bool:
         """The action has a learned effect and it fails from here.
@@ -414,13 +417,9 @@ class WorldPolicy:
         effect = model.effect_of(action)
         if effect is None or effect == (0, 0):
             return False
-        return model.simulate(
-            start, action, explore_unknown=True
-        ) is None
+        return model.simulate(start, action, explore_unknown=True) is None
 
-    def _perseveration(
-        self, available: list[str]
-    ) -> dict[str, Any] | None:
+    def _perseveration(self, available: list[str]) -> dict[str, Any] | None:
         """Continue the running channel while its prediction holds.
 
         The check is her own forward model: the state the last
@@ -435,11 +434,7 @@ class WorldPolicy:
         if choice["action"] not in available:
             return None
         start = self._model.start_state()
-        if (
-            start is None
-            or start.cells != expected.cells
-            or start.signature != expected.signature
-        ):
+        if start is None or start.cells != expected.cells or start.signature != expected.signature:
             return None
         # Still on script — extend the chain one step so a long
         # effective run perseverates rather than expiring after
@@ -455,9 +450,7 @@ class WorldPolicy:
             "weight": _SELECT_THRESHOLD,
         }
 
-    def _expected(
-        self, bid: dict[str, Any]
-    ) -> tuple[dict[str, Any], SimState] | None:
+    def _expected(self, bid: dict[str, Any]) -> tuple[dict[str, Any], SimState] | None:
         """The SimState the winning act should leave behind —
         the prediction perseveration checks against reality."""
         model = self._model
@@ -497,18 +490,14 @@ class WorldPolicy:
             self._plan_goal = goal
             self._plan_best_dist = float("inf")
             self._plan_route = None
-        dist = self._distance_to(
-            winner.get("goal") or self._valued_cells()
-        )
+        dist = self._distance_to(winner.get("goal") or self._valued_cells())
         # A route that must wrap a wall legitimately lengthens its
         # straight line to the goal; the corridor detour is still
         # progress. The plan's own remaining length is the honest
         # measure — a working route shortens every turn it runs.
         route = winner.get("route")
         progressed = dist < self._plan_best_dist or (
-            route is not None
-            and self._plan_route is not None
-            and route < self._plan_route
+            route is not None and self._plan_route is not None and route < self._plan_route
         )
         if route is not None:
             self._plan_route = route
@@ -527,10 +516,7 @@ class WorldPolicy:
         bottom = max(r for r, _ in fp)
         left = min(c for _, c in fp)
         right = max(c for _, c in fp)
-        return min(
-            max(top - r, 0, r - bottom) + max(left - c, 0, c - right)
-            for r, c in cells
-        )
+        return min(max(top - r, 0, r - bottom) + max(left - c, 0, c - right) for r, c in cells)
 
     def _strength(self, bid: dict[str, Any]) -> float:
         """Bid strength for selection: evidence weight plus the
@@ -538,18 +524,10 @@ class WorldPolicy:
         noise so identical bids don't fossilize an order."""
         field_term = 0.0
         if self._field is not None:
-            field_term = self._field.action_scores.get(
-                str(bid["action"]), 0.0
-            )
-        return (
-            bid["weight"]
-            + 0.05 * field_term
-            + self._rng.random() * 0.01
-        )
+            field_term = self._field.action_scores.get(str(bid["action"]), 0.0)
+        return bid["weight"] + 0.05 * field_term + self._rng.random() * 0.01
 
-    def _bid_reembody(
-        self, available: list[str]
-    ) -> dict[str, Any] | None:
+    def _bid_reembody(self, available: list[str]) -> dict[str, Any] | None:
         """Recover agency after the tracked body disappears.
 
         A reset, transform, or wholesale scene replacement can leave
@@ -565,17 +543,29 @@ class WorldPolicy:
         if me is not None and not me.gone:
             self._reembody_tries.clear()
             return None
-        non_reset = [
-            a for a in available
-            if self._model.action_labels.get(a) != "reset"
-        ]
+        # A pointer-only interface offers no locomotive body to lose:
+        # when every offered act is distal and nothing she has ever
+        # done moved anything, hunting contingent motion re-asks a
+        # question the world cannot answer — eight real steps per
+        # level in a click game. Distal agency was never lost; it is
+        # how this world works. Should a click ever move something,
+        # the nonzero effect re-arms the search.
+        if (
+            available
+            and all(a in self._model.coordinate_actions for a in available)
+            and not any(
+                effect != (0, 0)
+                for counts in self._model.action_effects.values()
+                for effect in counts
+            )
+        ):
+            return None
+        non_reset = [a for a in available if self._model.action_labels.get(a) != "reset"]
         candidates = non_reset or available
         least = min(self._reembody_tries[a] for a in candidates)
         if least >= _REEMBODY_SAMPLE_BOUND:
             return None
-        choices = [
-            a for a in candidates if self._reembody_tries[a] == least
-        ]
+        choices = [a for a in candidates if self._reembody_tries[a] == least]
         action = self._rng.choice(choices)
         return {
             "action": action,
@@ -584,9 +574,7 @@ class WorldPolicy:
             "weight": 0.95 if non_reset else 0.15,
         }
 
-    def _bid_calibrate(
-        self, available: list[str]
-    ) -> dict[str, Any] | None:
+    def _bid_calibrate(self, available: list[str]) -> dict[str, Any] | None:
         """Motor babbling — try an action whose bodily effect is
         still unknown.
 
@@ -601,27 +589,16 @@ class WorldPolicy:
         me = model.self_entity
         if me is None or me.gone:
             return None
-        untried = [
-            a for a in available if not model.action_understood(a)
-        ]
+        untried = [a for a in available if not model.action_understood(a)]
         if not untried:
             return None
-        non_reset = [
-            a for a in untried if model.action_labels.get(a) != "reset"
-        ]
+        non_reset = [a for a in untried if model.action_labels.get(a) != "reset"]
         candidates = non_reset or untried
-        evidence = {
-            a: sum(model.action_effects.get(a, Counter()).values())
-            for a in candidates
-        }
+        evidence = {a: sum(model.action_effects.get(a, Counter()).values()) for a in candidates}
         least = min(evidence.values())
         choices = [a for a in candidates if evidence[a] == least]
         pick = self._rng.choice(choices)
-        weight = (
-            0.7 + 0.3 * len(non_reset) / len(available)
-            if non_reset
-            else 0.15
-        )
+        weight = 0.7 + 0.3 * len(non_reset) / len(available) if non_reset else 0.15
         return {
             "action": pick,
             "cell": self._cell_for(pick),
@@ -629,15 +606,11 @@ class WorldPolicy:
             "weight": weight,
         }
 
-    def _bid_plan(
-        self, available: list[str]
-    ) -> dict[str, Any] | None:
+    def _bid_plan(self, available: list[str]) -> dict[str, Any] | None:
         """Goal pursuit — a route through learned physics toward a
         cell whose kind has learned value. Deliberate pursuit is a
         strong channel when it exists."""
-        seq = self._planner.plan(
-            self._valued_cells(), available
-        )
+        seq = self._planner.plan(self._valued_cells(), available)
         if not seq:
             return None
         action = seq[0][0]
@@ -659,28 +632,21 @@ class WorldPolicy:
             "weight": weight,
         }
 
-    def _bid_board(
-        self, available: list[str]
-    ) -> dict[str, Any] | None:
+    def _bid_board(self, available: list[str]) -> dict[str, Any] | None:
         """Constraint satisfaction — the structured-scene machinery
         holds a violation-reducing act. A solve in hand is
         deliberate pursuit: same league as a route to goal value."""
         cell = self._model.board_plan()
         if cell is None:
             return None
-        actions = [
-            a for a in self._model.coordinate_actions if a in available
-        ]
+        actions = [a for a in self._model.coordinate_actions if a in available]
         if not actions:
             return None
         # The control that has answered most is the one to press.
         action = max(
             actions,
             key=lambda a: (
-                sum(
-                    v for (act, _c), v in self._model.click_changes.items()
-                    if act == a
-                ),
+                sum(v for (act, _c), v in self._model.click_changes.items() if act == a),
                 -self._model.action_tries[a],
             ),
         )
@@ -691,20 +657,32 @@ class WorldPolicy:
             "weight": 0.8,
         }
 
+    def _bid_exemplar(self, available: list[str]) -> dict[str, Any] | None:
+        """Abstraction in hand — the demonstration machinery induced
+        a rule and its writer knows the next act toward the answer.
+
+        A predicted target plus a write plan is deliberate pursuit,
+        the same league as the boards solve: above probes and
+        intentions, below a verified route to learned value.
+        """
+        action = self._model.exemplar_act(available)
+        if action is None:
+            return None
+        return {
+            "action": action,
+            "cell": None,
+            "source": "exemplar",
+            "weight": 0.7,
+        }
+
     # Objective targets naming what her model has learned to want
     # route straight at the valued cells; targets naming what kills
     # her yield no route — avoidance is the passability gate's job,
     # not a pursuit bid's.
-    _OBJECTIVE_GOALS = frozenset(
-        {"goal", "win", "exit", "prize", "finish", "collect", "score"}
-    )
-    _OBJECTIVE_AVOID = frozenset(
-        {"hazard", "death", "die", "danger", "lose", "losing", "kill"}
-    )
+    _OBJECTIVE_GOALS = frozenset({"goal", "win", "exit", "prize", "finish", "collect", "score"})
+    _OBJECTIVE_AVOID = frozenset({"hazard", "death", "die", "danger", "lose", "losing", "kill"})
 
-    def _bid_intention(
-        self, available: list[str]
-    ) -> dict[str, Any] | None:
+    def _bid_intention(self, available: list[str]) -> dict[str, Any] | None:
         """Held objective — what the executive is pursuing on purpose.
 
         The prefrontal layer holds the objective; the basal ganglia
@@ -755,9 +733,7 @@ class WorldPolicy:
             return self._unprobed_cells()
         return set(self._frontier_targets())
 
-    def _bid_probe(
-        self, available: list[str]
-    ) -> dict[str, Any] | None:
+    def _bid_probe(self, available: list[str]) -> dict[str, Any] | None:
         """Affordance probing — an unanswered question about what a
         thing does to her. Mid gain: beats wandering, loses to a
         goal or a babbling body."""
@@ -767,9 +743,7 @@ class WorldPolicy:
         probe["weight"] = 0.5
         return probe
 
-    def _bid_frontier(
-        self, available: list[str]
-    ) -> dict[str, Any] | None:
+    def _bid_frontier(self, available: list[str]) -> dict[str, Any] | None:
         """Committed frontier coverage — perseveration toward the
         frontier she is already pushing at. Loses to probe and
         goal evidence, beats raw novelty."""
@@ -783,16 +757,12 @@ class WorldPolicy:
             "weight": 0.35,
         }
 
-    def _bid_forage(
-        self, available: list[str]
-    ) -> dict[str, Any] | None:
+    def _bid_forage(self, available: list[str]) -> dict[str, Any] | None:
         """Baseline foraging — the always-on floor. Novelty and
         frontier scoring still pick the direction; the bid itself
         is the weakest channel, so she wanders only when nothing
         better-informed is on the table."""
-        action = self._explore_action(
-            self._model.self_entity, available
-        )
+        action = self._explore_action(self._model.self_entity, available)
         cell = self._cell_for(action)
         if cell is None and action in self._model.coordinate_actions:
             cell = self._blind_probe_cell(action)
@@ -833,10 +803,7 @@ class WorldPolicy:
             if cell in grid
         }
         pool = {cell: grid[cell] for cell in entity_cells} or grid
-        least = min(
-            self._model.click_tries.get((action, color), 0)
-            for color in pool.values()
-        )
+        least = min(self._model.click_tries.get((action, color), 0) for color in pool.values())
         cells = [
             cell
             for cell, color in pool.items()
@@ -864,6 +831,11 @@ class WorldPolicy:
             return target
         return None
 
+    def valued_cells(self) -> set[Cell]:
+        """The pursuit targets, exposed — deliberation imagines
+        toward the same ends the plan drive pursues."""
+        return self._valued_cells()
+
     def _valued_cells(self) -> set[Cell]:
         """Cells of live entities whose kind is worth reaching.
 
@@ -880,13 +852,14 @@ class WorldPolicy:
         # keeps a refused door out of pursuit is the evidence that
         # her state needs changing.
         needs_change = sig is not None and any(
-            not e.gone and model.state_refused(e, sig)
-            for e in model.entities.values()
+            not e.gone and model.state_refused(e, sig) for e in model.entities.values()
         )
         pool = [
             e
             for e in model.entities.values()
-            if not e.gone and not e.is_self and not e.part_of_self
+            if not e.gone
+            and not e.is_self
+            and not e.part_of_self
             and e.color not in model.terrain_kinds
             and not model.is_display(e)
             and (
@@ -934,15 +907,9 @@ class WorldPolicy:
             fuel = [e for e in pool if e.color in scarce]
             if fuel:
                 pool = fuel
-        return {
-            cell
-            for e in pool
-            for cell in e.cells
-        }
+        return {cell for e in pool for cell in e.cells}
 
-    def _probe_unknown(
-        self, available: list[str]
-    ) -> dict[str, Any] | None:
+    def _probe_unknown(self, available: list[str]) -> dict[str, Any] | None:
         """Move toward what contact would still teach her.
 
         Two frontiers: a kind never touched at all, and — once her
@@ -959,10 +926,9 @@ class WorldPolicy:
         # Static questions get first refusal of the route, then the
         # moving ones remain available if they are all she can test.
         stable = [
-            e for e in unprobed
-            if not e.spontaneous
-            and e.velocity == (0.0, 0.0)
-            and e.churn_ticks * 2 < e.n_seen
+            e
+            for e in unprobed
+            if not e.spontaneous and e.velocity == (0.0, 0.0) and e.churn_ticks * 2 < e.n_seen
         ]
         candidates = stable or unprobed
         footprint = self._model.self_footprint()
@@ -975,9 +941,7 @@ class WorldPolicy:
             left = min(c for _, c in footprint)
             right = max(c for _, c in footprint)
             return min(
-                max(top - r, 0, r - bottom)
-                + max(left - c, 0, c - right)
-                for r, c in entity.cells
+                max(top - r, 0, r - bottom) + max(left - c, 0, c - right) for r, c in entity.cells
             )
 
         # Commitment first, then the nearest unanswered question:
@@ -991,13 +955,10 @@ class WorldPolicy:
         if committed is None:
             self._probe_entity = None
         ordered = ([committed] if committed is not None else []) + [
-            e for e in sorted(candidates, key=distance)
-            if e is not committed
+            e for e in sorted(candidates, key=distance) if e is not committed
         ]
         for entity in ordered:
-            target = set(entity.cells) | {
-                (round(entity.centroid[0]), round(entity.centroid[1]))
-            }
+            target = set(entity.cells) | {(round(entity.centroid[0]), round(entity.centroid[1]))}
             action = self._planner.next_action(target, available)
             if action is not None and action in available:
                 self._probe_entity = entity.id
@@ -1012,7 +973,9 @@ class WorldPolicy:
         return [
             e
             for e in model.entities.values()
-            if not e.gone and not e.is_self and not e.part_of_self
+            if not e.gone
+            and not e.is_self
+            and not e.part_of_self
             and e.color not in model.terrain_kinds
             and not model.is_display(e)
             and (
@@ -1026,10 +989,8 @@ class WorldPolicy:
                             and (
                                 e.blocked_states
                                 or e.open_states
-                                or model.affordance_of(e.color)[OUT_BLOCK]
-                                > 0
-                                or model.affordance_of(e.color)[OUT_HAZARD]
-                                > 0
+                                or model.affordance_of(e.color)[OUT_BLOCK] > 0
+                                or model.affordance_of(e.color)[OUT_HAZARD] > 0
                             )
                         )
                         or (
@@ -1037,8 +998,7 @@ class WorldPolicy:
                             # in — an epoch ago. What it answers now
                             # is again an open question.
                             sig in e.blocked_states
-                            and e.blocked_epochs.get(sig)
-                            not in (None, model._state_epoch)
+                            and e.blocked_epochs.get(sig) not in (None, model._state_epoch)
                         )
                     )
                 )
@@ -1047,15 +1007,9 @@ class WorldPolicy:
 
     def _unprobed_cells(self) -> set[Cell]:
         """Cells whose contact would still teach her something."""
-        return {
-            cell
-            for e in self._unprobed_entities()
-            for cell in e.cells
-        }
+        return {cell for e in self._unprobed_entities() for cell in e.cells}
 
-    def _bid_reprobe(
-        self, available: list[str]
-    ) -> dict[str, Any] | None:
+    def _bid_reprobe(self, available: list[str]) -> dict[str, Any] | None:
         """Instrumental retrial — the changed-body questions.
 
         Two targets, both conditional: a thing that refused a body
@@ -1081,7 +1035,8 @@ class WorldPolicy:
         # measurements a changed body can take. Mobile questions stay
         # eligible when nothing static remains unanswered.
         stable = [
-            e for e in retrials
+            e
+            for e in retrials
             if not e.spontaneous
             and e.velocity == (0.0, 0.0)
             # A centroid that holds still while its silhouette
@@ -1100,9 +1055,7 @@ class WorldPolicy:
             left = min(c for _, c in footprint)
             right = max(c for _, c in footprint)
             return min(
-                max(top - r, 0, r - bottom)
-                + max(left - c, 0, c - right)
-                for r, c in entity.cells
+                max(top - r, 0, r - bottom) + max(left - c, 0, c - right) for r, c in entity.cells
             )
 
         committed = next(
@@ -1117,29 +1070,22 @@ class WorldPolicy:
         # the answer. Producers rank first then; otherwise the
         # nearest open question is the cheap experiment.
         needs_change = any(
-            not e.gone and model.state_refused(e, sig)
-            for e in model.entities.values()
+            not e.gone and model.state_refused(e, sig) for e in model.entities.values()
         )
 
         def rank(entity: WorldEntity) -> tuple[bool, int]:
-            produces = (
-                entity.color in model.transforms
-                or entity.color in model._state_changers
-            )
+            produces = entity.color in model.transforms or entity.color in model._state_changers
             return (needs_change and not produces, distance(entity))
 
         ordered = ([committed] if committed is not None else []) + [
-            e for e in sorted(candidates, key=rank)
-            if e is not committed
+            e for e in sorted(candidates, key=rank) if e is not committed
         ]
         for entity in ordered:
             # The centroid is the stable point inside a flickering
             # silhouette: a goal set that is only the current cells
             # repaints the destination every tick and paces between
             # two adjacent answers forever.
-            target = set(entity.cells) | {
-                (round(entity.centroid[0]), round(entity.centroid[1]))
-            }
+            target = set(entity.cells) | {(round(entity.centroid[0]), round(entity.centroid[1]))}
             action = self._planner.next_action(target, available)
             if action is None:
                 continue
@@ -1155,9 +1101,7 @@ class WorldPolicy:
             "weight": 0.55,
         }
 
-    def _retrial_candidates(
-        self, model: WorldModel, sig: tuple[PartSig, ...]
-    ) -> list[WorldEntity]:
+    def _retrial_candidates(self, model: WorldModel, sig: tuple[PartSig, ...]) -> list[WorldEntity]:
         """Entities worth an instrumental retrial: things that refused
         a body whose signature this body has no verdict for, plus —
         while any kind refuses her current state — kinds that rewrote
@@ -1171,16 +1115,12 @@ class WorldPolicy:
             and not e.part_of_self
             and e.blocked_states
             and (
-                (
-                    sig not in e.blocked_states
-                    and sig not in e.open_states
-                )
+                (sig not in e.blocked_states and sig not in e.open_states)
                 or (
                     # Its verdict is from an older epoch — hidden
                     # state may have moved since it was taken.
                     sig in e.blocked_states
-                    and e.blocked_epochs.get(sig)
-                    not in (None, model._state_epoch)
+                    and e.blocked_epochs.get(sig) not in (None, model._state_epoch)
                 )
             )
             and not model.is_display(e)
@@ -1218,9 +1158,7 @@ class WorldPolicy:
         model = self._model
         goal = self._explore_goal
         if goal is not None and (
-            model.visits[goal]
-            or goal in model.known_blocked
-            or goal in model.refused_cells
+            model.visits[goal] or goal in model.known_blocked or goal in model.refused_cells
         ):
             goal = self._explore_goal = None
             self._frontier_plan = None
@@ -1346,9 +1284,7 @@ class WorldPolicy:
         return cells
 
     @staticmethod
-    def _open_distances(
-        seeds: set[Cell], open_map: set[Cell]
-    ) -> dict[Cell, int]:
+    def _open_distances(seeds: set[Cell], open_map: set[Cell]) -> dict[Cell, int]:
         """Map-distance outward from seed cells through open floor.
 
         Seeds may sit outside the open map — a question's own cells
@@ -1378,9 +1314,7 @@ class WorldPolicy:
             [a for a in waits if self._wait_tries[a] == least],
         )
 
-    def _explore_action(
-        self, me: WorldEntity | None, available: list[str]
-    ) -> str:
+    def _explore_action(self, me: WorldEntity | None, available: list[str]) -> str:
         """Novelty-seeking with a frontier bias.
 
         Beyond preferring least-tried actions and least-visited
@@ -1403,9 +1337,7 @@ class WorldPolicy:
             novelty = 0.0
             frontier = 0.0
             if effect is not None and fp:
-                dest_cells = {
-                    (r + effect[0], c + effect[1]) for r, c in fp
-                }
+                dest_cells = {(r + effect[0], c + effect[1]) for r, c in fp}
                 # A stride is refused by anything inside it — the
                 # bump evidence lives on the path, not only on the
                 # landing strip.
@@ -1413,9 +1345,9 @@ class WorldPolicy:
                 if path_cells & model.known_blocked:
                     novelty = -1.0
                 else:
-                    novelty = sum(
-                        1 for cell in dest_cells if model.visits[cell] == 0
-                    ) / len(dest_cells)
+                    novelty = sum(1 for cell in dest_cells if model.visits[cell] == 0) / len(
+                        dest_cells
+                    )
                     unseen = sum(
                         1
                         for r, c in path_cells
@@ -1428,9 +1360,17 @@ class WorldPolicy:
             # that move things, select pieces — is a working lever,
             # worth more than an equally-novel dead button.
             score = (
-                novelty + frontier + 1.0 / (1 + tries)
+                novelty
+                + frontier
+                + 1.0 / (1 + tries)
                 + self._rng.random() * 0.1
                 + (0.3 if model.distal_effects(action) else 0.0)
+                # Causal reach as a foraging disposition: controls
+                # whose posterior is still undecided or proven live
+                # pull ahead of earned-inert ones — exploration
+                # weights what a lever might still do, not just how
+                # little it has been pressed.
+                + 0.3 * (model.action_efficacy(action) - 0.5)
             )
             if self._field is not None:
                 # The action disposition the motor field carries —
@@ -1449,22 +1389,23 @@ class WorldPolicy:
         least = float("inf")
         model = self._model
         for entity in model.entities.values():
-            if (
-                entity.gone
-                or entity.color in model.terrain_kinds
-                or model.is_display(entity)
-            ):
+            if entity.gone or entity.color in model.terrain_kinds or model.is_display(entity):
                 continue
             # Distal presses are evidence too. A kind that has
             # answered enough clicks with nothing is understood
             # inert, not least understood — contact affordances
             # alone can never retire a thing her body may never
             # reach, and without this the pointer fixates on the
-            # one target its probing cannot teach it about.
+            # one target its probing cannot teach it about. The
+            # pressers' own causal-reach posteriors get a vote:
+            # a control still carrying retro-credit (unexplained
+            # changes landing after silent presses) may be working
+            # a channel the frame never shows — not inert until
+            # the model says so on both arms of the judgment.
             if (
                 self._click_tries(entity.color) >= _CLICK_SATIETY
-                and model.click_responsiveness(entity.color)
-                <= _CLICK_DEAD
+                and model.click_responsiveness(entity.color) <= _CLICK_DEAD
+                and all(model.action_inert(a) for (a, c) in model.click_tries if c == entity.color)
             ):
                 continue
             known = sum(model.affordance_of(entity.color).values())
@@ -1476,8 +1417,4 @@ class WorldPolicy:
 
     def _click_tries(self, color: int | None) -> int:
         """All the presses this kind has absorbed, across controls."""
-        return sum(
-            n
-            for (_action, c), n in self._model.click_tries.items()
-            if c == color
-        )
+        return sum(n for (_action, c), n in self._model.click_tries.items() if c == color)

@@ -55,20 +55,20 @@ from genesis_client.types import (
     ZoneTransitions,
 )
 
-TRACKED_STATES = 8  # must match zones::TRACKED_STATES
+TRACKED_STATES = 9  # must match zones::TRACKED_STATES
 SUBSYSTEM_REC = 21
 MODULE_REC = MODULE_REC_V2
 
 
 def _subsystem_rec(
-    tag: int, pid: int, cpu: float, io: float,
-    cache: float, branch: float,
+    tag: int,
+    pid: int,
+    cpu: float,
+    io: float,
+    cache: float,
+    branch: float,
 ) -> bytes:
-    return (
-        bytes([tag])
-        + struct.pack("<I", pid)
-        + struct.pack("<ffff", cpu, io, cache, branch)
-    )
+    return bytes([tag]) + struct.pack("<I", pid) + struct.pack("<ffff", cpu, io, cache, branch)
 
 
 def _module_rec(module_id: int, status: int, cpu_share: float) -> bytes:
@@ -247,11 +247,12 @@ def _report(subsystems, modules):
 def test_update_brain_activity_records_both_tiers() -> None:
     """The report populates the hardware and self-measured tiers."""
     model = SelfModel()
-    model.update_brain_activity(_report(
-        [_FakeTelemetry("cognitive", 0.4), _FakeTelemetry("daemon", 0.05)],
-        [_FakeModuleTelemetry("reasoning", 0.6),
-         _FakeModuleTelemetry("language", 0.2)],
-    ))
+    model.update_brain_activity(
+        _report(
+            [_FakeTelemetry("cognitive", 0.4), _FakeTelemetry("daemon", 0.05)],
+            [_FakeModuleTelemetry("reasoning", 0.6), _FakeModuleTelemetry("language", 0.2)],
+        )
+    )
 
     assert model.body_model.subsystem_activity == {"cognitive": 0.4, "daemon": 0.05}
     assert model.body_model.module_activity == {"reasoning": 0.6, "language": 0.2}
@@ -269,7 +270,9 @@ def test_activity_seeds_orders_by_measured_share() -> None:
     """The busiest region leads, so the composer tries it first."""
     model = SelfModel()
     model.body_model.module_activity = {
-        "reasoning": 0.1, "language": 0.5, "memory": 0.3,
+        "reasoning": 0.1,
+        "language": 0.5,
+        "memory": 0.3,
     }
     assert model.activity_seeds() == ["language", "memory", "reasoning"]
 
@@ -429,8 +432,9 @@ def test_presence_empty_mask_reports_everything_missing() -> None:
     """A zero mask means no sensor is confirmed present."""
     presence = SensorPresence(mask=0)
     assert presence.present == frozenset()
-    assert len(presence.missing) == 16
+    assert len(presence.missing) == 17
     assert "battery" in presence.missing
+    assert "cpuidle state counters" in presence.missing
 
 
 def test_channel_verified_returns_bool_for_unknown_channel() -> None:
@@ -449,9 +453,7 @@ def test_channel_verified_returns_bool_for_unknown_channel() -> None:
 
 def test_presence_distinguishes_desktop_from_laptop() -> None:
     """A machine with no battery reports it missing, not as zero energy."""
-    desktop = SensorPresence(
-        mask=SENSOR_TEMPERATURE | SENSOR_FREQUENCY | SENSOR_MEMORY
-    )
+    desktop = SensorPresence(mask=SENSOR_TEMPERATURE | SENSOR_FREQUENCY | SENSOR_MEMORY)
     assert "battery" in desktop.missing
     assert "fan PWM" in desktop.missing
     assert "temperature" in desktop.present
@@ -461,7 +463,7 @@ def test_presence_distinguishes_desktop_from_laptop() -> None:
 
 def test_presence_unknown_channel_is_not_verified() -> None:
     """An unrecognised channel cannot be claimed to be measured."""
-    presence = SensorPresence(mask=0xFFFF)
+    presence = SensorPresence(mask=0x1FFFF)
     assert not presence.channel_verified("no such channel")
 
 
@@ -470,11 +472,21 @@ def test_presence_unknown_channel_is_not_verified() -> None:
 
 def _body_state():
     return BodyState(
-        cpu_temp_c=50.0, temperature=0.5, arousal_freq=0.6,
-        cognitive_load=0.2, io_activity=0.1, stress_load=0.2,
-        energy_reserve=1.0, on_ac_power=True, num_cores=8,
-        distressed=False, autonomic_rate=3.0, thermoregulatory_effort=0.3,
-        metabolic_rate=0.1, core_voltage=1.2, supply_voltage=12.0,
+        cpu_temp_c=50.0,
+        temperature=0.5,
+        arousal_freq=0.6,
+        cognitive_load=0.2,
+        io_activity=0.1,
+        stress_load=0.2,
+        energy_reserve=1.0,
+        on_ac_power=True,
+        num_cores=8,
+        distressed=False,
+        autonomic_rate=3.0,
+        thermoregulatory_effort=0.3,
+        metabolic_rate=0.1,
+        core_voltage=1.2,
+        supply_voltage=12.0,
         description="",
     )
 
@@ -487,19 +499,22 @@ def test_sensors_present_counts_real_hardware_not_fields() -> None:
     all 28 channels claimed to be present regardless of hardware.
     """
     desktop = SensorPresence(
-        mask=SENSOR_TEMPERATURE | SENSOR_FREQUENCY | SENSOR_MAX_FREQUENCY
-        | SENSOR_MEMORY | SENSOR_PSI
+        mask=SENSOR_TEMPERATURE
+        | SENSOR_FREQUENCY
+        | SENSOR_MAX_FREQUENCY
+        | SENSOR_MEMORY
+        | SENSOR_PSI
     )
     model = SelfModel()
     model.update_hardware_body(_body_state(), desktop)
     desktop_count = model.body_model.hardware_sensors_present
 
-    full = SensorPresence(mask=0xFFFF)
+    full = SensorPresence(mask=0x1FFFF)
     model_full = SelfModel()
     model_full.update_hardware_body(_body_state(), full)
     full_count = model_full.body_model.hardware_sensors_present
 
-    assert full_count == 28, "all sensors present should count every channel"
+    assert full_count == 30, "all sensors present should count every channel"
     assert desktop_count < full_count, (
         "a machine with no battery, fan or RAPL domains must report fewer "
         "verified channels than one with everything"
@@ -525,7 +540,7 @@ def test_sensors_present_without_mask_keeps_legacy_behaviour() -> None:
     """
     model = SelfModel()
     model.update_hardware_body(_body_state(), None)
-    assert model.body_model.hardware_sensors_present == 28
+    assert model.body_model.hardware_sensors_present == 30
 
 
 # ─── zone / phase transition telemetry ────────────────────────
@@ -586,9 +601,7 @@ def test_zone_transitions_busiest_zone() -> None:
 
 def test_zone_transitions_empty_is_all_zeroes() -> None:
     """A daemon that has recorded no transitions reports zeroes, not None."""
-    report = ZoneTransitions.unpack(
-        _dwell_section({}) + _dwell_section({})
-    )
+    report = ZoneTransitions.unpack(_dwell_section({}) + _dwell_section({}))
     assert report.total_zone_transitions == 0
     assert report.total_phase_transitions == 0
     assert report.busiest_zone() is None
@@ -597,18 +610,47 @@ def test_zone_transitions_empty_is_all_zeroes() -> None:
 
 def test_zone_transitions_truncated_section_raises() -> None:
     """A section claiming more records than it carries is rejected."""
-    bad = bytes([TRACKED_STATES]) + struct.pack("<IQ", 1, 1000)  # claims 8, carries 1
+    bad = bytes([TRACKED_STATES]) + struct.pack("<IQ", 1, 1000)  # claims 9, carries 1
     with pytest.raises(ValueError):
         ZoneTransitions.unpack(bad)
 
 
 def test_zone_transitions_state_names_resolve() -> None:
     """Indices resolve to both zone and phase names."""
-    report = ZoneTransitions.unpack(
-        _dwell_section({0: (1, 1)}) + _dwell_section({1: (1, 1)})
-    )
+    report = ZoneTransitions.unpack(_dwell_section({0: (1, 1)}) + _dwell_section({1: (1, 1)}))
     assert report.zones[0].zone_name in ZONE_NAMES.values()
     assert report.phases[1].phase_name in PHASE_NAMES.values()
+
+
+def test_zone_transitions_tracked_states_matches_rust() -> None:
+    """The synthetic width must equal zones.rs's TRACKED_STATES.
+
+    A drift here would build packets narrower or wider than the real
+    response, so a layout change on the Rust side could pass unnoticed.
+    """
+    import pathlib
+    import re
+
+    zones_rs = (
+        pathlib.Path(__file__).resolve().parents[2] / "src" / "state" / "zones.rs"
+    ).read_text(encoding="utf-8")
+    m = re.search(r"pub const TRACKED_STATES: usize = (\d+)", zones_rs)
+    assert m, "TRACKED_STATES not found in zones.rs"
+    assert int(m.group(1)) == TRACKED_STATES
+
+
+def test_zone_transitions_includes_the_sleeping_zone() -> None:
+    """Zone index 8 is Sleeping — the tally must carry it on the wire.
+
+    TRACKED_STATES was once 8 (MentalPhase's width), which silently
+    dropped every transition into Sleeping: the zone section arrived
+    eight records wide and index 8 could never appear.
+    """
+    zones = _dwell_section({8: (1, 60000)})
+    report = ZoneTransitions.unpack(zones + _dwell_section({}))
+    assert report.zones[8].count == 1
+    assert report.zones[8].total_ms == 60000
+    assert report.zones[8].zone_name == "sleeping"
 
 
 # ─── body condition seeds ─────────────────────────────────────
@@ -616,21 +658,38 @@ def test_zone_transitions_state_names_resolve() -> None:
 
 def _loaded_body():
     return BodyState(
-        cpu_temp_c=90.0, temperature=0.9, arousal_freq=0.1,
-        cognitive_load=0.2, io_activity=0.1, stress_load=0.2,
-        energy_reserve=0.05, on_ac_power=False, num_cores=8,
-        distressed=True, autonomic_rate=3.0, thermoregulatory_effort=0.9,
-        metabolic_rate=0.1, core_voltage=1.2, supply_voltage=11.0,
-        description="", throttle_state=0.8, psi_cpu=0.4, psi_io=0.2,
-        psi_mem=0.1, battery_cycles=500.0, entropy_level=0.3,
-        core_activity=0.9, uncore_activity=0.85, dram_activity=0.88,
+        cpu_temp_c=90.0,
+        temperature=0.9,
+        arousal_freq=0.1,
+        cognitive_load=0.2,
+        io_activity=0.1,
+        stress_load=0.2,
+        energy_reserve=0.05,
+        on_ac_power=False,
+        num_cores=8,
+        distressed=True,
+        autonomic_rate=3.0,
+        thermoregulatory_effort=0.9,
+        metabolic_rate=0.1,
+        core_voltage=1.2,
+        supply_voltage=11.0,
+        description="",
+        throttle_state=0.8,
+        psi_cpu=0.4,
+        psi_io=0.2,
+        psi_mem=0.1,
+        battery_cycles=500.0,
+        entropy_level=0.3,
+        core_activity=0.9,
+        uncore_activity=0.85,
+        dram_activity=0.88,
     )
 
 
 def test_body_conditions_surface_throttling_and_stalls() -> None:
     """The involuntary channels reach a consumer for the first time."""
     model = SelfModel()
-    model.update_hardware_body(_loaded_body(), SensorPresence(mask=0xFFFF))
+    model.update_hardware_body(_loaded_body(), SensorPresence(mask=0x1FFFF))
     names = dict(model.body_condition_seeds())
     assert "throttle" in names
     assert "stall" in names
@@ -696,7 +755,7 @@ def test_body_conditions_ignore_unreported_fields() -> None:
 def test_body_condition_seeds_are_bare_names() -> None:
     """Conditions are building blocks, never pre-written sentences."""
     model = SelfModel()
-    model.update_hardware_body(_loaded_body(), SensorPresence(mask=0xFFFF))
+    model.update_hardware_body(_loaded_body(), SensorPresence(mask=0x1FFFF))
     for seed, urgency in model.body_condition_seeds():
         assert " " not in seed
         assert not seed.endswith((".", "!", "?"))

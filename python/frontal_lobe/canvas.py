@@ -46,7 +46,12 @@ except ImportError:  # pragma: no cover - platform without Cairo
     # None with a warning.
     cairo = None  # type: ignore[assignment]
 
-import cv2
+try:
+    import cv2
+except ImportError:  # pragma: no cover - platform without OpenCV
+    # Only floodFill is used; the NumPy fallback in _flood_mask_np
+    # keeps bucket fill working when OpenCV is not installed.
+    cv2 = None  # type: ignore[assignment]
 import numpy as np
 from PIL import Image
 
@@ -72,6 +77,7 @@ _SHEET_HEIGHT = 480
 # Retention bound on saved drawings — see scripts/hygiene.sh.
 _MAX_SAVED_DRAWINGS = 200
 
+
 # A brush is a point in parameter space, not an entry in a list.
 #   size      — mark width in px
 #   opacity   — 0..1 how much paint each pass lays down
@@ -96,8 +102,13 @@ class Brush:
 
     def copy(self) -> Brush:
         return Brush(
-            self.size, self.opacity, self.hardness,
-            self.scatter, self.texture, self.erase, self.blend,
+            self.size,
+            self.opacity,
+            self.hardness,
+            self.scatter,
+            self.texture,
+            self.erase,
+            self.blend,
         )
 
 
@@ -213,11 +224,7 @@ class PaintSheet:
 
     def _smooth_path(self, ctx, points: list[tuple[float, float]]) -> None:
         """Trace a path through points, smoothed like a moving hand."""
-        pts = [
-            (float(x), float(y))
-            for x, y in points
-            if math.isfinite(x) and math.isfinite(y)
-        ]
+        pts = [(float(x), float(y)) for x, y in points if math.isfinite(x) and math.isfinite(y)]
         if not pts:
             return
         ctx.move_to(*pts[0])
@@ -248,9 +255,7 @@ class PaintSheet:
             inner = max(0.05, self._brush.hardness)
             pat = cairo.RadialGradient(pt[0], pt[1], 0, pt[0], pt[1], radius)
             pat.add_color_stop_rgba(0, r, g, b, a * self._brush.opacity)
-            pat.add_color_stop_rgba(
-                inner, r, g, b, a * self._brush.opacity * 0.85
-            )
+            pat.add_color_stop_rgba(inner, r, g, b, a * self._brush.opacity * 0.85)
             pat.add_color_stop_rgba(1, r, g, b, 0)
             self._ctx.set_source(pat)
             self._ctx.arc(pt[0], pt[1], radius, 0, math.pi * 2)
@@ -270,9 +275,14 @@ class PaintSheet:
                 self._ctx.arc(x, y, w, 0, math.pi * 2)
                 self._ctx.fill()
 
-    def _stroke_line(self, points: list[tuple[float, float]], width: float,
-                     alpha: float, jitter: float = 0.0,
-                     operator=None) -> None:
+    def _stroke_line(
+        self,
+        points: list[tuple[float, float]],
+        width: float,
+        alpha: float,
+        jitter: float = 0.0,
+        operator=None,
+    ) -> None:
         """Lay the smoothed path down with a line style."""
         ctx = self._ctx
         r, g, b, a = self._color
@@ -285,8 +295,7 @@ class PaintSheet:
         ctx.set_line_join(cairo.LINE_JOIN_ROUND)
         if jitter > 0:
             pts = [
-                (x + float(self._rng.normal(0, jitter)),
-                 y + float(self._rng.normal(0, jitter)))
+                (x + float(self._rng.normal(0, jitter)), y + float(self._rng.normal(0, jitter)))
                 for x, y in points
             ]
         else:
@@ -299,14 +308,13 @@ class PaintSheet:
         """Draw one stroke through ``points`` with the current brush."""
         if not points:
             return
-        points = [
-            (max(0, min(self.width, x)), max(0, min(self.height, y)))
-            for x, y in points
-        ]
+        points = [(max(0, min(self.width, x)), max(0, min(self.height, y))) for x, y in points]
         b = self._brush
         if b.erase:
             self._stroke_line(
-                points, b.size * 2.0, 1.0,
+                points,
+                b.size * 2.0,
+                1.0,
                 operator=cairo.OPERATOR_DEST_OUT,
             )
         elif b.scatter > 0.25:
@@ -314,16 +322,17 @@ class PaintSheet:
         elif b.hardness < 0.5:
             self._stamp_soft(points)
         else:
-            op = (
-                cairo.OPERATOR_MULTIPLY if b.blend == "multiply" else None
-            )
+            op = cairo.OPERATOR_MULTIPLY if b.blend == "multiply" else None
             jitter = b.texture * b.size * 0.3
             self._stroke_line(points, b.size, b.opacity, jitter, op)
             # A rough utensil skids — a second faint offset pass.
             if b.texture > 0.3:
                 self._stroke_line(
-                    points, b.size * 0.6, b.opacity * 0.5,
-                    jitter * 1.6, op,
+                    points,
+                    b.size * 0.6,
+                    b.opacity * 0.5,
+                    jitter * 1.6,
+                    op,
                 )
 
     def line(self, x1: float, y1: float, x2: float, y2: float) -> None:
@@ -337,8 +346,7 @@ class PaintSheet:
         if not fill:
             self._ctx.set_line_width(max(0.6, self._brush.size * 0.5))
 
-    def ellipse(self, x: float, y: float, w: float, h: float,
-                fill: bool = False) -> None:
+    def ellipse(self, x: float, y: float, w: float, h: float, fill: bool = False) -> None:
         """An ellipse (or circle) inscribed in the given rect."""
         cx, cy = x + w / 2, y + h / 2
         rx, ry = max(w / 2, 0.5), max(h / 2, 0.5)
@@ -360,8 +368,7 @@ class PaintSheet:
             self._smooth_path(self._ctx, pts)
             self._ctx.stroke()
 
-    def rect(self, x: float, y: float, w: float, h: float,
-             fill: bool = False) -> None:
+    def rect(self, x: float, y: float, w: float, h: float, fill: bool = False) -> None:
         """A rectangle, outlined or filled."""
         self._shape_style(fill)
         if fill:
@@ -372,8 +379,7 @@ class PaintSheet:
             self._smooth_path(self._ctx, pts)
             self._ctx.stroke()
 
-    def polygon(self, points: list[tuple[float, float]],
-                fill: bool = False) -> None:
+    def polygon(self, points: list[tuple[float, float]], fill: bool = False) -> None:
         """A closed polygon through ``points``, outlined or filled."""
         if len(points) < 3:
             return
@@ -394,17 +400,19 @@ class PaintSheet:
         The fill sees the composite — paper plus paint — and repaints
         the contiguous region on the paint layer.
         """
-        seed = (int(max(0, min(self.width - 1, x))),
-                int(max(0, min(self.height - 1, y))))
+        seed = (int(max(0, min(self.width - 1, x))), int(max(0, min(self.height - 1, y))))
         comp = self._composite_rgb()
-        mask = np.zeros((self.height + 2, self.width + 2), np.uint8)
-        lo = (tolerance, tolerance, tolerance)
-        flags = 8 | cv2.FLOODFILL_MASK_ONLY | (255 << 8)
-        try:
-            cv2.floodFill(comp, mask, seed, 0, lo, lo, flags)
-        except cv2.error:
-            return False
-        region = mask[1:-1, 1:-1] == 255
+        if cv2 is not None:
+            mask = np.zeros((self.height + 2, self.width + 2), np.uint8)
+            lo = (tolerance, tolerance, tolerance)
+            flags = 8 | cv2.FLOODFILL_MASK_ONLY | (255 << 8)
+            try:
+                cv2.floodFill(comp, mask, seed, 0, lo, lo, flags)
+            except cv2.error:
+                return False
+            region = mask[1:-1, 1:-1] == 255
+        else:
+            region = _flood_mask_np(comp, seed, tolerance)
         if not region.any():
             return False
         paint = self._paint_array()
@@ -429,9 +437,7 @@ class PaintSheet:
     def _paint_array(self) -> np.ndarray:
         """The paint layer as a writable BGRA array."""
         buf = self._paint.get_data()
-        return np.frombuffer(buf, dtype=np.uint8).reshape(
-            self.height, self.width, 4
-        )
+        return np.frombuffer(buf, dtype=np.uint8).reshape(self.height, self.width, 4)
 
     def _paint_alpha(self) -> np.ndarray:
         return self._paint_array()[:, :, 3]
@@ -445,9 +451,7 @@ class PaintSheet:
         ctx.set_source_surface(self._paint, 0, 0)
         ctx.paint()
         out.flush()
-        arr = np.frombuffer(out.get_data(), dtype=np.uint8).reshape(
-            self.height, self.width, 4
-        )
+        arr = np.frombuffer(out.get_data(), dtype=np.uint8).reshape(self.height, self.width, 4)
         return arr[:, :, [2, 1, 0]].copy()
 
     def to_image(self) -> Image.Image:
@@ -487,9 +491,7 @@ class Canvas:
             use_krita: Mirror ops into a running Krita when reachable.
         """
         self._data_dir = Path(data_dir) if data_dir else None
-        self._rng = np.random.default_rng(
-            seed=seed if seed is not None else int(time.time())
-        )
+        self._rng = np.random.default_rng(seed=seed if seed is not None else int(time.time()))
         self._history = self._load_history()
         self._sheet: PaintSheet | None = None
         self._op_log: list[dict] = []
@@ -509,6 +511,7 @@ class Canvas:
             self._krita_tried = True
             try:
                 from frontal_lobe.krita_studio import KritaStudio
+
                 studio = KritaStudio()
                 if studio.connect(timeout=2.0):
                     self._krita = studio
@@ -550,8 +553,9 @@ class Canvas:
         """A copy of her drawing history (oldest first)."""
         return list(self._history)
 
-    def _recency(self, key: str, universe: tuple[str, ...] | list[str],
-                 now: float | None = None) -> dict[str, float]:
+    def _recency(
+        self, key: str, universe: tuple[str, ...] | list[str], now: float | None = None
+    ) -> dict[str, float]:
         """Seconds since each entry in ``universe`` was last used."""
         now = time.time() if now is None else now
         recency = dict.fromkeys(universe, math.inf)
@@ -577,15 +581,24 @@ class Canvas:
             if not isinstance(ts, (int, float)):
                 continue
             for item in record.get("tools") or ():
-                recency[item] = min(recency.get(item, math.inf),
-                                    now - float(ts))
+                recency[item] = min(recency.get(item, math.inf), now - float(ts))
         return recency
 
     def gesture_recency(self, now: float | None = None) -> dict[str, float]:
         """Seconds since each gesture family was last used."""
         gestures = (
-            "line", "polyline", "curve", "arc", "loop", "zigzag",
-            "scribble", "spiral", "wave", "dabs", "shape", "fill",
+            "line",
+            "polyline",
+            "curve",
+            "arc",
+            "loop",
+            "zigzag",
+            "scribble",
+            "spiral",
+            "wave",
+            "dabs",
+            "shape",
+            "fill",
         )
         return self._recency("gestures", gestures, now)
 
@@ -598,8 +611,9 @@ class Canvas:
                     hues.append(float(hue))
         return hues
 
-    def _record_drawing(self, result: DrawingResult,
-                        gestures: list[str], hues: list[float]) -> None:
+    def _record_drawing(
+        self, result: DrawingResult, gestures: list[str], hues: list[float]
+    ) -> None:
         """Append a drawing to her art history and persist it."""
         path = self._history_path
         if path is None:
@@ -635,15 +649,11 @@ class Canvas:
         if not _CAIRO_AVAILABLE and self._studio() is None:
             if not getattr(self, "_warned", False):
                 logger.warning(
-                    "no painting surface available — Cairo is missing "
-                    "and Krita is not reachable."
+                    "no painting surface available — Cairo is missing and Krita is not reachable."
                 )
                 self._warned = True
             return False
-        self._sheet = (
-            PaintSheet(width, height, paper, self._rng)
-            if _CAIRO_AVAILABLE else None
-        )
+        self._sheet = PaintSheet(width, height, paper, self._rng) if _CAIRO_AVAILABLE else None
         self.width = width
         self.height = height
         self._op_log = []
@@ -682,19 +692,26 @@ class Canvas:
         self._op_log.append(
             {
                 "op": "brush",
-                "size": size, "opacity": opacity, "hardness": hardness,
-                "scatter": scatter, "texture": texture, "erase": erase,
+                "size": size,
+                "opacity": opacity,
+                "hardness": hardness,
+                "scatter": scatter,
+                "texture": texture,
+                "erase": erase,
                 "blend": blend,
             }
         )
         if self._sheet is not None:
-            self._sheet.set_brush(
-                size, opacity, hardness, scatter, texture, erase, blend
-            )
+            self._sheet.set_brush(size, opacity, hardness, scatter, texture, erase, blend)
         self._mirror(
-            "brush", size=size or 0, opacity=opacity or 0,
-            hardness=hardness or 0, scatter=scatter or 0,
-            texture=texture or 0, erase=bool(erase), blend=blend or "",
+            "brush",
+            size=size or 0,
+            opacity=opacity or 0,
+            hardness=hardness or 0,
+            scatter=scatter or 0,
+            texture=texture or 0,
+            erase=bool(erase),
+            blend=blend or "",
         )
 
     def stroke(self, points: list[tuple[float, float]]) -> None:
@@ -703,29 +720,24 @@ class Canvas:
         self._op_log.append({"op": "stroke", "n": len(points)})
         if self._sheet is not None:
             self._sheet.stroke(points)
-        self._mirror(
-            "stroke", points=[[round(x, 1), round(y, 1)] for x, y in points]
-        )
+        self._mirror("stroke", points=[[round(x, 1), round(y, 1)] for x, y in points])
 
     def line(self, x1: float, y1: float, x2: float, y2: float) -> None:
         self.stroke([(x1, y1), (x2, y2)])
 
-    def ellipse(self, x: float, y: float, w: float, h: float,
-                fill: bool = False) -> None:
+    def ellipse(self, x: float, y: float, w: float, h: float, fill: bool = False) -> None:
         self._op_log.append({"op": "ellipse", "fill": fill})
         if self._sheet is not None:
             self._sheet.ellipse(x, y, w, h, fill)
         self._mirror("ellipse", x=x, y=y, w=w, h=h, fill=fill)
 
-    def rect(self, x: float, y: float, w: float, h: float,
-             fill: bool = False) -> None:
+    def rect(self, x: float, y: float, w: float, h: float, fill: bool = False) -> None:
         self._op_log.append({"op": "rect", "fill": fill})
         if self._sheet is not None:
             self._sheet.rect(x, y, w, h, fill)
         self._mirror("rect", x=x, y=y, w=w, h=h, fill=fill)
 
-    def polygon(self, points: list[tuple[float, float]],
-                fill: bool = False) -> None:
+    def polygon(self, points: list[tuple[float, float]], fill: bool = False) -> None:
         if len(points) < 3:
             return
         self._op_log.append({"op": "polygon", "fill": fill})
@@ -759,21 +771,13 @@ class Canvas:
         if emotion is not None:
             mood = f"feeling {emotion.label}"
 
-        tools = sorted({
-            entry["tool"] for entry in self._op_log if entry["op"] == "tool"
-        })
-        colors = sorted({
-            entry["rgb"] for entry in self._op_log if entry["op"] == "color"
-        })
-        gestures = sorted({
-            entry["gesture"] for entry in self._op_log
-            if entry.get("gesture")
-        })
-        hues = sorted({
-            entry["hue"] for entry in self._op_log if entry.get("hue") is not None
-        })
+        tools = sorted({entry["tool"] for entry in self._op_log if entry["op"] == "tool"})
+        colors = sorted({entry["rgb"] for entry in self._op_log if entry["op"] == "color"})
+        gestures = sorted({entry["gesture"] for entry in self._op_log if entry.get("gesture")})
+        hues = sorted({entry["hue"] for entry in self._op_log if entry.get("hue") is not None})
         n_strokes = sum(
-            1 for entry in self._op_log
+            1
+            for entry in self._op_log
             if entry["op"] in ("stroke", "ellipse", "rect", "polygon", "fill")
         )
 
@@ -822,9 +826,7 @@ class Canvas:
     # the op log so history remembers the gesture/hue she chose.
     def _tag(self, gesture: str | None = None, hue: float | None = None) -> None:
         if gesture is not None or hue is not None:
-            self._op_log.append(
-                {"op": "tag", "gesture": gesture, "hue": hue}
-            )
+            self._op_log.append({"op": "tag", "gesture": gesture, "hue": hue})
 
     def _prune_old_drawings(self) -> None:
         """Keep the newest ``_MAX_SAVED_DRAWINGS`` files; delete older."""
@@ -849,3 +851,37 @@ class Canvas:
                 path.unlink()
             except OSError as e:
                 logger.warning("could not prune old drawing %s: %s", path, e)
+
+
+def _flood_mask_np(
+    comp: np.ndarray,
+    seed: tuple[int, int],
+    tolerance: float,
+) -> np.ndarray:
+    """``cv2.floodFill`` MASK_ONLY in NumPy — the cv2-absent path.
+
+    Same semantics: 8-connectivity region growing where a candidate
+    pixel joins when every channel sits within ``tolerance`` of the
+    pixel it was reached from (the non-FIXED_RANGE comparison), the
+    seed included. Returns the (H, W) boolean region.
+    """
+    h, w = comp.shape[:2]
+    region = np.zeros((h, w), bool)
+    c = comp.astype(np.int32)
+    x0, y0 = seed
+    region[y0, x0] = True
+    stack = [(y0, x0)]
+    while stack:
+        y, x = stack.pop()
+        base = c[y, x]
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                ny, nx = y + dy, x + dx
+                if (dy == 0 and dx == 0) or not (0 <= ny < h and 0 <= nx < w):
+                    continue
+                if region[ny, nx]:
+                    continue
+                if np.abs(c[ny, nx] - base).max() <= tolerance:
+                    region[ny, nx] = True
+                    stack.append((ny, nx))
+    return region

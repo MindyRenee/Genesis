@@ -3,6 +3,7 @@
 import logging
 import os
 import tempfile
+from collections import deque
 from dataclasses import dataclass
 
 import pytest
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 # ======================================================================
 # From tests/test_dream_synthesis.py
 # ======================================================================
+
 
 @pytest.fixture
 def network() -> ConceptNetwork:
@@ -97,10 +99,7 @@ class TestDreamSynthesis:
         proposals = engine.synthesize(max_proposals=10)
 
         # The network should now have dream-synthesis edges
-        dream_edges = [
-            e for e in network.edges
-            if e.origin == "dream-synthesis"
-        ]
+        dream_edges = [e for e in network.edges if e.origin == "dream-synthesis"]
         assert len(dream_edges) == len(proposals)
 
         # All dream edges should have low weight
@@ -306,13 +305,15 @@ class TestDreamPersistence:
         """State should survive a to_dict/restore_from_dict round-trip."""
         engine = DreamSynthesis(network)
         # Add a fake insight
-        engine._validated_insights.append(DreamInsight(
-            source="dog",
-            target="cat",
-            relation=RelationType.SIMILAR_TO,
-            corroborations=3,
-            insight_text="test insight",
-        ))
+        engine._validated_insights.append(
+            DreamInsight(
+                source="dog",
+                target="cat",
+                relation=RelationType.SIMILAR_TO,
+                corroborations=3,
+                insight_text="test insight",
+            )
+        )
         engine._proposed_count = 5
         engine._rejected_count = 2
 
@@ -356,8 +357,7 @@ class TestDreamIntegration:
 
         # The dog-cat edge should have analogical transfer + shared hub
         dog_cat_results = [
-            r for r in results
-            if r.proposal.source == "dog" and r.proposal.target == "cat"
+            r for r in results if r.proposal.source == "dog" and r.proposal.target == "cat"
         ]
         if dog_cat_results:
             assert dog_cat_results[0].corroborations >= 1
@@ -495,9 +495,9 @@ class TestDreamSynthesisImprovesReasoning:
 
         # Should propose a SIMILAR_TO edge between star and fire
         star_fire_proposals = [
-            p for p in proposals
-            if {p.source, p.target} == {"star", "fire"}
-            and p.relation == RelationType.SIMILAR_TO
+            p
+            for p in proposals
+            if {p.source, p.target} == {"star", "fire"} and p.relation == RelationType.SIMILAR_TO
         ]
         assert len(star_fire_proposals) >= 1, (
             "Dream synthesis should propose a SIMILAR_TO edge between "
@@ -521,8 +521,7 @@ class TestDreamSynthesisImprovesReasoning:
 
         promoted = [r for r in results if r.promoted]
         assert len(promoted) >= 1, (
-            "At least one dream edge should be promoted with "
-            "≥2 corroborating paths"
+            "At least one dream edge should be promoted with ≥2 corroborating paths"
         )
 
     def test_reasoning_succeeds_after_dream_synthesis(self):
@@ -578,9 +577,9 @@ class TestDreamSynthesisImprovesReasoning:
         engine_before = Reasoner(net)
         results_before = engine_before.reason_about("star")
         analogical_before = [
-            r for r in results_before
-            if r.reasoning_type == ReasoningType.ANALOGICAL
-            and "heat" in r.conclusion.lower()
+            r
+            for r in results_before
+            if r.reasoning_type == ReasoningType.ANALOGICAL and "heat" in r.conclusion.lower()
         ]
         assert len(analogical_before) == 0, (
             "Before dream synthesis: no analogical insight about star→heat"
@@ -591,13 +590,8 @@ class TestDreamSynthesisImprovesReasoning:
         proposals = dream.synthesize(max_proposals=10)
         assert len(proposals) > 0, "Dream synthesis should produce proposals"
 
-        star_fire = [
-            p for p in proposals
-            if {p.source, p.target} == {"star", "fire"}
-        ]
-        assert len(star_fire) >= 1, (
-            "Dream synthesis should propose a star-fire connection"
-        )
+        star_fire = [p for p in proposals if {p.source, p.target} == {"star", "fire"}]
+        assert len(star_fire) >= 1, "Dream synthesis should propose a star-fire connection"
 
         # ── 4. Wake: new evidence corroborates the proposal ────────
         _add_corroborating_evidence(net)
@@ -605,25 +599,20 @@ class TestDreamSynthesisImprovesReasoning:
         # ── 5. Validation promotes it ──────────────────────────────
         validation_results = dream.review_pending_proposals()
         promoted = [r for r in validation_results if r.promoted]
-        assert len(promoted) >= 1, (
-            "At least one dream edge should be validated and promoted"
-        )
+        assert len(promoted) >= 1, "At least one dream edge should be validated and promoted"
 
         star_fire_promoted = [
-            r for r in promoted
-            if {r.proposal.source, r.proposal.target} == {"star", "fire"}
+            r for r in promoted if {r.proposal.source, r.proposal.target} == {"star", "fire"}
         ]
-        assert len(star_fire_promoted) >= 1, (
-            "The star-fire SIMILAR_TO edge should be promoted"
-        )
+        assert len(star_fire_promoted) >= 1, "The star-fire SIMILAR_TO edge should be promoted"
 
         # ── 6. Confirm reasoning can now bridge the gap ────────────
         engine_after = Reasoner(net)
         results_after = engine_after.reason_about("star")
         analogical_after = [
-            r for r in results_after
-            if r.reasoning_type == ReasoningType.ANALOGICAL
-            and "heat" in r.conclusion.lower()
+            r
+            for r in results_after
+            if r.reasoning_type == ReasoningType.ANALOGICAL and "heat" in r.conclusion.lower()
         ]
         assert len(analogical_after) > 0, (
             "After dream synthesis: analogical insight about star→heat "
@@ -638,10 +627,7 @@ class TestDreamSynthesisImprovesReasoning:
 
         # ── 7. The insight is tracked as a DreamInsight ────────────
         insights = dream.insights
-        star_fire_insights = [
-            i for i in insights
-            if {i.source, i.target} == {"star", "fire"}
-        ]
+        star_fire_insights = [i for i in insights if {i.source, i.target} == {"star", "fire"}]
         assert len(star_fire_insights) >= 1, (
             "The star-fire edge should be tracked as a DreamInsight"
         )
@@ -659,8 +645,7 @@ class TestDreamSynthesisImprovesReasoning:
         engine_before = Reasoner(net)
         before_results = engine_before.reason_about("star")
         before_analogical = [
-            r for r in before_results
-            if r.reasoning_type == ReasoningType.ANALOGICAL
+            r for r in before_results if r.reasoning_type == ReasoningType.ANALOGICAL
         ]
 
         # Sleep + wake + validate
@@ -673,8 +658,7 @@ class TestDreamSynthesisImprovesReasoning:
         engine_after = Reasoner(net)
         after_results = engine_after.reason_about("star")
         after_analogical = [
-            r for r in after_results
-            if r.reasoning_type == ReasoningType.ANALOGICAL
+            r for r in after_results if r.reasoning_type == ReasoningType.ANALOGICAL
         ]
 
         assert len(after_analogical) > len(before_analogical), (
@@ -688,9 +672,11 @@ class TestDreamSynthesisImprovesReasoning:
 # From tests/test_dream_concept_parsing.py
 # ======================================================================
 
+
 @dataclass
 class _MockEpisode:
     """Tests for mock episode."""
+
     episode_id: int
     text: str
 
@@ -710,6 +696,7 @@ class _MockDreamClient:
         if ep_id in self._episodes:
             return _MockEpisode(episode_id=ep_id, text=self._episodes[ep_id])
         from genesis_client.exceptions import EpisodeNotFound
+
         raise EpisodeNotFound(f"episode {ep_id} not found")
 
 
@@ -791,8 +778,7 @@ def test_old_format_falls_back_to_episode_retrieval():
         event_type=2,
         source_module=9,
         text=(
-            "[dream-insight] episode 1 connects to episode 2 "
-            "through 3 hops (direct distance: 42)"
+            "[dream-insight] episode 1 connects to episode 2 through 3 hops (direct distance: 42)"
         ),
     )
 
@@ -965,11 +951,6 @@ class _MockClient:
         self.impulses.append((chem, magnitude))
         return True
 
-    def set_volition(self, sleep: bool, magnitude: float, **kwargs) -> bool:
-        """Mirror of GenesisClient.set_volition; records the push."""
-        self.__dict__.setdefault("volitions", []).append((sleep, magnitude))
-        return True
-
     def set_zone(self, zone: int, **kwargs) -> bool:
         """Set zone."""
         self.zones.append(zone)
@@ -996,15 +977,17 @@ def test_sleep_aid_enters_sleep_state():
 
 
 def test_sleep_aid_emits_correct_impulses():
-    """sleep_aid() pushes the sleep-wake network toward sleep and relieves the
-    HPA drive (cortisol). Stage chemistry (GABA, serotonin, histamine,
-    orexin) is the network's to set, so those impulses are no longer sent."""
+    """sleep_aid() sends the endogenous sleep cascade — the circadian
+    signal up, the wake side's stabilizers withdrawn — and relieves the
+    HPA drive (cortisol). No held drive reaches the network; the
+    chemistry crosses it on the body's own time constant."""
     from genesis_client.protocol import (
         CHEM_CORTISOL,
         CHEM_GABA,
         CHEM_HISTAMINE,
+        CHEM_MELATONIN,
+        CHEM_NOREPINEPHRINE,
         CHEM_OREXIN,
-        CHEM_SEROTONIN,
     )
 
     with tempfile.TemporaryDirectory() as data_dir:
@@ -1014,23 +997,28 @@ def test_sleep_aid_emits_correct_impulses():
         impulses = dict(mock.impulses)
 
         assert impulses.get(CHEM_CORTISOL, 0.0) < 0.0, "cortisol must be suppressed"
-        for chem in (CHEM_GABA, CHEM_SEROTONIN, CHEM_HISTAMINE, CHEM_OREXIN):
-            assert chem not in impulses, f"chem {chem} is network-driven, not impulsed"
-        assert mock.volitions and mock.volitions[-1][0] is True, "sleep push missing"
+        assert impulses.get(CHEM_MELATONIN, 0.0) > 0.0, "circadian sleep signal missing"
+        assert impulses.get(CHEM_GABA, 0.0) > 0.0, "VLPO-transmitter support missing"
+        for chem in (CHEM_OREXIN, CHEM_HISTAMINE, CHEM_NOREPINEPHRINE):
+            assert impulses.get(chem, 0.0) < 0.0, (
+                f"wake-side chem {chem} must be withdrawn for sleep"
+            )
 
 
 def test_sleep_aid_pushes_strongly_toward_sleep():
-    """The sleep push must be strong enough to carry the network into sleep:
-    the volitional push is at least the mind's sleep magnitude (VOLITION_MAGNITUDE)."""
-    from brainstem.sleep import VOLITION_MAGNITUDE
+    """The cascade must withdraw the switch's stabilizer: orexin is
+    the wake side's latch (its loss is the narcolepsy signature), so a
+    sleep attempt pulls it below baseline, not nudges it."""
+    from genesis_client.protocol import CHEM_OREXIN
 
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_mind_sleep_aid(data_dir)
         mind.sleep_aid()
         mock = mind.client  # type: ignore[assignment]
-        sleep, magnitude = mock.volitions[-1]
-        assert sleep is True
-        assert magnitude >= VOLITION_MAGNITUDE, f"sleep push {magnitude} is too weak"
+        impulses = dict(mock.impulses)
+        assert impulses.get(CHEM_OREXIN, 0.0) <= -0.10, (
+            f"orexin withdrawal {impulses.get(CHEM_OREXIN)} too weak to unlatch the switch"
+        )
 
 
 def test_sleep_aid_idempotent_when_sleeping():
@@ -1074,8 +1062,7 @@ def test_sleep_aid_sets_sleeping_zone():
         mind.sleep_aid()
         mock = mind.client  # type: ignore[assignment]
         assert ZONE_SLEEPING in mock.zones, (
-            f"zone SLEEPING ({ZONE_SLEEPING}) not set, "
-            f"zones set: {mock.zones}"
+            f"zone SLEEPING ({ZONE_SLEEPING}) not set, zones set: {mock.zones}"
         )
 
 
@@ -1088,6 +1075,7 @@ def test_sleep_aid_sets_sleeping_zone():
 @dataclass
 class _MockPlasticityProfile:
     """Mock plasticity profile for wake_readiness receptor checks."""
+
     cortisol_tonic: float = 0.03
     bdnf_tonic: float = 0.5
 
@@ -1102,12 +1090,14 @@ class _WakeReadinessMockClient(_MockClient):
         adenosine: float = 0.1,
         cortisol: float = 0.03,
         bdnf: float = 0.5,
+        melatonin: float = 0.0,
+        phase: str = "active",
     ) -> None:
         super().__init__()
         self._adenosine = adenosine
-        self._profile = _MockPlasticityProfile(
-            cortisol_tonic=cortisol, bdnf_tonic=bdnf
-        )
+        self._melatonin = melatonin
+        self._phase = phase
+        self._profile = _MockPlasticityProfile(cortisol_tonic=cortisol, bdnf_tonic=bdnf)
 
     def get_state(self):
         """Return a mock core state with the configured adenosine."""
@@ -1119,7 +1109,24 @@ class _WakeReadinessMockClient(_MockClient):
             phase_name: str = "active"
             sleep_pressure: float = 0.0
 
-        return _MockState(chemicals={"adenosine": self._adenosine})
+        return _MockState(
+            chemicals={
+                "adenosine": self._adenosine,
+                "melatonin": self._melatonin,
+            },
+            phase_name=self._phase,
+        )
+
+    def get_phase(self):
+        """Return a mock PhaseInfo — the desync check reads this."""
+        from genesis_client.protocol import PHASE_ACTIVE, PHASE_NREM, PHASE_REM
+        from genesis_client.types import PhaseInfo
+
+        return PhaseInfo(
+            phase={"nrem": PHASE_NREM, "rem": PHASE_REM}.get(self._phase, PHASE_ACTIVE),
+            arousal=0.2,
+            valence=0.0,
+        )
 
     def get_recent_episodes(self, **kwargs) -> list:
         """No persisted dreams — wake() queries this for residues."""
@@ -1135,12 +1142,18 @@ def _make_wake_readiness_mind(
     adenosine: float = 0.1,
     cortisol: float = 0.03,
     bdnf: float = 0.5,
+    melatonin: float = 0.0,
+    phase: str = "active",
 ) -> Mind:
     """Create a Mind with a mock client configured for wake_readiness tests."""
     socket_path = os.path.join(data_dir, "genesis.sock")
     mind = Mind(socket_path)
     mind.client = _WakeReadinessMockClient(  # type: ignore[assignment]
-        adenosine=adenosine, cortisol=cortisol, bdnf=bdnf
+        adenosine=adenosine,
+        cortisol=cortisol,
+        bdnf=bdnf,
+        melatonin=melatonin,
+        phase=phase,
     )
     return mind
 
@@ -1178,7 +1191,8 @@ def test_wake_readiness_blocks_on_high_adenosine():
     """wake_readiness() should return False when adenosine is still high."""
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_wake_readiness_mind(
-            data_dir, adenosine=0.5  # well above AUTO_WAKE_ADENOSINE (0.20)
+            data_dir,
+            adenosine=0.5,  # well above AUTO_WAKE_ADENOSINE (0.20)
         )
         mind._is_sleeping = True
 
@@ -1192,9 +1206,7 @@ def test_wake_readiness_blocks_on_high_cortisol():
     with tempfile.TemporaryDirectory() as data_dir:
         # 0.07 is above the 0.05 wake gate and inside the substrate's
         # reachable envelope (resting ~0.02, sustained-drive peak ~0.08).
-        mind = _make_wake_readiness_mind(
-            data_dir, adenosine=0.1, cortisol=0.07, bdnf=0.5
-        )
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, cortisol=0.07, bdnf=0.5)
         mind._is_sleeping = True
 
         ready, reason = mind.wake_readiness()
@@ -1205,9 +1217,7 @@ def test_wake_readiness_blocks_on_high_cortisol():
 def test_wake_readiness_blocks_on_low_bdnf():
     """wake_readiness() should return False when BDNF is still low."""
     with tempfile.TemporaryDirectory() as data_dir:
-        mind = _make_wake_readiness_mind(
-            data_dir, adenosine=0.1, cortisol=0.03, bdnf=0.1
-        )
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, cortisol=0.03, bdnf=0.1)
         mind._is_sleeping = True
 
         ready, reason = mind.wake_readiness()
@@ -1221,9 +1231,7 @@ def test_wake_readiness_ready_when_all_signals_pass():
     from thalamus.brain_waves import SleepStage
 
     with tempfile.TemporaryDirectory() as data_dir:
-        mind = _make_wake_readiness_mind(
-            data_dir, adenosine=0.1, cortisol=0.03, bdnf=0.5
-        )
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, cortisol=0.03, bdnf=0.5)
         mind._is_sleeping = True
 
         # Sleep cycle in REM (not N3)
@@ -1240,9 +1248,7 @@ def test_wake_readiness_ready_when_all_signals_pass():
 def test_wake_readiness_ready_with_no_sleep_cycle():
     """wake_readiness() should pass the stage check if no cycle is active."""
     with tempfile.TemporaryDirectory() as data_dir:
-        mind = _make_wake_readiness_mind(
-            data_dir, adenosine=0.1, cortisol=0.03, bdnf=0.5
-        )
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, cortisol=0.03, bdnf=0.5)
         mind._is_sleeping = True
         # No sleep cycle set — inner_life.sleep_cycle is None
         mind.inner_life._sleep_cycle = None  # type: ignore[attr-defined]
@@ -1253,67 +1259,403 @@ def test_wake_readiness_ready_with_no_sleep_cycle():
 
 
 # ======================================================================
-# Auto-wake minimum sleep window — /sleep on an already-rested system
-# must not trigger an immediate auto-wake on the next heartbeat.
+# Sleep-onset window — while the sleep cascade is still switching, a
+# still-awake daemon phase is the in-progress transition, not a desync.
 # ======================================================================
 
 
-def test_auto_wake_blocked_inside_min_sleep_window():
-    """Auto-wake must not fire right after sleep onset on low adenosine.
+def test_sleep_onset_holds_while_drive_is_working():
+    """A fresh sleep stays asleep while the onset is still switching.
 
-    Regression test: /sleep enters self-initiated (auto-wakeable) sleep,
-    and the heartbeat's _auto_sleep_wake called wake() on the next tick
-    whenever effective adenosine was already <= AUTO_WAKE_ADENOSINE —
-    which is the normal state right after startup (the startup wake
-    cascade pins adenosine near its 0.15-0.20 baseline) or after any
-    recent wake (the wake cascade sends -0.30). Every /sleep on a
-    well-rested system woke ~1s after the command.
+    /sleep sends the endogenous sleep cascade; the flip-flop crosses on
+    LC's own ~23-min time constant. While the attempt is still inside
+    its switch window, a still-awake daemon phase is the in-progress
+    transition — the wake-desync check must not pull the mind back up.
     """
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_wake_readiness_mind(data_dir, adenosine=0.1)
         mind.sleep(user_initiated=False)
         assert mind.is_sleeping
 
-        # The next heartbeat — adenosine already below the wake
-        # threshold — must not wake it; sleep just started.
-        mind._check_auto_sleep()
+        mind._check_sleep_sync()
 
         assert mind.is_sleeping, (
-            "auto-wake fired inside the minimum sleep window — "
-            "a rested system put to bed should stay asleep"
+            "wake-desync fired inside the onset window — "
+            "the cascade means the body is still crossing"
         )
 
 
-def test_auto_wake_fires_after_min_sleep_window():
-    """Auto-wake still fires once the minimum sleep window has elapsed."""
+def test_failed_onset_wakes_after_drive_expires():
+    """A body that never crossed past the onset window wakes the mind.
+
+    If the daemon's phase still reads awake after the attempt window
+    has closed, and the phase persists past the flutter guard, the
+    onset failed — the body could not sleep — and the mind follows the
+    body rather than staying in a desynced pretend sleep.
+    """
     import time as _time
 
-    from brainstem.thresholds import AUTO_WAKE_MIN_SLEEP_S
+    from brainstem.thresholds import (
+        WAKE_DESYNC_GRACE_SECONDS,
+        WAKE_DESYNC_SETTLE_SECONDS,
+    )
 
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_wake_readiness_mind(data_dir, adenosine=0.1)
         mind.sleep(user_initiated=False)
-        # Simulate a sleep that has already run past the minimum window.
-        mind._sleep_start_time = _time.time() - AUTO_WAKE_MIN_SLEEP_S - 1.0
+        # The attempt window closed long ago and the phase has been
+        # persistently awake past the flutter guard.
+        mind._last_sleep_attempt = _time.time() - WAKE_DESYNC_SETTLE_SECONDS - 1.0
+        mind._body_awake_since = _time.time() - WAKE_DESYNC_GRACE_SECONDS - 1.0
 
-        mind._check_auto_sleep()
+        mind._check_sleep_sync()
 
         assert not mind.is_sleeping, (
-            "auto-wake did not fire after the minimum sleep window "
-            "with adenosine drained"
+            "a body that never reached sleep must wake the mind — "
+            "the two are never in opposite sleep states"
         )
 
 
-def test_auto_wake_window_does_not_block_user_initiated_sleep():
-    """User-initiated sleep is never auto-wakeable regardless."""
+def test_onset_window_holds_for_user_initiated_sleep():
+    """User-initiated sleep sits in the same onset window."""
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_wake_readiness_mind(data_dir, adenosine=0.1)
         mind.sleep(user_initiated=True)
-        mind._sleep_start_time = 0.0  # long past any window
 
-        mind._check_auto_sleep()
+        mind._check_sleep_sync()
 
         assert mind.is_sleeping
+
+
+# ======================================================================
+# Wake stabilization — an explicit /wake must hold through circadian
+# pressure, or it can never keep her up at night.
+# ======================================================================
+
+
+def _wake_stabilization_mind(data_dir: str, *, user_initiated: bool):
+    """A just-woken mind under circadian night, cascade freshly sent.
+
+    Reproduces the observed state: adenosine cleared (~0.01) after a
+    long sleep, melatonin deep in the night range (0.7), the daemon's
+    phase still NREM while the flip-flop transitions, a wake cascade
+    freshly sent, and the post-wake guards all elapsed except the
+    stabilization window.
+    """
+    import time as _time
+
+    mind = _make_wake_readiness_mind(data_dir, adenosine=0.01, melatonin=0.7, phase="nrem")
+    now = _time.time()
+    mind._last_wake_time = now - 400.0  # past AUTO_SLEEP_MIN_AWAKE
+    mind._last_interaction_time = now - 300.0  # past AUTO_SLEEP_MIN_IDLE
+    mind._last_wake_attempt = now  # wake attempt inside its switch window
+    mind._last_wake_user_initiated = user_initiated
+    # Wake() ran before the flutter grace began — the post-wake grace
+    # measures from _wake_time, and 0 would read as "just woke".
+    from brainstem.thresholds import WAKE_DESYNC_GRACE_SECONDS
+
+    mind._wake_time = now - WAKE_DESYNC_GRACE_SECONDS - 1.0
+    return mind
+
+
+def test_user_wake_resists_circadian_re_sleep():
+    """An explicit /wake holds through circadian night.
+
+    The desync check honors a sleeping daemon phase only once the wake
+    attempt has expired — and a user-initiated wake treats melatonin as
+    grogginess, not a knockout, so deep circadian night alone cannot
+    pull a user-woken mind back under.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _wake_stabilization_mind(data_dir, user_initiated=True)
+
+        mind._check_sleep_sync()
+
+        assert not mind.is_sleeping, (
+            "a user-initiated wake re-slept on melatonin alone — "
+            "the circadian veto must not undo a wake the user asked for"
+        )
+
+
+def test_non_user_wake_yields_to_circadian_re_sleep():
+    """A wake nobody asked for still falls back asleep at night.
+
+    The melatonin exemption covers user-initiated wakes only: a wake
+    with no one behind it, under genuine circadian drive and a daemon
+    phase already asleep, is a body that went back under — the mind
+    joins it.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _wake_stabilization_mind(data_dir, user_initiated=False)
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping, (
+            "a non-user wake under circadian drive should join the "
+            "sleeping body — the exemption covers user wakes only"
+        )
+
+
+def test_user_wake_still_sleeps_on_genuine_exhaustion():
+    """Adenosine >= WAKE_RESCUE_ADENOSINE sleeps even a user wake.
+
+    The exemption covers circadian pressure only — real residual sleep
+    pressure overrides any wake request.
+    """
+    from brainstem.thresholds import WAKE_RESCUE_ADENOSINE
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _wake_stabilization_mind(data_dir, user_initiated=True)
+        mock = mind.client  # type: ignore[assignment]
+        mock._adenosine = WAKE_RESCUE_ADENOSINE + 0.1
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping
+
+
+def test_self_sleep_urge_respects_user_wake():
+    """The volition self_sleep urge declines for a user-woken mind.
+
+    Same backstop, other gate: _perform_self_sleep must not undo an
+    explicit /wake inside the stabilization window under circadian
+    pressure.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _wake_stabilization_mind(data_dir, user_initiated=True)
+        mock = mind.client  # type: ignore[assignment]
+
+        from genesis_client.protocol import CHEM_MELATONIN
+
+        mind._perform_self_sleep()
+
+        assert not mind.is_sleeping
+        mock = mind.client  # type: ignore[assignment]
+        impulses = getattr(mock, "impulses", [])
+        assert all(m <= 0.0 for c, m in impulses if c == CHEM_MELATONIN), (
+            "the self-sleep urge sent sleep chemistry to a user-woken mind"
+        )
+
+
+# ======================================================================
+# Sleeping-side sync — while the mind sleeps, only the body's phase
+# moves it. Sleep phases keep it under; a persistent awake phase
+# (after the body was seen asleep this episode) pulls it up. There is
+# no adenosine/cycle auto-wake: drained pressure is "ready to wake",
+# never a trigger, so REM is never cut by a threshold.
+# ======================================================================
+
+
+def test_mind_stays_asleep_while_body_sleeps():
+    """A sleeping mind does not wake on drained adenosine alone.
+
+    Regression test: the retired auto-wake fired wake() the moment
+    adenosine cleared its threshold — ~30–60 min into a well-rested
+    sleep, mid-N2, before the first REM leg. Now the body's phase is
+    the only exit: while the daemon reads NREM the mind stays under.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, phase="nrem")
+        mind.sleep(user_initiated=False)
+        assert not mind._body_sleep_confirmed
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping, "a body in NREM must keep the mind asleep"
+        assert mind._body_sleep_confirmed, "the body's sleep crossing goes unrecorded"
+
+
+def test_mind_wakes_when_body_persistently_awake():
+    """A body seen asleep then persistently awake pulls the mind up.
+
+    The wake-desync path: the daemon's phase crossed into sleep this
+    episode, then genuinely woke — the body owns the transition in
+    both directions, so once the awake phase persists past the flutter
+    guard the mind follows it up.
+    """
+    import time as _time
+
+    from brainstem.thresholds import WAKE_DESYNC_GRACE_SECONDS
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, phase="active")
+        mind.sleep(user_initiated=False)
+        # The body crossed into sleep, then woke — and the awake phase
+        # has held past the flutter guard.
+        mind._body_sleep_confirmed = True
+        mind._last_sleep_attempt = 0.0
+        mind._body_awake_since = _time.time() - WAKE_DESYNC_GRACE_SECONDS - 1.0
+
+        mind._check_sleep_sync()
+
+        assert not mind.is_sleeping, "the mind must follow a genuinely woken body"
+
+
+def test_drowsy_after_confirmed_sleep_is_not_a_wake():
+    """Drowsy after the body crossed is heading back down — not a wake."""
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.3, phase="drowsy")
+        mind.sleep(user_initiated=False)
+        mind._body_sleep_confirmed = True
+        mind._last_sleep_attempt = 0.0
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping
+
+
+# ======================================================================
+# Restored sleep bookkeeping — a restart mid-episode must keep the
+# episode's own record. The journal showed every recorded wake with
+# duration_secs=0: a resumed sleep had _sleep_start_time=0 and
+# _sleep_start_cycles=0 while the tracker kept its cumulative counts,
+# so the episode's length and stage position were both lost. The
+# fields are bookkeeping now — nothing gates on them — but they keep
+# the journal honest.
+# ======================================================================
+
+
+def _legacy_sleep_save(cycles_completed: int = 1) -> dict:
+    """A pre-bookkeeping save shape: mid-cycle-2 N3, no episode fields."""
+    return {
+        "is_sleeping": True,
+        "user_initiated_sleep": False,
+        "sleep_cycle": {
+            "cycle_number": 2,
+            "current_stage": "n3",
+            "stage_slot": 2,
+            "time_in_stage": 400.0,
+            "time_in_cycle": 1660.0,
+            "cycles_completed": cycles_completed,
+        },
+    }
+
+
+def test_stage_sleep_state_legacy_save_resumes_as_first_cycle():
+    """Saves without the episode fields get conservative defaults.
+
+    An unknown-age episode is treated as fresh (the wake journal gets
+    an honest duration floor) and its in-flight cycle counted as the
+    first — the bookkeeping errs toward continuity, never toward a
+    phantom completed cycle.
+    """
+    import time as _time
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir)
+        before = _time.time()
+        is_sleeping, user_sleep, cycle, start_time, start_cycles = mind._stage_sleep_state(
+            _legacy_sleep_save()
+        )
+
+        assert is_sleeping is True
+        assert user_sleep is False
+        assert cycle.cycles_completed == 1
+        assert before <= start_time <= _time.time()
+        assert start_cycles == 1
+
+
+def test_stage_sleep_state_roundtrips_episode_bookkeeping():
+    """Saves carrying the episode fields restore them unchanged."""
+    import time as _time
+
+    onset = _time.time() - 3600.0
+    data = _legacy_sleep_save()
+    data["sleep_start_time"] = onset
+    data["sleep_start_cycles"] = 0
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir)
+        _, _, _, start_time, start_cycles = mind._stage_sleep_state(data)
+
+        assert start_time == onset
+        assert start_cycles == 0
+
+
+def test_restored_sleep_stays_asleep_while_body_sleeps():
+    """A restored mid-cycle sleep with a still-sleeping body stays under.
+
+    Regression test for the journal signature (every wake with
+    duration_secs=0): after a restart the restored episode resumes
+    with a daemon phase already in NREM — the body's crossing is
+    confirmed on the first sync and the mind remains asleep. There is
+    no restart-time wake anymore: adenosine cleared across the offline
+    gap is the daemon's to account for, and a body that is still
+    asleep is the only signal that matters.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.3, phase="nrem")
+        (
+            mind._is_sleeping,
+            mind._user_initiated_sleep,
+            cycle,
+            mind._sleep_start_time,
+            mind._sleep_start_cycles,
+        ) = mind._stage_sleep_state(_legacy_sleep_save())
+        mind.inner_life._sleep_cycle = cycle  # type: ignore[attr-defined]
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping, "restored mid-cycle sleep woke with the body still in NREM"
+        assert mind._body_sleep_confirmed
+
+
+def test_restored_sleep_follows_a_woken_body():
+    """A restored sleep whose body woke during downtime follows it up.
+
+    The daemon's state-open path clears adenosine across the offline
+    gap and the body wakes on its own physics; when the mind comes up
+    still flagged asleep and the daemon's phase has been persistently
+    awake, the wake-desync check pulls the mind up to join it — the
+    two are never in opposite sleep states.
+    """
+    import time as _time
+
+    from brainstem.thresholds import WAKE_DESYNC_GRACE_SECONDS
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.3, phase="active")
+        (
+            mind._is_sleeping,
+            mind._user_initiated_sleep,
+            cycle,
+            mind._sleep_start_time,
+            mind._sleep_start_cycles,
+        ) = mind._stage_sleep_state(_legacy_sleep_save())
+        mind.inner_life._sleep_cycle = cycle  # type: ignore[attr-defined]
+        # The body's awake phase has already persisted past the guard.
+        mind._body_awake_since = _time.time() - WAKE_DESYNC_GRACE_SECONDS - 1.0
+
+        mind._check_sleep_sync()
+
+        assert not mind.is_sleeping, (
+            "restored sleep stayed asleep while the body was awake — "
+            "the two are never in opposite sleep states"
+        )
+
+
+def test_restored_sleep_first_awake_observation_starts_grace():
+    """A body's first awake report after restore arms, not fires.
+
+    The wake-desync persistence guard starts the clock on the first
+    awake-phase observation — a single transitional report cannot wake
+    a freshly restored sleep.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.3, phase="active")
+        (
+            mind._is_sleeping,
+            mind._user_initiated_sleep,
+            cycle,
+            mind._sleep_start_time,
+            mind._sleep_start_cycles,
+        ) = mind._stage_sleep_state(_legacy_sleep_save())
+        mind.inner_life._sleep_cycle = cycle  # type: ignore[attr-defined]
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping, "first awake report woke a restored sleep immediately"
+        assert mind._body_awake_since > 0.0, "the grace clock did not arm"
 
 
 # ======================================================================
@@ -1386,9 +1728,7 @@ def test_lucid_probability_rem_boost_from_tracker():
     )
     # The probability with REM should be at least 0.12 (base 0.02
     # + REM 0.10 + minimal self-awareness)
-    assert prob_with_rem >= 0.12, (
-        f"Lucid probability with REM too low: {prob_with_rem:.3f}"
-    )
+    assert prob_with_rem >= 0.12, f"Lucid probability with REM too low: {prob_with_rem:.3f}"
 
 
 def test_lucid_probability_rem_with_low_arousal():
@@ -1406,8 +1746,7 @@ def test_lucid_probability_rem_with_low_arousal():
     prob = il.lucid_dream_probability(summary, is_rem=True)
 
     assert prob >= 0.12, (
-        f"Lucid probability during tracker-REM with low arousal should "
-        f"be >= 0.12, got {prob:.3f}"
+        f"Lucid probability during tracker-REM with low arousal should be >= 0.12, got {prob:.3f}"
     )
 
 
@@ -1438,9 +1777,7 @@ def test_lucid_probability_nrem_without_tracker_rem():
     prob = il.lucid_dream_probability(summary, is_rem=False)
 
     # Without REM, the probability should be low (base + self-awareness)
-    assert prob < 0.12, (
-        f"Lucid probability without REM should be low, got {prob:.3f}"
-    )
+    assert prob < 0.12, f"Lucid probability without REM should be low, got {prob:.3f}"
 
 
 # ─── Dream thoughts must not recite a concept pair ────────────────
@@ -1481,12 +1818,14 @@ def _make_inner_life_for_dream_composition():
 
     net = ConceptNetwork()
     net.add_concept(
-        "cat", confidence=0.9,
+        "cat",
+        confidence=0.9,
         properties={"definition": "a small domesticated feline"},
     )
     # Long scraped concept name — the engine filters this as noise.
     net.add_concept(
-        "compiler for the rust language", confidence=0.6,
+        "compiler for the rust language",
+        confidence=0.6,
         properties={"definition": "a program that turns source into a binary"},
     )
     net.add_concept("feline", confidence=0.9)
@@ -1499,13 +1838,12 @@ def _make_inner_life_for_dream_composition():
 
 _UNSEEDED_GENERATORS = ["_dream_thought", "_rem_dream_thought", "_nrem_dream_thought"]
 _SEEDED_GENERATORS = [
-    "_rem_seeded_dream_thought", "_nrem_seeded_dream_thought",
+    "_rem_seeded_dream_thought",
+    "_nrem_seeded_dream_thought",
 ]
 
 
-@pytest.mark.parametrize(
-    "method", _UNSEEDED_GENERATORS + _SEEDED_GENERATORS
-)
+@pytest.mark.parametrize("method", _UNSEEDED_GENERATORS + _SEEDED_GENERATORS)
 def test_dream_thought_content_is_an_anchor_not_a_sentence(method):
     """Every dream generator hands the language engine a topic anchor.
 
@@ -1529,9 +1867,7 @@ def test_dream_thought_content_is_an_anchor_not_a_sentence(method):
     # The association must survive as data, or the next link of the
     # chain has nothing to follow.
     assert thought.metadata is not None
-    assert thought.metadata.get("knowledge"), (
-        f"{method} dropped the association from its metadata"
-    )
+    assert thought.metadata.get("knowledge"), f"{method} dropped the association from its metadata"
 
 
 def test_dream_thought_chain_seeds_survive_anchor_only_content():
@@ -1582,8 +1918,11 @@ def test_dream_thought_speech_never_contains_the_raw_pair():
         SelfModel(
             born_at=int(time.time() * 1000),
             personality=PersonalityTraits(
-                openness=0.85, conscientiousness=0.72, extraversion=0.55,
-                agreeableness=0.78, neuroticism=0.38,
+                openness=0.85,
+                conscientiousness=0.72,
+                extraversion=0.55,
+                agreeableness=0.78,
+                neuroticism=0.38,
             ),
         ),
         seed=42,
@@ -1600,9 +1939,7 @@ def test_dream_thought_speech_never_contains_the_raw_pair():
     assert "compiler for the rust language" not in spoken, (
         f"an unspeakable paired concept reached speech: {spoken!r}"
     )
-    assert " and " not in spoken, (
-        f"recited a bare concept pair: {spoken!r}"
-    )
+    assert " and " not in spoken, f"recited a bare concept pair: {spoken!r}"
 
 
 def test_echoed_placeholder_is_suppressed_despite_grammar_decoration():
@@ -1626,8 +1963,11 @@ def test_echoed_placeholder_is_suppressed_despite_grammar_decoration():
         SelfModel(
             born_at=int(time.time() * 1000),
             personality=PersonalityTraits(
-                openness=0.85, conscientiousness=0.72, extraversion=0.55,
-                agreeableness=0.78, neuroticism=0.38,
+                openness=0.85,
+                conscientiousness=0.72,
+                extraversion=0.55,
+                agreeableness=0.78,
+                neuroticism=0.38,
             ),
         ),
         seed=42,
@@ -1648,3 +1988,68 @@ def test_echoed_placeholder_is_suppressed_despite_grammar_decoration():
         "an association the mind could not articulate must stay "
         "sub-verbal, not surface as a bare concept name"
     )
+
+
+def test_n3_pass_tolerates_dangling_edge_endpoints():
+    """A spilled concept leaves its edges in _edges and _edge_index —
+    ghost endpoints are normal state, so every N3-path traversal that
+    keys a live-only dict by an edge endpoint must skip them.
+
+    Regression: KeyError('synthesis of several') fired inside
+    detect_semantic_hubs' BFS (sigma/pred are built over live ids only)
+    and inside topology community detection (labels[neighbor]).
+    """
+    from temporal_lobe.concepts import NetworkTopology
+
+    net = ConceptNetwork()
+    net.add_concept("animal")
+    net.add_concept("dog")
+    net.add_edge("version", "synthesis of several", RelationType.IS_A, weight=0.5)
+    net.add_edge("dog", "animal", RelationType.IS_A, weight=0.9)
+
+    # Simulate the post-spill state: concept archived out of working
+    # memory, edge retained (spill keeps edges for hot traversal).
+    ghost = "synthesis of several"
+    net._concepts.pop(ghost, None)
+    net._alias_map.pop(ghost, None)
+    for col_cids in net._column_index.values():
+        col_cids.discard(ghost)
+
+    # detect_semantic_hubs → _compute_betweenness_centrality → BFS over
+    # _edge_index, which still holds the edge to the ghost.
+    net.detect_semantic_hubs()  # KeyError(ghost) before the fix
+
+    # topology metrics → _detect_communities labels[neighbor].
+    top = NetworkTopology(net)
+    communities = top.communities()  # KeyError(ghost) before the fix
+    assert all(ghost not in comm for comm in communities)
+
+
+def test_sleep_processes_close_on_stage_leave():
+    """Processes opened for N3 must close when the stage moves on —
+    interrupted sleep does not run stale physiology later."""
+    from unittest.mock import MagicMock
+
+    from brainstem.sleep import SleepMixin
+    from thalamus.brain_waves import SleepStage
+
+    def _proc():
+        yield {"a": 1}
+        yield {"b": 2}
+
+    mind = SleepMixin.__new__(SleepMixin)
+    mind.inner_life = MagicMock()
+    mind.inner_life.sleep_cycle = None
+    mind.brain = MagicMock()
+    mind.brain.frontal.memory.consolidate_during_sleep.return_value = 0
+    mind.brain_waves = MagicMock()
+    mind.brain_waves.return_value.consolidation = 0.5
+    mind._emit_live_thought = MagicMock()
+    mind._n3_processes = {"x": _proc()}
+    mind._n3_rotation = deque(["x"])
+    mind._n3_credit = 0.4
+
+    # Leaving N3 closes every live process rather than resuming it late.
+    mind._on_sleep_stage_transition(SleepStage.REM, 30.0)
+    assert not mind._n3_processes
+    assert not mind._n3_rotation

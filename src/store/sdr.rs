@@ -776,7 +776,12 @@ impl BundleStore {
             }
             let bundle = self.bundle_mut(j);
             for &pos in &sdr.active {
-                bundle[pos as usize] += weight;
+                // `Sdr.active` is a public field — a caller-built SDR
+                // can carry positions outside the SDR space, and those
+                // must not panic the store.
+                if let Some(cell) = bundle.get_mut(pos as usize) {
+                    *cell += weight;
+                }
             }
         }
 
@@ -793,15 +798,21 @@ impl BundleStore {
     /// number of active bits in the query.
     pub fn query_activation(&self, query: &Sdr) -> [f32; LOGHD_N] {
         let mut activation = [0.0f32; LOGHD_N];
-        if query.active.is_empty() {
+        let norm = query
+            .active
+            .iter()
+            .filter(|&&pos| (pos as usize) < SDR_DIM)
+            .count() as f32;
+        if norm == 0.0 {
             return activation;
         }
-        let norm = query.active.len() as f32;
         for (j, slot) in activation.iter_mut().enumerate() {
             let bundle = self.bundle(j);
             let mut sum = 0.0f32;
             for &pos in &query.active {
-                sum += bundle[pos as usize];
+                if let Some(&cell) = bundle.get(pos as usize) {
+                    sum += cell;
+                }
             }
             *slot = sum / norm;
         }
@@ -1101,6 +1112,33 @@ mod tests {
             max1 >= max2,
             "matching query should have higher activation: {max1} vs {max2}"
         );
+
+        drop(store);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn bundle_store_ignores_out_of_range_sdr_positions() {
+        // `Sdr.active` is a public field — a hand-built SDR can carry
+        // positions beyond the SDR space. The store must skip them
+        // rather than panic or corrupt the bundles.
+        let path = tmp_path("oob");
+        let mut store = BundleStore::create(&path).expect("create bundle store in temp dir");
+
+        let mut sdr = encode_content("calibration memory");
+        sdr.active.push(u16::MAX); // 65535 ≫ SDR_DIM
+        let code = episode_id_to_code(1);
+        store.add_episode(&code, &sdr);
+
+        // A query whose only in-range bit sits next to an OOB bit
+        // still activates the written bundles — and an all-OOB query
+        // returns zeros instead of dividing by an in-range count of 0.
+        let activation = store.query_activation(&sdr);
+        assert!(activation.iter().all(|a| a.is_finite()));
+        let oob_only = Sdr {
+            active: vec![SDR_DIM as u16, u16::MAX],
+        };
+        assert_eq!(store.query_activation(&oob_only), [0.0; LOGHD_N]);
 
         drop(store);
         let _ = std::fs::remove_file(&path);

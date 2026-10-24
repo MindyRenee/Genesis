@@ -51,11 +51,7 @@ def test_self_package_stays_lazy() -> None:
     tree = ast.parse(SELF_INIT.read_text(encoding="utf-8"))
     eager = []
     for node in tree.body:  # top-level statements only
-        if (
-            isinstance(node, ast.ImportFrom)
-            and node.level == 1
-            and node.module is not None
-        ):
+        if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module is not None:
             eager.append(node.module)
         if isinstance(node, ast.ImportFrom) and node.module == "_views":
             continue
@@ -71,10 +67,7 @@ def test_package_imports_cleanly() -> None:
     import os
 
     env = dict(os.environ)
-    env["PYTHONPATH"] = (
-        f"{_ROOT.parent}{os.pathsep}{_ROOT}{os.pathsep}"
-        + env.get("PYTHONPATH", "")
-    )
+    env["PYTHONPATH"] = f"{_ROOT.parent}{os.pathsep}{_ROOT}{os.pathsep}" + env.get("PYTHONPATH", "")
     result = subprocess.run(
         [sys.executable, "-c", "import mind"],
         capture_output=True,

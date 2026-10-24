@@ -80,20 +80,20 @@ logger = logging.getLogger(__name__)
 class PlanStepStatus(Enum):
     """Lifecycle state of a plan step."""
 
-    PENDING = "pending"          # not yet started
+    PENDING = "pending"  # not yet started
     IN_PROGRESS = "in_progress"  # currently being executed
-    COMPLETED = "completed"      # successfully done
-    FAILED = "failed"            # attempted but failed
-    SKIPPED = "skipped"          # bypassed during replanning
+    COMPLETED = "completed"  # successfully done
+    FAILED = "failed"  # attempted but failed
+    SKIPPED = "skipped"  # bypassed during replanning
 
 
 class PlanStatus(Enum):
     """Lifecycle state of an overall plan."""
 
-    DRAFT = "draft"          # created but not yet executing
-    ACTIVE = "active"        # currently executing
+    DRAFT = "draft"  # created but not yet executing
+    ACTIVE = "active"  # currently executing
     COMPLETED = "completed"  # all steps done, goal achieved
-    BLOCKED = "blocked"      # no path forward
+    BLOCKED = "blocked"  # no path forward
     ABANDONED = "abandoned"  # given up
 
 
@@ -106,15 +106,15 @@ class PlanStep:
     come before the things that depend on them.
     """
 
-    description: str           # what to do (e.g., "understand oxygen")
-    target_concept: str        # the concept this step works on
-    step_type: str             # understand, achieve, explain, resolve, verify
+    description: str  # what to do (e.g., "understand oxygen")
+    target_concept: str  # the concept this step works on
+    step_type: str  # understand, achieve, explain, resolve, verify
     prerequisites: list[str] = field(default_factory=list)  # concepts needed first
     status: PlanStepStatus = PlanStepStatus.PENDING
-    attempt_count: int = 0     # how many times this step has been tried
-    max_attempts: int = 3      # before marking as failed
-    result_summary: str = ""   # what happened when this step was executed
-    confidence: float = 0.0    # confidence in the step's outcome
+    attempt_count: int = 0  # how many times this step has been tried
+    max_attempts: int = 3  # before marking as failed
+    result_summary: str = ""  # what happened when this step was executed
+    confidence: float = 0.0  # confidence in the step's outcome
     # How success was established: "reported" (caller asserted),
     # "solver" (epistemically verified), "external" (world-checked).
     verification: str = ""
@@ -129,19 +129,19 @@ class Plan:
     turns until completed, blocked, or abandoned.
     """
 
-    goal: str                    # the goal this plan achieves
-    goal_type: str               # understand, achieve, explain, etc.
+    goal: str  # the goal this plan achieves
+    goal_type: str  # understand, achieve, explain, etc.
     steps: list[PlanStep] = field(default_factory=list)
     status: PlanStatus = PlanStatus.DRAFT
     current_step_index: int = 0  # which step is being executed
     created_at: int = field(default_factory=lambda: 0)
     updated_at: int = field(default_factory=lambda: 0)
     feasibility_score: float = 0.5  # 0..1, how feasible the plan is
-    revision_count: int = 0       # how many times the plan has been revised
-    failure_reason: str = ""      # why the plan failed (if it did)
+    revision_count: int = 0  # how many times the plan has been revised
+    failure_reason: str = ""  # why the plan failed (if it did)
     # Task-competence bindings (transient; not part of the plan record).
     task_context: Any = field(default=None, repr=False)
-    prior_skill_id: str = ""      # skill that boosted feasibility, if any
+    prior_skill_id: str = ""  # skill that boosted feasibility, if any
     episode_recorded: bool = field(default=False, repr=False)
 
     @property
@@ -155,8 +155,7 @@ class Plan:
     def is_complete(self) -> bool:
         """Whether all steps are completed."""
         return all(
-            s.status in (PlanStepStatus.COMPLETED, PlanStepStatus.SKIPPED)
-            for s in self.steps
+            s.status in (PlanStepStatus.COMPLETED, PlanStepStatus.SKIPPED) for s in self.steps
         )
 
     @property
@@ -165,8 +164,7 @@ class Plan:
         if not self.steps:
             return 0.0
         done = sum(
-            1 for s in self.steps
-            if s.status in (PlanStepStatus.COMPLETED, PlanStepStatus.SKIPPED)
+            1 for s in self.steps if s.status in (PlanStepStatus.COMPLETED, PlanStepStatus.SKIPPED)
         )
         return done / len(self.steps)
 
@@ -174,9 +172,12 @@ class Plan:
     def remaining_steps(self) -> int:
         """How many steps remain to be executed."""
         return sum(
-            1 for s in self.steps
-            if s.status not in (
-                PlanStepStatus.COMPLETED, PlanStepStatus.SKIPPED,
+            1
+            for s in self.steps
+            if s.status
+            not in (
+                PlanStepStatus.COMPLETED,
+                PlanStepStatus.SKIPPED,
             )
         )
 
@@ -191,9 +192,7 @@ class Plan:
         for i, step in enumerate(self.steps):
             marker = "→" if i == self.current_step_index else " "
             status = step.status.value
-            lines.append(
-                f"  {marker} {i + 1}. [{status}] {step.description}"
-            )
+            lines.append(f"  {marker} {i + 1}. [{status}] {step.description}")
         if self.failure_reason:
             lines.append(f"  failure: {self.failure_reason}")
         return "\n".join(lines)
@@ -375,64 +374,99 @@ class Planner:
 
         if goal_type == "understand":
             self._decompose_understand(
-                goal, steps, visited, max_depth, depth=0,
+                goal,
+                steps,
+                visited,
+                max_depth,
+                depth=0,
             )
         elif goal_type in ("achieve", "explain"):
             self._decompose_causal(
-                goal, steps, visited, max_depth, depth=0,
+                goal,
+                steps,
+                visited,
+                max_depth,
+                depth=0,
             )
-        elif goal_type == "resolve":
+        elif goal_type in ("resolve", "compare"):
             # For resolve, we need two concepts — encoded as "A vs B".
-            parts = goal.split(" vs ")
-            if len(parts) == 2:
-                self._decompose_understand(
-                    parts[0], steps, visited, max_depth, depth=0,
-                )
-                self._decompose_understand(
-                    parts[1], steps, visited, max_depth, depth=0,
-                )
-                steps.append(PlanStep(
-                    description=f"resolve contradiction between "
-                                f"{parts[0]} and {parts[1]}",
-                    target_concept=goal,
-                    step_type="resolve",
-                ))
-            else:
-                self._decompose_understand(
-                    goal, steps, visited, max_depth, depth=0,
-                )
-        elif goal_type == "compare":
-            parts = goal.split(" vs ")
-            if len(parts) == 2:
-                self._decompose_understand(
-                    parts[0], steps, visited, max_depth, depth=0,
-                )
-                self._decompose_understand(
-                    parts[1], steps, visited, max_depth, depth=0,
-                )
-                steps.append(PlanStep(
-                    description=f"compare {parts[0]} and {parts[1]}",
-                    target_concept=goal,
-                    step_type="compare",
-                ))
-            else:
-                self._decompose_understand(
-                    goal, steps, visited, max_depth, depth=0,
-                )
+            self._decompose_pair(
+                goal,
+                goal_type,
+                steps,
+                visited,
+                max_depth,
+            )
         else:
             self._decompose_understand(
-                goal, steps, visited, max_depth, depth=0,
+                goal,
+                steps,
+                visited,
+                max_depth,
+                depth=0,
             )
 
         # Always add a final verification step.
         if steps:
-            steps.append(PlanStep(
-                description=f"verify: {goal} {goal_type} achieved",
-                target_concept=goal,
-                step_type="verify",
-            ))
+            steps.append(
+                PlanStep(
+                    description=f"verify: {goal} {goal_type} achieved",
+                    target_concept=goal,
+                    step_type="verify",
+                )
+            )
 
         return steps
+
+    def _decompose_pair(
+        self,
+        goal: str,
+        goal_type: str,
+        steps: list[PlanStep],
+        visited: set[str],
+        max_depth: int,
+    ) -> None:
+        """Decompose an "A vs B" goal (resolve/compare).
+
+        Both sides become UNDERSTAND steps before the terminal
+        resolve/compare step; a goal without the "A vs B" shape falls
+        back to a single understand decomposition.
+        """
+        parts = goal.split(" vs ")
+        if len(parts) != 2:
+            self._decompose_understand(
+                goal,
+                steps,
+                visited,
+                max_depth,
+                depth=0,
+            )
+            return
+        self._decompose_understand(
+            parts[0],
+            steps,
+            visited,
+            max_depth,
+            depth=0,
+        )
+        self._decompose_understand(
+            parts[1],
+            steps,
+            visited,
+            max_depth,
+            depth=0,
+        )
+        if goal_type == "resolve":
+            description = f"resolve contradiction between {parts[0]} and {parts[1]}"
+        else:
+            description = f"compare {parts[0]} and {parts[1]}"
+        steps.append(
+            PlanStep(
+                description=description,
+                target_concept=goal,
+                step_type=goal_type,
+            )
+        )
 
     def _decompose_understand(
         self,
@@ -457,18 +491,24 @@ class Planner:
         for prereq in prereqs:
             if prereq not in visited:
                 self._decompose_understand(
-                    prereq, steps, visited, max_depth, depth + 1,
+                    prereq,
+                    steps,
+                    visited,
+                    max_depth,
+                    depth + 1,
                 )
 
         # Add the step for this concept (if not already added).
         existing = [s for s in steps if s.target_concept == concept]
         if not existing:
-            steps.append(PlanStep(
-                description=f"understand {concept}",
-                target_concept=concept,
-                step_type="understand",
-                prerequisites=prereqs,
-            ))
+            steps.append(
+                PlanStep(
+                    description=f"understand {concept}",
+                    target_concept=concept,
+                    step_type="understand",
+                    prerequisites=prereqs,
+                )
+            )
 
     def _decompose_causal(
         self,
@@ -492,7 +532,11 @@ class Planner:
         for cause in causes:
             if cause not in visited:
                 self._decompose_causal(
-                    cause, steps, visited, max_depth, depth + 1,
+                    cause,
+                    steps,
+                    visited,
+                    max_depth,
+                    depth + 1,
                 )
 
         # Also find prerequisites.
@@ -500,17 +544,23 @@ class Planner:
         for prereq in prereqs:
             if prereq not in visited:
                 self._decompose_understand(
-                    prereq, steps, visited, max_depth, depth + 1,
+                    prereq,
+                    steps,
+                    visited,
+                    max_depth,
+                    depth + 1,
                 )
 
         existing = [s for s in steps if s.target_concept == concept]
         if not existing:
-            steps.append(PlanStep(
-                description=f"achieve {concept}",
-                target_concept=concept,
-                step_type="achieve",
-                prerequisites=causes + prereqs,
-            ))
+            steps.append(
+                PlanStep(
+                    description=f"achieve {concept}",
+                    target_concept=concept,
+                    step_type="achieve",
+                    prerequisites=causes + prereqs,
+                )
+            )
 
     # ─── Task competence ─────────────────────────────────────────
 
@@ -541,16 +591,16 @@ class Planner:
                 "plan.goal_type": plan.goal_type,
                 "plan.steps.count": self._count_bucket(len(plan.steps)),
                 "plan.step_types": step_types,
-                "plan.has_prerequisites": any(
-                    s.prerequisites for s in plan.steps
-                ),
-                "plan.has_verify": any(
-                    s.step_type == "verify" for s in plan.steps
-                ),
+                "plan.has_prerequisites": any(s.prerequisites for s in plan.steps),
+                "plan.has_verify": any(s.step_type == "verify" for s in plan.steps),
             },
             actions=(
-                "understand", "achieve", "explain",
-                "resolve", "compare", "verify",
+                "understand",
+                "achieve",
+                "explain",
+                "resolve",
+                "compare",
+                "verify",
             ),
             goal_conditions=[self._goal_condition(plan.goal_type)],
             entities=("plan", "step", "concept"),
@@ -574,11 +624,7 @@ class Planner:
         if ctx is None or not ctx.skills:
             return score
         match = ctx.skills[0]
-        weight = (
-            0.3
-            * match.similarity
-            * verification_weight(match.skill.verification)
-        )
+        weight = 0.3 * match.similarity * verification_weight(match.skill.verification)
         plan.prior_skill_id = match.skill.skill_id
         return min(
             1.0,
@@ -615,13 +661,11 @@ class Planner:
         any retrieved skill that failed to transfer.
         """
         terminal = (
-            PlanStatus.COMPLETED, PlanStatus.BLOCKED, PlanStatus.ABANDONED,
+            PlanStatus.COMPLETED,
+            PlanStatus.BLOCKED,
+            PlanStatus.ABANDONED,
         )
-        if (
-            plan.episode_recorded
-            or plan.status not in terminal
-            or not plan.steps
-        ):
+        if plan.episode_recorded or plan.status not in terminal or not plan.steps:
             return
         plan.episode_recorded = True
         context = self._context_for(plan)
@@ -631,9 +675,7 @@ class Planner:
         # The consolidated procedure inherits the *weakest* step's
         # verification — a plan completed on reported assertions does
         # not produce a world-verified skill.
-        completed = [
-            s for s in plan.steps if s.status == PlanStepStatus.COMPLETED
-        ]
+        completed = [s for s in plan.steps if s.status == PlanStepStatus.COMPLETED]
         weakest = min(
             (verification_rank(s.verification) for s in completed),
             default=0,
@@ -698,7 +740,8 @@ class Planner:
             return causes
         for edge in self.network.get_edges(concept, "in"):
             if edge.relation in (
-                RelationType.CAUSES, RelationType.LEADS_TO,
+                RelationType.CAUSES,
+                RelationType.LEADS_TO,
             ):
                 source_concept = self.network.get_concept(edge.source)
                 if source_concept:
@@ -749,19 +792,14 @@ class Planner:
                     # overlap as evidence of executable competence.
                     model_confidence = operator.confidence
                     step_score = 0.45 * step_score + 0.55 * model_confidence
-                prior_count = context.schema.family_priors.get(
-                    step.step_type, 0
-                )
+                prior_count = context.schema.family_priors.get(step.step_type, 0)
                 if prior_count:
                     prior_strength = min(1.0, prior_count / 5.0)
                     step_score = 0.75 * step_score + 0.25 * prior_strength
             # Compound and verification steps retain structural priors.
             if " vs " in step.target_concept and concept is None:
                 parts = step.target_concept.split(" vs ")
-                exists = [
-                    self.network.get_concept(p) is not None
-                    for p in parts
-                ]
+                exists = [self.network.get_concept(p) is not None for p in parts]
                 step_score = max(step_score, 0.6 if all(exists) else 0.2)
             if step.step_type == "verify":
                 step_score = max(step_score, 0.9)
@@ -802,13 +840,12 @@ class Planner:
             return None
 
         # Skip completed/failed/skipped steps.
-        while (
-            plan.current_step_index < len(plan.steps)
-            and plan.steps[plan.current_step_index].status in (
-                PlanStepStatus.COMPLETED,
-                PlanStepStatus.SKIPPED,
-                PlanStepStatus.FAILED,
-            )
+        while plan.current_step_index < len(plan.steps) and plan.steps[
+            plan.current_step_index
+        ].status in (
+            PlanStepStatus.COMPLETED,
+            PlanStepStatus.SKIPPED,
+            PlanStepStatus.FAILED,
         ):
             plan.current_step_index += 1
 
@@ -869,11 +906,7 @@ class Planner:
 
         if success:
             step.status = PlanStepStatus.COMPLETED
-            step.verification = (
-                verification
-                if verification_rank(verification) > 0
-                else "reported"
-            )
+            step.verification = verification if verification_rank(verification) > 0 else "reported"
             plan.current_step_index += 1
             # Check if plan is complete.
             if plan.is_complete:
@@ -927,11 +960,13 @@ class Planner:
         new_steps: list[PlanStep] = []
         for prereq in alt_prereqs:
             if prereq not in existing_concepts:
-                new_steps.append(PlanStep(
-                    description=f"understand {prereq} (alternative path)",
-                    target_concept=prereq,
-                    step_type="understand",
-                ))
+                new_steps.append(
+                    PlanStep(
+                        description=f"understand {prereq} (alternative path)",
+                        target_concept=prereq,
+                        step_type="understand",
+                    )
+                )
 
         if new_steps:
             # Insert the new steps after the failed step.
@@ -1014,6 +1049,7 @@ class Planner:
 
     def restore_from_dict(self, data: dict[str, object]) -> None:
         """Restore state from persistence."""
+
         def _int_val(key: str) -> int:
             """Extract an int from persisted data, defaulting to 0."""
             val = data.get(key)
@@ -1040,18 +1076,12 @@ class Planner:
                 plan = Plan(
                     goal=goal,
                     goal_type=goal_type,
-                    feasibility_score=float(
-                        pd.get("feasibility_score", 0.5)
-                    ),
-                    current_step_index=int(
-                        pd.get("current_step_index", 0)
-                    ),
+                    feasibility_score=float(pd.get("feasibility_score", 0.5)),
+                    current_step_index=int(pd.get("current_step_index", 0)),
                     revision_count=int(pd.get("revision_count", 0)),
                     failure_reason=str(pd.get("failure_reason", "")),
                     prior_skill_id=str(pd.get("prior_skill_id", "")),
-                    episode_recorded=bool(
-                        pd.get("episode_recorded", False)
-                    ),
+                    episode_recorded=bool(pd.get("episode_recorded", False)),
                 )
                 # Restore status.
                 status_str = str(pd.get("status", "active"))
@@ -1067,26 +1097,14 @@ class Planner:
                             continue
                         step = PlanStep(
                             description=str(sd.get("description", "")),
-                            target_concept=str(
-                                sd.get("target_concept", "")
-                            ),
+                            target_concept=str(sd.get("target_concept", "")),
                             step_type=str(sd.get("step_type", "")),
-                            attempt_count=int(
-                                sd.get("attempt_count", 0)
-                            ),
-                            confidence=float(
-                                sd.get("confidence", 0.0)
-                            ),
-                            result_summary=str(
-                                sd.get("result_summary", "")
-                            ),
-                            verification=str(
-                                sd.get("verification", "")
-                            ),
+                            attempt_count=int(sd.get("attempt_count", 0)),
+                            confidence=float(sd.get("confidence", 0.0)),
+                            result_summary=str(sd.get("result_summary", "")),
+                            verification=str(sd.get("verification", "")),
                         )
-                        step_status_str = str(
-                            sd.get("status", "pending")
-                        )
+                        step_status_str = str(sd.get("status", "pending"))
                         try:
                             step.status = PlanStepStatus(step_status_str)
                         except ValueError:

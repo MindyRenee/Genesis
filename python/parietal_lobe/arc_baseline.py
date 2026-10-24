@@ -95,7 +95,10 @@ class _BaselineMind:
         frame: Any,
         available_actions: list[Any] | None = None,
         info: dict[str, Any] | None = None,
+        through: list[Any] | None = None,
     ) -> dict[str, Any] | None:
+        # The reference policy is a fixed function of the settled
+        # frame — no motion channel, so the strip is unused.
         return self._fn(frame, available_actions or [], self._rng)
 
     def world_episode_end(self, outcome: str, game: str = "the game") -> None:
@@ -123,9 +126,7 @@ class ArcBaseline:
         recordings_dir: str | None = None,
     ) -> None:
         if policy not in _POLICY_FNS:
-            raise ValueError(
-                f"unknown baseline {policy!r} — expected one of {POLICIES}"
-            )
+            raise ValueError(f"unknown baseline {policy!r} — expected one of {POLICIES}")
         self.policy = policy
         self._practice = ArcPractice(
             _BaselineMind(policy, _POLICY_FNS[policy]),

@@ -62,6 +62,9 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, ClassVar
 
+from infrastructure.text import is_blank
+from infrastructure.text import sentences as _sentences
+
 from .figurative import FigurativeLanguageProcessor, IronyDetection, Metaphor
 from .morphology import (
     VERB_LEXICON,
@@ -81,9 +84,6 @@ __all__ = [
 ]
 
 # ─── Pre-compiled regex patterns ──────────────────────────────────
-
-# Split into sentences on . ! ? followed by whitespace or end
-_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
 # Identify the main verb in a simple sentence — looks for common
 # action verbs and copular verbs. This is a heuristic parser, not
@@ -773,7 +773,7 @@ class Comprehension:
         Returns:
             A ComprehensionResult with the structured understanding.
         """
-        if not text or not text.strip():
+        if is_blank(text):
             return ComprehensionResult(raw_text=text or "", confidence=0.0)
 
         context = context or {}
@@ -818,14 +818,21 @@ class Comprehension:
         self._update_recent_entities(propositions, resolved)
 
         return self._assemble_result(
-            raw_text, speech_act, propositions, key_concepts, resolved,
-            is_negated, focus, confidence, clauses, parse_coverage,
-            unresolved_tokens, diagnostics,
+            raw_text,
+            speech_act,
+            propositions,
+            key_concepts,
+            resolved,
+            is_negated,
+            focus,
+            confidence,
+            clauses,
+            parse_coverage,
+            unresolved_tokens,
+            diagnostics,
         )
 
-    def _extract_propositions(
-        self, clauses: list[str]
-    ) -> tuple[list[Proposition], str]:
+    def _extract_propositions(self, clauses: list[str]) -> tuple[list[Proposition], str]:
         """Extract propositions from every clause, expanding shared-
         subject VP coordination ("I came and saw the water") and
         gapped VP coordination ("put the star in its hole and the
@@ -1004,9 +1011,7 @@ class Comprehension:
         not a clause boundary — this is how exposure teaches it
         that "salt and pepper" is one thing, not two clauses.
         """
-        self._known_chunks = frozenset(
-            c.lower().strip() for c in chunks if c and c.strip()
-        )
+        self._known_chunks = frozenset(c.lower().strip() for c in chunks if c and c.strip())
 
     def _split_clauses(self, text: str) -> list[str]:
         """Split text into clauses (rough sentence segmentation).
@@ -1021,7 +1026,7 @@ class Comprehension:
         - VP coordination sharing the subject: "I came and saw"
         - Learned chunks: "trial and error", "give and take"
         """
-        sentences = _SENTENCE_SPLIT_RE.split(text)
+        sentences = _sentences(text)
         clauses: list[str] = []
         for sentence in sentences:
             sentence = sentence.strip()
@@ -1058,8 +1063,8 @@ class Comprehension:
         """
         for m in self._COORDINATOR_RE.finditer(part):
             left = part[: m.start()]
-            right = part[m.end():]
-            if not left.strip() or not right.strip():
+            right = part[m.end() :]
+            if is_blank(left) or is_blank(right):
                 continue
 
             # Protect learned multi-word chunks: "trial and error"
@@ -1088,18 +1093,46 @@ class Comprehension:
     # When a coordinator's right side starts "noun + one of these"
     # ("salt and pepper are..."), the compound — not the right noun
     # alone — is the likely subject, so don't split.
-    _PLURAL_AGREEING = frozenset({
-        "are", "were", "have", "do", "don't",
-        "aren't", "weren't", "haven't",
-    })
+    _PLURAL_AGREEING = frozenset(
+        {
+            "are",
+            "were",
+            "have",
+            "do",
+            "don't",
+            "aren't",
+            "weren't",
+            "haven't",
+        }
+    )
 
     # Adverbs that can open a shared-subject VP ("and quickly left")
-    _SPLIT_ADVERBS = frozenset({
-        "then", "also", "just", "never", "always", "often", "soon",
-        "now", "later", "still", "even", "only", "again", "finally",
-        "suddenly", "immediately", "quickly", "slowly", "simply",
-        "really", "very", "too",
-    })
+    _SPLIT_ADVERBS = frozenset(
+        {
+            "then",
+            "also",
+            "just",
+            "never",
+            "always",
+            "often",
+            "soon",
+            "now",
+            "later",
+            "still",
+            "even",
+            "only",
+            "again",
+            "finally",
+            "suddenly",
+            "immediately",
+            "quickly",
+            "slowly",
+            "simply",
+            "really",
+            "very",
+            "too",
+        }
+    )
 
     def _right_is_clause(self, right: str) -> bool:
         """Return True if the text after a coordinator is clause-like.
@@ -1120,9 +1153,9 @@ class Comprehension:
         # Adverb + verb → still shared-subject VP coordination
         if len(words) >= 2:
             second = words[1].lower().rstrip(",.!?;:")
-            if (
-                first in self._SPLIT_ADVERBS or first.endswith("ly")
-            ) and self._looks_like_verb(second):
+            if (first in self._SPLIT_ADVERBS or first.endswith("ly")) and self._looks_like_verb(
+                second
+            ):
                 return False
             # NP-conjunction cue: "NOUN + plural-agreeing verb" means
             # the coordinator probably joined two noun phrases whose
@@ -1167,14 +1200,11 @@ class Comprehension:
             wl = w.lower().rstrip(",.!?;:")
             if wl not in self._COORDINATORS:
                 continue
-            left, right = words[:i], words[i + 1:]
+            left, right = words[:i], words[i + 1 :]
             if not left or not right:
                 continue
             # Protect learned multi-word chunks ("trial and error")
-            chunk = (
-                f"{left[-1].lower().rstrip(',.!?;:')} {wl} "
-                f"{right[0].lower().rstrip(',.!?;:')}"
-            )
+            chunk = f"{left[-1].lower().rstrip(',.!?;:')} {wl} {right[0].lower().rstrip(',.!?;:')}"
             if chunk in self._known_chunks:
                 continue
             if not self._opens_verb_phrase(right):
@@ -1196,9 +1226,7 @@ class Comprehension:
         ("saw it", "quickly left", "didn't see")."""
         for w in words:
             wl = w.lower().rstrip(",.!?;:")
-            if wl in self._SPLIT_ADVERBS or (
-                wl.endswith("ly") and len(wl) > 3
-            ):
+            if wl in self._SPLIT_ADVERBS or (wl.endswith("ly") and len(wl) > 3):
                 continue
             if wl in _AUX_VERBS or wl in _NEGATION_WORDS:
                 continue
@@ -1225,13 +1253,10 @@ class Comprehension:
             wl = w.lower().rstrip(",.!?;:")
             if wl not in self._COORDINATORS:
                 continue
-            left, right = words[:i], words[i + 1:]
+            left, right = words[:i], words[i + 1 :]
             if not left or not right:
                 continue
-            chunk = (
-                f"{left[-1].lower().rstrip(',.!?;:')} {wl} "
-                f"{right[0].lower().rstrip(',.!?;:')}"
-            )
+            chunk = f"{left[-1].lower().rstrip(',.!?;:')} {wl} {right[0].lower().rstrip(',.!?;:')}"
             if chunk in self._known_chunks:
                 continue
             vidx, _, _ = self._find_main_verb(left)
@@ -1244,26 +1269,18 @@ class Comprehension:
                 continue
             # A right side that is clause-like or VP-initial belongs
             # to the other coordination passes.
-            if self._opens_verb_phrase(right) or self._right_is_clause(
-                " ".join(right)
-            ):
+            if self._opens_verb_phrase(right) or self._right_is_clause(" ".join(right)):
                 continue
             # The right side must be "NP + prepositional phrase":
             # a preposition inside, but not leading, the conjunct.
             rprep = next(
-                (
-                    j
-                    for j, rw in enumerate(right)
-                    if rw.lower().rstrip(",.!?;:") in _PREPOSITIONS
-                ),
+                (j for j, rw in enumerate(right) if rw.lower().rstrip(",.!?;:") in _PREPOSITIONS),
                 None,
             )
             if rprep is None or rprep == 0:
                 continue
             prep = right[rprep].lower().rstrip(",.!?;:")
-            left_post_verb = {
-                x.lower().rstrip(",.!?;:") for x in left[vidx + 1 :]
-            }
+            left_post_verb = {x.lower().rstrip(",.!?;:") for x in left[vidx + 1 :]}
             if prep not in left_post_verb:
                 continue
             right_clause = " ".join([*left[: vidx + 1], *right])
@@ -1312,7 +1329,10 @@ class Comprehension:
         "agree": (("with",), ("to",), ("on",)),
         "deal": (("with",),),
         "participate": (("in",),),
-        "result": (("in",), ("from",),),
+        "result": (
+            ("in",),
+            ("from",),
+        ),
         "look": (("like",), ("for",), ("up",)),
         "give": (("rise", "to"), ("back",), ("away",), ("out",), ("up",)),
         "take": (("care", "of"), ("out",), ("back",), ("off",), ("up",), ("over",), ("away",)),
@@ -1327,7 +1347,10 @@ class Comprehension:
         "bring": (("back",), ("in",), ("up",), ("out",)),
         "carry": (("out",),),
         "set": (("down",), ("aside",), ("up",), ("off",)),
-        "throw": (("away",), ("out",),),
+        "throw": (
+            ("away",),
+            ("out",),
+        ),
         "hand": (("in",), ("out",), ("over",)),
         "drop": (("off",),),
         "write": (("down",),),
@@ -1373,19 +1396,43 @@ class Comprehension:
     }
 
     # Determiners that open a noun phrase
-    _DETERMINERS = frozenset({
-        "the", "a", "an", "this", "that", "these", "those",
-        "my", "your", "his", "her", "its", "our", "their",
-        "some", "any", "each", "every", "no", "all", "both",
-    })
+    _DETERMINERS = frozenset(
+        {
+            "the",
+            "a",
+            "an",
+            "this",
+            "that",
+            "these",
+            "those",
+            "my",
+            "your",
+            "his",
+            "her",
+            "its",
+            "our",
+            "their",
+            "some",
+            "any",
+            "each",
+            "every",
+            "no",
+            "all",
+            "both",
+        }
+    )
 
     # Determiners that can ONLY be determiners — a word after one is
     # a noun, never a verb ("the work", "my plan"). Ambiguous
     # determiners like "this"/"that"/"some" double as pronouns
     # ("this works") and are excluded from this set.
-    _PURE_DETERMINERS = frozenset({
-        "the", "a", "an",
-    })
+    _PURE_DETERMINERS = frozenset(
+        {
+            "the",
+            "a",
+            "an",
+        }
+    )
 
     def _extract_proposition(self, clause: str) -> Proposition:
         """Extract a subject-predicate-object triple from a clause.
@@ -1434,13 +1481,9 @@ class Comprehension:
         # These have non-canonical word order: the questioned
         # constituent or expletive sits where the subject would be.
         if is_question and first in _WH_WORDS:
-            return self._extract_wh_proposition(
-                words, first, negated, tense
-            )
+            return self._extract_wh_proposition(words, first, negated, tense)
         if is_question and first in _AUX_VERBS | _COPULAR_VERBS:
-            return self._extract_yesno_proposition(
-                words, first, negated, tense
-            )
+            return self._extract_yesno_proposition(words, first, negated, tense)
         if first == "there" and len(words) > 1 and words[1].lower() in _COPULAR_VERBS:
             return self._extract_there_proposition(words, negated, tense)
 
@@ -1471,9 +1514,7 @@ class Comprehension:
 
         passive = self._detect_passive(is_copular, remaining)
 
-        obj, roles = self._parse_object_and_roles(
-            remaining, is_copular, by_is_agent=passive
-        )
+        obj, roles = self._parse_object_and_roles(remaining, is_copular, by_is_agent=passive)
 
         # For copular verbs, the "object" is an attribute — except
         # in passives, where the participle joins the predicate.
@@ -1493,9 +1534,7 @@ class Comprehension:
             passive=passive,
         )
 
-    def _split_complement_proposition(
-        self, words: list[str]
-    ) -> Proposition | None:
+    def _split_complement_proposition(self, words: list[str]) -> Proposition | None:
         """Parse a that-complement clause ("John believes THAT Mary is
         in the kitchen") into a matrix proposition with the embedded
         clause attached.
@@ -1525,26 +1564,21 @@ class Comprehension:
         # Filter out leading auxiliaries and negation contractions
         # from subject ("I don't believe" → subject="I", not "I don't")
         subject_words = [
-            w for w in words[:verb_idx]
-            if w.lower() not in _AUX_VERBS
-            and w.lower() not in _NEGATION_WORDS
+            w
+            for w in words[:verb_idx]
+            if w.lower() not in _AUX_VERBS and w.lower() not in _NEGATION_WORDS
         ]
         # A word immediately before the verb that looks like an
         # adverb is a pre-verbal modifier, not part of the subject
         # ("I quickly left" → subject "I").
         while subject_words and (
-            subject_words[-1].lower().rstrip(",.!?;:")
-            in self._SPLIT_ADVERBS
-            or self._looks_like_adverb(
-                subject_words[-1].lower().rstrip(",.!?;:")
-            )
+            subject_words[-1].lower().rstrip(",.!?;:") in self._SPLIT_ADVERBS
+            or self._looks_like_adverb(subject_words[-1].lower().rstrip(",.!?;:"))
         ):
             subject_words.pop()
         return " ".join(subject_words).strip() if subject_words else ""
 
-    def _detect_passive(
-        self, is_copular: bool, remaining: list[str]
-    ) -> bool:
+    def _detect_passive(self, is_copular: bool, remaining: list[str]) -> bool:
         """Detect passive voice: copula + past participle.
 
         "water is needed by plants" — the complement is a participle
@@ -1556,11 +1590,7 @@ class Comprehension:
             return False
         for k, cand in enumerate(remaining[:3]):
             cl = cand.lower().rstrip(",.!?;:")
-            if (
-                cl in _NEGATION_WORDS
-                or cl in self._SPLIT_ADVERBS
-                or self._looks_like_adverb(cl)
-            ):
+            if cl in _NEGATION_WORDS or cl in self._SPLIT_ADVERBS or self._looks_like_adverb(cl):
                 continue
             # A relation word taking its own complement is locative,
             # not a participle — "the star IS LEFT OF the moon" is
@@ -1568,8 +1598,7 @@ class Comprehension:
             if (
                 cl in self._POSTNOMINAL_REL
                 and k + 1 < len(remaining)
-                and remaining[k + 1].lower().rstrip(",.!?;:")
-                in self._REL_COMPLEMENT_PREPS
+                and remaining[k + 1].lower().rstrip(",.!?;:") in self._REL_COMPLEMENT_PREPS
             ):
                 return False
             return is_participle(cl)
@@ -1681,14 +1710,16 @@ class Comprehension:
             if comp_start < 0:
                 comp_start = len(rest) - 1
             subject = " ".join(rest[:comp_start])
-            complement = " ".join(rest[comp_start:])
-            roles: dict[SemanticRole, str] = {}
-            if complement:
-                roles[SemanticRole.ATTRIBUTE] = complement
+            # The complement parses exactly as post-copula material in
+            # the declarative would — the question's radical is the
+            # same proposition it asks about, so "is mary in the
+            # kitchen?" carries the locative as LOCATION, matching
+            # "mary is in the kitchen".
+            obj, roles = self._parse_object_and_roles(rest[comp_start:], True)
             return Proposition(
                 subject=subject,
                 predicate=first,
-                object=complement,
+                object=obj,
                 roles=roles,
                 negated=negated,
                 tense=tense,
@@ -1723,9 +1754,7 @@ class Comprehension:
             tense=tense,
         )
 
-    def _absorb_particles(
-        self, words: list[str], verb_idx: int, verb: str
-    ) -> tuple[str, int]:
+    def _absorb_particles(self, words: list[str], verb_idx: int, verb: str) -> tuple[str, int]:
         """Absorb phrasal-verb particles into the predicate.
 
         "depends on memory" → predicate "depends on", object starts
@@ -1745,10 +1774,7 @@ class Comprehension:
         if not patterns:
             return verb, 0
 
-        following = [
-            w.lower().rstrip(",.!?;:")
-            for w in words[verb_idx + 1 : verb_idx + 4]
-        ]
+        following = [w.lower().rstrip(",.!?;:") for w in words[verb_idx + 1 : verb_idx + 4]]
         for pattern in patterns:
             if tuple(following[: len(pattern)]) == pattern:
                 parts = words[verb_idx : verb_idx + 1 + len(pattern)]
@@ -1759,10 +1785,12 @@ class Comprehension:
         """Heuristic: adjective endings used to stop subject-NP growth
         in yes/no questions ("is water clear" — 'clear' is the
         attribute, not part of the subject)."""
-        return word.endswith(
-            ("able", "ible", "al", "ful", "ic", "ive", "less",
-             "ous", "y", "ish", "ent", "ant")
-        ) and len(word) > 3
+        return (
+            word.endswith(
+                ("able", "ible", "al", "ful", "ic", "ive", "less", "ous", "y", "ish", "ent", "ant")
+            )
+            and len(word) > 3
+        )
 
     def _looks_like_adverb(self, word: str) -> bool:
         """Heuristic: -ly adverbs and degree words that open a
@@ -1770,8 +1798,16 @@ class Comprehension:
         if word.endswith("ly") and len(word) > 3:
             return True
         return word in {
-            "very", "really", "quite", "so", "too", "rather",
-            "somewhat", "fairly", "pretty", "truly",
+            "very",
+            "really",
+            "quite",
+            "so",
+            "too",
+            "rather",
+            "somewhat",
+            "fairly",
+            "pretty",
+            "truly",
         }
 
     def _find_main_verb(self, words: list[str]) -> tuple[int, str, bool]:
@@ -1864,10 +1900,7 @@ class Comprehension:
             # noun — "the work", "my plan". Ambiguous determiners
             # ("this", "that", "some", "each") also function as
             # pronouns ("this works"), so they don't block.
-            if (
-                prev_lower in self._PURE_DETERMINERS
-                or prev_lower in _POSSESSIVE_PRONOUNS
-            ):
+            if prev_lower in self._PURE_DETERMINERS or prev_lower in _POSSESSIVE_PRONOUNS:
                 continue
             if word_lower in _PREPOSITIONS or word_lower in _CONJUNCTIONS:
                 continue
@@ -1921,9 +1954,7 @@ class Comprehension:
             # claims the verb slot first: "has exactly TWO of
             # these" is possession, not "exactly" the verb.
             if post_aux_noun >= 0:
-                winner = (
-                    lexical_aux if lexical_aux >= 0 else post_aux_noun
-                )
+                winner = lexical_aux if lexical_aux >= 0 else post_aux_noun
                 return (
                     winner,
                     words[winner].lower().rstrip(",.!?;:"),
@@ -1990,18 +2021,14 @@ class Comprehension:
         opened = False
         for j in range(i):
             prev = words[j].lower().rstrip(",.!?;:")
-            if (
-                prev in self._PURE_DETERMINERS
-                or prev in _POSSESSIVE_PRONOUNS
-            ):
+            if prev in self._PURE_DETERMINERS or prev in _POSSESSIVE_PRONOUNS:
                 opened = True
             elif prev in _PREPOSITIONS or prev in _CONJUNCTIONS:
                 opened = False
         if not opened:
             return False
         return any(
-            w.lower().rstrip(",.!?;:") in _COPULAR_VERBS | _AUX_VERBS
-            for w in words[i + 1 :]
+            w.lower().rstrip(",.!?;:") in _COPULAR_VERBS | _AUX_VERBS for w in words[i + 1 :]
         )
 
     def _detect_tense(self, words: list[str]) -> str:
@@ -2060,9 +2087,7 @@ class Comprehension:
         obj, i = self._collect_object(words, is_copular)
         return self._parse_role_phrases(words, i, obj, by_is_agent)
 
-    def _collect_object(
-        self, words: list[str], is_copular: bool
-    ) -> tuple[str, int]:
+    def _collect_object(self, words: list[str], is_copular: bool) -> tuple[str, int]:
         """Collect the direct object — words until a preposition.
 
         Returns the object string and the index where role parsing
@@ -2092,8 +2117,7 @@ class Comprehension:
                 # the NP rather than opening a clause-level role.
                 if (
                     obj_parts
-                    and obj_parts[-1].lower().rstrip(",.!?;:")
-                    in self._POSTNOMINAL_REL
+                    and obj_parts[-1].lower().rstrip(",.!?;:") in self._POSTNOMINAL_REL
                     and word_lower in self._REL_COMPLEMENT_PREPS
                 ):
                     obj_parts.append(words[i])
@@ -2109,8 +2133,7 @@ class Comprehension:
                         if (
                             nxt in self._POSTNOMINAL_REL
                             and i + 1 < len(words)
-                            and words[i + 1].lower().rstrip(",.!?;:")
-                            in self._REL_COMPLEMENT_PREPS
+                            and words[i + 1].lower().rstrip(",.!?;:") in self._REL_COMPLEMENT_PREPS
                         ):
                             break
                         obj_parts.append(words[i])
@@ -2208,24 +2231,18 @@ class Comprehension:
     # Relation words that take a prepositional complement inside an
     # NP — "left of", "right of", "next to", "far from". When one of
     # these ends the object, the following PP is its complement.
-    _POSTNOMINAL_REL = frozenset(
-        {"left", "right", "next", "far", "apart", "close", "opposite"}
-    )
+    _POSTNOMINAL_REL = frozenset({"left", "right", "next", "far", "apart", "close", "opposite"})
     _REL_COMPLEMENT_PREPS = frozenset({"of", "to", "from"})
 
     # "at + X" idioms that are adverbial modifiers, never locations:
     # "at least two", "at most five", "at first", "at once".
-    _AT_ADVERBIALS = frozenset(
-        {"least", "most", "first", "last", "best", "worst", "once", "all"}
-    )
+    _AT_ADVERBIALS = frozenset({"least", "most", "first", "last", "best", "worst", "once", "all"})
 
     # Relative pronouns that open a restrictive clause modifying the
     # preceding noun phrase — "the machine that has two parts".
     _RELATIVE_PRONOUNS = frozenset({"that", "which", "who"})
 
-    def _split_complement(
-        self, words: list[str]
-    ) -> tuple[int, list[str]] | None:
+    def _split_complement(self, words: list[str]) -> tuple[int, list[str]] | None:
         """Split a verb from its "that"-complement, structurally.
 
         Returns ``(verb_index, tail)`` for a complement clause, else
@@ -2256,17 +2273,14 @@ class Comprehension:
             # this work when the complement opens with its own subject
             # ("that MARY is in the kitchen").
             if not any(
-                self._looks_like_verb(w.lower().rstrip(",.!?;:"))
-                or is_verb_form(w) is not None
+                self._looks_like_verb(w.lower().rstrip(",.!?;:")) or is_verb_form(w) is not None
                 for w in tail
             ):
                 continue
             return j, tail
         return None
 
-    def _extract_relative_propositions(
-        self, propositions: list[Proposition]
-    ) -> list[Proposition]:
+    def _extract_relative_propositions(self, propositions: list[Proposition]) -> list[Proposition]:
         """Split restrictive relative clauses out of objects.
 
         "a machine that has two parts" arrives as one proposition
@@ -2303,7 +2317,7 @@ class Comprehension:
                         or self._looks_like_verb(tail_first)
                     ):
                         continue
-                    rel_clause = f"{' '.join(words[:j])} {' '.join(words[j + 1:])}"
+                    rel_clause = f"{' '.join(words[:j])} {' '.join(words[j + 1 :])}"
                 elif wl.endswith("ing") and is_verb_form(wl):
                     # Reduced relative — "an object containing two
                     # parts" ≡ "an object that contains two parts".
@@ -2412,9 +2426,7 @@ class Comprehension:
         "they" → most recent plural entity or group
         """
         # Object-form pronouns share the subject-form logic
-        pronoun = {"him": "he", "her": "she", "them": "they"}.get(
-            pronoun, pronoun
-        )
+        pronoun = {"him": "he", "her": "she", "them": "they"}.get(pronoun, pronoun)
 
         # Filter out the pronoun itself and the current subject.
         # Conjunct NPs ("salt and pepper", "mind and body") are not
@@ -2426,10 +2438,7 @@ class Comprehension:
             and e.lower() not in _OBJECT_PRONOUNS
             and e.lower() not in _POSSESSIVE_PRONOUNS
             and e != current_prop.subject
-            and (
-                pronoun == "they"
-                or (" and " not in e.lower() and " or " not in e.lower())
-            )
+            and (pronoun == "they" or (" and " not in e.lower() and " or " not in e.lower()))
         ]
 
         if not candidates:
@@ -2638,10 +2647,36 @@ class Comprehension:
             represented.update(re.findall(r"[A-Za-z0-9']+", concept.concept.lower()))
 
         structural = {
-            "a", "an", "the", "and", "or", "but", "if", "then", "to",
-            "of", "in", "on", "at", "for", "with", "by", "from", "is",
-            "are", "was", "were", "be", "been", "am", "do", "does", "did",
-            "not", "no", "yes",
+            "a",
+            "an",
+            "the",
+            "and",
+            "or",
+            "but",
+            "if",
+            "then",
+            "to",
+            "of",
+            "in",
+            "on",
+            "at",
+            "for",
+            "with",
+            "by",
+            "from",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "am",
+            "do",
+            "does",
+            "did",
+            "not",
+            "no",
+            "yes",
         }
         content = [t for t in tokens if t not in structural and len(t) > 1]
         unresolved = [t for t in content if t not in represented]

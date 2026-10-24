@@ -15,13 +15,28 @@ from .types import Concept, ConceptCategory, ConceptModality, Edge, RelationType
 logger = logging.getLogger(__name__)
 
 
+def _note_archive_error(site: str, e: BaseException) -> None:
+    """Report an archive fault, deferring the transient degrades.
+
+    "database is locked" (WAL writer contention) and "Cannot operate
+    on a closed database" (connection closed during shutdown while a
+    reader was mid-flight) are temporary-unavailability states, not
+    faults — the operation can simply happen later. Everything else
+    still counts.
+    """
+    if isinstance(e, sqlite3.Error) and ("locked" in str(e) or "closed" in str(e)):
+        logger.debug("archive temporarily unavailable at %s — deferred", site)
+        return
+    note_swallowed(site, e)
+
+
 class ArchivalMixin:
     """Mixin for :class:`ConceptNetwork` — see module docstring."""
+
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see the package's core module).
         def __getattr__(self, name: str) -> Any: ...
-
 
     def attach_archive(self, archive: Any) -> None:
         """Attach a long-term memory archive to this network.
@@ -34,6 +49,7 @@ class ArchivalMixin:
             archive: A ``ConceptArchive`` instance.
         """
         self._archive = archive
+
     def purge_archived_concepts(self, concept_ids: list[str]) -> int:
         """Permanently remove selected concepts from long-term archive."""
         if self._archive is None or not concept_ids:
@@ -60,11 +76,12 @@ class ArchivalMixin:
         try:
             return self._archive.has_concept(cid)
         except (sqlite3.Error, RuntimeError) as e:
-            note_swallowed(
+            _note_archive_error(
                 "temporal_lobe.concepts.archival.has_concept_anywhere",
                 e,
             )
             return False
+
     @property
     def all_concept_ids(self) -> list[str]:
         """All concept IDs across working memory AND the archive.
@@ -84,11 +101,12 @@ class ArchivalMixin:
             try:
                 ids.update(self._archive.get_all_ids())
             except (sqlite3.Error, RuntimeError) as e:
-                note_swallowed(
+                _note_archive_error(
                     "temporal_lobe.concepts.archival.all_concept_ids",
                     e,
                 )
         return list(ids)
+
     def restore_archive_to_working_memory(self) -> int:
         """Recall ALL archived concepts back into working memory.
 
@@ -124,13 +142,13 @@ class ArchivalMixin:
             self._add_alias(concept.id, concept.id)
             for alias in concept.aliases:
                 self._add_alias(alias, concept.id)
-            for col in (concept.columns or {_column_of(concept.origin, concept.id)}):
+            for col in concept.columns or {_column_of(concept.origin, concept.id)}:
                 self._column_index.setdefault(col, set()).add(concept.id)
             # Recall archived edges for this concept.
             try:
                 archived_edges = self._archive.recall_edges(concept.id)
             except (sqlite3.Error, RuntimeError) as e:
-                note_swallowed(
+                _note_archive_error(
                     "temporal_lobe.concepts.archival.restore_archive_to_working_memory",
                     e,
                 )
@@ -145,9 +163,7 @@ class ArchivalMixin:
                     continue
                 # A live edge log never materializes derivable edges —
                 # they are recomputed by the similarity provider.
-                if self._edge_log is not None and is_derivable_edge(
-                    relation, e_data["origin"]
-                ):
+                if self._edge_log is not None and is_derivable_edge(relation, e_data["origin"]):
                     continue
                 edge = Edge(
                     source=e_data["source"],
@@ -163,14 +179,18 @@ class ArchivalMixin:
                 self._edge_key_index[key] = edge
                 if self._edge_log is not None:
                     self._edge_log.assert_edge(
-                        edge.source, edge.target, edge.relation,
-                        edge.weight, edge.origin, edge.created_at,
+                        edge.source,
+                        edge.target,
+                        edge.relation,
+                        edge.weight,
+                        edge.origin,
+                        edge.created_at,
                     )
             # Remove from the archive (concept + aliases).
             try:
                 self._archive.recall_concept(concept_id)
             except (sqlite3.Error, RuntimeError) as e:
-                note_swallowed(
+                _note_archive_error(
                     "temporal_lobe.concepts.archival.restore_archive_to_working_memory",
                     e,
                 )
@@ -182,11 +202,13 @@ class ArchivalMixin:
         self._search_index: dict[str, set[str]] | None = None
         if recalled > 0:
             logger.info(
-                "Restored %d concepts from archive to working memory "
-                "(working: %d, archive: %d)",
-                recalled, len(self._concepts), self.archive_size,
+                "Restored %d concepts from archive to working memory (working: %d, archive: %d)",
+                recalled,
+                len(self._concepts),
+                self.archive_size,
             )
         return recalled
+
     def dedupe_archive(self) -> int:
         """Drop archive rows for concepts present in working memory.
 
@@ -211,16 +233,16 @@ class ArchivalMixin:
                 return 0
             removed = self._archive.remove_concepts_batch(dupes)
         except (sqlite3.Error, RuntimeError) as e:
-            note_swallowed(
+            _note_archive_error(
                 "temporal_lobe.concepts.archival.dedupe_archive",
                 e,
             )
             return 0
         if removed > 0:
             logger.info(
-                "Deduped %d stale archive rows duplicated in working "
-                "memory (archive: %d)",
-                removed, self.archive_size,
+                "Deduped %d stale archive rows duplicated in working memory (archive: %d)",
+                removed,
+                self.archive_size,
             )
         return removed
 
@@ -236,25 +258,25 @@ class ArchivalMixin:
             # A live edge log never stores derivable edges anywhere —
             # not in the archive either; the similarity provider
             # recomputes them on demand.
-            if self._edge_log is not None and is_derivable_edge(
-                edge.relation, edge.origin
-            ):
+            if self._edge_log is not None and is_derivable_edge(edge.relation, edge.origin):
                 continue
             if edge.source in to_spill or edge.target in to_spill:
                 spilled.append(edge)
-                edge_dicts.append({
-                    "source": edge.source,
-                    "target": edge.target,
-                    "relation": edge.relation.value,
-                    "weight": edge.weight,
-                    "created_at": edge.created_at,
-                    "origin": edge.origin,
-                })
+                edge_dicts.append(
+                    {
+                        "source": edge.source,
+                        "target": edge.target,
+                        "relation": edge.relation.value,
+                        "weight": edge.weight,
+                        "created_at": edge.created_at,
+                        "origin": edge.origin,
+                    }
+                )
         if edge_dicts:
             try:
                 self._archive.archive_edges_batch(edge_dicts)
             except (sqlite3.Error, RuntimeError) as e:
-                note_swallowed(
+                _note_archive_error(
                     "temporal_lobe.concepts.archival._archive_spilled_edges",
                     e,
                 )
@@ -281,7 +303,9 @@ class ArchivalMixin:
                 for edge in spilled:
                     try:
                         self._edge_log.retract_edge(
-                            edge.source, edge.target, edge.relation,
+                            edge.source,
+                            edge.target,
+                            edge.relation,
                         )
                     except (OSError, ValueError) as e:
                         logger.warning(
@@ -313,6 +337,7 @@ class ArchivalMixin:
         self._world_concept_ids_cache = None
         self._quality_concept_ids_cache = None
         self._search_index = None
+
     def spill_dormant(
         self,
         activation_threshold: float = 0.01,
@@ -357,10 +382,15 @@ class ArchivalMixin:
         # autonomous learner output) SHOULD be spilled, not kept in
         # working memory forever.
         if protected_origins is None:
-            protected_origins = frozenset({
-                "identity", "introspection", "foundational",
-                "seeded", "structural",
-            })
+            protected_origins = frozenset(
+                {
+                    "identity",
+                    "introspection",
+                    "foundational",
+                    "seeded",
+                    "structural",
+                }
+            )
 
         # Under the cap, so there is nothing to spill. Archiving is a
         # memory-pressure valve, not a dormancy sweep: activation alone
@@ -368,13 +398,12 @@ class ArchivalMixin:
         if len(self._concepts) <= max_in_memory:
             logger.debug(
                 "spill_dormant: %d concepts is within the %d budget",
-                len(self._concepts), max_in_memory,
+                len(self._concepts),
+                max_in_memory,
             )
             return 0
 
-        to_spill = self._spill_candidates(
-            activation_threshold, protected_origins, max_in_memory
-        )
+        to_spill = self._spill_candidates(activation_threshold, protected_origins, max_in_memory)
         if not to_spill:
             return 0
         return self._commit_spill(to_spill)
@@ -408,7 +437,9 @@ class ArchivalMixin:
                 "spill_dormant: %d concepts over the %d budget but none "
                 "are dormant (activation < %.3f, never reviewed, origin "
                 "not protected); working memory cannot be trimmed",
-                len(self._concepts), max_in_memory, activation_threshold,
+                len(self._concepts),
+                max_in_memory,
+                activation_threshold,
             )
             return set()
         return {cid for _, cid in spillable[:n_to_spill]}
@@ -472,11 +503,12 @@ class ArchivalMixin:
                 "disk but still resident; the next spill will treat "
                 "them as spillable again. This is a bug in "
                 "_remove_spilled_from_working_memory.",
-                spilled, before, after,
+                spilled,
+                before,
+                after,
             )
         logger.info(
-            "Spilled %d dormant concepts to archive "
-            "(working: %d, archive: %d)",
+            "Spilled %d dormant concepts to archive (working: %d, archive: %d)",
             spilled,
             len(self._concepts),
             archive_count,
@@ -502,6 +534,7 @@ class ArchivalMixin:
             "modality": concept.modality.value,
             "is_semantic_hub": concept.is_semantic_hub,
         }
+
     def _dict_to_concept(self, data: dict[str, Any]) -> Concept:
         """Deserialize a dict back into a Concept."""
         try:
@@ -528,6 +561,7 @@ class ArchivalMixin:
             modality=modality,
             is_semantic_hub=bool(data.get("is_semantic_hub", False)),
         )
+
     def _recall_from_archive_by_id(self, concept_id: str) -> Concept | None:
         """Recall a concept from the archive by canonical ID.
 
@@ -545,8 +579,22 @@ class ArchivalMixin:
             return None
         try:
             data = self._archive.recall_concept(concept_id)
+        except (sqlite3.OperationalError, sqlite3.ProgrammingError) as e:
+            # "database is locked" and "closed database" are the
+            # documented temporary-unavailability degrades — a
+            # concurrent writer holds the WAL lock, or the archive
+            # closed during shutdown; the recall can simply happen
+            # later. Not faults; other sqlite errors still count.
+            if "locked" in str(e) or "closed" in str(e):
+                logger.debug("archive unavailable during recall of %s — deferred", concept_id)
+            else:
+                _note_archive_error(
+                    "temporal_lobe.concepts.archival._recall_from_archive_by_id",
+                    e,
+                )
+            return None
         except (sqlite3.Error, RuntimeError) as e:
-            note_swallowed(
+            _note_archive_error(
                 "temporal_lobe.concepts.archival._recall_from_archive_by_id",
                 e,
             )
@@ -560,15 +608,22 @@ class ArchivalMixin:
         for alias in concept.aliases:
             self._add_alias(alias, concept.id)
         # Restore column index
-        for col in (concept.columns or {_column_of(concept.origin, concept.id)}):
+        for col in concept.columns or {_column_of(concept.origin, concept.id)}:
             self._column_index.setdefault(col, set()).add(concept.id)
 
         # Restore archived edges that are no longer in working memory.
         # Edges that survived in working memory are left untouched.
         try:
             archived_edges = self._archive.recall_edges(concept.id)
+        except (sqlite3.OperationalError, sqlite3.ProgrammingError) as e:
+            if "locked" not in str(e) and "closed" not in str(e):
+                _note_archive_error(
+                    "temporal_lobe.concepts.archival._recall_from_archive_by_id",
+                    e,
+                )
+            archived_edges = []
         except (sqlite3.Error, RuntimeError) as e:
-            note_swallowed(
+            _note_archive_error(
                 "temporal_lobe.concepts.archival._recall_from_archive_by_id",
                 e,
             )
@@ -582,9 +637,7 @@ class ArchivalMixin:
             if key in self._edge_key_index:
                 continue  # live edge exists — skip
             # A live edge log never materializes derivable edges.
-            if self._edge_log is not None and is_derivable_edge(
-                relation, e_data["origin"]
-            ):
+            if self._edge_log is not None and is_derivable_edge(relation, e_data["origin"]):
                 continue
             edge = Edge(
                 source=e_data["source"],
@@ -600,8 +653,12 @@ class ArchivalMixin:
             self._edge_key_index[key] = edge
             if self._edge_log is not None:
                 self._edge_log.assert_edge(
-                    edge.source, edge.target, edge.relation,
-                    edge.weight, edge.origin, edge.created_at,
+                    edge.source,
+                    edge.target,
+                    edge.relation,
+                    edge.weight,
+                    edge.origin,
+                    edge.created_at,
                 )
 
         # Invalidate caches
@@ -610,6 +667,7 @@ class ArchivalMixin:
         self._quality_concept_ids_cache = None
         self._search_index = None
         return concept
+
     def _recall_from_archive_by_alias(self, alias: str) -> str | None:
         """Recall a concept from the archive by alias.
 
@@ -631,10 +689,11 @@ class ArchivalMixin:
         try:
             concept_ids = self._archive.find_by_alias(alias)
         except (sqlite3.Error, RuntimeError) as e:
-            note_swallowed(
-                "temporal_lobe.concepts.archival._recall_from_archive_by_alias",
-                e,
-            )
+            if "locked" not in str(e) and "closed" not in str(e):
+                _note_archive_error(
+                    "temporal_lobe.concepts.archival._recall_from_archive_by_alias",
+                    e,
+                )
             return None
         if not concept_ids:
             return None

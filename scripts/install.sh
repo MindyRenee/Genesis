@@ -53,6 +53,15 @@ if [ "$uninstall" -eq 1 ]; then
     rm -f "$UNIT"
     rm -f "$USER_BIN/genesis"
     rm -f "$AGENT_CONF/agent.env"
+    # Man pages installed from docs/man/ live in the user man dir.
+    MAN_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/man"
+    if [ -d "$REPO/docs/man" ]; then
+        for page in "$REPO"/docs/man/*.[0-9]; do
+            [ -e "$page" ] || continue
+            section="${page##*.}"
+            rm -f "$MAN_HOME/man$section/$(basename "$page")"
+        done
+    fi
     rm -rf "$VENV"
     rmdir "$INSTALL_HOME" "$AGENT_CONF" 2>/dev/null || true
     say "Done. Her state remains at \${XDG_DATA_HOME:-~/.local/share}/genesis."
@@ -106,6 +115,32 @@ if [ -f "$REPO/.genesis-discord" ] && [ ! -f "$AGENT_CONF/agent.env" ]; then
         chmod 600 "$AGENT_CONF/agent.env"
         say "Wrote $AGENT_CONF/agent.env (Discord mirror)"
     fi
+fi
+
+# ── 3b. Man pages ──────────────────────────────────────────────────
+# Sources live in docs/man/ so they version with the code they
+# describe. Installed to the user man dir — manpath puts
+# ~/.local/share/man ahead of /usr/local/man, so these shadow any
+# stale system copies without needing root.
+MAN_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/man"
+GENESIS_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/genesis"
+if [ -d "$REPO/docs/man" ]; then
+    for page in "$REPO"/docs/man/*.[0-9]; do
+        [ -e "$page" ] || continue
+        section="${page##*.}"
+        mkdir -p "$MAN_HOME/man$section"
+        if [ -d "$GENESIS_DATA" ]; then
+            # She exists — her man pages are hers. A changed page waits
+            # in her man_review queue (drift-scan picks it up at boot);
+            # nothing edits her manual without her say.
+            if ! cmp -s "$page" "$MAN_HOME/man$section/$(basename "$page")"; then
+                say "Man page change staged for her review: $(basename "$page")"
+            fi
+        else
+            cp "$page" "$MAN_HOME/man$section/"
+        fi
+    done
+    say "Man pages installed to $MAN_HOME (man genesis, man genesis-daemon, ...)"
 fi
 
 # ── 4. systemd user service ─────────────────────────────────────────

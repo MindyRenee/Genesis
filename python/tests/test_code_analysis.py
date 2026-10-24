@@ -24,12 +24,11 @@ def _symbol(analysis, name):
     for sym in analysis.symbols:
         if sym.name == name:
             return sym
-    raise AssertionError(
-        f"no symbol {name!r}; found {[s.name for s in analysis.symbols]}"
-    )
+    raise AssertionError(f"no symbol {name!r}; found {[s.name for s in analysis.symbols]}")
 
 
 # ─── Functions ─────────────────────────────────────────────────
+
 
 def test_parses_function_with_params_and_return():
     analysis = analyze_python_source(
@@ -54,16 +53,12 @@ def test_plain_function_is_not_async():
     The Rust analyzer sets this from `sig.asyncness`, so the two
     implementations of the same analysis disagreed.
     """
-    analysis = analyze_python_source(
-        "def plain():\n    return 1\n", "m.py"
-    )
+    analysis = analyze_python_source("def plain():\n    return 1\n", "m.py")
     assert _symbol(analysis, "plain").is_async is False
 
 
 def test_async_function_is_marked_async():
-    analysis = analyze_python_source(
-        "async def fetch(url: str) -> str:\n    return url\n", "m.py"
-    )
+    analysis = analyze_python_source("async def fetch(url: str) -> str:\n    return url\n", "m.py")
     func = _symbol(analysis, "fetch")
     assert func.is_async is True, (
         "an `async def` must be distinguishable from a `def`; "
@@ -88,6 +83,7 @@ def test_async_method_is_marked_async():
 
 
 # ─── Classes and methods ───────────────────────────────────────
+
 
 def test_method_is_distinguished_from_function():
     """A method's enclosing scope is its class — the definition of one."""
@@ -119,6 +115,7 @@ def test_nested_function_is_not_lifted_into_the_class():
 
 
 # ─── Complexity ────────────────────────────────────────────────
+
 
 def test_complexity_counts_decision_points():
     analysis = analyze_python_source(
@@ -156,10 +153,10 @@ def test_avg_and_max_complexity_ignore_classes():
 
 # ─── Call graph ────────────────────────────────────────────────
 
+
 def test_records_call_edges_between_symbols():
     analysis = analyze_python_source(
-        "def helper():\n    return 1\n"
-        "def caller():\n    return helper()\n",
+        "def helper():\n    return 1\ndef caller():\n    return helper()\n",
         "m.py",
     )
     callees = {edge.callee for edge in analysis.call_edges}
@@ -168,9 +165,7 @@ def test_records_call_edges_between_symbols():
 
 def test_builtin_calls_are_not_edges():
     """`print` fires constantly and would drown the real call graph."""
-    analysis = analyze_python_source(
-        "def noisy():\n    print(len([1, 2]))\n", "m.py"
-    )
+    analysis = analyze_python_source("def noisy():\n    print(len([1, 2]))\n", "m.py")
     callees = {edge.callee for edge in analysis.call_edges}
     assert "print" not in callees
     assert "len" not in callees
@@ -201,9 +196,7 @@ def test_impact_of_unknown_symbol_reports_not_found():
 
 
 def test_summarize_reports_shape():
-    analysis = analyze_python_source(
-        "class C:\n    def m(self):\n        return 1\n", "m.py"
-    )
+    analysis = analyze_python_source("class C:\n    def m(self):\n        return 1\n", "m.py")
     summary = summarize(analysis)
     assert summary["symbol_counts"] == {"class": 1, "method": 1}
     assert summary["language"] == "python"
@@ -232,18 +225,15 @@ def test_summarize_lists_hot_spots_by_complexity():
 
 # ─── Imports and summaries ─────────────────────────────────────
 
+
 def test_collects_imports():
-    analysis = analyze_python_source(
-        "import os\nfrom pathlib import Path\n", "m.py"
-    )
+    analysis = analyze_python_source("import os\nfrom pathlib import Path\n", "m.py")
     assert "os" in analysis.imports
     assert any("Path" in i for i in analysis.imports)
 
 
 def test_module_docstring_and_line_count():
-    analysis = analyze_python_source(
-        '"""Module docs."""\n\ndef f():\n    return 1\n', "m.py"
-    )
+    analysis = analyze_python_source('"""Module docs."""\n\ndef f():\n    return 1\n', "m.py")
     assert analysis.docstring == "Module docs."
     assert analysis.lines > 0
 

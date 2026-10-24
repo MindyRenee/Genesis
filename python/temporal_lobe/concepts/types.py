@@ -21,6 +21,8 @@ class CorticalLayer(Enum):
     L2_3 = "L2_3"
     L5 = "L5"
     L6 = "L6"
+
+
 class RelationType(Enum):
     """Types of relationships between concepts.
 
@@ -63,9 +65,13 @@ class RelationType(Enum):
     # A calls function B" with "curiosity leads_to learning".
     CALLS = "calls"  # function A calls function B (code call graph)
     DEFINES = "defines"  # module/class A defines member B (code structure)
+
+
 def _is_typed_relation(rel: RelationType) -> bool:
     """True if this relation type carries semantic meaning (not just co-occurrence)."""
     return rel not in _UNTYPED_RELATIONS
+
+
 class ConceptCategory(Enum):
     """Category of a concept, modeling the biological distinction between
     living and non-living things.
@@ -92,6 +98,8 @@ class ConceptCategory(Enum):
     ABSTRACT = "abstract"  # concepts without physical form (ideas, emotions)
     EVENT = "event"  # actions, processes, occurrences
     UNKNOWN = "unknown"  # not yet categorized
+
+
 class ConceptModality(Enum):
     """Sensorimotor modality of a concept.
 
@@ -121,6 +129,8 @@ class ConceptModality(Enum):
     ABSTRACT = "abstract"  # no single sensory-motor anchor (ideas, emotions)
     MIXED = "mixed"  # spans multiple modalities
     UNKNOWN = "unknown"  # not yet classified
+
+
 @dataclass
 class Concept:
     """A concept in Genesis's mind.
@@ -175,6 +185,8 @@ class Concept:
         parts.append(f"confidence={self.confidence:.2f}")
         parts.append(f"activation={self.activation:.2f}")
         return " ".join(parts)
+
+
 @dataclass
 class Edge:
     """A typed relationship between two concepts."""
@@ -185,6 +197,8 @@ class Edge:
     weight: float = 0.5  # 0..1, strength of the relationship
     created_at: int = field(default_factory=lambda: int(time.time() * 1000))
     origin: str = "inferred"  # "stated", "inferred", "observed"
+
+
 @dataclass(frozen=True)
 class Neighbor:
     """A neighboring concept with the provenance of the association.
@@ -224,6 +238,8 @@ class Provenance:
     def from_concept(cls, text: str, concept: Concept) -> Provenance:
         """Build a Provenance record from a concept's origin."""
         return cls(text=text, origin=concept.origin, is_seed=is_seed_origin(concept.origin))
+
+
 def is_seed_origin(origin: str) -> bool:
     """Return True if this origin marks developer-authored seed content.
 
@@ -234,16 +250,22 @@ def is_seed_origin(origin: str) -> bool:
     return origin in _SEED_ORIGINS
 
 
-_UNTYPED_RELATIONS = frozenset({
-    RelationType.RELATED_TO,
-    RelationType.BRIDGES,
-})
+_UNTYPED_RELATIONS = frozenset(
+    {
+        RelationType.RELATED_TO,
+        RelationType.BRIDGES,
+    }
+)
 
-_SEED_ORIGINS: frozenset[str] = frozenset({
-    # Concept origins
-    "seeded", "structural",
-    # Edge origins
-    "vocabulary_seed",
-    "relation_verb_seed", "relation_phrase_seed",
-    "narrative_template_seed",
-})
+_SEED_ORIGINS: frozenset[str] = frozenset(
+    {
+        # Concept origins
+        "seeded",
+        "structural",
+        # Edge origins
+        "vocabulary_seed",
+        "relation_verb_seed",
+        "relation_phrase_seed",
+        "narrative_template_seed",
+    }
+)

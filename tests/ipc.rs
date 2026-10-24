@@ -1081,6 +1081,8 @@ fn test_get_body_state() {
         entropy_level: 1.0,
         clocksource: 1,  // tsc
         suspend_caps: 3, // mem sleep + RTC wakealarm
+        rest: 0.3,       // moderate idle residency under load
+        temp_trend: 0.05,
         // Empty — the daemon sends structured fields; the cognitive
         // mind's language engine composes the description.
         description: String::new(),
@@ -1212,6 +1214,8 @@ fn test_get_body_state() {
         entropy_level: 1.0,
         clocksource: 1,
         suspend_caps: 3,
+        rest: 0.6, // light load — the body mostly idles
+        temp_trend: 0.0,
         // Empty — the daemon sends structured fields; the cognitive
         // mind's language engine composes the description.
         description: String::new(),
@@ -1287,6 +1291,8 @@ fn test_get_body_state() {
         entropy_level: 0.5,
         clocksource: 1,
         suspend_caps: 3,
+        rest: 0.0, // the body is working, not resting
+        temp_trend: 0.0,
         // Empty — the cognitive mind's language engine composes the
         // description from the structured fields, not the daemon.
         description: String::new(),
@@ -1394,6 +1400,8 @@ fn test_get_body_state() {
         entropy_level: 1.0,
         clocksource: 1,
         suspend_caps: 3,
+        rest: 0.0,
+        temp_trend: 0.0,
         description: String::new(),
     };
     publish_body_state(&no_rapl);
@@ -1734,4 +1742,98 @@ fn test_get_ion_summary() {
     );
     assert!(ions.atp_availability > 0.0);
     assert!(ions.gradient_integrity > 0.9);
+}
+
+// ─── Code analysis — the daemon's structural sense ────────────
+
+#[test]
+fn test_analyze_code() {
+    let mut sys = IpcTestSystem::new("analyze");
+    sys.start_server();
+
+    let source = br#"
+pub fn helper(x: i32) -> i32 {
+    x + 1
+}
+"#;
+    let path = b"demo.rs";
+    let mut payload = Vec::new();
+    payload.extend_from_slice(&(path.len() as u16).to_le_bytes());
+    payload.extend_from_slice(path);
+    payload.extend_from_slice(&(source.len() as u32).to_le_bytes());
+    payload.extend_from_slice(source);
+
+    let mut client = sys.client();
+    let resp = client
+        .request(genesis::daemon::ipc::cmd::ANALYZE_CODE, &payload)
+        .expect("request");
+    assert_eq!(resp[0], 1, "ack");
+    let report = String::from_utf8_lossy(&resp[1..]);
+    assert!(report.contains("file\tdemo.rs"));
+    assert!(report.contains("functions\t1"));
+    assert!(report.contains("unit\tfunction\thelper\t"));
+}
+
+#[test]
+fn test_analyze_code_parse_error() {
+    let mut sys = IpcTestSystem::new("analyze_bad");
+    sys.start_server();
+
+    let path = b"bad.rs";
+    let source = b"fn broken( {";
+    let mut payload = Vec::new();
+    payload.extend_from_slice(&(path.len() as u16).to_le_bytes());
+    payload.extend_from_slice(path);
+    payload.extend_from_slice(&(source.len() as u32).to_le_bytes());
+    payload.extend_from_slice(source);
+
+    let mut client = sys.client();
+    let resp = client
+        .request(genesis::daemon::ipc::cmd::ANALYZE_CODE, &payload)
+        .expect("request");
+    assert_eq!(resp[0], genesis::daemon::ipc::error::INVALID_VALUE);
+}
+
+#[test]
+fn test_analyze_code_short_payload() {
+    let mut sys = IpcTestSystem::new("analyze_short");
+    sys.start_server();
+
+    let mut client = sys.client();
+    let resp = client
+        .request(genesis::daemon::ipc::cmd::ANALYZE_CODE, &[0, 0])
+        .expect("request");
+    assert_eq!(resp[0], genesis::daemon::ipc::error::PAYLOAD_TOO_SHORT);
+}
+
+// ─── Re-inhabitation — the living mind's PID ────────────────
+
+#[test]
+fn test_set_cognitive_pid() {
+    // A re-inhabiting mind pushes its PID so the body measures the
+    // living process rather than the dead launcher's env var.
+    let mut sys = IpcTestSystem::new("cognitive_pid");
+    sys.start_server();
+
+    let mut client = sys.client();
+    let resp = client
+        .request(
+            genesis::daemon::ipc::cmd::SET_COGNITIVE_PID,
+            &4242u32.to_le_bytes(),
+        )
+        .expect("request");
+    assert_eq!(resp[0], 1, "ack");
+    assert_eq!(genesis::daemon::cpufreq::cognitive_pid(), Some(4242));
+}
+
+#[test]
+fn test_set_cognitive_pid_short_payload() {
+    let mut sys = IpcTestSystem::new("cognitive_pid_short");
+    sys.start_server();
+
+    let mut client = sys.client();
+    let resp = client
+        .request(genesis::daemon::ipc::cmd::SET_COGNITIVE_PID, &[1, 2])
+        .expect("request");
+    assert_eq!(resp[0], genesis::daemon::ipc::error::PAYLOAD_TOO_SHORT);
 }

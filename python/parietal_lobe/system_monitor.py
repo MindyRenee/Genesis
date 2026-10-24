@@ -84,6 +84,13 @@ class SystemSnapshot:
     cpu_governor: str = ""
     cpu_mhz: int = 0
 
+    # Own burn — how hard she is actually working: this process's
+    # CPU% (one core = 100) and resident memory. These are hers, not
+    # the machine's — the channel that answers "am *I* straining"
+    # rather than "is the room crowded."
+    self_cpu_percent: float = 0.0
+    self_memory_mb: float = 0.0
+
     # Memory
     memory_total_gb: float = 0.0
     memory_used_gb: float = 0.0
@@ -123,8 +130,7 @@ class SystemSnapshot:
             f"with {self.cpu_count} CPU cores",
             f"and {self.memory_total_gb:.1f} GB of memory",
             f"(using {self.memory_percent:.0f}% right now).",
-            f"project is {self.project_size_mb:.1f} MB "
-            f"across {self.project_file_count} files.",
+            f"project is {self.project_size_mb:.1f} MB across {self.project_file_count} files.",
         ]
         if self.disk_percent > 80:
             parts.append(f"Disk is {self.disk_percent:.0f}% full — getting tight.")
@@ -132,8 +138,12 @@ class SystemSnapshot:
             parts.append("memory usage high — cramped.")
         if self.load_avg[0] > self.cpu_count:
             parts.append(
-                f"system load is {self.load_avg[0]:.1f} "
-                f"— higher than CPU count. things are busy."
+                f"system load is {self.load_avg[0]:.1f} — higher than CPU count. things are busy."
+            )
+        if self.self_cpu_percent > 50:
+            parts.append(
+                f"she herself is working at {self.self_cpu_percent:.0f}% "
+                f"of a core, {self.self_memory_mb:.0f} MB resident."
             )
         if self.cores_mine and self.cores_mine < self.cpu_count:
             parts.append(
@@ -141,9 +151,7 @@ class SystemSnapshot:
                 "available — running below her reach."
             )
         if self.cpu_governor and self.cpu_governor != "unknown":
-            parts.append(
-                f"cpu governor {self.cpu_governor}, {self.cpu_mhz} MHz."
-            )
+            parts.append(f"cpu governor {self.cpu_governor}, {self.cpu_mhz} MHz.")
         return " ".join(parts)
 
     def concerns(self) -> list[str]:
@@ -166,13 +174,36 @@ class SystemSnapshot:
             )
         if self.process_count > 500:
             concerns.append(
-                f"{self.process_count} processes running — "
-                f"a lot of activity on this machine"
+                f"{self.process_count} processes running — a lot of activity on this machine"
             )
+        return concerns
+
+    def self_concerns(self) -> list[str]:
+        """Concerns about *her own* state — not the machine's.
+
+        The channel split: ``concerns()`` is environmental awareness
+        (the room is crowded — global load, global memory, process
+        count); this list is body distress (something is wrong with
+        *her* — her reach is limited, her own footprint is pressing,
+        her persistence medium is nearly gone). Foreign load belongs
+        to the room and never lands here.
+        """
+        concerns: list[str] = []
         if self.cores_mine and self.cpu_count and self.cores_mine < self.cpu_count:
             concerns.append(
                 f"CPU affinity is restricted — only {self.cores_mine} "
                 f"of {self.cpu_count} cores available"
+            )
+        total_mb = self.memory_total_gb * 1024
+        if total_mb and self.self_memory_mb > 0.6 * total_mb:
+            concerns.append(
+                f"Using {self.self_memory_mb:.0f} MB of "
+                f"{self.memory_total_gb:.1f} GB herself — "
+                "her own footprint is heavy"
+            )
+        if self.disk_percent > 95:
+            concerns.append(
+                f"Disk is {self.disk_percent:.0f}% full — her persistence medium is nearly gone"
             )
         return concerns
 
@@ -228,9 +259,7 @@ class MetricStats:
         """Maximum sample value, or 0.0 if empty."""
         return max(self.samples) if self.samples else 0.0
 
-    def is_deviation(
-        self, value: float, threshold: float = 2.0, min_std: float = 0.0
-    ) -> bool:
+    def is_deviation(self, value: float, threshold: float = 2.0, min_std: float = 0.0) -> bool:
         """Whether a value deviates from the baseline by >threshold std devs.
 
         Requires at least 10 samples before deviations can be detected —
@@ -292,9 +321,7 @@ class SystemBaseline:
 
     def __init__(self, persist_path: Path | None = None) -> None:
         """Initialize the baseline with empty metrics and optional persistence path."""
-        self._metrics: dict[str, MetricStats] = {
-            name: MetricStats() for name in self._METRIC_NAMES
-        }
+        self._metrics: dict[str, MetricStats] = {name: MetricStats() for name in self._METRIC_NAMES}
         self._persist_path = persist_path
         if persist_path and persist_path.exists():
             self.load()
@@ -312,9 +339,7 @@ class SystemBaseline:
         if total > 0 and total % 10 == 0:
             self.save()
 
-    def deviations(
-        self, snapshot: SystemSnapshot, threshold: float = 2.0
-    ) -> list[str]:
+    def deviations(self, snapshot: SystemSnapshot, threshold: float = 2.0) -> list[str]:
         """Return a list of human-readable deviations from baseline.
 
         Each entry describes a metric that is currently outside its
@@ -326,31 +351,51 @@ class SystemBaseline:
         # (name, value, min_std, template)
         # min_std prevents false positives from tightly-clustered samples
         checks = [
-            ("cpu_percent", snapshot.cpu_percent, 2.0,
-             "CPU usage is at {val:.0f}% — normally around {mean:.0f}% "
-             "(±{std:.0f}%)"),
-            ("memory_percent", snapshot.memory_percent, 1.0,
-             "Memory usage is at {val:.0f}% — normally around {mean:.0f}% "
-             "(±{std:.0f}%)"),
-            ("swap_used_gb", snapshot.swap_used_gb, 0.05,
-             "Swap usage is at {val:.1f} GB — normally around {mean:.1f} GB "
-             "(±{std:.1f} GB). Something may be consuming extra memory."),
-            ("load_avg_1", snapshot.load_avg[0], 0.1,
-             "System load is {val:.1f} — normally around {mean:.1f} "
-             "(±{std:.1f}). The machine is busier than usual."),
-            ("process_count", float(snapshot.process_count), 5.0,
-             "{val:.0f} processes running — normally around {mean:.0f} "
-             "(±{std:.0f}). Process count is unusual."),
-            ("disk_percent", snapshot.disk_percent, 0.1,
-             "Disk usage is at {val:.0f}% — normally around {mean:.0f}% "
-             "(±{std:.0f}%). Disk usage has changed."),
+            (
+                "cpu_percent",
+                snapshot.cpu_percent,
+                2.0,
+                "CPU usage is at {val:.0f}% — normally around {mean:.0f}% (±{std:.0f}%)",
+            ),
+            (
+                "memory_percent",
+                snapshot.memory_percent,
+                1.0,
+                "Memory usage is at {val:.0f}% — normally around {mean:.0f}% (±{std:.0f}%)",
+            ),
+            (
+                "swap_used_gb",
+                snapshot.swap_used_gb,
+                0.05,
+                "Swap usage is at {val:.1f} GB — normally around {mean:.1f} GB "
+                "(±{std:.1f} GB). Something may be consuming extra memory.",
+            ),
+            (
+                "load_avg_1",
+                snapshot.load_avg[0],
+                0.1,
+                "System load is {val:.1f} — normally around {mean:.1f} "
+                "(±{std:.1f}). The machine is busier than usual.",
+            ),
+            (
+                "process_count",
+                float(snapshot.process_count),
+                5.0,
+                "{val:.0f} processes running — normally around {mean:.0f} "
+                "(±{std:.0f}). Process count is unusual.",
+            ),
+            (
+                "disk_percent",
+                snapshot.disk_percent,
+                0.1,
+                "Disk usage is at {val:.0f}% — normally around {mean:.0f}% "
+                "(±{std:.0f}%). Disk usage has changed.",
+            ),
         ]
         for name, value, min_std, template in checks:
             metric = self._metrics[name]
             if metric.is_deviation(value, threshold, min_std=min_std):
-                deviations.append(template.format(
-                    val=value, mean=metric.mean, std=metric.std
-                ))
+                deviations.append(template.format(val=value, mean=metric.mean, std=metric.std))
         return deviations
 
     def describe(self) -> str:
@@ -379,9 +424,7 @@ class SystemBaseline:
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the baseline metrics to a dictionary."""
-        return {
-            name: m.to_dict() for name, m in self._metrics.items()
-        }
+        return {name: m.to_dict() for name, m in self._metrics.items()}
 
     def save(self) -> None:
         """Persist the baseline to disk so it survives restarts."""
@@ -389,6 +432,7 @@ class SystemBaseline:
             return
         try:
             import json
+
             data = {
                 "version": 1,
                 "metrics": {
@@ -400,9 +444,7 @@ class SystemBaseline:
                     for name, m in self._metrics.items()
                 },
             }
-            self._persist_path.write_text(
-                json.dumps(data, indent=2), encoding="utf-8"
-            )
+            self._persist_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         except OSError as e:
             logger.debug(f"baseline save failed: {e}")
 
@@ -412,6 +454,7 @@ class SystemBaseline:
             return
         try:
             import json
+
             data = json.loads(self._persist_path.read_text(encoding="utf-8"))
             for name, mdata in data.get("metrics", {}).items():
                 if name not in self._metrics:
@@ -476,6 +519,8 @@ class SystemMonitor:
         s.cpu_count = os.cpu_count() or 1
         s.cpu_percent = self._read_cpu_percent()
         s.load_avg = self._read_load_avg()
+        s.self_cpu_percent = self._read_self_cpu_percent()
+        s.self_memory_mb = self._read_self_memory_mb()
         try:
             speed = self._cpu_speed.sense()
             s.cores_mine = speed.cores_mine
@@ -560,6 +605,50 @@ class SystemMonitor:
                 return tuple(os.getloadavg())  # type: ignore[return-value]
             except (OSError, AttributeError):
                 return (0.0, 0.0, 0.0)
+
+    # ─── Own process (self channel — not the machine's) ────────────
+
+    @staticmethod
+    def _read_self_jiffies() -> int | None:
+        """utime + stime jiffies of this process from /proc/self/stat."""
+        try:
+            with open("/proc/self/stat") as f:
+                # comm may contain spaces/parens — fields resume after ')'.
+                rest = f.read().rsplit(")", 1)[1].split()
+            return int(rest[11]) + int(rest[12])  # utime, stime
+        except (OSError, ValueError, IndexError):
+            return None
+
+    def _read_self_cpu_percent(self) -> float:
+        """This process's CPU% over the sampling window (1 core = 100).
+
+        Two samples 100ms apart over /proc/self/stat jiffies, the same
+        window the global cpu_percent uses — so "her burn" and "the
+        machine's burn" are always directly comparable.
+        """
+        hz = os.sysconf("SC_CLK_TCK") if hasattr(os, "sysconf") else 100
+        j1 = self._read_self_jiffies()
+        if j1 is None:
+            return 0.0
+        t1 = time.monotonic()
+        time.sleep(0.1)
+        j2 = self._read_self_jiffies()
+        if j2 is None:
+            return 0.0
+        dt = time.monotonic() - t1
+        if dt <= 0:
+            return 0.0
+        return (j2 - j1) / hz / dt * 100.0
+
+    @staticmethod
+    def _read_self_memory_mb() -> float:
+        """Resident memory of this process in MB, from /proc/self/statm."""
+        try:
+            with open("/proc/self/statm") as f:
+                resident_pages = int(f.read().split()[1])
+            return resident_pages * (os.sysconf("SC_PAGE_SIZE") / 1024 / 1024)
+        except (OSError, ValueError, IndexError):
+            return 0.0
 
     # ─── Memory ───────────────────────────────────────────────────
 
@@ -686,10 +775,7 @@ class SystemMonitor:
         own: list[dict[str, Any]] = []
         for proc in self.list_processes(limit=1000):
             cmdline = proc.get("cmdline", "").lower()
-            if any(
-                keyword in cmdline
-                for keyword in ("genesis", "genesis-daemon", "genesis_cli")
-            ):
+            if any(keyword in cmdline for keyword in ("genesis", "genesis-daemon", "genesis_cli")):
                 own.append(proc)
         return own
 
@@ -702,11 +788,22 @@ class SystemMonitor:
     # check. Pruning dirs in-place during os.walk plus this wall-clock
     # cap means no tree shape can hold a caller that long again.
     _FS_SCAN_BUDGET_S = 1.5
-    _FS_SKIP_DIRS = frozenset({
-        "target", "__pycache__", ".git", ".venv", "venv",
-        "node_modules", ".pytest_cache", ".mypy_cache",
-        ".ruff_cache", "dist", "build", "genesis_data",
-    })
+    _FS_SKIP_DIRS = frozenset(
+        {
+            "target",
+            "__pycache__",
+            ".git",
+            ".venv",
+            "venv",
+            "node_modules",
+            ".pytest_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            "dist",
+            "build",
+            "genesis_data",
+        }
+    )
 
     def _scan_filesystem(self) -> dict[str, Any]:
         """Scan the project directory for file count and size.
@@ -722,12 +819,8 @@ class SystemMonitor:
         deadline = time.monotonic() + self._FS_SCAN_BUDGET_S
 
         try:
-            for dirpath, dirnames, filenames in os.walk(
-                self.project_root
-            ):
-                dirnames[:] = [
-                    d for d in dirnames if d not in self._FS_SKIP_DIRS
-                ]
+            for dirpath, dirnames, filenames in os.walk(self.project_root):
+                dirnames[:] = [d for d in dirnames if d not in self._FS_SKIP_DIRS]
                 if time.monotonic() > deadline:
                     return self._last_fs_scan()
                 for name in filenames:
@@ -794,9 +887,17 @@ class SystemMonitor:
             return result
 
         skip_dirs = {
-            "target", "__pycache__", ".git", ".venv", "venv",
-            "node_modules", ".pytest_cache", ".mypy_cache",
-            ".ruff_cache", "dist", "build",
+            "target",
+            "__pycache__",
+            ".git",
+            ".venv",
+            "venv",
+            "node_modules",
+            ".pytest_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            "dist",
+            "build",
         }
         return _scan(root, 0)
 
@@ -863,8 +964,9 @@ class SystemMonitor:
         if self._last_snapshot is None:
             return ""
         if not self.baseline.is_established:
-            return (f"baseline learning: {self.baseline.sample_count} samples "
-                    f"— need more observations")
+            return (
+                f"baseline learning: {self.baseline.sample_count} samples — need more observations"
+            )
         deviations = self.baseline.deviations(self._last_snapshot)
         if not deviations:
             return ""

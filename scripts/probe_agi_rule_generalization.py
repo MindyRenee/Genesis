@@ -64,13 +64,9 @@ def make_state(trial: Trial) -> dict[str, Any]:
     return {key: trial.feature_value}
 
 
-def apply_hidden_rule(
-    family: RuleFamily, trial: Trial, action: str
-) -> dict[str, Any]:
+def apply_hidden_rule(family: RuleFamily, trial: Trial, action: str) -> dict[str, Any]:
     key = family.feature_key
-    expected_role = (
-        family.true_role if trial.feature_value else family.false_role
-    )
+    expected_role = family.true_role if trial.feature_value else family.false_role
     # The environment knows the hidden causal rule. The agent sees only
     # the resulting state and success signal.
     prefix = action.split("_", 1)[0]
@@ -121,9 +117,7 @@ def explore(
                 "action": action,
                 "success": after["solved"],
                 "prediction_score": check.score,
-                "predicted_effects": [
-                    p.to_dict() for p in check.predicted
-                ],
+                "predicted_effects": [p.to_dict() for p in check.predicted],
             }
 
             if after["solved"]:
@@ -160,17 +154,10 @@ def model_select(
     candidates: list[tuple[float, str]] = []
 
     for action in trial.actions:
-        predictions = competence.predict(
-            context, action, make_state(trial)
-        )
-        solved_predictions = [
-            p for p in predictions
-            if p.key == "solved" and p.expected is True
-        ]
+        predictions = competence.predict(context, action, make_state(trial))
+        solved_predictions = [p for p in predictions if p.key == "solved" and p.expected is True]
         if solved_predictions:
-            candidates.append(
-                (max(p.confidence for p in solved_predictions), action)
-            )
+            candidates.append((max(p.confidence for p in solved_predictions), action))
 
     selected = max(candidates, default=(0.0, None))[1]
     return {
@@ -187,11 +174,7 @@ def execute_selection(
 ) -> dict[str, Any]:
     selection = model_select(competence, trial)
     action = selection["selected_action"]
-    after = (
-        apply_hidden_rule(family, trial, action)
-        if action is not None
-        else {"solved": False}
-    )
+    after = apply_hidden_rule(family, trial, action) if action is not None else {"solved": False}
     return {
         **selection,
         "success": after["solved"],
@@ -248,8 +231,7 @@ def main() -> None:
             "recognition_novel": transfer_context.novel,
             "similarity": transfer_context.similarity,
             "foreign_skill_count": sum(
-                m.skill.signature.domain != "archive"
-                for m in transfer_context.skills
+                m.skill.signature.domain != "archive" for m in transfer_context.skills
             ),
             "transfer_skills": [
                 {
@@ -263,9 +245,7 @@ def main() -> None:
             "independent_environment_rule": archive_family.true_role,
         },
         "measurements": {
-            "training_successes": sum(
-                int(x["success"]) for x in observations
-            ),
+            "training_successes": sum(int(x["success"]) for x in observations),
             "learned_skills": competence.skill_count,
             "learned_schemas": competence.schema_count,
             "transition_observations": competence.transition_count,

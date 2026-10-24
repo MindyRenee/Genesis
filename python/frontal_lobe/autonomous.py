@@ -61,6 +61,8 @@ from thalamus.brain_waves import BrainWave
 
 from genesis_client.protocol import CHEM_DOPAMINE
 from genesis_client.swallow import note_swallowed
+from genesis_client.threads import named_thread
+from infrastructure.text import sentences as _sentences
 
 __all__ = [
     "RATE_LIMIT_DELAY",
@@ -79,7 +81,6 @@ logger = logging.getLogger(__name__)
 # ─── Pre-compiled regex patterns (module-level for performance) ────────
 _WHITESPACE_RE = re.compile(r"\s+")
 _URL_RE = re.compile(r'https?://[^\s"<>\']+')
-_SENTENCE_SPLIT_RE = re.compile(r"[.!?]+")
 
 # Definition extraction patterns (used in _extract_definitions).
 _DEFINITION_IS_RE = re.compile(
@@ -187,43 +188,136 @@ _MAX_TOPIC_QUEUE = 200
 # instead of Wikipedia. This is a curated list of CS/ML/software
 # engineering terms that are world concepts (pass is_world_concept)
 # but are fundamentally about computing, not general knowledge.
-_PROGRAMMING_KEYWORDS: frozenset[str] = frozenset({
-    # ML/AI concepts
-    "neural network", "deep learning", "machine learning", "gradient descent",
-    "backpropagation", "convolutional", "recurrent neural", "transformer",
-    "attention mechanism", "reinforcement learning", "supervised learning",
-    "unsupervised learning", "embedding", "word2vec", "tokenization",
-    "language model", "generative model", "autoencoder", "gan",
-    "generative adversarial", "lstm", "gru", "dropout", "batch normalization",
-    "softmax", "cross entropy", "activation function", "loss function",
-    "stochastic gradient", "fine-tuning", "transfer learning",
-    # Data structures & algorithms
-    "binary tree", "hash table", "linked list", "graph traversal",
-    "dynamic programming", "breadth-first", "depth-first", "sorting algorithm",
-    "binary search", "red-black tree", "b-tree", "heap sort", "quick sort",
-    "merge sort", "trie", "bloom filter", "lru cache", "consistent hashing",
-    # Programming concepts
-    "recursion", "closure", "monad", "polymorphism", "inheritance",
-    "encapsulation", "design pattern", "factory pattern", "observer pattern",
-    "singleton", "dependency injection", "mock object", "unit test",
-    "integration test", "code coverage", "continuous integration",
-    "garbage collection", "memory leak", "deadlock", "race condition",
-    "concurrency", "asynchronous", "callback", "promise", "future",
-    "iterator", "generator", "decorator", "metaclass", "context manager",
-    # Web/networking
-    "rest api", "graphql", "webhook", "websocket", "http protocol",
-    "tcp protocol", "udp protocol", "dns", "load balancing", "reverse proxy",
-    "microservice", "containerization", "docker", "kubernetes",
-    # Databases
-    "relational database", "nosql", "sql query", "indexing", "sharding",
-    "replication", "acid", "cap theorem", "eventual consistency",
-    # Systems
-    "operating system", "file system", "process scheduling", "virtual memory",
-    "page replacement", "kernel", "system call", "interrupt", "context switch",
-    # Rust-specific concepts
-    "ownership", "borrowing", "lifetime", "trait", "enum", "pattern matching",
-    "zero-cost abstraction", "unsafe rust",
-})
+_PROGRAMMING_KEYWORDS: frozenset[str] = frozenset(
+    {
+        # ML/AI concepts
+        "neural network",
+        "deep learning",
+        "machine learning",
+        "gradient descent",
+        "backpropagation",
+        "convolutional",
+        "recurrent neural",
+        "transformer",
+        "attention mechanism",
+        "reinforcement learning",
+        "supervised learning",
+        "unsupervised learning",
+        "embedding",
+        "word2vec",
+        "tokenization",
+        "language model",
+        "generative model",
+        "autoencoder",
+        "gan",
+        "generative adversarial",
+        "lstm",
+        "gru",
+        "dropout",
+        "batch normalization",
+        "softmax",
+        "cross entropy",
+        "activation function",
+        "loss function",
+        "stochastic gradient",
+        "fine-tuning",
+        "transfer learning",
+        # Data structures & algorithms
+        "binary tree",
+        "hash table",
+        "linked list",
+        "graph traversal",
+        "dynamic programming",
+        "breadth-first",
+        "depth-first",
+        "sorting algorithm",
+        "binary search",
+        "red-black tree",
+        "b-tree",
+        "heap sort",
+        "quick sort",
+        "merge sort",
+        "trie",
+        "bloom filter",
+        "lru cache",
+        "consistent hashing",
+        # Programming concepts
+        "recursion",
+        "closure",
+        "monad",
+        "polymorphism",
+        "inheritance",
+        "encapsulation",
+        "design pattern",
+        "factory pattern",
+        "observer pattern",
+        "singleton",
+        "dependency injection",
+        "mock object",
+        "unit test",
+        "integration test",
+        "code coverage",
+        "continuous integration",
+        "garbage collection",
+        "memory leak",
+        "deadlock",
+        "race condition",
+        "concurrency",
+        "asynchronous",
+        "callback",
+        "promise",
+        "future",
+        "iterator",
+        "generator",
+        "decorator",
+        "metaclass",
+        "context manager",
+        # Web/networking
+        "rest api",
+        "graphql",
+        "webhook",
+        "websocket",
+        "http protocol",
+        "tcp protocol",
+        "udp protocol",
+        "dns",
+        "load balancing",
+        "reverse proxy",
+        "microservice",
+        "containerization",
+        "docker",
+        "kubernetes",
+        # Databases
+        "relational database",
+        "nosql",
+        "sql query",
+        "indexing",
+        "sharding",
+        "replication",
+        "acid",
+        "cap theorem",
+        "eventual consistency",
+        # Systems
+        "operating system",
+        "file system",
+        "process scheduling",
+        "virtual memory",
+        "page replacement",
+        "kernel",
+        "system call",
+        "interrupt",
+        "context switch",
+        # Rust-specific concepts
+        "ownership",
+        "borrowing",
+        "lifetime",
+        "trait",
+        "enum",
+        "pattern matching",
+        "zero-cost abstraction",
+        "unsafe rust",
+    }
+)
 
 # Source descriptions — Genesis's understanding of what each source
 # provides, including its reliability and limitations. It should
@@ -233,51 +327,51 @@ _PROGRAMMING_KEYWORDS: frozenset[str] = frozenset({
 # else is someone's opinion, approximation, or mistake.
 SOURCE_DESCRIPTIONS: dict[str, str] = {
     "wikipedia": "General encyclopedia — broad knowledge, history, science. "
-                 "Written by volunteers; articles can be wrong, outdated, or "
-                 "biased. Good for orientation but never assume it's correct. "
-                 "Not programming-specific — use for 'what is X' questions "
-                 "about the world, not about code.",
+    "Written by volunteers; articles can be wrong, outdated, or "
+    "biased. Good for orientation but never assume it's correct. "
+    "Not programming-specific — use for 'what is X' questions "
+    "about the world, not about code.",
     "github": "Open-source code repositories — real implementations by real "
-              "people. Millions of projects, most are not worth studying: "
-              "abandoned, poorly designed, or just bad ideas. Never copy "
-              "patterns blindly — humans write wasteful and unoptimized code. "
-              "Use for inspiration and seeing how problems are approached, "
-              "but always verify against developer docs. Prefer high-star, "
-              "actively maintained repos. Read-only, no cloning.",
+    "people. Millions of projects, most are not worth studying: "
+    "abandoned, poorly designed, or just bad ideas. Never copy "
+    "patterns blindly — humans write wasteful and unoptimized code. "
+    "Use for inspiration and seeing how problems are approached, "
+    "but always verify against developer docs. Prefer high-star, "
+    "actively maintained repos. Read-only, no cloning.",
     "python_docs": "Official Python documentation — the closest thing to "
-                   "facts for Python. stdlib reference, language guide, API "
-                   "specs. This is ground truth for how Python works. "
-                   "If something contradicts this, the other source is wrong.",
+    "facts for Python. stdlib reference, language guide, API "
+    "specs. This is ground truth for how Python works. "
+    "If something contradicts this, the other source is wrong.",
     "rust_docs": "Official Rust documentation — the closest thing to facts "
-                 "for Rust. stdlib reference, cargo, rustdoc. This is ground "
-                 "truth for how Rust works. If something contradicts this, "
-                 "the other source is wrong.",
+    "for Rust. stdlib reference, cargo, rustdoc. This is ground "
+    "truth for how Rust works. If something contradicts this, "
+    "the other source is wrong.",
     "man_pages": "Local Linux man pages — system documentation installed on "
-                 "this machine. Authoritative for system commands and "
-                 "installed software. Ground truth for how things work here.",
+    "this machine. Authoritative for system commands and "
+    "installed software. Ground truth for how things work here.",
     "wordnet": "WordNet — a local lexical database (no network). Word "
-               "definitions, example sentences, and semantic relations "
-               "(hypernyms, antonyms). Reliable for word meanings but not "
-               "for technical concepts. Best for 'what does this word mean'.",
+    "definitions, example sentences, and semantic relations "
+    "(hypernyms, antonyms). Reliable for word meanings but not "
+    "for technical concepts. Best for 'what does this word mean'.",
 }
 
 # Epistemic hierarchy — the reliability ranking of sources.
 # Higher = more trustworthy. Genesis should always cross-check
 # lower-ranked sources against higher-ranked ones.
 SOURCE_RELIABILITY: dict[str, int] = {
-    "python_docs": 5,   # Official language spec — ground truth
-    "rust_docs": 5,     # Official language spec — ground truth
-    "man_pages": 5,     # Official system documentation
-    "wordnet": 4,       # Curated lexical database — reliable for words
-    "wikipedia": 2,     # Volunteer-written, can be wrong or biased
-    "github": 1,        # Anyone can publish — most projects are bad
+    "python_docs": 5,  # Official language spec — ground truth
+    "rust_docs": 5,  # Official language spec — ground truth
+    "man_pages": 5,  # Official system documentation
+    "wordnet": 4,  # Curated lexical database — reliable for words
+    "wikipedia": 2,  # Volunteer-written, can be wrong or biased
+    "github": 1,  # Anyone can publish — most projects are bad
 }
 
 # GitHub quality filters — when searching GitHub, only look at
 # repos that meet these minimum standards. Most repos on GitHub
 # are abandoned, low-quality, or not worth studying.
 GITHUB_MIN_STARS = 50  # below this, probably not worth reading
-GITHUB_MIN_FORKS = 5   # below this, probably not validated by community
+GITHUB_MIN_FORKS = 5  # below this, probably not validated by community
 
 
 def is_programming_topic(topic: str) -> bool:
@@ -630,9 +724,13 @@ class AutonomousLearner:
         self._data_dir = data_dir
         self._force_offline = force_offline
         self._init_callbacks(
-            on_neuro_impulse, on_store_memory,
-            get_emotion, get_agency_topic, on_live_thought,
-            get_plasticity_profile, get_brain_waves,
+            on_neuro_impulse,
+            on_store_memory,
+            get_emotion,
+            get_agency_topic,
+            on_live_thought,
+            get_plasticity_profile,
+            get_brain_waves,
         )
         self._init_threading()
         self._init_stats()
@@ -778,7 +876,11 @@ class AutonomousLearner:
         self._predicted_reward: float = 0.0
 
     def _log_web_access(
-        self, url: str, source: str, topic: str, success: bool,
+        self,
+        url: str,
+        source: str,
+        topic: str,
+        success: bool,
         detail: str = "",
     ) -> None:
         """Log a web access to the browsing history.
@@ -798,7 +900,7 @@ class AutonomousLearner:
         with self._stats_lock:
             self._web_log.append(entry)
             if len(self._web_log) > self._web_log_max:
-                self._web_log = self._web_log[-self._web_log_max:]
+                self._web_log = self._web_log[-self._web_log_max :]
 
     def web_history(self, n: int = 20) -> list[dict[str, Any]]:
         """Return the last N web access entries."""
@@ -821,6 +923,7 @@ class AutonomousLearner:
         cache_dir = None
         if self._data_dir:
             from pathlib import Path
+
             cache_dir = Path(self._data_dir) / "source_cache"
         self._sources = SourceRegistry(
             cache_dir=cache_dir,
@@ -1027,7 +1130,7 @@ class AutonomousLearner:
                 note_swallowed(
                     "frontal_lobe.autonomous._emit",
                     e,
-                )# listener must never crash learning
+                )  # listener must never crash learning
 
     def start(self) -> None:
         """Start the background learning thread."""
@@ -1053,7 +1156,7 @@ class AutonomousLearner:
         # before random Wikipedia topics. These are local, instant, and
         # self-relevant.
         self._seed_man_page_topics()
-        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread = named_thread("autonomous-learner", self._run, comm="g-auto-learn")
         self._thread.start()
         logger.info("Autonomous learner started")
 
@@ -1062,8 +1165,11 @@ class AutonomousLearner:
 
         Python, Rust, and pip man pages are its toolchain documentation —
         local, instant, offline references. They are queued before any
-        random topics so it learns its own tools first. Lookups for
-        pages that aren't installed simply return nothing.
+        random topics so it learns its own tools first. Her own genesis*
+        pages are not here: they are not topics, they are part of her,
+        and are ingested constitutively at boot (see
+        Mind._ingest_man_pages). Lookups for pages that aren't
+        installed simply return nothing.
         """
         toolchain_pages = [
             "python3",
@@ -1577,9 +1683,7 @@ class AutonomousLearner:
                 data.get("topic_queue", [])[-_MAX_TOPIC_QUEUE:],
                 maxlen=_MAX_TOPIC_QUEUE,
             )
-            self._curiosity_queue = deque(
-                data.get("curiosity_queue", []), maxlen=50
-            )
+            self._curiosity_queue = deque(data.get("curiosity_queue", []), maxlen=50)
             self._surprise_baseline = data.get("surprise_baseline", 0.0)
             self._predicted_reward = data.get("predicted_reward", 0.0)
 
@@ -1654,18 +1758,23 @@ class AutonomousLearner:
         """
         self._emit(
             "learning",
-            f"Searching GitHub for quality projects about '{topic}' "
-            f"(min {GITHUB_MIN_STARS} stars)",
+            f"Searching GitHub for quality projects about '{topic}' (min {GITHUB_MIN_STARS} stars)",
         )
         try:
             results = self._sources.github.search_repos(
-                topic, limit=limit,
-                min_stars=GITHUB_MIN_STARS, min_forks=GITHUB_MIN_FORKS,
+                topic,
+                limit=limit,
+                min_stars=GITHUB_MIN_STARS,
+                min_forks=GITHUB_MIN_FORKS,
             )
         except (OSError, ConnectionError, RuntimeError) as e:
             logger.warning(f"GitHub search failed for '{topic}': {e}")
             self._log_web_access(
-                "github://search", "github", topic, False, str(e),
+                "github://search",
+                "github",
+                topic,
+                False,
+                str(e),
             )
             return None
 
@@ -1676,7 +1785,11 @@ class AutonomousLearner:
                 f"(filtered by stars/forks — most repos aren't worth studying)",
             )
             self._log_web_access(
-                "github://search", "github", topic, True, "no results",
+                "github://search",
+                "github",
+                topic,
+                True,
+                "no results",
             )
             return None
 
@@ -1753,7 +1866,7 @@ class AutonomousLearner:
         """
         for prefix in self._CODE_PREFIXES:
             if topic.startswith(prefix):
-                return topic[len(prefix):] or topic
+                return topic[len(prefix) :] or topic
         return topic
 
     def _learn_code_from_docs(self, topic: str) -> bool:
@@ -1773,7 +1886,8 @@ class AutonomousLearner:
         query = self._code_doc_query(topic)
 
         def _absorb_local(
-            src_result: SourceResult, src_label: str,
+            src_result: SourceResult,
+            src_label: str,
         ) -> bool:
             """Learn from a local reference and report actual success."""
             self._emit(
@@ -2140,7 +2254,7 @@ class AutonomousLearner:
                 note_swallowed(
                     "frontal_lobe.autonomous._next_topic",
                     e,
-                )# agency callback failure shouldn't block learning
+                )  # agency callback failure shouldn't block learning
             else:
                 with self._queue_lock:
                     if topic and topic not in self._topics_searched:
@@ -2387,8 +2501,7 @@ class AutonomousLearner:
                 # parse_relationships misses patterns that the
                 # semantic fact extractor catches.
                 semantic_relationships = [
-                    (fact.subject, fact.relation, fact.object)
-                    for fact in semantic_facts
+                    (fact.subject, fact.relation, fact.object) for fact in semantic_facts
                 ]
                 seen = set(new_relationships)
                 for rel in semantic_relationships:
@@ -2398,9 +2511,7 @@ class AutonomousLearner:
         except Exception as e:  # noqa: BLE001
             logger.warning(f"semantic fact extraction failed: {e}")
 
-    def _connect_co_occurring(
-        self, topic: str, concepts: list[str]
-    ) -> None:
+    def _connect_co_occurring(self, topic: str, concepts: list[str]) -> None:
         """Create RELATED_TO edges between the topic and co-occurring concepts.
 
         When the pattern parser fails to extract explicit relationships
@@ -2426,10 +2537,7 @@ class AutonomousLearner:
                 continue
             # Skip if an edge already exists in either direction
             existing = self.network.get_edges(topic, "both")
-            if any(
-                e.target == concept_name or e.source == concept_name
-                for e in existing
-            ):
+            if any(e.target == concept_name or e.source == concept_name for e in existing):
                 continue
             self.network.add_edge(
                 topic,
@@ -2508,8 +2616,8 @@ class AutonomousLearner:
             new_relationships: list = []
             definitions: dict = {}
         else:
-            new_concepts, new_relationships, definitions = (
-                self._extract_learning_material(text, topic, source=source)
+            new_concepts, new_relationships, definitions = self._extract_learning_material(
+                text, topic, source=source
             )
 
         self._attach_dictionary_definition(is_dictionary, text, topic, definitions)
@@ -2549,11 +2657,18 @@ class AutonomousLearner:
         self._maybe_learn_visually(sr, is_dictionary, topic)
 
         self._send_learning_impulses(
-            topic, all_learned_concepts, new_relationships, surprise,
+            topic,
+            all_learned_concepts,
+            new_relationships,
+            surprise,
             expected_concepts=expected_concepts,
         )
         self._store_learning_memory(
-            topic, sr.title, summary, all_learned_concepts, new_relationships,
+            topic,
+            sr.title,
+            summary,
+            all_learned_concepts,
+            new_relationships,
         )
 
         self._concepts_learned += len(all_learned_concepts)
@@ -2565,9 +2680,50 @@ class AutonomousLearner:
 
         return result
 
-    def _maybe_learn_visually(
-        self, sr: SourceResult, is_dictionary: bool, topic: str
-    ) -> None:
+    def ingest_endogenous(self, sr: SourceResult, topic: str) -> LearningResult | None:
+        """Learn content that is part of herself — her own man pages.
+
+        Same extraction pathway as fetched sources: concepts,
+        relationships, and definitions land in the concept network,
+        co-occurrence edges get drawn, a memory is stored. But there
+        is no fetch bookkeeping, web-access log, expectation, or
+        learning impulse — this material did not arrive from the
+        outside world. It is her own description of what she is;
+        ingesting it is constitutive, like the body knowing its own
+        schema, not an event she chose to look up.
+        """
+        text = sr.content
+        if len(text) < 50:
+            return None
+        if len(text) > MAX_TEXT_LENGTH:
+            text = text[:MAX_TEXT_LENGTH]
+
+        new_concepts, new_relationships, definitions = self._extract_learning_material(
+            text, topic, source=None
+        )
+        self._attach_definitions(definitions, source=None)
+        all_learned_concepts = list(set(new_concepts) | set(definitions.keys()))
+        if all_learned_concepts:
+            self._connect_co_occurring(topic, all_learned_concepts)
+
+        summary = self._make_summary(text, topic)
+        result = LearningResult(
+            url=sr.url,
+            title=sr.title,
+            concepts_learned=all_learned_concepts,
+            relationships_learned=new_relationships,
+            summary=summary,
+            timestamp=int(time.time() * 1000),
+        )
+        self._learning_log.append(result)
+        self._store_learning_memory(
+            topic, sr.title, summary, all_learned_concepts, new_relationships
+        )
+        self._concepts_learned += len(all_learned_concepts)
+        self._relationships_learned += len(new_relationships)
+        return result
+
+    def _maybe_learn_visually(self, sr: SourceResult, is_dictionary: bool, topic: str) -> None:
         """Visual learning: when learning from Wikipedia, also fetch the
         article's lead image and learn the visual-concept association.
         This is how Genesis learns to see: it encounters images in
@@ -2583,7 +2739,10 @@ class AutonomousLearner:
             self._try_visual_learning(sr.title, topic)
 
     def _extract_learning_material(
-        self, text: str, topic: str, source: dict[str, Any] | None = None,
+        self,
+        text: str,
+        topic: str,
+        source: dict[str, Any] | None = None,
     ) -> tuple[list[str], list[tuple[str, str, str]], dict[str, str]]:
         """Extract concepts, relationships, and definitions from corpus text.
 
@@ -2643,7 +2802,9 @@ class AutonomousLearner:
             )
 
     def _attach_definitions(
-        self, definitions: dict[str, str], source: dict[str, Any] | None = None,
+        self,
+        definitions: dict[str, str],
+        source: dict[str, Any] | None = None,
     ) -> None:
         """Attach extracted definitions to concepts in the network.
 
@@ -2689,8 +2850,11 @@ class AutonomousLearner:
                     c.confidence = max(c.confidence, 0.6)
 
     def _send_learning_impulses(
-        self, topic: str, new_concepts: list[str],
-        new_relationships: list[tuple], surprise: float,
+        self,
+        topic: str,
+        new_concepts: list[str],
+        new_relationships: list[tuple],
+        surprise: float,
         expected_concepts: set[str] | None = None,
     ) -> None:
         """Send neurochemical impulses based on learning outcome.
@@ -2710,9 +2874,7 @@ class AutonomousLearner:
         # Record this episode for novelty habituation
         self._recent_episode_times.append(time.time())
         # Update surprise baseline (EMA with α=0.05, slow adaptation)
-        self._surprise_baseline = (
-            0.95 * self._surprise_baseline + 0.05 * surprise
-        )
+        self._surprise_baseline = 0.95 * self._surprise_baseline + 0.05 * surprise
 
         # ── Compute depth factor ──
         # Depth = how much it already knew about the topic. If it
@@ -2741,9 +2903,7 @@ class AutonomousLearner:
                 # Update predicted reward (EMA with α=0.1, moderate
                 # adaptation — it learns to expect the reward after
                 # a few successful episodes)
-                self._predicted_reward = (
-                    0.9 * self._predicted_reward + 0.1 * actual_reward
-                )
+                self._predicted_reward = 0.9 * self._predicted_reward + 0.1 * actual_reward
                 # Only send positive RPE as dopamine (negative RPE
                 # would be a dopamine dip, handled by the error
                 # monitor). Clamp to [0, 0.2] — no runaway dopamine.
@@ -2766,8 +2926,12 @@ class AutonomousLearner:
                 logger.warning(f"memory store failed: {e}")
 
     def _store_learning_memory(
-        self, topic: str, source_title: str, summary: str,
-        new_concepts: list[str], new_relationships: list,
+        self,
+        topic: str,
+        source_title: str,
+        summary: str,
+        new_concepts: list[str],
+        new_relationships: list,
     ) -> None:
         """Store a learning episode as a memory.
 
@@ -2802,8 +2966,11 @@ class AutonomousLearner:
                 logger.warning(f"store_memory callback failed: {e}")
 
     def _bridge_and_post_learn(
-        self, topic: str, new_concepts: list[str],
-        new_relationships: list[tuple], surprise: float,
+        self,
+        topic: str,
+        new_concepts: list[str],
+        new_relationships: list[tuple],
+        surprise: float,
         source_label: str,
     ) -> None:
         """Bridge new concepts and run advanced learning integration.
@@ -2878,7 +3045,7 @@ class AutonomousLearner:
             note_swallowed(
                 "frontal_lobe.autonomous._bridge_and_post_learn",
                 e,
-            )# bridging is best-effort
+            )  # bridging is best-effort
 
         # ─── Advanced learning system integration ─────────────────
         # Wire STDP, dual-system, spaced repetition, and TD learning
@@ -2960,13 +3127,20 @@ class AutonomousLearner:
             # concepts learned) and surprise factor (unexpected
             # learning is more rewarding).
             self._send_learning_impulses(
-                topic, all_learned_concepts, new_relationships, surprise,
+                topic,
+                all_learned_concepts,
+                new_relationships,
+                surprise,
                 expected_concepts=expected_concepts,
             )
 
             # Store as a memory
             self._store_learning_memory(
-                topic, title, summary, all_learned_concepts, new_relationships,
+                topic,
+                title,
+                summary,
+                all_learned_concepts,
+                new_relationships,
             )
 
             self._concepts_learned += len(all_learned_concepts)
@@ -2987,7 +3161,10 @@ class AutonomousLearner:
             return None
 
     def _learn_from_text(
-        self, text: str, topic: str, title: str = "",
+        self,
+        text: str,
+        topic: str,
+        title: str = "",
     ) -> LearningResult | None:
         """Learn from raw text (e.g. a man page) without fetching a URL.
 
@@ -3004,7 +3181,10 @@ class AutonomousLearner:
         self._pages_fetched += 1
         self._session_pages += 1
         self._log_web_access(
-            f"man:{topic}", "man_pages", topic, True,
+            f"man:{topic}",
+            "man_pages",
+            topic,
+            True,
         )
         if self._session_pages >= MAX_PAGES_PER_SESSION:
             return None
@@ -3024,9 +3204,7 @@ class AutonomousLearner:
 
         summary = self._make_summary(text, topic)
 
-        surprise = self._evaluate_surprise(
-            topic, expected_concepts, all_learned_concepts
-        )
+        surprise = self._evaluate_surprise(topic, expected_concepts, all_learned_concepts)
 
         result = LearningResult(
             url=f"local:{topic}",
@@ -3039,20 +3217,29 @@ class AutonomousLearner:
         self._learning_log.append(result)
 
         self._send_learning_impulses(
-            topic, all_learned_concepts, new_relationships, surprise,
+            topic,
+            all_learned_concepts,
+            new_relationships,
+            surprise,
             expected_concepts=expected_concepts,
         )
 
         self._store_learning_memory(
-            topic, title or topic, summary,
-            all_learned_concepts, new_relationships,
+            topic,
+            title or topic,
+            summary,
+            all_learned_concepts,
+            new_relationships,
         )
 
         self._concepts_learned += len(all_learned_concepts)
         self._relationships_learned += len(new_relationships)
 
         self._bridge_and_post_learn(
-            topic, all_learned_concepts, new_relationships, surprise,
+            topic,
+            all_learned_concepts,
+            new_relationships,
+            surprise,
             f"local:{topic}",
         )
 
@@ -3164,10 +3351,7 @@ class AutonomousLearner:
         # is less novel than the 1st.
         now = time.time()
         # Prune old entries (older than 1 hour)
-        while (
-            self._recent_episode_times
-            and now - self._recent_episode_times[0] > 3600.0
-        ):
+        while self._recent_episode_times and now - self._recent_episode_times[0] > 3600.0:
             self._recent_episode_times.popleft()
         recent_count = len(self._recent_episode_times)
         # Habituation factor: 0 episodes → 1.0 (full surprise),
@@ -3204,8 +3388,7 @@ class AutonomousLearner:
                 seen = []
                 props["web_sources"] = seen
             if not any(
-                isinstance(entry, dict) and entry.get("url") == source.get("url")
-                for entry in seen
+                isinstance(entry, dict) and entry.get("url") == source.get("url") for entry in seen
             ):
                 seen.append(dict(source))
             del seen[:-WEB_SOURCES_CAP]
@@ -3213,7 +3396,10 @@ class AutonomousLearner:
             logger.debug("web source record failed", exc_info=True)
 
     def _extract_and_add_concepts(
-        self, text: str, topic: str, source: dict[str, Any] | None = None,
+        self,
+        text: str,
+        topic: str,
+        source: dict[str, Any] | None = None,
     ) -> list[str]:
         """Extract concepts from text and add new ones to the network.
 
@@ -3257,9 +3443,7 @@ class AutonomousLearner:
 
             existing = self.network.get_concept(concept_name)
             if existing is None:
-                created = self.network.add_concept(
-                    concept_name, confidence=0.4, origin="learned"
-                )
+                created = self.network.add_concept(concept_name, confidence=0.4, origin="learned")
                 self._record_web_source(created, source)
                 new_concepts.append(concept_name)
                 # Immediately connect the new concept to its nearest
@@ -3315,7 +3499,10 @@ class AutonomousLearner:
             return
         try:
             similar = self._embeddings.find_similar_to_text(
-                concept_name, k=1, threshold=0.25, exclude=concept_name,
+                concept_name,
+                k=1,
+                threshold=0.25,
+                exclude=concept_name,
             )
             if not similar:
                 return
@@ -3329,6 +3516,7 @@ class AutonomousLearner:
             if any(e.target == neighbor for e in existing_edges):
                 return
             from temporal_lobe.concepts import RelationType
+
             self.network.add_edge(
                 concept_name,
                 neighbor,
@@ -3345,7 +3533,9 @@ class AutonomousLearner:
             )
 
     def _extract_and_add_relationships(
-        self, text: str, source: dict[str, Any] | None = None,
+        self,
+        text: str,
+        source: dict[str, Any] | None = None,
     ) -> list[tuple[str, str, str]]:
         """Extract relationships from text using the ConceptNetwork's parser.
 
@@ -3385,7 +3575,7 @@ class AutonomousLearner:
     def _make_summary(self, text: str, topic: str) -> str:
         """Create a short summary of what it learned."""
         # Simple: first few sentences that mention the topic
-        sentences = _SENTENCE_SPLIT_RE.split(text)
+        sentences = _sentences(text)
         relevant = []
         for s in sentences:
             s = s.strip()
@@ -3413,7 +3603,7 @@ class AutonomousLearner:
         Only returns definitions that are concise (< 200 chars).
         """
         definitions = {}
-        sentences = _SENTENCE_SPLIT_RE.split(text)
+        sentences = _sentences(text)
 
         for sent in sentences:
             sent = sent.strip()
@@ -3466,7 +3656,9 @@ class AutonomousLearner:
     # ─── Scaled learning reward (dopamine impulse) ───────────────
 
     def compute_learning_reward(
-        self, concepts_learned: int, surprise: float,
+        self,
+        concepts_learned: int,
+        surprise: float,
         depth: float = 0.0,
     ) -> float:
         """Compute a dopamine reward scaled by learning magnitude.
@@ -3567,7 +3759,7 @@ class AutonomousLearner:
                 note_swallowed(
                     "frontal_lobe.autonomous.generate_deep_expectations",
                     e,
-                )# embeddings optional; don't block on errors
+                )  # embeddings optional; don't block on errors
 
         # Build Expectation objects, sorted by weight.
         result = [
@@ -3598,15 +3790,16 @@ class AutonomousLearner:
             target_degrees[tgt] = len(self.network.get_exact_neighbors(tgt))
 
         source_degrees = {
-            src: len(self.network.get_exact_neighbors(src))
-            for src, _, _ in source_neighbors
+            src: len(self.network.get_exact_neighbors(src)) for src, _, _ in source_neighbors
         }
 
-        mappings, concepts_transferred, relationships_transferred = (
-            self._transfer_mappings(
-                source_neighbors, target_by_rel, target_degrees,
-                source_degrees, similarity, target_domain,
-            )
+        mappings, concepts_transferred, relationships_transferred = self._transfer_mappings(
+            source_neighbors,
+            target_by_rel,
+            target_degrees,
+            source_degrees,
+            similarity,
+            target_domain,
         )
 
         return TransferResult(
@@ -3636,16 +3829,11 @@ class AutonomousLearner:
         source_profile = relation_profile(source_neighbors)
         target_profile = relation_profile(target_neighbors)
         relation_keys = set(source_profile) | set(target_profile)
-        dot = sum(
-            source_profile.get(k, 0.0) * target_profile.get(k, 0.0)
-            for k in relation_keys
-        )
+        dot = sum(source_profile.get(k, 0.0) * target_profile.get(k, 0.0) for k in relation_keys)
         source_norm = sum(v * v for v in source_profile.values()) ** 0.5
         target_norm = sum(v * v for v in target_profile.values()) ** 0.5
         relation_similarity = (
-            dot / (source_norm * target_norm)
-            if source_norm > 0.0 and target_norm > 0.0
-            else 0.0
+            dot / (source_norm * target_norm) if source_norm > 0.0 and target_norm > 0.0 else 0.0
         )
 
         source_set = {n for n, _, _ in source_neighbors}
@@ -3699,10 +3887,7 @@ class AutonomousLearner:
                     similar = self._embeddings.find_similar_concepts(
                         src, k=min(20, len(candidates) + 5), threshold=0.0
                     )
-                    semantic_scores = {
-                        name: max(0.0, min(1.0, score))
-                        for name, score in similar
-                    }
+                    semantic_scores = {name: max(0.0, min(1.0, score)) for name, score in similar}
                 except Exception as exc:  # noqa: BLE001
                     note_swallowed(
                         "frontal_lobe.autonomous.transfer_learning",
@@ -3720,11 +3905,7 @@ class AutonomousLearner:
                     source_degree, candidate_degree, 1
                 )
                 semantic = semantic_scores.get(candidate, 0.0)
-                score = (
-                    0.65 * semantic + 0.35 * degree_match
-                    if semantic_scores
-                    else degree_match
-                )
+                score = 0.65 * semantic + 0.35 * degree_match if semantic_scores else degree_match
                 if score > best_score:
                     best_score = score
                     best_target = candidate
@@ -3732,9 +3913,7 @@ class AutonomousLearner:
             if best_target is None or best_score < 0.25:
                 continue
 
-            transferred_weight = max(
-                0.0, min(1.0, float(weight) * similarity * best_score * 0.5)
-            )
+            transferred_weight = max(0.0, min(1.0, float(weight) * similarity * best_score * 0.5))
             if transferred_weight <= 0.0:
                 continue
 
@@ -3831,9 +4010,7 @@ class AutonomousLearner:
                 existing.confidence = existing.confidence + (1.0 - existing.confidence) * 0.05
         return concepts_learned
 
-    def _learn_observed_relationships(
-        self, user_input: str
-    ) -> list[tuple[str, str, str]]:
+    def _learn_observed_relationships(self, user_input: str) -> list[tuple[str, str, str]]:
         """Extract and store relationships the user expressed.
 
         Ensures both subject and object concepts exist before adding
@@ -4021,7 +4198,7 @@ class AutonomousLearner:
             note_swallowed(
                 "frontal_lobe.autonomous._post_learning_hook",
                 e,
-            )# STDP is optional; don't block learning
+            )  # STDP is optional; don't block learning
 
         # 2. Dual-system — encode into hippocampal fast store
         try:

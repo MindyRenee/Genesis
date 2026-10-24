@@ -8,6 +8,7 @@ import logging
 import socket
 import struct
 import sys
+import tempfile
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -17,6 +18,7 @@ from genesis_client.exceptions import ConnectionError, ProtocolError
 from genesis_client.protocol import (
     ADVANCE_NEURO,
     ADVANCE_PHYSICS,
+    ANALYZE_CODE,
     CHEM_BDNF,
     CHEM_CORTISOL,
     CHEM_DOPAMINE,
@@ -26,6 +28,8 @@ from genesis_client.protocol import (
     GET_FIELD_PROBE,
     GET_ION_SUMMARY,
     GET_NEURO_SUMMARY,
+    GET_OPTIC_STATE,
+    GET_PHASE,
     GET_SENSOR_PRESENCE,
     GET_STATE,
     HANDSHAKE,
@@ -54,6 +58,9 @@ from genesis_client.protocol import (
     PROTOCOL_VERSION,
     SET_FIELD_CARRIER,
     SET_FIELD_PHASE,
+    SET_FOCUS,
+    SET_LID,
+    SET_OPTIC_GAIN,
     SET_WAKE_ALARM,
     SHUTDOWN,
     STORE_EPISODE,
@@ -244,6 +251,14 @@ def test_command_ids():
     assert GET_FIELD_PROBE == 47
     assert SET_FIELD_PHASE == 48
     assert SET_FIELD_CARRIER == 49
+    # The optic pair is additive and continues past the field
+    # commands: the optic-state read, the corticothalamic gain, and
+    # the accommodation request must not collide with them.
+    assert GET_OPTIC_STATE == 52
+    assert SET_OPTIC_GAIN == 53
+    assert SET_FOCUS == 54
+    # The voluntary lid is additive past SET_COGNITIVE_PID.
+    assert SET_LID == 57
 
 
 def test_chemical_ids():
@@ -324,11 +339,33 @@ def test_protocol_version():
 
 
 def _client_with_socket():
-    """Helper: with socket."""
+    """Helper: client with a mock control-channel socket."""
     client = GenesisClient("/unused/genesis.sock", request_timeout=1.5)
     sock = Mock(spec=socket.socket)
     sock.gettimeout.return_value = 1.5
     client._sock = sock
+    client._ever_connected = True
+    return client, sock
+
+
+def _client_with_read_socket():
+    """Helper: client with a mock read-channel socket.
+
+    Read-only commands (``_READ_CHANNEL_CMDS``) travel on a second
+    daemon connection, so tests exercising GET_*/PING/episode reads
+    drive ``_read_sock`` and ``_connect_read`` rather than the control
+    channel.
+    """
+    # The socket path must exist on disk: the client treats a missing
+    # socket file as "daemon gone" and fails quietly instead of
+    # retrying — retry coverage needs a path that is present.
+    tmp = tempfile.NamedTemporaryFile(prefix="genesis-test-", suffix=".sock")
+    client = GenesisClient(tmp.name, request_timeout=1.5)
+    client._socket_file = tmp  # keep the file alive for the client's life
+    sock = Mock(spec=socket.socket)
+    sock.gettimeout.return_value = 1.5
+    client._read_sock = sock
+    client._ever_connected = True
     return client, sock
 
 
@@ -344,9 +381,13 @@ def test_client_does_not_replay_mutation_after_lost_response(command):
 
     with (
         patch("genesis_client.client.write_message") as send,
-        patch("genesis_client.client.read_message", side_effect=[
-            ConnectionError("response lost"), (command, b"\x01"),
-        ]),
+        patch(
+            "genesis_client.client.read_message",
+            side_effect=[
+                ConnectionError("response lost"),
+                (command, b"\x01"),
+            ],
+        ),
         patch.object(client, "connect", side_effect=reconnect),
     ):
         with pytest.raises(ConnectionError):
@@ -358,53 +399,75 @@ def test_client_does_not_replay_mutation_after_lost_response(command):
 
 def test_client_read_retries_once_and_closes_broken_socket():
     """Test client read retries once and closes broken socket."""
-    client, sock = _client_with_socket()
+    client, sock = _client_with_read_socket()
     replacement = Mock(spec=socket.socket)
 
     def reconnect():
-        """Swap the client's socket for the replacement mock."""
-        client._sock = replacement
+        """Swap the client's read socket for the replacement mock."""
+        client._read_sock = replacement
 
     with (
         patch("genesis_client.client.write_message") as send,
-        patch("genesis_client.client.read_message", side_effect=[
-            ConnectionError("response lost"), (GET_STATE, b"fresh"),
-        ]),
-        patch.object(client, "connect", side_effect=reconnect),
+        patch(
+            "genesis_client.client.read_message",
+            side_effect=[
+                ConnectionError("response lost"),
+                (GET_STATE, b"fresh"),
+            ],
+        ),
+        patch.object(client, "_connect_read", side_effect=reconnect),
     ):
         assert client._request(GET_STATE) == b"fresh"
 
     assert send.call_count == 2
     sock.close.assert_called_once()
-    assert client.is_connected
+    assert client._read_sock is replacement
 
 
-def test_client_failed_retry_closes_both_sockets():
-    """Test client failed retry closes both sockets."""
-    client, sock = _client_with_socket()
-    replacement = Mock(spec=socket.socket)
-
-    def reconnect():
-        """Swap the client's socket for the replacement mock."""
-        client._sock = replacement
+def test_client_missing_socket_fails_quietly_without_reconnect(caplog):
+    """A lost response with no socket file means teardown — fail, don't retry."""
+    client, _ = _client_with_read_socket()
+    client.socket_path = "/nonexistent/genesis-test.sock"
 
     with (
         patch("genesis_client.client.write_message"),
         patch("genesis_client.client.read_message", side_effect=ConnectionError("lost")),
-        patch.object(client, "connect", side_effect=reconnect),
+        patch.object(client, "_connect_read") as connect_read,
+        caplog.at_level(logging.WARNING, "genesis_client.client"),
+    ):
+        with pytest.raises(ConnectionError):
+            client._request(GET_STATE)
+
+    connect_read.assert_not_called()
+    assert not any("attempting reconnect" in r.message for r in caplog.records)
+
+
+def test_client_failed_retry_closes_both_sockets():
+    """Test client failed retry closes both sockets."""
+    client, sock = _client_with_read_socket()
+    replacement = Mock(spec=socket.socket)
+
+    def reconnect():
+        """Swap the client's read socket for the replacement mock."""
+        client._read_sock = replacement
+
+    with (
+        patch("genesis_client.client.write_message"),
+        patch("genesis_client.client.read_message", side_effect=ConnectionError("lost")),
+        patch.object(client, "_connect_read", side_effect=reconnect),
     ):
         with pytest.raises(ConnectionError):
             client._request(GET_STATE)
 
     sock.close.assert_called_once()
     replacement.close.assert_called_once()
-    assert not client.is_connected
+    assert client._read_sock is None
     assert not client._cache
 
 
 def test_client_disconnect_invalidates_cached_state():
     """Test client disconnect invalidates cached state."""
-    client, sock = _client_with_socket()
+    client, sock = _client_with_read_socket()
     with (
         patch("genesis_client.client.write_message"),
         patch("genesis_client.client.read_message", return_value=(GET_STATE, b"old")),
@@ -418,6 +481,106 @@ def test_client_disconnect_invalidates_cached_state():
     sock.close.assert_called_once()
 
 
+def test_client_reconnects_on_demand_after_connection_lost():
+    """A previously-connected client re-establishes the link itself.
+
+    After a daemon restart the next request reopens the socket rather
+    than every caller failing until some slower path notices. A client
+    that never connected still refuses immediately.
+    """
+    client = GenesisClient("/unused/genesis.sock", request_timeout=1.5)
+    # Never connected: the request must raise, not attempt a connect.
+    with pytest.raises(ConnectionError):
+        client._request(GET_STATE)
+
+    client._ever_connected = True
+    replacement = Mock(spec=socket.socket)
+    replacement.gettimeout.return_value = 1.5
+    with (
+        patch("genesis_client.client.os.path.exists", return_value=True),
+        patch("genesis_client.client.socket.socket", return_value=replacement),
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            side_effect=[
+                (HANDSHAKE, bytes([PROTOCOL_VERSION])),
+                (GET_STATE, b"fresh"),
+            ],
+        ),
+    ):
+        assert client._request(GET_STATE) == b"fresh"
+
+    # GET_STATE travels the read channel — the reconnect happens there.
+    assert client._read_sock is replacement
+
+
+def test_client_reads_bypass_held_control_channel():
+    """A stalled control-channel request must not starve reads.
+
+    Regression for the head-of-line block observed live: every IPC
+    call serialized through one socket lock, so one slow control
+    request (think burst, timed-out write) parked heartbeat,
+    regulator, and volition callers on ``_lock`` — including the
+    ``should_stop`` reads that let workers clear at shutdown. Pure
+    reads now travel a second connection under ``_read_lock``.
+    """
+    client, read_sock = _client_with_read_socket()
+    control_sock = Mock(spec=socket.socket)
+    client._sock = control_sock
+
+    # Simulate an in-flight stalled control request holding _lock.
+    acquired = client._lock.acquire(timeout=1.0)
+    assert acquired
+    try:
+        with (
+            patch("genesis_client.client.write_message") as send,
+            patch(
+                "genesis_client.client.read_message",
+                return_value=(GET_PHASE, b"\x00"),
+            ),
+        ):
+            # Must complete without ever touching the held _lock.
+            assert client._request(GET_PHASE) == b"\x00"
+        send.assert_called_once_with(read_sock, GET_PHASE, b"")
+    finally:
+        client._lock.release()
+
+
+def test_client_control_request_uses_control_channel():
+    """Writes stay on the control channel even with a live read socket."""
+    client, read_sock = _client_with_read_socket()
+    client._sock = Mock(spec=socket.socket)
+    client._sock.gettimeout.return_value = 1.5
+
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(STORE_EVENT, b"\x01"),
+        ),
+    ):
+        client._request(STORE_EVENT, b"payload")
+
+    send.assert_called_once_with(client._sock, STORE_EVENT, b"payload")
+    read_sock.sendall.assert_not_called()
+    read_sock.shutdown.assert_not_called()
+    read_sock.close.assert_not_called()
+
+
+def test_client_disconnect_closes_both_channels():
+    """disconnect() tears down the read channel too."""
+    client, read_sock = _client_with_read_socket()
+    control_sock = Mock(spec=socket.socket)
+    client._sock = control_sock
+
+    client.disconnect()
+
+    control_sock.close.assert_called_once()
+    read_sock.close.assert_called_once()
+    assert client._sock is None
+    assert client._read_sock is None
+
+
 def test_client_connect_replaces_socket_and_respects_timeout():
     """Test client connect replaces socket and respects timeout."""
     client, sock = _client_with_socket()
@@ -427,9 +590,13 @@ def test_client_connect_replaces_socket_and_respects_timeout():
         patch("genesis_client.client.os.path.exists", return_value=True),
         patch("genesis_client.client.socket.socket", return_value=replacement),
         patch("genesis_client.client.write_message"),
-        patch("genesis_client.client.read_message", return_value=(
-            HANDSHAKE, bytes([PROTOCOL_VERSION]),
-        )),
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(
+                HANDSHAKE,
+                bytes([PROTOCOL_VERSION]),
+            ),
+        ),
     ):
         client.connect()
 
@@ -453,39 +620,47 @@ def test_client_write_invalidates_cache_after_acquiring_lock():
     assert GET_STATE not in client._cache
 
 
-def test_client_cached_read_is_serialized_with_writes():
-    """Test client cached read is serialized with writes."""
-    client, _ = _client_with_socket()
+def test_client_cached_read_uses_read_channel_lock():
+    """Reads serialize on the read-channel lock, not the control lock."""
+    client, _ = _client_with_read_socket()
     with (
         patch("genesis_client.client.write_message"),
         patch("genesis_client.client.read_message", return_value=(GET_STATE, b"old")),
     ):
         client._request(GET_STATE)
         guard = MagicMock()
-        with patch.object(client, "_lock", guard):
+        guard.__enter__.return_value = None
+        guard.__exit__.return_value = False
+        with patch.object(client, "_read_lock", guard):
             assert client._request(GET_STATE) == b"old"
         guard.__enter__.assert_called_once()
 
 
 def test_client_cache_expires_despite_wall_clock_rollback():
     """Test client cache expires despite wall clock rollback."""
-    client, _ = _client_with_socket()
+    client, _ = _client_with_read_socket()
     with (
         patch("genesis_client.client.time") as clock,
         patch("genesis_client.client.write_message"),
-        patch("genesis_client.client.read_message", side_effect=[
-            (GET_STATE, b"old"), (GET_STATE, b"fresh"),
-        ]),
+        patch(
+            "genesis_client.client.read_message",
+            side_effect=[
+                (GET_STATE, b"old"),
+                (GET_STATE, b"fresh"),
+            ],
+        ),
     ):
         clock.time.side_effect = [200.0, 100.0]
-        clock.monotonic.side_effect = [10.0, 10.2, 10.2]
+        # Req 1: t0, elapsed, cache-store. Req 2: freshness check
+        # (stale → falls through), t0, elapsed, cache-store.
+        clock.monotonic.side_effect = [10.0, 10.2, 10.2, 11.0, 11.0, 11.0, 11.0]
         assert client._request(GET_STATE) == b"old"
         assert client._request(GET_STATE) == b"fresh"
 
 
 def test_client_discards_connection_after_response_command_mismatch():
     """Test client discards connection after response command mismatch."""
-    client, sock = _client_with_socket()
+    client, sock = _client_with_read_socket()
     with (
         patch("genesis_client.client.write_message"),
         patch("genesis_client.client.read_message", return_value=(STORE_EVENT, b"\x01")),
@@ -494,7 +669,7 @@ def test_client_discards_connection_after_response_command_mismatch():
             client._request(GET_STATE)
 
     sock.close.assert_called_once()
-    assert not client.is_connected
+    assert client._read_sock is None
 
 
 def test_client_detects_multibyte_error_for_ack_commands():
@@ -521,7 +696,7 @@ def test_client_detects_single_byte_error_for_data_commands():
     """Data commands (GET_*) return a single-byte error on failure."""
     from genesis_client.protocol import ERROR_READ_FAILED, GET_NEURO_SUMMARY
 
-    client, _ = _client_with_socket()
+    client, _ = _client_with_read_socket()
     with (
         patch("genesis_client.client.write_message"),
         patch(
@@ -541,10 +716,10 @@ def test_client_does_not_false_positive_on_data_first_byte():
     """
     from genesis_client.protocol import GET_INFERENCE_SUMMARY
 
-    client, _ = _client_with_socket()
+    client, _ = _client_with_read_socket()
     # 60 bytes of data — first byte is 0x9A (part of an f32 mantissa),
     # which has the high bit set but is NOT an error response.
-    data = bytes([0x9A]) + b"\x99\x99\x3E" + b"\x00" * 56
+    data = bytes([0x9A]) + b"\x99\x99\x3e" + b"\x00" * 56
     assert len(data) == 60
     with (
         patch("genesis_client.client.write_message"),
@@ -561,10 +736,10 @@ def test_client_does_not_false_positive_on_data_first_byte():
 @pytest.mark.parametrize(
     ("dt_sent", "dt_expected"),
     [
-        (0.5, 0.5),      # in range — passed through unchanged
-        (100.0, 10.0),   # stall longer than the daemon's max — truncated
-        (0.0, 0.001),    # degenerate zero elapsed — clamped to min
-        (-5.0, 0.001),   # negative (clock anomaly) — clamped to min
+        (0.5, 0.5),  # in range — passed through unchanged
+        (100.0, 10.0),  # stall longer than the daemon's max — truncated
+        (0.0, 0.001),  # degenerate zero elapsed — clamped to min
+        (-5.0, 0.001),  # negative (clock anomaly) — clamped to min
     ],
 )
 def test_advance_physics_clamps_dt(dt_sent, dt_expected):
@@ -611,9 +786,7 @@ def test_advance_neuro_takes_no_dt_from_the_caller():
     import inspect
 
     params = inspect.signature(GenesisClient.advance_neuro).parameters
-    assert "dt" not in params, (
-        "advance_neuro must not accept dt; the daemon owns time"
-    )
+    assert "dt" not in params, "advance_neuro must not accept dt; the daemon owns time"
 
     client, _ = _client_with_socket()
     ok_resp = b"\x01" + b"\x00\x00\x80\x3f" * 4 + b"\x00" * 4
@@ -631,7 +804,6 @@ def test_advance_neuro_takes_no_dt_from_the_caller():
 
     (packed,) = struct.unpack("<f", send.call_args[0][2])
     assert abs(packed - DT_NOMINAL_STEP) < 1e-6
-
 
 
 def test_protocol_error_is_os_error():
@@ -782,6 +954,150 @@ def test_set_wake_alarm_returns_none_on_malformed_response():
         assert client.set_wake_alarm(1_800_000_000) is None
 
 
+def test_set_focus_packs_f32_meters_and_acks():
+    """set_focus sends [f32 meters] on the control channel and maps
+    the ack byte to True."""
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_FOCUS, b"\x01"),
+        ),
+    ):
+        assert client.set_focus(0.5) is True
+
+    assert send.call_args[0][1] == SET_FOCUS
+    assert send.call_args[0][2] == struct.pack("<f", 0.5)
+
+
+def test_set_focus_zero_relaxes_the_lens():
+    """A non-positive distance is the body's relax-to-infinity — the
+    client passes it through; the daemon clamps it to 0 D."""
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_FOCUS, b"\x01"),
+        ),
+    ):
+        assert client.set_focus(0.0) is True
+
+    assert send.call_args[0][2] == struct.pack("<f", 0.0)
+
+
+def test_set_focus_returns_false_when_the_daemon_predates_it():
+    """An unacked or missing response is an absent channel, not a
+    silent success."""
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_FOCUS, b"\x00"),
+        ),
+    ):
+        assert client.set_focus(2.0) is False
+
+    # A daemon that closes mid-request reads as unsupported too.
+    with (
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            side_effect=ConnectionError("gone"),
+        ),
+        patch.object(client, "connect"),
+    ):
+        assert client.set_focus(2.0) is False
+
+
+def test_set_lid_packs_f32_openness_and_acks():
+    """set_lid sends [f32 openness] on the control channel and maps
+    the ack byte to True — the voluntary lid is a held position."""
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_LID, b"\x01"),
+        ),
+    ):
+        assert client.set_lid(0.05) is True
+
+    assert send.call_args[0][1] == SET_LID
+    assert send.call_args[0][2] == struct.pack("<f", 0.05)
+
+
+def test_set_lid_returns_false_when_the_daemon_predates_it():
+    """A body without the command cannot hold the lid — False marks
+    the absent channel rather than a silent success."""
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_LID, b"\x00"),
+        ),
+    ):
+        assert client.set_lid(0.05) is False
+
+    with (
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            side_effect=ConnectionError("gone"),
+        ),
+        patch.object(client, "connect"),
+    ):
+        assert client.set_lid(0.05) is False
+
+
+def test_set_cognitive_pid_packs_u32_and_acks():
+    """set_cognitive_pid sends [u32 pid] on the control channel so a
+    re-inhabiting mind replaces the dead launcher's env-var PID."""
+    from genesis_client.protocol import SET_COGNITIVE_PID
+
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_COGNITIVE_PID, b"\x01"),
+        ),
+    ):
+        assert client.set_cognitive_pid(4242) is True
+
+    assert send.call_args[0][1] == SET_COGNITIVE_PID
+    assert send.call_args[0][2] == struct.pack("<I", 4242)
+
+
+def test_set_cognitive_pid_false_when_the_daemon_predates_it():
+    """A body that predates the command cannot adopt the new PID —
+    False marks the absent channel rather than a silent success."""
+    from genesis_client.protocol import SET_COGNITIVE_PID
+
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_COGNITIVE_PID, b"\x00"),
+        ),
+    ):
+        assert client.set_cognitive_pid(4242) is False
+
+    with (
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            side_effect=ConnectionError("gone"),
+        ),
+        patch.object(client, "connect"),
+    ):
+        assert client.set_cognitive_pid(4242) is False
+
+
 # ─── Test runner ──────────────────────────────────────────────
 
 
@@ -871,149 +1187,134 @@ def test_ion_summary_unpack_matches_wire_layout():
         IonSummary.unpack(raw[:107])
 
 
-def test_set_volition_is_opcode_46() -> None:
-    """Volitional push onto the sleep-wake network. Pinned against the Rust
-    daemon's `cmd::SET_VOLITION`, which is also 46."""
+def test_set_volition_is_retired_opcode_46() -> None:
+    """The SET_VOLITION wire number is retired — volitional pushes onto the
+    sleep-wake network were removed in favour of chemical impulses — but
+    the constant is kept pinned at 46 so the number is never reused."""
     from genesis_client import protocol
 
     assert protocol.SET_VOLITION == 46
     assert "SET_VOLITION" in protocol.__all__
+    assert not hasattr(protocol, "set_volition")
 
 
-def test_get_dyadic_state_is_opcode_50() -> None:
-    """Dyadic snapshot — pinned against the Rust daemon's
-    `cmd::GET_DYADIC_STATE`, which is also 50."""
+def test_get_internals_is_opcode_51_and_decodes_lines() -> None:
+    """Process-local daemon internals — pinned against the Rust daemon's
+    `cmd::GET_INTERNALS` (51) and decoded from `[u8 ack]` + `key=value` lines."""
     from genesis_client import protocol
 
-    assert protocol.GET_DYADIC_STATE == 50
-    assert "GET_DYADIC_STATE" in protocol.__all__
+    assert protocol.GET_INTERNALS == 51
+    assert "GET_INTERNALS" in protocol.__all__
+
+    client, _ = _client_with_read_socket()
+    body = b"\x01tick_count=42\ngate.intero.period_ms=6000\n"
+    with (
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(protocol.GET_INTERNALS, body),
+        ),
+    ):
+        internals = client.get_internals()
+
+    assert internals == {
+        "tick_count": "42",
+        "gate.intero.period_ms": "6000",
+    }
 
 
-def test_dyadic_snapshot_unpack_matches_wire_layout():
-    """DyadicSnapshot decodes the daemon's snapshot body.
+def test_analyze_code_request_payload_and_decode() -> None:
+    """analyze_code packs [u16 path][path][u32 src][src], travels the
+    read channel (pure analysis — never queues behind writes), and
+    decodes the tab-separated line report."""
+    from genesis_client import protocol
 
-    Layout: [u8 ver][6×f32 pooled][u8 has_person][u8 name_len][name]
-    [u8 auth][5×f32 aura][f64 presence][u32 field_samples][10×f32 field]
-    [u8 has_reunion][f32 bond][f32 seconds_since][u16 person_count].
-    If either side reorders a field the payload still unpacks — the
-    test pins the order, not just the width.
-    """
-    import struct
+    assert protocol.ANALYZE_CODE == 55
+    assert "ANALYZE_CODE" in protocol.__all__
 
-    from genesis_client.types import DyadicSnapshot
-
-    body = bytearray([1])
-    body += struct.pack("<6f", 0.1, 0.2, 0.3, 0.4, 0.5, 0.6)
-    body += bytes([1])  # has_person
-    body += bytes([5]) + b"mindy" + bytes([1])  # name_len, name, auth
-    body += struct.pack("<5f", 0.22, 0.7, 0.5, 0.8, 0.4)
-    body += struct.pack("<d", 3600.0)
-    body += struct.pack("<I", 42)
-    body += struct.pack("<10f", *range(10))
-    body += bytes([1])  # has_reunion
-    body += struct.pack("<2f", 0.22, 3.5)
-    body += struct.pack("<H", 3)
-
-    snap = DyadicSnapshot.unpack(bytes(body))
-    assert snap.user_valence == pytest.approx(0.1)
-    assert snap.coupling == pytest.approx(0.6)
-    person = snap.person
-    assert person is not None
-    assert person.name == "mindy"
-    assert person.authenticated is True
-    assert person.familiarity == pytest.approx(0.22)
-    assert person.presence_seconds == pytest.approx(3600.0)
-    assert person.field_samples == 42
-    assert person.field == tuple(float(i) for i in range(10))
-    assert snap.reunion == {"bond": pytest.approx(0.22), "seconds_since": pytest.approx(3.5)}
-    assert snap.person_count == 3
-    # v1 body has no ambient tail — the channel reads as absent, not
-    # fabricated.
-    assert snap.ambient_field_samples == 0
-    assert snap.ambient_field == ()
-
-
-def test_dyadic_snapshot_unpack_ambient_field_tail():
-    """The additive ambient tail decodes when present: the pooled
-    field signature — "someone is here" — for presence that never
-    attributes a person."""
-    import struct
-
-    from genesis_client.types import DyadicSnapshot
-
-    body = bytearray([1])
-    body += struct.pack("<6f", *([0.0] * 6))
-    body += bytes([0])  # no person — anonymous presence
-    body += bytes([0])  # no reunion
-    body += struct.pack("<H", 2)
-    body += struct.pack("<I", 17)
-    body += struct.pack("<10f", *([0.3] * 10))
-
-    snap = DyadicSnapshot.unpack(bytes(body))
-    assert snap.person is None
-    assert snap.person_count == 2
-    assert snap.ambient_field_samples == 17
-    assert snap.ambient_field == pytest.approx([0.3] * 10)
-
-
-def test_update_user_affect_person_key_and_alias():
-    """The update tail carries the person key, provenance, and the
-    one-shot merge alias — [u8 key_len][key][u8 auth][u8 alias_len]
-    [alias]. Face-cluster keys ride the same field as names."""
-    from unittest.mock import MagicMock
-
-    from genesis_client.client import GenesisClient
-
-    client = GenesisClient.__new__(GenesisClient)
-    client._request = MagicMock(return_value=b"\x01")
-
-    # Anonymous face key — no name needed to be someone.
-    assert client.update_user_affect(0.5, 0.6, 0.7, 0.8, speaker="face:3")
-    payload = client._request.call_args[0][1]
-    assert payload[16] == 6
-    assert payload[17:23] == b"face:3"
-    assert payload[23] == 0
-
-    # Naming fold: alice now carries face:3's measured history.
-    client.update_user_affect(
-        0.5, 0.6, 0.7, 0.8,
-        speaker="alice", authenticated=True, merge_alias="face:3",
+    client, read_sock = _client_with_read_socket()
+    report = (
+        b"file\tdemo.rs\n"
+        b"lines\t12\n"
+        b"functions\t1\n"
+        b"avg_complexity\t1.5\n"
+        b"unit\tfunction\thelper\thelper\t1-4\tpub\ti32;i32\ti32"
+        b"\tadd\tVec;HashMap\t1\t0\t3\tAdds things.\n"
+        b"impl\tConfig\tHandler\n"
+        b"impl\tConfig\t-\n"
+        b"edge\tcaller\thelper\n"
     )
-    payload = client._request.call_args[0][1]
-    assert payload[16] == 5
-    assert payload[17:22] == b"alice"
-    assert payload[22] == 1
-    assert payload[23] == 6
-    assert payload[24:30] == b"face:3"
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(ANALYZE_CODE, b"\x01" + report),
+        ),
+    ):
+        result = client.analyze_code("demo.rs", "pub fn helper() {}")
+
+    assert result is not None
+    assert result["file"] == "demo.rs"
+    assert result["stats"]["functions"] == 1
+    assert result["stats"]["avg_complexity"] == 1.5
+    unit = result["units"][0]
+    assert unit["kind"] == "function"
+    assert unit["name"] == "helper"
+    assert unit["span"] == (1, 4)
+    assert unit["public"] is True
+    assert unit["params"] == ["i32", "i32"]
+    assert unit["return_type"] == "i32"
+    assert unit["calls"] == ["add"]
+    assert unit["refs"] == ["Vec", "HashMap"]
+    assert unit["stmts"] == 3
+    assert unit["docs"] == "Adds things."
+    assert result["impls"] == [("Config", "Handler"), ("Config", None)]
+    assert result["edges"] == [("caller", "helper")]
+
+    # Payload shape: [u16 path_len][path][u32 src_len][source].
+    sent_cmd, sent_payload = send.call_args[0][1], send.call_args[0][2]
+    assert sent_cmd == ANALYZE_CODE
+    path_len = struct.unpack("<H", sent_payload[:2])[0]
+    assert sent_payload[2 : 2 + path_len] == b"demo.rs"
+    src_off = 2 + path_len
+    src_len = struct.unpack("<I", sent_payload[src_off : src_off + 4])[0]
+    assert sent_payload[src_off + 4 : src_off + 4 + src_len] == b"pub fn helper() {}"
+    # Pure analysis rides the read channel, not the control socket.
+    assert send.call_args[0][0] is read_sock
 
 
-def test_dyadic_snapshot_unpack_anonymous():
-    """Anonymous/absent presence: no person block, no reunion."""
-    import struct
+def test_analyze_code_returns_none_on_daemon_rejection() -> None:
+    """A parse failure (INVALID_VALUE) or dead daemon yields None —
+    an absent channel, never a fabricated reading."""
+    client, _ = _client_with_read_socket()
+    with (
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(ANALYZE_CODE, b"\x05"),
+        ),
+    ):
+        assert client.analyze_code("bad.rs", "fn broken( {") is None
 
-    from genesis_client.types import DyadicSnapshot
-
-    body = bytearray([1])
-    body += struct.pack("<6f", *([0.0] * 6))
-    body += bytes([0])  # no person
-    body += bytes([0])  # no reunion
-    body += struct.pack("<H", 0)
-
-    snap = DyadicSnapshot.unpack(bytes(body))
-    assert snap.person is None
-    assert snap.reunion is None
-    assert snap.person_count == 0
+    client2 = GenesisClient("/unused/genesis.sock", request_timeout=1.5)
+    assert client2.analyze_code("x.rs", "fn x() {}") is None
 
 
-def test_dyadic_snapshot_unpack_rejects_garbage():
-    """A truncated or foreign payload is an error, not a reading."""
-    import struct
+def test_decode_code_analysis_tolerates_partial_reports() -> None:
+    """Malformed numeric fields degrade to zero rather than poison
+    the reading; comma-bearing type strings survive the ';' split."""
+    from genesis_client.client import _decode_code_analysis
 
-    from genesis_client.types import DyadicSnapshot
-
-    with pytest.raises(ValueError, match="bad dyadic snapshot"):
-        DyadicSnapshot.unpack(b"")
-    with pytest.raises(ValueError, match="bad dyadic snapshot"):
-        DyadicSnapshot.unpack(struct.pack("<6f", *([0.0] * 6)))  # no ver byte
-    with pytest.raises(ValueError, match="bad dyadic snapshot"):
-        DyadicSnapshot.unpack(bytes([9]) + bytes(40))  # wrong version
+    report = (
+        "file\tdemo.rs\n"
+        "functions\tNaN\n"
+        "unit\tfunction\tf\tf\t-\tpub,async"
+        "\tHashMap<String, Vec<u8>>;(u8, u8)\t\t\t\tNaN\t0\t1\t\n"
+    )
+    decoded = _decode_code_analysis(report)
+    assert decoded["stats"]["functions"] == 0
+    unit = decoded["units"][0]
+    assert unit["span"] == (0, 0)
+    assert unit["async_"] is True
+    assert unit["params"] == ["HashMap<String, Vec<u8>>", "(u8, u8)"]
+    assert unit["branches"] == 0

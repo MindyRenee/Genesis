@@ -78,8 +78,10 @@ class STDP:
             if not np.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be finite and positive")
         for name, value in (
-            ("a_plus", a_plus), ("a_minus", a_minus),
-            ("learning_rate", learning_rate), ("window_ms", window_ms),
+            ("a_plus", a_plus),
+            ("a_minus", a_minus),
+            ("learning_rate", learning_rate),
+            ("window_ms", window_ms),
         ):
             if not np.isfinite(value) or value < 0:
                 raise ValueError(f"{name} must be finite and nonnegative")
@@ -163,9 +165,9 @@ class STDP:
                     for name, times in self._spike_history.items()
                     if times and time_ms - times[-1] <= self.window_ms
                 }
-            self._spike_history.setdefault(
-                concept, deque(maxlen=self._max_history)
-            ).append(float(time_ms))
+            self._spike_history.setdefault(concept, deque(maxlen=self._max_history)).append(
+                float(time_ms)
+            )
             if self.defer_updates:
                 self._decay_eligibility(time_ms)
                 for pre, post, _delta_t, delta in pairs:

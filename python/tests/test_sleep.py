@@ -496,6 +496,52 @@ class TestInnerLifeSleepArchitecture:
         il = self._make_inner_life()
         assert il.total_synaptic_downscaling == 0.0
 
+    def test_active_cycle_is_the_stage_authority(self):
+        """While a sleep cycle runs, the tracker — not the daemon
+        summary — decides the stage. Regression for the N1-pinning
+        defect: a summary-side derivation (pressure or arousal) must
+        never override the running cycle, which is the only source
+        that walks the full N1→N2→N3→N2→REM architecture. The daemon
+        clamps NREM arousal into a narrow band, so it cannot carry
+        the depth anyway."""
+        from types import SimpleNamespace
+
+        il = self._make_inner_life()
+        il._sleep_cycle = SleepCycleTracker()
+        il._sleep_cycle.advance(1900.0)  # ~30 min in → deep N3
+        assert il._sleep_cycle.current_stage is SleepStage.N3
+
+        # A high-arousal NREM summary must not pull the stage up to N1.
+        summary = SimpleNamespace(phase_name="nrem", arousal=0.9)
+        stage, is_rem, _dt = il._determine_dream_stage(summary)
+        assert stage is SleepStage.N3
+        assert not is_rem
+
+        # Nor may a "rem" phase force REM while the tracker sits in N2.
+        il2 = self._make_inner_life()
+        il2._sleep_cycle = SleepCycleTracker()
+        il2._sleep_cycle.advance(300.0)  # N2
+        stage2, is_rem2, _ = il2._determine_dream_stage(
+            SimpleNamespace(phase_name="rem", arousal=0.1)
+        )
+        assert stage2 is SleepStage.N2
+        assert not is_rem2
+
+    def test_summary_fallback_when_no_cycle(self):
+        """With no tracker running, the arousal bands derive the stage."""
+        from types import SimpleNamespace
+
+        il = self._make_inner_life()
+        assert il._sleep_cycle is None
+        stage, is_rem, _ = il._determine_dream_stage(
+            SimpleNamespace(phase_name="nrem", arousal=0.15)
+        )
+        assert stage is SleepStage.N3
+        assert not is_rem
+        stage, is_rem, _ = il._determine_dream_stage(SimpleNamespace(phase_name="rem", arousal=0.6))
+        assert stage is SleepStage.REM
+        assert is_rem
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Sleep-state persistence / serialization
@@ -581,16 +627,16 @@ def test_restore_sleep_cycle_rem_cycle_2():
     tracker = SleepCycleTracker()
     # Advance through a full cycle: N1→N2→N3→N2→REM
     # Cycle 1 durations: N1=300, N2=900, N3=2400, N2_ascent=360, REM=600
-    tracker.advance(300.0)   # N1 → N2
-    tracker.advance(900.0)   # N2 → N3
+    tracker.advance(300.0)  # N1 → N2
+    tracker.advance(900.0)  # N2 → N3
     tracker.advance(2400.0)  # N3 → N2 (ascent)
-    tracker.advance(360.0)   # N2 ascent → REM
-    tracker.advance(600.0)   # REM → new cycle N1
+    tracker.advance(360.0)  # N2 ascent → REM
+    tracker.advance(600.0)  # REM → new cycle N1
     # Now in cycle 2
     assert tracker.cycle_number == 2
-    tracker.advance(300.0)   # N1 → N2
+    tracker.advance(300.0)  # N1 → N2
     # Cycle 2 N2 descent = 900 + 60 = 960s
-    tracker.advance(960.0)   # N2 → N3
+    tracker.advance(960.0)  # N2 → N3
 
     data = serialize_sleep_state(
         is_sleeping=True,

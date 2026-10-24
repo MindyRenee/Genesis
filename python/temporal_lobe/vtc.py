@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 _DATA_DIR = default_data_dir() / "visual_cortex"
 _VTC_FILE = _DATA_DIR / "vtc_space.npz"
 
+
 class VTCFeatureSpace:
     """Ventral temporal cortex — axis-based feature space.
 
@@ -104,7 +105,7 @@ class VTCFeatureSpace:
             # padded/truncated to n_components
             if len(descriptor) < self.n_components:
                 return np.pad(descriptor, (0, self.n_components - len(descriptor)))
-            return descriptor[:self.n_components]
+            return descriptor[: self.n_components]
 
     def _update_pca(self, descriptor: np.ndarray) -> None:
         """Incrementally update PCA with a new observation.
@@ -139,10 +140,7 @@ class VTCFeatureSpace:
         # _scatter is always set alongside _mean (above), so it's not
         # None here — but mypy can't infer that from the early return.
         assert self._scatter is not None
-        self._scatter = (
-            alpha * self._scatter
-            + (1 - alpha) * np.outer(delta_old, delta_new)
-        )
+        self._scatter = alpha * self._scatter + (1 - alpha) * np.outer(delta_old, delta_new)
 
         # Recompute PCA every 10 samples (expensive but d is small)
         if self._n_samples % 10 == 0 and self._scatter is not None:
@@ -186,8 +184,7 @@ class VTCFeatureSpace:
             # Dimension check: saved mean must match current input_dim.
             if mean.size > 0 and mean.shape[0] != self.input_dim:
                 logger.warning(
-                    f"VTC load skipped: saved input_dim "
-                    f"{mean.shape[0]} != current {self.input_dim}"
+                    f"VTC load skipped: saved input_dim {mean.shape[0]} != current {self.input_dim}"
                 )
                 return False
             if mean.size > 0:

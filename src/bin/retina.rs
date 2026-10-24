@@ -42,11 +42,37 @@ fn main() {
             signal_handler as *const () as libc::sighandler_t,
         );
     }
-    // Open the first V4L2 capture device.
-    let dev = match Device::new(0) {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("retina: cannot open /dev/video0: {e}");
+
+    // Get camera device from environment variable or default to /dev/video0
+    let camera_path = std::env::var("GENESIS_CAMERA").unwrap_or_else(|_| "/dev/video0".to_string());
+    let camera_index = camera_path
+        .strip_prefix("/dev/video")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+
+    // Open the V4L2 capture device. EBUSY is transient — a previous
+    // retina can still be releasing the device through a restart
+    // overlap — so it gets a short retry window before giving up.
+    let mut dev = None;
+    for _ in 0..10 {
+        match Device::new(camera_index) {
+            Ok(d) => {
+                dev = Some(d);
+                break;
+            }
+            Err(e) if e.raw_os_error() == Some(libc::EBUSY) => {
+                thread::sleep(Duration::from_millis(200));
+            }
+            Err(e) => {
+                eprintln!("retina: cannot open {camera_path}: {e}");
+                process::exit(1);
+            }
+        }
+    }
+    let dev = match dev {
+        Some(d) => d,
+        None => {
+            eprintln!("retina: cannot open {camera_path}: device stayed busy");
             process::exit(1);
         }
     };
@@ -62,25 +88,37 @@ fn main() {
     fmt.width = 640;
     fmt.height = 480;
 
-    // Try RGB24 first, then the camera's native uncompressed fallback.
-    fmt.fourcc = FourCC::new(b"RGB3");
-    let mut fmt = match dev.set_format(&fmt) {
-        Ok(f) => f,
-        Err(e) => {
-            eprintln!("retina: cannot set RGB3 format: {e}");
+    // Try RGB24 first, then the camera's native uncompressed
+    // fallback. A driver rejects an unsupported fourcc with EINVAL —
+    // move on to the next candidate — and answers EBUSY while a
+    // previous handle still owns the device, which gets the same
+    // brief retry window as open.
+    let mut negotiated = None;
+    'fourcc: for cand in [b"RGB3", b"YUYV"] {
+        fmt.fourcc = FourCC::new(cand);
+        for _ in 0..10 {
+            match dev.set_format(&fmt) {
+                Ok(f) if f.fourcc == FourCC::new(cand) => {
+                    negotiated = Some(f);
+                    break 'fourcc;
+                }
+                // Driver accepted the request but negotiated a
+                // different fourcc — try the next candidate.
+                Ok(_) => continue 'fourcc,
+                Err(e) if e.raw_os_error() == Some(libc::EBUSY) => {
+                    thread::sleep(Duration::from_millis(200));
+                }
+                Err(_) => continue 'fourcc,
+            }
+        }
+    }
+    let fmt = match negotiated {
+        Some(f) => f,
+        None => {
+            eprintln!("retina: no usable format on {camera_path}");
             process::exit(1);
         }
     };
-    if fmt.fourcc != FourCC::new(b"RGB3") {
-        fmt.fourcc = FourCC::new(b"YUYV");
-        fmt = match dev.set_format(&fmt) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("retina: cannot set YUYV format: {e}");
-                process::exit(1);
-            }
-        };
-    }
 
     println!(
         "retina: {}x{} fourcc={:?} size={} stride={}",
@@ -172,6 +210,16 @@ fn main() {
         let (buf, meta) = match stream.next() {
             Ok(frame) => frame,
             Err(e) => {
+                // A signal (SIGTERM/SIGINT) interrupts the blocking
+                // dequeue — that's the exit path, not a capture fault.
+                if SHOULD_EXIT.load(Ordering::Relaxed) {
+                    break;
+                }
+                // EINTR from any other signal is transient; retry
+                // without logging or delay.
+                if e.raw_os_error() == Some(libc::EINTR) {
+                    continue;
+                }
                 eprintln!("retina: capture error: {e}");
                 // Back off to avoid a tight error spin that floods the
                 // log and burns CPU when the camera is disconnected.

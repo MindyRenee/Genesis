@@ -210,9 +210,7 @@ class OuterWorld:
         sentiment = analyze_sentiment(text).get("compound", 0.0)
         now = time.time()
         with self._lock:
-            presence = self._presence_locked(
-                AMBIENT_PRESENCE_ID, PresenceKind.VOICE
-            )
+            presence = self._presence_locked(AMBIENT_PRESENCE_ID, PresenceKind.VOICE)
             was_present = presence.present
             presence.seen(now)
             presence.belief.note_activity(now, weight=0.6)
@@ -360,9 +358,7 @@ class OuterWorld:
     def presences(self) -> list[Presence]:
         """All known presences, most recently seen first."""
         with self._lock:
-            return sorted(
-                self._presences.values(), key=lambda p: p.last_seen, reverse=True
-            )
+            return sorted(self._presences.values(), key=lambda p: p.last_seen, reverse=True)
 
     def present_presences(self) -> list[Presence]:
         """Presences currently in its world."""
@@ -438,11 +434,7 @@ class OuterWorld:
         """Recent inbound event rate (events per minute, last 5 min)."""
         cutoff = time.time() - 300.0
         with self._lock:
-            count = sum(
-                1
-                for e in self._stream.recent(200)
-                if e.inbound and e.timestamp >= cutoff
-            )
+            count = sum(1 for e in self._stream.recent(200) if e.inbound and e.timestamp >= cutoff)
         return count / 5.0
 
     def tick(self, now: float | None = None) -> None:
@@ -459,16 +451,11 @@ class OuterWorld:
         departures: list[ExternalEvent] = []
         with self._lock:
             for presence in self._presences.values():
-                departing = (
-                    presence.present
-                    and ts - presence.last_seen > presence.timeout
-                )
+                departing = presence.present and ts - presence.last_seen > presence.timeout
                 if departing:
                     presence.present = False
                 bid = presence.belief.pending_bid
-                if bid is not None and (
-                    departing or ts - bid.at > presence.belief.bid_window()
-                ):
+                if bid is not None and (departing or ts - bid.at > presence.belief.bid_window()):
                     # They left without answering, or the answer
                     # window closed — the bid didn't land.
                     presence.belief.resolve_bid(False, ts)
@@ -509,8 +496,7 @@ class OuterWorld:
                 belief = p.belief.describe(now)
                 suffix = f"; {belief}" if belief else ""
                 lines.append(
-                    f"  {p.display_name} ({p.kind.value}) — here, "
-                    f"last active {ago}{suffix}"
+                    f"  {p.display_name} ({p.kind.value}) — here, last active {ago}{suffix}"
                 )
         else:
             lines.append("  no one is here right now")
@@ -519,10 +505,7 @@ class OuterWorld:
             ago = self._ago(now - p.last_seen)
             belief = p.belief.describe(now)
             suffix = f"; {belief}" if belief else ""
-            lines.append(
-                f"  {p.display_name} ({p.kind.value}) — away, "
-                f"last seen {ago}{suffix}"
-            )
+            lines.append(f"  {p.display_name} ({p.kind.value}) — away, last seen {ago}{suffix}")
         isolation = self.social_isolation()
         lines.append(
             f"  social isolation: {isolation:.0%}   "
@@ -543,9 +526,7 @@ class OuterWorld:
         with self._lock:
             return {
                 "version": 1,
-                "presences": {
-                    pid: p.to_dict() for pid, p in self._presences.items()
-                },
+                "presences": {pid: p.to_dict() for pid, p in self._presences.items()},
                 "events": [e.to_dict() for e in self._stream.recent(50)],
                 "last_addressed_time": self._last_addressed_time,
                 "unanswered_bids": self._unanswered_bids,
@@ -575,9 +556,7 @@ class OuterWorld:
             event = ExternalEvent.from_dict(edata)
             if event is not None:
                 events.append(event)
-        last_addressed = float(
-            data.get("last_addressed_time", time.time())
-        )
+        last_addressed = float(data.get("last_addressed_time", time.time()))
         bids = int(data.get("unanswered_bids", 0))
         with self._lock:
             self._presences = presences
@@ -600,9 +579,7 @@ class OuterWorld:
                 # A listener must never break the world.
                 logger.debug("world event listener failed", exc_info=True)
 
-    def _presence_locked(
-        self, presence_id: str, kind: PresenceKind
-    ) -> Presence:
+    def _presence_locked(self, presence_id: str, kind: PresenceKind) -> Presence:
         """Get or create a presence. Caller holds ``self._lock``."""
         presence = self._presences.get(presence_id)
         if presence is None:
@@ -619,7 +596,8 @@ class OuterWorld:
         prefers stale strangers it never formed a relationship with.
         """
         candidates = [
-            p for p in self._presences.values()
+            p
+            for p in self._presences.values()
             if not p.present and p.familiarity < 0.3 and p.bond < 0.3
         ]
         if not candidates:
@@ -630,9 +608,7 @@ class OuterWorld:
         stale = min(candidates, key=lambda p: p.last_seen)
         del self._presences[stale.presence_id]
 
-    def _arrival_locked(
-        self, presence: Presence, now: float
-    ) -> ExternalEvent:
+    def _arrival_locked(self, presence: Presence, now: float) -> ExternalEvent:
         """Build an ARRIVAL event for a presence that just appeared.
 
         Caller holds ``self._lock``. A returning presence it knows

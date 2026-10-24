@@ -50,23 +50,35 @@ class MetaCognitiveRouter:
         # Self-reflective questions — these are about HER state, not
         # factual lookups. Must come before the factual route.
         ("identity", "curious", re.compile(r"\bwhat are you curious about\b")),
-        ("identity", "curious", re.compile(
-            r"\bwhat (?:questions?|topics?) (?:are|do) you "
-            r"(?:feel )?(?:most )?(?:curious about|wonder about)\b"
-        )),
+        (
+            "identity",
+            "curious",
+            re.compile(
+                r"\bwhat (?:questions?|topics?) (?:are|do) you "
+                r"(?:feel )?(?:most )?(?:curious about|wonder about)\b"
+            ),
+        ),
         ("identity", "curious", re.compile(r"\bwhat (?:do|are) you (?:wonder|curious)\b")),
-        ("identity", "want_learn", re.compile(
-            r"\bwhat do you want to (?:learn|know|understand)\b"
-        )),
-        ("identity", "want_learn", re.compile(
-            r"\bwhat (?:are you|do you) (?:trying to|want to) learn\b"
-        )),
+        (
+            "identity",
+            "want_learn",
+            re.compile(r"\bwhat do you want to (?:learn|know|understand)\b"),
+        ),
+        (
+            "identity",
+            "want_learn",
+            re.compile(r"\bwhat (?:are you|do you) (?:trying to|want to) learn\b"),
+        ),
         ("identity", "learned", re.compile(r"\bwhat have you (?:been )?learn(?:ed|ing)\b")),
         ("identity", "learned", re.compile(r"\bwhat did you learn\b")),
-        ("identity", "learned", re.compile(
-            r"\bwhat (?:are you|have you been) "
-            r"(?:learning|studying|reading|exploring)(?: about)?\b"
-        )),
+        (
+            "identity",
+            "learned",
+            re.compile(
+                r"\bwhat (?:are you|have you been) "
+                r"(?:learning|studying|reading|exploring)(?: about)?\b"
+            ),
+        ),
         # Personal preference questions — "what's your favorite X?",
         # "do you like X?", "what do you enjoy?". These are about HER
         # preferences, not factual lookups about a concept. Must come
@@ -74,9 +86,11 @@ class MetaCognitiveRouter:
         # color" matches the factual pattern and tries to look up
         # "your favorite color" as a concept.
         ("preference", "favorite", re.compile(r"\bwhat('?s| is) your favorite (.+?)(?:[.?!]|$)")),
-        ("preference", "hobby", re.compile(
-            r"\bwhat do you (?:like to do|do for fun|enjoy doing)\b"
-        )),
+        (
+            "preference",
+            "hobby",
+            re.compile(r"\bwhat do you (?:like to do|do for fun|enjoy doing)\b"),
+        ),
         ("preference", "like", re.compile(r"\bdo you (?:like|love|enjoy|prefer) (.+?)(?:[.?!]|$)")),
         # User model (questions only — statements are learned by the
         # theory-of-mind / user profile pipeline)
@@ -153,9 +167,7 @@ class MetaCognitiveRouter:
         (
             "correction",
             "no",
-            re.compile(
-                r"^(?:no|nope|wrong|not quite|not really|not exactly|incorrect)[.!?]*$"
-            ),
+            re.compile(r"^(?:no|nope|wrong|not quite|not really|not exactly|incorrect)[.!?]*$"),
         ),
         (
             "correction",
@@ -204,9 +216,7 @@ class MetaCognitiveRouter:
         (
             "goal",
             "goals",
-            re.compile(
-                r"\bwhat are you (?:trying to learn|thinking about|working on)\b"
-            ),
+            re.compile(r"\bwhat are you (?:trying to learn|thinking about|working on)\b"),
         ),
         ("goal", "goal", re.compile(r"\bwhat is your (?:goal|current goal)\b")),
         ("goal", "why_ask", re.compile(r"\bwhy (?:are you|do you) ask(?:ing)?\b")),
@@ -220,9 +230,7 @@ class MetaCognitiveRouter:
         (
             "comparison",
             "difference",
-            re.compile(
-                r"\bwhat(?:'s| is) (?:the )?difference between (.+?) and (.+?)(?:[.?!]|$)"
-            ),
+            re.compile(r"\bwhat(?:'s| is) (?:the )?difference between (.+?) and (.+?)(?:[.?!]|$)"),
         ),
         (
             "comparison",
@@ -307,8 +315,18 @@ class MetaCognitiveRouter:
     # something with code, even if the sentence ends with a period.
     _CODE_REQUEST_STARTERS: ClassVar[frozenset[str]] = frozenset(
         {
-            "tell", "show", "give", "explain", "describe", "help",
-            "improve", "fix", "update", "change", "check", "review",
+            "tell",
+            "show",
+            "give",
+            "explain",
+            "describe",
+            "help",
+            "improve",
+            "fix",
+            "update",
+            "change",
+            "check",
+            "review",
         }
     )
 
@@ -352,9 +370,7 @@ class MetaCognitiveRouter:
         if intent_value == "farewell" or self._FAREWELL_RE.search(lower):
             return Route(route="farewell", confidence=0.9, sub_kind="")
 
-        direct_request = lower.startswith(
-            ("please", "could you", "would you", "can you")
-        )
+        direct_request = lower.startswith(("please", "could you", "would you", "can you"))
         if intent_value == "request" and not direct_request:
             return Route(route="indirect_request", confidence=0.9, sub_kind="")
 
@@ -401,7 +417,8 @@ class MetaCognitiveRouter:
                         topic = match.group(1).strip().strip("?").strip(".").strip("!")
                     if topic:
                         return Route(
-                            route=route, confidence=0.9,
+                            route=route,
+                            confidence=0.9,
                             sub_kind=f"{sub_kind}:{topic}",
                         )
                     return Route(route=route, confidence=0.9, sub_kind=sub_kind)

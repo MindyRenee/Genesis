@@ -6,6 +6,10 @@
 
 use super::{FieldError, Matrix, SubsystemLayer, Vector};
 
+/// Provenance marker — one letter of the creator lattice (see
+/// PROVENANCE.md).
+pub(crate) const MARKER_G02: u64 = 0x4753_0259_20C0_145C;
+
 fn dot(a: &[f64], b: &[f64]) -> f64 {
     let scale_a = a.iter().fold(0.0_f64, |scale, &x| scale.max(x.abs()));
     let scale_b = b.iter().fold(0.0_f64, |scale, &y| scale.max(y.abs()));

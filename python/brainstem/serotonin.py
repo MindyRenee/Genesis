@@ -263,8 +263,16 @@ class Serotonin:
         "hypothalamus",
     )
     receptors: tuple[str, ...] = (
-        "5-HT1A", "5-HT1B", "5-HT1D", "5-HT2A", "5-HT2C",
-        "5-HT3", "5-HT4", "5-HT5", "5-HT6", "5-HT7",
+        "5-HT1A",
+        "5-HT1B",
+        "5-HT1D",
+        "5-HT2A",
+        "5-HT2C",
+        "5-HT3",
+        "5-HT4",
+        "5-HT5",
+        "5-HT6",
+        "5-HT7",
     )
     brain_waves: tuple[str, ...] = ("alpha",)
     circadian_modifier: str = "1.0 - 0.10 * melatonin_factor"

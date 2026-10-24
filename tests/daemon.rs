@@ -353,7 +353,7 @@ fn test_association_finds_similar_memories() {
         .expect("store");
 
     // Find associations for the first episode
-    let hash = sys.ltm.index_entry_ref(0).association_hash;
+    let hash = sys.ltm.index_entry_ref(0).expect("slot 0").association_hash;
     let associations = AssociationEngine::find_associations(&sys.ltm, hash, 10);
 
     assert!(!associations.is_empty(), "should find associations");
@@ -1149,6 +1149,37 @@ fn test_manifest_reports_memory_uptime_idle_and_errors() {
 }
 
 #[test]
+fn test_manifest_error_status_counted_without_liveness() {
+    // Regression: `error_count` was computed inside the `is_alive()`
+    // gate, and `Error` is not alive — so a module that reported
+    // status=Error (the primary crash signal) was skipped and the
+    // count stayed 0. The count must not depend on liveness.
+    let mut m = RuntimeManifest::new();
+    m.get_mut(ModuleId::Reasoning).expect("reasoning").status = ModuleStatus::Error as u8;
+    // A module that failed and was subsequently marked Stopped still
+    // carries its error_code — the failure happened and stays visible.
+    {
+        let lang = m.get_mut(ModuleId::Language).expect("language");
+        lang.set_error(9);
+        lang.status = ModuleStatus::Stopped as u8;
+    }
+    m.recompute();
+
+    assert_eq!(
+        m.error_count, 2,
+        "Error status and a persisted error_code must each count, got {}",
+        m.error_count
+    );
+    // active_count is documented as "non-Stopped": the Error module
+    // counts, the Stopped one does not.
+    assert_eq!(
+        m.active_count, 1,
+        "an Error module is non-Stopped and must be counted, got {}",
+        m.active_count
+    );
+}
+
+#[test]
 fn test_manifest_set_task_and_error() {
     // task_id and error_code existed in the layout with no writer.
     let sys = TestSystem::new("manifest_task", 16, 64);
@@ -1202,6 +1233,32 @@ fn test_transition_tally_ignores_out_of_range_states() {
     assert!(!t.record((TRACKED_STATES + 5) as u8, 1000));
     assert_eq!(t.total_transitions(), 0, "an unknown state records nothing");
     assert_eq!(t.total_ms(200, 9999), 0, "and reports no dwell");
+}
+
+#[test]
+fn test_transition_tally_covers_every_zone_and_phase() {
+    // TRACKED_STATES was once 8 — MentalPhase's width — while
+    // CognitiveZone::Sleeping is discriminant 8. The tally silently
+    // dropped every transition into Sleeping, and the zone history
+    // reported by GET_ZONE_TRANSITIONS could never show it.
+    use genesis::state::zones::{CognitiveZone, MentalPhase, TRACKED_STATES, TransitionTally};
+
+    assert!(
+        (CognitiveZone::Sleeping as usize) < TRACKED_STATES,
+        "the widest zone discriminant must fit the tally"
+    );
+    assert!(
+        (MentalPhase::Overwhelmed as usize) < TRACKED_STATES,
+        "the widest phase discriminant must fit the tally"
+    );
+
+    let mut t = TransitionTally::default();
+    assert!(
+        t.record(CognitiveZone::Sleeping as u8, 1000),
+        "a transition into Sleeping must be recorded"
+    );
+    assert_eq!(t.counts[CognitiveZone::Sleeping as usize], 1);
+    assert_eq!(t.total_ms(CognitiveZone::Sleeping as u8, 4000), 3000);
 }
 
 #[test]
@@ -1345,6 +1402,49 @@ fn advance_neuro_steps_the_sleep_network() {
         "network went non-finite: {after:?}"
     );
     assert_ne!(after, before, "the sleep network did not advance");
+    drop(mmap);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn advance_neuro_couples_adenosine_to_h_not_f_scn() {
+    // Regression: the adenosine coupling in `advance_neuro` must
+    // write the homeostat index, not the SCN's — a slip writes h
+    // (~300 units) onto f_scn (a firing rate under ~7 Hz), pinning
+    // the circadian drive at saturation while h free-integrates
+    // uncoupled from chemistry. Index 4 must receive the write;
+    // index 3 must stay in SCN's firing-rate range.
+    let path = std::env::temp_dir().join(format!(
+        "genesis_h_scn_{}.bin",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let mmap = MmapState::create(&path, 1, 1000).expect("create state");
+    mmap.modify(1000, |state| {
+        state.neurochemicals.chemicals[neurochemical::NeurochemicalId::Adenosine as usize].level =
+            0.95;
+    })
+    .expect("set adenosine");
+
+    let mut tl = TickLoop::new();
+    tl.note_mind_drive();
+    tl.advance_neuro(&mmap);
+
+    let net = mmap.read_consistent().expect("read").sleep_network;
+    let h_expected = sleep_network::h_from_adenosine(0.95); // ≈ H_MAX
+    assert!(
+        net[4] > h_expected * 0.8,
+        "h (index 4) should track adenosine: got {}, want ≈{}",
+        net[4],
+        h_expected
+    );
+    assert!(
+        net[3].abs() < 100.0,
+        "f_scn (index 3) must not carry the homeostat: got {}",
+        net[3]
+    );
     drop(mmap);
     let _ = std::fs::remove_file(&path);
 }

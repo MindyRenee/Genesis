@@ -148,16 +148,13 @@ class Hypothesis:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> Hypothesis:
+        """Reconstruct a Hypothesis from a serialized mapping."""
         return cls(
             hypothesis_id=str(data["hypothesis_id"]),
             kind=str(data["kind"]),
-            context=tuple(
-                GoalCondition.from_dict(c) for c in data.get("context", [])
-            ),
+            context=tuple(GoalCondition.from_dict(c) for c in data.get("context", [])),
             action=(None if data.get("action") is None else str(data["action"])),
-            effect=tuple(
-                GoalCondition.from_dict(c) for c in data.get("effect", [])
-            ),
+            effect=tuple(GoalCondition.from_dict(c) for c in data.get("effect", [])),
             support=int(data.get("support", 0)),
             violations=int(data.get("violations", 0)),
             note=str(data.get("note", "")),
@@ -214,11 +211,7 @@ class HypothesisLedger:
         conditional — falsification is the point.
         """
         view = transition_view(before, after)
-        changed = [
-            key
-            for key, v in view.items()
-            if key.endswith(".changed") and v
-        ]
+        changed = [key for key, v in view.items() if key.endswith(".changed") and v]
         new: list[Hypothesis] = []
         for changed_key in changed:
             key = changed_key[: -len(".changed")]
@@ -283,9 +276,7 @@ class HypothesisLedger:
                 continue
             effect = (GoalCondition(key, "eq", value),)
             h = Hypothesis(
-                hypothesis_id=_hash(
-                    {"kind": kind, "effect": [c.descriptor() for c in effect]}
-                ),
+                hypothesis_id=_hash({"kind": kind, "effect": [c.descriptor() for c in effect]}),
                 kind=kind,
                 effect=effect,
                 support=1 if won else 0,
@@ -300,9 +291,7 @@ class HypothesisLedger:
 
     # ── Verification ──────────────────────────────────────────
 
-    def observe_transition(
-        self, action: str, before: State, after: State
-    ) -> int:
+    def observe_transition(self, action: str, before: State, after: State) -> int:
         """Score every applicable mechanic hypothesis on this transition.
 
         Returns how many hypotheses were put on trial — the caller
@@ -339,11 +328,7 @@ class HypothesisLedger:
 
     def best_goal(self) -> Hypothesis | None:
         """Strongest standing goal hypothesis, verified first."""
-        goals = [
-            h
-            for h in self.hypotheses.values()
-            if h.kind == "goal" and h.status != "refuted"
-        ]
+        goals = [h for h in self.hypotheses.values() if h.kind == "goal" and h.status != "refuted"]
         if not goals:
             return None
         return max(
@@ -358,9 +343,7 @@ class HypothesisLedger:
         score = 0.0
         if goal is not None:
             total = sum(c.weight for c in goal.effect) or 1.0
-            score = (
-                sum(c.score(flat) * c.weight for c in goal.effect) / total
-            ) * goal.confidence
+            score = (sum(c.score(flat) * c.weight for c in goal.effect) / total) * goal.confidence
         for h in self.hypotheses.values():
             if h.kind == "avoid" and h.status != "refuted" and h.holds(flat):
                 score -= _AVOID_WEIGHT * h.confidence
@@ -390,6 +373,7 @@ class HypothesisLedger:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> HypothesisLedger:
+        """Reconstruct a HypothesisLedger from a serialized mapping."""
         ledger = cls()
         for item in data.get("hypotheses", []):
             h = Hypothesis.from_dict(item)

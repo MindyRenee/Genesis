@@ -33,27 +33,50 @@ def _out(*args: object) -> None:
 
 
 GENERATIVE = {
-    "swr-replay", "spindle", "lucid-dream", "dream-synthesis",
-    "discovered", "insight", "introspection", "analogy", "spontaneous",
-    "exploration", "corrected", "reified",
+    "swr-replay",
+    "spindle",
+    "lucid-dream",
+    "dream-synthesis",
+    "discovered",
+    "insight",
+    "introspection",
+    "analogy",
+    "spontaneous",
+    "exploration",
+    "corrected",
+    "reified",
 }
 SEEDS = {
-    "vocabulary_seed", "relation_verb_seed", "relation_phrase_seed",
+    "vocabulary_seed",
+    "relation_verb_seed",
+    "relation_phrase_seed",
     "situation_verb_seed",
 }
 MACHINE = {"semantic"}  # derivable similarity materialized per edge_log.py
 LABELING = {
-    "emotion_labeling", "mode_labeling", "labeling",
-    "plasticity_labeling", "valence_labeling", "emotion_share",
+    "emotion_labeling",
+    "mode_labeling",
+    "labeling",
+    "plasticity_labeling",
+    "valence_labeling",
+    "emotion_share",
 }
 CAUSAL = {
-    "causes", "creates", "enables", "prevents", "leads_to",
-    "emerges_from", "harms", "contradicts", "goal_directed",
+    "causes",
+    "creates",
+    "enables",
+    "prevents",
+    "leads_to",
+    "emerges_from",
+    "harms",
+    "contradicts",
+    "goal_directed",
     "opposite_of",
 }
 ASSOC = {"related_to", "similar_to"}
 TAXONOMIC = {"is_a", "part_of"}
 CODE = {"calls", "defines", "depends_on"}
+
 
 def _default_data_dir() -> str:
     """Resolve the data dir the way run.sh does.
@@ -97,6 +120,7 @@ def tier(origin: str) -> str:
 
 
 def is_cat(name: str) -> bool:
+    """True for category concepts — the ``_cat:``-prefixed names."""
     return name.startswith("_cat:")
 
 
@@ -116,9 +140,7 @@ def spearman(a: list[float], b: list[float]) -> float:
     ra, rb = rank(a), rank(b)
     ma, mb = statistics.mean(ra), statistics.mean(rb)
     num = sum((x - ma) * (y - mb) for x, y in zip(ra, rb, strict=True))
-    den = math.sqrt(
-        sum((x - ma) ** 2 for x in ra) * sum((y - mb) ** 2 for y in rb)
-    )
+    den = math.sqrt(sum((x - ma) ** 2 for x in ra) * sum((y - mb) ** 2 for y in rb))
     return num / den if den else 0.0
 
 
@@ -128,10 +150,7 @@ def _second_order_table(
     birth: dict[str, tuple[int, str]],
 ) -> None:
     """Second-order assembly: both endpoints born via generative origins."""
-    _out(
-        f"\n{'date':<12}{'n':>5}{'2ndOrd':>7}{'pct':>6}"
-        "  (both endpoints born generatively)"
-    )
+    _out(f"\n{'date':<12}{'n':>5}{'2ndOrd':>7}{'pct':>6}  (both endpoints born generatively)")
     for d in days:
         es = by_day[d]
         n = len(es)
@@ -159,10 +178,7 @@ def main() -> None:
     _out(f"days: {days[0]} -> {days[-1]} ({len(days)})")
     _out(f"edges: {len(edges)}")
 
-    _out(
-        f"\n{'date':<12}{'n':>5}{'gen%':>7}{'exp%':>7}"
-        f"{'mach%':>7}{'lab%':>7}{'seed%':>7}"
-    )
+    _out(f"\n{'date':<12}{'n':>5}{'gen%':>7}{'exp%':>7}{'mach%':>7}{'lab%':>7}{'seed%':>7}")
     gen_share: list[tuple[datetime.date, float]] = []
     for d in days:
         es = by_day[d]
@@ -185,9 +201,7 @@ def main() -> None:
     bc = collections.Counter(t for _, (_, t) in birth.items())
     _out(f"birth tiers: {dict(bc)}")
 
-    _out(
-        f"\n{'date':<12}{'newC':>5}{'genC':>5}{'genC%':>7}{'catC':>5}"
-    )
+    _out(f"\n{'date':<12}{'newC':>5}{'genC':>5}{'genC%':>7}{'catC':>5}")
     seen: set[str] = set()
     for d in days:
         es = sorted(by_day[d], key=lambda x: x["created_at"])
@@ -220,10 +234,7 @@ def main() -> None:
             return "code"
         return "other"
 
-    _out(
-        f"\n{'date':<12}{'n':>5}{'caus%':>7}{'taxon%':>7}"
-        f"{'assoc%':>7}{'code%':>7}"
-    )
+    _out(f"\n{'date':<12}{'n':>5}{'caus%':>7}{'taxon%':>7}{'assoc%':>7}{'code%':>7}")
     for d in days:
         es = by_day[d]
         n = len(es)

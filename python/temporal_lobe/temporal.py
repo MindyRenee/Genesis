@@ -52,9 +52,7 @@ class TemporalLobe:
 
     def grow_concept_learner(self, synapses) -> ConceptLearner:
         """Grow the label-acquisition machinery on the synaptic substrate."""
-        self.concept_learner = ConceptLearner(
-            network=self.network, synapses=synapses
-        )
+        self.concept_learner = ConceptLearner(network=self.network, synapses=synapses)
         return self.concept_learner
 
     def grow_memory_store(self, **deps: Any) -> MemoryStore:

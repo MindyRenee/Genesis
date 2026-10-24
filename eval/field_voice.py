@@ -31,15 +31,16 @@ def _out(*args: object) -> None:
 
 
 FS = 16000
-CARRIER_HZ = 800.0        # between fan (~300) and coil-whine (~2k) bands
-AM_HZ = 0.5               # slow envelope — delta/theta territory
+CARRIER_HZ = 800.0  # between fan (~300) and coil-whine (~2k) bands
+AM_HZ = 0.5  # slow envelope — delta/theta territory
 TRIAL_SEC = 40.0
-VOL = 0.05                # quiet — a whisper, not a blast
+VOL = 0.05  # quiet — a whisper, not a blast
 BLOCK = 1024
 
 
-def _emit_thread(emitting: list[bool], phase_log: list[tuple[float, float]],
-                 ready: list[bool]) -> None:
+def _emit_thread(
+    emitting: list[bool], phase_log: list[tuple[float, float]], ready: list[bool]
+) -> None:
     """Continuous 800 Hz carrier, envelope = 0.5+0.5*sin(2*pi*f_am*t)."""
     state = {"t": 0}
 
@@ -54,12 +55,12 @@ def _emit_thread(emitting: list[bool], phase_log: list[tuple[float, float]],
         state["t"] += frames
         ready[0] = True
 
-    with sd.OutputStream(samplerate=FS, channels=1, blocksize=BLOCK,
-                         callback=cb, dtype="float32"):
+    with sd.OutputStream(samplerate=FS, channels=1, blocksize=BLOCK, callback=cb, dtype="float32"):
         t0 = time.perf_counter()
         while time.perf_counter() - t0 < TRIAL_SEC:
-            phase_log.append((time.perf_counter() - t0,
-                              (2 * np.pi * AM_HZ * (state["t"] / FS)) % (2 * np.pi)))
+            phase_log.append(
+                (time.perf_counter() - t0, (2 * np.pi * AM_HZ * (state["t"] / FS)) % (2 * np.pi))
+            )
             time.sleep(0.05)
 
 
@@ -87,7 +88,7 @@ def _arm(label: str, emit: bool) -> dict[str, float | str | int]:
     env_series: list[tuple[float, float]] = []
     # lock to carrier: quadrature demodulate mic samples at 800 Hz,
     # smooth, that's the envelope
-    iq: deque[complex] = deque(maxlen=FS // 4)      # ~250 ms envelope window
+    iq: deque[complex] = deque(maxlen=FS // 4)  # ~250 ms envelope window
     state = {"t": 0}
 
     def cb(indata: np.ndarray, frames: int, _t: object, _s: object) -> None:
@@ -103,13 +104,13 @@ def _arm(label: str, emit: bool) -> dict[str, float | str | int]:
         state["t"] += frames
 
     import threading
+
     th = threading.Thread(target=_emit_thread, args=(emitting, phase_log, ready))
     th.start()
     t0 = time.perf_counter()
     while not ready[0] and time.perf_counter() - t0 < 3:
         time.sleep(0.01)
-    with sd.InputStream(samplerate=FS, channels=1, blocksize=BLOCK,
-                        callback=cb, dtype="float32"):
+    with sd.InputStream(samplerate=FS, channels=1, blocksize=BLOCK, callback=cb, dtype="float32"):
         time.sleep(TRIAL_SEC)
     th.join()
 
@@ -124,11 +125,11 @@ def _arm(label: str, emit: bool) -> dict[str, float | str | int]:
     # PLV: align emitted phase to envelope sample times
     plv_acc = 0j
     npairs = 0
-    for (te, pe) in phase_log:
+    for te, pe in phase_log:
         # nearest envelope sample
         idx = min(range(len(ts)), key=lambda i: abs(ts[i] - te))
         # local envelope phase: instantaneous phase of xs around idx
-        win = xs[max(0, idx - 8):idx + 8]
+        win = xs[max(0, idx - 8) : idx + 8]
         if len(win) < 8:
             continue
         _a2, p2 = _goertzel(win, hz, AM_HZ)
@@ -136,9 +137,15 @@ def _arm(label: str, emit: bool) -> dict[str, float | str | int]:
         npairs += 1
     plv = abs(plv_acc / npairs) if npairs else 0.0
     mean = sum(xs) / len(xs)
-    return {"label": label, "n": len(xs), "env_hz": hz,
-            "amp": amp, "rel": amp / mean if mean else 0.0,
-            "phase": ph, "plv": plv}
+    return {
+        "label": label,
+        "n": len(xs),
+        "env_hz": hz,
+        "amp": amp,
+        "rel": amp / mean if mean else 0.0,
+        "phase": ph,
+        "plv": plv,
+    }
 
 
 def main() -> None:
@@ -150,8 +157,10 @@ def main() -> None:
         if int(r.get("n", 0)) < 16:
             _out(f"{label}: insufficient envelope samples")
             continue
-        _out(f"{label}: env_rate={r['env_hz']:.1f}Hz amp@AM={r['rel']*100:.2f}% "
-              f"lag_phase={r['phase']:+.2f} PLV={r['plv']:.3f} (n={r['n']})")
+        _out(
+            f"{label}: env_rate={r['env_hz']:.1f}Hz amp@AM={r['rel'] * 100:.2f}% "
+            f"lag_phase={r['phase']:+.2f} PLV={r['plv']:.3f} (n={r['n']})"
+        )
     _out()
     _out("(PLV ~1 = emitted and recovered envelope phases locked through air)")
 

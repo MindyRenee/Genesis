@@ -68,15 +68,13 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from temporal_lobe.morphology import deconjugate_verb, is_verb_form
+from temporal_lobe.morphology import conjugate_verb, deconjugate_verb, is_verb_form
 
 if TYPE_CHECKING:
     from temporal_lobe.comprehension import ComprehensionResult, Proposition
 
 _ARTICLE_RE = re.compile(r"^(?:the|a|an)\s+")
-_PREP_RE = re.compile(
-    r"^(?:in|inside|at|on|into|onto|within|near|by|to|back to)\s+"
-)
+_PREP_RE = re.compile(r"^(?:in|inside|at|on|into|onto|within|near|by|to|back to)\s+")
 _UNCERTAIN_RE = re.compile(r"\b(?:might|maybe|perhaps|either)\b", re.I)
 _AND_RE = re.compile(r"\s+(?:and|or)\s+")
 # A stated reason: "went to the kitchen because she was hungry".
@@ -89,9 +87,7 @@ _DISCOURSE_RE = re.compile(
     re.I,
 )
 # Explicit purpose markers beyond a bare "to <verb>" infinitive.
-_PURPOSE_RE = re.compile(
-    r"\b(?:in order to|so as to)\s+(.+?)\s*$", re.I
-)
+_PURPOSE_RE = re.compile(r"\b(?:in order to|so as to)\s+(.+?)\s*$", re.I)
 
 # Attributed-belief memory is small like the rest of the model — an
 # entity's recent beliefs, not an encyclopedia.
@@ -100,22 +96,85 @@ _MAX_BELIEFS = 8
 # Verb families, as lemmas and common past forms — the vocabulary the
 # situation model understands. These are building blocks (seeds), not
 # responses.
-_MOTION = frozenset({
-    "go", "went", "gone", "move", "moved", "journey", "journeyed",
-    "travel", "travelled", "traveled", "run", "ran", "walk", "walked",
-    "march", "marched", "flee", "fled", "head", "headed", "return",
-    "returned", "come", "came", "leave", "left for", "enter", "entered",
-    "get", "sneak", "sneaked", "hurry", "hurried", "dash", "dashed",
-})
-_TAKE = frozenset({
-    "take", "took", "grab", "grabbed", "get", "got", "pick", "picked",
-    "hold", "held", "carry", "carried", "snatch", "snatched",
-    "retrieve", "retrieved",
-})
-_DROP = frozenset({
-    "drop", "dropped", "leave", "left for", "discard", "discarded",
-    "put down", "put", "set down", "abandon", "abandoned",
-})
+_MOTION = frozenset(
+    {
+        "go",
+        "went",
+        "gone",
+        "move",
+        "moved",
+        "journey",
+        "journeyed",
+        "travel",
+        "travelled",
+        "traveled",
+        "run",
+        "ran",
+        "walk",
+        "walked",
+        "march",
+        "marched",
+        "flee",
+        "fled",
+        "head",
+        "headed",
+        "return",
+        "returned",
+        "come",
+        "came",
+        "leave",
+        "left for",
+        "enter",
+        "entered",
+        "get",
+        "sneak",
+        "sneaked",
+        "hurry",
+        "hurried",
+        "dash",
+        "dashed",
+    }
+)
+_TAKE = frozenset(
+    {
+        "take",
+        "took",
+        "grab",
+        "grabbed",
+        "get",
+        "got",
+        "pick",
+        "picked",
+        "hold",
+        "held",
+        "carry",
+        "carried",
+        "snatch",
+        "snatched",
+        "retrieve",
+        "retrieved",
+    }
+)
+# Stative possession — "john has the ball" settles the same residue
+# as taking it: who holds what. Auxiliaries never reach the predicate
+# ("have taken" parses the main verb), so a bare "have" predicate is
+# always the possession reading.
+_HAVE = frozenset({"have", "has", "had", "having"})
+_DROP = frozenset(
+    {
+        "drop",
+        "dropped",
+        "leave",
+        "left for",
+        "discard",
+        "discarded",
+        "put down",
+        "put",
+        "set down",
+        "abandon",
+        "abandoned",
+    }
+)
 # A possession verb in a copula frame: comprehension yields
 # "Sandra is carrying the milk" as predicate "is" with the whole
 # verb phrase in ATTRIBUTE, so the verb arrives here as a participle
@@ -124,21 +183,54 @@ _DROP = frozenset({
 # matched explicitly — stemming is not worth the ambiguity here, and a
 # missed form only costs the possession answer.
 _POSSESSIVE_VERBS = (
-    "carrying", "carry", "carried",
-    "holding", "hold", "held",
-    "taking", "take", "took", "taken",
-    "grabbing", "grab", "grabbed",
-    "picking", "pick", "picked",
-    "snatching", "snatch", "snatched",
-    "retrieving", "retrieve", "retrieved",
-    "dropping", "drop", "dropped",
-    "discarding", "discard", "discarded",
-    "abandoning", "abandon", "abandoned",
-    "putting down", "put down", "setting down", "set down",
-    "giving", "give", "gave", "given",
-    "handing", "hand", "handed",
-    "passing", "pass", "passed",
-    "offering", "offer", "offered",
+    "carrying",
+    "carry",
+    "carried",
+    "holding",
+    "hold",
+    "held",
+    "taking",
+    "take",
+    "took",
+    "taken",
+    "grabbing",
+    "grab",
+    "grabbed",
+    "picking",
+    "pick",
+    "picked",
+    "snatching",
+    "snatch",
+    "snatched",
+    "retrieving",
+    "retrieve",
+    "retrieved",
+    "dropping",
+    "drop",
+    "dropped",
+    "discarding",
+    "discard",
+    "discarded",
+    "abandoning",
+    "abandon",
+    "abandoned",
+    "putting down",
+    "put down",
+    "setting down",
+    "set down",
+    "giving",
+    "give",
+    "gave",
+    "given",
+    "handing",
+    "hand",
+    "handed",
+    "passing",
+    "pass",
+    "passed",
+    "offering",
+    "offer",
+    "offered",
 )
 # Longest-first so "putting down" wins over "putting".
 _GERUND_POSSESSION_RE = re.compile(
@@ -152,28 +244,55 @@ _GERUND_POSSESSION_RE = re.compile(
 # the participle and returning it would never hit, which is why the
 # family test below compares against the normalized verb.
 _PARTICIPLE_LEMMA = {
-    "carrying": "carry", "holding": "hold", "taking": "take",
-    "grabbing": "grab", "picking": "pick", "snatching": "snatch",
-    "retrieving": "retrieve", "dropping": "drop",
-    "discarding": "discard", "abandoning": "abandon",
-    "putting down": "put down", "setting down": "set down",
-    "giving": "give", "handing": "hand", "passing": "pass",
-    "offering": "offer", "taken": "take",
+    "carrying": "carry",
+    "holding": "hold",
+    "taking": "take",
+    "grabbing": "grab",
+    "picking": "pick",
+    "snatching": "snatch",
+    "retrieving": "retrieve",
+    "dropping": "drop",
+    "discarding": "discard",
+    "abandoning": "abandon",
+    "putting down": "put down",
+    "setting down": "set down",
+    "giving": "give",
+    "handing": "hand",
+    "passing": "pass",
+    "offering": "offer",
+    "taken": "take",
 }
-_GIVE = frozenset({
-    "give", "gave", "hand", "handed", "pass", "passed", "offer",
-    "offered",
-})
-_COPULA = frozenset({
-    "is", "are", "was", "were", "be", "being", "been",
-    "isn't", "aren't", "wasn't", "weren't",
-})
+_GIVE = frozenset(
+    {
+        "give",
+        "gave",
+        "hand",
+        "handed",
+        "pass",
+        "passed",
+        "offer",
+        "offered",
+    }
+)
+_COPULA = frozenset(
+    {
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "being",
+        "been",
+        "isn't",
+        "aren't",
+        "wasn't",
+        "weren't",
+    }
+)
 
 _DIRS = frozenset({"north", "south", "east", "west"})
 _POS = frozenset({"left", "right", "above", "below"})
-_DIR_OF_RE = re.compile(
-    r"\b(north|south|east|west)\s+of\s+(?:the\s+)?(.+?)\s*$", re.I
-)
+_DIR_OF_RE = re.compile(r"\b(north|south|east|west)\s+of\s+(?:the\s+)?(.+?)\s*$", re.I)
 _POS_OF_RE = re.compile(
     r"\b(?:to\s+the\s+)?(left|right)\s+of\s+(?:the\s+)?(.+?)\s*$"
     r"|\b(above|below)\s+(?:the\s+)?(.+?)\s*$",
@@ -183,21 +302,54 @@ _AFRAID_RE = re.compile(r"\bafraid\s+of\s+(?:the\s+)?(.+?)\s*$", re.I)
 _FITS_RE = re.compile(r"(.+?)\s+fits?\s+in\s+(?:the\s+)?(.+?)\s*$", re.I)
 _BIGGER_RE = re.compile(
     r"(.+?)\s+(?:is|are|was|were)\s+(bigger|larger|smaller)\s+than\s+"
-    r"(?:the\s+)?(.+?)\s*$", re.I
+    r"(?:the\s+)?(.+?)\s*$",
+    re.I,
 )
 _SIZE_ATTR = {"big": 1, "large": 1, "small": -1, "little": -1, "tiny": -1}
-_STATE_WORDS = frozenset({
-    "hungry", "thirsty", "tired", "sleepy", "bored", "afraid", "scared",
-    "happy", "sad", "angry", "full", "cold", "hot", "sick",
-})
-_COLORS = frozenset({
-    "white", "black", "red", "green", "blue", "yellow", "gray", "grey",
-    "brown", "orange", "pink", "purple",
-})
+_STATE_WORDS = frozenset(
+    {
+        "hungry",
+        "thirsty",
+        "tired",
+        "sleepy",
+        "bored",
+        "afraid",
+        "scared",
+        "happy",
+        "sad",
+        "angry",
+        "full",
+        "cold",
+        "hot",
+        "sick",
+    }
+)
+_COLORS = frozenset(
+    {
+        "white",
+        "black",
+        "red",
+        "green",
+        "blue",
+        "yellow",
+        "gray",
+        "grey",
+        "brown",
+        "orange",
+        "pink",
+        "purple",
+    }
+)
 # Irregular plurals seen in this vocabulary domain.
-_PLURALS = {"mice": "mouse", "geese": "goose", "men": "man",
-            "women": "woman", "children": "child", "sheep": "sheep",
-            "wolves": "wolf"}
+_PLURALS = {
+    "mice": "mouse",
+    "geese": "goose",
+    "men": "man",
+    "women": "woman",
+    "children": "child",
+    "sheep": "sheep",
+    "wolves": "wolf",
+}
 
 
 def _norm(text: str) -> str:
@@ -253,9 +405,7 @@ def _destination_before(raw: str, purpose_head: str) -> str:
     by the purpose. Recover any to-phrase that precedes it.
     """
     m = re.search(
-        r"\bto\s+((?:(?:the|a|an)\s+)?\w+(?:\s+\w+)*?)\s+to\s+"
-        + re.escape(purpose_head)
-        + r"\b",
+        r"\bto\s+((?:(?:the|a|an)\s+)?\w+(?:\s+\w+)*?)\s+to\s+" + re.escape(purpose_head) + r"\b",
         raw,
         re.I,
     )
@@ -287,27 +437,74 @@ def _verb_match(asked: str, logged: str) -> bool:
 # complement-taking predicates. A believed/thought/hoped clause is
 # attributed to the holder's beliefs; speech verbs (say, tell,
 # report...) are public acts and stay on the event log only.
-_ATTITUDE = frozenset({
-    "think", "believe", "know", "hope", "expect", "suppose", "guess",
-    "imagine", "assume", "suspect", "doubt", "fear", "wish", "want",
-    "feel", "remember", "understand", "realize", "figure", "conclude",
-    "dream", "wonder", "decide",
-})
+_ATTITUDE = frozenset(
+    {
+        "think",
+        "believe",
+        "know",
+        "hope",
+        "expect",
+        "suppose",
+        "guess",
+        "imagine",
+        "assume",
+        "suspect",
+        "doubt",
+        "fear",
+        "wish",
+        "want",
+        "feel",
+        "remember",
+        "understand",
+        "realize",
+        "figure",
+        "conclude",
+        "dream",
+        "wonder",
+        "decide",
+    }
+)
 
 # Report predicates — public speech acts whose complement is what was
 # said, not what is believed. "Mary said that P" attributes P to
 # Mary's utterance.
-_CTP_REPORT = frozenset({
-    "say", "tell", "report", "claim", "state", "describe", "mention",
-    "admit", "confess", "insist", "maintain", "argue", "warn",
-    "promise", "explain", "suggest", "imply", "announce", "whisper",
-    "shout", "ask", "write", "read", "hear",
-})
+_CTP_REPORT = frozenset(
+    {
+        "say",
+        "tell",
+        "report",
+        "claim",
+        "state",
+        "describe",
+        "mention",
+        "admit",
+        "confess",
+        "insist",
+        "maintain",
+        "argue",
+        "warn",
+        "promise",
+        "explain",
+        "suggest",
+        "imply",
+        "announce",
+        "whisper",
+        "shout",
+        "ask",
+        "write",
+        "read",
+        "hear",
+    }
+)
 
 # Role → preposition for compact proposition descriptions.
 _ROLE_PREP = (
-    ("location", "in"), ("goal", "to"), ("time", "during"),
-    ("theme", "about"), ("beneficiary", "for"), ("instrument", "with"),
+    ("location", "in"),
+    ("goal", "to"),
+    ("time", "during"),
+    ("theme", "about"),
+    ("beneficiary", "for"),
+    ("instrument", "with"),
     ("source", "from"),
 )
 
@@ -320,11 +517,17 @@ def _describe_prop(prop: Proposition) -> str:
     is a *description of content*, not asserted state and not her
     spoken words; it exists so attribution can carry structure.
     """
-    parts = [
-        p
-        for p in (_norm(prop.subject), prop.predicate.lower(), _norm(prop.object))
-        if p
-    ]
+    subject = _norm(prop.subject)
+    pred = prop.predicate.lower()
+    # A do-support radical keeps the verb in base form ("does john
+    # have" → "john have"); agree it with the subject so the content
+    # reads as the declarative it stands for. Already-inflected and
+    # unlearned verbs are left as parsed.
+    if pred and is_verb_form(pred) == pred:
+        last = subject.split()[-1] if subject.split() else subject
+        plural = " and " in subject or (last.endswith("s") and not last.endswith("ss"))
+        pred = conjugate_verb(pred, plural=plural)
+    parts = [p for p in (subject, pred, _norm(prop.object)) if p]
     if prop.negated and len(parts) >= 2:
         parts.insert(2, "not")
     for role_label, prep in _ROLE_PREP:
@@ -345,12 +548,12 @@ class EntityState:
     """The discourse state of one entity."""
 
     location: str | None = None
-    location_seq: int = -1               # event index of the latest location
+    location_seq: int = -1  # event index of the latest location
     location_history: list[tuple[int, str]] = field(default_factory=list)
     not_at: set[str] = field(default_factory=set)
     candidates: set[str] = field(default_factory=set)
     carrying: list[str] = field(default_factory=list)
-    holder: str = ""                     # for objects: who carries it
+    holder: str = ""  # for objects: who carries it
     classes: set[str] = field(default_factory=set)
     attributes: set[str] = field(default_factory=set)
     fears: set[str] = field(default_factory=set)
@@ -411,9 +614,7 @@ class SituationEvent:
 
     def describe(self) -> str:
         """Compact "subject predicate object" rendering."""
-        return " ".join(
-            p for p in (self.subject, self.predicate, self.object) if p
-        )
+        return " ".join(p for p in (self.subject, self.predicate, self.object) if p)
 
 
 @dataclass
@@ -578,8 +779,7 @@ class SituationModel:
         if prop.embedded is not None:
             yield from SituationModel._walk(prop.embedded)
 
-    def _apply(self, prop: Proposition, result: ComprehensionResult,
-             uncertain: bool) -> None:
+    def _apply(self, prop: Proposition, result: ComprehensionResult, uncertain: bool) -> None:
         raw = result.raw_text
         pred = prop.predicate.lower()
         subjects = self._subjects(prop, raw, result.resolved_references)
@@ -635,7 +835,7 @@ class SituationModel:
             return
 
         # ── Possession ──
-        if pred in _TAKE and obj:
+        if pred in (_TAKE | _HAVE) and obj:
             for s in subjects:
                 self._take(s, _norm(obj))
             return
@@ -643,8 +843,12 @@ class SituationModel:
             for s in subjects:
                 self._drop(s, _norm(obj))
             return
-        if pred in _GIVE and (obj or ben):
-            self._give(subjects, obj, ben)
+        if pred in _GIVE and (obj or ben or destination):
+            # A "to"-dative recipient arrives in the GOAL role —
+            # "gave the ball to Mary" parses destination "mary",
+            # which for a transfer verb *is* the beneficiary.
+            recipient = ben or (_place(destination) if destination else None)
+            self._give(subjects, obj, recipient)
             return
 
         # ── Copula: location, negation, class, attribute ──
@@ -709,9 +913,7 @@ class SituationModel:
             else:
                 destination = ""
 
-        time_marker, time_cause = _split_cause(
-            prop.roles.get(_ROLE_TIME) or ""
-        )
+        time_marker, time_cause = _split_cause(prop.roles.get(_ROLE_TIME) or "")
         self._ctx = _EventCtx(
             subjects=subjects,
             obj=obj,
@@ -844,7 +1046,7 @@ class SituationModel:
 
         # "X is a <class>" / "X is <attribute>"
         obj = self._ctx.obj if self._ctx is not None else prop.object.strip()
-        attr_text = (attr or obj)
+        attr_text = attr or obj
         if not attr_text:
             return
         value = _norm(attr_text)
@@ -907,7 +1109,7 @@ class SituationModel:
         if not subjects:
             return
         recipient = _norm(ben) if ben else ""
-        item = obj
+        item = _norm(obj)
         if not recipient and obj:
             # First capitalized token in the object is the recipient.
             m = re.match(r"^([A-Z][a-zA-Z]*)\s+(?:the\s+)?(.+)$", obj)
@@ -916,8 +1118,8 @@ class SituationModel:
         if not item or not recipient:
             return
         giver = self._entity(subjects[0])
-        if _norm(item) in giver.carrying:
-            giver.carrying.remove(_norm(item))
+        if item in giver.carrying:
+            giver.carrying.remove(item)
         self._take(recipient, item)
         self._log(subjects[0], "gave", f"{item} to {recipient}")
 
@@ -989,9 +1191,7 @@ class SituationModel:
         for prev in self.events[-self.BIND_WINDOW :]:
             if prev.seq == ev.seq:
                 continue
-            if ev_parts & set(prev.participants) or (
-                ev.location and ev.location == prev.location
-            ):
+            if ev_parts & set(prev.participants) or (ev.location and ev.location == prev.location):
                 bound.append(prev.seq)
         if not bound and self.events:
             self._episode += 1
@@ -1031,9 +1231,7 @@ class SituationModel:
             self._req_seq += 1
         del self.requests[: -self.MAX_REQUESTS]
 
-    def _link_stated_causes(
-        self, result: ComprehensionResult, start_seq: int
-    ) -> None:
+    def _link_stated_causes(self, result: ComprehensionResult, start_seq: int) -> None:
         """Wire explicit consequence markers between events.
 
         "A so B" and "A. Therefore B" state that A caused B; both
@@ -1060,8 +1258,7 @@ class SituationModel:
         """Record that one event caused/enable another."""
         if cause_seq == effect_seq:
             return
-        if not (0 <= cause_seq < len(self.events)
-                and 0 <= effect_seq < len(self.events)):
+        if not (0 <= cause_seq < len(self.events) and 0 <= effect_seq < len(self.events)):
             return
         cause = self.events[cause_seq]
         effect = self.events[effect_seq]
@@ -1080,7 +1277,7 @@ class SituationModel:
         return e.location, set(e.candidates)
 
     def is_at(self, entity: str, place: str) -> str | None:
-        """"yes" / "no" / "maybe" — or None when nothing is known."""
+        """ "yes" / "no" / "maybe" — or None when nothing is known."""
         e = self.entities.get(_norm(entity))
         if e is None:
             return None
@@ -1097,10 +1294,7 @@ class SituationModel:
 
     def who_is_at(self, place: str) -> list[str]:
         p = _place(place)
-        return sorted(
-            name for name, e in self.entities.items()
-            if e.location == p and not e.holder
-        )
+        return sorted(name for name, e in self.entities.items() if e.location == p and not e.holder)
 
     def carrying(self, entity: str) -> list[str]:
         e = self.entities.get(_norm(entity))
@@ -1150,9 +1344,7 @@ class SituationModel:
     # protagonist, space, time, causation, intention (Zwaan &
     # Radvansky, 1998).
 
-    def events_involving(
-        self, entity: str, limit: int = 10
-    ) -> list[SituationEvent]:
+    def events_involving(self, entity: str, limit: int = 10) -> list[SituationEvent]:
         """Events an entity participates in, most recent first —
         the protagonist index."""
         seqs = self.by_participant.get(_norm(entity), [])
@@ -1413,10 +1605,8 @@ class SituationModel:
         return None
 
 
-_OPPOSITE = {"north": "south", "south": "north",
-             "east": "west", "west": "east"}
-_POS_OPPOSITE = {"left": "right", "right": "left",
-                 "above": "below", "below": "above"}
+_OPPOSITE = {"north": "south", "south": "north", "east": "west", "west": "east"}
+_POS_OPPOSITE = {"left": "right", "right": "left", "above": "below", "below": "above"}
 _DIR_LETTER = {"north": "n", "south": "s", "east": "e", "west": "w"}
 
 # SemanticRole members resolved lazily to avoid a hard import cycle at

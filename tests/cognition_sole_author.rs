@@ -96,9 +96,11 @@ fn body_state_does_not_move_her_chemistry() {
     // work, and a single-arm test would not be able to attribute
     // movement to the body at all.
     //
-    // `tick` re-reads the interoceptor only every
-    // `INTEROCEPTION_INTERVAL_TICKS` (30) ticks, and the first tick after
-    // construction is tick 1, so the forced body state is used as-is.
+    // `tick` re-reads the interoceptor on a wall-clock adaptive gate
+    // (6 s nominal): the first tick after construction always reads,
+    // and the 9-tick measurement span is far below the 2 s floor, so
+    // the forced body state — applied after a priming read — is used
+    // as-is.
     let neutral = run_arm(false);
     let hot = run_arm(true);
 
@@ -157,6 +159,12 @@ fn run_arm(extreme: bool) -> Arm {
         tl.advance_physics(&sys.mmap, 1.0);
     }
 
+    // Prime the interoception gate: the adaptive wall-clock gate fires
+    // on the first tick (next_ms = 0), then will not fire again for at
+    // least its 2 s floor. Reading once first lets the forced body
+    // state survive the measurement ticks below.
+    let _ = tl.tick(&sys.mmap, &sys.stm, &mut sys.ltm);
+
     if extreme {
         let mut hot = tl.last_body_state.clone();
         hot.cpu_temp_c = 95.0;
@@ -166,14 +174,16 @@ fn run_arm(extreme: bool) -> Arm {
         hot.on_ac_power = false;
         tl.last_body_state = hot;
     }
-    let advised = tl.interoceptor.neuro_impulses(&tl.last_body_state);
+    let advised = {
+        let s = sys.mmap.read_consistent().expect("read state");
+        tl.interoceptor
+            .neuro_impulses(&tl.last_body_state, &s.neurochemicals)
+    };
 
-    // `tick` re-reads the interoceptor whenever tick_count is a multiple
-    // of INTEROCEPTION_INTERVAL_TICKS (30), which would overwrite the
-    // forced state with the real machine. After 200 settle calls
-    // tick_count is 200, so the next nine ticks land on 201..=209 and
-    // miss the next multiple (210). Stay inside one interval or this
-    // test silently measures the real hardware instead.
+    // A re-read within the measurement span would overwrite the forced
+    // state with the real machine — the gate's next fire is >= 2 s out
+    // (its floor), and nine ticks land well inside that. Stay inside
+    // one interval or this test silently measures the real hardware.
     for _ in 0..9 {
         let _ = tl.tick(&sys.mmap, &sys.stm, &mut sys.ltm);
     }

@@ -39,6 +39,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from discord_feed import DiscordFeed
+from infrastructure.config import default_data_dir
 
 logger = logging.getLogger("discord_pulse")
 
@@ -46,12 +47,14 @@ _STATE_NAME = "discord_pulse_state.json"
 
 
 def _default_data_dir() -> Path:
-    return Path(
-        os.environ.get(
-            "GENESIS_DATA_DIR",
-            Path.home() / ".local/share/genesis",
-        )
-    )
+    """Resolve the data dir the way run.sh does.
+
+    Delegates to the canonical resolver: GENESIS_DATA_DIR, then the
+    checkout's .genesis-data-dir pin, then XDG_DATA_HOME, then
+    ~/.local/share. The pin outranks XDG_DATA_HOME because that is
+    ambient launcher environment, not Genesis config.
+    """
+    return default_data_dir()
 
 
 def _load_state(data_dir: Path) -> dict:
@@ -179,7 +182,7 @@ def _journal_delta(data_dir: Path, state: dict) -> dict[str, object]:
             if kind.startswith("dream") or "dream" in str(rec.get("trigger", "")):
                 out["dreams"] = int(out["dreams"]) + 1
                 if text:
-                    last_dream = f"{kind}: \"{text}\""
+                    last_dream = f'{kind}: "{text}"'
             elif text.startswith("insight"):
                 out["insights"].append(text)  # type: ignore[attr-defined]
         out["last_dream"] = last_dream
@@ -295,8 +298,9 @@ def run_once(data_dir: Path, feed: DiscordFeed) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--once", action="store_true", help="post a single pulse and exit")
-    parser.add_argument("--interval", type=int,
-                        default=int(os.environ.get("GENESIS_PULSE_INTERVAL", "2700")))
+    parser.add_argument(
+        "--interval", type=int, default=int(os.environ.get("GENESIS_PULSE_INTERVAL", "2700"))
+    )
     parser.add_argument("--data-dir", type=Path, default=_default_data_dir())
     args = parser.parse_args()
 

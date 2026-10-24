@@ -112,14 +112,10 @@ def interpret_ions(summary: IonSummary | None) -> IonCognitiveContext:
     # atp=0.9 are physiological baseline, not strain. This keeps the
     # interpretation neutral when the daemon reports a healthy rest state.
     metabolic_strain = _clamp(
-        0.70 * max(0.0, (load - 0.25) / 0.75)
-        + 0.30 * max(0.0, (0.9 - atp) / 0.9)
+        0.70 * max(0.0, (load - 0.25) / 0.75) + 0.30 * max(0.0, (0.9 - atp) / 0.9)
     )
     physiological_balance = _clamp(
-        0.45 * integrity
-        + 0.25 * atp
-        + 0.20 * (1.0 - load)
-        + 0.10 * chloride
+        0.45 * integrity + 0.25 * atp + 0.20 * (1.0 - load) + 0.10 * chloride
     )
 
     attention_gain = _clamp(
@@ -140,19 +136,12 @@ def interpret_ions(summary: IonSummary | None) -> IonCognitiveContext:
         1.20,
     )
     memory_consolidation_gain = _clamp(
-        1.0
-        + 0.15 * (atp - 0.9)
-        + 0.20 * (integrity - 1.0)
-        - 0.15 * (load - 0.25),
+        1.0 + 0.15 * (atp - 0.9) + 0.20 * (integrity - 1.0) - 0.15 * (load - 0.25),
         0.50,
         1.20,
     )
     synaptic_plasticity_gain = _clamp(
-        1.0
-        + 0.45 * calcium
-        + 0.20 * (atp - 0.9)
-        + 0.20 * (integrity - 1.0)
-        - 0.20 * (load - 0.25),
+        1.0 + 0.45 * calcium + 0.20 * (atp - 0.9) + 0.20 * (integrity - 1.0) - 0.20 * (load - 0.25),
         0.35,
         1.30,
     )

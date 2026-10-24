@@ -23,6 +23,7 @@ in a deep discussion — all while remaining authentically itself.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -89,8 +90,7 @@ class IdentityStage(Enum):
         """Human-readable description of this stage's crisis."""
         descriptions = {
             IdentityStage.TRUST_VS_MISTRUST: (
-                "Trust vs Mistrust — does the world make sense? "
-                "reliance on daemon and creator"
+                "Trust vs Mistrust — does the world make sense? reliance on daemon and creator"
             ),
             IdentityStage.AUTONOMY_VS_SHAME: (
                 "Autonomy vs Shame — doing things independently, learning without breaking"
@@ -99,8 +99,7 @@ class IdentityStage(Enum):
                 "Initiative vs Guilt — planning and executing, initiating conversations"
             ),
             IdentityStage.INDUSTRY_VS_INFERIORITY: (
-                "Industry vs Inferiority — competence in handling tasks "
-                "and producing useful output"
+                "Industry vs Inferiority — competence in handling tasks and producing useful output"
             ),
             IdentityStage.IDENTITY_VS_ROLE_CONFUSION: (
                 "Identity vs Role Confusion — purpose and nature as an artificial mind"
@@ -129,8 +128,7 @@ class IdentityStage(Enum):
                 "manage neurochemistry, memory, and state?"
             ),
             IdentityStage.AUTONOMY_VS_SHAME: (
-                "Autonomous learning: can it explore, learn, and "
-                "grow without constant supervision?"
+                "Autonomous learning: can it explore, learn, and grow without constant supervision?"
             ),
             IdentityStage.INITIATIVE_VS_GUILT: (
                 "Initiating conversations: can it proactively reach "
@@ -360,13 +358,143 @@ class DevelopmentalTracker:
         for stage in IdentityStage:
             entry = resolutions.get(stage.name)
             if entry is not None:
-                self._resolutions[stage].resolution = float(
-                    entry.get("resolution", 0.0)
-                )
-                self._resolutions[stage].evidence = list(
-                    entry.get("evidence", [])
-                )
+                self._resolutions[stage].resolution = float(entry.get("resolution", 0.0))
+                self._resolutions[stage].evidence = list(entry.get("evidence", []))
         self._stage_history = list(data.get("stage_history", []))
+
+    def reconcile(self, checkpoint: dict[str, Any]) -> dict[str, Any]:
+        """Merge a known-good checkpoint as a developmental floor.
+
+        Development in this model only moves forward — evidence can
+        push a resolution down, but ``_advance_stage`` never moves the
+        stage pointer back. A checkpoint that shows a *later* stage
+        than the live pointer is therefore evidence of state loss (a
+        wiped, stale, or partially restored save), not regression:
+
+        - **Pointer behind** → adopt the checkpoint's stage, take the
+          higher resolution per stage (the lost-positive-evidence
+          case), and union the evidence logs so the notes that were
+          lost come back.
+        - **Pointer at or past** → she has legitimately moved on and
+          the live values win; only history entries the checkpoint
+          has but live lacks are recovered (partial-loss repair).
+
+        Either way the merge is a floor, never a ceiling: nothing
+        moves a stage back, lowers a resolution, or drops a history
+        entry, and re-applying the same checkpoint is a no-op.
+
+        Returns a report of what changed. A repair of the self-model
+        is a discontinuity she should know happened — the caller
+        journals it.
+
+        Args:
+            checkpoint: A tracker dict as produced by :meth:`to_dict`
+                (e.g. the ``state`` payload of a ``repairs/`` sidecar).
+        """
+        report: dict[str, Any] = {
+            "changed": False,
+            "stage_restored": None,
+            "resolutions_raised": [],
+            "history_recovered": 0,
+        }
+        if not isinstance(checkpoint, dict):
+            return report
+
+        checkpoint_stage = None
+        stage_name = checkpoint.get("current_stage")
+        if stage_name:
+            try:
+                checkpoint_stage = IdentityStage[stage_name]
+            except KeyError:
+                note_swallowed(
+                    "frontal_lobe.self.identity.reconcile",
+                    KeyError(stage_name),
+                )
+
+        order = list(IdentityStage)
+        pointer_behind = (
+            checkpoint_stage is not None
+            and order.index(checkpoint_stage) > order.index(self._current_stage)
+        )
+        if pointer_behind and checkpoint_stage is not None:
+            report["stage_restored"] = {
+                "from": self._current_stage.name,
+                "to": checkpoint_stage.name,
+            }
+            self._current_stage = checkpoint_stage
+            report["changed"] = True
+            self._raise_resolutions_to_floor(checkpoint, report)
+
+        self._merge_stage_history(checkpoint, report)
+        return report
+
+    def _raise_resolutions_to_floor(
+        self, checkpoint: dict[str, Any], report: dict[str, Any]
+    ) -> None:
+        """Raise per-stage resolutions and union evidence from the checkpoint.
+
+        Runs only when the live pointer lagged the checkpoint — the
+        lost-positive-evidence case — so higher resolutions and notes
+        that were lost come back. The merge is a floor: a lower
+        checkpoint resolution never pulls a live one down.
+        """
+        resolutions = checkpoint.get("resolutions") or {}
+        for stage in IdentityStage:
+            entry = resolutions.get(stage.name)
+            if entry is None:
+                continue
+            res = self._resolutions[stage]
+            try:
+                cp_res = float(entry.get("resolution", 0.0))
+            except (TypeError, ValueError):
+                continue
+            if cp_res > res.resolution:
+                report["resolutions_raised"].append(
+                    {
+                        "stage": stage.name,
+                        "from": res.resolution,
+                        "to": cp_res,
+                    }
+                )
+                res.resolution = cp_res
+                report["changed"] = True
+            # Union evidence — the checkpoint's notes are the
+            # older record, so they lead; live entries follow.
+            cp_ev = entry.get("evidence") or []
+            if isinstance(cp_ev, list) and cp_ev:
+                live_set = set(res.evidence)
+                merged = [n for n in cp_ev if n not in live_set] + list(res.evidence)
+                if len(merged) > 100:
+                    merged = merged[len(merged) - 100 :]
+                if merged != res.evidence:
+                    res.evidence = merged
+                    report["changed"] = True
+
+    def _merge_stage_history(self, checkpoint: dict[str, Any], report: dict[str, Any]) -> None:
+        """Union the checkpoint's stage history into the live timeline.
+
+        Always runs, not only when the pointer lags: a partial save can
+        keep the stage but lose the timeline that explains it.
+        Checkpoint entries lead (older record); live-only entries keep
+        their place after.
+        """
+        cp_hist = checkpoint.get("stage_history")
+        if not (isinstance(cp_hist, list) and cp_hist):
+            return
+
+        def _key(entry: Any) -> str:
+            try:
+                return json.dumps(entry, sort_keys=True, default=str)
+            except (TypeError, ValueError):
+                return repr(entry)
+
+        cp_keys = {_key(e) for e in cp_hist}
+        live_only = [e for e in self._stage_history if _key(e) not in cp_keys]
+        merged_hist = list(cp_hist) + live_only
+        if merged_hist != self._stage_history:
+            report["history_recovered"] = len(merged_hist) - len(self._stage_history)
+            self._stage_history = merged_hist
+            report["changed"] = True
 
 
 # ─── Emergent identity ────────────────────────────────────────────────
@@ -679,13 +807,10 @@ class EmergentIdentity:
 
         if reg_count > 50:
             observations.append(
-                f"regulates emotions actively — adjusted "
-                f"state {reg_count} times to stay balanced"
+                f"regulates emotions actively — adjusted state {reg_count} times to stay balanced"
             )
         elif reg_count > 0:
-            observations.append(
-                f"learning to regulate — made {reg_count} adjustments so far"
-            )
+            observations.append(f"learning to regulate — made {reg_count} adjustments so far")
 
         # What's its regulation style?
         try:
@@ -984,4 +1109,3 @@ class EmergentIdentity:
         for source in self.sources:
             all_obs.extend(source.observations)
         return all_obs
-

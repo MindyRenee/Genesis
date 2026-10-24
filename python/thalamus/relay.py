@@ -29,10 +29,10 @@ from collections.abc import Callable
 # kind is the low 8 bits of the module's task_id. 0 means the module
 # has nothing to say. The remaining bits are a per-post salt so two
 # identical messages in a row still register as a change on the wire.
-KIND_HEARD = 1     # afferent: words reached the ear (sensory -> anyone)
-KIND_SPOKE = 2     # efferent: words left the mouth (language -> anyone)
+KIND_HEARD = 1  # afferent: words reached the ear (sensory -> anyone)
+KIND_SPOKE = 2  # efferent: words left the mouth (language -> anyone)
 KIND_RECALLED = 3  # memory surfaced a trace
-KIND_FELT = 4      # limbic state shifted
+KIND_FELT = 4  # limbic state shifted
 
 _MASK = 0xFF
 
@@ -80,6 +80,7 @@ class Thalamus:
         return handler
 
     def unregister(self, module_id: int, handler: Handler) -> None:
+        """Stop hearing ``module_id`` — drop the projection."""
         with self._lock:
             handlers = self._handlers.get(module_id)
             if handlers and handler in handlers:
@@ -92,6 +93,7 @@ class Thalamus:
         projection is removed only then, so non-matching messages pass
         it by without consuming it.
         """
+
         def _wrapper(kind: int, payload: object) -> None:
             if handler(kind, payload):
                 self.unregister(module_id, _wrapper)

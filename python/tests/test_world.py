@@ -49,25 +49,17 @@ def _make_inner_life() -> InnerLife:
 
 def test_event_inbound_classification():
     """Inbound kinds are the world acting on it; outbound are its acts."""
-    inbound = ExternalEvent(
-        kind=EventKind.USER_SPEECH, source="user", content="hello"
-    )
-    outbound = ExternalEvent(
-        kind=EventKind.UTTERANCE, source="self", content="hi"
-    )
+    inbound = ExternalEvent(kind=EventKind.USER_SPEECH, source="user", content="hello")
+    outbound = ExternalEvent(kind=EventKind.UTTERANCE, source="self", content="hi")
     assert inbound.inbound
     assert not outbound.inbound
 
 
 def test_event_describe_direction():
     """describe() marks direction without being its voice."""
-    e = ExternalEvent(
-        kind=EventKind.USER_SPEECH, source="user", content="hi there"
-    )
+    e = ExternalEvent(kind=EventKind.USER_SPEECH, source="user", content="hi there")
     assert "user" in e.describe() and "hi there" in e.describe()
-    u = ExternalEvent(
-        kind=EventKind.UTTERANCE, source="self", content="hello"
-    )
+    u = ExternalEvent(kind=EventKind.UTTERANCE, source="self", content="hello")
     assert "it said" in u.describe()
 
 
@@ -116,9 +108,7 @@ def test_event_stream_bounded_and_ordered():
     """The stream keeps recent events, oldest first, bounded."""
     stream = EventStream(max_size=5)
     for i in range(8):
-        stream.append(
-            ExternalEvent(kind=EventKind.UTTERANCE, source="self", content=str(i))
-        )
+        stream.append(ExternalEvent(kind=EventKind.UTTERANCE, source="self", content=str(i)))
     assert len(stream) == 5
     recent = stream.recent(5)
     assert [e.content for e in recent] == ["3", "4", "5", "6", "7"]
@@ -293,8 +283,10 @@ def test_event_listener_receives_events():
 def test_listener_failure_does_not_break_world():
     """A throwing listener must never break event recording."""
     world = _make_world()
+
     def bad(_e):
         raise RuntimeError("listener exploded")
+
     world.on_external_event = bad
     event = world.hear_user("hi")  # must not raise
     assert event.kind == EventKind.USER_SPEECH
@@ -421,16 +413,18 @@ def test_world_restore_rejects_non_dict():
 def test_world_restore_skips_malformed_entries():
     """Bad presence/event entries are skipped, good ones restore."""
     world = _make_world()
-    world.restore_from_dict({
-        "presences": {
-            "user": {"presence_id": "user", "kind": "user", "interactions": 3},
-            "broken": {"kind": "nonsense"},
-            "notadict": 42,
-        },
-        "events": [{"kind": "bogus"}, "junk"],
-        "last_addressed_time": 1000.0,
-        "unanswered_bids": 2,
-    })
+    world.restore_from_dict(
+        {
+            "presences": {
+                "user": {"presence_id": "user", "kind": "user", "interactions": 3},
+                "broken": {"kind": "nonsense"},
+                "notadict": 42,
+            },
+            "events": [{"kind": "bogus"}, "junk"],
+            "last_addressed_time": 1000.0,
+            "unanswered_bids": 2,
+        }
+    )
     user = world.presence("user")
     assert user is not None and user.interactions == 3
     assert world.presence("broken") is None
@@ -674,9 +668,7 @@ def test_belief_dict_roundtrip_drops_pending_bid():
     assert restored.pending_bid is None
     # Malformed belief payloads downgrade to priors, not errors.
     assert PresenceBelief.from_dict("junk").responsiveness.evidence == 0.0
-    assert PresenceBelief.from_dict(
-        {"responsiveness": {"a": "x"}}
-    ).responsiveness.evidence == 0.0
+    assert PresenceBelief.from_dict({"responsiveness": {"a": "x"}}).responsiveness.evidence == 0.0
 
 
 # ─── Beliefs: world integration ─────────────────────────────
@@ -765,7 +757,9 @@ def test_perceive_carries_structured_percept():
     world = _make_world()
     grid = [[0, 0, 1], [0, 1, 0], [1, 0, 0]]
     event = world.perceive(
-        "a structured field", salience=0.7, source="console:test",
+        "a structured field",
+        salience=0.7,
+        source="console:test",
         percept={"grid": grid},
     )
     assert event is not None
@@ -778,7 +772,9 @@ def test_percept_not_persisted():
     """The percept payload is live data; the record stores its text."""
     world = _make_world()
     world.perceive(
-        "a field", salience=0.7, source="console:test",
+        "a field",
+        salience=0.7,
+        source="console:test",
         percept=[[1, 0], [0, 1]],
     )
     data = world.to_dict()
@@ -793,7 +789,9 @@ def test_world_percept_grounds_into_concepts(tmp_path):
     mind = Mind(str(tmp_path / "genesis.sock"))
     grid = [[0, 0, 0], [0, 5, 0], [0, 0, 0]]
     mind.world.perceive(
-        "a dot in a field", salience=0.7, source="console:test",
+        "a dot in a field",
+        salience=0.7,
+        source="console:test",
         percept=grid,
     )
     net = mind.brain.frontal.network
@@ -824,7 +822,10 @@ def test_world_percept_ignores_non_grid(tmp_path):
 
     mind = Mind(str(tmp_path / "genesis.sock"))
     event = mind.world.perceive(
-        "a hum", salience=0.3, source="ambient", percept="not a grid",
+        "a hum",
+        salience=0.3,
+        source="ambient",
+        percept="not a grid",
     )
     assert event is not None
     assert mind.brain.frontal.network.get_concept("world:ambient:obj:0") is None

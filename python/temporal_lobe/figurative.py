@@ -637,9 +637,7 @@ class FigurativeLanguageProcessor:
         context_lower = context.lower() if context else ""
 
         surface_sentiment = self._surface_sentiment(text_lower)
-        expected_sentiment = self._expected_sentiment(
-            context_lower, text_lower, surface_sentiment
-        )
+        expected_sentiment = self._expected_sentiment(context_lower, text_lower, surface_sentiment)
 
         # Irony = surface contradicts expected
         is_ironic = (

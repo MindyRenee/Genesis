@@ -182,13 +182,114 @@ class VQCodebook:
             }
         k = min(self.k, n)  # can't have more prototypes than points
 
-        prototypes, iters = self._train_kmeans(
-            vectors, k, iters, batch_size, seed
+        gen = self.fit_steps(
+            vectors, concept_names, iters=iters, batch_size=batch_size, seed=seed
         )
-        self._prototypes = prototypes
-        self._training_iters = iters
+        # fit_steps yields per iteration; run it to completion for
+        # the monolithic call. The final value arrives as
+        # StopIteration.value.
+        for _ in gen:
+            pass
+        iters = self._training_iters
 
-        # Encode all vectors
+        stats = {
+            "final_error": self._reconstruction_error,
+            "relative_error": self._relative_reconstruction_error,
+            "cosine": self._reconstruction_cosine,
+            "saturation": self._residual_saturation_fraction,
+            "iters": float(self._training_iters),
+            "k": float(k),
+            "n": float(n),
+        }
+        logger.info(
+            "VQ codebook trained: k=%d, n=%d, error=%.6f, iters=%d",
+            k,
+            n,
+            self._reconstruction_error,
+            self._training_iters,
+        )
+        return stats
+
+    def fit_steps(
+        self,
+        vectors: np.ndarray,
+        concept_names: list[str],
+        iters: int = DEFAULT_ITERS,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        seed: int = 42,
+    ):
+        """Train the codebook incrementally — one Lloyd iteration per step.
+
+        Identical math to :meth:`fit`, but the training loop is a
+        generator: each ``next()`` runs one mini-batch assign+update
+        iteration, so a caller can spread a full training pass across
+        many small slices — e.g. one iteration per sleep tick, the way
+        consolidation actually happens (incrementally across the
+        night, not in one blocked pass). Convergence early-exits the
+        same way, and ``_encode_all`` runs once at the end.
+
+        Yields:
+            ``{"iter": iters_run}`` after each iteration.
+
+        Returns (as ``StopIteration.value``):
+            The same stats dict :meth:`fit` returns.
+        """
+        n, d = vectors.shape
+        if d != self.dim:
+            self.dim = d
+        if len(concept_names) != n:
+            raise ValueError("concept_names must have one entry per vector")
+        if not np.all(np.isfinite(vectors)):
+            raise ValueError("vectors must contain only finite values")
+        if not np.isfinite(self.residual_scale) or self.residual_scale <= 0.0:
+            raise ValueError("residual_scale must be finite and positive")
+        if n == 0:
+            self._reset_to_empty(d)
+            return {
+                "final_error": 0.0,
+                "relative_error": 0.0,
+                "cosine": 0.0,
+                "saturation": 0.0,
+                "iters": 0.0,
+                "k": 0.0,
+                "n": 0.0,
+            }
+        k = min(self.k, n)
+
+        rng = np.random.default_rng(seed)
+        indices = rng.choice(n, size=k, replace=False)
+        prototypes = vectors[indices].copy().astype(np.float32)
+
+        prev_error = float("inf")
+        iters_run = 0
+        for iteration in range(iters):
+            batch_n = min(batch_size, n)
+            batch_idx = rng.choice(n, size=batch_n, replace=False)
+            batch = vectors[batch_idx]
+
+            batch_sq = (batch**2).sum(axis=1, keepdims=True)
+            proto_sq = (prototypes**2).sum(axis=1)
+            cross = batch @ prototypes.T
+            dist_sq = batch_sq + proto_sq - 2 * cross
+            assignments = np.argmin(dist_sq, axis=1)
+
+            for ki in range(k):
+                mask = assignments == ki
+                if mask.any():
+                    lr = 1.0 / (1.0 + iteration * 0.1)
+                    assigned = batch[mask].mean(axis=0)
+                    prototypes[ki] = (1 - lr) * prototypes[ki] + lr * assigned
+
+            iters_run = iteration + 1
+            yield {"iter": iters_run}
+
+            error = self._compute_error(vectors, prototypes)
+            if abs(prev_error - error) < 1e-6:
+                break
+            prev_error = error
+
+        self._prototypes = prototypes
+        self._training_iters = iters_run
         self._encode_all(vectors, concept_names)
 
         stats = {
@@ -202,7 +303,10 @@ class VQCodebook:
         }
         logger.info(
             "VQ codebook trained: k=%d, n=%d, error=%.6f, iters=%d",
-            k, n, self._reconstruction_error, self._training_iters,
+            k,
+            n,
+            self._reconstruction_error,
+            self._training_iters,
         )
         return stats
 
@@ -218,55 +322,6 @@ class VQCodebook:
         self._residual_saturation_fraction = 0.0
         self._training_iters = 0
 
-    def _train_kmeans(
-        self,
-        vectors: np.ndarray,
-        k: int,
-        iters: int,
-        batch_size: int,
-        seed: int,
-    ) -> tuple[np.ndarray, int]:
-        """Mini-batch k-means. Returns (prototypes, iters_run)."""
-        n = vectors.shape[0]
-        rng = np.random.default_rng(seed)
-
-        # Initialize prototypes via random sampling (k-means++ is
-        # overkill for our scale; random init + enough iters works).
-        indices = rng.choice(n, size=k, replace=False)
-        prototypes = vectors[indices].copy().astype(np.float32)
-
-        prev_error = float("inf")
-        for iteration in range(iters):
-            # Sample a mini-batch
-            batch_n = min(batch_size, n)
-            batch_idx = rng.choice(n, size=batch_n, replace=False)
-            batch = vectors[batch_idx]
-
-            # Assign each point to nearest prototype (Euclidean)
-            # Using matrix operations: ||a-b||^2 = ||a||^2 + ||b||^2 - 2*a.b
-            batch_sq = (batch ** 2).sum(axis=1, keepdims=True)  # (B, 1)
-            proto_sq = (prototypes ** 2).sum(axis=1)  # (K,)
-            cross = batch @ prototypes.T  # (B, K)
-            dist_sq = batch_sq + proto_sq - 2 * cross  # (B, K)
-            assignments = np.argmin(dist_sq, axis=1)  # (B,)
-
-            # Update prototypes: move toward assigned points
-            for ki in range(k):
-                mask = assignments == ki
-                if mask.any():
-                    # Learning rate decays with iteration
-                    lr = 1.0 / (1.0 + iteration * 0.1)
-                    assigned = batch[mask].mean(axis=0)
-                    prototypes[ki] = (1 - lr) * prototypes[ki] + lr * assigned
-
-            # Compute reconstruction error on full dataset
-            error = self._compute_error(vectors, prototypes)
-            if abs(prev_error - error) < 1e-6:
-                # Converged
-                return prototypes, iteration + 1
-            prev_error = error
-        return prototypes, iters
-
     def _compute_error(self, vectors: np.ndarray, prototypes: np.ndarray) -> float:
         """Compute mean squared reconstruction error."""
         # Batch the distance computation to avoid memory issues
@@ -274,9 +329,9 @@ class VQCodebook:
         total_error = 0.0
         batch = 2048
         for i in range(0, n, batch):
-            chunk = vectors[i:i + batch]
-            chunk_sq = (chunk ** 2).sum(axis=1, keepdims=True)
-            proto_sq = (prototypes ** 2).sum(axis=1)
+            chunk = vectors[i : i + batch]
+            chunk_sq = (chunk**2).sum(axis=1, keepdims=True)
+            proto_sq = (prototypes**2).sum(axis=1)
             cross = chunk @ prototypes.T
             dist_sq = chunk_sq + proto_sq - 2 * cross
             min_dist = dist_sq.min(axis=1)
@@ -292,12 +347,12 @@ class VQCodebook:
         # Batch the assignment
         batch = 2048
         for i in range(0, n, batch):
-            chunk = vectors[i:i + batch]
-            chunk_sq = (chunk ** 2).sum(axis=1, keepdims=True)
-            proto_sq = (self._prototypes ** 2).sum(axis=1)
+            chunk = vectors[i : i + batch]
+            chunk_sq = (chunk**2).sum(axis=1, keepdims=True)
+            proto_sq = (self._prototypes**2).sum(axis=1)
             cross = chunk @ self._prototypes.T
             dist_sq = chunk_sq + proto_sq - 2 * cross
-            prototype_ids[i:i + batch] = np.argmin(dist_sq, axis=1)
+            prototype_ids[i : i + batch] = np.argmin(dist_sq, axis=1)
 
         # Compute residuals and quantize to int8
         reconstructed = self._prototypes[prototype_ids]
@@ -318,7 +373,7 @@ class VQCodebook:
         # Compute actual reconstruction error with quantized residuals
         recon = self._reconstruct_all()
         error = vectors - recon
-        self._reconstruction_error = float(np.mean(error ** 2))
+        self._reconstruction_error = float(np.mean(error**2))
         input_energy = float(np.sum(vectors * vectors))
         self._relative_reconstruction_error = float(
             np.sum(error * error) / max(input_energy, 1e-12)
@@ -354,7 +409,8 @@ class VQCodebook:
         residual = v - self._prototypes[pid]
         residual_int8 = np.clip(
             np.round(residual / self.residual_scale),
-            -128, 127,
+            -128,
+            127,
         ).astype(np.int8)
         return pid, residual_int8
 
@@ -479,11 +535,13 @@ class VQCodebook:
                 keep = np.argpartition(dist, limit - 1)[:limit]
                 ci, cj, dist = ci[keep], cj[keep], dist[keep]
             for i, j, d in zip(ci, cj, dist, strict=True):
-                candidates.append((
-                    float(d),
-                    self._concept_names[int(indices[i])],
-                    self._concept_names[int(indices[j])],
-                ))
+                candidates.append(
+                    (
+                        float(d),
+                        self._concept_names[int(indices[i])],
+                        self._concept_names[int(indices[j])],
+                    )
+                )
 
         candidates.sort(key=lambda x: x[0])
         if limit is not None and len(candidates) > limit:
@@ -512,15 +570,13 @@ class VQCodebook:
             dim=np.array(self.dim, dtype=np.int32),
             k=np.array(self.k, dtype=np.int32),
             residual_scale=np.array(self.residual_scale, dtype=np.float32),
-            reconstruction_error=np.array(self._reconstruction_error, dtype=np.float32),
+            reconstruction_error=np.array(self._reconstruction_error, dtype=np.float64),
             relative_reconstruction_error=np.array(
-                self._relative_reconstruction_error, dtype=np.float32
+                self._relative_reconstruction_error, dtype=np.float64
             ),
-            reconstruction_cosine=np.array(
-                self._reconstruction_cosine, dtype=np.float32
-            ),
+            reconstruction_cosine=np.array(self._reconstruction_cosine, dtype=np.float64),
             residual_saturation_fraction=np.array(
-                self._residual_saturation_fraction, dtype=np.float32
+                self._residual_saturation_fraction, dtype=np.float64
             ),
         )
 
@@ -545,9 +601,7 @@ class VQCodebook:
             self._relative_reconstruction_error = float(
                 data.get("relative_reconstruction_error", 0.0)
             )
-            self._reconstruction_cosine = float(
-                data.get("reconstruction_cosine", 0.0)
-            )
+            self._reconstruction_cosine = float(data.get("reconstruction_cosine", 0.0))
             self._residual_saturation_fraction = float(
                 data.get("residual_saturation_fraction", 0.0)
             )

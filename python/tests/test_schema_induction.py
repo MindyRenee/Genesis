@@ -14,9 +14,18 @@ from temporal_lobe.concepts import (
 def stress_network() -> ConceptNetwork:
     """A network where several concepts share a relation to one endpoint."""
     net = ConceptNetwork()
-    for name in ("caffeine", "exercise", "morning", "alertness",
-                 "cortisol", "deadlines", "noise", "stress",
-                 "memory", "sleep"):
+    for name in (
+        "caffeine",
+        "exercise",
+        "morning",
+        "alertness",
+        "cortisol",
+        "deadlines",
+        "noise",
+        "stress",
+        "memory",
+        "sleep",
+    ):
         net.add_concept(name, confidence=0.8, origin="test")
     # Three things cause alertness -> "causes of alertness" schema.
     net.add_edge("caffeine", "alertness", RelationType.CAUSES, 0.7, origin="observed")
@@ -80,8 +89,11 @@ class TestDiscovery:
         """Code symbols and utterance seeds are not schema material."""
         for i in range(4):
             stress_network.add_edge(
-                f"python:mod.fn{i}", "python:np.savez",
-                RelationType.DEPENDS_ON, 0.9, origin="observed",
+                f"python:mod.fn{i}",
+                "python:np.savez",
+                RelationType.DEPENDS_ON,
+                0.9,
+                origin="observed",
             )
         inducer = SchemaInducer(stress_network)
         hubs = {s.hub_id for s in inducer.discover_schemas()}
@@ -89,10 +101,7 @@ class TestDiscovery:
 
     def test_members_ranked_by_weight(self, stress_network: ConceptNetwork):
         inducer = SchemaInducer(stress_network)
-        schema = next(
-            s for s in inducer.discover_schemas()
-            if s.hub_id == "_gen:causes:to:stress"
-        )
+        schema = next(s for s in inducer.discover_schemas() if s.hub_id == "_gen:causes:to:stress")
         assert schema.members[0] == "cortisol"  # highest member weight
         assert set(schema.members) == {"cortisol", "deadlines", "noise"}
 
@@ -112,18 +121,14 @@ class TestAcceptance:
             assert ("_gen:causes:to:stress", RelationType.IS_A) in out
         # The compressed claim: the class itself bears the relation.
         hub_edges = net.get_edges("_gen:causes:to:stress", "out")
-        assert any(
-            e.target == "stress" and e.relation == RelationType.CAUSES
-            for e in hub_edges
-        )
+        assert any(e.target == "stress" and e.relation == RelationType.CAUSES for e in hub_edges)
 
     def test_shared_source_schema_edge(self, stress_network: ConceptNetwork):
         inducer = SchemaInducer(stress_network)
         inducer.discover_and_accept()
         edges = stress_network.get_edges("stress", "out")
         assert any(
-            e.target == "_gen:harms:from:stress" and e.relation == RelationType.HARMS
-            for e in edges
+            e.target == "_gen:harms:from:stress" and e.relation == RelationType.HARMS for e in edges
         )
 
     def test_reified_origin(self, stress_network: ConceptNetwork):
@@ -149,8 +154,11 @@ class TestAcceptance:
         # Make 'stress' a kind of the (future) hub before induction.
         stress_network.add_concept("_gen:causes:to:stress", origin="test")
         stress_network.add_edge(
-            "_gen:causes:to:stress", "cortisol", RelationType.IS_A,
-            0.9, origin="test",
+            "_gen:causes:to:stress",
+            "cortisol",
+            RelationType.IS_A,
+            0.9,
+            origin="test",
         )
         inducer = SchemaInducer(stress_network)
         inducer.discover_and_accept()
@@ -167,18 +175,14 @@ class TestAcceptance:
         # over schemas on a second pass.
         inducer = SchemaInducer(stress_network)
         inducer.discover_and_accept()
-        for h in ("_gen:causes:to:stress", "_gen:causes:to:alertness",
-                  "_gen:harms:from:stress"):
-            stress_network.add_edge(
-                h, "memory", RelationType.HARMS, 0.8, origin="test"
-            )
+        for h in ("_gen:causes:to:stress", "_gen:causes:to:alertness", "_gen:harms:from:stress"):
+            stress_network.add_edge(h, "memory", RelationType.HARMS, 0.8, origin="test")
         schemas = inducer.discover_schemas()
-        hub = next(
-            (s for s in schemas if s.hub_id == "_gen:harms:to:memory"), None
-        )
+        hub = next((s for s in schemas if s.hub_id == "_gen:harms:to:memory"), None)
         assert hub is not None
         gen_members = {
-            "_gen:causes:to:stress", "_gen:causes:to:alertness",
+            "_gen:causes:to:stress",
+            "_gen:causes:to:alertness",
             "_gen:harms:from:stress",
         }
         assert gen_members <= set(hub.members)

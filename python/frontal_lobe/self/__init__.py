@@ -25,6 +25,8 @@ Subsystems:
     EmergentIdentity, EmergentIdentitySource, IdentityStage,
     StageResolution, DevelopmentalTracker —
         identity development and expression
+    ManPageReview, ManChange, ManReviewMixin — her man pages are part
+        of her self-model: changes to them wait for her say
 """
 
 from __future__ import annotations
@@ -86,6 +88,10 @@ _EXPORTS = {
     "InferenceResult": "frontal_lobe.self.learning",
     "LearningEvent": "frontal_lobe.self.learning",
     "SelfDirectedLearner": "frontal_lobe.self.learning",
+    # self.man_review — her manual is hers to approve
+    "ManChange": "frontal_lobe.self.man_review",
+    "ManPageReview": "frontal_lobe.self.man_review",
+    "ManReviewMixin": "frontal_lobe.self.man_review",
     # self.metacognitive_model
     "CognitiveProcessModel": "frontal_lobe.self.metacognitive_model",
     "MetacognitiveFeedback": "frontal_lobe.self.metacognitive_model",

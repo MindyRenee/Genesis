@@ -18,6 +18,10 @@
 
 use crate::daemon::tensor_slab::{self, Tensor, dtype};
 
+/// Provenance marker — one letter of the creator lattice (see
+/// PROVENANCE.md).
+pub(crate) const MARKER_G03: u64 = 0x4753_0342_450A_56CC;
+
 // ─── Canonical coordinate grid ──────────────────────────────────
 //
 // The environment interface addresses points on a grid up to 64×64
@@ -54,6 +58,19 @@ pub fn cell_coord(i: usize, width: usize) -> (usize, usize) {
     (i % width, i / width)
 }
 
+/// The field's shape read as a distribution — what the argmax
+/// discards. `centroid` is the softmax mean cell on the canonical
+/// grid (continuous — finer than the winning cell), `spread` the
+/// RMS radius about it in canonical cells (how far the urge
+/// reaches), `entropy` the normalized Shannon entropy in 0..1
+/// (0 = a decided point, 1 = maximally diffuse).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct SpatialDistribution {
+    pub centroid: (f32, f32),
+    pub spread: f32,
+    pub entropy: f32,
+}
+
 /// What the motor fields currently point at. Both halves are
 /// optional: a published action field yields `action`, a published
 /// spatial field yields `cell` (already scaled onto the canonical
@@ -64,12 +81,17 @@ pub struct MotorTarget {
     pub action: Option<(u8, f32)>,
     /// Winning grid cell `(x, y)` and its field strength, if any.
     pub cell: Option<(u16, u16, f32)>,
+    /// The spatial field's distributional shape — centroid, spread,
+    /// entropy — when a spatial field is published.
+    pub dist: Option<SpatialDistribution>,
 }
 
 impl MotorTarget {
-    /// Fixed 14-byte wire form:
-    /// `[flags][action_id][f32 a_strength][u16 x][u16 y][f32 s_strength]`.
-    /// `flags` bit0 = action present, bit1 = cell present.
+    /// Wire form: the fixed 14-byte base
+    /// `[flags][action_id][f32 a_strength][u16 x][u16 y][f32 s_strength]`,
+    /// plus an additive 16-byte distribution tail
+    /// `[f32 cx][f32 cy][f32 spread][f32 entropy]` when `dist` is
+    /// present. `flags` bit0 = action, bit1 = cell, bit2 = dist.
     pub fn encode(&self) -> Vec<u8> {
         let mut flags = 0u8;
         if self.action.is_some() {
@@ -78,15 +100,24 @@ impl MotorTarget {
         if self.cell.is_some() {
             flags |= 2;
         }
+        if self.dist.is_some() {
+            flags |= 4;
+        }
         let (action_id, a_str) = self.action.unwrap_or((0xFF, 0.0));
         let (x, y, s_str) = self.cell.unwrap_or((0, 0, 0.0));
-        let mut out = Vec::with_capacity(14);
+        let mut out = Vec::with_capacity(30);
         out.push(flags);
         out.push(action_id);
         out.extend_from_slice(&a_str.to_le_bytes());
         out.extend_from_slice(&x.to_le_bytes());
         out.extend_from_slice(&y.to_le_bytes());
         out.extend_from_slice(&s_str.to_le_bytes());
+        if let Some(d) = self.dist {
+            out.extend_from_slice(&d.centroid.0.to_le_bytes());
+            out.extend_from_slice(&d.centroid.1.to_le_bytes());
+            out.extend_from_slice(&d.spread.to_le_bytes());
+            out.extend_from_slice(&d.entropy.to_le_bytes());
+        }
         out
     }
 }
@@ -99,15 +130,16 @@ fn f32_at(t: &Tensor, i: usize) -> Option<f32> {
         .and_then(|b| b.try_into().ok().map(f32::from_le_bytes))
 }
 
-/// Scan a 2-D `f32` field for its strongest live cell and project the
-/// winner onto the canonical coordinate grid.
+/// Scan a 2-D `f32` field for an extremal live cell — the peak when
+/// `maximize`, the valley otherwise — and project it onto the
+/// canonical coordinate grid.
 ///
 /// Nested `(y, x)` loops over row-major data: `i = y*w + x` picks the
 /// element, `x = i % w` / `y = i / w` recover the cell. A field
-/// published at a different resolution is still honored — the winning
+/// published at a different resolution is still honored — the extreme
 /// cell is scaled into the canonical grid rather than rejected, so a
 /// coarse 8×8 urge and a native 64×64 field address the same world.
-pub fn spatial_winner(field: &Tensor) -> Option<(u16, u16, f32)> {
+fn spatial_extremum(field: &Tensor, maximize: bool) -> Option<(u16, u16, f32)> {
     if field.dtype != dtype::F32 || field.shape.len() != 2 {
         return None;
     }
@@ -117,7 +149,11 @@ pub fn spatial_winner(field: &Tensor) -> Option<(u16, u16, f32)> {
         return None;
     }
 
-    let mut best = f32::NEG_INFINITY;
+    let mut best = if maximize {
+        f32::NEG_INFINITY
+    } else {
+        f32::INFINITY
+    };
     let mut best_cell: Option<(usize, usize)> = None;
     for y in 0..h {
         for x in 0..w {
@@ -125,7 +161,8 @@ pub fn spatial_winner(field: &Tensor) -> Option<(u16, u16, f32)> {
             let Some(v) = f32_at(field, i) else {
                 return None; // payload shorter than the declared shape
             };
-            if v.is_finite() && v > best {
+            let better = if maximize { v > best } else { v < best };
+            if v.is_finite() && better {
                 best = v;
                 best_cell = Some((x, y));
             }
@@ -139,6 +176,98 @@ pub fn spatial_winner(field: &Tensor) -> Option<(u16, u16, f32)> {
         let gx = (x * MOTOR_FIELD_WIDTH / w).min(MOTOR_FIELD_WIDTH - 1) as u16;
         let gy = (y * MOTOR_FIELD_HEIGHT / h).min(MOTOR_FIELD_HEIGHT - 1) as u16;
         (gx, gy, best)
+    })
+}
+
+/// The field's strongest live cell — where the urge peaks.
+pub fn spatial_winner(field: &Tensor) -> Option<(u16, u16, f32)> {
+    spatial_extremum(field, true)
+}
+
+/// The opposite of `spatial_winner`: the field's deepest live
+/// valley — the cell the disposition most actively suppresses. A
+/// flat field's trough says nothing, but a shaped field's valley is
+/// information the argmax discards.
+pub fn spatial_trough(field: &Tensor) -> Option<(u16, u16, f32)> {
+    spatial_extremum(field, false)
+}
+
+/// The field's shape as a distribution — softmax over the live
+/// cells at unit temperature (the field's own scale sets the
+/// concentration), with the centroid and RMS radius taken in
+/// canonical-grid coordinates and the Shannon entropy normalized
+/// to 0..1 by ln(live cells).
+pub fn spatial_readout(field: &Tensor) -> Option<SpatialDistribution> {
+    if field.dtype != dtype::F32 || field.shape.len() != 2 {
+        return None;
+    }
+    let h = field.shape[0] as usize;
+    let w = field.shape[1] as usize;
+    if h == 0 || w == 0 {
+        return None;
+    }
+
+    // Pass 1: softmax stability needs the max; the entropy norm
+    // needs the live-cell count.
+    let mut max = f32::NEG_INFINITY;
+    let mut live = 0usize;
+    for i in 0..h * w {
+        let v = f32_at(field, i)?;
+        if v.is_finite() {
+            max = max.max(v);
+            live += 1;
+        }
+    }
+    if live == 0 {
+        return None;
+    }
+
+    // Pass 2: unnormalized softmax mass and its moments. Each cell's
+    // canonical coordinate is (x·64/w, y·64/h) — the readout lives
+    // on the same grid the winner is projected onto.
+    let sx = MOTOR_FIELD_WIDTH as f32 / w as f32;
+    let sy = MOTOR_FIELD_HEIGHT as f32 / h as f32;
+    let (mut z, mut cx, mut cy) = (0.0f32, 0.0f32, 0.0f32);
+    for y in 0..h {
+        for x in 0..w {
+            let v = f32_at(field, cell_index(x, y, w))?;
+            if v.is_finite() {
+                let p = (v - max).exp();
+                z += p;
+                cx += p * (x as f32 * sx);
+                cy += p * (y as f32 * sy);
+            }
+        }
+    }
+    if z <= 0.0 {
+        return None;
+    }
+    cx /= z;
+    cy /= z;
+    let (mut var, mut cross_term) = (0.0f32, 0.0f32);
+    for y in 0..h {
+        for x in 0..w {
+            let v = f32_at(field, cell_index(x, y, w))?;
+            if v.is_finite() {
+                let p = (v - max).exp();
+                let dx = x as f32 * sx - cx;
+                let dy = y as f32 * sy - cy;
+                var += p * (dx * dx + dy * dy);
+                cross_term += p * (v - max);
+            }
+        }
+    }
+    // Shannon entropy: H = ln Z − ⟨v−max⟩_p, normalized by ln(live)
+    // so a uniform field reads 1 and a decided point reads 0.
+    let entropy = if live > 1 {
+        (z.ln() - cross_term / z) / (live as f32).ln()
+    } else {
+        0.0
+    };
+    Some(SpatialDistribution {
+        centroid: (cx, cy),
+        spread: (var / z).max(0.0).sqrt(),
+        entropy: entropy.clamp(0.0, 1.0),
     })
 }
 
@@ -183,7 +312,8 @@ pub fn current_motor_target() -> MotorTarget {
     let action = slab
         .get(MOTOR_ACTIONS)
         .and_then(|s| action_winner(s, slab.get(MOTOR_ACTION_IDS)));
-    MotorTarget { action, cell }
+    let dist = slab.get(MOTOR_SPATIAL).and_then(spatial_readout);
+    MotorTarget { action, cell, dist }
 }
 
 #[cfg(test)]
@@ -235,6 +365,28 @@ mod tests {
     }
 
     #[test]
+    fn spatial_trough_is_the_winners_opposite_cell() {
+        // 8×8 field: peak at (3,5), valley at (6,1) — the two scans
+        // must land on opposite corners of the disposition.
+        let w = 8;
+        let h = 8;
+        let mut vals = vec![0.0f32; w * h];
+        vals[cell_index(3, 5, w)] = 0.9;
+        vals[cell_index(6, 1, w)] = -0.7;
+        let t = f32_field(&[h as u32, w as u32], &vals);
+        assert_eq!(spatial_winner(&t), Some((24, 40, 0.9)));
+        assert_eq!(spatial_trough(&t), Some((48, 8, -0.7)));
+
+        // Same guards: NaN is not a valley; bad layouts yield none.
+        let mut nan_vals = vec![f32::NAN; 16];
+        nan_vals[3] = 0.2;
+        let nan_t = f32_field(&[4, 4], &nan_vals);
+        assert_eq!(spatial_trough(&nan_t), Some((48, 0, 0.2)));
+        let u8_t = Tensor::new(dtype::U8, vec![4, 4], vec![0; 16]).unwrap();
+        assert_eq!(spatial_trough(&u8_t), None);
+    }
+
+    #[test]
     fn spatial_winner_ignores_nan_and_rejects_bad_layout() {
         let mut vals = vec![f32::NAN; 16];
         vals[3] = 0.2;
@@ -263,10 +415,43 @@ mod tests {
     }
 
     #[test]
+    fn spatial_readout_reports_the_field_shape_not_just_its_peak() {
+        // A decided field: one hot cell at (3,5) on 8×8 — the
+        // centroid lands on that cell's canonical point, the spread
+        // and entropy near zero.
+        let w = 8;
+        let h = 8;
+        let mut vals = vec![-10.0f32; w * h];
+        vals[cell_index(3, 5, w)] = 5.0;
+        let t = f32_field(&[h as u32, w as u32], &vals);
+        let d = spatial_readout(&t).unwrap();
+        assert!((d.centroid.0 - 3.0 * 8.0).abs() < 0.5);
+        assert!((d.centroid.1 - 5.0 * 8.0).abs() < 0.5);
+        assert!(d.spread < 4.0);
+        assert!(d.entropy < 0.15);
+
+        // A flat field: maximum diffusion — centroid at grid
+        // center, entropy at the top of the scale.
+        let flat = f32_field(&[h as u32, w as u32], &[0.0; 64]);
+        let d = spatial_readout(&flat).unwrap();
+        assert!((d.centroid.0 - 28.0).abs() < 1.0); // (3.5)·8
+        assert!((d.centroid.1 - 28.0).abs() < 1.0);
+        assert!(d.entropy > 0.99);
+        assert!(d.spread > 10.0);
+
+        // Same guards: no live cells / bad layouts → None.
+        let u8_t = Tensor::new(dtype::U8, vec![4, 4], vec![0; 16]).unwrap();
+        assert_eq!(spatial_readout(&u8_t), None);
+        let dead = f32_field(&[4, 4], &[f32::NEG_INFINITY; 16]);
+        assert_eq!(spatial_readout(&dead), None);
+    }
+
+    #[test]
     fn motor_target_encodes_fixed_width() {
         let t = MotorTarget {
             action: Some((6, 0.8)),
             cell: Some((12, 34, 0.5)),
+            dist: None,
         };
         let bytes = t.encode();
         assert_eq!(bytes.len(), 14);
@@ -274,6 +459,21 @@ mod tests {
         assert_eq!(bytes[1], 6);
         assert_eq!(u16::from_le_bytes([bytes[6], bytes[7]]), 12);
         assert_eq!(u16::from_le_bytes([bytes[8], bytes[9]]), 34);
+
+        // The distribution tail is additive: flag bit2, +16 bytes.
+        let t = MotorTarget {
+            dist: Some(SpatialDistribution {
+                centroid: (24.0, 40.0),
+                spread: 6.5,
+                entropy: 0.3,
+            }),
+            ..Default::default()
+        };
+        let bytes = t.encode();
+        assert_eq!(bytes.len(), 30);
+        assert_eq!(bytes[0], 0b100);
+        assert_eq!(f32::from_le_bytes(bytes[14..18].try_into().unwrap()), 24.0);
+        assert_eq!(f32::from_le_bytes(bytes[22..26].try_into().unwrap()), 6.5);
 
         let empty = MotorTarget::default().encode();
         assert_eq!(empty[0], 0);

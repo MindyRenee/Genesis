@@ -10,6 +10,20 @@ The pipeline:
     retina frame (shared memory)
         |
         v
+    thalamic relay gate     -> the body's GET_OPTIC_STATE relay_gain;
+        |                      NREM/REM blocks transmission at the
+        |                      thalamus — a look through a closed gate
+        |                      is a blind look (status "gated")
+        v
+    Eye optics              -> the body's own aperture (pupil_mm):
+        |                      retinal irradiance gain + depth-of-field
+        |                      blur applied before the receptors
+        v
+    Illumination (Retinex)  -> I = ρ·E split: the illuminant map, its
+        |                      gradient (light direction), shadow
+        |                      candidates, and the von Kries-adapted
+        |                      image every cortical stage analyses
+        v
     Color analysis          -> spatial color regions, lighting, mood
         |
         v
@@ -46,6 +60,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from occipital_lobe import V1Model, VisualField
+from occipital_lobe.v1 import name_color
 from temporal_lobe import DetectedObject, ObjectRecognizer
 from temporal_lobe.concepts import RelationType
 
@@ -57,6 +72,9 @@ from genesis_client.protocol import (
 )
 from genesis_client.swallow import note_swallowed
 
+from ..epipolar import EpipolarProcessor, TwoViewReport
+from . import illumination, optics
+from .phototransduction import PhototransductionCascade, PhototransductionState
 from .recognition import FaceRecognizer
 from .retina import latest_frame
 
@@ -64,6 +82,17 @@ if TYPE_CHECKING:
     from limbic_system.emotion import EmotionalState
 
 logger = logging.getLogger(__name__)
+
+# Below this relay gain the thalamus is blocking sensory transmission
+# (TRN inhibition in NREM; the near-block of REM). NREM sits near 0.02,
+# REM near 0.08, drowsy/overwhelmed and waking phases well above 0.15 —
+# so the gate is effectively the sleep boundary, not an arousal ramp.
+_THALAMIC_BLOCK = 0.15
+
+# Corticothalamic feedback decays with a 20 s half-life after the last
+# look — attention gain onto the dLGN persists only while cortex keeps
+# attending vision, it is not a standing bias.
+_OPTIC_ENGAGEMENT_HALF_LIFE_S = 20.0
 
 
 @dataclass
@@ -76,8 +105,28 @@ class VisionScene:
     ``as_metadata()`` through the language engine.
     """
 
-    # "ok" | "unavailable" | "mid_update" | "unprocessed"
+    # "ok" | "unavailable" | "mid_update" | "unprocessed" | "gated"
     status: str = "ok"
+    # The thalamic relay gain the body reported for this look — None
+    # when no optic reading was taken (older daemon, no client).
+    relay_gate: float | None = None
+    # The body's aperture for this look (mm) — the pupil that shaped
+    # retinal irradiance and depth of field. 0.0 when the daemon did
+    # not report one.
+    pupil_mm: float = 0.0
+    # The distance the lens was powered for during this look (m) —
+    # the ciliary muscle's proprioceptive depth signal. None when the
+    # eye rested at infinity or the body did not report one.
+    focus_m: float | None = None
+    # Eyelid transmission during this look — 1.0 open, ~0.5 drowsy.
+    # The retinal image was already dimmed by it.
+    lid: float = 1.0
+    # Illumination decomposition — the light field this look was seen
+    # under. ``illuminant`` names the light's colour; shadow_* the
+    # share of the field reading as shadow and where its mass sits.
+    illuminant: str = ""
+    shadow_fraction: float = 0.0
+    shadow_direction: str = ""  # "left" | "center" | "right" | ""
     light_level: str = ""
     dominant_color: str = ""
     warmth: str = ""
@@ -89,6 +138,26 @@ class VisionScene:
     light_direction: str = ""  # "left" / "right" / ""
     highly_structured: bool = False
     salience: float = 0.0
+    # Per-region dominant colour names — {"left": "blue", "center":
+    # "brown", ...} for left/center/right/top/bottom. Spatial colour
+    # is what lets the report say where the colours are, not just that
+    # one exists.
+    color_regions: dict[str, str] = field(default_factory=dict)
+    # How many V1 features came from opponent-colour channels rather
+    # than luminance — structure only colour vision can see.
+    chromatic_features: int = 0
+    # Dorsal stream (MSTd): the two-view epipolar geometry between this
+    # look and the last one — self-motion, heading, and parallax depth
+    # as data. "still" | "turn" | "travel" | "unresolved", empty when
+    # no pair exists yet or the dorsal stage failed.
+    view_motion: str = ""
+    view_direction: str = ""  # heading or swing: left/right/up/down/toward/away
+    view_motion_deg: float = 0.0  # rotation between the looks, degrees
+    near_structure: str = ""  # region of strongest parallax: left/center/right
+    movers: int = 0  # independently-moving tracked structure
+    # Phototransduction cascade state — enzymatic dynamics of cone signaling.
+    # None when the cascade is not active (e.g., no camera or gated).
+    phototransduction: PhototransductionState | None = None
 
     def as_metadata(self) -> dict:
         """The scene as language-engine metadata (the ``vision_scene`` slot)."""
@@ -102,6 +171,18 @@ class VisionScene:
             "light_direction": self.light_direction,
             "structured": self.highly_structured,
             "salience": self.salience,
+            "regions": dict(self.color_regions),
+            "chromatic_features": self.chromatic_features,
+            "view_motion": self.view_motion,
+            "view_direction": self.view_direction,
+            "view_motion_deg": self.view_motion_deg,
+            "near_structure": self.near_structure,
+            "movers": self.movers,
+            "illuminant": self.illuminant,
+            "shadow_fraction": self.shadow_fraction,
+            "shadow_direction": self.shadow_direction,
+            "focus_m": self.focus_m,
+            "lid": self.lid,
         }
 
     def memory_text(self) -> str:
@@ -112,12 +193,26 @@ class VisionScene:
             parts.append(f"faces: {named} (+{self.n_unknown_faces} unknown)")
         if self.objects:
             objs = ",".join(
-                f"{o['name']}({o['color'] or '-'})@{o['position']}"
-                for o in self.objects
+                f"{o['name']}({o['color'] or '-'})@{o['position']}" for o in self.objects
             )
             parts.append(f"objects: {objs}")
+        if self.color_regions:
+            regions = ",".join(f"{place}={c}" for place, c in self.color_regions.items() if c)
+            if regions:
+                parts.append(f"regions: {regions}")
         if self.light_direction:
             parts.append(f"light: {self.light_direction}")
+        if self.view_motion and self.view_motion != "still":
+            motion = self.view_motion
+            if self.view_direction:
+                motion += f"-{self.view_direction}"
+            if self.view_motion_deg:
+                motion += f" {self.view_motion_deg:.0f}deg"
+            parts.append(f"view: {motion}")
+        if self.near_structure:
+            parts.append(f"near: {self.near_structure}")
+        if self.movers:
+            parts.append(f"movers: {self.movers}")
         return " | ".join(parts)
 
 
@@ -163,6 +258,20 @@ class Vision:
         # "face:N" cluster ids for familiar strangers. This is what the
         # dyadic signature keys on; a name is optional, a person is not.
         self._last_person_keys: list[str] = []
+        # Dorsal stream (MSTd): two-view epipolar geometry between
+        # successive looks — self-motion and parallax depth. Lazily
+        # created on first use, like the other sublayers.
+        self._epipolar: EpipolarProcessor | None = None
+        # Corticothalamic engagement — how strongly recent seeing has
+        # been attending vision, decayed toward the next look. The
+        # heartbeat pushes it to the body as SET_OPTIC_GAIN — V1's
+        # layer-6 feedback onto the thalamic relay.
+        self._optic_engagement = 0.0
+        self._optic_engagement_at = 0.0
+        # Phototransduction cascade — enzymatic model of cone signaling.
+        # Lazily created on first use. Simulates the enzyme kinetics that
+        # convert photon absorption into electrical signals.
+        self._phototransduction: PhototransductionCascade | None = None
 
     def set_gamma_callback(self, callback: Callable[[float], None]) -> None:
         """Register a callback for V1 gamma power updates.
@@ -220,6 +329,52 @@ class Vision:
             return None
         return self._object_recognizer
 
+    def _get_epipolar(self) -> EpipolarProcessor:
+        """Get or lazily create the dorsal-stream two-view stage (MSTd)."""
+        if self._epipolar is None:
+            self._epipolar = EpipolarProcessor()
+        return self._epipolar
+
+    def _get_phototransduction(self) -> PhototransductionCascade:
+        """Get or lazily create the phototransduction cascade model."""
+        if self._phototransduction is None:
+            self._phototransduction = PhototransductionCascade()
+        return self._phototransduction
+
+    def _run_phototransduction(self, brightness: float) -> PhototransductionState:
+        """Run the phototransduction cascade for one visual frame.
+
+        Simulates the enzymatic cascade that converts photon absorption
+        into electrical signals in cone photoreceptors. The brightness
+        value from the frame is used as the light input to the cascade.
+
+        Args:
+            brightness: Normalized brightness (0-1) from the frame
+
+        Returns:
+            The phototransduction state after integration
+        """
+        cascade = self._get_phototransduction()
+        # Step the cascade with the current brightness as light input
+        # Integrate for 10 ms to capture the fast dynamics
+        for _ in range(10):
+            cascade.step(brightness)
+        return cascade.state
+
+    def _two_view_geometry(self, rgb) -> TwoViewReport | None:
+        """Relate this look to the last one — self-motion and depth.
+
+        A geometry failure degrades the percept; it doesn't blind it.
+        """
+        try:
+            return self._get_epipolar().process(rgb)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "occipital_lobe.perception.vision._two_view_geometry",
+                e,
+            )
+            return None
+
     def get_face_recognizer(self) -> FaceRecognizer | None:
         """Public access to the face recognizer for registration."""
         return self._get_face_recognizer()
@@ -254,9 +409,7 @@ class Vision:
         """Return the names of objects it last saw (empty if none)."""
         return list(self._last_objects)
 
-    def _recognize_objects(
-        self, rgb
-    ) -> tuple[list[DetectedObject], dict[str, str]]:
+    def _recognize_objects(self, rgb) -> tuple[list[DetectedObject], dict[str, str]]:
         """Detect and identify objects (IT cortex), enriching with colors.
 
         Skip on near-blank frames — saves ~2s of YOLO inference when
@@ -352,82 +505,31 @@ class Vision:
         the caller hands ``scene.as_metadata()`` to the language engine,
         which composes its actual report from it.
         """
+        gate = self._optic_gate(client)
+        if isinstance(gate, VisionScene):
+            return gate
+        relay_gate, pupil_mm, focus_m, lid = gate
         if not self.is_available():
-            return VisionScene(status="unavailable")
+            return VisionScene(status="unavailable", relay_gate=relay_gate)
         try:
             frame = latest_frame(copy=True)
             if frame is None:
                 return VisionScene(status="mid_update")
 
-            # Convert to RGB.
+            # Convert to RGB. The retina reader returns (H, W, 3) for
+            # RGB3/BGR3, (H, W, 2) packed YUYV pairs for YUYV, and the
+            # raw 1-D buffer for any other fourcc — the last is not a
+            # scene, so refuse it cleanly rather than misparse it.
             if frame.ndim == 3 and frame.shape[2] == 3:
                 rgb = frame
-            else:
+            elif frame.ndim == 3 and frame.shape[2] == 2:
                 rgb = _yuyv_to_rgb(frame)
+            else:
+                return VisionScene(status="unprocessed", relay_gate=relay_gate)
 
-            # ── Color and lighting analysis (full resolution) ──────
-            color_info = _analyze_color_and_light(rgb)
-
-            # ── Object recognition (IT cortex) ─────────────────────
-            objects, object_colors = self._recognize_objects(rgb)
-
-            # ── Face recognition (FFA) ─────────────────────────────
-            face_names, n_unknown_faces = self._recognize_faces(rgb)
-
-            # ── V1 sparse coding (sublayer: edges, gamma) ──────────
-            field = self._run_v1_sparse_coding(rgb, objects)
-
-            # ── Package the structured scene percept ────────────────
-            scene = _build_scene(
-                color_info, objects, object_colors,
-                face_names, n_unknown_faces, field,
+            return self._analyze_frame(
+                rgb, pupil_mm, focus_m, lid, relay_gate, client, emotion, network
             )
-
-            # ── Change detection ───────────────────────────────────
-            changed = (
-                self._last_color != color_info.dominant_color
-                or self._last_light != color_info.light_level
-                or self._last_objects != [o.name for o in objects]
-            )
-            self._last_color = color_info.dominant_color
-            self._last_light = color_info.light_level
-
-            # ── Salience ───────────────────────────────────────────
-            mean_saturation = color_info.mean_saturation
-            salience = self._compute_salience(
-                color_info, field, objects, face_names,
-            )
-
-            # ── Wire into the concept network ──────────────────────
-            if network is not None:
-                _learn_scene(
-                    network, color_info.dominant_color,
-                    color_info.light_level, salience, field,
-                )
-                if objects:
-                    _learn_objects(network, objects, salience)
-
-            scene.salience = salience
-
-            # ── Modulate neurochemistry ────────────────────────────
-            if client is not None and emotion is not None:
-                self._modulate_vision_chemistry(
-                    client, color_info, mean_saturation,
-                    salience, changed, field, objects, face_names,
-                    emotion, scene,
-                )
-
-            # ── Feed V1 gamma to brain waves ───────────────────────
-            if field is not None and self._on_gamma is not None and field.gamma_power > 0:
-                try:
-                    self._on_gamma(field.gamma_power)
-                except Exception as e:  # noqa: BLE001
-                    note_swallowed(
-                        "occipital_lobe.perception.vision.see",
-                        e,
-                    )
-
-            return scene
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "occipital_lobe.perception.vision.see",
@@ -435,12 +537,241 @@ class Vision:
             )
             return VisionScene(status="unprocessed")
 
+    def _optic_gate(self, client) -> tuple[float | None, float, float | None, float] | VisionScene:
+        """The thalamic gate — the body's own read of the optic nerve.
+
+        The TRN blocks transmission during NREM/REM upstream of
+        cortex, so the relay is consulted before the frame is: a
+        look through a closed gate is a blind look. A daemon that
+        predates the channel reports no gate and seeing proceeds
+        ungated — the gate is a body signal, not a mind construct.
+
+        Returns the (relay_gate, pupil_mm, focus_m, lid) tuple, or a
+        gated ``VisionScene`` when transmission is blocked.
+        """
+        relay_gate: float | None = None
+        pupil_mm = 0.0
+        focus_m: float | None = None
+        lid = 1.0
+        if client is not None:
+            try:
+                optic = client.get_optic_state()
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "occipital_lobe.perception.vision.see",
+                    e,
+                )
+                optic = None
+            if optic is not None:
+                relay_gate = optic.relay_gain
+                pupil_mm = optic.pupil_mm
+                focus_m = optic.focus_m
+                lid = optic.lid
+                if relay_gate < _THALAMIC_BLOCK:
+                    return VisionScene(status="gated", relay_gate=relay_gate)
+        return (relay_gate, pupil_mm, focus_m, lid)
+
+    def _analyze_frame(
+        self,
+        rgb,
+        pupil_mm: float,
+        focus_m: float | None,
+        lid: float,
+        relay_gate: float | None,
+        client,
+        emotion: EmotionalState | None,
+        network,
+    ) -> VisionScene:
+        """The cortical pipeline on one captured frame: optics,
+        illumination, recognition, packaging, integration."""
+        # ── Eye optics — the aperture the body set ─────────────
+        # The pupil the body integrated (light reflex + LC tone)
+        # decides what reaches the receptors: retinal irradiance
+        # scales with aperture area, and depth of field narrows as
+        # it opens — the defocus blur lands on the retinal image
+        # before anything cortical sees it.
+        optical = optics.apply(rgb, pupil_mm, focus_m, lid)
+        rgb = optical.frame
+
+        # ── Illumination — light and surface, separated ────────
+        # The Retinex split: the illuminant map drives the light
+        # direction and the shadow read; its chromaticity drives
+        # the von Kries cone-class gain whose adapted image every
+        # cortical stage analyses. Colour names now belong to
+        # surfaces — a shadowed yellow wall is yellow, not brown.
+        illum = illumination.analyze(rgb)
+        rgb = illum.frame
+
+        # ── Color and lighting analysis (full resolution) ──────
+        color_info = _analyze_color_and_light(rgb)
+
+        # ── Phototransduction cascade (enzymatic model) ─────────
+        # The cones receive retinal illuminance — scene luminance
+        # through the aperture — not the scene's own brightness.
+        pt_state = self._run_phototransduction(
+            optics.retinal_irradiance(color_info.brightness, pupil_mm)
+        )
+
+        # ── Object recognition (IT cortex) ─────────────────────
+        objects, object_colors = self._recognize_objects(rgb)
+
+        # ── Face recognition (FFA) ─────────────────────────────
+        face_names, n_unknown_faces = self._recognize_faces(rgb)
+
+        # ── V1 sparse coding (sublayer: edges, gamma) ──────────
+        field = self._run_v1_sparse_coding(rgb, objects)
+
+        # ── MSTd (dorsal stream): two-view geometry of this look
+        # against the last — self-motion, heading, parallax depth
+        two_view = self._two_view_geometry(rgb)
+
+        # ── Package the structured scene percept ────────────────
+        scene = _build_scene(
+            color_info,
+            objects,
+            object_colors,
+            face_names,
+            n_unknown_faces,
+            field,
+            two_view,
+            illum,
+        )
+        scene.relay_gate = relay_gate
+        scene.pupil_mm = optical.pupil_mm
+        scene.focus_m = optical.focus_m
+        scene.lid = optical.lid
+        scene.phototransduction = pt_state
+
+        self._integrate_scene(
+            scene,
+            color_info,
+            objects,
+            face_names,
+            field,
+            network,
+            client,
+            emotion,
+            two_view,
+        )
+
+        return scene
+
+    def _integrate_scene(
+        self,
+        scene: VisionScene,
+        color_info,
+        objects: list,
+        face_names: list[str],
+        field,
+        network,
+        client,
+        emotion: EmotionalState | None,
+        two_view: TwoViewReport | None = None,
+    ) -> None:
+        """Wire the built scene into memory, chemistry, and brain waves.
+
+        Runs change detection, salience, concept-network learning,
+        neurochemical modulation, and the V1 gamma feed. Mutates the
+        scene (salience) and the frame-to-frame change trackers.
+        """
+        # ── Change detection ───────────────────────────────────
+        # A moved view is a changed view — the orienting signal cares
+        # that the visual field shifted, not only that its content did.
+        changed = (
+            self._last_color != color_info.dominant_color
+            or self._last_light != color_info.light_level
+            or self._last_objects != [o.name for o in objects]
+            or (two_view is not None and two_view.moved)
+        )
+        self._last_color = color_info.dominant_color
+        self._last_light = color_info.light_level
+
+        # ── Salience ───────────────────────────────────────────
+        mean_saturation = color_info.mean_saturation
+        salience = self._compute_salience(
+            color_info,
+            field,
+            objects,
+            face_names,
+            two_view,
+        )
+
+        # ── Wire into the concept network ──────────────────────
+        if network is not None:
+            _learn_scene(
+                network,
+                color_info.dominant_color,
+                color_info.light_level,
+                salience,
+                field,
+                color_info.regions,
+            )
+            if objects:
+                _learn_objects(network, objects, salience)
+            _learn_view_motion(network, two_view, objects, salience)
+
+        scene.salience = salience
+
+        # Corticothalamic engagement — seeing that mattered raises the
+        # gain cortex feeds back to the thalamic relay on the next
+        # heartbeat. It accumulates (max, not overwrite) so a dim look
+        # doesn't erase the attention a salient one built.
+        if salience > self.corticothalamic_gain():
+            self._optic_engagement = salience
+            self._optic_engagement_at = time.monotonic()
+
+        # ── Modulate neurochemistry ────────────────────────────
+        if client is not None and emotion is not None:
+            self._modulate_vision_chemistry(
+                client,
+                color_info,
+                mean_saturation,
+                salience,
+                changed,
+                field,
+                objects,
+                face_names,
+                emotion,
+                scene,
+            )
+
+        # ── Feed V1 gamma to brain waves ───────────────────────
+        if field is not None and self._on_gamma is not None and field.gamma_power > 0:
+            try:
+                self._on_gamma(field.gamma_power)
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "occipital_lobe.perception.vision.see",
+                    e,
+                )
+
+    def corticothalamic_gain(self) -> float:
+        """The mind's engagement gain back onto the thalamic relay —
+        the layer-6 V1→dLGN feedback, decayed toward the last look.
+
+        The heartbeat pushes this to the body via ``set_optic_gain``;
+        the body clamps it and scales the relay within what the sleep
+        stage permits. It decays with a 20 s half-life — attention
+        gain persists only while cortex keeps attending vision.
+        """
+        if self._optic_engagement_at <= 0.0:
+            return 0.0
+        elapsed = time.monotonic() - self._optic_engagement_at
+        return max(
+            0.0,
+            min(
+                1.0,
+                self._optic_engagement * (0.5 ** (elapsed / _OPTIC_ENGAGEMENT_HALF_LIFE_S)),
+            ),
+        )
+
     def _compute_salience(
         self,
         color_info,
         field,
         objects: list,
         face_names: list[str],
+        two_view: TwoViewReport | None = None,
     ) -> float:
         """Compute overall scene salience from color, V1, objects, and faces."""
         mean_saturation = color_info.mean_saturation
@@ -450,6 +781,10 @@ class Vision:
             0.25 + 0.35 * color_info.brightness + 0.4 * mean_saturation,
         )
         salience = max(v1_salience, color_salience)
+        if two_view is not None and two_view.moved:
+            # A shifted view is inherently attended — the organism moved
+            # or the world did; either way the scene is not the same one.
+            salience = max(salience, 0.45)
         if objects:
             # Scale object salience by the largest object's area_ratio —
             # a large object dominating the frame is more salient than
@@ -478,8 +813,12 @@ class Vision:
         """Send neurochemical impulses based on the visual scene."""
         gamma_val = field.gamma_power if field is not None else 0.0
         _modulate_chemistry(
-            client, color_info.brightness, mean_saturation,
-            salience, changed, gamma=gamma_val,
+            client,
+            color_info.brightness,
+            mean_saturation,
+            salience,
+            changed,
+            gamma=gamma_val,
         )
         if objects:
             try:
@@ -512,9 +851,9 @@ def _yuyv_to_rgb(yuyv: np.ndarray) -> np.ndarray:
 
     def yuv_to_rgb(y: np.ndarray) -> np.ndarray:
         """Convert a single YUV pixel to RGB."""
-        r = ((298 * y + 409 * v + 128) >> 8)
-        g = ((298 * y - 100 * u - 208 * v + 128) >> 8)
-        b = ((298 * y + 516 * u + 128) >> 8)
+        r = (298 * y + 409 * v + 128) >> 8
+        g = (298 * y - 100 * u - 208 * v + 128) >> 8
+        b = (298 * y + 516 * u + 128) >> 8
         return np.clip(np.stack([r, g, b], axis=-1), 0, 255).astype(np.uint8)
 
     h, w = yuyv.shape[:2]
@@ -634,38 +973,32 @@ def _rgb_to_hsv_vec(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray
     return h, s, mx
 
 
-def _dominant_color_name(
-    hue: np.ndarray, sat: np.ndarray, val: np.ndarray
-) -> str:
-    """Name the dominant color of the frame."""
+def _dominant_color_name(hue: np.ndarray, sat: np.ndarray, val: np.ndarray) -> str:
+    """Name the dominant color of the frame.
+
+    Names with the full palette — the peak hue bin's own saturation and
+    value decide between orange and brown, red and pink, gray and
+    black — rather than hue alone.
+    """
     mask = (sat > 0.15) & (val > 0.15)
     if not mask.any():
-        return "gray" if val.mean() < 0.6 else "white"
+        v = float(val.mean())
+        if v > 0.75:
+            return "white"
+        if v < 0.12:
+            return "black"
+        return "gray"
 
     hues = hue[mask]
     counts, edges = np.histogram(hues, bins=12, range=(0.0, 360.0))
     peak = int(np.argmax(counts))
+    peak_mask = (hues >= edges[peak]) & (hues < edges[peak + 1])
     hue_center = (edges[peak] + edges[peak + 1]) / 2.0
-    return _name_hue(hue_center)
-
-
-def _name_hue(hue: float) -> str:
-    """Map a hue angle (degrees) to a color name."""
-    if hue < 15 or hue >= 345:
-        return "red"
-    if hue < 45:
-        return "orange"
-    if hue < 65:
-        return "yellow"
-    if hue < 150:
-        return "green"
-    if hue < 200:
-        return "cyan"
-    if hue < 260:
-        return "blue"
-    if hue < 300:
-        return "magenta"
-    return "red"
+    return name_color(
+        hue_center,
+        float(sat[mask][peak_mask].mean()),
+        float(val[mask][peak_mask].mean()),
+    )
 
 
 def _color_warmth(hue: np.ndarray, sat: np.ndarray) -> str:
@@ -700,14 +1033,15 @@ def _spatial_color_regions(
     brightness: dict[str, float] = {}
     sh, sw = sample.shape[:2]
 
-    # Left / center / right thirds.
+    # Left / center / right thirds. ``sample`` arrives already
+    # normalized to [0, 1] — _rgb_to_hsv_vec takes it as-is.
     for name, x_start, x_end in [
         ("left", 0, sw // 3),
         ("center", sw // 3, 2 * sw // 3),
         ("right", 2 * sw // 3, sw),
     ]:
         strip = sample[:, x_start:x_end].reshape(-1, 3)
-        hue, sat, val = _rgb_to_hsv_vec(strip.astype(np.float32) / 255.0)
+        hue, sat, val = _rgb_to_hsv_vec(strip)
         regions[name] = _dominant_color_name(hue, sat, val)
         brightness[name] = float(val.mean())
 
@@ -717,16 +1051,14 @@ def _spatial_color_regions(
         ("bottom", sh // 2, sh),
     ]:
         strip = sample[y_start:y_end, :].reshape(-1, 3)
-        hue, sat, val = _rgb_to_hsv_vec(strip.astype(np.float32) / 255.0)
+        hue, sat, val = _rgb_to_hsv_vec(strip)
         regions[name] = _dominant_color_name(hue, sat, val)
         brightness[name] = float(val.mean())
 
     return regions, brightness
 
 
-def _object_colors(
-    rgb: np.ndarray, objects: list[DetectedObject]
-) -> dict[str, str]:
+def _object_colors(rgb: np.ndarray, objects: list[DetectedObject]) -> dict[str, str]:
     """Determine the color of each detected object.
 
     Samples the pixels within each object's bounding box and names
@@ -766,6 +1098,8 @@ def _build_scene(
     face_names: list[str],
     n_unknown_faces: int,
     field: VisualField | None = None,
+    two_view: TwoViewReport | None = None,
+    illum: illumination.Illumination | None = None,
 ) -> VisionScene:
     """Package the percept as structured data for the language engine.
 
@@ -789,23 +1123,30 @@ def _build_scene(
             if obj.name == "person" and (face_names or n_unknown_faces):
                 continue
             color = object_colors.get(obj.name, "")
-            obj_entries.append({
-                "name": obj.name,
-                "color": color if color not in ("gray", "white", "unknown") else "",
-                "position": obj.position_description,
-            })
+            obj_entries.append(
+                {
+                    "name": obj.name,
+                    "color": color if color not in ("gray", "white", "unknown") else "",
+                    "position": obj.position_description,
+                }
+            )
 
-    # ── Spatial color highlights ─────────────────────────────
-    # If the left/right regions differ meaningfully in mean luminance,
-    # record which side the light seems to come from. The comparison
-    # uses real per-region luminance — comparing color *names* would
-    # call a shadowed yellow wall "brighter" than a sunlit gray one.
-    light_direction = ""
-    rb = color_info.region_brightness
-    if "left" in rb and "right" in rb:
-        diff = rb["left"] - rb["right"]
-        if abs(diff) > 0.08:
-            light_direction = "left" if diff > 0 else "right"
+    # ── Light direction ──────────────────────────────────────
+    # With an illuminant decomposition the direction is the light
+    # field's own gradient — surface colours can't vote. The
+    # region-luminance heuristic remains only for callers that never
+    # decomposed the light (it would still call a shadowed saturated
+    # wall "brighter" than a lit gray one — the heuristic is the
+    # documented approximation, the illuminant is the truth).
+    if illum is not None:
+        light_direction = illum.light_direction
+    else:
+        light_direction = ""
+        rb = color_info.region_brightness
+        if "left" in rb and "right" in rb:
+            diff = rb["left"] - rb["right"]
+            if abs(diff) > 0.08:
+                light_direction = "left" if diff > 0 else "right"
 
     return VisionScene(
         status="ok",
@@ -817,7 +1158,17 @@ def _build_scene(
         n_unknown_faces=n_unknown_faces,
         objects=obj_entries,
         light_direction=light_direction,
+        illuminant=illum.illuminant_name if illum is not None else "",
+        shadow_fraction=illum.shadow_fraction if illum is not None else 0.0,
+        shadow_direction=illum.shadow_direction if illum is not None else "",
         highly_structured=field is not None and field.contour_count() > 5,
+        color_regions=dict(color_info.regions),
+        chromatic_features=field.chromatic_features if field is not None else 0,
+        view_motion=two_view.kind if two_view else "",
+        view_direction=two_view.direction if two_view else "",
+        view_motion_deg=two_view.rotation_deg if two_view else 0.0,
+        near_structure=two_view.nearest_region if two_view else "",
+        movers=two_view.movers if two_view else 0,
     )
 
 
@@ -827,11 +1178,14 @@ def _learn_scene(
     light: str,
     salience: float,
     field: VisualField | None = None,
+    regions: dict[str, str] | None = None,
 ) -> None:
     """Add scene concepts and relations to the semantic network.
 
     When a VisualField is available (from the occipital subsystem), also
     learns V1-specific concepts: edges, orientations, contours.
+    Region colours (the blue left, the brown centre) are learned too —
+    spatial colour is a different percept from a single dominant hue.
     """
     for concept in ("retina", "vision", "scene", "camera"):
         network.add_concept(concept, origin="sensory")
@@ -845,33 +1199,61 @@ def _learn_scene(
     network.add_edge("scene", light, RelationType.RELATED_TO, weight=w * 0.7, origin="sensory")
     network.add_edge("retina", "camera", RelationType.RELATED_TO, weight=0.8, origin="sensory")
 
+    # Region colours — each distinct colour present somewhere in the
+    # field becomes a scene concept of its own.
+    if regions:
+        for region_color in {c for c in regions.values() if c and c != color}:
+            network.add_concept(region_color, origin="sensory")
+            network.add_edge(
+                "scene",
+                region_color,
+                RelationType.RELATED_TO,
+                weight=w * 0.5,
+                origin="sensory",
+            )
+
     # V1-specific learning: edges, contours, gamma.
     if field is not None and field.feature_count() > 0:
         network.add_concept("edge", origin="sensory")
         network.add_concept("contour", origin="sensory")
         network.add_concept("orientation", origin="sensory")
         network.add_edge(
-            "vision", "edge", RelationType.CREATES,
-            weight=w * 0.6, origin="sensory",
+            "vision",
+            "edge",
+            RelationType.CREATES,
+            weight=w * 0.6,
+            origin="sensory",
         )
         network.add_edge(
-            "edge", "contour", RelationType.RELATED_TO,
-            weight=w * 0.5, origin="sensory",
+            "edge",
+            "contour",
+            RelationType.RELATED_TO,
+            weight=w * 0.5,
+            origin="sensory",
         )
         network.add_edge(
-            "edge", "orientation", RelationType.RELATED_TO,
-            weight=w * 0.4, origin="sensory",
+            "edge",
+            "orientation",
+            RelationType.RELATED_TO,
+            weight=w * 0.4,
+            origin="sensory",
         )
         if field.contour_count() > 0:
             network.add_edge(
-                "contour", "shape", RelationType.RELATED_TO,
-                weight=w * 0.5, origin="sensory",
+                "contour",
+                "shape",
+                RelationType.RELATED_TO,
+                weight=w * 0.5,
+                origin="sensory",
             )
         if field.gamma_power > 0.3:
             network.add_concept("gamma", origin="sensory")
             network.add_edge(
-                "vision", "gamma", RelationType.RELATED_TO,
-                weight=w * 0.4, origin="sensory",
+                "vision",
+                "gamma",
+                RelationType.RELATED_TO,
+                weight=w * 0.4,
+                origin="sensory",
             )
 
 
@@ -889,8 +1271,11 @@ def _learn_objects(
     """
     network.add_concept("object", origin="sensory")
     network.add_edge(
-        "vision", "object", RelationType.CREATES,
-        weight=max(0.2, min(0.9, salience)), origin="sensory",
+        "vision",
+        "object",
+        RelationType.CREATES,
+        weight=max(0.2, min(0.9, salience)),
+        origin="sensory",
     )
 
     w = max(0.3, min(0.9, salience))
@@ -899,13 +1284,19 @@ def _learn_objects(
         network.add_concept(obj.name, origin="sensory")
         # Link it to the general "object" concept.
         network.add_edge(
-            "object", obj.name, RelationType.RELATED_TO,
-            weight=w * (0.5 + obj.confidence * 0.5), origin="sensory",
+            "object",
+            obj.name,
+            RelationType.RELATED_TO,
+            weight=w * (0.5 + obj.confidence * 0.5),
+            origin="sensory",
         )
         # Link it to vision — it saw it.
         network.add_edge(
-            "vision", obj.name, RelationType.RELATED_TO,
-            weight=w * 0.7, origin="sensory",
+            "vision",
+            obj.name,
+            RelationType.RELATED_TO,
+            weight=w * 0.7,
+            origin="sensory",
         )
         # Add spatial position concepts.
         cx, _cy = obj.center
@@ -917,9 +1308,116 @@ def _learn_objects(
             pos = "center"
         network.add_concept(pos, origin="sensory")
         network.add_edge(
-            obj.name, pos, RelationType.RELATED_TO,
-            weight=w * 0.4, origin="sensory",
+            obj.name,
+            pos,
+            RelationType.RELATED_TO,
+            weight=w * 0.4,
+            origin="sensory",
         )
+
+
+def _learn_view_motion(
+    network,
+    report: TwoViewReport | None,
+    objects: list[DetectedObject],
+    salience: float,
+) -> None:
+    """Ground the dorsal stream's two-view percept: spatial relations
+    and causal influence.
+
+    The epipolar geometry supplies what the image plane cannot —
+    *depth* (parallax puts near structure somewhere in the field) and
+    *attribution* (a coherent ego-motion model means the view change
+    came with the eye — her motion explains it; tracks that break the
+    model moved on their own — the world acted on her).
+    """
+    if report is None or not report.moved:
+        return
+    w = max(0.2, min(0.9, salience))
+    network.add_concept("motion", origin="sensory")
+    network.add_concept("view_change", origin="sensory")
+    network.add_edge(
+        "vision",
+        "view_change",
+        RelationType.CREATES,
+        weight=w * 0.6,
+        origin="sensory",
+    )
+    # Causal attribution — the influence relation. A coherent
+    # ego-motion model means the change is her own motion's doing;
+    # independent movers and unresolved change are the world's.
+    if report.kind in ("travel", "turn"):
+        network.add_concept("self_motion", origin="sensory")
+        network.add_edge(
+            "self_motion",
+            "view_change",
+            RelationType.CAUSES,
+            weight=w,
+            origin="sensory",
+        )
+        network.add_edge(
+            "self_motion",
+            "motion",
+            RelationType.IS_A,
+            weight=w * 0.7,
+            origin="sensory",
+        )
+    if report.movers or report.kind == "unresolved":
+        network.add_concept("external_motion", origin="sensory")
+        network.add_edge(
+            "external_motion",
+            "view_change",
+            RelationType.CAUSES,
+            weight=w * 0.8,
+            origin="sensory",
+        )
+        network.add_edge(
+            "external_motion",
+            "motion",
+            RelationType.IS_A,
+            weight=w * 0.7,
+            origin="sensory",
+        )
+    if report.kind == "travel" and report.direction:
+        network.add_concept("heading", origin="sensory")
+        network.add_concept(report.direction, origin="sensory")
+        network.add_edge(
+            "self_motion",
+            "heading",
+            RelationType.HAS_PROPERTY,
+            weight=w * 0.5,
+            origin="sensory",
+        )
+        network.add_edge(
+            "heading",
+            report.direction,
+            RelationType.HAS_PROPERTY,
+            weight=w * 0.6,
+            origin="sensory",
+        )
+    # Parallax depth — the spatial relation the flat image lacks.
+    # Objects sitting in the nearest third of the field are "near".
+    if report.kind == "travel" and report.nearest_region:
+        network.add_concept("depth", origin="sensory")
+        network.add_concept("near", origin="sensory")
+        network.add_edge(
+            "vision",
+            "depth",
+            RelationType.CREATES,
+            weight=w * 0.5,
+            origin="sensory",
+        )
+        third = ("left", "center", "right").index(report.nearest_region)
+        for obj in objects or []:
+            cx, _cy = obj.center
+            if third / 3 <= cx < (third + 1) / 3:
+                network.add_edge(
+                    obj.name,
+                    "near",
+                    RelationType.SPATIAL_RELATION,
+                    weight=w * 0.6,
+                    origin="sensory",
+                )
 
 
 def _modulate_chemistry(

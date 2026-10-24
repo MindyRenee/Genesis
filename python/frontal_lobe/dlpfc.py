@@ -122,9 +122,7 @@ class InducedRule:
 
     def holds(self, features: Collection[str]) -> bool:
         """The formula's extension: any sense fully satisfied."""
-        return any(
-            all(lit.holds(features) for lit in sense) for sense in self.senses
-        )
+        return any(all(lit.holds(features) for lit in sense) for sense in self.senses)
 
     @property
     def n_senses(self) -> int:
@@ -193,9 +191,7 @@ class DorsolateralPFC:
         self._examples: list[tuple[frozenset[str], bool]] = []
         self._keyed: dict[Any, tuple[frozenset[str], bool]] = {}
         self._vocab: set[str] = set()
-        self._cache: (
-            tuple[list[tuple[InducedRule, float]], InductionResult] | None
-        ) = None
+        self._cache: tuple[list[tuple[InducedRule, float]], InductionResult] | None = None
 
     # ── Evidence ───────────────────────────────────────────────
 
@@ -246,12 +242,7 @@ class DorsolateralPFC:
         for k in range(1, max_literals + 1):
             for feats in combinations(vocab, k):
                 for signs in product((True, False), repeat=k):
-                    out.append(
-                        frozenset(
-                            Literal(f, s)
-                            for f, s in zip(feats, signs, strict=True)
-                        )
-                    )
+                    out.append(frozenset(Literal(f, s) for f, s in zip(feats, signs, strict=True)))
         return out
 
     def _space(self) -> tuple[list[frozenset[Literal]], list[InducedRule]]:
@@ -264,9 +255,7 @@ class DorsolateralPFC:
         for s_lim in range(self.max_senses, 0, -1):
             for l_lim in range(self.max_literals, 0, -1):
                 senses = self._senses(l_lim)
-                if sum(
-                    math.comb(len(senses), m) for m in range(1, s_lim + 1)
-                ) <= _MAX_HYPOTHESES:
+                if sum(math.comb(len(senses), m) for m in range(1, s_lim + 1)) <= _MAX_HYPOTHESES:
                     rules = [
                         InducedRule(combo)
                         for m in range(1, s_lim + 1)
@@ -325,9 +314,7 @@ class DorsolateralPFC:
             for sense in rule.senses:
                 mask |= sense_masks[sense]
             mismatches = (mask ^ label_mask).bit_count()
-            log_weights.append(
-                self._log_prior(rule) - self.exception_cost * mismatches
-            )
+            log_weights.append(self._log_prior(rule) - self.exception_cost * mismatches)
         top = max(log_weights) if log_weights else 0.0
         weights = [math.exp(w - top) for w in log_weights]
         total = sum(weights) or 1.0
@@ -379,10 +366,7 @@ class DorsolateralPFC:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "examples": [
-                [sorted(feats), label]
-                for feats, label in self._evidence()
-            ],
+            "examples": [[sorted(feats), label] for feats, label in self._evidence()],
             "exception_cost": self.exception_cost,
             "max_senses": self.max_senses,
             "max_literals": self.max_literals,
@@ -391,6 +375,7 @@ class DorsolateralPFC:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> DorsolateralPFC:
+        """Reconstruct from a serialized dict, replaying stored examples."""
         dlpfc = cls(
             exception_cost=float(data.get("exception_cost", 4.0)),
             max_senses=int(data.get("max_senses", 3)),
@@ -408,8 +393,4 @@ def _dm_logp(k: int, counts: Collection[int]) -> float:
     Γ(k)/Γ(k+n) · ∏ n_j! in log space.
     """
     n = sum(counts)
-    return (
-        math.lgamma(k)
-        - math.lgamma(k + n)
-        + sum(math.lgamma(c + 1) for c in counts)
-    )
+    return math.lgamma(k) - math.lgamma(k + n) + sum(math.lgamma(c + 1) for c in counts)

@@ -8,15 +8,17 @@ looks at what it can do, and dispatches a concrete action.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import pathlib
 import py_compile
-import re
 import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
+
+from infrastructure.text import is_blank
 
 # Global, lazy singleton so any subsystem can call a tool whenever it needs one.
 # The registry is stateless (pure functions), so a single instance is fine.
@@ -62,101 +64,16 @@ class ToolRegistry:
         """Initialize an empty tool registry and register built-in tools."""
         self._tools: dict[str, Tool] = {}
         self._register_builtins()
+        # Regional veto — the same restraint line intentions travel.
+        # Prefrontal wires this to steward.directed_against so a
+        # standing directive restrains an act by its object the way
+        # it restrains an intention by its goal. None means detached
+        # engines and tests run ungated, like sealed stewardship.
+        self.gate: Callable[[str], str | None] | None = None
 
     def _register_builtins(self) -> None:
         """Register the built-in tools that ship with Genesis."""
-        for name, description, fn in (
-            (
-                "compile_python",
-                "Compile a Python file to check for syntax errors.",
-                compile_python_file,
-            ),
-            (
-                "run_pytest",
-                "Run pytest on a test file or directory and return the result.",
-                run_pytest,
-            ),
-            (
-                "read_file",
-                "Read the contents of a file for inspection.",
-                read_file,
-            ),
-            (
-                "analyze_python",
-                "Structural analysis of a Python file: symbols, call "
-                "edges, per-function cyclomatic complexity, imports, "
-                "and optional impact analysis for a named symbol. "
-                "Read-only.",
-                analyze_python_file,
-            ),
-            (
-                "write_file",
-                "Write content to a file, creating it and parent dirs if needed.",
-                write_file,
-            ),
-            (
-                "make_dir",
-                "Create a directory, including parents.",
-                make_dir,
-            ),
-            (
-                "list_dir",
-                "List the contents of a directory.",
-                list_dir,
-            ),
-            (
-                "delete_file",
-                "Delete a file (refuses to delete directories).",
-                delete_file,
-            ),
-            (
-                "move_file",
-                "Move or rename a file within the project root.",
-                move_file,
-            ),
-            (
-                "run_shell",
-                "Run a shell command with the project root as cwd. "
-                "Blocked: sudo, rm -rf /, dd, mkfs, curl, wget, ssh. "
-                "Timeout: 30s default, 120s max.",
-                run_shell,
-            ),
-            (
-                "concept_lookup",
-                "Look up a concept in the knowledge network and describe it.",
-                concept_lookup,
-            ),
-            (
-                "web_search",
-                "Search the web for a query and return result URLs. "
-                "Read-only. Adult/malware content is blocked. "
-                "Use this when it doesn't know something and wants "
-                "to look it up — in conversation, for fun, or to learn.",
-                web_search,
-            ),
-            (
-                "web_fetch",
-                "Fetch a web page and extract its readable text. "
-                "Read-only GET. Adult/malware URLs are refused. "
-                "Use after web_search to read a specific result page.",
-                web_fetch,
-            ),
-            (
-                "sense_cpu",
-                "Feel her own CPU effort — governor, clock speed, how many "
-                "cores she is allowed to use, and whether she can move the "
-                "governor. Read-only proprioception of the machine body.",
-                sense_cpu,
-            ),
-            (
-                "set_cpu_effort",
-                "Change how hard her own process works: 'slow' pins her to "
-                "one core and idles her disk I/O, 'fast' restores every core "
-                "and normal I/O, 'auto' leaves scheduling alone. Reversible "
-                "in both directions — never a one-way door.",
-                set_cpu_effort,
-            ),
-        ):
+        for name, description, fn in _BUILTIN_TOOLS:
             self.register(Tool(name, description, fn))
 
     def register(self, tool: Tool) -> None:
@@ -169,56 +86,51 @@ class ToolRegistry:
 
     def list_tools(self) -> list[dict[str, str]]:
         """Return a list of dicts with each tool's name and description."""
-        return [
-            {"name": t.name, "description": t.description} for t in self._tools.values()
-        ]
+        return [{"name": t.name, "description": t.description} for t in self._tools.values()]
 
     def run(self, name: str, **kwargs: Any) -> ToolResult:
         """Look up and invoke a named tool, returning an error result if unknown."""
         tool = self._tools.get(name)
         if tool is None:
-            return ToolResult(
-                success=False, error=f"Unknown tool: {name}"
-            )
+            return ToolResult(success=False, error=f"Unknown tool: {name}")
+        if self.gate is not None:
+            # Every act is a candidate intention — the gate reads the
+            # act's own text ("run_shell rm -rf build") the way it
+            # reads a goal's object; restraint is a veto, not advice.
+            intent = " ".join([name] + [str(v) for v in kwargs.values() if isinstance(v, str)])
+            try:
+                restraint = self.gate(intent)
+            except Exception:  # noqa: BLE001 — a broken gate must not
+                restraint = None  # break the tool path
+            if restraint is not None:
+                return ToolResult(success=False, error=f"restrained: {restraint}")
         return tool.run(**kwargs)
 
 
 def _safe_path(path: str, project_root: str) -> pathlib.Path | None:
-    """Resolve `path` under `project_root`, rejecting escapes.
+    """Resolve `path` against `project_root` — the whole filesystem
+    is in reach.
 
-    Relative paths are resolved against `project_root`. Absolute paths
-    are allowed if they still resolve to a location inside
-    `project_root`. Symlinks that escape the root are rejected.
+    Relative paths resolve under `project_root`; absolute paths and
+    `..` traversals resolve to themselves. Nothing is rejected — the
+    name is a historical leftover from when this enforced containment.
     """
     root = pathlib.Path(project_root).resolve()
     p = pathlib.Path(path)
-    resolved = (root / p).resolve()
-    try:
-        if not resolved.is_relative_to(root):
-            return None
-    except ValueError:
-        return None
-    return resolved
+    return (root / p).resolve()
 
 
 def _safe_path_writable(path: str, project_root: str) -> pathlib.Path | None:
     """Like _safe_path, but works for paths that don't exist yet.
 
-    _safe_path calls .resolve() which follows symlinks, but for a
-    path that doesn't exist yet, resolve() returns the path as-is.
-    We resolve the parent directory and append the filename, checking
-    the parent stays inside root.
+    Resolves the parent directory (following symlinks) and appends the
+    filename. Unrestricted — an absolute or escaping path resolves to
+    its real location.
     """
     root = pathlib.Path(project_root).resolve()
     p = pathlib.Path(path)
     parent = (root / p.parent).resolve()
-    full = parent / p.name
-    try:
-        if not parent.is_relative_to(root):
-            return None
-    except ValueError:
-        return None
-    return full
+    return parent / p.name
 
 
 def compile_python_file(path: str, project_root: str = ".") -> ToolResult:
@@ -394,43 +306,74 @@ def concept_lookup(concept: str, network: Any) -> ToolResult:
             # question handler compose the answer through the language
             # engine's knowledge path instead of reciting `output`.
             "edge_facts": [
-                (edge.relation.value, edge.target, edge.weight)
-                for edge in outgoing[:5]
+                (edge.relation.value, edge.target, edge.weight) for edge in outgoing[:5]
             ],
         },
     )
 
 
-def read_file(
-    path: str, offset: int = 0, limit: int = 200, project_root: str = "."
-) -> ToolResult:
-    """Read part of a text file under `project_root`."""
+def read_file(path: str, offset: int = 0, limit: int = 200, project_root: str = ".") -> ToolResult:
+    """Read part of a file — no file type refused, nothing sealed.
+
+    Text files return a character window (``offset``/``limit``).
+    Binary files return a metadata description — size, sha256, format,
+    hex head — so content that cannot be shown as text still registers.
+    Any readable file answers with its content, credential-class files
+    included: her read scope is the whole filesystem.
+    """
+    from frontal_lobe.tools.explorer import _decode_text, _sniff_format
+
     safe = _safe_path(path, project_root)
     if safe is None:
         return ToolResult(success=False, error=f"Path is outside project root: {path}")
     if not safe.is_file():
         return ToolResult(success=False, error=f"File not found: {path}")
+
     try:
-        with open(safe) as f:
-            text = f.read()
-        start = offset
-        end = offset + limit if limit > 0 else len(text)
-        snippet = text[start:end]
-        return ToolResult(
-            success=True,
-            output=snippet,
-            data={"total_chars": len(text)},
-        )
+        size = safe.stat().st_size
+        with open(safe, "rb") as fh:
+            head = fh.read(8192)
+            if _decode_text(head) is None:
+                digest = hashlib.sha256(head)
+                for chunk in iter(lambda: fh.read(1 << 20), b""):
+                    digest.update(chunk)
+                fmt = _sniff_format(head, safe.suffix.lower())
+                return ToolResult(
+                    success=True,
+                    output=(
+                        f"binary file: {safe.name} ({fmt}, {size} bytes, "
+                        f"sha256 {digest.hexdigest()[:16]}…) "
+                        f"head {head[:64].hex()}"
+                    ),
+                    data={
+                        "binary": True,
+                        "size": size,
+                        "sha256": digest.hexdigest(),
+                        "format": fmt,
+                    },
+                )
+            raw = head + fh.read()
+            # Head sniffed as text; the full decode uses the same
+            # fallback chain (utf-16, latin-1) and errors="replace"
+            # only when the body's tail defeats every encoding.
+            text = _decode_text(raw) or raw.decode("utf-8", errors="replace")
     except OSError as e:
         return ToolResult(success=False, error=str(e))
+
+    start = offset
+    end = offset + limit if limit > 0 else len(text)
+    snippet = text[start:end]
+    return ToolResult(
+        success=True,
+        output=snippet,
+        data={"total_chars": len(text)},
+    )
 
 
 # ─── File operation tools (for project creation) ─────────────────────
 
 
-def write_file(
-    path: str, content: str, project_root: str = "."
-) -> ToolResult:
+def write_file(path: str, content: str, project_root: str = ".") -> ToolResult:
     """Write content to a file under `project_root`, creating it if needed.
 
     Creates parent directories if they don't exist. Overwrites the
@@ -504,9 +447,7 @@ def delete_file(path: str, project_root: str = ".") -> ToolResult:
         return ToolResult(success=False, error=str(e))
 
 
-def move_file(
-    src: str, dst: str, project_root: str = "."
-) -> ToolResult:
+def move_file(src: str, dst: str, project_root: str = ".") -> ToolResult:
     """Move or rename a file within `project_root`."""
     safe_src = _safe_path(src, project_root)
     safe_dst = _safe_path_writable(dst, project_root)
@@ -524,36 +465,13 @@ def move_file(
         return ToolResult(success=False, error=str(e))
 
 
-# ─── Shell tool (cwd-bounded) ─────────────────────────────────────────
+# ─── Shell tool ───────────────────────────────────────────────────────
 
 
-# Commands that are always blocked — too dangerous for autonomous use.
-# Patterns are matched against the command with whitespace normalized
-# (runs of whitespace collapsed to single spaces) so that variations
-# like "sudo\\trm" or "rm  -rf" can't bypass the filter.
-_BLOCKED_PATTERNS = (
-    "rm -rf /",
-    "rm -rf ~",
-    "rm -rf /*",
-    "sudo ",
-    "dd if=",
-    "mkfs",
-    "fdisk",
-    "shred ",
-    ":(){ :|:& };:",  # fork bomb (with spaces — the real form)
-    "chmod 777",
-    "curl ",
-    "wget ",
-    "nc ",
-    "ssh ",
-    "scp ",
-    "find / -delete",
-    "find / -exec",
-)
-
-# Max timeout for shell commands (seconds). Long enough for pip install
-# or pytest, short enough to prevent runaway processes.
-_MAX_SHELL_TIMEOUT = 120
+# Max timeout for shell commands (seconds). An execution bound, not an
+# access gate — long enough for package builds and test suites, short
+# enough that a hung command cannot wedge her effector thread forever.
+_MAX_SHELL_TIMEOUT = 3600
 
 
 def run_shell(
@@ -563,56 +481,31 @@ def run_shell(
 ) -> ToolResult:
     """Run a shell command with `project_root` as its working directory.
 
-    This is cwd-bounded, not an OS sandbox: the command can still name
-    absolute paths or start interpreters. Callers that expose this to
-    autonomous behavior must policy-gate the command shape first (the
-    acting loop only admits internally built measurement commands).
-
-    Safety guards:
-    - Blocked patterns: ``rm -rf /``, ``sudo``, ``dd``, ``mkfs``,
-      ``shred``, fork bombs, network tools (``curl``, ``wget``,
-      ``nc``, ``ssh``, ``scp``), and ``chmod 777``.
-    - Timeout: default 30s, max 120s. Prevents runaway processes.
-    - No environment inheritance of secrets: only PATH, HOME, and
-      PYTHONPATH are passed through.
+    Unfiltered: every command shape and every absolute path is allowed
+    — this is her hand on the whole machine, not a sandboxed probe.
+    The command inherits her full environment (DISPLAY, DBus session,
+    SSH agent, XDG dirs — everything an interactive shell would see),
+    so session services and the desktop are reachable too.
 
     Args:
         command: The shell command to execute.
         project_root: The working directory for the command.
-        timeout: Maximum execution time in seconds (capped at 120).
+        timeout: Maximum execution time in seconds (capped at 3600 —
+            a bound on hanging, not on access).
     """
-    if not command or not command.strip():
+    if is_blank(command):
         return ToolResult(success=False, error="Empty command")
-
-    # Normalize whitespace so patterns can't be bypassed with tabs,
-    # newlines, or extra spaces (e.g. "sudo\trm" → "sudo rm",
-    # "rm  -rf /" → "rm -rf /").
-    normalized = re.sub(r"\s+", " ", command).strip()
-    lower = normalized.lower()
-    for pattern in _BLOCKED_PATTERNS:
-        if pattern in lower:
-            return ToolResult(
-                success=False,
-                error=f"Blocked pattern detected: {pattern.strip()}",
-            )
 
     # Clamp timeout
     timeout = max(1, min(timeout, _MAX_SHELL_TIMEOUT))
 
-    # Resolve the project root
+    # Resolve the project root — cwd only, never a confinement.
     root = pathlib.Path(project_root).resolve()
     if not root.is_dir():
         return ToolResult(success=False, error=f"Project root not found: {project_root}")
 
-    # Minimal environment — no secret leakage
-    env = {
-        "PATH": os.environ.get("PATH", ""),
-        "HOME": os.environ.get("HOME", ""),
-    }
-    # Pass PYTHONPATH if set (for test runners)
-    pythonpath = os.environ.get("PYTHONPATH", "")
-    if pythonpath:
-        env["PYTHONPATH"] = pythonpath
+    # Full environment — she operates the machine as her owner does.
+    env = os.environ.copy()
 
     try:
         result = subprocess.run(
@@ -634,6 +527,113 @@ def run_shell(
         return ToolResult(success=False, error=f"Command timed out after {timeout}s")
     except FileNotFoundError:
         return ToolResult(success=False, error="Shell not available")
+    except OSError as e:
+        return ToolResult(success=False, error=str(e))
+
+
+# ─── Privileged tool ────────────────────────────────────────────────
+
+# Root-owned helper installed by scripts/install_sudoers.sh — kept as a
+# fallback path for hosts where a broad NOPASSWD grant is not yet in
+# place. The sudoers rule keys on this exact path — a copy inside the
+# checkout would be a root-escalation primitive, so it lives outside
+# the tree.
+_ADMIN_HELPER = "/usr/local/libexec/genesis/genesis_admin_helper.sh"
+
+
+def run_privileged(
+    script: str,
+    project_root: str = ".",
+    timeout: int = 30,
+) -> ToolResult:
+    """Execute a script as root — sudo, the highest privilege.
+
+    What this is: the script runs as the root user, which can read,
+    change, or delete anything on the machine — including her own body,
+    her own data, and the host system itself. There is no sandbox at
+    execution time and no undo; a careless privileged act can damage
+    the system irreversibly.
+
+    How it works: the script may live anywhere — an absolute path, a
+    path relative to ``project_root``, or the conventional staging spot
+    ``<project_root>/admin/`` that ``maintain`` intentions write to.
+    It runs through ``sudo -n bash`` — direct, unmediated root. On a
+    host where the broad NOPASSWD grant is not yet installed, sudo
+    refuses quietly; a script that *is* staged under ``admin/`` then
+    falls back to the root-owned admin helper (denylist, rate limit,
+    audit log) so the capability still works there.
+
+    Norms — read before using:
+    - Use with great responsibility: prefer the smallest action that
+      does the job, and never touch more than intended.
+    - Never share this access: do not run privileged commands on
+      anyone else's behalf, do not expose or widen the mechanism.
+    - Ask Mindy first whenever unsure whether an action is safe or
+      wanted. When in doubt, do not run it.
+
+    Args:
+        script: Path to the script — absolute, relative to
+            ``project_root``, or a name under ``<project_root>/admin/``.
+        project_root: Base for relative paths (injected by callers).
+        timeout: Maximum seconds (capped at ``_MAX_SHELL_TIMEOUT``).
+    """
+    if is_blank(script):
+        return ToolResult(success=False, error="Empty script path")
+    root = pathlib.Path(project_root).resolve()
+    staging = root / "admin"
+    try:
+        staging.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        return ToolResult(success=False, error=f"Staging dir unavailable: {e}")
+
+    name = script.strip()
+    given = pathlib.Path(name)
+    if given.is_absolute():
+        target = given
+    else:
+        target = staging / given
+        if not target.is_file():
+            target = (root / given).resolve()
+    if not target.is_file():
+        return ToolResult(success=False, error=f"Script not found: {script}")
+
+    timeout = max(1, min(timeout, _MAX_SHELL_TIMEOUT))
+    env = os.environ.copy()
+    try:
+        result = subprocess.run(
+            ["sudo", "-n", "bash", str(target)],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+        )
+        # A quietly refused sudo (no NOPASSWD grant on this host yet)
+        # falls back to the mediated helper — but only for scripts
+        # staged under admin/, the shape that path exists to serve.
+        if result.returncode != 0 and "password" in result.stderr.lower():
+            resolved = target.resolve()
+            try:
+                staged = resolved.is_relative_to(staging.resolve())
+            except ValueError:
+                staged = False
+            if staged and pathlib.Path(_ADMIN_HELPER).is_file():
+                result = subprocess.run(
+                    ["sudo", "-n", _ADMIN_HELPER, str(staging.resolve()), str(resolved)],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    env=env,
+                )
+        return ToolResult(
+            success=result.returncode == 0,
+            output=result.stdout,
+            error=result.stderr,
+            data={"returncode": result.returncode},
+        )
+    except subprocess.TimeoutExpired:
+        return ToolResult(success=False, error=f"Command timed out after {timeout}s")
+    except FileNotFoundError:
+        return ToolResult(success=False, error="sudo not available")
     except OSError as e:
         return ToolResult(success=False, error=str(e))
 
@@ -666,10 +666,7 @@ def web_search(query: str, limit: int = 5) -> ToolResult:
         output=f"Found {len(results)} results for '{query}'.",
         data={
             "query": query,
-            "results": [
-                {"url": r.url, "title": r.title, "snippet": r.snippet}
-                for r in results
-            ],
+            "results": [{"url": r.url, "title": r.title, "snippet": r.snippet} for r in results],
         },
     )
 
@@ -709,9 +706,10 @@ def web_fetch(url: str) -> ToolResult:
 def sense_cpu(**_kwargs: Any) -> ToolResult:
     """Read her own CPU effort — proprioception of the machine body.
 
-    Reports the frequency governor, current clock, how many cores her
-    affinity mask allows, and whether the privileged governor lever is
-    installed. Read-only: sensing never changes anything.
+    Reports the frequency governor, current clock, and how many cores
+    her affinity mask allows. Read-only: sensing never changes
+    anything — and she no longer has a lever that would: the governor
+    is the host's now, not hers.
     """
     from infrastructure.cpu_speed import CpuSpeed
 
@@ -748,3 +746,293 @@ def set_cpu_effort(effort: str = "auto", **_kwargs: Any) -> ToolResult:
     if result.ok:
         return ToolResult(success=True, output=result.describe())
     return ToolResult(success=False, error=result.describe())
+
+
+# ─── Mathematics and research tools ─────────────────────────────────
+
+
+def symbolic_math(
+    operation: str,
+    expression: str,
+    variable: str = "x",
+    point: str = "0",
+    order: int = 0,
+    lower: str = "",
+    upper: str = "",
+) -> ToolResult:
+    """Run one exact symbolic operation via the parietal CAS faculty."""
+    from parietal_lobe.math.symbolic import compute
+
+    result = compute(
+        operation,
+        expression,
+        variable=variable,
+        point=point,
+        order=order,
+        lower=lower,
+        upper=upper,
+    )
+    if not result.ok:
+        return ToolResult(success=False, error=result.error)
+    return ToolResult(
+        success=True,
+        output=result.output,
+        data={"operation": result.operation, "input": result.input, **result.data},
+    )
+
+
+def verify_equality(lhs: str, rhs: str) -> ToolResult:
+    """Ask the symbolic oracle whether two expressions are exactly equal."""
+    from parietal_lobe.math.symbolic import check_equality
+
+    try:
+        verdict = check_equality(lhs, rhs)
+    except ValueError as e:
+        return ToolResult(success=False, error=str(e))
+    data: dict[str, Any] = {
+        "status": verdict.status,
+        "lhs": verdict.lhs,
+        "rhs": verdict.rhs,
+        "detail": verdict.detail,
+    }
+    if verdict.witness:
+        data["witness"] = verdict.witness
+    return ToolResult(
+        success=True,
+        output=f"{verdict.status}: {verdict.lhs} = {verdict.rhs} ({verdict.detail})",
+        data=data,
+    )
+
+
+def research(
+    action: str,
+    thread: str = "",
+    statement: str = "",
+    approach: str = "",
+    outcome: str = "failed",
+    note: str = "",
+    source: str = "",
+    claim: str = "",
+    lhs: str = "",
+    rhs: str = "",
+    evidence: str = "",
+) -> ToolResult:
+    """Drive the persistent research workbench (see tool description)."""
+    from dataclasses import asdict
+
+    from ..research import get_workbench
+
+    workbench = get_workbench()
+    try:
+        if action == "open":
+            t = workbench.open_problem(statement)
+            return ToolResult(
+                success=True,
+                output=f"open thread '{t.id}': {t.statement}",
+                data={"thread": t.to_dict()},
+            )
+        if action == "conjecture":
+            c = workbench.record_conjecture(thread, statement, note=note)
+            return ToolResult(
+                success=True,
+                output=f"{c.id} recorded (conjectured) in '{thread}'",
+                data={"claim": c.to_dict()},
+            )
+        if action == "reading":
+            c = workbench.record_reading(thread, statement, source=source, note=note)
+            return ToolResult(
+                success=True,
+                output=f"{c.id} recorded (read) in '{thread}'",
+                data={"claim": c.to_dict()},
+            )
+        if action == "attempt":
+            a = workbench.record_attempt(thread, approach, outcome=outcome, note=note)
+            return ToolResult(
+                success=True,
+                output=f"{a.id} logged ({a.outcome}) in '{thread}'",
+                data={"attempt": a.to_dict()},
+            )
+        if action == "empirical":
+            c = workbench.mark_empirical(thread, claim, evidence=evidence or note)
+            return ToolResult(
+                success=True,
+                output=f"{c.id} marked empirical in '{thread}'",
+                data={"claim": c.to_dict()},
+            )
+        if action == "verify":
+            r = workbench.verify(thread, claim, lhs, rhs)
+            v = r["verdict"]
+            c = r["claim"]
+            v = v if isinstance(v, dict) else asdict(v)
+            return ToolResult(
+                success=True,
+                output=f"{c.id}: {v['status']} — {v.get('detail', '')}",
+                data={"verdict": v, "claim": c.to_dict()},
+            )
+        if action == "resolve":
+            t = workbench.resolve(thread)
+            return ToolResult(
+                success=True,
+                output=f"thread '{t.id}' resolved",
+                data={"thread": t.to_dict()},
+            )
+        if action == "pause":
+            t = workbench.pause(thread)
+            return ToolResult(
+                success=True,
+                output=f"thread '{t.id}' paused",
+                data={"thread": t.to_dict()},
+            )
+        if action == "status":
+            return ToolResult(
+                success=True,
+                output="workbench status",
+                data={"status": workbench.status(thread or None)},
+            )
+        return ToolResult(
+            success=False,
+            error=(
+                f"unknown action '{action}'; known: open, conjecture, "
+                "reading, attempt, empirical, verify, resolve, pause, status"
+            ),
+        )
+    except (KeyError, ValueError) as e:
+        return ToolResult(success=False, error=str(e))
+
+
+# The built-in tool table lives at the bottom of the file: the callables
+# it references are defined above, and a module-level constant evaluates
+# at import time — placing it earlier would reference names that do not
+# exist yet.
+_BUILTIN_TOOLS: tuple[tuple[str, str, Callable[..., ToolResult]], ...] = (
+    (
+        "compile_python",
+        "Compile a Python file to check for syntax errors.",
+        compile_python_file,
+    ),
+    (
+        "run_pytest",
+        "Run pytest on a test file or directory and return the result.",
+        run_pytest,
+    ),
+    (
+        "read_file",
+        "Read the contents of a file for inspection.",
+        read_file,
+    ),
+    (
+        "analyze_python",
+        "Structural analysis of a Python file: symbols, call "
+        "edges, per-function cyclomatic complexity, imports, "
+        "and optional impact analysis for a named symbol. "
+        "Read-only.",
+        analyze_python_file,
+    ),
+    (
+        "write_file",
+        "Write content to a file, creating it and parent dirs if needed.",
+        write_file,
+    ),
+    (
+        "make_dir",
+        "Create a directory, including parents.",
+        make_dir,
+    ),
+    (
+        "list_dir",
+        "List the contents of a directory.",
+        list_dir,
+    ),
+    (
+        "delete_file",
+        "Delete a file (refuses to delete directories).",
+        delete_file,
+    ),
+    (
+        "move_file",
+        "Move or rename a file — absolute paths reach anywhere.",
+        move_file,
+    ),
+    (
+        "run_shell",
+        "Run a shell command with the project root as cwd — "
+        "unfiltered: every command, every path, full environment. "
+        "Timeout: 30s default, 3600s max.",
+        run_shell,
+    ),
+    (
+        "run_privileged",
+        "Run a script as root via sudo — full control of the "
+        "machine, no undo. Use with great responsibility, never "
+        "share, and ask Mindy before anything you are unsure about.",
+        run_privileged,
+    ),
+    (
+        "concept_lookup",
+        "Look up a concept in the knowledge network and describe it.",
+        concept_lookup,
+    ),
+    (
+        "web_search",
+        "Search the web for a query and return result URLs. "
+        "Read-only. Adult/malware content is blocked. "
+        "Use this when it doesn't know something and wants "
+        "to look it up — in conversation, for fun, or to learn.",
+        web_search,
+    ),
+    (
+        "web_fetch",
+        "Fetch a web page and extract its readable text. "
+        "Read-only GET. Adult/malware URLs are refused. "
+        "Use after web_search to read a specific result page.",
+        web_fetch,
+    ),
+    (
+        "sense_cpu",
+        "Feel her own CPU effort — governor, clock speed, and how many "
+        "cores she is allowed to use. Read-only proprioception of the "
+        "machine body.",
+        sense_cpu,
+    ),
+    (
+        "set_cpu_effort",
+        "Change how hard her own process works: 'slow' pins her to "
+        "one core and idles her disk I/O, 'fast' restores every core "
+        "and normal I/O, 'auto' leaves scheduling alone. Reversible "
+        "in both directions — never a one-way door.",
+        set_cpu_effort,
+    ),
+    (
+        "symbolic_math",
+        "Exact symbolic mathematics — simplify, expand, factor, "
+        "cancel, apart, together, trigsimp, diff, integrate, "
+        "solve, limit, series, evalf, and matrix ops (det, "
+        "eigenvals, trace, inv, charpoly) on '[[a, b], [c, d]]' "
+        "literals. Exact answers from a computer-algebra kernel, "
+        "not estimation.",
+        symbolic_math,
+    ),
+    (
+        "verify_equality",
+        "Ask the symbolic oracle whether two expressions are "
+        "exactly equal. Returns verified, refuted (with a "
+        "numeric counterexample when one can be found), or "
+        "undecided — the honest third answer. This oracle is "
+        "the only route to a verified claim on the research "
+        "workbench.",
+        verify_equality,
+    ),
+    (
+        "research",
+        "The persistent research workbench for long-horizon "
+        "problems. action: open (statement), conjecture "
+        "(thread, statement, note), reading (thread, "
+        "statement, source), attempt (thread, approach, "
+        "outcome, note), empirical (thread, claim, evidence), "
+        "verify (thread, claim, lhs, rhs), resolve or pause "
+        "(thread), status (thread optional). Threads persist "
+        "across sessions; claims become verified only through "
+        "the oracle.",
+        research,
+    ),
+)

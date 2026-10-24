@@ -5,19 +5,36 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any
 
+from infrastructure.text import sentences as _sentences
+
 from .classify import (
     _BREAK_TOKENS,
     _CLAUSE_SPLIT_RE,
     _CLAUSE_SUBJECT_RE,
     _COMPOUND_SPLIT_RE,
+    _CONTEXT_VERB_BASES,
     _FUNCTION_WORDS,
     _INDEPENDENT_CLAUSE_RE,
     _RELATION_VERBS,
     _RELATIVE_CLAUSE_RE,
-    _SENTENCE_SPLIT_RE,
     _WORD_RE,
 )
 from .types import Concept, Edge, RelationType
+
+# Pronouns that mark a following ambiguous noun/verb base as a
+# predicate ("they mean", "we sense", "it results") — a homograph
+# after any of these is verbal, not a noun head.
+_SUBJECT_PRONOUNS: frozenset[str] = frozenset(
+    {"i", "we", "you", "they", "he", "she", "it", "one", "who"}
+)
+
+# A concept name is a noun phrase, not a sentence: real entries rarely
+# exceed a handful of tokens ("types of mean" is 3). Anything longer
+# is enumeration or clause residue the parser failed to split — the
+# web-ingest blobs of the form "arithmetic geometric harmonic ... mode"
+# are exactly this. Items past the bound are dropped, not truncated:
+# truncating would mint a different wrong concept instead of none.
+_MAX_CONCEPT_TOKENS = 7
 
 
 def _plausible_entity(name: str) -> bool:
@@ -29,20 +46,16 @@ def _plausible_entity(name: str) -> bool:
     (is_world_concept rejects digit-bearing names outright).
     """
     name = name.strip()
-    return (
-        len(name) >= 3
-        and name[0].isalpha()
-        and not any(ch.isdigit() for ch in name)
-    )
+    return len(name) >= 3 and name[0].isalpha() and not any(ch.isdigit() for ch in name)
 
 
 class ExtractionMixin:
     """Mixin for :class:`ConceptNetwork` — see module docstring."""
+
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see the package's core module).
         def __getattr__(self, name: str) -> Any: ...
-
 
     def extract_from_text(self, text: str) -> list[str]:
         """Extract potential concepts (noun phrases) from text.
@@ -65,6 +78,7 @@ class ExtractionMixin:
         to also get the learned proper-noun flag for each concept.
         """
         return [name for name, _ in self.extract_from_text_typed(text)]
+
     def extract_from_text_typed(self, text: str) -> list[tuple[str, bool]]:
         """Extract concepts with a learned proper-noun flag.
 
@@ -95,6 +109,7 @@ class ExtractionMixin:
 
         # Deduplicate while preserving order, ORing the proper-noun flag
         return self._dedup_concepts_typed(concepts)
+
     def _tokenize_text(self, text: str) -> list[tuple[str, int]]:
         """Tokenize text into words with positions."""
         # Keep apostrophes for contractions (don't) but split on other punctuation
@@ -107,6 +122,7 @@ class ExtractionMixin:
                 continue
             tokens.append((word, pos))
         return tokens
+
     def _detect_sentence_initial(self, text: str, tokens: list[tuple[str, int]]) -> set[int]:
         """Detect sentence-initial token positions."""
         sentence_initial_positions = {0}
@@ -118,6 +134,7 @@ class ExtractionMixin:
             if prefix and prefix[-1] in ".!?;:\n":
                 sentence_initial_positions.add(i)
         return sentence_initial_positions
+
     def _classify_tokens(
         self,
         tokens: list[tuple[str, int]],
@@ -165,6 +182,7 @@ class ExtractionMixin:
         # they may be plural nouns ("trade talks").
         # Lazy import: keeps the morphology edge out of module load.
         from temporal_lobe.morphology import is_verb_form
+
         for i in range(len(classified)):
             role, w, pos = classified[i]
             if role != "noun":
@@ -178,7 +196,31 @@ class ExtractionMixin:
             nxt = classified[i + 1][0] if i + 1 < len(classified) else "end"
             if nxt in ("stop", "of") or (nxt == "end" and not wl.endswith("s")):
                 classified[i] = ("stop", w, pos)
+
+        # Noun/verb homograph bases (``_CONTEXT_VERB_BASES``: "mean",
+        # "control", "sense", ...) enter as nouns — in encyclopedic text
+        # the bare base is more often a noun head ("geometric mean",
+        # "the flow of information") than a bare-stem predicate, whose
+        # role the inflected forms already cover ("it means X"). They
+        # reclassify as breaks only in clear verbal contexts: after the
+        # infinitive marker "to" ("to mean"), after a subject pronoun
+        # ("they mean"), or between a subject noun and a "that"
+        # complement ("results mean that ...").
+        for i in range(len(classified)):
+            role, w, pos = classified[i]
+            if role != "noun" or w.lower() not in _CONTEXT_VERB_BASES:
+                continue
+            prev_w = classified[i - 1][1].lower() if i else ""
+            prev_role = classified[i - 1][0] if i else "start"
+            next_w = classified[i + 1][1].lower() if i + 1 < len(classified) else ""
+            if (
+                prev_w == "to"
+                or prev_w in _SUBJECT_PRONOUNS
+                or (prev_role in ("noun", "cap", "cap_init") and next_w == "that")
+            ):
+                classified[i] = ("stop", w, pos)
         return classified
+
     def _build_noun_phrases(
         self,
         text: str,
@@ -220,6 +262,7 @@ class ExtractionMixin:
 
             i = j
         return concepts
+
     def _extend_phrase(
         self,
         text: str,
@@ -265,6 +308,7 @@ class ExtractionMixin:
             # Anything else breaks the phrase
             break
         return j
+
     def _collect_phrase(
         self,
         text: str,
@@ -319,9 +363,8 @@ class ExtractionMixin:
             if not has_cap:
                 phrase = phrase.lower()
             concepts.append((phrase, is_proper))
-    def _dedup_concepts_typed(
-        self, concepts: list[tuple[str, bool]]
-    ) -> list[tuple[str, bool]]:
+
+    def _dedup_concepts_typed(self, concepts: list[tuple[str, bool]]) -> list[tuple[str, bool]]:
         """Deduplicate typed (name, is_proper) concepts, ORing the flag.
 
         Preserves the first occurrence's casing and order. The
@@ -335,6 +378,12 @@ class ExtractionMixin:
         order: list[str] = []
         for name, is_proper in concepts:
             key = name.lower()
+            # Enumeration residue: a common-noun phrase this long is a
+            # list the parser failed to split, not one concept. Proper
+            # names are exempt — long ones exist ("United Nations
+            # Educational Scientific and Cultural Organization").
+            if not is_proper and len(key.split()) > _MAX_CONCEPT_TOKENS:
+                continue
             if key in seen_flag:
                 seen_flag[key] = seen_flag[key] or is_proper
             else:
@@ -342,6 +391,7 @@ class ExtractionMixin:
                 first_name[key] = name
                 order.append(key)
         return [(first_name[key], seen_flag[key]) for key in order]
+
     def learn_from_statement(self, subject: str, relation: str, obj: str) -> Edge | None:
         """Learn a relationship from a parsed statement.
 
@@ -389,6 +439,7 @@ class ExtractionMixin:
             return None
 
         return self.add_edge(subject, obj, rel, origin="stated")
+
     def parse_relationships(self, text: str) -> list[tuple[str, RelationType, str]]:
         """Parse relationships from a natural language statement.
 
@@ -413,7 +464,7 @@ class ExtractionMixin:
           match and breaks; compound items are then expanded.
         """
         # Split into sentences
-        sentences = _SENTENCE_SPLIT_RE.split(text)
+        sentences = _sentences(text)
         results: list[tuple[str, RelationType, str]] = []
         # Track (subject, object) pairs already emitted to avoid duplicate
         # edges when the same clause could match multiple patterns or
@@ -443,6 +494,7 @@ class ExtractionMixin:
                 self._match_clause_edges(clause, seen_pairs, results)
 
         return results
+
     def _split_into_clauses(self, sentence: str) -> list[str]:
         """Split a sentence into independent clauses.
 
@@ -541,6 +593,7 @@ class ExtractionMixin:
             if not split_happened:
                 clauses.append(part)
         return clauses
+
     def _concept_items(self, phrase: str) -> list[str]:
         """Split a phrase into list items and extract concepts.
 
@@ -565,16 +618,20 @@ class ExtractionMixin:
             # or "that causes Y" — these are not list items.
             first_word = raw.split()[0].lower()
             if first_word in (
-                "which", "who", "that", "where", "when", "why",
-                "whose", "whom",
+                "which",
+                "who",
+                "that",
+                "where",
+                "when",
+                "why",
+                "whose",
+                "whom",
             ):
                 break
             # Strip leading articles before deciding whether the
             # item starts with a verb. "the study of X" is fine,
             # but "produced by neurons" should be skipped.
-            clean = re.sub(
-                r"^(?:the|a|an)\s+", "", raw, flags=re.IGNORECASE
-            )
+            clean = re.sub(r"^(?:the|a|an)\s+", "", raw, flags=re.IGNORECASE)
             if not clean:
                 continue
             first_word = clean.split()[0].lower()
@@ -588,6 +645,13 @@ class ExtractionMixin:
             item = (concepts[0] if concepts else clean).lower()
             if len(item) < 3 or item in _FUNCTION_WORDS:
                 continue
+            # Enumeration/clause residue that survived parsing — the
+            # `else clean` fallback above passes such strings through
+            # verbatim, which is how whole word-lists once became single
+            # concepts. A relation endpoint this long is never one
+            # concept; drop it.
+            if len(item.split()) > _MAX_CONCEPT_TOKENS:
+                continue
             # Reject names that can never be world concepts: citation
             # fragments like "(2004)" and markup residue like ") that"
             # parse as entities on raw text but start with punctuation
@@ -596,6 +660,7 @@ class ExtractionMixin:
                 continue
             items.append(item)
         return items
+
     def _match_clause_edges(
         self,
         clause: str,
@@ -648,6 +713,7 @@ class ExtractionMixin:
                     results.append((subj, rel_type, tgt))
 
             break  # one pattern per clause
+
     def learn_from_text(self, text: str) -> list[Edge]:
         """Extract and learn both concepts and relationships from text.
 
@@ -689,6 +755,7 @@ class ExtractionMixin:
                 edges.append(edge)
 
         return edges
+
     def teach(
         self,
         subject: str,
@@ -718,10 +785,13 @@ class ExtractionMixin:
             # exited before the next save. `set_edge_weight` is the
             # single write-through path for weight changes.
             return self.set_edge_weight(
-                edge.source, edge.target, relation,
+                edge.source,
+                edge.target,
+                relation,
                 max(edge.weight, confidence),
             )
         return None
+
     def teach_concept(
         self,
         name: str,
@@ -735,6 +805,7 @@ class ExtractionMixin:
         taught concepts start with high confidence.
         """
         return self.add_concept(name, aliases=aliases, confidence=confidence, origin=origin)
+
     def summarize(self) -> str:
         """Human-readable summary of the concept network."""
         lines = [

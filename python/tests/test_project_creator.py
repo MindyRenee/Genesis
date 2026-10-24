@@ -9,6 +9,7 @@ from frontal_lobe.tools.framework import (
     list_dir,
     make_dir,
     move_file,
+    run_privileged,
     run_shell,
     write_file,
 )
@@ -32,7 +33,7 @@ from frontal_lobe.tools.project_creator import (
 )
 from temporal_lobe.concepts import ConceptNetwork
 
-# ─── Tool sandboxing ─────────────────────────────────────────────────
+# ─── File operation tools ────────────────────────────────────────────
 
 
 def test_write_file_creates_file() -> None:
@@ -51,12 +52,14 @@ def test_write_file_creates_parent_dirs() -> None:
         assert (Path(root) / "sub" / "dir" / "test.txt").read_text() == "content"
 
 
-def test_write_file_rejects_escape() -> None:
-    """write_file rejects paths that escape the project root."""
-    with tempfile.TemporaryDirectory() as root:
-        result = write_file("../../escape.txt", "content", project_root=root)
-        assert not result.success
-        assert "outside project root" in result.error
+def test_write_file_allows_anywhere() -> None:
+    """write_file resolves absolute and escaping paths to their real
+    locations — the whole filesystem is in reach."""
+    with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as other:
+        outside = Path(other) / "elsewhere.txt"
+        result = write_file(str(outside), "content", project_root=root)
+        assert result.success
+        assert outside.read_text() == "content"
 
 
 def test_make_dir_creates_directory() -> None:
@@ -158,13 +161,16 @@ def test_sanitize_name_defaults_to_project() -> None:
 def _seeded_network() -> ConceptNetwork:
     """Build a small concept network with real typed edges for tests."""
     from temporal_lobe.concepts import RelationType
+
     net = ConceptNetwork()
     net.add_concept(
-        "memory", confidence=0.9,
+        "memory",
+        confidence=0.9,
         properties={"definition": "storing and retrieving information"},
     )
     net.add_concept(
-        "learning", confidence=0.9,
+        "learning",
+        confidence=0.9,
         properties={"definition": "acquiring skill or knowledge"},
     )
     net.add_concept("stress", confidence=0.6, properties={"definition": "strain or pressure"})
@@ -197,6 +203,7 @@ def test_compose_main_module_compiles() -> None:
     """The composed main.py must be syntactically valid Python."""
     import py_compile
     import tempfile
+
     net = _seeded_network()
     k = gather_knowledge("memory", net)
     assert k is not None
@@ -231,6 +238,7 @@ def test_compose_test_module_compiles() -> None:
     """The composed test module must be syntactically valid Python."""
     import py_compile
     import tempfile
+
     net = _seeded_network()
     k = gather_knowledge("memory", net)
     assert k is not None
@@ -247,6 +255,7 @@ def test_compose_test_module_compiles() -> None:
 def test_compose_main_module_adaptive_structure() -> None:
     """Different domains produce different relation functions."""
     from temporal_lobe.concepts import RelationType
+
     net = ConceptNetwork()
     net.add_concept("fire", confidence=0.8, properties={"definition": "combustion"})
     net.add_concept("smoke", confidence=0.7, properties={"definition": "visible particles"})
@@ -456,6 +465,7 @@ def test_manage_project_lifecycle_archives_oversized() -> None:
 def test_manage_project_lifecycle_archives_oldest_over_limit() -> None:
     """manage_project_lifecycle archives oldest projects past max_active."""
     import time
+
     with tempfile.TemporaryDirectory() as data_dir:
         create_project(description="first", data_dir=data_dir)
         time.sleep(0.05)
@@ -501,28 +511,39 @@ def test_run_shell_cwd_is_project_root() -> None:
         assert root in result.output or Path(root).name in result.output
 
 
-def test_run_shell_blocks_sudo() -> None:
-    """run_shell blocks sudo commands."""
+def test_run_shell_allows_formerly_blocked_shapes() -> None:
+    """Command shapes the old blocklist denied now run — sh -c, eval,
+    python -c, git."""
     with tempfile.TemporaryDirectory() as root:
-        result = run_shell("sudo echo hi", project_root=root)
-        assert not result.success
-        assert "blocked" in result.error.lower()
-
-
-def test_run_shell_blocks_rm_rf_root() -> None:
-    """run_shell blocks rm -rf /."""
-    with tempfile.TemporaryDirectory() as root:
-        result = run_shell("rm -rf /", project_root=root)
-        assert not result.success
-        assert "blocked" in result.error.lower()
-
-
-def test_run_shell_blocks_network_tools() -> None:
-    """run_shell blocks curl and wget."""
-    with tempfile.TemporaryDirectory() as root:
-        for cmd in ("curl http://example.com", "wget http://example.com"):
+        for cmd in ("sh -c 'echo hi'", "eval echo hi", "python3 -c 'print(1)'"):
             result = run_shell(cmd, project_root=root)
-            assert not result.success, f"Should block: {cmd}"
+            assert result.success, f"Should run: {cmd} — {result.error}"
+
+
+def test_run_shell_writes_outside_root() -> None:
+    """Absolute write targets outside the project root are allowed."""
+    with tempfile.TemporaryDirectory() as root:
+        target = Path("/dev/shm/genesis_unrestricted_probe.txt")
+        try:
+            result = run_shell(f"echo hi > {target}", project_root=root)
+            assert result.success, result.error
+            assert target.read_text().strip() == "hi"
+        finally:
+            target.unlink(missing_ok=True)
+
+
+def test_run_shell_full_environment() -> None:
+    """run_shell inherits the full environment, not a minimal one."""
+    import os
+
+    with tempfile.TemporaryDirectory() as root:
+        os.environ["GENESIS_TEST_MARKER"] = "present"
+        try:
+            result = run_shell("echo $GENESIS_TEST_MARKER", project_root=root)
+            assert result.success
+            assert "present" in result.output
+        finally:
+            del os.environ["GENESIS_TEST_MARKER"]
 
 
 def test_run_shell_returns_exit_code() -> None:
@@ -531,6 +552,44 @@ def test_run_shell_returns_exit_code() -> None:
         result = run_shell("exit 42", project_root=root)
         assert not result.success
         assert result.data["returncode"] == 42
+
+
+def test_run_privileged_allows_escape() -> None:
+    """run_privileged no longer refuses paths outside admin/ — a
+    ``..`` path resolves and is attempted (sudo itself may still
+    refuse without a NOPASSWD grant; that is the OS deciding, not
+    a policy gate)."""
+    with tempfile.TemporaryDirectory() as root:
+        outside = Path(root).parent / "evil.sh"
+        outside.write_text("echo hi\n")
+        try:
+            result = run_privileged("../evil.sh", project_root=root)
+            assert "outside staging" not in (result.error or "")
+            assert "not found" not in (result.error or "")
+        finally:
+            outside.unlink(missing_ok=True)
+
+
+def test_run_privileged_requires_existing_file() -> None:
+    """run_privileged refuses a script that does not exist."""
+    with tempfile.TemporaryDirectory() as root:
+        result = run_privileged("nope.sh", project_root=root)
+        assert not result.success
+        assert "not found" in result.error
+
+
+def test_run_privileged_rejects_empty() -> None:
+    """run_privileged rejects a blank script path."""
+    with tempfile.TemporaryDirectory() as root:
+        result = run_privileged("  ", project_root=root)
+        assert not result.success
+
+
+def test_run_privileged_creates_staging_dir() -> None:
+    """run_privileged ensures <sandbox>/admin/ exists before validating."""
+    with tempfile.TemporaryDirectory() as root:
+        run_privileged("nope.sh", project_root=root)
+        assert (Path(root) / "admin").is_dir()
 
 
 def test_run_shell_empty_command() -> None:

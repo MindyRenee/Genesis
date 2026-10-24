@@ -255,10 +255,19 @@ class SourceTag:
 
 
 # Valid source categories for source monitoring.
-VALID_SOURCES: frozenset[str] = frozenset({
-    "user", "genesis", "conversation", "learning",
-    "inference", "imagination", "self_analysis", "world", "unknown",
-})
+VALID_SOURCES: frozenset[str] = frozenset(
+    {
+        "user",
+        "genesis",
+        "conversation",
+        "learning",
+        "inference",
+        "imagination",
+        "self_analysis",
+        "world",
+        "unknown",
+    }
+)
 
 
 @dataclass(slots=True)
@@ -594,9 +603,7 @@ class MemorySystem:
         )
         self._records[eid] = record
 
-    def _wire_memory_subsystems(
-        self, eid: int, text: str, emotional_tag: list[float]
-    ) -> None:
+    def _wire_memory_subsystems(self, eid: int, text: str, emotional_tag: list[float]) -> None:
         """Wire a newly stored memory into emotional, attractor, and priming subsystems.
 
         - Emotional memory: tag the memory with the current emotional state
@@ -692,9 +699,7 @@ class MemorySystem:
         # Emotional associations shape what we remember (Bower, 1981;
         # Phelps, 2004).
         query_emotion = self._compute_query_emotion(query_concepts)
-        results = self._rank_by_emotional_congruence(
-            results, query_emotion=query_emotion
-        )
+        results = self._rank_by_emotional_congruence(results, query_emotion=query_emotion)
         # Somatic (state-dependent) re-rank: memories encoded in a
         # body state similar to the current one are easier to recall
         # (Eich 1980). Additive and bounded — never overrides the
@@ -721,9 +726,7 @@ class MemorySystem:
         for r in results:
             risk = self.check_confabulation_risk(r.episode_id)
             if risk > 0.7:
-                logger.debug(
-                    f"high confabulation risk ({risk:.2f}) for episode {r.episode_id}"
-                )
+                logger.debug(f"high confabulation risk ({risk:.2f}) for episode {r.episode_id}")
         _t_post = time.perf_counter() - _t0
         logger.debug(
             f"retrieve_relevant sub-timing: "
@@ -736,9 +739,7 @@ class MemorySystem:
         )
         return results
 
-    def _compute_query_emotion(
-        self, query_concepts: list[str]
-    ) -> list[float] | None:
+    def _compute_query_emotion(self, query_concepts: list[str]) -> list[float] | None:
         """Compute a weighted emotional tag for the query concepts.
 
         Retrieves emotional associations for the query concepts and
@@ -757,10 +758,7 @@ class MemorySystem:
         if em_weights:
             total = sum(w for _, w in em_weights)
             if total > 0:
-                return [
-                    sum(tag[i] * w for tag, w in em_weights) / total
-                    for i in range(12)
-                ]
+                return [sum(tag[i] * w for tag, w in em_weights) / total for i in range(12)]
         return None
 
     def retrieve_episode(
@@ -901,7 +899,7 @@ class MemorySystem:
         # Gather candidate records (non-retrieved, non-forgotten).
         candidate_eids: list[int] = []
         candidate_tags: list[list[float]] = []
-        for eid, rec in self._records.items():
+        for eid, rec in list(self._records.items()):
             if eid in retrieved_set or rec.forgotten:
                 continue
             candidate_eids.append(eid)
@@ -1181,16 +1179,7 @@ class MemorySystem:
         """
         if self.attractor.pattern_count == 0:
             return results
-        import time as _attractor_time
-        _t0 = _attractor_time.perf_counter()
-        try:
-            _completed, match_id = self.attractor.retrieve(
-                _text_to_vector(query, self.attractor.size)
-            )
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"attractor retrieve failed: {e}")
-            match_id = None
-        _t_retrieve = _attractor_time.perf_counter() - _t0
+        match_id, _t_retrieve = self._attractor_retrieve(query)
         if match_id is None:
             logger.debug(
                 f"attractor: retrieve={_t_retrieve:.3f}s "
@@ -1218,17 +1207,7 @@ class MemorySystem:
                 return results[:limit]
         # Not in results — try to fetch the episode and synthesize a
         # result entry for it.
-        _t0 = _attractor_time.perf_counter()
-        try:
-            ep = self.client.retrieve_episode(eid)
-        except Exception as e:  # noqa: BLE001
-            # Expected when sleep compression has pruned the episode.
-            note_swallowed(
-                "temporal_lobe.memory.memory._apply_attractor_completion",
-                e,
-            )
-            ep = None
-        _t_fetch = _attractor_time.perf_counter() - _t0
+        ep, _t_fetch = self._fetch_attractor_episode(eid)
         if ep is None:
             logger.debug(
                 f"attractor: retrieve={_t_retrieve:.3f}s "
@@ -1247,10 +1226,59 @@ class MemorySystem:
             results.append(completed)
         else:
             results.insert(0, completed)
-        # CA3 auto-association: find other stored patterns similar
-        # to the completed pattern. These are related memories that
-        # should also be surfaced — the hippocampal CA3 region
-        # activates similar memories when one is recalled.
+        self._surface_attractor_associations(eid, results, _t_retrieve, _t_fetch)
+        return results[:limit]
+
+    def _attractor_retrieve(self, query: str) -> tuple[Any, float]:
+        """Run the Hopfield retrieve for *query*.
+
+        Returns ``(match_id, elapsed_s)`` — ``match_id`` is None when
+        retrieval fails or no stored pattern converged.
+        """
+        import time as _attractor_time
+
+        _t0 = _attractor_time.perf_counter()
+        try:
+            _completed, match_id = self.attractor.retrieve(
+                _text_to_vector(query, self.attractor.size)
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"attractor retrieve failed: {e}")
+            match_id = None
+        return match_id, _attractor_time.perf_counter() - _t0
+
+    def _fetch_attractor_episode(self, eid: int) -> tuple[Any, float]:
+        """Fetch the episode an attractor match points at.
+
+        Returns ``(episode, elapsed_s)`` — ``episode`` is None when the
+        match refers to an episode sleep compression has pruned.
+        """
+        import time as _attractor_time
+
+        _t0 = _attractor_time.perf_counter()
+        try:
+            ep = self.client.retrieve_episode(eid)
+        except Exception as e:  # noqa: BLE001
+            # Expected when sleep compression has pruned the episode.
+            note_swallowed(
+                "temporal_lobe.memory.memory._fetch_attractor_episode",
+                e,
+            )
+            ep = None
+        return ep, _attractor_time.perf_counter() - _t0
+
+    def _surface_attractor_associations(
+        self,
+        eid: int,
+        results: list[SimilarEpisode],
+        _t_retrieve: float,
+        _t_fetch: float,
+    ) -> None:
+        """CA3 auto-association: surface episodes similar to the
+        completed pattern — related memories the hippocampal CA3
+        region co-activates when one is recalled."""
+        import time as _attractor_time
+
         _t0 = _attractor_time.perf_counter()
         similar_ids = self.attractor.auto_associate(str(eid))
         _t_auto = _attractor_time.perf_counter() - _t0
@@ -1269,12 +1297,14 @@ class MemorySystem:
             except Exception:  # noqa: BLE001
                 continue
             if sep is not None:
-                results.append(SimilarEpisode(
-                    episode_id=sid_eid,
-                    hamming_distance=0,
-                    timestamp=sep.timestamp,
-                    salience=sep.salience,
-                ))
+                results.append(
+                    SimilarEpisode(
+                        episode_id=sid_eid,
+                        hamming_distance=0,
+                        timestamp=sep.timestamp,
+                        salience=sep.salience,
+                    )
+                )
                 _fetched += 1
         _t_assoc_fetch = _attractor_time.perf_counter() - _t0
         logger.debug(
@@ -1285,7 +1315,6 @@ class MemorySystem:
             f"patterns={self.attractor.pattern_count} "
             f"similar_ids={len(similar_ids)} fetched={_fetched}"
         )
-        return results[:limit]
 
     def _rank_by_emotional_congruence(
         self,
@@ -1533,7 +1562,7 @@ class MemorySystem:
         """SWS: replay recent memories + systems consolidation + experience replay."""
         processed = 0
         replayed_ids: list[int] = []
-        for rec in self._records.values():
+        for rec in list(self._records.values()):
             if rec.forgotten:
                 continue
             if rec.encoded_at >= recent_cutoff:
@@ -1589,7 +1618,7 @@ class MemorySystem:
         # Collect candidate memories: non-forgotten, not recently
         # encoded (older than the recent cutoff).
         candidates: list[MemoryRecord] = []
-        for rec in self._records.values():
+        for rec in list(self._records.values()):
             if rec.forgotten or rec.encoded_at >= recent_cutoff:
                 continue
             candidates.append(rec)
@@ -1640,7 +1669,7 @@ class MemorySystem:
         """N2: sleep spindles drive hippocampal→neocortical transfer."""
         processed = 0
         replayed = 0
-        for rec in self._records.values():
+        for rec in list(self._records.values()):
             if rec.forgotten:
                 continue
             if rec.hippocampal_dependency > 0.0:
@@ -1666,7 +1695,7 @@ class MemorySystem:
         replayed = 0
         # Emotional memories are identified by high emotional
         # variance in the 12-chemical tag.
-        for rec in self._records.values():
+        for rec in list(self._records.values()):
             if rec.forgotten:
                 continue
             emotional_intensity = _emotional_intensity(rec.emotional_tag)
@@ -1699,7 +1728,7 @@ class MemorySystem:
         """N1: the lightest stage — minor replay."""
         processed = 0
         replayed = 0
-        for rec in self._records.values():
+        for rec in list(self._records.values()):
             if rec.forgotten or rec.encoded_at < recent_cutoff:
                 continue
             rec.synaptic_strength = min(1.0, rec.synaptic_strength + 0.03 * strength_scale)
@@ -1751,7 +1780,7 @@ class MemorySystem:
 
         # Sort records by encoded_at for interference calculations.
         sorted_records = sorted(
-            (r for r in self._records.values() if not r.forgotten),
+            (r for r in list(self._records.values()) if not r.forgotten),
             key=lambda r: r.encoded_at,
         )
         # Parallel array of the sort key, for bisect-based windowing.
@@ -1784,7 +1813,7 @@ class MemorySystem:
         cutoff = now_ms - self._FORGOTTEN_EVICTION_GRACE_MS
         evictable = [
             eid
-            for eid, rec in self._records.items()
+            for eid, rec in list(self._records.items())
             if rec.forgotten and rec.encoded_at < cutoff
         ]
         if not evictable:
@@ -1962,7 +1991,7 @@ class MemorySystem:
         Args:
             dt: Elapsed time in seconds.
         """
-        for rec in self._records.values():
+        for rec in list(self._records.values()):
             if rec.reconsolidation_window > 0:
                 rec.reconsolidation_window = max(0.0, rec.reconsolidation_window - dt)
 
@@ -2036,10 +2065,8 @@ class MemorySystem:
         """
         return [
             rec.episode_id
-            for rec in self._records.values()
-            if not rec.forgotten
-            and rec.source_tag is not None
-            and rec.source_tag.source == source
+            for rec in list(self._records.values())
+            if not rec.forgotten and rec.source_tag is not None and rec.source_tag.source == source
         ]
 
     def source_summary(self) -> dict[str, int]:
@@ -2049,7 +2076,7 @@ class MemorySystem:
         knowledge came from.
         """
         counts: dict[str, int] = {}
-        for rec in self._records.values():
+        for rec in list(self._records.values()):
             if rec.forgotten:
                 continue
             src = rec.source_tag.source if rec.source_tag else "unknown"
@@ -2108,7 +2135,7 @@ class MemorySystem:
             Number of memories processed.
         """
         processed = 0
-        for rec in self._records.values():
+        for rec in list(self._records.values()):
             if rec.forgotten or rec.hippocampal_dependency <= 0.0:
                 continue
             rec.hippocampal_dependency = max(
@@ -2137,7 +2164,7 @@ class MemorySystem:
     @property
     def active_memory_count(self) -> int:
         """Number of non-forgotten tracked memories."""
-        return sum(1 for r in self._records.values() if not r.forgotten)
+        return sum(1 for r in list(self._records.values()) if not r.forgotten)
 
     # ── Persistence ──────────────────────────────────────────────
 
@@ -2232,15 +2259,9 @@ class MemorySystem:
             self._records[eid] = rec
         self.forgotten_count = int(data.get("forgotten_count", 0))
         self.reconsolidation_count = int(data.get("reconsolidation_count", 0))
-        self.synaptic_consolidation_count = int(
-            data.get("synaptic_consolidation_count", 0)
-        )
-        self.systems_consolidation_count = int(
-            data.get("systems_consolidation_count", 0)
-        )
-        self.sleep_consolidation_count = int(
-            data.get("sleep_consolidation_count", 0)
-        )
+        self.synaptic_consolidation_count = int(data.get("synaptic_consolidation_count", 0))
+        self.systems_consolidation_count = int(data.get("systems_consolidation_count", 0))
+        self.sleep_consolidation_count = int(data.get("sleep_consolidation_count", 0))
         self.facts_replayed_count = int(data.get("facts_replayed_count", 0))
 
 

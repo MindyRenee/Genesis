@@ -349,9 +349,7 @@ class Parser:
 
         trailing = self.peek()
         if trailing.type != TokenType.EOF:
-            raise ParseError(
-                f"Unexpected token {trailing.value!r} at pos {trailing.pos}"
-            )
+            raise ParseError(f"Unexpected token {trailing.value!r} at pos {trailing.pos}")
         return result
 
     def _parse_expr(self, min_prec: int) -> Any:
@@ -783,9 +781,7 @@ def simplify(node: Any, enabled_rules: set[str] | None = None) -> Any:
     return node
 
 
-def _apply_binop_identities(
-    op: str, left: Any, right: Any, enabled_rules: set[str]
-) -> Any | None:
+def _apply_binop_identities(op: str, left: Any, right: Any, enabled_rules: set[str]) -> Any | None:
     """Apply algebraic identity rules to a binary operation.
 
     Returns the simplified node if an identity matched, or None to
@@ -1232,9 +1228,7 @@ def solve_equation(eq: Equation, enabled_rules: set[str] | None = None) -> Solve
     )
 
 
-def _solve_linear(
-    coeffs: dict[int, float], var_name: str, steps: list[SolveStep]
-) -> SolveResult:
+def _solve_linear(coeffs: dict[int, float], var_name: str, steps: list[SolveStep]) -> SolveResult:
     """Solve a linear equation a*x + b = 0 → x = -b/a."""
     # Linear: a*x + b = 0 → x = -b/a
     a = coeffs.get(1, 0)
@@ -1484,9 +1478,7 @@ def _extract_coefficients(node: Any, var: str) -> dict[int, float] | None:
     return None
 
 
-def _extract_multiplication(
-    n: Any, var: str, sign: float, add_term
-) -> bool:
+def _extract_multiplication(n: Any, var: str, sign: float, add_term) -> bool:
     """Extract coefficients from a multiplication BinOp (constant × polynomial).
 
     One side must be a constant, the other a polynomial term in ``var``.
@@ -2181,8 +2173,7 @@ def _discover_divisibility(n_examples: int) -> list[Conjecture]:
     if holds:
         conjectures.append(
             Conjecture(
-                "A number is divisible by 3 if and only if the sum of its digits is divisible"
-                "by 3",
+                "A number is divisible by 3 if and only if the sum of its digits is divisibleby 3",
                 evidence[:10],
                 1.0,
             )
@@ -2200,8 +2191,7 @@ def _discover_divisibility(n_examples: int) -> list[Conjecture]:
     if holds9:
         conjectures.append(
             Conjecture(
-                "A number is divisible by 9 if and only if the sum of its digits is divisible"
-                "by 9",
+                "A number is divisible by 9 if and only if the sum of its digits is divisibleby 9",
                 evidence9[:10],
                 1.0,
             )
@@ -2327,11 +2317,15 @@ def _math_state(question: str) -> dict[str, Any]:
     numbers = sum(1 for t in tokens if t.type == TokenType.NUMBER)
     idents = {t.value for t in tokens if t.type == TokenType.IDENT}
     functions = idents & _BUILTIN_FUNCTIONS.keys()
-    variables = idents - _BUILTIN_FUNCTIONS.keys() - {
-        "pi",
-        "e",
-        "infinity",
-    }
+    variables = (
+        idents
+        - _BUILTIN_FUNCTIONS.keys()
+        - {
+            "pi",
+            "e",
+            "infinity",
+        }
+    )
     ops = {
         t.value
         for t in tokens
@@ -2358,17 +2352,11 @@ def _math_state(question: str) -> dict[str, Any]:
     )
     if lower.startswith(("prove ", "show that ")):
         form = "prove"
-    elif re.match(
-        r"(?:discover|find\s+patterns?\s+in|explore|investigate)\s", lower
-    ):
+    elif re.match(r"(?:discover|find\s+patterns?\s+in|explore|investigate)\s", lower):
         form = "discover"
-    elif re.match(
-        r"(?:solve|find\s+x\s+in|find\s+the\s+value\s+of\s+x\s+in)\s", lower
-    ):
+    elif re.match(r"(?:solve|find\s+x\s+in|find\s+the\s+value\s+of\s+x\s+in)\s", lower):
         form = "solve"
-    elif re.match(
-        r"(?:what\s+is|what's|calculate|compute|evaluate)\s", lower
-    ):
+    elif re.match(r"(?:what\s+is|what's|calculate|compute|evaluate)\s", lower):
         form = "compute"
     else:
         form = "expression"

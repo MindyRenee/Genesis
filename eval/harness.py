@@ -93,14 +93,19 @@ def isolated_daemon(
     """
     binary = find_daemon_binary(project_root)
     if binary is None:
-        raise FileNotFoundError(
-            "genesis-daemon binary not found (run: cargo build --release)"
-        )
+        raise FileNotFoundError("genesis-daemon binary not found (run: cargo build --release)")
     data_dir = tempfile.mkdtemp(prefix="genesis_eval_")
     socket_path = os.path.join(data_dir, "genesis.sock")
     proc = subprocess.Popen(
-        [binary, "--data-dir", data_dir, "--stm-capacity", str(stm_capacity),
-         "--ltm-capacity", str(ltm_capacity)],
+        [
+            binary,
+            "--data-dir",
+            data_dir,
+            "--stm-capacity",
+            str(stm_capacity),
+            "--ltm-capacity",
+            str(ltm_capacity),
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )

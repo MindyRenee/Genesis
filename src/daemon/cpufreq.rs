@@ -753,16 +753,53 @@ pub fn derive_nice(ach: f32) -> i32 {
 
 // ─── Cognitive mind priority ──────────────────────────────────
 
-/// Get the cognitive mind's PID from the `GENESIS_COGNITIVE_PID` env var.
+/// The cognitive PID the mind most recently pushed over IPC.
+///
+/// `GENESIS_COGNITIVE_PID` names the launcher alive at spawn time —
+/// right for a fresh pair, wrong forever after a re-inhabitation:
+/// when the mind dies and a new one adopts the surviving body, the
+/// env var still holds the dead launcher's PID. `SET_COGNITIVE_PID`
+/// carries the living one.
+static COGNITIVE_PID_OVERRIDE: OnceLock<Mutex<Option<u32>>> = OnceLock::new();
+
+fn cognitive_pid_override() -> &'static Mutex<Option<u32>> {
+    COGNITIVE_PID_OVERRIDE.get_or_init(|| Mutex::new(None))
+}
+
+/// Store the PID a re-inhabiting mind pushed over IPC.
+pub fn set_cognitive_pid(pid: u32) {
+    if let Ok(mut guard) = cognitive_pid_override().lock() {
+        *guard = Some(pid);
+    }
+}
+
+/// Clear the IPC-pushed override (test-only — the OnceLock cannot be
+/// un-written in production, matching every other capability gate).
+#[cfg(test)]
+pub fn reset_cognitive_pid() {
+    if let Ok(mut guard) = cognitive_pid_override().lock() {
+        *guard = None;
+    }
+}
+
+/// Get the cognitive mind's PID — the IPC-pushed value when a mind
+/// has re-inhabited this body, else the `GENESIS_COGNITIVE_PID` env
+/// var the launcher set at spawn.
 ///
 /// The CLI passes its PID when starting the daemon so the daemon can
 /// include the cognitive mind in interoception (reading its CPU/memory/IO
 /// metrics to feel its body state). The PID is **not** used to control
 /// the cognitive mind's scheduling or I/O priority — the cognitive mind
 /// controls its own process resources via its brain wave state.
-/// Returns `None` if the env var is not set (e.g. when the daemon is
+/// Returns `None` if neither source is set (e.g. when the daemon is
 /// run standalone).
 pub fn cognitive_pid() -> Option<u32> {
+    if let Some(cell) = COGNITIVE_PID_OVERRIDE.get()
+        && let Ok(guard) = cell.lock()
+        && let Some(pid) = *guard
+    {
+        return Some(pid);
+    }
     std::env::var("GENESIS_COGNITIVE_PID")
         .ok()
         .and_then(|s| s.parse::<u32>().ok())
@@ -1928,5 +1965,24 @@ mod tests {
             policy.min_freq,
             policy.max_freq
         );
+    }
+
+    #[test]
+    fn test_cognitive_pid_override_wins_then_falls_back() {
+        // The IPC-pushed PID (a re-inhabiting mind) takes precedence
+        // over `GENESIS_COGNITIVE_PID`, and clearing it falls back to
+        // the env var. Precedence is exercised through the override
+        // mutex, not `env::set_var`: `cargo test` runs tests on
+        // parallel threads in one process, so mutating the
+        // environment here would race with concurrent readers.
+        set_cognitive_pid(4_000_000);
+        assert_eq!(cognitive_pid(), Some(4_000_000));
+        set_cognitive_pid(4_000_001);
+        assert_eq!(cognitive_pid(), Some(4_000_001));
+        reset_cognitive_pid();
+        let env = std::env::var("GENESIS_COGNITIVE_PID")
+            .ok()
+            .and_then(|s| s.parse::<u32>().ok());
+        assert_eq!(cognitive_pid(), env);
     }
 }

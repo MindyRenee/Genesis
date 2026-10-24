@@ -21,9 +21,14 @@ import struct
 
 from .exceptions import ConnectionError
 
+# Provenance marker — one letter of the creator lattice (see
+# PROVENANCE.md).
+_MARKER_G09 = 0x4753094544B80616
+
 __all__ = [
     "ADVANCE_NEURO",
     "ADVANCE_PHYSICS",
+    "ANALYZE_CODE",
     "APPLY_BODY_CONTROL",
     "ARCHIVE_EPISODE",
     "ASSOCIATE",
@@ -63,10 +68,12 @@ __all__ = [
     "GET_DYADIC_STATE",
     "GET_FIELD_PROBE",
     "GET_INFERENCE_SUMMARY",
+    "GET_INTERNALS",
     "GET_ION_SUMMARY",
     "GET_MEMORY_STATS",
     "GET_MOTOR_TARGET",
     "GET_NEURO_SUMMARY",
+    "GET_OPTIC_STATE",
     "GET_PHASE",
     "GET_PLASTICITY_PROFILE",
     "GET_PROCESS_HEALTH",
@@ -137,8 +144,12 @@ __all__ = [
     "SENSOR_RAPL",
     "SENSOR_SUPPLY_VOLTAGE",
     "SENSOR_TEMPERATURE",
+    "SET_COGNITIVE_PID",
     "SET_FIELD_CARRIER",
     "SET_FIELD_PHASE",
+    "SET_FOCUS",
+    "SET_LID",
+    "SET_OPTIC_GAIN",
     "SET_POLICY_AUTHORITY",
     "SET_VOLITION",
     "SET_WAKE_ALARM",
@@ -262,9 +273,10 @@ SET_WAKE_ALARM = 34
 # Response: [u8 ack] + [f32 applied].
 SET_POLICY_AUTHORITY = 35
 
-# Volitional push onto the sleep-wake network. Request: [u8 kind]
-# (0 = sleep, drives VLPO; 1 = wake, drives LC) + [f32 magnitude].
-# Response: [u8 ack]. Decays on the physics clock.
+# Retired — never reuse this wire number. Volitional pushes onto the
+# sleep-wake network were removed: /sleep and /wake act through
+# neurochemical impulses only; the chemicals control, as in a real
+# brain — nothing exogenous is held on the wire.
 SET_VOLITION = 46
 
 # The body's real measured substrate dynamics — the daemon's field
@@ -276,6 +288,21 @@ SET_VOLITION = 46
 # [f32 pstate_rate][f32 irq_rate][f32 carrier_hz][u8 samples_ok]
 # [f32 carrier_lag][f32 carrier_phase][f32 carrier_coherence].
 # v1 is 102 bytes without the three phase fields.
+# v3 is 195 bytes — the v2 body plus the electrical + Maxwell tail:
+# [10 f32 power bands (real measured watts)][f32 power_watts]
+# [f32 power_sensor_hz][f32 rail_volts][f32 supply_amps]
+# [f32 power_lag][f32 power_coherence][u8 electrical_present mask]
+# [f32 carrier_current_a][f32 b_est_ut][f32 e_ind_vm]
+# [f32 radiated_pwr_w]. The Maxwell fields are estimates — the
+# current is measured, the loop geometry an assumption
+# (src/daemon/maxwell.rs). v4 appends the radio tail
+# [10f rf flux bands][10f rf rssi bands][f32 rf_bytes_s]
+# [f32 rf_rssi_dbm][f32 rf_noise_dbm][f32 rf_irq_rate]
+# [f32 rf_sensor_hz][f32 bt_bytes_s][f32 bt_events_s]
+# [f32 bt_rssi_dbm][u8 rf_present mask] → 308 bytes. v5 appends
+# iw station telemetry [5×f32] → 328 bytes; v6 appends the flux
+# phasors [10f rf_flux_phase][10f rf_flux_phase_coherence] →
+# 408 bytes.
 # Layout: `src/daemon/field_probe.rs`. Additive: no CoreState or
 # BodyState layout changes, so PROTOCOL_VERSION stays 3. A daemon
 # without a running probe returns a single error byte — an absent
@@ -295,29 +322,87 @@ SET_FIELD_PHASE = 48
 # probe's real-work carrier. Request: [f32 depth][f32 freq_hz].
 # Depth 0..1 (0 = unmodulated work); freq 0 hands the rhythm back to
 # the body's phase, positive overrides it (clamped 0.1..100 Hz) so
-# evaluation can drive arbitrary bands — including epsilon-rate
-# infraslow where the thermal field can hold an oscillation.
+# evaluation can drive arbitrary bands — including infraslow rates
+# where the thermal field can hold an oscillation.
 # Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
 SET_FIELD_CARRIER = 49
 
-# The dyadic model's latest snapshot — who is present and how the
-# dyad is running, as measured evidence for the mind's own appraisal:
-# the present person's signature (name, provenance, bond depth,
-# affective aura, in-tune history, and the field band-energy
-# configuration recorded while they were present), the pooled
-# coupling estimates, and the one-tick reunion signal. No chemical
-# prescriptions travel on this channel — what any of it means to her
-# state is decided by her own appraisal via NEURO_IMPULSE.
-# Response: layout in `dyadic_model::DyadicSnapshot::to_wire` —
-#   [u8 version=1][6 × f32 pooled][u8 has_person]
-#   if set: [u8 name_len][name][u8 authenticated]
-#           [5 × f32 aura/synchrony][f64 presence_s]
-#           [u32 field_samples][10 × f32 field]
-#   [u8 has_reunion][f32 bond][f32 seconds_since][u16 person_count]
-# A single READ_FAILED byte until the tick loop first publishes —
-# an absent channel, not a zero reading.
-# Additive: PROTOCOL_VERSION stays 3.
+# RETIRED — pinned so the wire number is never reused. The per-person
+# dyadic snapshot channel was removed with the person registry; the
+# interlocutor model's coupling output is applied to neurochemistry
+# inside the tick.
 GET_DYADIC_STATE = 50
+
+# The daemon's process-local internals — the gears no state file or
+# CoreState field exposes: every adaptive gate's full snapshot
+# (bounds, period, next-fire countdown, smoothed demand), the mind
+# lease, tick counter, volition drive, last-applied body policy, and
+# the autonomous fallback's own gates.
+# Response: [u8 ack] (1) then UTF-8 `key=value` lines — self-describing
+# and additive, so a reader written today still parses tomorrow's
+# longer dump. Observation only.
+# Additive: PROTOCOL_VERSION stays 3.
+GET_INTERNALS = 51
+
+# The optic nerve's subcortical channel state — the body's own read
+# of the retinal segment, not the mind's: photopic and melanopic
+# irradiance, motion energy, the collicular orienting transient, the
+# SCN light drive it currently feeds the circadian oscillator, and
+# the thalamic relay gate the mind must honour (it approaches 0 in
+# NREM — sensory transmission is blocked at the thalamus, so a look
+# during sleep is a blind look). This is the same /genesis_retina
+# segment the mind reads frames from — the daemon consumes the
+# nerve's non-image-forming branches, the mind the relayed image.
+# Response: [u8 ack] then 46 bytes —
+#   [u8 flags][u8 pad][7 × f32][u64 frame_seq][i64 frame_age_ms]
+#   flags bit0 = eye ever produced a frame, bit1 = frames fresh (<5 s)
+# A daemon that has never seen a frame still answers — an absent eye
+# is a reading, not an error. A daemon that predates the command
+# returns UNKNOWN_COMMAND, which the client turns into None.
+# Additive: PROTOCOL_VERSION stays 3.
+GET_OPTIC_STATE = 52
+
+# Corticothalamic feedback — the mind's engagement gain onto the
+# thalamic relay, the layer-6 V1→dLGN projection. Modulatory only:
+# it scales the relay within ±40 % and can never open a gate the
+# sleep stage has closed. Request: [f32 gain] in 0..1 (0.5 = neutral).
+# Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
+SET_OPTIC_GAIN = 53
+
+# Accommodation — the mind's focus request in metres. The body
+# converts it to the ciliary drive (1/m dioptres, clamped to 0..6 —
+# infinity to a ~17 cm near point) and slews toward it on the
+# advance clock; non-positive/non-finite distances relax to
+# infinity. Monocular: no vergence component. Request:
+# [f32 meters]. Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
+SET_FOCUS = 54
+
+# Structural code analysis — the daemon's code sense. The mind sends a
+# source file it already read ([u16 path_len][path utf-8]
+# [u32 source_len][source utf-8]); the body parses it into a real Rust
+# AST (syn), extracts semantic units, the call graph, impl relations,
+# and complexity metrics, and returns `[u8 ack]` + a UTF-8 line report
+# (tab-separated fields, `;`-separated lists — type strings may contain
+# commas). A source that fails to parse returns INVALID_VALUE so the
+# mind can fall back to its own lightweight parser. Stateless, pure.
+ANALYZE_CODE = 55
+
+# The cognitive mind's PID, pushed over IPC when a new mind re-inhabits
+# a surviving body. GENESIS_COGNITIVE_PID names the launcher alive at
+# spawn; after a re-inhabitation it still holds the dead launcher's
+# PID, and interoception would measure a corpse.
+# Request: [u32 pid]. Response: [u8 ack] (1).
+# Additive: PROTOCOL_VERSION unaffected.
+SET_COGNITIVE_PID = 56
+
+# Voluntary eyelid — the orbicularis oculi the camera hardware lacks.
+# The mind's requested lid openness composes with the sleep phase's
+# own lid position by min: the will can shut an open eye (to rest it,
+# to dim the world) but cannot open one the stage has closed.
+# Request: [f32 openness] in 0..1 (1.0 = released to phase). Held,
+# not momentary — lids stay where the mind left them.
+# Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
+SET_LID = 57
 
 # Which optional hardware sensors this machine actually has.
 # Response: [u16 mask] — a bitmask of SENSOR_* below. A set bit means
@@ -364,7 +449,8 @@ DROP_TENSOR = 44
 # Decode the published motor fields (`motor.spatial` +
 # `motor.actions`) into a concrete action/grid target on the daemon's
 # canonical 64×64 coordinate grid (`src/field/motor.rs`). Response is
-# a fixed 12 bytes — see `tensor.unpack_motor_target`.
+# a 14-byte base plus an additive 16-byte distribution tail when the
+# daemon reports field shape — see `tensor.unpack_motor_target`.
 GET_MOTOR_TARGET = 45
 
 SUBSYSTEM_DAEMON = 0
@@ -395,6 +481,7 @@ SENSOR_LOCAL_TIMER = 1 << 12
 SENSOR_MEMORY = 1 << 13
 SENSOR_PSI = 1 << 14
 SENSOR_BATTERY_CYCLES = 1 << 15
+SENSOR_CPUIDLE = 1 << 16
 
 # Bit position -> channel name, for reporting. Order matches the Rust
 # `SENSOR_BITS` table so both sides list absences in the same order.
@@ -415,6 +502,7 @@ SENSOR_NAMES: dict[int, str] = {
     SENSOR_MEMORY: "total memory",
     SENSOR_PSI: "pressure stall information",
     SENSOR_BATTERY_CYCLES: "battery cycle count",
+    SENSOR_CPUIDLE: "cpuidle state counters",
 }
 
 # ─── Error response codes ─────────────────────────────────────
@@ -659,9 +747,7 @@ def pack_message(cmd_id: int, payload: bytes = b"") -> bytes:
         raise ValueError(f"cmd_id must be 0-255, got {cmd_id}")
     total_len = 1 + len(payload)
     if total_len > MAX_MESSAGE_LEN:
-        raise ValueError(
-            f"message length {total_len} exceeds maximum {MAX_MESSAGE_LEN}"
-        )
+        raise ValueError(f"message length {total_len} exceeds maximum {MAX_MESSAGE_LEN}")
     return _U32.pack(total_len) + bytes([cmd_id]) + payload
 
 
@@ -685,9 +771,7 @@ def unpack_message(data: bytes) -> tuple[int, bytes]:
     if total_len == 0:
         raise ValueError("message length is zero (must include at least the command_id byte)")
     if total_len > MAX_MESSAGE_LEN:
-        raise ValueError(
-            f"message length {total_len} exceeds maximum {MAX_MESSAGE_LEN}"
-        )
+        raise ValueError(f"message length {total_len} exceeds maximum {MAX_MESSAGE_LEN}")
     if len(data) < 4 + total_len:
         raise ValueError("message shorter than declared length")
     cmd_id = data[4]
@@ -730,13 +814,9 @@ def read_message(sock: socket.socket) -> tuple[int, bytes]:
     len_buf = read_exact(sock, 4)
     total_len = _U32.unpack(len_buf)[0]
     if total_len == 0:
-        raise ConnectionError(
-            "message length is zero (must include at least the command_id byte)"
-        )
+        raise ConnectionError("message length is zero (must include at least the command_id byte)")
     if total_len > MAX_MESSAGE_LEN:
-        raise ConnectionError(
-            f"message length {total_len} exceeds maximum {MAX_MESSAGE_LEN}"
-        )
+        raise ConnectionError(f"message length {total_len} exceeds maximum {MAX_MESSAGE_LEN}")
     payload_buf = read_exact(sock, total_len)
     cmd_id = payload_buf[0]
     payload = payload_buf[1:]

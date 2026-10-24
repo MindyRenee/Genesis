@@ -177,8 +177,7 @@ class GrowthLedger:
         delta = value - previous
         sign = "+" if delta >= 0 else ""
         logger.debug(
-            f"Growth milestone: [{dimension}/{metric}] "
-            f"{previous} -> {value} ({sign}{delta:.2f})"
+            f"Growth milestone: [{dimension}/{metric}] {previous} -> {value} ({sign}{delta:.2f})"
         )
         return milestone
 
@@ -234,9 +233,7 @@ class GrowthLedger:
         latest = self.get_latest(dimension, metric)
         return latest.value if latest else None
 
-    def get_history(
-        self, dimension: str, metric: str
-    ) -> list[tuple[int, float]]:
+    def get_history(self, dimension: str, metric: str) -> list[tuple[int, float]]:
         """Get the full history of a metric as (timestamp, value) pairs."""
         return [
             (m.timestamp, m.value)
@@ -253,10 +250,7 @@ class GrowthLedger:
         voice. It covers all dimensions that have milestones.
         """
         if not self._milestones:
-            return (
-                "hasn't recorded any growth milestones yet. "
-                "still at the beginning of journey"
-            )
+            return "hasn't recorded any growth milestones yet. still at the beginning of journey"
 
         # Group milestones by dimension
         by_dimension: dict[str, list[GrowthMilestone]] = {}
@@ -298,10 +292,7 @@ class GrowthLedger:
         # Summary stats
         total = self._total_recorded
         dimensions = len(by_dimension)
-        parts.append(
-            f"\n  Total: {total} milestones across "
-            f"{dimensions} dimension(s)."
-        )
+        parts.append(f"\n  Total: {total} milestones across {dimensions} dimension(s).")
 
         return "\n".join(parts)
 
@@ -315,9 +306,7 @@ class GrowthLedger:
             return "# Growth Ledger\n\nNo milestones recorded yet.\n"
 
         lines = ["# Growth Ledger", ""]
-        lines.append(
-            f"_{self._total_recorded} milestones recorded_\n"
-        )
+        lines.append(f"_{self._total_recorded} milestones recorded_\n")
 
         # Group by dimension
         by_dimension: dict[str, list[GrowthMilestone]] = {}
@@ -366,10 +355,7 @@ class GrowthLedger:
         """Serialize state for persistence."""
         return {
             "milestones": [m.to_dict() for m in self._milestones],
-            "last_values": {
-                f"{d}/{m}": v
-                for (d, m), v in self._last_values.items()
-            },
+            "last_values": {f"{d}/{m}": v for (d, m), v in self._last_values.items()},
             "total_recorded": self._total_recorded,
         }
 
@@ -379,11 +365,9 @@ class GrowthLedger:
         # hold more; keep the most recent.
         self._milestones = [
             GrowthMilestone.from_dict(m)
-            for m in data.get("milestones", [])[-self._MAX_MILESTONES:]
+            for m in data.get("milestones", [])[-self._MAX_MILESTONES :]
         ]
-        self._total_recorded = max(
-            int(data.get("total_recorded", 0)), len(self._milestones)
-        )
+        self._total_recorded = max(int(data.get("total_recorded", 0)), len(self._milestones))
         self._last_values = {}
         for key_str, value in data.get("last_values", {}).items():
             parts = key_str.split("/", 1)

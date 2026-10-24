@@ -85,7 +85,10 @@ class TestTaskCompetence:
         steps = [ProcedureStep("move", {"to": "target"})]
 
         skill = competence.record_episode(
-            context, steps=steps, success=True, verification_score=1.0,
+            context,
+            steps=steps,
+            success=True,
+            verification_score=1.0,
             verification="solver",
         )
         assert skill is not None
@@ -93,7 +96,10 @@ class TestTaskCompetence:
 
         # A weaker re-verification must not downgrade the record.
         same = competence.record_episode(
-            context, steps=steps, success=True, verification_score=1.0,
+            context,
+            steps=steps,
+            success=True,
+            verification_score=1.0,
             verification="reported",
         )
         assert same is skill
@@ -101,7 +107,10 @@ class TestTaskCompetence:
 
         # Stronger evidence upgrades it.
         competence.record_episode(
-            context, steps=steps, success=True, verification_score=1.0,
+            context,
+            steps=steps,
+            success=True,
+            verification_score=1.0,
             verification="external",
         )
         assert skill.verification == "external"
@@ -140,8 +149,10 @@ class TestTaskCompetence:
         ctx_a = competence.recognize(
             domain="arcade.navigation",
             state={
-                "self.r": 5, "self.c": 5,
-                "target.distance": 8, "objects.count": 3,
+                "self.r": 5,
+                "self.c": 5,
+                "target.distance": 8,
+                "objects.count": 3,
             },
             actions=("up", "down", "left", "right"),
             goal_conditions=[GoalCondition("target.distance", "eq", 0)],
@@ -162,8 +173,10 @@ class TestTaskCompetence:
         ctx_b = competence.recognize(
             domain="tiles.maze",
             state={
-                "self.r": 1, "self.c": 1,
-                "target.distance": 5, "objects.count": 4,
+                "self.r": 1,
+                "self.c": 1,
+                "target.distance": 5,
+                "objects.count": 4,
             },
             actions=("up", "down", "left", "right"),
             goal_conditions=[GoalCondition("target.distance", "eq", 0)],
@@ -208,12 +221,18 @@ class TestTaskCompetence:
         competence = TaskCompetence()
         context = _context(competence)
         epistemic = competence.record_episode(
-            context, steps=[ProcedureStep("move", {"how": "thought"})],
-            success=True, verification_score=1.0, verification="solver",
+            context,
+            steps=[ProcedureStep("move", {"how": "thought"})],
+            success=True,
+            verification_score=1.0,
+            verification="solver",
         )
         worldly = competence.record_episode(
-            context, steps=[ProcedureStep("move", {"how": "acted"})],
-            success=True, verification_score=1.0, verification="external",
+            context,
+            steps=[ProcedureStep("move", {"how": "acted"})],
+            success=True,
+            verification_score=1.0,
+            verification="external",
         )
         assert epistemic is not None and worldly is not None
 
@@ -252,12 +271,8 @@ class TestTaskCompetence:
             GoalCondition("target.distance", "eq", 0),
             GoalCondition("agent.alive", "truthy"),
         ]
-        assert competence.verify(
-            goals, {"target.distance": 0, "agent.alive": True}
-        ) == 1.0
-        assert competence.verify(
-            goals, {"target.distance": 2, "agent.alive": True}
-        ) < 1.0
+        assert competence.verify(goals, {"target.distance": 0, "agent.alive": True}) == 1.0
+        assert competence.verify(goals, {"target.distance": 2, "agent.alive": True}) < 1.0
 
     def test_failed_episode_does_not_become_skill(self):
         competence = TaskCompetence()
@@ -351,7 +366,6 @@ class TestTaskCompetence:
         restore_task_competence(restored, data["task_competence"])
         assert restored.skill_count == 1
 
-
     def test_verified_skill_is_grounded_in_concept_network(self):
         from temporal_lobe.concepts import ConceptNetwork, RelationType
 
@@ -387,9 +401,7 @@ class TestTaskCompetence:
         assert RelationType.PART_OF in rels
         assert RelationType.GOAL_DIRECTED in rels
         assert net.get_concept("domain:navigation") is not None
-        assert (
-            net.get_concept("goal:target.distance|eq|0") is not None
-        )
+        assert net.get_concept("goal:target.distance|eq|0") is not None
 
 
 def _planning_network() -> ConceptNetwork:
@@ -421,9 +433,7 @@ class TestPlanningCompetenceAdapter:
         from frontal_lobe.reasoning import Planner
 
         competence = TaskCompetence()
-        planner = Planner(
-            _planning_network(), task_competence=competence
-        )
+        planner = Planner(_planning_network(), task_competence=competence)
         plan = planner.create_plan("fire", "understand")
         step = planner.advance(plan)
         assert step is not None
@@ -438,9 +448,7 @@ class TestPlanningCompetenceAdapter:
         from frontal_lobe.reasoning import Planner, PlanStatus
 
         competence = TaskCompetence()
-        planner = Planner(
-            _planning_network(), task_competence=competence
-        )
+        planner = Planner(_planning_network(), task_competence=competence)
         plan = planner.create_plan("fire", "understand")
         _run_plan(planner, plan)
 
@@ -455,9 +463,7 @@ class TestPlanningCompetenceAdapter:
         from frontal_lobe.reasoning import Planner
 
         competence = TaskCompetence()
-        planner = Planner(
-            _planning_network(), task_competence=competence
-        )
+        planner = Planner(_planning_network(), task_competence=competence)
         plan = planner.create_plan("fire", "understand")
         _run_plan(planner, plan)
         skill = next(iter(competence.skills.values()))
@@ -475,16 +481,17 @@ class TestPlanningCompetenceAdapter:
 
         # Steps marked by an epistemic verifier → "solver" skill.
         competence = TaskCompetence()
-        planner = Planner(
-            _planning_network(), task_competence=competence
-        )
+        planner = Planner(_planning_network(), task_competence=competence)
         plan = planner.create_plan("fire", "understand")
         while True:
             step = planner.advance(plan)
             if step is None:
                 break
             planner.mark_step(
-                plan, step, success=True, confidence=0.8,
+                plan,
+                step,
+                success=True,
+                confidence=0.8,
                 verification="solver",
             )
         skill = next(iter(competence.skills.values()))
@@ -492,9 +499,7 @@ class TestPlanningCompetenceAdapter:
 
         # Steps marked by bare assertion → "reported" skill.
         competence2 = TaskCompetence()
-        planner2 = Planner(
-            _planning_network(), task_competence=competence2
-        )
+        planner2 = Planner(_planning_network(), task_competence=competence2)
         plan2 = planner2.create_plan("fire", "understand")
         _run_plan(planner2, plan2)
         skill2 = next(iter(competence2.skills.values()))
@@ -504,12 +509,8 @@ class TestPlanningCompetenceAdapter:
         # solver-verified one on the same cold goal.
         cold = planner.create_plan("dragon", "understand")
         cold2 = planner2.create_plan("dragon", "understand")
-        solver_lift = (
-            cold.feasibility_score - planner._evaluate_feasibility(cold)
-        )
-        reported_lift = (
-            cold2.feasibility_score - planner2._evaluate_feasibility(cold2)
-        )
+        solver_lift = cold.feasibility_score - planner._evaluate_feasibility(cold)
+        reported_lift = cold2.feasibility_score - planner2._evaluate_feasibility(cold2)
         assert solver_lift > reported_lift > 0.0
 
     def test_step_verification_survives_plan_persistence(self):
@@ -519,9 +520,7 @@ class TestPlanningCompetenceAdapter:
         plan = planner.create_plan("fire", "understand")
         step = planner.advance(plan)
         assert step is not None
-        planner.mark_step(
-            plan, step, success=True, verification="solver"
-        )
+        planner.mark_step(plan, step, success=True, verification="solver")
 
         restored = Planner(_planning_network())
         restored.restore_from_dict(planner.to_dict())
@@ -631,28 +630,39 @@ class TestTaskCompetenceGeneralization:
         prediction for never-seen align_merek — the rule, not the name."""
         competence = TaskCompetence()
         _observe_rule_trial(
-            competence, domain="lattice", feature_key="amber",
-            target="ravel", feature_value=True, prefix="align",
+            competence,
+            domain="lattice",
+            feature_key="amber",
+            target="ravel",
+            feature_value=True,
+            prefix="align",
         )
         _observe_rule_trial(
-            competence, domain="lattice", feature_key="amber",
-            target="sorn", feature_value=False, prefix="align",
+            competence,
+            domain="lattice",
+            feature_key="amber",
+            target="sorn",
+            feature_value=False,
+            prefix="align",
         )
         _observe_rule_trial(
-            competence, domain="lattice", feature_key="amber",
-            target="tavi", feature_value=True, prefix="align",
+            competence,
+            domain="lattice",
+            feature_key="amber",
+            target="tavi",
+            feature_value=True,
+            prefix="align",
         )
 
         held_out = _rule_context(
-            competence, domain="lattice", feature_key="amber",
-            feature_value=True, actions=("align_merek", "align_false_merek"),
+            competence,
+            domain="lattice",
+            feature_key="amber",
+            feature_value=True,
+            actions=("align_merek", "align_false_merek"),
         )
-        predicted = competence.predict(
-            held_out, "align_merek", {"amber": True}
-        )
-        assert any(
-            p.key == "solved" and p.expected is True for p in predicted
-        )
+        predicted = competence.predict(held_out, "align_merek", {"amber": True})
+        assert any(p.key == "solved" and p.expected is True for p in predicted)
 
     def test_conditional_model_abstains_on_unseen_shape(self):
         """An action only ever observed under flag-true yields no
@@ -660,18 +670,23 @@ class TestTaskCompetenceGeneralization:
         over the condition that decides the outcome."""
         competence = TaskCompetence()
         _observe_rule_trial(
-            competence, domain="lattice", feature_key="amber",
-            target="ravel", feature_value=True, prefix="align",
+            competence,
+            domain="lattice",
+            feature_key="amber",
+            target="ravel",
+            feature_value=True,
+            prefix="align",
         )
         other_shape = _rule_context(
-            competence, domain="lattice", feature_key="amber",
-            feature_value=False, actions=("align_sorn", "align_false_sorn"),
+            competence,
+            domain="lattice",
+            feature_key="amber",
+            feature_value=False,
+            actions=("align_sorn", "align_false_sorn"),
         )
         # The schema merged (same signature shape modulo the flag
         # value); align_ravel was never observed under flag-false.
-        predicted = competence.predict(
-            other_shape, "align_ravel", {"amber": False}
-        )
+        predicted = competence.predict(other_shape, "align_ravel", {"amber": False})
         assert all(p.expected is not True for p in predicted)
 
     def test_foreign_skill_rebinds_by_step_position(self):
@@ -680,25 +695,26 @@ class TestTaskCompetenceGeneralization:
         this position solved the analogous task'."""
         competence = TaskCompetence()
         _observe_rule_trial(
-            competence, domain="lattice", feature_key="amber",
-            target="ravel", feature_value=True, prefix="align",
+            competence,
+            domain="lattice",
+            feature_key="amber",
+            target="ravel",
+            feature_value=True,
+            prefix="align",
             record_skill=True,
         )
 
         archive = _rule_context(
-            competence, domain="archive", feature_key="ochre",
-            feature_value=True, actions=("index", "discard"),
+            competence,
+            domain="archive",
+            feature_key="ochre",
+            feature_value=True,
+            actions=("index", "discard"),
         )
         # The retrieval must actually surface the foreign skill.
-        assert any(
-            m.skill.signature.domain == "lattice" for m in archive.skills
-        )
-        predicted = competence.predict(
-            archive, "index", {"ochre": True}
-        )
-        assert any(
-            p.key == "solved" and p.expected is True for p in predicted
-        )
+        assert any(m.skill.signature.domain == "lattice" for m in archive.skills)
+        predicted = competence.predict(archive, "index", {"ochre": True})
+        assert any(p.key == "solved" and p.expected is True for p in predicted)
         # And the wrong position must not be predicted.
         wrong = competence.predict(archive, "discard", {"ochre": True})
         assert all(p.expected is not True for p in wrong)
@@ -708,18 +724,23 @@ class TestTaskCompetenceGeneralization:
         a flag-false situation — the condition is part of the rule."""
         competence = TaskCompetence()
         _observe_rule_trial(
-            competence, domain="lattice", feature_key="amber",
-            target="ravel", feature_value=True, prefix="align",
+            competence,
+            domain="lattice",
+            feature_key="amber",
+            target="ravel",
+            feature_value=True,
+            prefix="align",
             record_skill=True,
         )
         archive_false = _rule_context(
-            competence, domain="archive", feature_key="ochre",
-            feature_value=False, actions=("index", "discard"),
+            competence,
+            domain="archive",
+            feature_key="ochre",
+            feature_value=False,
+            actions=("index", "discard"),
         )
         for action in ("index", "discard"):
-            predicted = competence.predict(
-                archive_false, action, {"ochre": False}
-            )
+            predicted = competence.predict(archive_false, action, {"ochre": False})
             assert all(p.expected is not True for p in predicted)
 
     def test_abstraction_state_round_trips(self):
@@ -727,60 +748,76 @@ class TestTaskCompetenceGeneralization:
         positions all survive serialization."""
         competence = TaskCompetence()
         _observe_rule_trial(
-            competence, domain="lattice", feature_key="amber",
-            target="ravel", feature_value=True, prefix="align",
+            competence,
+            domain="lattice",
+            feature_key="amber",
+            target="ravel",
+            feature_value=True,
+            prefix="align",
         )
         _observe_rule_trial(
-            competence, domain="lattice", feature_key="amber",
-            target="tavi", feature_value=True, prefix="align",
+            competence,
+            domain="lattice",
+            feature_key="amber",
+            target="tavi",
+            feature_value=True,
+            prefix="align",
             record_skill=True,
         )
 
         restored = TaskCompetence.from_dict(competence.to_dict())
         held_out = _rule_context(
-            restored, domain="lattice", feature_key="amber",
-            feature_value=True, actions=("align_nema", "align_false_nema"),
+            restored,
+            domain="lattice",
+            feature_key="amber",
+            feature_value=True,
+            actions=("align_nema", "align_false_nema"),
         )
-        predicted = restored.predict(
-            held_out, "align_nema", {"amber": True}
-        )
-        assert any(
-            p.key == "solved" and p.expected is True for p in predicted
-        )
+        predicted = restored.predict(held_out, "align_nema", {"amber": True})
+        assert any(p.key == "solved" and p.expected is True for p in predicted)
         archive = _rule_context(
-            restored, domain="archive", feature_key="ochre",
-            feature_value=True, actions=("index", "discard"),
+            restored,
+            domain="archive",
+            feature_key="ochre",
+            feature_value=True,
+            actions=("index", "discard"),
         )
         rebound = restored.predict(archive, "index", {"ochre": True})
-        assert any(
-            p.key == "solved" and p.expected is True for p in rebound
-        )
+        assert any(p.key == "solved" and p.expected is True for p in rebound)
 
     def test_exact_model_beats_foreign_rebinding(self):
         """Observed evidence for this action under this condition
         outranks an analogous foreign skill."""
         competence = TaskCompetence()
         _observe_rule_trial(
-            competence, domain="lattice", feature_key="amber",
-            target="ravel", feature_value=True, prefix="align",
+            competence,
+            domain="lattice",
+            feature_key="amber",
+            target="ravel",
+            feature_value=True,
+            prefix="align",
             record_skill=True,
         )
         # Same domain, direct observation of the queried action under
         # the same shape — the foreign skill must not override it.
         context = _rule_context(
-            competence, domain="lattice", feature_key="amber",
-            feature_value=True, actions=("align_sorn", "align_false_sorn"),
+            competence,
+            domain="lattice",
+            feature_key="amber",
+            feature_value=True,
+            actions=("align_sorn", "align_false_sorn"),
         )
         # Two direct observations — the concrete model's reliability
         # (observations/3) then exceeds any rebound's halved match score.
         for _ in range(2):
             competence.record_transition(
-                context, "align_sorn", {"amber": True},
-                {"amber": True, "solved": True}, success=True,
+                context,
+                "align_sorn",
+                {"amber": True},
+                {"amber": True, "solved": True},
+                success=True,
             )
-        predicted = competence.predict(
-            context, "align_sorn", {"amber": True}
-        )
+        predicted = competence.predict(context, "align_sorn", {"amber": True})
         assert predicted[0].key == "solved"
         assert predicted[0].expected is True
         # Concrete evidence — not the weaker rebound confidence.

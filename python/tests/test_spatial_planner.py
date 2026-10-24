@@ -20,8 +20,8 @@ import sys
 
 sys.path.insert(0, str(__file__).rsplit("/tests/", 1)[0])
 
-from frontal_lobe.games.spatial.agent import SpatialAgent
 from parietal_lobe.grid import Grid
+from parietal_lobe.spatial.agent import SpatialAgent
 
 # Steps are the moves a world would teach: 1=up 2=down 3=left 4=right.
 _STEPS = {1: (-1, 0), 2: (1, 0), 3: (0, -1), 4: (0, 1)}

@@ -12,7 +12,11 @@ The architecture:
     retina frame
         │
         ▼
-    [patch extractor]  → 8×8 luminance patches on a grid
+    [opponent split]   → luminance (lum) + red-green (L−M) + blue-yellow
+        │                (S−(L+M)) images — the parvocellular L−M and
+        │                koniocellular S−(L+M) opponent channels
+        ▼
+    [patch extractor]  → 8×8 patches on a grid, per channel
         │
         ▼
     [dictionary Φ]     → Gabor features at 8 orientations, 2 scales, 2 phases
@@ -35,6 +39,13 @@ updated online by a Hebbian-like rule when the subsystem sees enough patches. Th
 makes the horizontal connections plastic: what it sees literally reshapes how
 it sees the next thing.
 
+The opponent channels give V1 true colour vision: a chromatic boundary
+invisible to luminance (a red apple on a green leaf at equal brightness)
+still produces oriented features through the L−M or S−(L+M) channel —
+the double-opponent complement of real V1. Features carry their channel
+("lum" | "rg" | "by"), and contours are colour-attributed so the ventral
+stream can report a *coloured* edge, not just an edge.
+
 Unlike the existing `vision.py` module, which only reports the dominant colour,
 the occipital subsystem reports edges, orientations, shapes-in-formation, and how
 strongly the current view drives V1 gamma (the neural signature of binding).
@@ -48,7 +59,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-__all__ = ["V1Model", "VisualContour", "VisualFeature", "VisualField"]
+__all__ = ["V1Model", "VisualContour", "VisualFeature", "VisualField", "name_color"]
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +71,13 @@ class VisualFeature:
     Each feature is a sparse-coding latent variable that won the competition
     for a particular image patch. It carries pixel centre, patch-grid
     indices, orientation, scale, phase, and response strength.
+
+    ``channel`` names which opponent channel drove the response:
+    ``"lum"`` for achromatic (broadband) cells, ``"rg"`` for the
+    red-green (L−M) parvocellular opponent channel, and ``"by"`` for
+    the blue-yellow (S−(L+M)) koniocellular channel. Chromatic
+    features are the double-opponent complement of V1 — they fire on
+    colour boundaries even when luminance is flat.
     """
 
     y: float  # pixel-space row centre of the patch
@@ -71,6 +89,7 @@ class VisualFeature:
     phase: float  # 0 or π/2, even or odd Gabor
     strength: float  # post-ReLU latent activity z_i
     feature_index: int  # index into the dictionary / latent space
+    channel: str = "lum"  # "lum" | "rg" | "by" — which opponent channel
 
     @property
     def position(self) -> tuple[float, float]:
@@ -90,6 +109,11 @@ class VisualContour:
     mean_orientation: float = 0.0
     length: float = 0.0
     salience: float = 0.0
+    # Dominant hue across the contour's span when an RGB frame was
+    # available — a single name ("red") for a uniform region, a pair
+    # ("red-green") when the contour is a chromatic boundary between
+    # two colour clusters. Empty when no colour could be attributed.
+    color: str = ""
 
     def __bool__(self) -> bool:
         """Whether this contour contains any detected features."""
@@ -122,6 +146,11 @@ class VisualField:
     # This is the key signal sent to the brain-wave system.
     gamma_power: float = 0.0
 
+    # How many features were carried by the opponent-colour channels
+    # ("rg" + "by") rather than luminance — the chromatic share of the
+    # percept. Zero on a colourless world.
+    chromatic_features: int = 0
+
     # Wave-coupled state: a forward (perceptual) or backward (resting)
     # alpha wave would gate this field differently.
     attended: bool = True
@@ -144,18 +173,17 @@ class VisualField:
                 f"{self.contour_count()} shape-like arrangement"
                 f"{'s' if self.contour_count() != 1 else ''}"
             )
-        parts.append(
-            f"The view sets my visual gamma at {self.gamma_power:.2f}."
-        )
+        parts.append(f"The view sets my visual gamma at {self.gamma_power:.2f}.")
         return " ".join(parts)
 
 
 class V1Model:
-    """Primary visual cortex (V1) for Genesis.
+    """Primary visual cortex (V1) for Genesis with parallel M/P pathways.
 
     A sparse-coding, recurrently connected model of early visual processing.
-    It is self-contained, uses only NumPy, and is fully deterministic given
-    a random seed.
+    It implements the biological separation of magnocellular (M) and
+    parvocellular (P) pathways from the LGN, each with its own dictionary
+    and processing characteristics.
 
     Args:
         patch_size: size of the square image patches used as V1 input.
@@ -167,6 +195,8 @@ class V1Model:
         recurrent_scale: recurrent drive weight γ.
         interaction_lr: online learning rate for the interaction matrix M.
         seed: random seed for reproducibility.
+        m_scales: spatial scales for M-pathway (fewer, coarser for motion)
+        p_scales: spatial scales for P-pathway (more, finer for detail)
     """
 
     def __init__(
@@ -180,8 +210,10 @@ class V1Model:
         recurrent_scale: float = 0.5,
         interaction_lr: float = 0.01,
         seed: int | None = None,
+        m_scales: int = 2,  # M-pathway: fewer, coarser scales (motion)
+        p_scales: int = 3,  # P-pathway: more, finer scales (detail)
     ) -> None:
-        """Initialize the occipital subsystem model with Gabor filter bank parameters."""
+        """Initialize the occipital subsystem model with parallel M/P pathways."""
         self.patch_size = patch_size
         self.orientations = orientations
         self.scales = scales
@@ -190,23 +222,30 @@ class V1Model:
         self.sparsity = sparsity
         self.recurrent_scale = recurrent_scale
         self.interaction_lr = interaction_lr
+        self.m_scales = m_scales
+        self.p_scales = p_scales
 
         self._rng = np.random.default_rng(seed)
 
+        # === Magnocellular (M) pathway ===
+        # Coarser scales, larger receptive fields, motion/luminance focus
+        self.m_n_features = orientations * m_scales * phases
+        self.phi_m = self._build_gabor_dictionary(scales=m_scales)
+        self.M_m = self._build_initial_interaction_matrix(self.m_n_features)
+        self._phi_m_phi_m = self.phi_m.T @ self.phi_m
+
+        # === Parvocellular (P) pathway ===
+        # Finer scales, smaller receptive fields, color/detail focus
+        self.p_n_features = orientations * p_scales * phases
+        self.phi_p = self._build_gabor_dictionary(scales=p_scales)
+        self.M_p = self._build_initial_interaction_matrix(self.p_n_features)
+        self._phi_p_phi_p = self.phi_p.T @ self.phi_p
+
+        # Legacy single dictionary for backward compatibility
         self.n_features = orientations * scales * phases
         self.feature_dims = (patch_size, patch_size)
-
-        # Φ: dictionary of image features (patch pixels → feature space).
-        # Shape: (patch_pixels, n_features). Each column is a unit-norm Gabor.
         self.phi = self._build_gabor_dictionary()
-
-        # M: pairwise interaction / horizontal connection matrix.
-        # M[i, j] > 0 means feature i and j facilitate each other if both
-        # co-active and co-circular. Initialized with a biologically
-        # motivated prior and then adapted by experience.
         self.M = self._build_initial_interaction_matrix()
-
-        # Pre-compute the data-likelihood Gram matrix ΦᵀΦ.
         self._phi_phi = self.phi.T @ self.phi
 
         # Diagnostic counters.
@@ -216,6 +255,123 @@ class V1Model:
     # ═══════════════════════════════════════════════════════════════════
     # Public API
     # ═══════════════════════════════════════════════════════════════════
+
+    def process_m_pathway(
+        self,
+        luminance: np.ndarray,
+        learn: bool = True,
+    ) -> VisualField:
+        """Process through magnocellular (M) pathway - motion/luminance stream.
+
+        Args:
+            luminance: grayscale image from LGN M-pathway (H_m, W_m)
+            learn: if True, update M-pathway interaction matrix
+
+        Returns:
+            VisualField with M-pathway features (for dorsal stream to parietal)
+        """
+        if luminance.size == 0:
+            return VisualField(summary="M-pathway: no luminance signal")
+
+        # M-pathway uses coarser patches (larger receptive fields)
+        patches, grid = _extract_patches(luminance, self.patch_size)
+        if patches.size == 0:
+            return VisualField(summary="M-pathway: view too small")
+
+        X = _whiten_patches(patches)
+        Z = self._infer_latents(X, phi=self.phi_m, phi_phi=self._phi_m_phi_m, M=self.M_m)
+        features = self._latents_to_features(Z, grid, pathway="m")
+
+        if learn and features:
+            self._update_interaction_matrix(Z, M=self.M_m)
+
+        contours = self._group_contours(features)
+        salience = _compute_salience(features, contours)
+        gamma = _compute_v1_gamma(Z)
+
+        return VisualField(
+            summary=f"M-pathway: {len(features)} motion features",
+            features=features,
+            contours=contours,
+            brightness=luminance.mean(),
+            salience=salience,
+            gamma_power=gamma,
+        )
+
+    def process_p_pathway(
+        self,
+        color: np.ndarray,
+        learn: bool = True,
+        k_by: np.ndarray | None = None,
+    ) -> VisualField:
+        """Process through parvocellular (P) pathway - color/detail stream.
+
+        The P stream carries both fine achromatic detail and the
+        red-green (L−M) opponent signal; the koniocellular (K)
+        blue-yellow signal arrives separately via ``k_by``. Each
+        channel runs through the P dictionary, so the returned field
+        holds colour-selective features — chromatic boundaries that
+        luminance cannot see — tagged by their channel.
+
+        Args:
+            color: RGB image from LGN P-pathway (H, W, 3), float in
+                [0, 1] or uint8
+            learn: if True, update P-pathway interaction matrix
+            k_by: optional blue-yellow (S−(L+M)) opponent image from
+                the LGN K-pathway (H, W), signed. When absent the
+                blue-yellow channel is computed from ``color``.
+
+        Returns:
+            VisualField with P-pathway features (for ventral stream to temporal)
+        """
+        if color.size == 0 or color.ndim != 3 or color.shape[2] != 3:
+            return VisualField(summary="P-pathway: no color signal")
+
+        rgb = color[..., :3].astype(np.float64)
+        if rgb.max() > 1.5:
+            rgb /= 255.0
+        lum, rg, by = _opponent_channels(rgb)
+        # The LGN's koniocellular output is the same S−(L+M) opponent
+        # signal — prefer the thalamic copy when it arrives.
+        if k_by is not None and k_by.shape == by.shape:
+            by = k_by.astype(np.float64)
+
+        features: list[VisualFeature] = []
+        latents: list[np.ndarray] = []
+        n_chromatic = 0
+        for channel_image, channel_name in ((lum, "lum"), (rg, "rg"), (by, "by")):
+            if channel_name != "lum" and (_chromatic_energy(channel_image) < _MIN_CHROMATIC_ENERGY):
+                # A colourless world drives no opponent response —
+                # skip the channel rather than thresholding noise.
+                continue
+            patches, grid = _extract_patches(channel_image, self.patch_size)
+            if patches.size == 0:
+                return VisualField(summary="P-pathway: view too small")
+            X = _whiten_patches(patches)
+            Z = self._infer_latents(X, phi=self.phi_p, phi_phi=self._phi_p_phi_p, M=self.M_p)
+            channel_features = self._latents_to_features(Z, grid, channel=channel_name)
+            features.extend(channel_features)
+            n_chromatic += len(channel_features) if channel_name != "lum" else 0
+            latents.append(Z)
+            if learn and channel_features:
+                self._update_interaction_matrix(Z, M=self.M_p)
+
+        contours = self._group_contours(features)
+        _attribute_contour_colors(rgb, contours, self.patch_size)
+        dominant_color, brightness = _scene_color_and_brightness(rgb)
+        salience = _compute_salience(features, contours)
+        gamma = _compute_v1_gamma(np.vstack(latents))
+
+        return VisualField(
+            summary=f"P-pathway: {len(features)} detail features ({n_chromatic} chromatic)",
+            features=features,
+            contours=contours,
+            dominant_color=dominant_color,
+            brightness=brightness,
+            salience=salience,
+            gamma_power=gamma,
+            chromatic_features=n_chromatic,
+        )
 
     def process(
         self,
@@ -250,19 +406,43 @@ class V1Model:
         Z = self._infer_latents(X)
 
         # Convert latent codes to visual features.
-        features = self._latents_to_features(Z, grid)
+        features = self._latents_to_features(Z, grid, channel="lum")
+
+        # Chromatic pass — the same patch grid over the opponent
+        # channels. An isoluminant colour boundary produces no
+        # luminance contrast but fires hard here; this is the
+        # double-opponent complement of V1. The chroma gate skips a
+        # channel entirely on a colourless world rather than
+        # thresholding noise.
+        rgb = _normalized_rgb(frame)
+        latents = [Z]
+        n_chromatic = 0
+        if rgb is not None:
+            _, rg, by = _opponent_channels(rgb)
+            for channel_image, channel_name in ((rg, "rg"), (by, "by")):
+                if _chromatic_energy(channel_image) < _MIN_CHROMATIC_ENERGY:
+                    continue
+                c_patches, _ = _extract_patches(channel_image, self.patch_size)
+                Z_c = self._infer_latents(_whiten_patches(c_patches))
+                c_features = self._latents_to_features(Z_c, grid, channel=channel_name)
+                features.extend(c_features)
+                n_chromatic += len(c_features)
+                latents.append(Z_c)
 
         # Learn from co-active features if requested.
         if learn and features:
-            self._update_interaction_matrix(Z)
+            for z in latents:
+                self._update_interaction_matrix(z)
 
         # Group co-circular / co-linear active features into contours.
         contours = self._group_contours(features)
+        if rgb is not None:
+            _attribute_contour_colors(rgb, contours, self.patch_size)
 
         # Scene-level measures.
         dominant_color, brightness = _scene_color_and_brightness(frame)
         salience = _compute_salience(features, contours)
-        gamma = _compute_v1_gamma(Z)
+        gamma = _compute_v1_gamma(np.vstack(latents))
 
         summary = _build_summary(
             len(features),
@@ -271,6 +451,7 @@ class V1Model:
             brightness,
             gamma,
             features=features,
+            n_chromatic=n_chromatic,
         )
 
         return VisualField(
@@ -281,6 +462,7 @@ class V1Model:
             brightness=brightness,
             salience=salience,
             gamma_power=gamma,
+            chromatic_features=n_chromatic,
         )
 
     def reset_interactions(self) -> None:
@@ -292,19 +474,29 @@ class V1Model:
     # Dictionary construction
     # ═══════════════════════════════════════════════════════════════════
 
-    def _build_gabor_dictionary(self) -> np.ndarray:
+    def _build_gabor_dictionary(self, scales: int | None = None) -> np.ndarray:
         """Build an over-complete Gabor dictionary Φ.
+
+        Args:
+            scales: number of spatial scales (uses self.scales if None)
 
         Returns a (patch_size², n_features) matrix with unit-norm columns.
         """
         side = self.patch_size
+        n_scales = scales if scales is not None else self.scales
         n = side * side
-        k = self.n_features
+        k = self.orientations * n_scales * self.phases
         phi = np.zeros((n, k), dtype=np.float64)
 
         sigma = side / 2.8
         thetas = np.linspace(0, np.pi, self.orientations, endpoint=False)
-        scales = np.array([4.0, 8.0][: self.scales])
+        # Scale frequencies: coarser for M, finer for P
+        if n_scales == 2:
+            scale_freqs = [4.0, 8.0]  # Coarser (M-pathway)
+        elif n_scales == 3:
+            scale_freqs = [3.0, 5.0, 8.0]  # Finer (P-pathway)
+        else:
+            scale_freqs = [4.0 + 4.0 * i for i in range(n_scales)]
         phases = [0.0, np.pi / 2][: self.phases]
 
         y, x = np.mgrid[-side // 2 : side // 2, -side // 2 : side // 2]
@@ -314,7 +506,7 @@ class V1Model:
 
         idx = 0
         for theta in thetas:
-            for freq in scales:
+            for freq in scale_freqs:
                 for phase in phases:
                     xr = x * np.cos(theta) + y * np.sin(theta)
                     kernel = gauss * np.cos(2.0 * np.pi * xr / freq + phase)
@@ -341,7 +533,7 @@ class V1Model:
     # Interaction matrix M
     # ═══════════════════════════════════════════════════════════════════
 
-    def _build_initial_interaction_matrix(self) -> np.ndarray:
+    def _build_initial_interaction_matrix(self, n_features: int | None = None) -> np.ndarray:
         """Initialise M with co-circular / same-orientation facilitation.
 
         Two features are connected if:
@@ -351,11 +543,15 @@ class V1Model:
 
         We don't know the patch location here, so the prior depends only on
         feature identity. A local Hebbian rule later refines it with usage.
+
+        Args:
+            n_features: number of features (uses self.n_features if None)
         """
-        M = np.zeros((self.n_features, self.n_features), dtype=np.float64)
-        for i in range(self.n_features):
+        n = n_features if n_features is not None else self.n_features
+        M = np.zeros((n, n), dtype=np.float64)
+        for i in range(n):
             ti, si, pi = self._feature_metadata(i)
-            for j in range(self.n_features):
+            for j in range(n):
                 tj, sj, pj = self._feature_metadata(j)
                 if i == j or si != sj:
                     continue
@@ -374,7 +570,7 @@ class V1Model:
                 M[i, j] = base
         return M
 
-    def _update_interaction_matrix(self, Z: np.ndarray) -> None:
+    def _update_interaction_matrix(self, Z: np.ndarray, M: np.ndarray | None = None) -> None:
         """Hebbian update of M from co-active latent patterns.
 
         For each patch, increase M[i, j] when z_i and z_j are both active,
@@ -383,31 +579,45 @@ class V1Model:
 
         Args:
             Z: (n_patches, n_features) latent activity matrix.
+            M: interaction matrix to update (uses self.M if None)
         """
         if Z.shape[0] == 0:
             return
+
+        target_M = M if M is not None else self.M
 
         active = (Z > 1e-4).astype(np.float64)
         # Pairwise co-activation outer product, averaged over patches.
         cov = (active.T @ active) / Z.shape[0]
 
         # Update only off-diagonal entries.
-        delta = self.interaction_lr * (cov - 0.05 * self.M)
+        delta = self.interaction_lr * (cov - 0.05 * target_M)
         np.fill_diagonal(delta, 0.0)
-        self.M += delta
+        target_M += delta
 
         # Soft clip to keep dynamics stable.
-        np.clip(self.M, -0.5, 0.5, out=self.M)
+        np.clip(target_M, -0.5, 0.5, out=target_M)
         self.patches_seen += Z.shape[0]
 
     # ═══════════════════════════════════════════════════════════════════
     # Inference
     # ═══════════════════════════════════════════════════════════════════
 
-    def _infer_latents(self, X: np.ndarray) -> np.ndarray:
+    def _infer_latents(
+        self,
+        X: np.ndarray,
+        phi: np.ndarray | None = None,
+        phi_phi: np.ndarray | None = None,
+        M: np.ndarray | None = None,
+    ) -> np.ndarray:
         """Run recurrent ISTA to convergence for all patches.
 
-        X: (n_patches, patch_pixels)
+        Args:
+            X: (n_patches, patch_pixels)
+            phi: dictionary matrix (uses self.phi if None)
+            phi_phi: precomputed Gram matrix (uses self._phi_phi if None)
+            M: interaction matrix (uses self.M if None)
+
         Returns Z: (n_patches, n_features)
 
         Dynamics:
@@ -416,11 +626,16 @@ class V1Model:
         where σ² = 1 for inference on clean (non-noisy) data.
         """
         n_patches = X.shape[0]
-        Z = np.zeros((n_patches, self.n_features), dtype=np.float64)
+        target_phi = phi if phi is not None else self.phi
+        target_phi_phi = phi_phi if phi_phi is not None else self._phi_phi
+        target_M = M if M is not None else self.M
+        n_features = target_phi.shape[1]
 
-        W = self._phi_phi + (self.recurrent_scale * self.M)
+        Z = np.zeros((n_patches, n_features), dtype=np.float64)
 
-        feedforward = X @ self.phi
+        W = target_phi_phi + (self.recurrent_scale * target_M)
+
+        feedforward = X @ target_phi
         bias = self.recurrent_scale * self.sparsity
 
         for _ in range(40):  # enough for convergence; bounded, no unroll
@@ -439,8 +654,18 @@ class V1Model:
         self,
         Z: np.ndarray,
         grid: list[tuple[int, int, int, int]],
+        pathway: str = "legacy",
+        channel: str = "lum",
     ) -> list[VisualFeature]:
-        """Convert latent activity into a list of VisualFeatures."""
+        """Convert latent activity into a list of VisualFeatures.
+
+        Args:
+            Z: latent activity matrix
+            grid: patch grid positions
+            pathway: "m" for magnocellular, "p" for parvocellular, "legacy" for single
+            channel: opponent channel the latents were inferred from —
+                "lum" (achromatic), "rg" (red-green), or "by" (blue-yellow)
+        """
         features: list[VisualFeature] = []
         zmax = Z.max()
         threshold = 0.1 * zmax if zmax > 0 else 0.05
@@ -461,6 +686,7 @@ class V1Model:
                         phase=ph,
                         strength=float(z[j]),
                         feature_index=j,
+                        channel=channel,
                     )
                 )
         return features
@@ -491,22 +717,30 @@ class V1Model:
                 parent[ri] = rj
 
         # Adjacency graph: link features in neighbouring patches with
-        # compatible orientations. Patch grid indices are used here.
-        for i in range(n):
-            for j in range(i + 1, n):
-                fi, fj = features[i], features[j]
-                drow = abs(fi.row - fj.row)
-                dcol = abs(fi.col - fj.col)
-                if drow > 1 or dcol > 1:
-                    continue
-                # Same or co-linear orientation.
-                dtheta = _angle_difference(fi.orientation, fj.orientation)
-                if dtheta > np.pi / self.orientations:
-                    continue
-                # Phase consistency: even and odd Gabor pairs encode the
-                # same edge with a 90° phase shift, so large phase
-                # differences are not a reason to split contours.
-                union(i, j)
+        # compatible orientations. Only the 3×3 block of patch cells
+        # around a feature can hold a neighbour, so bucket by cell
+        # rather than checking all n² pairs.
+        cells: dict[tuple[int, int], list[int]] = {}
+        for i, f in enumerate(features):
+            cells.setdefault((f.row, f.col), []).append(i)
+
+        orientation_tol = np.pi / self.orientations
+        for i, fi in enumerate(features):
+            for drow in (-1, 0, 1):
+                for dcol in (-1, 0, 1):
+                    for j in cells.get((fi.row + drow, fi.col + dcol), ()):
+                        if j <= i:
+                            continue
+                        fj = features[j]
+                        # Same or co-linear orientation.
+                        dtheta = _angle_difference(fi.orientation, fj.orientation)
+                        if dtheta > orientation_tol:
+                            continue
+                        # Phase consistency: even and odd Gabor pairs
+                        # encode the same edge with a 90° phase shift,
+                        # so large phase differences are not a reason
+                        # to split contours.
+                        union(i, j)
 
         groups: dict[int, list[VisualFeature]] = {}
         for i, f in enumerate(features):
@@ -625,29 +859,198 @@ def _compute_v1_gamma(Z: np.ndarray) -> float:
     return float(np.clip(active.mean() + active.std() * 0.3, 0.0, 1.0))
 
 
+def _normalized_rgb(frame: np.ndarray) -> np.ndarray | None:
+    """Return an RGB frame as float64 in [0, 1], or None if not colour.
+
+    Accepts uint8 (÷255) and float input already in [0, 1]; 3- and
+    4-channel frames alike (alpha is dropped).
+    """
+    if frame.ndim != 3 or frame.shape[2] not in (3, 4):
+        return None
+    rgb = frame[..., :3].astype(np.float64)
+    if rgb.size == 0:
+        return None
+    if rgb.max() > 1.5:
+        rgb /= 255.0
+    return rgb
+
+
+def _opponent_channels(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Split a normalized RGB image into opponent-colour channels.
+
+    Returns ``(lum, rg, by)`` — luminance, the red-green (L−M)
+    parvocellular opponent image, and the blue-yellow (S−(L+M))
+    koniocellular opponent image. ``rg``/``by`` are signed and centred
+    near zero on a colourless image; the same transforms the LGN
+    computes upstream.
+
+    Args:
+        rgb: (H, W, 3) float image already in [0, 1].
+    """
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    lum = 0.299 * r + 0.587 * g + 0.114 * b
+    rg = r - g
+    by = b - 0.5 * (r + g)
+    return lum, rg, by
+
+
+# Mean |chroma| below which an opponent channel is treated as silent —
+# a colourless world has rg/by ≈ 0 (up to camera noise), and a quiet
+# channel must not be thresholded into phantom colour features.
+_MIN_CHROMATIC_ENERGY = 0.02
+
+
+def _chromatic_energy(channel: np.ndarray) -> float:
+    """Mean absolute opponent response — how much colour a channel carries."""
+    if channel.size == 0:
+        return 0.0
+    return float(np.abs(channel).mean())
+
+
+def _attribute_contour_colors(
+    rgb: np.ndarray,
+    contours: list[VisualContour],
+    patch_size: int,
+) -> None:
+    """Name the dominant hue across each contour's span.
+
+    A contour over a uniform region gets one colour ("red"); a
+    chromatic boundary gets the pair it separates ("red-green").
+    Achromatic regions name their luminance instead ("white",
+    "black"). This is what lets the ventral stream report a *coloured*
+    edge rather than just an edge.
+    """
+    h, w = rgb.shape[:2]
+    half = patch_size / 2.0
+    for contour in contours:
+        ys = [f.y for f in contour.features]
+        xs = [f.x for f in contour.features]
+        y0 = max(0, int(min(ys) - half))
+        y1 = min(h, int(max(ys) + half) + 1)
+        x0 = max(0, int(min(xs) - half))
+        x1 = min(w, int(max(xs) + half) + 1)
+        region = rgb[y0:y1, x0:x1]
+        if region.size == 0:
+            continue
+        contour.color = _dominant_region_color(region)
+
+
+def _dominant_region_color(region: np.ndarray) -> str:
+    """Name the dominant colour of an RGB region (float, [0,1]).
+
+    The two strongest hue clusters are joined when they are
+    comparable — a contour on a colour boundary legitimately reports
+    "red-green" rather than the muddied mean hue.
+    """
+    flat = region.reshape(-1, 3)
+    mx = flat.max(axis=1)
+    mn = flat.min(axis=1)
+    d = mx - mn
+    sat = np.where(mx > 1e-8, d / np.maximum(mx, 1e-8), 0.0)
+    chroma = (sat > 0.15) & (mx > 0.15)
+
+    if not chroma.any():
+        # Achromatic patch — name the luminance instead.
+        v = float(mx.mean())
+        if v > 0.75:
+            return "white"
+        if v < 0.15:
+            return "black"
+        return "gray"
+
+    hue = np.zeros(flat.shape[0])
+    r, g, b = flat[:, 0], flat[:, 1], flat[:, 2]
+    red_max = chroma & (mx == r) & (d != 0)
+    green_max = chroma & (mx == g) & (d != 0) & ~red_max
+    blue_max = chroma & (mx == b) & (d != 0) & ~red_max & ~green_max
+    hue[red_max] = (60.0 * ((g - b) / np.maximum(d, 1e-8)))[red_max] % 360.0
+    hue[green_max] = (60.0 * ((b - r) / np.maximum(d, 1e-8)) + 120.0)[green_max] % 360.0
+    hue[blue_max] = (60.0 * ((r - g) / np.maximum(d, 1e-8)) + 240.0)[blue_max] % 360.0
+
+    hues = hue[chroma]
+    counts, edges = np.histogram(hues, bins=12, range=(0.0, 360.0))
+    order = np.argsort(counts)[::-1]
+    peak = order[0]
+    peak_hue = (edges[peak] + edges[peak + 1]) / 2.0
+    peak_mask = (hues >= edges[peak]) & (hues < edges[peak + 1])
+    first = name_color(
+        peak_hue,
+        float(sat[chroma][peak_mask].mean()),
+        float(mx[chroma][peak_mask].mean()),
+    )
+    if len(order) > 1 and counts[order[1]] >= 0.4 * counts[peak]:
+        second_bin = order[1]
+        second_hue = (edges[second_bin] + edges[second_bin + 1]) / 2.0
+        second_mask = (hues >= edges[second_bin]) & (hues < edges[second_bin + 1])
+        second = name_color(
+            second_hue,
+            float(sat[chroma][second_mask].mean()),
+            float(mx[chroma][second_mask].mean()),
+        )
+        if second != first:
+            return f"{first}-{second}"
+    return first
+
+
+def name_color(hue: float, sat: float, val: float) -> str:
+    """Full-palette colour name from hue (deg), saturation, value ∈ [0,1].
+
+    Hue alone cannot tell orange from brown, yellow from beige, or
+    red from pink — those differ in lightness, not wavelength. This
+    names the colours a trichromat actually distinguishes: the
+    saturated hue band plus black, white, gray, brown, beige, olive,
+    and pink.
+    """
+    if val < 0.10:
+        return "black"
+    if sat < 0.14:
+        return "white" if val > 0.75 else "gray"
+    # Brown is dark, desaturated orange — same hue, different lightness.
+    if 15 <= hue < 70 and val < 0.45 and sat < 0.75:
+        return "brown"
+    # Beige is the pale mirror of brown — cream, tan, khaki, skin
+    # tones: warm hue, modest saturation, mid-high value.
+    if 20 <= hue < 60 and sat < 0.5 and val >= 0.5:
+        return "beige"
+    # Olive is dark, muted yellow-green — a leaf in shadow.
+    if 60 <= hue < 95 and val < 0.5:
+        return "olive"
+    # Pink is pale, unsaturated red/magenta.
+    if sat < 0.5 and val > 0.55 and (hue < 20 or hue >= 300):
+        return "pink"
+    return _name_hue(hue)
+
+
 def _scene_color_and_brightness(frame: np.ndarray) -> tuple[str, float]:
     """Dominant colour and brightness for scene description."""
     if frame.ndim == 2:
-        return "gray", float(np.clip(frame.mean() / 255.0, 0.0, 1.0))
+        v = frame.astype(np.float64)
+        if v.size == 0:
+            return "gray", 0.0
+        if v.max() > 1.5:
+            v /= 255.0
+        return "gray", float(np.clip(v.mean(), 0.0, 1.0))
 
     if frame.ndim == 3 and frame.shape[2] in (3, 4):
-        rgb = frame[..., :3].astype(np.float64) / 255.0
-        # Hue from the global mean colour.
+        rgb = _normalized_rgb(frame)
+        if rgb is None:
+            return "unknown", 0.5
+        # Colour from the global mean, named with its own
+        # saturation/value so dark orange reads "brown", pale red
+        # "pink", and a dark frame "black" rather than "gray".
         mean_rgb = rgb.mean(axis=(0, 1))
         mr, mg, mb = mean_rgb
-        dmean = max(mean_rgb) - min(mean_rgb)
-        if dmean > 0.05:
-            if mr >= max(mg, mb):
-                h_val = 60.0 * ((mg - mb) / dmean) % 360.0
-            elif mg >= mr and mg >= mb:
-                h_val = 60.0 * ((mb - mr) / dmean) + 120.0
-            else:
-                h_val = 60.0 * ((mr - mg) / dmean) + 240.0
-            h_name = _name_hue(h_val)
-        else:
-            h_name = "gray"
+        mx = max(mean_rgb)
+        dmean = mx - min(mean_rgb)
         brightness = float(np.clip(mean_rgb.mean(), 0.0, 1.0))
-        return h_name, brightness
+        sat = float(dmean / max(mx, 1e-8))
+        if mr >= max(mg, mb):
+            h_val = (60.0 * ((mg - mb) / dmean)) % 360.0 if dmean > 1e-8 else 0.0
+        elif mg >= mb:
+            h_val = 60.0 * ((mb - mr) / dmean) + 120.0 if dmean > 1e-8 else 0.0
+        else:
+            h_val = 60.0 * ((mr - mg) / dmean) + 240.0 if dmean > 1e-8 else 0.0
+        return name_color(h_val, sat, brightness), brightness
 
     return "unknown", 0.5
 
@@ -667,8 +1070,8 @@ def _name_hue(hue: float) -> str:
     if hue < 260:
         return "blue"
     if hue < 300:
-        return "magenta"
-    return "red"
+        return "violet"
+    return "magenta"
 
 
 def _compute_salience(
@@ -690,13 +1093,16 @@ def _build_summary(
     brightness: float,
     gamma: float,
     features: list[VisualFeature] | None = None,
+    n_chromatic: int = 0,
 ) -> str:
     """Generate a concise V1-level summary.
 
     When the feature list is available, the summary includes spatial
     layout (where edges are concentrated) and dominant orientation —
     giving its a richer sense of the scene's structure beyond just
-    counts and color.
+    counts and color. Chromatic features (opponent-channel responses)
+    are noted when present — a coloured edge is a different kind of
+    structure than a shadow edge.
     """
     if n_features == 0:
         # Semantic fragment for the language engine to render — not a
@@ -753,7 +1159,10 @@ def _build_summary(
     else:
         parts.append("with scattered edges but no clear shapes")
 
-    parts.append(
-        f"({n_features} oriented V1 features; gamma {gamma:.2f})."
-    )
+    # Chromatic structure — a colour edge is structure the achromatic
+    # channel alone could not see.
+    if n_chromatic > 0:
+        parts.append(f"({n_chromatic} colour-selective features)")
+
+    parts.append(f"({n_features} oriented V1 features; gamma {gamma:.2f}).")
     return " ".join(parts)

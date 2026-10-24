@@ -191,9 +191,7 @@ class CognitiveTrajectoryModel:
         # The last reading, for the cognition engine to read.
         self.last_reading: CognitiveTrajectoryReading | None = None
 
-    def compute_surprise(
-        self, actual_topics: dict[str, float]
-    ) -> CognitiveTrajectoryReading:
+    def compute_surprise(self, actual_topics: dict[str, float]) -> CognitiveTrajectoryReading:
         """Compute cognitive surprise and learn from the error.
 
         Called after the early percept broadcast, when the actual
@@ -215,9 +213,7 @@ class CognitiveTrajectoryModel:
         # and actual topic distributions. This is the cognitive
         # prediction error — "how different is what I'm actually
         # thinking about from what I predicted I'd think about?"
-        all_topics = set(self._predicted_topics.keys()) | set(
-            actual_topics.keys()
-        )
+        all_topics = set(self._predicted_topics.keys()) | set(actual_topics.keys())
         if all_topics:
             raw_surprise = sum(
                 abs(actual_topics.get(t, 0.0) - self._predicted_topics.get(t, 0.0))
@@ -229,8 +225,7 @@ class CognitiveTrajectoryModel:
 
         # Update surprise EMA (same as Rust engine)
         self._surprise_ema = (
-            self._surprise_ema * (1.0 - _SURPRISE_EMA_DECAY)
-            + surprise * _SURPRISE_EMA_DECAY
+            self._surprise_ema * (1.0 - _SURPRISE_EMA_DECAY) + surprise * _SURPRISE_EMA_DECAY
         )
         self._surprise_ema = max(0.0, min(1.0, self._surprise_ema))
 
@@ -249,9 +244,7 @@ class CognitiveTrajectoryModel:
             if pred_topic not in self._transition_weights:
                 self._transition_weights[pred_topic] = {}
             for actual_topic, actual_activation in actual_topics.items():
-                error = actual_activation - self._predicted_topics.get(
-                    actual_topic, 0.0
-                )
+                error = actual_activation - self._predicted_topics.get(actual_topic, 0.0)
                 update = lr * error * pred_activation
                 current = self._transition_weights[pred_topic].get(actual_topic, 0.0)
                 self._transition_weights[pred_topic][actual_topic] = max(
@@ -343,8 +336,7 @@ class CognitiveTrajectoryModel:
             "surprise_ema": self._surprise_ema,
             "precision": self._precision,
             "transition_weights": {
-                src: dict(targets)
-                for src, targets in self._transition_weights.items()
+                src: dict(targets) for src, targets in self._transition_weights.items()
             },
         }
 
@@ -358,9 +350,7 @@ class CognitiveTrajectoryModel:
         self._surprise_ema = data.get("surprise_ema", 0.0)
         self._precision = data.get("precision", 0.5)
         weights_data = data.get("transition_weights", {})
-        self._transition_weights = {
-            src: dict(targets) for src, targets in weights_data.items()
-        }
+        self._transition_weights = {src: dict(targets) for src, targets in weights_data.items()}
         # Predicted topics reset to empty (transient, not persisted)
         self._predicted_topics = {}
         self.last_reading = None

@@ -270,9 +270,7 @@ class GlobalWorkspace:
         if module not in self._modules:
             self._modules.append(module)
 
-    def register_responder(
-        self, responder: Callable[[WorkspaceItem], str | None]
-    ) -> None:
+    def register_responder(self, responder: Callable[[WorkspaceItem], str | None]) -> None:
         """Register a region that can answer a heard utterance.
 
         A responder is a region, not an engine. It receives the same
@@ -338,8 +336,8 @@ class GlobalWorkspace:
             if it was below threshold (remained noncognitive).
         """
         effective_threshold = self._effective_threshold(brain_waves)
-        to_distribute, ignited, just_ignited, recurrent_ignitions = (
-            self._contend(content, source, activation, metadata, effective_threshold)
+        to_distribute, ignited, just_ignited, recurrent_ignitions = self._contend(
+            content, source, activation, metadata, effective_threshold
         )
 
         # Distribute outside the lock to avoid holding it while
@@ -357,9 +355,7 @@ class GlobalWorkspace:
                     )
         return ignited
 
-    def _effective_threshold(
-        self, brain_waves: BrainWaveState | None
-    ) -> float:
+    def _effective_threshold(self, brain_waves: BrainWaveState | None) -> float:
         """Brain-wave-modulated ignition threshold.
         Gamma: long-range synchrony → easier ignition (lower threshold).
         Delta: deep rest → harder ignition (higher threshold)."""
@@ -416,8 +412,7 @@ class GlobalWorkspace:
                 # support from coherent incumbents).
                 self._settle(candidate, effective_threshold)
                 ignited = (
-                    activation >= effective_threshold
-                    or candidate.activation >= effective_threshold
+                    activation >= effective_threshold or candidate.activation >= effective_threshold
                 )
                 if ignited:
                     self._items.append(candidate)
@@ -498,9 +493,7 @@ class GlobalWorkspace:
         union = topics_a | topics_b
         return len(topics_a & topics_b) / len(union) if union else 0.5
 
-    def _settle(
-        self, candidate: WorkspaceItem, effective_threshold: float
-    ) -> None:
+    def _settle(self, candidate: WorkspaceItem, effective_threshold: float) -> None:
         """Run recurrent competition over incumbents + candidate + pending.
 
         Each iteration applies, from a synchronous snapshot:
@@ -581,9 +574,7 @@ class GlobalWorkspace:
     def _upsert_pending(self, candidate: WorkspaceItem) -> None:
         """Add or refresh a below-threshold candidate in the pending pool."""
         for p in self._pending:
-            if p.source == candidate.source and _content_equal(
-                p.content, candidate.content
-            ):
+            if p.source == candidate.source and _content_equal(p.content, candidate.content):
                 p.activation = max(p.activation, candidate.activation)
                 p.timestamp = candidate.timestamp
                 return
@@ -635,28 +626,17 @@ class GlobalWorkspace:
                     for j, other in enumerate(surviving):
                         if i == j:
                             continue
-                        coupling += (
-                            (2.0 * self._coherence(item, other) - 1.0)
-                            * activations[j]
-                        )
+                        coupling += (2.0 * self._coherence(item, other) - 1.0) * activations[j]
                         others += activations[j]
-                    delta = self.coupling_rate * scale * (
-                        coupling - others / max(1, self.capacity)
-                    )
+                    delta = self.coupling_rate * scale * (coupling - others / max(1, self.capacity))
                     delta = max(
                         -self.max_coupling_delta,
                         min(self.max_coupling_delta, delta),
                     )
-                    item.activation = max(
-                        0.0, min(1.0, item.activation + delta)
-                    )
+                    item.activation = max(0.0, min(1.0, item.activation + delta))
 
-            self._items = [
-                item for item in surviving if item.activation >= 0.1
-            ]
-            evicted = [
-                item for item in surviving if item.activation < 0.1
-            ]
+            self._items = [item for item in surviving if item.activation >= 0.1]
+            evicted = [item for item in surviving if item.activation < 0.1]
             return evicted
 
     @property

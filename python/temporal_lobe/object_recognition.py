@@ -33,6 +33,7 @@ Biological basis:
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass
 
 import numpy as np
@@ -54,25 +55,93 @@ def _require_cv2():  # type: ignore[no-untyped-def]
         ) from e
     return cv2
 
+
 # Model path — YOLOv5s ONNX from the Ultralytics release
 _MODEL_DIR = default_data_dir() / "models"
 _MODEL_FILE = _MODEL_DIR / "yolov5s.onnx"
 
 # COCO class names (80 categories) — the vocabulary of its IT cortex.
 COCO_CLASSES: list[str] = [
-    "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train",
-    "truck", "boat", "traffic light", "fire hydrant", "stop sign",
-    "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep",
-    "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella",
-    "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard",
-    "sports ball", "kite", "baseball bat", "baseball glove", "skateboard",
-    "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork",
-    "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange",
-    "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair",
-    "couch", "potted plant", "bed", "dining table", "toilet", "tv",
-    "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave",
-    "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase",
-    "scissors", "teddy bear", "hair drier", "toothbrush",
+    "person",
+    "bicycle",
+    "car",
+    "motorcycle",
+    "airplane",
+    "bus",
+    "train",
+    "truck",
+    "boat",
+    "traffic light",
+    "fire hydrant",
+    "stop sign",
+    "parking meter",
+    "bench",
+    "bird",
+    "cat",
+    "dog",
+    "horse",
+    "sheep",
+    "cow",
+    "elephant",
+    "bear",
+    "zebra",
+    "giraffe",
+    "backpack",
+    "umbrella",
+    "handbag",
+    "tie",
+    "suitcase",
+    "frisbee",
+    "skis",
+    "snowboard",
+    "sports ball",
+    "kite",
+    "baseball bat",
+    "baseball glove",
+    "skateboard",
+    "surfboard",
+    "tennis racket",
+    "bottle",
+    "wine glass",
+    "cup",
+    "fork",
+    "knife",
+    "spoon",
+    "bowl",
+    "banana",
+    "apple",
+    "sandwich",
+    "orange",
+    "broccoli",
+    "carrot",
+    "hot dog",
+    "pizza",
+    "donut",
+    "cake",
+    "chair",
+    "couch",
+    "potted plant",
+    "bed",
+    "dining table",
+    "toilet",
+    "tv",
+    "laptop",
+    "mouse",
+    "remote",
+    "keyboard",
+    "cell phone",
+    "microwave",
+    "oven",
+    "toaster",
+    "sink",
+    "refrigerator",
+    "book",
+    "clock",
+    "vase",
+    "scissors",
+    "teddy bear",
+    "hair drier",
+    "toothbrush",
 ]
 
 # YOLOv5 input size
@@ -128,6 +197,9 @@ class ObjectRecognizer:
         this object is cheap even if the model file is missing.
         """
         self._net: object | None = None
+        # cv2.dnn.Net is not thread-safe — see the note on
+        # FaceRecognizer._infer_lock in occipital_lobe.perception.
+        self._infer_lock = threading.Lock()
         self._available: bool | None = None
 
     def is_available(self) -> bool:
@@ -156,9 +228,7 @@ class ObjectRecognizer:
         cv2 = _require_cv2()
         if self._net is None:
             if not _MODEL_FILE.exists():
-                raise FileNotFoundError(
-                    f"Object detection model not found: {_MODEL_FILE}"
-                )
+                raise FileNotFoundError(f"Object detection model not found: {_MODEL_FILE}")
             # On OpenCV 5+ (new graph engine), setPreferableBackend
             # internally triggers a setPreferableTarget call that emits
             # a harmless warning ("Targets are not supported by the new
@@ -198,18 +268,21 @@ class ObjectRecognizer:
 
         cv2 = _require_cv2()
         h, w = rgb_frame.shape[:2]
-        net = self._get_net()
 
         # YOLOv5 preprocessing: resize to 640x640, normalize to [0,1].
         # YOLOv5 expects RGB and our input is already RGB, so no
         # channel swap (swapRB=True would produce BGR — the exact
         # channel inversion YuNet needs and YOLOv5 doesn't).
         blob = cv2.dnn.blobFromImage(
-            rgb_frame, 1.0 / 255.0, (_INPUT_SIZE, _INPUT_SIZE),
+            rgb_frame,
+            1.0 / 255.0,
+            (_INPUT_SIZE, _INPUT_SIZE),
             swapRB=False,
         )
-        net.setInput(blob)
-        output = net.forward()
+        with self._infer_lock:
+            net = self._get_net()
+            net.setInput(blob)
+            output = net.forward()
 
         # YOLOv5 output: (1, 25200, 85)
         # Each row: [cx, cy, w, h, obj_score, 80_class_scores]
@@ -261,13 +334,15 @@ class ObjectRecognizer:
             wi = min(w - x, int(bw))
             hi = min(h - y, int(bh))
 
-            results.append(DetectedObject(
-                name=COCO_CLASSES[int(det_class_ids[idx])],
-                confidence=float(det_confidences[idx]),
-                bbox=(x, y, wi, hi),
-                center=(norm_cx, norm_cy),
-                area_ratio=area_ratio,
-            ))
+            results.append(
+                DetectedObject(
+                    name=COCO_CLASSES[int(det_class_ids[idx])],
+                    confidence=float(det_confidences[idx]),
+                    bbox=(x, y, wi, hi),
+                    center=(norm_cx, norm_cy),
+                    area_ratio=area_ratio,
+                )
+            )
 
         # Sort by confidence (highest first)
         results.sort(key=lambda o: o.confidence, reverse=True)

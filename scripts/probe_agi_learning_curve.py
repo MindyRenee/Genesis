@@ -83,22 +83,24 @@ def run_trial(
     records: list[dict[str, Any]] = []
     while attempts < len(trial.actions):
         action = choose_action(
-            competence, context, trial,
+            competence,
+            context,
+            trial,
             exploration_cursor=exploration_cursor + attempts,
         )
         before = {"target.id": trial.target}
         success = action == trial.actions[trial.correct_index]
         after = {**before, "solved": success}
-        check = competence.record_transition(
-            context, action, before, after, success=success
-        )
+        check = competence.record_transition(context, action, before, after, success=success)
         attempts += 1
-        records.append({
-            "action": action,
-            "success": success,
-            "prediction_score": check.score,
-            "predicted_effects": [p.to_dict() for p in check.predicted],
-        })
+        records.append(
+            {
+                "action": action,
+                "success": success,
+                "prediction_score": check.score,
+                "predicted_effects": [p.to_dict() for p in check.predicted],
+            }
+        )
 
         if success:
             competence.record_episode(
@@ -155,9 +157,7 @@ def main() -> None:
         "environment_rule_hidden": True,
         "episodes": episodes,
         "measurements": {
-            "total_environment_interactions": sum(
-                e["attempts"] for e in episodes
-            ),
+            "total_environment_interactions": sum(e["attempts"] for e in episodes),
             "attempts_per_episode": [e["attempts"] for e in episodes],
             "all_successful": all(e["success"] for e in episodes),
             "transition_observations": competence.transition_count,

@@ -28,6 +28,7 @@ from temporal_lobe.concepts import _FUNCTION_WORDS, is_world_concept
 from thalamus.brain_waves import BrainWave, BrainWaveState
 
 from genesis_client.swallow import note_swallowed
+from infrastructure.text import collapse_ws
 
 __all__ = [
     "IntegratedPerception",
@@ -525,37 +526,19 @@ _FEEDBACK_PATTERN_STRS = [
 
 # Pre-compile all pattern lists for fast matching (avoids re-compiling
 # the same patterns on every call to _match_any).
-_GREETING_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(p) for p in _GREETING_PATTERN_STRS
-]
-_FAREWELL_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(p) for p in _FAREWELL_PATTERN_STRS
-]
-_SELF_INQUIRY_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(p) for p in _SELF_INQUIRY_PATTERN_STRS
-]
+_GREETING_PATTERNS: list[re.Pattern[str]] = [re.compile(p) for p in _GREETING_PATTERN_STRS]
+_FAREWELL_PATTERNS: list[re.Pattern[str]] = [re.compile(p) for p in _FAREWELL_PATTERN_STRS]
+_SELF_INQUIRY_PATTERNS: list[re.Pattern[str]] = [re.compile(p) for p in _SELF_INQUIRY_PATTERN_STRS]
 _CODE_PATTERNS: list[re.Pattern[str]] = [re.compile(p) for p in _CODE_PATTERN_STRS]
-_PHILOSOPHY_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(p) for p in _PHILOSOPHY_PATTERN_STRS
-]
-_EMOTION_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(p) for p in _EMOTION_PATTERN_STRS
-]
-_INTRODUCTION_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(p) for p in _INTRODUCTION_PATTERN_STRS
-]
+_PHILOSOPHY_PATTERNS: list[re.Pattern[str]] = [re.compile(p) for p in _PHILOSOPHY_PATTERN_STRS]
+_EMOTION_PATTERNS: list[re.Pattern[str]] = [re.compile(p) for p in _EMOTION_PATTERN_STRS]
+_INTRODUCTION_PATTERNS: list[re.Pattern[str]] = [re.compile(p) for p in _INTRODUCTION_PATTERN_STRS]
 _ENCOURAGEMENT_PATTERNS: list[re.Pattern[str]] = [
     re.compile(p) for p in _ENCOURAGEMENT_PATTERN_STRS
 ]
-_CORRECTION_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(p) for p in _CORRECTION_PATTERN_STRS
-]
-_COMFORT_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(p) for p in _COMFORT_PATTERN_STRS
-]
-_FEEDBACK_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(p) for p in _FEEDBACK_PATTERN_STRS
-]
+_CORRECTION_PATTERNS: list[re.Pattern[str]] = [re.compile(p) for p in _CORRECTION_PATTERN_STRS]
+_COMFORT_PATTERNS: list[re.Pattern[str]] = [re.compile(p) for p in _COMFORT_PATTERN_STRS]
+_FEEDBACK_PATTERNS: list[re.Pattern[str]] = [re.compile(p) for p in _FEEDBACK_PATTERN_STRS]
 
 # Pre-compiled patterns used inside functions (hot paths).
 _TOPIC_WORD_RE = re.compile(r"[a-z'-]+(?:-[a-z'-]+)*")
@@ -582,6 +565,361 @@ _NAME_PATTERNS = [
         re.IGNORECASE,
     ),
 ]
+# Function/state words that leak into name captures — "my name is
+# going to…", "i am about to…", "i'm so tired" must not mint a
+# person. A captured name fails if ANY token is one of these.
+NON_NAME_WORDS: frozenset[str] = frozenset(
+    {
+        # determiners & pronouns
+        "a",
+        "an",
+        "the",
+        "this",
+        "that",
+        "these",
+        "those",
+        "my",
+        "your",
+        "his",
+        "her",
+        "its",
+        "our",
+        "their",
+        "i",
+        "me",
+        "we",
+        "us",
+        "you",
+        "he",
+        "she",
+        "it",
+        "they",
+        "them",
+        "him",
+        "who",
+        "whom",
+        "whose",
+        "what",
+        "which",
+        "someone",
+        "anyone",
+        "everyone",
+        "somebody",
+        "nobody",
+        "anybody",
+        "everybody",
+        "something",
+        "anything",
+        "everything",
+        "nothing",
+        "one",
+        "all",
+        "some",
+        "any",
+        "each",
+        "few",
+        "many",
+        "much",
+        "more",
+        "most",
+        "other",
+        "another",
+        "such",
+        "own",
+        "same",
+        # prepositions & conjunctions
+        "about",
+        "above",
+        "across",
+        "after",
+        "against",
+        "along",
+        "among",
+        "around",
+        "at",
+        "before",
+        "behind",
+        "below",
+        "beneath",
+        "beside",
+        "between",
+        "beyond",
+        "by",
+        "despite",
+        "down",
+        "during",
+        "except",
+        "for",
+        "from",
+        "in",
+        "inside",
+        "into",
+        "like",
+        "near",
+        "of",
+        "off",
+        "on",
+        "onto",
+        "out",
+        "outside",
+        "over",
+        "past",
+        "since",
+        "through",
+        "to",
+        "toward",
+        "under",
+        "until",
+        "up",
+        "upon",
+        "with",
+        "within",
+        "without",
+        "and",
+        "or",
+        "but",
+        "nor",
+        "so",
+        "yet",
+        "as",
+        "if",
+        "than",
+        "because",
+        "while",
+        "although",
+        "though",
+        "unless",
+        "when",
+        "where",
+        "whether",
+        "either",
+        "neither",
+        "both",
+        "once",
+        "only",
+        "even",
+        # auxiliaries & common verbs that follow "i am"
+        "am",
+        "are",
+        "is",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "do",
+        "does",
+        "did",
+        "doing",
+        "done",
+        "have",
+        "has",
+        "had",
+        "having",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "can",
+        "could",
+        "may",
+        "might",
+        "must",
+        "need",
+        "ought",
+        "get",
+        "gets",
+        "getting",
+        "got",
+        "go",
+        "goes",
+        "going",
+        "gone",
+        "come",
+        "came",
+        "coming",
+        "take",
+        "taking",
+        "make",
+        "making",
+        "try",
+        "trying",
+        "want",
+        "wanting",
+        "see",
+        "seeing",
+        "know",
+        "knowing",
+        "think",
+        "thinking",
+        "feel",
+        "feeling",
+        "look",
+        "looking",
+        "say",
+        "saying",
+        "said",
+        "tell",
+        "telling",
+        "let",
+        "lets",
+        "put",
+        "keep",
+        "keeping",
+        "seem",
+        "seems",
+        # adverbs & misc
+        "not",
+        "no",
+        "yes",
+        "very",
+        "really",
+        "just",
+        "quite",
+        "rather",
+        "too",
+        "also",
+        "still",
+        "already",
+        "always",
+        "never",
+        "ever",
+        "often",
+        "sometimes",
+        "usually",
+        "now",
+        "then",
+        "here",
+        "there",
+        "everywhere",
+        "somewhere",
+        "anywhere",
+        "nowhere",
+        "how",
+        "why",
+        "again",
+        "almost",
+        "back",
+        "far",
+        "later",
+        "maybe",
+        "perhaps",
+        "probably",
+        "soon",
+        "well",
+        "enough",
+        "instead",
+        "anyway",
+        # states reported after "i'm"/"i am" that aren't names
+        "fine",
+        "good",
+        "great",
+        "ok",
+        "okay",
+        "sure",
+        "sorry",
+        "glad",
+        "happy",
+        "sad",
+        "angry",
+        "afraid",
+        "scared",
+        "tired",
+        "sleepy",
+        "hungry",
+        "sick",
+        "busy",
+        "free",
+        "ready",
+        "lost",
+        "found",
+        "home",
+        "away",
+        "late",
+        "early",
+        "new",
+        "old",
+        "young",
+        "alone",
+        "together",
+        "awake",
+        "asleep",
+        "alive",
+        "dead",
+        "wondering",
+        "right",
+        "left",
+        "present",
+        "nearby",
+        "listening",
+        "asking",
+        "hoping",
+        "waiting",
+        "leaving",
+        "staying",
+        "working",
+        "playing",
+        "reading",
+        "writing",
+        "running",
+        "walking",
+        "sitting",
+        "standing",
+        "lying",
+        "better",
+        "worse",
+        "best",
+        "worst",
+        # predicate adjectives & participles from "i'm <state>" captures
+        # — observed as corrupted user_name/known_users entries
+        "proud",
+        "relying",
+        "responsible",
+        "talking",
+        "fixing",
+        "learning",
+        "coding",
+        "debugging",
+        "studying",
+        "watching",
+        "bored",
+        "excited",
+        "curious",
+        "confused",
+        "worried",
+        "interested",
+        "serious",
+        "honest",
+        "certain",
+        "unsure",
+        "aware",
+        "kidding",
+        "joking",
+        "testing",
+        "checking",
+        "finished",
+        "stuck",
+    }
+)
+
+
+def is_plausible_name(name: str) -> bool:
+    """Whether a captured token sequence plausibly is a person's name.
+
+    Introductions are parsed out of free text, so the capture regularly
+    lands on function words ("i am about to leave" → "about"). A name
+    is rejected when any token is a function/state word — real names
+    essentially never contain them, while every fragment does.
+    """
+    tokens = name.lower().split()
+    return (
+        bool(tokens)
+        and len(tokens) <= 4
+        and all(t.isalpha() or "'" in t or "-" in t for t in tokens)
+        and not any(t in NON_NAME_WORDS for t in tokens)
+    )
+
+
 _ABOUT_GENESIS_RE = re.compile(r"\b(you|your|yourself|genesis)\b")
 # Negation: only first-person subject/possessive ("I", "my") negates
 # "your" — not "me" which is often an indirect object ("tell me about
@@ -667,78 +1005,228 @@ def _is_relational_wh_question(lower: str) -> bool:
     return bool(_RELATIONAL_WH_QUESTION_RE.match(lower))
 
 
-
-
 # Relation/question verbs that appear in wh-questions as the relation
 # being asked about, not as the topic. "What does cortisol cause?" —
 # the topic is "cortisol", not "cause". These verbs are grammatical
 # function words in question context, not conceptual content. They
 # must be filtered from topics so self-assessment doesn't flag them
 # as knowledge gaps and replace valid answers with hedging.
-_QUESTION_RELATION_VERBS: frozenset[str] = frozenset({
-    "cause", "causes",
-    "enable", "enables", "help", "helps",
-    "depend", "depends", "need", "needs", "require", "requires",
-    "emerge", "emerges",
-    "create", "creates", "created", "make", "makes", "making",
-    "made", "built", "designed", "developed",
-    "want", "wants", "desire", "desires",
-    "use", "uses", "employ", "employs",
-    "live", "lives", "reside", "resides",
-    "know", "knows", "understand", "understands", "remember", "remembers",
-    "contain", "contains", "include", "includes",
-    "eat", "eats", "drink", "drinks", "consume", "consumes",
-    "prevent", "prevents", "harm", "harms",
-    "lead", "leads",
-    # Discourse/request verbs — "Can you explain X?", "Tell me about Y",
-    # "What do you think about Z?" — these are the speech act, not the
-    # topic. Without filtering, "explain" becomes topics[0] and the
-    # executive goal becomes "answer the question about explain".
-    "explain", "explains",
-    "tell", "tells", "describe", "describes",
-    "discuss", "discusses", "talk", "talks",
-    "think", "thinks", "say", "says", "mean", "means",
-    "share", "shares", "show", "shows", "give", "gives",
-    "ask", "asks", "answer", "answers",
-    "feel", "feels", "seem", "seems", "look", "looks",
-    "happen", "happens", "going", "doing",
-})
+_QUESTION_RELATION_VERBS: frozenset[str] = frozenset(
+    {
+        "cause",
+        "causes",
+        "enable",
+        "enables",
+        "help",
+        "helps",
+        "depend",
+        "depends",
+        "need",
+        "needs",
+        "require",
+        "requires",
+        "emerge",
+        "emerges",
+        "create",
+        "creates",
+        "created",
+        "make",
+        "makes",
+        "making",
+        "made",
+        "built",
+        "designed",
+        "developed",
+        "want",
+        "wants",
+        "desire",
+        "desires",
+        "use",
+        "uses",
+        "employ",
+        "employs",
+        "live",
+        "lives",
+        "reside",
+        "resides",
+        "know",
+        "knows",
+        "understand",
+        "understands",
+        "remember",
+        "remembers",
+        "contain",
+        "contains",
+        "include",
+        "includes",
+        "eat",
+        "eats",
+        "drink",
+        "drinks",
+        "consume",
+        "consumes",
+        "prevent",
+        "prevents",
+        "harm",
+        "harms",
+        "lead",
+        "leads",
+        # Discourse/request verbs — "Can you explain X?", "Tell me about Y",
+        # "What do you think about Z?" — these are the speech act, not the
+        # topic. Without filtering, "explain" becomes topics[0] and the
+        # executive goal becomes "answer the question about explain".
+        "explain",
+        "explains",
+        "tell",
+        "tells",
+        "describe",
+        "describes",
+        "discuss",
+        "discusses",
+        "talk",
+        "talks",
+        "think",
+        "thinks",
+        "say",
+        "says",
+        "mean",
+        "means",
+        "share",
+        "shares",
+        "show",
+        "shows",
+        "give",
+        "gives",
+        "ask",
+        "asks",
+        "answer",
+        "answers",
+        "feel",
+        "feels",
+        "seem",
+        "seems",
+        "look",
+        "looks",
+        "happen",
+        "happens",
+        "going",
+        "doing",
+    }
+)
 
 # Common contractions that slip through _FUNCTION_WORDS because the
 # apostrophe form ("i'm") isn't in the set (only "i" is). These are
 # never the conceptual topic of a question.
-_TOPIC_CONTRACTIONS: frozenset[str] = frozenset({
-    "i'm", "i've", "i'll", "i'd",
-    "you're", "you've", "you'll", "you'd",
-    "he's", "she's", "it's", "we're", "we've", "we'll", "we'd",
-    "they're", "they've", "they'll", "they'd",
-    "don't", "doesn't", "didn't", "won't", "wouldn't",
-    "can't", "couldn't", "shouldn't", "isn't", "aren't",
-    "wasn't", "weren't", "hasn't", "haven't", "hadn't",
-    "that's", "there's", "what's", "who's", "where's",
-    "let's", "here's",
-})
+_TOPIC_CONTRACTIONS: frozenset[str] = frozenset(
+    {
+        "i'm",
+        "i've",
+        "i'll",
+        "i'd",
+        "you're",
+        "you've",
+        "you'll",
+        "you'd",
+        "he's",
+        "she's",
+        "it's",
+        "we're",
+        "we've",
+        "we'll",
+        "we'd",
+        "they're",
+        "they've",
+        "they'll",
+        "they'd",
+        "don't",
+        "doesn't",
+        "didn't",
+        "won't",
+        "wouldn't",
+        "can't",
+        "couldn't",
+        "shouldn't",
+        "isn't",
+        "aren't",
+        "wasn't",
+        "weren't",
+        "hasn't",
+        "haven't",
+        "hadn't",
+        "that's",
+        "there's",
+        "what's",
+        "who's",
+        "where's",
+        "let's",
+        "here's",
+    }
+)
 
 # Discourse adverbs and interjections that are conversational filler,
 # not conceptual content. "What have you been thinking about lately?"
 # — "lately" is a temporal adverb, not the topic. "Thanks" is a
 # social formula, not a concept. These leak through as topics because
 # they aren't function words or question verbs.
-_TOPIC_DISCOURSE_WORDS: frozenset[str] = frozenset({
-    # Temporal adverbs
-    "lately", "recently", "today", "tomorrow", "yesterday",
-    "now", "soon", "later", "sometimes", "often", "always",
-    "never", "ever", "still", "already", "yet",
-    # Social/discourse filler
-    "thanks", "thank", "okay", "ok", "sure", "yes", "yeah",
-    "please", "maybe", "perhaps", "quite", "really", "actually",
-    "basically", "honestly", "anyway", "anyways", "incidentally",
-    # Degree/frequency adverbs
-    "very", "too", "so", "just", "also", "even", "only",
-    # Common adjectives that are evaluative, not conceptual
-    "good", "bad", "great", "fine", "nice", "well",
-    "right", "wrong", "true", "false",
-})
+_TOPIC_DISCOURSE_WORDS: frozenset[str] = frozenset(
+    {
+        # Temporal adverbs
+        "lately",
+        "recently",
+        "today",
+        "tomorrow",
+        "yesterday",
+        "now",
+        "soon",
+        "later",
+        "sometimes",
+        "often",
+        "always",
+        "never",
+        "ever",
+        "still",
+        "already",
+        "yet",
+        # Social/discourse filler
+        "thanks",
+        "thank",
+        "okay",
+        "ok",
+        "sure",
+        "yes",
+        "yeah",
+        "please",
+        "maybe",
+        "perhaps",
+        "quite",
+        "really",
+        "actually",
+        "basically",
+        "honestly",
+        "anyway",
+        "anyways",
+        "incidentally",
+        # Degree/frequency adverbs
+        "very",
+        "too",
+        "so",
+        "just",
+        "also",
+        "even",
+        "only",
+        # Common adjectives that are evaluative, not conceptual
+        "good",
+        "bad",
+        "great",
+        "fine",
+        "nice",
+        "well",
+        "right",
+        "wrong",
+        "true",
+        "false",
+    }
+)
 
 
 def _extract_topics(text: str, network=None) -> list[str]:
@@ -758,7 +1246,8 @@ def _extract_topics(text: str, network=None) -> list[str]:
     # Also filter contractions ("i'm") and discourse filler ("lately",
     # "thanks") that slip through the above two sets.
     content_freq = {
-        w: c for w, c in freq.items()
+        w: c
+        for w, c in freq.items()
         if w not in _FUNCTION_WORDS
         and w not in _QUESTION_RELATION_VERBS
         and w not in _TOPIC_CONTRACTIONS
@@ -800,9 +1289,7 @@ def _extract_topics(text: str, network=None) -> list[str]:
 _COPULA_VERBS = frozenset({"is", "are", "was", "were", "be", "being"})
 
 
-def _detect_statement_subject(
-    lower_text: str, content_freq: dict[str, int]
-) -> str | None:
+def _detect_statement_subject(lower_text: str, content_freq: dict[str, int]) -> str | None:
     """Detect the grammatical subject of a definitional statement.
 
     For statements like "water is a clear liquid" or "dogs are mammals",
@@ -836,9 +1323,7 @@ def _detect_statement_subject(
     return None
 
 
-def _merge_multi_word_topics(
-    text: str, topics: list[str], network
-) -> list[str]:
+def _merge_multi_word_topics(text: str, topics: list[str], network) -> list[str]:
     """Merge adjacent topics into multi-word concepts found in the network.
 
     Maintains the original word order: a multi-word concept is emitted
@@ -893,29 +1378,92 @@ def _merge_multi_word_topics(
 # classification, not response generation.
 _EMOJI_SENTIMENT: dict[str, float] = {
     # Positive emojis
-    "😊": 0.8, "😀": 0.8, "😄": 0.9, "😁": 0.8, "😂": 0.9,
-    "🤣": 0.9, "😃": 0.8, "😍": 0.9, "🥰": 0.9, "😘": 0.8,
-    "😋": 0.7, "😎": 0.7, "🤩": 0.9, "🥳": 0.9, "😇": 0.7,
-    "🙂": 0.6, "😉": 0.5, "🙌": 0.8, "👍": 0.8, "👏": 0.7,
-    "💪": 0.7, "🎉": 0.9, "❤️": 0.9, "💕": 0.8, "💖": 0.9,
-    "🌟": 0.7, "✨": 0.6, "🔥": 0.7, "💯": 0.8, "🙏": 0.6,
-    "☀️": 0.6, "🌈": 0.7, "🌸": 0.6, "🍀": 0.6, "🎵": 0.6,
+    "😊": 0.8,
+    "😀": 0.8,
+    "😄": 0.9,
+    "😁": 0.8,
+    "😂": 0.9,
+    "🤣": 0.9,
+    "😃": 0.8,
+    "😍": 0.9,
+    "🥰": 0.9,
+    "😘": 0.8,
+    "😋": 0.7,
+    "😎": 0.7,
+    "🤩": 0.9,
+    "🥳": 0.9,
+    "😇": 0.7,
+    "🙂": 0.6,
+    "😉": 0.5,
+    "🙌": 0.8,
+    "👍": 0.8,
+    "👏": 0.7,
+    "💪": 0.7,
+    "🎉": 0.9,
+    "❤️": 0.9,
+    "💕": 0.8,
+    "💖": 0.9,
+    "🌟": 0.7,
+    "✨": 0.6,
+    "🔥": 0.7,
+    "💯": 0.8,
+    "🙏": 0.6,
+    "☀️": 0.6,
+    "🌈": 0.7,
+    "🌸": 0.6,
+    "🍀": 0.6,
+    "🎵": 0.6,
     # Negative emojis
-    "😢": -0.8, "😭": -0.9, "😞": -0.7, "😔": -0.7, "😟": -0.7,
-    "😕": -0.5, "🙁": -0.6, "☹️": -0.7, "😣": -0.6, "😖": -0.7,
-    "😫": -0.8, "😩": -0.8, "😤": -0.7, "😠": -0.8, "😡": -0.9,
-    "🤬": -0.9, "😱": -0.8, "😨": -0.7, "😰": -0.7, "😥": -0.6,
-    "😓": -0.6, "🥺": -0.5, "💔": -0.8, "👎": -0.7,
-    "🤦": -0.6, "🤷": -0.4, "🙄": -0.5, "😒": -0.6, "🥱": -0.4,
+    "😢": -0.8,
+    "😭": -0.9,
+    "😞": -0.7,
+    "😔": -0.7,
+    "😟": -0.7,
+    "😕": -0.5,
+    "🙁": -0.6,
+    "☹️": -0.7,
+    "😣": -0.6,
+    "😖": -0.7,
+    "😫": -0.8,
+    "😩": -0.8,
+    "😤": -0.7,
+    "😠": -0.8,
+    "😡": -0.9,
+    "🤬": -0.9,
+    "😱": -0.8,
+    "😨": -0.7,
+    "😰": -0.7,
+    "😥": -0.6,
+    "😓": -0.6,
+    "🥺": -0.5,
+    "💔": -0.8,
+    "👎": -0.7,
+    "🤦": -0.6,
+    "🤷": -0.4,
+    "🙄": -0.5,
+    "😒": -0.6,
+    "🥱": -0.4,
     # Neutral/ambiguous emojis (not mapped — they don't affect sentiment)
 }
 
 # Emoticon sentiment map — classic text-based emoticons.
 _EMOTICON_SENTIMENT: dict[str, float] = {
-    ":)": 0.6, ":-)": 0.6, ":D": 0.8, ":-D": 0.8,
-    ":(": -0.6, ":-(": -0.6, ":'(": -0.7, ":/": -0.3,
-    ":|": -0.2, ":P": 0.4, ":-P": 0.4, ";)": 0.5, ";-)": 0.5,
-    "<3": 0.8, "</3": -0.7, ":>": 0.5,
+    ":)": 0.6,
+    ":-)": 0.6,
+    ":D": 0.8,
+    ":-D": 0.8,
+    ":(": -0.6,
+    ":-(": -0.6,
+    ":'(": -0.7,
+    ":/": -0.3,
+    ":|": -0.2,
+    ":P": 0.4,
+    ":-P": 0.4,
+    ";)": 0.5,
+    ";-)": 0.5,
+    "<3": 0.8,
+    "</3": -0.7,
+    ":>": 0.5,
 }
 
 
@@ -1035,7 +1583,7 @@ def _detect_question_type(text: str) -> QuestionType:
         # and "wherever" doesn't match "where". The starter must be
         # followed by a word boundary (space, punctuation, or end).
         if lower.startswith(starter):
-            rest = lower[len(starter):]
+            rest = lower[len(starter) :]
             if not rest or rest[0] in " \t\n.,!?;:'\"()[]{}":
                 return qtype
 
@@ -1068,7 +1616,9 @@ def _extract_entities(text: str) -> dict[str, str]:
     for name_re in _NAME_PATTERNS:
         m = name_re.search(text)
         if m:
-            entities["name"] = m.group(1)
+            candidate = m.group(1).strip()
+            if is_plausible_name(candidate):
+                entities["name"] = candidate
 
     # Numbers
     numbers = _NUMBER_RE.findall(text)
@@ -1123,9 +1673,7 @@ def _blend_semantic_evidence(
         intent_probabilities, semantic_probs, pattern_weight=0.65
     )
     # Override the rule-based intent if meaning strongly points elsewhere.
-    top_intent = max(
-        intent_probabilities, key=lambda k: intent_probabilities[k]
-    )
+    top_intent = max(intent_probabilities, key=lambda k: intent_probabilities[k])
     if (
         top_intent != intent
         and top_intent != Intent.UNKNOWN
@@ -1177,45 +1725,91 @@ def perceive(
     (enhanced processing) lowers it (more matches — it's more
     perceptive of remote associations).
     """
-    lower = text.lower().strip()
+    # Canonical form once, at the boundary: invisible format
+    # characters removed (a zero-width-space message is silence, not
+    # a ghost perception), whitespace collapsed, then lowercased for
+    # the downstream classifiers.
+    lower = collapse_ws(text).lower()
     word_count = len(lower.split())
 
-    # Handle empty or whitespace-only input.
+    # Handle empty or whitespace-only input — including input whose
+    # only characters were invisible.
     if not lower:
         return _empty_perception(text)
 
     intent = _classify_intent(lower)
     question_type = _detect_question_type(lower)
-    topics = _extract_topics(lower, network=network)
-
-    topics, context_flags = _resolve_topics(
-        lower, topics, embeddings, network, brain_waves,
-    )
-
     (
+        topics,
         is_about_genesis,
         is_about_user,
         is_about_code,
         is_about_emotion,
         is_about_existence,
-    ) = context_flags
+    ) = _resolve_context(lower, embeddings, network, brain_waves)
 
-    sentiment, sentiment_label, emotion_word, entities, key_phrases, confidence, \
-        intent_probabilities = _extract_perception_signals(
-            lower, text, intent, topics, question_type,
-            pattern_weights, context_prior,
-        )
+    (
+        sentiment,
+        sentiment_label,
+        emotion_word,
+        entities,
+        key_phrases,
+        confidence,
+        intent_probabilities,
+    ) = _extract_perception_signals(
+        lower,
+        text,
+        intent,
+        topics,
+        question_type,
+        pattern_weights,
+        context_prior,
+    )
 
     intent, intent_probabilities = _blend_semantic_evidence(
-        text, intent, intent_probabilities, embeddings,
+        text,
+        intent,
+        intent_probabilities,
+        embeddings,
     )
 
     return _build_perception(
-        text, word_count, intent, question_type, topics, sentiment,
-        sentiment_label, emotion_word, is_about_genesis, is_about_user,
-        is_about_code, is_about_emotion, is_about_existence, entities,
-        key_phrases, confidence, intent_probabilities,
+        text,
+        word_count,
+        intent,
+        question_type,
+        topics,
+        sentiment,
+        sentiment_label,
+        emotion_word,
+        is_about_genesis,
+        is_about_user,
+        is_about_code,
+        is_about_emotion,
+        is_about_existence,
+        entities,
+        key_phrases,
+        confidence,
+        intent_probabilities,
     )
+
+
+def _resolve_context(
+    lower: str,
+    embeddings,
+    network,
+    brain_waves: BrainWaveState | None,
+) -> tuple[list[str], bool, bool, bool, bool, bool]:
+    """Extract topics and resolve the about-* context flags."""
+    topics = _extract_topics(lower, network=network)
+    topics, context_flags = _resolve_topics(
+        lower,
+        topics,
+        embeddings,
+        network,
+        brain_waves,
+    )
+    return (topics, *context_flags)
 
 
 def _resolve_topics(
@@ -1240,7 +1834,11 @@ def _resolve_topics(
     # store finds concepts whose vectors are close to the text vector.
     if embeddings and embeddings.has_embeddings:
         topics = _augment_topics_with_embeddings(
-            lower, topics, embeddings, brain_waves, network,
+            lower,
+            topics,
+            embeddings,
+            brain_waves,
+            network,
         )
 
     # Detect context flags early — needed for context-aware topic resolution
@@ -1264,8 +1862,7 @@ def _resolve_topics(
     # daemon", "genesis's code") are caught by is_about_code via
     # _CODE_PATTERNS.
     _needs_self_resolution = is_about_code or (
-        is_about_genesis
-        and re.search(r"\b(your|yourself)\b", lower) is not None
+        is_about_genesis and re.search(r"\b(your|yourself)\b", lower) is not None
     )
     if network is not None and _needs_self_resolution:
         topics = _resolve_self_topics(topics, network)
@@ -1299,8 +1896,13 @@ def _extract_perception_signals(
         lower, intent, pattern_weights, context_prior
     )
     return (
-        sentiment, sentiment_label, emotion_word, entities, key_phrases,
-        confidence, intent_probabilities,
+        sentiment,
+        sentiment_label,
+        emotion_word,
+        entities,
+        key_phrases,
+        confidence,
+        intent_probabilities,
     )
 
 
@@ -1476,7 +2078,9 @@ def _augment_topics_with_embeddings(
             # Gamma enhanced processing — perceive remote associations.
             threshold = 0.25
     semantic_matches = embeddings.find_similar_to_text(
-        lower, k=5, threshold=threshold,
+        lower,
+        k=5,
+        threshold=threshold,
     )
     # Extract content words from the query for relevance filtering
     query_words = set(lower.split())
@@ -1554,7 +2158,10 @@ def _resolve_self_topics(topics: list[str], network) -> list[str]:
         key = (query, frozenset(origins) if origins else None, limit, min_score)
         if key not in search_cache:
             search_cache[key] = network.search_concepts(
-                query, origins=origins, limit=limit, min_score=min_score,
+                query,
+                origins=origins,
+                limit=limit,
+                min_score=min_score,
             )
         return search_cache[key]
 
@@ -1803,6 +2410,7 @@ class PatternWeights:
 # uninformative when the cognition engine wants to consider
 # alternatives.
 
+
 def _mean_word_vector(text: str, embeddings) -> np.ndarray | None:
     """Compute an average word-vector for a piece of text."""
     words = _SENTIMENT_WORD_RE.findall(text.lower())
@@ -1833,9 +2441,9 @@ def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 # would leak stale entries and could be recycled by a new store after
 # the old one is collected — returning vectors computed against the
 # wrong embedding space.
-_intent_prototype_cache: weakref.WeakKeyDictionary[
-    object, dict[Intent, list[np.ndarray]]
-] = weakref.WeakKeyDictionary()
+_intent_prototype_cache: weakref.WeakKeyDictionary[object, dict[Intent, list[np.ndarray]]] = (
+    weakref.WeakKeyDictionary()
+)
 
 
 def _get_prototype_vectors(embeddings) -> dict[Intent, list[np.ndarray]]:
@@ -1866,9 +2474,7 @@ def _get_prototype_vectors(embeddings) -> dict[Intent, list[np.ndarray]]:
     return vectors
 
 
-def _compute_semantic_intent_probabilities(
-    text: str, embeddings
-) -> dict[Intent, float]:
+def _compute_semantic_intent_probabilities(text: str, embeddings) -> dict[Intent, float]:
     """Compute intent likelihoods from semantic similarity to prototypes."""
     if not embeddings or not embeddings.has_embeddings:
         return {}
@@ -2180,8 +2786,8 @@ class MultisensoryIntegrator:
             elif inp.modality == SensoryModality.TEXT:
                 modality_intents[inp.modality.value] = base.intent
 
-        cross_modal_confidence, conflict_detected, conflict_description = (
-            _cross_modal_binding(modality_intents, base.confidence)
+        cross_modal_confidence, conflict_detected, conflict_description = _cross_modal_binding(
+            modality_intents, base.confidence
         )
 
         if inactive:

@@ -34,7 +34,10 @@ import wave
 from pathlib import Path
 from typing import Any
 
+from genesis_client.threads import call_on_named_thread, named_thread
 from infrastructure.config import VOSK_MODEL_NAME, vosk_model_dir
+from infrastructure.text import is_blank
+from infrastructure.text import sentences as _sentences
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +102,7 @@ def _chunk_text_for_tts(text: str) -> list[str]:
     import re
 
     # Split on sentence boundaries, keeping the delimiter
-    sentences = re.split(r'(?<=[.!?])\s+', text)
+    sentences = _sentences(text)
     chunks: list[str] = []
     current = ""
 
@@ -109,7 +112,7 @@ def _chunk_text_for_tts(text: str) -> list[str]:
             if current:
                 chunks.append(current.strip())
                 current = ""
-            comma_parts = re.split(r'(?<=[,;:])\s+', sentence)
+            comma_parts = re.split(r"(?<=[,;:])\s+", sentence)
             for part in comma_parts:
                 if len(current) + len(part) + 1 <= _MAX_TTS_CHUNK_CHARS:
                     current = (current + " " + part).strip() if current else part
@@ -162,7 +165,7 @@ class Voice:
                 with config_path.open() as f:
                     self._sample_rate = json.load(f)["audio"]["sample_rate"]
             except (OSError, KeyError, json.JSONDecodeError) as e:
-                logger.debug(f'__init__ failed: {e}')
+                logger.debug(f"__init__ failed: {e}")
         self._piper_proc: subprocess.Popen | None = None
         self._play_proc: subprocess.Popen | None = None
         self._all_procs: list[subprocess.Popen] = []  # track all spawned procs
@@ -175,9 +178,9 @@ class Voice:
         # queued instead of cutting off the current speech. This prevents
         # her words from being truncated mid-sentence when multiple
         # thoughts or responses arrive in quick succession.
-        self._speech_queue: collections.deque[
-            tuple[str, float, float, float, float]
-        ] = collections.deque(maxlen=3)
+        self._speech_queue: collections.deque[tuple[str, float, float, float, float]] = (
+            collections.deque(maxlen=3)
+        )
         self._queue_lock = threading.Lock()
 
     def _check_piper(self) -> bool:
@@ -229,7 +232,7 @@ class Voice:
             caution: 0-1, slows speech slightly (careful delivery).
             creativity: 0-1, adds slight pitch variation.
         """
-        if not text.strip():
+        if is_blank(text):
             return
 
         # Chunk long text to keep each Piper invocation short on slow
@@ -240,25 +243,19 @@ class Voice:
         # timeout in _speak_piper scales with chunk length.
         chunks = _chunk_text_for_tts(text)
         if len(chunks) <= 1:
-            self._speak_single(
-                text, blocking, alertness, valence, caution, creativity
-            )
+            self._speak_single(text, blocking, alertness, valence, caution, creativity)
             return
         # Speak each chunk sequentially. Non-blocking mode queues
         # the remaining chunks so they play in order without cutting
         # off the current speech.
         for i, chunk in enumerate(chunks):
             if i == 0:
-                self._speak_single(
-                    chunk, blocking, alertness, valence, caution, creativity
-                )
+                self._speak_single(chunk, blocking, alertness, valence, caution, creativity)
             else:
                 with self._queue_lock:
                     max_q = self._speech_queue.maxlen or 3
                     if len(self._speech_queue) < max_q:
-                        self._speech_queue.append(
-                            (chunk, alertness, valence, caution, creativity)
-                        )
+                        self._speech_queue.append((chunk, alertness, valence, caution, creativity))
 
     def _speak_single(
         self,
@@ -280,9 +277,7 @@ class Voice:
             with self._queue_lock:
                 max_q = self._speech_queue.maxlen or 3
                 if len(self._speech_queue) < max_q:
-                    self._speech_queue.append(
-                        (text, alertness, valence, caution, creativity)
-                    )
+                    self._speech_queue.append((text, alertness, valence, caution, creativity))
             return
 
         self.stop()
@@ -304,9 +299,7 @@ class Voice:
             if blocking:
                 self._done_speaking()
 
-    def _reap_children(
-        self, procs: tuple[subprocess.Popen, ...], timeout: float = 30.0
-    ) -> None:
+    def _reap_children(self, procs: tuple[subprocess.Popen, ...], timeout: float = 30.0) -> None:
         """Reap finished TTS child processes so they don't become zombies.
 
         Includes a timeout so a hung Piper/aplay process (e.g. audio
@@ -345,9 +338,7 @@ class Voice:
         with self._queue_lock:
             if not self._speech_queue:
                 return
-            text, alertness, _valence, caution, _creativity = (
-                self._speech_queue.popleft()
-            )
+            text, alertness, _valence, caution, _creativity = self._speech_queue.popleft()
         # Play the queued utterance. We call the internal playback
         # directly (not speak()) to avoid re-checking is_speaking,
         # which would re-queue and never play.
@@ -436,9 +427,12 @@ class Voice:
             # hiccup would underrun it. 200ms is 4x that, stable.
             play_cmd = [
                 "aplay",
-                "-r", str(self._sample_rate),
-                "-f", "S16_LE",
-                "-c", "1",
+                "-r",
+                str(self._sample_rate),
+                "-f",
+                "S16_LE",
+                "-c",
+                "1",
                 "-q",
                 "--buffer-time=200000",
                 "--period-time=50000",
@@ -475,10 +469,11 @@ class Voice:
                 # killed mid-length utterances, so scale it: ~0.6 s per
                 # character with a 60 s floor covers RTF ≈ 4.
                 tts_timeout = max(60.0, 15.0 + 0.6 * len(text))
-                threading.Thread(
-                    target=self._reap_children,
+                named_thread(
+                    "tts-reaper",
+                    self._reap_children,
                     args=((proc, self._play_proc), tts_timeout),
-                    daemon=True,
+                    comm="g-tts-reap",
                 ).start()
         except Exception as e:  # noqa: BLE001
             logger.debug(f"Piper TTS failed: {e}")
@@ -501,10 +496,11 @@ class Voice:
             if blocking:
                 self._play_proc.wait()
             else:
-                threading.Thread(
-                    target=self._reap_children,
+                named_thread(
+                    "tts-reaper",
+                    self._reap_children,
                     args=((self._play_proc,),),
-                    daemon=True,
+                    comm="g-tts-reap",
                 ).start()
         except Exception as e:  # noqa: BLE001
             logger.debug(f"espeak-ng failed: {e}")
@@ -703,13 +699,22 @@ class VoiceInput:
             """Append incoming audio bytes to the chunk list for later recognition."""
             chunks.append(indata.tobytes())
 
-        with sd.RawInputStream(
-            samplerate=self.sample_rate,
-            blocksize=1024,
-            dtype="int16",
-            channels=1,
-            callback=callback,
-        ):
+        # Open AND start inside the named helper — the PortAudio
+        # callback worker inherits the comm of whichever thread runs
+        # OpenStream/StartStream first for the backend.
+        def _open_vosk_stream() -> Any:
+            s = sd.RawInputStream(
+                samplerate=self.sample_rate,
+                blocksize=1024,
+                dtype="int16",
+                channels=1,
+                callback=callback,
+            )
+            s.start()
+            return s
+
+        stream = call_on_named_thread("mic-io", _open_vosk_stream, comm="g-mic-io")
+        try:
             start = _time.time()
             while True:
                 _time.sleep(0.05)
@@ -735,6 +740,8 @@ class VoiceInput:
                 # Speech ended (1.5s of silence after speech)
                 if speech_started and silence_count > 30:
                     break
+        finally:
+            stream.close()
 
         # Get final result — reprocess all chunks in a fresh recognizer
         final_recognizer = KaldiRecognizer(self._vosk_model, self.sample_rate)
@@ -774,13 +781,19 @@ class VoiceInput:
             elif speech_started:
                 silence_frames += 1
 
-        with sd.InputStream(
-            samplerate=self.sample_rate,
-            blocksize=chunk_samples,
-            dtype="int16",
-            channels=1,
-            callback=callback,
-        ):
+        def _open_google_stream() -> Any:
+            s = sd.InputStream(
+                samplerate=self.sample_rate,
+                blocksize=chunk_samples,
+                dtype="int16",
+                channels=1,
+                callback=callback,
+            )
+            s.start()
+            return s
+
+        stream = call_on_named_thread("mic-io", _open_google_stream, comm="g-mic-io")
+        try:
             start = _time.time()
             while True:
                 _time.sleep(0.05)
@@ -791,6 +804,8 @@ class VoiceInput:
                     break
                 if speech_started and silence_frames > max_silence:
                     break
+        finally:
+            stream.close()
 
         if not audio_chunks or not speech_started:
             return None

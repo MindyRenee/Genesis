@@ -260,9 +260,7 @@ class NetworkTopology:
         # For smaller networks, compute full metrics
         return self._describe_small_network(parts)
 
-    def _describe_large_network(
-        self, parts: list[str], n: int, edges: int
-    ) -> str:
+    def _describe_large_network(self, parts: list[str], n: int, edges: int) -> str:
         """Describe structure for large networks using sampling."""
         # Average degree — a better density metric for large graphs
         avg_degree = edges * 2 / n if n > 0 else 0
@@ -377,13 +375,31 @@ class NetworkTopology:
         n = len(concepts)
         if n == 0:
             self._cache = self._build_topology_cache(
-                {}, {}, {}, {}, [], {}, 0.0, 0.0, False, 0.0,
+                {},
+                {},
+                {},
+                {},
+                [],
+                {},
+                0.0,
+                0.0,
+                False,
+                0.0,
             )
             return
 
-        # Build adjacency list (undirected, weighted)
+        # Build adjacency list (undirected, weighted). Restrict to
+        # live-live edges: edges legitimately point at archived concepts
+        # (spill keeps them for traversal, and the canonical edge log
+        # replays them into _edges), and every metric below keys a
+        # concepts-only table by adjacency members — a ghost endpoint
+        # would KeyError community detection (labels[neighbor]) and the
+        # BFS metrics alike.
+        live = set(concepts)
         adj: dict[str, list[str]] = defaultdict(list)
         for edge in self.network._edges:
+            if edge.source not in live or edge.target not in live:
+                continue
             adj[edge.source].append(edge.target)
             adj[edge.target].append(edge.source)
 
@@ -435,9 +451,15 @@ class NetworkTopology:
         )
 
         self._cache = self._build_topology_cache(
-            clustering, degree_centrality, eigenvector_centrality,
-            betweenness_centrality, communities, concept_to_community,
-            global_clustering, average_path_length, is_small_world,
+            clustering,
+            degree_centrality,
+            eigenvector_centrality,
+            betweenness_centrality,
+            communities,
+            concept_to_community,
+            global_clustering,
+            average_path_length,
+            is_small_world,
             small_world_sigma,
         )
 
@@ -511,6 +533,7 @@ class NetworkTopology:
             is_small_world = False
 
         return small_world_sigma, is_small_world
+
     def _compute_clustering(
         self,
         concepts: list[str],

@@ -112,7 +112,10 @@ The extended model — the Limit Cycle Reciprocal Interaction Model
 Modern refinement (Lu et al., Nature 2006): the REM switch itself
 is another flip-flop — SLD (sublaterodorsal) REM-on neurons vs
 vlPAG/LPT REM-off neurons, mutually inhibitory, with orexin and
-monoaminergic tone biasing the balance.
+monoaminergic tone biasing the balance. Genesis's Rust sleep network
+models the REM-on side (`f_r`, sublaterodorsal/precoeruleus); the
+REM-off counterpart is this module's own oscillator variable `O`
+(the McCarley–Hobson predator above), not a separate body population.
 
 
 ════════════════════════════════════════════════════════════════════════
@@ -357,6 +360,10 @@ _EXPORTS: dict[str, str] = {
     "ParasomniaEvent": "thalamus.events",
     # Autonomic monitoring — module EEG (which subsystem is firing)
     "ModuleSampler": "brainstem.module_sampler",
+    # The NTS/parabrachial relay — first CNS landing for body
+    # afferents: threat → CeA low road, source-level monoamine
+    # modulation, all magnitudes self-set from live levels
+    "InteroceptiveRelay": "brainstem.interoceptive_relay",
     # The autonomic rhythm itself — the periodic loop that samples
     # the body and publishes module activity to the manifest
     "HeartbeatMixin": "brainstem.heartbeat",
@@ -364,9 +371,7 @@ _EXPORTS: dict[str, str] = {
     "LifecycleMixin": "brainstem.lifecycle",
     # The VLPO flip-flop — sleep-wake switching and consolidation drive
     "SleepMixin": "brainstem.sleep",
-    "SleepStageWorker": "brainstem.sleep",
-    # Autonomic setpoints — warning and sleep thresholds
-    "AUTO_SLEEP_ADENOSINE": "brainstem.thresholds",
+    # Autonomic setpoints — warning thresholds
     "WARN_CORTISOL": "brainstem.thresholds",
     # Neuromodulator source nuclei (table in the module docstring) —
     # the brainstem owns the cells that make these chemicals

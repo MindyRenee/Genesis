@@ -43,8 +43,16 @@ __all__ = ["GESTURES", "Painter"]
 # primitives, not subjects: a stroke is still hers to place, size,
 # and combine however she wants.
 GESTURES = (
-    "line", "polyline", "curve", "arc", "loop", "zigzag",
-    "scribble", "spiral", "wave", "dabs",
+    "line",
+    "polyline",
+    "curve",
+    "arc",
+    "loop",
+    "zigzag",
+    "scribble",
+    "spiral",
+    "wave",
+    "dabs",
 )
 
 # Informal labels for what a dialed brush *resembles* — used only to
@@ -87,9 +95,7 @@ class Painter:
         v = float(self._rng.uniform(0.0, 1.0))
         if v < 0.8:
             # Most paper is pale — a light tint of any hue.
-            r, g, b = colorsys.hsv_to_rgb(
-                float(self._rng.uniform(0, 1)), 0.12, 0.96
-            )
+            r, g, b = colorsys.hsv_to_rgb(float(self._rng.uniform(0, 1)), 0.12, 0.96)
         else:
             # Sometimes she wants a dark or colored ground.
             r, g, b = colorsys.hsv_to_rgb(
@@ -103,9 +109,9 @@ class Painter:
     def _novelty_weight(seconds_since: float) -> float:
         """Boredom curve: recently-touched things lose their pull."""
         if math.isinf(seconds_since):
-            return 3.0      # never tried — maximum pull
+            return 3.0  # never tried — maximum pull
         if seconds_since < 1800:
-            return 0.1      # just used — nearly no pull
+            return 0.1  # just used — nearly no pull
         if seconds_since < 7200:
             return 0.4
         if seconds_since < 86400:
@@ -116,9 +122,7 @@ class Painter:
         """How her hand moves this time, novelty-weighted."""
         recency = canvas.gesture_recency()
         names = list(GESTURES)
-        weights = np.array(
-            [self._novelty_weight(recency.get(g, math.inf)) for g in names]
-        )
+        weights = np.array([self._novelty_weight(recency.get(g, math.inf)) for g in names])
         weights /= weights.sum()
         return str(self._rng.choice(names, p=weights))
 
@@ -144,8 +148,7 @@ class Painter:
     def _dial_brush(self) -> dict:
         """Any point in brush space — her own implement this stroke."""
         brush = {
-            "size": float(math.exp(self._rng.uniform(
-                math.log(1.0), math.log(45.0)))),
+            "size": float(math.exp(self._rng.uniform(math.log(1.0), math.log(45.0)))),
             "opacity": float(self._rng.uniform(0.35, 1.0)),
             "hardness": float(self._rng.uniform(0.0, 1.0)),
             "scatter": 0.0,
@@ -190,17 +193,13 @@ class Painter:
             float(self._rng.uniform(0, canvas.height)),
         )
 
-    def _gesture_points(self, gesture: str, canvas: Canvas
-                        ) -> list[tuple[float, float]]:
+    def _gesture_points(self, gesture: str, canvas: Canvas) -> list[tuple[float, float]]:
         w, h = canvas.width, canvas.height
         rng = self._rng
         if gesture == "line":
             return [self._rand_point(canvas), self._rand_point(canvas)]
         if gesture == "polyline":
-            return [
-                self._rand_point(canvas)
-                for _ in range(int(rng.integers(3, 7)))
-            ]
+            return [self._rand_point(canvas) for _ in range(int(rng.integers(3, 7)))]
         if gesture == "curve":
             p0 = self._rand_point(canvas)
             p3 = self._rand_point(canvas)
@@ -208,10 +207,18 @@ class Painter:
             c2 = self._rand_point(canvas)
             pts: list[tuple[float, float]] = []
             for t in np.linspace(0, 1, 24):
-                x = float((1 - t) ** 3 * p0[0] + 3 * (1 - t) ** 2 * t * c1[0]
-                          + 3 * (1 - t) * t ** 2 * c2[0] + t ** 3 * p3[0])
-                y = float((1 - t) ** 3 * p0[1] + 3 * (1 - t) ** 2 * t * c1[1]
-                          + 3 * (1 - t) * t ** 2 * c2[1] + t ** 3 * p3[1])
+                x = float(
+                    (1 - t) ** 3 * p0[0]
+                    + 3 * (1 - t) ** 2 * t * c1[0]
+                    + 3 * (1 - t) * t**2 * c2[0]
+                    + t**3 * p3[0]
+                )
+                y = float(
+                    (1 - t) ** 3 * p0[1]
+                    + 3 * (1 - t) ** 2 * t * c1[1]
+                    + 3 * (1 - t) * t**2 * c2[1]
+                    + t**3 * p3[1]
+                )
                 pts.append((x, y))
             return pts
         if gesture == "arc":
@@ -230,8 +237,7 @@ class Painter:
             phase = float(rng.uniform(0, math.pi * 2))
             n = int(rng.integers(1, 4))
             return [
-                (cx + rx * math.cos(phase + t),
-                 cy + ry * math.sin(phase + t))
+                (cx + rx * math.cos(phase + t), cy + ry * math.sin(phase + t))
                 for t in np.linspace(0, n * 2 * math.pi, 48)
             ]
         if gesture == "zigzag":
@@ -242,10 +248,10 @@ class Painter:
             norm = math.hypot(px, py) or 1.0
             amp = float(rng.uniform(10, 60))
             return [
-                (x0 + (x1 - x0) * i / n
-                 + (px / norm) * amp * (1 if i % 2 else -1),
-                 y0 + (y1 - y0) * i / n
-                 + (py / norm) * amp * (1 if i % 2 else -1))
+                (
+                    x0 + (x1 - x0) * i / n + (px / norm) * amp * (1 if i % 2 else -1),
+                    y0 + (y1 - y0) * i / n + (py / norm) * amp * (1 if i % 2 else -1),
+                )
                 for i in range(n + 1)
             ]
         if gesture == "scribble":
@@ -262,10 +268,10 @@ class Painter:
             r0 = float(rng.uniform(3, 12))
             r1 = float(rng.uniform(30, min(w, h) * 0.4))
             return [
-                (cx + (r0 + (r1 - r0) * t / (turns * 2 * math.pi))
-                 * math.cos(t),
-                 cy + (r0 + (r1 - r0) * t / (turns * 2 * math.pi))
-                 * math.sin(t))
+                (
+                    cx + (r0 + (r1 - r0) * t / (turns * 2 * math.pi)) * math.cos(t),
+                    cy + (r0 + (r1 - r0) * t / (turns * 2 * math.pi)) * math.sin(t),
+                )
                 for t in np.linspace(0, turns * 2 * math.pi, 72)
             ]
         if gesture == "wave":
@@ -275,18 +281,14 @@ class Painter:
             amp = float(rng.uniform(10, 80))
             freq = float(rng.uniform(1.5, 5.0))
             return [
-                (x, yc + amp * math.sin((x - x0) / (x1 - x0)
-                                        * freq * 2 * math.pi))
+                (x, yc + amp * math.sin((x - x0) / (x1 - x0) * freq * 2 * math.pi))
                 for x in np.linspace(x0, x1, 40)
             ]
         if gesture == "dabs":
             x0, y0 = self._rand_point(canvas)
             x1, y1 = self._rand_point(canvas)
             n = int(rng.integers(4, 14))
-            return [
-                (x0 + (x1 - x0) * i / (n - 1), y0 + (y1 - y0) * i / (n - 1))
-                for i in range(n)
-            ]
+            return [(x0 + (x1 - x0) * i / (n - 1), y0 + (y1 - y0) * i / (n - 1)) for i in range(n)]
         return [self._rand_point(canvas), self._rand_point(canvas)]
 
     def _one_move(self, canvas: Canvas) -> None:
@@ -309,9 +311,12 @@ class Painter:
         brush = self._dial_brush()
         canvas.pick_tool(self._name_it(brush), size=brush["size"])
         canvas.set_brush(
-            opacity=brush["opacity"], hardness=brush["hardness"],
-            scatter=brush["scatter"], texture=brush["texture"],
-            erase=brush["erase"], blend=brush["blend"],
+            opacity=brush["opacity"],
+            hardness=brush["hardness"],
+            scatter=brush["scatter"],
+            texture=brush["texture"],
+            erase=brush["erase"],
+            blend=brush["blend"],
         )
         r, g, b, a = self._pick_color(canvas)
         canvas.set_color(r, g, b, a)
@@ -332,8 +337,7 @@ class Painter:
         brush = self._dial_brush()
         r, g, b, a = self._pick_color(canvas)
         canvas.pick_tool(self._name_it(brush), size=brush["size"])
-        canvas.set_brush(opacity=brush["opacity"], erase=brush["erase"],
-                         blend=brush["blend"])
+        canvas.set_brush(opacity=brush["opacity"], erase=brush["erase"], blend=brush["blend"])
         canvas.set_color(r, g, b, a)
         kind = str(self._rng.choice(("ellipse", "rect", "polygon")))
         fill = bool(self._rng.uniform() < 0.4)
@@ -342,7 +346,8 @@ class Painter:
             x = float(self._rng.uniform(0, w * 0.7))
             y = float(self._rng.uniform(0, h * 0.7))
             canvas.ellipse(
-                x, y,
+                x,
+                y,
                 float(self._rng.uniform(15, w - x)),
                 float(self._rng.uniform(15, h - y)),
                 fill=fill,
@@ -351,13 +356,12 @@ class Painter:
             x = float(self._rng.uniform(0, w * 0.7))
             y = float(self._rng.uniform(0, h * 0.7))
             canvas.rect(
-                x, y,
+                x,
+                y,
                 float(self._rng.uniform(15, w - x)),
                 float(self._rng.uniform(15, h - y)),
                 fill=fill,
             )
         else:
             n = int(self._rng.integers(3, 7))
-            canvas.polygon(
-                [self._rand_point(canvas) for _ in range(n)], fill=fill
-            )
+            canvas.polygon([self._rand_point(canvas) for _ in range(n)], fill=fill)

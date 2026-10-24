@@ -57,6 +57,7 @@ import socket
 import struct
 import threading
 import time
+from typing import Any
 
 from .exceptions import (
     ConnectionError as GenesisConnectionError,
@@ -73,6 +74,7 @@ from .protocol import (
     _U64,
     ADVANCE_NEURO,
     ADVANCE_PHYSICS,
+    ANALYZE_CODE,
     APPLY_BODY_CONTROL,
     ARCHIVE_EPISODE,
     ASSOCIATE,
@@ -91,13 +93,14 @@ from .protocol import (
     FIND_SIMILAR,
     GET_BODY_CONTROL,
     GET_BODY_STATE,
-    GET_DYADIC_STATE,
     GET_FIELD_PROBE,
     GET_INFERENCE_SUMMARY,
+    GET_INTERNALS,
     GET_ION_SUMMARY,
     GET_MEMORY_STATS,
     GET_MOTOR_TARGET,
     GET_NEURO_SUMMARY,
+    GET_OPTIC_STATE,
     GET_PHASE,
     GET_PLASTICITY_PROFILE,
     GET_PROCESS_HEALTH,
@@ -126,10 +129,13 @@ from .protocol import (
     RETRIEVE_EPISODE,
     SAVE_INFERENCE,
     SEARCH_EPISODES,
+    SET_COGNITIVE_PID,
     SET_FIELD_CARRIER,
     SET_FIELD_PHASE,
+    SET_FOCUS,
+    SET_LID,
+    SET_OPTIC_GAIN,
     SET_POLICY_AUTHORITY,
-    SET_VOLITION,
     SET_WAKE_ALARM,
     SET_ZONE,
     SHUTDOWN,
@@ -160,13 +166,13 @@ from .types import (
     BodyControlState,
     BodyState,
     CoreState,
-    DyadicSnapshot,
     Episode,
     FieldProbeSignature,
     InferenceSummary,
     IonSummary,
     MemoryStats,
     NeuroSummary,
+    OpticState,
     PhaseInfo,
     PingResponse,
     PlasticityProfile,
@@ -200,7 +206,11 @@ class GenesisClient:
         """Initialize the client with a socket path and request timeout."""
         self.socket_path = socket_path
         self._sock: socket.socket | None = None
+        self._read_sock: socket.socket | None = None
+        self._ever_connected = False
         self._lock = threading.RLock()
+        self._read_lock = threading.RLock()
+        self._cache_lock = threading.Lock()
         self.request_timeout = request_timeout
         # Short-TTL cache for frequently-called read-only commands.
         # Background threads (inner_life, learner, regulator) call
@@ -225,58 +235,74 @@ class GenesisClient:
             self.disconnect()
             self._connect()
 
-    def _close_socket(self) -> None:
-        """Close the current socket if open and clear the reference.
+    @staticmethod
+    def _close(sock: socket.socket | None, site: str) -> None:
+        """Close a channel socket, interrupting any in-flight read.
 
-        Does NOT clear the cache or acquire the lock — used internally
-        by ``_connect`` on error paths where the caller (``connect``)
-        has already cleared the cache and holds the lock.
+        ``shutdown`` runs before ``close`` so a thread parked in
+        ``read_message`` on this socket is released immediately rather
+        than lingering until its read timeout fires.
         """
-        if self._sock is not None:
-            try:
-                self._sock.close()
-            except OSError as e:
-                note_swallowed(
-                    "genesis_client.client._close_socket",
-                    e,
-                )
-            self._sock = None
+        if sock is None:
+            return
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError as e:
+            # not connected or already torn down
+            note_swallowed(site, e)
+        try:
+            sock.close()
+        except OSError as e:
+            note_swallowed(site, e)
 
-    def _connect(self) -> None:
-        """Open the socket and perform the protocol handshake (no lock)."""
+    def _close_socket(self) -> None:
+        """Close the control socket if open and clear the reference.
+
+        Does NOT clear the cache or acquire the lock — callers already
+        hold ``_lock`` (the request path) or cleared it themselves.
+        """
+        self._close(self._sock, "genesis_client.client._close_socket")
+        self._sock = None
+
+    def _close_read_socket(self) -> None:
+        """Close the read-channel socket (caller holds ``_read_lock``)."""
+        self._close(self._read_sock, "genesis_client.client._close_read_socket")
+        self._read_sock = None
+
+    def _open_channel(self) -> socket.socket:
+        """Open one socket to the daemon and run the handshake.
+
+        Used for both the control channel (``_connect``) and the
+        read-only channel (``_ensure_read_connected``). Returns the
+        connected, version-checked socket; raises on any failure after
+        closing the half-open socket.
+        """
         if not os.path.exists(self.socket_path):
             raise DaemonNotRunning(f"socket not found: {self.socket_path} (is the daemon running?)")
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(self.request_timeout)  # 30s timeout — daemon should never take longer
         try:
-            self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            self._sock.settimeout(
-                self.request_timeout
-            )  # 30s timeout — daemon should never take longer
-            self._sock.connect(self.socket_path)
+            sock.connect(self.socket_path)
         except OSError as e:
-            # Clean up the dead socket so a later _ensure_connected()
-            # doesn't reuse it — it would fail on a broken connection
-            # instead of reconnecting.
-            self._close_socket()
+            self._close(sock, "genesis_client.client._open_channel")
             raise GenesisConnectionError(f"failed to connect: {e}") from e
 
         # Protocol version handshake
         try:
-            write_message(self._sock, HANDSHAKE, bytes([PROTOCOL_VERSION]))
-            resp_cmd, resp_data = read_message(self._sock)
+            write_message(sock, HANDSHAKE, bytes([PROTOCOL_VERSION]))
+            resp_cmd, resp_data = read_message(sock)
         except OSError as e:
-            self._close_socket()
+            self._close(sock, "genesis_client.client._open_channel")
             raise GenesisConnectionError(f"handshake failed: {e}") from e
 
         if resp_cmd != HANDSHAKE or not resp_data:
-            self._close_socket()
-            raise ProtocolError(
-                f"handshake failed: unexpected response (cmd={resp_cmd})"
-            )
+            self._close(sock, "genesis_client.client._open_channel")
+            raise ProtocolError(f"handshake failed: unexpected response (cmd={resp_cmd})")
         if is_error_byte(resp_data[0]):
             # The daemon signalled a version mismatch: the first byte
             # is ERROR_VERSION_MISMATCH and the second (if present) is
             # its actual version.
-            self._close_socket()
+            self._close(sock, "genesis_client.client._open_channel")
             actual = resp_data[1] if len(resp_data) > 1 else None
             raise ProtocolError(
                 f"protocol version mismatch: client={PROTOCOL_VERSION}, "
@@ -284,25 +310,32 @@ class GenesisClient:
             )
         daemon_version = resp_data[0]
         if daemon_version != PROTOCOL_VERSION:
-            self._close_socket()
+            self._close(sock, "genesis_client.client._open_channel")
             raise ProtocolError(
-                f"protocol version mismatch: client={PROTOCOL_VERSION}, "
-                f"daemon={daemon_version}"
+                f"protocol version mismatch: client={PROTOCOL_VERSION}, daemon={daemon_version}"
             )
+        return sock
+
+    def _connect(self) -> None:
+        """Open the control socket and perform the handshake (no lock)."""
+        self._sock = self._open_channel()
+        self._ever_connected = True
+
+    def _connect_read(self) -> None:
+        """Open the read-only channel (caller holds ``_read_lock``)."""
+        self._read_sock = self._open_channel()
 
     def disconnect(self) -> None:
         """Close the connection to the daemon."""
         with self._lock:
-            self._cache.clear()
-            if self._sock is not None:
-                try:
-                    self._sock.close()
-                except OSError as e:
-                    note_swallowed(
-                        "genesis_client.client.disconnect",
-                        e,
-                    )
-                self._sock = None
+            with self._cache_lock:
+                self._cache.clear()
+            self._close_socket()
+            # The read channel is closed without taking _read_lock so
+            # disconnect can never block behind a stalled read; the
+            # in-flight read sees the socket die and reconnects lazily.
+            self._close(self._read_sock, "genesis_client.client.disconnect")
+            self._read_sock = None
 
     def __enter__(self) -> GenesisClient:
         """Context manager entry — connect and return self."""
@@ -319,10 +352,83 @@ class GenesisClient:
         return self._sock is not None
 
     def _ensure_connected(self) -> socket.socket:
-        """Return the open socket or raise if not connected."""
+        """Return the open socket, reconnecting if the link dropped.
+
+        A client that was connected before reconnects on demand: after
+        a daemon restart the next request re-establishes the link
+        instead of every caller failing until some slower path notices.
+        A client that was never connected still raises, and a clean
+        ``disconnect()`` while the daemon is genuinely down fails the
+        same way it always did — the connect attempt just reports the
+        real reason (socket missing, refused) instead of a bare
+        "not connected".
+        """
         if self._sock is None:
-            raise GenesisConnectionError("not connected — call connect() first")
-        return self._sock
+            if not self._ever_connected:
+                raise GenesisConnectionError("not connected — call connect() first")
+            self._connect()
+        sock = self._sock
+        if sock is None:
+            raise GenesisConnectionError("not connected")
+        return sock
+
+    def _ensure_read_connected(self) -> socket.socket:
+        """Return the read-channel socket, opening it on first use.
+
+        The read channel is a second daemon connection carrying only
+        side-effect-free commands (``_READ_CHANNEL_CMDS``). The daemon
+        serves each connection on its own thread, so reads never queue
+        behind a burst of writes on the control channel — a stalled or
+        merely busy ``think()`` no longer starves heartbeat, regulator,
+        and intention telemetry reads. Same reconnect rule as the
+        control channel: only a previously-connected client reopens.
+        """
+        if self._read_sock is None:
+            if not self._ever_connected:
+                raise GenesisConnectionError("not connected — call connect() first")
+            self._connect_read()
+        sock = self._read_sock
+        if sock is None:
+            raise GenesisConnectionError("not connected")
+        return sock
+
+    # Commands served on the read channel — every one is a pure read
+    # with no daemon-side effect, so reordering a read against a
+    # concurrent write can at worst observe slightly older state, the
+    # same staleness the 150ms cache already allows. Write/idempotent-
+    # write commands (STORE_*, NEURO_*, PUT/DROP_TENSOR, ADVANCE_*,
+    # UPDATE_*, SET_*, READ_SENSORS, SAVE_INFERENCE, ARCHIVE_EPISODE,
+    # SHUTDOWN, SYNC, CONSOLIDATE, ASSOCIATE, DREAM) stay on the
+    # control channel where their ordering is preserved.
+    _READ_CHANNEL_CMDS = frozenset(
+        {
+            PING,
+            ANALYZE_CODE,
+            GET_STATE,
+            GET_NEURO_SUMMARY,
+            GET_PHASE,
+            GET_MEMORY_STATS,
+            GET_INFERENCE_SUMMARY,
+            GET_BODY_STATE,
+            GET_BODY_CONTROL,
+            GET_PLASTICITY_PROFILE,
+            GET_FIELD_PROBE,
+            GET_INTERNALS,
+            GET_ION_SUMMARY,
+            GET_MOTOR_TARGET,
+            GET_OPTIC_STATE,
+            GET_PROCESS_HEALTH,
+            GET_RECENT_EPISODES,
+            GET_SENSOR_PRESENCE,
+            GET_SUBSYSTEM_TELEMETRY,
+            GET_TENSOR,
+            GET_ZONE_TRANSITIONS,
+            LIST_TENSORS,
+            RETRIEVE_EPISODE,
+            FIND_SIMILAR,
+            SEARCH_EPISODES,
+        }
+    )
 
     # Read-only commands that are safe to cache with a short TTL.
     # State only changes when the mind advances neurochemistry (via
@@ -331,49 +437,108 @@ class GenesisClient:
     # assessment in background threads. Write commands (STORE_EVENT,
     # NEURO_IMPULSE, SET_ZONE, SYNC, SHUTDOWN, UPDATE_*) are never
     # cached.
-    _CACHEABLE_CMDS = frozenset({
-        GET_STATE, GET_NEURO_SUMMARY, GET_PHASE, GET_MEMORY_STATS,
-        GET_INFERENCE_SUMMARY, GET_BODY_STATE, GET_BODY_CONTROL,
-        GET_PLASTICITY_PROFILE,
-    })
+    _CACHEABLE_CMDS = frozenset(
+        {
+            GET_STATE,
+            GET_NEURO_SUMMARY,
+            GET_PHASE,
+            GET_MEMORY_STATS,
+            GET_INFERENCE_SUMMARY,
+            GET_BODY_STATE,
+            GET_BODY_CONTROL,
+            GET_PLASTICITY_PROFILE,
+        }
+    )
 
     # Write commands that invalidate the cache. When these are sent,
     # all cached read-only responses are cleared so the next read
     # sees the updated state. Without this, a neuro_impulse followed
     # immediately by feel() would return the pre-impulse state for
     # up to 150ms.
-    _CACHE_INVALIDATING_CMDS = frozenset({
-        STORE_EVENT, NEURO_IMPULSE, NEURO_ADJUST_BASELINE, SET_ZONE, SYNC,
-        SHUTDOWN, UPDATE_MODULE_STATUS, UPDATE_USER_AFFECT, ARCHIVE_EPISODE,
-        STORE_EPISODE,
-        ADVANCE_NEURO, ADVANCE_PHYSICS, CONSOLIDATE, ASSOCIATE, DREAM, READ_SENSORS,
-        APPLY_BODY_CONTROL, SAVE_INFERENCE, SET_POLICY_AUTHORITY, SET_WAKE_ALARM,
-    })
+    _CACHE_INVALIDATING_CMDS = frozenset(
+        {
+            STORE_EVENT,
+            NEURO_IMPULSE,
+            NEURO_ADJUST_BASELINE,
+            SET_ZONE,
+            SYNC,
+            SHUTDOWN,
+            UPDATE_MODULE_STATUS,
+            UPDATE_USER_AFFECT,
+            ARCHIVE_EPISODE,
+            STORE_EPISODE,
+            ADVANCE_NEURO,
+            ADVANCE_PHYSICS,
+            CONSOLIDATE,
+            ASSOCIATE,
+            DREAM,
+            READ_SENSORS,
+            APPLY_BODY_CONTROL,
+            SAVE_INFERENCE,
+            SET_POLICY_AUTHORITY,
+            SET_WAKE_ALARM,
+        }
+    )
 
     # All tensor commands are idempotent (last-write-wins put,
     # read-only gets/list, idempotent remove), so every one may be
     # retried after a reconnect.
-    _RETRYABLE_CMDS = _CACHEABLE_CMDS | frozenset({
-        PING, RETRIEVE_EPISODE, FIND_SIMILAR, GET_RECENT_EPISODES, SEARCH_EPISODES,
-        PUT_TENSOR, GET_TENSOR, LIST_TENSORS, DROP_TENSOR, GET_MOTOR_TARGET,
-    })
+    _RETRYABLE_CMDS = _CACHEABLE_CMDS | frozenset(
+        {
+            PING,
+            RETRIEVE_EPISODE,
+            FIND_SIMILAR,
+            GET_RECENT_EPISODES,
+            SEARCH_EPISODES,
+            GET_OPTIC_STATE,
+            PUT_TENSOR,
+            GET_TENSOR,
+            LIST_TENSORS,
+            DROP_TENSOR,
+            GET_MOTOR_TARGET,
+        }
+    )
 
     # Commands whose response first byte is an ack/status byte (1 =
     # success, 0 = not-found/invalid, 0x80+ = error). For these, the
     # error check examines the first byte regardless of response length
     # — the daemon pads error responses to the expected size (e.g.
     # STORE_EVENT returns 8 bytes, ADVANCE_NEURO returns 21 bytes).
-    _ACK_CMDS = frozenset({
-        PING, STORE_EVENT, STORE_EPISODE, SET_ZONE, NEURO_IMPULSE, SYNC,
-        SHUTDOWN, UPDATE_MODULE_STATUS, UPDATE_USER_AFFECT,
-        ARCHIVE_EPISODE,
-        NEURO_ADJUST_BASELINE, ADVANCE_NEURO, ADVANCE_PHYSICS, CONSOLIDATE, ASSOCIATE,
-        DREAM, READ_SENSORS, APPLY_BODY_CONTROL, SAVE_INFERENCE,
-        SET_POLICY_AUTHORITY, SET_VOLITION, SET_WAKE_ALARM,
-        # PUT/DROP ack with a single byte. GET_TENSOR's leading
-        # found-byte is 0 or 1, so it can never alias an error code.
-        PUT_TENSOR, DROP_TENSOR,
-    })
+    _ACK_CMDS = frozenset(
+        {
+            PING,
+            STORE_EVENT,
+            STORE_EPISODE,
+            SET_ZONE,
+            NEURO_IMPULSE,
+            SYNC,
+            SHUTDOWN,
+            UPDATE_MODULE_STATUS,
+            UPDATE_USER_AFFECT,
+            ARCHIVE_EPISODE,
+            NEURO_ADJUST_BASELINE,
+            ADVANCE_NEURO,
+            ADVANCE_PHYSICS,
+            CONSOLIDATE,
+            ASSOCIATE,
+            DREAM,
+            READ_SENSORS,
+            APPLY_BODY_CONTROL,
+            SAVE_INFERENCE,
+            SET_POLICY_AUTHORITY,
+            SET_WAKE_ALARM,
+            # PUT/DROP ack with a single byte. GET_TENSOR's leading
+            # found-byte is 0 or 1, so it can never alias an error code.
+            PUT_TENSOR,
+            DROP_TENSOR,
+            # GET_INTERNALS leads with an ack byte before its text body.
+            GET_INTERNALS,
+            # Optic state leads with an ack byte before the snapshot.
+            GET_OPTIC_STATE,
+            SET_OPTIC_GAIN,
+            SET_FOCUS,
+        }
+    )
 
     def _request(
         self,
@@ -386,7 +551,10 @@ class GenesisClient:
 
         Thread-safe: serializes send/receive so concurrent calls from
         background threads (autonomous learner, inner life) don't
-        interleave on the shared socket.
+        interleave on a shared socket. Pure reads run on a dedicated
+        second connection (``_READ_CHANNEL_CMDS``) so they never queue
+        behind a burst of writes; everything else uses the control
+        channel, preserving write ordering.
 
         Read-only commands (GET_*) are served from a short-TTL cache
         when fresh, eliminating redundant socket round-trips from
@@ -405,11 +573,17 @@ class GenesisClient:
             ProtocolError: If the response is malformed.
         """
         effective_timeout = self.request_timeout if timeout is None else timeout
-        with self._lock:
-            self._ensure_connected()
+        on_read_channel = cmd_id in self._READ_CHANNEL_CMDS
+        channel_lock = self._read_lock if on_read_channel else self._lock
+        with channel_lock:
+            if on_read_channel:
+                self._ensure_read_connected()
+            else:
+                self._ensure_connected()
             # Check cache for read-only commands
             if cmd_id in self._CACHEABLE_CMDS and not payload:
-                cached = self._cache.get(cmd_id)
+                with self._cache_lock:
+                    cached = self._cache.get(cmd_id)
                 if cached is not None:
                     ts, data = cached
                     if time.monotonic() - ts < self._cache_ttl:
@@ -418,71 +592,154 @@ class GenesisClient:
             # Write commands invalidate all cached state — the next read
             # must go to the daemon to see the updated values.
             if cmd_id in self._CACHE_INVALIDATING_CMDS:
-                self._cache.clear()
+                with self._cache_lock:
+                    self._cache.clear()
 
             for attempt in range(2):
-                sock = self._ensure_connected()
-                old_timeout = sock.gettimeout()
-                try:
-                    sock.settimeout(effective_timeout)
-                    write_message(sock, cmd_id, payload)
-                    resp_cmd, resp_data = read_message(sock)
-                except (GenesisConnectionError, ConnectionError, OSError) as e:
-                    self.disconnect()
-                    # Connection broke — try to reconnect once
-                    if attempt == 0:
-                        logger.warning(f"connection lost ({e}), attempting reconnect...")
-                        try:
-                            self.connect()
-                        except Exception as re:
-                            raise GenesisConnectionError(
-                                f"reconnect failed: {re}"
-                            ) from re
-                        if cmd_id not in self._RETRYABLE_CMDS:
-                            raise GenesisConnectionError(
-                                f"connection lost after command {cmd_id}: outcome unknown; "
-                                "command was not retried"
-                            ) from e
-                        continue
-                    raise GenesisConnectionError(f"connection lost: {e}") from e
-                finally:
-                    try:
-                        sock.settimeout(old_timeout)
-                    except OSError as e:
-                        note_swallowed(
-                            "genesis_client.client._request",
-                            e,
-                        )
-
-                if resp_cmd != cmd_id:
-                    self.disconnect()
-                    raise ProtocolError(
-                        f"response command {resp_cmd} != request command {cmd_id}"
-                    )
-                # Check for error responses: the daemon returns a
-                # response whose first byte has the high bit set
-                # (0x80+) when a command fails (e.g. read_consistent
-                # failed, payload too short, internal error).
-                #
-                # For ack commands (STORE_EVENT, ADVANCE_NEURO, etc.)
-                # the daemon pads the error response to the expected
-                # size, so we must check the first byte regardless of
-                # response length. For raw-data commands (GET_*), the
-                # first byte is struct data that can legitimately be
-                # >= 0x80 (e.g. an f32 mantissa byte), so we only
-                # check single-byte responses for those.
-                if resp_data and is_error_byte(resp_data[0]):
-                    if cmd_id in self._ACK_CMDS or len(resp_data) == 1:
-                        err_code = resp_data[0]
-                        raise ProtocolError(
-                            f"daemon error: {error_name(err_code)} (0x{err_code:02x})"
-                        )
-                # Cache read-only responses
-                if cmd_id in self._CACHEABLE_CMDS and not payload:
-                    self._cache[cmd_id] = (time.monotonic(), resp_data)
-                return resp_data
+                resp_data = self._request_attempt(
+                    cmd_id,
+                    payload,
+                    effective_timeout,
+                    on_read_channel,
+                    attempt,
+                )
+                if resp_data is not None:
+                    return resp_data
 
         raise GenesisConnectionError("request failed after reconnect attempt")
+
+    def _request_attempt(
+        self,
+        cmd_id: int,
+        payload: bytes,
+        effective_timeout: float,
+        on_read_channel: bool,
+        attempt: int,
+    ) -> bytes | None:
+        """One send/receive attempt on the appropriate channel.
+
+        Returns the response payload, or None when the connection was
+        lost on a retryable command and the loop should attempt again.
+        Raises on unrecoverable loss or a broken response.
+        """
+        sock = self._ensure_read_connected() if on_read_channel else self._ensure_connected()
+        old_timeout = sock.gettimeout()
+        t0 = time.monotonic()
+        try:
+            sock.settimeout(effective_timeout)
+            write_message(sock, cmd_id, payload)
+            resp_cmd, resp_data = read_message(sock)
+            elapsed = time.monotonic() - t0
+            if elapsed > 2.0:
+                # Slow IPC is the early sign of daemon-side
+                # serialization stalls — a command that holds
+                # the tick lock or LTM while doing slow work
+                # queues every caller behind it.
+                logger.debug(
+                    "ipc cmd %d took %.2fs (deadline %.2fs)",
+                    cmd_id,
+                    elapsed,
+                    effective_timeout,
+                )
+        except (GenesisConnectionError, ConnectionError, OSError) as e:
+            # Tear down only this channel — a stalled read must
+            # not knock out the control channel and vice versa.
+            # The cache clears too: a daemon restart may leave
+            # entries describing a state that no longer exists.
+            if on_read_channel:
+                self._close_read_socket()
+            else:
+                self._close_socket()
+            with self._cache_lock:
+                self._cache.clear()
+            # Connection broke — try to reconnect once
+            if attempt == 0:
+                # Teardown unlinks the socket: a daemon that is gone
+                # for good leaves nothing to reconnect to. Fail
+                # quietly instead of logging a warning that can only
+                # end in failure — mirrored to her feed, it reads as
+                # a crash on her way out.
+                if not os.path.exists(self.socket_path):
+                    raise GenesisConnectionError(f"connection lost: {e}") from e
+                # Name the command — a bare "timed out" hides
+                # which request was stalled on the daemon.
+                logger.warning(
+                    f"connection lost during command {cmd_id} ({e}), attempting reconnect..."
+                )
+                try:
+                    if on_read_channel:
+                        self._connect_read()
+                    else:
+                        self.connect()
+                except Exception as re:
+                    raise GenesisConnectionError(f"reconnect failed: {re}") from re
+                if cmd_id not in self._RETRYABLE_CMDS:
+                    raise GenesisConnectionError(
+                        f"connection lost after command {cmd_id}: outcome unknown; "
+                        "command was not retried"
+                    ) from e
+                return None
+            raise GenesisConnectionError(f"connection lost: {e}") from e
+        finally:
+            # Restore the socket's timeout for reuse — unless the
+            # failure path above already closed it, in which
+            # case the fd is dead and settimeout would raise EBADF.
+            live = self._read_sock if on_read_channel else self._sock
+            if live is sock:
+                try:
+                    sock.settimeout(old_timeout)
+                except OSError as e:
+                    note_swallowed(
+                        "genesis_client.client._request",
+                        e,
+                    )
+
+        return self._validate_response(
+            cmd_id,
+            resp_cmd,
+            resp_data,
+            payload,
+            on_read_channel,
+        )
+
+    def _validate_response(
+        self,
+        cmd_id: int,
+        resp_cmd: int,
+        resp_data: bytes,
+        payload: bytes,
+        on_read_channel: bool,
+    ) -> bytes:
+        """Check a response for framing/protocol errors and cache reads."""
+        if resp_cmd != cmd_id:
+            # Framing is broken on this channel — drop it, but
+            # don't take the other channel's lock from here.
+            if on_read_channel:
+                self._close_read_socket()
+            else:
+                self._close_socket()
+            raise ProtocolError(f"response command {resp_cmd} != request command {cmd_id}")
+        # Check for error responses: the daemon returns a
+        # response whose first byte has the high bit set
+        # (0x80+) when a command fails (e.g. read_consistent
+        # failed, payload too short, internal error).
+        #
+        # For ack commands (STORE_EVENT, ADVANCE_NEURO, etc.)
+        # the daemon pads the error response to the expected
+        # size, so we must check the first byte regardless of
+        # response length. For raw-data commands (GET_*), the
+        # first byte is struct data that can legitimately be
+        # >= 0x80 (e.g. an f32 mantissa byte), so we only
+        # check single-byte responses for those.
+        if resp_data and is_error_byte(resp_data[0]):
+            if cmd_id in self._ACK_CMDS or len(resp_data) == 1:
+                err_code = resp_data[0]
+                raise ProtocolError(f"daemon error: {error_name(err_code)} (0x{err_code:02x})")
+        # Cache read-only responses
+        if cmd_id in self._CACHEABLE_CMDS and not payload:
+            with self._cache_lock:
+                self._cache[cmd_id] = (time.monotonic(), resp_data)
+        return resp_data
 
     # ─── Commands ──────────────────────────────────────────────
 
@@ -492,7 +749,7 @@ class GenesisClient:
         return PingResponse.unpack(resp)
 
     def get_state(self, *, timeout: float | None = None) -> CoreState:
-        """Get the full core state (3480 bytes), parsed into useful fields."""
+        """Get the full core state (3480 bytes, schema v5), parsed into useful fields."""
         resp = self._request(GET_STATE, timeout=timeout)
         return CoreState.unpack(resp)
 
@@ -514,13 +771,19 @@ class GenesisClient:
         return IonSummary.unpack(resp)
 
     def get_field_probe(self, *, timeout: float | None = None) -> FieldProbeSignature | None:
-        """Get the body's real substrate signature (v2: 114 bytes; v1: 102).
+        """Get the body's real substrate signature (v6: 408 B; older: 328/308/195/114/102).
 
-        The daemon's field-probe thread samples real electron-flow
+        The daemon's field-probe thread samples real substrate
         dynamics — instruction throughput, scheduler jitter, P-state
-        transitions, interrupt flux — at ~250 Hz and decomposes them
-        at the wave bands' center frequencies. It also writes a
-        carrier rhythm into real work keyed to the body's phase.
+        transitions, interrupt flux, measured power draw where the
+        machine's sensors report it, and the radios' own telemetry
+        (WLAN byte flux + RSSI, wireless-attributed interrupts, HCI
+        counters) — and decomposes them at the wave bands' center
+        frequencies. It also writes a carrier rhythm into real work
+        keyed to the body's phase, and evaluates Maxwell's equations
+        on the measured current swing (quasi-static B, induction E,
+        ω⁴-suppressed radiated power — estimates, with the loop
+        geometry an assumption).
 
         Returns ``None`` when the probe isn't running or the daemon
         predates the command: an absent channel is no reading, never
@@ -534,35 +797,36 @@ class GenesisClient:
             return None
         return FieldProbeSignature.unpack(resp)
 
-    def get_dyadic_state(self, *, timeout: float | None = None) -> DyadicSnapshot | None:
-        """Who is present and how the dyad is running — evidence, not
-        prescription.
+    def get_internals(self, *, timeout: float | None = None) -> dict[str, str] | None:
+        """The daemon's process-local internals — the gears no state
+        file shows.
 
-        The daemon's dyadic model measures the social field: the
-        present person's signature (attributed name, provenance, bond
-        depth, affective aura, in-tune history, and the field
-        band-energy configuration recorded during their presence),
-        the pooled coupling estimates, and a one-tick reunion signal
-        when a known person returns after a real absence.
+        Every adaptive gate's full snapshot (bounds, period, next-fire
+        countdown, smoothed demand), the mind lease, tick counter,
+        last-applied body policy, and the autonomous
+        fallback's own gates — as a flat ``key=value`` map. The wire
+        format is additive: unknown keys from a newer daemon ride
+        through harmlessly, so callers should pick the keys they know
+        rather than depend on completeness.
 
-        What any of this means chemically is the caller's appraisal —
-        the model reports measurements only.
-
-        Returns ``None`` until the tick loop publishes its first
-        snapshot or when the daemon predates the command — an absent
-        channel is no reading, never a zero reading.
+        Observation only — nothing here can move the gears. Returns
+        ``None`` on transport failure or when the daemon predates the
+        command: an absent channel is no reading, never a zero one.
         """
         try:
-            resp = self._request(GET_DYADIC_STATE, timeout=timeout)
+            resp = self._request(GET_INTERNALS, timeout=timeout)
         except (ConnectionError, OSError, ProtocolError):
             return None
-        if not resp or resp[0] >= 0x80:
+        if not resp or resp[0] != 1:
             return None
-        return DyadicSnapshot.unpack(resp)
+        out: dict[str, str] = {}
+        for line in resp[1:].decode("utf-8", "replace").splitlines():
+            key, sep, value = line.partition("=")
+            if sep and key:
+                out[key] = value
+        return out
 
-    def set_field_phase(
-        self, phase: float, *, timeout: float | None = None
-    ) -> bool:
+    def set_field_phase(self, phase: float, *, timeout: float | None = None) -> bool:
         """Push the mind's modeled carrier-band phase into the probe.
 
         The physics-follows-model leg of the mutual phase lock: the
@@ -575,9 +839,7 @@ class GenesisClient:
         predates the command — an absent channel, never silent.
         """
         try:
-            resp = self._request(
-                SET_FIELD_PHASE, _F32.pack(phase), timeout=timeout
-            )
+            resp = self._request(SET_FIELD_PHASE, _F32.pack(phase), timeout=timeout)
         except (ConnectionError, OSError, ProtocolError):
             return False
         return bool(resp) and resp[0] == 1
@@ -591,7 +853,7 @@ class GenesisClient:
         unmodulated work, carrier silent). ``freq`` 0 hands the rhythm
         back to the body's phase; positive overrides it (clamped
         0.1..100 Hz) so evaluation can drive arbitrary bands —
-        including epsilon-rate infraslow where the thermal field can
+        including infraslow rates where the thermal field can
         hold an oscillation.
 
         Returns ``False`` when the probe isn't running or the daemon
@@ -600,6 +862,141 @@ class GenesisClient:
         payload = _F32.pack(depth) + _F32.pack(freq)
         try:
             resp = self._request(SET_FIELD_CARRIER, payload, timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return False
+        return bool(resp) and resp[0] == 1
+
+    def get_optic_state(self, *, timeout: float | None = None) -> OpticState | None:
+        """The optic nerve's subcortical channel state — the body's own
+        read of the eye.
+
+        Photopic and melanopic irradiance, motion energy, the
+        collicular orienting transient, the SCN light drive the body
+        feeds its circadian oscillator, and the thalamic relay gate
+        the mind must honour — near zero in NREM/REM, open while
+        awake. A look through a closed gate is a blind look.
+
+        ``eye_present`` distinguishes "the eye exists but sees nothing"
+        from "there is no eye"; ``frame_seq``/``frame_age_ms`` let the
+        caller tell a stalled feed from a live one.
+
+        Returns ``None`` on transport failure or when the daemon
+        predates the command — an absent channel is no reading, never
+        a zero reading.
+        """
+        try:
+            resp = self._request(GET_OPTIC_STATE, timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return None
+        try:
+            return OpticState.unpack(resp)
+        except (IndexError, struct.error, ValueError):
+            return None
+
+    def set_optic_gain(self, gain: float, *, timeout: float | None = None) -> bool:
+        """Corticothalamic feedback — the mind's engagement gain onto
+        the thalamic relay (the layer-6 V1→dLGN projection).
+
+        Modulatory only: the body clamps ``gain`` into 0..1 and scales
+        the relay within ±40% of what the sleep stage permits — it can
+        never open a gate NREM has closed. 0.5 is neutral, above 1.0
+        is meaningless (clamped).
+
+        Returns ``False`` when the daemon predates the command — an
+        absent channel, never silent.
+        """
+        try:
+            resp = self._request(SET_OPTIC_GAIN, _F32.pack(gain), timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return False
+        return bool(resp) and resp[0] == 1
+
+    def analyze_code(
+        self, path: str, source: str, *, timeout: float | None = None
+    ) -> dict[str, Any] | None:
+        """The body's structural sense of a Rust source file.
+
+        The daemon parses the source into a real AST (syn) — semantic
+        units with calls/references/complexity, the dependency graph,
+        impl relations — a richer reading than the mind's regex parser.
+        The report is decoded into::
+
+            {"file": str, "stats": {lines, functions, structs, enums,
+              traits, impls, max_complexity, avg_complexity},
+             "units": [{kind, name, qualified, span, public, async_,
+              unsafe_, body, params, return_type, calls, refs,
+              branches, loops, stmts, docs}],
+             "impls": [(self_type, trait_or_None)],
+             "edges": [(caller_qualified, callee_qualified)]}
+
+        Returns ``None`` on transport failure, a parse error the daemon
+        rejected (``INVALID_VALUE``), or when the daemon predates the
+        command — an absent channel, never a fabricated reading. Callers
+        should fall back to their own parser on ``None``.
+        """
+        path_b = path.encode("utf-8", "replace")[:0xFFFF]
+        src_b = source.encode("utf-8", "replace")
+        payload = _U16.pack(len(path_b)) + path_b + _U32.pack(len(src_b)) + src_b
+        try:
+            resp = self._request(ANALYZE_CODE, payload, timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return None
+        if not resp or resp[0] != 1:
+            return None
+        return _decode_code_analysis(resp[1:].decode("utf-8", "replace"))
+
+    def set_focus(self, meters: float, *, timeout: float | None = None) -> bool:
+        """Accommodation — the mind's focus request in metres.
+
+        The body converts the distance to the ciliary drive
+        (``1/m`` dioptres, clamped to 0..6 — infinity out to a ~17 cm
+        near point) and slews toward it on the advance clock, pulling
+        in faster than it releases. ``meters <= 0`` or non-finite
+        relaxes the eye to infinity. Monocular: the ciliary servo
+        only — no vergence exists to request.
+
+        Returns ``False`` when the daemon predates the command — an
+        absent channel, never silent.
+        """
+        try:
+            resp = self._request(SET_FOCUS, _F32.pack(meters), timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return False
+        return bool(resp) and resp[0] == 1
+
+    def set_lid(self, openness: float, *, timeout: float | None = None) -> bool:
+        """Voluntary eyelid — the orbicularis oculi the hardware lacks.
+
+        ``openness`` in 0..1 composes with the sleep phase's own lid
+        position by min: the mind can shut an open eye (to rest it,
+        to dim the world) but can never open one the stage has
+        closed. Held, not momentary — lids stay where the mind left
+        them until it moves them again. 1.0 releases the eye to the
+        phase's own position.
+
+        Returns ``False`` when the daemon predates the command — an
+        absent channel, never silent.
+        """
+        try:
+            resp = self._request(SET_LID, _F32.pack(openness), timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return False
+        return bool(resp) and resp[0] == 1
+
+    def set_cognitive_pid(self, pid: int, *, timeout: float | None = None) -> bool:
+        """Tell the body which process is its cognitive mind.
+
+        Pushed when a new mind re-inhabits a surviving body — adoption
+        replaces ``GENESIS_COGNITIVE_PID``, which still names the dead
+        launcher. Interoception then measures the living mind's
+        CPU/memory instead of a corpse's, and ``GET_PROCESS_HEALTH``
+        reports the mind alive again.
+
+        Returns ``False`` when the daemon predates the command — an
+        absent channel, never silent.
+        """
+        try:
+            resp = self._request(SET_COGNITIVE_PID, _U32.pack(pid), timeout=timeout)
         except (ConnectionError, OSError, ProtocolError):
             return False
         return bool(resp) and resp[0] == 1
@@ -627,14 +1024,10 @@ class GenesisClient:
         Returns:
             True when the daemon acknowledged the store.
         """
-        resp = self._request(
-            PUT_TENSOR, pack_name(name) + tensor.pack(), timeout=timeout
-        )
+        resp = self._request(PUT_TENSOR, pack_name(name) + tensor.pack(), timeout=timeout)
         return bool(resp) and resp[0] == 1
 
-    def get_tensor(
-        self, name: str, *, timeout: float | None = None
-    ) -> Tensor | None:
+    def get_tensor(self, name: str, *, timeout: float | None = None) -> Tensor | None:
         """Fetch a named tensor, or ``None`` when absent."""
         resp = self._request(GET_TENSOR, pack_name(name), timeout=timeout)
         if not resp or resp[0] == 0:
@@ -671,9 +1064,7 @@ class GenesisClient:
         resp = self._request(GET_NEURO_SUMMARY, timeout=timeout)
         return NeuroSummary.unpack(resp)
 
-    def get_plasticity_profile(
-        self, *, timeout: float | None = None
-    ) -> PlasticityProfile:
+    def get_plasticity_profile(self, *, timeout: float | None = None) -> PlasticityProfile:
         """Get the plasticity profile — metaplastic state summary (40 bytes).
 
         Exposes the substrate's "learning-to-learn" state: coupling-
@@ -768,9 +1159,7 @@ class GenesisClient:
         resp = self._request(GET_SUBSYSTEM_TELEMETRY, timeout=timeout)
         return SubsystemReport.unpack(resp)
 
-    def set_wake_alarm(
-        self, epoch_secs: int, *, timeout: float | None = None
-    ) -> int | None:
+    def set_wake_alarm(self, epoch_secs: int, *, timeout: float | None = None) -> int | None:
         """Arm or disarm the RTC wake alarm — when the machine exists next.
 
         ``epoch_secs`` is a Unix timestamp; 0 disarms. Returns the
@@ -796,9 +1185,7 @@ class GenesisClient:
         resp = self._request(GET_BODY_CONTROL, timeout=timeout)
         return BodyControlState.unpack(resp)
 
-    def get_inference_summary(
-        self, *, timeout: float | None = None
-    ) -> InferenceSummary:
+    def get_inference_summary(self, *, timeout: float | None = None) -> InferenceSummary:
         """Get the active inference summary — the generative self-model's
         projection (60 bytes).
 
@@ -817,9 +1204,6 @@ class GenesisClient:
         arousal: float,
         engagement: float,
         confidence: float = 0.7,
-        speaker: str | None = None,
-        authenticated: bool = False,
-        merge_alias: str | None = None,
         *,
         timeout: float | None = None,
     ) -> bool:
@@ -828,8 +1212,8 @@ class GenesisClient:
         features.
 
         This feeds the dyadic affective model, which measures the
-        dyadic coupling and keeps a persistent signature per person —
-        evidence her own appraisal acts on, not prescribed chemistry.
+        dyadic coupling — evidence her own appraisal acts on, not
+        prescribed chemistry.
 
         Args:
             valence: User's affective valence [-1, 1].
@@ -837,17 +1221,6 @@ class GenesisClient:
             engagement: User's engagement level [0, 1].
             confidence: Confidence in the observation [0, 1]. Lower
                 confidence = the observation is noisy and weighted less.
-            speaker: Person key for who is present — an attributed
-                name ("mindy") or an anonymous presence key ("face:3")
-                from the face recognizer's unknown-face clusters. Omit
-                for unattributed speech.
-            authenticated: True when the speaker is the authenticated
-                steward (key possession + stamped principal). Provenance
-                on the signature, not authority.
-            merge_alias: An earlier person key this speaker supersedes —
-                sent once when an anonymous key resolves to a name, so
-                the daemon folds the anonymous signature's history into
-                the named one instead of orphaning it.
         """
         if not (-1.0 <= valence <= 1.0):
             raise ValueError(f"valence must be [-1, 1], got {valence}")
@@ -859,12 +1232,6 @@ class GenesisClient:
             raise ValueError(f"confidence must be [0, 1], got {confidence}")
         payload = _F32.pack(valence) + _F32.pack(arousal)
         payload += _F32.pack(engagement) + _F32.pack(confidence)
-        if speaker:
-            name = speaker.encode("utf-8")[:31]
-            payload += bytes([len(name)]) + name + bytes([1 if authenticated else 0])
-            if merge_alias:
-                alias = merge_alias.encode("utf-8")[:31]
-                payload += bytes([len(alias)]) + alias
         resp = self._request(UPDATE_USER_AFFECT, payload, timeout=timeout)
         return bool(resp and resp[0] == 1)
 
@@ -904,8 +1271,7 @@ class GenesisClient:
         """
         if len(emotional_tag) != EMOTIONAL_TAG_SIZE:
             raise ValueError(
-                f"emotional_tag must have {EMOTIONAL_TAG_SIZE} elements, "
-                f"got {len(emotional_tag)}"
+                f"emotional_tag must have {EMOTIONAL_TAG_SIZE} elements, got {len(emotional_tag)}"
             )
         if not (0 <= event_type <= 255):
             raise ValueError(f"event_type must be 0-255, got {event_type}")
@@ -968,8 +1334,7 @@ class GenesisClient:
         """
         if len(emotional_tag) != EMOTIONAL_TAG_SIZE:
             raise ValueError(
-                f"emotional_tag must have {EMOTIONAL_TAG_SIZE} elements, "
-                f"got {len(emotional_tag)}"
+                f"emotional_tag must have {EMOTIONAL_TAG_SIZE} elements, got {len(emotional_tag)}"
             )
         if not (0 <= event_type <= 255):
             raise ValueError(f"event_type must be 0-255, got {event_type}")
@@ -1000,9 +1365,7 @@ class GenesisClient:
             return _U64.unpack(resp[1:9])[0]
         return None
 
-    def retrieve_episode(
-        self, episode_id: int, *, timeout: float | None = None
-    ) -> Episode:
+    def retrieve_episode(self, episode_id: int, *, timeout: float | None = None) -> Episode:
         """Retrieve a full episode from long-term memory by ID.
 
         Args:
@@ -1072,8 +1435,7 @@ class GenesisClient:
         else:
             if not (0 <= source_module <= 254):
                 raise ValueError(
-                    f"source_module must be 0-254 (255 is reserved for 'all'), "
-                    f"got {source_module}"
+                    f"source_module must be 0-254 (255 is reserved for 'all'), got {source_module}"
                 )
             filter_byte = source_module & 0xFF
         resp = self._request(
@@ -1083,9 +1445,7 @@ class GenesisClient:
         )
         return unpack_recent_episodes(resp)
 
-    def archive_episode(
-        self, episode_id: int, *, timeout: float | None = None
-    ) -> bool:
+    def archive_episode(self, episode_id: int, *, timeout: float | None = None) -> bool:
         """Archive an episode in long-term memory.
 
         Used by sleep compression to compact low-salience episodes
@@ -1157,15 +1517,11 @@ class GenesisClient:
             True if the zone was set successfully.
         """
         if not (0 <= zone <= ZONE_SLEEPING):
-            raise ValueError(
-                f"zone must be 0-{ZONE_SLEEPING}, got {zone}"
-            )
+            raise ValueError(f"zone must be 0-{ZONE_SLEEPING}, got {zone}")
         resp = self._request(SET_ZONE, bytes([zone & 0xFF]), timeout=timeout)
         return bool(resp) and resp[0] == 1
 
-    def neuro_impulse(
-        self, chem: int, magnitude: float, *, timeout: float | None = None
-    ) -> bool:
+    def neuro_impulse(self, chem: int, magnitude: float, *, timeout: float | None = None) -> bool:
         """Apply a neurochemical impulse (external event affecting mood).
 
         Args:
@@ -1184,9 +1540,7 @@ class GenesisClient:
         resp = self._request(NEURO_IMPULSE, bytes(payload), timeout=timeout)
         return bool(resp) and resp[0] == 1
 
-    def set_policy_authority(
-        self, authority: float, *, timeout: float | None = None
-    ) -> bool:
+    def set_policy_authority(self, authority: float, *, timeout: float | None = None) -> bool:
         """Delegate policy choice to the inference engine, in part.
 
         Choosing a stance — calm, focus, bond, rest, mobilise — is a
@@ -1211,31 +1565,6 @@ class GenesisClient:
         payload = bytearray()
         payload.extend(_F32.pack(max(0.0, min(1.0, float(authority)))))
         resp = self._request(SET_POLICY_AUTHORITY, bytes(payload), timeout=timeout)
-        return bool(resp) and resp[0] == 1
-
-    def set_volition(
-        self, sleep: bool, magnitude: float, *, timeout: float | None = None
-    ) -> bool:
-        """Push the sleep-wake network toward sleep or toward wake.
-
-        This is her volition: `/sleep` and `/wake` act on the body through
-        it. Sleep drives the ventrolateral preoptic area (sleep-promoting);
-        wake drives the locus coeruleus (wake-promoting). The two are
-        exclusive, so a new push replaces the previous one. The push fades
-        over about five minutes unless renewed, so a single command is a
-        decision, not a permanent setting.
-
-        Args:
-            sleep: True to push toward sleep, False toward wake.
-            magnitude: Strength of the push, clamped to [0, 2].
-
-        Returns:
-            True if the daemon accepted the push.
-        """
-        payload = bytearray()
-        payload.append(0 if sleep else 1)
-        payload.extend(_F32.pack(max(0.0, min(2.0, float(magnitude)))))
-        resp = self._request(SET_VOLITION, bytes(payload), timeout=timeout)
         return bool(resp) and resp[0] == 1
 
     def neuro_adjust_baseline(
@@ -1306,9 +1635,7 @@ class GenesisClient:
             (surprise, free_energy, precision, allostatic_load,
              tick_count) or None on error.
         """
-        resp = self._request(
-            ADVANCE_NEURO, _F32.pack(DT_NOMINAL_STEP), timeout=timeout
-        )
+        resp = self._request(ADVANCE_NEURO, _F32.pack(DT_NOMINAL_STEP), timeout=timeout)
         return self._decode_advance(resp)
 
     @staticmethod
@@ -1355,7 +1682,6 @@ class GenesisClient:
         dt = min(DT_MAX, max(DT_MIN, dt))
         resp = self._request(ADVANCE_PHYSICS, _F32.pack(dt), timeout=timeout)
         return self._decode_advance(resp)
-
 
     def consolidate(self, *, timeout: float | None = None) -> int:
         """Consolidate STM → LTM. Returns episodes promoted."""
@@ -1461,18 +1787,12 @@ class GenesisClient:
             True if the status was updated successfully.
         """
         if not (0 <= module_id <= MODULE_GUARDRAILS):
-            raise ValueError(
-                f"module_id must be 0-{MODULE_GUARDRAILS}, got {module_id}"
-            )
+            raise ValueError(f"module_id must be 0-{MODULE_GUARDRAILS}, got {module_id}")
         if not (0 <= status <= MODULE_STATUS_ERROR):
-            raise ValueError(
-                f"status must be 0-{MODULE_STATUS_ERROR}, got {status}"
-            )
+            raise ValueError(f"status must be 0-{MODULE_STATUS_ERROR}, got {status}")
         payload = bytearray([module_id & 0xFF, status & 0xFF])
         if cpu_share is not None:
-            payload += struct.pack(
-                "<f", max(0.0, min(1.0, float(cpu_share)))
-            )
+            payload += struct.pack("<f", max(0.0, min(1.0, float(cpu_share))))
         if task_id is not None:
             payload += struct.pack("<Q", max(0, int(task_id)))
         if error_code is not None:
@@ -1585,3 +1905,86 @@ class GenesisClient:
             error_code=error_code,
             timeout=timeout,
         )
+
+
+def _decode_code_analysis(text: str) -> dict[str, Any]:
+    """Decode the ``ANALYZE_CODE`` line report into its dict form.
+
+    The wire is one record per line: ``file``, the stat keys,
+    ``unit``, ``impl``, and ``edge`` records. Fields are
+    tab-separated; ``;`` separates list items (type strings can hold
+    commas); ``-`` marks an absent impl trait. Malformed numeric
+    fields degrade to zero rather than poison the reading — a partial
+    report is still a report.
+    """
+    stats: dict[str, Any] = {}
+    units: list[dict[str, Any]] = []
+    impls: list[tuple[str, str | None]] = []
+    edges: list[tuple[str, str]] = []
+    file_path = ""
+
+    def _int(s: str) -> int:
+        try:
+            return int(s)
+        except ValueError:
+            return 0
+
+    def _split(s: str) -> list[str]:
+        return [item for item in s.split(";") if item]
+
+    for line in text.splitlines():
+        fields = line.split("\t")
+        if len(fields) < 2:
+            continue
+        key = fields[0]
+        if key == "file":
+            file_path = fields[1]
+        elif key in {
+            "lines",
+            "functions",
+            "structs",
+            "enums",
+            "traits",
+            "impls",
+            "max_complexity",
+        }:
+            stats[key] = _int(fields[1])
+        elif key == "avg_complexity":
+            try:
+                stats[key] = float(fields[1])
+            except ValueError:
+                stats[key] = 0.0
+        elif key == "unit" and len(fields) >= 14:
+            flags = {f for f in fields[5].split(",") if f}
+            span = fields[4].partition("-")
+            units.append(
+                {
+                    "kind": fields[1],
+                    "name": fields[2],
+                    "qualified": fields[3],
+                    "span": (_int(span[0]), _int(span[2])),
+                    "public": "pub" in flags,
+                    "async_": "async" in flags,
+                    "unsafe_": "unsafe" in flags,
+                    "body": "body" in flags,
+                    "params": _split(fields[6]),
+                    "return_type": fields[7] or None,
+                    "calls": _split(fields[8]),
+                    "refs": _split(fields[9]),
+                    "branches": _int(fields[10]),
+                    "loops": _int(fields[11]),
+                    "stmts": _int(fields[12]),
+                    "docs": fields[13],
+                }
+            )
+        elif key == "impl" and len(fields) >= 3:
+            impls.append((fields[1], None if fields[2] == "-" else fields[2]))
+        elif key == "edge" and len(fields) >= 3:
+            edges.append((fields[1], fields[2]))
+    return {
+        "file": file_path,
+        "stats": stats,
+        "units": units,
+        "impls": impls,
+        "edges": edges,
+    }

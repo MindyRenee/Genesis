@@ -230,9 +230,7 @@ class Reflection:
         # Theta: consolidation-focused (mood + learning + gaps).
         # Alpha/Beta: standard (all checks).
         wave = state.brain_waves
-        skip_deep = (
-            wave is not None and wave.dominant == BrainWave.DELTA
-        )
+        skip_deep = wave is not None and wave.dominant == BrainWave.DELTA
 
         # ── Metacognitive surprise → deeper reflection ──
         # If the previous cycle's metacognitive surprise was high,
@@ -419,8 +417,7 @@ class Reflection:
         if new_concepts > 0:
             return Insight(
                 type="growth",
-                content=f"{new_concepts} new concepts: "
-                f"{', '.join(state.perception.topics[:3])}",
+                content=f"{new_concepts} new concepts: {', '.join(state.perception.topics[:3])}",
                 confidence=0.8,
             )
 
@@ -515,7 +512,7 @@ class Reflection:
 
     def get_insights_by_type(self, type_: str) -> list[Insight]:
         """Get all insights of a specific type."""
-        return [i for i in self.insights if i.type == type_]
+        return [i for i in list(self.insights) if i.type == type_]
 
     # ─── Metacognitive control strategies ───────────────────────────
 
@@ -586,17 +583,15 @@ class Reflection:
         if not self.insights:
             return "hasn't reflected on anything yet"
 
-        parts = [
-            f"{len(self.insights)} insights across {self._interaction_count} interactions"
-        ]
+        parts = [f"{len(self.insights)} insights across {self._interaction_count} interactions"]
 
         from collections import Counter
 
-        type_counts = Counter(i.type for i in self.insights)
+        type_counts = Counter(i.type for i in list(self.insights))
         for type_, count in type_counts.most_common():
             parts.append(f"  {type_}: {count}")
 
-        actionable = [i for i in self.insights if i.actionable]
+        actionable = [i for i in list(self.insights) if i.actionable]
         if actionable:
             parts.append(f"{len(actionable)} actionable")
 
@@ -951,11 +946,7 @@ class ErrorMonitor:
         Below that, runner-up competition is normal selection, not a
         failure.
         """
-        threshold = (
-            self.conflict_threshold
-            if error.signal == "conflict"
-            else self.error_threshold
-        )
+        threshold = self.conflict_threshold if error.signal == "conflict" else self.error_threshold
         return error.error_magnitude >= threshold
 
     def _register(self, error: PredictionError) -> None:
@@ -983,9 +974,7 @@ class ErrorMonitor:
         # doesn't represent its current condition. Only count signals
         # that crossed their detection gate.
         self.error_count = sum(1 for e in self._errors if e.is_error)
-        self.cumulative_error_signal = sum(
-            e.error_magnitude for e in self._errors if e.is_error
-        )
+        self.cumulative_error_signal = sum(e.error_magnitude for e in self._errors if e.is_error)
 
     def compute_error_signal(self) -> float:
         """Compute the current error signal (ERN-like).
@@ -1049,9 +1038,7 @@ class ErrorMonitor:
                 to-say-it self-corrections.
         """
         self._caution_level = min(self.max_caution, self._caution_level + amount)
-        self._channel_demand[channel] = (
-            self._channel_demand.get(channel, 0.0) + amount
-        )
+        self._channel_demand[channel] = self._channel_demand.get(channel, 0.0) + amount
 
     def expected_value_of_control(self) -> dict[str, float]:
         """Expected value of control per channel (Shenhav et al., 2013).

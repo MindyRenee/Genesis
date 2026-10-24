@@ -61,6 +61,7 @@ def set_swallow_sink(sink: Callable[[str, int, BaseException], None] | None) -> 
     global _sink
     _sink = sink
 
+
 # Occurrence counts at which a repeat is journaled. Doubling, so the
 # number of records for a site that fails N times is O(log N).
 _BACKOFF_STEPS = (2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096)

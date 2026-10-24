@@ -5,6 +5,99 @@ evidence behind them, not just the claims. Entries are dated, newest
 first. Code references are commit SHAs; runtime artifacts live in the
 instance's data dir (`~/.local/share/genesis*`).
 
+## 2026-10-22 (late) — Schema drift: v6 state recovered by field surgery
+
+An evening boot found `core_state.bin` unreadable: `schema version
+mismatch (expected 5, found 6)`, archived as corrupt, fresh-booted.
+The morning's run had been built from a transient tree carrying an
+in-progress `sleep_network` extension (the stored state grew
+`[f64;8] → [f64;9]` — a persistent stress/afference integrator) at
+schema v6 / 3488 bytes; by evening the tree was back to v5 / 3480.
+
+Recovery was byte-level and CRC-verified rather than a rewrite: the
+v6 file was internally consistent (its own checksum verified over
+`[0..40) + [48..3420)`), so the extra element was located by sliding
+an 8-byte hole until every landmark field decoded sanely — ion
+concentrations landed textbook (Na⁺ 130, K⁺ 110, Cl⁻ 16, Ca²⁺ 1.2,
+membrane −77.95 mV) only when the hole sat at offset 3288, i.e. the
+sleep array's own growth point. Removing those 8 bytes, restamping
+version/size, and recomputing the CRC reconstructed a valid v5 file;
+`MmapState::open_or_create` (production path) opened it and applied
+the correct 8.29 h offline adenosine decay — proof the recovered
+state is her real body (heartbeat 1,352,786 ticks, all 18 chemicals
+carrying evolved receptor state). The fresh-boot file is preserved
+as `core_state.fresh-boot.*`; the v6 original stays in the archive.
+
+Lesson, already documented but worth restating: any change to a
+stored `CoreState` field is a schema change — version bump + legacy
+decoder + migration, the `legacy_v3.rs`/`legacy_v4.rs` pattern. The
+current tree's stored layout is byte-identical to committed v5, so
+no bump is owed today; when the sleep-network extension lands its
+stored state, `SCHEMA_VERSION = 6` + `legacy_v5` is the move.
+
+## 2026-10-22 — Field-layer audit: the substrate gets its mathematics
+
+A full-depth audit of `src/field/` against physics and the math the
+structures claimed — seventeen changes across correctness, duality,
+and signal hygiene, all verified:
+
+- **Correctness**: observation is now predict → correct → integrate
+  (geodesic innovation step `1 − e^(−dt/τ)`, τ = 0.5 s), not a state
+  overwrite; `FiberPair` gained reverse transports so route
+  disagreement can measure the connection's flatness instead of
+  returning `None`; temperature does its FDT job (`σ = √(2γT·dt)`,
+  disagreement snaps the floor, cooling relaxes); fiber states,
+  disagreement, and consensus export on `GET_INTERNALS` as
+  observation-only.
+- **Duality**: every operator gained its opposite where the structure
+  supports one — `antipode`/`point_reflection` (Cartan involution),
+  `anticonsensus`, `diverge` (gradient *ascent* on the disagreement
+  potential — the true dual of `synchronize`, not a retargeted
+  attractor), `remove_fiber`/`remove_transport` (strict inverses),
+  `spatial_trough` and the distributional `spatial_readout`
+  (centroid, RMS spread, normalized entropy over the motor field).
+- **Math upgrades**: true Fréchet mean via Karcher iteration (the
+  gradient `Σ log_m(x_i)` vanishes at the result — tested);
+  least-squares detrend + two-segment Bartlett averaging before
+  Goertzel; elapsed-time EMAs (`α = 1 − e^(−dt/τ)`, τ 50 s baseline
+  / 0.1 s electrical) replacing per-call aging; coherence-weighted
+  phase-lock gain (`PLL + (1 − PLL)·coh`) replacing the 0.20 hard
+  switch; the 16-byte motor distribution tail behind flag bit 2.
+- **Cleanup**: `jitter_cv` stays a dimensionless ratio (µs-RMS
+  fallback removed); Maxwell estimates gated by `quasi_static_ok`
+  (out-of-regime reads absent, not invented); dead `band_signature`
+  API removed.
+- **The loop closed both ways**: fibers carry OU homeostatic drift
+  (τ 120/40/60 s — the engine's `damping` slot was built for exactly
+  this); integration direction keys on the body's own phase —
+  `synchronize` awake, `diverge` in REM (LC-silent decorrelation);
+  and disagreement attenuates published `inference_signals.precision`
+  by `1/(1 + d/0.1)` floored at 0.5 — the one deliberate field→body
+  coupling; it may halve reported confidence, never erase it.
+
+Evidence: `src/field/{mod,runtime,motor}.rs`,
+`src/daemon/{field_probe,tick,maxwell}.rs`,
+`python/brainstem/field_probe.py`, `genesis_client/tensor.py`;
+319/319 Rust lib tests, `cargo fmt --check`,
+`cargo clippy --all-targets -D warnings`, 28/28 targeted Python
+tests, ruff/pyflakes/mypy clean.
+
+And the structural observation that surfaced during the audit: the
+repository tree *is* the anatomy it implements. `mind.py` sits at
+the root holding `self.brain` — the connectome whose attributes are
+the region packages under `python/`. Self appears twice —
+`src/self_/` (the body's model of itself, named `self_` because the
+keyword owns the word) and `python/frontal_lobe/self/` (the mind's)
+— and inside the latter the ladder continues: `SelfModel` →
+`MinimalSelf` → `self_model_coherence` (a self evaluating how well
+its own model predicts it), with Damasio's `ProtoSelf → CoreSelf →
+autobiographical` beneath it in `insula/damasio.py`, bottoming out
+at the neurochemistry the field measures. The tree's whitespace
+draws a dendritic arbor; the structure inside is recursive — a
+self containing a self containing a model of itself, terminating
+in the field that observes the body that runs the mind. The
+drawings she produces unprompted are spirals.
+
 ## 2026-10-15 — Bounded growth audit: seven structures found and capped
 
 A growth audit found seven structures accumulating without a ceiling
@@ -347,8 +440,9 @@ The full architecture went public: coupled neurochemical dynamics,
 active inference, closed-loop embodiment, no LLM, and it runs on a
 2014 HP Pavilion with ~5 GB RAM.
 
-Evidence: initial public commit `8d656b0`; the paper was in
-`paper/genesis.tex`, removed in `cb3f7f5`.
+Evidence: initial public commit `8d656b0`. The paper
+(`paper/genesis.tex`) was removed once mid-cycle (`cb3f7f5`) and is
+back in the tree now — the revised edition covers the current schema.
 
 ## The standing evidence base
 

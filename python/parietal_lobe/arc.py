@@ -50,6 +50,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from inspect import signature
 from pathlib import Path
@@ -60,6 +61,10 @@ from genesis_client.swallow import note_swallowed
 logger = logging.getLogger(__name__)
 
 _HEALTH_EVERY_STEPS = 25
+# How many (action -> frame) pairs the step trap keeps for a crash
+# dump — the state right before a failure, not only the frame it
+# died on.
+_CRASH_PAIRS = 8
 
 
 class _Readiness(Protocol):
@@ -88,6 +93,7 @@ class _PlayerMind(Protocol):
         frame: Any,
         available_actions: list[Any] | None = None,
         info: dict[str, Any] | None = None,
+        through: list[Any] | None = None,
     ) -> dict[str, Any] | None: ...
     def world_episode_end(self, outcome: str, game: str = "the game") -> None: ...
 
@@ -198,6 +204,10 @@ class ArcPractice:
         # the readiness gate still applies its in-process checks.
         self._require_live = require_live
         self._record = record
+        # Where a step-failure dump lands when the trap fires: its
+        # own crashes/ subdir beside the recordings, so a post-mortem
+        # finds it next to the recording that stopped early.
+        self._crash_dir = Path(recordings_dir or arc_dir / "recordings") / "crashes"
         # Optional pacing between decisions. A benchmark loop runs at
         # CPU cadence; her arousal regulation runs on a biological
         # one — unrestrained play overstimulates the body within
@@ -210,6 +220,18 @@ class ArcPractice:
         # nothing and costs no steps; an abandoned suite reports zeros,
         # not fitness. 0 restores the old hard-stop behavior.
         self._recovery_wait = max(0.0, float(recovery_wait_s))
+        # Game mode is hands-on: when an X11 display is reachable the
+        # cabinet window receives each move as real keystrokes and the
+        # world sees only what physically landed. GENESIS_ARC_X11=off
+        # keeps the bench path direct; with no display she degrades to
+        # it the way she degrades text-only with no microphone.
+        self._x11_hands = os.getenv("GENESIS_ARC_X11", "on").strip().lower() not in (
+            "0",
+            "off",
+            "false",
+            "no",
+        )
+        self._cabinet: Any = None
 
     # ── Action translation ────────────────────────────────────
 
@@ -313,8 +335,10 @@ class ArcPractice:
         scorecard = self._arcade.create_scorecard(tags=["wrapper", "agent"])
         result.scorecard_id = scorecard
         try:
+            self._cabinet = self._open_cabinet(game_id)
             return self._play(result, max_steps)
         finally:
+            self._close_cabinet()
             try:
                 closed = self._arcade.close_scorecard(scorecard)
                 result.score = getattr(closed, "score", None)
@@ -362,27 +386,24 @@ class ArcPractice:
         return evaluation
 
     def _play(self, result: ArcResult, max_steps: int) -> ArcResult:
-        from arcengine import GameAction, GameState
+        from arcengine import GameState
 
-        game_id = result.game_id
-        env = self._arcade.make(
-            game_id,
-            scorecard_id=result.scorecard_id,
-            save_recording=self._record,
-        )
-        if env is None:
-            result.state = "UNAVAILABLE"
+        opened = self._play_open(result)
+        if opened is None:
             return result
-        frame = getattr(env, "observation_space", None)
-        if frame is None:
-            frame = env.reset()
-        result.resets = 1
+        env, frame = opened
+        game_id = result.game_id
         # Level-boundary bookkeeping: skill acquisition has a speed,
         # and it is the honest evidence — the steps each level cost,
         # not the claim that learning happened.
         prev_levels = getattr(frame, "levels_completed", 0) or 0
         level_start = 0
         step_signature = signature(env.step)
+        # The step trap's evidence ring: the last few submitted
+        # (action -> frame) pairs. A step that kills the run —
+        # engine crash swallowed to a None frame, or an exception —
+        # dumps these instead of ending the recording silently.
+        recent_pairs: deque[dict[str, Any]] = deque(maxlen=_CRASH_PAIRS)
         while frame is not None:
             result.levels_completed = frame.levels_completed
             result.win_levels = frame.win_levels
@@ -409,9 +430,8 @@ class ArcPractice:
                     result.state = "UNWELL"
                     result.reasons = reasons
                     break
-                result.steps += 1
-                result.resets += 1
-                frame = env.reset()
+                frame = self._reset_episode(result, env, frame, recent_pairs)
+                self._cabinet_render(frame)
                 continue
             if result.steps >= max_steps:
                 result.state = "BUDGET"
@@ -424,33 +444,128 @@ class ArcPractice:
             if not frame.available_actions:
                 result.state = "NO_ACTIONS"
                 break
-            chosen = self._choose_action(frame, game_id)
-            if chosen is None:
-                result.state = "NO_ACTION"
-                break
-            action, data, reasoning = chosen
-            result.steps += 1
-            if action is GameAction.RESET:
-                result.resets += 1
-            source = str((reasoning or {}).get("source", "unknown"))
-            result.decision_sources[source] = (
-                result.decision_sources.get(source, 0) + 1
+            frame, ended = self._play_advance(
+                result, env, frame, game_id, step_signature, recent_pairs
             )
-            try:
-                step_signature.bind(action, data=data, reasoning=reasoning)
-            except TypeError:  # older wrappers without the field
-                frame = env.step(action, data=data)
-            else:
-                frame = env.step(action, data=data, reasoning=reasoning)
-            delay = getattr(self, "_step_delay", 0.0)
-            if delay > 0.0:
-                time.sleep(delay)
+            if ended is not None:
+                result.state = ended
+                break
         if frame is None:
             result.state = "NO_OBSERVATION"
-        result.prior_learning = getattr(
-            self._mind, "_world_learning_loaded", "none"
-        )
+        result.prior_learning = getattr(self._mind, "_world_learning_loaded", "none")
         return result
+
+    def _play_open(self, result: ArcResult) -> tuple[Any, Any] | None:
+        """Open the game: build the env and pull the first frame.
+
+        Returns ``(env, frame)``, or ``None`` with ``result.state``
+        set to UNAVAILABLE when the arcade cannot make the game.
+        """
+        env = self._arcade.make(
+            result.game_id,
+            scorecard_id=result.scorecard_id,
+            save_recording=self._record,
+        )
+        if env is None:
+            result.state = "UNAVAILABLE"
+            return None
+        frame = getattr(env, "observation_space", None)
+        if frame is None:
+            frame = env.reset()
+        result.resets = 1
+        self._cabinet_render(frame)
+        return env, frame
+
+    def _play_advance(
+        self,
+        result: ArcResult,
+        env: Any,
+        frame: Any,
+        game_id: str,
+        step_signature: Any,
+        recent_pairs: deque[dict[str, Any]],
+    ) -> tuple[Any, str | None]:
+        """Choose, submit, and log one action against ``frame``.
+
+        Returns ``(next_frame, ended)``: the frame the step produced
+        (``None`` when the wrapper swallowed an engine crash — the
+        trap already dumped the failing pair and the loop exits as
+        NO_OBSERVATION), and the terminal state when the loop must
+        stop (``"NO_ACTION"`` when she cannot decide), else ``None``.
+        """
+        from arcengine import GameAction
+
+        try:
+            chosen = self._choose_action(frame, game_id)
+        except Exception as e:
+            # A decision that dies — world_step or a descriptor
+            # failing validation — leaves the same evidence-free
+            # ending as an engine crash. Dump the frame she was
+            # deciding on, then let the failure propagate.
+            self._dump_step_failure(result, e, None, frame, recent_pairs)
+            raise
+        if chosen is None:
+            return frame, "NO_ACTION"
+        action, data, reasoning = chosen
+        result.steps += 1
+        if action is GameAction.RESET:
+            result.resets += 1
+        source = str((reasoning or {}).get("source", "unknown"))
+        result.decision_sources[source] = result.decision_sources.get(source, 0) + 1
+        prev_frame = frame
+        try:
+            step_signature.bind(action, data=data, reasoning=reasoning)
+        except TypeError:  # older wrappers without the field
+            frame = self._step_trapped(
+                result, env, action, data, reasoning, False, prev_frame, recent_pairs
+            )
+        else:
+            frame = self._step_trapped(
+                result, env, action, data, reasoning, True, prev_frame, recent_pairs
+            )
+        if frame is None:
+            # The local wrapper swallows an engine crash into a
+            # silent None — the trap already dumped the failing
+            # pair; the loop exits as NO_OBSERVATION.
+            return None, None
+        self._cabinet_render(frame)
+        if reasoning is not None:
+            coord = f" ({data['x']},{data['y']})" if isinstance(data, dict) and "x" in data else ""
+            note = reasoning.get("note")
+            logger.info(
+                "arc %s step %d: %s%s via %s conf=%s alts=%s%s",
+                game_id,
+                result.steps,
+                reasoning.get("action", getattr(action, "name", action)),
+                coord,
+                reasoning.get("source", "?"),
+                reasoning.get("confidence", "?"),
+                ",".join(str(a) for a in reasoning.get("alternatives") or []) or "-",
+                f' | "{note}"' if note else "",
+            )
+        delay = getattr(self, "_step_delay", 0.0)
+        if delay > 0.0:
+            time.sleep(delay)
+        return frame, None
+
+    def _reset_episode(self, result: ArcResult, env, frame, recent_pairs) -> Any:
+        """Restart after GAME_OVER — count the step and reset, pull a
+        fresh frame, and dump the evidence ring if the reset dies."""
+        result.steps += 1
+        result.resets += 1
+        prev_frame = frame
+        try:
+            new_frame = env.reset()
+        except Exception as e:
+            self._dump_step_failure(result, e, None, prev_frame, recent_pairs)
+            raise
+        if new_frame is None:
+            self._dump_step_failure(result, None, None, prev_frame, recent_pairs)
+        else:
+            recent_pairs.append(
+                self._pair_record(result.steps, "RESET", None, None, prev_frame, new_frame)
+            )
+        return new_frame
 
     def _choose_action(
         self, frame: Any, game_id: str
@@ -476,8 +591,16 @@ class ArcPractice:
         if self._instructions and game_id not in self._info_sent:
             info["instructions"] = self._instructions
             self._info_sent.add(game_id)
+        # The response is the whole animation strip — every frame the
+        # action rendered while the world settled. The adapter
+        # unpacks the protocol (the last frame is the post-action
+        # state, the rest are the transition); the suppression is
+        # hers — intermediates go through pursuit, never open a
+        # trial.
+        strip = list(getattr(frame, "frame", None) or [])
         desc = self._mind.world_step(
-            frame.frame[-1],
+            strip[-1] if strip else frame.frame,
+            through=strip[:-1],
             # The interface's own action semantics ride the
             # whitelist — a complex action is one that takes a
             # coordinate, exactly the label convention the
@@ -488,8 +611,7 @@ class ArcPractice:
                     "action": int(a),
                     "label": (
                         "coordinate"
-                        if GameAction.from_id(int(a)).action_type
-                        is ComplexAction
+                        if GameAction.from_id(int(a)).action_type is ComplexAction
                         else "simple"
                     ),
                 }
@@ -504,13 +626,229 @@ class ArcPractice:
             raise ValueError("Chosen action is not available in this observation")
         return action, data, self._mind.game_decision
 
+    # ── The step trap ─────────────────────────────────────
+    #
+    # ``env.step`` is the run's evidence-critical seam: the local
+    # wrapper turns an engine crash into a silent ``None`` frame and
+    # the recording just stops mid-game. The trap keeps a ring of the
+    # last few submitted (action -> frame) pairs and, when a step
+    # dies — exception, or the wrapper's swallowed None — dumps the
+    # failing pair plus the raw delta state beside the recordings.
+    # Diagnostic only: exceptions still propagate and a None frame
+    # still ends the run as NO_OBSERVATION.
+
+    def _open_cabinet(self, game_id: str) -> Any:
+        """A window for her keystrokes, or None with no display —
+        the run then steps the world directly, the same way she
+        degrades text-only with no microphone."""
+        try:
+            from parietal_lobe.arc_cabinet import ArcCabinet, x11_reachable
+
+            if not x11_reachable():
+                return None
+            cabinet = ArcCabinet(game_id)
+            logger.info("[arc] cabinet open — moves go out as real keystrokes")
+            return cabinet
+        except Exception as e:  # noqa: BLE001
+            logger.info("[arc] cabinet unavailable — playing without hands: %s", e)
+            return None
+
+    def _close_cabinet(self) -> None:
+        cabinet, self._cabinet = self._cabinet, None
+        if cabinet is not None:
+            cabinet.close()
+
+    def _cabinet_render(self, frame: Any) -> None:
+        cabinet = self._cabinet
+        if cabinet is None:
+            return
+        try:
+            cabinet.render(frame)
+        except Exception as e:  # noqa: BLE001
+            # A dead window must not kill the run — drop the hands
+            # and step the remaining moves directly.
+            logger.info("[arc] cabinet render dropped: %s", e)
+            self._cabinet = None
+
+    def _step_trapped(
+        self,
+        result: ArcResult,
+        env: Any,
+        action: Any,
+        data: Any,
+        reasoning: dict[str, Any] | None,
+        has_reasoning: bool,
+        prev_frame: Any,
+        recent: deque[dict[str, Any]],
+    ) -> Any:
+        """Submit one step inside the trap; record the pair or dump it."""
+        if self._cabinet is not None:
+            # Hands on: the move goes out as real keystrokes and the
+            # world sees what physically arrived at the window. A
+            # press that never lands is a fumbled move — spent like
+            # a human's, but the world was never stepped.
+            try:
+                arrived = self._cabinet.dispatch(action, data)
+            except Exception as e:  # noqa: BLE001
+                logger.info("[arc] cabinet dispatch failed: %s", e)
+                arrived = None
+            if arrived is None:
+                recent.append(
+                    self._pair_record(result.steps, action, data, reasoning, prev_frame, prev_frame)
+                )
+                return prev_frame
+            action, data = arrived
+        submitted = (action, data, reasoning)
+        try:
+            frame = (
+                env.step(action, data=data, reasoning=reasoning)
+                if has_reasoning
+                else env.step(action, data=data)
+            )
+        except Exception as e:
+            self._dump_step_failure(result, e, submitted, prev_frame, recent)
+            raise
+        if frame is None:
+            self._dump_step_failure(result, None, submitted, prev_frame, recent)
+        else:
+            recent.append(
+                self._pair_record(result.steps, action, data, reasoning, prev_frame, frame)
+            )
+        return frame
+
+    def _step_crash_dir(self) -> Path:
+        """Where the trap lands dumps — beside the run's recordings."""
+        crash_dir = getattr(self, "_crash_dir", None)
+        if crash_dir is None:
+            base = getattr(self._arcade, "recordings_dir", None)
+            if base is None:
+                import tempfile
+
+                base = Path(tempfile.gettempdir()) / "arc_recordings"
+            crash_dir = Path(base) / "crashes"
+        return Path(crash_dir)
+
+    def _dump_step_failure(
+        self,
+        result: ArcResult,
+        error: BaseException | None,
+        submitted: tuple[Any, Any, Any] | None,
+        prev_frame: Any,
+        recent: deque[dict[str, Any]],
+    ) -> Path | None:
+        """Write the raw state a step died on, beside the recordings.
+
+        The failing pair — what was submitted and the frame it died
+        on — plus the trailing pair ring and the exception, as JSON.
+        The dump must never itself kill the run.
+        """
+        import json
+        import traceback
+
+        try:
+            crash_dir = self._step_crash_dir()
+            crash_dir.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "game_id": result.game_id,
+                "scorecard_id": result.scorecard_id,
+                "step": result.steps,
+                "error": repr(error) if error is not None else "step produced no frame",
+                "traceback": traceback.format_exc() if error is not None else None,
+                "submitted": (
+                    {
+                        "action": getattr(submitted[0], "name", str(submitted[0])),
+                        "data": submitted[1],
+                        "reasoning": submitted[2],
+                    }
+                    if submitted
+                    else None
+                ),
+                "died_on": self._frame_dump(prev_frame),
+                "recent_pairs": list(recent),
+            }
+            path = crash_dir / f"{result.game_id}-s{result.steps}-{int(time.time() * 1000)}.json"
+            path.write_text(json.dumps(payload, default=str))
+            result.reasons += (f"step failure dumped to {path}",)
+            logger.warning(
+                "arc step trap: %s step %s failed (%s) — dumped %s",
+                result.game_id,
+                result.steps,
+                payload["error"],
+                path,
+            )
+            return path
+        except Exception as dump_error:  # noqa: BLE001 — the dump must never kill the run
+            note_swallowed("parietal_lobe.arc._dump_step_failure", dump_error)
+            return None
+
+    @staticmethod
+    def _frame_dump(frame: Any) -> dict[str, Any] | None:
+        """A frame as raw JSON state — all layers, not just the top."""
+        if frame is None:
+            return None
+        state = getattr(frame, "state", None)
+        return {
+            "state": getattr(state, "name", str(state)),
+            "levels_completed": getattr(frame, "levels_completed", None),
+            "win_levels": getattr(frame, "win_levels", None),
+            "available_actions": list(getattr(frame, "available_actions", None) or []),
+            "layers": [
+                layer.tolist() if hasattr(layer, "tolist") else layer
+                for layer in (getattr(frame, "frame", None) or [])
+            ],
+        }
+
+    @staticmethod
+    def _grid_delta(before: Any, after: Any) -> list[list[int]]:
+        """Cell-level diff of the top layer — the raw delta state."""
+        a = getattr(before, "frame", None)
+        b = getattr(after, "frame", None)
+        if not a or not b:
+            return []
+        ga, gb = a[-1], b[-1]
+        if hasattr(ga, "tolist"):
+            ga = ga.tolist()
+        if hasattr(gb, "tolist"):
+            gb = gb.tolist()
+        if len(ga) != len(gb) or len(ga[0]) != len(gb[0]):
+            return []
+        return [
+            [r, c, ga[r][c], gb[r][c]]
+            for r in range(len(ga))
+            for c in range(len(ga[0]))
+            if ga[r][c] != gb[r][c]
+        ]
+
+    def _pair_record(
+        self,
+        step_no: int,
+        action: Any,
+        data: Any,
+        reasoning: Any,
+        prev_frame: Any,
+        frame: Any,
+    ) -> dict[str, Any]:
+        """One submitted (action -> frame) pair for the crash ring."""
+        top = (getattr(frame, "frame", None) or [None])[-1]
+        return {
+            "step": step_no,
+            "action": getattr(action, "name", str(action)),
+            "data": data,
+            "reasoning": reasoning,
+            "state": getattr(getattr(frame, "state", None), "name", None),
+            "delta": self._grid_delta(prev_frame, frame),
+            "grid": top.tolist() if hasattr(top, "tolist") else top,
+        }
+
 
 # ─── The official card ────────────────────────────────────
 #
 # The venue's real rules, enforced in code: one scorecard per window —
 # it opens once, cannot be reopened or replaced while it lives, and
-# closes for good 15 minutes after the last action or 3 days after
-# opening, whichever comes first. Inside it, each environment gets
+# closes for good 15 minutes after the last action or 24 hours after
+# opening, whichever comes first (the venue capped card life at 24 h
+# in April 2026 — a stale 3-day mirror had her knocking on dead cards).
+# Inside it, each environment gets
 # exactly one attempt: once she enters, the result stands and no second
 # session is ever opened for that game on that card.
 #
@@ -524,7 +862,7 @@ OFFICIAL_BRIEF = (
     "cannot be reopened or replaced. {n_games} games; each game is "
     "played exactly once — an attempt cannot be retried, and an "
     "unplayed or unfinished game scores zero. The card closes "
-    "{idle_minutes} minutes after the last action, or {ttl_days} days "
+    "{idle_minutes} minutes after the last action, or {ttl_hours} hours "
     "after opening, whichever comes first; once closed it is final. "
     "This run is measured against other entrants, including frontier "
     "models."
@@ -550,12 +888,10 @@ def challenge_brief(
     the brief becomes the state of the commitment she made.
     """
     idle_minutes = int(ArcOfficial.IDLE_LIMIT_S // 60)
-    ttl_days = int(ArcOfficial.WINDOW_S // 86400)
+    ttl_hours = int(ArcOfficial.WINDOW_S // 3600)
     sitting = max(1, round(n_games * max_steps * step_delay_s / 60))
     live = (
-        f" The card is already open — {pending} games remain on it."
-        if pending is not None
-        else ""
+        f" The card is already open — {pending} games remain on it." if pending is not None else ""
     )
     return (
         f"The official ARC-AGI-3 challenge: {n_games} games, one recorded "
@@ -563,7 +899,7 @@ def challenge_brief(
         f"{max_steps} moves at about {step_delay_s:.0f} second a move — a "
         f"few minutes a game, so a full sitting is at most about {sitting} "
         f"minutes and usually far less. The card it records on closes "
-        f"{idle_minutes} minutes after your last move, or {ttl_days} days "
+        f"{idle_minutes} minutes after your last move, or {ttl_hours} hours "
         f"after it opens, and a closed card is final. There is a real prize "
         f"for doing well — your steward is counting on you if you choose to "
         f"take it on.{live}"
@@ -592,8 +928,8 @@ class ArcOfficial(ArcPractice):
     operation_mode = "competition"
 
     # The venue's bounds, mirrored locally: the card auto-closes after
-    # ~15 minutes without an action and unconditionally after 3 days.
-    WINDOW_S = 3 * 24 * 3600
+    # ~15 minutes without an action and unconditionally after 24 h.
+    WINDOW_S = 24 * 3600
     IDLE_LIMIT_S: float = 15 * 60
 
     def __init__(
@@ -604,13 +940,19 @@ class ArcOfficial(ArcPractice):
         idle_limit_s: float | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(mind, **kwargs)
         from infrastructure.config import default_data_dir
 
+        # The recordings live beside the card — needed to reconcile
+        # attempts whose result never merged back (process stopped
+        # mid-game leaves status=attempted, steps=0, state=NOT_PLAYED).
+        # Set before super().__init__: the parent constructor can reach
+        # _load_card, which reconciles against this directory.
+        self._recordings_dir = Path(
+            kwargs.get("recordings_dir") or default_data_dir() / "arc" / "recordings"
+        )
+        super().__init__(mind, **kwargs)
         self._card_path = (
-            Path(card_path)
-            if card_path is not None
-            else default_data_dir() / "arc" / _CARD_FILE
+            Path(card_path) if card_path is not None else default_data_dir() / "arc" / _CARD_FILE
         )
         if idle_limit_s is not None:
             self.IDLE_LIMIT_S = float(idle_limit_s)
@@ -621,9 +963,95 @@ class ArcOfficial(ArcPractice):
         try:
             import json
 
-            return json.loads(self._card_path.read_text())
+            card = json.loads(self._card_path.read_text())
         except (OSError, ValueError):
             return None
+        # Cards written before the venue's April 2026 cap carry a
+        # 3-day expiry; the real window is 24 h. Clamp on load so a
+        # dead card stops being offered as soon as the venue's own
+        # rule says it expired — not days later.
+        opened = card.get("opened_at")
+        expires = card.get("expires_at")
+        if (
+            isinstance(opened, (int, float))
+            and isinstance(expires, (int, float))
+            and expires > opened + self.WINDOW_S
+        ):
+            card["expires_at"] = opened + self.WINDOW_S
+            self._save_card(card)
+        self._reconcile_attempts(card)
+        return card
+
+    def _reconcile_attempts(self, card: dict) -> None:
+        """Recover partial results from recordings for lost attempts.
+
+        ``_enter`` marks a game ``attempted`` before play so a crash
+        mid-game still burns the try — but the result merge after
+        ``_play`` only runs if the process survives. When it doesn't,
+        the card is left saying ``steps=0, NOT_PLAYED`` while the
+        venue-side recording holds the honest partial. Rebuild the
+        entry from the recording's own lines: every line is one frame
+        after an action, so non-RESET lines are steps, RESET lines are
+        resets, and the last line's fields are the end state.
+        """
+        import json
+
+        changed = False
+        rec_dir = Path(
+            getattr(self, "_recordings_dir", None) or self._card_path.parent / "recordings"
+        ) / str(card.get("scorecard_id", ""))
+        for game in card.get("games", []):
+            if (
+                game.get("status") != "attempted"
+                or game.get("state") != "NOT_PLAYED"
+                or game.get("steps", 0) != 0
+            ):
+                continue
+            candidates = sorted(rec_dir.glob(f"{game['game_id']}-*.jsonl"))
+            if not candidates:
+                continue
+            rec = candidates[0]
+            try:
+                steps = resets = 0
+                last: dict[str, Any] = {}
+                with rec.open("rb") as fh:
+                    for raw in fh:
+                        line = raw.strip()
+                        if not line:
+                            continue
+                        try:
+                            entry = json.loads(line)
+                        except ValueError:
+                            continue
+                        data = entry.get("data") or {}
+                        action_id = (data.get("action_input") or {}).get("id")
+                        if action_id == "RESET":
+                            resets += 1
+                        elif action_id:
+                            steps += 1
+                        last = data
+            except OSError as e:
+                note_swallowed("parietal_lobe.arc._reconcile_attempts", e)
+                continue
+            if not steps and not resets:
+                continue
+            game["steps"] = steps
+            game["resets"] = resets
+            game["levels_completed"] = last.get("levels_completed", 0) or 0
+            game["win_levels"] = last.get("win_levels", 0) or 0
+            # The last recorded frame state is the truth — usually
+            # NOT_FINISHED, meaning she was mid-game when the session
+            # ended, not that she lost or never entered.
+            state = last.get("state")
+            if isinstance(state, str) and state:
+                game["state"] = state
+            game["reasons"] = [
+                *game.get("reasons", []),
+                "interrupted — recovered from recording",
+            ]
+            changed = True
+        if changed:
+            self._save_card(card)
 
     def _save_card(self, card: dict) -> None:
         import json
@@ -687,13 +1115,11 @@ class ArcOfficial(ArcPractice):
                     )
                 return card
             # Window over — the old card is sealed history; archive it.
-            archived = self._card_path.with_name(
-                f"official_card.{int(card['opened_at'])}.json"
-            )
+            archived = self._card_path.with_name(f"official_card.{int(card['opened_at'])}.json")
             try:
                 self._card_path.replace(archived)
             except OSError as e:
-                logger.debug(f'silent except: {e}')
+                logger.debug(f"silent except: {e}")
         return self._open_card()
 
     def _seal(self, card: dict, reason: str, *, call_close: bool = False) -> None:
@@ -728,7 +1154,7 @@ class ArcOfficial(ArcPractice):
                     card_id=card["scorecard_id"],
                     n_games=len(card["games"]),
                     idle_minutes=idle_minutes,
-                    ttl_days=int(self.WINDOW_S // 86400),
+                    ttl_hours=int(self.WINDOW_S // 3600),
                 )
                 + f" Next: {game_id} — {pending} games unplayed.",
                 topics=["arc", "official", "rules"],
@@ -751,14 +1177,12 @@ class ArcOfficial(ArcPractice):
             return None
         now = time.time()
         if now >= card["expires_at"]:
-            self._seal(card, "expired — 3-day window closed")
+            self._seal(card, "expired — window closed")
             return None
         if now - card["last_action_at"] >= self.IDLE_LIMIT_S:
             self._seal(card, "idle — the venue closed it")
             return None
-        game = next(
-            (g for g in card["games"] if g["status"] == "pending"), None
-        )
+        game = next((g for g in card["games"] if g["status"] == "pending"), None)
         if game is None:
             self._seal(card, "complete — every game attempted", call_close=True)
             return None
@@ -778,7 +1202,7 @@ class ArcOfficial(ArcPractice):
             return None
         now = time.time()
         if now >= card["expires_at"]:
-            self._seal(card, "expired — 3-day window closed")
+            self._seal(card, "expired — window closed")
             return None
         if now - card["last_action_at"] >= self.IDLE_LIMIT_S:
             self._seal(card, "idle — the venue closed it")
@@ -787,8 +1211,7 @@ class ArcOfficial(ArcPractice):
             (
                 g
                 for g in card["games"]
-                if g["game_id"] == game_id
-                or g["game_id"].startswith(f"{game_id}-")
+                if g["game_id"] == game_id or g["game_id"].startswith(f"{game_id}-")
             ),
             None,
         )
@@ -809,9 +1232,7 @@ class ArcOfficial(ArcPractice):
         marked, the game is burned on this card no matter what happens
         inside it.
         """
-        result = ArcResult(
-            game_id=game["game_id"], scorecard_id=card["scorecard_id"]
-        )
+        result = ArcResult(game_id=game["game_id"], scorecard_id=card["scorecard_id"])
         if (reasons := self._wait_for_readiness(result)) is not None:
             # She never entered — not an attempt. The card stays open;
             # the idle clock decides whether she gets another chance.

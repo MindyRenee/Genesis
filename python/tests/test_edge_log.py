@@ -21,14 +21,17 @@ from temporal_lobe.concepts.types import Edge, RelationType
 
 
 def _edge(src="a", tgt="b", rel=RelationType.IS_A, w=0.7, origin="stated"):
-    return Edge(source=src, target=tgt, relation=rel, weight=w,
-                created_at=1000, origin=origin)
+    return Edge(source=src, target=tgt, relation=rel, weight=w, created_at=1000, origin=origin)
 
 
 class TestClassification:
     def test_typed_relations_always_canonical(self):
-        for rel in (RelationType.IS_A, RelationType.CAUSES,
-                    RelationType.CALLS, RelationType.PART_OF):
+        for rel in (
+            RelationType.IS_A,
+            RelationType.CAUSES,
+            RelationType.CALLS,
+            RelationType.PART_OF,
+        ):
             assert not is_derivable_edge(rel, "hub_attachment")
             assert not is_derivable_edge(rel, "inferred")
 
@@ -75,8 +78,15 @@ class TestClassification:
         # Unlisted provenance is not provably geometry — keep it.
         # Experiential origins (sleep replay, introspection, sensory
         # co-activation) carry bindings similarity cannot rebuild.
-        for origin in ("swr-replay", "introspection", "sensory",
-                       "spindle", "lucid-dream", "learned", "unknown-x"):
+        for origin in (
+            "swr-replay",
+            "introspection",
+            "sensory",
+            "spindle",
+            "lucid-dream",
+            "learned",
+            "unknown-x",
+        ):
             assert not is_derivable_edge(RelationType.RELATED_TO, origin)
 
     def test_accepts_relation_value_strings(self):
@@ -121,18 +131,18 @@ class TestEdgeLog:
 
     def test_derivable_rejected_at_boundary(self, tmp_path):
         log = open_edge_log(tmp_path)
-        assert not log.assert_edge(
-            "a", "b", RelationType.RELATED_TO, 0.5, "hub_attachment", 1
-        )
+        assert not log.assert_edge("a", "b", RelationType.RELATED_TO, 0.5, "hub_attachment", 1)
         assert log.fold() == {}
         log.close()
 
     def test_snapshot_filters_derivables(self, tmp_path):
         log = open_edge_log(tmp_path)
-        log.snapshot([
-            _edge("a", "b", RelationType.IS_A),
-            _edge("a", "c", RelationType.RELATED_TO, origin="hub_attachment"),
-        ])
+        log.snapshot(
+            [
+                _edge("a", "b", RelationType.IS_A),
+                _edge("a", "c", RelationType.RELATED_TO, origin="hub_attachment"),
+            ]
+        )
         live = log.fold()
         log.close()
         assert len(live) == 1
@@ -153,8 +163,12 @@ class TestEdgeLog:
         log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1)
         log.close()
         with open(log.path, "a", encoding="utf-8") as f:
-            f.write('{"op":"assert","source":"bad","target":"x","relation":"is_a","weight":"nan"}\n')
-            f.write('{"op":"assert","source":"bad2","target":"x","relation":"is_a","created_at":{}}\n')
+            f.write(
+                '{"op":"assert","source":"bad","target":"x","relation":"is_a","weight":"nan"}\n'
+            )
+            f.write(
+                '{"op":"assert","source":"bad2","target":"x","relation":"is_a","created_at":{}}\n'
+            )
             f.write('{"op":"snapshot","edges":"not-a-list"}\n')
         reopened = open_edge_log(tmp_path)
         live = reopened.fold()
@@ -174,8 +188,7 @@ class TestEdgeLog:
     def test_compact_single_line_same_fold(self, tmp_path):
         log = open_edge_log(tmp_path)
         for i in range(50):
-            log.assert_edge(f"c{i}", "hub", RelationType.RELATED_TO,
-                            0.5, "stated", i)
+            log.assert_edge(f"c{i}", "hub", RelationType.RELATED_TO, 0.5, "stated", i)
         log.retract_edge("c0", "hub", RelationType.RELATED_TO)
         before = log.fold()
         n = log.compact()
@@ -240,8 +253,7 @@ class TestNetworkWiring:
         log = open_edge_log(tmp_path)
         net = ConceptNetwork()
         net.attach_edge_log(log)
-        result = net.add_edge("a", "b", RelationType.RELATED_TO, 0.5,
-                              "hub_attachment")
+        result = net.add_edge("a", "b", RelationType.RELATED_TO, 0.5, "hub_attachment")
         assert result is None
         assert net.edge_count == 0
         assert log.fold() == {}
@@ -301,16 +313,12 @@ class TestNetworkWiring:
         net = ConceptNetwork()
         net.attach_edge_log(log)
         net.add_edge("a", "b", RelationType.IS_A, 0.7, "stated")
-        net.attach_similarity_provider(
-            lambda cid: [("z", 0.9), ("y", 0.6)]
-        )
+        net.attach_similarity_provider(lambda cid: [("z", 0.9), ("y", 0.6)])
         assoc = net.get_associations("a")
         log.close()
         exact = [n for n in assoc if n.provenance == "exact"]
         virtual = [n for n in assoc if n.provenance == "embedding"]
-        assert [(n.concept, n.relation) for n in exact] == [
-            ("b", RelationType.IS_A)
-        ]
+        assert [(n.concept, n.relation) for n in exact] == [("b", RelationType.IS_A)]
         assert [n.concept for n in virtual] == ["z", "y"]
         assert all(n.relation is None for n in virtual)
 
@@ -357,13 +365,17 @@ class TestLegacyJsonMigration:
         # No "origin" key at all — the common legacy shape.
         _restore_edges(
             net,
-            [{"source": "a", "target": "b",
-              "relation": RelationType.RELATED_TO.value, "weight": 0.6}],
+            [
+                {
+                    "source": "a",
+                    "target": "b",
+                    "relation": RelationType.RELATED_TO.value,
+                    "weight": 0.6,
+                }
+            ],
             {"a": "a", "b": "b"},
         )
-        assert net.edge_count == 1, (
-            "legacy edge with no origin was dropped as if it were derivable"
-        )
+        assert net.edge_count == 1, "legacy edge with no origin was dropped as if it were derivable"
 
     def test_restore_drops_derivable_legacy_edge(self, tmp_path):
         from infrastructure.persistence import _restore_edges
@@ -373,9 +385,15 @@ class TestLegacyJsonMigration:
             net.add_concept(n, confidence=0.8)
         _restore_edges(
             net,
-            [{"source": "a", "target": "b",
-              "relation": RelationType.RELATED_TO.value, "weight": 0.6,
-              "origin": "semantic_bridge"}],
+            [
+                {
+                    "source": "a",
+                    "target": "b",
+                    "relation": RelationType.RELATED_TO.value,
+                    "weight": 0.6,
+                    "origin": "semantic_bridge",
+                }
+            ],
             {"a": "a", "b": "b"},
         )
         assert net.edge_count == 0
@@ -389,9 +407,15 @@ class TestLegacyJsonMigration:
         # Typed relations are always canonical facts, whatever the origin.
         _restore_edges(
             net,
-            [{"source": "a", "target": "b",
-              "relation": RelationType.IS_A.value, "weight": 0.6,
-              "origin": "inferred"}],
+            [
+                {
+                    "source": "a",
+                    "target": "b",
+                    "relation": RelationType.IS_A.value,
+                    "weight": 0.6,
+                    "origin": "inferred",
+                }
+            ],
             {"a": "a", "b": "b"},
         )
         assert net.edge_count == 1
@@ -409,10 +433,14 @@ class TestLegacyJsonMigration:
             net.add_concept(n, confidence=0.8)
         # Pre-log state: one canonical edge, one derivable leftover.
         net._edges = [
-            Edge(source="a", target="b", relation=RelationType.IS_A,
-                 weight=0.7, origin="stated"),
-            Edge(source="c", target="d", relation=RelationType.RELATED_TO,
-                 weight=0.6, origin="co_occurrence"),
+            Edge(source="a", target="b", relation=RelationType.IS_A, weight=0.7, origin="stated"),
+            Edge(
+                source="c",
+                target="d",
+                relation=RelationType.RELATED_TO,
+                weight=0.6,
+                origin="co_occurrence",
+            ),
         ]
         net._rebuild_edge_indices()
 
@@ -469,8 +497,7 @@ class TestWeightWriteThrough:
         log = open_edge_log(tmp_path)
         net = ConceptNetwork()
         net.attach_edge_log(log)
-        net.add_edge("dog", "animal", RelationType.IS_A, weight=0.2,
-                     origin="stated")
+        net.add_edge("dog", "animal", RelationType.IS_A, weight=0.2, origin="stated")
         net.teach("dog", RelationType.IS_A, "animal", confidence=0.9)
         log.close()
         reloaded = open_edge_log(tmp_path).fold()
@@ -490,8 +517,7 @@ class TestWeightWriteThrough:
         log = open_edge_log(tmp_path)
         net = ConceptNetwork()
         net.attach_edge_log(log)
-        net.add_edge("dog", "animal", RelationType.IS_A, weight=0.5,
-                     origin="stated")
+        net.add_edge("dog", "animal", RelationType.IS_A, weight=0.5, origin="stated")
         net.add_edge("dog", "animal", RelationType.IS_A, origin="stated")
         log.close()
         reloaded = open_edge_log(tmp_path).fold()
@@ -521,6 +547,7 @@ class TestCompactionFailureIsReported:
         log.compact = boom  # type: ignore[method-assign]
         # Force the threshold so compaction is attempted.
         import temporal_lobe.concepts.network as nmod
+
         original = nmod._COMPACT_THRESHOLD_BYTES
         nmod._COMPACT_THRESHOLD_BYTES = 0
         try:

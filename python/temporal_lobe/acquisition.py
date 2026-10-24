@@ -48,6 +48,8 @@ import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 
+from infrastructure.text import is_blank
+
 __all__ = ["LanguageAcquisition", "LearnedUnit"]
 
 
@@ -149,7 +151,7 @@ class LanguageAcquisition:
             A list of LearnedUnit objects discovered or reinforced
             in this input.
         """
-        if not text or not text.strip():
+        if is_blank(text):
             return []
 
         self._total_inputs += 1

@@ -41,14 +41,14 @@ _EMISSION_FREQS = (300.0, 2000.0, 5000.0)
 # fast/slow EMA ratio that counts as an acoustic onset.
 _TRANSIENT_RATIO = 4.0
 # EMA time constants in ~64 ms blocks (1024 @ 16 kHz).
-_FAST_ALPHA = 0.15   # ~0.4 s
+_FAST_ALPHA = 0.15  # ~0.4 s
 _SLOW_ALPHA = 0.005  # ~13 s
 # Stimulus scale for sustained emission level.
 _EMISSION_STIMULUS = 0.08
 
 _listener_lock = threading.Lock()
-_listener: Any = None          # _FieldAudio | None
-_listener_failed = False       # one failed open ⇒ absent forever
+_listener: Any = None  # _FieldAudio | None
+_listener_failed = False  # one failed open ⇒ absent forever
 
 
 class _FieldAudio:
@@ -61,12 +61,8 @@ class _FieldAudio:
         self._fast = 0.0
         self._slow = 0.0
         self._init = False
-        self._ks = [
-            round(_BLOCK * f / _SAMPLE_RATE) for f in _EMISSION_FREQS
-        ]
-        self._coeffs = [
-            2.0 * math.cos(2.0 * math.pi * k / _BLOCK) for k in self._ks
-        ]
+        self._ks = [round(_BLOCK * f / _SAMPLE_RATE) for f in _EMISSION_FREQS]
+        self._coeffs = [2.0 * math.cos(2.0 * math.pi * k / _BLOCK) for k in self._ks]
         self._stream = sd.InputStream(
             samplerate=_SAMPLE_RATE,
             channels=1,
@@ -127,7 +123,13 @@ class _FieldAudio:
 def _get_listener() -> _FieldAudio | None:
     """Lazily open the capture device. One failure ⇒ absent forever —
     a device the machine doesn't have is an absent channel, and a busy
-    one is too (the speech pipeline may own it)."""
+    one is too (the speech pipeline may own it).
+
+    The stream opens on a dedicated named thread: PortAudio's callback
+    worker is born inside ``sd.InputStream`` and inherits the opening
+    thread's comm name forever — opened here it read as a second
+    copy of whatever cognitive thread first touched this channel.
+    """
     global _listener, _listener_failed
     if os.environ.get("GENESIS_FIELD_AUDIO", "1") == "0":
         return None
@@ -137,7 +139,9 @@ def _get_listener() -> _FieldAudio | None:
         if _listener is not None:
             return _listener
         try:
-            _listener = _FieldAudio()
+            from genesis_client.threads import call_on_named_thread
+
+            _listener = call_on_named_thread("field-audio", _FieldAudio, comm="g-field-aud")
         except Exception:  # noqa: BLE001 — absent channel, any cause
             _listener_failed = True
             return None

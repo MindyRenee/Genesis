@@ -210,13 +210,13 @@ def test_rem_alpha_is_intermittent():
 
     osc._amplitude = dict.fromkeys(BrainWave, 0.1)
     for _ in range(40):
-        osc._phase[BrainWave.EPSILON] = 0.0  # envelope ~ max gain
+        osc._phase[BrainWave.INFRASLOW] = 0.0  # envelope ~ max gain
         osc._step(0.2, targets)
     hi = osc._amplitude[BrainWave.ALPHA]
 
     osc._amplitude = dict.fromkeys(BrainWave, 0.1)
     for _ in range(40):
-        osc._phase[BrainWave.EPSILON] = 3.141592653589793  # envelope ~ 0
+        osc._phase[BrainWave.INFRASLOW] = 3.141592653589793  # envelope ~ 0
         osc._step(0.2, targets)
     lo = osc._amplitude[BrainWave.ALPHA]
     assert hi > lo * 4, f"alpha not intermittent: hi={hi}, lo={lo}"
@@ -261,9 +261,7 @@ def test_sleep_stage_override_drives_nrem_waves():
 
 def test_n2_waves_carry_sigma_spindles():
     """N2 waves are spindle-rich — the graphoelement that defines it."""
-    state = assess_brain_waves(
-        _make_summary(arousal=0.18, phase=PHASE_NREM), SleepStage.N2
-    )
+    state = assess_brain_waves(_make_summary(arousal=0.18, phase=PHASE_NREM), SleepStage.N2)
     assert state.powers[BrainWave.SIGMA] > 0.15
     # Spindles are generated centrally.
     central = state.regional_powers["central"]
@@ -272,9 +270,7 @@ def test_n2_waves_carry_sigma_spindles():
 
 def test_n3_waves_are_frontally_dominant_delta():
     """Slow-wave sleep delta peaks over frontal cortex."""
-    state = assess_brain_waves(
-        _make_summary(arousal=0.15, phase=PHASE_NREM), SleepStage.N3
-    )
+    state = assess_brain_waves(_make_summary(arousal=0.15, phase=PHASE_NREM), SleepStage.N3)
     frontal = state.regional_powers["frontal"]
     assert max(frontal, key=lambda b: frontal[b]) == BrainWave.DELTA
 
@@ -288,9 +284,7 @@ def test_effective_phase_resolves_waking_low_arousal_to_drowsy():
     effective = StatusMixin._effective_phase
 
     def _core(zone, phase, arousal):
-        return SimpleNamespace(
-            cognitive_zone=zone, emergent_phase=phase, arousal=arousal
-        )
+        return SimpleNamespace(cognitive_zone=zone, emergent_phase=phase, arousal=arousal)
 
     # Waking phase carrying N1-level arousal is pre-sleep.
     assert effective(None, _core(ZONE_IDLE, PHASE_ACTIVE, 0.30)) == PHASE_DROWSY
@@ -419,6 +413,24 @@ def test_consolidation_weight_affects_theta():
     assert high_state.consolidation > low_state.consolidation
 
 
+def test_consolidation_suppressed_when_encoding_dominates():
+    """Encoding mode suppresses consolidation drive — write, not replay.
+
+    encoding_weight and consolidation_weight compete (the same
+    balance compute_theta_gamma_coupling uses to pick a phase): when
+    encoding outranks consolidation, the drive is gated down even
+    though the slow-wave bands are present.
+    """
+    deep = {"arousal": 0.18, "phase": PHASE_NREM}
+    # Same consolidation weight in all three — only the encoding
+    # balance changes.
+    encode_mode = assess_brain_waves(_make_summary(**deep, encoding=0.9, consolidation=0.3))
+    balanced = assess_brain_waves(_make_summary(**deep, encoding=0.3, consolidation=0.3))
+    replay_mode = assess_brain_waves(_make_summary(**deep, encoding=0.1, consolidation=0.9))
+    assert encode_mode.consolidation < balanced.consolidation
+    assert replay_mode.consolidation > balanced.consolidation
+
+
 # ─── Sleep stage tests ────────────────────────────────────────
 
 
@@ -494,9 +506,15 @@ def test_curiosity_gamma_more_questions():
     from temporal_lobe.concepts import ConceptNetwork
 
     emo = EmotionalState(
-        label="curious", nuance="default", cognitive_style="steady",
-        valence=0.3, alertness=0.7, plasticity=0.6, creativity=0.5,
-        caution=0.2, openness_to_engage=0.7,
+        label="curious",
+        nuance="default",
+        cognitive_style="steady",
+        valence=0.3,
+        alertness=0.7,
+        plasticity=0.6,
+        creativity=0.5,
+        caution=0.2,
+        openness_to_engage=0.7,
     )
     net = ConceptNetwork()
     reasoning = Reasoner(net)
@@ -598,9 +616,15 @@ def test_narrative_delta_suppresses_recording():
     engine = Narrator(model, net)
 
     emo = EmotionalState(
-        label="neutral", nuance="default", cognitive_style="steady",
-        valence=0.0, alertness=0.5, plasticity=0.5, creativity=0.5,
-        caution=0.3, openness_to_engage=0.7,
+        label="neutral",
+        nuance="default",
+        cognitive_style="steady",
+        valence=0.0,
+        alertness=0.5,
+        plasticity=0.5,
+        creativity=0.5,
+        caution=0.3,
+        openness_to_engage=0.7,
     )
 
     delta = _make_wave_state(BrainWave.DELTA)
@@ -638,36 +662,43 @@ def test_dream_synthesis_theta_more_proposals():
     assert len(theta_proposals) >= len(delta_proposals)
 
 
-def test_sleep_compression_consolidation_scales_homeostasis():
-    """High consolidation intensity produces more aggressive downscaling."""
-    import tempfile
-
-    from temporal_lobe.compression import SleepCompressor
-    from temporal_lobe.concepts import ConceptNetwork, Edge, RelationType
+def test_synaptic_downscaler_body_pressure_drives_shy():
+    """SHY renormalisation is proportional, pressure-driven, and
+    non-destructive: every edge loses weight ∝ w × rate × dt, no edge
+    is deleted, and higher body sleep pressure downscales faster."""
+    from brainstem.architecture import SynapticDownscaler
+    from temporal_lobe.concepts import ConceptNetwork, RelationType
 
     net = ConceptNetwork()
     net.add_concept("a", origin="learned")
     net.add_concept("b", origin="learned")
+    net.add_concept("c", origin="learned")
     net.add_edge("a", "b", RelationType.IS_A, weight=0.8)
+    net.add_edge("b", "c", RelationType.IS_A, weight=0.2)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        compressor = SleepCompressor(tmpdir, homeostasis_scale=0.9)
+    downscaler = SynapticDownscaler()
+    downscaler.body_pressure = 1.0  # body still needs sleep
 
-        # High consolidation → more aggressive downscaling
-        compressor._apply_homeostasis(net, consolidation_intensity=1.0)
-        high_edges = [e for e in net.edges if e.source == "a" and e.target == "b"]
-        high_final = high_edges[0].weight if high_edges else 0.0
+    before = len(net.edges)
+    w_strong, w_weak = net.edges[0].weight, net.edges[1].weight
+    downscaler.downscale_during_n3(net, dt=1.0)
 
-        # Reset
-        net.replace_edges([Edge(source="a", target="b", relation=RelationType.IS_A, weight=0.8)])
+    # No deletion — the kill floor is gone.
+    assert len(net.edges) == before
+    # Proportional: the strong edge lost more absolute weight.
+    d_strong = w_strong - net.edges[0].weight
+    d_weak = w_weak - net.edges[1].weight
+    assert d_strong > d_weak > 0.0
 
-        # Low consolidation → gentler downscaling
-        compressor._apply_homeostasis(net, consolidation_intensity=0.1)
-        low_edges = [e for e in net.edges if e.source == "a" and e.target == "b"]
-        low_final = low_edges[0].weight if low_edges else 0.0
-
-        # High consolidation should have downscaled more
-        assert high_final < low_final
+    # Higher body pressure → faster renormalisation.
+    calm = SynapticDownscaler()
+    calm.body_pressure = 0.0
+    net2 = ConceptNetwork()
+    net2.add_concept("x", origin="learned")
+    net2.add_concept("y", origin="learned")
+    net2.add_edge("x", "y", RelationType.IS_A, weight=0.8)
+    calm.downscale_during_n3(net2, dt=1.0)
+    assert net2.edges[0].weight > net.edges[0].weight
 
 
 def test_voice_brain_waves_modulate_rhythm():
@@ -680,9 +711,15 @@ def test_voice_brain_waves_modulate_rhythm():
     voice = Voice(personality, seed=42)
 
     emo = EmotionalState(
-        label="neutral", nuance="default", cognitive_style="steady",
-        valence=0.0, alertness=0.7, plasticity=0.5, creativity=0.5,
-        caution=0.3, openness_to_engage=0.7,
+        label="neutral",
+        nuance="default",
+        cognitive_style="steady",
+        valence=0.0,
+        alertness=0.7,
+        plasticity=0.5,
+        creativity=0.5,
+        caution=0.3,
+        openness_to_engage=0.7,
     )
 
     # Long sentence that could be split
@@ -804,9 +841,7 @@ def test_derive_self_priority_brain_waves_override_body():
     nice, _ = derive_self_priority(state, body_recommended_nice=10)
     # Brain waves should override: gamma-dominant should still get
     # negative or near-zero nice despite the body saying 10
-    assert nice < 5, (
-        f"brain waves should override body deprioritization: nice={nice}"
-    )
+    assert nice < 5, f"brain waves should override body deprioritization: nice={nice}"
 
 
 def test_derive_self_priority_clamps():
@@ -835,10 +870,13 @@ def test_derive_self_priority_clamps():
     )
     nice, io_class = derive_self_priority(state)
     assert -5 <= nice <= 10, f"nice out of range: {nice}"
-    assert io_class in ("idle", "best-effort-0", "best-effort-1",
-                        "best-effort-3", "best-effort-6"), (
-        f"invalid io_class: {io_class}"
-    )
+    assert io_class in (
+        "idle",
+        "best-effort-0",
+        "best-effort-1",
+        "best-effort-3",
+        "best-effort-6",
+    ), f"invalid io_class: {io_class}"
 
 
 # ─── Beta sub-band tests ──────────────────────────────────────
@@ -888,35 +926,35 @@ def test_waking_no_sigma():
     assert state.powers[BrainWave.SIGMA] < 0.05
 
 
-# ─── Epsilon and Lambda band tests ────────────────────────────
+# ─── Infraslow and Epsilon band tests ─────────────────────────
 
 
-def test_deep_sleep_has_epsilon():
-    """Deep sleep (N3) has epsilon (infraslow) activity."""
+def test_deep_sleep_has_infraslow():
+    """Deep sleep (N3) has infraslow activity."""
     summary = _make_summary(arousal=0.1, phase=PHASE_NREM)
     state = assess_brain_waves(summary)
-    assert state.powers[BrainWave.EPSILON] > 0.03
+    assert state.powers[BrainWave.INFRASLOW] > 0.03
 
 
-def test_waking_has_epsilon():
-    """Waking states have some epsilon (infraslow) activity."""
+def test_waking_has_infraslow():
+    """Waking states have some infraslow activity."""
     summary = _make_summary(arousal=0.5, phase=PHASE_ACTIVE)
     state = assess_brain_waves(summary)
-    assert state.powers[BrainWave.EPSILON] > 0.02
+    assert state.powers[BrainWave.INFRASLOW] > 0.02
 
 
-def test_n3_has_lambda():
-    """N3 sleep has lambda (HFO) activity — sharp wave-ripples."""
+def test_n3_has_epsilon():
+    """N3 sleep has epsilon (HFO) activity — sharp wave-ripples."""
     summary = _make_summary(arousal=0.1, phase=PHASE_NREM)
     state = assess_brain_waves(summary)
-    assert state.powers[BrainWave.LAMBDA] > 0.01
+    assert state.powers[BrainWave.EPSILON] > 0.01
 
 
-def test_flow_has_lambda():
-    """Flow state has lambda (HFO) activity."""
+def test_flow_has_epsilon():
+    """Flow state has epsilon (HFO) activity."""
     summary = _make_summary(arousal=0.7, plasticity=0.6, phase=PHASE_FLOW)
     state = assess_brain_waves(summary)
-    assert state.powers[BrainWave.LAMBDA] > 0.02
+    assert state.powers[BrainWave.EPSILON] > 0.02
 
 
 # ─── Theta-gamma coupling tests ───────────────────────────────
@@ -927,8 +965,9 @@ def test_theta_gamma_coupling_encoding_phase():
     from thalamus.brain_waves import compute_theta_gamma_coupling
 
     state = assess_brain_waves(
-        _make_summary(arousal=0.5, plasticity=0.5, phase=PHASE_ACTIVE,
-                      encoding=0.9, consolidation=0.1)
+        _make_summary(
+            arousal=0.5, plasticity=0.5, phase=PHASE_ACTIVE, encoding=0.9, consolidation=0.1
+        )
     )
     coupling = compute_theta_gamma_coupling(state, consolidation_weight=0.1, encoding_weight=0.9)
     assert coupling.mode == "encoding"
@@ -942,8 +981,9 @@ def test_theta_gamma_coupling_retrieval_phase():
     from thalamus.brain_waves import compute_theta_gamma_coupling
 
     state = assess_brain_waves(
-        _make_summary(arousal=0.5, plasticity=0.5, phase=PHASE_ACTIVE,
-                      encoding=0.1, consolidation=0.9)
+        _make_summary(
+            arousal=0.5, plasticity=0.5, phase=PHASE_ACTIVE, encoding=0.1, consolidation=0.9
+        )
     )
     coupling = compute_theta_gamma_coupling(state, consolidation_weight=0.9, encoding_weight=0.1)
     assert coupling.mode == "retrieval"
@@ -990,9 +1030,7 @@ def test_stimulus_decays():
         state2 = assess_brain_waves(summary)
     gamma2 = state2.powers[BrainWave.GAMMA]
 
-    assert gamma2 < gamma1, (
-        f"stimulus should decay: {gamma1} → {gamma2}"
-    )
+    assert gamma2 < gamma1, f"stimulus should decay: {gamma1} → {gamma2}"
     reset_oscillator()
 
 
@@ -1065,15 +1103,32 @@ if __name__ == "__main__":
     sys.exit(0 if success else 1)
 
 
-def test_nrem_depth_follows_the_network_sleep_pressure() -> None:
-    """With the network's sleep pressure, NREM depth is set by pressure, not by
-    arousal (which the network now sets from LC alone, so it cannot express
-    depth). The cut points are the network's own NREM terciles."""
-    from thalamus.brain_waves import NREM_N2_PRESSURE, NREM_N3_PRESSURE, _sleep_stage_from_summary
+def test_nrem_depth_follows_chemical_arousal() -> None:
+    """NREM depth is read off her chemical arousal — which the
+    sleep-wake network drives down through the descent (measured
+    ~0.49 at onset to ~0.14 once LC silences), so the bands trace a
+    real N1 → N2 → N3 architecture. The earlier homeostat mapping
+    pinned the stage at N1 whenever adenosine sat low, because a live
+    h is a decaying remainder, not a depth."""
+    assert _sleep_stage_from_summary(_make_summary(arousal=0.49, phase=PHASE_NREM)) is SleepStage.N1
+    assert _sleep_stage_from_summary(_make_summary(arousal=0.28, phase=PHASE_NREM)) is SleepStage.N2
+    assert _sleep_stage_from_summary(_make_summary(arousal=0.15, phase=PHASE_NREM)) is SleepStage.N3
 
-    summary = _make_summary(arousal=0.21, phase=PHASE_NREM)
-    assert _sleep_stage_from_summary(summary, NREM_N3_PRESSURE) is SleepStage.N3
-    assert _sleep_stage_from_summary(summary, NREM_N2_PRESSURE) is SleepStage.N2
-    assert _sleep_stage_from_summary(summary, 0.0) is SleepStage.N1
-    # Without pressure the arousal bands apply, unchanged.
-    assert _sleep_stage_from_summary(summary) is SleepStage.N2
+
+def test_nrem_arousal_descent_reports_deepening_stages() -> None:
+    """The fallback arousal mapping still descends when arousal does:
+    used only when no sleep-cycle tracker is active, it must report the
+    full N1→N2→N3 band sweep rather than pinning at N1."""
+    descent = [0.48, 0.40, 0.33, 0.26, 0.21, 0.18, 0.14]
+    stages = [
+        _sleep_stage_from_summary(_make_summary(arousal=a, phase=PHASE_NREM)) for a in descent
+    ]
+    assert stages == [
+        SleepStage.N1,
+        SleepStage.N1,
+        SleepStage.N2,
+        SleepStage.N2,
+        SleepStage.N2,
+        SleepStage.N3,
+        SleepStage.N3,
+    ]

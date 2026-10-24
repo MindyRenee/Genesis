@@ -44,16 +44,16 @@ MOTOR_FIELD_WIDTH = 64
 MOTOR_FIELD_HEIGHT = 64
 
 # Field amplitudes — relative weights of the drives the field carries.
-_W_WIN = 1.0        # touching this kind won before
-_W_COLLECT = 0.7    # this kind is consumable value
-_W_HAZARD = 1.0     # this kind killed her
+_W_WIN = 1.0  # touching this kind won before
+_W_COLLECT = 0.7  # this kind is consumable value
+_W_HAZARD = 1.0  # this kind killed her
 _W_UNPROBED = 0.25  # an entity whose affordance is still unknown
-_W_RESPONSIVE = 0.5 # a kind whose distal acts the world has answered
+_W_RESPONSIVE = 0.5  # a kind whose distal acts the world has answered
 _W_FRONTIER = 0.15  # visited space adjacent to unseen space
-_W_BLOCKED = 0.8    # known-solid cells
-_W_UNTRIED = 0.3    # an action whose effect is unlearned
-_W_RESET = 0.8      # interface-labeled episode-ending actions
-_W_RECALL = 0.6     # episodic recall's associative valence on a kind
+_W_BLOCKED = 0.8  # known-solid cells
+_W_UNTRIED = 0.3  # an action whose effect is unlearned
+_W_RESET = 0.8  # interface-labeled episode-ending actions
+_W_RECALL = 0.6  # episodic recall's associative valence on a kind
 
 
 @dataclass(slots=True)
@@ -72,9 +72,7 @@ class MotorField:
     peak: tuple[int, int] | None = field(default=None)
 
 
-def compose_spatial_field(
-    model: WorldModel, height: int, width: int
-) -> list[list[float]]:
+def compose_spatial_field(model: WorldModel, height: int, width: int) -> list[list[float]]:
     """Project the world model's learned values onto the grid.
 
     Nested (row, col) accumulation over each live entity's cells —
@@ -102,9 +100,7 @@ def compose_spatial_field(
         # A kind the world answers when she acts at it keeps its
         # pull — a control worth pressing again. Normalized so a
         # press that moves ~8 cells saturates the term.
-        responsive = min(
-            1.0, model.click_responsiveness(entity.color) / 8.0
-        )
+        responsive = min(1.0, model.click_responsiveness(entity.color) / 8.0)
         strength += _W_RESPONSIVE * responsive
         # Associative recall: a kind her memory remembers as a goal
         # attracts, as a killer repels — a voice in the field, not a
@@ -155,17 +151,10 @@ def compose_action_field(
         score = 0.0
         effect = model.expected_effect(action) if me is not None else None
         if effect is not None and (effect[0] or effect[1]) and fp:
-            dest_cells = {
-                (r + effect[0], c + effect[1]) for r, c in fp
-            }
-            field_cells = [
-                (r, c) for r, c in dest_cells
-                if 0 <= r < height and 0 <= c < width
-            ]
+            dest_cells = {(r + effect[0], c + effect[1]) for r, c in fp}
+            field_cells = [(r, c) for r, c in dest_cells if 0 <= r < height and 0 <= c < width]
             if field_cells:
-                score += sum(
-                    spatial[r][c] for r, c in field_cells
-                ) / len(field_cells)
+                score += sum(spatial[r][c] for r, c in field_cells) / len(field_cells)
             if dest_cells & model.known_blocked:
                 score -= _W_BLOCKED
         if not model.action_understood(action):

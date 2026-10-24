@@ -12,11 +12,15 @@ from frontal_lobe.question_handler import (
     _PAST_MARKER_RE,
     QuestionHandler,
 )
+from frontal_lobe.reasoning import Judge
 from frontal_lobe.self import SelfComposer, SelfModel
 from frontal_lobe.tools.framework import ToolRegistry
 from limbic_system.emotion import EmotionalState
 from occipital_lobe.perception import Intent, Perception, QuestionType
+from parietal_lobe.correspondence import CorrespondenceLedger
+from parietal_lobe.situation_model import SituationModel
 from temporal_lobe.base import Thought
+from temporal_lobe.comprehension import Comprehension
 from temporal_lobe.concepts import ConceptNetwork, RelationType
 from temporal_lobe.memory.memory import MemoryContext
 
@@ -35,8 +39,15 @@ _VERB_MAP = {
 def _network() -> ConceptNetwork:
     net = ConceptNetwork()
     for name in (
-        "alice", "genesis", "cognition", "sleep", "memory",
-        "food", "glip", "dreams", "emptycon",
+        "alice",
+        "genesis",
+        "cognition",
+        "sleep",
+        "memory",
+        "food",
+        "glip",
+        "dreams",
+        "emptycon",
     ):
         net.add_concept(name, confidence=0.8)
     net.add_edge("alice", "genesis", RelationType.CREATES, 0.95)
@@ -64,9 +75,7 @@ def _handler(net: ConceptNetwork) -> QuestionHandler:
     )
 
 
-def _perception(
-    text: str, qtype: QuestionType, topics: list[str] | None = None
-) -> Perception:
+def _perception(text: str, qtype: QuestionType, topics: list[str] | None = None) -> Perception:
     return Perception(
         raw_text=text,
         intent=Intent.QUESTION,
@@ -205,9 +214,7 @@ def _memory_context(ep_text: str):
 
     ctx = MemoryContext()
     ctx.retrieved.append(
-        SimilarEpisode(
-            episode_id=7, hamming_distance=5, timestamp=1, salience=0.9
-        )
+        SimilarEpisode(episode_id=7, hamming_distance=5, timestamp=1, salience=0.9)
     )
     episode = SimpleNamespace(text=ep_text)
     return ctx, lambda _eid: episode
@@ -215,8 +222,11 @@ def _memory_context(ep_text: str):
 
 def _bare_thought() -> Thought:
     return Thought(
-        content="mammal", intent="inform", emotion="calm",
-        confidence=0.9, topics=["mammal"],
+        content="mammal",
+        intent="inform",
+        emotion="calm",
+        confidence=0.9,
+        topics=["mammal"],
     )
 
 
@@ -264,13 +274,9 @@ def test_produced_passive_is_incoming():
 def test_negated_question_declined():
     """Negated questions ask about absences its edges can't enumerate."""
     handler = _handler(_network())
-    assert _relation_meta(
-        handler, "Why does sleep not cause memory?", QuestionType.WHY
-    ) is None
+    assert _relation_meta(handler, "Why does sleep not cause memory?", QuestionType.WHY) is None
     # "doesn't" (no space) must also be detected.
-    assert _relation_meta(
-        handler, "Why doesn't sleep affect memory?", QuestionType.WHY
-    ) is None
+    assert _relation_meta(handler, "Why doesn't sleep affect memory?", QuestionType.WHY) is None
 
 
 def test_mixed_relations_keep_dominant():
@@ -284,9 +290,9 @@ def test_mixed_relations_keep_dominant():
 
 
 def test_unknown_subject_returns_none():
-    assert _relation_meta(
-        _handler(_network()), "What does a zorblax eat?", QuestionType.WHAT
-    ) is None
+    assert (
+        _relation_meta(_handler(_network()), "What does a zorblax eat?", QuestionType.WHAT) is None
+    )
 
 
 def test_no_question_type_returns_none():
@@ -365,3 +371,137 @@ def test_creator_name_derived_from_network():
     thought = handler.question_creator_personal("who is alice", _emotion())
     assert thought is not None
     assert thought.metadata.get("field") == "creator"
+
+
+# ─── Polar questions: judgment against the situation model ──────
+
+
+def _polar_handler() -> tuple[QuestionHandler, SituationModel, Comprehension]:
+    """A handler wired like production: real model, ledger, judge.
+
+    The story is fed through real parses, so the verdict exercises
+    the same proposition→claim→bearing chain the live path does.
+    """
+    model = SituationModel()
+    handler = _handler(_network())
+    handler._situation = model
+    handler._judge = Judge(CorrespondenceLedger(model))
+    return handler, model, Comprehension()
+
+
+def _polar_meta(handler: QuestionHandler, comp: Comprehension, text: str):
+    result = comp.comprehend(text)
+    thought = handler.question_situation(
+        _perception(text, QuestionType.YES_NO),
+        _emotion(),
+        result.propositions,
+    )
+    if thought is None:
+        return None
+    return thought.metadata.get("situation_answer")
+
+
+def test_polar_supported_claim_hedges_then_asserts():
+    """The first check cannot license assertion; the second can."""
+    handler, model, comp = _polar_handler()
+    model.update(comp.comprehend("Mary is in the kitchen."))
+
+    first = _polar_meta(handler, comp, "is Mary in the kitchen?")
+    assert first is not None
+    assert first["kind"] == "verdict_hedge"
+    assert first["stance"] == "hedge"
+    assert first["claim"] == "mary is in the kitchen"
+
+    # Checking again is more evidence — the Beta posterior accumulates
+    # per claim, so the second answer commits.
+    second = _polar_meta(handler, comp, "is Mary in the kitchen?")
+    assert second["kind"] == "verdict_assert"
+    assert second["stance"] == "assert"
+
+
+def test_polar_contradicted_claim_doubts_then_denies():
+    """A claim the model affirms the negation of leans false first."""
+    handler, model, comp = _polar_handler()
+    model.update(comp.comprehend("Mary is in the kitchen."))
+
+    first = _polar_meta(handler, comp, "is Mary in the bathroom?")
+    assert first is not None
+    assert first["kind"] == "verdict_doubt"
+
+    second = _polar_meta(handler, comp, "is Mary in the bathroom?")
+    assert second["kind"] == "verdict_deny"
+
+
+def test_polar_equivocal_claim_suspends():
+    """An either/or discourse is equivocal bearing — judgment holds."""
+    handler, model, comp = _polar_handler()
+    model.update(comp.comprehend("John is either in the bathroom or the den."))
+
+    meta = _polar_meta(handler, comp, "is John in the bathroom?")
+    assert meta is not None
+    assert meta["kind"] == "verdict_suspend"
+
+
+def test_polar_unknown_claim_suspends():
+    """An entity the discourse never mentioned gives no bearing."""
+    handler, model, comp = _polar_handler()
+    model.update(comp.comprehend("Mary is in the kitchen."))
+
+    meta = _polar_meta(handler, comp, "is the dog in the den?")
+    assert meta is not None
+    assert meta["kind"] == "verdict_suspend"
+
+
+def test_polar_possession_question_judged():
+    """'does John have the ball?' checks the carries claim 'has' settled."""
+    handler, model, comp = _polar_handler()
+    model.update(comp.comprehend("John has the ball."))
+
+    meta = _polar_meta(handler, comp, "does John have the ball?")
+    assert meta is not None
+    assert meta["kind"] == "verdict_hedge"
+    assert meta["claim"] == "john has ball"
+
+
+def test_polar_without_judge_falls_through():
+    """No assertion gate → no verdict; the question routes onward."""
+    model = SituationModel()
+    comp = Comprehension()
+    handler = _handler(_network())
+    handler._situation = model
+    model.update(comp.comprehend("Mary is in the kitchen."))
+
+    result = comp.comprehend("is Mary in the kitchen?")
+    thought = handler.question_situation(
+        _perception("is Mary in the kitchen?", QuestionType.YES_NO),
+        _emotion(),
+        result.propositions,
+    )
+    assert thought is None
+
+
+def test_polar_without_propositions_falls_through():
+    """Without the parsed clauses there is no radical to judge."""
+    handler, model, comp = _polar_handler()
+    model.update(comp.comprehend("Mary is in the kitchen."))
+
+    thought = handler.question_situation(
+        _perception("is Mary in the kitchen?", QuestionType.YES_NO),
+        _emotion(),
+    )
+    assert thought is None
+
+
+def test_wh_question_not_hijacked_by_polar_path():
+    """A wh-question carries its own focus — never the whether-gap."""
+    handler, model, comp = _polar_handler()
+    model.update(comp.comprehend("Mary is in the kitchen."))
+
+    result = comp.comprehend("where is Mary?")
+    thought = handler.question_situation(
+        _perception("where is Mary?", QuestionType.WHERE),
+        _emotion(),
+        result.propositions,
+    )
+    assert thought is not None
+    assert thought.metadata["situation_answer"]["kind"] == "location"

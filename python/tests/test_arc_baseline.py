@@ -79,6 +79,7 @@ class _FakeArcade:
 
 def _baseline(monkeypatch, env, policy="uniform") -> ArcBaseline:
     """An ArcBaseline whose SDK is a fake — no engine download needed."""
+
     class _Mode(Enum):
         OFFLINE = "offline"
         COMPETITION = "competition"
@@ -145,13 +146,9 @@ def test_baseline_suite_one_scorecard_every_env(monkeypatch):
     baseline = _baseline(monkeypatch, _FakeEnv(win_after=1))
     arcade = baseline._practice._arcade
     made = []
-    arcade.get_environments = lambda: [
-        SimpleNamespace(game_id=g) for g in ("a", "b")
-    ]
+    arcade.get_environments = lambda: [SimpleNamespace(game_id=g) for g in ("a", "b")]
     arcade.make = lambda game, **kw: made.append(game) or _FakeEnv(win_after=1)
-    arcade.close_scorecard = (
-        lambda card: arcade.closed.append(card) or SimpleNamespace(score=0.0)
-    )
+    arcade.close_scorecard = lambda card: arcade.closed.append(card) or SimpleNamespace(score=0.0)
     result = baseline.play_all(max_steps=2)
     assert made == ["a", "b"]
     assert arcade.closed == ["card-1"]

@@ -36,8 +36,8 @@ class PairDelta:
     """The perceived change between one input and its output."""
 
     same_shape: bool
-    added: frozenset[tuple[int, int, int]]   # (r, c, color) — bg → colored
-    removed: frozenset[tuple[int, int]]      # colored → bg
+    added: frozenset[tuple[int, int, int]]  # (r, c, color) — bg → colored
+    removed: frozenset[tuple[int, int]]  # colored → bg
     recolored: frozenset[tuple[int, int, int, int]]  # (r, c, old, new)
 
     @property
@@ -92,9 +92,7 @@ class TaskDelta:
             return set()
         consistent: set[str] = set()
         for name, rel in _DELTA_RELATIONS.items():
-            if all(
-                _completes_with(inp, out, rel) for inp, out in examples
-            ):
+            if all(_completes_with(inp, out, rel) for inp, out in examples):
                 consistent.add(name)
         return consistent
 

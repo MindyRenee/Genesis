@@ -50,9 +50,7 @@ logger = logging.getLogger(__name__)
 # input→output pair — perceptual inference, not search — so they
 # participate in recognition alongside the fixed vocabulary. Display
 # names drop the ``infer_`` prefix ("infer_recolor_map" → "recolor_map").
-_INFER_SKILLS = tuple(
-    (INFER_OP_NAMES[fn].removeprefix("infer_"), fn) for fn in INFER_OPS
-)
+_INFER_SKILLS = tuple((INFER_OP_NAMES[fn].removeprefix("infer_"), fn) for fn in INFER_OPS)
 
 
 class SpatialImagery:
@@ -96,10 +94,7 @@ class SpatialImagery:
     def applicable_skills(self, grid: Grid) -> list[str]:
         """Skills whose preconditions hold on this grid — affordances
         of the imagery workspace."""
-        return [
-            name for name in self.known_skills
-            if self.imagine(grid, name) is not None
-        ]
+        return [name for name in self.known_skills if self.imagine(grid, name) is not None]
 
     def recognize_change(self, before: Grid, after: Grid) -> list[str]:
         """Which known skills explain ``before`` → ``after``.

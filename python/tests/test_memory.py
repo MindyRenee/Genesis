@@ -40,10 +40,10 @@ from genesis_client.types import Episode, MemoryStats, SimilarEpisode
 logger = logging.getLogger(__name__)
 
 
-
 # ======================================================================
 # From tests/test_memory_engine.py
 # ======================================================================
+
 
 def _make_mock_client(ltm_count: int = 0) -> MagicMock:
     """Create a mock GenesisClient."""
@@ -473,7 +473,9 @@ def test_forget_idempotent_same_timestamp() -> None:
     now = time.time()
     old_time = int((now - 3600) * 1000)  # 1 hour ago
     rec = _make_record(
-        episode_id=1, salience=0.1, encoded_at=old_time,
+        episode_id=1,
+        salience=0.1,
+        encoded_at=old_time,
     )
     rec.last_accessed = old_time
     engine._records[1] = rec
@@ -493,7 +495,9 @@ def test_forget_idempotent_with_interference() -> None:
     # Three memories encoded close together → interference.
     for i in range(3):
         rec = _make_record(
-            episode_id=i, salience=0.3, encoded_at=base + i * 1000,
+            episode_id=i,
+            salience=0.3,
+            encoded_at=base + i * 1000,
         )
         rec.last_accessed = base + i * 1000
         engine._records[i] = rec
@@ -1124,6 +1128,7 @@ def test_store_memory_clamps_out_of_range_emotional_tag() -> None:
 # From tests/test_reconsolidation_boundaries.py
 # ======================================================================
 
+
 def _make_mock_client_recons(ltm_count: int = 1) -> MagicMock:
     """Create a mock GenesisClient."""
     client = MagicMock()
@@ -1180,8 +1185,7 @@ def test_recall_with_prediction_error_opens_window():
     engine._mark_accessed(episode_id=1, now_ms=int(time.time() * 1000), opens_window=True)
 
     assert rec.reconsolidation_window > 0, (
-        f"Window should open with prediction error, "
-        f"got {rec.reconsolidation_window}"
+        f"Window should open with prediction error, got {rec.reconsolidation_window}"
     )
     assert rec.reconsolidation_window == engine._RECONSOLIDATION_WINDOW, (
         f"Window should be full duration, got {rec.reconsolidation_window}"
@@ -1191,9 +1195,7 @@ def test_recall_with_prediction_error_opens_window():
 
 def test_retrieval_practice_strengthens_memory():
     """Every recall should strengthen the memory (retrieval practice effect)."""
-    engine, rec = _make_engine_with_record(
-        episode_id=1, retention=0.5, synaptic_strength=0.4
-    )
+    engine, rec = _make_engine_with_record(episode_id=1, retention=0.5, synaptic_strength=0.4)
     initial_retention = rec.retention
     initial_synaptic = rec.synaptic_strength
 
@@ -1243,7 +1245,9 @@ def test_retrieve_relevant_with_pe_opens_window():
     # Mock find_similar to return our episode
     engine.client.find_similar.return_value = [
         SimilarEpisode(
-            episode_id=1, hamming_distance=10, timestamp=int(time.time() * 1000),
+            episode_id=1,
+            hamming_distance=10,
+            timestamp=int(time.time() * 1000),
             salience=0.5,
         )
     ]
@@ -1260,7 +1264,9 @@ def test_retrieve_relevant_without_pe_does_not_open_window():
     engine, rec = _make_engine_with_record(episode_id=1)
     engine.client.find_similar.return_value = [
         SimilarEpisode(
-            episode_id=1, hamming_distance=10, timestamp=int(time.time() * 1000),
+            episode_id=1,
+            hamming_distance=10,
+            timestamp=int(time.time() * 1000),
             salience=0.5,
         )
     ]
@@ -1276,9 +1282,14 @@ def test_retrieve_episode_with_pe_opens_window():
     """retrieve_episode with prediction_error >= threshold opens window."""
     engine, rec = _make_engine_with_record(episode_id=1)
     engine.client.retrieve_episode.return_value = Episode(
-        episode_id=1, timestamp=int(time.time() * 1000), salience=0.5,
-        association_hash=0, full_emotional_tag=[0.5] * 12,
-        event_type=0, source_module=4, text="test memory",
+        episode_id=1,
+        timestamp=int(time.time() * 1000),
+        salience=0.5,
+        association_hash=0,
+        full_emotional_tag=[0.5] * 12,
+        event_type=0,
+        source_module=4,
+        text="test memory",
     )
 
     engine.retrieve_episode(1, prediction_error=0.3)
@@ -1291,9 +1302,14 @@ def test_retrieve_episode_without_pe_does_not_open_window():
     """retrieve_episode with prediction_error=0 does NOT open window."""
     engine, rec = _make_engine_with_record(episode_id=1)
     engine.client.retrieve_episode.return_value = Episode(
-        episode_id=1, timestamp=int(time.time() * 1000), salience=0.5,
-        association_hash=0, full_emotional_tag=[0.5] * 12,
-        event_type=0, source_module=4, text="test memory",
+        episode_id=1,
+        timestamp=int(time.time() * 1000),
+        salience=0.5,
+        association_hash=0,
+        full_emotional_tag=[0.5] * 12,
+        event_type=0,
+        source_module=4,
+        text="test memory",
     )
 
     engine.retrieve_episode(1, prediction_error=0.0)
@@ -1485,7 +1501,9 @@ def test_rif_weakenes_competing_memories():
     # rec1 has default emotional_tag [0.5]*12
     # Create a competing memory with the same emotional tag
     rec2 = MemoryRecord(
-        episode_id=2, retention=0.8, salience=0.3,
+        episode_id=2,
+        retention=0.8,
+        salience=0.3,
         emotional_tag=[0.5] * 12,  # identical → max similarity
     )
     engine._records[2] = rec2
@@ -1509,7 +1527,9 @@ def test_rif_does_not_weaken_dissimilar_memories():
     # Create a dissimilar memory — emotional tag pointing in a very
     # different direction from [0.5]*12 (cosine similarity < 0.6).
     rec2 = MemoryRecord(
-        episode_id=2, retention=0.8, salience=0.3,
+        episode_id=2,
+        retention=0.8,
+        salience=0.3,
         emotional_tag=[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     )
     engine._records[2] = rec2
@@ -1542,12 +1562,16 @@ def test_rif_high_salience_resists_weakening():
     engine, _ = _make_engine_with_record(episode_id=1, retention=0.8)
     # Low-salience competing memory
     rec_low = MemoryRecord(
-        episode_id=2, retention=0.8, salience=0.1,
+        episode_id=2,
+        retention=0.8,
+        salience=0.1,
         emotional_tag=[0.5] * 12,
     )
     # High-salience competing memory (same emotional tag)
     rec_high = MemoryRecord(
-        episode_id=3, retention=0.8, salience=0.9,
+        episode_id=3,
+        retention=0.8,
+        salience=0.9,
         emotional_tag=[0.5] * 12,
     )
     engine._records[2] = rec_low
@@ -1585,7 +1609,9 @@ def test_rif_integrated_with_retrieve_relevant():
     # Mock find_similar to return only episode 1
     engine.client.find_similar.return_value = [
         SimilarEpisode(
-            episode_id=1, hamming_distance=10, timestamp=int(time.time() * 1000),
+            episode_id=1,
+            hamming_distance=10,
+            timestamp=int(time.time() * 1000),
             salience=0.5,
         )
     ]
@@ -1618,8 +1644,7 @@ def test_replay_old_memories_strengthens_old():
 
     assert replayed >= 1, f"Should replay at least 1 memory, got {replayed}"
     assert rec.retention > initial_retention, (
-        f"Old memory retention should increase, "
-        f"got {rec.retention} (was {initial_retention})"
+        f"Old memory retention should increase, got {rec.retention} (was {initial_retention})"
     )
     assert rec.synaptic_strength > initial_synaptic, (
         f"Old memory synaptic strength should increase, "
@@ -1666,7 +1691,9 @@ def test_replay_respects_sample_size_limit():
     old_time = int(time.time() * 1000) - 999_999_999
     for i in range(1, 21):
         engine._records[i] = MemoryRecord(
-            episode_id=i, retention=0.5, encoded_at=old_time,
+            episode_id=i,
+            retention=0.5,
+            encoded_at=old_time,
         )
 
     replayed = engine._replay_old_memories(recent_cutoff=int(time.time() * 1000))
@@ -1761,7 +1788,7 @@ def main() -> None:
         except Exception as e:  # noqa: BLE001
             print(f"  FAIL  {test.__name__}: {e}")
             failed += 1
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Memory boundary & source monitoring tests: {passed} passed, {failed} failed")
     if failed > 0:
         sys.exit(1)
@@ -1774,6 +1801,7 @@ if __name__ == "__main__":
 # ======================================================================
 # From tests/test_memory_systems.py
 # ======================================================================
+
 
 def test_fear_conditioning_creates_memory() -> None:
     """Fear conditioning creates a new emotional memory."""
@@ -2000,11 +2028,15 @@ def test_ems_active_count() -> None:
             id="orthogonal",
         ),
         pytest.param(
-            [], [], 0.0,
+            [],
+            [],
+            0.0,
             id="empty",
         ),
         pytest.param(
-            [1.0, 0.0], [1.0, 0.0, 0.5, 0.5], None,
+            [1.0, 0.0],
+            [1.0, 0.0, 0.5, 0.5],
+            None,
             id="different_lengths",
         ),
     ],
@@ -2236,6 +2268,7 @@ def test_spreading_with_network_spreads() -> None:
 # ======================================================================
 # From tests/test_spaced_repetition.py
 # ======================================================================
+
 
 @pytest.fixture
 def network() -> ConceptNetwork:

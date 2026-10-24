@@ -5,8 +5,13 @@ wants — in conversation, for fun, to learn. It is a read-only capability:
 it can search, fetch pages, and read content, but cannot submit forms,
 post data, or modify anything online.
 
-Search uses DuckDuckGo Lite (no API key, privacy-respecting, free).
-Page fetching uses plain GET requests with a descriptive User-Agent.
+Search and browsing run through a real browser: a headless Chromium
+driven over the DevTools protocol (the same machinery ARC web games
+use), so JavaScript-heavy pages render and Google search behaves like
+it does for a person. Plain-HTML fetches still take the lightweight
+urllib path first; Chrome is the fallback for thin or failed pages.
+DuckDuckGo Lite remains only as an emergency path when no browser can
+launch at all.
 
 Content filtering:
     A blocklist of adult/pornographic, malware, and tracking domains
@@ -23,18 +28,26 @@ from and composes with — it never recites web text verbatim.
 
 from __future__ import annotations
 
+import atexit
 import html.parser
 import ipaddress
+import json
 import logging
 import re
 import socket
 import ssl
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from genesis_client.swallow import note_swallowed
+
+if TYPE_CHECKING:
+    from parietal_lobe.arc_web import _Browser
 
 logger = logging.getLogger(__name__)
 
@@ -62,78 +75,175 @@ _URL_RE = re.compile(r'https?://[^\s<>"\']+')
 # below catches adult-themed searches regardless of domain.
 
 # Adult/pornographic domains — the most common ones.
-_BLOCKED_DOMAINS: frozenset[str] = frozenset({
-    # Pornographic tube/aggregate sites
-    "pornhub.com", "www.pornhub.com",
-    "xvideos.com", "www.xvideos.com",
-    "xnxx.com", "www.xnxx.com",
-    "xhamster.com", "www.xhamster.com",
-    "redtube.com", "www.redtube.com",
-    "youporn.com", "www.youporn.com",
-    "tube8.com", "www.tube8.com",
-    "spankbang.com", "www.spankbang.com",
-    "txxx.com", "www.txxx.com",
-    "porn300.com", "www.porn300.com",
-    "eporner.com", "www.eporner.com",
-    "beeg.com", "www.beeg.com",
-    "drtuber.com", "www.drtuber.com",
-    "nuvid.com", "www.nuvid.com",
-    "pornone.com", "www.pornone.com",
-    "hclips.com", "www.hclips.com",
-    "upornia.com", "www.upornia.com",
-    "tubepornstars.com", "www.tubepornstars.com",
-    "porntrex.com", "www.porntrex.com",
-    "camwhores.tv", "www.camwhores.tv",
-    "chaturbate.com", "www.chaturbate.com",
-    "bongacams.com", "www.bongacams.com",
-    "livejasmin.com", "www.livejasmin.com",
-    "cam4.com", "www.cam4.com",
-    "stripchat.com", "www.stripchat.com",
-    # Adult image boards / aggregators
-    "imagefap.com", "www.imagefap.com",
-    "motherless.com", "www.motherless.com",
-    "efukt.com", "www.efukt.com",
-    # Adult content networks
-    "onlyfans.com", "www.onlyfans.com",
-    "fansly.com", "www.fansly.com",
-    # Pornographic search/aggregators
-    "porndig.com", "www.porndig.com",
-    "pornmd.com", "www.pornmd.com",
-    "findtubes.com", "www.findtubes.com",
-    "porntube.com", "www.porntube.com",
-    "keezmovies.com", "www.keezmovies.com",
-    "extremetube.com", "www.extremetube.com",
-    # Malware / phishing / scam domains
-    "doubleclick.net", "www.doubleclick.net",
-    "googletagmanager.com", "www.googletagmanager.com",
-    "googletagservices.com", "www.googletagservices.com",
-    "google-analytics.com", "www.google-analytics.com",
-    "scorecardresearch.com", "www.scorecardresearch.com",
-    "quantserve.com", "www.quantserve.com",
-    "adnxs.com", "www.adnxs.com",
-    "criteo.com", "www.criteo.com",
-    "taboola.com", "www.taboola.com",
-    "outbrain.com", "www.outbrain.com",
-})
+_BLOCKED_DOMAINS: frozenset[str] = frozenset(
+    {
+        # Pornographic tube/aggregate sites
+        "pornhub.com",
+        "www.pornhub.com",
+        "xvideos.com",
+        "www.xvideos.com",
+        "xnxx.com",
+        "www.xnxx.com",
+        "xhamster.com",
+        "www.xhamster.com",
+        "redtube.com",
+        "www.redtube.com",
+        "youporn.com",
+        "www.youporn.com",
+        "tube8.com",
+        "www.tube8.com",
+        "spankbang.com",
+        "www.spankbang.com",
+        "txxx.com",
+        "www.txxx.com",
+        "porn300.com",
+        "www.porn300.com",
+        "eporner.com",
+        "www.eporner.com",
+        "beeg.com",
+        "www.beeg.com",
+        "drtuber.com",
+        "www.drtuber.com",
+        "nuvid.com",
+        "www.nuvid.com",
+        "pornone.com",
+        "www.pornone.com",
+        "hclips.com",
+        "www.hclips.com",
+        "upornia.com",
+        "www.upornia.com",
+        "tubepornstars.com",
+        "www.tubepornstars.com",
+        "porntrex.com",
+        "www.porntrex.com",
+        "camwhores.tv",
+        "www.camwhores.tv",
+        "chaturbate.com",
+        "www.chaturbate.com",
+        "bongacams.com",
+        "www.bongacams.com",
+        "livejasmin.com",
+        "www.livejasmin.com",
+        "cam4.com",
+        "www.cam4.com",
+        "stripchat.com",
+        "www.stripchat.com",
+        # Adult image boards / aggregators
+        "imagefap.com",
+        "www.imagefap.com",
+        "motherless.com",
+        "www.motherless.com",
+        "efukt.com",
+        "www.efukt.com",
+        # Adult content networks
+        "onlyfans.com",
+        "www.onlyfans.com",
+        "fansly.com",
+        "www.fansly.com",
+        # Pornographic search/aggregators
+        "porndig.com",
+        "www.porndig.com",
+        "pornmd.com",
+        "www.pornmd.com",
+        "findtubes.com",
+        "www.findtubes.com",
+        "porntube.com",
+        "www.porntube.com",
+        "keezmovies.com",
+        "www.keezmovies.com",
+        "extremetube.com",
+        "www.extremetube.com",
+        # Malware / phishing / scam domains
+        "doubleclick.net",
+        "www.doubleclick.net",
+        "googletagmanager.com",
+        "www.googletagmanager.com",
+        "googletagservices.com",
+        "www.googletagservices.com",
+        "google-analytics.com",
+        "www.google-analytics.com",
+        "scorecardresearch.com",
+        "www.scorecardresearch.com",
+        "quantserve.com",
+        "www.quantserve.com",
+        "adnxs.com",
+        "www.adnxs.com",
+        "criteo.com",
+        "www.criteo.com",
+        "taboola.com",
+        "www.taboola.com",
+        "outbrain.com",
+        "www.outbrain.com",
+    }
+)
 
 # Search query terms that indicate an adult search. If any of these
 # appear in the query, the search is refused. This catches adult
 # content regardless of which domain it lives on.
-_ADULT_QUERY_TERMS: frozenset[str] = frozenset({
-    "porn", "pornography", "xxx", "hentai", "rule34", "rule 34",
-    "nsfw", "camgirl", "cam girl", "strip cam", "sex cam",
-    "escort", "hookup", "fuck", "dick", "cock", "pussy",
-    "boob", "tits", "milf", "anal sex", "blowjob", "handjob",
-    "creampie", "gangbang", "bondage", "bdsm",
-    "onlyfans leak", "nude", "nudes", "naked",
-})
+_ADULT_QUERY_TERMS: frozenset[str] = frozenset(
+    {
+        "porn",
+        "pornography",
+        "xxx",
+        "hentai",
+        "rule34",
+        "rule 34",
+        "nsfw",
+        "camgirl",
+        "cam girl",
+        "strip cam",
+        "sex cam",
+        "escort",
+        "hookup",
+        "fuck",
+        "dick",
+        "cock",
+        "pussy",
+        "boob",
+        "tits",
+        "milf",
+        "anal sex",
+        "blowjob",
+        "handjob",
+        "creampie",
+        "gangbang",
+        "bondage",
+        "bdsm",
+        "onlyfans leak",
+        "nude",
+        "nudes",
+        "naked",
+    }
+)
 
 # File extensions that are never useful content for learning.
 _SKIP_EXTENSIONS = (
-    ".pdf", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg",
-    ".css", ".js", ".mp3", ".mp4", ".avi", ".mov", ".wav",
-    ".zip", ".tar", ".gz", ".rar", ".7z", ".exe", ".dmg",
-    ".iso", ".bin", ".dat", ".db", ".sqlite",
+    ".pdf",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".bmp",
+    ".svg",
+    ".css",
+    ".js",
+    ".mp3",
+    ".mp4",
+    ".avi",
+    ".mov",
+    ".wav",
+    ".zip",
+    ".tar",
+    ".gz",
+    ".rar",
+    ".7z",
+    ".exe",
+    ".dmg",
+    ".iso",
+    ".bin",
+    ".dat",
+    ".db",
+    ".sqlite",
 )
 
 
@@ -162,13 +272,23 @@ def _domain_of(url: str) -> str:
 # GCP/AWS-style endpoints) or LAN admin pages straight into its
 # concept network, where they could surface in conversation later.
 
-_LOCAL_HOSTNAMES: frozenset[str] = frozenset({
-    "localhost", "localhost.localdomain", "ip6-localhost",
-    "ip6-loopback", "broadcasthost",
-})
+_LOCAL_HOSTNAMES: frozenset[str] = frozenset(
+    {
+        "localhost",
+        "localhost.localdomain",
+        "ip6-localhost",
+        "ip6-loopback",
+        "broadcasthost",
+    }
+)
 
 _LOCAL_HOST_SUFFIXES = (
-    ".localhost", ".local", ".lan", ".home", ".internal", ".corp",
+    ".localhost",
+    ".local",
+    ".lan",
+    ".home",
+    ".internal",
+    ".corp",
 )
 
 
@@ -264,20 +384,52 @@ def is_query_safe(query: str) -> bool:
 class _TextExtractor(html.parser.HTMLParser):
     """Extract readable text from HTML, skipping non-content elements."""
 
-    _SKIP_TAGS = frozenset({
-        "script", "style", "nav", "footer", "header", "form",
-        "input", "select", "option", "button", "textarea",
-        "label", "fieldset", "legend", "svg", "math", "canvas",
-        "iframe", "noscript", "aside",
-    })
+    _SKIP_TAGS = frozenset(
+        {
+            "script",
+            "style",
+            "nav",
+            "footer",
+            "header",
+            "form",
+            "input",
+            "select",
+            "option",
+            "button",
+            "textarea",
+            "label",
+            "fieldset",
+            "legend",
+            "svg",
+            "math",
+            "canvas",
+            "iframe",
+            "noscript",
+            "aside",
+        }
+    )
 
     # HTML void elements — these never have closing tags, so they
     # must not increment the skip depth (otherwise the depth grows
     # unbounded and swallows all subsequent content).
-    _VOID_TAGS = frozenset({
-        "area", "base", "br", "col", "embed", "hr", "img",
-        "input", "link", "meta", "param", "source", "track", "wbr",
-    })
+    _VOID_TAGS = frozenset(
+        {
+            "area",
+            "base",
+            "br",
+            "col",
+            "embed",
+            "hr",
+            "img",
+            "input",
+            "link",
+            "meta",
+            "param",
+            "source",
+            "track",
+            "wbr",
+        }
+    )
 
     def __init__(self) -> None:
         super().__init__()
@@ -302,11 +454,27 @@ class _TextExtractor(html.parser.HTMLParser):
             self._skip_depth -= 1
         if tag == "title":
             self._in_title = False
-        if tag in ("p", "h1", "h2", "h3", "h4", "h5", "h6", "li",
-                    "dd", "dt", "blockquote", "div", "br", "tr", "td"):
+        if tag in (
+            "p",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "li",
+            "dd",
+            "dt",
+            "blockquote",
+            "div",
+            "br",
+            "tr",
+            "td",
+        ):
             self._text_parts.append(" ")
 
     def handle_data(self, data: str) -> None:
+        """Accumulate character data — title kept apart, body appended, skipped tags dropped."""
         if self._skip_depth > 0:
             return
         if self._in_title:
@@ -369,6 +537,252 @@ def _get_ssl_context() -> ssl.SSLContext:
     return _ssl_ctx
 
 
+# ─── Headless browser (the Chrome path) ────────────────────────────
+#
+# One lazy headless Chromium shared by search and fetch, driven over
+# the DevTools protocol by the same ``_Browser`` the ARC web games
+# use. A single tab means navigation must be serialized — the lock
+# wraps each navigate → settle → extract cycle so concurrent callers
+# (curiosity worker, conversation) cannot interleave page loads.
+
+_browser_lock = threading.Lock()
+_browser: _Browser | None = None
+_browser_failed = False
+
+
+def _get_browser():
+    """Return the shared headless Chromium, launching it on first use.
+
+    Returns None if a browser cannot start — callers then take their
+    lightweight fallback path. A failed launch marks the path dead for
+    the session rather than paying the spawn cost on every call; a
+    crashed browser gets relaunched once on the next call.
+    """
+    global _browser, _browser_failed
+    if _browser is not None:
+        return _browser
+    if _browser_failed:
+        return None
+    try:
+        from parietal_lobe.arc_web import _Browser
+
+        _browser = _Browser(headless=True)
+        atexit.register(_close_browser)
+        return _browser
+    except Exception as e:  # noqa: BLE001 — no browser → urllib fallback
+        note_swallowed("frontal_lobe.tools.web_search.browser_launch", e)
+        _browser_failed = True
+        return None
+
+
+def _close_browser() -> None:
+    global _browser
+    if _browser is not None:
+        try:
+            _browser.close()
+        except Exception as e:  # noqa: BLE001 — dying anyway
+            note_swallowed("frontal_lobe.tools.web_search.browser_close", e)
+        _browser = None
+
+
+def _chrome_wait_ready(browser, url: str = "", accept: tuple[str, ...] = ()) -> None:
+    """Wait for the navigated page to finish loading (bounded).
+
+    ``readyState`` alone lies: it still reads ``complete`` from the
+    previous document until the new navigation commits, so the poll
+    also requires ``location.href`` to be the page we asked for — or
+    a known redirect destination listed in ``accept`` (a walled
+    search engine redirects to its own interstitial, and that *is*
+    the answer).
+    """
+    deadline = time.time() + 8
+    stem = url.split("?")[0] if url else ""
+    while time.time() < deadline:
+        try:
+            landed = str(browser.js("window.location.href") or "")
+            on_target = not stem or landed.startswith(stem)
+            redirected = any(a in landed for a in accept)
+            if (on_target or redirected) and browser.js("document.readyState") == "complete":
+                # Small settle for JS-injected content (search
+                # results render after readyState flips).
+                time.sleep(0.4)
+                return
+        except Exception as e:  # noqa: BLE001 — renderer mid-crash
+            note_swallowed("frontal_lobe.tools.web_search.ready_poll", e)
+            return
+        time.sleep(0.15)
+
+
+def _bing_unwrap(link: str) -> str:
+    """Unwrap a Bing /ck/a redirect to its real target URL.
+
+    Bing wraps result hrefs as ``/ck/a?!...&u=a1<base64url>`` — the
+    ``u`` param is the destination, base64url-encoded after an ``a1``
+    marker. Anything else passes through unchanged.
+    """
+    host = urllib.parse.urlparse(link).netloc.lower()
+    if "bing.com" not in host or "/ck/" not in urllib.parse.urlparse(link).path:
+        return link
+    qs = urllib.parse.parse_qs(urllib.parse.urlparse(link).query)
+    enc = (qs.get("u") or [""])[0]
+    if not enc.startswith("a1"):
+        return link
+    import base64
+
+    try:
+        pad = "=" * (-len(enc[2:]) % 4)
+        return base64.urlsafe_b64decode(enc[2:] + pad).decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001 — malformed wrapper → drop later
+        return ""
+
+
+def _chrome_search(query: str, limit: int) -> list[WebSearchResult] | None:
+    """Search through the headless browser: Google, then Bing.
+
+    Both run in the real Chromium — Google is tried first, and when
+    its automation wall answers (``/sorry/``, consent) the same tab
+    falls through to Bing. Returns None when the browser path itself
+    failed (caller takes the non-browser fallback); an empty list is
+    a genuine "no results" and stands.
+    """
+    browser = _get_browser()
+    if browser is None:
+        return None
+    try:
+        with _browser_lock:
+            browser.navigate(
+                "https://www.google.com/search?"
+                + urllib.parse.urlencode({"q": query, "num": str(max(limit, 10))})
+            )
+            _chrome_wait_ready(
+                browser,
+                "https://www.google.com/search",
+                accept=("/sorry/", "consent"),
+            )
+            landed = str(browser.js("window.location.href") or "")
+            hits: list[dict] = []
+            if "/sorry/" not in landed and "consent" not in landed:
+                # Organic results anchor an <h3>; a walled page has none.
+                raw = browser.js(
+                    "JSON.stringify(Array.from("
+                    "document.querySelectorAll('a h3'))"
+                    ".map(h => {const a = h.closest('a');"
+                    " return a ? {u: a.href, t: h.innerText} : null})"
+                    ".filter(Boolean))"
+                )
+                hits = json.loads(raw) if raw else []
+            if not hits:
+                # Google walled or empty — same tab, second engine.
+                browser.navigate(
+                    "https://www.bing.com/search?"
+                    + urllib.parse.urlencode({"q": query, "count": str(max(limit, 10))})
+                )
+                _chrome_wait_ready(browser, "https://www.bing.com/search")
+                raw = browser.js(
+                    "JSON.stringify(Array.from("
+                    "document.querySelectorAll('li.b_algo h2 a'))"
+                    ".map(a => ({u: a.href,"
+                    " t: a.innerText || a.textContent || ''})))"
+                )
+                hits = json.loads(raw) if raw else []
+                for hit in hits:
+                    hit["u"] = _bing_unwrap(str(hit.get("u", "")))
+    except Exception as e:  # noqa: BLE001 — dead browser → relaunch next time
+        note_swallowed("frontal_lobe.tools.web_search.chrome_search", e)
+        _close_browser()
+        return None
+    results: list[WebSearchResult] = []
+    seen: set[str] = set()
+    for hit in hits:
+        link = str(hit.get("u", ""))
+        title = str(hit.get("t", ""))[:200]
+        host = urllib.parse.urlparse(link).netloc.lower()
+        # Google's /url?q= redirect wrappers — unwrap to the real
+        # target before the engine-domain check below.
+        if "google." in host:
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(link).query)
+            link = (qs.get("q") or qs.get("url") or [""])[0]
+            if not link:
+                continue
+            host = urllib.parse.urlparse(link).netloc.lower()
+        # Anything still on an engine domain is internal chrome —
+        # related-searches, cached pages, unwrapped wrappers.
+        if "bing.com" in host or "google." in host:
+            continue
+        if urllib.parse.urlparse(link).scheme not in ("http", "https"):
+            continue
+        if link in seen:
+            continue
+        if not is_url_safe(link):
+            continue
+        seen.add(link)
+        results.append(WebSearchResult(url=link, title=title))
+        if len(results) >= limit:
+            break
+    return results
+
+
+def _chrome_fetch(url: str) -> WebFetchResult | None:
+    """Fetch a page through the headless browser (JS-rendered).
+
+    Used when the urllib path failed or returned too little text —
+    single-page apps and cookie-walled pages render properly here.
+    """
+    browser = _get_browser()
+    if browser is None:
+        return None
+    try:
+        with _browser_lock:
+            browser.navigate(url)
+            _chrome_wait_ready(browser, url)
+            # Redirect safety: the safety check ran on the input URL,
+            # but navigation may have landed elsewhere — re-verify.
+            final_url = browser.js("window.location.href") or ""
+            final_host = _host_of(str(final_url))
+            if _host_is_local(final_host) or _resolves_to_non_public(final_host):
+                logger.debug(f"chrome fetch refused (redirect to private): {url}")
+                return None
+            if not is_url_safe(str(final_url)):
+                logger.debug(f"chrome fetch refused (redirect to blocked): {url}")
+                return None
+            payload = browser.js(
+                "JSON.stringify({"
+                "t: document.title || '',"
+                "x: (document.body ? document.body.innerText : '')"
+                f".slice(0, {MAX_TEXT_LENGTH}),"
+                "l: Array.from(document.querySelectorAll('a[href]'))"
+                ".map(a => a.href).slice(0, 200)"
+                "})"
+            )
+    except Exception as e:  # noqa: BLE001 — dead browser → relaunch next time
+        note_swallowed("frontal_lobe.tools.web_search.chrome_fetch", e)
+        _close_browser()
+        return None
+    try:
+        data = json.loads(payload) if payload else {}
+    except (TypeError, ValueError) as e:
+        note_swallowed("frontal_lobe.tools.web_search.chrome_parse", e)
+        return None
+    text = str(data.get("x", ""))
+    if len(text) < 100:
+        return None
+    related: list[str] = []
+    for link in data.get("l", []):
+        link = str(link).split("&")[0]
+        if link == url or "duckduckgo" in link.lower():
+            continue
+        if is_url_safe(link) and link not in related:
+            related.append(link)
+        if len(related) >= 5:
+            break
+    return WebFetchResult(
+        url=url,
+        title=str(data.get("t", "")),
+        content=text,
+        related_links=related,
+    )
+
+
 # ─── Public API ─────────────────────────────────────────────────────
 
 
@@ -393,6 +807,13 @@ def search(query: str, limit: int = 5) -> list[WebSearchResult]:
         logger.debug(f"web search refused (adult query): {query!r}")
         return []
 
+    # Chrome first — real Google through the real browser. None means
+    # the browser path itself failed (couldn't launch, dead socket);
+    # an empty list is a genuine "Google had nothing" and stands.
+    chrome_results = _chrome_search(query, limit)
+    if chrome_results is not None:
+        return chrome_results
+
     data = urllib.parse.urlencode({"q": query, "kl": "us-en"}).encode()
     try:
         req = urllib.request.Request(
@@ -406,9 +827,7 @@ def search(query: str, limit: int = 5) -> list[WebSearchResult]:
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
             # Bounded read — a hostile endpoint could otherwise stream
             # a huge body inside the timeout window.
-            html_text = resp.read(2 * 1024 * 1024 + 1).decode(
-                "utf-8", errors="ignore"
-            )
+            html_text = resp.read(2 * 1024 * 1024 + 1).decode("utf-8", errors="ignore")
     except (OSError, ValueError, RuntimeError) as e:
         note_swallowed(
             "frontal_lobe.tools.web_search.search",
@@ -485,15 +904,15 @@ def fetch(url: str) -> WebFetchResult | None:
             content_type = resp.headers.get("Content-Type", "")
             if "text/html" not in content_type and "text/plain" not in content_type:
                 return None
-            raw = resp.read(MAX_TEXT_LENGTH * 10 + 1).decode(
-                "utf-8", errors="ignore"
-            )
+            raw = resp.read(MAX_TEXT_LENGTH * 10 + 1).decode("utf-8", errors="ignore")
     except (urllib.error.URLError, urllib.error.HTTPError, OSError, ValueError) as e:
         note_swallowed(
             "frontal_lobe.tools.web_search.fetch",
             e,
         )
-        return None
+        # urllib couldn't reach it — the real browser gets a shot
+        # before the fetch is declared dead.
+        return _chrome_fetch(url)
 
     if len(raw) > MAX_TEXT_LENGTH * 10:
         raw = raw[: MAX_TEXT_LENGTH * 10]
@@ -504,7 +923,9 @@ def fetch(url: str) -> WebFetchResult | None:
     title = extractor.title or ""
 
     if len(text) < 100:
-        return None
+        # Too little text — a JS-rendered page or an interstitial.
+        # The real browser can still see it.
+        return _chrome_fetch(url)
 
     # Extract outbound links for curiosity chaining (follow links
     # from articles). Only keep safe, non-self links.
@@ -528,9 +949,7 @@ def fetch(url: str) -> WebFetchResult | None:
     )
 
 
-def search_and_fetch(
-    query: str, limit: int = 3
-) -> WebFetchResult | None:
+def search_and_fetch(query: str, limit: int = 3) -> WebFetchResult | None:
     """Search the web and fetch the top safe result.
 
     Convenience function: searches for the query, then fetches the

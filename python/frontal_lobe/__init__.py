@@ -802,12 +802,35 @@ _EXPORTS: dict[str, str] = {
     # (PFC / frontoparietal / mPFC+TPJ)
     "Analogizer": "frontal_lobe.reasoning",
     "BeliefRevision": "frontal_lobe.reasoning",
+    # Conceptual blending — the emergent-structure engine beside the
+    # analogizer (RLPFC relational integration)
+    "Blend": "frontal_lobe.reasoning",
+    "MentalSpace": "frontal_lobe.reasoning",
+    # The analytic counterfactual theory of causation — structural
+    # surgery over the mechanisms (Lewis/Pearl)
+    "StructuralModel": "frontal_lobe.reasoning",
+    "ConventionAgent": "frontal_lobe.reasoning",
+    "ConventionReport": "frontal_lobe.reasoning",
     "CriticalThinker": "frontal_lobe.reasoning",
     "DecisionMaker": "frontal_lobe.reasoning",
     "DecisionResult": "frontal_lobe.reasoning",
+    "Deduction": "frontal_lobe.reasoning",
     "DriftDiffusionModel": "frontal_lobe.reasoning",
     "EvidenceAccumulator": "frontal_lobe.reasoning",
+    # Foundationalism — first principles and the Agrippan audit
+    "Foundations": "frontal_lobe.reasoning",
+    "Audit": "frontal_lobe.reasoning",
+    # Judgment — the assertion act: stance-taking over checked
+    # claims and assessed reasoning (Frege's judgment stroke)
+    "Judge": "frontal_lobe.reasoning",
+    "Judgment": "frontal_lobe.reasoning",
+    "Stance": "frontal_lobe.reasoning",
     "MetaReasoning": "frontal_lobe.reasoning",
+    # Modal metaphysics — ersatz worlds, counterparts, Humean
+    # supervenience, conceivability (the transcendence of the
+    # empirical: possibility known a priori)
+    "PossibleWorld": "frontal_lobe.reasoning",
+    "ModalIndividual": "frontal_lobe.reasoning",
     "Planner": "frontal_lobe.reasoning",
     "ProblemSolver": "frontal_lobe.reasoning",
     "Reasoner": "frontal_lobe.reasoning",
@@ -840,6 +863,7 @@ _EXPORTS: dict[str, str] = {
     # Volition — internal urges / motivation-to-action (ACC)
     "Urge": "frontal_lobe.volition",
     "Volition": "frontal_lobe.volition",
+    "Readiness": "frontal_lobe.volition",
     # Generative thought and question composition (DLPFC)
     "QuestionComposer": "frontal_lobe.question_composer",
     "ThoughtComposer": "frontal_lobe.thought_composer",
@@ -930,6 +954,16 @@ _EXPORTS: dict[str, str] = {
     # (anterior PFC hypothesis-space maintenance)
     "Hypothesis": "frontal_lobe.reasoning.hypotheses",
     "HypothesisLedger": "frontal_lobe.reasoning.hypotheses",
+    # Abstraction from paired examples — rostrolateral PFC
+    # relational integration: the rule covering every exemplar at
+    # once, searched in rostrocaudal abstraction order (contrast
+    # dlpfc's DNF posterior, which induces *classification* rules
+    # from labeled examples — a different hypothesis space)
+    "ExampleInductor": "frontal_lobe.reasoning.induction",
+    "TransformRule": "frontal_lobe.reasoning.induction",
+    "PairStore": "frontal_lobe.reasoning.induction",
+    "RuleStatus": "frontal_lobe.reasoning.induction",
+    "AbstractLevel": "frontal_lobe.reasoning.induction",
     # Reusable problem-solving methods mined during sleep
     # (DreamCoder-style wake–sleep compression)
     "Method": "frontal_lobe.reasoning.method_library",
@@ -963,37 +997,37 @@ _EXPORTS: dict[str, str] = {
     # Commitment boundaries — the digitizer between continuous
     # signal and discrete state (all-or-none spike-threshold analog)
     "CommitmentBoundary": "commitment",
-    # Game play — choosing a game, holding its rules in working
-    # memory, planning moves, learning which pay (dlPFC/frontoparietal
-    # — the same network Sudoku and chess light up). The board
-    # substrate itself is parietal; the wanting is basal ganglia.
-    "GameAttempt": "frontal_lobe.games.play",
-    "GameEnvironment": "frontal_lobe.games.environment",
-    "GameObservation": "frontal_lobe.games.environment",
-    "GameOutcome": "frontal_lobe.games.environment",
-    "GamePlay": "frontal_lobe.games.play",
-    "GamePlayer": "frontal_lobe.games.player",
-    "PlayResult": "frontal_lobe.games.player",
-    "PlayStep": "frontal_lobe.games.player",
-    "X11Game": "frontal_lobe.games.windowed",
-    # The play faculties — the external game session and the internal
-    # puzzle domains it shares machinery with.
-    "GameSession": "frontal_lobe.games.session",
-    "SpatialAgent": "frontal_lobe.games.spatial.agent",
+    # Play — the basal ganglia's action-selection loop over her
+    # world: which task to run (Go/NoGo gating scored by mastery),
+    # the actor-critic player, and the environments that judge her.
+    # The world-side contracts and judges live in ``worlds`` (the
+    # P and R of the MDP); the competencies live in their regions.
+    "GameAttempt": "basal_ganglia.play",
+    "GamePlay": "basal_ganglia.play",
+    "GamePlayer": "basal_ganglia.player",
+    "PlayResult": "basal_ganglia.player",
+    "PlayStep": "basal_ganglia.player",
+    "GameEnvironment": "worlds.environment",
+    "GameObservation": "worlds.environment",
+    "GameOutcome": "worlds.environment",
+    "X11Game": "worlds.windowed",
+    "GameSession": "worlds.session",
+    # The play faculties — each in the region whose math performs it.
+    "SpatialAgent": "parietal_lobe.spatial.agent",
     "ConstraintSession": "parietal_lobe.boards",
-    "SpatialSolution": "frontal_lobe.games.spatial.solver",
-    "RelationsAgent": "frontal_lobe.games.relations.agent",
-    "Arrangement": "frontal_lobe.games.relations.world",
-    "AssemblyAgent": "frontal_lobe.games.assembly.agent",
-    "PiecePuzzle": "frontal_lobe.games.assembly.puzzle",
-    "RuleAgent": "frontal_lobe.games.classification.agent",
-    "GuessTarget": "frontal_lobe.games.classification.world",
-    "PatternAgent": "frontal_lobe.games.sequence.agent",
-    "PatternLine": "frontal_lobe.games.sequence.puzzle",
-    "SorterAgent": "frontal_lobe.games.sorter.agent",
-    "ShapeSorter": "frontal_lobe.games.sorter.puzzle",
-    "QuantitiesAgent": "frontal_lobe.games.quantities.agent",
-    "Basket": "frontal_lobe.games.quantities.world",
+    "SpatialSolution": "parietal_lobe.spatial.solver",
+    "RelationsAgent": "parietal_lobe.relations",
+    "Arrangement": "worlds.relations",
+    "AssemblyAgent": "parietal_lobe.assembly",
+    "PiecePuzzle": "worlds.assembly",
+    "RuleAgent": "basal_ganglia.rule_agent",
+    "GuessTarget": "worlds.classification",
+    "PatternAgent": "temporal_lobe.sequence_agent",
+    "PatternLine": "worlds.sequence",
+    "SorterAgent": "basal_ganglia.sorter_agent",
+    "ShapeSorter": "worlds.sorter",
+    "QuantitiesAgent": "parietal_lobe.quantities",
+    "Basket": "worlds.quantities",
     # Glutamate — the cortex-wide excitatory drive; the cortical
     # regions share it, and the executive is where it is claimed.
     "Glutamate": "frontal_lobe.glutamate",
@@ -1040,6 +1074,16 @@ _EXPORTS: dict[str, str] = {
     # Metacognitive self-improvement proposals (the code lives in
     # self/ but the function is prefrontal metacognition)
     "ProposalsMixin": "frontal_lobe.self.proposals",
+    # Self-sovereignty over her own manual — changes to her man
+    # pages wait for her say (self-model ownership of self-docs)
+    "ManChange": "frontal_lobe.self.man_review",
+    "ManPageReview": "frontal_lobe.self.man_review",
+    "ManReviewMixin": "frontal_lobe.self.man_review",
+    # Long-horizon mathematical inquiry — open problems that persist
+    # across sessions, with claims gated on the parietal oracle's
+    # verdict (prefrontal sustained/deliberative cognition)
+    "ResearchWorkbench": "frontal_lobe.research",
+    "get_workbench": "frontal_lobe.research",
 }
 
 __all__ = sorted(_EXPORTS)

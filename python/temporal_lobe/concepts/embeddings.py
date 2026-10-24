@@ -113,21 +113,120 @@ class EmbeddingStore:
     # Stopwords to exclude from TF-IDF text tokens. These words carry
     # little semantic signal and create spurious similarity between
     # unrelated concepts that happen to share them in their definitions.
-    _STOPWORDS: frozenset[str] = frozenset({
-        "the", "a", "an", "and", "or", "but", "is", "are", "was", "were",
-        "be", "been", "being", "have", "has", "had", "do", "does", "did",
-        "will", "would", "could", "should", "may", "might", "must", "shall",
-        "can", "need", "dare", "ought", "used", "to", "of", "in", "for",
-        "on", "at", "by", "with", "from", "as", "into", "through", "during",
-        "before", "after", "above", "below", "between", "under", "over",
-        "again", "further", "then", "once", "here", "there", "when", "where",
-        "why", "how", "all", "each", "few", "more", "most", "other", "some",
-        "such", "no", "nor", "not", "only", "own", "same", "so", "than",
-        "too", "very", "just", "now", "also", "its", "it", "he", "she",
-        "they", "we", "you", "i", "me", "him", "her", "us", "them", "my",
-        "your", "his", "our", "their", "this", "that", "these", "those",
-        "which", "who", "whom", "what", "whose",
-    })
+    _STOPWORDS: frozenset[str] = frozenset(
+        {
+            "the",
+            "a",
+            "an",
+            "and",
+            "or",
+            "but",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "must",
+            "shall",
+            "can",
+            "need",
+            "dare",
+            "ought",
+            "used",
+            "to",
+            "of",
+            "in",
+            "for",
+            "on",
+            "at",
+            "by",
+            "with",
+            "from",
+            "as",
+            "into",
+            "through",
+            "during",
+            "before",
+            "after",
+            "above",
+            "below",
+            "between",
+            "under",
+            "over",
+            "again",
+            "further",
+            "then",
+            "once",
+            "here",
+            "there",
+            "when",
+            "where",
+            "why",
+            "how",
+            "all",
+            "each",
+            "few",
+            "more",
+            "most",
+            "other",
+            "some",
+            "such",
+            "no",
+            "nor",
+            "not",
+            "only",
+            "own",
+            "same",
+            "so",
+            "than",
+            "too",
+            "very",
+            "just",
+            "now",
+            "also",
+            "its",
+            "it",
+            "he",
+            "she",
+            "they",
+            "we",
+            "you",
+            "i",
+            "me",
+            "him",
+            "her",
+            "us",
+            "them",
+            "my",
+            "your",
+            "his",
+            "our",
+            "their",
+            "this",
+            "that",
+            "these",
+            "those",
+            "which",
+            "who",
+            "whom",
+            "what",
+            "whose",
+        }
+    )
     # GloVe embedding dimensions (if available)
     GLOVE_DIM = 50
 
@@ -379,9 +478,7 @@ class EmbeddingStore:
             full[flat_start : flat_start + width] = vec[:width]
         return self._cache_concept(concept_name, full)
 
-    def _cache_concept(
-        self, concept_name: str, vec: np.ndarray | None
-    ) -> np.ndarray | None:
+    def _cache_concept(self, concept_name: str, vec: np.ndarray | None) -> np.ndarray | None:
         """Store a concept vector in the bounded ad-hoc cache."""
         cache = self._concept_cache
         cache[concept_name] = vec
@@ -460,9 +557,7 @@ class EmbeddingStore:
                         query = f"{query} {alias.replace('_', ' ')}"
             if not query:
                 return []
-            return self.find_similar_to_text(
-                query, k=k, threshold=threshold, exclude=concept_name
-            )
+            return self.find_similar_to_text(query, k=k, threshold=threshold, exclude=concept_name)
 
         # Resolve the concept to its index in the concept matrix
         idx = self._concept_to_idx.get(concept_name)
@@ -479,15 +574,11 @@ class EmbeddingStore:
                         query = f"{query} {alias.replace('_', ' ')}"
             if not query:
                 return []
-            return self.find_similar_to_text(
-                query, k=k, threshold=threshold, exclude=concept_name
-            )
+            return self.find_similar_to_text(query, k=k, threshold=threshold, exclude=concept_name)
 
         # Use the concept's own vector for hybrid similarity search
         query_vec = self._concept_matrix[idx]
-        return self._search_hybrid(
-            query_vec, k, threshold, exclude=concept_name
-        )
+        return self._search_hybrid(query_vec, k, threshold, exclude=concept_name)
 
     def _search_hybrid(
         self,
@@ -539,15 +630,15 @@ class EmbeddingStore:
 
         # Combine: weighted sum of toroidal and flat similarities
         alpha = self.TOROIDAL_WEIGHT
-        similarities = (
-            alpha * toroidal_sim + (1.0 - alpha) * flat_sim
-        ).astype(np.float32)
+        similarities = (alpha * toroidal_sim + (1.0 - alpha) * flat_sim).astype(np.float32)
 
         results = self._collect_search_results(similarities, threshold, k, exclude)
         if len(results) < k:
             results.extend(
                 self._search_archive_flat(
-                    query_vec, k - len(results), threshold,
+                    query_vec,
+                    k - len(results),
+                    threshold,
                     exclude_names={exclude, *(n for n, _ in results)},
                 )
             )
@@ -665,23 +756,20 @@ class EmbeddingStore:
 
         # Exclude A and B from results
         exclude_set = {idx_a, idx_b}
-        results = self._collect_search_results_excluding(
-            combined, threshold, k, exclude_set
-        )
+        results = self._collect_search_results_excluding(combined, threshold, k, exclude_set)
         if len(results) < k:
             results.extend(
                 self._search_archive_vesica(
-                    vec_a, vec_b, k - len(results), threshold,
-                    exclude_names={
-                        concept_a, concept_b, *(n for n, _ in results)
-                    },
+                    vec_a,
+                    vec_b,
+                    k - len(results),
+                    threshold,
+                    exclude_names={concept_a, concept_b, *(n for n, _ in results)},
                 )
             )
         return results
 
-    def _compute_hybrid_similarities(
-        self, query_vec: np.ndarray
-    ) -> np.ndarray:
+    def _compute_hybrid_similarities(self, query_vec: np.ndarray) -> np.ndarray:
         """Compute hybrid similarities for all concepts (no filtering)."""
         assert self._concept_matrix is not None
         n = self._concept_matrix.shape[0]
@@ -714,8 +802,7 @@ class EmbeddingStore:
             toroidal_sim = np.ones(n, dtype=np.float32)
 
         return (
-            self.TOROIDAL_WEIGHT * toroidal_sim
-            + (1.0 - self.TOROIDAL_WEIGHT) * flat_sim
+            self.TOROIDAL_WEIGHT * toroidal_sim + (1.0 - self.TOROIDAL_WEIGHT) * flat_sim
         ).astype(np.float32)
 
     def _collect_search_results_excluding(
@@ -825,15 +912,17 @@ class EmbeddingStore:
                             new_exp_len - new_glove_start,
                         )
                         if glove_copy_len > 0:
-                            matrix[i, exp_start + new_glove_start:
-                                   exp_start + new_glove_start + glove_copy_len] = (
-                                old_exp[glove_start:glove_start + glove_copy_len]
-                            )
+                            matrix[
+                                i,
+                                exp_start + new_glove_start : exp_start
+                                + new_glove_start
+                                + glove_copy_len,
+                            ] = old_exp[glove_start : glove_start + glove_copy_len]
                 else:
                     # No TF-IDF mapping (e.g., first refresh or no vocab):
                     # copy by position as a fallback
                     copy_len = min(old_exp.shape[0], new_exp_len)
-                    matrix[i, exp_start:exp_start + copy_len] = old_exp[:copy_len]
+                    matrix[i, exp_start : exp_start + copy_len] = old_exp[:copy_len]
 
     def _refresh_preserve_experiential(self) -> None:
         """Refresh the spectral component while preserving Hebbian learning.
@@ -920,8 +1009,13 @@ class EmbeddingStore:
 
         # Restore Hebbian-adapted experiential vectors for existing concepts.
         self._restore_hebbian_experiential(
-            matrix, concepts, old_matrix, old_to_idx,
-            old_tfidf_vocab, old_tfidf_dim, old_spectral_dim,
+            matrix,
+            concepts,
+            old_matrix,
+            old_to_idx,
+            old_tfidf_vocab,
+            old_tfidf_dim,
+            old_spectral_dim,
             old_experiential_dim,
         )
 
@@ -977,14 +1071,12 @@ class EmbeddingStore:
 
         # Save the TF-IDF vocabulary so columns can be re-mapped on load.
         # Native string dtype (not `object`) so the file needs no pickle.
-        tfidf_words = (
-            str_array(self._tfidf_vocab.keys())
+        tfidf_words = str_array(self._tfidf_vocab.keys()) if self._tfidf_vocab else str_array([])
+        tfidf_indices = (
+            np.array(list(self._tfidf_vocab.values()), dtype=np.int32)
             if self._tfidf_vocab
-            else str_array([])
+            else np.array([], dtype=np.int32)
         )
-        tfidf_indices = np.array(
-            list(self._tfidf_vocab.values()), dtype=np.int32
-        ) if self._tfidf_vocab else np.array([], dtype=np.int32)
 
         # Errors propagate. This used to be caught and logged at DEBUG,
         # which is how a truncated or failed write of a large learned
@@ -1055,10 +1147,7 @@ class EmbeddingStore:
             saved_tfidf_dim = int(data["tfidf_dim"])
             words = data["tfidf_words"]
             indices = data["tfidf_indices"]
-            saved_tfidf_vocab = {
-                str(w): int(idx)
-                for w, idx in zip(words, indices, strict=False)
-            }
+            saved_tfidf_vocab = {str(w): int(idx) for w, idx in zip(words, indices, strict=False)}
         except (KeyError, ValueError) as e:
             note_swallowed(
                 "temporal_lobe.concepts.embeddings.load_experiential",
@@ -1079,17 +1168,19 @@ class EmbeddingStore:
                 saved_exp = saved_vectors[i]
                 new_exp_len = self._concept_matrix.shape[1] - exp_start
                 if self._restore_saved_vector(
-                    saved_exp, current_idx, exp_start, new_exp_len,
-                    tfidf_col_map, saved_tfidf_dim,
+                    saved_exp,
+                    current_idx,
+                    exp_start,
+                    new_exp_len,
+                    tfidf_col_map,
+                    saved_tfidf_dim,
                 ):
                     restored += 1
 
         if restored > 0:
             # Re-normalize after restoring
             self._concept_matrix = self._normalize_rows(self._concept_matrix)
-            self._non_spectral_norms = self._compute_non_spectral_norms(
-                self._concept_matrix
-            )
+            self._non_spectral_norms = self._compute_non_spectral_norms(self._concept_matrix)
             self._concept_cache.clear()
 
         return restored > 0
@@ -1115,9 +1206,9 @@ class EmbeddingStore:
             # Re-map TF-IDF columns by word
             for saved_col, current_col in tfidf_col_map.items():
                 if saved_col < saved_exp.shape[0] and current_col < new_exp_len:
-                    self._concept_matrix[current_idx, exp_start + current_col] = (
-                        saved_exp[saved_col]
-                    )
+                    self._concept_matrix[current_idx, exp_start + current_col] = saved_exp[
+                        saved_col
+                    ]
             # Copy GloVe columns directly (fixed word list, no drift)
             glove_start = saved_tfidf_dim
             new_glove_start = self._tfidf_dim
@@ -1130,15 +1221,14 @@ class EmbeddingStore:
                 if glove_copy_len > 0:
                     self._concept_matrix[
                         current_idx,
-                        exp_start + new_glove_start:
-                        exp_start + new_glove_start + glove_copy_len
-                    ] = saved_exp[glove_start:glove_start + glove_copy_len]
+                        exp_start + new_glove_start : exp_start + new_glove_start + glove_copy_len,
+                    ] = saved_exp[glove_start : glove_start + glove_copy_len]
         else:
             # Backwards-compatible fallback: copy by position
             copy_len = min(saved_exp.shape[0], new_exp_len)
-            self._concept_matrix[current_idx, exp_start:exp_start + copy_len] = (
-                saved_exp[:copy_len]
-            )
+            self._concept_matrix[current_idx, exp_start : exp_start + copy_len] = saved_exp[
+                :copy_len
+            ]
         return True
 
     # ─── Internal: loading and building ─────────────────────────
@@ -1327,17 +1417,13 @@ class EmbeddingStore:
         for d in range(toroidal_dim):
             span = ranges[d, 1] - ranges[d, 0]
             if span > 1e-8:
-                angles[:, d] = 2.0 * np.pi * (
-                    toroidal_block[:, d] - ranges[d, 0]
-                ) / span
+                angles[:, d] = 2.0 * np.pi * (toroidal_block[:, d] - ranges[d, 0]) / span
 
         self._toroidal_dim = toroidal_dim
         self._angle_matrix = angles.astype(np.float32)
         self._toroidal_ranges = ranges
 
-    def _toroidal_similarity(
-        self, query_angles: np.ndarray
-    ) -> np.ndarray:
+    def _toroidal_similarity(self, query_angles: np.ndarray) -> np.ndarray:
         """Compute geodesic similarity on the torus for all concepts.
 
         Given a query angle vector (toroidal_dim,), returns an (N,)
@@ -1385,9 +1471,7 @@ class EmbeddingStore:
         for d in range(self._toroidal_dim):
             span = self._toroidal_ranges[d, 1] - self._toroidal_ranges[d, 0]
             if span > 1e-8:
-                angles[d] = 2.0 * np.pi * (
-                    exp_block[d] - self._toroidal_ranges[d, 0]
-                ) / span
+                angles[d] = 2.0 * np.pi * (exp_block[d] - self._toroidal_ranges[d, 0]) / span
         return angles
 
     # ─── Spectral embedding ─────────────────────────────────────
@@ -1486,9 +1570,7 @@ class EmbeddingStore:
         """
         n = len(concepts)
 
-        landmarks, landmark_set, landmark_idx, n_landmarks = self._select_landmarks(
-            concepts, n
-        )
+        landmarks, landmark_set, landmark_idx, n_landmarks = self._select_landmarks(concepts, n)
 
         landmark_embedding = self._compute_landmark_embedding(
             landmarks, landmark_set, landmark_idx, n_landmarks
@@ -1626,9 +1708,7 @@ class EmbeddingStore:
 
     # ─── Experiential embedding ──────────────────────────────────
 
-    def _build_experiential_embedding(
-        self, concepts: list[str]
-    ) -> np.ndarray | None:
+    def _build_experiential_embedding(self, concepts: list[str]) -> np.ndarray | None:
         """Build experiential embedding from the holographic graph.
 
         The holographic graph stores sleep-discovered associations —
@@ -1650,9 +1730,7 @@ class EmbeddingStore:
             return None
 
         try:
-            hgraph_concepts, features = (
-                self._holographic_graph.extract_association_matrix()
-            )
+            hgraph_concepts, features = self._holographic_graph.extract_association_matrix()
         except Exception:  # noqa: BLE001
             return None
 
@@ -1680,10 +1758,7 @@ class EmbeddingStore:
             return True
 
         # Map holographic graph concepts to the full concept list
-        shared = [
-            c for c in hgraph_concepts
-            if c in concept_set and _is_clean_concept(c)
-        ]
+        shared = [c for c in hgraph_concepts if c in concept_set and _is_clean_concept(c)]
         if len(shared) < 2:
             return None
 
@@ -1706,9 +1781,7 @@ class EmbeddingStore:
             shared_embedding = sub_features[:, :dim]
         else:
             # Pad with zeros if fewer features than dim
-            shared_embedding = np.zeros(
-                (len(shared), dim), dtype=np.float32
-            )
+            shared_embedding = np.zeros((len(shared), dim), dtype=np.float32)
             shared_embedding[:, :n_features] = sub_features
 
         # Map back to the full concept list
@@ -1791,7 +1864,6 @@ class EmbeddingStore:
 
         # L2 normalize rows
         return self._normalize_rows(matrix)
-
 
     def _extract_text_tokens(self, concept_name: str) -> list[str]:
         """Extract text tokens from a concept's name and definition."""
@@ -1911,9 +1983,7 @@ class EmbeddingStore:
         # TF-IDF component
         if self._idf is not None and self._tfidf_vocab:
             tokens = [
-                w.strip(".,;:!?()\"'`").lower()
-                for w in text.split()
-                if w.strip(".,;:!?()\"'`")
+                w.strip(".,;:!?()\"'`").lower() for w in text.split() if w.strip(".,;:!?()\"'`")
             ]
             vec = np.zeros(len(self._tfidf_vocab), dtype=np.float32)
             for token in tokens:
@@ -1930,16 +2000,12 @@ class EmbeddingStore:
         # content-word semantics in the averaged vector.
         if self._word_vectors is not None:
             tokens = [
-                w.strip(".,;:!?()\"'`").lower()
-                for w in text.split()
-                if w.strip(".,;:!?()\"'`")
+                w.strip(".,;:!?()\"'`").lower() for w in text.split() if w.strip(".,;:!?()\"'`")
             ]
             vecs = [
                 self._word_vectors[self._word_to_idx[t]]
                 for t in tokens
-                if t in self._word_to_idx
-                and t not in self._STOPWORDS
-                and len(t) >= 3
+                if t in self._word_to_idx and t not in self._STOPWORDS and len(t) >= 3
             ]
             if vecs:
                 avg = np.mean(vecs, axis=0)
@@ -2004,7 +2070,9 @@ class EmbeddingStore:
             # whether the hot query used hybrid scoring.
             results.extend(
                 self._search_archive_flat(
-                    query, k - len(results), threshold,
+                    query,
+                    k - len(results),
+                    threshold,
                     exclude_names={exclude, *(n for n, _ in results)},
                 )
             )
@@ -2027,9 +2095,7 @@ class EmbeddingStore:
 
         # Handle dimension mismatch
         if query.shape[0] != self._concept_matrix.shape[1]:
-            if not query_has_spectral and (
-                self._spectral_dim > 0 or self._experiential_dim > 0
-            ):
+            if not query_has_spectral and (self._spectral_dim > 0 or self._experiential_dim > 0):
                 # Text query: build a full-size vector with zeros for
                 # the spectral AND experiential components, and the
                 # query values for the TF-IDF and GloVe components
@@ -2141,10 +2207,7 @@ class EmbeddingStore:
                 e,
             )
             return
-        items = [
-            (cid, data) for cid, data in archived
-            if cid not in self._concept_to_idx
-        ]
+        items = [(cid, data) for cid, data in archived if cid not in self._concept_to_idx]
         if not items:
             return
 
@@ -2156,29 +2219,21 @@ class EmbeddingStore:
             row = np.zeros(flat_dim, dtype=np.float32)
 
             # TF-IDF block over name + aliases + definition
-            if (
-                self._idf is not None and self._tfidf_vocab
-                and self._tfidf_dim > 0
-            ):
+            if self._idf is not None and self._tfidf_vocab and self._tfidf_dim > 0:
                 vec = np.zeros(self._tfidf_dim, dtype=np.float32)
                 for token in self._archived_text_tokens(cid, data):
                     j = self._tfidf_vocab.get(token)
                     if j is not None:
                         vec[j] += 1.0
                 vec *= self._idf
-                row[tfidf_pos:tfidf_pos + self._tfidf_dim] = vec
+                row[tfidf_pos : tfidf_pos + self._tfidf_dim] = vec
 
             # GloVe block — average over name and alias word vectors
             if self._glove_dim > 0:
                 texts = [cid, *(str(a) for a in (data.get("aliases") or []))]
-                vecs = [
-                    v for t in texts
-                    if (v := self._compute_glove_vector(t)) is not None
-                ]
+                vecs = [v for t in texts if (v := self._compute_glove_vector(t)) is not None]
                 if vecs:
-                    row[glove_pos:glove_pos + self._glove_dim] = np.mean(
-                        vecs, axis=0
-                    )
+                    row[glove_pos : glove_pos + self._glove_dim] = np.mean(vecs, axis=0)
 
             norm = np.linalg.norm(row)
             if norm < 1e-8:
@@ -2191,13 +2246,9 @@ class EmbeddingStore:
         self._archive_matrix = matrix[: len(names)]
         self._archive_names = names
         self._archive_to_idx = {n: i for i, n in enumerate(names)}
-        logger.debug(
-            "Cold layer built: %d archived concepts embedded", len(names)
-        )
+        logger.debug("Cold layer built: %d archived concepts embedded", len(names))
 
-    def _archived_text_tokens(
-        self, concept_id: str, data: dict[str, Any]
-    ) -> list[str]:
+    def _archived_text_tokens(self, concept_id: str, data: dict[str, Any]) -> list[str]:
         """Extract filtered tokens from an archived concept dict.
 
         Mirrors ``_extract_text_tokens`` but reads the serialized
@@ -2215,11 +2266,7 @@ class EmbeddingStore:
         for text in texts:
             for w in text.lower().split():
                 cleaned = w.strip(".,;:!?()\"'`")
-                if (
-                    cleaned
-                    and cleaned not in self._STOPWORDS
-                    and len(cleaned) >= 3
-                ):
+                if cleaned and cleaned not in self._STOPWORDS and len(cleaned) >= 3:
                     tokens.append(cleaned)
         return tokens
 
@@ -2299,9 +2346,7 @@ class EmbeddingStore:
         if sims_a is None or sims_b is None:
             return []
         combined = np.minimum(sims_a, sims_b)
-        return self._collect_archive_results(
-            combined, k, threshold, exclude_names
-        )
+        return self._collect_archive_results(combined, k, threshold, exclude_names)
 
     # ─── Utilities ──────────────────────────────────────────────
 

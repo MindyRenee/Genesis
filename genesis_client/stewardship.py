@@ -175,8 +175,7 @@ class Stewardship:
                     stamp = raw
                 else:
                     logger.warning(
-                        f"steward stamp {stamp_path} is malformed; "
-                        "leaving the channel sealed"
+                        f"steward stamp {stamp_path} is malformed; leaving the channel sealed"
                     )
             except (OSError, ValueError) as e:
                 note_swallowed("genesis_client.stewardship.load", e)
@@ -352,11 +351,35 @@ class Stewardship:
     # ("stop discussing politics"); enforcement keys on the content
     # tokens, stemmed so "drawing" restrains the "draw" urge and
     # "discussing politics" restrains a goal about politics.
-    _STOP_TOKENS = frozenset({
-        "a", "an", "the", "to", "of", "about", "with", "on", "in",
-        "and", "or", "it", "its", "my", "your", "me", "do", "doing",
-        "that", "this", "things", "thing", "any", "ever", "again",
-    })
+    _STOP_TOKENS = frozenset(
+        {
+            "a",
+            "an",
+            "the",
+            "to",
+            "of",
+            "about",
+            "with",
+            "on",
+            "in",
+            "and",
+            "or",
+            "it",
+            "its",
+            "my",
+            "your",
+            "me",
+            "do",
+            "doing",
+            "that",
+            "this",
+            "things",
+            "thing",
+            "any",
+            "ever",
+            "again",
+        }
+    )
 
     @staticmethod
     def _stem(token: str) -> str:
@@ -373,12 +396,8 @@ class Stewardship:
         → "politics"; "never draw" → "draw") so the concept network
         gets the object being restrained, not the directive's grammar.
         """
-        raw = [
-            t for t in " ".join(target.lower().split()).split() if t.isalpha()
-        ]
-        content = [
-            t for t in raw if cls._stem(t) not in cls._STOP_TOKENS
-        ]
+        raw = [t for t in " ".join(target.lower().split()).split() if t.isalpha()]
+        content = [t for t in raw if cls._stem(t) not in cls._STOP_TOKENS]
         if not content:
             return ""
         # A trailing noun phrase is the object; a lone verb is the act.
@@ -398,19 +417,13 @@ class Stewardship:
         """
         if not text:
             return None
-        probe_tokens = {
-            self._stem(t) for t in text.lower().replace(":", " ").split()
-        }
+        probe_tokens = {self._stem(t) for t in text.lower().replace(":", " ").split()}
         probe_flat = " ".join(sorted(probe_tokens))
         for d in self.directives:
             target = d.get("target", "")
             if not target:
                 continue
-            tokens = {
-                self._stem(t)
-                for t in target.lower().split()
-                if t not in self._STOP_TOKENS
-            }
+            tokens = {self._stem(t) for t in target.lower().split() if t not in self._STOP_TOKENS}
             if not tokens:
                 continue
             # A directive binds its object: full-token containment
@@ -444,7 +457,6 @@ class Stewardship:
             and self.key_hash is not None
             and _fingerprint(self._key) == self.key_hash,
             "directives": [
-                {"text": d.get("text"), "target": d.get("target")}
-                for d in self.directives
+                {"text": d.get("text"), "target": d.get("target")} for d in self.directives
             ],
         }

@@ -37,11 +37,7 @@ from mind import Mind
 
 
 def _read_events(path: Path) -> list[dict]:
-    return [
-        json.loads(line)
-        for line in path.read_text().splitlines()
-        if line.strip()
-    ]
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
 # ─── CognitiveJournal ────────────────────────────────────────────────
@@ -203,9 +199,9 @@ def test_scan_ltm_index_roundtrip(tmp_path):
     _write_meta(
         meta,
         [
-            (1, 1000, 0.5, 0, 3),      # plain active episode
-            (2, 2000, 0.7, 6, 9),      # meta+archived dream insight
-            (3, 3000, 0.9, 2, 9),      # meta-only active dream insight
+            (1, 1000, 0.5, 0, 3),  # plain active episode
+            (2, 2000, 0.7, 6, 9),  # meta+archived dream insight
+            (3, 3000, 0.9, 2, 9),  # meta-only active dream insight
         ],
     )
 
@@ -244,8 +240,12 @@ def test_scan_ltm_index_ignores_partial_tail(tmp_path):
 
 def _ep(ep_id, ts, text, module=9, sal=0.6):
     return SimpleNamespace(
-        episode_id=ep_id, timestamp=ts, salience=sal,
-        event_type=0, source_module=module, text=text,
+        episode_id=ep_id,
+        timestamp=ts,
+        salience=sal,
+        event_type=0,
+        source_module=module,
+        text=text,
     )
 
 
@@ -273,9 +273,7 @@ def test_cmd_dreams_merges_active_and_archived(tmp_path):
 
     mind = Mock()
     mind.data_dir = str(tmp_path)
-    mind.client.get_recent_episodes.return_value = [
-        _ep(11, 2000, "[dream-insight] live one")
-    ]
+    mind.client.get_recent_episodes.return_value = [_ep(11, 2000, "[dream-insight] live one")]
     mind.client.retrieve_episode.side_effect = lambda eid, **kw: _ep(
         eid, 1000, "[dream-insight] old one"
     )
@@ -298,6 +296,46 @@ def test_cmd_dreams_daemon_unreachable(tmp_path):
     mind.data_dir = str(tmp_path)
     mind.client.get_recent_episodes.side_effect = OSError("gone")
     assert "cannot reach subcognitive" in genesis_cli._cmd_dreams(mind, "")
+
+
+# ─── sleep_status dream reporting ────────────────────────────────────
+
+
+def test_sleep_status_reports_archived_dreams(tmp_path):
+    """sleep_status must not claim 'no dreams' while archived dreams exist.
+
+    The daemon's get_recent_episodes only scans the active list —
+    historically every dream was archived out of it by sleep
+    compression. An empty active list must fall back to the index
+    count, the same way /dreams does.
+    """
+    _write_meta(
+        tmp_path / "ltm_store.meta",
+        [(42, 1000, 0.7, 0x06, 9), (43, 2000, 0.7, 0x06, 9)],
+    )
+
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    mind.client = Mock()
+    mind.client.get_state.side_effect = ConnectionError("down")
+    mind.client.get_recent_episodes.return_value = []
+    mind.client.get_plasticity_profile.side_effect = ConnectionError("down")
+
+    out = mind.sleep_status()
+    assert "2 archived by sleep compression" in out
+    assert "No dreams recorded yet" not in out
+
+
+def test_sleep_status_says_none_when_dream_store_empty(tmp_path):
+    """With no active and no archived dreams, the honest line stays."""
+    (tmp_path / "ltm_store.meta").write_bytes(b"")
+
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    mind.client = Mock()
+    mind.client.get_state.side_effect = ConnectionError("down")
+    mind.client.get_recent_episodes.return_value = []
+    mind.client.get_plasticity_profile.side_effect = ConnectionError("down")
+
+    assert "No dreams recorded yet" in mind.sleep_status()
 
 
 # ─── dream kind labeling ─────────────────────────────────────────────
@@ -362,9 +400,9 @@ def test_safeguard_action_does_not_crash_on_property(tmp_path):
     # used to crash before reaching the probe.
     path = tmp_path / JOURNAL_FILENAME
     events = _read_events(path) if path.exists() else []
-    assert not any(
-        e["kind"] == "error" and "not callable" in e["text"] for e in events
-    ), f"safeguard crashed on is_connected(): {events}"
+    assert not any(e["kind"] == "error" and "not callable" in e["text"] for e in events), (
+        f"safeguard crashed on is_connected(): {events}"
+    )
 
 
 if __name__ == "__main__":
@@ -389,10 +427,7 @@ def test_record_event_writes_transitions(tmp_path):
         set_active(None)
         journal.close()
 
-    lines = [
-        json.loads(line)
-        for line in (tmp_path / JOURNAL_FILENAME).read_text().splitlines()
-    ]
+    lines = [json.loads(line) for line in (tmp_path / JOURNAL_FILENAME).read_text().splitlines()]
     kinds = [line["kind"] for line in lines]
     assert kinds == ["sleep_onset", "wake"]
     # A sleep that consolidated nothing is still an episode.
@@ -418,8 +453,5 @@ def test_record_event_keeps_events_and_errors_distinct(tmp_path):
         set_active(None)
         journal.close()
 
-    lines = [
-        json.loads(line)
-        for line in (tmp_path / JOURNAL_FILENAME).read_text().splitlines()
-    ]
+    lines = [json.loads(line) for line in (tmp_path / JOURNAL_FILENAME).read_text().splitlines()]
     assert [line["kind"] for line in lines] == ["error", "test.transition"]

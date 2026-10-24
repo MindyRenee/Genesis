@@ -35,12 +35,7 @@ from dataclasses import dataclass, field
 
 from parietal_lobe.grid import Grid
 
-_BORDER_OFFSETS = [
-    (dr, dc)
-    for dr in (-1, 0, 1)
-    for dc in (-1, 0, 1)
-    if (dr, dc) != (0, 0)
-]
+_BORDER_OFFSETS = [(dr, dc) for dr in (-1, 0, 1) for dc in (-1, 0, 1) if (dr, dc) != (0, 0)]
 
 
 @dataclass
@@ -113,9 +108,7 @@ def _background(grid: Grid) -> int:
     return Counter(v for _r, _c, v in grid.iter_cells()).most_common(1)[0][0]
 
 
-def _components(
-    grid: Grid, background: int
-) -> list[frozenset[tuple[int, int]]]:
+def _components(grid: Grid, background: int) -> list[frozenset[tuple[int, int]]]:
     """8-connected non-background regions (blocks, frames, bars)."""
     seen: set[tuple[int, int]] = set()
     comps: list[frozenset[tuple[int, int]]] = []
@@ -219,10 +212,7 @@ def _lattice(elements: list[_Element], framed: bool) -> _Board | None:
                     row=ri,
                     col=ci,
                     centre=e.micro[1][1],
-                    borders={
-                        off: e.micro[off[0] + 1][off[1] + 1]
-                        for off in _BORDER_OFFSETS
-                    },
+                    borders={off: e.micro[off[0] + 1][off[1] + 1] for off in _BORDER_OFFSETS},
                 )
             )
     return board
@@ -255,9 +245,7 @@ def _boards(grid: Grid) -> list[_Board]:
             continue
         separator = Counter(grid.at(r, c) for r, c in comp).most_common(1)[0][0]
         edge_colours = {
-            grid.at(r, c)
-            for r, c in comp
-            if r in (top, top + h - 1) or c in (left, left + w - 1)
+            grid.at(r, c) for r, c in comp if r in (top, top + h - 1) or c in (left, left + w - 1)
         }
         inner: list[_Element] = []
         seen: set[tuple[int, int]] = set()
@@ -417,12 +405,7 @@ class ConstraintSession:
 
     def observe(self, grid: Grid) -> None:
         boards = _boards(grid)
-        signature = tuple(
-            sorted(
-                (b.framed, len(b.positions), len(b.markers))
-                for b in boards
-            )
-        )
+        signature = tuple(sorted((b.framed, len(b.positions), len(b.markers)) for b in boards))
         new_layout = signature != self._signature
         if new_layout:
             # A new layout is a new level of work — counts reset, the
@@ -478,17 +461,13 @@ class ConstraintSession:
         clicked = prev_board.positions.get(pos)
         if clicked is None or clicked.micro is None:
             return
-        spread = {
-            (p[0] - pos[0], p[1] - pos[1]) for p in changed if p != pos
-        }
+        spread = {(p[0] - pos[0], p[1] - pos[1]) for p in changed if p != pos}
         if not spread:
             return
         best: tuple[int, int] | None = None
         for colour in clicked.border_values | {clicked.micro[1][1]}:
             dirs = {
-                (o[0], o[1])
-                for o in _BORDER_OFFSETS
-                if clicked.micro[o[0] + 1][o[1] + 1] == colour
+                (o[0], o[1]) for o in _BORDER_OFFSETS if clicked.micro[o[0] + 1][o[1] + 1] == colour
             }
             if spread <= dirs and (best is None or len(dirs) < best[1]):
                 best = (colour, len(dirs))
@@ -503,9 +482,7 @@ class ConstraintSession:
             return self._nonzero_rel
         return None
 
-    def _prop_set(
-        self, board: _Board, pos: tuple[int, int]
-    ) -> set[tuple[int, int]]:
+    def _prop_set(self, board: _Board, pos: tuple[int, int]) -> set[tuple[int, int]]:
         """Tiles a click on ``pos`` moves: itself plus the neighbours
         its link-coloured cells point at (once the link is learned)."""
         out = {pos}
@@ -606,9 +583,7 @@ class ConstraintSession:
         self._planned_clicks += 1
         self._pre_click = (key, board)
 
-    def _constraints(
-        self, board: _Board
-    ) -> dict[tuple[int, int], list[tuple[str, int]]]:
+    def _constraints(self, board: _Board) -> dict[tuple[int, int], list[tuple[str, int]]]:
         """Every (relation, key) demand marker borders place on tiles."""
         marked = board.marker_positions
         needs: dict[tuple[int, int], list[tuple[str, int]]] = {}
@@ -629,14 +604,10 @@ class ConstraintSession:
         for (r, c), constraints in sorted(self._constraints(board).items()):
             current = board.positions[(r, c)].key
             equal_targets = {
-                centre
-                for rel, centre in constraints
-                if rel == "equal" and centre != current
+                centre for rel, centre in constraints if rel == "equal" and centre != current
             }
             differ_centres = {
-                centre
-                for rel, centre in constraints
-                if rel == "differ" and centre == current
+                centre for rel, centre in constraints if rel == "differ" and centre == current
             }
             if len(equal_targets) == 1:
                 out.append(_Violation(r, c, equal_targets.pop()))
@@ -694,11 +665,7 @@ class ConstraintSession:
                 if centre not in index:
                     allowed = set()
                     break
-                options = (
-                    {centre}
-                    if rel == "equal"
-                    else {c for c in order if c != centre}
-                )
+                options = {centre} if rel == "equal" else {c for c in order if c != centre}
                 allowed = options if allowed is None else allowed & options
             if not allowed or len(allowed) > 1:
                 continue  # unsatisfiable or not linearizable
@@ -733,8 +700,7 @@ class ConstraintSession:
                 if i != r and rows[i][c] % size:
                     factor = rows[i][c] % size
                     rows[i] = [
-                        (a - factor * b) % size
-                        for a, b in zip(rows[i], rows[r], strict=True)
+                        (a - factor * b) % size for a, b in zip(rows[i], rows[r], strict=True)
                     ]
             pivot_col[r] = c
             r += 1

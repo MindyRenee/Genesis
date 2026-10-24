@@ -13,12 +13,15 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import struct
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 from temporal_lobe.concepts import ConceptNetwork, open_archive
+
+from genesis_client.ltm_index import scan_ltm_index
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -82,7 +85,9 @@ def _run(recover_mod, argv: list[str]) -> int:
 
 
 def test_recovery_archives_only_what_is_missing(
-    recover, tmp_path: Path, capsys,
+    recover,
+    tmp_path: Path,
+    capsys,
 ) -> None:
     """Concepts already resident must not be re-added; the rest must land."""
     target = tmp_path / "target"
@@ -111,7 +116,8 @@ def test_recovery_archives_only_what_is_missing(
         __import__("gzip").decompress((target / "cognitive_state.json").read_bytes()),
     )
     assert {c["id"] for c in state["concept_network"]["concepts"]} == {
-        "resident_a", "resident_b",
+        "resident_a",
+        "resident_b",
     }
 
 
@@ -199,11 +205,99 @@ def test_merge_script_is_idempotent_on_rerun(tmp_path: Path, capsys) -> None:
 
 
 def test_scripts_compile_and_have_help() -> None:
-    """Both scripts must at least be syntactically runnable."""
-    for name in ("merge_data_dirs.py", "recover_pruned_concepts.py"):
+    """All repair scripts must at least be syntactically runnable."""
+    for name in (
+        "merge_data_dirs.py",
+        "recover_pruned_concepts.py",
+        "restore_archived_dreams.py",
+    ):
         proc = subprocess.run(
             [sys.executable, str(REPO / "scripts" / name), "--help"],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         assert proc.returncode == 0, f"{name}: {proc.stderr}"
         assert "usage:" in proc.stdout.lower(), name
+
+
+# ─── restore_archived_dreams.py ──────────────────────────────────────
+#
+# The flags byte lives at offset 60 inside each 64-byte index entry;
+# bit 2 (0x04) is ARCHIVED. The script clears it on non-deleted
+# module-9 entries so the daemon's open() rebuild returns them to
+# active_ids — see scripts/restore_archived_dreams.py and
+# src/store/ltm.rs.
+
+_LTM_ENTRY = struct.Struct("<QQQQII f 4f BB2x".replace(" ", ""))
+_LTM_HEADER = struct.Struct("<4sIIIQ40x".replace(" ", ""))
+
+
+def _write_ltm_meta(path: Path, entries: list[tuple[int, int, float, int, int]]) -> None:
+    """Write an ltm_store.meta: (episode_id, timestamp, salience, flags, module)."""
+    body = b"".join(
+        _LTM_ENTRY.pack(eid, 16, ts, 0, 4, 64, sal, 0, 0, 0, 0, flags, mod)
+        for eid, ts, sal, flags, mod in entries
+    )
+    path.write_bytes(
+        _LTM_HEADER.pack(b"LTMM", 2, 0xFFFFFFFF, len(entries), len(entries) + 1) + body
+    )
+
+
+def test_restore_archived_dreams_dry_run_and_write(tmp_path: Path) -> None:
+    """Archived module-9 entries are un-archived; everything else untouched."""
+    restore = _load_script("restore_archived_dreams.py")
+    meta = tmp_path / "ltm_store.meta"
+    _write_ltm_meta(
+        meta,
+        [
+            (1, 1000, 0.7, 0x06, 9),  # meta+archived dream → restored
+            (2, 2000, 0.7, 0x02, 9),  # active dream → untouched
+            (3, 3000, 0.5, 0x04, 4),  # archived non-dream → untouched
+            (4, 4000, 0.7, 0x07, 9),  # deleted+archived dream → untouched
+        ],
+    )
+
+    seen, restored = restore.restore_archived_dreams(meta, write=False)
+    assert (seen, restored) == (3, 1)
+    entries = {e.episode_id: e for e in scan_ltm_index(meta)}
+    assert entries[1].is_archived, "dry-run must not modify the index"
+
+    seen, restored = restore.restore_archived_dreams(meta, write=True)
+    assert restored == 1
+    entries = {e.episode_id: e for e in scan_ltm_index(meta)}
+    assert not entries[1].is_archived and entries[1].is_meta_memory
+    assert not entries[2].is_archived
+    assert entries[3].is_archived
+    assert entries[4].is_archived
+
+    # Idempotent — a second pass finds nothing left to restore.
+    assert restore.restore_archived_dreams(meta, write=True)[1] == 0
+
+
+def test_restore_archived_dreams_refuses_live_daemon(tmp_path: Path) -> None:
+    """The index must only be edited while the daemon is stopped."""
+    import socket
+
+    restore = _load_script("restore_archived_dreams.py")
+    _write_ltm_meta(tmp_path / "ltm_store.meta", [(1, 1000, 0.7, 0x06, 9)])
+    listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    listener.bind(str(tmp_path / "genesis.sock"))
+    listener.listen(1)
+    try:
+        with pytest.raises(SystemExit):
+            _run(restore, ["--data-dir", str(tmp_path), "--write"])
+    finally:
+        listener.close()
+
+
+def test_restore_archived_dreams_main_reports(tmp_path: Path, capsys) -> None:
+    """The CLI path reports dry-run vs write honestly."""
+    restore = _load_script("restore_archived_dreams.py")
+    _write_ltm_meta(tmp_path / "ltm_store.meta", [(1, 1000, 0.7, 0x06, 9)])
+
+    assert _run(restore, ["--data-dir", str(tmp_path)]) == 0
+    assert "dry-run" in capsys.readouterr().out
+
+    assert _run(restore, ["--data-dir", str(tmp_path), "--write"]) == 0
+    assert "restored 1" in capsys.readouterr().out

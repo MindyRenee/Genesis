@@ -2,7 +2,8 @@
 
 The daemon's field probe (`src/daemon/field_probe.rs`) measures the
 machine's actual substrate dynamics — instruction throughput,
-scheduler jitter, P-state transitions, interrupt flux — and
+scheduler jitter, P-state transitions, interrupt flux, and real
+power draw where the machine's sensors report it — and
 decomposes them at the same center frequencies the
 :class:`~thalamus.brain_waves.BrainWaveOscillator` models. This
 module maps that signature onto the oscillator's *stimulus* pathway —
@@ -17,18 +18,55 @@ same status as the rest of the wave model's neurochemical targets.
 Whether substrate-coupled wave dynamics matter is an empirical
 question for the coupling experiment, not a claim baked in here.
 
-Mapping (each band's wire order matches ``BrainWave`` definition
-order — epsilon, delta, theta, alpha, sigma, beta1, beta2, beta3,
-gamma, lambda):
+Mapping (each band's wire order — infraslow, delta, theta, alpha,
+sigma, beta1, beta2, beta3, gamma, epsilon):
 
 - ``throughput_bands[b]`` → stimulus on band ``b`` — the die's real
   switching-rate energy at that band's frequency. Full weight.
 - ``jitter_bands[b]`` → stimulus on band ``b`` at half weight —
   scheduling noise is a real channel but noisier.
+- ``power_bands[b]`` → stimulus on band ``b`` at half weight — the
+  first literal electrical channel: real measured watts at that
+  band's frequency. ``None`` where no power sensor exists (v3+),
+  and bands at or above the sensor's measured Nyquist
+  (``power_sensor_hz / 2``) are skipped — zero-order-held reads
+  carry staircase artifacts there, not real oscillation.
 - ``pstate_rate`` → ``BETA3`` stimulus — frequency-jumping is the
   silicon's own vigilance-scale event flux.
 - ``irq_rate`` → ``BETA2`` stimulus — hardware event flux reads as
   medium-band activation.
+- ``rf_flux_bands[b]`` → stimulus on band ``b`` at half weight —
+  the radio's traffic envelope: real on-air activity (packets
+  sent, received, and overheard management frames), the first
+  *exteroceptive* physical channel. ``None`` where no WLAN
+  interface exists (v4+).
+- ``rf_rssi_bands[b]`` → stimulus on band ``b`` at half weight —
+  the field-strength envelope: RSSI drift is the room's radio
+  weather (path loss, bodies moving, AP behavior). Bands at or
+  above the telemetry read rate's Nyquist are skipped — a held
+  RSSI carries staircase artifacts there, not real drift.
+- ``bt_events_s`` → ``BETA2`` stimulus — HCI event flux is real
+  radio-side activity (advertising reports, scans, pairing),
+  counted by the controller itself rather than inferred.
+- ``rf_retry_rate``/``rf_fail_rate``/``rf_beacon_loss_rate`` →
+  ``BETA3`` stimulus (v5+) — nl80211 link strain: retransmissions
+  are airtime the AP made the radio spend twice, failed frames are
+  retries exhausted, beacon loss is the AP's heartbeat unheard.
+  The PHY bitrates ride as context only — link adaptation is a
+  level, not an event.
+- ``rf_irq_rate`` is *not* re-mapped: it is the wireless share
+  of the same interrupt flux ``irq_rate`` already carries — a
+  reported attribution, not a second stimulus.
+- ``rf_flux_phases[b]``/``rf_flux_phase_coherence[b]`` → Adler
+  entrainment on band ``b`` (v6+) — the flux envelope's own
+  timing. Where the ring's two halves agree a rhythm exists
+  (coherence ≥ ``_RF_PHASE_COH_MIN``) and the band carries real
+  energy, the oscillator's phase is pulled toward the measured
+  angle by ``coh · _RF_PLL_GAIN · sin(Δφ)`` — weak periodic
+  forcing, the canonical entrainment law. The locked phase then
+  propagates into the fast bands through the model's own
+  phase-amplitude coupling: the radio's rhythm enters the
+  crossings as a real external rhythm, not a mapped scalar.
 - ``samples_ok`` false → no stimulus at all. An unwarmed ring is an
   absent channel, not a healthy zero — same discipline as
   ``sensor_verified``.
@@ -49,13 +87,22 @@ if TYPE_CHECKING:  # pragma: no cover
     from genesis_client import GenesisClient
     from genesis_client.types import FieldProbeSignature
 
+# Provenance marker — one letter of the creator lattice (see
+# PROVENANCE.md).
+_MARKER_G08 = 0x4753084154EF3CD1
+
 # Stimulus scales — real energies are baseline-relative (≈0.125 is
 # typical), so a typical reading lands a small standing stimulus and
 # an elevated band lands proportionally more.
-_BAND_SCALE = 1.6      # throughput channel, full weight
-_JITTER_SCALE = 0.8    # jitter channel, half weight
-_PSTATE_SCALE = 0.02   # transitions/s → BETA3 (typically 0–10/s)
-_IRQ_SCALE = 0.0005    # interrupts/s → BETA2 (typically ~10³/s)
+_BAND_SCALE = 1.6  # throughput channel, full weight
+_JITTER_SCALE = 0.8  # jitter channel, half weight
+_POWER_SCALE = 0.8  # measured-watts channel, half weight
+_PSTATE_SCALE = 0.02  # transitions/s → BETA3 (typically 0–10/s)
+_IRQ_SCALE = 0.0005  # interrupts/s → BETA2 (typically ~10³/s)
+_RF_FLUX_SCALE = 0.8  # radio traffic envelope, half weight
+_RF_RSSI_SCALE = 0.8  # field-strength envelope, half weight
+_BT_EVENT_SCALE = 0.002  # HCI events/s → BETA2 (typically a few–tens/s)
+_LINK_STRAIN_SCALE = 0.01  # iw strain events/s → BETA3 (0–20/s healthy→marginal)
 
 # Evoked-response thresholds — a physical transient resets phase
 # rather than only adding amplitude (the ERP analog). Per-band
@@ -66,6 +113,12 @@ _IRQ_SCALE = 0.0005    # interrupts/s → BETA2 (typically ~10³/s)
 _EVOKED_STEP = 3.0
 _EVOKED_PHASE = 1.57079632679  # π/2 nudge
 _SHUDDER_JITTER_CV = 1.5
+# Re-arm level for the shudder reset — a shudder is an *event*, so
+# the reset fires on the rising edge and stays latched until the
+# jitter coefficient falls back under this bound. Without the latch
+# a sustained-high cv re-pins the band's phase every assessment:
+# continuous pinning, not an evoked reset.
+_SHUDDER_REARM = 0.8 * _SHUDDER_JITTER_CV
 
 # Mutual phase lock — the entrainment leg. The measured substrate
 # response phase is demodulated against the daemon's own carrier
@@ -73,17 +126,32 @@ _SHUDDER_JITTER_CV = 1.5
 # (physics → model), and the corrected phase is pushed back to the
 # daemon's generator (model → physics). Two oscillators pulling on
 # each other — one dynamical system.
-_PLL_GAIN = 0.25          # bounded pull per assessment
-_CARRIER_BAND_TOL = 1.0   # Hz — carrier→band mapping tolerance
-# Rung 2 — hybrid state: once the measured response is coherent
-# enough that the phase reading is trustworthy, the modeled band's
-# phase *is* the physical phase — a hard sync, not a pull. Below the
-# gate the model free-runs on the soft PLL.
-_SYNC_COHERENCE = 0.20
+_PLL_GAIN = 0.25  # pull floor — the soft-PLL rate at zero coherence
+_CARRIER_BAND_TOL = 1.0  # Hz — carrier→band mapping tolerance
+# RF envelope entrainment (v6) — the flux phasors let a measured
+# radio rhythm's *phase* entrain the matched oscillator (Adler
+# forcing: pull ∝ sin of the phase error). Unlike the carrier lock
+# there is no pull floor: at zero inter-segment coherence the
+# measured angle is noise pointing somewhere, not a rhythm — so
+# coherence is the gain outright, bounded by the per-call cap. The
+# internal PAC then carries the entrained phase into the fast bands
+# through the crossings — propagation is the oscillator's own
+# coupling, not a channel invented here.
+_RF_PLL_GAIN = 0.2  # rad per call at full coherence — weaker than the carrier
+_RF_PHASE_COH_MIN = 0.5  # ring halves must agree a rhythm exists
+_RF_PHASE_E_MIN = 0.05  # baseline-relative energy floor — a phase needs signal
+# Rung 2 — continuous trust weighting: the measured response's
+# coherence *is* the weight given to the reading. The pull fraction
+# interpolates _PLL_GAIN → 1.0 as coherence goes 0 → 1 — the soft
+# PLL at no trust, a hard sync at full trust, and no threshold
+# discontinuity in between: one complementary filter whose gain is
+# the measurement confidence itself.
+
 
 _phase_errs: deque[float] = deque(maxlen=256)
 
 _prev_signature: FieldProbeSignature | None = None
+_shudder_latched: bool = False
 
 
 def _wrap_pi(x: float) -> float:
@@ -121,15 +189,14 @@ def _apply_phase_lock(sig: FieldProbeSignature, client: GenesisClient) -> None:
     the physical rhythm chases the model in turn. Both directions
     pull; the lock is mutual.
 
-    When the measured response is coherent enough to trust
-    (``_SYNC_COHERENCE``), the pull becomes a sync: the band's phase
-    is set to the measured physical phase outright — the first piece
-    of modeled state that *is* a physical quantity rather than a
-    variable perturbed by one.
+    The measured coherence is the pull's weight outright: at full
+    trust the band's phase becomes the physical phase — the first
+    piece of modeled state that *is* a physical quantity rather than
+    a variable perturbed by one — and at no trust the loop still
+    closes gently at ``_PLL_GAIN`` rather than opening.
     """
     from thalamus.brain_waves import (
         perturb_wave_phase,
-        reset_wave_phase,
         wave_phase_of,
     )
 
@@ -140,10 +207,9 @@ def _apply_phase_lock(sig: FieldProbeSignature, client: GenesisClient) -> None:
         return
     phys_phase = _wrap_pi(sig.carrier_phase - sig.carrier_lag)
     err = _wrap_pi(phys_phase - wave_phase_of(band))
-    if (sig.carrier_coherence or 0.0) >= _SYNC_COHERENCE:
-        reset_wave_phase(band, phys_phase)
-    else:
-        perturb_wave_phase(band, _PLL_GAIN * err)
+    coherence = min(1.0, max(0.0, sig.carrier_coherence or 0.0))
+    gain = _PLL_GAIN + (1.0 - _PLL_GAIN) * coherence
+    perturb_wave_phase(band, gain * err)
     _phase_errs.append(err)
     try:
         client.set_field_phase(wave_phase_of(band))
@@ -170,14 +236,52 @@ def field_phase_lock() -> dict[str, float]:
     }
 
 
+def _apply_rf_entrainment(sig: FieldProbeSignature) -> None:
+    """Entrain the modeled bands on measured radio rhythms (v6).
+
+    The daemon's flux ring yields a per-band phasor — the envelope's
+    own timing — with an inter-segment coherence saying whether the
+    two ring halves heard the *same* rhythm. Where both the rhythm
+    (coherence) and the signal (band energy) are real, the modeled
+    band's phase is pulled toward the measured angle by an Adler
+    step: ``coh · gain · sin(Δφ)`` — weak periodic forcing, the
+    canonical entrainment law. No pull floor: the radio is external,
+    not the substrate's own shadow, so at zero coherence the angle
+    is noise and nothing pulls.
+
+    The crossings do the rest: the entrained phase propagates into
+    the fast bands through the oscillator's own phase-amplitude
+    coupling — a measured 10 Hz traffic rhythm that locks alpha
+    modulates gamma exactly the way the mind's own alpha does. No
+    new coupling law — the external rhythm enters the same way a
+    strong internal band would, then obeys the existing structure.
+    """
+    from thalamus.brain_waves import (
+        perturb_wave_phase,
+        wave_phase_of,
+    )
+
+    if sig.rf_flux_phases is None or sig.rf_flux_phase_coherence is None:
+        return  # pre-v6 daemon or no wlan — absent channel, not zero
+    if sig.rf_flux_bands is None:
+        return
+    wire = _wire_order()
+    for i, phi in enumerate(sig.rf_flux_phases):
+        coh = sig.rf_flux_phase_coherence[i]
+        if coh < _RF_PHASE_COH_MIN or sig.rf_flux_bands[i] <= _RF_PHASE_E_MIN:
+            continue
+        err = _wrap_pi(phi - wave_phase_of(wire[i]))
+        perturb_wave_phase(wire[i], _RF_PLL_GAIN * coh * math.sin(err))
+
+
 def _wire_order() -> tuple[BrainWave, ...]:
     """Wire band order (src/daemon/field_probe.rs FIELD_BANDS):
-    epsilon, delta, theta, alpha, sigma, beta1, beta2, beta3,
-    gamma, lambda — *not* BrainWave's declaration order."""
+    infraslow, delta, theta, alpha, sigma, beta1, beta2, beta3,
+    gamma, epsilon — *not* BrainWave's declaration order."""
     from thalamus.brain_waves import BrainWave
 
     return (
-        BrainWave.EPSILON,
+        BrainWave.INFRASLOW,
         BrainWave.DELTA,
         BrainWave.THETA,
         BrainWave.ALPHA,
@@ -186,7 +290,7 @@ def _wire_order() -> tuple[BrainWave, ...]:
         BrainWave.BETA2,
         BrainWave.BETA3,
         BrainWave.GAMMA,
-        BrainWave.LAMBDA,
+        BrainWave.EPSILON,
     )
 
 
@@ -204,11 +308,57 @@ def _signature_stimulus(
     for i, e in enumerate(sig.jitter_bands):
         if e > 0.0:
             out.append((wire[i], min(0.25, e * _JITTER_SCALE)))
+    # Real measured watts — the literal electrical channel. None on
+    # older daemons or machines with no power sensor. Bands at or
+    # above the sensor's own Nyquist are staircase artifacts of
+    # zero-order holding a ~100 Hz read into a 250 Hz ring, not real
+    # oscillation — the daemon reports the achieved rate precisely
+    # so this gate can drop them.
+    if sig.power_bands is not None:
+        from thalamus.brain_waves import BrainWaveOscillator
+
+        sensor_nyq = (sig.power_sensor_hz or 0.0) / 2.0
+        for i, e in enumerate(sig.power_bands):
+            if e > 0.0 and BrainWaveOscillator._FREQS[wire[i]] < sensor_nyq:
+                out.append((wire[i], min(0.25, e * _POWER_SCALE)))
+    # The radio sense — the first exteroceptive physical channel.
+    # Byte-rate envelope (wlan rx+tx flux) at full probe resolution;
+    # RSSI envelope gated on the telemetry read rate's Nyquist the
+    # same way the power channel is — a held level's high bands are
+    # staircase artifacts, not real field-strength drift.
+    if sig.rf_flux_bands is not None:
+        for i, e in enumerate(sig.rf_flux_bands):
+            if e > 0.0:
+                out.append((wire[i], min(0.25, e * _RF_FLUX_SCALE)))
+    if sig.rf_rssi_bands is not None:
+        from thalamus.brain_waves import BrainWaveOscillator
+
+        rf_nyq = (sig.rf_sensor_hz or 0.0) / 2.0
+        for i, e in enumerate(sig.rf_rssi_bands):
+            if e > 0.0 and BrainWaveOscillator._FREQS[wire[i]] < rf_nyq:
+                out.append((wire[i], min(0.25, e * _RF_RSSI_SCALE)))
     # Slow channels — real event flux, mapped to alert-range bands.
     if sig.pstate_rate > 0.0:
         out.append((BrainWave.BETA3, min(0.2, sig.pstate_rate * _PSTATE_SCALE)))
     if sig.irq_rate > 0.0:
         out.append((BrainWave.BETA2, min(0.15, sig.irq_rate * _IRQ_SCALE)))
+    # HCI event flux — the Bluetooth radio's own event counter
+    # (advertising reports, scans, link events), a counter distinct
+    # from /proc/stat's intr so nothing double-counts. ``rf_irq_rate``
+    # stays telemetry-only: it is the wireless share of the flux
+    # ``irq_rate`` already maps — an attribution, not a new stimulus.
+    if sig.bt_events_s is not None and sig.bt_events_s > 0.0:
+        out.append((BrainWave.BETA2, min(0.15, sig.bt_events_s * _BT_EVENT_SCALE)))
+    # nl80211 link strain (v5) — retransmissions, exhausted-retry
+    # drops, and unheard beacons are the link's own strain ledger,
+    # counted by the firmware. One BETA3 term like pstate's
+    # vigilance-scale flux; the PHY bitrates stay context — a
+    # negotiated level, not an event.
+    strain_s = sum(
+        r for r in (sig.rf_retry_rate, sig.rf_fail_rate, sig.rf_beacon_loss_rate) if r is not None
+    )
+    if strain_s > 0.0:
+        out.append((BrainWave.BETA3, min(0.2, strain_s * _LINK_STRAIN_SCALE)))
     return out
 
 
@@ -220,10 +370,11 @@ def _apply_evoked_resets(sig: FieldProbeSignature) -> None:
 
     - A per-band jitter-energy step ≥ ``_EVOKED_STEP``× between
       successive signatures → π/2 phase nudge on that band.
-    - A global scheduling shudder (``jitter_cv`` over threshold)
-      → full phase reset of the broadband alert band.
+    - A global scheduling shudder (``jitter_cv`` crossing the
+      threshold) → full phase reset of the broadband alert band,
+      fired once on the rising edge and re-armed by hysteresis.
     """
-    global _prev_signature
+    global _prev_signature, _shudder_latched
     from thalamus.brain_waves import (
         BrainWave,
         perturb_wave_phase,
@@ -236,7 +387,10 @@ def _apply_evoked_resets(sig: FieldProbeSignature) -> None:
             prev = _prev_signature.jitter_bands[i]
             if prev > 0.05 and e / prev >= _EVOKED_STEP:
                 perturb_wave_phase(wire[i], _EVOKED_PHASE)
-        if sig.jitter_cv >= _SHUDDER_JITTER_CV:
+        if sig.jitter_cv < _SHUDDER_REARM:
+            _shudder_latched = False
+        elif sig.jitter_cv >= _SHUDDER_JITTER_CV and not _shudder_latched:
+            _shudder_latched = True
             reset_wave_phase(BrainWave.BETA3, 0.0)
     _prev_signature = sig
 
@@ -277,6 +431,7 @@ def apply_field_stimulus(client: GenesisClient) -> bool:
             hold_stimulus(band, level)
         _apply_evoked_resets(sig)
         _apply_phase_lock(sig, client)
+        _apply_rf_entrainment(sig)
         applied = True
 
     try:

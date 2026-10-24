@@ -31,6 +31,10 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any
 
+# Provenance marker — one letter of the creator lattice (see
+# PROVENANCE.md).
+_MARKER_G10 = 0x47530A204780A5FF
+
 __all__ = [
     "DTYPE_STRUCT",
     "MAX_DIMS",
@@ -97,8 +101,7 @@ class Tensor:
         expected = self.elements * self.itemsize
         if expected != len(self.payload):
             raise ValueError(
-                f"payload {len(self.payload)}B != "
-                f"{self.elements} elements × {self.itemsize}B"
+                f"payload {len(self.payload)}B != {self.elements} elements × {self.itemsize}B"
             )
         if len(self.payload) > MAX_TENSOR_BYTES:
             raise ValueError("tensor payload exceeds MAX_TENSOR_BYTES")
@@ -119,9 +122,7 @@ class Tensor:
     # ── Construction ──────────────────────────────────────────
 
     @classmethod
-    def from_lists(
-        cls, data: Sequence[Any], dtype: DType | None = None
-    ) -> Tensor:
+    def from_lists(cls, data: Sequence[Any], dtype: DType | None = None) -> Tensor:
         """Build a tensor from nested lists, inferring the shape.
 
         ``dtype`` defaults to F32 when any element is a float, I32
@@ -133,9 +134,7 @@ class Tensor:
         _flatten(data, shape, 0, flat)
         if dtype is None:
             dtype = DType.F32 if any(isinstance(v, float) for v in flat) else DType.I32
-        payload = struct.pack(
-            "<" + DTYPE_STRUCT[dtype] * len(flat), *flat
-        ) if flat else b""
+        payload = struct.pack("<" + DTYPE_STRUCT[dtype] * len(flat), *flat) if flat else b""
         return cls(dtype=dtype, shape=shape, payload=payload)
 
     @classmethod
@@ -173,11 +172,7 @@ class Tensor:
         """Flat element list."""
         if not self.payload:
             return []
-        return list(
-            struct.unpack(
-                "<" + DTYPE_STRUCT[self.dtype] * self.elements, self.payload
-            )
-        )
+        return list(struct.unpack("<" + DTYPE_STRUCT[self.dtype] * self.elements, self.payload))
 
     def to_lists(self) -> list[Any]:
         """Nested lists matching ``shape``."""
@@ -215,9 +210,7 @@ class Tensor:
         return tensor
 
     @classmethod
-    def _unpack_prefix(
-        cls, buf: bytes | bytearray | memoryview
-    ) -> tuple[Tensor, int]:
+    def _unpack_prefix(cls, buf: bytes | bytearray | memoryview) -> tuple[Tensor, int]:
         """Parse a tensor from the front of ``buf``; returns it plus the
         byte offset just past it."""
         if len(buf) < 2:
@@ -232,9 +225,7 @@ class Tensor:
         header = 2 + ndim * 4
         if len(buf) < header:
             raise ValueError("tensor dims truncated")
-        shape = tuple(
-            _U32.unpack_from(buf, 2 + i * 4)[0] for i in range(ndim)
-        )
+        shape = tuple(_U32.unpack_from(buf, 2 + i * 4)[0] for i in range(ndim))
         n = 1
         for d in shape:
             n *= d
@@ -257,13 +248,21 @@ class TensorMeta:
 @dataclass(slots=True)
 class MotorTarget:
     """Decode of ``GET_MOTOR_TARGET``: what the published motor fields
-    currently point at on the daemon's canonical 64×64 grid."""
+    currently point at on the daemon's canonical 64×64 grid.
+
+    The v2 tail adds the field's shape — centroid (continuous), RMS
+    spread in cells, and normalized entropy — when the daemon reports
+    it; ``None`` fields mean an older daemon, not a decided field."""
 
     action_id: int | None = None
     action_strength: float = 0.0
     x: int | None = None
     y: int | None = None
     cell_strength: float = 0.0
+    centroid_x: float | None = None
+    centroid_y: float | None = None
+    spread: float | None = None
+    entropy: float | None = None
 
     @property
     def has_action(self) -> bool:
@@ -272,6 +271,10 @@ class MotorTarget:
     @property
     def has_cell(self) -> bool:
         return self.x is not None
+
+    @property
+    def has_distribution(self) -> bool:
+        return self.centroid_x is not None
 
 
 def pack_name(name: str) -> bytes:
@@ -298,16 +301,15 @@ def unpack_list(resp: bytes) -> list[TensorMeta]:
         dtype = DType(resp[off])
         ndim = resp[off + 1]
         off += 2
-        shape = tuple(
-            _U32.unpack_from(resp, off + i * 4)[0] for i in range(ndim)
-        )
+        shape = tuple(_U32.unpack_from(resp, off + i * 4)[0] for i in range(ndim))
         off += ndim * 4
         out.append(TensorMeta(name=name, dtype=dtype, shape=shape))
     return out
 
 
 def unpack_motor_target(resp: bytes) -> MotorTarget:
-    """Parse the fixed 14-byte ``GET_MOTOR_TARGET`` response."""
+    """Parse the ``GET_MOTOR_TARGET`` response: the fixed 14-byte base
+    plus the additive 16-byte distribution tail when present."""
     if len(resp) < 14:
         raise ValueError("motor target response too short")
     flags = resp[0]
@@ -319,6 +321,13 @@ def unpack_motor_target(resp: bytes) -> MotorTarget:
         target.x = _U16.unpack_from(resp, 6)[0]
         target.y = _U16.unpack_from(resp, 8)[0]
         target.cell_strength = _F32.unpack_from(resp, 10)[0]
+    if flags & 4:
+        if len(resp) < 30:
+            raise ValueError("motor target distribution tail truncated")
+        target.centroid_x = _F32.unpack_from(resp, 14)[0]
+        target.centroid_y = _F32.unpack_from(resp, 18)[0]
+        target.spread = _F32.unpack_from(resp, 22)[0]
+        target.entropy = _F32.unpack_from(resp, 26)[0]
     return target
 
 
@@ -339,9 +348,7 @@ def _infer_shape(data: Sequence[Any]) -> tuple[int, ...]:
     return (n, *inner)
 
 
-def _flatten(
-    data: Sequence[Any], shape: tuple[int, ...], dim: int, out: list[Any]
-) -> None:
+def _flatten(data: Sequence[Any], shape: tuple[int, ...], dim: int, out: list[Any]) -> None:
     if dim == len(shape):
         out.append(data)
         return
@@ -357,6 +364,4 @@ def _nest(flat: list[Any], shape: tuple[int, ...]) -> Any:
     step = 1
     for d in shape[1:]:
         step *= d
-    return [
-        _nest(flat[i * step : (i + 1) * step], shape[1:]) for i in range(shape[0])
-    ]
+    return [_nest(flat[i * step : (i + 1) * step], shape[1:]) for i in range(shape[0])]

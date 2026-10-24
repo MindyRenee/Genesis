@@ -21,9 +21,13 @@ from infrastructure.notifications import Notification, NotificationQueue
 def _make_summary(phase: int = 0) -> NeuroSummary:
     """Create a NeuroSummary with the given phase."""
     return NeuroSummary(
-        arousal=0.5, valence=0.5, global_tone=0.5,
-        plasticity_gate=0.5, encoding_weight=0.5,
-        consolidation_weight=0.5, retrieval_weight=0.5,
+        arousal=0.5,
+        valence=0.5,
+        global_tone=0.5,
+        plasticity_gate=0.5,
+        encoding_weight=0.5,
+        consolidation_weight=0.5,
+        retrieval_weight=0.5,
         phase=phase,
     )
 
@@ -31,8 +35,12 @@ def _make_summary(phase: int = 0) -> NeuroSummary:
 def _make_dream_episode(eid: int, text: str = "A novel connection") -> RecentEpisode:
     """Create a RecentEpisode from the dream module (source_module=9)."""
     return RecentEpisode(
-        episode_id=eid, timestamp=1000, salience=0.7,
-        event_type=2, source_module=9, text=text,
+        episode_id=eid,
+        timestamp=1000,
+        salience=0.7,
+        event_type=2,
+        source_module=9,
+        text=text,
     )
 
 
@@ -79,10 +87,12 @@ def test_first_poll_does_not_notify():
 
 def test_phase_change_detected():
     """A phase change between polls should generate a notification."""
-    queue = _make_queue(summaries=[
-        _make_summary(phase=0),  # first poll (active)
-        _make_summary(phase=4),  # second poll (drowsy)
-    ])
+    queue = _make_queue(
+        summaries=[
+            _make_summary(phase=0),  # first poll (active)
+            _make_summary(phase=4),  # second poll (drowsy)
+        ]
+    )
 
     queue.poll()  # first poll — no notification
     enqueued = queue.poll()  # second poll — phase changed
@@ -98,10 +108,12 @@ def test_phase_change_detected():
 
 def test_no_phase_change_no_notification():
     """No phase change should produce no notification."""
-    queue = _make_queue(summaries=[
-        _make_summary(phase=0),
-        _make_summary(phase=0),  # same phase
-    ])
+    queue = _make_queue(
+        summaries=[
+            _make_summary(phase=0),
+            _make_summary(phase=0),  # same phase
+        ]
+    )
 
     queue.poll()
     enqueued = queue.poll()
@@ -172,10 +184,12 @@ def test_multiple_new_dreams():
 
 def test_drain_clears_queue():
     """drain() should empty the queue."""
-    queue = _make_queue(summaries=[
-        _make_summary(phase=0),
-        _make_summary(phase=4),
-    ])
+    queue = _make_queue(
+        summaries=[
+            _make_summary(phase=0),
+            _make_summary(phase=4),
+        ]
+    )
 
     queue.poll()
     queue.poll()
@@ -189,10 +203,12 @@ def test_drain_clears_queue():
 
 def test_reset_clears_state():
     """reset() should clear the queue and reset state tracking."""
-    queue = _make_queue(summaries=[
-        _make_summary(phase=0),
-        _make_summary(phase=4),
-    ])
+    queue = _make_queue(
+        summaries=[
+            _make_summary(phase=0),
+            _make_summary(phase=4),
+        ]
+    )
 
     queue.poll()
     queue.poll()
@@ -209,6 +225,7 @@ def test_reset_clears_state():
 
 def test_connection_error_handled_gracefully():
     """Connection errors during poll should not crash."""
+
     def failing_summary() -> None:
         """Raise a ConnectionError to simulate a daemon outage."""
         raise ConnectionError("daemon unreachable")
@@ -250,9 +267,13 @@ def test_queue_bounded():
     )
     # Manually enqueue 5 notifications
     for i in range(5):
-        queue._enqueue(Notification(
-            kind="test", message=f"msg {i}", timestamp=i,
-        ))
+        queue._enqueue(
+            Notification(
+                kind="test",
+                message=f"msg {i}",
+                timestamp=i,
+            )
+        )
 
     notifications = queue.drain()
     # Only the last 3 should remain (deque maxlen drops oldest)
@@ -284,10 +305,11 @@ def main() -> None:
             passed += 1
         except Exception as e:  # noqa: BLE001
             import traceback
+
             print(f"  FAIL  {test.__name__}: {e}")
             traceback.print_exc()
             failed += 1
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Notification queue tests: {passed} passed, {failed} failed")
     if failed > 0:
         sys.exit(1)

@@ -339,10 +339,7 @@ def test_persistence_round_trip() -> None:
     assert model.cycle_count == 10
     assert model.surprise_ema > 0.0
     original_precision = model.precision
-    original_weights = {
-        src: dict(targets)
-        for src, targets in model._transition_weights.items()
-    }
+    original_weights = {src: dict(targets) for src, targets in model._transition_weights.items()}
 
     # Serialize
     data = model.to_dict()

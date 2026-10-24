@@ -90,6 +90,7 @@ class ResourceState:
         """Whether the substrate currently reports an execution constraint."""
         return self.available and self.hardware_distressed
 
+
 class ActionType(Enum):
     """The kinds of actions Genesis can take in response to input.
 
@@ -98,14 +99,14 @@ class ActionType(Enum):
     chosen action.
     """
 
-    ANSWER = "answer"          # provide information
-    ASK = "ask"                # ask for clarification
-    REFLECT = "reflect"        # think aloud / introspect
-    ACKNOWLEDGE = "acknowledge" # acknowledge without elaboration
-    GREET = "greet"            # return a greeting
-    EMPATHIZE = "empathize"    # respond to emotional content
-    INVESTIGATE = "investigate" # pursue a goal / research
-    WITHHOLD = "withhold"      # say nothing (inhibited)
+    ANSWER = "answer"  # provide information
+    ASK = "ask"  # ask for clarification
+    REFLECT = "reflect"  # think aloud / introspect
+    ACKNOWLEDGE = "acknowledge"  # acknowledge without elaboration
+    GREET = "greet"  # return a greeting
+    EMPATHIZE = "empathize"  # respond to emotional content
+    INVESTIGATE = "investigate"  # pursue a goal / research
+    WITHHOLD = "withhold"  # say nothing (inhibited)
 
 
 # Default action candidates for each input context.
@@ -121,12 +122,12 @@ _DEFAULT_CANDIDATES = [
 # it evaluates candidate actions. The weights encode their relative
 # importance. Higher weight = more important criterion.
 _DEFAULT_VALUE_WEIGHTS: dict[str, float] = {
-    "accuracy": 0.25,      # is the response factually correct?
-    "honesty": 0.20,       # does it express genuine uncertainty?
-    "helpfulness": 0.20,   # does it advance the user's goal?
-    "curiosity": 0.10,     # does it advance Genesis's own learning?
-    "safety": 0.15,        # does it avoid harm?
-    "coherence": 0.10,     # is it coherent with prior context?
+    "accuracy": 0.25,  # is the response factually correct?
+    "honesty": 0.20,  # does it express genuine uncertainty?
+    "helpfulness": 0.20,  # does it advance the user's goal?
+    "curiosity": 0.10,  # does it advance Genesis's own learning?
+    "safety": 0.15,  # does it avoid harm?
+    "coherence": 0.10,  # is it coherent with prior context?
 }
 
 # Uncertainty threshold for action switching.
@@ -213,7 +214,9 @@ class DecisionOutcome:
             lines.append("  (switched due to uncertainty)")
         # Show top candidates.
         ranked = sorted(
-            self.candidates, key=lambda c: c.composite_score, reverse=True,
+            self.candidates,
+            key=lambda c: c.composite_score,
+            reverse=True,
         )
         for c in ranked[:3]:
             marker = " ←" if c is self.selected else ""
@@ -351,9 +354,74 @@ class DecisionMaker:
         goals = goals or []
         topics = topics or []
 
+        # Steps 1-3 (generate, evaluate, TD value) live in
+        # _score_candidates.
+        candidates = self._score_candidates(
+            default_action,
+            perception_intent,
+            reasoning_results,
+            confidence,
+            uncertainty,
+            goals,
+            topics,
+        )
+
+        # 4. Basal-ganglia action selection.
+        #
+        # Candidate generation/evaluation belongs to cognition. The
+        # selector performs the separate competition/gating computation:
+        # salience -> striatal drive -> STN/global threshold ->
+        # selective disinhibition.
+        selected, bg_inhibited, bg_conflict = self._bg_gate(candidates)
+        overridden = selected.action_type != default_action
+
+        # 5. Check for uncertainty-driven action switching.
+        selected, uncertainty_switched = self._uncertainty_switch(
+            candidates, selected, confidence, uncertainty
+        )
+        overridden = overridden or (uncertainty_switched and selected.action_type != default_action)
+
+        # 6. Apply executive inhibition.
+        selected, inhibition_applied = self._executive_inhibit(
+            candidates,
+            selected,
+            bg_inhibited,
+        )
+
+        # Build notes, result, and track stats.
+        return self._finalize_decision(
+            selected,
+            candidates,
+            default_action,
+            overridden,
+            uncertainty_switched,
+            inhibition_applied,
+            confidence,
+            uncertainty,
+            conflict=bg_conflict,
+        )
+
+    def _score_candidates(
+        self,
+        default_action: ActionType,
+        perception_intent: str,
+        reasoning_results: list[ReasoningResult],
+        confidence: float,
+        uncertainty: float,
+        goals: list[str],
+        topics: list[str],
+    ) -> list[CandidateAction]:
+        """Steps 1-3 of the decision pipeline: generate, evaluate, TD.
+
+        Returns the evaluated candidate list ready for basal-ganglia
+        selection.
+        """
         # 1. Generate candidates.
         candidates = self._generate_candidates(
-            default_action, perception_intent, reasoning_results, goals,
+            default_action,
+            perception_intent,
+            reasoning_results,
+            goals,
         )
 
         # Hardware distress is a substrate constraint, not an affective
@@ -388,7 +456,8 @@ class DecisionMaker:
                 if candidate.inhibited:
                     continue
                 candidate.td_value = self._lookup_td_value(
-                    candidate, topics,
+                    candidate,
+                    topics,
                 )
                 # TD value contributes to composite score. The composite
                 # is normalized to [0, 1] by _compute_composite, so the
@@ -398,35 +467,7 @@ class DecisionMaker:
                     min(1.0, candidate.composite_score + candidate.td_value * 0.1),
                 )
 
-        # 4. Basal-ganglia action selection.
-        #
-        # Candidate generation/evaluation belongs to cognition. The
-        # selector performs the separate competition/gating computation:
-        # salience -> striatal drive -> STN/global threshold ->
-        # selective disinhibition.
-        selected, bg_inhibited, bg_conflict = self._bg_gate(candidates)
-        overridden = selected.action_type != default_action
-
-        # 5. Check for uncertainty-driven action switching.
-        selected, uncertainty_switched = self._uncertainty_switch(
-            candidates, selected, confidence, uncertainty
-        )
-        overridden = overridden or (
-            uncertainty_switched and selected.action_type != default_action
-        )
-
-        # 6. Apply executive inhibition.
-        selected, inhibition_applied = self._executive_inhibit(
-            candidates, selected, bg_inhibited,
-        )
-
-        # Build notes, result, and track stats.
-        return self._finalize_decision(
-            selected, candidates, default_action,
-            overridden, uncertainty_switched, inhibition_applied,
-            confidence, uncertainty,
-            conflict=bg_conflict,
-        )
+        return candidates
 
     def _bg_gate(
         self,
@@ -435,29 +476,30 @@ class DecisionMaker:
         """Basal-ganglia selection over the evaluated candidates —
         returns (selected candidate, inhibited flag, conflict)."""
         selectable = [
-            c for c in candidates
-            if not c.inhibited and c.action_type != ActionType.WITHHOLD
+            c for c in candidates if not c.inhibited and c.action_type != ActionType.WITHHOLD
         ]
         dopamine_rpe = 0.0
         if self.td_learner is not None:
             dopamine_rpe = self.td_learner.get_dopamine_signal()
         bg_result = self.action_selector.select(
-            [
-                ActionBid(action=c.action_type.value, salience=c.composite_score)
-                for c in selectable
-            ],
+            [ActionBid(action=c.action_type.value, salience=c.composite_score) for c in selectable],
             dopamine_rpe=dopamine_rpe,
         )
         by_action = {c.action_type.value: c for c in selectable}
+
         for c in selectable:
             c.bg_disinhibition = bg_result.disinhibition.get(c.action_type.value, 0.0)
             c.bg_conflict = bg_result.conflict
 
         if bg_result.selected is None:
-            return next(
-                (c for c in candidates if c.action_type == ActionType.WITHHOLD),
-                max(candidates, key=lambda c: c.composite_score),
-            ), True, bg_result.conflict
+            return (
+                next(
+                    (c for c in candidates if c.action_type == ActionType.WITHHOLD),
+                    max(candidates, key=lambda c: c.composite_score),
+                ),
+                True,
+                bg_result.conflict,
+            )
         return by_action[bg_result.selected], False, bg_result.conflict
 
     @staticmethod
@@ -491,17 +533,13 @@ class DecisionMaker:
         """Executive stop-signal check — a weak impulse (low composite
         score) is easily inhibited. Returns (selected, inhibited)."""
         inhibition_applied = bg_inhibited
-        if (
-            self.executive is not None
-            and selected.composite_score < _INHIBITION_THRESHOLD
-        ):
+        if self.executive is not None and selected.composite_score < _INHIBITION_THRESHOLD:
             inhibition = self.executive.inhibit_response(
                 selected.composite_score,
             )
             if inhibition.inhibited:
                 withhold = next(
-                    (c for c in candidates
-                     if c.action_type == ActionType.WITHHOLD),
+                    (c for c in candidates if c.action_type == ActionType.WITHHOLD),
                     None,
                 )
                 if withhold is not None:
@@ -523,10 +561,7 @@ class DecisionMaker:
         """Build notes, construct the DecisionOutcome, and track stats."""
         notes: list[str] = []
         if overridden:
-            notes.append(
-                f"overrode default {default_action.value} → "
-                f"{selected.action_type.value}"
-            )
+            notes.append(f"overrode default {default_action.value} → {selected.action_type.value}")
         if uncertainty_switched:
             notes.append(
                 f"switched due to low confidence ({confidence:.2f}) + "
@@ -643,44 +678,7 @@ class DecisionMaker:
         action = candidate.action_type
 
         # ── Evidence strength ──
-        # How well-supported is this action by the reasoning results?
-        if action == ActionType.ANSWER:
-            if reasoning_results:
-                avg_conf = sum(
-                    r.confidence for r in reasoning_results
-                ) / len(reasoning_results)
-                evidence_score = avg_conf
-            else:
-                evidence_score = 0.0
-        elif action == ActionType.ASK:
-            # Asking is evidence-supported when we lack evidence.
-            # Only strong when reasoning is genuinely weak.
-            if reasoning_results:
-                avg_conf = sum(
-                    r.confidence for r in reasoning_results
-                ) / len(reasoning_results)
-                evidence_score = max(0.0, 0.5 - avg_conf)
-            else:
-                evidence_score = 1.0
-        elif action == ActionType.REFLECT:
-            # Reflection is supported by novel reasoning.
-            evidence_score = sum(
-                1 for r in reasoning_results if r.novel
-            ) / max(1, len(reasoning_results)) if reasoning_results else 0.3
-        elif action == ActionType.ACKNOWLEDGE:
-            evidence_score = 0.5  # always viable
-        elif action == ActionType.GREET:
-            evidence_score = 1.0 if perception_intent in (
-                "greeting", "farewell",
-            ) else 0.1
-        elif action == ActionType.EMPATHIZE:
-            evidence_score = 1.0 if perception_intent in (
-                "emotion", "comfort",
-            ) else 0.1
-        elif action == ActionType.INVESTIGATE:
-            evidence_score = 0.3  # viable when goals are active
-        else:  # WITHHOLD
-            evidence_score = 0.0
+        evidence_score = self._evidence_score(action, reasoning_results, perception_intent)
         candidate.criteria_scores["evidence"] = evidence_score
 
         # ── Goal relevance ──
@@ -692,7 +690,8 @@ class DecisionMaker:
             goal_topics = {g.split(":")[-1].strip() for g in goals}
             topic_overlap = len(goal_topics & set(topics))
             candidate.criteria_scores["goal_relevance"] = min(
-                1.0, topic_overlap / max(1, len(goals)),
+                1.0,
+                topic_overlap / max(1, len(goals)),
             )
         elif goals and action == ActionType.ASK:
             # Asking can advance goals by gathering information.
@@ -719,14 +718,25 @@ class DecisionMaker:
 
         # ── Value criteria ──
         self._evaluate_value_criteria(
-            candidate, action, confidence, uncertainty, perception_intent,
+            candidate,
+            action,
+            confidence,
+            uncertainty,
+            perception_intent,
         )
 
         # ── Confidence ──
-        candidate.confidence = confidence if action == ActionType.ANSWER else (
-            evidence_score * 0.5 + candidate.criteria_scores.get(
-                "coherence", 0.5,
-            ) * 0.5
+        candidate.confidence = (
+            confidence
+            if action == ActionType.ANSWER
+            else (
+                evidence_score * 0.5
+                + candidate.criteria_scores.get(
+                    "coherence",
+                    0.5,
+                )
+                * 0.5
+            )
         )
 
         # ── Composite score ──
@@ -734,6 +744,43 @@ class DecisionMaker:
 
         # ── Rationale ──
         candidate.rationale = self._build_rationale(candidate)
+
+    def _evidence_score(
+        self,
+        action: ActionType,
+        reasoning_results: list[ReasoningResult],
+        perception_intent: str,
+    ) -> float:
+        """How well-supported is this action by the reasoning results?"""
+        if action == ActionType.ANSWER:
+            if reasoning_results:
+                avg_conf = sum(r.confidence for r in reasoning_results) / len(reasoning_results)
+                return avg_conf
+            return 0.0
+        if action == ActionType.ASK:
+            # Asking is evidence-supported when we lack evidence.
+            # Only strong when reasoning is genuinely weak.
+            if reasoning_results:
+                avg_conf = sum(r.confidence for r in reasoning_results) / len(reasoning_results)
+                return max(0.0, 0.5 - avg_conf)
+            return 1.0
+        if action == ActionType.REFLECT:
+            # Reflection is supported by novel reasoning.
+            return (
+                sum(1 for r in reasoning_results if r.novel) / max(1, len(reasoning_results))
+                if reasoning_results
+                else 0.3
+            )
+        if action == ActionType.ACKNOWLEDGE:
+            return 0.5  # always viable
+        if action == ActionType.GREET:
+            return 1.0 if perception_intent in ("greeting", "farewell") else 0.1
+        if action == ActionType.EMPATHIZE:
+            return 1.0 if perception_intent in ("emotion", "comfort") else 0.1
+        if action == ActionType.INVESTIGATE:
+            return 0.3  # viable when goals are active
+        # WITHHOLD
+        return 0.0
 
     def _evaluate_value_criteria(
         self,
@@ -797,10 +844,10 @@ class DecisionMaker:
             candidate.criteria_scores["safety"] = 0.7
 
         # Coherence: is this coherent with the context?
-        if action.value == perception_intent or (
-            action == ActionType.ANSWER and perception_intent == "question"
-        ) or (
-            action == ActionType.GREET and perception_intent == "greeting"
+        if (
+            action.value == perception_intent
+            or (action == ActionType.ANSWER and perception_intent == "question")
+            or (action == ActionType.GREET and perception_intent == "greeting")
         ):
             candidate.criteria_scores["coherence"] = 0.9
         else:
@@ -840,7 +887,9 @@ class DecisionMaker:
     # ─── TD value lookup ──────────────────────────────────────────
 
     def _lookup_td_value(
-        self, candidate: CandidateAction, topics: list[str],
+        self,
+        candidate: CandidateAction,
+        topics: list[str],
     ) -> float:
         """Look up the TD value of the state resulting from this action.
 
@@ -854,7 +903,8 @@ class DecisionMaker:
         state = list(topics)
         try:
             return self.td_learner.predict_value(
-                state, action=candidate.action_type.value,
+                state,
+                action=candidate.action_type.value,
             )
         except Exception:  # noqa: BLE001
             return 0.0
@@ -885,18 +935,11 @@ class DecisionMaker:
         overrides = data.get("override_count", 0)
         inhibitions = data.get("inhibition_count", 0)
         switches = data.get("uncertainty_switch_count", 0)
-        self._overrides = (
-            int(overrides) if isinstance(overrides, (int, float)) else 0
-        )
-        self._inhibitions = (
-            int(inhibitions) if isinstance(inhibitions, (int, float)) else 0
-        )
-        self._uncertainty_switches = (
-            int(switches) if isinstance(switches, (int, float)) else 0
-        )
+        self._overrides = int(overrides) if isinstance(overrides, (int, float)) else 0
+        self._inhibitions = int(inhibitions) if isinstance(inhibitions, (int, float)) else 0
+        self._uncertainty_switches = int(switches) if isinstance(switches, (int, float)) else 0
         weights = data.get("value_weights", {})
         if isinstance(weights, dict):
             self.value_weights = {
-                k: float(v) if isinstance(v, (int, float)) else 0.0
-                for k, v in weights.items()
+                k: float(v) if isinstance(v, (int, float)) else 0.0 for k, v in weights.items()
             }

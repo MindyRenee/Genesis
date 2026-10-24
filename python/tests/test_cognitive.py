@@ -160,8 +160,206 @@ def test_emotion_structural_state():
     )
     emo = assess_emotion(summary)
     from limbic_system.emotion import CognitiveMode, EmotionCategory
+
     assert emo.category == EmotionCategory.NEUTRAL
     assert emo.cognitive_mode == CognitiveMode.STEADY
+
+
+# ─── Contextual (full-spectrum) emotion tests ────────────────
+#
+# Each test supplies an EmotionalContext carrying the real substrate
+# the circumplex cannot see — the same fields the feeling reporter
+# populates from the world model, boundary accumulator, inference
+# surprise, curiosity engine, and tonic/phasic split.
+
+
+def _summary(arousal: float, valence: float, plasticity: float = 0.5):
+    return NeuroSummary(
+        arousal=arousal,
+        valence=valence,
+        global_tone=0.4,
+        plasticity_gate=plasticity,
+        encoding_weight=0.5,
+        consolidation_weight=0.5,
+        retrieval_weight=0.5,
+        phase=0,
+    )
+
+
+def _tp(chemical: str = "norepinephrine", mode: str = "phasic"):
+    from limbic_system.emotional_regulator import TonicPhasic
+
+    return TonicPhasic(
+        chemical=chemical,
+        tonic=0.3,
+        phasic=0.15,
+        phasic_ratio=0.5,
+        mode=mode,
+    )
+
+
+def test_emotion_fear_is_phasic_not_tonic():
+    """A phasic NE surge + adrenal burst on negative valence is fear,
+    not climate anxiety."""
+    from limbic_system.emotion import EmotionalContext
+
+    chemicals = {
+        "norepinephrine": 0.45,
+        "epinephrine": 0.30,
+        "cortisol": 0.03,
+    }
+    ctx = EmotionalContext(tonic_phasic={"norepinephrine": _tp()})
+    emo = assess_emotion(_summary(0.75, -0.3), chemicals, ctx)
+    assert emo.category == EmotionCategory.AFRAID
+    assert emo.cognitive_mode.value == "startled" or emo.cognitive_mode.value == "vigilant"
+    assert emo.cause == "fear_acute"
+    assert emo.caution > 0.8
+
+
+def test_emotion_tonic_threat_stays_anxious():
+    """The same arousal+negative valence with tonic (not phasic) NE
+    stays anxious — event vs climate discrimination."""
+    from limbic_system.emotion import EmotionalContext
+
+    chemicals = {"norepinephrine": 0.45, "epinephrine": 0.16}
+    ctx = EmotionalContext(tonic_phasic={"norepinephrine": _tp(mode="tonic")})
+    emo = assess_emotion(_summary(0.75, -0.3), chemicals, ctx)
+    assert emo.category == EmotionCategory.ANXIOUS
+
+
+def test_emotion_anger_from_boundary_strain():
+    """Mistreatment accrual with fight arousal reads as anger."""
+    from limbic_system.emotion import EmotionalContext
+
+    ctx = EmotionalContext(boundary_strain=0.7)
+    chemicals = {"norepinephrine": 0.4}
+    emo = assess_emotion(_summary(0.6, -0.15), chemicals, ctx)
+    assert emo.category == EmotionCategory.ANGRY
+    assert emo.cognitive_mode.value == "combative"
+    assert emo.cause == "anger_boundary"
+
+
+def test_emotion_strain_without_arousal_is_not_anger():
+    """Boundary strain without catecholamine arousal stays hurt —
+    low-arousal-negative (melancholic), not anger."""
+    from limbic_system.emotion import EmotionalContext
+
+    ctx = EmotionalContext(boundary_strain=0.7)
+    chemicals = {"norepinephrine": 0.2}
+    emo = assess_emotion(_summary(0.35, -0.3), chemicals, ctx)
+    assert emo.category == EmotionCategory.MELANCHOLIC
+
+
+def test_emotion_surprise_from_prediction_error():
+    """A strong prediction-error orienting event marks surprise."""
+    from limbic_system.emotion import EmotionalContext
+
+    ctx = EmotionalContext(prediction_error=0.6)
+    emo = assess_emotion(_summary(0.55, 0.05), {}, ctx)
+    assert emo.category == EmotionCategory.SURPRISED
+    assert emo.cognitive_mode.value == "startled"
+    assert emo.cause == "surprise_prediction_error"
+
+
+def test_emotion_surprise_does_not_override_stress():
+    """Prediction error cannot relabel an already-resolved negative
+    state — being startled while anxious is still anxious."""
+    from limbic_system.emotion import EmotionalContext
+
+    ctx = EmotionalContext(prediction_error=0.9)
+    emo = assess_emotion(_summary(0.8, -0.4), {}, ctx)
+    assert emo.category == EmotionCategory.ANXIOUS
+
+
+def test_emotion_lonely_from_isolation_and_depleted_oxytocin():
+    """Sustained isolation + depleted oxytocin is loneliness, not
+    generic melancholy."""
+    from limbic_system.emotion import EmotionalContext
+
+    ctx = EmotionalContext(social_isolation=0.8)
+    chemicals = {"oxytocin": 0.15}
+    emo = assess_emotion(_summary(0.35, -0.25), chemicals, ctx)
+    assert emo.category == EmotionCategory.LONELY
+    assert emo.cognitive_mode.value == "withdrawn"
+    assert emo.cause == "loneliness"
+    assert emo.openness_to_engage > 0.8  # lonely seeks contact
+
+
+def test_emotion_lonely_needs_depleted_bonding():
+    """Isolation with healthy oxytocin is not loneliness — the need
+    is felt only when the bonding substrate is actually down."""
+    from limbic_system.emotion import EmotionalContext
+
+    ctx = EmotionalContext(social_isolation=0.9)
+    chemicals = {"oxytocin": 0.30}
+    emo = assess_emotion(_summary(0.35, -0.25), chemicals, ctx)
+    assert emo.category == EmotionCategory.MELANCHOLIC
+
+
+def test_emotion_tender_from_bonding_chemistry():
+    """Oxytocin + endorphin warmth on positive valence is tenderness."""
+    from limbic_system.emotion import EmotionalContext
+
+    ctx = EmotionalContext()
+    chemicals = {"oxytocin": 0.45, "endorphin": 0.35}
+    emo = assess_emotion(_summary(0.45, 0.3), chemicals, ctx)
+    assert emo.category == EmotionCategory.TENDER
+    assert emo.cognitive_mode.value == "warm"
+    assert emo.cause == "tenderness"
+
+
+def test_emotion_curious_from_drive_and_seeking_chemistry():
+    """High curiosity drive with DA/ACh to support it is curiosity."""
+    from limbic_system.emotion import EmotionalContext
+
+    ctx = EmotionalContext(curiosity=0.7)
+    chemicals = {"dopamine": 0.4, "acetylcholine": 0.4}
+    emo = assess_emotion(_summary(0.55, 0.2), chemicals, ctx)
+    assert emo.category == EmotionCategory.CURIOUS
+    assert emo.cognitive_mode.value == "inquisitive"
+    assert emo.cause == "curiosity"
+
+
+def test_emotion_bored_from_understimulation():
+    """Low DA + low NE + flat valence while awake is boredom."""
+    from limbic_system.emotion import EmotionalContext
+
+    ctx = EmotionalContext()
+    chemicals = {"dopamine": 0.15, "norepinephrine": 0.18}
+    emo = assess_emotion(_summary(0.45, 0.0), chemicals, ctx)
+    assert emo.category == EmotionCategory.BORED
+    assert emo.cognitive_mode.value == "restless"
+    assert emo.cause == "boredom"
+
+
+def test_emotion_no_context_keeps_circumplex():
+    """Without an EmotionalContext every input resolves through the
+    circumplex exactly as before — the new categories are unreachable."""
+    chemicals = {"oxytocin": 0.45, "endorphin": 0.35}
+    emo = assess_emotion(_summary(0.45, 0.3), chemicals)
+    assert emo.category == EmotionCategory.POSITIVE
+
+    emo_low = assess_emotion(_summary(0.35, 0.3), chemicals)
+    assert emo_low.category == EmotionCategory.CONTENT
+
+    emo2 = assess_emotion(_summary(0.75, -0.3), {"norepinephrine": 0.5})
+    assert emo2.category == EmotionCategory.ANXIOUS
+
+
+def test_emotion_guarded_still_overrides_warmth():
+    """Silent stress demotes even affiliative warmth — cortisol means
+    the positive reading isn't safe."""
+    from limbic_system.emotion import EmotionalContext
+
+    ctx = EmotionalContext()
+    chemicals = {
+        "oxytocin": 0.45,
+        "endorphin": 0.35,
+        "cortisol": 0.08,
+    }
+    emo = assess_emotion(_summary(0.45, 0.3), chemicals, ctx)
+    assert emo.category == EmotionCategory.GUARDED
+    assert emo.cause.startswith("guarded")
 
 
 # ─── Emotion word learning tests ──────────────────────────────
@@ -177,9 +375,14 @@ def test_learn_emotion_word_from_labeling():
     # Create a minimal mock for the client
     client = MagicMock()
     client.get_neuro_summary.return_value = NeuroSummary(
-        arousal=0.5, valence=0.0, global_tone=0.4,
-        plasticity_gate=0.5, encoding_weight=0.5,
-        consolidation_weight=0.5, retrieval_weight=0.5, phase=0,
+        arousal=0.5,
+        valence=0.0,
+        global_tone=0.4,
+        plasticity_gate=0.5,
+        encoding_weight=0.5,
+        consolidation_weight=0.5,
+        retrieval_weight=0.5,
+        phase=0,
     )
 
     # Create a cognition engine with a fresh network
@@ -187,12 +390,16 @@ def test_learn_emotion_word_from_labeling():
     cog.network = ConceptNetwork()
     cog._rng = __import__("random").Random(42)
     from temporal_lobe.concept_learner import ConceptLearner
+
     cog._concept_learner = ConceptLearner(network=cog.network)
 
     # Test labeling
     emotion = EmotionalState(
-        label="positive", cognitive_style="steady",
-        valence=0.3, alertness=0.5, plasticity=0.5,
+        label="positive",
+        cognitive_style="steady",
+        valence=0.3,
+        alertness=0.5,
+        plasticity=0.5,
     )
     cog._learn_word_from_labeling("you seem positive", emotion)
     cog._learn_word_from_labeling("you seem content", emotion)
@@ -213,6 +420,7 @@ def test_learn_emotion_word_from_labeling():
     # Verify relationships were created between words
     # for the same category (SIMILAR_TO edges)
     from temporal_lobe.concepts import RelationType
+
     neighbors = cog.network.get_neighbors("positive", RelationType.SIMILAR_TO)
     neighbor_ids = [n[0] for n in neighbors]
     assert "content" in neighbor_ids
@@ -236,11 +444,15 @@ def test_learn_emotion_word_skips_non_emotion_words():
     cog.network = ConceptNetwork()
     cog._rng = __import__("random").Random(42)
     from temporal_lobe.concept_learner import ConceptLearner
+
     cog._concept_learner = ConceptLearner(network=cog.network)
 
     emotion = EmotionalState(
-        label="neutral", cognitive_style="steady",
-        valence=0.0, alertness=0.5, plasticity=0.5,
+        label="neutral",
+        cognitive_style="steady",
+        valence=0.0,
+        alertness=0.5,
+        plasticity=0.5,
     )
     # "you seem good" — "good" is in skip_words
     cog._learn_word_from_labeling("you seem good", emotion)
@@ -256,11 +468,15 @@ def test_learn_emotion_word_different_patterns():
     cog.network = ConceptNetwork()
     cog._rng = __import__("random").Random(42)
     from temporal_lobe.concept_learner import ConceptLearner
+
     cog._concept_learner = ConceptLearner(network=cog.network)
 
     emotion = EmotionalState(
-        label="stressed", cognitive_style="vigilant",
-        valence=-0.3, alertness=0.8, plasticity=0.4,
+        label="stressed",
+        cognitive_style="vigilant",
+        valence=-0.3,
+        alertness=0.8,
+        plasticity=0.4,
     )
     cog._learn_word_from_labeling("you're feeling stressed", emotion)
     cog._learn_word_from_labeling("that's called overwhelmed", emotion)
@@ -492,8 +708,7 @@ def _run_mind_tests(mind) -> None:
     emotion = mind.feel()
     valid_labels = {category.value for category in EmotionCategory}
     assert emotion.label in valid_labels, (
-        f"unknown emotional label {emotion.label!r}; "
-        f"expected one of {sorted(valid_labels)}"
+        f"unknown emotional label {emotion.label!r}; expected one of {sorted(valid_labels)}"
     )
     logger.info(f"  PASS  emotion: {emotion.label}")
 

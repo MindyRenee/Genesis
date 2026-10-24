@@ -221,9 +221,7 @@ class PresenceBelief:
     reply_latency: _LognormalFit = field(default_factory=_LognormalFit)
     attention: float = 0.0
     _attention_at: float = 0.0
-    activity_hours: list[float] = field(
-        default_factory=lambda: [_HOUR_PRIOR] * 24
-    )
+    activity_hours: list[float] = field(default_factory=lambda: [_HOUR_PRIOR] * 24)
     pending_bid: _PendingBid | None = None
 
     # ── Observations ────────────────────────────────────────────
@@ -334,10 +332,7 @@ class PresenceBelief:
         Requires real bid history — a stranger is never written off.
         """
         r = self.responsiveness
-        return (
-            r.evidence >= _UNRESPONSIVE_MIN_BIDS
-            and r.mean < _UNRESPONSIVE_MAX_MEAN
-        )
+        return r.evidence >= _UNRESPONSIVE_MIN_BIDS and r.mean < _UNRESPONSIVE_MAX_MEAN
 
     def sample_topic(self) -> str | None:
         """Thompson-sample a topic they're receptive to.
@@ -375,9 +370,7 @@ class PresenceBelief:
         return {
             "responsiveness": self.responsiveness.to_dict(),
             "mood": self.mood.to_dict(),
-            "topic_receptivity": {
-                t: p.to_dict() for t, p in self.topic_receptivity.items()
-            },
+            "topic_receptivity": {t: p.to_dict() for t, p in self.topic_receptivity.items()},
             "reply_latency": self.reply_latency.to_dict(),
             "attention": self.attention,
             "attention_at": self._attention_at,
@@ -402,9 +395,7 @@ class PresenceBelief:
             if isinstance(topics, dict):
                 for name, pdata in topics.items():
                     belief.topic_receptivity[str(name)] = Beta.from_dict(pdata)
-            belief.reply_latency = _LognormalFit.from_dict(
-                data.get("reply_latency")
-            )
+            belief.reply_latency = _LognormalFit.from_dict(data.get("reply_latency"))
             belief.attention = max(0.0, min(1.0, float(data.get("attention", 0.0))))
             # Persist the decay anchor so restored attention keeps
             # fading from when they were last active, not forever.

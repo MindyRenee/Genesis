@@ -21,9 +21,7 @@ from parietal_lobe.embodiment import EmbodimentMixin
 
 def _embodiment(tmp_path, monkeypatch, *, fresh=False, context="game-x"):
     """A bare mixin — just the attributes the gate touches."""
-    monkeypatch.setattr(
-        "parietal_lobe.embodiment.default_data_dir", lambda: tmp_path
-    )
+    monkeypatch.setattr("parietal_lobe.embodiment.default_data_dir", lambda: tmp_path)
     m = EmbodimentMixin.__new__(EmbodimentMixin)
     m._world_context = context
     m._fresh_world_run = fresh
@@ -91,9 +89,7 @@ def test_normal_run_still_saves(tmp_path, monkeypatch):
     """The gate only binds fresh runs — ordinary play still banks."""
     m = _embodiment(tmp_path, monkeypatch)
     m._save_world_learning()
-    assert json.loads(_learning_file(tmp_path).read_text()) == {
-        "learned": True
-    }
+    assert json.loads(_learning_file(tmp_path).read_text()) == {"learned": True}
 
 
 # ─── Domain-general competence checkpoint ─────────────────────
@@ -115,9 +111,7 @@ def _embodiment_with_competence(tmp_path, monkeypatch, *, fresh=False):
     from frontal_lobe.reasoning.competence import TaskCompetence
 
     m = _embodiment(tmp_path, monkeypatch, fresh=fresh)
-    m.brain = SimpleNamespace(
-        frontal=SimpleNamespace(task_competence=TaskCompetence())
-    )
+    m.brain = SimpleNamespace(frontal=SimpleNamespace(task_competence=TaskCompetence()))
     return m
 
 

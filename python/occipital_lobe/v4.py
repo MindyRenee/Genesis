@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 _DATA_DIR = default_data_dir() / "visual_cortex"
 _V4_FILE = _DATA_DIR / "v4_dictionary.npz"
 
+
 class V4Model:
     """Mid-level visual cortex — learns features from V1 latents.
 
@@ -149,10 +150,12 @@ class V4Model:
                 v4_input = pooled
         else:
             # Pad with zeros for color dims
-            v4_input = np.hstack([
-                pooled,
-                np.zeros((pooled.shape[0], self.color_dims), dtype=np.float64),
-            ])
+            v4_input = np.hstack(
+                [
+                    pooled,
+                    np.zeros((pooled.shape[0], self.color_dims), dtype=np.float64),
+                ]
+            )
 
         # Infer with the current dictionary.
         v4_latents = self._infer_latents(v4_input)
@@ -186,21 +189,17 @@ class V4Model:
         n_v4_cols = n_cols // ps
 
         # Reshape V1 latents into grid form
-        grid = v1_latents[:n_rows * n_cols].reshape(n_rows, n_cols, -1)
+        grid = v1_latents[: n_rows * n_cols].reshape(n_rows, n_cols, -1)
 
         # Trim to exact multiples
-        grid = grid[:n_v4_rows * ps, :n_v4_cols * ps]
+        grid = grid[: n_v4_rows * ps, : n_v4_cols * ps]
         grid = grid.reshape(n_v4_rows, ps, n_v4_cols, ps, -1)
         # Transpose to (n_v4_rows, n_v4_cols, ps, ps, n_features)
         grid = grid.transpose(0, 2, 1, 3, 4)
         # Flatten pool dimensions
         pooled = grid.reshape(n_v4_rows * n_v4_cols, -1)
 
-        positions = [
-            (r * ps, c * ps)
-            for r in range(n_v4_rows)
-            for c in range(n_v4_cols)
-        ]
+        positions = [(r * ps, c * ps) for r in range(n_v4_rows) for c in range(n_v4_cols)]
 
         return pooled.astype(np.float64), positions
 
@@ -250,7 +249,7 @@ class V4Model:
             if len(vec) < self.color_dims:
                 vec = np.pad(vec, (0, self.color_dims - len(vec)))
             else:
-                vec = vec[:self.color_dims]
+                vec = vec[: self.color_dims]
 
             stats[i] = vec
 
@@ -283,21 +282,21 @@ class V4Model:
         # θ̄ = arg(Σ exp(iθ)) (Mardia & Jupp). A linear mean would place
         # a red cluster split across 0°/360° at ~180° (cyan) artifactually.
         hue_rad = np.deg2rad(hue)
-        mean_hue = float(np.angle(np.mean(np.exp(1j * hue_rad))) % (2.0 * np.pi)) / (
-            2.0 * np.pi
-        )
+        mean_hue = float(np.angle(np.mean(np.exp(1j * hue_rad))) % (2.0 * np.pi)) / (2.0 * np.pi)
         # Circular std: σ = √(−2 ln R), R = |Σ exp(iθ)|/n.
         resultant = float(np.abs(np.mean(np.exp(1j * hue_rad))))
         hue_std = float(np.sqrt(max(0.0, -2.0 * np.log(max(resultant, 1e-8)))) / (2.0 * np.pi))
 
-        return np.array([
-            mean_hue,
-            np.mean(s),
-            np.mean(v),
-            min(hue_std, 0.5),
-            np.std(s),
-            np.std(v),
-        ])
+        return np.array(
+            [
+                mean_hue,
+                np.mean(s),
+                np.mean(v),
+                min(hue_std, 0.5),
+                np.std(s),
+                np.std(v),
+            ]
+        )
 
     def _refresh_dictionary_cache(self) -> None:
         """Refresh quantities derived from the current dictionary."""

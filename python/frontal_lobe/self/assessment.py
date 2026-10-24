@@ -296,9 +296,7 @@ class SelfAssessment:
             assessment.confidence = 0.1
             assessment.issues.append("No recognized topics in the question")
 
-    def _assess_answer_hedging(
-        self, assessment: AnswerAssessment, answer_lower: str
-    ) -> None:
+    def _assess_answer_hedging(self, assessment: AnswerAssessment, answer_lower: str) -> None:
         """Check for hedging language and adjust confidence."""
         hedge_words = {
             "maybe",
@@ -321,9 +319,7 @@ class SelfAssessment:
             assessment.confidence *= 1.0 - hedge_penalty
             assessment.issues.append(f"Answer contains hedging language ({hedge_count} instances)")
 
-    def _check_ignorance(
-        self, assessment: AnswerAssessment, answer_lower: str
-    ) -> bool:
+    def _check_ignorance(self, assessment: AnswerAssessment, answer_lower: str) -> bool:
         """Check for 'I don't know' language."""
         ignorance_phrases = {
             "i don't know",
@@ -424,9 +420,7 @@ class SelfAssessment:
                     assessment.grounded = False
                     assessment.issues.append("Answer not grounded in learned definitions")
 
-    def _check_answer_repetition(
-        self, assessment: AnswerAssessment, answer: str
-    ) -> None:
+    def _check_answer_repetition(self, assessment: AnswerAssessment, answer: str) -> None:
         """Check for repetition from previous answers."""
         if self._answer_history:
             recent = list(self._answer_history)[-5:]
@@ -501,9 +495,7 @@ class SelfAssessment:
             elif not ka.has_definition:
                 gaps.append(f"'{topic}' exists but no definition")
             elif not ka.has_relationships:
-                gaps.append(
-                    f"'{topic}' known but no relationships"
-                )
+                gaps.append(f"'{topic}' known but no relationships")
             elif ka.confidence < 0.4:
                 gaps.append(f"only a little known about '{topic}'")
         return gaps
@@ -689,21 +681,13 @@ class SelfAssessment:
         confident: set[str] = set()
         if self.profile.confident_topics:
             confident = set(sorted(self.profile.confident_topics)[:10])
-            parts.append(
-                ("pred", f"know {self._join_fragments(sorted(confident))} well")
-            )
+            parts.append(("pred", f"know {self._join_fragments(sorted(confident))} well"))
 
         # Weaknesses — don't list a gap if it's already a strength.
         if self.profile.known_gaps:
-            gaps = [
-                g
-                for g in sorted(self.profile.known_gaps)
-                if g not in confident
-            ][:10]
+            gaps = [g for g in sorted(self.profile.known_gaps) if g not in confident][:10]
             if gaps:
-                parts.append(
-                    ("pred", f"still learn {self._join_fragments(gaps)}")
-                )
+                parts.append(("pred", f"still learn {self._join_fragments(gaps)}"))
 
         # Question type performance
         for qtype, stats in self.profile.question_type_stats.items():
@@ -718,9 +702,7 @@ class SelfAssessment:
         # Recently learned
         if self.profile.recently_learned:
             recent = list(self.profile.recently_learned)[-5:]
-            parts.append(
-                ("pred", f"recently learn about {self._join_fragments(recent)}")
-            )
+            parts.append(("pred", f"recently learn about {self._join_fragments(recent)}"))
 
         return parts
 

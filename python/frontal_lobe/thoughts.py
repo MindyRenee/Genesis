@@ -84,14 +84,16 @@ class SpontaneousThought:
     # dream reflection is a waking thought *about* a dream, so its
     # is_dream is False — but it is still not something she decided to go
     # and learn about.
-    DREAM_DERIVED_TRIGGERS = frozenset({
-        "dream",
-        "lucid-dream",
-        "dream-reflection",
-        "rem-dream",
-        "nrem-dream",
-        "dream_insight",
-    })
+    DREAM_DERIVED_TRIGGERS = frozenset(
+        {
+            "dream",
+            "lucid-dream",
+            "dream-reflection",
+            "rem-dream",
+            "nrem-dream",
+            "dream_insight",
+        }
+    )
 
     def is_dream_derived(self) -> bool:
         """True if this thought's content originates in sleep.
@@ -141,15 +143,16 @@ class SpontaneousThought:
         to `content`.
         """
         meta = self.metadata
-        if meta is not None and (
-            meta.get("knowledge") is not None or meta.get("self_fragments")
-        ):
+        if meta is not None and (meta.get("knowledge") is not None or meta.get("self_fragments")):
             from temporal_lobe.base import Thought as _Thought
+
             thought = _Thought(
                 content=self.content,
                 intent=(
-                    "reflect" if self.is_dream
-                    else "self_report" if meta.get("self_fragments")
+                    "reflect"
+                    if self.is_dream
+                    else "self_report"
+                    if meta.get("self_fragments")
                     else "inform"
                 ),
                 emotion=getattr(emotion, "label", "neutral"),
@@ -182,7 +185,9 @@ def _same_utterance(left: str, right: str) -> bool:
     thought asked to be said and what the engine produced. Anything
     more than that is a real difference in words.
     """
+
     def norm(text: str) -> str:
+        """Normalize for comparison — trim, lowercase, drop terminal punctuation."""
         return _TERMINAL_PUNCT_RE.sub("", text.strip()).lower()
 
     return bool(norm(left)) and norm(left) == norm(right)

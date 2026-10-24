@@ -1,3 +1,7 @@
+<!-- Pull requests are reviewed only from contributors with prior
+written permission — see CONTRIBUTING.md and LICENSE. Unsolicited
+PRs are not the way in; ask first. -->
+
 ## Summary
 
 <!-- What changed, and which invariant or behavior it protects. -->

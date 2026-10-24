@@ -32,9 +32,7 @@ class TopicResolver:
 
     # Extra conversational words that aren't in the concept_network
     # stoplist but still aren't domain concepts.
-    _EXTRA_STOP = frozenset(
-        {"tell", "about", "actually", "no", "yes", "really", "very"}
-    )
+    _EXTRA_STOP = frozenset({"tell", "about", "actually", "no", "yes", "really", "very"})
 
     def __init__(self, network: ConceptNetwork) -> None:
         """Wire the resolver to its concept network."""
@@ -63,9 +61,7 @@ class TopicResolver:
         # If topics are already resolved to code/identity concepts
         # (have python: or rust: prefix), pass them through — they've
         # already been contextually resolved and shouldn't be recombined
-        if topics and any(
-            t.startswith(("python:", "rust:", "identity:")) for t in topics
-        ):
+        if topics and any(t.startswith(("python:", "rust:", "identity:")) for t in topics):
             return topics
 
         lower = raw_text.lower()
@@ -132,9 +128,7 @@ class TopicResolver:
                 return c
         return None
 
-    def _combine_adjacent_topics(
-        self, topics: list[str], lower: str
-    ) -> list[str]:
+    def _combine_adjacent_topics(self, topics: list[str], lower: str) -> list[str]:
         """Try pairs of adjacent topics to find multi-word concepts in the network."""
         resolved: list[str] = []
         used: set[int] = set()
@@ -162,22 +156,16 @@ class TopicResolver:
                 resolved.append(found if found else topics[i])
         return resolved
 
-    def _merge_text_concepts(
-        self, raw_text: str, resolved: list[str]
-    ) -> list[str]:
+    def _merge_text_concepts(self, raw_text: str, resolved: list[str]) -> list[str]:
         """Find multi-word concepts from raw text and merge with resolved topics."""
         words = re.findall(r"[^\W_]+", raw_text.casefold())
         text_concepts: list[str] = []
         max_width = min(5, len(words))
         for width in range(max_width, 1, -1):
             for start in range(len(words) - width + 1):
-                candidate = " ".join(words[start:start + width])
+                candidate = " ".join(words[start : start + width])
                 found = self.find_concept_variant(candidate)
-                if (
-                    found
-                    and found not in resolved
-                    and found not in text_concepts
-                ):
+                if found and found not in resolved and found not in text_concepts:
                     text_concepts.append(found)
 
         # Prioritize multi-word concepts from the text (they're more
@@ -191,14 +179,10 @@ class TopicResolver:
             for tc in text_concepts:
                 for w in tc.split():
                     covered.add(w)
-            resolved = text_concepts + [
-                t for t in resolved if t not in covered
-            ]
+            resolved = text_concepts + [t for t in resolved if t not in covered]
         return resolved
 
-    def _filter_function_words(
-        self, resolved: list[str], topics: list[str]
-    ) -> list[str]:
+    def _filter_function_words(self, resolved: list[str], topics: list[str]) -> list[str]:
         """Filter out English function words from resolved topics."""
         # Filter out English function words — these are grammatical
         # structure (question words, articles, auxiliary verbs), not

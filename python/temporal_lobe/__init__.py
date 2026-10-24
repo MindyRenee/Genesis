@@ -21,15 +21,22 @@ Key functions:
     - Language comprehension (Wernicke's area, left temporal)
 
 The temporal subsystem receives input from:
-    - Occipital subsystem (ventral stream: V1 -> V4 -> VTC -> IT)
+    - Occipital subsystem (ventral stream: V1 P-pathway -> V4 -> VTC -> IT)
     - Auditory nerve (cochlea -> brainstem -> thalamus -> A1)
     - Parietal subsystem (spatial context for object-location binding)
     - Frontal subsystem (top-down attention and retrieval cues)
 
 Pipeline (ventral "what" stream, continued from occipital subsystem):
 
-    VTC output (from occipital subsystem)
+    V1 P-pathway output (color/detail from LGN parvocellular stream)
         |
+        v
+    [V4] Mid-level visual cortex (occipital subsystem)
+        |   Pools V1 latents into larger receptive fields
+        |   Adds chromatic channels
+        v
+    [VTC] Ventral temporal cortex (occipital subsystem)
+        |   PCA of V4 activations
         v
     [IT] Inferotemporal cortex (object_recognition.py)
         |   Object categorization and identification
@@ -672,6 +679,13 @@ _EXPORTS: dict[str, str] = {
     "ComprehensionResult": "temporal_lobe.comprehension",
     "LanguageAcquisition": "temporal_lobe.acquisition",
     "Vocabulary": "temporal_lobe.vocabulary",
+    # Semantic synthesis — compositional meaning (Frege): the sense
+    # of the whole composed from the senses of the parts; the
+    # anterior temporal lobe is the semantic hub
+    "Sense": "temporal_lobe.semantics",
+    "synthesize": "temporal_lobe.semantics",
+    "analytic": "temporal_lobe.semantics",
+    "analytic_status": "temporal_lobe.semantics",
     # Anterior temporal semantic hub — the concept network binds
     # multimodal features into unified concept representations
     "Concept": "temporal_lobe.concepts.types",
@@ -823,6 +837,10 @@ _EXPORTS: dict[str, str] = {
     # The region itself — Wernicke + ATL hub + medial-temporal
     # encoding as one object
     "TemporalLobe": "temporal_lobe.temporal",
+    # Sequence prediction — the hippocampal/temporal predictive-map
+    # faculty the play loop drives on pattern tasks (the world it
+    # predicts lives in ``worlds.sequence``)
+    "PatternAgent": "temporal_lobe.sequence_agent",
 }
 
 # The five eager names stay in a literal list so static checkers

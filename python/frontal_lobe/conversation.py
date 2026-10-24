@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from typing import TYPE_CHECKING, Any
@@ -26,6 +27,7 @@ from genesis_client.protocol import (
     MODULE_SENSORY,
 )
 from genesis_client.swallow import note_swallowed
+from genesis_client.threads import named_thread
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -40,6 +42,13 @@ logger = logging.getLogger(__name__)
 # condition gets reported, and `_think_recovery_active` is cleared so
 # the state is observable rather than silently permanent.
 _THINK_RECOVERY_JOIN_S = 30.0
+
+# Default bound on one conversational turn's think() call. The timeout
+# exists to catch a *wedged* worker (blocked on I/O), not a legitimately
+# slow host — a grown concept network makes spread activation and memory
+# retrieval take tens of seconds on modest hardware. GENESIS_THINK_TIMEOUT_S
+# overrides it.
+_DEFAULT_THINK_TIMEOUT_S = float(os.environ.get("GENESIS_THINK_TIMEOUT_S", "60"))
 
 # Relation grounding bound — a scene's relations are quadratic in its
 # object count, so a field busier than this grounds its objects only.
@@ -112,6 +121,7 @@ def stream_kind(thought) -> str:
 
 class ConversationMixin:
     """Mixin for :class:`Mind` — see module docstring."""
+
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see mind.py).
@@ -125,8 +135,8 @@ class ConversationMixin:
         _think_wedged_since: float | None
         _think_worker_lock: threading.Lock
         _game_session: Any
-        def __getattr__(self, name: str) -> Any: ...
 
+        def __getattr__(self, name: str) -> Any: ...
 
     def add_live_thought_listener(self, listener) -> None:
         """Register a listener for Genesis's spontaneous thoughts.
@@ -137,9 +147,8 @@ class ConversationMixin:
         it learned autonomously). Must be thread-safe.
         """
         self._live_thought_listeners.append(listener)
-    def _emit_live_thought(
-        self, kind: str, content: str, *, meta: dict | None = None
-    ) -> None:
+
+    def _emit_live_thought(self, kind: str, content: str, *, meta: dict | None = None) -> None:
         """Notify all live-thought listeners and broadcast to the workspace.
 
         Live thoughts are Genesis's agentic output — things it does,
@@ -167,6 +176,10 @@ class ConversationMixin:
         Thread-safe: volition actions run in background threads, and
         the workspace uses an internal lock.
         """
+        # The channel board's "last" line reads this — what she most
+        # recently emitted, kind and words, verbatim.
+        self._last_emitted = (kind, content)
+
         # Journal the event first — the durable record of its inner
         # life. The journal swallows its own errors; it can never block
         # or break the broadcast and listeners below.
@@ -178,9 +191,7 @@ class ConversationMixin:
         # the cognitive field. Best-effort — workspace errors must not
         # block the live thought from reaching CLI listeners.
         try:
-            if hasattr(self, "cognition") and hasattr(
-                self.brain.frontal, "global_workspace"
-            ):
+            if hasattr(self, "cognition") and hasattr(self.brain.frontal, "global_workspace"):
                 bw = None
                 if hasattr(self.brain.frontal, "language"):
                     bw = self.brain.frontal.language.current_brain_waves
@@ -215,22 +226,23 @@ class ConversationMixin:
                     "mind.conversation._emit_live_thought",
                     e,
                 )
+
     def mark_user_activity(self) -> None:
         """Mark that the user is active (typing or interacting).
 
         This updates ``_last_interaction_time`` from the CLI's input
-        loop, BEFORE the sleep check. Without this, the heartbeat's
-        auto-sleep check can fire between the user pressing Enter and
-        ``respond()`` being called, putting it to sleep and causing
-        the message to be lost. By marking activity here, the
-        heartbeat sees the user as active even if it's already asleep
-        (so after /wake, it doesn't immediately fall back asleep).
+        loop, BEFORE responding. The heartbeat's waking-side signals
+        run in a separate thread and must see the user as active —
+        announcing sleepiness or renewing a wake drive mid-turn is
+        noise.
         """
         self._last_interaction_time = time.time()
+
     @property
     def is_user_sleeping(self) -> bool:
         """Whether its sleep was user-initiated (not auto-wakeable)."""
         return self._is_sleeping and self._user_initiated_sleep
+
     @property
     def awaiting_question_answer(self) -> bool:
         """True while a popped question is still awaiting its answer.
@@ -240,30 +252,42 @@ class ConversationMixin:
         open turn and volition stays held.
         """
         return bool(self.brain.frontal._pending_question_concepts)
+
     @property
     def is_teaching(self) -> bool:
         """Whether it is currently in teaching/training mode."""
         return self._is_teaching
+
+    @property
+    def in_question_session(self) -> bool:
+        """Whether a /teach-questions answer session is holding focus."""
+        return self._answering_questions
+
     @property
     def is_gaming(self) -> bool:
         """Whether it is currently in game mode (focused play)."""
         return self._is_gaming
+
     @property
     def teaching_topic(self) -> str:
         """The topic the user is currently teaching it about."""
         return self._teaching_topic
+
     @property
     def has_queued_questions(self) -> bool:
         """Whether it has queued questions to ask."""
         return self.brain.frontal.has_queued_questions()
+
     @property
     def queued_question_count(self) -> int:
         """Number of queued questions."""
         return self.brain.frontal.queued_question_count()
+
     @property
     def on_speak(self) -> Callable[[str], None] | None:
         """Callback used when the speech urge fires."""
         return self._on_speak
+
     @on_speak.setter
     def on_speak(self, callback: Callable[[str], None] | None) -> None:
         """Register the callback invoked when it speaks.
@@ -273,6 +297,7 @@ class ConversationMixin:
                 to disable the speech callback.
         """
         self._on_speak = callback
+
     def offer_utterance(self, text: str) -> None:
         """Offer a candidate utterance for the speech-volition to consider.
 
@@ -291,6 +316,7 @@ class ConversationMixin:
             if text in self._speech_queue:
                 return
             self._speech_queue.append(text)
+
     def _defer(self, delay: float, callback: Callable[[], None]) -> threading.Timer:
         """Schedule ``callback`` after ``delay`` seconds on a daemon timer.
 
@@ -306,6 +332,7 @@ class ConversationMixin:
         timer.daemon = True
         timer.start()
         return timer
+
     def _learn_from_bugs(self) -> None:
         """Fetch documentation for bug categories it doesn't understand.
 
@@ -328,10 +355,7 @@ class ConversationMixin:
 
             try:
                 # Fetch docs for the relevant concepts
-                self._emit_live_thought(
-                    "code",
-                    f"Studying bug category '{category}'"
-                )
+                self._emit_live_thought("code", f"Studying bug category '{category}'")
                 self.fetch_docs(knowledge.docs_query, knowledge.docs_language)
                 # Mark as studied so we don't re-fetch
                 self.bug_reporter.mark_studied(category)
@@ -339,7 +363,8 @@ class ConversationMixin:
                 note_swallowed(
                     "mind.conversation._learn_from_bugs",
                     e,
-                )# docs fetch failure shouldn't crash
+                )  # docs fetch failure shouldn't crash
+
     def _on_spontaneous_thought(self, thought) -> None:
         """Callback for when Genesis has a spontaneous thought."""
         # Surface to live listeners first (e.g. terminal ticker)
@@ -376,6 +401,7 @@ class ConversationMixin:
             return
         if bare and " " not in bare:
             from temporal_lobe.concepts.classify import is_world_concept
+
             if not is_world_concept(bare):
                 logger.debug(f"suppressed internal-id thought: {bare}")
                 return
@@ -410,6 +436,7 @@ class ConversationMixin:
             thought.content[:100],
             weight=0.2,
         )
+
     def _on_world_event(self, event: ExternalEvent) -> None:
         """Route an external world event into its cognition.
 
@@ -491,13 +518,15 @@ class ConversationMixin:
         if event.salience >= 0.4:
             try:
                 self.inner_life.queue_for_replay(
-                    [event.describe()[:200]], salience=event.salience,
+                    [event.describe()[:200]],
+                    salience=event.salience,
                 )
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.conversation._on_world_event",
                     e,
                 )
+
     def _ground_world_percept(self, event: ExternalEvent) -> None:
         """Perceive a structured percept and ground it semantically.
 
@@ -540,6 +569,7 @@ class ConversationMixin:
                 "mind.conversation._ground_world_percept",
                 e,
             )
+
     def _learner_neuro_impulse(self, chem: int, amount: float) -> None:
         """Callback for the learner to trigger neurochemistry."""
         try:
@@ -549,6 +579,7 @@ class ConversationMixin:
                 "mind.conversation._learner_neuro_impulse",
                 e,
             )
+
     def _get_plasticity_profile(self):
         """Callback for the learner to read the substrate's metaplastic state.
 
@@ -567,6 +598,7 @@ class ConversationMixin:
                 e,
             )
             return None
+
     def _get_current_posture(self) -> str:
         """Read the learner's current learning posture.
 
@@ -579,6 +611,7 @@ class ConversationMixin:
             return self.learner.current_posture
         except (AttributeError, RuntimeError):
             return "neutral"
+
     def _add_emergent_identity_source(
         self,
         name: str,
@@ -606,6 +639,7 @@ class ConversationMixin:
                 observations=[observation],
             )
         )
+
     def _learner_store_memory(self, text: str, salience: float = 0.5) -> None:
         """Callback for the learner to store a memory."""
         # Surface to live listeners first (e.g. terminal ticker)
@@ -647,7 +681,8 @@ class ConversationMixin:
         # is always empty and downscaling operates on zero load.
         try:
             self.inner_life.queue_for_replay(
-                [text[:200]], salience=salience,
+                [text[:200]],
+                salience=salience,
             )
             self.inner_life.accumulate_synaptic_load(salience * 0.1)
         except Exception as e:  # noqa: BLE001
@@ -666,6 +701,7 @@ class ConversationMixin:
                 "mind.conversation._learner_store_memory",
                 e,
             )
+
     def _schedule_think_recovery(self) -> None:
         """Resume background systems only after the timed-out thinker exits."""
         with self._think_worker_lock:
@@ -694,9 +730,7 @@ class ConversationMixin:
                     self._active_think_worker = None
                 self.brain.frontal._last_state = None
                 self._think_recovery_active = False
-                self._think_wedged_since = (
-                    time.monotonic() if still_alive else None
-                )
+                self._think_wedged_since = time.monotonic() if still_alive else None
             if still_alive:
                 logger.error(
                     "think() worker still running %.0fs after timeout; "
@@ -709,11 +743,12 @@ class ConversationMixin:
                 return
             self._defer(10.0, self._resume_background)
 
-        threading.Thread(
-            target=_recover,
-            daemon=True,
-            name="think-recovery",
+        named_thread(
+            "think-recovery",
+            _recover,
+            comm="g-think-rec",
         ).start()
+
     def _respond_timeout(self, user_input: str, timeout: float) -> str:
         """Handle a think() timeout — return a graceful fallback.
 
@@ -722,7 +757,8 @@ class ConversationMixin:
         """
         logger.warning(
             "cognition.think() timed out after %.1fs for input: %s",
-            timeout, user_input[:80],
+            timeout,
+            user_input[:80],
         )
         # Clear stale attention so the next cognitive state report
         # doesn't show foci from the previous turn. Without this,
@@ -739,6 +775,7 @@ class ConversationMixin:
         self.brain.frontal._last_state = None
         self._schedule_think_recovery()
         from temporal_lobe.base import Thought as _Thought
+
         emo = self.feel()
         timeout_thought = _Thought(
             content="processing",
@@ -753,6 +790,7 @@ class ConversationMixin:
             },
         )
         return self.language.render(timeout_thought, emo)
+
     def _respond_error(self, err: Exception) -> str:
         """Handle a think() error — log and render an error response.
 
@@ -765,7 +803,8 @@ class ConversationMixin:
         # rendered as a Thought below, but the traceback is
         # invaluable for diagnosing intermittent NoneType crashes.
         logger.exception(
-            "cognition.think() raised: %s", err,
+            "cognition.think() raised: %s",
+            err,
             exc_info=(type(err), err, err.__traceback__),
         )
         if isinstance(err, (OSError, ConnectionError)):
@@ -786,8 +825,7 @@ class ConversationMixin:
         )
         return self.language.render(err_thought, self.feel())
 
-
-    def respond(self, user_input: str, timeout: float = 15.0) -> str:
+    def respond(self, user_input: str, timeout: float = _DEFAULT_THINK_TIMEOUT_S) -> str:
         """Process one user turn and record its observed response latency.
 
         Timing starts when the interaction enters the public response
@@ -800,13 +838,14 @@ class ConversationMixin:
         finally:
             elapsed_ms = (time.perf_counter() - started) * 1000.0
             regulator = getattr(self.brain.frontal, "regulator", None)
-            if regulator is not None:
+            interoception = getattr(regulator, "interoception", None)
+            if interoception is not None:
                 try:
-                    regulator.record_response_latency(elapsed_ms)
+                    interoception.record_response_latency(elapsed_ms)
                 except (AttributeError, TypeError, ValueError):
                     logger.debug("failed to record response latency", exc_info=True)
 
-    def _respond_once(self, user_input: str, timeout: float = 15.0) -> str:
+    def _respond_once(self, user_input: str, timeout: float = _DEFAULT_THINK_TIMEOUT_S) -> str:
         """Process user input and return a response.
 
         This is the main interaction method. It:
@@ -835,10 +874,8 @@ class ConversationMixin:
         self.wake_if_asleep()
 
         # Mark the interaction time immediately — the heartbeat loop's
-        # auto-sleep check runs in a separate thread and must see that
-        # the user is active BEFORE think() completes. Without this,
-        # it can fall asleep mid-thought if the daemon enters NREM
-        # while it's composing a response.
+        # waking-side signals run in a separate thread and must see
+        # that the user is active BEFORE think() completes.
         self._last_interaction_time = time.time()
 
         # Record the inbound turn in its external world — someone
@@ -859,7 +896,7 @@ class ConversationMixin:
 
         self._interaction_count += 1
         # Pause autonomous learning, inner life, expensive self-directed
-        # inference, and volition (bug scans, code learning, self-improvement)
+        # inference, and volition (bug scans, self-improvement)
         # while in conversation so the user gets a fast, uninterrupted reply.
         self.learner.pause()
         self.inner_life.pause()
@@ -888,9 +925,7 @@ class ConversationMixin:
         self._after_thought(user_input, response, state)
         return self._said(response)
 
-    def _respond_while_busy(
-        self, user_input: str, timeout: float
-    ) -> str | None:
+    def _respond_while_busy(self, user_input: str, timeout: float) -> str | None:
         """The active-worker gate: a think worker or think-recovery
         already in flight means this turn gets the fallback text.
 
@@ -912,7 +947,8 @@ class ConversationMixin:
                     "conversation is still gated by a wedged think() "
                     "worker (%.0fs). Messages will not be processed "
                     "until it exits; restart with ./run.sh --stop if "
-                    "it does not.", stuck,
+                    "it does not.",
+                    stuck,
                 )
             return self._said(self._respond_timeout(user_input, timeout))
         with self._think_worker_lock:
@@ -920,9 +956,7 @@ class ConversationMixin:
                 self._active_think_worker = None
         return None
 
-    def _after_thought(
-        self, user_input: str, response: str, state
-    ) -> None:
+    def _after_thought(self, user_input: str, response: str, state) -> None:
         """Post-response bookkeeping: developmental evidence, the
         delayed background resume, and the post-conversation
         self-invoke check (background thread so it doesn't delay
@@ -931,12 +965,15 @@ class ConversationMixin:
         self._last_interaction_time = time.time()
         # Resume after a short delay (give conversation breathing room)
         self._defer(10.0, self._resume_background)
+        # An answer that drained the queue ends the session — the
+        # exchange it existed for is complete.
+        self.end_question_session_if_done()
         # Check if it should self-invoke a command based on its
         # post-conversation state.
-        threading.Thread(
-            target=self._check_post_conversation_self_invoke,
-            daemon=True,
-            name="post-conv-self-invoke",
+        named_thread(
+            "post-conv-self-invoke",
+            self._check_post_conversation_self_invoke,
+            comm="g-post-conv",
         ).start()
 
     def _said(self, text: str) -> str:
@@ -1014,9 +1051,7 @@ class ConversationMixin:
 
                 listener = self.brain.thalamus.once(MODULE_LANGUAGE, _collect)
                 try:
-                    self.brain.thalamus.post(
-                        MODULE_SENSORY, KIND_HEARD, (turn_id, user_input)
-                    )
+                    self.brain.thalamus.post(MODULE_SENSORY, KIND_HEARD, (turn_id, user_input))
                 finally:
                     # No-op if the listener already fired and dropped
                     # itself; otherwise a turn that raises must not
@@ -1028,9 +1063,7 @@ class ConversationMixin:
             except Exception as e:  # noqa: BLE001
                 result_holder["error"] = e
 
-        worker = threading.Thread(
-            target=_think_worker, daemon=True, name="think-worker"
-        )
+        worker = named_thread("think-worker", _think_worker, comm="g-think")
         with self._think_worker_lock:
             self._active_think_worker = worker
         worker.start()
@@ -1086,11 +1119,7 @@ class ConversationMixin:
             # If it's stressed after a conversation, it may choose
             # to meditate — cognitive self-regulation, not an autonomic
             # reflex. High cortisol + negative valence = stress.
-            if (
-                emotion.arousal > 0.65
-                and emotion.valence < -0.2
-                and not self._is_meditating
-            ):
+            if emotion.arousal > 0.65 and emotion.valence < -0.2 and not self._is_meditating:
                 self._last_conv_self_invoke = now
                 self._emit_volition_thought(
                     ("stress", "regulation", "calm", "meditation"),
@@ -1126,8 +1155,7 @@ class ConversationMixin:
                 if curiosity > 0.7 and emotion.valence > 0.1:
                     self._last_conv_self_invoke = now
                     self._emit_volition_thought(
-                        ("introspection", "self", "understanding",
-                         "reflection"),
+                        ("introspection", "self", "understanding", "reflection"),
                         "thinking",
                     )
                     self.self_invoke("/introspect")
@@ -1141,6 +1169,7 @@ class ConversationMixin:
                 "mind.conversation._check_post_conversation_self_invoke",
                 e,
             )
+
     def _resume_inner_life(self) -> None:
         """Resume inner life and volition once the user has gone quiet.
 
@@ -1154,10 +1183,18 @@ class ConversationMixin:
             or self._is_sleeping
             or self._is_teaching
             or self._is_gaming
+            or self._stop_latched  # stopping — suppression stays latched
         ):
             return
         idle = time.time() - self._last_interaction_time
         if idle >= self.CONVERSATION_FOCUS_SECONDS:
+            if self._answering_questions:
+                # The user walked away mid-session — the exchange is
+                # over, so the session ends the way a conversation
+                # ends. Remaining queued questions keep for the next
+                # /teach-questions.
+                self.exit_question_mode()
+                return
             self._suppress_volition = False
             self.inner_life.resume()
         else:
@@ -1165,6 +1202,7 @@ class ConversationMixin:
                 self.CONVERSATION_FOCUS_SECONDS - idle,
                 self._resume_inner_life,
             )
+
     def _resume_background(self) -> None:
         """Resume background processes after conversation.
 
@@ -1182,7 +1220,13 @@ class ConversationMixin:
             return
         # In teaching mode, the autonomous learner and inner life
         # stay paused — they're managed by enter/exit_teaching_mode.
-        if self._is_teaching or self._is_gaming:
+        # A question-answer session holds the same posture: the
+        # exchange is the only thing she's doing until it ends.
+        if self._is_teaching or self._is_gaming or self._answering_questions:
+            return
+        # Deferred resume timer firing during teardown — the pauses
+        # it would lift belong to threads already joined.
+        if self._stop_latched:
             return
         self.learner.resume()
         self.brain.frontal.self_learner.resume()
@@ -1191,6 +1235,7 @@ class ConversationMixin:
         # answering its questions), it should focus on them, not
         # wander into bug scans, drawing, or exploration.
         self._resume_inner_life()
+
     def see(self) -> str:
         """Look through the retina, store the observation, and report it.
 
@@ -1227,9 +1272,7 @@ class ConversationMixin:
                 )
             report = self.language.render(thought, emotion)
             try:
-                self.world.it_acted(
-                    "looked through the retina", detail=report[:200]
-                )
+                self.world.it_acted("looked through the retina", detail=report[:200])
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.conversation.see",
@@ -1242,6 +1285,7 @@ class ConversationMixin:
                 e,
             )
             from temporal_lobe.base import Thought as _Thought
+
             emo = self.feel()
             thought = _Thought(
                 content="see",
@@ -1251,6 +1295,7 @@ class ConversationMixin:
                 metadata={"vision_status": "unprocessed"},
             )
             return self.language.render(thought, emo)
+
     def look_at_image(self, path: str) -> str:
         """Look at an image file and describe what it sees.
 
@@ -1260,6 +1305,7 @@ class ConversationMixin:
         it can perceive (color, structure, brightness).
         """
         from temporal_lobe.base import Thought as _Thought
+
         emo = self.feel()
 
         try:
@@ -1306,7 +1352,7 @@ class ConversationMixin:
                 top = percept.candidates[0]
                 if top[1] > 0.2:
                     candidates_meta = [
-                        {"name": name.replace('_', ' '), "similarity": sim}
+                        {"name": name.replace("_", " "), "similarity": sim}
                         for name, sim in percept.candidates[:3]
                         if sim > 0.1
                     ]
@@ -1334,9 +1380,7 @@ class ConversationMixin:
             )
             rendered = self.language.render(thought, emo)
             try:
-                self.world.it_acted(
-                    "looked at an image", detail=rendered[:200]
-                )
+                self.world.it_acted("looked at an image", detail=rendered[:200])
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.conversation.look_at_image",
@@ -1356,6 +1400,7 @@ class ConversationMixin:
                 metadata={"vision_status": "unprocessed"},
             )
             return self.language.render(thought, emo)
+
     def _render_self_report(
         self,
         content: str,
@@ -1372,6 +1417,7 @@ class ConversationMixin:
         never bypass its cognition with hardcoded reply templates.
         """
         from temporal_lobe.base import Thought as _Thought
+
         emo = self.feel()
         thought = _Thought(
             content=content,
@@ -1381,6 +1427,7 @@ class ConversationMixin:
             metadata=metadata or {},
         )
         return self.language.render(thought, emo)
+
     def enter_teaching_mode(self, topic: str = "") -> None:
         """Put Genesis into teaching/training mode.
 
@@ -1403,6 +1450,7 @@ class ConversationMixin:
 
         self.learner.pause()
         self.inner_life.pause()
+
     def exit_teaching_mode(self) -> None:
         """Exit teaching/training mode and resume normal operation."""
         if not self._is_teaching:
@@ -1417,6 +1465,101 @@ class ConversationMixin:
         # exiting teaching mid-conversation shouldn't flood the
         # exchange with stray urges.
         self._resume_inner_life()
+
+    def enter_question_mode(self, topic: str = "") -> None:
+        """Enter a focused question-answer session (/teach-questions).
+
+        She asked; the user is answering. Takes the same posture
+        teaching mode does — the autonomous learner and inner life
+        pause so the exchange is the only thing she is doing, and
+        volition stays held while questions are out. The question's
+        target concept borrows the lesson-scope filter: her inline
+        curiosity stays on what the exchange is about (follow-up
+        questions that pertain still reach her; unrelated ones queue
+        for later), and the executive's task set names what she's
+        doing — the mechanics of focus, not just its name.
+
+        The session ends when the queue drains
+        (:meth:`end_question_session_if_done`), on /teach-questions
+        stop or clear, or when the user goes quiet for the
+        conversation focus window — whichever comes first.
+        """
+        if self._answering_questions:
+            # Re-entering on the next pop — the new question's
+            # concept becomes the scope.
+            if topic:
+                self._question_topic: str = topic
+                self.brain.frontal.teaching_topic = topic
+                try:
+                    self.brain.frontal.executive.switch_task(topic)
+                except Exception as e:  # noqa: BLE001
+                    logger.debug(f"executive task switch failed: {e}")
+            return
+        self._answering_questions: bool = True
+        self._question_topic = topic
+        # Save whatever lesson scope was in force — a /teach active
+        # on entry gets its filter back on exit.
+        self._prior_qa_teaching = (
+            self.brain.frontal.teaching_mode,
+            self.brain.frontal.teaching_topic,
+        )
+        self.brain.frontal.teaching_mode = True
+        self.brain.frontal.teaching_topic = topic
+        self._prior_qa_task = self.brain.frontal.executive.active_task
+        try:
+            self.brain.frontal.executive.switch_task(topic or "answering questions")
+        except Exception as e:  # noqa: BLE001 — task-set is advisory
+            logger.debug(f"executive task switch failed: {e}")
+        self.learner.pause()
+        self.inner_life.pause()
+        self._suppress_volition = True
+        # Someone is answering her questions — the alert, attentive
+        # posture game mode takes for play.
+        self._learner_neuro_impulse(CHEM_NOREPINEPHRINE, 0.1)
+
+    def exit_question_mode(self) -> None:
+        """Leave the question-answer session and release its posture."""
+        if not self._answering_questions:
+            return
+        self._answering_questions = False
+        self._question_topic = ""
+        teaching_mode, teaching_topic = getattr(self, "_prior_qa_teaching", (False, ""))
+        self.brain.frontal.teaching_mode = teaching_mode
+        self.brain.frontal.teaching_topic = teaching_topic
+        if self._is_teaching:
+            # A /teach that began during the session owns the filter
+            # now — re-apply its declared topic.
+            self.brain.frontal.teaching_mode = True
+            self.brain.frontal.teaching_topic = self._teaching_topic
+        if not self._is_gaming:
+            try:
+                self.brain.frontal.executive.switch_task(
+                    getattr(self, "_prior_qa_task", "") or "idle"
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"executive task restore failed: {e}")
+        if not (self._is_teaching or self._is_gaming):
+            self.learner.resume()
+        # Suppression and inner life release on the usual quiet
+        # window — an exit mid-exchange shouldn't flood the turn.
+        self._resume_inner_life()
+
+    def end_question_session_if_done(self) -> bool:
+        """End the question session once nothing remains to answer.
+
+        The session's work is done when no popped question still
+        awaits its answer and the queue holds nothing more — focus
+        returns to the normal background. Called after every
+        conversation turn so the drain is recognized wherever the
+        answer arrived from.
+        """
+        if not self._answering_questions:
+            return False
+        if self.awaiting_question_answer or self.has_queued_questions:
+            return False
+        self.exit_question_mode()
+        return True
+
     def enter_game_mode(self) -> None:
         """Put Genesis into game mode — focused play.
 
@@ -1447,6 +1590,7 @@ class ConversationMixin:
             self.brain.frontal.executive.switch_task("games")
         except Exception as e:  # noqa: BLE001 — task-set is advisory
             logger.debug(f"executive task switch failed: {e}")
+
     def exit_game_mode(self) -> None:
         """Exit game mode and resume normal operation."""
         if not self._is_gaming:
@@ -1457,11 +1601,10 @@ class ConversationMixin:
         self.disengage_world()
         self._resume_inner_life()
         try:
-            self.brain.frontal.executive.switch_task(
-                getattr(self, "_prior_task", "") or "idle"
-            )
+            self.brain.frontal.executive.switch_task(getattr(self, "_prior_task", "") or "idle")
         except Exception as e:  # noqa: BLE001
             logger.debug(f"executive task restore failed: {e}")
+
     def game_turn(self, line: str) -> str:
         """One game-mode turn: world state in, action out.
 
@@ -1474,7 +1617,7 @@ class ConversationMixin:
         if not self._is_gaming or not line.startswith("FRAME "):
             return self.respond(line)
         if self._game_session is None:
-            from frontal_lobe.games.session import GameSession
+            from worlds.session import GameSession
 
             self._game_session = GameSession(self)
         try:
@@ -1482,6 +1625,7 @@ class ConversationMixin:
         except Exception as e:  # noqa: BLE001
             note_swallowed("mind.game_turn", e)
             return ""
+
     @property
     def game_decision(self) -> dict[str, Any] | None:
         """The decision basis behind the last world action.
@@ -1492,6 +1636,7 @@ class ConversationMixin:
         alongside each step.
         """
         return self.last_world_decision
+
     def pop_queued_question(self) -> dict[str, str] | None:
         """Pop the next queued question.
 
@@ -1504,12 +1649,14 @@ class ConversationMixin:
         if q and q.get("target_concept"):
             self.brain.frontal._pending_question_concepts[q["target_concept"]] = q["text"]
         if q is not None:
-            # A question is now out for an answer — an open turn. Hold
-            # volition until the user goes quiet; if no answer ever
-            # comes, the deferred release restores autonomy on its own.
-            self._suppress_volition = True
+            # A question is now out for an answer — an open turn. The
+            # session takes the focused posture (background paused,
+            # curiosity scoped, executive tasked); the deferred quiet
+            # check ends it if the user walks away.
+            self.enter_question_mode(q.get("target_concept", ""))
             self._defer(self.CONVERSATION_FOCUS_SECONDS, self._resume_inner_life)
         return q
+
     def clear_queued_questions(self) -> None:
         """Clear all queued questions."""
         self.brain.frontal.clear_question_queue()

@@ -78,28 +78,32 @@ logger = logging.getLogger(__name__)
 # Relations that carry structural meaning — used to decide whether two
 # concepts share enough structure to be analogs. RELATED_TO alone is not
 # structural (it's generic co-occurrence), so it doesn't count.
-_STRUCTURAL_RELATIONS: frozenset[RelationType] = frozenset({
-    RelationType.IS_A,
-    RelationType.PART_OF,
-    RelationType.CAUSES,
-    RelationType.LEADS_TO,
-    RelationType.ENABLES,
-    RelationType.DEPENDS_ON,
-    RelationType.HAS_PROPERTY,
-    RelationType.EMERGES_FROM,
-    RelationType.PREVENTS,
-    RelationType.HARMS,
-    RelationType.CREATES,
-    RelationType.OPPOSITE_OF,
-})
+_STRUCTURAL_RELATIONS: frozenset[RelationType] = frozenset(
+    {
+        RelationType.IS_A,
+        RelationType.PART_OF,
+        RelationType.CAUSES,
+        RelationType.LEADS_TO,
+        RelationType.ENABLES,
+        RelationType.DEPENDS_ON,
+        RelationType.HAS_PROPERTY,
+        RelationType.EMERGES_FROM,
+        RelationType.PREVENTS,
+        RelationType.HARMS,
+        RelationType.CREATES,
+        RelationType.OPPOSITE_OF,
+    }
+)
 
 # Relations that indicate a proposed edge would be contradictory.
-_CONTRADICTION_RELATIONS: frozenset[RelationType] = frozenset({
-    RelationType.OPPOSITE_OF,
-    RelationType.CONTRADICTS,
-    RelationType.PREVENTS,
-    RelationType.HARMS,
-})
+_CONTRADICTION_RELATIONS: frozenset[RelationType] = frozenset(
+    {
+        RelationType.OPPOSITE_OF,
+        RelationType.CONTRADICTS,
+        RelationType.PREVENTS,
+        RelationType.HARMS,
+    }
+)
 
 # Minimum structural similarity (profile cosine) for two concepts to be
 # considered analogs. Below this, the structural overlap is too weak.
@@ -274,9 +278,7 @@ class Analogizer:
         inverted = self._build_inverted_index(concept_ids, profiles)
 
         # Find analogous pairs across columns.
-        pairs = self._find_analogous_pairs(
-            concept_ids, profiles, inverted, max_pairs
-        )
+        pairs = self._find_analogous_pairs(concept_ids, profiles, inverted, max_pairs)
         self._pairs_found += len(pairs)
 
         if not pairs:
@@ -285,9 +287,7 @@ class Analogizer:
         # Generate and validate candidate inferences for each pair.
         all_insights: list[AnalogyInsight] = []
         for pair in pairs:
-            inferences = self._generate_inferences(
-                pair, profiles, max_inferences_per_pair
-            )
+            inferences = self._generate_inferences(pair, profiles, max_inferences_per_pair)
             for inf in inferences:
                 self._inferences_proposed += 1
                 if self._validate_inference(inf, pair):
@@ -371,9 +371,7 @@ class Analogizer:
             profile[(edge.relation.value, "in")] += 1
         return profile
 
-    def _compute_profiles(
-        self, concept_ids: list[str]
-    ) -> dict[str, Counter[tuple[str, str]]]:
+    def _compute_profiles(self, concept_ids: list[str]) -> dict[str, Counter[tuple[str, str]]]:
         """Compute relation profiles for a list of concepts."""
         return {cid: self._relation_profile(cid) for cid in concept_ids}
 
@@ -392,7 +390,7 @@ class Analogizer:
         inverted: dict[RelationType, set[str]] = {}
         for cid in concept_ids:
             profile = profiles[cid]
-            for (rel_val, _direction) in profile:
+            for rel_val, _direction in profile:
                 try:
                     rel = RelationType(rel_val)
                 except ValueError:
@@ -433,7 +431,7 @@ class Analogizer:
     ) -> frozenset[RelationType]:
         """Structural relation types that both profiles share."""
         shared: set[RelationType] = set()
-        for (rel_val, _direction) in set(p1) & set(p2):
+        for rel_val, _direction in set(p1) & set(p2):
             try:
                 rel = RelationType(rel_val)
             except ValueError:
@@ -471,7 +469,7 @@ class Analogizer:
             # Gather candidate set: concepts sharing any structural
             # relation with cid (via inverted index).
             candidates: set[str] = set()
-            for (rel_val, _direction) in profile:
+            for rel_val, _direction in profile:
                 try:
                     rel = RelationType(rel_val)
                 except ValueError:
@@ -517,16 +515,16 @@ class Analogizer:
                 if pair_key in seen:
                     continue
                 seen.add(pair_key)
-                shared = self._shared_structural_relations(
-                    profile, profiles[cand]
+                shared = self._shared_structural_relations(profile, profiles[cand])
+                pairs.append(
+                    AnalogyPair(
+                        source=cid,
+                        target=cand,
+                        structural_similarity=sim,
+                        shared_relations=shared,
+                        cross_domain=cross_domain,
+                    )
                 )
-                pairs.append(AnalogyPair(
-                    source=cid,
-                    target=cand,
-                    structural_similarity=sim,
-                    shared_relations=shared,
-                    cross_domain=cross_domain,
-                ))
 
         return pairs
 
@@ -564,19 +562,19 @@ class Analogizer:
 
         # 1. Analogical similarity edge (S ~ C).
         if not self._has_edge(s, c, RelationType.SIMILAR_TO):
-            shared_names = ", ".join(
-                sorted(r.value for r in pair.shared_relations)
+            shared_names = ", ".join(sorted(r.value for r in pair.shared_relations))
+            inferences.append(
+                AnalogyInsight(
+                    source=s,
+                    target=c,
+                    relation=RelationType.SIMILAR_TO,
+                    confidence=min(_SIMILARITY_WEIGHT, pair.structural_similarity),
+                    kind="similarity",
+                    analog_source=c,
+                    analog_target=s,
+                    basis=shared_names,
+                )
             )
-            inferences.append(AnalogyInsight(
-                source=s,
-                target=c,
-                relation=RelationType.SIMILAR_TO,
-                confidence=min(_SIMILARITY_WEIGHT, pair.structural_similarity),
-                kind="similarity",
-                analog_source=c,
-                analog_target=s,
-                basis=shared_names,
-            ))
 
         # 2. Relation transfer in both directions.
         # S -> C: for each relation S has that C lacks, project.
@@ -663,16 +661,18 @@ class Analogizer:
                     profiles.get(t_prime, self._relation_profile(t_prime)),
                 )
                 confidence = _TRANSFER_WEIGHT_BASE * max(target_match, 0.1)
-                inferences.append(AnalogyInsight(
-                    source=source,
-                    target=t_prime,
-                    relation=rel,
-                    confidence=confidence,
-                    kind="transfer",
-                    analog_source=analog,
-                    analog_target=analog_target,
-                    basis=f"role-equivalent of {analog_target}",
-                ))
+                inferences.append(
+                    AnalogyInsight(
+                        source=source,
+                        target=t_prime,
+                        relation=rel,
+                        confidence=confidence,
+                        kind="transfer",
+                        analog_source=analog,
+                        analog_target=analog_target,
+                        basis=f"role-equivalent of {analog_target}",
+                    )
+                )
 
         return inferences
 
@@ -690,9 +690,7 @@ class Analogizer:
         role-equivalent is the concept that "does the same thing" in
         source's domain as analog_target does in the analog's domain.
         """
-        target_profile = profiles.get(
-            analog_target, self._relation_profile(analog_target)
-        )
+        target_profile = profiles.get(analog_target, self._relation_profile(analog_target))
         if not target_profile:
             return None
 
@@ -737,9 +735,7 @@ class Analogizer:
 
     # ─── Validation ──────────────────────────────────────────────
 
-    def _validate_inference(
-        self, inf: AnalogyInsight, pair: AnalogyPair
-    ) -> bool:
+    def _validate_inference(self, inf: AnalogyInsight, pair: AnalogyPair) -> bool:
         """Validate a candidate inference before writing it.
 
         Rejects if:
@@ -784,10 +780,7 @@ class Analogizer:
         # An IS_A proposal is contradicted if src and tgt are opposites.
         if inf.relation == RelationType.IS_A:
             for edge in self.network.get_edges(src, "out"):
-                if (
-                    edge.target == tgt
-                    and edge.relation == RelationType.OPPOSITE_OF
-                ):
+                if edge.target == tgt and edge.relation == RelationType.OPPOSITE_OF:
                     return True
 
         return False
@@ -836,7 +829,9 @@ class Analogizer:
         if self.embeddings is not None and self.embeddings.has_embeddings:
             try:
                 similar = self.embeddings.find_similar_concepts(
-                    src, k=20, threshold=0.5,
+                    src,
+                    k=20,
+                    threshold=0.5,
                 )
                 for neighbor, _score in similar:
                     if neighbor == tgt:
@@ -850,9 +845,7 @@ class Analogizer:
 
         return count
 
-    def _has_edge(
-        self, source: str, target: str, relation: RelationType
-    ) -> bool:
+    def _has_edge(self, source: str, target: str, relation: RelationType) -> bool:
         """Check if a specific typed edge exists between two concepts."""
         for edge in self.network.get_edges(source, "out"):
             if edge.target == target and edge.relation == relation:
@@ -909,17 +902,19 @@ class Analogizer:
                 relation = RelationType(str(relation_str))
             except ValueError:
                 relation = RelationType.RELATED_TO
-            self._insights.append(AnalogyInsight(
-                source=str(item["source"]),
-                target=str(item["target"]),
-                relation=relation,
-                confidence=float(item.get("confidence", 0.0)),
-                kind=str(item.get("kind", "transfer")),
-                analog_source=str(item.get("analog_source", "")),
-                analog_target=str(item.get("analog_target", "")),
-                basis=str(item.get("basis", "")),
-                timestamp=int(item.get("timestamp", 0)),
-            ))
+            self._insights.append(
+                AnalogyInsight(
+                    source=str(item["source"]),
+                    target=str(item["target"]),
+                    relation=relation,
+                    confidence=float(item.get("confidence", 0.0)),
+                    kind=str(item.get("kind", "transfer")),
+                    analog_source=str(item.get("analog_source", "")),
+                    analog_target=str(item.get("analog_target", "")),
+                    basis=str(item.get("basis", "")),
+                    timestamp=int(item.get("timestamp", 0)),
+                )
+            )
         stats = data.get("stats", {})
         if isinstance(stats, dict):
             self._pairs_found = int(stats.get("pairs_found", 0))

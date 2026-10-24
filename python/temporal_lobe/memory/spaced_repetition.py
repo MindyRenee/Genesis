@@ -198,9 +198,7 @@ class SpacedRepetitionScheduler:
             # immune to forgetting and stopped being scheduled. A
             # cap keeps the decay curve meaningful over the life of a
             # months-long instance.
-            record.stability = min(
-                record.stability * record.ease_factor, self.MAX_STABILITY
-            )
+            record.stability = min(record.stability * record.ease_factor, self.MAX_STABILITY)
             # Reward: increase ease factor (cap at a reasonable max).
             record.ease_factor = min(3.5, record.ease_factor + self.EASE_BUMP)
         else:

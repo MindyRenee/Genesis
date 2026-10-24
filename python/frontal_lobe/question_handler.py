@@ -27,18 +27,21 @@ Dependencies (passed to ``__init__``):
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
+from frontal_lobe.reasoning import Stance
 from limbic_system.emotion import EmotionalState
 from occipital_lobe.perception import Perception, QuestionType
 from temporal_lobe.base import Language, Thought
 
 if TYPE_CHECKING:
-    from frontal_lobe.reasoning import ReasoningResult, TheoryOfMind
+    from frontal_lobe.reasoning import Judge, ReasoningResult, TheoryOfMind
     from frontal_lobe.self import SelfComposer, SelfModel
     from frontal_lobe.tools.framework import ToolRegistry
     from parietal_lobe.situation_model import SituationModel
+    from temporal_lobe.comprehension import Proposition
     from temporal_lobe.concepts import ConceptNetwork, RelationType
     from temporal_lobe.memory import MemoryContext
 
@@ -51,6 +54,16 @@ __all__ = ["QuestionHandler"]
 # Regex for cleaning up episodic memory text.
 _ASSOCIATION_DEBUG_RE = re.compile(r"\[association\].*")
 _USER_PREFIX_RE = re.compile(r"^User:\s*+")
+
+# Answer confidence per judgment stance for polar questions: a
+# committed stance (assert or deny) answers decisively, a hedge
+# leans, a suspension reports that judgment could not be made.
+_POLAR_CONFIDENCE = {
+    Stance.ASSERT: 0.75,
+    Stance.DENY: 0.7,
+    Stance.HEDGE: 0.55,
+    Stance.SUSPEND: 0.35,
+}
 
 # Explicit-memory question markers — matched on word boundaries so
 # substrings inside words ("dragon" contains "ago", "beforehand"
@@ -67,14 +80,146 @@ _PAST_MARKER_RE = re.compile(
 # _question_verbs stays the single source of truth for answerable
 # verbs. The boundary set used by the parser is
 # ``_question_verbs.keys() | _BOUNDARY_ONLY_VERBS``.
-_BOUNDARY_ONLY_VERBS = frozenset({
-    "prevent", "prevents", "form", "forms", "arise", "arises",
-    "come", "comes", "go", "goes", "do", "does", "be", "is", "are",
-    "harm", "harms", "hurt", "hurts", "grow", "grows",
-    "learn", "learns", "forget", "forgets",
-    "feel", "feels", "think", "thinks",
-    "like", "likes", "love", "loves", "hate", "hates",
-})
+_BOUNDARY_ONLY_VERBS = frozenset(
+    {
+        "prevent",
+        "prevents",
+        "form",
+        "forms",
+        "arise",
+        "arises",
+        "come",
+        "comes",
+        "go",
+        "goes",
+        "do",
+        "does",
+        "be",
+        "is",
+        "are",
+        "harm",
+        "harms",
+        "hurt",
+        "hurts",
+        "grow",
+        "grows",
+        "learn",
+        "learns",
+        "forget",
+        "forgets",
+        "feel",
+        "feels",
+        "think",
+        "thinks",
+        "like",
+        "likes",
+        "love",
+        "loves",
+        "hate",
+        "hates",
+    }
+)
+
+
+def _build_question_verbs() -> dict[str, list[RelationType]]:
+    """The verb → relation mapping for question routing.
+
+    RelationType is imported lazily here (not at module top) so the
+    module stays importable ahead of temporal_lobe.concepts.
+    """
+    from temporal_lobe.concepts import RelationType as RT
+
+    return {
+        "create": [RT.CREATES],
+        "creates": [RT.CREATES],
+        "created": [RT.CREATES],
+        "make": [RT.CREATES],
+        "makes": [RT.CREATES],
+        "made": [RT.CREATES],
+        "build": [RT.CREATES],
+        "builds": [RT.CREATES],
+        "built": [RT.CREATES],
+        "design": [RT.CREATES],
+        "designs": [RT.CREATES],
+        "designed": [RT.CREATES],
+        "develop": [RT.CREATES],
+        "develops": [RT.CREATES],
+        "developed": [RT.CREATES],
+        "produce": [RT.CREATES],
+        "produces": [RT.CREATES],
+        "produced": [RT.CREATES],
+        "cause": [RT.CAUSES],
+        "causes": [RT.CAUSES],
+        "lead": [RT.CAUSES],
+        "leads": [RT.CAUSES],
+        "result": [RT.CAUSES],
+        "results": [RT.CAUSES],
+        "affect": [RT.CAUSES, RT.RELATED_TO],
+        "affects": [RT.CAUSES, RT.RELATED_TO],
+        "influence": [RT.CAUSES, RT.RELATED_TO],
+        "influences": [RT.CAUSES, RT.RELATED_TO],
+        "change": [RT.CAUSES, RT.RELATED_TO],
+        "changes": [RT.CAUSES, RT.RELATED_TO],
+        "shape": [RT.CAUSES, RT.RELATED_TO],
+        "shapes": [RT.CAUSES, RT.RELATED_TO],
+        "emerge": [RT.EMERGES_FROM],
+        "emerges": [RT.EMERGES_FROM],
+        "need": [RT.DEPENDS_ON],
+        "needs": [RT.DEPENDS_ON],
+        "require": [RT.DEPENDS_ON],
+        "requires": [RT.DEPENDS_ON],
+        "depend": [RT.DEPENDS_ON],
+        "depends": [RT.DEPENDS_ON],
+        "want": [RT.DEPENDS_ON],
+        "wants": [RT.DEPENDS_ON],
+        "desire": [RT.DEPENDS_ON],
+        "desires": [RT.DEPENDS_ON],
+        "eat": [RT.DEPENDS_ON],
+        "eats": [RT.DEPENDS_ON],
+        "drink": [RT.DEPENDS_ON],
+        "drinks": [RT.DEPENDS_ON],
+        "consume": [RT.DEPENDS_ON],
+        "consumes": [RT.DEPENDS_ON],
+        "use": [RT.ENABLES],
+        "uses": [RT.ENABLES],
+        "employ": [RT.ENABLES],
+        "employs": [RT.ENABLES],
+        "enable": [RT.ENABLES],
+        "enables": [RT.ENABLES],
+        "help": [RT.ENABLES],
+        "helps": [RT.ENABLES],
+        "support": [RT.ENABLES, RT.RELATED_TO],
+        "supports": [RT.ENABLES, RT.RELATED_TO],
+        "live": [RT.SPATIAL_RELATION, RT.RELATED_TO],
+        "lives": [RT.SPATIAL_RELATION, RT.RELATED_TO],
+        "reside": [RT.SPATIAL_RELATION, RT.RELATED_TO],
+        "resides": [RT.SPATIAL_RELATION, RT.RELATED_TO],
+        "exist": [RT.SPATIAL_RELATION, RT.RELATED_TO],
+        "exists": [RT.SPATIAL_RELATION, RT.RELATED_TO],
+        "know": [RT.RELATED_TO],
+        "knows": [RT.RELATED_TO],
+        "understand": [RT.RELATED_TO],
+        "understands": [RT.RELATED_TO],
+        "remember": [RT.RELATED_TO],
+        "remembers": [RT.RELATED_TO],
+        "relate": [RT.RELATED_TO],
+        "relates": [RT.RELATED_TO],
+        "connect": [RT.RELATED_TO],
+        "connects": [RT.RELATED_TO],
+        "work": [RT.RELATED_TO, RT.ENABLES],
+        "works": [RT.RELATED_TO, RT.ENABLES],
+        "function": [RT.RELATED_TO, RT.ENABLES],
+        "functions": [RT.RELATED_TO, RT.ENABLES],
+        "operate": [RT.RELATED_TO, RT.ENABLES],
+        "operates": [RT.RELATED_TO, RT.ENABLES],
+        "have": [RT.PART_OF, RT.RELATED_TO],
+        "has": [RT.PART_OF, RT.RELATED_TO],
+        "contain": [RT.PART_OF, RT.RELATED_TO],
+        "contains": [RT.PART_OF, RT.RELATED_TO],
+        "include": [RT.PART_OF, RT.RELATED_TO],
+        "includes": [RT.PART_OF, RT.RELATED_TO],
+        "about": [RT.RELATED_TO],
+    }
 
 
 class QuestionHandler:
@@ -100,6 +245,7 @@ class QuestionHandler:
         resolve_topics: Callable[[list[str], str], list[str]],
         user_profile: UserProfile | None = None,
         situation_model: SituationModel | None = None,
+        judge: Judge | None = None,
     ) -> None:
         """Wire the question handler to its concept network and language engine."""
         self._network = network
@@ -110,6 +256,11 @@ class QuestionHandler:
         # an authoritative answer in the model and only a coincidental
         # one in the network.
         self._situation = situation_model
+        # The assertion gate for polar questions — a yes/no question
+        # asks whether its radical holds, which is a judgment call:
+        # the radical is checked against the modeled world and the
+        # verdict becomes the stance the answer is composed from.
+        self._judge = judge
         self._language = language
         self._composer = composer
         self._self_composer = self_composer
@@ -122,79 +273,12 @@ class QuestionHandler:
         self._user_profile = user_profile
 
         # Build the verb → relation mapping now that we can import.
-        from temporal_lobe.concepts import RelationType as RT
-
-        self._question_verbs: dict[str, list[RT]] = {
-            "create": [RT.CREATES], "creates": [RT.CREATES],
-            "created": [RT.CREATES],
-            "make": [RT.CREATES], "makes": [RT.CREATES],
-            "made": [RT.CREATES],
-            "build": [RT.CREATES], "builds": [RT.CREATES],
-            "built": [RT.CREATES],
-            "design": [RT.CREATES], "designs": [RT.CREATES],
-            "designed": [RT.CREATES],
-            "develop": [RT.CREATES], "develops": [RT.CREATES],
-            "developed": [RT.CREATES],
-            "produce": [RT.CREATES], "produces": [RT.CREATES],
-            "produced": [RT.CREATES],
-            "cause": [RT.CAUSES], "causes": [RT.CAUSES],
-            "lead": [RT.CAUSES], "leads": [RT.CAUSES],
-            "result": [RT.CAUSES], "results": [RT.CAUSES],
-            "affect": [RT.CAUSES, RT.RELATED_TO],
-            "affects": [RT.CAUSES, RT.RELATED_TO],
-            "influence": [RT.CAUSES, RT.RELATED_TO],
-            "influences": [RT.CAUSES, RT.RELATED_TO],
-            "change": [RT.CAUSES, RT.RELATED_TO],
-            "changes": [RT.CAUSES, RT.RELATED_TO],
-            "shape": [RT.CAUSES, RT.RELATED_TO],
-            "shapes": [RT.CAUSES, RT.RELATED_TO],
-            "emerge": [RT.EMERGES_FROM], "emerges": [RT.EMERGES_FROM],
-            "need": [RT.DEPENDS_ON], "needs": [RT.DEPENDS_ON],
-            "require": [RT.DEPENDS_ON], "requires": [RT.DEPENDS_ON],
-            "depend": [RT.DEPENDS_ON], "depends": [RT.DEPENDS_ON],
-            "want": [RT.DEPENDS_ON], "wants": [RT.DEPENDS_ON],
-            "desire": [RT.DEPENDS_ON], "desires": [RT.DEPENDS_ON],
-            "eat": [RT.DEPENDS_ON], "eats": [RT.DEPENDS_ON],
-            "drink": [RT.DEPENDS_ON], "drinks": [RT.DEPENDS_ON],
-            "consume": [RT.DEPENDS_ON], "consumes": [RT.DEPENDS_ON],
-            "use": [RT.ENABLES], "uses": [RT.ENABLES],
-            "employ": [RT.ENABLES], "employs": [RT.ENABLES],
-            "enable": [RT.ENABLES], "enables": [RT.ENABLES],
-            "help": [RT.ENABLES], "helps": [RT.ENABLES],
-            "support": [RT.ENABLES, RT.RELATED_TO],
-            "supports": [RT.ENABLES, RT.RELATED_TO],
-            "live": [RT.SPATIAL_RELATION, RT.RELATED_TO],
-            "lives": [RT.SPATIAL_RELATION, RT.RELATED_TO],
-            "reside": [RT.SPATIAL_RELATION, RT.RELATED_TO],
-            "resides": [RT.SPATIAL_RELATION, RT.RELATED_TO],
-            "exist": [RT.SPATIAL_RELATION, RT.RELATED_TO],
-            "exists": [RT.SPATIAL_RELATION, RT.RELATED_TO],
-            "know": [RT.RELATED_TO], "knows": [RT.RELATED_TO],
-            "understand": [RT.RELATED_TO], "understands": [RT.RELATED_TO],
-            "remember": [RT.RELATED_TO], "remembers": [RT.RELATED_TO],
-            "relate": [RT.RELATED_TO], "relates": [RT.RELATED_TO],
-            "connect": [RT.RELATED_TO], "connects": [RT.RELATED_TO],
-            "work": [RT.RELATED_TO, RT.ENABLES],
-            "works": [RT.RELATED_TO, RT.ENABLES],
-            "function": [RT.RELATED_TO, RT.ENABLES],
-            "functions": [RT.RELATED_TO, RT.ENABLES],
-            "operate": [RT.RELATED_TO, RT.ENABLES],
-            "operates": [RT.RELATED_TO, RT.ENABLES],
-            "have": [RT.PART_OF, RT.RELATED_TO],
-            "has": [RT.PART_OF, RT.RELATED_TO],
-            "contain": [RT.PART_OF, RT.RELATED_TO],
-            "contains": [RT.PART_OF, RT.RELATED_TO],
-            "include": [RT.PART_OF, RT.RELATED_TO],
-            "includes": [RT.PART_OF, RT.RELATED_TO],
-            "about": [RT.RELATED_TO],
-        }
+        self._question_verbs = _build_question_verbs()
 
         # Verbs that mark the subject/verb boundary during parsing —
         # answerable verbs plus relationless verbs (love, feel, ...)
         # that still delimit the subject even when they lead nowhere.
-        self._question_boundary_verbs = (
-            self._question_verbs.keys() | _BOUNDARY_ONLY_VERBS
-        )
+        self._question_boundary_verbs = self._question_verbs.keys() | _BOUNDARY_ONLY_VERBS
 
     def update_dependencies(self, *, user_profile: UserProfile | None = None) -> None:
         """Update optional dependencies after late initialization."""
@@ -211,6 +295,7 @@ class QuestionHandler:
         reasoning_results: list[ReasoningResult] | None = None,
         retrieve_episode: Callable[[int], Any] | None = None,
         resolved_text: str | None = None,
+        propositions: Sequence[Proposition] | None = None,
     ) -> Thought:
         """Handle a general question.
 
@@ -226,6 +311,10 @@ class QuestionHandler:
         parses it so "what does it eat?" is read as "what does
         <referent> eat?" — the referent only exists in the resolved
         text, not in ``perception.raw_text``.
+
+        ``propositions`` are the turn's parsed clauses, when the
+        caller already ran comprehension — polar questions need them:
+        a whether-focus clause is the very content judgment checks.
         """
         # First, the discourse situation: if the question asks about
         # the world the conversation is currently describing, the
@@ -233,14 +322,12 @@ class QuestionHandler:
         # concept network first would let a coincidental association
         # ("mary" has an unrelated edge in the network) outrank what
         # the user just said.
-        result = self.question_situation(perception, emotion)
+        result = self.question_situation(perception, emotion, propositions)
         if result is not None:
             return result
 
         # Then relation-based wh-question answering over the graph.
-        result = self.question_relation_query(
-            perception, emotion, resolved_text=resolved_text
-        )
+        result = self.question_relation_query(perception, emotion, resolved_text=resolved_text)
         if result is not None:
             return result
 
@@ -252,9 +339,7 @@ class QuestionHandler:
         if result is not None:
             return result
         if retrieve_episode is not None:
-            result = self.question_memory_retrieval(
-                perception, emotion, memory, retrieve_episode
-            )
+            result = self.question_memory_retrieval(perception, emotion, memory, retrieve_episode)
             if result is not None:
                 return result
         result = self.question_tool_lookup(perception, emotion)
@@ -262,9 +347,7 @@ class QuestionHandler:
             return result
         result = self.question_compose_reasoning(perception, emotion, reasoning_results)
         if result is not None:
-            return self._enrich_with_memory(
-                result, perception, memory, retrieve_episode
-            )
+            return self._enrich_with_memory(result, perception, memory, retrieve_episode)
         # Web search — when it can't answer from its own knowledge,
         # it searches the web and expresses what it finds. This is
         # its on-demand gateway to the wider web: in conversation, for
@@ -272,13 +355,9 @@ class QuestionHandler:
         # never reciting the page verbatim.
         result = self.question_web_search(perception, emotion)
         if result is not None:
-            return self._enrich_with_memory(
-                result, perception, memory, retrieve_episode
-            )
+            return self._enrich_with_memory(result, perception, memory, retrieve_episode)
         result = self.question_reflection_fallback(perception, emotion)
-        return self._enrich_with_memory(
-            result, perception, memory, retrieve_episode
-        )
+        return self._enrich_with_memory(result, perception, memory, retrieve_episode)
 
     # ─── Discourse situation (state under discussion) ───────────
 
@@ -296,7 +375,10 @@ class QuestionHandler:
     )
 
     def question_situation(
-        self, perception: Perception, emotion: EmotionalState
+        self,
+        perception: Perception,
+        emotion: EmotionalState,
+        propositions: Sequence[Proposition] | None = None,
     ) -> Thought | None:
         """Answer from the situation the discourse is currently describing.
 
@@ -317,15 +399,58 @@ class QuestionHandler:
         if self._situation is None or not self._situation.entities:
             return None
 
+        # A polar question asks whether its content obtains — that is
+        # what judgment is for. The clause's whether-focus marks it
+        # as a gap rather than a truth-bearer, so the radical is
+        # checked with the focus cleared; the verdict's stance then
+        # becomes the answer kind the language engine renders.
+        if self._judge is not None:
+            for prop in propositions or ():
+                if prop.focus == "whether" and prop.subject:
+                    return self._polar_answer(prop, emotion)
+
         text = perception.raw_text.strip().rstrip("?").strip()
         if not text:
             return None
 
         return self._situation_answer(text, emotion)
 
-    def _situation_answer(
-        self, text: str, emotion: EmotionalState
-    ) -> Thought | None:
+    def _polar_answer(self, prop: Proposition, emotion: EmotionalState) -> Thought:
+        """Judge a yes/no question's radical against the modeled world.
+
+        ``judge`` runs the proposition through the correspondence
+        ledger — the claim the question makes if true — and the
+        resulting stance (assert / hedge / suspend / deny) selects the
+        ``verdict_*`` answer kind. The checked content travels as
+        ``claim`` so the language layer can restate what was judged.
+        """
+        assert self._judge is not None  # guarded by question_situation
+        judgment = self._judge.judge(replace(prop, focus=""))
+        kind = f"verdict_{judgment.stance.name.lower()}"
+        if judgment.stance is Stance.HEDGE:
+            # A hedge has a direction the stance alone doesn't carry:
+            # leaning true ("i think so") and leaning false ("i don't
+            # think so") are different answers, and a perfectly split
+            # posterior is a suspension, not a lean.
+            if judgment.degree < 0.5:
+                kind = "verdict_doubt"
+            elif judgment.degree == 0.5:
+                kind = "verdict_suspend"
+        target = prop.object or next(iter(prop.roles.values()), prop.subject)
+        return self._situation_thought(
+            emotion,
+            kind=kind,
+            subject=prop.subject,
+            objects=[target],
+            confidence=_POLAR_CONFIDENCE[judgment.stance],
+            extra={
+                "claim": judgment.content,
+                "stance": judgment.stance.name.lower(),
+                "degree": judgment.degree,
+            },
+        )
+
+    def _situation_answer(self, text: str, emotion: EmotionalState) -> Thought | None:
         """Dispatch one parsed question to the model's typed accessors.
 
         Each branch asks the model a question it is built to answer and
@@ -404,6 +529,7 @@ class QuestionHandler:
         subject: str,
         objects: list[str],
         confidence: float,
+        extra: dict[str, Any] | None = None,
     ) -> Thought:
         """Package a situation-model answer as structured metadata.
 
@@ -418,6 +544,8 @@ class QuestionHandler:
                 "objects": objects,
             }
         }
+        if extra:
+            meta["situation_answer"].update(extra)
         return Thought(
             content="situation_answer",
             intent="inform",
@@ -489,7 +617,10 @@ class QuestionHandler:
         # for incoming edges to X (the source of the emergence).
         if verb in ("emerge", "emerges") and question_word == "what":
             return self._compose_relation_answer(
-                subject_id, relations, "incoming", emotion,
+                subject_id,
+                relations,
+                "incoming",
+                emotion,
                 question_word=question_word,
             )
 
@@ -498,7 +629,10 @@ class QuestionHandler:
         # relation, so the answer lives on incoming edges.
         if self._is_past_tense(verb):
             return self._compose_relation_answer(
-                subject_id, relations, "incoming", emotion,
+                subject_id,
+                relations,
+                "incoming",
+                emotion,
                 question_word=question_word,
             )
 
@@ -507,7 +641,10 @@ class QuestionHandler:
         # relation, so the answer lives on outgoing edges.
         if question_word in ("who", "what", "where", "why", "how"):
             return self._compose_relation_answer(
-                subject_id, relations, "outgoing", emotion,
+                subject_id,
+                relations,
+                "outgoing",
+                emotion,
                 question_word=question_word,
             )
 
@@ -520,9 +657,7 @@ class QuestionHandler:
         question_word = qtype.value.lower()
 
         # "What is X about?" / "What was X about?"
-        about_match = re.match(
-            r"(?:what|who)\s+(?:is|was|are|were)\s+(.+?)\s+about\b", text
-        )
+        about_match = re.match(r"(?:what|who)\s+(?:is|was|are|were)\s+(.+?)\s+about\b", text)
         if about_match:
             return about_match.group(1).strip(), "about", False, "what"
 
@@ -571,7 +706,7 @@ class QuestionHandler:
         neg = re.search(r"\b(?:not|n't)\b", rest)
         if neg:
             is_negative = True
-            rest = (rest[: neg.start()] + rest[neg.end():]).strip()
+            rest = (rest[: neg.start()] + rest[neg.end() :]).strip()
 
         # Split rest into subject + verb. Try phrasal verbs first.
         phrasal_patterns = [
@@ -611,7 +746,7 @@ class QuestionHandler:
                 return subject, verb, is_negative, question_word
             # Last resort: first word is subject, second is verb
             if len(words) > start + 1:
-                subject = " ".join(words[start:len(words)-1]).strip()
+                subject = " ".join(words[start : len(words) - 1]).strip()
                 verb = words[-1].lower().rstrip("?,.!")
                 return subject, verb, is_negative, question_word
 
@@ -664,7 +799,12 @@ class QuestionHandler:
     def _is_past_tense(verb: str) -> bool:
         """Heuristic: is this verb form a past participle/past tense used for object questions?"""
         return verb in (
-            "created", "made", "built", "designed", "developed", "produced",
+            "created",
+            "made",
+            "built",
+            "designed",
+            "developed",
+            "produced",
         )
 
     def _compose_relation_answer(
@@ -869,9 +1009,7 @@ class QuestionHandler:
 
     # ─── Creator / personal questions ────────────────────────────
 
-    def question_creator_personal(
-        self, lower: str, emotion: EmotionalState
-    ) -> Thought | None:
+    def question_creator_personal(self, lower: str, emotion: EmotionalState) -> Thought | None:
         """Handle creator-related and personal fact lookup questions."""
         creator_hit = (
             "who made you" in lower
@@ -909,9 +1047,7 @@ class QuestionHandler:
         # Questions about the user — "who am I?", "do you know me?",
         # or the learned user name — compose from what it knows about
         # this person, not from a creator template.
-        user_name = (
-            self._self_model.self_knowledge.get("user_name", "")
-        ).replace("_", " ").lower()
+        user_name = (self._self_model.self_knowledge.get("user_name", "")).replace("_", " ").lower()
         user_hit = "who am i" in lower or "do you know me" in lower
         if not user_hit and user_name:
             user_hit = (
@@ -990,10 +1126,7 @@ class QuestionHandler:
                 if (
                     result.reasoning_type in (ReasoningType.DEDUCTIVE, ReasoningType.CAUSAL)
                     and result.confidence > 0.5
-                    and any(
-                        t.lower() in result.conclusion.lower()
-                        for t in perception.topics
-                    )
+                    and any(t.lower() in result.conclusion.lower() for t in perception.topics)
                 ):
                     return Thought(
                         content=result.conclusion,
@@ -1005,10 +1138,7 @@ class QuestionHandler:
                     )
 
             for result in reasoning_results:
-                if (
-                    result.reasoning_type == ReasoningType.SYNTHESIS
-                    and result.confidence > 0.5
-                ):
+                if result.reasoning_type == ReasoningType.SYNTHESIS and result.confidence > 0.5:
                     return Thought(
                         content=result.conclusion,
                         intent="reflect",
@@ -1080,7 +1210,9 @@ class QuestionHandler:
     # ─── Memory retrieval ────────────────────────────────────────
 
     def _clean_episode_text(
-        self, episode: Any, prefer_user: bool = False,
+        self,
+        episode: Any,
+        prefer_user: bool = False,
     ) -> str | None:
         """Clean a retrieved episode's text for use in a response.
 
@@ -1107,7 +1239,10 @@ class QuestionHandler:
         return ep_text
 
     def question_memory_retrieval(
-        self, perception: Perception, emotion: EmotionalState, memory: MemoryContext,
+        self,
+        perception: Perception,
+        emotion: EmotionalState,
+        memory: MemoryContext,
         retrieve_episode: Callable[[int], Any],
     ) -> Thought | None:
         """Answer an explicit memory question from retrieved episodes.
@@ -1223,7 +1358,7 @@ class QuestionHandler:
         for part in parts:
             part = part.strip()
             if part.startswith("Genesis:"):
-                part = part[len("Genesis:"):].strip()
+                part = part[len("Genesis:") :].strip()
             if part and not part.startswith("User:") and len(part) > 10:
                 genesis_parts.append(part)
         if genesis_parts:
@@ -1243,7 +1378,7 @@ class QuestionHandler:
         for part in parts:
             part = part.strip()
             if part.startswith("User:"):
-                part = part[len("User:"):].strip()
+                part = part[len("User:") :].strip()
             if part and not part.startswith("Genesis:") and len(part) > 10:
                 user_parts.append(part)
         if user_parts:
@@ -1324,8 +1459,18 @@ class QuestionHandler:
 
         if "who is my" in lower_text:
             for relation in (
-                "son", "daughter", "father", "mother", "brother", "sister",
-                "husband", "wife", "partner", "friend", "dog", "cat",
+                "son",
+                "daughter",
+                "father",
+                "mother",
+                "brother",
+                "sister",
+                "husband",
+                "wife",
+                "partner",
+                "friend",
+                "dog",
+                "cat",
             ):
                 concept_name = f"my {relation}"
                 if concept_name in lower_text and self._network.get_concept(concept_name):

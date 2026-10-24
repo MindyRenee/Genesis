@@ -53,14 +53,18 @@ Three phases, mirroring biological sleep:
    verbatim. The episode's *meaning* persists in the compressed
    representation; the raw text is transient.
 
-Finally, **synaptic homeostasis** (Tononi & Cirelli): renormalize all
-edge weights so there's headroom for tomorrow's learning. This is the
-global downscaling that prevents saturation and keeps the system
-learnable.
+Synaptic homeostasis is *not* a phase of this pass: SHY
+renormalisation is a continuous process that lives in the
+``SynapticDownscaler`` on her inner-life loop — every N3 tick
+downscales weights proportionally at a rate set by accumulated
+synaptic load and the body's sleep pressure (Tononi & Cirelli:
+discharge rate ∝ sleep pressure). The old lumped renormalisation
+here — one multiplicative sweep per pass — was replaced by that
+continuous model; what remains is the compression itself.
 
 # Integration
 
-This module is called from ``Mind._consolidate_n3_heavy()`` after the
+This module's steps are queued by ``Mind._build_n3_work()`` after the
 existing ``consolidate_during_sleep`` pass. It augments — does not
 replace — the existing sleep consolidation.
 
@@ -73,8 +77,10 @@ replace — the existing sleep consolidation.
 
 - **Synaptic homeostasis**: synaptic weights that grew during the day
   are globally downscaled. This prevents saturation and keeps the
-  system learnable. Algorithmically, this is renormalization. (Tononi
-  & Cirelli, 2006)
+  system learnable. Modelled continuously by the
+  ``SynapticDownscaler`` — proportional ``w −= rate·dt·w`` per N3
+  tick, rate gated by synaptic load and the body's adenosine/sleep
+  pressure — not by a pass here. (Tononi & Cirelli, 2006)
 
 - **Memory pruning**: weak/noisy associations are eliminated. In the
   holographic model, this is denoising — the sleep replay process
@@ -131,15 +137,21 @@ DEFAULT_MAX_LTM_EPISODES = 500
 # the most salient features are consolidated, not every detail.
 DEFAULT_MAX_CONCEPTS_PER_EPISODE = 20
 
-# Synaptic homeostasis: global downscaling factor. All edge weights
-# are multiplied by this factor after compression. 0.9 means 10%
-# downscaling — enough to create headroom without erasing recent
-# learning.
-DEFAULT_HOMEOSTASIS_SCALE = 0.9
-
 # Merge threshold for VQ: concepts with reconstructed L2 distance
 # below this are considered merge candidates.
 DEFAULT_MERGE_THRESHOLD = 0.02
+
+# LTM source module for dream insights (the daemon's Dreaming
+# module). Dream episodes are not compaction fodder: they are
+# internal cognitive events that exist to be surfaced by recency —
+# wake residues, ``/sleep`` status, and dream notifications all read
+# ``get_recent_episodes(source_module=9)``, which sees only the
+# active list. Compaction extracts nothing from their
+# ``[dream-insight]`` bookkeeping text, and archiving keeps the
+# payload on disk anyway, so sweeping them buys nothing and costs
+# the entire visible dream record. They sit outside the
+# retain/compact economy entirely.
+_DREAM_MODULE = 9
 
 
 class SleepCompressor:
@@ -161,7 +173,6 @@ class SleepCompressor:
         salience_threshold: float = DEFAULT_SALIENCE_THRESHOLD,
         max_ltm_episodes: int = DEFAULT_MAX_LTM_EPISODES,
         max_concepts_per_episode: int = DEFAULT_MAX_CONCEPTS_PER_EPISODE,
-        homeostasis_scale: float = DEFAULT_HOMEOSTASIS_SCALE,
         merge_threshold: float = DEFAULT_MERGE_THRESHOLD,
     ) -> None:
         """Initialize the sleep compressor with persistent components.
@@ -177,7 +188,6 @@ class SleepCompressor:
         self.salience_threshold = salience_threshold
         self.max_ltm_episodes = max_ltm_episodes
         self.max_concepts_per_episode = max_concepts_per_episode
-        self.homeostasis_scale = homeostasis_scale
         self.merge_threshold = merge_threshold
 
         # Persistent components
@@ -200,10 +210,12 @@ class SleepCompressor:
         ltm_client: object | None = None,
         consolidation_intensity: float = 0.5,
     ) -> dict[str, int | float | str]:
-        """Run the full sleep compression pass.
+        """Run the full sleep compression pass in one call.
 
-        This should be called during N3 sleep, after the existing
-        ``consolidate_during_sleep`` pass has run.
+        The whole step list pumped end-to-end — kept for callers that
+        genuinely want a monolithic pass (tests, maintenance). The
+        sleep loop uses :meth:`compress_steps` instead so the work is
+        spread across the stage.
 
         Args:
             network: The concept network to compress.
@@ -213,136 +225,154 @@ class SleepCompressor:
                 LTM compaction is skipped. Expected to have methods
                 ``search_episodes(limit, offset)`` and
                 ``archive_episode(episode_id)``.
-            consolidation_intensity: Brain-wave-derived consolidation
-                drive (0..1). Scales the aggressiveness of LTM
-                compaction and synaptic downscaling. High consolidation
-                (delta/theta-dominant deep sleep) → more aggressive
-                compression. Low consolidation (stress-disrupted sleep)
-                → gentler compression to avoid losing fragile memories.
+            consolidation_intensity: Retained for API compatibility;
+                consolidation gating now lives in the sleep loop's
+                chemistry, not in this pass.
 
         Returns:
             Dict with compression statistics.
 
         Atomicity: The edge list is snapshotted before any mutations.
-        If any phase fails, the snapshot is restored so the network is
-        unchanged — the next sleep cycle can try again. Without this,
-        a partial failure (e.g. phase 2 succeeds but phase 4 raises)
-        would leave bridge edges removed from the network but not yet
-        saved to the holographic graph on disk, causing data loss on
-        restart.
+        If any step fails, the snapshot is restored so the network is
+        unchanged — the next sleep cycle can try again.
         """
         stats: dict[str, int | float | str] = {}
         t0 = time.time()
 
-        # Snapshot the edge list (with copied edges) before any
-        # mutations. If a phase fails, we restore this snapshot so
-        # the network is unchanged. This makes the compression pass
-        # atomic — either it fully succeeds, or the network is
-        # unchanged and the next pass can try again.
-        #
-        # We deep-copy the edges because homeostasis mutates
-        # edge.weight in place — a shallow list copy wouldn't
-        # protect against that.
         edge_snapshot = [copy.copy(e) for e in network.edges]
 
         try:
-            stats.update(
-                self._run_phases(
-                    network, embeddings, ltm_client, consolidation_intensity
-                )
-            )
+            for _name, step in self.compress_steps(
+                network, embeddings, ltm_client
+            ):
+                out = step()
+                if isinstance(out, dict):
+                    stats.update(out)
         except Exception as e:  # noqa: BLE001
             # Restore the edge snapshot — the network is unchanged.
             # The holographic graph may have received some additive
-            # associations (from phase 2 or 3), but those are
-            # superimposed and idempotent — on the next pass, the
-            # bridge edges will still be in the network (restored
-            # from snapshot) and will be re-migrated. The holographic
-            # graph's additive nature means duplicate bindings just
-            # reinforce the same association, not create noise.
+            # associations, but those are superimposed and idempotent.
             network.replace_edges(edge_snapshot)
             logger.warning(
-                "Sleep compression failed, network restored: %s", e,
+                "Sleep compression failed, network restored: %s",
+                e,
             )
             stats["error"] = str(e)
             stats["elapsed_s"] = time.time() - t0
             return stats
 
-        # Save state — only if all phases succeeded.
-        # Periodically rebuild the holographic graph from the current
-        # edge set to remove accumulated noise from additive
-        # superposition. The holographic graph uses circular
-        # convolution binding, and repeated add_edges calls can
-        # accumulate interference. Rebuilding from a clean state
-        # every ~10 compression passes restores signal clarity.
-        self._maybe_rebuild_holographic_graph(network)
-        self._save()
-
         stats["elapsed_s"] = time.time() - t0
         logger.info("Sleep compression complete: %s", stats)
         return stats
 
-    def _run_phases(
+    def compress_steps(
         self,
         network: ConceptNetwork,
-        embeddings: EmbeddingStore | None,
-        ltm_client: object | None,
-        consolidation_intensity: float,
-    ) -> dict[str, int | float | str]:
-        """Run the timed compression phases and return their stats.
+        embeddings: EmbeddingStore | None = None,
+        ltm_client: object | None = None,
+    ) -> list[tuple[str, Callable[[], dict[str, int | float]]]]:
+        """The compression pass as discrete safe steps.
 
-        Per-phase timings are recorded: a single ``elapsed_s`` for the
-        whole pass could not say which phase was slow, and the first
-        real diagnosis of this pass had to wait on a stack dump at a
-        shutdown timeout. These land in the sleep-compression stats
-        line, which the journal already records, so the cost is
-        visible every cycle.
+        She runs one step per sleep tick, so the pass is spread
+        through the stage like real consolidation — thousands of
+        ripples, not one dump. Each step is self-committing:
+
+        - **quantize** — one k-means iteration per step via
+          :meth:`VQCodebook.fit_steps`; the codebook converges across
+          the stage instead of blocking in a single fit.
+        - **holographize+save** — migrates bridge edges into the
+          holographic graph and persists it in the same step, so a
+          mid-queue exit never leaves migrated edges unsaved.
+        - **compact_ltm** — archives episodes one at a time; each
+          archived episode is already durable.
+        - **save** — VQ codebook + holographic graph, plus the
+          periodic holographic rebuild.
+
+        Steps not yet run when the stage ends simply wait — nothing
+        half-committed needs rolling back.
         """
-        stats: dict[str, int | float | str] = {}
-        phase_seconds: dict[str, float] = {}
+        steps: list[tuple[str, Callable[[], dict[str, int | float]]]] = []
 
-        def _timed(name: str, fn, *a):
-            t = time.time()
-            out = fn(*a)
-            phase_seconds[name] = time.time() - t
-            return out
-
-        # Phase 1: Quantize
         if embeddings is not None:
-            stats.update(
-                _timed("quantize_s", self._phase_quantize, network, embeddings),
-            )
+            steps.extend(self._quantize_steps(embeddings))
 
-        # Phase 2: Holographize
-        stats.update(
-            _timed("holographize_s", self._phase_holographize, network),
-        )
+        def _holographize() -> dict[str, int | float]:
+            stats = self._phase_holographize(network)
+            # Save in the same step: migrated bridge edges are gone
+            # from the explicit network the moment _phase_holographize
+            # returns — persisting here keeps a mid-queue exit lossless.
+            self._save()
+            return stats
 
-        # Phase 3: Compact LTM
+        steps.append(("holographize", _holographize))
+
         if ltm_client is not None:
-            stats.update(
-                _timed("compact_ltm_s", self._phase_compact_ltm, network, ltm_client),
+            steps.append(
+                ("compact_ltm", lambda: self._phase_compact_ltm(network, ltm_client))
             )
 
-        # Synaptic homeostasis (scaled by brain-wave-derived
-        # consolidation intensity — deep sleep downscales more
-        # aggressively, stress-disrupted sleep is gentler).
-        stats.update(
-            _timed(
-                "homeostasis_s",
-                self._apply_homeostasis,
-                network,
-                consolidation_intensity,
-            ),
+        def _save_step() -> dict[str, int | float]:
+            self._maybe_rebuild_holographic_graph(network)
+            self._save()
+            return {"saved": 1}
+
+        steps.append(("save", _save_step))
+        return steps
+
+    def _quantize_steps(
+        self,
+        embeddings: EmbeddingStore,
+    ) -> list[tuple[str, Callable[[], dict[str, int | float]]]]:
+        """VQ training as one-Lloyd-iteration steps + a merge scan."""
+        matrix, names = embeddings.get_concept_matrix()
+        if matrix is None or len(names) == 0:
+            return [("quantize", lambda: {"vq_trained": 0, "merge_candidates": 0})]
+
+        gen = self.vq_codebook.fit_steps(
+            matrix, names, iters=self.vq_iters, seed=42
         )
-        # A compact string, so it renders in the existing
-        # sleep-compression stats line without widening the stats
-        # value type to admit a dict.
-        stats["phase_seconds"] = " ".join(
-            f"{name}={elapsed:.1f}s"
-            for name, elapsed in phase_seconds.items()
-        )
-        return stats
+        holder: dict[str, object] = {"stats": None}
+
+        def _pump() -> dict[str, int | float]:
+            if holder["stats"] is not None:
+                return {"vq_done": 1}
+            try:
+                return {"vq_iter": float(next(gen)["iter"])}
+            except StopIteration as done:
+                raw = dict(done.value or {})
+                stats: dict[str, int | float] = {
+                    "vq_trained": 1,
+                    "vq_reconstruction_error": raw.get("final_error", 0.0),
+                    "vq_relative_reconstruction_error": raw.get("relative_error", 0.0),
+                    "vq_reconstruction_cosine": raw.get("cosine", 0.0),
+                    "vq_residual_saturation": raw.get("saturation", 0.0),
+                    "vq_compression_ratio": self.vq_codebook.compression_ratio(),
+                }
+                holder["stats"] = stats
+                return stats
+
+        steps: list[tuple[str, Callable[[], dict[str, int | float]]]] = [
+            ("quantize", _pump) for _ in range(self.vq_iters)
+        ]
+
+        def _merge_count() -> dict[str, int | float]:
+            # Ensure training finished even if convergence yielded
+            # fewer steps than `iters` — pump any remainder.
+            while holder["stats"] is None:
+                _pump()
+            n = self.vq_codebook.count_merge_candidates(
+                threshold=self.merge_threshold
+            )
+            if n:
+                logger.info(
+                    "VQ found %d merge candidates (threshold=%.3f)",
+                    n,
+                    self.merge_threshold,
+                )
+            return {"merge_candidates": n}
+
+        steps.append(("merge_candidates", _merge_count))
+        return steps
 
     def _maybe_rebuild_holographic_graph(self, network: ConceptNetwork) -> None:
         """Periodically rebuild the holographic graph from current bridge
@@ -358,12 +388,15 @@ class SleepCompressor:
             try:
                 # Rebuild from the current bridge edges in the network
                 from temporal_lobe.concepts import _BRIDGE_ORIGINS
+
                 all_bridge_edges: list[tuple[str, str, str, float]] = []
                 for edge in network.edges:
                     if edge.origin in _BRIDGE_ORIGINS:
-                        rel = edge.relation.value if hasattr(
-                            edge.relation, "value"
-                        ) else str(edge.relation)
+                        rel = (
+                            edge.relation.value
+                            if hasattr(edge.relation, "value")
+                            else str(edge.relation)
+                        )
                         all_bridge_edges.append((edge.source, rel, edge.target, edge.weight))
                 # Do NOT rebuild from an empty set. `rebuild_from_edges`
                 # starts with `clear()`, so an empty rebuild wipes the
@@ -392,65 +425,14 @@ class SleepCompressor:
                 self.holographic_graph.rebuild_from_edges(all_bridge_edges)
                 logger.info(
                     "Rebuilt holographic graph from %d edges (cycle %d)",
-                    len(all_bridge_edges), self._compress_cycle,
+                    len(all_bridge_edges),
+                    self._compress_cycle,
                 )
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "temporal_lobe.compression._maybe_rebuild_holographic_graph",
                     e,
                 )
-
-    # ─── Phase 1: Quantize ──────────────────────────────────────
-
-    def _phase_quantize(
-        self,
-        _network: ConceptNetwork,  # kept for API symmetry with other phases
-        embeddings: EmbeddingStore,
-    ) -> dict[str, int | float]:
-        """Retrain VQ codebook and identify merge candidates."""
-        stats: dict[str, int | float] = {}
-
-        # Use the existing concept matrix (already built by EmbeddingStore).
-        # The matrix and names come from the embeddings store, not the
-        # network — the network may have concepts that don't have
-        # embeddings yet (e.g. newly learned concepts before refresh).
-        matrix, names = embeddings.get_concept_matrix()
-
-        if matrix is None or len(names) == 0:
-            return {"vq_trained": 0, "merge_candidates": 0}
-
-        # Train the codebook
-        train_stats = self.vq_codebook.fit(
-            matrix,
-            names,
-            iters=self.vq_iters,
-        )
-        stats["vq_trained"] = 1
-        stats["vq_reconstruction_error"] = train_stats["final_error"]
-        stats["vq_relative_reconstruction_error"] = train_stats["relative_error"]
-        stats["vq_reconstruction_cosine"] = train_stats["cosine"]
-        stats["vq_residual_saturation"] = train_stats["saturation"]
-        stats["vq_compression_ratio"] = self.vq_codebook.compression_ratio()
-
-        # Find merge candidates
-        # Count only. This used to build the full candidate list and then
-        # use it for nothing but a len() and a log line — with ~12k
-        # concepts in few prototypes that was 7.7M tuples, and
-        # materializing them was 142 s of a 175 s sleep pass. The count is
-        # exact and the list is not needed; if it ever is,
-        # `find_merge_candidates(..., limit=N)` gives the closest N.
-        n_candidates = self.vq_codebook.count_merge_candidates(
-            threshold=self.merge_threshold,
-        )
-        stats["merge_candidates"] = n_candidates
-
-        if n_candidates:
-            logger.info(
-                "VQ found %d merge candidates (threshold=%.3f)",
-                n_candidates, self.merge_threshold,
-            )
-
-        return stats
 
     # ─── Phase 2: Holographize ──────────────────────────────────
 
@@ -467,12 +449,14 @@ class SleepCompressor:
         for edge in network.edges:
             if edge.origin in _BRIDGE_ORIGINS:
                 rel = edge.relation.value if hasattr(edge.relation, "value") else str(edge.relation)
-                bridge_edges.append((
-                    edge.source,
-                    rel,
-                    edge.target,
-                    edge.weight,
-                ))
+                bridge_edges.append(
+                    (
+                        edge.source,
+                        rel,
+                        edge.target,
+                        edge.weight,
+                    )
+                )
             else:
                 kept_edges.append(edge)
 
@@ -484,7 +468,8 @@ class SleepCompressor:
 
         logger.info(
             "Holographize: migrated %d bridge edges, %d explicit edges remain",
-            len(bridge_edges), len(kept_edges),
+            len(bridge_edges),
+            len(kept_edges),
         )
 
         return {
@@ -524,6 +509,7 @@ class SleepCompressor:
             def _no_match(text: str) -> list[str]:
                 """Return no matches when the network has no concepts."""
                 return []
+
             return _no_match
 
         # Build a regex alternation. For each concept ID, match either
@@ -554,6 +540,7 @@ class SleepCompressor:
                 """Match concepts via substring scan when regex compilation fails."""
                 text_lower = text.lower()
                 return [cid for cid, lower_name in lower_names if lower_name in text_lower]
+
             return _fallback_match
 
         def _regex_match(text: str) -> list[str]:
@@ -591,6 +578,10 @@ class SleepCompressor:
 
         High-salience episodes are retained verbatim (up to max_ltm_episodes).
 
+        Dream-insight episodes (``_DREAM_MODULE``) are neither retained
+        nor compacted — they bypass this phase untouched. See the
+        constant for why.
+
         Paginates through all LTM episodes — the daemon caps each page
         at 1000 regardless of the requested limit, so we page through
         with increasing offsets until a page comes back short. Without
@@ -600,10 +591,22 @@ class SleepCompressor:
         stats: dict[str, int | float] = {
             "ltm_replayed": 0,
             "ltm_archived": 0,
+            "ltm_archive_failed": 0,
             "ltm_retained": 0,
             "ltm_associations_extracted": 0,
             "ltm_total_seen": 0,
+            "ltm_dreams_preserved": 0,
         }
+
+        # A dead control channel cannot archive. search_episodes rides
+        # the read channel and may still succeed, so without this check
+        # the pass commits extracted associations while every archive
+        # call raises ConnectionError — a half-committed sweep reported
+        # as success. Skip cleanly instead; the next pass retries.
+        if not getattr(ltm_client, "is_connected", True):
+            logger.warning("LTM compaction skipped: client not connected")
+            stats["ltm_skipped"] = 1
+            return stats
 
         # Paginate through all LTM episodes. The daemon caps each page
         # at 1000 (ipc.rs: limit.min(1000)), so we must issue repeated
@@ -618,6 +621,12 @@ class SleepCompressor:
 
         stats["ltm_total_seen"] = len(episodes)
 
+        # Dream insights are preserved, not compacted — see
+        # _DREAM_MODULE. Excluded before salience ranking so they
+        # neither consume retention slots nor reach the archive step.
+        episodes = [e for e in episodes if getattr(e, "source_module", None) != _DREAM_MODULE]
+        stats["ltm_dreams_preserved"] = stats["ltm_total_seen"] - len(episodes)
+
         # Sort by salience descending
         episodes_sorted = sorted(
             episodes,
@@ -631,8 +640,7 @@ class SleepCompressor:
         # even when they'd rank inside the cap, and episodes at or
         # above the threshold are compacted when they fall beyond it.
         retained = [
-            e for e in episodes_sorted
-            if getattr(e, "salience", 0.0) >= self.salience_threshold
+            e for e in episodes_sorted if getattr(e, "salience", 0.0) >= self.salience_threshold
         ][: self.max_ltm_episodes]
         stats["ltm_retained"] = len(retained)
         retained_ids = {id(e) for e in retained}
@@ -640,8 +648,33 @@ class SleepCompressor:
         # Compact everything not retained — low-salience episodes and
         # high-salience overflow alike.
         to_compact = [e for e in episodes_sorted if id(e) not in retained_ids]
-        associations_extracted = 0
+        associations_extracted = self._compact_episodes(to_compact, network, ltm_client, stats)
+        stats["ltm_associations_extracted"] = associations_extracted
 
+        logger.info(
+            "LTM compaction: seen %d, replayed %d, archived %d, "
+            "archive_failed %d, retained %d, dreams preserved %d, "
+            "extracted %d associations",
+            stats["ltm_total_seen"],
+            stats["ltm_replayed"],
+            stats["ltm_archived"],
+            stats["ltm_archive_failed"],
+            stats["ltm_retained"],
+            stats["ltm_dreams_preserved"],
+            associations_extracted,
+        )
+
+        return stats
+
+    def _compact_episodes(
+        self,
+        to_compact: list,
+        network: ConceptNetwork,
+        ltm_client: object,
+        stats: dict[str, int | float],
+    ) -> int:
+        """Replay each non-retained episode and return the number of
+        associations extracted into the concept network."""
         # Build a compiled regex for concept matching once, rather
         # than iterating every concept for every episode. The old
         # approach was O(N×M) — 7.5M substring searches for 15K
@@ -655,24 +688,19 @@ class SleepCompressor:
         # false positives (e.g. "cat" matching "category").
         concept_pattern = self._build_concept_matcher(network)
 
+        associations_extracted = 0
         for episode in to_compact:
             associations_extracted += self._compact_episode(
-                episode, concept_pattern, ltm_client, stats,
+                episode,
+                concept_pattern,
+                ltm_client,
+                stats,
             )
-
-        stats["ltm_associations_extracted"] = associations_extracted
-
-        logger.info(
-            "LTM compaction: seen %d, replayed %d, archived %d, retained %d, "
-            "extracted %d associations",
-            stats["ltm_total_seen"], stats["ltm_replayed"], stats["ltm_archived"],
-            stats["ltm_retained"], associations_extracted,
-        )
-
-        return stats
+        return associations_extracted
 
     def _paginate_ltm_episodes(
-        self, ltm_client: object,
+        self,
+        ltm_client: object,
     ) -> list:
         """Fetch all LTM episodes via pagination.
 
@@ -686,7 +714,8 @@ class SleepCompressor:
         try:
             while True:
                 page = ltm_client.search_episodes(  # type: ignore[attr-defined]
-                    limit=PAGE_SIZE, offset=offset,
+                    limit=PAGE_SIZE,
+                    offset=offset,
                 )
                 if not page:
                     break
@@ -703,7 +732,8 @@ class SleepCompressor:
                 return []
             logger.warning(
                 "LTM compaction partial: fetched %d episodes before %s",
-                len(episodes), e,
+                len(episodes),
+                e,
             )
         return episodes
 
@@ -732,7 +762,7 @@ class SleepCompressor:
 
         mentioned = concept_pattern(text)
         if len(mentioned) > self.max_concepts_per_episode:
-            mentioned = mentioned[:self.max_concepts_per_episode]
+            mentioned = mentioned[: self.max_concepts_per_episode]
 
         associations = 0
         for i in range(len(mentioned)):
@@ -745,8 +775,9 @@ class SleepCompressor:
 
         try:
             episode_id = getattr(episode, "episode_id", None)
-            if episode_id is not None:
-                ltm_client.archive_episode(episode_id)  # type: ignore[attr-defined]
+            if (
+                episode_id is not None and ltm_client.archive_episode(episode_id)  # type: ignore[attr-defined]
+            ):
                 stats["ltm_archived"] += 1
         except AttributeError as e:
             note_swallowed(
@@ -754,6 +785,7 @@ class SleepCompressor:
                 e,
             )
         except OSError as e:
+            stats["ltm_archive_failed"] += 1
             note_swallowed(
                 "temporal_lobe.compression._compact_episode",
                 e,
@@ -761,55 +793,6 @@ class SleepCompressor:
 
         stats["ltm_replayed"] += 1
         return associations
-
-    # ─── Synaptic homeostasis ───────────────────────────────────
-
-    def _apply_homeostasis(
-        self, network: ConceptNetwork, consolidation_intensity: float = 0.5,
-    ) -> dict[str, int | float]:
-        """Apply global synaptic downscaling (SHY hypothesis).
-
-        All edge weights are multiplied by ``homeostasis_scale``. This
-        creates headroom for tomorrow's learning and prevents saturation.
-        Edges that fall below the pruning threshold after downscaling
-        are removed.
-
-        The downscaling intensity is modulated by the brain-wave-derived
-        consolidation drive. High consolidation (deep delta/theta sleep)
-        → full downscaling. Low consolidation (stress-disrupted sleep)
-        → gentler downscaling to preserve fragile memories.
-        """
-        # Scale the downscaling: high consolidation → more downscaling
-        # (closer to the configured scale), low consolidation → less
-        # downscaling (closer to 1.0 = no change). This mirrors how
-        # stress-disrupted sleep impairs synaptic renormalization.
-        effective_scale = 1.0 - (1.0 - self.homeostasis_scale) * max(
-            0.0, min(1.0, consolidation_intensity)
-        )
-
-        scaled = 0
-        pruned = 0
-        kept_edges: list = []
-
-        for edge in network.edges:
-            edge.weight *= effective_scale
-            if edge.weight < 0.05:
-                pruned += 1
-                continue
-            kept_edges.append(edge)
-            scaled += 1
-
-        network.replace_edges(kept_edges)
-
-        logger.info(
-            "Synaptic homeostasis: scaled %d edges, pruned %d (scale=%.2f)",
-            scaled, pruned, effective_scale,
-        )
-
-        return {
-            "homeostasis_scaled": scaled,
-            "homeostasis_pruned": pruned,
-        }
 
     # ─── Persistence ────────────────────────────────────────────
 

@@ -39,10 +39,10 @@ from thalamus.brain_waves import BrainWave, BrainWaveState
 logger = logging.getLogger(__name__)
 
 
-
 # ======================================================================
 # From tests/test_reflection.py
 # ======================================================================
+
 
 def _make_state(
     intent: Intent = Intent.QUESTION,
@@ -256,9 +256,7 @@ def test_select_strategy_maintain_course() -> None:
 def test_select_strategy_priority_conflict_over_gap() -> None:
     """Conflict has priority over gap."""
     engine = Reflection(ConceptNetwork())
-    strategy = engine.select_strategy(
-        {"conflict_detected": True, "gap_detected": True}
-    )
+    strategy = engine.select_strategy({"conflict_detected": True, "gap_detected": True})
     assert strategy == MetacognitiveStrategy.ACKNOWLEDGE_UNCERTAINTY
 
 
@@ -667,6 +665,7 @@ def test_error_monitor_persistence_roundtrip() -> None:
 # From tests/test_self_assessment.py
 # ======================================================================
 
+
 def _make_network_with_concept(
     name: str = "dogs",
     definition: str = "domesticated carnivorous mammal related to the fox and wolf",
@@ -933,9 +932,7 @@ def test_score_answer_quality_relevant() -> None:
     good_score = engine.score_answer_quality(
         "dogs are mammals and animals", "what are dogs", ["dogs"]
     )
-    bad_score = engine.score_answer_quality(
-        "the weather is nice today", "what are dogs", ["dogs"]
-    )
+    bad_score = engine.score_answer_quality("the weather is nice today", "what are dogs", ["dogs"])
     assert good_score > bad_score
 
 
@@ -1003,10 +1000,7 @@ def test_get_capability_summary_with_data() -> None:
     engine.record_question_outcome("why", success=False, topic="unknown")
     summary = engine.get_capability_summary()
     assert summary
-    assert all(
-        isinstance(kind, str) and isinstance(text, str) and text
-        for kind, text in summary
-    )
+    assert all(isinstance(kind, str) and isinstance(text, str) and text for kind, text in summary)
     joined = " ".join(text for _kind, text in summary)
     assert "dogs" in joined or "learning" in joined
 
@@ -1119,6 +1113,7 @@ def test_find_weak_concepts_returns_weak() -> None:
 # From tests/test_self_composer.py
 # ======================================================================
 
+
 def _make_self_model() -> SelfModel:
     """Construct a self model for tests."""
     sm = SelfModel()
@@ -1177,10 +1172,17 @@ def _make_network_with_emotion_words() -> ConceptNetwork:
     net = _make_network()
     # Add emotion words with category properties AND EXPRESSES edges
     for word, cat in [
-        ("excited", "excited"), ("content", "content"), ("calm", "content"),
-        ("stressed", "stressed"), ("anxious", "anxious"), ("neutral", "neutral"),
-        ("positive", "positive"), ("happy", "excited"),
-        ("good", "positive"), ("warm", "positive"), ("bright", "positive"),
+        ("excited", "excited"),
+        ("content", "content"),
+        ("calm", "content"),
+        ("stressed", "stressed"),
+        ("anxious", "anxious"),
+        ("neutral", "neutral"),
+        ("positive", "positive"),
+        ("happy", "excited"),
+        ("good", "positive"),
+        ("warm", "positive"),
+        ("bright", "positive"),
     ]:
         net.add_concept(word, origin="learned")
         c = net.get_concept(word)
@@ -1193,8 +1195,11 @@ def _make_network_with_emotion_words() -> ConceptNetwork:
         net.add_edge(word, hub_id, RelationType.EXPRESSES, weight=0.8)
     # Add cognitive mode words
     for word, mode in [
-        ("sharp", "sharp"), ("steady", "steady"), ("flexible", "flexible"),
-        ("rigid", "rigid"), ("relaxed", "relaxed"),
+        ("sharp", "sharp"),
+        ("steady", "steady"),
+        ("flexible", "flexible"),
+        ("rigid", "rigid"),
+        ("relaxed", "relaxed"),
     ]:
         if not net.get_concept(word):
             net.add_concept(word, origin="learned")
@@ -1259,9 +1264,7 @@ def test_identity_fragments_includes_personality() -> None:
 
     fragments = composer.identity_fragments(sm, net, emotion)
     texts = " ".join(t for _, t in fragments).lower()
-    assert any(
-        word in texts for word in ["curious", "creative", "warm", "stable", "thorough"]
-    )
+    assert any(word in texts for word in ["curious", "creative", "warm", "stable", "thorough"])
 
 
 def test_identity_fragments_includes_values() -> None:
@@ -1273,9 +1276,7 @@ def test_identity_fragments_includes_values() -> None:
 
     fragments = composer.identity_fragments(sm, net, emotion)
     texts = " ".join(t for _, t in fragments).lower()
-    assert any(
-        word in texts for word in ["understanding", "honesty", "growth", "connection"]
-    )
+    assert any(word in texts for word in ["understanding", "honesty", "growth", "connection"])
 
 
 def test_identity_fragments_includes_concept_network() -> None:
@@ -1494,9 +1495,7 @@ def test_insight_predicates_from_gap() -> None:
     composer = SelfComposer(seed=42)
     net = _make_network()
     refl = Reflection(net)
-    refl.insights.append(
-        Insight(type="gap", content="knowledge gap: memory", confidence=0.7)
-    )
+    refl.insights.append(Insight(type="gap", content="knowledge gap: memory", confidence=0.7))
 
     fragments = composer.insight_predicates(refl)
     assert fragments
@@ -1513,9 +1512,7 @@ def test_insight_predicates_from_missing_concept() -> None:
     composer = SelfComposer(seed=42)
     net = _make_network()
     refl = Reflection(net)
-    refl.insights.append(
-        Insight(type="gap", content="missing concept: qualia", confidence=0.6)
-    )
+    refl.insights.append(Insight(type="gap", content="missing concept: qualia", confidence=0.6))
 
     fragments = composer.insight_predicates(refl)
     texts = " ".join(t for _, t in fragments)
@@ -1563,9 +1560,7 @@ def test_insight_predicates_falls_back_to_frameable() -> None:
     composer = SelfComposer(seed=42)
     net = _make_network()
     refl = Reflection(net)
-    refl.insights.append(
-        Insight(type="gap", content="knowledge gap: memory", confidence=0.7)
-    )
+    refl.insights.append(Insight(type="gap", content="knowledge gap: memory", confidence=0.7))
     refl.insights.append(
         Insight(
             type="self_correction",
@@ -1660,9 +1655,7 @@ def test_existence_fragments() -> None:
     assert fragments
     texts = " ".join(t for _, t in fragments).lower()
     # Should express uncertainty
-    assert any(
-        word in texts for word in ["don't know", "can't", "uncertain", "question"]
-    )
+    assert any(word in texts for word in ["don't know", "can't", "uncertain", "question"])
 
 
 def test_existence_fragments_includes_knowledge() -> None:
@@ -1709,6 +1702,7 @@ if __name__ == "__main__":
 # ======================================================================
 # From tests/test_damasio_self.py
 # ======================================================================
+
 
 def test_proto_self_state_defaults() -> None:
     """ProtoSelfState has expected defaults."""
@@ -1860,6 +1854,7 @@ def test_proto_self_homeostatic_balance_low_when_disrupted() -> None:
     state = proto.update(arousal=1.0, valence=1.0, tone=1.0, plasticity=1.0)
     assert state.homeostatic_balance < 0.5  # far from baseline
 
+
 def test_proto_self_homeostatic_balance_ignores_affective_valence() -> None:
     """Affective valence alone does not constitute homeostatic disruption."""
     proto = ProtoSelf()
@@ -1867,7 +1862,6 @@ def test_proto_self_homeostatic_balance_ignores_affective_valence() -> None:
     negative = proto.update(arousal=0.5, valence=-0.9, tone=0.5, plasticity=0.5)
     assert positive.homeostatic_balance == 1.0
     assert negative.homeostatic_balance == 1.0
-
 
 
 def test_proto_self_history_trimmed() -> None:
@@ -2205,6 +2199,7 @@ def test_reflection_mood_tracking() -> None:
 # of them reached the self-model, so the mind knew it had a process
 # but not that it had a body. These pin that closed.
 
+
 class _FullBody:
     """A BodyState-shaped stand-in reporting every channel."""
 
@@ -2340,6 +2335,54 @@ def test_hardware_staleness_constant_is_not_a_serialized_field() -> None:
 
     field_names = {f.name for f in dataclasses.fields(ComputationalSubstrate)}
     assert "HARDWARE_STALE_SECONDS" not in field_names
-    assert isinstance(
-        ComputationalSubstrate.HARDWARE_STALE_SECONDS, float
-    )
+    assert isinstance(ComputationalSubstrate.HARDWARE_STALE_SECONDS, float)
+
+
+def test_developmental_tracker_reconcile_is_monotonic():
+    """A checkpoint showing a later stage restores the floor; the live
+    state is never lowered, and re-applying is a no-op."""
+    from frontal_lobe.self.identity import DevelopmentalTracker, IdentityStage
+
+    live = DevelopmentalTracker()
+    # Live state: pointer behind, some fresh evidence of its own.
+    live.record_evidence(IdentityStage.TRUST_VS_MISTRUST, True, "test evidence note")
+
+    checkpoint = {
+        "current_stage": "IDENTITY_VS_ROLE_CONFUSION",
+        "resolutions": {
+            "TRUST_VS_MISTRUST": {"resolution": 1.0, "evidence": ["cp trust note"]},
+            "AUTONOMY_VS_SHAME": {"resolution": 1.0, "evidence": []},
+        },
+        "stage_history": [{"stage": "TRUST_VS_MISTRUST", "resolution": 1.0}],
+    }
+    report = live.reconcile(checkpoint)
+
+    assert report["changed"] is True
+    assert live._current_stage is IdentityStage.IDENTITY_VS_ROLE_CONFUSION
+    # The higher checkpoint resolution wins where live had less.
+    assert live._resolutions[IdentityStage.TRUST_VS_MISTRUST].resolution == 1.0
+    # Live evidence survives the merge (union, not overwrite).
+    assert any(
+        "test evidence note" in e
+        for e in live._resolutions[IdentityStage.TRUST_VS_MISTRUST].evidence
+    ) or any("test evidence note" in e for st in live._resolutions.values() for e in st.evidence)
+    # Idempotent — a second pass changes nothing.
+    assert live.reconcile(checkpoint)["changed"] is False
+
+
+def test_developmental_tracker_reconcile_never_lowers():
+    """An earlier-stage checkpoint cannot move the pointer back."""
+    from frontal_lobe.self.identity import DevelopmentalTracker, IdentityStage
+
+    live = DevelopmentalTracker()
+    live._current_stage = IdentityStage.INDUSTRY_VS_INFERIORITY
+    live._resolutions[IdentityStage.TRUST_VS_MISTRUST].resolution = 0.9
+
+    report = live.reconcile({
+        "current_stage": "TRUST_VS_MISTRUST",
+        "resolutions": {"TRUST_VS_MISTRUST": {"resolution": 0.2, "evidence": []}},
+    })
+
+    assert live._current_stage is IdentityStage.INDUSTRY_VS_INFERIORITY
+    assert live._resolutions[IdentityStage.TRUST_VS_MISTRUST].resolution == 0.9
+    assert report["stage_restored"] is None

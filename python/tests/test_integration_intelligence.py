@@ -219,8 +219,7 @@ def test_dedup_reasoning_ignores_sentence_punctuation() -> None:
     net = ConceptNetwork()
     net.add_concept("ferret", confidence=0.6, origin="learned")
     net.add_concept("small mammal", confidence=0.5)
-    net.add_edge("ferret", "small mammal", RelationType.IS_A, 0.6,
-                 origin="stated")
+    net.add_edge("ferret", "small mammal", RelationType.IS_A, 0.6, origin="stated")
     reasoner = Reasoner(net)
     results = reasoner.reason_about("ferret")
     assert results, "expected a deductive conclusion for an is_a edge"
@@ -237,13 +236,10 @@ def test_compose_about_does_not_repeat_fact_as_inference() -> None:
         "ferret",
         confidence=0.6,
         origin="learned",
-        properties={
-            "definition": "a small mammal that likes to steal shiny objects"
-        },
+        properties={"definition": "a small mammal that likes to steal shiny objects"},
     )
     net.add_concept("small mammal", confidence=0.5)
-    net.add_edge("ferret", "small mammal", RelationType.IS_A, 0.6,
-                 origin="stated")
+    net.add_edge("ferret", "small mammal", RelationType.IS_A, 0.6, origin="stated")
     reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion()
@@ -292,7 +288,7 @@ def test_compose_confidence_reflects_knowledge() -> None:
     uncertain_thought = composer.compose_about("uncertain", emotion)
 
     assert certain_thought is not None  # has knowledge → composes
-    assert uncertain_thought is None    # no knowledge → silence
+    assert uncertain_thought is None  # no knowledge → silence
 
 
 # ─── Working memory tests ──────────────────────────────────────
@@ -512,9 +508,7 @@ def test_gather_knowledge_excludes_hub_attachment_edges() -> None:
     net = ConceptNetwork()
     net.add_concept("makes", confidence=0.9)
     net.add_concept("emotion", confidence=1.0)
-    net.add_edge(
-        "makes", "emotion", RelationType.RELATED_TO, 0.10, origin="hub_attachment"
-    )
+    net.add_edge("makes", "emotion", RelationType.RELATED_TO, 0.10, origin="hub_attachment")
     composer = ThoughtComposer(net, Reasoner(net), seed=42)
 
     assert composer._gather_knowledge("makes", depth=2) == []

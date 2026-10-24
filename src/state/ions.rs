@@ -121,8 +121,9 @@ impl IonId {
 /// Resting intracellular concentrations in mM, in `IonId` order.
 ///
 /// Ca²⁺ is 100 nM (0.0001 mM), Cl⁻ is low intracellularly, K⁺ is the
-/// dominant intracellular cation, and Na⁺ is low intracellularly.
-pub const REST_INTRACELLULAR_MM: [f32; ION_COUNT] = [0.0001, 6.0, 140.0, 15.0];
+/// dominant intracellular cation, and Na⁺ is low intracellularly (~10 mM
+/// in neurons, per hippocampal and cortical measurements).
+pub const REST_INTRACELLULAR_MM: [f32; ION_COUNT] = [0.0001, 6.0, 140.0, 10.0];
 
 /// Resting extracellular concentrations in mM, in `IonId` order.
 pub const REST_EXTRACELLULAR_MM: [f32; ION_COUNT] = [1.2, 110.0, 5.0, 145.0];
@@ -455,19 +456,25 @@ impl IonState {
 
         // Extracellular reservoirs and glial buffering pull concentrations
         // back toward their physiological bath values. Slow intracellular
-        // restoration bounds residual Na⁺/K⁺ drift without hiding the
-        // explicit pump fluxes above.
+        // restoration for Na⁺/K⁺ is gated by ATP availability: without energy,
+        // passive restoration is disabled and pump/transporter fluxes alone
+        // determine concentration drift. This prevents the restoration term
+        // from masking pump failure or ATP depletion.
         let dt64 = f64::from(dt);
         let extracellular_alpha = -(-dt64 / f64::from(EXTRACELLULAR_TAU_S)).exp_m1();
         let intracellular_alpha = -(-dt64 / f64::from(INTRACELLULAR_TAU_S)).exp_m1();
+        let atp_factor = f64::from(self.atp_availability);
         for (i, ion) in IonId::all().into_iter().enumerate() {
             let flux = f64::from(channel_flux[i]) + f64::from(transporter_flux[i]);
             let inside = f64::from(self.intracellular_mm[i]);
             let outside = f64::from(self.extracellular_mm[i]);
             let inside_delta = if ion == IonId::Sodium || ion == IonId::Potassium {
-                (f64::from(REST_INTRACELLULAR_MM[i]) - inside
+                // Restoration is scaled by ATP: when ATP is low, only the
+                // explicit pump/transporter fluxes drive concentration change.
+                let restoration = (f64::from(REST_INTRACELLULAR_MM[i]) - inside
                     + flux * f64::from(INTRACELLULAR_TAU_S))
-                    * intracellular_alpha
+                    * intracellular_alpha;
+                flux * dt64 + restoration * atp_factor
             } else {
                 flux * dt64
                     * if ion == IonId::Calcium {

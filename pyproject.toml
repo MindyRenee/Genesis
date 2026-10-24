@@ -16,7 +16,7 @@ keywords = [
     "machine-learning",
     "neuromodulation",
 ]
-license = { text = "AGPL-3.0-only, with Ethical Use restrictions (see LICENSE)" }
+license = { text = "Proprietary — all rights reserved (see LICENSE)" }
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -33,6 +33,7 @@ dependencies = [
     # Pinned mirrors of requirements.txt — update both together.
     "numpy==2.5.3",
     "nltk==3.10.3",
+    "scipy==1.16.3",
     "orjson==3.12.0",
     "psutil==7.2.2",
     "Pillow==12.3.0",
@@ -44,18 +45,30 @@ dependencies = [
 [project.optional-dependencies]
 # Voice/ambient-listening extras — the wheels bind system libraries
 # (libportaudio, etc.), so they stay opt-in. Degrade-to-text is normal.
+# piper-tts ships the piper binary that install_optional_deps.sh links
+# into python/voices/piper; speech.py invokes it as a subprocess.
 voice = [
     "vosk==0.3.45",
     "sounddevice==0.5.2",
     "speechrecognition==3.14.2",
+    "piper-tts==1.8.0",
 ]
-
-[project.urls]
-Repository = "https://github.com/MindyRenee/Genesis"
-Issues = "https://github.com/MindyRenee/Genesis/issues"
-Documentation = "https://github.com/MindyRenee/Genesis/tree/main/docs"
-Changelog = "https://github.com/MindyRenee/Genesis/blob/main/CHANGELOG.md"
-DOI = "https://doi.org/10.5281/zenodo.22817337"
+# ARC game-play extras — the engine stack pulls in flask/matplotlib/
+# pydantic, so it stays opt-in. arc.py imports it lazily and the ARC
+# tests skip without it.
+arc = [
+    "arc-agi>=0.9.9",
+    "arcengine>=0.9.3",
+]
+# Symbolic mathematics (parietal formal layer — symbolic_math tool).
+# symbolic.py imports it lazily and degrades gracefully without it;
+# the math tests skip when absent.
+math = [
+    "sympy==1.12",
+    # mpmath>=1.4 deprecated names sympy 1.12 still calls
+    # (ctx_mp.bitcount, mpnumeric) — keep it below the break.
+    "mpmath<1.4",
+]
 
 [project.scripts]
 genesis = "genesis_cli:_console_main"
@@ -79,6 +92,7 @@ exclude = ["tests*", "python*", "voices*", "__pycache__*", "scripts*"]
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+extend-exclude = ["build", "notebooks"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "RUF", "B", "BLE", "C4"]

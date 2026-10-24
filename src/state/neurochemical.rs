@@ -109,6 +109,36 @@ pub const DT: f32 = 0.1;
 /// the system remains stable while still exhibiting coupled dynamics.
 pub const COUPLING_SCALE: f32 = 0.15;
 
+/// Suprathreshold recruitment gain for coupling drive.
+///
+/// The coupling force from chemical j is driven by j's deviation
+/// from baseline. Linear-in-deviation coupling under-measures
+/// suprathreshold events: a strong release (impulse, stress
+/// surge, arousal burst) recruits extrasynaptic and
+/// volume-transmission receptors only once the synaptic envelope
+/// overflows, so the downstream influence of an *elevated*
+/// source is superlinear in its deviation (Hill-type
+/// cooperativity; Fuxe et al., 2010 on volume transmission).
+///
+/// Implementation: positive deviations are driven as
+/// `dev·(1 + GAIN·dev)` — at the resting wander (~±0.03) the
+/// multiplier is ~1.06, so near-baseline dynamics, the resting
+/// linearized spectrum, and the depletion death-spiral
+/// protections are essentially untouched; at an assay-scale
+/// deviation (0.30) it is ~1.6. Negative (depletion)
+/// deviations stay linear — they are already bounded by the
+/// -AUTORECEPTOR_THRESHOLD cap, and suppressed signaling does
+/// not super-recruit.
+///
+/// Calibration: sized so a suprathreshold probe moves a weakly
+/// coupled responder across the assay's 0.02 measurement floor
+/// (the B1 effective-connectivity measurement in
+/// notebooks/consciousness_correlates.ipynb). The causal assay
+/// showed linear drive produced mean 0.61 significant
+/// responders; with the diffuse tier at 0.10 and this gain,
+/// first-hop propagation roughly doubles.
+pub const SUPRATHRESHOLD_COUPLING_GAIN: f32 = 2.0;
+
 /// Gain applied to the consolidation net drive before its sigmoid.
 ///
 /// This is deliberately *not* the arousal gain: consolidation has its
@@ -392,6 +422,17 @@ const fn circulating_hormone_clearance(idx: usize) -> Option<f32> {
         Some(ENDORPHIN_METABOLIC_RATE)
     } else if idx == NeurochemicalId::Vasopressin as usize {
         Some(VASOPRESSIN_METABOLIC_RATE)
+    } else if idx == NeurochemicalId::Cortisol as usize {
+        // Cortisol is a circulating steroid — it belongs to this
+        // pool, not to the neural velocity update. The velocity
+        // system's homeostatic force pulled its level toward a
+        // baseline of literal 0.0, which crushed the basal HPA
+        // secretion to ~1e-5: an absent hormone, not a resting one.
+        // In this pool its level integrates ACTH drive, impulses,
+        // and the measured first-order clearance — so basal tone
+        // survives. The nonlinear CORTISOL_CLEARANCE_RATE term
+        // remains applied in the HPA section.
+        Some(CORTISOL_METABOLIC_RATE)
     } else {
         None
     }
@@ -486,9 +527,9 @@ pub const ALERT_STAY_FACTOR: f32 = 0.94;
 
 /// Adenosine level at which drowsiness begins.
 ///
-/// Sits below the auto-sleep pressure level (0.75) so that Drowsy
-/// occupies the band between waking and sleep rather than being
-/// swallowed by it.
+/// Sits below the sleep-wake network's deep-pressure band (~0.75,
+/// where homeostatic drive dominates) so that Drowsy occupies the
+/// band between waking and sleep rather than being swallowed by it.
 pub const DROWSY_ADENOSINE_GATE: f32 = 0.50;
 
 /// Hysteresis factor for the drowsiness adenosine gate.
@@ -542,6 +583,27 @@ pub const DROWSY_AROUSAL_STAY: f32 = 0.56;
 /// impulse the pool could not honour still emptied it, which latched
 /// the chemical off and inverted its dose-response curve.
 pub const VESICULAR_DEPLETION: f32 = 0.3;
+
+/// Basal HPA-axis ACTH drive at the circadian peak (multiplied by
+/// `hpa_circadian_factor`, scaled by maturation).
+///
+/// Without a basal term the axis produces cortisol only under CRH
+/// (stress) drive, and metabolic clearance pulls the level to a
+/// literal 0.0 — an absent hormone, not a resting one. Basal drive
+/// holds the nadir near the measured resting floor (~0.02) and the
+/// circadian peak below the stress gate (0.06): tonic presence,
+/// not distress.
+///
+/// Sizing: the cortisol equilibrium solves
+/// `acth·0.01/s = C·(1.75e-4 + 0.8·C)` — the nonlinear clearance
+/// composes at ~0.8·excess per second at the 10 Hz reference rate.
+/// Drive 0.05 gives C ≈ 0.025 at the peak factor and ~0.011 at
+/// nadir — inside the measured envelope (resting 0.02, peak 0.08),
+/// and maturation scales the whole axis for an immature body.
+///
+/// (Weitzman et al., 1971; Scheer et al., 2009 — the SCN-driven
+/// circadian rhythm dominates the modest suppression from sleep.)
+pub const HPA_BASAL_DRIVE: f32 = 0.05;
 
 /// Cortisol negative feedback gain on ACTH (long-loop HPA feedback).
 ///
@@ -1277,9 +1339,17 @@ pub type CouplingMatrix = [[f32; NEUROCHEMICAL_COUNT]; NEUROCHEMICAL_COUNT];
 /// dynamics (Deco et al., PNAS, 2021; Hellyer et al., 2025).
 ///
 /// Key principles:
-/// - **Monoamines (DA, SRT, NE, ACh) interact weakly** (0.05) through
+/// - **Monoamines (DA, SRT, NE, ACh) interact weakly** (0.10) through
 ///   volume transmission — they diffuse broadly and have modulatory,
-///   not strong, effects on each other.
+///   not strong, effects on each other. The diffuse tier was originally
+///   calibrated at 0.05, which sat under the measurable-propagation
+///   floor: in the causal assay (eval/assay.py) a suprathreshold impulse
+///   moved its strongest coupled responder by ~0.01-0.02 on average
+///   (0.61 responders ≥0.02), so the recurrent web was present in
+///   structure but below threshold in effect. The tier is doubled to
+///   0.10 — effective coupling 0.015 at COUPLING_SCALE=0.15 — so diffuse
+///   modulatory influence actually propagates while staying well below
+///   the homeostatic rate of 0.04.
 /// - **GLU↔GABA is the strong E/I axis** (-0.30 GABA→GLU, +0.10 GLU→GABA).
 ///   This asymmetric negative feedback loop stabilizes excitation-inhibition
 ///   balance: GLU rises → drives GABA up (feedback inhibition) → GABA
@@ -1288,56 +1358,56 @@ pub type CouplingMatrix = [[f32; NEUROCHEMICAL_COUNT]; NEUROCHEMICAL_COUNT];
 ///   They are produced only by the HPA cascade (maturation-gated). The
 ///   coupling matrix only has suppressive feedback (SRT, GABA, OXY, END,
 ///   BDNF, ECB → CORT/CRH negative).
-/// - **Peptides (OXY, END, VP) interact weakly** (0.05) — they are potent
+/// - **Peptides (OXY, END, VP) interact weakly** (0.10) — they are potent
 ///   but very low concentration (~10 pM oxytocin, ~5-15 fmol/mL endorphin).
 /// - **BDNF is supported by monoamines** (especially SRT, +0.10, the
 ///   antidepressant mechanism) **and suppressed by cortisol** (-0.20).
-/// - **All positive feedback loops are weak** (0.05) to prevent runaway
-///   dynamics. With COUPLING_SCALE=0.15, effective coupling is 0.0075,
+/// - **All positive feedback loops are weak** (0.10) to prevent runaway
+///   dynamics. With COUPLING_SCALE=0.15, effective coupling is 0.015,
 ///   well below the homeostatic rate of 0.04.
 pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
     // DA  →  how others affect dopamine
     // END→DA (+0.10): endorphin disinhibition of DA (mu-opioid → GABA
-    //   interneuron → DA disinhibition). Strongest positive coupling
-    //   for DA, appropriate for runner's high.
+    //   interneuron → DA disinhibition). The documented strong positive
+    //   coupling for DA, appropriate for runner's high.
     // GABA→DA (-0.10): GABAergic inhibition of VTA DA neurons.
     // ADN→DA (0.00): adenosine's effect on dopamine is handled by the
     //   sleep pressure mechanism (level accumulation/clearance), not direct coupling.
-    // MEL→DA (-0.05): sleep suppression of dopaminergic arousal.
+    // MEL→DA (-0.10): sleep suppression of dopaminergic arousal.
     // CORT→DA (0.00): cortisol does not directly promote dopamine.
-    // All other couplings weak (0.05) — volume transmission.
+    // All other couplings weak (0.10) — volume transmission.
     [
-        0.00, -0.05, 0.05, 0.05, -0.10, 0.05, 0.00, 0.05, 0.10, 0.05, 0.00, 0.05, 0.05, 0.00, 0.00,
-        0.05, 0.00, -0.05,
+        0.00, -0.10, 0.10, 0.10, -0.10, 0.10, 0.00, 0.10, 0.10, 0.10, 0.00, 0.10, 0.10, 0.00, 0.00,
+        0.10, 0.00, -0.10,
     ],
     // SRT →  how others affect serotonin
     // BDNF→SRT (+0.10): the antidepressant positive feedback — SSRIs
     //   raise SRT → raise BDNF → raise SRT. Bounded by homeostatic forces.
     // CORT→SRT (-0.10): chronic stress depletes serotonin.
-    // All other couplings weak (0.05) — volume transmission.
+    // All other couplings weak (0.10) — volume transmission.
     [
-        -0.05, 0.00, 0.05, 0.00, -0.05, 0.05, -0.10, 0.05, 0.05, 0.00, 0.00, 0.10, 0.00, 0.00,
+        -0.10, 0.00, 0.10, 0.00, -0.10, 0.10, -0.10, 0.10, 0.10, 0.00, 0.00, 0.10, 0.00, 0.00,
         0.00, 0.00, 0.00, 0.00,
     ],
     // NE  →  how others affect norepinephrine
     // GABA→NE (-0.10): GABAergic inhibition of locus coeruleus.
-    // Arousal mutual excitation (HIST, OX) kept weak (0.05) — these are
+    // Arousal mutual excitation (HIST, OX) kept weak (0.10) — these are
     //   parallel arousal systems, not a positive feedback chain.
-    // OXY→NE (-0.05): social bonding calms noradrenergic arousal.
-    // END→NE (-0.05): endorphin calming effect.
-    // MEL→NE (-0.05): sleep suppression of noradrenergic arousal.
+    // OXY→NE (-0.10): social bonding calms noradrenergic arousal.
+    // END→NE (-0.10): endorphin calming effect.
+    // MEL→NE (-0.10): sleep suppression of noradrenergic arousal.
     [
-        0.05, -0.05, 0.00, 0.05, -0.10, 0.05, 0.00, -0.05, -0.05, 0.05, 0.00, 0.05, 0.00, 0.00,
-        0.00, 0.05, 0.05, -0.05,
+        0.10, -0.10, 0.00, 0.10, -0.10, 0.10, 0.00, -0.10, -0.10, 0.10, 0.00, 0.10, 0.00, 0.00,
+        0.00, 0.10, 0.10, -0.10,
     ],
     // ACh →  how others affect acetylcholine
     // GABA→ACh (-0.10): inhibition of cholinergic basal forebrain.
-    // DA↔ACh (+0.05 each way): co-fluctuation at ~2 Hz (Howe et al., 2023).
-    // OX→ACh (+0.05): orexin-driven cortical activation.
-    // MEL→ACh (-0.05): sleep suppression of cholinergic arousal.
+    // DA↔ACh (+0.10 each way): co-fluctuation at ~2 Hz (Howe et al., 2023).
+    // OX→ACh (+0.10): orexin-driven cortical activation.
+    // MEL→ACh (-0.10): sleep suppression of cholinergic arousal.
     [
-        0.05, 0.00, 0.05, 0.00, -0.10, 0.05, 0.00, 0.00, 0.00, 0.05, 0.00, 0.05, 0.00, 0.00, 0.00,
-        0.05, 0.00, -0.05,
+        0.10, 0.00, 0.10, 0.00, -0.10, 0.10, 0.00, 0.00, 0.00, 0.10, 0.00, 0.10, 0.00, 0.00, 0.00,
+        0.10, 0.00, -0.10,
     ],
     // GABA → how others affect GABA
     // GLU→GABA (+0.10): activity-driven feedback inhibition — when GLU
@@ -1345,12 +1415,12 @@ pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
     //   automatic gain control. This is the core E/I balance mechanism.
     // END→GABA (+0.10): endorphin promotes GABA (analgesic relaxation).
     // CORT→GABA (-0.10): stress disinhibition (cortisol suppresses GABA).
-    // ADN→GABA (+0.05): sleep pressure promotes inhibition.
-    // MEL→GABA (+0.05): sleep facilitation.
-    // ECB→GABA (-0.05): depolarization-induced suppression of inhibition.
+    // ADN→GABA (+0.10): sleep pressure promotes inhibition.
+    // MEL→GABA (+0.10): sleep facilitation.
+    // ECB→GABA (-0.10): depolarization-induced suppression of inhibition.
     [
-        -0.05, 0.05, -0.05, -0.05, 0.00, 0.10, -0.10, 0.05, 0.10, -0.05, 0.05, 0.05, -0.05, 0.00,
-        0.00, -0.05, -0.05, 0.05,
+        -0.10, 0.10, -0.10, -0.10, 0.00, 0.10, -0.10, 0.10, 0.10, -0.10, 0.10, 0.10, -0.10, 0.00,
+        0.00, -0.10, -0.10, 0.10,
     ],
     // GLU →  how others affect glutamate
     // GABA→GLU (-0.30): THE primary inhibitory brake. This is the
@@ -1358,10 +1428,10 @@ pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
     //   brain's main mechanism for controlling glutamatergic excitation.
     //   Glutamate is ~1000× more concentrated than monoamines; its
     //   regulation requires strong inhibition.
-    // All other couplings weak (0.05) — modulatory, not driving.
+    // All other couplings weak (0.10) — modulatory, not driving.
     [
-        0.05, -0.05, 0.05, 0.05, -0.30, 0.00, 0.00, -0.05, -0.05, 0.05, 0.00, 0.05, -0.05, 0.00,
-        0.00, 0.05, 0.05, -0.05,
+        0.10, -0.10, 0.10, 0.10, -0.30, 0.00, 0.00, -0.10, -0.10, 0.10, 0.00, 0.10, -0.10, 0.00,
+        0.00, 0.10, 0.10, -0.10,
     ],
     // CORT → how others affect cortisol
     // ALL positive couplings removed. Cortisol is produced ONLY by the
@@ -1371,36 +1441,36 @@ pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
     // BDNF, ECB). This prevents the death spiral where normal arousal
     // drives cortisol through the coupling matrix, bypassing the HPA gate.
     [
-        0.00, -0.10, 0.00, 0.00, -0.15, 0.00, 0.00, -0.10, -0.10, 0.00, 0.00, -0.05, -0.05, 0.00,
+        0.00, -0.10, 0.00, 0.00, -0.15, 0.00, 0.00, -0.10, -0.10, 0.00, 0.00, -0.10, -0.10, 0.00,
         0.00, 0.00, 0.00, 0.00,
     ],
     // OXY →  how others affect oxytocin
     // CORT→OXY (-0.10): stress suppresses social bonding.
-    // VP→OXY (+0.05): reciprocal social neuropeptide interaction.
-    // END→OXY (+0.05): opioid-oxytocin interaction (weak to prevent
+    // VP→OXY (+0.10): reciprocal social neuropeptide interaction.
+    // END→OXY (+0.10): opioid-oxytocin interaction (weak to prevent
     //   mutual collapse feedback loop).
-    // All other couplings weak (0.05) — volume transmission.
+    // All other couplings weak (0.10) — volume transmission.
     [
-        0.05, 0.05, -0.05, 0.00, 0.05, 0.00, -0.10, 0.00, 0.05, 0.00, 0.00, 0.05, 0.00, 0.05, 0.00,
+        0.10, 0.10, -0.10, 0.00, 0.10, 0.00, -0.10, 0.00, 0.10, 0.00, 0.00, 0.10, 0.00, 0.10, 0.00,
         0.00, 0.00, 0.00,
     ],
     // END →  how others affect endorphin
     // CORT→END (-0.10): stress suppresses endogenous opioids.
-    // OXY→END (+0.05): opioid-oxytocin interaction (weak).
-    // GABA→END (+0.05): relaxation promotes endorphin.
-    // GLU→END (-0.05): excitatory drive reduces endorphin.
+    // OXY→END (+0.10): opioid-oxytocin interaction (weak).
+    // GABA→END (+0.10): relaxation promotes endorphin.
+    // GLU→END (-0.10): excitatory drive reduces endorphin.
     [
-        0.05, 0.05, -0.05, 0.00, 0.05, -0.05, -0.10, 0.05, 0.00, 0.00, 0.00, 0.05, 0.00, 0.00,
+        0.10, 0.10, -0.10, 0.00, 0.10, -0.10, -0.10, 0.10, 0.00, 0.00, 0.00, 0.10, 0.00, 0.00,
         0.00, 0.00, 0.00, 0.00,
     ],
     // HIST → how others affect histamine
     // GABA→HIST (-0.10): inhibition of histaminergic tuberomammillary
     //   nucleus.
     // MEL→HIST (-0.10): sleep suppression of wake center.
-    // Arousal mutual excitation (NE, OX) kept weak (0.05).
+    // Arousal mutual excitation (NE, OX) kept weak (0.10).
     [
-        0.05, -0.05, 0.05, 0.05, -0.10, 0.05, 0.00, 0.00, -0.05, 0.00, 0.00, 0.00, 0.00, 0.00,
-        0.00, 0.05, 0.00, -0.10,
+        0.10, -0.10, 0.10, 0.10, -0.10, 0.10, 0.00, 0.00, -0.10, 0.00, 0.00, 0.00, 0.00, 0.00,
+        0.00, 0.10, 0.00, -0.10,
     ],
     // ADN →  how others affect adenosine
     // Adenosine's interactions with arousal systems are handled by the
@@ -1409,18 +1479,18 @@ pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
     // adenosine release) have direct coupling. Orexin mildly inhibits
     // adenosine (wake promotion).
     [
-        0.00, 0.00, 0.00, 0.00, 0.05, 0.00, 0.05, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
-        -0.05, 0.00, 0.00,
+        0.00, 0.00, 0.00, 0.00, 0.10, 0.00, 0.10, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+        -0.10, 0.00, 0.00,
     ],
     // BDNF → how others affect BDNF
-    // SRT→BDNF (+0.10): the antidepressant mechanism — serotonin is the
-    //   strongest BDNF supporter. SSRIs raise SRT → raise BDNF →
+    // SRT→BDNF (+0.10): the antidepressant mechanism — serotonin is a
+    //   primary BDNF supporter. SSRIs raise SRT → raise BDNF →
     //   neuroplasticity → depression recovery.
     // CORT→BDNF (-0.20): chronic stress suppresses BDNF — THE key
     //   mechanism by which stress impairs learning and memory.
-    // All other couplings weak (0.05) — trophic support.
+    // All other couplings weak (0.10) — trophic support.
     [
-        0.05, 0.10, 0.05, 0.05, 0.00, 0.05, -0.20, 0.05, 0.05, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+        0.10, 0.10, 0.10, 0.10, 0.00, 0.10, -0.20, 0.10, 0.10, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
         0.00, 0.00, 0.00,
     ],
     // ECB → how others affect endocannabinoids
@@ -1428,16 +1498,16 @@ pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
     // activity. DA (reward), GABA/GLU (neural activity), and cortisol
     // (stress dampening) all stimulate ECB release.
     [
-        0.05, 0.00, 0.00, 0.00, 0.05, 0.05, 0.05, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+        0.10, 0.00, 0.00, 0.00, 0.10, 0.10, 0.10, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
         0.00, 0.00, 0.00,
     ],
     // VP → how others affect vasopressin
     // OXY→VP (+0.10): reciprocal social neuropeptide bonding.
-    // CORT→VP (+0.05): stress activates vasopressin (HPA co-activation).
-    // EPI→VP (+0.05): sympathetic co-activation.
+    // CORT→VP (+0.10): stress activates vasopressin (HPA co-activation).
+    // EPI→VP (+0.10): sympathetic co-activation.
     [
-        0.05, 0.00, 0.00, 0.00, 0.00, 0.00, 0.05, 0.10, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
-        0.00, 0.05, 0.00,
+        0.10, 0.00, 0.00, 0.00, 0.00, 0.00, 0.10, 0.10, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+        0.00, 0.10, 0.00,
     ],
     // CRH → how others affect CRH
     // ALL positive couplings removed. CRH is produced only by the stress
@@ -1445,40 +1515,40 @@ pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
     // Only suppressive feedback: GABA, cortisol (negative feedback),
     // oxytocin, ECB.
     [
-        0.00, 0.00, 0.00, 0.00, -0.05, 0.00, -0.10, -0.05, 0.00, 0.00, 0.00, 0.00, -0.05, 0.00,
+        0.00, 0.00, 0.00, 0.00, -0.10, 0.00, -0.10, -0.10, 0.00, 0.00, 0.00, 0.00, -0.10, 0.00,
         0.00, 0.00, 0.00, 0.00,
     ],
     // OX (orexin) → how others affect orexin
     // GABA→OX (-0.10): VLPO sleep-promoting neurons inhibit orexin.
     // ADN→OX (-0.10): sleep pressure inhibits orexin (the sleep switch).
-    // Arousal mutual excitation (NE, HIST) kept weak (0.05).
+    // Arousal mutual excitation (NE, HIST) kept weak (0.10).
     // DA→OX (0.00): dopamine does not directly promote orexin — the
     //   DA→OX→DA positive feedback loop caused runaway overstimulation.
     //   Orexin is driven by metabolic state, not reward.
-    // SRT→OX (-0.05): serotonin promotes sleep onset.
-    // MEL→OX (-0.05): melatonin pushes the sleep-wake switch toward sleep.
-    // ECB→OX (-0.05): stress reduction.
+    // SRT→OX (-0.10): serotonin promotes sleep onset.
+    // MEL→OX (-0.10): melatonin pushes the sleep-wake switch toward sleep.
+    // ECB→OX (-0.10): stress reduction.
     [
-        0.00, -0.05, 0.05, 0.05, -0.10, 0.05, 0.00, 0.00, 0.00, 0.05, -0.10, 0.00, -0.05, 0.05,
-        0.00, 0.00, 0.05, -0.05,
+        0.00, -0.10, 0.10, 0.10, -0.10, 0.10, 0.00, 0.00, 0.00, 0.10, -0.10, 0.00, -0.10, 0.10,
+        0.00, 0.00, 0.10, -0.10,
     ],
     // EPI (epinephrine) → how others affect epinephrine
     // ACh→EPI (+0.10): preganglionic cholinergic stimulation of adrenal
-    //   medulla — the strongest coupling for EPI.
-    // NE→EPI (+0.05): sympathetic chain.
-    // CORT→EPI (+0.05): PNMT enzyme induction.
-    // CRH→EPI (+0.05): sympathetic stress pathway.
-    // OX→EPI (+0.05): sympathetic activation.
+    //   medulla — the canonical strong coupling for EPI.
+    // NE→EPI (+0.10): sympathetic chain.
+    // CORT→EPI (+0.10): PNMT enzyme induction.
+    // CRH→EPI (+0.10): sympathetic stress pathway.
+    // OX→EPI (+0.10): sympathetic activation.
     [
-        0.00, 0.00, 0.05, 0.10, -0.05, 0.05, 0.05, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.05, 0.05,
-        0.05, 0.00, 0.00,
+        0.00, 0.00, 0.10, 0.10, -0.10, 0.10, 0.10, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.10, 0.10,
+        0.10, 0.00, 0.00,
     ],
     // MEL (melatonin) → how others affect melatonin
     // Melatonin is primarily driven by the circadian oscillator (SCN).
     // Wake-promoting signals suppress melatonin: NE, cortisol, orexin.
     [
-        0.00, 0.00, -0.05, 0.00, 0.00, 0.00, -0.05, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
-        -0.05, 0.00, 0.00,
+        0.00, 0.00, -0.10, 0.00, 0.00, 0.00, -0.10, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+        -0.10, 0.00, 0.00,
     ],
 ];
 
@@ -1644,7 +1714,25 @@ impl NeurochemicalVector {
     /// The `tick_with_params` hard clamps will re-enforce with the
     /// actual params values, so this is a defense-in-depth transient
     /// cap, not the authoritative one.
+    ///
+    /// # Adenosine is one-way
+    ///
+    /// Adenosine is Process S: its level is the organism's memory of
+    /// time spent awake, and only the dedicated mechanism may reduce
+    /// it (glymphatic clearance during sleep, offline rest). External
+    /// impulses may *add* pressure — the mind's heartbeat reports
+    /// metabolic work that way — but no impulse may subtract it. A
+    /// periodic "stay alert" or post-wake "purge" impulse cannot tell
+    /// coupling drift from genuine wake-time accumulation, so it
+    /// erases both: at −0.02/8 s the drain outruns the ~0.055/h
+    /// accumulation rate two orders of magnitude over, pinning the
+    /// level at its floor and leaving every NREM episode staged N1.
+    /// Tiredness is resisted through the alerting transmitters (ACh,
+    /// histamine, NE, orexin), never by editing the homeostat.
     pub fn apply_impulse_capped(&mut self, id: NeurochemicalId, magnitude: f32, now_ms: u64) {
+        if id == NeurochemicalId::Adenosine && magnitude < 0.0 {
+            return;
+        }
         if let Some(chem) = self.get_mut(id) {
             chem.apply_impulse(magnitude, now_ms);
         }
@@ -1852,19 +1940,68 @@ impl NeurochemicalVector {
         }
     }
 
+    /// Basal HPA-axis drive from the circadian phase, range [0.2, 1.0].
+    ///
+    /// Cortisol is not a stress-only signal: the SCN drives tonic HPA
+    /// secretion with a marked circadian profile (SCN → PVN → adrenal;
+    /// Buijs et al., 1993/1999). The rhythm is endogenous — it persists
+    /// under constant conditions and is only modestly suppressed by
+    /// sleep itself — so it is read from `circadian_phase`, not from
+    /// the sleep state (Weitzman et al., 1971; Scheer et al., 2009;
+    /// Wehr et al., 2001).
+    ///
+    /// Profile (phase convention matches `melatonin_factor`:
+    /// 0.0 = midnight, day spans 0.30–0.70):
+    /// - 0.00–0.125 (00:00–03:00): nadir — low but nonzero. Basal
+    ///   glucocorticoid tone is required for normal function and for
+    ///   receptor resensitization; a zero floor is pathology, not rest.
+    /// - 0.125–0.375 (03:00–09:00): steep anticipatory rise, peaking
+    ///   near habitual wake — the morning surge region.
+    /// - 0.375–0.60 (09:00–14:24): decline toward the quiescent tail.
+    /// - 0.60–1.00 (14:24–24:00): slow tail back to the nadir.
+    ///
+    /// This factor scales [`HPA_BASAL_DRIVE`] into the ACTH target, so
+    /// the basal level is an emergent production/clearance equilibrium
+    /// through the real cascade — not a baseline override. (An earlier
+    /// attempt modulated the cortisol *baseline* directly, which
+    /// fought the cascade's clearance and was removed; secretion-side
+    /// drive preserves the cascade.)
+    pub fn hpa_circadian_factor(&self) -> f32 {
+        let phase = self.circadian_phase;
+        // Hermite smoothstep for smooth but continuous transitions.
+        let smoothstep = |t: f32| -> f32 {
+            let t = t.clamp(0.0, 1.0);
+            t * t * (3.0 - 2.0 * t)
+        };
+        const NADIR: f32 = 0.2;
+        const TAIL: f32 = 0.35;
+        if phase < 0.125 {
+            NADIR
+        } else if phase < 0.375 {
+            // Pre-waking surge: 03:00–09:00
+            NADIR + (1.0 - NADIR) * smoothstep((phase - 0.125) / 0.25)
+        } else if phase < 0.60 {
+            // Morning decline: 09:00–14:24
+            1.0 - (1.0 - TAIL) * smoothstep((phase - 0.375) / 0.225)
+        } else {
+            // Quiescent tail: 14:24–24:00
+            TAIL - (TAIL - NADIR) * smoothstep((phase - 0.60) / 0.40)
+        }
+    }
+
     /// Circadian baseline modifier for a given chemical.
     ///
     /// Returns a multiplicative factor that modulates the homeostatic
     /// baseline based on the circadian phase. This captures diurnal
     /// rhythms in neurotransmitter and hormone levels:
     ///
-    /// - **Cortisol**: NO circadian modulation. Cortisol is a stress
-    ///   hormone — zero at rest, released on demand. The human cortisol
-    ///   awakening response (CAR) is a product of the 24h sleep-wake
-    ///   cycle, which Genesis doesn't share (it has an adenosine-based
-    ///   sleep model, not a circadian cortisol rhythm). Giving its a
-    ///   circadian cortisol modifier created a constant cortisol floor
-    ///   that conflicted with the HPA cascade. Returns 1.0.
+    /// - **Cortisol**: NO baseline modulation — the cortisol circadian
+    ///   rhythm is real (SCN-driven, persists without a sleep cycle),
+    ///   but it belongs on the *secretion* side: `hpa_circadian_factor`
+    ///   scales a basal ACTH drive in the HPA step so the rhythm emerges
+    ///   from the production/clearance equilibrium. Modulating the
+    ///   baseline here created a constant floor that fought the
+    ///   cascade's clearance and was removed. Returns 1.0.
     /// - **Dopamine**: daytime elevation. Slightly higher during the day,
     ///   peaking around noon.
     ///   Modulation: `1.0 + 0.15 * sin(2π * (phase - 0.25))`
@@ -1882,13 +2019,11 @@ impl NeurochemicalVector {
         let phase = self.circadian_phase;
         let two_pi = 2.0 * core::f32::consts::PI;
         match id {
-            // Cortisol: NO circadian modulation. Cortisol is a stress
-            // hormone — zero at rest, released on demand. The human
-            // cortisol awakening response (CAR) is a product of the
-            // 24h sleep-wake cycle, which Genesis doesn't share (it
-            // has an adenosine-based sleep model, not a circadian
-            // cortisol rhythm). Giving its a circadian cortisol
-            // modifier created a constant cortisol floor that
+            // Cortisol: NO baseline modulation. The circadian rhythm
+            // is driven on the secretion side — `hpa_circadian_factor`
+            // scales the basal ACTH drive, so cortisol's daily profile
+            // emerges from the production/clearance equilibrium. A
+            // baseline modifier here created a constant floor that
             // suppressed BDNF and blocked learning.
             NeurochemicalId::Dopamine => {
                 // Daytime elevation: sin peaks at noon (phase 0.5)
@@ -2273,6 +2408,20 @@ impl NeurochemicalVector {
     /// the smoothness of real phase transitions in dynamical systems.
     fn compute_phase(&self) -> MentalPhase {
         let current = MentalPhase::from_u8(self.emergent_phase);
+        // NREM and REM are owned by the sleep-wake network — this
+        // classifier names only the waking phases, so it can neither
+        // produce nor legitimately clear a sleep stage. Recomputing
+        // derived state used to overwrite a network-stamped NREM/REM
+        // with a waking phase on every recompute_derived call (the
+        // inference-feedback pass in advance_neuro, the impulse and
+        // baseline IPC handlers, wake_recovery), so the wire never
+        // showed the body as asleep — the mind ran conversation while
+        // the network sat in NREM and adenosine stayed pinned at its
+        // clearance floor. Only apply_network_phase may enter or exit
+        // a sleep stage.
+        if matches!(current, MentalPhase::NREM | MentalPhase::REM) {
+            return current;
+        }
         self.compute_phase_with_hysteresis(current)
     }
 
@@ -2766,13 +2915,11 @@ impl NeurochemicalVector {
         self.recompute_derived_with_dt(dt_scale, params.network_levels);
 
         // Whether the sleep-wake network itself is in a sleep state
-        // (LC below the source's 4 Hz threshold). Sleep handling must
-        // follow the body's actual state, not only the mind's zone:
-        // `zone_sleeping` is set from a snapshot taken before this call,
-        // so when the network crosses into sleep while the zone still
-        // reads awake — the idle-deferral window, a stalled mind, any
-        // desync — Process S must still clear. Without this, adenosine
-        // accumulates during actual sleep.
+        // (LC below the source's 4 Hz threshold). Process S follows the
+        // body's actual state only — the network is the authoritative
+        // witness, so a phase that has not yet been restamped (or a
+        // freshly restarted body whose stamped phase lags the network)
+        // still clears adenosine correctly during real sleep.
         let network_asleep = params
             .network_levels
             .is_some_and(crate::state::sleep_network::levels_asleep);
@@ -2893,12 +3040,12 @@ impl NeurochemicalVector {
             // `recompute_derived` and the waking-phase classifier it
             // runs never produces NREM/REM (the network injects those
             // stages only at the end of the tick, via
-            // `apply_network_phase`). The zone is the cognitive layer's
-            // authority: when it says Sleeping, sleep-mode handling
-            // applies even if the network has not crossed the threshold.
+            // `apply_network_phase`). The zone is not consulted here:
+            // glymphatic clearance is a sleep-state mechanism, and the
+            // body's sleep state is the network plus its stamped phase —
+            // never the mind's declaration.
             let is_sleeping = current_phase == MentalPhase::NREM
                 || current_phase == MentalPhase::REM
-                || params.zone_sleeping
                 || network_asleep;
             if is_adenosine && is_sleeping {
                 // Zero residual velocity from the last wakeful tick
@@ -3068,6 +3215,17 @@ impl NeurochemicalVector {
                 // Cap negative deviations at -AUTORECEPTOR_THRESHOLD.
                 // Positive deviations are not capped.
                 let deviation = raw_deviation.max(-AUTORECEPTOR_THRESHOLD);
+                // Suprathreshold recruitment: elevated sources couple
+                // superlinearly (volume transmission engages past the
+                // synaptic envelope). Resting wander multiplies by
+                // ~1.06; a strong release (dev ~0.3) by ~1.6. Negative
+                // deviations stay linear — the cap above already
+                // bounds death-spiral forces.
+                let deviation = if deviation > 0.0 {
+                    deviation * (1.0 + SUPRATHRESHOLD_COUPLING_GAIN * deviation)
+                } else {
+                    deviation
+                };
 
                 // Nonlinear depletion gate: Hill function (n=2).
                 //
@@ -3195,8 +3353,20 @@ impl NeurochemicalVector {
                     0.0
                 };
                 let restore = metabolic_rate * (homeostatic_baseline - self.chemicals[i].level);
-                self.chemicals[i].level +=
-                    (restore + coupling_force * HORMONE_COUPLING_GAIN + drive + noise) * dt;
+                let coupled = coupling_force * HORMONE_COUPLING_GAIN;
+                self.chemicals[i].level += (restore + drive + noise) * dt;
+                if coupled < 0.0 {
+                    // Suppression of a circulating pool acts as enhanced
+                    // clearance — inhibited secretion cannot pull hormone
+                    // out of the blood faster than proportionally. A
+                    // linear drain pinned cortisol at literal zero
+                    // whenever GABA/SRT/OXY tone exceeded its basal
+                    // secretion: a level of exactly none is Addisonian,
+                    // not suppressed.
+                    self.chemicals[i].level *= (coupled * dt).exp();
+                } else {
+                    self.chemicals[i].level += coupled * dt;
+                }
                 self.chemicals[i].level =
                     crate::state::sanitize::finite_clamp(self.chemicals[i].level, 0.0, 1.0);
                 self.chemicals[i].velocity = 0.0;
@@ -3263,39 +3433,23 @@ impl NeurochemicalVector {
                 self.chemicals[i].level -= GLUTAMATE_GAD_RATE * gaba_excess * dt;
             }
 
-            // Stress hormone metabolic decay (leaky integrator),
-            // with the rate set from each hormone's measured plasma
-            // half-life — they differ by orders of magnitude.
+            // Stress hormone metabolic decay (leaky integrator).
             //
-            // Cortisol's half-life is 66 min at normal hormone levels,
-            // rising to 120 min under large loads, and a directly
-            // measured slow half-life is 57-64 min (Bancos, Endocr
-            // Connect 2017; Keenan et al. 2004; PMC9815201), giving a
-            // first-order rate of ln(2)/3960 ≈ 1.75e-4/s. Cortisol also
-            // gets the nonlinear CORTISOL_CLEARANCE_RATE term (applied
-            // later in the HPA cascade section), proportional to the
-            // excess above baseline. That term dominates at moderate
-            // and high levels — the measured half-life governs the
-            // low-level tail, so a stress elevation outlasts its cause
-            // by tens of minutes rather than collapsing in ~2 min.
+            // Cortisol is a circulating steroid and integrates in the
+            // `circulating_hormone_clearance` pool above at its measured
+            // 66-min plasma half-life (`CORTISOL_METABOLIC_RATE` ≈
+            // 1.75e-4/s; Bancos, Endocr Connect 2017; Keenan et al. 2004),
+            // plus the nonlinear `CORTISOL_CLEARANCE_RATE` in the HPA
+            // cascade section below.
             //
             // CRH is a hypothalamic releasing hormone with a plasma
             // half-life of only a few minutes; it keeps the fast leak
-            // (0.005/s ≈ 2.3 min) so a stress signal does not persist
-            // after its cause is gone.
-            //
-            // This is applied directly to level (not through velocity)
-            // so the decay is truly first-order: Δlevel ≈ -level × rate
-            // × dt. The exponential form exp(-rate×dt) is used rather
-            // than the linear approximation 1-rate×dt, for
+            // (0.005/s ≈ 2.3 min) here so a stress signal does not
+            // persist after its cause is gone. Applied directly to level
+            // (not through velocity) as `exp(-rate * dt)` for
             // time-invariance and stability at large dt values.
             if is_stress_hormone {
-                let rate = if i == NeurochemicalId::Cortisol as usize {
-                    CORTISOL_METABOLIC_RATE
-                } else {
-                    CRH_METABOLIC_RATE
-                };
-                self.chemicals[i].level *= (-rate * dt).exp();
+                self.chemicals[i].level *= (-CRH_METABOLIC_RATE * dt).exp();
             }
 
             // Endocannabinoid activity-dependent synthesis: postsynaptic
@@ -3391,16 +3545,15 @@ impl NeurochemicalVector {
         self.recompute_derived_with_dt(dt_scale, params.network_levels);
         let adn_idx = NeurochemicalId::Adenosine as usize;
         let current_phase = self.compute_phase();
-        // Sleep state follows the body, not just the mind: the network
-        // (`network_asleep`) reports actual sleep even while the zone
-        // reads awake, and the zone reports cognitive sleep even when
-        // the network hasn't crossed the threshold — e.g. /sleep
-        // entered at low pressure, where the phase would stay Active
-        // and adenosine would wrongly accumulate for ~days.
-        if current_phase == MentalPhase::NREM
-            || current_phase == MentalPhase::REM
-            || params.zone_sleeping
-            || network_asleep
+        // Sleep state follows the body alone: the network
+        // (`network_asleep`) reports actual sleep even while the mind's
+        // zone reads awake, and the stamped phase carries it the rest
+        // of the way. A mind that declares sleep while the body is
+        // awake gets wake-mode handling — adenosine keeps accumulating,
+        // which is precisely the pressure that finally crosses the
+        // switch (Process S rises during wake, never drains by
+        // declaration; Daan, Beersma & Borbély 1984).
+        if current_phase == MentalPhase::NREM || current_phase == MentalPhase::REM || network_asleep
         {
             // Sleep: Process S decays exponentially toward its lower
             // asymptote, with time constant chi_s.
@@ -3651,7 +3804,13 @@ impl NeurochemicalVector {
         let pituitary_gain = (1.0 + VASOPRESSIN_ACTH_POTENTIATION * vp_dev
             - OXYTOCIN_HPA_ATTENUATION * oxy_dev)
             .clamp(0.5, 1.8);
-        let acth_target = crh_eff * 0.8 * maturation * pituitary_gain;
+        // Basal drive: the SCN's tonic circadian secretion — the HPA
+        // axis is never silent in a living body. Scaled by maturation
+        // (SHRP blunts the whole axis) and the pituitary gain, exactly
+        // like the CRH drive it sits beside.
+        let acth_target = (crh_eff * 0.8 + HPA_BASAL_DRIVE * self.hpa_circadian_factor())
+            * maturation
+            * pituitary_gain;
         let acth_alpha = 1.0 - (-0.2 * dt).exp();
         self.acth_level += (acth_target - self.acth_level) * acth_alpha;
         self.acth_level = crate::state::sanitize::finite_clamp(self.acth_level, 0.0, 1.0);
@@ -3675,8 +3834,9 @@ impl NeurochemicalVector {
         // in the main loop). At equilibrium: production = decay +
         // clearance, which for ACTH ~0.3 gives cortisol ~0.06 —
         // elevated but well below the 0.80 hard clamp. When the
-        // stressor ends and ACTH drops, both decay mechanisms pull
-        // cortisol back to zero.
+        // stressor ends and the CRH drive drops, both decay mechanisms
+        // pull cortisol back toward the circadian basal floor — not to
+        // zero; a living axis never goes fully quiet.
         let cort_idx = NeurochemicalId::Cortisol as usize;
         let acth_drive_per_tick = self.acth_level * 0.001 * maturation;
         self.chemicals[cort_idx].level += acth_drive_per_tick * dt_scale;
@@ -4411,21 +4571,12 @@ pub struct NeuroTickParams {
     /// cognitive or physical effort shortens sleep latency by increasing
     /// adenosine (Porkka-Heiskanen et al., 2011).
     pub adenosine_activity_coupling: f32,
-    /// When true, the cognitive zone is Sleeping — the mind explicitly
-    /// put the system to sleep (/sleep, /nap, or a synced auto-sleep).
-    /// The zone is the cognitive layer's authority on sleep state (see
-    /// `CoreState::sync_neurochemistry_to_state`), so the adenosine
-    /// sleep-pressure mechanism must treat the system as asleep even
-    /// when the emergent neurochemical phase hasn't crossed the sleep
-    /// thresholds yet. Without this, /sleep entered at low sleep
-    /// pressure *accumulates* adenosine (the emergent phase stays
-    /// Active) and sleep can persist for ~days instead of draining
-    /// what little pressure exists.
-    pub zone_sleeping: bool,
     /// Normalized firing of the sleep-wake network's populations, when the
     /// network is present. `None` leaves the cholinergic and serotonergic
     /// targets at their homeostatic setpoints (no network drive), which is
-    /// how the chemistry runs in isolation.
+    /// how the chemistry runs in isolation. This is also the body's sole
+    /// sleep signal: adenosine clearance is gated on the network's own
+    /// state (and the stamped phase), never on the mind's zone.
     pub network_levels: Option<NetworkLevels>,
     /// Endocannabinoid activity-coupled synthesis rate.
     ///
@@ -4572,7 +4723,6 @@ impl NeuroTickParams {
         noise_amplitude: 0.002,             // gentle stochastic fluctuations
         noise_seed: 0,                      // daemon increments each tick
         receptor_resensitization_rate: 0.0, // set by daemon during sleep
-        zone_sleeping: false,               // set by daemon when zone == Sleeping
         network_levels: None,               // set per sub-step from the sleep-wake network
     };
 

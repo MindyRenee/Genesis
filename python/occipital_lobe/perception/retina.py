@@ -59,6 +59,12 @@ class Retina:
 
     def close(self) -> None:
         """Detach from the shared memory. The underlying segment survives."""
+        # Release our own memoryview first: any slice or np.frombuffer
+        # view still alive holds an exported pointer on the segment and
+        # SharedMemory.close() raises BufferError while exports exist.
+        if self._buf is not None:
+            self._buf.release()
+            self._buf = None
         self._shmem.close()
 
     def read_header(self) -> tuple[int, int, int, bytes, int, int]:
@@ -115,21 +121,24 @@ class Retina:
                 bpp = 3
                 row_bytes = width * bpp
                 if stride == row_bytes:
-                    frame = frame[:row_bytes * height].reshape((height, width, bpp))
+                    frame = frame[: row_bytes * height].reshape((height, width, bpp))
                 else:
-                    frame = frame[:stride * height].reshape((height, stride))
+                    frame = frame[: stride * height].reshape((height, stride))
                     frame = frame[:, :row_bytes].reshape((height, width, bpp))
-                if fourcc == b"BGR3":
-                    # Convert BGR → RGB in place for downstream color logic.
+                if fourcc == b"RGB3":
+                    # V4L2's RGB3 stores B,G,R in memory (the fourcc
+                    # names word order, not byte order); BGR3 is the
+                    # one already in R,G,B byte order. Flip RGB3's
+                    # memory order so downstream sees RGB.
                     frame = frame[..., ::-1]
             elif fourcc == b"YUYV":
                 # YUYV is 2 bytes per pixel, uncompressed.
                 bpp = 2
                 row_bytes = width * bpp
                 if stride == row_bytes:
-                    frame = frame[:row_bytes * height].reshape((height, width, bpp))
+                    frame = frame[: row_bytes * height].reshape((height, width, bpp))
                 else:
-                    frame = frame[:stride * height].reshape((height, stride))
+                    frame = frame[: stride * height].reshape((height, stride))
                     frame = frame[:, :row_bytes].reshape((height, width, bpp))
             else:
                 # For other uncompressed formats, return the raw 1D buffer as-is.
@@ -158,7 +167,12 @@ def latest_frame(copy: bool = True) -> np.ndarray | None:
     Returns ``None`` if no consistent frame could be read (e.g. the
     writer is producing frames faster than we can read them).
     """
-    r = Retina()
+    try:
+        r = Retina()
+    except FileNotFoundError:
+        # No retina segment — the camera process is not running. That
+        # is the documented text-only degradation: no frame, not a fault.
+        return None
     try:
         return r.latest(copy=True)
     finally:

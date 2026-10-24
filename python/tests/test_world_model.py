@@ -31,6 +31,7 @@ from parietal_lobe.world_model import (
     OUT_TRANSFORM,
     OUT_WIN,
     SimState,
+    WorldEvent,
     WorldModel,
 )
 
@@ -313,6 +314,52 @@ def test_terminal_credit_is_an_object_not_the_medium():
     assert model.affordance_of(8)[OUT_WIN] == 0
     assert model.affordance_of(6)[OUT_WIN] == 0
     assert sum(e.kind == OUT_WIN and "goal" in e.text for e in events) == 1
+
+
+def test_vanished_part_credits_contacts_as_transformers():
+    """A part consumed on contact is a transformer, not just a loss.
+
+    last_transform cannot see it — the entity is already gone from
+    the cluster — so the "part_lost" record in prior_events is the
+    only evidence her body changed. Whatever she was touching on the
+    tick it vanished caused it.
+    """
+    model = _world_with_self()
+    me = model.self_entity
+    assert me is not None
+    # Annex the color-5 block as a part of her.
+    part = next(e for e in model.entities.values() if e.color == 5)
+    part.part_of_self = True
+    # It vanishes while a color-8 contact stands adjacent to her.
+    events = model.observe(
+        _scene(
+            [
+                (_ME, set(_ME_CELLS)),
+                (8, {(7, 3)}),  # adjacent to her row-6 bottom edge
+                (9, {(12, 10), (12, 11)}),
+            ]
+        )
+    )
+    assert any(e.kind == "part_lost" for e in events)
+    # The contact at the loss is credited as a transformer even
+    # though no from→to signature pair survived the disappearance.
+    assert model.affordance_of(8)[OUT_TRANSFORM] == 1
+    assert any(e.kind == "transformed" and e.other_id is not None for e in events)
+
+
+def test_terminal_prior_events_speak_for_the_tick():
+    """A tick whose cause is already recorded is spoken for.
+
+    prior_events carrying a terminal verdict means the ending already
+    gave its account: benign outcome crediting must not run on top of
+    it — no queued collections, no contact outcomes.
+    """
+    model = _world_with_self()
+    verdict = WorldEvent("reset", "the world reset", salience=0.9)
+    events = model._contact_outcomes("up", [verdict])
+    assert events == []
+    assert model._pending_collect == []
+    assert not model.affordances
 
 
 def test_death_retry_keeps_the_spatial_map():
@@ -2747,6 +2794,10 @@ def test_calibration_babbles_the_least_measured_action():
     model.action_tries["right"] = 10
     model.action_effects["down"] = Counter({(0, 0): 3})
     model.action_tries["down"] = 3
+    # The causal-reach posterior those trials would have produced.
+    model._efficacy["left"] = [4.0, 1.0]
+    model._efficacy["right"] = [4.0, 1.0]
+    model._efficacy["down"] = [1.0, 9.0]
     model.action_noop_contexts["down"] = {frozenset(_ME_CELLS)}
     assert not model.action_understood("down")
     model.action_noop_contexts["down"].update(
@@ -2779,6 +2830,8 @@ def test_coordinate_action_graduates_without_noop_contexts():
     model.learn_action_label("press", "coordinate")
     model.action_effects["press"] = Counter({(0, 0): 30})
     model.action_tries["press"] = 30
+    # Thirty silent trials' worth of posterior: proven inert.
+    model._efficacy["press"] = [1.0, 30.0]
     # One stance, thirty clicks — context diversity is unreachable
     # for an act that does not move her.
     model.action_noop_contexts["press"] = {frozenset(_ME_CELLS)}
@@ -2802,6 +2855,9 @@ def test_inert_action_graduates_on_tries_when_contexts_cannot_diversify():
     model = _world_with_self()
     model.action_effects["use"] = Counter({(0, 0): 7})
     model.action_tries["use"] = 7
+    # Seven silent trials' posterior — decided-inert, so the verdict
+    # falls to the context-and-tries branch the test is about.
+    model._efficacy["use"] = [1.0, 7.0]
     model.action_noop_contexts["use"] = {frozenset(_ME_CELLS)}
     assert not model.action_understood("use")
 
@@ -2975,9 +3031,13 @@ def test_click_dead_entity_stops_being_informative(tmp_path):
     policy._model._last_grid = {(0, 0): 5, (12, 10): 9, (7, 7): 0}
     assert policy._most_informative_cell() in {(0, 0), (12, 10)}
     # Press the color-5 corner enough times with no answer — the
-    # click ledger calls it inert, and the pointer moves on.
+    # click ledger calls it inert, and the pointer moves on. The
+    # presser itself must have earned inert too: tries plus the
+    # posterior those silent presses produced.
     subject.world_model.click_tries[("6", 5)] = 9
     subject.world_model.click_changes[("6", 5)] = 0
+    subject.world_model.action_tries["6"] = 9
+    subject.world_model._efficacy["6"] = [1.0, 10.0]
     assert policy._most_informative_cell() == (12, 10)
 
 
@@ -3077,8 +3137,7 @@ def test_blind_probe_aims_at_things_not_floor(tmp_path):
     obj = {(12, 10), (12, 11)}
     subject.observe(_scene([(_ME, set(_ME_CELLS)), (9, obj)]))
     policy._model._last_grid = {
-        (r, c): (9 if (r, c) in obj else 0)
-        for r in range(16) for c in range(16)
+        (r, c): (9 if (r, c) in obj else 0) for r in range(16) for c in range(16)
     }
     # Every probe lands on a perceived thing — either object; the
     # one invariant is that no press is wasted on bare floor.
@@ -3165,11 +3224,319 @@ def test_distal_effects_survive_learning_export():
             )
         )
     restored = WorldModel()
-    assert restored.import_learning(
-        json.loads(json.dumps(model.export_learning()))
-    )
+    assert restored.import_learning(json.loads(json.dumps(model.export_learning())))
     assert restored.entity_effects[("pull", 9)][(1, 0)] == 2
     assert restored.action_understood("pull")
+
+
+# ─── registers — the symbol channel ───────────────────────────
+#
+# A register is a cell-region whose *pattern* is its value: a glyph
+# wheel, a dial, a digit. Writing it changes its signature without
+# translating anything, so the motion ledgers can never see the act
+# — tr87's bracket-and-glyph world is the case that forced the
+# channel. What an action does to a register is a transition
+# (old symbol → new symbol), and a cursor is whatever entity was
+# standing on the cell when the write landed.
+
+_GLYPH = 7
+_CURSOR = 4
+# Three glyphs cycling A → B → C → A — distinct *shapes* (signatures
+# are translation-invariant, so a moved domino is no new glyph).
+_GLYPHS = [
+    {(10, 5), (10, 6)},
+    {(10, 5), (11, 5)},
+    {(10, 5), (10, 6), (11, 5)},
+]
+_CURSOR_CELLS = {(9, 4), (9, 5), (9, 6), (9, 7), (12, 4), (12, 5), (12, 6), (12, 7)}
+_WALL = {(0, c) for c in range(16)}
+
+
+def _sig(cells: set[tuple[int, int]]) -> tuple[tuple[int, int], ...]:
+    top = min(r for r, _ in cells)
+    left = min(c for _, c in cells)
+    return tuple(sorted((r - top, c - left) for r, c in cells))
+
+
+def _glyph_frame(g: int) -> Scene:
+    return _scene([(_GLYPH, _GLYPHS[g]), (_CURSOR, _CURSOR_CELLS), (2, _WALL)])
+
+
+def test_register_write_builds_transition_graph():
+    """Rewrites under a pending action land in the symbol ledger —
+    the act's answer is the transition, not a displacement."""
+    model = WorldModel()
+    model.observe(_glyph_frame(0))
+    for i in range(1, 4):
+        model.note_action("next")
+        model.observe(_glyph_frame(i % 3))
+    by_from = model.sig_effects[("next", _GLYPH)]
+    sig_a = _sig(_GLYPHS[0])
+    sig_b = _sig(_GLYPHS[1])
+    sig_c = _sig(_GLYPHS[2])
+    assert by_from[sig_a][sig_b] == 1
+    assert by_from[sig_b][sig_c] == 1
+    assert by_from[sig_c][sig_a] == 1
+
+
+def test_register_cycle_is_the_alphabet():
+    """A closed modal transition graph is the dial's order — the
+    finite cyclic group the world's physics reveals."""
+    model = WorldModel()
+    model.observe(_glyph_frame(0))
+    for i in range(1, 5):
+        model.note_action("next")
+        model.observe(_glyph_frame(i % 3))
+    cycle = model.register_cycle("next", _GLYPH)
+    assert cycle is not None and len(cycle) == 3
+    # Partial graphs are honest None — two seen states, one edge.
+    model2 = WorldModel()
+    model2.observe(_glyph_frame(0))
+    model2.note_action("next")
+    model2.observe(_glyph_frame(1))
+    assert model2.register_cycle("next", _GLYPH) is None
+
+
+def test_entity_becomes_register_not_terrain():
+    """Repeated writes with no translation classify the cell — a
+    dial, not a thing that keeps reshaping."""
+    model = WorldModel()
+    model.observe(_glyph_frame(0))
+    events = []
+    for i in range(1, 3):
+        model.note_action("next")
+        events = model.observe(_glyph_frame(i % 3))
+    regs = model.registers()
+    assert len(regs) == 1 and regs[0].color == _GLYPH
+    assert any(e.kind == "wrote" for e in events)
+
+
+def test_cursor_is_who_covered_the_write():
+    """The bracket is evidence by occupancy — the entity standing
+    on the cell when its value was written. A wall that merely
+    abuts the glyph inside the frame loses: brackets enclose,
+    boundaries abut."""
+    abut = {(10, 7)}  # adjacent to the glyph, inside the bracket's box
+    model = WorldModel()
+
+    def scene(g):
+        return _scene(
+            [
+                (_GLYPH, _GLYPHS[g]),
+                (_CURSOR, _CURSOR_CELLS),
+                (2, _WALL | abut),
+            ]
+        )
+
+    model.observe(scene(0))
+    for i in range(1, 4):
+        model.note_action("next")
+        model.observe(scene(i % 3))
+    assert model.selector_of("next") == _CURSOR
+
+
+def test_next_signature_predicts_the_write():
+    """Once a state's rewrite is observed, the next symbol is
+    predictable — the planner can aim the dial."""
+    model = WorldModel()
+    model.observe(_glyph_frame(0))
+    for i in range(1, 5):
+        model.note_action("next")
+        model.observe(_glyph_frame(i % 3))
+    reg = next(e for e in model.entities.values() if e.color == _GLYPH)
+    predicted = model.next_signature("next", reg)
+    assert reg.shape == _sig(_GLYPHS[1]) and predicted == _sig(_GLYPHS[2])
+
+
+def test_consistent_writes_make_the_action_understood():
+    """A write is a settled semantics: (0,0) displacement plus a
+    regular transition function graduates the action — the spin
+    loop's exit condition."""
+    model = _world_with_self()
+    wall = (2, {(r, c) for r in range(14, 16) for c in range(16)})
+
+    def scene(g):
+        return _scene(
+            [
+                (_ME, set(_ME_CELLS)),
+                (5, {(0, 0), (0, 1), (1, 0), (1, 1)}),
+                (_GLYPH, _GLYPHS[g]),
+                (_CURSOR, _CURSOR_CELLS),
+                wall,
+            ]
+        )
+
+    model.observe(scene(0))
+    for i in range(1, 4):
+        model.note_action("next")
+        model.observe(scene(i % 3))
+    # The register-write channel, not a motion claim, carries it.
+    assert model.effect_of("next") == (0, 0)
+    assert model._register_consistent("next")
+    assert model.action_understood("next")
+
+
+def test_register_knowledge_survives_reset_and_export():
+    """Alphabets are physics, not positions: a level change keeps
+    them, a new world clears them, and they checkpoint."""
+    import json
+
+    model = WorldModel()
+    model.observe(_glyph_frame(0))
+    for i in range(1, 4):
+        model.note_action("next")
+        model.observe(_glyph_frame(i % 3))
+    model.reset(keep_learning=True)
+    assert ("next", _GLYPH) in model.sig_effects
+    model.reset(keep_learning=False)
+    assert not model.sig_effects and not model.register_covers
+
+    model2 = WorldModel()
+    model2.observe(_glyph_frame(0))
+    for i in range(1, 4):
+        model2.note_action("next")
+        model2.observe(_glyph_frame(i % 3))
+    restored = WorldModel()
+    assert restored.import_learning(json.loads(json.dumps(model2.export_learning())))
+    assert restored.register_cycle("next", _GLYPH) is not None
+    assert restored.selector_of("next") == _CURSOR
+
+
+# ─── contingency — the causal bookkeeping ───────────────────
+#
+# The trial ledger implements Hammond's ΔP and the latent-cause
+# channel: a frame-silent action is negative evidence, never an
+# inert verdict, because hidden state can move without the frame.
+
+
+_OTHERS = [(5, {(0, 0), (0, 1), (1, 0), (1, 1)}), (9, {(12, 10), (12, 11)})]
+
+
+def test_silent_trials_decay_efficacy_without_inert_verdict():
+    """A few unanswered presses are undecided, not dead."""
+    model = _world_with_self()
+    for _ in range(3):
+        model.note_action("press")
+        model.observe(_scene([(_ME, set(_ME_CELLS)), *_OTHERS]))
+    eff = model.action_efficacy("press")
+    assert eff < 0.5  # β is accumulating on the silent evidence
+    assert not model.action_inert("press")  # but the verdict needs more
+
+
+def test_silent_action_earns_inert_verdict():
+    """Quiet world + never an answer: inertness is earned, not assumed."""
+    model = _world_with_self()
+    for _ in range(6):
+        model.note_action("press")
+        model.observe(_scene([(_ME, set(_ME_CELLS)), *_OTHERS]))
+    assert model.action_efficacy("press") < 0.2
+    assert model.action_inert("press")
+    # ΔP is negative: consequences happened, just never under it.
+    assert model.action_contingency("press") is not None
+    assert model.action_contingency("press") <= 0.0
+
+
+def test_unexplained_change_retrocredits_silent_action():
+    """The latent-cause channel: a change nothing commanded hands
+    credit back to the recent silent trials by recency."""
+    model = _world_with_self()
+    model.note_action("press")
+    model.observe(_scene([(_ME, set(_ME_CELLS)), *_OTHERS]))
+    before = model.action_efficacy("press")
+    # Uncommanded: the color-9 entity shifts a row on its own.
+    moved = [(5, {(0, 0), (0, 1), (1, 0), (1, 1)}), (9, {(13, 10), (13, 11)})]
+    model.observe(_scene([(_ME, set(_ME_CELLS)), *moved]))
+    assert model.action_efficacy("press") > before
+
+
+def test_contingency_ignores_ambient_drift():
+    """A free-running world cannot make a dead lever look live:
+    consequences that arrive on every tick raise the ¬a arm too."""
+    model = _world_with_self()
+    drift = [(5, {(0, 0), (0, 1), (1, 0), (1, 1)})]
+    # Ambient mover: teaches its spontaneity uncommanded.
+    for i in range(4):
+        model.observe(_scene([(_ME, set(_ME_CELLS)), *drift, (9, {(4 + i, 10), (4 + i, 11)})]))
+    for i in range(4, 8):
+        model.note_action("press")
+        model.observe(_scene([(_ME, set(_ME_CELLS)), *drift, (9, {(4 + i, 10), (4 + i, 11)})]))
+    dp = model.action_contingency("press")
+    assert dp is not None and dp <= 0.0
+
+
+def test_contingency_credits_a_working_lever():
+    """The ΔP arm stays honest the other way too: an act that
+    answers every time, in a world that otherwise sits still, is
+    the cause."""
+    model = _world_with_self()
+    for i in range(4):
+        model.note_action("up")
+        cells = {(r - 2, c) for r, c in _ME_CELLS} if i % 2 == 0 else set(_ME_CELLS)
+        model.observe(_scene([(_ME, cells), *_OTHERS]))
+    # A couple of silent trials on another control give the ¬a arm
+    # its quiet baseline to compare against.
+    for _ in range(2):
+        model.note_action("press")
+        model.observe(_scene([(_ME, set(_ME_CELLS)), *_OTHERS]))
+    dp = model.action_contingency("up")
+    assert dp is not None and dp > 0.3
+    assert model.action_efficacy("up") > 0.7
+    assert not model.action_inert("up")
+
+
+def test_pursuit_integrates_animation_into_one_trial():
+    """A multi-frame consequence is motion evidence plus one trial:
+    the hops integrate into the net displacement, attribution and
+    tick-counting stay closed until the frame settles."""
+    model = _world_with_self()
+    model.note_action("leap")
+    # The answer renders as a strip — three hops of 3 rows each.
+    for k in (1, 2):
+        model.pursue(_scene([(_ME, {(r + 3 * k, c) for r, c in _ME_CELLS}), *_OTHERS]))
+    model.observe(_scene([(_ME, {(r + 9, c) for r, c in _ME_CELLS}), *_OTHERS]))
+    assert model.action_tries["leap"] == 1
+    assert model.effect_of("leap") == (9, 0)
+    assert model.action_efficacy("leap") > 0.6
+
+
+def test_pursuit_without_settled_frame_opens_no_trial():
+    """Pursuit alone is the mask: motion tracked, no bookkeeping."""
+    model = WorldModel()
+    model.observe(_scene([(_ME, set(_ME_CELLS)), *_OTHERS]))
+    model.note_action("leap")
+    model.pursue(_scene([(_ME, {(r + 3, c) for r, c in _ME_CELLS}), *_OTHERS]))
+    assert model.action_tries["leap"] == 0
+    assert model.tick == 1
+    # Positions still followed the transition.
+    me = next(e for e in model.entities.values() if e.color == _ME)
+    assert min(r for r, _ in me.cells) == 7
+
+
+def test_coherent_shift_reads_as_viewport_not_turnover():
+    """A uniform whole-field displacement is the window sliding over
+    a world larger than itself — optic flow, not a new world.
+    Identity survives and the frame-coordinate maps translate with
+    it."""
+    model = WorldModel()
+    me_cells = {(4, 2), (4, 3), (5, 2), (5, 3)}
+    others = [
+        (5, {(0, 0), (0, 1), (1, 0), (1, 1)}),
+        (9, {(12, 10), (12, 11), (13, 10), (13, 11)}),
+    ]
+    model.observe(_scene([(_ME, me_cells), *others], h=32))
+    model.known_free.add((7, 7))
+
+    scrolled = [
+        (color, {(r + 8, c) for r, c in cells}) for color, cells in [(_ME, me_cells), *others]
+    ]
+    events = model.observe(_scene(scrolled, h=32))
+
+    kinds = [e.kind for e in events]
+    assert "reset" not in kinds
+    assert "shift" in kinds
+    assert (15, 7) in model.known_free and (7, 7) not in model.known_free
+    assert len(model.entities) == 3
+    assert not any(e.gone for e in model.entities.values())
 
 
 if __name__ == "__main__":

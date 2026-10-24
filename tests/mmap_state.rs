@@ -667,11 +667,25 @@ fn test_open_migrates_legacy_layout_in_place() {
     let state = mmap.read_consistent().expect("read after migration");
     // The persisted state survived: this is a migration, not a reset.
     for (&id, &before) in ALL_CHEMICALS.iter().zip(&levels_before) {
-        assert_eq!(
-            state.neurochemicals.get(id).expect("chemical slot").level,
-            before,
-            "{id:?} must survive the layout migration untouched"
-        );
+        let after = state.neurochemicals.get(id).expect("chemical slot").level;
+        if id == NeurochemicalId::Adenosine {
+            // Offline rest legitimately touches adenosine on open: the
+            // gap since `last_updated` is decayed toward the 0.20 floor
+            // by wall-clock time, so an exact bit match is impossible
+            // even on a sub-second reopen. It may only drift downward
+            // and only by the measured gap's worth — a same-instant
+            // migration is far below 1e-4.
+            assert!(
+                after <= before && before - after < 1e-4,
+                "Adenosine must survive migration within offline-rest drift: \
+                 before={before} after={after}"
+            );
+        } else {
+            assert_eq!(
+                after, before,
+                "{id:?} must survive the layout migration untouched"
+            );
+        }
     }
     // The new field exists and starts at zero — the authority grant is
     // something cognition extends, never something a file inherits.

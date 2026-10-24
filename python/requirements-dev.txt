@@ -14,5 +14,13 @@ mypy==2.3.1
 # backlog to clear first. See scripts/hygiene.sh [3].
 vulture==2.14
 
+# Optional-at-runtime deps kept in dev/CI so their code paths and
+# tests run (symbolic.py degrades gracefully when sympy is absent;
+# ARC tests importorskip arcengine).
+sympy==1.12
+# mpmath>=1.4 deprecated names sympy 1.12 still calls
+# (ctx_mp.bitcount, mpnumeric); keep it below the break.
+mpmath<1.4
+
 # Test
 pytest==9.1.1

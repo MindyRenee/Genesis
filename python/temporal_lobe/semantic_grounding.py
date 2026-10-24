@@ -80,9 +80,7 @@ class SemanticGrounder:
     def __init__(self, network: ConceptNetwork) -> None:
         self.network = network
 
-    def ground_argument(
-        self, surface: str, *, context: str = ""
-    ) -> GroundedArgument:
+    def ground_argument(self, surface: str, *, context: str = "") -> GroundedArgument:
         """Resolve a surface phrase through the network, using context for polysemy."""
         text = surface.strip()
         if not text:
@@ -95,11 +93,7 @@ class SemanticGrounder:
         for candidate in self._lookup_candidates(text):
             if context:
                 concept_id = self.network.resolve_in_context(candidate, context)
-                concept = (
-                    self.network.get_concept(concept_id)
-                    if concept_id is not None
-                    else None
-                )
+                concept = self.network.get_concept(concept_id) if concept_id is not None else None
             else:
                 concept = self.network.get_concept(candidate)
             if concept is None:
@@ -136,9 +130,7 @@ class SemanticGrounder:
                 seen.add(key.casefold())
                 yield key
 
-    def ground(
-        self, proposition: Proposition, *, context: str = ""
-    ) -> GroundedProposition:
+    def ground(self, proposition: Proposition, *, context: str = "") -> GroundedProposition:
         """Ground one proposition without changing linguistic information."""
         roles = {
             role: self.ground_argument(value, context=context)

@@ -10,9 +10,9 @@ authors:
 repository-code: https://github.com/MindyRenee/Genesis
 version: "0.2.0"
 date-released: 2026-09-17
-# `license` is omitted deliberately: LICENSE is AGPL-3.0 with added
-# Ethical Use restrictions (Section 7 terms), which has no SPDX id.
-# Declaring plain AGPL-3.0-only here would understate the rider.
+# `license` is omitted deliberately: LICENSE is proprietary (all rights
+# reserved), which has no SPDX id. Declaring any SPDX license here
+# would imply a grant of rights that does not exist.
 identifiers:
   - type: doi
     value: 10.5281/zenodo.22817337

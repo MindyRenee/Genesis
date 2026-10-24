@@ -29,10 +29,14 @@ def _scan(source: str) -> list:
     path = os.path.join(root, "sample.py")
     with open(path, "w", encoding="utf-8") as f:
         f.write(textwrap.dedent(source))
-    return BugReporter(
-        project_root=root,
-        log_path=os.path.join(root, "bug_reports.jsonl"),
-    ).scan(max_files=5).bugs
+    return (
+        BugReporter(
+            project_root=root,
+            log_path=os.path.join(root, "bug_reports.jsonl"),
+        )
+        .scan(max_files=5)
+        .bugs
+    )
 
 
 def _categories(source: str) -> set[str]:
@@ -477,10 +481,14 @@ def _scan_tree(files: dict[str, str]) -> list:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
-    return BugReporter(
-        project_root=root,
-        log_path=os.path.join(root, "bug_reports.jsonl"),
-    ).scan(max_files=10).bugs
+    return (
+        BugReporter(
+            project_root=root,
+            log_path=os.path.join(root, "bug_reports.jsonl"),
+        )
+        .scan(max_files=10)
+        .bugs
+    )
 
 
 def test_print_flagged_inside_core_package() -> None:
@@ -491,10 +499,7 @@ def test_print_flagged_inside_core_package() -> None:
             "python/mypkg/mod.py": 'def f():\n    print("hi")\n',
         }
     )
-    assert any(
-        b.category == "print_in_code" and b.file == "python/mypkg/mod.py"
-        for b in bugs
-    )
+    assert any(b.category == "print_in_code" and b.file == "python/mypkg/mod.py" for b in bugs)
 
 
 def test_print_not_flagged_in_toplevel_script() -> None:
@@ -580,9 +585,9 @@ def test_open_reports_reads_log_without_rescanning() -> None:
 
 
 def test_resolve_discharges_fixed_report() -> None:
-    """resolve() moves a repaired report to history immediately —
-    the open list drops it, history records it resolved, and a
-    second resolve is a no-op."""
+    """resolve() drops a repaired report immediately — the open list
+    loses it, no history file is written, and a second resolve is a
+    no-op."""
     root, _path, rep = _reporter_with_bug(
         """
         def f():
@@ -597,7 +602,66 @@ def test_resolve_discharges_fixed_report() -> None:
     assert not rep.resolve("sample.py", "silent_except")
 
     history = os.path.join(root, "bug_reports_history.jsonl")
-    with open(history, encoding="utf-8") as f:
-        archived = f.read()
-    assert '"status": "resolved"' in archived
-    assert "silent_except" in archived
+    assert not os.path.exists(history)
+
+
+def test_scan_resolution_writes_no_history() -> None:
+    """A bug that disappears between scans is dropped, not archived."""
+    root, _path, rep = _reporter_with_bug(
+        """
+        def f():
+            try:
+                x = 1
+            except Exception:
+                pass
+        """
+    )
+    assert rep.open_reports()
+
+    with open(os.path.join(root, "sample.py"), "w", encoding="utf-8") as f:
+        f.write("def f():\n    return 1\n")
+    rep.scan(max_files=5)
+
+    assert not rep.open_reports()
+    history = os.path.join(root, "bug_reports_history.jsonl")
+    assert not os.path.exists(history)
+
+
+def test_scan_aborts_on_stop_hook() -> None:
+    """A wired should_stop abandons the walk mid-scan.
+
+    The shutdown half of the cooperative hook: distinct from parking —
+    parking waits for a busy foreground to clear, stopping abandons the
+    audit at the next file boundary so a 1000-file scan cannot run
+    through the teardown and into the closing stores.
+    """
+    import itertools
+
+    root = tempfile.mkdtemp()
+    for i in range(5):
+        with open(os.path.join(root, f"f{i}.py"), "w", encoding="utf-8") as f:
+            f.write("x = 1\n")
+
+    reporter = BugReporter(
+        project_root=root,
+        log_path=os.path.join(root, "bug_reports.jsonl"),
+    )
+
+    checks = itertools.count()
+    reporter.should_stop = lambda: next(checks) >= 2
+
+    result = reporter.scan(max_files=10)
+    assert result.total_files == 2
+
+
+def test_scan_without_stop_hook_never_aborts() -> None:
+    """Default should_stop is None — the scan runs to its bound."""
+    root = tempfile.mkdtemp()
+    with open(os.path.join(root, "a.py"), "w", encoding="utf-8") as f:
+        f.write("x = 1\n")
+    reporter = BugReporter(
+        project_root=root,
+        log_path=os.path.join(root, "bug_reports.jsonl"),
+    )
+    assert reporter.should_stop is None
+    assert reporter.scan(max_files=5).total_files == 1

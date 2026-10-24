@@ -27,6 +27,7 @@ import math
 import re
 import time
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -87,6 +88,7 @@ class CodeLearningResult:
 @dataclass(slots=True)
 class CodeInvestigation:
     """Inspectable evidence for an autonomous code-study decision."""
+
     filepath: str
     score: float
     reason: str
@@ -325,6 +327,18 @@ _SELF_CONFIDENCE = 0.9
 _REL_DEFINES = RelationType.DEFINES
 _REL_IMPLEMENTS = RelationType.INSTANCE_OF
 _REL_CALLS = RelationType.CALLS
+
+# Daemon unit-kind → concept property kind (AST path).
+_UNIT_KIND_MAP = {
+    "function": "function",
+    "struct": "struct",
+    "enum": "enum",
+    "trait": "trait",
+    "module": "module",
+    "type_alias": "type_alias",
+    "constant": "constant",
+    "static": "static",
+}
 _REL_DERIVED = RelationType.DEPENDS_ON
 
 
@@ -439,14 +453,16 @@ class CodeLearner:
         if not isinstance(meta, dict):
             meta = {}
             concept.properties["code_learning"] = meta
-        meta.update({
-            "fingerprint": fingerprint,
-            "uncertainty": max(0.0, min(1.0, uncertainty)),
-            "complexity": self._file_complexity.get(rel, 0.0),
-            "last_analyzed": self._spaced_repetition.last_analyzed.get(rel, time.time()),
-            "review_count": self._spaced_repetition._review_counts.get(rel, 1),
-            "importance": self._spaced_repetition._importance.get(rel, 0.5),
-        })
+        meta.update(
+            {
+                "fingerprint": fingerprint,
+                "uncertainty": max(0.0, min(1.0, uncertainty)),
+                "complexity": self._file_complexity.get(rel, 0.0),
+                "last_analyzed": self._spaced_repetition.last_analyzed.get(rel, time.time()),
+                "review_count": self._spaced_repetition._review_counts.get(rel, 1),
+                "importance": self._spaced_repetition._importance.get(rel, 0.5),
+            }
+        )
 
     # ── Public API ──────────────────────────────────────────────────
 
@@ -542,11 +558,20 @@ class CodeLearner:
             purge(stale)
         return removed
 
-    def learn_file(self, filepath: str, *, force: bool = False) -> FileLearningResult:
+    def learn_file(
+        self,
+        filepath: str,
+        *,
+        force: bool = False,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> FileLearningResult:
         """Analyze a single source file and add its concepts to the network.
 
         Detects language by extension (``.py`` → Python AST, ``.rs`` →
         Rust regex). Files already analyzed are skipped (deduplication).
+        ``should_stop`` is polled inside the analysis so a shutdown can
+        abort mid-file; an aborted pass returns ``analyzed=False`` so the
+        file is not marked learned on partial coverage.
         Returns what was learned from this file.
         """
         path = Path(filepath)
@@ -582,9 +607,9 @@ class CodeLearner:
 
         suffix = path.suffix.lower()
         if suffix == ".py":
-            result = self.learn_python_file(filepath)
+            result = self.learn_python_file(filepath, should_stop=should_stop)
         elif suffix == ".rs":
-            result = self.learn_rust_file(filepath)
+            result = self.learn_rust_file(filepath, should_stop=should_stop)
         else:
             return FileLearningResult(
                 filepath=rel,
@@ -609,16 +634,14 @@ class CodeLearner:
         importance = self._file_complexity.get(rel, 0.5)
         self._spaced_repetition.record_analysis(rel, importance=importance)
         self._file_fingerprints[rel] = fingerprint or ""
-        self._file_uncertainty[rel] = max(
-            0.05, self._file_uncertainty.get(rel, 1.0) * 0.55
-        )
-        self._persist_investigation_state(
-            rel, fingerprint, self._file_uncertainty[rel]
-        )
+        self._file_uncertainty[rel] = max(0.05, self._file_uncertainty.get(rel, 1.0) * 0.55)
+        self._persist_investigation_state(rel, fingerprint, self._file_uncertainty[rel])
 
         return result
 
-    def learn_python_file(self, filepath: str) -> FileLearningResult:
+    def learn_python_file(
+        self, filepath: str, *, should_stop: Callable[[], bool] | None = None
+    ) -> FileLearningResult:
         """Analyze a Python file using the ``ast`` module.
 
         Extracts module-level functions, classes, methods, imports, and
@@ -665,7 +688,10 @@ class CodeLearner:
         functions = 0
         classes = 0
 
+        stopping = should_stop if should_stop is not None else (lambda: False)
         for node in ast.iter_child_nodes(tree):
+            if stopping():
+                break
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 functions += 1
                 self._add_python_function(node, module_concept, module_name, rel)
@@ -677,13 +703,26 @@ class CodeLearner:
         # lexical scope, so calls made by methods land on the method
         # concept and calls made by nested helpers land on the named
         # callable that actually contains them.
-        self._add_python_imports(tree, module_concept)
-        analysis = analyze_python_tree(tree, rel)
-        self._enrich_python_symbols(analysis, module_name)
-        self._add_python_call_edges(analysis, module_name)
+        if not stopping():
+            self._add_python_imports(tree, module_concept)
+            analysis = analyze_python_tree(tree, rel)
+            self._enrich_python_symbols(analysis, module_name, stopping)
+            self._add_python_call_edges(analysis, module_name, stopping)
 
         concepts_added = self.network.size - concepts_before
         relationships_added = self.network.edge_count - edges_before
+
+        if stopping():
+            return FileLearningResult(
+                filepath=rel,
+                language="python",
+                concepts_added=concepts_added,
+                relationships_added=relationships_added,
+                functions=functions,
+                classes=classes,
+                lines=lines,
+                analyzed=False,
+            )
 
         self._store_memory(rel, functions, classes, lines, language="python")
 
@@ -697,11 +736,17 @@ class CodeLearner:
             lines=lines,
         )
 
-    def learn_rust_file(self, filepath: str) -> FileLearningResult:
-        """Analyze a Rust file using regex patterns.
+    def learn_rust_file(
+        self, filepath: str, *, should_stop: Callable[[], bool] | None = None
+    ) -> FileLearningResult:
+        """Analyze a Rust file, preferring the daemon's AST analysis.
 
-        Extracts functions, structs, enums, traits, impl blocks, modules,
-        and use statements. No external dependencies — just regex.
+        When the daemon answers ``ANALYZE_CODE`` the learner folds its
+        syn-based parse — calls, type references, impl pairs, source
+        spans, complexity — into the concept network. Without a daemon
+        (or an older one that predates the opcode) it falls back to the
+        local regex parser: functions, structs, enums, traits, impl
+        blocks, modules, and use statements.
         """
         path = Path(filepath)
         rel = self._relative(path)
@@ -712,9 +757,7 @@ class CodeLearner:
             return self._empty_result(rel, "rust")
 
         lines = source.count("\n") + (1 if source and not source.endswith("\n") else 0)
-        module_name = self._disambiguate_module_name(
-            path, "rust", self._module_name(path, "rust")
-        )
+        module_name = self._disambiguate_module_name(path, "rust", self._module_name(path, "rust"))
 
         concepts_before = self.network.size
         edges_before = self.network.edge_count
@@ -728,14 +771,43 @@ class CodeLearner:
             properties={"kind": "module", "language": "rust", "file": rel},
         )
 
-        functions = self._add_rust_functions(source, module_concept, module_name, rel)
-        classes = self._add_rust_types(source, module_concept, module_name, rel)
-        self._add_rust_traits_mods(source, module_concept, module_name, rel)
-        self._add_rust_impls(source, module_concept, module_name, rel)
-        self._add_rust_uses(source, module_concept, module_name, rel)
+        stopping = should_stop if should_stop is not None else (lambda: False)
+
+        # The daemon's structural sense first: a real AST (syn) gives
+        # calls, type references, impl pairs, spans, and complexity —
+        # strictly richer than the regex parser, which stays as the
+        # fallback for a daemon that is absent or predates the opcode.
+        analysis = self.client.analyze_code(rel, source) if self.client is not None else None
+        if analysis is not None:
+            functions, classes = self._add_rust_analysis(analysis, module_concept, module_name, rel)
+            if not stopping():
+                self._add_rust_uses(source, module_concept, module_name, rel)
+        else:
+            functions = self._add_rust_functions(source, module_concept, module_name, rel)
+            classes = 0
+            if not stopping():
+                classes = self._add_rust_types(source, module_concept, module_name, rel)
+            if not stopping():
+                self._add_rust_traits_mods(source, module_concept, module_name, rel)
+            if not stopping():
+                self._add_rust_impls(source, module_concept, module_name, rel)
+            if not stopping():
+                self._add_rust_uses(source, module_concept, module_name, rel)
 
         concepts_added = self.network.size - concepts_before
         relationships_added = self.network.edge_count - edges_before
+
+        if stopping():
+            return FileLearningResult(
+                filepath=rel,
+                language="rust",
+                concepts_added=concepts_added,
+                relationships_added=relationships_added,
+                functions=functions,
+                classes=classes,
+                lines=lines,
+                analyzed=False,
+            )
 
         self._store_memory(rel, functions, classes, lines, language="rust")
 
@@ -773,9 +845,7 @@ class CodeLearner:
             self.network.add_edge(module_concept, fn_concept, _REL_DEFINES, origin="observed")
         return functions
 
-    def _add_rust_types(
-        self, source: str, module_concept: str, module_name: str, rel: str
-    ) -> int:
+    def _add_rust_types(self, source: str, module_concept: str, module_name: str, rel: str) -> int:
         """Extract Rust structs and enums as concepts. Returns class count."""
         classes = 0  # structs + enums
 
@@ -847,9 +917,7 @@ class CodeLearner:
             )
             self.network.add_edge(module_concept, concept, RelationType.PART_OF, origin="observed")
 
-    def _add_rust_impls(
-        self, source: str, module_concept: str, module_name: str, rel: str
-    ) -> None:
+    def _add_rust_impls(self, source: str, module_concept: str, module_name: str, rel: str) -> None:
         """Extract Rust impl blocks as relationships."""
         # Impl blocks (trait impls → IMPLEMENTS, inherent impls → DEFINES)
         for match in _RUST_IMPL_FOR_RE.finditer(source):
@@ -872,9 +940,7 @@ class CodeLearner:
                 origin="observed",
             )
 
-    def _add_rust_uses(
-        self, source: str, module_concept: str, module_name: str, rel: str
-    ) -> None:
+    def _add_rust_uses(self, source: str, module_concept: str, module_name: str, rel: str) -> None:
         """Extract Rust use statements as import relationships."""
         for match in _RUST_USE_RE.finditer(source):
             used = match.group(1)
@@ -889,6 +955,94 @@ class CodeLearner:
                 RelationType.DEPENDS_ON,
                 origin="observed",
             )
+
+    def _add_rust_analysis(
+        self,
+        analysis: dict,
+        module_concept: str,
+        module_name: str,
+        rel: str,
+    ) -> tuple[int, int]:
+        """Fold the daemon's AST analysis into the concept network.
+
+        ``self.client.analyze_code`` returns real parse data — call
+        targets, type references, impl pairs, source spans, complexity —
+        the regex path cannot see. Returns (function count, class count)
+        so the learning result stays comparable to the regex path.
+        """
+        units = analysis.get("units") or []
+        local_names = {u["name"] for u in units}
+        functions = 0
+        classes = 0
+
+        for unit in units:
+            kind = unit["kind"]
+            if kind == "impl":
+                continue  # impl blocks live as edges, not concepts
+            concept = f"rust:{module_name}.{unit['name']}"
+            if kind == "function":
+                functions += 1
+            elif kind in {"struct", "enum"}:
+                classes += 1
+            props: dict = {
+                "kind": _UNIT_KIND_MAP.get(kind, kind),
+                "language": "rust",
+                "file": rel,
+                "public": unit["public"],
+            }
+            if unit["span"][0]:
+                props["span"] = f"{unit['span'][0]}-{unit['span'][1]}"
+            if unit["async_"]:
+                props["async"] = True
+            if unit["unsafe_"]:
+                props["unsafe"] = True
+            if kind == "function":
+                props["complexity"] = unit["branches"] + unit["loops"] + 1
+                if unit["params"]:
+                    props["params"] = unit["params"]
+                if unit["return_type"]:
+                    props["returns"] = unit["return_type"]
+            if unit["docs"]:
+                props["docs"] = unit["docs"][:200]
+            self.network.add_concept(
+                concept,
+                confidence=_SELF_CONFIDENCE,
+                origin="code",
+                properties=props,
+            )
+            edge_rel = RelationType.PART_OF if kind == "module" else _REL_DEFINES
+            self.network.add_edge(module_concept, concept, edge_rel, origin="observed")
+
+            # Call graph — resolve intra-file callees to their concept;
+            # external calls become unqualified rust: concepts.
+            for callee in unit["calls"]:
+                simple = callee.split("::")[-1]
+                target = (
+                    f"rust:{module_name}.{simple}" if simple in local_names else f"rust:{simple}"
+                )
+                self.network.add_edge(concept, target, _REL_CALLS, origin="observed")
+
+            # Type references — what this unit depends on structurally.
+            for ref in unit["refs"]:
+                if ref == unit["name"]:
+                    continue
+                target = f"rust:{module_name}.{ref}" if ref in local_names else f"rust:{ref}"
+                self.network.add_edge(concept, target, RelationType.DEPENDS_ON, origin="observed")
+
+        # Impl relations — (self-type, trait) pairs the daemon saw.
+        for self_ty, trait in analysis.get("impls") or []:
+            type_concept = f"rust:{module_name}.{self_ty}"
+            if trait:
+                self.network.add_edge(
+                    type_concept,
+                    f"rust:{module_name}.{trait}",
+                    _REL_IMPLEMENTS,
+                    origin="observed",
+                )
+            else:
+                self.network.add_edge(module_concept, type_concept, _REL_DEFINES, origin="observed")
+
+        return functions, classes
 
     def get_code_summary(self) -> dict:
         """Return a summary of analyzed code."""
@@ -932,10 +1086,7 @@ class CodeLearner:
         files = self._iter_source_files(include_tests=include_tests)
         if not files:
             return None
-        goal_tokens = {
-            token.lower()
-            for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", goal or "")
-        }
+        goal_tokens = {token.lower() for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", goal or "")}
         choices: list[CodeInvestigation] = []
         excluded = exclude or set()
         for path in files:
@@ -946,9 +1097,7 @@ class CodeLearner:
             fp = self._source_fingerprint(path)
             changed = bool(fp and fp != self._file_fingerprints.get(rel))
             novelty = 1.0 if not known else 0.0
-            uncertainty = self._file_uncertainty.get(
-                rel, 1.0 if not known else 0.45
-            )
+            uncertainty = self._file_uncertainty.get(rel, 1.0 if not known else 0.45)
             dependency = self._dependency_value(rel)
             goal_relevance = self._goal_relevance(rel, goal_tokens)
             change = 1.0 if changed else 0.0
@@ -956,9 +1105,13 @@ class CodeLearner:
             retention_pressure = 1.0 - retention if known else 0.0
             complexity = self._estimate_complexity(path)
             score = (
-                0.30 * novelty + 0.24 * uncertainty + 0.18 * dependency
-                + 0.14 * goal_relevance + 0.10 * change
-                + 0.03 * retention_pressure + 0.01 * complexity
+                0.30 * novelty
+                + 0.24 * uncertainty
+                + 0.18 * dependency
+                + 0.14 * goal_relevance
+                + 0.10 * change
+                + 0.03 * retention_pressure
+                + 0.01 * complexity
             )
             reasons: list[str] = []
             if novelty:
@@ -975,10 +1128,19 @@ class CodeLearner:
                 reasons.append("retention-loss")
             if not reasons:
                 reasons.append("highest-information candidate")
-            choices.append(CodeInvestigation(
-                str(path), score, ", ".join(reasons), novelty, uncertainty,
-                dependency, goal_relevance, change, retention_pressure
-            ))
+            choices.append(
+                CodeInvestigation(
+                    str(path),
+                    score,
+                    ", ".join(reasons),
+                    novelty,
+                    uncertainty,
+                    dependency,
+                    goal_relevance,
+                    change,
+                    retention_pressure,
+                )
+            )
         choices.sort(key=lambda item: (-item.score, item.filepath))
         return choices[0]
 
@@ -996,21 +1158,30 @@ class CodeLearner:
         """Use active-goal overlap only as a routing signal."""
         if not goal_tokens:
             return 0.0
-        tokens = {
-            token.lower()
-            for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", rel)
-        }
+        tokens = {token.lower() for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", rel)}
         return min(1.0, len(tokens & goal_tokens) / max(1, len(goal_tokens)))
 
     def investigate_code(
-        self, *, max_files: int = 5, goal: str | None = None,
-        include_tests: bool = True
+        self,
+        *,
+        max_files: int = 5,
+        goal: str | None = None,
+        include_tests: bool = True,
+        should_stop: Callable[[], bool] | None = None,
     ) -> CodeLearningResult:
-        """Perform bounded autonomous investigation with real re-analysis."""
+        """Perform bounded autonomous investigation with real re-analysis.
+
+        ``should_stop``, when supplied, is polled between files — a
+        true answer abandons the investigation at the next file
+        boundary (shutdown, suppression), returning what it learned
+        so far rather than running to completion through a teardown.
+        """
         results: list[FileLearningResult] = []
         reasons: dict[str, str] = {}
         investigated: set[str] = set()
         for _ in range(max(0, max_files)):
+            if should_stop is not None and should_stop():
+                break
             decision = self.investigate_next(
                 goal=goal, include_tests=include_tests, exclude=investigated
             )
@@ -1018,7 +1189,7 @@ class CodeLearner:
                 break
             investigated.add(decision.filepath)
             reasons[decision.filepath] = decision.reason
-            results.append(self.learn_file(decision.filepath, force=True))
+            results.append(self.learn_file(decision.filepath, force=True, should_stop=should_stop))
         return CodeLearningResult(
             files_analyzed=len(results),
             concepts_added=sum(r.concepts_added for r in results),
@@ -1207,7 +1378,10 @@ class CodeLearner:
                         )
 
     def _enrich_python_symbols(
-        self, analysis: FileAnalysis, module_name: str,
+        self,
+        analysis: FileAnalysis,
+        module_name: str,
+        should_stop: Callable[[], bool] | None = None,
     ) -> None:
         """Attach structural facts (complexity, params, raises) to the
         concepts the learner already created.
@@ -1217,6 +1391,8 @@ class CodeLearner:
         module functions, ``python:Class.meth`` for methods.
         """
         for sym in analysis.symbols:
+            if should_stop is not None and should_stop():
+                return
             concept_id = self._symbol_concept_id(sym, module_name)
             if concept_id is None:
                 continue
@@ -1236,7 +1412,9 @@ class CodeLearner:
                 props["span"] = sym.end_line - sym.line + 1
 
     def _symbol_concept_id(
-        self, sym: Any, module_name: str,
+        self,
+        sym: Any,
+        module_name: str,
     ) -> str | None:
         """Map an analyzed symbol to the learner's concept id."""
         parts = sym.qualified.split(".")
@@ -1255,7 +1433,10 @@ class CodeLearner:
         return None
 
     def _add_python_call_edges(
-        self, analysis: FileAnalysis, module_name: str,
+        self,
+        analysis: FileAnalysis,
+        module_name: str,
+        should_stop: Callable[[], bool] | None = None,
     ) -> None:
         """Add CALLS edges from scoped callers to resolvable local symbols.
 
@@ -1267,6 +1448,8 @@ class CodeLearner:
         """
         symbol_by_qual = {s.qualified: s for s in analysis.symbols}
         for edge in analysis.call_edges:
+            if should_stop is not None and should_stop():
+                return
             owner_sym = symbol_by_qual.get(edge.caller)
             if owner_sym is None:
                 continue
@@ -1294,19 +1477,21 @@ class CodeLearner:
         local = {
             sym.qualified: sym
             for sym in symbols
-            if sym.kind in ("function", "method")
-            and len(sym.qualified.split(".")) <= 3
+            if sym.kind in ("function", "method") and len(sym.qualified.split(".")) <= 3
         }
         caller_parts = caller_qualified.split(".")
         candidates: list[str] = []
         if callee.startswith("self.") and len(caller_parts) >= 3:
             candidates.append(".".join([*caller_parts[:-1], callee.split(".", 1)[1]]))
         elif "." not in callee:
-            candidates.extend((
-                f"{module_name}.{callee}",
-                f"{caller_qualified.rsplit('.', 1)[0]}.{callee}"
-                if len(caller_parts) >= 3 else "",
-            ))
+            candidates.extend(
+                (
+                    f"{module_name}.{callee}",
+                    f"{caller_qualified.rsplit('.', 1)[0]}.{callee}"
+                    if len(caller_parts) >= 3
+                    else "",
+                )
+            )
         else:
             candidates.append(f"{module_name}.{callee}")
         for qualified in candidates:
@@ -1314,6 +1499,7 @@ class CodeLearner:
                 sym = local[qualified]
                 return self._symbol_concept_id(sym, module_name) or f"python:{qualified}"
         return f"python:{callee}"
+
     @staticmethod
     def _name_from_node(node: ast.expr) -> str | None:
         """Extract a dotted name from an AST expression."""
@@ -1372,9 +1558,7 @@ class CodeLearner:
         except ValueError:
             return str(path)
 
-    def _disambiguate_module_name(
-        self, path: Path, language: str, candidate: str
-    ) -> str:
+    def _disambiguate_module_name(self, path: Path, language: str, candidate: str) -> str:
         """Avoid collapsing same-named modules from different directories."""
         prefix = f"{language}:{candidate}"
         existing = self.network.get_concept(prefix)

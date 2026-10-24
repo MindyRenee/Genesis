@@ -28,6 +28,7 @@ def _out(*args: object) -> None:
     """Report channel — for these assay tools, stdout IS the product."""
     print(*args, flush=True)
 
+
 EDGE_LOG = Path.home() / ".local" / "share" / "genesis" / "edge_log.jsonl"
 
 
@@ -43,8 +44,11 @@ def load_network() -> ConceptNetwork:
                 except ValueError:
                     continue
                 net.add_edge(
-                    e["source"], e["target"], rel,
-                    e.get("weight", 0.5), origin=e.get("origin", "fold"),
+                    e["source"],
+                    e["target"],
+                    rel,
+                    e.get("weight", 0.5),
+                    origin=e.get("origin", "fold"),
                 )
     return net
 

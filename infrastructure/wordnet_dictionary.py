@@ -19,14 +19,15 @@ logger = logging.getLogger(__name__)
 @dataclass
 class WordNetEntry:
     """A single WordNet sense for a word."""
+
     word: str
     definition: str
     part_of_speech: str
     examples: list[str]
-    hypernyms: list[str]      # IS_A — what this is a kind of
-    meronyms: list[str]       # PART_OF — parts of this
-    similar_to: list[str]     # SIMILAR_TO — related concepts
-    antonyms: list[str]       # OPPOSITE_OF — opposites
+    hypernyms: list[str]  # IS_A — what this is a kind of
+    meronyms: list[str]  # PART_OF — parts of this
+    similar_to: list[str]  # SIMILAR_TO — related concepts
+    antonyms: list[str]  # OPPOSITE_OF — opposites
 
 
 def lookup_word(word: str, max_senses: int = 2) -> list[WordNetEntry]:

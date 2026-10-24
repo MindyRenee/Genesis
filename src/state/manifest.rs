@@ -375,20 +375,33 @@ impl RuntimeManifest {
         let mut failed = 0u8;
 
         for m in &self.modules {
-            if m.status().is_alive() {
-                active += 1;
-                cpu += m.cpu_share;
-                mem += m.mem_usage_mb;
-                // "Running" and "Idle" are both alive, but only one is
-                // doing work. `active_count` alone conflated them, so
-                // a mind with every part alive-but-idle read as fully
-                // busy.
-                if m.status() == ModuleStatus::Idle {
-                    idle += 1;
-                }
-                if m.has_error() {
-                    failed += 1;
-                }
+            // Errors are counted independently of the lifecycle gate:
+            // a module in `Error` status is not `is_alive()`, and an
+            // `error_code` can persist on a module that has since
+            // stopped. Gating the count on `is_alive()` made the one
+            // module that had actually crashed invisible to
+            // `error_count` — the failure signal was structurally
+            // impossible to observe.
+            if m.has_error() || m.status() == ModuleStatus::Error {
+                failed += 1;
+            }
+            // The documented contract is "non-Stopped": Starting,
+            // Stopping, and Error modules are still loaded parts of
+            // the mind, and their last reported load belongs to the
+            // aggregate. `is_alive()` (Running|Idle) made transitional
+            // and crashed modules vanish from every count.
+            if m.status() == ModuleStatus::Stopped {
+                continue;
+            }
+            active += 1;
+            cpu += m.cpu_share;
+            mem += m.mem_usage_mb;
+            // "Running" and "Idle" are both alive, but only one is
+            // doing work. `active_count` alone conflated them, so
+            // a mind with every part alive-but-idle read as fully
+            // busy.
+            if m.status() == ModuleStatus::Idle {
+                idle += 1;
             }
         }
 

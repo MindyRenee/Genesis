@@ -50,41 +50,39 @@ def _make_styler(
 def test_relative_that_subject_of_clause_not_rewritten() -> None:
     """'that' as subject of a relative clause is not anaphoric."""
     styler = _make_styler("genesis")
-    out = styler.resolve_anaphora(
-        "a ferret is a small mammal that likes to steal shiny objects"
-    )
+    out = styler.resolve_anaphora("a ferret is a small mammal that likes to steal shiny objects")
     assert out == "a ferret is a small mammal that likes to steal shiny objects"
 
 
 def test_relative_that_auxiliary_not_rewritten() -> None:
     """'that' followed by an auxiliary still heads a relative clause."""
     styler = _make_styler("genesis")
-    assert styler.resolve_anaphora(
-        "a bird that can fly is neat"
-    ) == "a bird that can fly is neat"
-    assert styler.resolve_anaphora(
-        "a fox is a canine that hunts mice"
-    ) == "a fox is a canine that hunts mice"
-    assert styler.resolve_anaphora(
-        "the cat that lives here is friendly"
-    ) == "the cat that lives here is friendly"
+    assert styler.resolve_anaphora("a bird that can fly is neat") == "a bird that can fly is neat"
+    assert (
+        styler.resolve_anaphora("a fox is a canine that hunts mice")
+        == "a fox is a canine that hunts mice"
+    )
+    assert (
+        styler.resolve_anaphora("the cat that lives here is friendly")
+        == "the cat that lives here is friendly"
+    )
 
 
 def test_relative_which_who_where_when_not_rewritten() -> None:
     """'which'/'who'/'where'/'when' are never focus pronouns."""
     styler = _make_styler("genesis")
-    assert styler.resolve_anaphora(
-        "a cat which hunts mice is useful"
-    ) == "a cat which hunts mice is useful"
-    assert styler.resolve_anaphora(
-        "the person who called earlier"
-    ) == "the person who called earlier"
-    assert styler.resolve_anaphora(
-        "the place where we met"
-    ) == "the place where we met"
-    assert styler.resolve_anaphora(
-        "the day when everything changed"
-    ) == "the day when everything changed"
+    assert (
+        styler.resolve_anaphora("a cat which hunts mice is useful")
+        == "a cat which hunts mice is useful"
+    )
+    assert (
+        styler.resolve_anaphora("the person who called earlier") == "the person who called earlier"
+    )
+    assert styler.resolve_anaphora("the place where we met") == "the place where we met"
+    assert (
+        styler.resolve_anaphora("the day when everything changed")
+        == "the day when everything changed"
+    )
 
 
 # ─── Complementizer 'that' must survive untouched ───────────────
@@ -93,15 +91,13 @@ def test_relative_which_who_where_when_not_rewritten() -> None:
 def test_complementizer_that_not_rewritten() -> None:
     """'that' introducing a complement clause is not anaphoric."""
     styler = _make_styler("genesis")
-    assert styler.resolve_anaphora(
-        "i think that ferrets are cute"
-    ) == "i think that ferrets are cute"
+    assert (
+        styler.resolve_anaphora("i think that ferrets are cute") == "i think that ferrets are cute"
+    )
     # "she"/"he" bind only to animate referents — with no animate
     # entity in focus history they stay unresolved. What must survive
     # is the complementizer "that" and the expletive "it was late".
-    assert styler.resolve_anaphora(
-        "she said that it was late"
-    ) == "she said that it was late"
+    assert styler.resolve_anaphora("she said that it was late") == "she said that it was late"
     out = styler.resolve_anaphora("i told you that he left")
     assert " that " in out and "told Genesis that" in out
 
@@ -109,9 +105,7 @@ def test_complementizer_that_not_rewritten() -> None:
 def test_complementizer_that_after_pronoun_object() -> None:
     """'tell me that it matters' — 'that' stays, clause intact."""
     styler = _make_styler("genesis")
-    assert styler.resolve_anaphora(
-        "tell me that it matters"
-    ) == "tell me that it matters"
+    assert styler.resolve_anaphora("tell me that it matters") == "tell me that it matters"
 
 
 # ─── Determiners and zero-relatives must survive untouched ──────
@@ -121,20 +115,14 @@ def test_determiner_that_this_not_rewritten() -> None:
     """'that dog' / 'this concept' — demonstrative determiners."""
     styler = _make_styler("genesis")
     assert styler.resolve_anaphora("that dog is big") == "that dog is big"
-    assert styler.resolve_anaphora(
-        "this concept is interesting"
-    ) == "this concept is interesting"
+    assert styler.resolve_anaphora("this concept is interesting") == "this concept is interesting"
 
 
 def test_zero_relative_you_not_rewritten() -> None:
     """'you' inside a zero-relative clause is generic, not Genesis."""
     styler = _make_styler("genesis")
-    assert styler.resolve_anaphora(
-        "a pet you can keep"
-    ) == "a pet you can keep"
-    assert styler.resolve_anaphora(
-        "the thing you said"
-    ) == "the thing you said"
+    assert styler.resolve_anaphora("a pet you can keep") == "a pet you can keep"
+    assert styler.resolve_anaphora("the thing you said") == "the thing you said"
 
 
 # ─── Expletive 'it' must survive untouched ──────────────────────
@@ -154,18 +142,14 @@ def test_expletive_it_not_rewritten() -> None:
 def test_demonstrative_that_resolves_to_focus() -> None:
     """Sentence-initial 'that is…' resolves to the focus."""
     styler = _make_styler("ferret")
-    assert styler.resolve_anaphora("that is interesting") == (
-        "ferret is interesting"
-    )
+    assert styler.resolve_anaphora("that is interesting") == ("ferret is interesting")
 
 
 def test_demonstrative_object_position_resolves() -> None:
     """'that' after a verb or preposition resolves to the focus."""
     styler = _make_styler("ferret")
     assert styler.resolve_anaphora("i like that") == "i like ferret"
-    assert styler.resolve_anaphora("tell me about that") == (
-        "tell me about ferret"
-    )
+    assert styler.resolve_anaphora("tell me about that") == ("tell me about ferret")
 
 
 def test_bare_pronouns_resolve_to_focus() -> None:
@@ -179,9 +163,7 @@ def test_you_your_resolve_to_genesis() -> None:
     """'you'/'your' address Genesis directly."""
     styler = _make_styler("ferret")
     assert styler.resolve_anaphora("are you awake") == "are Genesis awake"
-    assert styler.resolve_anaphora("what is your name") == (
-        "what is Genesis's name"
-    )
+    assert styler.resolve_anaphora("what is your name") == ("what is Genesis's name")
 
 
 def test_no_focus_leaves_text_unchanged() -> None:
@@ -231,9 +213,7 @@ def test_it_skips_genesis_focus() -> None:
 def test_she_binds_to_animate_referent() -> None:
     """'she' walks history to the first animate entity, skipping
     inanimate foci like 'wheel'."""
-    styler = _make_styler(
-        foci=["ferret", "wheel"], network=_network_with_animacy()
-    )
+    styler = _make_styler(foci=["ferret", "wheel"], network=_network_with_animacy())
     assert styler.resolve_anaphora("she left") == "ferret left"
 
 

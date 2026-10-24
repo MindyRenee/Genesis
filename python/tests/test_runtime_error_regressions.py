@@ -47,9 +47,7 @@ def test_sleep_desync_reads_the_phase_field(monkeypatch) -> None:
     from brainstem.sleep import SleepMixin
 
     src = inspect.getsource(SleepMixin._check_sleep_desync)
-    assert "get_phase().phase" in src, (
-        "_check_sleep_desync must read PhaseInfo.phase"
-    )
+    assert "get_phase().phase" in src, "_check_sleep_desync must read PhaseInfo.phase"
     assert "get_phase().emergent_phase" not in src, (
         "emergent_phase is a CoreState field; reading it off PhaseInfo "
         "raises AttributeError and kills the desync check"
@@ -99,7 +97,8 @@ def test_identity_curiosity_source_actually_produces_observations() -> None:
     # `questions_asked` counts retained question records; seed it so the
     # "deeply curious" branch is taken.
     curiosity._asked_questions = deque(
-        [f"seeded-{i}" for i in range(120)], maxlen=200,
+        [f"seeded-{i}" for i in range(120)],
+        maxlen=200,
     )
 
     synth = EmergentIdentity.__new__(EmergentIdentity)
@@ -110,8 +109,7 @@ def test_identity_curiosity_source_actually_produces_observations() -> None:
     # emotion=None call raised before any observation could be recorded,
     # so this source was empty for the life of the process.
     assert source.observations, (
-        "curiosity source produced no observations — generate_questions "
-        "probably raised again"
+        "curiosity source produced no observations — generate_questions probably raised again"
     )
 
 
@@ -175,9 +173,7 @@ def test_curiosity_shared_state_is_thread_safe() -> None:
     def churn_questions() -> None:
         try:
             for _ in range(25):
-                curiosity.generate_questions(
-                    emotion, active_concepts=focus_names, max_questions=2
-                )
+                curiosity.generate_questions(emotion, active_concepts=focus_names, max_questions=2)
         except Exception as e:  # noqa: BLE001 — collect, assert below
             errors.append(e)
 
@@ -209,8 +205,7 @@ def test_curiosity_shared_state_is_thread_safe() -> None:
 
     assert all(not t.is_alive() for t in threads), "churn threads wedged"
     assert not errors, (
-        f"concurrent curiosity access raised {errors!r} — shared state "
-        "must be serialized"
+        f"concurrent curiosity access raised {errors!r} — shared state must be serialized"
     )
 
 
@@ -268,9 +263,70 @@ def test_sleep_desync_runs_without_raising() -> None:
     probe = SleepMixin.__new__(SleepMixin)
     probe._is_sleeping = False
     probe._wake_time = 0.0
+    probe._last_wake_attempt = 0.0
     probe.client = _Client()  # type: ignore[attr-defined]
 
     # Must not raise AttributeError. The return value is not what is
     # under test; reaching a decision at all is.
     result = probe._check_sleep_desync()
     assert result in (True, False)
+
+
+def test_module_exists_probe_maps_real_package_paths() -> None:
+    """_module_exists silently answered False for renamed packages.
+
+    The overrides table held pre-split paths ("memory_engine" →
+    "memory"), so several capability checks probed modules that no
+    longer exist and tallied find_spec churn. Every override must
+    resolve to a real module, and a probe miss is an answer, not a
+    logged fault.
+    """
+    import importlib.util
+
+    from frontal_lobe.self.introspection import (
+        _MODULE_PATH_OVERRIDES,
+        Introspection,
+    )
+
+    from genesis_client import swallow
+
+    for name, mod_path in _MODULE_PATH_OVERRIDES.items():
+        spec = importlib.util.find_spec(mod_path)
+        assert spec is not None, f"{name} -> {mod_path} does not resolve"
+
+    probe = Introspection.__new__(Introspection)
+    site = "frontal_lobe.self.introspection._module_exists"
+    before = swallow.swallow_count(site)
+    # A genuinely absent module is a False answer, not a fault.
+    assert probe._module_exists("definitely_not_a_real_module_xyz") is False
+    assert swallow.swallow_count(site) == before
+
+
+def test_cortical_tick_tolerates_active_set_mutation() -> None:
+    """The sustain pass iterated _active_ids live while other threads
+    mutate it — "Set changed size during iteration" crashed
+    prefrontal.tick. Iterating a snapshot makes the race safe.
+    """
+    import threading
+
+    from temporal_lobe.concepts import ConceptNetwork
+
+    net = ConceptNetwork()
+    try:
+        concepts = [net.add_concept(f"race_{i}", origin="test") for i in range(40)]
+        for c in concepts:
+            c.activation = 0.9
+        stop = threading.Event()
+
+        def churn() -> None:
+            while not stop.is_set():
+                net._active_ids = {c.id for c in concepts[:10]}  # emulate the periodic rescan
+
+        t = threading.Thread(target=churn, daemon=True)
+        t.start()
+        for _ in range(20):
+            net.cortical_tick()  # must not raise RuntimeError
+        stop.set()
+        t.join(timeout=5)
+    finally:
+        pass  # ConceptNetwork owns no background threads to stop

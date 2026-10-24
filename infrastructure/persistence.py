@@ -136,9 +136,7 @@ if TYPE_CHECKING:
     from .bug_reporter import BugReporter
 
 
-def _snapshot[T](
-    src: Callable[[], Iterable[T]] | Iterable[T], attempts: int = 8
-) -> list[T]:
+def _snapshot[T](src: Callable[[], Iterable[T]] | Iterable[T], attempts: int = 8) -> list[T]:
     """Materialize a collection that other threads may be mutating.
 
     Autosave and shutdown serialization run concurrently with
@@ -199,7 +197,8 @@ def save_state(
     dream_synthesis: Any = None,
     inner_life_state: dict[str, Any] | None = None,
     world_state: dict[str, Any] | None = None,
-    executive: ExecutiveFunction | None = None, curiosity: Curiosity | None = None,
+    executive: ExecutiveFunction | None = None,
+    curiosity: Curiosity | None = None,
     cognitive_map: CognitiveMap | None = None,
 ) -> None:
     """Save Genesis's cognitive state to disk.
@@ -223,14 +222,7 @@ def save_state(
         curiosity: Asked/resolved question history and gap habituation —
             the novelty window that stops questions re-firing on restart.
         remaining kwargs: Optional subsystem states, each serialized iff
-            present — predictive coding, theory of mind, procedural
-            memory, task competence, spaced repetition, TD learning,
-            synapses, emotional memory, attractor, error monitor,
-            emergent identity (+ sources), HPA axis, allostatic load,
-            self-directed/autonomous learners, self-improvement, growth
-            ledger, plasticity, developmental tracker, bug reporter,
-            cognitive trajectory, dream synthesis, inner life, executive
-            intentions.
+            present — see ``_add_optional_state`` for the full list.
     """
     state: dict[str, Any] = {
         "version": 2,
@@ -278,6 +270,38 @@ def save_state(
     _atomic_write_state(data_dir, state)
 
 
+def _first_non_str_key(node: Any, path: str = "state") -> str:
+    """Locate the first non-str dict key in a nested structure.
+
+    Depth-first, insertion-ordered — deterministic for the same input.
+    Returns a dotted path like ``state['curiosity']['x'][<enum>]`` for
+    logging; never raises on cycles (``id()``-guarded).
+    """
+    seen: set[int] = set()
+
+    def _walk(obj: Any, p: str) -> str | None:
+        oid = id(obj)
+        if oid in seen:
+            return None
+        if isinstance(obj, dict):
+            seen.add(oid)
+            for k, v in obj.items():
+                if not isinstance(k, str):
+                    return f"{p}[{k!r}] (type {type(k).__name__})"
+                r = _walk(v, f"{p}[{k!r}]")
+                if r is not None:
+                    return r
+        elif isinstance(obj, (list, tuple)):
+            seen.add(oid)
+            for i, v in enumerate(obj):
+                r = _walk(v, f"{p}[{i}]")
+                if r is not None:
+                    return r
+        return None
+
+    return _walk(node, path) or "<not found — error may be value-side>"
+
+
 def _atomic_write_state(data_dir: str, state: dict[str, Any]) -> None:
     """Write state dict to disk atomically (write to temp, then rename).
 
@@ -292,10 +316,22 @@ def _atomic_write_state(data_dir: str, state: dict[str, Any]) -> None:
     path = os.path.join(data_dir, "cognitive_state.json")
 
     # Serialize with orjson (6x faster) or stdlib fallback
-    if _HAS_ORJSON:
-        data_bytes = orjson.dumps(state, default=str)
-    else:
-        data_bytes = json.dumps(state, default=str).encode("utf-8")
+    try:
+        if _HAS_ORJSON:
+            data_bytes = orjson.dumps(state, default=str)
+        else:
+            data_bytes = json.dumps(state, default=str).encode("utf-8")
+    except TypeError as e:
+        # ``default=str`` coerces values only — a non-str dict key
+        # anywhere in the tree fails the whole save with an opaque
+        # "Dict key must be str". Name the path so the offender is
+        # identifiable from the log instead of a full audit.
+        logger.error(
+            "state serialization failed (%s); first non-str key at %s",
+            e,
+            _first_non_str_key(state),
+        )
+        raise
 
     # Compress with gzip if enabled
     if _USE_GZIP:
@@ -393,7 +429,17 @@ def _add_optional_state(
     curiosity: Curiosity | None = None,
     cognitive_map: CognitiveMap | None = None,
 ) -> None:
-    """Add optional state fields to the state dict."""
+    """Add optional state fields to the state dict.
+
+    Each optional subsystem state is serialized iff present —
+    predictive coding, theory of mind, procedural memory, task
+    competence, spaced repetition, TD learning, synapses, emotional
+    memory, attractor, error monitor, emergent identity (+ sources),
+    HPA axis, allostatic load, self-directed/autonomous learners,
+    self-improvement, growth ledger, plasticity, developmental
+    tracker, bug reporter, cognitive trajectory, dream synthesis,
+    inner life, executive intentions.
+    """
     if predictive_coding is not None:
         state["predictive_coding"] = _serialize_predictive_coding(predictive_coding)
     if theory_of_mind is not None:
@@ -668,9 +714,7 @@ def _restore_concepts(
         if new_id in network._concepts:
             existing = network._concepts[new_id]
             existing.aliases |= set(c_data.get("aliases", []))
-            existing.activation = max(
-                existing.activation or 0.0, c_data.get("activation") or 0.0
-            )
+            existing.activation = max(existing.activation or 0.0, c_data.get("activation") or 0.0)
             network._mark_active(new_id)
             existing.confidence = max(existing.confidence, confidence)
             existing.columns |= set(c_data.get("columns", []))
@@ -882,12 +926,10 @@ def restore_narrative(narrative: Narrator, data: dict[str, Any]) -> None:
                 ev_id = ev_data.get("id", "")
                 if ev_id.startswith("event-"):
                     try:
-                        num = int(ev_id[len("event-"):])
+                        num = int(ev_id[len("event-") :])
                         max_id = max(max_id, num)
                     except ValueError:
-                        logger.debug(
-                            "restore_narrative: non-numeric event id %r", ev_id
-                        )
+                        logger.debug("restore_narrative: non-numeric event id %r", ev_id)
         narrative._event_counter = max_id
 
     # Restore restructuring count (narrative therapy).
@@ -915,13 +957,15 @@ def restore_narrative(narrative: Narrator, data: dict[str, Any]) -> None:
 
         restored_milestones = []
         for m_data in data["life_script"]:
-            restored_milestones.append(Milestone(
-                name=m_data["name"],
-                expected_age=m_data["expected_age"],
-                importance=m_data.get("importance", 0.5),
-                reached=m_data.get("reached", False),
-                reached_at=m_data.get("reached_at", 0),
-            ))
+            restored_milestones.append(
+                Milestone(
+                    name=m_data["name"],
+                    expected_age=m_data["expected_age"],
+                    importance=m_data.get("importance", 0.5),
+                    reached=m_data.get("reached", False),
+                    reached_at=m_data.get("reached_at", 0),
+                )
+            )
         if restored_milestones:
             narrative.life_script.milestones = restored_milestones
 
@@ -1047,10 +1091,35 @@ def restore_self_model(self_model: SelfModel, data: dict[str, Any]) -> None:
             neuroticism=personality_data.get("neuroticism", 0.40),
         )
 
-    # Restore self-knowledge entries
+    # Restore self-knowledge entries. Person-name fields are validated:
+    # a capture bug once minted "About"/"code just enough to" as
+    # identities, and every subsequent save preserved them — re-keying
+    # the dyadic attribution onto a phantom. Re-validating at load is
+    # the self-healing boundary: a bad capture cannot persist across
+    # restarts even if it is written.
+    _PERSON_KEYS = {"user_name", "current_speaker", "creator_name"}
+    from occipital_lobe.perception.core import is_plausible_name
+
     for entry in data.get("self_knowledge", []):
         key = entry["key"]
         value = entry["value"]
+        if key in _PERSON_KEYS and isinstance(value, str):
+            if value and not is_plausible_name(value):
+                logger.warning(
+                    "dropping implausible %s on restore: %r",
+                    key,
+                    value,
+                )
+                continue
+        elif key == "known_users" and isinstance(value, list):
+            kept = [n for n in value if isinstance(n, str) and is_plausible_name(n)]
+            if len(kept) != len(value):
+                logger.warning(
+                    "dropped %d implausible known_users on restore: %r",
+                    len(value) - len(kept),
+                    [n for n in value if n not in kept],
+                )
+            value = kept
         self_model.self_knowledge[key] = value
 
 
@@ -1113,7 +1182,7 @@ def restore_theory_of_mind(theory_of_mind: TheoryOfMind, data: dict[str, Any]) -
             note_swallowed(
                 "infrastructure.persistence.restore_theory_of_mind",
                 e,
-            )# skip unknown levels
+            )  # skip unknown levels
     # Restore scalar fields
     model.emotional_state = model_data.get("emotional_state", "neutral")
     model.emotional_valence = model_data.get("emotional_valence", 0.0)
@@ -1173,9 +1242,7 @@ def restore_procedural_memory(procedural_memory: ProceduralMemory, data: dict[st
     procedural_memory.executions = data.get("executions", 0)
 
 
-def restore_task_competence(
-    task_competence: TaskCompetence, data: dict[str, Any]
-) -> None:
+def restore_task_competence(task_competence: TaskCompetence, data: dict[str, Any]) -> None:
     """Restore learned task schemas, affordances, and skills."""
     restored = TaskCompetence.from_dict(data)
     task_competence.schemas = restored.schemas
@@ -1266,9 +1333,7 @@ def restore_emotional_memory(emotional_memory: EmotionalMemorySystem, data: dict
     emotional_memory.extinction_count = data.get("extinction_count", 0)
 
 
-def restore_semantic_memory(
-    semantic_memory: SemanticMemory, data: dict[str, Any]
-) -> None:
+def restore_semantic_memory(semantic_memory: SemanticMemory, data: dict[str, Any]) -> None:
     """Restore the semantic fact/schema store from persisted state.
 
     Never raises: a corrupt or partial payload costs the learned facts,
@@ -1547,9 +1612,7 @@ def _serialize_reflection(reflection: Reflection) -> dict[str, Any]:
             }
             for i in _snapshot(reflection.insights)
         ],
-        "mood_history": [
-            list(m) for m in _snapshot(reflection._mood_history)
-        ],
+        "mood_history": [list(m) for m in _snapshot(reflection._mood_history)],
         "response_patterns": _snapshot(reflection._response_patterns)[-50:],
         "metacognitive_model": reflection.metacognitive_model.to_dict(),
     }
@@ -1663,8 +1726,7 @@ def _serialize_self_model(self_model: SelfModel) -> dict[str, Any]:
             "neuroticism": p.neuroticism,
         },
         "self_knowledge": [
-            {"key": k, "value": v}
-            for k, v in _snapshot(self_model.self_knowledge.items)
+            {"key": k, "value": v} for k, v in _snapshot(self_model.self_knowledge.items)
         ],
     }
 
@@ -1678,24 +1740,19 @@ def _serialize_predictive_coding(
     """Serialize predictive coding layer to a dict."""
     return {
         "topic_transitions": {
-            k: dict(v)
-            for k, v in _snapshot(predictive_coding._topic_transitions.items)
+            k: dict(v) for k, v in _snapshot(predictive_coding._topic_transitions.items)
         },
         "intent_transitions": {
-            k: dict(v)
-            for k, v in _snapshot(predictive_coding._intent_transitions.items)
+            k: dict(v) for k, v in _snapshot(predictive_coding._intent_transitions.items)
         },
         "emotion_intents": {
-            k: dict(v)
-            for k, v in _snapshot(predictive_coding._emotion_intents.items)
+            k: dict(v) for k, v in _snapshot(predictive_coding._emotion_intents.items)
         },
         "hour_intents": {
-            str(k): dict(v)
-            for k, v in _snapshot(predictive_coding._hour_intents.items)
+            str(k): dict(v) for k, v in _snapshot(predictive_coding._hour_intents.items)
         },
         "concept_cooccurrence": {
-            k: dict(v)
-            for k, v in _snapshot(predictive_coding._concept_cooccurrence.items)
+            k: dict(v) for k, v in _snapshot(predictive_coding._concept_cooccurrence.items)
         },
         "surprise_ema": predictive_coding._surprise_ema,
         "accuracy_ema": predictive_coding._accuracy_ema,
@@ -1994,6 +2051,8 @@ def serialize_sleep_state(
     is_sleeping: bool,
     user_initiated_sleep: bool,
     sleep_cycle: Any,
+    sleep_start_time: float = 0.0,
+    sleep_start_cycles: int = 0,
 ) -> dict[str, Any]:
     """Serialize sleep state so it survives restarts.
 
@@ -2008,8 +2067,14 @@ def serialize_sleep_state(
     Args:
         is_sleeping: Whether it's currently asleep.
         user_initiated_sleep: Whether the user put it to bed
-            (vs. auto-sleep from sleep pressure).
+            (vs. a body-joined or urge-invoked sleep).
         sleep_cycle: The SleepCycleTracker (or None if awake).
+        sleep_start_time: Wall-clock time the episode began. The wake
+            event's duration accounting measures from it; without it a
+            resumed sleep reports every wake as zero-length.
+        sleep_start_cycles: ``cycles_completed`` at sleep onset — the
+            episode's anchor into the tracker's cumulative count, so a
+            resumed sleep knows where its own cycles begin.
     """
     cycle_data: dict[str, Any] | None = None
     if sleep_cycle is not None:
@@ -2025,6 +2090,8 @@ def serialize_sleep_state(
         "is_sleeping": is_sleeping,
         "user_initiated_sleep": user_initiated_sleep,
         "sleep_cycle": cycle_data,
+        "sleep_start_time": sleep_start_time,
+        "sleep_start_cycles": sleep_start_cycles,
     }
 
 

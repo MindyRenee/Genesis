@@ -40,6 +40,7 @@ import json
 import logging
 import os
 import tempfile
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -91,6 +92,7 @@ def _require_cv2():  # type: ignore[no-untyped-def]
         ) from e
     return cv2
 
+
 # Model paths — downloaded from OpenCV model zoo
 _MODEL_DIR = default_data_dir() / "models"
 _DETECTOR_MODEL = _MODEL_DIR / "face_detection_yunet.onnx"
@@ -114,6 +116,11 @@ _CLUSTER_THRESHOLD = 0.45
 # Cap on live anonymous clusters — crowd scenes must not grow the
 # registry without bound. Least-recently-seen evicts.
 _MAX_CLUSTERS = 64
+
+# A cluster must be seen this many times before it persists to disk —
+# one-shot detections are usually false positives (shadows, posters,
+# faces on screens) and must not become durable "people".
+_MIN_PERSISTED_SIGHTINGS = 2
 
 
 @dataclass
@@ -139,12 +146,11 @@ class FaceCluster:
 
     Unknown faces are not noise: a recurring stranger should become
     *familiar*. Unmatched embeddings cluster here under stable
-    "face:N" keys so presence, aura, and field accrue to them in the
-    dyadic model exactly as they do for named people. Naming a
-    cluster folds its history into the named signature.
+    "face:N" keys so presence accrues to them in the presence model
+    exactly as it does for named people.
     """
 
-    cluster_id: str          # "face:3"
+    cluster_id: str  # "face:3"
     embeddings: list[list[float]] = field(default_factory=list)
     sightings: int = 0
     first_seen: float = field(default_factory=time.time)
@@ -173,6 +179,13 @@ class FaceRecognizer:
         """Initialize the face recognition system with optional data directory."""
         self._detector: object | None = None
         self._recognizer: object | None = None
+        # cv2 DNN objects are not thread-safe: the presence sampler,
+        # see(), and look_at_image can all reach this recognizer from
+        # different threads, and a concurrent detect()/feature() pair
+        # corrupts the engine's internal buffers (observed as the
+        # OpenCV 5 forwardGraph "buf.shape() == m.shape()" assert).
+        # Every cv2 touch in detect_faces runs under this lock.
+        self._infer_lock = threading.Lock()
         self._available: bool | None = None
         self._known_faces: dict[str, list[KnownFace]] = {}
         # Anonymous face clusters — stable "face:N" identities for
@@ -216,9 +229,7 @@ class FaceRecognizer:
         cv2 = _require_cv2()
         if self._detector is None:
             if not _DETECTOR_MODEL.exists():
-                raise FileNotFoundError(
-                    f"Face detector model not found: {_DETECTOR_MODEL}"
-                )
+                raise FileNotFoundError(f"Face detector model not found: {_DETECTOR_MODEL}")
             # On OpenCV 5+ (new graph engine), FaceDetectorYN.create
             # internally loads the ONNX model via the DNN module, which
             # emits a harmless warning ("Targets are not supported by the
@@ -249,9 +260,7 @@ class FaceRecognizer:
         cv2 = _require_cv2()
         if self._recognizer is None:
             if not _RECOGNIZER_MODEL.exists():
-                raise FileNotFoundError(
-                    f"Face recognizer model not found: {_RECOGNIZER_MODEL}"
-                )
+                raise FileNotFoundError(f"Face recognizer model not found: {_RECOGNIZER_MODEL}")
             # Same OpenCV 5+ warning suppression as _get_detector.
             _log_level: int | None
             try:
@@ -283,44 +292,47 @@ class FaceRecognizer:
         bgr = cv2.cvtColor(rgb_frame, cv2.COLOR_RGB2BGR)
         h, w = bgr.shape[:2]
 
-        detector = self._get_detector()
-        detector.setInputSize((w, h))
+        with self._infer_lock:
+            detector = self._get_detector()
+            detector.setInputSize((w, h))
 
-        # Detect faces — returns Nx15 matrix:
-        # columns: x, y, w, h, x_re, y_re, x_le, y_le, x_nose, y_nose,
-        #          x_rm, y_rm, x_lm, y_lm, score
-        _, faces = detector.detect(bgr)
-        if faces is None:
-            return []
+            # Detect faces — returns Nx15 matrix:
+            # columns: x, y, w, h, x_re, y_re, x_le, y_le, x_nose, y_nose,
+            #          x_rm, y_rm, x_lm, y_lm, score
+            _, faces = detector.detect(bgr)
+            if faces is None:
+                return []
 
-        recognizer = self._get_recognizer()
-        results: list[DetectedFace] = []
+            recognizer = self._get_recognizer()
+            results: list[DetectedFace] = []
 
-        for face in faces:
-            x, y, w, h = int(face[0]), int(face[1]), int(face[2]), int(face[3])
+            for face in faces:
+                x, y, w, h = int(face[0]), int(face[1]), int(face[2]), int(face[3])
 
-            # Extract 128-d embedding using SFace. alignCrop takes one
-            # face row (15 values); passing the whole N×15 matrix would
-            # align every embedding to the first face's landmarks.
-            aligned = recognizer.alignCrop(bgr, face[None])
-            embedding = recognizer.feature(aligned).flatten()
+                # Extract 128-d embedding using SFace. alignCrop takes one
+                # face row (15 values); passing the whole N×15 matrix would
+                # align every embedding to the first face's landmarks.
+                aligned = recognizer.alignCrop(bgr, face[None])
+                embedding = recognizer.feature(aligned).flatten()
 
-            # Try to recognize — named first, then anonymous clusters.
-            # Either way the face leaves with a stable person key.
-            name, confidence = self._match_face(embedding)
-            if name is not None:
-                person_key, tier = name, "named"
-            else:
-                person_key, tier = self._match_or_cluster(embedding)
+                # Try to recognize — named first, then anonymous clusters.
+                # Either way the face leaves with a stable person key.
+                name, confidence = self._match_face(embedding)
+                if name is not None:
+                    person_key, tier = name, "named"
+                else:
+                    person_key, tier = self._match_or_cluster(embedding)
 
-            results.append(DetectedFace(
-                bbox=(x, y, w, h),
-                name=name,
-                confidence=confidence,
-                embedding=embedding,
-                person_key=person_key,
-                tier=tier,
-            ))
+                results.append(
+                    DetectedFace(
+                        bbox=(x, y, w, h),
+                        name=name,
+                        confidence=confidence,
+                        embedding=embedding,
+                        person_key=person_key,
+                        tier=tier,
+                    )
+                )
 
         return results
 
@@ -355,8 +367,7 @@ class FaceRecognizer:
         # Convert similarity to confidence (higher = more confident)
         if best_sim >= _RECOGNITION_THRESHOLD:
             confidence = float(
-                min(1.0, (best_sim - _RECOGNITION_THRESHOLD)
-                    / (1.0 - _RECOGNITION_THRESHOLD))
+                min(1.0, (best_sim - _RECOGNITION_THRESHOLD) / (1.0 - _RECOGNITION_THRESHOLD))
             )
             return best_name, confidence
         return None, 0.0
@@ -391,9 +402,7 @@ class FaceRecognizer:
             cluster.last_seen = now
             cluster.embeddings.append(embedding.tolist())
             if len(cluster.embeddings) > _MAX_EMBEDDINGS_PER_NAME:
-                cluster.embeddings = cluster.embeddings[
-                    -_MAX_EMBEDDINGS_PER_NAME:
-                ]
+                cluster.embeddings = cluster.embeddings[-_MAX_EMBEDDINGS_PER_NAME:]
             self._save_clusters()
             return best_id, "familiar"
 
@@ -420,8 +429,7 @@ class FaceRecognizer:
 
         The cluster's sightings become the named person's embeddings —
         the familiar stranger was *them* all along. Returns the folded
-        cluster id so the caller can report the merge on the dyadic
-        wire (the alias field), or None if the cluster is unknown.
+        cluster id, or None if the cluster is unknown.
         """
         name = name.lower().strip()
         cluster = self._clusters.pop(cluster_id, None)
@@ -429,9 +437,7 @@ class FaceRecognizer:
             return None
         entries = self._known_faces.setdefault(name, [])
         for emb in cluster.embeddings:
-            entries.append(KnownFace(
-                name=name, embedding=emb, registered_at=cluster.first_seen
-            ))
+            entries.append(KnownFace(name=name, embedding=emb, registered_at=cluster.first_seen))
         if len(entries) > _MAX_EMBEDDINGS_PER_NAME:
             self._known_faces[name] = entries[-_MAX_EMBEDDINGS_PER_NAME:]
         self._save_known_faces()
@@ -444,9 +450,7 @@ class FaceRecognizer:
         cluster = self._clusters.get(cluster_id)
         return cluster.sightings if cluster else 0
 
-    def register_face(
-        self, name: str, rgb_frame: np.ndarray
-    ) -> bool:
+    def register_face(self, name: str, rgb_frame: np.ndarray) -> bool:
         """Register a face from a frame.
 
         Detects the largest face in the frame and stores its embedding
@@ -506,8 +510,7 @@ class FaceRecognizer:
             with open(self._faces_file) as f:
                 data = json.load(f)
             self._known_faces = {
-                name: [KnownFace(**face) for face in faces]
-                for name, faces in data.items()
+                name: [KnownFace(**face) for face in faces] for name, faces in data.items()
             }
             logger.info(
                 f"Loaded {sum(len(v) for v in self._known_faces.values())} "
@@ -554,15 +557,20 @@ class FaceRecognizer:
                 )
                 for c in data.get("clusters", [])
             }
-            logger.info(
-                "Loaded %d anonymous face cluster(s)", len(self._clusters)
-            )
+            logger.info("Loaded %d anonymous face cluster(s)", len(self._clusters))
         except Exception as e:  # noqa: BLE001
             logger.warning(f"Failed to load face clusters: {e}")
 
     def _save_clusters(self) -> None:
         """Persist anonymous clusters so a familiar stranger survives
-        a restart — an unnamed person is still a person."""
+        a restart — an unnamed person is still a person.
+
+        Only *confirmed* clusters are durable: a single sighting is
+        provisional because the detector also fires on shadows, posters
+        and pictures on screens — every persisted registry full of
+        one-shot clusters is detector noise being promoted to people.
+        A real person recurs within a session and reaches the second
+        sighting quickly."""
         if self._clusters_file is None:
             return
         try:
@@ -577,6 +585,7 @@ class FaceRecognizer:
                         "last_seen": c.last_seen,
                     }
                     for c in self._clusters.values()
+                    if c.sightings >= _MIN_PERSISTED_SIGHTINGS
                 ],
             }
             _write_json_atomically(self._clusters_file, data)

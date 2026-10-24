@@ -150,12 +150,9 @@ class AssayResult:
         ]
         for e in self.effects:
             transition = (
-                e.phase_pre if e.phase_pre == e.phase_slow
-                else f"{e.phase_pre}->{e.phase_slow}"
+                e.phase_pre if e.phase_pre == e.phase_slow else f"{e.phase_pre}->{e.phase_slow}"
             )
-            coupled = ",".join(
-                f"{name}{delta:+.2f}" for name, delta in e.top_coupled
-            )
+            coupled = ",".join(f"{name}{delta:+.2f}" for name, delta in e.top_coupled)
             lines.append(
                 f"{e.name:<16} {e.d_arousal_slow:+9.3f} {e.d_valence_slow:+9.3f} "
                 f"{e.d_plasticity_slow:+8.3f} {transition:<22} {coupled}"
@@ -165,7 +162,9 @@ class AssayResult:
 
 def _is_finite_state(state: Any) -> bool:
     values = [
-        state.arousal, state.valence, state.plasticity_gate,
+        state.arousal,
+        state.valence,
+        state.plasticity_gate,
         *state.chemicals.values(),
     ]
     return all(math.isfinite(v) for v in values)
@@ -196,9 +195,7 @@ def run_chemical_assay(
     settle(client, ticks=settle_ticks, dt=dt)
 
     for chem_id in sorted(CHEM_NAMES):
-        result.effects.append(
-            _measure_chemical(client, chem_id, impulse, dt)
-        )
+        result.effects.append(_measure_chemical(client, chem_id, impulse, dt))
         settle(client, ticks=washout_ticks, dt=dt)
 
     return result
@@ -239,25 +236,17 @@ def _measure_chemical(
 
     for snap, tag in ((fast, "fast"), (slow, "slow")):
         if not _is_finite_state(snap):
-            raise ValueError(
-                f"non-finite state after {name} impulse ({tag} point)"
-            )
+            raise ValueError(f"non-finite state after {name} impulse ({tag} point)")
 
     # Background motion over the measurement window, per chemical.
     fast_drift = {
-        n: control_fast.chemicals[n] - control_pre.chemicals[n]
-        for n in CHEM_NAMES.values()
+        n: control_fast.chemicals[n] - control_pre.chemicals[n] for n in CHEM_NAMES.values()
     }
     slow_drift = {
-        n: control_slow.chemicals[n] - control_pre.chemicals[n]
-        for n in CHEM_NAMES.values()
+        n: control_slow.chemicals[n] - control_pre.chemicals[n] for n in CHEM_NAMES.values()
     }
-    d_self_fast = (
-        fast.chemicals[name] - pre.chemicals[name] - fast_drift[name]
-    )
-    d_self_slow = (
-        slow.chemicals[name] - pre.chemicals[name] - slow_drift[name]
-    )
+    d_self_fast = fast.chemicals[name] - pre.chemicals[name] - fast_drift[name]
+    d_self_slow = slow.chemicals[name] - pre.chemicals[name] - slow_drift[name]
 
     coupled: list[tuple[str, float]] = []
     for other_id, other_name in CHEM_NAMES.items():
@@ -266,9 +255,7 @@ def _measure_chemical(
         coupled.append(
             (
                 other_name,
-                slow.chemicals[other_name]
-                - pre.chemicals[other_name]
-                - slow_drift[other_name],
+                slow.chemicals[other_name] - pre.chemicals[other_name] - slow_drift[other_name],
             )
         )
     coupled.sort(key=lambda kv: abs(kv[1]), reverse=True)

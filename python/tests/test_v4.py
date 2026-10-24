@@ -44,9 +44,7 @@ def test_reconstruction_metrics_match_returned_code_and_dictionary():
     expected_relative = np.sum(error * error) / max(np.sum(X * X), 1e-12)
 
     np.testing.assert_allclose(model.reconstruction_mse, expected_mse)
-    np.testing.assert_allclose(
-        model.relative_reconstruction_error, expected_relative
-    )
+    np.testing.assert_allclose(model.relative_reconstruction_error, expected_relative)
     assert np.isfinite(model.reconstruction_cosine)
     assert 0.0 <= model.sparsity_fraction <= 1.0
 

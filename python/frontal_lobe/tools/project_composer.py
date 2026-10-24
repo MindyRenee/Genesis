@@ -161,10 +161,14 @@ def gather_knowledge(
 
     # Include the topic itself as an entry if it has a definition
     if topic_def and len(topic_def) >= _MIN_DEF_LEN:
-        entries.append((
-            topic, _truncate_def(topic_def),
-            float(concept.confidence), str(concept.origin),
-        ))
+        entries.append(
+            (
+                topic,
+                _truncate_def(topic_def),
+                float(concept.confidence),
+                str(concept.origin),
+            )
+        )
 
     for edge in network.get_edges(topic, direction="both"):
         if len(entries) >= _MAX_ENTRIES or len(relations) >= _MAX_ENTRIES:
@@ -278,7 +282,7 @@ def _build_entries_block(knowledge: DomainKnowledge) -> str:
         entry_lines.append(
             f'    DomainEntry(name="{_str_escape(ename)}", '
             f'definition="{_str_escape(edef)}", '
-            f'confidence={econf:.3f}, '
+            f"confidence={econf:.3f}, "
             f'origin="{_str_escape(eorigin)}"),'
         )
     return "\n".join(entry_lines) if entry_lines else "    # (no entries with definitions)"
@@ -315,7 +319,7 @@ def _build_relation_functions(knowledge: DomainKnowledge) -> str:
             continue
         rel_funcs.append(f'''
 def {func_name}(name: str) -> list[str]:
-    """Return what ``name`` {rel.replace('_', ' ')}, from the relations graph."""
+    """Return what ``name`` {rel.replace("_", " ")}, from the relations graph."""
     entry = RELATIONS.get(name)
     if entry is None:
         return []
@@ -332,8 +336,10 @@ def _pick_demo_query(knowledge: DomainKnowledge, topic: str) -> tuple[str, str, 
     demo_rel_func is None and callers fall back to the generic
     related_to(name, relation).
     """
-    demo_name = topic if any(e[0] == topic for e in knowledge.entries) else (
-        knowledge.entries[0][0] if knowledge.entries else topic
+    demo_name = (
+        topic
+        if any(e[0] == topic for e in knowledge.entries)
+        else (knowledge.entries[0][0] if knowledge.entries else topic)
     )
 
     # Pick a relation that actually involves the demo concept for the demo
@@ -420,12 +426,12 @@ def main() -> None:
             print(f"  neighbors: {{', '.join(nbrs[:5])}}")
 '''
     if demo_rel_func is not None:
-        module += f'''        print(f"  {demo_rel}: {{{demo_rel_func}(focal.name)}}")
-'''
+        module += f"""        print(f"  {demo_rel}: {{{demo_rel_func}(focal.name)}}")
+"""
     elif demo_rel:
         module += f'''        print(f"  {demo_rel}: {{related_to(focal.name, "{demo_rel}")}}")
 '''
-    module += '''    else:
+    module += """    else:
         print("(domain has no entries with definitions)")
     print()
     print("query examples:")
@@ -436,7 +442,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-'''
+"""
     return module
 
 
@@ -572,7 +578,9 @@ def _test_entries_lines(test_name: str, has_entries: bool) -> list[str]:
 
 
 def _test_relations_lines(
-    test_rel_src: str, test_rel: str, test_rel_tgt: str,
+    test_rel_src: str,
+    test_rel: str,
+    test_rel_tgt: str,
 ) -> list[str]:
     """Compose the relation-graph test function source lines (empty if none)."""
     if not test_rel:
@@ -608,9 +616,11 @@ def compose_test_module(name: str, knowledge: DomainKnowledge) -> str:
     work — not just that ``main()`` prints the package name.
     """
     # Pick a real entry name to test with
-    test_name = knowledge.topic if any(
-        e[0] == knowledge.topic for e in knowledge.entries
-    ) else (knowledge.entries[0][0] if knowledge.entries else "")
+    test_name = (
+        knowledge.topic
+        if any(e[0] == knowledge.topic for e in knowledge.entries)
+        else (knowledge.entries[0][0] if knowledge.entries else "")
+    )
 
     # Pick a real relation to test
     test_rel = ""

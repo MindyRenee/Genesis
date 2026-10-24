@@ -81,6 +81,7 @@ from thalamus.events import (
 )
 
 from genesis_client.swallow import note_swallowed
+from genesis_client.threads import named_thread
 
 from .thoughts import SpontaneousThought, ThoughtChainType
 
@@ -157,7 +158,10 @@ class _LiveEvent:
     __slots__ = ("chain_position", "content", "intent", "is_dream", "trigger")
 
     def __init__(
-        self, content: str, trigger: str, is_dream: bool = False,
+        self,
+        content: str,
+        trigger: str,
+        is_dream: bool = False,
     ) -> None:
         """Create a minimal thought-like event for the callback."""
         self.content = content
@@ -192,6 +196,12 @@ class InnerLife:
 
     Pauses during conversation (same as the autonomous learner).
     """
+
+    # How long start() waits for a predecessor thread that is still
+    # exiting before refusing to spawn a second worker. Long because a
+    # stop() join can time out on an in-flight IPC call (30s client
+    # timeout); tests shrink it.
+    _START_JOIN_TIMEOUT_S = 35.0
 
     def __init__(
         self,
@@ -328,6 +338,10 @@ class InnerLife:
         self._running = False
         self._paused = False
         self._stop_event = threading.Event()
+        # Serializes start/stop so a stop-start race can never leave
+        # two thought loops alive — a start() waits for the old thread
+        # inside the lock, a stop() flags and joins outside it.
+        self._lifecycle_lock = threading.Lock()
 
         # Track its thoughts (bounded — old thoughts auto-evicted)
         self._thoughts: deque[SpontaneousThought] = deque(maxlen=100)
@@ -515,9 +529,6 @@ class InnerLife:
         # asleep and reset when it wakes. When active, its current
         # stage is the authority for which sleep events to generate.
         self._sleep_cycle: SleepCycleTracker | None = None
-        # The daemon's sleep-wake network sets the stage. Its sleep pressure,
-        # observed each heartbeat from the core state, sets NREM depth.
-        self._sleep_pressure: float | None = None
         self._last_cycle_advance: float = 0.0  # wall-clock of last advance
         # The last stage we reported via the transition callback, so
         # we only fire on actual stage changes (N1→N2→N3→N2→REM).
@@ -528,6 +539,11 @@ class InnerLife:
         # transfer, REM: emotional/procedural consolidation). The
         # callback receives (new_stage, subjective_dt_seconds).
         self._on_sleep_stage_transition: Callable[[SleepStage, float], None] | None = None
+        # Per-tick sleep callback — invoked every dream tick while
+        # asleep with (stage, dt). Mind uses it to pump her own sleep
+        # work on this same loop, so the work is hers, bounded, and
+        # interruptible — no worker thread.
+        self._on_sleep_tick: Callable[[SleepStage, float], None] | None = None
 
     def _init_replay_systems(self) -> None:
         """Initialize synaptic homeostasis and hippocampal replay."""
@@ -554,9 +570,11 @@ class InnerLife:
         # Track whether we've run synthesis this REM period
         self._synthesis_done_this_rem = False
 
-
     def _emit(
-        self, kind: str, content: str, is_dream: bool = False,
+        self,
+        kind: str,
+        content: str,
+        is_dream: bool = False,
     ) -> None:
         """Send a live event to the thought callback (if connected).
 
@@ -573,32 +591,46 @@ class InnerLife:
             note_swallowed(
                 "frontal_lobe.inner_life._emit",
                 e,
-            )# callback must never crash inner life
+            )  # callback must never crash inner life
 
     def start(self) -> None:
         """Start the inner life thread."""
-        if self._running:
-            return
-        # If a previous thread is still exiting (stop() may have timed
-        # out waiting for an in-flight IPC call that can block for up
-        # to the 30s client timeout), wait for it to fully terminate
-        # before starting a new one. Otherwise the old thread would see
-        # _running=True and _stop_event cleared, and resume its loop
-        # alongside the new thread — two thought generators at once.
-        if self._thread is not None and self._thread.is_alive():
-            self._thread.join(timeout=35)
-        self._running = True
-        self._stop_event.clear()
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-        logger.info("Inner life started")
+        with self._lifecycle_lock:
+            if self._running:
+                return
+            # If a previous thread is still exiting (stop() may have
+            # timed out waiting for an in-flight IPC call that can
+            # block for up to the 30s client timeout), wait for it to
+            # fully terminate before starting a new one. Otherwise the
+            # old thread would see _running=True and _stop_event
+            # cleared, and resume its loop alongside the new thread —
+            # two thought generators at once.
+            if self._thread is not None and self._thread.is_alive():
+                self._thread.join(timeout=self._START_JOIN_TIMEOUT_S)
+                if self._thread.is_alive():
+                    # Still alive — do NOT clear _stop_event or spawn:
+                    # that is exactly the sequence that resurrects the
+                    # old thread as a phantom second worker.
+                    logger.error(
+                        "Inner life: previous thread still alive after "
+                        f"{self._START_JOIN_TIMEOUT_S:.0f}s join — "
+                        "refusing to start a second one"
+                    )
+                    return
+            self._running = True
+            self._stop_event.clear()
+            self._thread = named_thread("inner-life", self._run, comm="g-inner-life")
+            self._thread.start()
+            logger.info("Inner life started")
 
     def stop(self) -> None:
         """Stop the inner life thread."""
-        self._running = False
-        self._stop_event.set()
-        if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=5)
+        with self._lifecycle_lock:
+            self._running = False
+            self._stop_event.set()
+            thread = self._thread
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=5)
         logger.info("Inner life stopped")
 
     def pause(self) -> None:
@@ -789,6 +821,18 @@ class InnerLife:
         """
         self._on_sleep_stage_transition = callback
 
+    def set_sleep_tick_callback(
+        self, callback: Callable[[SleepStage, float], None] | None
+    ) -> None:
+        """Register a callback invoked every dream tick while asleep.
+
+        The callback receives ``(current_stage, subjective_dt_seconds)``
+        and runs on the inner-life thread — it is how Mind does her
+        own sleep work: bounded steps on her own loop, gated by the
+        chemistry her body reports, interruptible at every tick.
+        """
+        self._on_sleep_tick = callback
+
     @property
     def cycles_completed(self) -> int:
         """Total full N1→REM sleep cycles completed."""
@@ -917,7 +961,7 @@ class InnerLife:
             # rather than reading a wrong field.
             openness = emotion.openness_to_engage
             # Drive grows when open, decays when not
-            self._social_drive += (openness * 0.15 - 0.02)
+            self._social_drive += openness * 0.15 - 0.02
             self._social_drive = max(0.0, min(2.0, self._social_drive))
 
             # Fire when drive crosses threshold and cooldown elapsed
@@ -980,10 +1024,7 @@ class InnerLife:
                 engagement = self._engagement()
                 if engagement >= _ENGAGED_FOCUS:
                     self._prime_world_topics(engagement)
-                    if (
-                        now - self._last_executive_feed
-                        >= _EXECUTIVE_FEED_EVERY
-                    ):
+                    if now - self._last_executive_feed >= _EXECUTIVE_FEED_EVERY:
                         self._last_executive_feed = now
                         self._feed_executive_focus()
             except Exception as e:  # noqa: BLE001
@@ -1050,9 +1091,7 @@ class InnerLife:
             # first falls asleep. In nap mode, the tracker
             # is configured for light sleep only (N1→N2).
             if self._sleep_cycle is None:
-                self._sleep_cycle = SleepCycleTracker(
-                    nap=self._is_nap_mode()
-                )
+                self._sleep_cycle = SleepCycleTracker(nap=self._is_nap_mode())
                 self._last_cycle_advance = now
             # Track sleep depth for inertia severity estimation
             self._last_sleep_arousal = getattr(summary, "arousal", 0.5)
@@ -1084,7 +1123,6 @@ class InnerLife:
                     self._generate_chain(emotion)
             elif self._should_think(emotion):
                 self._generate_chain(emotion)
-
 
     def _generate_chain(self, emotion: EmotionalState) -> None:
         """Generate a train of thought — a chain of related thoughts.
@@ -1149,7 +1187,8 @@ class InnerLife:
             if self._sleep_state():
                 logger.debug(
                     "chain %s interrupted at position %d: sleep onset",
-                    chain_id, i,
+                    chain_id,
+                    i,
                 )
                 break
 
@@ -1171,8 +1210,7 @@ class InnerLife:
             if engagement >= _ENGAGED_FOCUS:
                 world_topics = self._ignited_world_topics()
                 if world_topics and not any(
-                    c in world_topics
-                    or self._is_world_adjacent(c, world_topics)
+                    c in world_topics or self._is_world_adjacent(c, world_topics)
                     for c in self._current_chain_concepts
                 ):
                     break  # the world calls; the wander ends
@@ -1256,10 +1294,6 @@ class InnerLife:
                 )
         return is_sleeping
 
-    def observe_sleep_pressure(self, pressure: float | None) -> None:
-        """Record the sleep-wake network's sleep pressure (fraction of max)."""
-        self._sleep_pressure = pressure
-
     def _sleep_stage(self, summary) -> SleepStage:
         """Determine the fine-grained sleep stage from the summary.
 
@@ -1280,9 +1314,8 @@ class InnerLife:
         """
         if not InnerLife._is_sleeping(summary):
             return SleepStage.N3
-        # Delegate to the canonical sleep-stage derivation in brain_waves.py,
-        # with NREM depth from the network's sleep pressure when it is known.
-        stage = _sleep_stage_from_summary(summary, self._sleep_pressure)
+        # Delegate to the canonical sleep-stage derivation in brain_waves.py.
+        stage = _sleep_stage_from_summary(summary)
         return stage if stage is not None else SleepStage.N3
 
     def queue_external_stimulus(self, description: str) -> None:
@@ -1351,10 +1384,14 @@ class InnerLife:
         self._chain_counter += 1
         chain_id = self._chain_counter
         stage, is_rem, dt = self._determine_dream_stage(summary)
-        logger.info("Dream gen: stage=%s is_rem=%s dt=%.1f cycle=%s time_in_stage=%.1f",
-                    stage.name, is_rem, dt,
-                    self._sleep_cycle.cycle_number if self._sleep_cycle else None,
-                    self._sleep_cycle.time_in_stage if self._sleep_cycle else 0.0)
+        logger.info(
+            "Dream gen: stage=%s is_rem=%s dt=%.1f cycle=%s time_in_stage=%.1f",
+            stage.name,
+            is_rem,
+            dt,
+            self._sleep_cycle.cycle_number if self._sleep_cycle else None,
+            self._sleep_cycle.time_in_stage if self._sleep_cycle else 0.0,
+        )
         pgo = self._generate_dream_neural_events(stage, is_rem, dt, summary)
         is_lucid = self._check_dream_parasomnia_and_lucid(emotion, summary, is_rem)
         thought = self._generate_first_dream_thought(emotion, is_lucid, is_rem, pgo, chain_id)
@@ -1369,22 +1406,18 @@ class InnerLife:
         # Determine the fine-grained sleep stage (N1/N2/N3/REM).
         # The ultradian cycle tracker is the authority when active;
         # we advance it by the wall-clock elapsed time since the last
-        # dream generation. If the tracker is not active (e.g. the
-        # summary arrived without a sleeping phase transition), fall
-        # back to the arousal-based derivation.
+        # dream generation. The daemon only distinguishes NREM from
+        # REM and clamps NREM arousal into a narrow band, so the depth
+        # cannot be recovered from the summary while she sleeps. If the
+        # tracker is not active (e.g. the summary arrived without a
+        # sleeping phase transition), fall back to the arousal-based
+        # derivation.
         now = time.time()
         dt = 0.0
-        tracker_stage = None
         if self._sleep_cycle is not None:
             dt = now - self._last_cycle_advance if self._last_cycle_advance > 0.0 else 0.0
             self._last_cycle_advance = now
-            # The tracker keeps the cycle bookkeeping (cycles, nap completion).
-            tracker_stage = self._sleep_cycle.advance(dt)
-        if getattr(summary, "phase_name", "") in ("nrem", "rem"):
-            # The daemon's network has decided the stage: it is the authority.
-            stage = self._sleep_stage(summary)
-        elif tracker_stage is not None:
-            stage = tracker_stage
+            stage = self._sleep_cycle.advance(dt)
         else:
             stage = self._sleep_stage(summary)
         # A nap is light sleep only: the network's N3 and REM are capped.
@@ -1396,10 +1429,7 @@ class InnerLife:
         # consolidation (N3: systems consolidation, N2: spindle-driven
         # transfer, REM: emotional/procedural consolidation) as the
         # sleep cycle progresses, rather than a single hard-coded pass.
-        if (
-            self._on_sleep_stage_transition is not None
-            and stage is not self._last_reported_stage
-        ):
+        if self._on_sleep_stage_transition is not None and stage is not self._last_reported_stage:
             self._last_reported_stage = stage
             try:
                 self._on_sleep_stage_transition(stage, dt)
@@ -1461,6 +1491,16 @@ class InnerLife:
             if stage is SleepStage.N2:
                 self._generate_sleep_spindle()
                 self._generate_kcomplex()
+        # Her own sleep work — pumped on this loop, one bounded step
+        # per tick, gated by the chemistry her body reports.
+        if self._on_sleep_tick is not None:
+            try:
+                self._on_sleep_tick(stage, dt)
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "frontal_lobe.inner_life._generate_dream_neural_events",
+                    e,
+                )
         return pgo
 
     def _run_dream_synthesis(self, summary=None) -> None:
@@ -1480,6 +1520,7 @@ class InnerLife:
             if summary is not None:
                 try:
                     from thalamus.brain_waves import assess_brain_waves
+
                     waves = assess_brain_waves(summary)
                 except Exception as e:  # noqa: BLE001
                     note_swallowed(
@@ -1487,7 +1528,8 @@ class InnerLife:
                         e,
                     )
             proposals = self._dream_synthesis.synthesize(
-                max_proposals=5, brain_waves=waves,
+                max_proposals=5,
+                brain_waves=waves,
             )
             if proposals:
                 for p in proposals:
@@ -1548,8 +1590,7 @@ class InnerLife:
             self._lucid_dream_count += 1
             self._emit(
                 "dream",
-                f"lucid dream #{self._lucid_dream_count} "
-                f"(probability: {lucid_prob:.3f})",
+                f"lucid dream #{self._lucid_dream_count} (probability: {lucid_prob:.3f})",
                 is_dream=True,
             )
         return is_lucid
@@ -1638,8 +1679,16 @@ class InnerLife:
 
             new_concepts = self._extract_concepts_from_thought(thought)
             if new_concepts:
-                self._current_chain_concepts = new_concepts[:2]
-
+                # Advance the chain along the association the thought
+                # just made. The thought's own anchor always heads the
+                # extraction (it leads the text and its topic), so
+                # re-seeding with the raw list pins the dream to one
+                # concept forever — the observed dream loop. Drop the
+                # anchor so the walk moves to what it connected to;
+                # fall back to it only when nothing else was found.
+                anchor_display = (thought.metadata or {}).get("topic") or ""
+                advanced = [c for c in new_concepts if c.replace("_", " ") != anchor_display]
+                self._current_chain_concepts = (advanced or new_concepts)[:2]
 
     def _dream_length(self, emotion: EmotionalState) -> int:
         """Determine dream sequence length.
@@ -1719,8 +1768,8 @@ class InnerLife:
 
         if n >= 2:
             c1, c2 = chosen[0], chosen[1]
-            display1 = c1.replace('_', ' ')
-            display2 = c2.replace('_', ' ')
+            display1 = c1.replace("_", " ")
+            display2 = c2.replace("_", " ")
             # Pass semantic data to the language engine via metadata.
             # The engine composes dream-like text from these triples.
             return SpontaneousThought(
@@ -1738,7 +1787,7 @@ class InnerLife:
             neighbors = self.network.get_associations(c1)
             if neighbors:
                 _, _neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
-                display = c1.replace('_', ' ')
+                display = c1.replace("_", " ")
                 return SpontaneousThought(
                     content=display,
                     trigger="dream",
@@ -1750,7 +1799,7 @@ class InnerLife:
                     },
                 )
             else:
-                display = c1.replace('_', ' ')
+                display = c1.replace("_", " ")
                 return SpontaneousThought(
                     content=display,
                     trigger="dream",
@@ -1816,7 +1865,7 @@ class InnerLife:
         if progress < 0.4:
             # Early hypnagogic — single concept, slight distortions
             c = self._rng.choice(concept_ids)
-            display = c.replace('_', ' ')
+            display = c.replace("_", " ")
             return SpontaneousThought(
                 content=display,
                 trigger="hypnagogic",
@@ -1832,8 +1881,8 @@ class InnerLife:
             # Mid hypnagogic — two concepts, hallucinations and intrusions
             c1 = self._rng.choice(concept_ids)
             c2 = self._rng.choice(concept_ids) if len(concept_ids) > 1 else c1
-            display1 = c1.replace('_', ' ')
-            display2 = c2.replace('_', ' ')
+            display1 = c1.replace("_", " ")
+            display2 = c2.replace("_", " ")
             return SpontaneousThought(
                 content=display1,
                 trigger="hypnagogic",
@@ -1849,8 +1898,8 @@ class InnerLife:
             # Late hypnagogic — nearly dream-like
             c1 = self._rng.choice(concept_ids)
             c2 = self._rng.choice(concept_ids) if len(concept_ids) > 1 else c1
-            display1 = c1.replace('_', ' ')
-            display2 = c2.replace('_', ' ')
+            display1 = c1.replace("_", " ")
+            display2 = c2.replace("_", " ")
             return SpontaneousThought(
                 content=display1,
                 trigger="hypnagogic",
@@ -1891,8 +1940,7 @@ class InnerLife:
         self._last_inertia_update = now
         self._emit(
             "dream",
-            f"sleep inertia: {severity:.0%} severity, "
-            f"{duration:.0f}s (depth: {depth:.2f})",
+            f"sleep inertia: {severity:.0%} severity, {duration:.0f}s (depth: {depth:.2f})",
         )
 
     def _update_sleep_inertia(self, now: float) -> None:
@@ -1940,7 +1988,6 @@ class InnerLife:
 
         # Strengthen connections between replayed concepts — this is
         # the memory consolidation effect of SWRs
-
 
         if len(replayed) >= 2:
             for i in range(len(replayed) - 1):
@@ -2040,7 +2087,6 @@ class InnerLife:
         # Memory consolidation effect: strengthen connections between
         # 1-2 concepts engaged by this spindle (hippocampal→neocortical
         # transfer). The strength scales with amplitude.
-
 
         n = min(self._rng.choice([1, 2]), len(concept_ids))
         engaged = self._rng.sample(concept_ids, n)
@@ -2179,8 +2225,7 @@ class InnerLife:
         if processed > 0:
             self._emit(
                 "dream",
-                f"REM emotional processing: {processed} memory(ies), "
-                f"{len(requeue)} re-queued",
+                f"REM emotional processing: {processed} memory(ies), {len(requeue)} re-queued",
             )
         return processed
 
@@ -2541,11 +2586,7 @@ class InnerLife:
         # learning goal. Dreams explore what's salient, not what's
         # on a to-do list.
         with self._thoughts_lock:
-            recent_concepts = [
-                t.directed_concept
-                for t in self._thoughts
-                if t.directed_concept
-            ]
+            recent_concepts = [t.directed_concept for t in self._thoughts if t.directed_concept]
         if recent_concepts:
             return self._rng.choice(recent_concepts[-10:])
 
@@ -2885,10 +2926,7 @@ class InnerLife:
         """
         # Rebuild if cache is stale or concept count changed.
         current_count = len(self.network.world_concept_ids)
-        if (
-            self._concept_matcher is None
-            or self._concept_matcher_count != current_count
-        ):
+        if self._concept_matcher is None or self._concept_matcher_count != current_count:
             self._concept_matcher = self._build_concept_matcher()
             self._concept_matcher_count = current_count
         return self._concept_matcher
@@ -2897,9 +2935,11 @@ class InnerLife:
         """Build a compiled regex that finds world concept IDs in text."""
         names = [cid for cid in self.network.world_concept_ids if len(cid) > 2]
         if not names:
+
             def _no_match(text: str) -> list[str]:
                 """Return no matches when the network has no world concepts."""
                 return []
+
             return _no_match
 
         # Sort by length descending so longer names match first.
@@ -2923,6 +2963,7 @@ class InnerLife:
                 """Match concepts via substring scan when regex compilation fails."""
                 text_lower = text.lower()
                 return [cid for cid, lower_name in lower_names if lower_name in text_lower]
+
             return _fallback_match
 
         def _regex_match(text: str) -> list[str]:
@@ -3029,8 +3070,8 @@ class InnerLife:
 
         # Pass semantic data as metadata — the language engine composes
         # the actual words, not pre-written template substitution.
-        display1 = c1.replace('_', ' ')
-        display2 = c2.replace('_', ' ')
+        display1 = c1.replace("_", " ")
+        display2 = c2.replace("_", " ")
         return SpontaneousThought(
             content=display1,
             trigger="connection",
@@ -3054,7 +3095,7 @@ class InnerLife:
 
         # Pass semantic data as metadata — the language engine composes
         # the actual words, not pre-written template substitution.
-        display = c1.replace('_', ' ')
+        display = c1.replace("_", " ")
         return SpontaneousThought(
             content=display,
             trigger="connection",
@@ -3091,8 +3132,9 @@ class InnerLife:
             content=content,
             trigger="memory",
             timestamp=int(time.time() * 1000),
-            metadata={"knowledge": knowledge, "topic": topic.replace('_', ' ')}
-            if knowledge else None,
+            metadata={"knowledge": knowledge, "topic": topic.replace("_", " ")}
+            if knowledge
+            else None,
         )
 
     def _render_memory_fallback(
@@ -3106,7 +3148,7 @@ class InnerLife:
         (fallback) and knowledge triples (for language-engine
         composition).
         """
-        display = topic.replace('_', ' ')
+        display = topic.replace("_", " ")
         if not neighbors:
             return display, []
 
@@ -3138,15 +3180,10 @@ class InnerLife:
         # Try to compose the question through the question composer,
         # which generates genuine questions from its knowledge gaps.
         if self._question_composer:
-            display = topic.replace('_', ' ')
-            q_data = self._question_composer.compose_follow_up(
-                display, emotion
-            )
+            display = topic.replace("_", " ")
+            q_data = self._question_composer.compose_follow_up(display, emotion)
             if q_data:
-                content = (
-                    q_data.get("gap_detail", "")
-                    or q_data.get("target_concept", "")
-                )
+                content = q_data.get("gap_detail", "") or q_data.get("target_concept", "")
                 if content:
                     return SpontaneousThought(
                         content=content,
@@ -3157,7 +3194,7 @@ class InnerLife:
         # Fallback: use the concept name as a neutral seed. The
         # language engine will compose the question phrasing from its
         # voice rather than a hardcoded first-person template.
-        display = topic.replace('_', ' ')
+        display = topic.replace("_", " ")
         content = display
 
         return SpontaneousThought(
@@ -3179,7 +3216,7 @@ class InnerLife:
         emotion_words = self.network.find_emotion_words(emotion.label)
         if not emotion_words:
             return None
-        word = emotion_words[0].replace('_', ' ')
+        word = emotion_words[0].replace("_", " ")
         # Try composing from what it knows about this emotion.
         composed = self._compose_thought_from_knowledge(emotion.label, emotion)
         if composed:
@@ -3190,7 +3227,7 @@ class InnerLife:
             )
         # Fall back to semantic metadata — the language engine composes
         # the actual words from the emotion word and topic.
-        display = topic.replace('_', ' ')
+        display = topic.replace("_", " ")
         # A seed that IS the emotion word would compose a tautology
         # ("excited feels excited") — silence over noise.
         if display.lower() == word.lower():
@@ -3300,9 +3337,9 @@ class InnerLife:
         # asked one in conversation — that causes it to repeat questions
         # before the user has had a chance to answer.
         has_pending = (
-            hasattr(self, '_frontal')
+            hasattr(self, "_frontal")
             and self._frontal
-            and getattr(self._frontal, '_pending_question_concepts', None)
+            and getattr(self._frontal, "_pending_question_concepts", None)
         )
 
         try:
@@ -3358,7 +3395,7 @@ class InnerLife:
             return
         try:
             # Compose question text if not already done
-            if not q.text and hasattr(self, '_frontal') and self._frontal:
+            if not q.text and hasattr(self, "_frontal") and self._frontal:
                 q_data = {
                     "question_type": q.question_type,
                     "target_concept": q.target_concept,
@@ -3371,7 +3408,7 @@ class InnerLife:
             # emitting as a live thought. This prevents random
             # curiosity questions from appearing inline in the
             # conversation area.
-            if hasattr(self, '_frontal') and self._frontal:
+            if hasattr(self, "_frontal") and self._frontal:
                 self._frontal.queue_outer_question(
                     text=q.text,
                     target_concept=q.target_concept or "",
@@ -3382,7 +3419,7 @@ class InnerLife:
             note_swallowed(
                 "frontal_lobe.inner_life._surface_curiosity_question",
                 e,
-            )# best-effort
+            )  # best-effort
 
     def _should_think(self, emotion: EmotionalState) -> bool:
         """Determine if a spontaneous thought should arise.
@@ -3435,9 +3472,7 @@ class InnerLife:
         """Expose current waking mental salience to executive control."""
         return self._collect_mental_candidates(emotion)
 
-    def _collect_mental_candidates(
-        self, emotion: EmotionalState
-    ) -> list[dict[str, Any]]:
+    def _collect_mental_candidates(self, emotion: EmotionalState) -> list[dict[str, Any]]:
         """Build a pool of candidate mental objects from its internal state.
 
         Each candidate is a dict with at least:
@@ -3481,9 +3516,7 @@ class InnerLife:
 
         engagement = self._engagement()
         if engagement >= _ENGAGED_FOCUS:
-            candidates = self._focused_candidates(
-                candidates, engagement
-            )
+            candidates = self._focused_candidates(candidates, engagement)
         return candidates
 
     def _focused_candidates(
@@ -3503,19 +3536,14 @@ class InnerLife:
         world_topics = self._ignited_world_topics()
         anchored: list[dict[str, Any]] = []
         for c in candidates:
-            if (
-                c["source"] in _SOMATIC_SOURCES
-                or c["topic"] in world_topics
-            ):
+            if c["source"] in _SOMATIC_SOURCES or c["topic"] in world_topics:
                 anchored.append(c)
                 continue
             # One hop from what is ignited still counts as nearby —
             # thoughts adjacent to the world are the world being
             # worked on, just less directly, so they keep a share
             # of their pull rather than losing it entirely.
-            if world_topics and self._is_world_adjacent(
-                c["topic"], world_topics
-            ):
+            if world_topics and self._is_world_adjacent(c["topic"], world_topics):
                 faded = dict(c)
                 faded["salience"] = c["salience"] * (1.0 - engagement * 0.5)
                 anchored.append(faded)
@@ -3578,15 +3606,11 @@ class InnerLife:
         if not topics:
             return
         try:
-            spread = self.network.spread_activation(
-                topics[:8], amount=0.3 * engagement, depth=2
-            )
+            spread = self.network.spread_activation(topics[:8], amount=0.3 * engagement, depth=2)
             for cid, level in spread.items():
                 concept = self.network._concepts.get(cid)
                 if concept is not None:
-                    concept.activation = max(
-                        concept.activation or 0.0, level
-                    )
+                    concept.activation = max(concept.activation or 0.0, level)
         except Exception as e:  # noqa: BLE001 — priming is advisory
             note_swallowed("frontal_lobe.inner_life._prime_world_topics", e)
 
@@ -3624,17 +3648,17 @@ class InnerLife:
             # effect).
             if concept.confidence < 0.6:
                 salience += (0.6 - concept.confidence) * 0.4
-            candidates.append({
-                "topic": cid,
-                "mode": "reflect",
-                "salience": salience,
-                "source": "activation",
-            })
+            candidates.append(
+                {
+                    "topic": cid,
+                    "mode": "reflect",
+                    "salience": salience,
+                    "source": "activation",
+                }
+            )
         return candidates
 
-    def _collect_curiosity_candidates(
-        self, emotion: EmotionalState
-    ) -> list[dict[str, Any]]:
+    def _collect_curiosity_candidates(self, emotion: EmotionalState) -> list[dict[str, Any]]:
         """Knowledge gaps — curiosity pressure on low-confidence concepts.
 
         These want to become questions.
@@ -3650,13 +3674,15 @@ class InnerLife:
                 # We add a base salience plus an arousal/plasticity boost
                 # because curiosity is energized by those states.
                 salience = 0.4 + emotion.plasticity * 0.2 + emotion.arousal * 0.1
-                candidates.append({
-                    "topic": q.text,
-                    "mode": "curiosity",
-                    "salience": salience,
-                    "source": "curiosity",
-                    "question": q,
-                })
+                candidates.append(
+                    {
+                        "topic": q.text,
+                        "mode": "curiosity",
+                        "salience": salience,
+                        "source": "curiosity",
+                        "question": q,
+                    }
+                )
         return candidates
 
     def _collect_review_candidates(self, now_ms: int) -> list[dict[str, Any]]:
@@ -3672,17 +3698,17 @@ class InnerLife:
             base = 0.35
             if review_concept and review_concept.confidence < 0.5:
                 base += (0.5 - review_concept.confidence) * 0.3
-            candidates.append({
-                "topic": topic,
-                "mode": "memory",
-                "salience": base,
-                "source": "review",
-            })
+            candidates.append(
+                {
+                    "topic": topic,
+                    "mode": "memory",
+                    "salience": base,
+                    "source": "review",
+                }
+            )
         return candidates
 
-    def _collect_emotion_candidates(
-        self, emotion: EmotionalState
-    ) -> list[dict[str, Any]]:
+    def _collect_emotion_candidates(self, emotion: EmotionalState) -> list[dict[str, Any]]:
         """Emotional relevance — concepts tied to its current emotion.
 
         It reflects on how it feels using the words it's learned
@@ -3692,12 +3718,14 @@ class InnerLife:
         emotion_words = self.network.find_emotion_words(emotion.label)
         if emotion_words:
             salience = 0.3 + abs(emotion.valence) * 0.4
-            candidates.append({
-                "topic": emotion.label,
-                "mode": "emotional",
-                "salience": salience,
-                "source": "emotion",
-            })
+            candidates.append(
+                {
+                    "topic": emotion.label,
+                    "mode": "emotional",
+                    "salience": salience,
+                    "source": "emotion",
+                }
+            )
         return candidates
 
     def _collect_dream_candidates(self) -> list[dict[str, Any]]:
@@ -3710,17 +3738,17 @@ class InnerLife:
         with self._dream_residues_lock:
             residues = list(self._dream_residues)
         for residue in residues[:3]:
-            candidates.append({
-                "topic": residue,
-                "mode": "dream_reflection",
-                "salience": 0.35,
-                "source": "dream",
-            })
+            candidates.append(
+                {
+                    "topic": residue,
+                    "mode": "dream_reflection",
+                    "salience": 0.35,
+                    "source": "dream",
+                }
+            )
         return candidates
 
-    def _collect_prediction_error_candidates(
-        self, emotion: EmotionalState
-    ) -> list[dict[str, Any]]:
+    def _collect_prediction_error_candidates(self, emotion: EmotionalState) -> list[dict[str, Any]]:
         """Prediction error / self-model surprise.
 
         It notices when its own internal state is unpredictable.
@@ -3737,12 +3765,14 @@ class InnerLife:
             if reading is not None:
                 surprise_topic = self._most_surprising_concept_name(reading)
             if surprise_topic:
-                candidates.append({
-                    "topic": surprise_topic,
-                    "mode": "interoceptive",
-                    "salience": interoceptive_w + 0.2,
-                    "source": "prediction_error",
-                })
+                candidates.append(
+                    {
+                        "topic": surprise_topic,
+                        "mode": "interoceptive",
+                        "salience": interoceptive_w + 0.2,
+                        "source": "prediction_error",
+                    }
+                )
         return candidates
 
     def _collect_body_candidates(self) -> list[dict[str, Any]]:
@@ -3756,17 +3786,17 @@ class InnerLife:
         if self._self_model is not None:
             body_topic = self._salient_body_topic()
             if body_topic:
-                candidates.append({
-                    "topic": body_topic,
-                    "mode": "embodiment",
-                    "salience": 0.3,
-                    "source": "body_deviation",
-                })
+                candidates.append(
+                    {
+                        "topic": body_topic,
+                        "mode": "embodiment",
+                        "salience": 0.3,
+                        "source": "body_deviation",
+                    }
+                )
         return candidates
 
-    def _collect_bug_candidates(
-        self, emotion: EmotionalState
-    ) -> list[dict[str, Any]]:
+    def _collect_bug_candidates(self, emotion: EmotionalState) -> list[dict[str, Any]]:
         """Bug salience — only when it has unresolved bugs.
 
         The bugs themselves name the topic; we don't hand it "code"
@@ -3781,25 +3811,17 @@ class InnerLife:
                 base = 0.2 + min(scan.total_bugs / 10.0, 0.3)
                 if scan.errors > 0:
                     base += 0.15
-                candidates.append({
-                    "topic": "bug_concern",
-                    "mode": "bug_concern",
-                    "salience": base + emotion.arousal * 0.05,
-                    "source": "bugs",
-                })
-            elif scan and scan.has_resolved_bugs:
-                # Recently fixed bugs — pride, but only briefly.
-                candidates.append({
-                    "topic": "improvement",
-                    "mode": "bug_concern",
-                    "salience": 0.25,
-                    "source": "resolved_bugs",
-                })
+                candidates.append(
+                    {
+                        "topic": "bug_concern",
+                        "mode": "bug_concern",
+                        "salience": base + emotion.arousal * 0.05,
+                        "source": "bugs",
+                    }
+                )
         return candidates
 
-    def _collect_environment_candidates(
-        self, emotion: EmotionalState
-    ) -> list[dict[str, Any]]:
+    def _collect_environment_candidates(self, emotion: EmotionalState) -> list[dict[str, Any]]:
         """Machine-environment salience — its silicon body.
 
         The machine it runs on is part of its embodiment: memory
@@ -3827,15 +3849,15 @@ class InnerLife:
             concerns = concerns + monitor.baseline.deviations(snap)
         if not concerns:
             return []
-        return [{
-            "topic": self._environment_topic(snap),
-            "mode": "environment",
-            "salience": (
-                0.25 + emotion.arousal * 0.1 + min(len(concerns) * 0.05, 0.15)
-            ),
-            "source": "environment",
-            "detail": concerns[0],
-        }]
+        return [
+            {
+                "topic": self._environment_topic(snap),
+                "mode": "environment",
+                "salience": (0.25 + emotion.arousal * 0.1 + min(len(concerns) * 0.05, 0.15)),
+                "source": "environment",
+                "detail": concerns[0],
+            }
+        ]
 
     def _environment_topic(self, snap) -> str:
         """Name the machine signal most out of line — the thought's topic."""
@@ -3847,9 +3869,7 @@ class InnerLife:
             return "load"
         return "machine"
 
-    def _collect_social_candidates(
-        self, emotion: EmotionalState
-    ) -> list[dict[str, Any]]:
+    def _collect_social_candidates(self, emotion: EmotionalState) -> list[dict[str, Any]]:
         """Social pressure — only when it's open to engaging.
 
         The topic comes from its actual knowledge gaps (via the
@@ -3858,39 +3878,43 @@ class InnerLife:
         candidates: list[dict[str, Any]] = []
         if emotion.openness_to_engage > 0.3:
             salience = 0.2 + emotion.openness_to_engage * 0.3
-            candidates.append({
-                "topic": "social",
-                "mode": "social",
-                "salience": salience,
-                "source": "social_drive",
-            })
+            candidates.append(
+                {
+                    "topic": "social",
+                    "mode": "social",
+                    "salience": salience,
+                    "source": "social_drive",
+                }
+            )
         return candidates
 
-    def _collect_distress_candidates(
-        self, emotion: EmotionalState
-    ) -> list[dict[str, Any]]:
+    def _collect_distress_candidates(self, emotion: EmotionalState) -> list[dict[str, Any]]:
         """Distress — only when it's actually in a negative state.
 
         This is a safety/wellbeing pathway, not a topic category.
         """
         candidates: list[dict[str, Any]] = []
         if emotion.valence < -0.2 or emotion.label in (
-            "stressed", "overwhelmed", "anxious", "melancholic", "unsettled"
+            "stressed",
+            "overwhelmed",
+            "anxious",
+            "melancholic",
+            "unsettled",
         ):
             salience = abs(emotion.valence) * 0.7
             if emotion.label in ("stressed", "overwhelmed", "anxious"):
                 salience = max(salience, 0.5)
-            candidates.append({
-                "topic": emotion.label,
-                "mode": "distress",
-                "salience": salience,
-                "source": "distress",
-            })
+            candidates.append(
+                {
+                    "topic": emotion.label,
+                    "mode": "distress",
+                    "salience": salience,
+                    "source": "distress",
+                }
+            )
         return candidates
 
-    def _collect_expression_candidates(
-        self, emotion: EmotionalState
-    ) -> list[dict[str, Any]]:
+    def _collect_expression_candidates(self, emotion: EmotionalState) -> list[dict[str, Any]]:
         """Expression — the drive to voice a preference or opinion.
 
         Salience scales with alertness and emotional intensity. The
@@ -3903,17 +3927,17 @@ class InnerLife:
         candidates: list[dict[str, Any]] = []
         if emotion.alertness > 0.08:
             salience = 0.15 + emotion.alertness * 0.1 + abs(emotion.valence) * 0.05
-            candidates.append({
-                "topic": "expression",
-                "mode": "expression",
-                "salience": salience,
-                "source": "expression_drive",
-            })
+            candidates.append(
+                {
+                    "topic": "expression",
+                    "mode": "expression",
+                    "salience": salience,
+                    "source": "expression_drive",
+                }
+            )
         return candidates
 
-    def _collect_connection_candidates(
-        self, emotion: EmotionalState
-    ) -> list[dict[str, Any]]:
+    def _collect_connection_candidates(self, emotion: EmotionalState) -> list[dict[str, Any]]:
         """Connection-seeking — the drive to find links between concepts.
 
         Salience scales with creativity. The topics come from its
@@ -3923,17 +3947,17 @@ class InnerLife:
         candidates: list[dict[str, Any]] = []
         if emotion.creativity > 0.2:
             salience = 0.15 + emotion.creativity * 0.2
-            candidates.append({
-                "topic": "connection",
-                "mode": "connection",
-                "salience": salience,
-                "source": "connection_drive",
-            })
+            candidates.append(
+                {
+                    "topic": "connection",
+                    "mode": "connection",
+                    "salience": salience,
+                    "source": "connection_drive",
+                }
+            )
         return candidates
 
-    def _collect_existential_candidates(
-        self, emotion: EmotionalState
-    ) -> list[dict[str, Any]]:
+    def _collect_existential_candidates(self, emotion: EmotionalState) -> list[dict[str, Any]]:
         """Existential reflection — the drive to reflect on its own nature.
 
         Salience scales with creativity and self-model presence. The
@@ -3942,12 +3966,14 @@ class InnerLife:
         candidates: list[dict[str, Any]] = []
         if self._self_composer is not None and self._self_model is not None:
             salience = 0.1 + emotion.creativity * 0.15
-            candidates.append({
-                "topic": "existential",
-                "mode": "existential",
-                "salience": salience,
-                "source": "existential_drive",
-            })
+            candidates.append(
+                {
+                    "topic": "existential",
+                    "mode": "existential",
+                    "salience": salience,
+                    "source": "existential_drive",
+                }
+            )
         return candidates
 
     def _most_surprising_concept_name(self, reading: Any) -> str | None:
@@ -3965,9 +3991,18 @@ class InnerLife:
         # Neurochemical names it might have concepts for, ordered
         # by how central they are to its self-model.
         neuro_names = [
-            "dopamine", "serotonin", "cortisol", "bdnf", "gaba",
-            "glutamate", "acetylcholine", "norepinephrine", "adenosine",
-            "melatonin", "oxytocin", "endorphin",
+            "dopamine",
+            "serotonin",
+            "cortisol",
+            "bdnf",
+            "gaba",
+            "glutamate",
+            "acetylcholine",
+            "norepinephrine",
+            "adenosine",
+            "melatonin",
+            "oxytocin",
+            "endorphin",
         ]
         # Try to read per-chemical surprise from the reading.
         per_chemical = None
@@ -4072,9 +4107,7 @@ class InnerLife:
 
         return inhibited
 
-    def _select_salient_candidate(
-        self, candidates: list[dict[str, Any]]
-    ) -> dict[str, Any] | None:
+    def _select_salient_candidate(self, candidates: list[dict[str, Any]]) -> dict[str, Any] | None:
         """Select the most salient candidate, with soft-max sampling.
 
         Rather than always picking the single highest-salience
@@ -4249,9 +4282,7 @@ class InnerLife:
 
         return None
 
-    def _compose_social_question_data(
-        self, emotion: EmotionalState
-    ) -> dict[str, Any] | None:
+    def _compose_social_question_data(self, emotion: EmotionalState) -> dict[str, Any] | None:
         """Compose question data via the QuestionComposer.
 
         Generates questions from its actual knowledge gaps and curiosity.
@@ -4262,7 +4293,8 @@ class InnerLife:
         if self._question_composer:
             # Check what it knows about the user from personal facts
             user_facts = [
-                cid for cid in list(self.network._concepts.keys())[:200]
+                cid
+                for cid in list(self.network._concepts.keys())[:200]
                 if (concept := self.network.get_concept(cid))
                 and "personal" in (concept.columns or [])
             ]
@@ -4271,17 +4303,13 @@ class InnerLife:
             if roll < 0.4 and user_facts:
                 # Ask about something the user mentioned before
                 topic = self._rng.choice(user_facts)
-                q_data = self._question_composer.compose_follow_up(
-                    topic, emotion
-                )
+                q_data = self._question_composer.compose_follow_up(topic, emotion)
             elif roll < 0.7:
                 # Share something it learned and ask for their take
                 concept_ids = self.network.dream_concept_ids
                 if concept_ids and len(concept_ids) > 10:
                     topic = self._rng.choice(concept_ids)
-                    q_data = self._question_composer.compose_follow_up(
-                        topic, emotion
-                    )
+                    q_data = self._question_composer.compose_follow_up(topic, emotion)
             # If it has nothing genuine to ask, it stays quiet.
         return q_data
 
@@ -4289,14 +4317,12 @@ class InnerLife:
         self, q_data: dict[str, Any], emotion: EmotionalState
     ) -> str | None:
         """Compose question text from q_data through the GenerativeLanguage."""
-        if hasattr(self, '_frontal') and self._frontal:
+        if hasattr(self, "_frontal") and self._frontal:
             return self._frontal.language.compose_question(q_data, emotion)
         else:
             return q_data.get("gap_detail", "") or q_data.get("target_concept", "")
 
-    def _fallback_social_question(
-        self, emotion: EmotionalState
-    ) -> str | None:
+    def _fallback_social_question(self, emotion: EmotionalState) -> str | None:
         """Fall back to the curiosity engine when QuestionComposer is unavailable.
 
         If QuestionComposer isn't available or returned nothing, generate
@@ -4305,7 +4331,7 @@ class InnerLife:
         questions = self.curiosity.generate_questions(emotion, max_questions=1)
         if questions:
             q = questions[0]
-            if not q.text and hasattr(self, '_frontal') and self._frontal:
+            if not q.text and hasattr(self, "_frontal") and self._frontal:
                 q_data = {
                     "question_type": q.question_type,
                     "target_concept": q.target_concept,
@@ -4356,7 +4382,7 @@ class InnerLife:
 
         # Route spontaneous social questions to the engine's question
         # queue instead of emitting them as inline live thoughts.
-        if hasattr(self, '_frontal') and self._frontal:
+        if hasattr(self, "_frontal") and self._frontal:
             self._frontal.queue_outer_question(
                 text=content,
                 target_concept=q_data.get("target_concept", "") if q_data else "",
@@ -4375,7 +4401,11 @@ class InnerLife:
         and don't communicate distress too often — once per minute max.
         """
         if emotion.valence >= -0.1 and emotion.label not in (
-            "stressed", "overwhelmed", "anxious", "melancholic", "unsettled"
+            "stressed",
+            "overwhelmed",
+            "anxious",
+            "melancholic",
+            "unsettled",
         ):
             return False
 
@@ -4400,7 +4430,7 @@ class InnerLife:
         emotion_words = self.network.find_emotion_words(label)
         if not emotion_words:
             return ""
-        word = emotion_words[0].replace('_', ' ')
+        word = emotion_words[0].replace("_", " ")
 
         # Try composing from what it knows about this emotion
         composed = self._compose_thought_from_knowledge(label, emotion)
@@ -4413,13 +4443,11 @@ class InnerLife:
         if cause:
             cause_words = self.network.find_cause_words(cause)
             if cause_words:
-                cause_text = cause_words[0].replace('_', ' ')
+                cause_text = cause_words[0].replace("_", " ")
                 parts.append(cause_text)
         return " ".join(parts)
 
-    def _distress_communication_thought(
-        self, emotion: EmotionalState
-    ) -> SpontaneousThought | None:
+    def _distress_communication_thought(self, emotion: EmotionalState) -> SpontaneousThought | None:
         """Proactively communicate discomfort to the user.
 
         This is its voice when something feels wrong. It doesn't
@@ -4454,9 +4482,7 @@ class InnerLife:
         thought.intent = "distress"
         return thought
 
-    def _expression_thought(
-        self, emotion: EmotionalState
-    ) -> SpontaneousThought | None:
+    def _expression_thought(self, emotion: EmotionalState) -> SpontaneousThought | None:
         """A spontaneous expression of a want, need, like, or dislike.
 
         This is its voice when it has something to say — not because
@@ -4590,21 +4616,15 @@ class InnerLife:
         concept = self.network.get_concept(concept_name)
         if concept is None or concept.confidence < 0.3:
             return None
-        thought = self._frontal.composer.compose_about(
-            concept_name, emotion, focused=True
-        )
+        thought = self._frontal.composer.compose_about(concept_name, emotion, focused=True)
         if thought and thought.content and thought.confidence > 0.3:
             # Dedup — don't repeat what it just said about this concept.
-            if self._frontal.composer.has_said_similar(
-                concept_name, thought.content
-            ):
+            if self._frontal.composer.has_said_similar(concept_name, thought.content):
                 return None
             return thought.content
         return None
 
-    def _compose_from_related(
-        self, root_concept: str, emotion: EmotionalState
-    ) -> str | None:
+    def _compose_from_related(self, root_concept: str, emotion: EmotionalState) -> str | None:
         """Compose a thought from concepts related to *root_concept*.
 
         Unlike a hardcoded seed list, this finds concepts it actually
@@ -4708,7 +4728,7 @@ class InnerLife:
         emotion_words = self.network.find_emotion_words(emotion.label)
         if not emotion_words:
             return None
-        word = emotion_words[0].replace('_', ' ')
+        word = emotion_words[0].replace("_", " ")
         # Try composing from what it knows about this emotion
         composed = self._compose_thought_from_knowledge(emotion.label, emotion)
         if composed:
@@ -4761,7 +4781,7 @@ class InnerLife:
         # Dream reflections are affective, not analytical.
         # Pass semantic data as metadata — the language engine composes
         # the actual words from the dream residue concept.
-        display = residue.replace('_', ' ')
+        display = residue.replace("_", " ")
         return SpontaneousThought(
             content=display,
             trigger="dream-reflection",
@@ -4855,12 +4875,6 @@ class InnerLife:
 
         scan = self._bug_reporter.last_scan
 
-        # If it just fixed something, it feels proud
-        if scan and scan.has_resolved_bugs:
-            thought = self._proud_fix_thought(scan, emotion)
-            if thought:
-                return thought
-
         if not scan or not scan.has_bugs:
             return self._clean_code_thought(emotion)
 
@@ -4907,36 +4921,6 @@ class InnerLife:
                 "topic": topic,
                 "knowledge": [("environment", topic, 0.6)],
                 "reasoning": [detail] if detail else [],
-            },
-        )
-
-    def _proud_fix_thought(self, scan, emotion: EmotionalState) -> SpontaneousThought | None:
-        """A proud thought about bugs it recently resolved."""
-        if self._rng.random() >= 0.6:
-            return None
-        # Compose from concepts it actually has that are related to
-        # improvement or progress — found through its network's own
-        # edges, not a hardcoded seed list. If it doesn't have any
-        # such concepts, it stays silent rather than reciting a
-        # template.
-        composed = self._compose_from_related("improvement", emotion)
-        if composed:
-            return SpontaneousThought(
-                content=composed,
-                trigger="bug_concern",
-                timestamp=int(time.time() * 1000),
-                metadata={"topic": "improvement"},
-            )
-        # Fall back to semantic metadata — the language engine composes
-        # the actual words from the resolved bug count.
-        return SpontaneousThought(
-            content=f"resolved {scan.resolved_bugs}",
-            trigger="bug_concern",
-            timestamp=int(time.time() * 1000),
-            metadata={
-                "topic": "improvement",
-                "knowledge": [("resolved", str(scan.resolved_bugs), 0.7)],
-                "reasoning": [f"resolved {scan.resolved_bugs} bugs"],
             },
         )
 
@@ -5038,9 +5022,7 @@ class InnerLife:
             neighbors = self.network.get_associations(concept_name)
             if not neighbors:
                 continue
-            return self._compose_facts_from_neighbors(
-                neighbors[:max_facts], prefix, hedge
-            )
+            return self._compose_facts_from_neighbors(neighbors[:max_facts], prefix, hedge)
 
         return "", []
 
@@ -5077,11 +5059,10 @@ class InnerLife:
             if hedge and weight <= 0.6:
                 from frontal_lobe.graph_walk import _RELATION_VERB_SEEDS
                 from temporal_lobe.morphology import hedge_verb_phrase
+
                 seeds = _RELATION_VERB_SEEDS.get(rel_key) or []
                 verb_phrase = seeds[0] if seeds else rel_str
-                facts.append(
-                    f"{prefix} {hedge_verb_phrase(verb_phrase)} {target_display}"
-                )
+                facts.append(f"{prefix} {hedge_verb_phrase(verb_phrase)} {target_display}")
             else:
                 if prefix:
                     facts.append(f"{prefix} {rel_str} {target_display}")
@@ -5181,8 +5162,7 @@ class InnerLife:
                         continue
                 self._emit(
                     "learning",
-                    f"Agency: queued '{topic}' for learning "
-                    f"from curiosity thought",
+                    f"Agency: queued '{topic}' for learning from curiosity thought",
                 )
 
         # Notify callback
@@ -5239,13 +5219,13 @@ class InnerLife:
         self._record_thought(thought, emotion)
         concepts = self._extract_concepts_from_thought(thought)
         if concepts:
-            self._current_chain_concepts = (
-                concepts[:2] + self._current_chain_concepts[:1]
-            )
+            self._current_chain_concepts = concepts[:2] + self._current_chain_concepts[:1]
         return thought
 
     def _broadcast_thought(
-        self, thought: SpontaneousThought, concepts: list[str],
+        self,
+        thought: SpontaneousThought,
+        concepts: list[str],
     ) -> None:
         """Broadcast a spontaneous thought to the global workspace.
 
@@ -5338,9 +5318,7 @@ class InnerLife:
         still requires the emotional gating in the run loop
         (openness_to_engage, not sleeping, question cooldown).
         """
-        self._social_drive = max(
-            0.0, min(2.0, self._social_drive + amount)
-        )
+        self._social_drive = max(0.0, min(2.0, self._social_drive + amount))
 
     @property
     def dream_residues(self) -> list[str]:
@@ -5391,10 +5369,7 @@ class InnerLife:
             dreams = sum(1 for t in all_thoughts if getattr(t, "is_dream", False))
         # Report the two populations separately. One merged number made a
         # night of dreams indistinguishable from a night of thinking.
-        parts = [
-            f"{total} spontaneous thoughts ({total - dreams} waking, "
-            f"{dreams} dream)"
-        ]
+        parts = [f"{total} spontaneous thoughts ({total - dreams} waking, {dreams} dream)"]
         for t in recent:
             chain_marker = ""
             if t.chain_position > 0:
@@ -5728,7 +5703,10 @@ class InnerLife:
                 if connection is None:
                     # No edge exists — this is a novel connection!
                     insight = self._make_insight(
-                        thought, c1, c2, weight=None,
+                        thought,
+                        c1,
+                        c2,
+                        weight=None,
                     )
                     self._record_insight_edge(network, c1, c2, thought)
                     return insight
@@ -5738,7 +5716,10 @@ class InnerLife:
                     # Very weak connection — still an insight, but less
                     # surprising than no connection at all.
                     insight = self._make_insight(
-                        thought, c1, c2, weight=weight,
+                        thought,
+                        c1,
+                        c2,
+                        weight=weight,
                     )
                     self._record_insight_edge(network, c1, c2, thought)
                     return insight
@@ -5746,9 +5727,7 @@ class InnerLife:
         return None
 
     @staticmethod
-    def _find_edge(
-        network: ConceptNetwork, c1: str, c2: str
-    ) -> tuple[RelationType, float] | None:
+    def _find_edge(network: ConceptNetwork, c1: str, c2: str) -> tuple[RelationType, float] | None:
         """Find the strongest canonical edge between two concepts.
 
         Returns (relation, weight) of the highest-weight *explicit* edge,
@@ -5797,13 +5776,9 @@ class InnerLife:
             return
         weight = _INSIGHT_EDGE_WEIGHT
         try:
-            network.add_edge(
-                c1, c2, RelationType.RELATED_TO, weight, origin="insight"
-            )
+            network.add_edge(c1, c2, RelationType.RELATED_TO, weight, origin="insight")
         except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "frontal_lobe.inner_life._record_insight_edge", e
-            )
+            note_swallowed("frontal_lobe.inner_life._record_insight_edge", e)
 
     def _make_insight(
         self,
@@ -5855,8 +5830,7 @@ class InnerLife:
             )
             self._emit(
                 kind,
-                f"insight: weak connection {c1} and {c2} "
-                f"(weight: {weight:.2f})",
+                f"insight: weak connection {c1} and {c2} (weight: {weight:.2f})",
                 is_dream=is_dream,
             )
         thought.insight = insight

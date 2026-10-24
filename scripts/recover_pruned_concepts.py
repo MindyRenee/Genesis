@@ -44,8 +44,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
-sys.path[:0] = [str(Path(__file__).resolve().parent.parent / "python"),
-               str(Path(__file__).resolve().parent.parent)]
+sys.path[:0] = [
+    str(Path(__file__).resolve().parent.parent / "python"),
+    str(Path(__file__).resolve().parent.parent),
+]
 
 from temporal_lobe.concepts import ConceptNetwork, open_archive  # noqa: E402
 from temporal_lobe.concepts.edge_log import open_edge_log  # noqa: E402
@@ -105,7 +107,9 @@ def main() -> int:
         help="a data directory to recover concepts from; repeatable",
     )
     ap.add_argument(
-        "--write", action="store_true", help="commit (default: dry run)",
+        "--write",
+        action="store_true",
+        help="commit (default: dry run)",
     )
     args = ap.parse_args()
 
@@ -125,8 +129,7 @@ def main() -> int:
         print(f"  {src_dir}: {len(found)} concepts ({new} new to this run)")
 
     recoverable = {
-        cid: rec for cid, rec in candidates.items()
-        if cid not in working and cid not in archived
+        cid: rec for cid, rec in candidates.items() if cid not in working and cid not in archived
     }
     already = len(candidates) - len(recoverable)
 
@@ -151,11 +154,22 @@ def main() -> int:
             {
                 k: v
                 for k, v in rec.items()
-                if k in {
-                    "id", "aliases", "activation", "confidence", "origin",
-                    "columns", "created_at", "review_count", "last_reviewed",
-                    "properties", "category", "modality",
-                    "is_animacy_detected", "is_semantic_hub",
+                if k
+                in {
+                    "id",
+                    "aliases",
+                    "activation",
+                    "confidence",
+                    "origin",
+                    "columns",
+                    "created_at",
+                    "review_count",
+                    "last_reviewed",
+                    "properties",
+                    "category",
+                    "modality",
+                    "is_animacy_detected",
+                    "is_semantic_hub",
                 }
             },
             set(rec.get("aliases") or []),

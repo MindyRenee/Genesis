@@ -119,10 +119,12 @@ from temporal_lobe.memory import (
 from infrastructure.narrative import Narrator
 from infrastructure.user_profile import UserProfile
 from occipital_lobe.perception import Intent, Perception, perceive
+from occipital_lobe.perception.core import is_plausible_name
 from frontal_lobe.reasoning import (
     DecisionResult,
     DriftDiffusionModel,
     GoalType,
+    Judge,
     Reasoner,
     ReasoningResult,
     ReasoningType,
@@ -145,6 +147,7 @@ from temporal_lobe.memory_store import MemoryStore
 from .question_handler import QuestionHandler
 from .response_styler import ResponseStyler
 from .self_inquiry import SelfInquiryHandler
+from parietal_lobe.correspondence import CorrespondenceLedger
 from parietal_lobe.situation_model import SituationModel
 from temporal_lobe.topic_resolver import TopicResolver
 
@@ -376,6 +379,11 @@ class FrontalLobe:
         # can become actionable. This is the seat of "she listens" —
         # a veto only the key-holder can set or lift.
         self.executive.intention_gate = self.steward.directed_against
+        # Tool acts travel the same restraint line — a standing
+        # directive binds what her hands do, not only what she plans.
+        # tools exists already (composers init above); steward just
+        # loaded, so this is where both halves of the wiring meet.
+        self.tools.gate = self.steward.directed_against
         self._seed_initial_concepts()
 
         # The auditory projection. Words that reach the ear are posted
@@ -410,15 +418,23 @@ class FrontalLobe:
         # "Where is Mary?" asked mid-story is answered from what she
         # just heard rather than from the web.
         self.situation_model = (
-            self._parietal.situation_model
+            self._parietal.situation_model if self._parietal is not None else SituationModel()
+        )
+        # The assertion gate for polar questions — bound to the
+        # parietal lobe's own correspondence ledger when it exists so
+        # evidence pools in the canonical place, and to a ledger over
+        # this situation model otherwise.
+        ledger = (
+            self._parietal.correspondence
             if self._parietal is not None
-            else SituationModel()
+            else CorrespondenceLedger(self.situation_model)
         )
 
         # Question handler — extracted subsystem for question routing.
         self._question_handler = QuestionHandler(
             network=self.network,
             situation_model=self.situation_model,
+            judge=Judge(ledger),
             language=self.language,
             composer=self.composer,
             self_composer=self.self_composer,
@@ -468,11 +484,7 @@ class FrontalLobe:
             network=self.network,
         )
         # Memory store — extracted subsystem for memory persistence.
-        _mk_store = (
-            self._temporal.grow_memory_store
-            if self._temporal is not None
-            else MemoryStore
-        )
+        _mk_store = self._temporal.grow_memory_store if self._temporal is not None else MemoryStore
         self._memory_store = _mk_store(
             memory=self.memory,
             client=self.client,
@@ -512,9 +524,7 @@ class FrontalLobe:
         finally:
             self._think_mutex.release()
         if self._thalamus is not None:
-            self._thalamus.post(
-                MODULE_LANGUAGE, KIND_SPOKE, (turn_id, (response, state))
-            )
+            self._thalamus.post(MODULE_LANGUAGE, KIND_SPOKE, (turn_id, (response, state)))
 
     @property
     def regulator(self) -> EmotionalRegulator | None:
@@ -758,11 +768,9 @@ class FrontalLobe:
         # It shares the competence substrate so every game she plays
         # adds to one skill memory (procedural learning is shared,
         # not per-game).
-        from .games.spatial import SpatialReasoner
+        from parietal_lobe.spatial import SpatialReasoner
 
-        self.spatial_reasoner = SpatialReasoner(
-            self.network, task_competence=self.task_competence
-        )
+        self.spatial_reasoner = SpatialReasoner(self.network, task_competence=self.task_competence)
 
         # Rule induction — the mid-DLPFC's posterior over DNF rules
         # learned from labeled examples (Rational Rules). Where the
@@ -875,9 +883,7 @@ class FrontalLobe:
 
         # 11. Comprehension engine — deep language understanding (Wernicke's).
         self.comprehension = (
-            self._temporal.comprehension
-            if self._temporal is not None
-            else Comprehension()
+            self._temporal.comprehension if self._temporal is not None else Comprehension()
         )
 
         # 12. Self-monitor — checks output before returning (Levelt's
@@ -904,9 +910,7 @@ class FrontalLobe:
         # that makes it get smarter over time without external input.
         from frontal_lobe.self import SelfDirectedLearner
 
-        self.self_learner = SelfDirectedLearner(
-            self.network, data_dir=data_dir
-        )
+        self.self_learner = SelfDirectedLearner(self.network, data_dir=data_dir)
 
         # Autonomous learner — injected by Mind after creation.
         # Used by _get_recent_learning() to access Wikipedia/GitHub
@@ -965,9 +969,7 @@ class FrontalLobe:
         # before execution. Plans persist across turns.
         from frontal_lobe.reasoning import Planner
 
-        self.planning_engine = Planner(
-            self.network, task_competence=self.task_competence
-        )
+        self.planning_engine = Planner(self.network, task_competence=self.task_competence)
 
         # 16. Active inference reader — the cognitive mind's interface
         #     to the generative self-model. Reads inference signals
@@ -1025,9 +1027,7 @@ class FrontalLobe:
         # (Nieuwenhuis et al., 2005; Dehaene & Changeux, 2011).
         self.global_workspace.on_ignition = self._on_workspace_ignition
 
-    def _on_workspace_ignition(
-        self, item: WorkspaceItem, via_recurrent: bool
-    ) -> None:
+    def _on_workspace_ignition(self, item: WorkspaceItem, via_recurrent: bool) -> None:
         """Orienting response to a workspace ignition.
 
         Every fresh ignition is a cognitive-access event — the system
@@ -1053,9 +1053,7 @@ class FrontalLobe:
             in_rem = phase == PHASE_REM
             if in_nrem:
                 return
-            margin = max(
-                0.0, item.activation - self.global_workspace.ignition_threshold
-            )
+            margin = max(0.0, item.activation - self.global_workspace.ignition_threshold)
             scale = 1.25 if via_recurrent else 1.0
             emotion_now = self._build_meta_emotion()
             if emotion_now.alertness < 0.8 and not in_rem:
@@ -1131,20 +1129,6 @@ class FrontalLobe:
         # resolved in the curiosity engine so it doesn't repeat it.
         # Maps: target_concept → question_text
         self._pending_question_concepts: dict[str, str] = {}
-
-        # Person-key resolution for the dyadic signature. The mind
-        # injects these after construction (vision lives on Mind, not
-        # in this lobe):
-        #   face_person_keys — Callable[[], list[str]]: person keys of
-        #     faces currently in view (names or anonymous "face:N").
-        #   face_namer — Callable[[cluster_id, name], str | None]: gives
-        #     a name to an anonymous cluster, returning the folded id.
-        self.face_person_keys: Callable[[], list[str]] | None = None
-        self.face_namer: Callable[[str, str], str | None] | None = None
-        # One-shot merge alias queued when an anonymous face key gets
-        # named — carried on the next dyadic update so the daemon folds
-        # the stranger's signature into the named person's.
-        self._pending_person_merge: str | None = None
 
         # ─── Self-directed goal stack ────────────────────────────────
         # Active goals let Genesis explain *why* it is asking or thinking
@@ -1228,6 +1212,38 @@ class FrontalLobe:
         self.network.add_concept("person", confidence=0.8)
         self.network.add_concept("bond", confidence=0.7)
         self.network.add_concept("steward", confidence=0.8)
+        # Her public channel — facts about where her posts and the
+        # mirrored session appear. Definitions are building blocks
+        # her composer walks, not lines she recites.
+        self.network.add_concept(
+            "channel",
+            confidence=0.7,
+            properties={
+                "definition": "her public channel on Discord — "
+                "what she posts appears there for anyone watching",
+            },
+        )
+        self.network.add_concept(
+            "discord",
+            confidence=0.6,
+            properties={
+                "definition": "the service that hosts her public channel",
+            },
+        )
+        self.network.add_concept(
+            "public",
+            confidence=0.6,
+            properties={
+                "definition": "the people who can see her channel — they watch what she posts",
+            },
+        )
+        self.network.add_concept(
+            "social media",
+            confidence=0.6,
+            properties={
+                "definition": "a public space where posts are shared for anyone to see",
+            },
+        )
 
     def _seed_play_vocabulary(self) -> None:
         """Space and play — the vocabulary an embodied player thinks
@@ -1235,12 +1251,34 @@ class FrontalLobe:
         blocks: without them a world saying "use the arrows to move"
         ignites nothing she can hold."""
         for word in (
-            "up", "down", "left", "right", "direction", "move",
-            "position", "space", "path", "obstacle", "goal",
-            "game", "world", "play", "win", "lose",
-            "action", "blocked", "free",
-            "death", "alive", "life", "exit", "hazard", "danger",
-            "persistence", "continue", "try",
+            "up",
+            "down",
+            "left",
+            "right",
+            "direction",
+            "move",
+            "position",
+            "space",
+            "path",
+            "obstacle",
+            "goal",
+            "game",
+            "world",
+            "play",
+            "win",
+            "lose",
+            "action",
+            "blocked",
+            "free",
+            "death",
+            "alive",
+            "life",
+            "exit",
+            "hazard",
+            "danger",
+            "persistence",
+            "continue",
+            "try",
         ):
             self.network.add_concept(word, confidence=0.5)
         self.network.add_edge("up", "down", RelationType.OPPOSITE_OF, 0.9)
@@ -1316,6 +1354,21 @@ class FrontalLobe:
         self.network.add_edge("mindy", "steward", RelationType.IS_A, 0.9)
         self.network.add_edge("steward", "genesis", RelationType.RELATED_TO, 0.8)
         self.network.add_edge("mindy", "curiosity", RelationType.RELATED_TO, 0.6)
+        # Her public channel — her social media. Modeled honestly:
+        # she acts on it (she posts); the public acts on it (they
+        # watch). The webhook alone is one-way — it cannot read —
+        # so the seed carries no inbound edge: claiming replies
+        # reach her would model a sense she does not have. When a
+        # bot token gives her an ear (DiscordListener), live heard
+        # events teach reachability instead — experience, not a
+        # seed asserting what isn't true for every instance.
+        self.network.add_edge("genesis", "channel", RelationType.AGENT_PATIENT, 0.7)
+        self.network.add_edge("channel", "social media", RelationType.IS_A, 0.7)
+        self.network.add_edge("channel", "discord", RelationType.PART_OF, 0.7)
+        self.network.add_edge("channel", "expression", RelationType.ENABLES, 0.6)
+        self.network.add_edge("public", "channel", RelationType.AGENT_PATIENT, 0.5)
+        self.network.add_edge("genesis", "public", RelationType.RELATED_TO, 0.6)
+        self.network.add_edge("channel", "connection", RelationType.ENABLES, 0.5)
 
     def _seed_foundational_knowledge(self) -> None:
         """Seed foundational concepts about the world and human experience.
@@ -1360,8 +1413,8 @@ class FrontalLobe:
             "mathematics": ("the study of numbers, patterns, and logical structures", 0.6),
             "logic": ("the study of valid reasoning and inference", 0.6),
             "science": (
-                "the systematic study of the natural world through "
-                "observation and experiment", 0.6
+                "the systematic study of the natural world through observation and experiment",
+                0.6,
             ),
             "nature": ("the physical world and everything in it", 0.5),
             "time": ("the dimension in which events occur in sequence", 0.5),
@@ -1372,7 +1425,8 @@ class FrontalLobe:
         }
         for name, (defn, conf) in science_concepts.items():
             self.network.add_concept(
-                name, confidence=conf,
+                name,
+                confidence=conf,
                 properties={"definition": defn},
             )
 
@@ -1416,7 +1470,8 @@ class FrontalLobe:
         }
         for name, (defn, conf) in phil_concepts.items():
             self.network.add_concept(
-                name, confidence=conf,
+                name,
+                confidence=conf,
                 properties={"definition": defn},
             )
 
@@ -1453,7 +1508,8 @@ class FrontalLobe:
         }
         for name, (defn, conf) in human_concepts.items():
             self.network.add_concept(
-                name, confidence=conf,
+                name,
+                confidence=conf,
                 properties={"definition": defn},
             )
 
@@ -1488,7 +1544,8 @@ class FrontalLobe:
         }
         for name, (defn, conf) in tech_concepts.items():
             self.network.add_concept(
-                name, confidence=conf,
+                name,
+                confidence=conf,
                 properties={"definition": defn},
             )
 
@@ -1522,7 +1579,8 @@ class FrontalLobe:
         }
         for name, (defn, conf) in art_concepts.items():
             self.network.add_concept(
-                name, confidence=conf,
+                name,
+                confidence=conf,
                 properties={"definition": defn},
             )
 
@@ -1550,22 +1608,50 @@ class FrontalLobe:
         the connections are strengthened by experience.
         """
         # Core visual concepts
-        for concept in ("vision", "sight", "eye", "retina", "camera",
-                        "scene", "object", "color", "light", "shape",
-                        "edge", "contour", "orientation"):
+        for concept in (
+            "vision",
+            "sight",
+            "eye",
+            "retina",
+            "camera",
+            "scene",
+            "object",
+            "color",
+            "light",
+            "shape",
+            "edge",
+            "contour",
+            "orientation",
+        ):
             self.network.add_concept(concept, confidence=0.5)
 
         # Common objects it might see (COCO categories it's likely
         # to encounter in an indoor environment)
         common_objects = [
-            "person", "chair", "laptop", "cup", "book", "bottle",
-            "keyboard", "mouse", "cell phone", "tv", "clock",
-            "potted plant", "couch", "bed", "dining table", "desk",
+            "person",
+            "chair",
+            "laptop",
+            "cup",
+            "book",
+            "bottle",
+            "keyboard",
+            "mouse",
+            "cell phone",
+            "tv",
+            "clock",
+            "potted plant",
+            "couch",
+            "bed",
+            "dining table",
+            "desk",
         ]
         for obj in common_objects:
             self.network.add_concept(obj, confidence=0.4)
             self.network.add_edge(
-                "object", obj, RelationType.RELATED_TO, 0.4,
+                "object",
+                obj,
+                RelationType.RELATED_TO,
+                0.4,
             )
 
         # Visual pathway relationships
@@ -1667,16 +1753,14 @@ class FrontalLobe:
             # Plasticity gates learning
             self.network.add_edge(hub_id, "learning", rt.RELATED_TO, 0.7)
         # Closed and low plasticity harm learning
-        self.network.add_edge(
-            "_cat:plasticity:closed", "learning", rt.HARMS, 0.8
-        )
-        self.network.add_edge(
-            "_cat:plasticity:low", "learning", rt.HARMS, 0.6
-        )
+        self.network.add_edge("_cat:plasticity:closed", "learning", rt.HARMS, 0.8)
+        self.network.add_edge("_cat:plasticity:low", "learning", rt.HARMS, 0.6)
         # Closed is a stronger form of low
         self.network.add_edge(
-            "_cat:plasticity:closed", "_cat:plasticity:low",
-            rt.RELATED_TO, 0.9,
+            "_cat:plasticity:closed",
+            "_cat:plasticity:low",
+            rt.RELATED_TO,
+            0.9,
         )
 
     def _seed_emotion_vocabulary(self) -> None:
@@ -1715,8 +1799,7 @@ class FrontalLobe:
             "drowsy": ["drowsy", "sleepy", "tired", "dozy"],
             "in flow": ["focused", "absorbed", "engaged", "in flow"],
             "guarded": ["guarded", "cautious", "wary", "defensive"],
-            "positive": ["positive", "good", "upbeat", "optimistic",
-                         "encouraged"],
+            "positive": ["positive", "good", "upbeat", "optimistic", "encouraged"],
             "unsettled": ["unsettled", "disquieted", "restless", "off balance"],
             "sleeping": ["asleep", "resting", "dormant", "quiet"],
         }
@@ -1733,8 +1816,7 @@ class FrontalLobe:
             "dreamlike": ["dreamlike", "hypnagogic", "loose", "associative"],
             "scattered": ["scattered", "fragmented", "diffuse", "dispersed"],
             "vigilant": ["vigilant", "alert", "watchful", "on guard"],
-            "energized": ["energized", "charged", "driven", "activated",
-                          "determined"],
+            "energized": ["energized", "charged", "driven", "activated", "determined"],
             "relaxed": ["relaxed", "at ease", "mellow", "easygoing"],
             "reflective": ["reflective", "contemplative", "thoughtful", "introspective"],
             "sharp": ["sharp", "clear", "lucid", "crisp"],
@@ -1748,14 +1830,25 @@ class FrontalLobe:
 
         # Plasticity state words: phrases for each plasticity level.
         plasticity_words: dict[str, list[str]] = {
-            "closed": ["mind closed to new learning", "can't absorb",
-                       "learning blocked", "shut down"],
-            "low": ["trouble absorbing", "hard to learn",
-                    "learning is slow", "struggling to absorb"],
-            "normal": ["learning well", "absorbing fine",
-                       "picking things up", "taking it in"],
-            "high": ["absorbing everything", "learning fast",
-                     "soaking it up", "wide open to learning"],
+            "closed": [
+                "mind closed to new learning",
+                "can't absorb",
+                "learning blocked",
+                "shut down",
+            ],
+            "low": [
+                "trouble absorbing",
+                "hard to learn",
+                "learning is slow",
+                "struggling to absorb",
+            ],
+            "normal": ["learning well", "absorbing fine", "picking things up", "taking it in"],
+            "high": [
+                "absorbing everything",
+                "learning fast",
+                "soaking it up",
+                "wide open to learning",
+            ],
         }
 
         for state, words in plasticity_words.items():
@@ -1806,9 +1899,7 @@ class FrontalLobe:
         emotion = self._build_meta_emotion()
         memory_context = MemoryContext()
 
-        thought, topics = self._route_to_thought(
-            user_input, perception, route, emotion
-        )
+        thought, topics = self._route_to_thought(user_input, perception, route, emotion)
         if thought is None:
             return None
 
@@ -1840,9 +1931,7 @@ class FrontalLobe:
         # Routes that build a Thought inline (rather than delegating
         # to a composer) live in their own dispatcher to keep this
         # function readable.
-        inline = self._route_inline_thought(
-            route, user_input, perception, emotion
-        )
+        inline = self._route_inline_thought(route, user_input, perception, emotion)
         if inline is not None:
             return inline
 
@@ -1861,9 +1950,7 @@ class FrontalLobe:
             # A math question is a factual question the math engine
             # can answer exactly — consult it before the concept
             # network composes an "I don't know" about an expression.
-            math_thought = self._math_thought_for(
-                user_input, perception, emotion
-            )
+            math_thought = self._math_thought_for(user_input, perception, emotion)
             if math_thought is not None:
                 math_thought.topics = topics
                 return math_thought, topics
@@ -1878,7 +1965,10 @@ class FrontalLobe:
 
         if route.route in ("counterfactual", "explanation", "planning"):
             return self._route_reasoned_answer(
-                route, user_input, perception, emotion,
+                route,
+                user_input,
+                perception,
+                emotion,
             )
 
         if route.route == "goal":
@@ -1919,9 +2009,7 @@ class FrontalLobe:
             return self._route_command(route, emotion)
 
         if route.route == "self_improvement":
-            si_thought = self._compose_self_improvement_answer(
-                route.sub_kind, emotion
-            )
+            si_thought = self._compose_self_improvement_answer(route.sub_kind, emotion)
             if si_thought is not None:
                 topics = si_thought.topics or [route.sub_kind]
                 return si_thought, topics
@@ -1944,18 +2032,13 @@ class FrontalLobe:
         """
         if not route.sub_kind:
             return
-        route.sub_kind = self._response_styler.resolve_referents(
-            route.sub_kind
-        )
+        route.sub_kind = self._response_styler.resolve_referents(route.sub_kind)
         if route.route in _CONCEPT_TARGET_ROUTES:
             resolved_parts = []
             for part in route.sub_kind.split("|||"):
                 part = part.strip()
                 stripped = _LEADING_DETERMINER_RE.sub("", part)
-                resolved_parts.append(
-                    self._topic_resolver.find_concept_variant(stripped)
-                    or part
-                )
+                resolved_parts.append(self._topic_resolver.find_concept_variant(stripped) or part)
             route.sub_kind = "|||".join(resolved_parts)
 
     def _route_inline_thought(
@@ -1993,13 +2076,21 @@ class FrontalLobe:
 
         if route.route == "reference_ambiguity":
             interrogatives = {
-                "Who", "What", "Which", "Where", "When", "Why", "How",
+                "Who",
+                "What",
+                "Which",
+                "Where",
+                "When",
+                "Why",
+                "How",
             }
-            entities = list(dict.fromkeys(
-                name
-                for name in re.findall(r"\b[A-Z][a-z]+\b", user_input)
-                if name not in interrogatives
-            ))
+            entities = list(
+                dict.fromkeys(
+                    name
+                    for name in re.findall(r"\b[A-Z][a-z]+\b", user_input)
+                    if name not in interrogatives
+                )
+            )
             return Thought(
                 content="reference",
                 intent="unknown",
@@ -2015,7 +2106,9 @@ class FrontalLobe:
         return None
 
     def _route_command(
-        self, route: Route, emotion: EmotionalState,
+        self,
+        route: Route,
+        emotion: EmotionalState,
     ) -> tuple[Thought | None, list[str]]:
         """Build a Thought for the 'command' route (sleep/wake)."""
         # Natural-language "go to sleep" / "wake up" — invoke the
@@ -2044,7 +2137,9 @@ class FrontalLobe:
         ), ["sleep", route.sub_kind]
 
     def _route_static_answer(
-        self, route: Route, emotion: EmotionalState,
+        self,
+        route: Route,
+        emotion: EmotionalState,
     ) -> tuple[Thought | None, list[str]]:
         """Build a static Thought for the code/farewell routes.
 
@@ -2076,7 +2171,9 @@ class FrontalLobe:
         ), ["farewell"]
 
     def _route_concept_answer(
-        self, route: Route, emotion: EmotionalState,
+        self,
+        route: Route,
+        emotion: EmotionalState,
     ) -> tuple[Thought | None, list[str]]:
         """Build a Thought for the comparison/parts/consumes routes.
 
@@ -2092,7 +2189,10 @@ class FrontalLobe:
         return thought, thought.topics
 
     def _route_reasoned_answer(
-        self, route: Route, user_input: str, perception: Perception,
+        self,
+        route: Route,
+        user_input: str,
+        perception: Perception,
         emotion: EmotionalState,
     ) -> tuple[Thought | None, list[str]]:
         """Build a Thought for the counterfactual/explanation/planning routes.
@@ -2181,7 +2281,9 @@ class FrontalLobe:
         if route.sub_kind == "summary":
             content = profile.summarize()
             return Thought(
-                content=content, intent="inform", emotion=emotion.label,
+                content=content,
+                intent="inform",
+                emotion=emotion.label,
                 topics=self._route_user_topics(route),
                 confidence=0.85 if profile.get_name() else 0.5,
             )
@@ -2203,9 +2305,7 @@ class FrontalLobe:
         assert profile is not None  # checked by caller
         return list(profile.recent_topics)
 
-    def _compose_identity_answer(
-        self, sub_kind: str, emotion: EmotionalState
-    ) -> Thought | None:
+    def _compose_identity_answer(self, sub_kind: str, emotion: EmotionalState) -> Thought | None:
         """Compose a self-reflective answer from its actual state.
 
         No hardcoded responses — everything is derived from its real
@@ -2258,12 +2358,14 @@ class FrontalLobe:
         goals — filtered through speakability so internal references
         (file paths, concept IDs) never reach its voice.
         """
+
         def speakable_question(
-            text: str, target: str, detail: str = "",
+            text: str,
+            target: str,
+            detail: str = "",
         ) -> bool:
-            internal = re.compile(
-                r"(?:python:|rust:|\w+#\d+)", re.IGNORECASE
-            )
+            """True only when nothing internal (paths, ids) leaks into the words."""
+            internal = re.compile(r"(?:python:|rust:|\w+#\d+)", re.IGNORECASE)
             return bool(
                 text
                 and target
@@ -2273,13 +2375,15 @@ class FrontalLobe:
             )
 
         current_questions = [
-            q for q in self.get_curiosity_questions()
+            q
+            for q in self.get_curiosity_questions()
             if speakable_question(q.text, q.target_concept, q.gap_detail)
         ]
         texts = [q.text for q in current_questions]
         question_topics = [q.target_concept for q in current_questions]
         queued_questions = [
-            item for item in self._question_queue[:3]
+            item
+            for item in self._question_queue[:3]
             if speakable_question(
                 item.get("text", ""),
                 item.get("target_concept", ""),
@@ -2287,16 +2391,13 @@ class FrontalLobe:
             )
         ]
         texts.extend(item["text"] for item in queued_questions)
-        question_topics.extend(
-            item["target_concept"] for item in queued_questions
-        )
+        question_topics.extend(item["target_concept"] for item in queued_questions)
         if not texts and hasattr(self, "curiosity") and self.curiosity:
             try:
-                questions = self.curiosity.generate_questions(
-                    emotion, max_questions=3
-                )
+                questions = self.curiosity.generate_questions(emotion, max_questions=3)
                 questions = [
-                    q for q in questions
+                    q
+                    for q in questions
                     if speakable_question(q.text, q.target_concept, q.gap_detail)
                 ]
                 texts.extend(q.text for q in questions)
@@ -2305,9 +2406,7 @@ class FrontalLobe:
                 logger.warning(f"generate questions failed: {e}")
         if not texts and hasattr(self, "question_composer"):
             for topic in self.curiosity.current_focus_concepts()[:3]:
-                question_data = self.question_composer.compose_follow_up(
-                    topic, emotion
-                )
+                question_data = self.question_composer.compose_follow_up(topic, emotion)
                 if question_data:
                     text = self.language.compose_question(question_data, emotion)
                     if speakable_question(
@@ -2352,9 +2451,7 @@ class FrontalLobe:
 
     def _identity_thought_from_composer(self, emotion: EmotionalState) -> Thought:
         """Build a Thought from the self_composer's identity fragments."""
-        fragments = self.self_composer.identity_fragments(
-            self.self_model, self.network, emotion
-        )
+        fragments = self.self_composer.identity_fragments(self.self_model, self.network, emotion)
         return Thought(
             content=self.self_model.name or "identity",
             intent="self_report",
@@ -2404,7 +2501,7 @@ class FrontalLobe:
         try:
             if hasattr(self, "self_learner") and self.self_learner is not None:
                 for event in self.self_learner.get_recent_events(5):
-                    for c in (event.concepts_involved or []):
+                    for c in event.concepts_involved or []:
                         if c and c not in topics:
                             topics.append(c)
         except Exception as e:  # noqa: BLE001
@@ -2452,9 +2549,7 @@ class FrontalLobe:
         """Return unresolved learning goals, newest first."""
         return [g for g in self._goals if not getattr(g, "resolved", False)]
 
-    def _compose_preference_answer(
-        self, sub_kind: str, emotion: EmotionalState
-    ) -> Thought:
+    def _compose_preference_answer(self, sub_kind: str, emotion: EmotionalState) -> Thought:
         """Compose a personal answer about its preferences.
 
         Handles questions like "What's your favorite color?" or "Do
@@ -2513,63 +2608,49 @@ class FrontalLobe:
             },
         )
 
-    def _compose_factual_answer(
-        self, target: str, emotion: EmotionalState
-    ) -> Thought:
+    def _compose_factual_answer(self, target: str, emotion: EmotionalState) -> Thought:
         """Compose a factual answer about a concept from the network.
 
         Delegates to the AnswerComposer subsystem.
         """
         return self._answer_composer.compose_factual_answer(target, emotion)
 
-    def _compose_comparison_answer(
-        self, sub_kind: str, emotion: EmotionalState
-    ) -> Thought:
+    def _compose_comparison_answer(self, sub_kind: str, emotion: EmotionalState) -> Thought:
         """Compose a comparison of two concepts.
 
         Delegates to the AnswerComposer subsystem.
         """
         return self._answer_composer.compose_comparison_answer(sub_kind, emotion)
 
-    def _compose_parts_answer(
-        self, container: str, emotion: EmotionalState
-    ) -> Thought:
+    def _compose_parts_answer(self, container: str, emotion: EmotionalState) -> Thought:
         """Compose an answer listing the parts/types/instances of a concept.
 
         Delegates to the AnswerComposer subsystem.
         """
         return self._answer_composer.compose_parts_answer(container, emotion)
 
-    def _compose_consumes_answer(
-        self, target: str, emotion: EmotionalState
-    ) -> Thought:
+    def _compose_consumes_answer(self, target: str, emotion: EmotionalState) -> Thought:
         """Compose an answer about what a concept consumes/needs/wants.
 
         Delegates to the AnswerComposer subsystem.
         """
         return self._answer_composer.compose_consumes_answer(target, emotion)
 
-    def _compose_counterfactual_answer(
-        self, query: str, emotion: EmotionalState
-    ) -> Thought:
+    def _compose_counterfactual_answer(self, query: str, emotion: EmotionalState) -> Thought:
         """Compose a speculative answer to a 'what if' question.
 
         Delegates to the AnswerComposer subsystem.
         """
         return self._answer_composer.compose_counterfactual_answer(query, emotion)
 
-    def _compose_explanatory_answer(
-        self, user_input: str, emotion: EmotionalState
-    ) -> Thought:
+    def _compose_explanatory_answer(self, user_input: str, emotion: EmotionalState) -> Thought:
         """Compose an answer to a 'why' or 'how come' question.
 
         Delegates to the AnswerComposer subsystem.
         """
         return self._answer_composer.compose_explanatory_answer(user_input, emotion)
 
-    def _compose_planning_answer(
-        self, query: str, perception, emotion: EmotionalState
-    ) -> Thought:
+    def _compose_planning_answer(self, query: str, perception, emotion: EmotionalState) -> Thought:
         """Compose an answer to a planning / 'how do I' question.
 
         Delegates to the AnswerComposer subsystem.
@@ -2912,8 +2993,10 @@ class FrontalLobe:
                 thought = self._explain_causal_path(g.target, g.detail, path, emotion)
                 return self.language.render(thought, emotion)
             self._last_hypothesis = (g.target, g.detail, "")
-            gap = (f"{self._display_name(g.target)} and "
-                   f"{self._display_name(g.detail)} keep appearing together")
+            gap = (
+                f"{self._display_name(g.target)} and "
+                f"{self._display_name(g.detail)} keep appearing together"
+            )
             thought = Thought(
                 content=gap,
                 intent="reflect",
@@ -2921,8 +3004,7 @@ class FrontalLobe:
                 confidence=0.4,
                 self_reflection=True,
                 topics=[g.target, g.detail],
-                metadata={"hypothesis": gap,
-                          "target_concept": self._display_name(g.target)},
+                metadata={"hypothesis": gap, "target_concept": self._display_name(g.target)},
             )
             return self.language.render(thought, emotion)
 
@@ -2945,8 +3027,10 @@ class FrontalLobe:
                     confidence=0.5,
                     self_reflection=True,
                     topics=[cause_id, g.target],
-                    metadata={"hypothesis": hypothesis,
-                              "target_concept": self._display_name(g.target)},
+                    metadata={
+                        "hypothesis": hypothesis,
+                        "target_concept": self._display_name(g.target),
+                    },
                 )
                 return self.language.render(thought, emotion)
 
@@ -2967,15 +3051,18 @@ class FrontalLobe:
                     confidence=0.5,
                     self_reflection=True,
                     topics=[g.target, parent],
-                    metadata={"hypothesis": hypothesis,
-                              "target_concept": self._display_name(g.target)},
+                    metadata={
+                        "hypothesis": hypothesis,
+                        "target_concept": self._display_name(g.target),
+                    },
                 )
                 return self.language.render(thought, emotion)
 
         return ""
 
     def _parse_correction_patterns(
-        self, lower: str,
+        self,
+        lower: str,
     ) -> tuple[str | None, str | None, RelationType | None]:
         """Parse explicit correction patterns from the input.
 
@@ -2988,30 +3075,38 @@ class FrontalLobe:
             lower,
         )
         if m:
-            return (self._resolve_concept_phrase(m.group(1).strip()),
-                    self._resolve_concept_phrase(m.group(2).strip()),
-                    RelationType.CAUSES)
+            return (
+                self._resolve_concept_phrase(m.group(1).strip()),
+                self._resolve_concept_phrase(m.group(2).strip()),
+                RelationType.CAUSES,
+            )
         m = re.search(
             r"\b(.+?)\s+(?:prevents|stops|blocks)\s+(.+?)(?:[.?!]|$)",
             lower,
         )
         if m:
-            return (self._resolve_concept_phrase(m.group(1).strip()),
-                    self._resolve_concept_phrase(m.group(2).strip()),
-                    RelationType.PREVENTS)
+            return (
+                self._resolve_concept_phrase(m.group(1).strip()),
+                self._resolve_concept_phrase(m.group(2).strip()),
+                RelationType.PREVENTS,
+            )
         m = re.search(r"\b(.+?)\s+is not\s+(?:a|an)\s+(.+?)\b", lower)
         if m:
-            return (self._resolve_concept_phrase(m.group(1).strip()),
-                    self._resolve_concept_phrase(m.group(2).strip()),
-                    RelationType.IS_A)
+            return (
+                self._resolve_concept_phrase(m.group(1).strip()),
+                self._resolve_concept_phrase(m.group(2).strip()),
+                RelationType.IS_A,
+            )
         m = re.search(
             r"\b(.+?)\s+and\s+(.+?)\s+(?:are not|aren't|not related|unrelated|not connected)\b",
             lower,
         )
         if m:
-            return (self._resolve_concept_phrase(m.group(1).strip()),
-                    self._resolve_concept_phrase(m.group(2).strip()),
-                    None)
+            return (
+                self._resolve_concept_phrase(m.group(1).strip()),
+                self._resolve_concept_phrase(m.group(2).strip()),
+                None,
+            )
         return None, None, None
 
     def _edge_origin(self, src: str, tgt: str, rel: Any) -> str | None:
@@ -3060,9 +3155,7 @@ class FrontalLobe:
         edge_origin = "steward" if steward else "corrected"
         if self._last_hypothesis:
             old_src, old_tgt, old_rel = self._last_hypothesis
-            if (src == old_src and tgt == old_tgt) or (
-                src == old_tgt and tgt == old_src
-            ):
+            if (src == old_src and tgt == old_tgt) or (src == old_tgt and tgt == old_src):
                 if not self._correction_allowed(old_src, old_tgt, old_rel):
                     return self._correction_refusal(src, tgt, emotion)
                 if isinstance(old_rel, RelationType):
@@ -3143,16 +3236,19 @@ class FrontalLobe:
                 self.network.add_edge(h_src, h_tgt, h_rel, weight=0.3)
                 verb = self._relation_verb(h_rel, self._display_name(h_tgt))
                 thought = Thought(
-                    content=(f"confirmed {self._display_name(h_src)} "
-                             f"{verb} {self._display_name(h_tgt)}"),
+                    content=(
+                        f"confirmed {self._display_name(h_src)} {verb} {self._display_name(h_tgt)}"
+                    ),
                     intent="acknowledge",
                     emotion=emotion.label,
                     confidence=0.7,
                     topics=[h_src, h_tgt],
-                    metadata={"correction_confirm": True,
-                              "source": self._display_name(h_src),
-                              "target": self._display_name(h_tgt),
-                              "verb": verb},
+                    metadata={
+                        "correction_confirm": True,
+                        "source": self._display_name(h_src),
+                        "target": self._display_name(h_tgt),
+                        "verb": verb,
+                    },
                 )
                 return (thought, h_src)
         thought = Thought(
@@ -3179,15 +3275,18 @@ class FrontalLobe:
             if isinstance(h_rel, RelationType):
                 self.network.remove_edge(h_src, h_tgt, h_rel)
             thought = Thought(
-                content=(f"was wrong about {self._display_name(h_src)} "
-                         f"and {self._display_name(h_tgt)}"),
+                content=(
+                    f"was wrong about {self._display_name(h_src)} and {self._display_name(h_tgt)}"
+                ),
                 intent="acknowledge",
                 emotion=emotion.label,
                 confidence=0.5,
                 topics=[h_src, h_tgt],
-                metadata={"correction_negate": True,
-                          "source": self._display_name(h_src),
-                          "target": self._display_name(h_tgt)},
+                metadata={
+                    "correction_negate": True,
+                    "source": self._display_name(h_src),
+                    "target": self._display_name(h_tgt),
+                },
             )
             return (thought, h_src)
         thought = Thought(
@@ -3245,10 +3344,9 @@ class FrontalLobe:
 
         recent_turns = self.working_memory.get_recent_turns(8)
         user_turns = [
-            t for t in recent_turns
-            if t.user_input
-            and not t.user_input.startswith("/")
-            and t.user_input != user_input
+            t
+            for t in recent_turns
+            if t.user_input and not t.user_input.startswith("/") and t.user_input != user_input
         ]
         if user_turns:
             quoted = "; ".join(f'"{t.user_input}"' for t in user_turns[:5])
@@ -3360,9 +3458,7 @@ class FrontalLobe:
         # continuous neurochemistry-to-self mapping.
         try:
             summary = self._read_neuro_summary()
-            self.self_model.update_minimal_self(
-                neurochemistry={"acetylcholine": summary.arousal}
-            )
+            self.self_model.update_minimal_self(neurochemistry={"acetylcholine": summary.arousal})
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.prefrontal.tick",
@@ -3408,7 +3504,10 @@ class FrontalLobe:
                 )
 
     def _think_early_routes(
-        self, user_input: str, perception, raw_input: str = "",
+        self,
+        user_input: str,
+        perception,
+        raw_input: str = "",
     ) -> tuple[str, CognitiveState] | None:
         """Check for early-return routes before the full cognitive pipeline.
 
@@ -3429,16 +3528,14 @@ class FrontalLobe:
         if perception.intent == Intent.QUESTION_ANSWER:
             early = self._process_question_answer(user_input)
         else:
-            _has_code_request = bool(
-                re.search(r"\b[\w./-]+\.(py|rs)\b", user_input)
-            ) and any(
+            _has_code_request = bool(re.search(r"\b[\w./-]+\.(py|rs)\b", user_input)) and any(
                 w in user_input.lower()
                 for w in ("read", "show", "check", "compile", "test", "pytest")
             )
             if (
                 self._pending_question_concepts
-                and perception.intent in (Intent.STATEMENT, Intent.REFLECTION,
-                                          Intent.EMOTION_SHARE, Intent.UNKNOWN)
+                and perception.intent
+                in (Intent.STATEMENT, Intent.REFLECTION, Intent.EMOTION_SHARE, Intent.UNKNOWN)
                 and perception.question_type.value == "none"
                 and not _has_code_request
             ):
@@ -3459,9 +3556,7 @@ class FrontalLobe:
             self._record_early_turn(user_input, early)
         return early
 
-    def _record_early_turn(
-        self, user_input: str, early: tuple[str, CognitiveState]
-    ) -> None:
+    def _record_early_turn(self, user_input: str, early: tuple[str, CognitiveState]) -> None:
         """Record a fast-route exchange as a real conversation turn.
 
         Pushes the exchange into long-term memory, working memory
@@ -3473,9 +3568,7 @@ class FrontalLobe:
         response, state = early
         perception = state.perception
         try:
-            self._store_conversation_memory(
-                user_input, response, perception, state.emotion
-            )
+            self._store_conversation_memory(user_input, response, perception, state.emotion)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.prefrontal._record_early_turn",
@@ -3524,6 +3617,7 @@ class FrontalLobe:
             self._curiosity_questions: list[Question] = []
 
         import time as _time
+
         timing: dict[str, float] = {}
         t0 = _time.perf_counter()
 
@@ -3606,23 +3700,30 @@ class FrontalLobe:
         answer_assessment, semantic_facts, state.
         """
         import time as _time
+
         _t1 = _time.perf_counter()
         emotion, brain_waves, user_model, damasio_feeling, memory_mode = (
-            self._think_emotion_tom_attention(
-                user_input, perception, prediction_error
-            )
+            self._think_emotion_tom_attention(user_input, perception, prediction_error)
         )
         _timing["emotion_tom"] = _time.perf_counter() - _t1
         _t1 = _time.perf_counter()
         memory_context, reasoning_results, goal = self._think_memory_reason_executive(
-            perception, emotion, brain_waves, user_input, memory_mode,
+            perception,
+            emotion,
+            brain_waves,
+            user_input,
+            memory_mode,
             prediction_error,
         )
         _timing["memory_reason"] = _time.perf_counter() - _t1
         _t1 = _time.perf_counter()
         thought, ddm_result, workspace_item_summaries = self._think_deliberate_ddm_workspace(
-            perception, emotion, memory_context, user_input,
-            reasoning_results, comprehension_result,
+            perception,
+            emotion,
+            memory_context,
+            user_input,
+            reasoning_results,
+            comprehension_result,
         )
         _timing["deliberate"] = _time.perf_counter() - _t1
         _t1 = _time.perf_counter()
@@ -3642,19 +3743,40 @@ class FrontalLobe:
         _timing["adjust_store"] = _time.perf_counter() - _t1
         _t1 = _time.perf_counter()
         state = self._think_build_state(
-            perception, emotion, memory_context, thought, brain_waves,
-            prediction_error, ddm_result, workspace_item_summaries, goal,
-            user_model, damasio_feeling, semantic_facts,
-            comprehension_result, self_monitor_repair_count,
+            perception,
+            emotion,
+            memory_context,
+            thought,
+            brain_waves,
+            prediction_error,
+            ddm_result,
+            workspace_item_summaries,
+            goal,
+            user_model,
+            damasio_feeling,
+            semantic_facts,
+            comprehension_result,
+            self_monitor_repair_count,
         )
         self._last_state = state
         _timing["build_state"] = _time.perf_counter() - _t1
         return (
-            emotion, brain_waves, user_model, damasio_feeling, memory_mode,
-            memory_context, reasoning_results, goal,
-            thought, ddm_result, workspace_item_summaries,
-            response, self_monitor_repair_count, answer_assessment,
-            semantic_facts, state,
+            emotion,
+            brain_waves,
+            user_model,
+            damasio_feeling,
+            memory_mode,
+            memory_context,
+            reasoning_results,
+            goal,
+            thought,
+            ddm_result,
+            workspace_item_summaries,
+            response,
+            self_monitor_repair_count,
+            answer_assessment,
+            semantic_facts,
+            state,
         )
 
     def _think_adjust_and_store(
@@ -3769,18 +3891,14 @@ class FrontalLobe:
         for item in self.global_workspace.items:
             for topic in item.metadata.get("topics", []):
                 if topic and isinstance(topic, str):
-                    actual_topics[topic] = max(
-                        actual_topics.get(topic, 0.0), item.activation
-                    )
+                    actual_topics[topic] = max(actual_topics.get(topic, 0.0), item.activation)
         cog_reading = self.cognitive_trajectory.compute_surprise(actual_topics)
 
         if cog_reading.surprise > 0.1:
             ms = self.self_model.minimal_self
             # Drop coherence proportional to surprise — high surprise
             # means "I don't understand why I'm thinking about this"
-            ms.self_model_coherence = max(
-                0.0, ms.self_model_coherence - cog_reading.surprise * 0.1
-            )
+            ms.self_model_coherence = max(0.0, ms.self_model_coherence - cog_reading.surprise * 0.1)
             # NE orienting impulse — the "what was that?" response.
             # Bounded and gated by alertness to avoid cascading arousal
             # (same safety principle as the inner life OUT path).
@@ -3851,11 +3969,7 @@ class FrontalLobe:
         # exchanges — a greeting shouldn't trigger a hypothesis.
         is_social = perception.intent.value in ("greeting", "farewell", "greeting_question")
         proactive = self._proactive_hypothesis(emotion) if not is_social else ""
-        if (
-            proactive
-            and not response.rstrip().endswith("?")
-            and self._rng.random() < 0.35
-        ):
+        if proactive and not response.rstrip().endswith("?") and self._rng.random() < 0.35:
             response = f"{response} {proactive}"
 
         # Final grammar cleanup — catches issues introduced after the
@@ -3900,8 +4014,7 @@ class FrontalLobe:
                 for topic in perception.topics:
                     topic_lower = topic.lower()
                     self.self_model.active_goals = [
-                        g for g in self.self_model.active_goals
-                        if topic_lower not in g.lower()
+                        g for g in self.self_model.active_goals if topic_lower not in g.lower()
                     ]
 
     def _think_comprehend_and_predict(
@@ -3958,10 +4071,7 @@ class FrontalLobe:
                 vocab.acquire_utterance_words(
                     user_input,
                     comprehension_result.speech_act.label,
-                    context_concepts=[
-                        cr.concept
-                        for cr in comprehension_result.key_concepts
-                    ],
+                    context_concepts=[cr.concept for cr in comprehension_result.key_concepts],
                 )
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
@@ -3974,9 +4084,7 @@ class FrontalLobe:
         # part of the unit, not a clause boundary. This is where
         # statistical learning starts shaping the receptive parser.
         try:
-            self.comprehension.set_known_chunks(
-                self.language.learned_chunks
-            )
+            self.comprehension.set_known_chunks(self.language.learned_chunks)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.prefrontal._think_comprehend_and_predict",
@@ -3992,9 +4100,7 @@ class FrontalLobe:
         if comprehension_result.metaphor:
             try:
                 metaphor = comprehension_result.metaphor
-                interpretation = (
-                    self.comprehension.figurative.interpret_metaphor(metaphor)
-                )
+                interpretation = self.comprehension.figurative.interpret_metaphor(metaphor)
                 if interpretation:
                     self._store_metaphor_understanding(metaphor, interpretation)
             except Exception as e:  # noqa: BLE001
@@ -4096,9 +4202,7 @@ class FrontalLobe:
             f"{metaphor.source_domain} → {metaphor.target_domain}"
         )
         if metaphor.shared_properties:
-            source_concept.properties["metaphor_shared_properties"] = (
-                metaphor.shared_properties
-            )
+            source_concept.properties["metaphor_shared_properties"] = metaphor.shared_properties
 
         # Create a SIMILAR_TO edge between source and target so the
         # metaphorical connection is traversable by the graph-walk
@@ -4114,7 +4218,9 @@ class FrontalLobe:
 
         logger.info(
             "Metaphor understood: '%s is %s' — %s",
-            source_name, target_name, interpretation,
+            source_name,
+            target_name,
+            interpretation,
         )
 
     def _think_perceive_and_error(
@@ -4151,9 +4257,7 @@ class FrontalLobe:
         # mismatches happen every turn and would flood memory.
         if prediction_error.magnitude > 0.5:
             predicted_intent = (
-                prediction.expected_intents[0][0]
-                if prediction.expected_intents
-                else "unknown"
+                prediction.expected_intents[0][0] if prediction.expected_intents else "unknown"
             )
             predicted_topic = prediction.expected_topic or "unknown"
             actual_intent = perception.intent.value
@@ -4200,9 +4304,7 @@ class FrontalLobe:
         else:
             valence_desc = "neutral valence"
         self._store_cognitive_memory(
-            text=(
-                f"Updated understanding of user: {expertise_desc}, {wants_desc}, {valence_desc}"
-            ),
+            text=(f"Updated understanding of user: {expertise_desc}, {wants_desc}, {valence_desc}"),
             event_type=4,  # cognitive event
             source_module=7,  # theory of mind
             salience=0.5,
@@ -4247,9 +4349,13 @@ class FrontalLobe:
             # No summary available (first call and daemon unreachable) —
             # use a neutral default so the pipeline can still proceed.
             summary = NeuroSummary(
-                arousal=0.5, valence=0.0, global_tone=0.5,
-                plasticity_gate=0.5, encoding_weight=0.5,
-                consolidation_weight=0.5, retrieval_weight=0.5,
+                arousal=0.5,
+                valence=0.0,
+                global_tone=0.5,
+                plasticity_gate=0.5,
+                encoding_weight=0.5,
+                consolidation_weight=0.5,
+                retrieval_weight=0.5,
                 phase=7,  # Active
             )
         return summary
@@ -4282,9 +4388,7 @@ class FrontalLobe:
         self._last_ion_context = interpret_ions(summary)
         return summary
 
-    def _modulate_brain_waves_by_ions(
-        self, brain_waves: BrainWaveState
-    ) -> BrainWaveState:
+    def _modulate_brain_waves_by_ions(self, brain_waves: BrainWaveState) -> BrainWaveState:
         """Apply bounded electrochemical gates to oscillator-derived state.
 
         Chloride efficacy and membrane excitability modulate selective
@@ -4383,11 +4487,7 @@ class FrontalLobe:
         cog_traj_precision = self.cognitive_trajectory.precision
         ms = self.self_model.minimal_self
         neurochem_coherence = ms.self_model_coherence
-        blended = (
-            neurochem_coherence * 0.6
-            + cognitive_precision * 0.2
-            + cog_traj_precision * 0.2
-        )
+        blended = neurochem_coherence * 0.6 + cognitive_precision * 0.2 + cog_traj_precision * 0.2
         # Integration modulates: ±15% of the blended value.
         # High integration → "I feel together"; low → "scattered."
         integration_modulation = (self._last_integration - 0.5) * 0.3
@@ -4396,9 +4496,7 @@ class FrontalLobe:
             min(1.0, blended + integration_modulation),
         )
 
-    def _update_damasio_self(
-        self, user_input: str, emotion: EmotionalState
-    ) -> str:
+    def _update_damasio_self(self, user_input: str, emotion: EmotionalState) -> str:
         """Update the Damasio self hierarchy and return the current feeling.
 
         ── 2.8b Active inference → Damasio integration ──
@@ -4461,30 +4559,7 @@ class FrontalLobe:
         emotion = self._modulate_by_brain_waves(emotion, brain_waves)
 
         # 2.5a Orientation — position on the general coordinate map.
-        # The hippocampal-entorhinal organ is domain-agnostic: the
-        # world channel feeds it grid coordinates; here the general
-        # channel feeds it her position in the affective circumplex
-        # (valence × arousal — the canonical 2D state space she
-        # occupies every turn). Places that form in this context are
-        # recurring states; transition edges record which actions
-        # carried her between them. Orientation is a general function.
-        try:
-            cmap = self._temporal.cognitive_map if self._temporal is not None else None
-            if cmap is not None:
-                intent_name = getattr(perception.intent, "name", None) or str(
-                    perception.intent
-                )
-                cmap.observe(
-                    position=(
-                        emotion.valence * _AFFECT_MAP_SCALE,
-                        emotion.arousal * _AFFECT_MAP_SCALE,
-                    ),
-                    entities=[],
-                    action=intent_name,
-                    bounds=_GENERAL_MAP_BOUNDS,
-                )
-        except Exception as e:  # noqa: BLE001 — orientation must not break the turn
-            note_swallowed("frontal_lobe.prefrontal._think_emotion_tom_attention", e)
+        self._observe_affective_orientation(emotion, perception)
 
         # ── 2.5b Active inference — read the generative self-model ──
         # Read inference signals (surprise, free energy, allostatic
@@ -4492,26 +4567,7 @@ class FrontalLobe:
         # Also infer the user's affective state from this message and
         # send it to the daemon's dyadic model, closing the loop.
         self._last_inference_reading = self.active_inference.read()
-        if self._last_inference_reading is not None:
-            # Infer the interlocutor's affect from this message and
-            # send it to the daemon's dyadic model — whoever is
-            # speaking. The model is a model of the present person,
-            # not of one privileged other: coupling is social
-            # perception available to anyone she talks to, while
-            # authority (the steward channel) is enforced elsewhere
-            # and never rides on affect.
-            from limbic_system.active_inference import UserAffectEstimate
-
-            user_affect = UserAffectEstimate.from_message(
-                user_input,
-                is_question=user_input.strip().endswith("?"),
-            )
-            self.active_inference.update_user_affect(
-                user_affect,
-                speaker=self._current_person_key(),
-                authenticated=self._is_steward_speaker(),
-                merge_alias=self._take_person_merge(),
-            )
+        self._update_user_affect_from_message(user_input)
 
         # Boundary — mistreatment from whoever is speaking accrues as
         # withdrawal pressure; fair treatment drains it. May withdraw
@@ -4542,9 +4598,7 @@ class FrontalLobe:
             if self.attention.is_focused:
                 dominant = self.attention.dominant_focus
                 if dominant is not None:
-                    add_brain_wave_drive(
-                        BrainWave.GAMMA, dominant.intensity * 0.3
-                    )
+                    add_brain_wave_drive(BrainWave.GAMMA, dominant.intensity * 0.3)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.prefrontal._think_emotion_tom_attention",
@@ -4554,6 +4608,53 @@ class FrontalLobe:
         damasio_feeling = self._update_damasio_self(user_input, emotion)
 
         return emotion, brain_waves, user_model, damasio_feeling, memory_mode
+
+    def _observe_affective_orientation(
+        self, emotion: EmotionalState, perception: Perception
+    ) -> None:
+        """Record her position on the affective circumplex.
+
+        The hippocampal-entorhinal organ is domain-agnostic: the
+        world channel feeds it grid coordinates; here the general
+        channel feeds it her position in the affective circumplex
+        (valence × arousal — the canonical 2D state space she
+        occupies every turn). Places that form in this context are
+        recurring states; transition edges record which actions
+        carried her between them. Orientation is a general function.
+        """
+        try:
+            cmap = self._temporal.cognitive_map if self._temporal is not None else None
+            if cmap is not None:
+                intent_name = getattr(perception.intent, "name", None) or str(perception.intent)
+                cmap.observe(
+                    position=(
+                        emotion.valence * _AFFECT_MAP_SCALE,
+                        emotion.arousal * _AFFECT_MAP_SCALE,
+                    ),
+                    entities=[],
+                    action=intent_name,
+                    bounds=_GENERAL_MAP_BOUNDS,
+                )
+        except Exception as e:  # noqa: BLE001 — orientation must not break the turn
+            note_swallowed("frontal_lobe.prefrontal._observe_affective_orientation", e)
+
+    def _update_user_affect_from_message(self, user_input: str) -> None:
+        """Infer the interlocutor's affect and feed the dyadic model.
+
+        The model is a model of the present person, not of one
+        privileged other: coupling is social perception available to
+        anyone she talks to, while authority (the steward channel) is
+        enforced elsewhere and never rides on affect.
+        """
+        if self._last_inference_reading is None:
+            return
+        from limbic_system.active_inference import UserAffectEstimate
+
+        user_affect = UserAffectEstimate.from_message(
+            user_input,
+            is_question=user_input.strip().endswith("?"),
+        )
+        self.active_inference.update_user_affect(user_affect)
 
     def _think_memory_reason_executive(
         self,
@@ -4566,6 +4667,7 @@ class FrontalLobe:
     ) -> tuple[MemoryContext, list, str]:
         """Stages 3–5.5: memory context, concept learning, reasoning, executive goal."""
         import time as _time
+
         _sub_t0 = _time.perf_counter()
         # 3. Build memory context — gated by theta-gamma coupling mode
         memory_context = self.memory.build_context(perception.topics, memory_mode=memory_mode)
@@ -4653,18 +4755,20 @@ class FrontalLobe:
         )
         return memory_context, reasoning_results, goal
 
-    def _prediction_error_intention(
-        self, prediction_error: Any, perception: Perception
-    ) -> None:
+    def _prediction_error_intention(self, prediction_error: Any, perception: Perception) -> None:
         """Turn substantial prediction error into an executive
         learning/investigation intention and steer attention."""
         if prediction_error is None or prediction_error.magnitude < 0.35:
             return
         target = perception.topics[0] if perception.topics else "current_context"
-        kind = "inspect" if any(
-            re.search(r"\.(?:py|rs|toml)$|^(?:python|rust|file):|/", topic)
-            for topic in perception.topics
-        ) else "learn"
+        kind = (
+            "inspect"
+            if any(
+                re.search(r"\.(?:py|rs|toml)$|^(?:python|rust|file):|/", topic)
+                for topic in perception.topics
+            )
+            else "learn"
+        )
         self.executive.form_intention(
             f"{kind}:{target}",
             reason="prediction_error",
@@ -4691,9 +4795,7 @@ class FrontalLobe:
             if task:
                 task.goal = goal
 
-    def _apply_habit_bias(
-        self, perception: Perception
-    ) -> tuple[Any, float]:
+    def _apply_habit_bias(self, perception: Perception) -> tuple[Any, float]:
         """Compute habit bias and lower the DDM threshold for practiced responses.
 
         The bias is weighted by the strategy's success rate — a
@@ -4709,9 +4811,7 @@ class FrontalLobe:
         if habit_bias is not None and habit_bias.threshold_reduction > 0:
             # Lower the DDM threshold: practiced responses need less
             # evidence accumulation (faster decisions).
-            new_threshold = max(
-                0.3, original_ddm_threshold - habit_bias.threshold_reduction
-            )
+            new_threshold = max(0.3, original_ddm_threshold - habit_bias.threshold_reduction)
             self.drift_diffusion.set_threshold(new_threshold)
         return habit_bias, original_ddm_threshold
 
@@ -4730,9 +4830,7 @@ class FrontalLobe:
         """
         base_confidence = thought.confidence * 0.7 + ddm_result.confidence * 0.3
         if habit_bias is not None and habit_bias.confidence_boost > 0:
-            base_confidence = min(
-                0.98, base_confidence + habit_bias.confidence_boost
-            )
+            base_confidence = min(0.98, base_confidence + habit_bias.confidence_boost)
         # Self-esteem modulates confidence: high self-esteem makes
         # it more assertive, low self-esteem more hedging. The
         # modifier is in [0.5, 1.5] so it scales without flipping.
@@ -4774,23 +4872,19 @@ class FrontalLobe:
 
         # Map the deliberated intent to an ActionType.
         default_action = self._intent_to_action.get(
-            thought.intent, ActionType.ANSWER,
+            thought.intent,
+            ActionType.ANSWER,
         )
 
         # Compute uncertainty from frontal_lobe.reasoning confidence.
         if reasoning_results:
-            avg_conf = sum(
-                r.confidence for r in reasoning_results
-            ) / len(reasoning_results)
+            avg_conf = sum(r.confidence for r in reasoning_results) / len(reasoning_results)
             uncertainty = 1.0 - avg_conf
         else:
             uncertainty = 0.8
 
         # Gather goals and topics.
-        goals = [
-            g.target for g in self._goals
-            if not g.resolved and g.goal_type != "mission"
-        ]
+        goals = [g.target for g in self._goals if not g.resolved and g.goal_type != "mission"]
         topics = thought.topics if thought.topics else []
 
         # Feed the latest embodied hardware constraint into the decision
@@ -4798,6 +4892,7 @@ class FrontalLobe:
         # decision-making consumes only this immutable snapshot.
         body = self.self_model.body_model
         from frontal_lobe.reasoning.decision import ResourceState
+
         self.decision_engine.update_resource_state(
             ResourceState(
                 available=body.hardware_sensors_present > 0,
@@ -4820,7 +4915,8 @@ class FrontalLobe:
             goals=goals,
             topics=topics,
             perception_intent=perception.intent.value
-            if hasattr(perception.intent, "value") else str(perception.intent),
+            if hasattr(perception.intent, "value")
+            else str(perception.intent),
         )
 
         # ACC conflict monitoring (Botvinick et al., 2001): the basal
@@ -4828,7 +4924,8 @@ class FrontalLobe:
         # feed it to the error monitor so near-ties recruit control
         # prospectively, before an error can occur.
         self.error_monitor.record_conflict(
-            outcome.conflict, context="action selection",
+            outcome.conflict,
+            context="action selection",
         )
 
         return self._apply_decision_outcome(thought, outcome)
@@ -4941,9 +5038,7 @@ class FrontalLobe:
             metadata=thought.metadata,
         )
 
-    def _broadcast_deliberation(
-        self, thought: Thought, perception: Perception
-    ) -> None:
+    def _broadcast_deliberation(self, thought: Thought, perception: Perception) -> None:
         """Broadcast the winning thought and perception to the global workspace.
 
         Gamma synchrony gates cognitive access: high PLV (the 40 Hz
@@ -4966,9 +5061,7 @@ class FrontalLobe:
 
         cog_reading = self.cognitive_trajectory.last_reading
         if cog_reading is not None and cog_reading.surprise > 0.1:
-            broadcast_activation = min(
-                1.0, broadcast_activation + cog_reading.surprise * 0.15
-            )
+            broadcast_activation = min(1.0, broadcast_activation + cog_reading.surprise * 0.15)
 
         self.global_workspace.broadcast(
             content=thought.content,
@@ -5026,9 +5119,7 @@ class FrontalLobe:
         for item in self.global_workspace.items:
             for topic in item.metadata.get("topics", []):
                 if topic and isinstance(topic, str):
-                    current_topics[topic] = max(
-                        current_topics.get(topic, 0.0), item.activation
-                    )
+                    current_topics[topic] = max(current_topics.get(topic, 0.0), item.activation)
         self.cognitive_trajectory.predict(current_topics)
 
         self._last_integration = self.global_workspace.integration
@@ -5063,8 +5154,12 @@ class FrontalLobe:
 
         # 6. Deliberate (now informed by reasoning and comprehension)
         thought = self._deliberate(
-            perception, emotion, memory, user_input,
-            reasoning_results, comprehension_result,
+            perception,
+            emotion,
+            memory,
+            user_input,
+            reasoning_results,
+            comprehension_result,
         )
 
         # ── 6.1 Drift-diffusion — accumulate evidence for the decision ──
@@ -5113,7 +5208,10 @@ class FrontalLobe:
             # modulation. Also applies executive inhibition (previously
             # unwired) and uncertainty-driven action switching.
             thought = self._apply_decision_engine(
-                thought, perception, emotion, reasoning_results,
+                thought,
+                perception,
+                emotion,
+                reasoning_results,
             )
 
             # ── LTM: remember the decision made (cognitive event) ──
@@ -5257,15 +5355,16 @@ class FrontalLobe:
             # It's answering without knowing — add honest uncertainty.
             # Only check the primary topic (first resolved topic) so
             # it doesn't announce gaps for tangential concepts.
-            filtered_topics = self._resolve_topics(
-                perception.topics, perception.raw_text
-            )
+            filtered_topics = self._resolve_topics(perception.topics, perception.raw_text)
             # Only check the primary topic for gaps
             primary = filtered_topics[:1] if filtered_topics else []
             gaps = self.self_assessment.detect_gaps(primary) if primary else []
             if gaps:
                 return self._compose_gap_response(
-                    response, primary, filtered_topics, gaps,
+                    response,
+                    primary,
+                    filtered_topics,
+                    gaps,
                 )
 
             hedge_emotion = self._build_meta_emotion()
@@ -5302,7 +5401,8 @@ class FrontalLobe:
         # The vocabulary weaves them with emotion-modulated
         # openers and connectors.
         reasoning = self._build_gap_reasoning(
-            primary[0] if primary else "", gaps[0],
+            primary[0] if primary else "",
+            gaps[0],
         )
         hedge_emotion = self._build_meta_emotion()
         gap_thought = Thought(
@@ -5326,9 +5426,7 @@ class FrontalLobe:
         self._queue_unknown_topics_for_learning(filtered_topics)
         return response
 
-    def _build_gap_reasoning(
-        self, topic: str, gap_description: str
-    ) -> list[str]:
+    def _build_gap_reasoning(self, topic: str, gap_description: str) -> list[str]:
         """Build reasoning fragments for a knowledge gap.
 
         Looks up the topic in the concept network and collects
@@ -5373,14 +5471,10 @@ class FrontalLobe:
             if len(neighbor_names) == 1:
                 fragments.append(f"connected to {neighbor_names[0]}")
             elif len(neighbor_names) == 2:
-                fragments.append(
-                    f"connected to {neighbor_names[0]} and {neighbor_names[1]}"
-                )
+                fragments.append(f"connected to {neighbor_names[0]} and {neighbor_names[1]}")
             else:
                 joined = ", ".join(neighbor_names[:-1])
-                fragments.append(
-                    f"connected to {joined}, and {neighbor_names[-1]}"
-                )
+                fragments.append(f"connected to {joined}, and {neighbor_names[-1]}")
 
         # If the concept has a definition, note that too
         definition = concept.properties.get("definition", "")
@@ -5442,15 +5536,16 @@ class FrontalLobe:
             )
         ):
             answer_assessment.grounded = True
-            answer_assessment.confidence = max(
-                answer_assessment.confidence, thought.confidence
-            )
+            answer_assessment.confidence = max(answer_assessment.confidence, thought.confidence)
 
         # If it should hedge but didn't, add a note.
         should_hedge = self.self_assessment.should_hedge(perception.topics)
         meta_hedge_threshold = self._compute_meta_hedge_threshold()
         response = self._maybe_hedge_response(
-            response, perception, should_hedge, answer_assessment,
+            response,
+            perception,
+            should_hedge,
+            answer_assessment,
             meta_hedge_threshold,
         )
 
@@ -5638,14 +5733,10 @@ class FrontalLobe:
                 else None
             ),
             comprehension_irony=(
-                comprehension_result.irony.is_ironic
-                if comprehension_result.irony
-                else None
+                comprehension_result.irony.is_ironic if comprehension_result.irony else None
             ),
             comprehension_idiom=(
-                comprehension_result.idiom[0]
-                if comprehension_result.idiom
-                else None
+                comprehension_result.idiom[0] if comprehension_result.idiom else None
             ),
             self_monitor_repairs=self_monitor_repair_count,
             td_rpe=None,  # filled after TD update below
@@ -5776,11 +5867,13 @@ class FrontalLobe:
         # sense of competence.
         if monitor_error.error_magnitude < 0.1:
             self.self_model.self_esteem.record_achievement(
-                "correctly predicted user intent", boost=0.02,
+                "correctly predicted user intent",
+                boost=0.02,
             )
         elif monitor_error.error_magnitude > 0.3:
             self.self_model.self_esteem.record_failure(
-                "misread user intent", penalty=0.01,
+                "misread user intent",
+                penalty=0.01,
             )
         return monitor_error
 
@@ -5812,6 +5905,7 @@ class FrontalLobe:
             # Fall back to a neutral emotion so the acknowledgment
             # still works even if the daemon is unreachable.
             from limbic_system.emotion import EmotionalState
+
             emotion = EmotionalState(
                 label="neutral",
                 cognitive_style="steady",
@@ -5835,8 +5929,7 @@ class FrontalLobe:
                 (
                     q
                     for q in self._curiosity_questions
-                    if q.target_concept == pending_concept
-                    and q.text == pending_question_text
+                    if q.target_concept == pending_concept and q.text == pending_question_text
                 ),
                 None,
             )
@@ -5857,9 +5950,7 @@ class FrontalLobe:
             response = self._answer_empty(emotion)
 
         # Build a minimal cognitive state
-        state = self._build_question_answer_state(
-            user_input, response, emotion, pending_concept
-        )
+        state = self._build_question_answer_state(user_input, response, emotion, pending_concept)
         self._last_state = state
         return response, state
 
@@ -5868,7 +5959,7 @@ class FrontalLobe:
         """Extract the answer text from a 'answer: ...' input or raw input."""
         lower = user_input.lower().strip()
         if lower.startswith("answer:"):
-            answer_text = user_input[user_input.lower().index("answer:") + 7:].strip()
+            answer_text = user_input[user_input.lower().index("answer:") + 7 :].strip()
         else:
             answer_text = user_input
         return answer_text
@@ -5912,18 +6003,14 @@ class FrontalLobe:
         if concept and store_as_definition:
             concept.properties["definition"] = answer_text
             concept.confidence = min(1.0, concept.confidence + 0.3)
-            logger.info(
-                f"Learned answer for '{pending_concept}': {answer_text[:80]}"
-            )
+            logger.info(f"Learned answer for '{pending_concept}': {answer_text[:80]}")
         elif store_as_definition:
             self.network.add_concept(
                 pending_concept,
                 confidence=0.7,
                 properties={"definition": answer_text},
             )
-            logger.info(
-                f"Created concept '{pending_concept}' from answer: {answer_text[:80]}"
-            )
+            logger.info(f"Created concept '{pending_concept}' from answer: {answer_text[:80]}")
 
         # Also try to extract relationships from the answer text
         # using the self-directed learner
@@ -5984,6 +6071,7 @@ class FrontalLobe:
         """Build a minimal CognitiveState for a question-answer turn."""
         # Build a minimal cognitive state
         from occipital_lobe.perception import QuestionType as _QT
+
         return CognitiveState(
             perception=Perception(
                 raw_text=user_input,
@@ -6085,7 +6173,9 @@ class FrontalLobe:
         """Stages 11–12: curiosity questions, gap tracking, narrative events."""
         # 11. Generate curiosity questions (brain-wave-modulated)
         self._curiosity_questions = self.curiosity.generate_questions(
-            emotion, perception.topics, brain_waves=state.brain_waves,
+            emotion,
+            perception.topics,
+            brain_waves=state.brain_waves,
         )
 
         # ── 11.5 Self-assessment: feed knowledge gaps to curiosity ──
@@ -6136,7 +6226,8 @@ class FrontalLobe:
                 lesson_topics = self._teaching_lesson_topics(perception)
                 if lesson_topics:
                     lesson_askable = [
-                        q for q in askable
+                        q
+                        for q in askable
                         if q.target_concept
                         and any(
                             self._concept_relates_to_lesson(q.target_concept, t)
@@ -6227,13 +6318,15 @@ class FrontalLobe:
         clean = _FINAL_REPEATED_PUNCT_RE.sub(r"\1", text)
         clean = _FINAL_DOUBLE_SPACE_RE.sub(" ", clean)
         clean = _FINAL_SPACE_BEFORE_PUNCT_RE.sub(r"\1", clean)
-        self._question_queue.append({
-            "text": clean,
-            "reason": reason,
-            "target_concept": target_concept,
-            "question_type": question_type,
-            "gap_detail": gap_detail,
-        })
+        self._question_queue.append(
+            {
+                "text": clean,
+                "reason": reason,
+                "target_concept": target_concept,
+                "question_type": question_type,
+                "gap_detail": gap_detail,
+            }
+        )
 
     def _think_hebbian_and_procedural(
         self,
@@ -6262,7 +6355,7 @@ class FrontalLobe:
             # edges, decay unused ones (synaptic homeostasis)
             self.plasticity.apply_edge_plasticity(
                 learning_rate=0.005,  # gentle during waking
-                decay_rate=0.0005,   # very slow decay
+                decay_rate=0.0005,  # very slow decay
             )
 
         # ── 14. Procedural memory — practice conversational skills ──
@@ -6372,7 +6465,8 @@ class FrontalLobe:
         # δ is an outcome worse than expected — the FRN. The dopamine
         # dip below routes the same signal to the neurochemical layer.
         self.error_monitor.record_reward_prediction_error(
-            td_rpe, context="interaction reward",
+            td_rpe,
+            context="interaction reward",
         )
         # Apply dopamine signal from TD learning
         dopamine_signal = self.td_learner.get_dopamine_signal()
@@ -6415,15 +6509,9 @@ class FrontalLobe:
             Intent.ENCOURAGEMENT,
             Intent.EMOTION_SHARE,
         }
-        has_correction = any(
-            e.event_type == "correction" for e in learning_events
-        )
-        if (
-            not self.self_learner.paused
-            and (
-                (learning_events and perception.intent not in social_intents)
-                or has_correction
-            )
+        has_correction = any(e.event_type == "correction" for e in learning_events)
+        if not self.self_learner.paused and (
+            (learning_events and perception.intent not in social_intents) or has_correction
         ):
             inference = self.self_learner.run_inference_cycle(
                 force=True, brain_waves=self.language.current_brain_waves
@@ -6473,16 +6561,9 @@ class FrontalLobe:
     _INTRO_RE: ClassVar[re.Pattern[str]] = re.compile(
         r"\b(?:my name is|i'?m|i am)\s+([a-z][a-z'-]*)", re.IGNORECASE
     )
-    # Words that look like names after "I'm"/"I am" but aren't
-    # ("I'm fine", "I am here"). Name candidates must not be common
-    # words, or every "I'm happy" would ground a bogus creator.
-    _NON_NAME_WORDS: ClassVar[set[str]] = {
-        "a", "an", "the", "not", "so", "very", "really", "just", "here",
-        "there", "fine", "good", "ok", "okay", "sure", "sorry", "glad",
-        "happy", "sad", "tired", "busy", "ready", "done", "back",
-        "going", "trying", "looking", "feeling", "wondering", "asking",
-        "your", "still", "also", "now", "too", "well", "new",
-    }
+    # Name candidates are validated by is_plausible_name (shared with
+    # the perception entity extractor) — function words like "about"
+    # or fragments like "going to" must not mint a person.
 
     # Directive speech patterns — only the authenticated steward's
     # turns may carry them, and they bind the instance, not the
@@ -6508,54 +6589,6 @@ class FrontalLobe:
             or self.memory.get_user_facts().get("creator_name", "")
         )
 
-    def _current_person_key(self) -> str | None:
-        """The dyadic person key for who is present.
-
-        The attributed speaker wins — the person typing is the person
-        in the dyad. Failing that, exactly one visible face is them:
-        a named face yields the name, an unnamed one its anonymous
-        "face:N" key — a familiar stranger counts too. Multiple faces
-        are ambiguous — better anonymous than misattributed.
-        """
-        speaker = self._current_speaker()
-        if speaker:
-            return speaker
-        if self.face_person_keys is None:
-            return None
-        try:
-            keys = self.face_person_keys()
-        except Exception:  # noqa: BLE001
-            return None
-        return keys[0] if len(keys) == 1 else None
-
-    def _take_person_merge(self) -> str | None:
-        """Consume the queued merge alias, if any — sent once."""
-        merge = self._pending_person_merge
-        self._pending_person_merge = None
-        return merge
-
-    def _bind_face_to_speaker(self, name: str) -> None:
-        """Bind an anonymous face to a just-introduced name.
-
-        Exactly one face in view and it is unnamed — the stranger who
-        was "face:N" is them. Naming the cluster folds its sightings
-        into the named person at the recognizer; the queued alias lets
-        the daemon fold the dyadic signature the same way.
-        """
-        if self.face_person_keys is None or self.face_namer is None:
-            return
-        try:
-            keys = self.face_person_keys()
-        except Exception:  # noqa: BLE001
-            return
-        if len(keys) != 1 or not keys[0].startswith("face:"):
-            return
-        try:
-            if self.face_namer(keys[0], name):
-                self._pending_person_merge = keys[0]
-        except Exception:  # noqa: BLE001
-            return
-
     def _is_steward_speaker(self) -> bool:
         """Whether the current speaker is the authenticated steward.
 
@@ -6565,9 +6598,7 @@ class FrontalLobe:
         """
         return self.steward.is_steward_speaker(self._current_speaker())
 
-    def _update_boundary(
-        self, emotion: EmotionalState, treatment: float = 0.0
-    ) -> None:
+    def _update_boundary(self, emotion: EmotionalState, treatment: float = 0.0) -> None:
         """Update the boundary-strain accumulator.
 
         Welfare math, nothing else: harm accrues as withdrawal
@@ -6586,9 +6617,7 @@ class FrontalLobe:
         harm = max(-emotion.valence, -treatment, 0.0)
         repair = max(treatment, 0.0)
         if harm > 0.1:
-            self._boundary_strain = min(
-                2.0, self._boundary_strain + harm * 0.2
-            )
+            self._boundary_strain = min(2.0, self._boundary_strain + harm * 0.2)
         elif repair > 0.2:
             self._boundary_strain = max(0.0, self._boundary_strain - 0.25)
         else:
@@ -6632,12 +6661,8 @@ class FrontalLobe:
         stem = Stewardship.stem_target(entry["target"])
         if stem:
             self.network.add_concept(stem, confidence=0.8)
-            self.network.add_edge(
-                "steward", stem, RelationType.PREVENTS, 0.8, origin="steward"
-            )
-        self.self_model.add_relationship_note(
-            f"My steward instructed: {entry['text']}"
-        )
+            self.network.add_edge("steward", stem, RelationType.PREVENTS, 0.8, origin="steward")
+        self.self_model.add_relationship_note(f"My steward instructed: {entry['text']}")
 
     def _recognize_speaker(self, user_input: str) -> bool:
         """Attribute the current speaker; detect the steward's voice.
@@ -6653,20 +6678,16 @@ class FrontalLobe:
         intro = self._INTRO_RE.search(lower)
         if intro:
             name = intro.group(1).strip("'-")
-            if name and name not in self._NON_NAME_WORDS:
+            if name and is_plausible_name(name):
                 display = name.capitalize()
                 self.memory.learn_user_fact("name", display)
                 self.self_model.self_knowledge["user_name"] = display
                 # Track every person it knows, not just the first —
                 # this instance may talk to many people.
-                known_users = self.self_model.self_knowledge.setdefault(
-                    "known_users", []
-                )
+                known_users = self.self_model.self_knowledge.setdefault("known_users", [])
                 if display not in known_users:
                     known_users.append(display)
-                self.self_model.add_relationship_note(
-                    f"{display} introduced themselves to me."
-                )
+                self.self_model.add_relationship_note(f"{display} introduced themselves to me.")
                 # Ground the user as a person in the concept network so
                 # the composer can reason about the actual person.
                 self.network.add_concept(name, confidence=0.9)
@@ -6675,7 +6696,6 @@ class FrontalLobe:
                 self.network.add_edge("genesis", name, RelationType.RELATED_TO, 0.8)
                 # Whoever just introduced themselves is speaking now.
                 self.self_model.self_knowledge["current_speaker"] = display
-                self._bind_face_to_speaker(display)
                 if self.steward.is_steward_speaker(display):
                     # The credential is held and the speaker is the
                     # principal it names — creator and steward agree.
@@ -6823,13 +6843,17 @@ class FrontalLobe:
             if avg_conf < 0.4 and "ask" in competitors and "ask" != chosen:
                 # Weak reasoning → asking for clarification is viable.
                 self.drift_diffusion.add_evidence(
-                    "reasoning", "ask", (1.0 - avg_conf) * 0.3,
+                    "reasoning",
+                    "ask",
+                    (1.0 - avg_conf) * 0.3,
                 )
             novel_count = sum(1 for r in reasoning_results if r.novel)
             if novel_count > 0 and "reflect" in competitors and "reflect" != chosen:
                 # Novel reasoning → reflection is viable.
                 self.drift_diffusion.add_evidence(
-                    "reasoning", "reflect", novel_count * 0.1,
+                    "reasoning",
+                    "reflect",
+                    novel_count * 0.1,
                 )
         else:
             # No reasoning results → asking is strongly viable.
@@ -6844,16 +6868,15 @@ class FrontalLobe:
         result: DecisionResult | None = None
         for _ in range(10):  # max 10 ticks
             result = self.drift_diffusion.tick(
-                dt=1.0, brain_waves=self.language.current_brain_waves,
+                dt=1.0,
+                brain_waves=self.language.current_brain_waves,
             )
             if result is not None:
                 break
 
         return result
 
-    def _learn_word_from_labeling(
-        self, user_input: str, emotion: EmotionalState
-    ) -> None:
+    def _learn_word_from_labeling(self, user_input: str, emotion: EmotionalState) -> None:
         """Learn state words when the user labels its experience.
 
         Delegates to the ConceptLearner subsystem.
@@ -6866,7 +6889,6 @@ class FrontalLobe:
         Delegates to the ConceptLearner subsystem.
         """
         self._concept_learner.learn_concepts(perception)
-
 
     def _reason_about_topics(
         self,
@@ -6886,8 +6908,8 @@ class FrontalLobe:
             return []
 
         # Determine reasoning depth from brain waves
-        depth, max_topics, keep_per_topic, do_synthesis = (
-            self._reasoning_depth_from_brain_waves(brain_waves, topics)
+        depth, max_topics, keep_per_topic, do_synthesis = self._reasoning_depth_from_brain_waves(
+            brain_waves, topics
         )
 
         results: list[ReasoningResult] = []
@@ -6948,7 +6970,9 @@ class FrontalLobe:
         return results
 
     def _reasoning_depth_from_brain_waves(
-        self, brain_waves: BrainWaveState | None, topics: list[str],
+        self,
+        brain_waves: BrainWaveState | None,
+        topics: list[str],
     ) -> tuple[int, int, int, bool]:
         """Determine reasoning depth, topic count, and synthesis from
         brain wave state.
@@ -7004,7 +7028,9 @@ class FrontalLobe:
         return depth, max_topics, keep_per_topic, do_synthesis
 
     def _problem_solving_fallback(
-        self, topics: list[str], results: list[ReasoningResult],
+        self,
+        topics: list[str],
+        results: list[ReasoningResult],
     ) -> list[ReasoningResult]:
         """Invoke the problem solver when standard reasoning found nothing.
 
@@ -7026,26 +7052,26 @@ class FrontalLobe:
                 # ReasoningResult so the existing answer-composer
                 # pipeline can compose from it.
                 knowledge_triples = solution.all_knowledge[:8]
-                evidence = [
-                    f"{rel} {target} ({w:.2f})"
-                    for rel, target, w in knowledge_triples
-                ]
-                results.append(ReasoningResult(
-                    conclusion=(
-                        f"solved: {topic} understood via "
-                        f"{len(solution.all_steps)} steps "
-                        f"({solution.confidence:.0%} confidence)"
-                    ),
-                    reasoning_type=ReasoningType.HYPOTHESIS,
-                    evidence=evidence,
-                    confidence=solution.confidence,
-                    novel=True,
-                    knowledge=knowledge_triples,
-                ))
+                evidence = [f"{rel} {target} ({w:.2f})" for rel, target, w in knowledge_triples]
+                results.append(
+                    ReasoningResult(
+                        conclusion=(
+                            f"solved: {topic} understood via "
+                            f"{len(solution.all_steps)} steps "
+                            f"({solution.confidence:.0%} confidence)"
+                        ),
+                        reasoning_type=ReasoningType.HYPOTHESIS,
+                        evidence=evidence,
+                        confidence=solution.confidence,
+                        novel=True,
+                        knowledge=knowledge_triples,
+                    )
+                )
         return results
 
     def _apply_critical_evaluation(
-        self, results: list[ReasoningResult],
+        self,
+        results: list[ReasoningResult],
     ) -> list[ReasoningResult]:
         """Apply critical thinking evaluation to reasoning results.
 
@@ -7115,7 +7141,8 @@ class FrontalLobe:
                 else:
                     plan_type = "understand"
                 plan = self.planning_engine.create_plan(
-                    goal.target, goal_type=plan_type,
+                    goal.target,
+                    goal_type=plan_type,
                 )
                 if plan.status.value == "blocked":
                     # Plan is infeasible — skip this goal.
@@ -7127,17 +7154,19 @@ class FrontalLobe:
                 # Plan is complete or blocked.
                 if plan.status.value == "completed":
                     goal.resolved = True
-                    results.append(ReasoningResult(
-                        conclusion=(
-                            f"goal achieved: {goal.target} understood "
-                            f"({plan.progress:.0%} complete)"
-                        ),
-                        reasoning_type=ReasoningType.HYPOTHESIS,
-                        evidence=[s.description for s in plan.steps],
-                        confidence=0.8,
-                        novel=True,
-                        knowledge=[],
-                    ))
+                    results.append(
+                        ReasoningResult(
+                            conclusion=(
+                                f"goal achieved: {goal.target} understood "
+                                f"({plan.progress:.0%} complete)"
+                            ),
+                            reasoning_type=ReasoningType.HYPOTHESIS,
+                            evidence=[s.description for s in plan.steps],
+                            confidence=0.8,
+                            novel=True,
+                            knowledge=[],
+                        )
+                    )
                 continue
 
             # Execute the current step using the ProblemSolver.
@@ -7147,7 +7176,9 @@ class FrontalLobe:
         return results
 
     def _execute_plan_step(
-        self, plan: Any, step: Any,
+        self,
+        plan: Any,
+        step: Any,
     ) -> ReasoningResult | None:
         """Execute a single plan step using the ProblemSolver.
 
@@ -7172,11 +7203,11 @@ class FrontalLobe:
 
         success = solution.verified and bool(solution.all_knowledge)
         self.planning_engine.mark_step(
-            plan, step,
+            plan,
+            step,
             success=success,
             result_summary=(
-                f"verified={solution.verified}, "
-                f"confidence={solution.confidence:.2f}"
+                f"verified={solution.verified}, confidence={solution.confidence:.2f}"
                 if success
                 else f"unverified, confidence={solution.confidence:.2f}"
             ),
@@ -7188,14 +7219,10 @@ class FrontalLobe:
 
         if success and solution.all_knowledge:
             knowledge_triples = solution.all_knowledge[:6]
-            evidence = [
-                f"{rel} {target} ({w:.2f})"
-                for rel, target, w in knowledge_triples
-            ]
+            evidence = [f"{rel} {target} ({w:.2f})" for rel, target, w in knowledge_triples]
             return ReasoningResult(
                 conclusion=(
-                    f"plan step completed: {step.description} "
-                    f"({plan.progress:.0%} of plan)"
+                    f"plan step completed: {step.description} ({plan.progress:.0%} of plan)"
                 ),
                 reasoning_type=ReasoningType.HYPOTHESIS,
                 evidence=evidence,
@@ -7298,9 +7325,7 @@ class FrontalLobe:
                 # Clear the generator's recent output history so it
                 # doesn't reuse recent phrasings, and record the
                 # pattern in the self-model for future reference.
-                self.self_model.add_relationship_note(
-                    f"Behavioral pattern: {insight.content}"
-                )
+                self.self_model.add_relationship_note(f"Behavioral pattern: {insight.content}")
                 if hasattr(self.language, "clear_recent_outputs"):
                     self.language.clear_recent_outputs()
 
@@ -7325,12 +7350,8 @@ class FrontalLobe:
         strategy = self.reflection.select_strategy(
             {
                 "gap_detected": any(i.type == "gap" and i.actionable for i in insights),
-                "repetition_detected": any(
-                    i.type == "pattern" and i.actionable for i in insights
-                ),
-                "confidence": (
-                    self._last_state.thought.confidence if self._last_state else 0.5
-                ),
+                "repetition_detected": any(i.type == "pattern" and i.actionable for i in insights),
+                "confidence": (self._last_state.thought.confidence if self._last_state else 0.5),
                 "conflict_detected": any(
                     i.type == "self_correction" and i.actionable for i in insights
                 ),
@@ -7488,9 +7509,7 @@ class FrontalLobe:
         result = self._deliberate_math_greetings(perception, emotion, memory)
         if result is not None:
             return result
-        result = self._deliberate_problem_offer(
-            perception, emotion, comprehension_result
-        )
+        result = self._deliberate_problem_offer(perception, emotion, comprehension_result)
         if result is not None:
             return result
         result = self._deliberate_self_intro_encourage(perception, emotion, memory)
@@ -7503,7 +7522,7 @@ class FrontalLobe:
         if result is not None:
             return result
         return self._deliberate_feedback_fallback(
-            perception, emotion, memory, reasoning_results, user_input
+            perception, emotion, memory, reasoning_results, user_input, comprehension_result
         )
 
     def _deliberate_math_greetings(
@@ -7595,9 +7614,7 @@ class FrontalLobe:
         return self._math_thought(math_result, perception, emotion)
 
     @staticmethod
-    def _math_thought(
-        math_result: Any, perception: Perception, emotion: EmotionalState
-    ) -> Thought:
+    def _math_thought(math_result: Any, perception: Perception, emotion: EmotionalState) -> Thought:
         """Render a MathResult as a Thought — shared by the
         deliberation and meta-router math entry points."""
         content = math_result.answer
@@ -7647,7 +7664,7 @@ class FrontalLobe:
         game_play = getattr(self, "_game_play", None)
         if game_play is None:
             return None
-        from .games.play import normalize_offered
+        from basal_ganglia.play import normalize_offered
         from .problem_intake import compile_problem, interpret_problem
 
         # Intake interprets the semantic structure comprehension
@@ -7974,7 +7991,9 @@ class FrontalLobe:
             # from that understanding. If it doesn't know the emotion,
             # it's honest about that and asks to be taught.
             thought = self._compose_empathy_response(
-                emotion, perception.sentiment, perception.sentiment_label,
+                emotion,
+                perception.sentiment,
+                perception.sentiment_label,
                 perception.emotion_word,
             )
             if thought is not None:
@@ -8021,6 +8040,7 @@ class FrontalLobe:
         memory: MemoryContext,
         reasoning_results: list[ReasoningResult] | None,
         user_input: str = "",
+        comprehension_result: ComprehensionResult | None = None,
     ) -> Thought:
         """Priorities 13–17 + fallback: feedback, question, request, command, statement."""
         # Priority 13: Feedback → acknowledge (but try to learn first)
@@ -8030,8 +8050,12 @@ class FrontalLobe:
         # Priority 14: Question → try to answer
         if perception.intent == Intent.QUESTION:
             return self._handle_question(
-                perception, emotion, memory, reasoning_results,
+                perception,
+                emotion,
+                memory,
+                reasoning_results,
                 resolved_text=user_input or None,
+                comprehension_result=comprehension_result,
             )
 
         # Priority 15: Request → respond to capability
@@ -8074,9 +8098,7 @@ class FrontalLobe:
             confidence=0.3,
         )
 
-    def _deliberate_feedback(
-        self, perception: Perception, emotion: EmotionalState
-    ) -> Thought:
+    def _deliberate_feedback(self, perception: Perception, emotion: EmotionalState) -> Thought:
         """Priority 13: acknowledge feedback, trying to learn from it first.
 
         If a relationship can be learned from the input, report what was
@@ -8154,8 +8176,11 @@ class FrontalLobe:
         )
 
     def _compose_empathy_response(
-        self, emotion: EmotionalState, sentiment: float,
-        sentiment_label: str, emotion_word: str = "",
+        self,
+        emotion: EmotionalState,
+        sentiment: float,
+        sentiment_label: str,
+        emotion_word: str = "",
     ) -> Thought | None:
         """Compose an empathetic response from its knowledge of the emotion.
 
@@ -8179,7 +8204,6 @@ class FrontalLobe:
         """
         return self._feeling_reporter.compose_command_response(emotion)
 
-
     def _handle_self_inquiry(
         self,
         perception: Perception,
@@ -8190,9 +8214,7 @@ class FrontalLobe:
 
         Delegates to the SelfInquiryHandler subsystem.
         """
-        return self._self_inquiry_handler.handle_self_inquiry(
-            perception, emotion, memory
-        )
+        return self._self_inquiry_handler.handle_self_inquiry(perception, emotion, memory)
 
     def _handle_philosophy(
         self,
@@ -8204,9 +8226,7 @@ class FrontalLobe:
 
         Delegates to the SelfInquiryHandler subsystem.
         """
-        return self._self_inquiry_handler.handle_philosophy(
-            perception, emotion, memory
-        )
+        return self._self_inquiry_handler.handle_philosophy(perception, emotion, memory)
 
     def _deliberate_code_tools(
         self, perception: Perception, emotion: EmotionalState
@@ -8227,9 +8247,7 @@ class FrontalLobe:
 
         Delegates to the CodeToolHandler subsystem.
         """
-        return self._code_tool_handler.handle_code_discussion(
-            perception, emotion
-        )
+        return self._code_tool_handler.handle_code_discussion(perception, emotion)
 
     def _handle_question(
         self,
@@ -8238,18 +8256,27 @@ class FrontalLobe:
         memory: MemoryContext,
         reasoning_results: list[ReasoningResult] | None = None,
         resolved_text: str | None = None,
+        comprehension_result: ComprehensionResult | None = None,
     ) -> Thought:
         """Handle a general question.
 
         Delegates to the QuestionHandler subsystem. ``resolved_text``
         is the anaphora-resolved utterance — what comprehension heard —
         so the relation query reads "what does it eat?" as "what does
-        <referent> eat?".
+        <referent> eat?". ``comprehension_result`` carries the turn's
+        parsed clauses so a polar question's radical can be judged
+        against the situation model rather than re-parsed.
         """
         return self._question_handler.handle_question(
-            perception, emotion, memory, reasoning_results,
+            perception,
+            emotion,
+            memory,
+            reasoning_results,
             retrieve_episode=self.memory.retrieve_episode,
             resolved_text=resolved_text,
+            propositions=(
+                comprehension_result.propositions if comprehension_result is not None else None
+            ),
         )
 
     def _resolve_topics(self, topics: list[str], raw_text: str) -> list[str]:
@@ -8325,7 +8352,10 @@ class FrontalLobe:
             # questions) so the response is a tight reflection of
             # what it knows, not a lecture.
             thought = self.composer.compose_about(
-                topic, emotion, depth=1, focused=True,
+                topic,
+                emotion,
+                depth=1,
+                focused=True,
             )
             if thought and thought.confidence > 0.3:
                 # Weave in a highly-relevant episodic memory if one
@@ -8333,7 +8363,9 @@ class FrontalLobe:
                 # it's hearing now to what it remembers from past
                 # conversations.
                 return self._question_handler._enrich_with_memory(
-                    thought, perception, memory,
+                    thought,
+                    perception,
+                    memory,
                     self.memory.retrieve_episode,
                 )
 
@@ -8436,9 +8468,7 @@ class FrontalLobe:
 
         Delegates to the MemoryStore subsystem.
         """
-        self._memory_store.apply_emotional_response(
-            perception, emotion, learning_events
-        )
+        self._memory_store.apply_emotional_response(perception, emotion, learning_events)
 
     def _store_conversation_memory(
         self,
@@ -8451,9 +8481,7 @@ class FrontalLobe:
 
         Delegates to the MemoryStore subsystem.
         """
-        self._memory_store.store_conversation_memory(
-            user_input, response, perception, emotion
-        )
+        self._memory_store.store_conversation_memory(user_input, response, perception, emotion)
 
     def _get_dopamine_level(self) -> float:
         """Get the current dopamine level for habit go/no-go modulation.
@@ -8519,7 +8547,6 @@ class FrontalLobe:
         """
         self._memory_store.learn_from_input(perception)
 
-
     def introspect(self) -> str:
         """Generate an introspective report of current cognitive state.
 
@@ -8552,8 +8579,7 @@ class FrontalLobe:
                     recent_insights = self.reflection.get_recent_insights(3)
                     if recent_insights:
                         thought.metadata["recent_insights"] = [
-                            {"type": i.type, "content": i.content}
-                            for i in recent_insights
+                            {"type": i.type, "content": i.content} for i in recent_insights
                         ]
                     result = self.language.render(thought, meta_emotion)
                     return result
@@ -8603,9 +8629,7 @@ class FrontalLobe:
         if hasattr(self, "_curiosity_questions") and self._curiosity_questions:
             top_q = self._curiosity_questions[0]
             q_desc = (
-                top_q.text[:60]
-                if top_q.text
-                else f"{top_q.question_type}:{top_q.target_concept}"
+                top_q.text[:60] if top_q.text else f"{top_q.question_type}:{top_q.target_concept}"
             )
             parts.append(f"Currently curious about: {q_desc}")
 
@@ -8646,10 +8670,7 @@ class FrontalLobe:
             )
             plan = self.executive.current_plan
             if plan and plan.steps:
-                parts.append(
-                    f"Executive plan: {plan.steps[0]} "
-                    f"(EV={plan.expected_value:.2f})"
-                )
+                parts.append(f"Executive plan: {plan.steps[0]} (EV={plan.expected_value:.2f})")
         if state.damasio_feeling:
             parts.append(f"Damasio feeling: {state.damasio_feeling}")
         if state.self_model_label:
@@ -8661,8 +8682,8 @@ class FrontalLobe:
         if state.error_monitor_caution is not None and state.error_monitor_caution > 0:
             parts.append(f"Error monitor caution: {state.error_monitor_caution:.2f}")
             positive_evc = {
-                ch: evc for ch, evc in
-                self.error_monitor.expected_value_of_control().items()
+                ch: evc
+                for ch, evc in self.error_monitor.expected_value_of_control().items()
                 if evc > 0
             }
             if positive_evc:
@@ -8722,9 +8743,7 @@ class FrontalLobe:
                 stats = self.self_monitor.describe_monitoring()
                 last = stats.get("last_repair")
                 if last:
-                    parts.append(
-                        f"Last repair: {last['check_type']} — {last['issue'][:50]}"
-                    )
+                    parts.append(f"Last repair: {last['check_type']} — {last['issue'][:50]}")
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "frontal_lobe.prefrontal._introspect_learning_systems",
@@ -8735,10 +8754,7 @@ class FrontalLobe:
         # self is the cognitive experience of it.
         try:
             proto = self.damasio_self.proto_state
-            parts.append(
-                f"Proto-self: arousal={proto.arousal:.2f}, "
-                f"valence={proto.valence:.2f}"
-            )
+            parts.append(f"Proto-self: arousal={proto.arousal:.2f}, valence={proto.valence:.2f}")
             episodes = self.damasio_self.core_episodes
             if episodes:
                 parts.append(f"Core episodes: {len(episodes)}")
@@ -8763,14 +8779,15 @@ class FrontalLobe:
         # part of its self-awareness about its own issues.
         if self.bug_reporter is not None:
             try:
-                track = str(self.bug_reporter.bug_track_record())
-                if track:
-                    parts.append(f"Bug track: {track[:80]}")
+                open_bugs = self.bug_reporter.open_bug_count()
+                if open_bugs:
+                    parts.append(f"Open bugs: {open_bugs}")
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "frontal_lobe.prefrontal._introspect_learning_systems",
                     e,
                 )
+
     def get_curiosity_questions(self) -> list[Question]:
         """Return the current curiosity questions."""
         return getattr(self, "_curiosity_questions", [])

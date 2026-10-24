@@ -20,9 +20,7 @@ from frontal_lobe.dlpfc import (
 
 def _rule(*senses: tuple[tuple[str, bool], ...]) -> InducedRule:
     """Build a rule from ((feature, present), ...) senses."""
-    return InducedRule(
-        tuple(frozenset(Literal(f, s) for f, s in sense) for sense in senses)
-    )
+    return InducedRule(tuple(frozenset(Literal(f, s) for f, s in sense) for sense in senses))
 
 
 # ── Induction ───────────────────────────────────────────────
@@ -195,8 +193,12 @@ def test_describe_is_formal_not_prose() -> None:
 
 def test_canonical_order() -> None:
     """Syntactically identical formulae are the same object."""
-    a = _rule((("b", True), ("a", True)),)
-    b = _rule((("a", True), ("b", True)),)
+    a = _rule(
+        (("b", True), ("a", True)),
+    )
+    b = _rule(
+        (("a", True), ("b", True)),
+    )
     assert a == b and hash(a) == hash(b)
 
 
@@ -205,8 +207,8 @@ def test_canonical_order() -> None:
 
 def test_rule_agent_induce_mode_uses_posterior() -> None:
     """The worksheet agent induces the hidden rule through the DLPFC."""
-    from frontal_lobe.games.classification.agent import RuleAgent
-    from frontal_lobe.games.classification.world import Item, RuleGame
+    from basal_ganglia.rule_agent import RuleAgent
+    from worlds.classification import Item, RuleGame
 
     items = [
         Item(0, "alpha", ("striped", "round")),

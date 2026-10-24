@@ -311,9 +311,7 @@ class ProtoSelf:
         """The previous proto-self state (for change detection)."""
         return self._history[-1] if self._history else None
 
-    def _compute_homeostatic_balance(
-        self, arousal: float, tone: float, plasticity: float
-    ) -> float:
+    def _compute_homeostatic_balance(self, arousal: float, tone: float, plasticity: float) -> float:
         """Compute how homeostatically balanced the current state is.
 
         High balance = state is near baseline (stable).
@@ -526,8 +524,7 @@ class AutobiographicalSelf:
         self.narrative.record_event(
             summary=f"{episode.feeling_label} / {episode.trigger}",
             significance=(
-                f"proto-self shift {episode.change_magnitude:.2f}, "
-                f"salience {episode.salience:.2f}"
+                f"proto-self shift {episode.change_magnitude:.2f}, salience {episode.salience:.2f}"
             ),
             emotion=emotion,
         )
@@ -876,9 +873,7 @@ class DamasioSelfHierarchy:
         # stringified content.
         topics = item.metadata.get("topics") if item.metadata else None
         if topics and isinstance(topics, list):
-            self._pending_trigger = ", ".join(
-                str(t) for t in topics if t
-            )
+            self._pending_trigger = ", ".join(str(t) for t in topics if t)
         elif item.content:
             self._pending_trigger = str(item.content)[:200]
         else:

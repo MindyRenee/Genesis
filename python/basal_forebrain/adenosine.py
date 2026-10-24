@@ -56,9 +56,9 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
     Only GABA (promotes sleep) and cortisol (stress-related adenosine release) have direct coupling.
     Orexin mildly inhibits adenosine (wake promotion).
 
-    GABA -> ADN: +0.05  (weak volume transmission.)
-    CORT -> ADN: +0.05  (stress-related adenosine release.)
-    OX   -> ADN: -0.05  (wake promotion — orexin mildly inhibits adenosine.)
+    GABA -> ADN: +0.10  (weak volume transmission.)
+    CORT -> ADN: +0.10  (stress-related adenosine release.)
+    OX   -> ADN: -0.10  (wake promotion — orexin mildly inhibits adenosine.)
     DA   -> ADN: 0.00   (no direct coupling)
     SRT  -> ADN: 0.00   (no direct coupling)
     NE   -> ADN: 0.00   (no direct coupling)
@@ -78,7 +78,7 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 COUPLING: HOW ADENOSINE AFFECTS OTHERS (matrix column 10)
 ════════════════════════════════════════════════════════════════════════
 
-    ADN -> GABA:  +0.05  (sleep pressure promotes inhibition.)
+    ADN -> GABA:  +0.10  (sleep pressure promotes inhibition.)
     ADN -> OX :  -0.10  (sleep pressure inhibits orexin (the sleep switch).)
     ADN -> DA :  0.00   (no direct coupling)
     ADN -> SRT:  0.00   (no direct coupling)
@@ -234,8 +234,20 @@ APPLICATION IN GENESIS
 Maximum impulse magnitude: 0.1
 (Conservative — adenosine is the primary sleep driver)
 
+One-way rule:
+    Process S only moves down through sleep. `apply_impulse_capped`
+    ignores negative adenosine impulses: external events may add
+    metabolic load, but clearance belongs to the dedicated mechanism
+    (glymphatic during sleep, offline rest). Fighting drowsiness is
+    done on the alerting transmitters (ACh, histamine, NE), never by
+    editing the homeostat — a periodic drain cannot distinguish
+    coupling drift from genuine wake-time accumulation, and at any
+    plausible cadence it outruns the ~0.055/h accumulation rate by
+    orders of magnitude, pinning pressure at the floor (every NREM
+    episode staged N1).
+
 Python modules that send adenosine impulses:
-    - emotional_regulator.py: wakefulness (negative), drowsiness
+    - brainstem/heartbeat.py: metabolic work load (positive)
 
 Python modules that read adenosine:
     - emotion.py: maps to EmotionalState (drowsiness)
@@ -243,8 +255,8 @@ Python modules that read adenosine:
     - sleep/ (Python): sleep pressure, sleep timing
 
 Typical impulse scenarios:
-    - Wakefulness: -0.06 (emotional_regulator)
-    - Drowsiness: +0.06 (emotional_regulator, negative for wake)
+    - Sustained compute: +0.00015/work-second (heartbeat)
+    - Rest policy: +0.03 (active_inference — skipped during sleep)
 """
 
 from __future__ import annotations

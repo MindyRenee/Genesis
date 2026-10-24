@@ -28,8 +28,10 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-sys.path[:0] = [str(Path(__file__).resolve().parent.parent / "python"),
-               str(Path(__file__).resolve().parent.parent)]
+sys.path[:0] = [
+    str(Path(__file__).resolve().parent.parent / "python"),
+    str(Path(__file__).resolve().parent.parent),
+]
 
 from temporal_lobe.concepts.edge_log import EdgeLog, is_derivable_edge  # noqa: E402
 from temporal_lobe.concepts.types import RelationType  # noqa: E402
@@ -58,14 +60,11 @@ def _archive_rows(db_path: Path) -> tuple[list[dict], set[str]]:
                 "origin": r[5],
             }
             for r in con.execute(
-                "SELECT source, target, relation, weight, created_at, origin "
-                "FROM edges"
+                "SELECT source, target, relation, weight, created_at, origin FROM edges"
             )
         ]
         try:
-            concepts = {
-                r[0] for r in con.execute("SELECT concept_id FROM concepts")
-            }
+            concepts = {r[0] for r in con.execute("SELECT concept_id FROM concepts")}
         except sqlite3.Error:
             concepts = set()
         return edges, concepts
@@ -91,9 +90,7 @@ def migrate(data_dir: Path, write: bool, force: bool) -> int:
     concepts = {c["id"] for c in cn.get("concepts", [])}
     working_edges = cn.get("edges", [])
 
-    archived_edges, archived_concepts = _archive_rows(
-        data_dir / "concept_archive.db"
-    )
+    archived_edges, archived_concepts = _archive_rows(data_dir / "concept_archive.db")
     all_concepts = concepts | archived_concepts
 
     stats: Counter[str] = Counter()
@@ -161,17 +158,19 @@ def migrate(data_dir: Path, write: bool, force: bool) -> int:
         # runtime uses: snapshot is the migration's birth record.
         from temporal_lobe.concepts.types import Edge
 
-        log.snapshot([
-            Edge(
-                source=e["source"],
-                target=e["target"],
-                relation=RelationType(e["relation"]),
-                weight=e["weight"],
-                created_at=e["created_at"],
-                origin=e["origin"],
-            )
-            for e in edges_list
-        ])
+        log.snapshot(
+            [
+                Edge(
+                    source=e["source"],
+                    target=e["target"],
+                    relation=RelationType(e["relation"]),
+                    weight=e["weight"],
+                    created_at=e["created_at"],
+                    origin=e["origin"],
+                )
+                for e in edges_list
+            ]
+        )
         log.close()
         tmp.replace(log_path)
     except Exception:

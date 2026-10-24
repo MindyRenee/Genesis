@@ -549,8 +549,7 @@ class Narrator:
 
         # Current state
         parts.append(
-            f"{self.network.total_concept_count} concepts, "
-            f"{self.network.edge_count} relationships"
+            f"{self.network.total_concept_count} concepts, {self.network.edge_count} relationships"
         )
 
         parts.append("still becoming")
@@ -900,8 +899,7 @@ class Narrator:
         # Chapters — never evict the current chapter.
         while len(self.chapters) > self._max_chapters:
             idx = next(
-                (i for i, ch in enumerate(self.chapters)
-                 if ch is not self._current_chapter),
+                (i for i, ch in enumerate(self.chapters) if ch is not self._current_chapter),
                 None,
             )
             if idx is None:
@@ -911,7 +909,8 @@ class Narrator:
             # it by label — remove the matching node so it doesn't
             # dangle.
             self._hierarchy[AutobiographicalLevel.LIFETIME_PERIOD] = [
-                n for n in self._hierarchy[AutobiographicalLevel.LIFETIME_PERIOD]
+                n
+                for n in self._hierarchy[AutobiographicalLevel.LIFETIME_PERIOD]
                 if n.label != chapter.title
             ]
             self._drop_events({e.id for e in chapter.events})
@@ -953,13 +952,14 @@ class Narrator:
         for eid in evicted_ids:
             self._event_to_label.pop(eid, None)
         self._hierarchy[AutobiographicalLevel.EVENT_SPECIFIC] = [
-            n for n in self._hierarchy[AutobiographicalLevel.EVENT_SPECIFIC]
+            n
+            for n in self._hierarchy[AutobiographicalLevel.EVENT_SPECIFIC]
             if n.event_id not in evicted_ids
         ]
         kept = [
-            link for link in self._temporal_links
-            if link.source_id not in evicted_ids
-            and link.target_id not in evicted_ids
+            link
+            for link in self._temporal_links
+            if link.source_id not in evicted_ids and link.target_id not in evicted_ids
         ]
         if len(kept) != len(self._temporal_links):
             self._temporal_links = kept

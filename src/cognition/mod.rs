@@ -34,8 +34,8 @@ pub mod intention;
 pub mod self_model;
 
 pub use code_analysis::{
-    DependencyGraph, FileAnalysis, GraphEdge, GraphNode, SemanticUnit, UnitKind, analyze_file,
-    analyze_file_path, find_refactoring_targets,
+    DependencyGraph, FileAnalysis, GraphEdge, GraphNode, SemanticUnit, UnitKind, analysis_to_wire,
+    analyze_file, analyze_file_path, find_refactoring_targets,
 };
 pub use intention::{GoalKind, Intention, IntentionManager};
 pub use self_model::SelfModel;

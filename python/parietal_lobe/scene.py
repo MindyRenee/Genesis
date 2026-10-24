@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
+from functools import cached_property
 
 from .grid import Grid
 
@@ -60,20 +61,24 @@ class PerceivedObject:
     def size(self) -> int:
         return len(self.cells)
 
-    @property
+    # bbox/centroid/shape_signature are cached: cells is a frozenset —
+    # the object never changes after construction, and _compute_relations
+    # reads these once per ordered pair, so an uncached property was
+    # O(n² × cells) on every frame.
+    @cached_property
     def bbox(self) -> tuple[int, int, int, int]:
         """(top, left, bottom, right) inclusive."""
         rs = [r for r, _ in self.cells]
         cs = [c for _, c in self.cells]
         return min(rs), min(cs), max(rs), max(cs)
 
-    @property
+    @cached_property
     def centroid(self) -> tuple[float, float]:
         rs = [r for r, _ in self.cells]
         cs = [c for _, c in self.cells]
         return sum(rs) / len(rs), sum(cs) / len(cs)
 
-    @property
+    @cached_property
     def shape_signature(self) -> tuple[tuple[int, int], ...]:
         """Translation-invariant cell pattern — the object's shape."""
         top, left, _, _ = self.bbox
@@ -105,9 +110,14 @@ def _connected_components(
     """Extract uniform-color connected components (4- or 8-connectivity)."""
     if diagonal:
         neighbors = [
-            (-1, -1), (-1, 0), (-1, 1),
-            (0, -1), (0, 1),
-            (1, -1), (1, 0), (1, 1),
+            (-1, -1),
+            (-1, 0),
+            (-1, 1),
+            (0, -1),
+            (0, 1),
+            (1, -1),
+            (1, 0),
+            (1, 1),
         ]
     else:
         neighbors = [(-1, 0), (1, 0), (0, -1), (0, 1)]
@@ -133,16 +143,19 @@ def _connected_components(
                 ):
                     visited.add((nr, nc))
                     queue.append((nr, nc))
-        objects.append(
-            PerceivedObject(index=len(objects), color=color, cells=frozenset(cells))
-        )
+        objects.append(PerceivedObject(index=len(objects), color=color, cells=frozenset(cells)))
     return objects
 
 
-def _bboxes_touch(
-    a: PerceivedObject, b: PerceivedObject, diagonal: bool = True
-) -> bool:
+def _bboxes_touch(a: PerceivedObject, b: PerceivedObject, diagonal: bool = True) -> bool:
     """True if any cell of a is (8-)adjacent to any cell of b."""
+    # Cells can only be adjacent when the bounding boxes come within one
+    # cell of each other — an O(1) rejection that skips the cell scan for
+    # nearly every pair in a crowded scene.
+    at, al, ab, ar = a.bbox
+    bt, bl, bb, br = b.bbox
+    if at > bb + 1 or bt > ab + 1 or al > br + 1 or bl > ar + 1:
+        return False
     deltas = [(-1, 0), (1, 0), (0, -1), (0, 1)]
     if diagonal:
         deltas += [(-1, -1), (-1, 1), (1, -1), (1, 1)]

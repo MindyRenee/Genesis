@@ -174,7 +174,7 @@ class MethodLibrary:
         # since provenance dedupes per method.
         if self._seen > len(solutions):
             self._seen = 0
-        new = solutions[self._seen:]
+        new = solutions[self._seen :]
         self._seen = len(solutions)
 
         # group key → {goal: relation-label set it gathered}
@@ -195,10 +195,7 @@ class MethodLibrary:
             # The reusable evidence pattern is what recurred across
             # *every* supporting goal — intersection, restricted to
             # channels the solver can actually re-derive at replay.
-            common = (
-                frozenset.intersection(*rels_by_goal.values())
-                & EDGE_FOR_LABEL.keys()
-            )
+            common = frozenset.intersection(*rels_by_goal.values()) & EDGE_FOR_LABEL.keys()
             method = self.methods.get(mid)
             if method is not None:
                 # Reinforce: new distinct goals add compression mass,
@@ -244,13 +241,9 @@ class MethodLibrary:
         (nothing gathered) carry no method signal.
         """
         operators = {
-            s.operator
-            for s in sol.all_steps
-            if s.operator != "goal_check" and s.knowledge
+            s.operator for s in sol.all_steps if s.operator != "goal_check" and s.knowledge
         }
-        sub_types = tuple(sorted(
-            sub.problem.goal_type.value for sub in sol.sub_solutions
-        ))
+        sub_types = tuple(sorted(sub.problem.goal_type.value for sub in sol.sub_solutions))
         if not operators:
             return None
         return (
@@ -308,16 +301,12 @@ class MethodLibrary:
                 continue
             if m.reliability < _SUGGEST_FLOOR:
                 continue
-            if best is None or (
-                m.reliability, m.support
-            ) > (best.reliability, best.support):
+            if best is None or (m.reliability, m.support) > (best.reliability, best.support):
                 best = m
         return best
 
     @staticmethod
-    def _relations_can_serve(
-        goal_type: str, relations: tuple[str, ...]
-    ) -> bool:
+    def _relations_can_serve(goal_type: str, relations: tuple[str, ...]) -> bool:
         """Whether the method's evidence channels can satisfy the goal.
 
         Mirrors the solver's verification criteria: ACHIEVE needs
@@ -361,8 +350,7 @@ class MethodLibrary:
             "archived": len(self._archive),
             "uses": sum(m.uses for m in live),
             "mean_reliability": (
-                round(sum(m.reliability for m in live) / len(live), 3)
-                if live else 0.0
+                round(sum(m.reliability for m in live) / len(live), 3) if live else 0.0
             ),
             "solutions_mined": self._seen,
         }

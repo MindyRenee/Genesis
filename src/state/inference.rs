@@ -6,10 +6,10 @@
 //! engine to the cognitive mind, without requiring a schema version
 //! bump.
 //!
-//! The block sat at 3228 in schema v3 and 3352 in schema v4. Schema v5
-//! inserted the 64-byte sleep-network layer at 3224, moving it here;
-//! see [`crate::state::core_state::GenesisCoreState`] for the full
-//! layout.
+//! The block sat at 3228 in schema v3 and 3352 in v4 —
+//! v5 inserted the 64-byte sleep-network layer at 3224, moving the
+//! block here; see [`crate::state::core_state::GenesisCoreState`] for
+//! the full layout.
 //! `python/genesis_client/types.py` reads this block by offset and must
 //! be updated whenever it moves — a stale offset there parses
 //! successfully out of the wrong bytes.
@@ -51,7 +51,7 @@
 //! Genesis's and the user's valence trajectories — measures how "in
 //! sync" they are.
 //!
-//! # Layout (60 bytes)
+//! # Layout (64 bytes)
 //!
 //! ```text
 //! offset  field                        type    notes
@@ -71,6 +71,7 @@
 //!  48     prediction_error_serotonin   f32     SRT state prediction error [-2,2]
 //!  52     model_maturity               f32     model confidence [0,1]
 //!  56     inference_tick_count         u32     inference cycles run
+//!  60     policy_authority             f32     delegated policy authority [0,1]
 //! ```
 //!
 //! These fields are NOT covered by the CRC32 checksum (they live in
@@ -92,7 +93,7 @@
 //! - Pezzulo, G., Rigoli, F. & Friston, K. (2015). Active inference,
 //!   homeostatic and allostatic control. Prog. Neurobiol., 134.
 
-/// The active inference signal projection — 60 bytes that live in the
+/// The active inference signal projection — 64 bytes that live in the
 /// reserved region of `GenesisCoreState`.
 ///
 /// See the [module-level documentation](self) for the full architecture.

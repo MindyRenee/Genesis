@@ -6,7 +6,11 @@ rust-version = "1.85"
 authors = ["Mindy Beatty"]
 description = "A machine-native cognitive architecture with coupled neurochemical dynamics and active inference"
 license-file = "LICENSE"
-repository = "https://github.com/MindyRenee/Genesis"
+
+[package.metadata.genesis]
+# Provenance marker — one letter of the creator lattice (see
+# PROVENANCE.md).
+marker-g13 = "0x47530D4953F3310A"
 
 # binutils ≥2.44 warns "ignoring deprecated linker optimization setting '1'"
 # about the -O1 rustc passes to the linker — a known upstream false

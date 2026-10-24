@@ -4,16 +4,18 @@ This is the flip side of the ticker. The daemon *reads* the CPU and
 publishes what it sees; that is all it does. Deciding to run faster or
 slower is hers, and this module is how she does it.
 
-Two classes of lever exist, and the difference matters:
+Only one class of lever remains, by design:
 
 - **Unprivileged, reversible.** CPU affinity (``taskset``) — how many
   cores she is allowed to use — and I/O scheduling class (``ionice``).
   She can pull both in both directions with no privilege at all.
   Slower is not "less CPU forever", it is fewer cores and lazier disk.
-- **Privileged.** The frequency governor, the min/max frequency bounds
-  and the turbo gate. These are root-owned ``sysfs`` files, so acting
-  on them needs a privileged helper. When that helper is not installed
-  this module says so plainly instead of pretending.
+
+The privileged levers — frequency governor, min/max frequency bounds,
+turbo gate — are gone. They acted on the *host's* clock through a
+root-owned helper, and pinning the machine's frequency policy from
+her state is what ran the host hot. The loop now closes inside her:
+she can observe the host's clock but only act on her own process.
 
 Scheduling priority (``nice``) is deliberately *not* offered. It looks
 like the obvious speed control and it is a trap: unprivileged she can
@@ -33,16 +35,9 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 
-from infrastructure.paths import code_root
-
 __all__ = ["CpuSpeed", "CpuSpeedState", "SpeedResult"]
 
 _CPUFS = "/sys/devices/system/cpu/cpu0/cpufreq"
-
-# How many cores she keeps under each effort level. Affinity is the
-# lever that actually bounds her CPU appetite without privilege, and it
-# reverses exactly, so "slow" is a dial rather than a commitment.
-_SLOW_CORES = 1
 
 
 def _read(path: str) -> str | None:
@@ -62,27 +57,6 @@ def _run(command: list[str]) -> tuple[bool, str]:
         return False, str(exc)
     output = (done.stdout + done.stderr).strip()
     return done.returncode == 0, output
-
-
-def _find_helper() -> str:
-    """Locate ``cpufreq_helper.sh`` — the same order the daemon uses.
-
-    1. ``GENESIS_CPUFREQ_HELPER`` — explicit override.
-    2. ``/usr/local/libexec/genesis/cpufreq_helper.sh`` — the root-owned
-       copy ``install_sudoers.sh`` places, and the only path a properly
-       installed sudoers rule covers (a NOPASSWD rule on a
-       checkout-writable path would be a self-serve root escalation —
-       she can draft patches to her own source).
-    3. ``<code root>/scripts/cpufreq_helper.sh`` — the checkout copy;
-       works when the sudoers rule points there (older installs).
-    """
-    env = os.environ.get("GENESIS_CPUFREQ_HELPER")
-    if env:
-        return env
-    libexec = "/usr/local/libexec/genesis/cpufreq_helper.sh"
-    if os.path.exists(libexec):
-        return libexec
-    return str(code_root() / "scripts" / "cpufreq_helper.sh")
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,41 +103,14 @@ class CpuSpeed:
     Args:
         pid: The process whose scheduling she is adjusting — her own
             conscious mind by default.
-        helper: Path to the privileged helper script, if one exists.
     """
 
-    def __init__(self, pid: int | None = None, helper: str | None = None) -> None:
-        """Bind to a process and locate the privileged helper if present."""
+    def __init__(self, pid: int | None = None) -> None:
+        """Bind to the process whose scheduling she is adjusting."""
         self.pid = pid if pid is not None else os.getpid()
-        self.helper = helper or _find_helper()
         self._applied: list[str] = []
-        self._sudo_ok: bool | None = None
 
     # ─── Sensing ──────────────────────────────────────────────────
-
-    @property
-    def has_privileged_control(self) -> bool:
-        """Whether she can move the governor, not just throttle herself.
-
-        The governor files are root-owned, so this is true only when a
-        passwordless path to them exists. Reporting this honestly
-        matters more than reporting a lever she cannot pull — so probe
-        the resolved helper the way the daemon does (``<helper> test``
-        is a documented no-op that exits 0) rather than checking
-        whether a sudoers file exists at all: a rule covering a
-        different checkout's path would make the file exist while
-        granting her nothing.
-        """
-        if self._sudo_ok is None:
-            helper_ok = os.path.exists(self.helper) and os.access(
-                self.helper, os.X_OK
-            )
-            if not helper_ok or shutil.which("sudo") is None:
-                self._sudo_ok = False
-            else:
-                ok, _ = _run(["sudo", "-n", self.helper, "test", ""])
-                self._sudo_ok = ok
-        return self._sudo_ok
 
     def sense(self) -> CpuSpeedState:
         """Read her current CPU speed, governor and scheduling."""
@@ -188,7 +135,9 @@ class CpuSpeed:
             cores_total=cores_total,
             cores_mine=cores_mine,
             io_class=io_class,
-            can_change_governor=self.has_privileged_control,
+            # The governor lever was removed — she observes the
+            # host's clock but can no longer reach out and move it.
+            can_change_governor=False,
         )
 
     # ─── Effort ───────────────────────────────────────────────────
@@ -205,8 +154,7 @@ class CpuSpeed:
             effort: "slow", "fast", or "auto" to leave scheduling alone.
 
         Returns:
-            The outcome, including whether the privileged governor lever
-            was needed and unavailable.
+            The outcome.
         """
         choice = effort.strip().lower()
         if choice not in {"slow", "fast", "auto"}:
@@ -217,7 +165,7 @@ class CpuSpeed:
 
         # Reset first so "slow" and "fast" are always relative to a
         # known-clean baseline rather than stacking on a previous change.
-        self.release(scheduling_only=True)
+        self.release()
         if choice == "slow":
             # Pin to a CPU the mask actually allows — 0 may not be in
             # the current affinity set.
@@ -250,23 +198,13 @@ class CpuSpeed:
                     f"{'; '.join([*applied, failed])}",
                 )
 
-        note = ""
-        if not self.has_privileged_control:
-            note = (
-                " I cannot move the governor itself — that is root-owned and no "
-                "privileged helper is installed, so this is cores and disk only"
-            )
-        return SpeedResult(True, "change speed", f"{'; '.join(applied)}.{note}")
+        return SpeedResult(True, "change speed", f"{'; '.join(applied)}.")
 
-    def release(self, scheduling_only: bool = False) -> str:
+    def release(self) -> str:
         """Undo everything she has applied to her own scheduling.
 
         This is the recovery path and must never fail: affinity goes
         back to every core and I/O class returns to normal.
-
-        Args:
-            scheduling_only: Skip the privileged lever when it is not
-                available, rather than reporting it as missing.
 
         Returns:
             A short description of what was released.
@@ -280,38 +218,8 @@ class CpuSpeed:
         ok, _ = _run(["ionice", "-c", "2", "-n", "4", "-p", str(self.pid)])
         if ok:
             released.append("normal disk I/O")
-        if not scheduling_only and self.has_privileged_control:
-            ok, _ = _run(["sudo", "-n", self.helper, "set_governor", "schedutil"])
-            if ok:
-                released.append("schedutil governor")
         self._applied.clear()
         return ", ".join(released) if released else "nothing to release"
-
-    # ─── Governor (privileged) ────────────────────────────────────
-
-    def set_governor(self, governor: str) -> SpeedResult:
-        """Switch the frequency governor — needs root.
-
-        Args:
-            governor: One of the names in scaling_available_governors.
-
-        Returns:
-            The outcome, or a clear statement that she lacks the lever.
-        """
-        available = _read(f"{_CPUFS}/scaling_available_governors") or ""
-        if governor not in available.split():
-            return SpeedResult(
-                False, "change governor",
-                f"'{governor}' is not one of: {available}",
-            )
-        if not self.has_privileged_control:
-            return SpeedResult(
-                False, "change governor",
-                "the governor is root-owned and no privileged helper is installed "
-                "(needs scripts/install_sudoers.sh — a sudoers rule for this helper)",
-            )
-        ok, detail = _run(["sudo", "-n", self.helper, "set_governor", governor])
-        return SpeedResult(ok, "change governor", f"governor is now {governor}. {detail}")
 
 
 def _as_int(text: str) -> int:

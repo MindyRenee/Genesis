@@ -324,6 +324,15 @@ class ComputationalSubstrate:
     # Suspend capability bitmask (bit0 mem-suspend, bit1 RTC wakealarm).
     suspend_caps: int = 0
 
+    # ── Rest — the parasympathetic layer ─────────────────────
+    # Depth-weighted cpuidle residency [0,1] — measured evidence the
+    # cores are parked in real sleep states, not merely unexcited.
+    rest: float = 0.0
+    # Signed deviation of cpu_temp_c from its own ~60 s EMA [-1,1] —
+    # which way the body is moving; negative is the recovery
+    # direction, positive is heat building.
+    temp_trend: float = 0.0
+
     # How many hardware channels the daemon actually reported on the
     # last read. Distinguishes "the sensor says zero" from "there is
     # no sensor" — without it, an absent sensor is indistinguishable
@@ -734,6 +743,7 @@ class _HardwareChannels:
         return True
 
     def num(self, name: str, default: float) -> float:
+        """Body-state field ``name`` as a finite float, else ``default``."""
         try:
             v = float(getattr(self._body_state, name, default))
         except (TypeError, ValueError):
@@ -742,6 +752,7 @@ class _HardwareChannels:
         return v if v == v and abs(v) != float("inf") else default
 
     def take(self, name: str, attr: str, default: float, channel: str = "") -> None:
+        """Copy a body-state channel onto the body; counts present only if its sensor exists."""
         if not hasattr(self._body_state, name):
             return
         self.reported.add(name)
@@ -785,9 +796,12 @@ def _take_hardware_channels(
     model, grouped by physical domain. Channels stored unscaled."""
     # ── Thermal ───────────────────────────────────────────
     channels.take("cpu_temp_c", "cpu_temp_c", 0.0, "temperature")
+    channels.take("temp_trend", "temp_trend", 0.0, "temperature")
     channels.take("throttle_state", "throttle_state", 0.0, "frequency")
     channels.take(
-        "thermoregulatory_effort", "thermoregulatory_effort", 0.0,
+        "thermoregulatory_effort",
+        "thermoregulatory_effort",
+        0.0,
         "fan PWM",
     )
 
@@ -828,6 +842,12 @@ def _take_hardware_channels(
     channels.take("core_activity", "core_activity", 0.0, "RAPL power domains")
     channels.take("uncore_activity", "uncore_activity", 0.0, "RAPL power domains")
     channels.take("dram_activity", "dram_activity", 0.0, "RAPL power domains")
+
+    # ── Rest — the parasympathetic channel ────────────────
+    # cpuidle residency is the body's measured report that the
+    # substrate is at rest — an active signal, not the absence of
+    # activity on the excited channels above.
+    channels.take("rest", "rest", 0.0, "cpuidle state counters")
 
     # ── Integrity and capability ──────────────────────────
     # Entropy and suspend caps are readable from /proc on any Linux
@@ -969,8 +989,7 @@ class SelfModel:
                     # rather than a hardcoded string. The content
                     # comes from introspection-written concept edges.
                     is_a_targets = [
-                        t for t, r, w in neighbors
-                        if r == RelationType.IS_A and w > 0.5
+                        t for t, r, w in neighbors if r == RelationType.IS_A and w > 0.5
                     ]
                     if is_a_targets:
                         display = is_a_targets[0].replace("_", " ")
@@ -1051,12 +1070,20 @@ class SelfModel:
         }
 
         adjustments = self._personality_adjustments(
-            emotional_valence, learning_occurred, social_engagement,
-            stress_level, BASE_RATE, dt,
+            emotional_valence,
+            learning_occurred,
+            social_engagement,
+            stress_level,
+            BASE_RATE,
+            dt,
         )
 
         deltas = self._apply_personality_drift(
-            adjustments, defaults, BASE_RATE, RESTORING, dt,
+            adjustments,
+            defaults,
+            BASE_RATE,
+            RESTORING,
+            dt,
         )
 
         return deltas
@@ -1075,21 +1102,15 @@ class SelfModel:
         neg = max(0.0, -emotional_valence)  # negative valence component
 
         adjustments = {
-            "openness": (
-                (0.5 if learning_occurred else 0.0) + pos * 0.3
-            ) * base_rate * dt,
+            "openness": ((0.5 if learning_occurred else 0.0) + pos * 0.3) * base_rate * dt,
             "conscientiousness": (
                 stress_level * 0.4  # stress demands discipline
-            ) * base_rate * dt,
-            "extraversion": (
-                social_engagement * pos * 0.5
-            ) * base_rate * dt,
-            "agreeableness": (
-                social_engagement * pos * 0.3 - stress_level * 0.2
-            ) * base_rate * dt,
-            "neuroticism": (
-                neg * 0.4 + stress_level * 0.3 - pos * 0.2
-            ) * base_rate * dt,
+            )
+            * base_rate
+            * dt,
+            "extraversion": (social_engagement * pos * 0.5) * base_rate * dt,
+            "agreeableness": (social_engagement * pos * 0.3 - stress_level * 0.2) * base_rate * dt,
+            "neuroticism": (neg * 0.4 + stress_level * 0.3 - pos * 0.2) * base_rate * dt,
         }
         return adjustments
 
@@ -1336,14 +1357,10 @@ class SelfModel:
         body = self.body_model
         subsystems = getattr(report, "subsystems", None)
         if subsystems is not None:
-            body.subsystem_activity = {
-                t.subsystem_name: t.cpu for t in subsystems
-            }
+            body.subsystem_activity = {t.subsystem_name: t.cpu for t in subsystems}
         modules = getattr(report, "modules", None)
         if modules is not None:
-            body.module_activity = {
-                t.module_name: t.cpu_share for t in modules
-            }
+            body.module_activity = {t.module_name: t.cpu_share for t in modules}
 
     def body_condition_seeds(self) -> list[tuple[str, float]]:
         """Return concept seeds for whatever its body is currently doing.
@@ -1368,8 +1385,9 @@ class SelfModel:
         body = self.body_model
         out: list[tuple[str, float]] = []
 
-        def add(seed: str, present: bool, magnitude: float, threshold: float,
-                weight: float) -> None:
+        def add(
+            seed: str, present: bool, magnitude: float, threshold: float, weight: float
+        ) -> None:
             if not present or magnitude < threshold:
                 return
             # Scale within the condition's own range, so a throttled
@@ -1404,8 +1422,13 @@ class SelfModel:
         if verified("fan PWM"):
             add("heat", True, body.thermoregulatory_effort, 0.6, 1.5)
         if verified("RAPL power domains"):
-            add("power", True, max(body.core_activity, body.uncore_activity,
-                                   body.dram_activity), 0.7, 1.0)
+            add(
+                "power",
+                True,
+                max(body.core_activity, body.uncore_activity, body.dram_activity),
+                0.7,
+                1.0,
+            )
 
         out.sort(key=lambda pair: pair[1], reverse=True)
         return out

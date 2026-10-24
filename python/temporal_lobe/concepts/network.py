@@ -92,14 +92,14 @@ class ConceptNetwork(
 ):
     """A semantic graph of concepts and their relationships.
 
-        This is Genesis's understanding of the world. It's built from
-        conversation, reasoning, and experience. The reasoning engine
-        traverses this graph to draw conclusions.
+    This is Genesis's understanding of the world. It's built from
+    conversation, reasoning, and experience. The reasoning engine
+    traverses this graph to draw conclusions.
 
-        The network is not static — concepts can be added, merged, split,
-        and reweighted. Activation spreads through the network (spreading
-        activation), so using one concept primes related ones.
-        """
+    The network is not static — concepts can be added, merged, split,
+    and reweighted. Activation spreads through the network (spreading
+    activation), so using one concept primes related ones.
+    """
 
     _RELATION_PHRASE_SEEDS: ClassVar[dict[str, list[str]]] = {
         "is_a": [
@@ -241,9 +241,20 @@ class ConceptNetwork(
             RelationType.RELATED_TO,
             (1, 0, 2),
         ),
-        # "X denotes Y" / "X describes Y" / "X means Y" / "X defines Y"
+        # "Types of X include A, B, and C" — subtype enumeration. The
+        # items are instances of the genus, so the direction reverses:
+        # subject group is the item list, object group is the genus.
         (
-            r"^(.+?)\s+(?:denotes?|describes?|defines?|means?)\s+(.+?)[.!]?$",
+            r"^(?:types?|kinds?|forms?|varieties|classes|categories|species|genera|modes?)\s+of\s+(.+?)\s+(?:include|includes|contain|contains|comprise|comprises)\s+(.+?)[.!]?$",
+            RelationType.IS_A,
+            (2, 0, 1),
+        ),
+        # "X denotes Y" / "X describes Y" / "X means Y" / "X defines Y".
+        # Bare "mean" is excluded: it is a noun head far more often than
+        # a predicate ("types of mean include ..."), and letting it match
+        # here stranded enumeration objects inside the object capture.
+        (
+            r"^(.+?)\s+(?:denotes?|describes?|defines?|means)\s+(.+?)[.!]?$",
             RelationType.IS_A,
             (1, 0, 2),
         ),
@@ -409,14 +420,17 @@ class ConceptNetwork(
         # ``get_associations`` only — never on the hot paths
         # (spread_activation, has_neighbors).
         self._similarity_provider: Any = None
+
     @property
     def size(self) -> int:
         """Number of concepts in the network."""
         return len(self._concepts)
+
     @property
     def edge_count(self) -> int:
         """Number of relationships in the network."""
         return len(self._edges)
+
     @property
     def archive_size(self) -> int:
         """Number of concepts in the long-term archive (0 if no archive)."""
@@ -430,10 +444,12 @@ class ConceptNetwork(
                 e,
             )
             return 0
+
     @property
     def total_concept_count(self) -> int:
         """Total concepts across working memory + long-term archive."""
         return len(self._concepts) + self.archive_size
+
     def iter_concept_names(self) -> list[str]:
         """Return the names of all concepts currently in working memory.
 
@@ -442,6 +458,7 @@ class ConceptNetwork(
         the class.
         """
         return list(self._concepts.keys())
+
     def iter_concepts(self) -> list[tuple[str, Concept]]:
         """Return ``(name, concept)`` pairs for all in-memory concepts.
 
@@ -450,6 +467,7 @@ class ConceptNetwork(
         ``_concepts`` directly from outside the class.
         """
         return list(self._concepts.items())
+
     @property
     def edges(self) -> list[Edge]:
         """All edges in the network (read-only view of the internal list).
@@ -461,6 +479,7 @@ class ConceptNetwork(
         not add/remove elements.
         """
         return self._edges
+
     def replace_edges(self, edges: list[Edge]) -> None:
         """Replace the entire edge list and rebuild indices.
 
@@ -474,19 +493,18 @@ class ConceptNetwork(
             # A live log owns the edge set: derivables are stripped
             # and the canonical remainder is snapshotted as the new
             # fold base.
-            edges = [
-                e for e in edges
-                if not is_derivable_edge(e.relation, e.origin)
-            ]
+            edges = [e for e in edges if not is_derivable_edge(e.relation, e.origin)]
             self._edge_log.snapshot(edges)
         self._edges = edges
         self._rebuild_edge_indices()
+
     @property
     def concept_ids(self) -> list[str]:
         """List of all concept IDs (cached, invalidated on add/remove)."""
         if self._concept_ids_cache is None:
             self._concept_ids_cache = list(self._concepts.keys())
         return self._concept_ids_cache
+
     @property
     def world_concept_ids(self) -> list[str]:
         """Concept IDs filtered to genuine world knowledge.
@@ -505,6 +523,7 @@ class ConceptNetwork(
                 cid for cid in self.concept_ids if is_world_concept(cid)
             ]
         return self._world_concept_ids_cache
+
     def attach_holographic_graph(self, hgraph: Any) -> None:
         """Attach a holographic associative graph to this network.
 
@@ -517,6 +536,7 @@ class ConceptNetwork(
             hgraph: A ``HolographicGraph`` instance.
         """
         self._holographic_graph = hgraph
+
     def attach_edge_log(self, log: Any) -> None:
         """Attach the canonical edge log — the single source of truth.
 
@@ -544,25 +564,23 @@ class ConceptNetwork(
             # point of the migration.
             self._strip_derivable_edges()
             log.snapshot(self._edges)
+
     def _load_from_edge_log(self) -> None:
         """Replace in-memory edges with the canonical log fold."""
         live = self._edge_log.fold()
         self._edges = list(live.values())
         self._rebuild_edge_indices()
         self._quality_concept_ids_cache = None
+
     def _strip_derivable_edges(self) -> None:
         """Drop derivable edges from memory — a live log never stores them."""
-        kept = [
-            e for e in self._edges
-            if not is_derivable_edge(e.relation, e.origin)
-        ]
+        kept = [e for e in self._edges if not is_derivable_edge(e.relation, e.origin)]
         if len(kept) != len(self._edges):
             self._edges = kept
             self._rebuild_edge_indices()
             self._quality_concept_ids_cache = None
-    def _warn_compact_failure(
-        self, size: int, exc: OSError, what: str
-    ) -> None:
+
+    def _warn_compact_failure(self, size: int, exc: OSError, what: str) -> None:
         """Report a failed edge-log compaction, throttled.
 
         The condition is persistent, so warning on every save would
@@ -571,9 +589,7 @@ class ConceptNetwork(
         """
         self._compact_failures += 1
         n = self._compact_failures
-        if n > _COMPACT_WARN_EVERY_STARTUP and (
-            n - 1
-        ) % _COMPACT_WARN_EVERY != 0:
+        if n > _COMPACT_WARN_EVERY_STARTUP and (n - 1) % _COMPACT_WARN_EVERY != 0:
             return
         logger.warning(
             "edge log %s (%d bytes, over the %d-byte threshold): %s. "
@@ -625,6 +641,7 @@ class ConceptNetwork(
                 self._warn_compact_failure(size, exc, "compaction failed")
             else:
                 self._compact_failures = 0
+
     def attach_similarity_provider(self, provider: Any) -> None:
         """Attach the virtual similarity layer for derivable associations.
 
@@ -635,6 +652,7 @@ class ConceptNetwork(
         (``spread_activation``, ``has_neighbors``, ``get_neighbors``).
         """
         self._similarity_provider = provider
+
     def get_associations(
         self,
         concept: str,
@@ -663,29 +681,21 @@ class ConceptNetwork(
         neighbors: list[Neighbor] = []
         for edge in self._edge_index.get(cid, []):
             if relation is None or edge.relation == relation:
-                neighbors.append(
-                    Neighbor(edge.target, edge.relation, edge.weight, "exact")
-                )
+                neighbors.append(Neighbor(edge.target, edge.relation, edge.weight, "exact"))
         for edge in self._reverse_index.get(cid, []):
             if relation is None or edge.relation == relation:
-                neighbors.append(
-                    Neighbor(edge.source, edge.relation, edge.weight, "exact")
-                )
+                neighbors.append(Neighbor(edge.source, edge.relation, edge.weight, "exact"))
         if self._holographic_graph is not None:
             for target, rel, sim in self._query_holographic_neighbors(cid, relation):
                 neighbors.append(Neighbor(target, rel, sim, "holographic"))
-        if (
-            self._similarity_provider is not None
-            and relation in (None, RelationType.SIMILAR_TO)
-        ):
+        if self._similarity_provider is not None and relation in (None, RelationType.SIMILAR_TO):
             try:
                 for target, score in self._similarity_provider(cid)[:k_virtual]:
-                    neighbors.append(
-                        Neighbor(target, None, float(score), "embedding")
-                    )
+                    neighbors.append(Neighbor(target, None, float(score), "embedding"))
             except Exception:  # noqa: BLE001
                 logger.debug("similarity provider failed for %r", cid)
         return neighbors
+
     def replace_contents(self, other: ConceptNetwork) -> None:
         """Adopt another network's content while keeping this object's identity.
 
@@ -736,6 +746,7 @@ class ConceptNetwork(
                 # transactional state restore.
                 self._strip_derivable_edges()
                 self._edge_log.snapshot(self._edges)
+
     def concept_quality(self, concept_id: str) -> float:
         """Structural quality score for a concept (0.0 to 1.0).
 
@@ -787,12 +798,8 @@ class ConceptNetwork(
         # Confidence
         conf = concept.confidence
 
-        return (
-            0.30 * def_score
-            + 0.20 * edge_density
-            + 0.30 * typed_density
-            + 0.20 * conf
-        )
+        return 0.30 * def_score + 0.20 * edge_density + 0.30 * typed_density + 0.20 * conf
+
     @property
     def quality_concept_ids(self) -> list[str]:
         """World concepts with quality ≥ ``QUALITY_THRESHOLD``.
@@ -812,6 +819,7 @@ class ConceptNetwork(
                 if self.concept_quality(cid) >= QUALITY_THRESHOLD
             ]
         return self._quality_concept_ids_cache
+
     @property
     def dream_concept_ids(self) -> list[str]:
         """Concept IDs for dream/thought generation.
@@ -826,6 +834,7 @@ class ConceptNetwork(
         if len(quality) >= 10:
             return quality
         return self.world_concept_ids
+
     @property
     def mean_edge_weight(self) -> float:
         """Mean weight of all edges (0 if the network has no edges).
@@ -838,6 +847,7 @@ class ConceptNetwork(
         if not self._edges:
             return 0.0
         return sum(e.weight for e in self._edges) / len(self._edges)
+
     @property
     def mean_concept_confidence(self) -> float:
         """Mean confidence of all concepts (0 if the network is empty).
@@ -856,6 +866,7 @@ class ConceptNetwork(
         if not values:
             return 0.0
         return sum(c.confidence for c in values) / len(values)
+
     @property
     def network_density(self) -> float:
         """Edge density of the network (edges / possible directed edges).
@@ -869,6 +880,7 @@ class ConceptNetwork(
             return 0.0
         possible = n * (n - 1)
         return len(self._edges) / possible
+
     def _find_matching_sense(
         self, name: str, properties: dict[str, Any] | None
     ) -> tuple[Concept, str] | None:
@@ -897,11 +909,10 @@ class ConceptNetwork(
             # Merge if either definition is empty (unspecified → not a
             # new sense; the merge fills in the empty one), or if both
             # definitions match (case-insensitive).
-            if (not new_def or not existing_def) or (
-                new_def.lower() == existing_def.lower()
-            ):
+            if (not new_def or not existing_def) or (new_def.lower() == existing_def.lower()):
                 return existing, eid
         return None
+
     def _create_disambiguated_concept(
         self,
         name: str,
@@ -952,6 +963,7 @@ class ConceptNetwork(
         for a in aliases or set():
             self._add_alias(a, disambig_id)
         return concept
+
     def _create_new_concept(
         self,
         name: str,
@@ -1003,6 +1015,7 @@ class ConceptNetwork(
         # Update column index
         self._column_index.setdefault(new_column, set()).add(name)
         return concept
+
     def add_concept(
         self,
         name: str,
@@ -1066,8 +1079,12 @@ class ConceptNetwork(
                     recalled = self._recall_from_archive_by_id(name)
                     if recalled is not None:
                         return self._merge_into_existing(
-                            recalled, recalled.id, aliases, confidence,
-                            properties, new_column,
+                            recalled,
+                            recalled.id,
+                            aliases,
+                            confidence,
+                            properties,
+                            new_column,
                         )
             except (sqlite3.Error, RuntimeError) as e:
                 note_swallowed(
@@ -1076,9 +1093,8 @@ class ConceptNetwork(
                 )
 
         # Create new concept
-        return self._create_new_concept(
-            name, aliases, confidence, origin, new_column, properties
-        )
+        return self._create_new_concept(name, aliases, confidence, origin, new_column, properties)
+
     def _merge_into_existing(
         self,
         existing: Concept,
@@ -1134,6 +1150,7 @@ class ConceptNetwork(
                     existing.modality = mod
         existing.columns.add(new_column)
         return existing
+
     def _add_alias(self, alias: str, concept_id: str) -> None:
         """Add an alias mapping, supporting multiple senses.
 
@@ -1156,6 +1173,7 @@ class ConceptNetwork(
             return  # no change — don't invalidate the search index
         # Any alias mutation invalidates the trigram search index
         self._search_index = None
+
     def add_edge(
         self,
         source: str,
@@ -1195,9 +1213,7 @@ class ConceptNetwork(
         key = (src_id, tgt_id, relation)
         existing = self._edge_key_index.get(key)
         if existing is not None:
-            return self.set_edge_weight(
-                src_id, tgt_id, relation, min(1.0, existing.weight + 0.2)
-            )
+            return self.set_edge_weight(src_id, tgt_id, relation, min(1.0, existing.weight + 0.2))
 
         # A live edge log never materializes derivable edges — they
         # are recomputed by the similarity provider at query time.
@@ -1218,7 +1234,12 @@ class ConceptNetwork(
             # Persist first. If the canonical write fails, do not mutate the
             # live graph into a state that cannot be recovered from disk.
             if not self._edge_log.assert_edge(
-                src_id, tgt_id, relation, weight, origin, edge.created_at,
+                src_id,
+                tgt_id,
+                relation,
+                weight,
+                origin,
+                edge.created_at,
             ):
                 return None
         self._edges.append(edge)
@@ -1228,6 +1249,7 @@ class ConceptNetwork(
         # Edge counts affect quality scores — invalidate the cache.
         self._quality_concept_ids_cache = None
         return edge
+
     def set_edge_weight(
         self,
         source: str,
@@ -1263,8 +1285,12 @@ class ConceptNetwork(
             # Persist first so an I/O failure cannot leave memory ahead of
             # the canonical relationship store.
             if not self._edge_log.assert_edge(
-                source, target, relation,
-                new_weight, edge.origin, edge.created_at,
+                source,
+                target,
+                relation,
+                new_weight,
+                edge.origin,
+                edge.created_at,
             ):
                 return None
         edge.weight = new_weight
@@ -1279,6 +1305,7 @@ class ConceptNetwork(
             # the concept between the alias lookup and here.
             return self._concepts.get(cid)
         return None
+
     def has_concept(self, cid: str) -> bool:
         """Check if a concept ID exists in the network.
 
@@ -1287,6 +1314,7 @@ class ConceptNetwork(
         name or alias) and does not resolve.
         """
         return cid in self._concepts
+
     def get_edges(self, concept: str, direction: str = "out") -> list[Edge]:
         """Get edges connected to a concept.
 
@@ -1303,6 +1331,7 @@ class ConceptNetwork(
         if direction in ("in", "both"):
             edges.extend(self._reverse_index.get(cid, []))
         return edges
+
     def get_neighbors(
         self, concept: str, relation: RelationType | None = None
     ) -> list[tuple[str, RelationType, float]]:
@@ -1321,6 +1350,7 @@ class ConceptNetwork(
             for n in self.get_associations(concept, relation)
             if n.provenance != "embedding" and n.relation is not None
         ]
+
     def get_exact_neighbors(
         self, concept: str, relation: RelationType | None = None
     ) -> list[tuple[str, RelationType, float]]:
@@ -1344,6 +1374,7 @@ class ConceptNetwork(
             if relation is None or edge.relation == relation:
                 neighbors.append((edge.source, edge.relation, edge.weight))
         return neighbors
+
     def has_neighbors(self, concept: str) -> bool:
         """Check if a concept has any explicit edges (no holographic query).
 
@@ -1358,6 +1389,7 @@ class ConceptNetwork(
         if not cid:
             return False
         return bool(self._edge_index.get(cid) or self._reverse_index.get(cid))
+
     def _query_holographic_neighbors(
         self, cid: str, relation: RelationType | None = None
     ) -> list[tuple[str, RelationType, float]]:
@@ -1372,13 +1404,16 @@ class ConceptNetwork(
         try:
             if relation is not None:
                 hits = self._holographic_graph.query(
-                    cid, relation.value, top_k=10,
+                    cid,
+                    relation.value,
+                    top_k=10,
                 )
                 for target, sim in hits:
                     result.append((target, relation, _clamp_holo_sim(sim)))
             else:
                 all_hits = self._holographic_graph.query_all_relations(
-                    cid, top_k=10,
+                    cid,
+                    top_k=10,
                 )
                 for rel_str, hits in all_hits.items():
                     try:
@@ -1393,6 +1428,7 @@ class ConceptNetwork(
                 e,
             )
         return result
+
     def find_concepts_by_origin(self, origin: str, limit: int = 100) -> list[str]:
         """Find all concept IDs with a given origin.
 
@@ -1408,9 +1444,8 @@ class ConceptNetwork(
             if len(result) >= limit:
                 break
         return result
-    def find_concepts_by_property(
-        self, key: str, value: str, limit: int = 100
-    ) -> list[Concept]:
+
+    def find_concepts_by_property(self, key: str, value: str, limit: int = 100) -> list[Concept]:
         """Find all concepts that have a specific property key=value pair.
 
         Used for structural lookups like emotion-word associations:
@@ -1427,9 +1462,8 @@ class ConceptNetwork(
                     break
         result.sort(key=lambda c: c.activation or 0.0, reverse=True)
         return result
-    def _find_words_for_hub(
-        self, hub_id: str, property_key: str, property_value: str
-    ) -> list[str]:
+
+    def _find_words_for_hub(self, hub_id: str, property_key: str, property_value: str) -> list[str]:
         """Find words that EXPRESS a category hub, via graph traversal.
 
         Primary path: traverse EXPRESSES edges from the hub concept.
@@ -1444,8 +1478,7 @@ class ConceptNetwork(
             word_ids = [n[0] for n in neighbors]
             # Sort by activation
             word_ids.sort(
-                key=lambda wid: (self._concepts[wid].activation or 0.0)
-                if wid in self._concepts else 0.0,
+                key=lambda wid: getattr(self._concepts.get(wid), "activation", None) or 0.0,
                 reverse=True,
             )
             return word_ids
@@ -1453,6 +1486,7 @@ class ConceptNetwork(
         # Fallback: property scan (backward compatibility)
         concepts = self.find_concepts_by_property(property_key, property_value)
         return [c.id for c in concepts]
+
     def find_emotion_words(self, category: str) -> list[str]:
         """Find words associated with an emotion category.
 
@@ -1462,18 +1496,16 @@ class ConceptNetwork(
         category, returns an empty list — it cannot describe that
         emotion in words yet.
         """
-        return self._find_words_for_hub(
-            f"_cat:emotion:{category}", "emotion_category", category
-        )
+        return self._find_words_for_hub(f"_cat:emotion:{category}", "emotion_category", category)
+
     def find_cognitive_mode_words(self, mode: str) -> list[str]:
         """Find words associated with a cognitive mode.
 
         Traverses EXPRESSES edges from the ``_cat:mode:<mode>`` hub
         concept. Falls back to property scan for backward compatibility.
         """
-        return self._find_words_for_hub(
-            f"_cat:mode:{mode}", "cognitive_mode", mode
-        )
+        return self._find_words_for_hub(f"_cat:mode:{mode}", "cognitive_mode", mode)
+
     def find_cause_words(self, cause_category: str) -> list[str]:
         """Find words associated with a cause category.
 
@@ -1486,6 +1518,7 @@ class ConceptNetwork(
         return self._find_words_for_hub(
             f"_cat:cause:{cause_category}", "cause_category", cause_category
         )
+
     def find_plasticity_words(self, state: str) -> list[str]:
         """Find words associated with a plasticity state.
 
@@ -1493,9 +1526,8 @@ class ConceptNetwork(
         hub concept. Falls back to property scan for backward
         compatibility.
         """
-        return self._find_words_for_hub(
-            f"_cat:plasticity:{state}", "plasticity_state", state
-        )
+        return self._find_words_for_hub(f"_cat:plasticity:{state}", "plasticity_state", state)
+
     def find_alertness_words(self, state: str) -> list[str]:
         """Find words associated with an alertness state.
 
@@ -1505,9 +1537,8 @@ class ConceptNetwork(
         alertness state, returns an empty list — it cannot describe
         that state in words yet.
         """
-        return self._find_words_for_hub(
-            f"_cat:alertness:{state}", "alertness_state", state
-        )
+        return self._find_words_for_hub(f"_cat:alertness:{state}", "alertness_state", state)
+
     def find_valence_words(self, state: str) -> list[str]:
         """Find words associated with a valence state.
 
@@ -1517,9 +1548,8 @@ class ConceptNetwork(
         valence state, returns an empty list — it cannot describe
         that state in words yet.
         """
-        return self._find_words_for_hub(
-            f"_cat:valence:{state}", "valence_state", state
-        )
+        return self._find_words_for_hub(f"_cat:valence:{state}", "valence_state", state)
+
     def seed_relation_verbs(self) -> None:
         """Seed relation-verb phrases into the concept network.
 
@@ -1539,15 +1569,20 @@ class ConceptNetwork(
                     continue
                 if self.get_concept(cid) is None:
                     self.add_concept(
-                        cid, origin="structural",
+                        cid,
+                        origin="structural",
                         properties={"template": display},
                     )
                 existing = self.get_exact_neighbors(cid, RelationType.EXPRESSES)
                 if not any(n[0] == hub_id for n in existing):
                     self.add_edge(
-                        cid, hub_id, RelationType.EXPRESSES,
-                        weight=0.6, origin="relation_verb_seed",
+                        cid,
+                        hub_id,
+                        RelationType.EXPRESSES,
+                        weight=0.6,
+                        origin="relation_verb_seed",
                     )
+
     _SITUATION_VERB_SEEDS: ClassVar[dict[str, list[str]]] = {
         # "Where is X?" — the subject and its location.
         "location": [
@@ -1576,6 +1611,34 @@ class ConceptNetwork(
             "the {place} has {who} in it",
             "{who} {be} found in the {place}",
         ],
+        # Yes/no questions — the stance a judgment took on the claim.
+        # {claim} is the checked content's surface form, so restating
+        # it under a stance lets her say what she judged, not just how.
+        "verdict_assert": [
+            "yes",
+            "yes — {claim}",
+            "that's right, {claim}",
+        ],
+        "verdict_deny": [
+            "no",
+            "that isn't right",
+            "i don't believe {claim}",
+        ],
+        "verdict_hedge": [
+            "i think {claim}",
+            "probably — {claim}",
+            "as far as i can tell, {claim}",
+        ],
+        "verdict_doubt": [
+            "i don't think {claim}",
+            "probably not",
+            "i doubt it",
+        ],
+        "verdict_suspend": [
+            "i'm not sure",
+            "i can't say",
+            "i don't know about that",
+        ],
     }
 
     def seed_situation_verbs(self) -> None:
@@ -1598,21 +1661,23 @@ class ConceptNetwork(
             if self.get_concept(hub_id) is None:
                 self.add_concept(hub_id, confidence=0.7, origin="structural")
             for phrase in phrases:
-                cid = "_utt:" + re.sub(
-                    r"[{}]", "", phrase.replace(" ", "_")
-                ).lower().rstrip("_")
+                cid = "_utt:" + re.sub(r"[{}]", "", phrase.replace(" ", "_")).lower().rstrip("_")
                 if not cid or len(cid) < 2:
                     continue
                 if self.get_concept(cid) is None:
                     self.add_concept(
-                        cid, origin="structural",
+                        cid,
+                        origin="structural",
                         properties={"template": phrase},
                     )
                 existing = self.get_exact_neighbors(cid, RelationType.EXPRESSES)
                 if not any(n[0] == hub_id for n in existing):
                     self.add_edge(
-                        cid, hub_id, RelationType.EXPRESSES,
-                        weight=0.6, origin="situation_verb_seed",
+                        cid,
+                        hub_id,
+                        RelationType.EXPRESSES,
+                        weight=0.6,
+                        origin="situation_verb_seed",
                     )
 
     def find_situation_verbs(self, kind: str) -> list[str]:
@@ -1661,6 +1726,7 @@ class ConceptNetwork(
             else:
                 results.append(n[0].replace("_", " "))
         return results
+
     def seed_relation_phrases(self) -> None:
         """Seed relation-phrase templates into the concept network.
 
@@ -1681,15 +1747,20 @@ class ConceptNetwork(
                     continue
                 if self.get_concept(cid) is None:
                     self.add_concept(
-                        cid, origin="structural",
+                        cid,
+                        origin="structural",
                         properties={"template": phrase},
                     )
                 existing = self.get_exact_neighbors(cid, RelationType.EXPRESSES)
                 if not any(n[0] == hub_id for n in existing):
                     self.add_edge(
-                        cid, hub_id, RelationType.EXPRESSES,
-                        weight=0.6, origin="relation_phrase_seed",
+                        cid,
+                        hub_id,
+                        RelationType.EXPRESSES,
+                        weight=0.6,
+                        origin="relation_phrase_seed",
                     )
+
     def find_relation_phrases(self, relation: RelationType) -> list[str]:
         """Find phrasing templates for a relation type.
 
@@ -1713,13 +1784,10 @@ class ConceptNetwork(
             if isinstance(template, str):
                 results.append(template)
             else:
-                results.append(
-                    n[0].replace("_", " ").replace("target", "{target}")
-                )
+                results.append(n[0].replace("_", " ").replace("target", "{target}"))
         return results
-    def _hub_items_with_provenance(
-        self, hub_id: str
-    ) -> list[Provenance]:
+
+    def _hub_items_with_provenance(self, hub_id: str) -> list[Provenance]:
         """Retrieve EXPRESSES neighbours of a hub with provenance.
 
         Returns items sorted by activation (highest first). Each item's
@@ -1731,8 +1799,7 @@ class ConceptNetwork(
             return []
         word_ids = [n[0] for n in neighbors]
         word_ids.sort(
-            key=lambda wid: (self._concepts[wid].activation or 0.0)
-            if wid in self._concepts else 0.0,
+            key=lambda wid: getattr(self._concepts.get(wid), "activation", None) or 0.0,
             reverse=True,
         )
         results: list[Provenance] = []
@@ -1744,34 +1811,26 @@ class ConceptNetwork(
             text = template if isinstance(template, str) else wid.replace("_", " ")
             results.append(Provenance.from_concept(text, concept))
         return results
-    def find_utterance_words_with_provenance(
-        self, slot_name: str
-    ) -> list[Provenance]:
+
+    def find_utterance_words_with_provenance(self, slot_name: str) -> list[Provenance]:
         """Find utterance words for a slot, with seed/learned provenance.
 
         Like ``_utterance_words`` but returns ``Provenance`` items.
         """
         return self._hub_items_with_provenance(f"_cat:utterance:{slot_name}")
-    def find_relation_verbs_with_provenance(
-        self, relation: RelationType
-    ) -> list[Provenance]:
+
+    def find_relation_verbs_with_provenance(self, relation: RelationType) -> list[Provenance]:
         """Find relation verb phrases, with seed/learned provenance."""
-        return self._hub_items_with_provenance(
-            f"_cat:relation_verb:{relation.value}"
-        )
-    def find_relation_phrases_with_provenance(
-        self, relation: RelationType
-    ) -> list[Provenance]:
+        return self._hub_items_with_provenance(f"_cat:relation_verb:{relation.value}")
+
+    def find_relation_phrases_with_provenance(self, relation: RelationType) -> list[Provenance]:
         """Find relation phrase templates, with seed/learned provenance."""
-        return self._hub_items_with_provenance(
-            f"_cat:relation_phrase:{relation.value}"
-        )
+        return self._hub_items_with_provenance(f"_cat:relation_phrase:{relation.value}")
+
     def has_learned_utterances(self, slot_name: str) -> bool:
         """Return True if any non-seed utterance words exist for this slot."""
-        return any(
-            not p.is_seed
-            for p in self.find_utterance_words_with_provenance(slot_name)
-        )
+        return any(not p.is_seed for p in self.find_utterance_words_with_provenance(slot_name))
+
     def search_concepts(
         self,
         query: str,
@@ -1825,9 +1884,7 @@ class ConceptNetwork(
                 if col not in origins and concept.origin not in origins:
                     continue
 
-            score = self._score_concept_match(
-                cid, concept, query_lower, query_words, query_compact
-            )
+            score = self._score_concept_match(cid, concept, query_lower, query_words, query_compact)
 
             if score > min_score:
                 results.append((score, cid))
@@ -1835,6 +1892,7 @@ class ConceptNetwork(
         # Sort by score, return top results
         results.sort(key=lambda x: -x[0])
         return [cid for _, cid in results[:limit]]
+
     def _search_candidates(
         self,
         query_lower: str,
@@ -1855,9 +1913,7 @@ class ConceptNetwork(
         search_strings = [query_lower]
         if len(query_words) > 1 and query_compact != query_lower:
             search_strings.append(query_compact)
-        search_strings.extend(
-            w for w in query_words if w != query_lower and len(w) >= 3
-        )
+        search_strings.extend(w for w in query_words if w != query_lower and len(w) >= 3)
 
         # If no search string is long enough for trigrams, fall back to
         # scanning all concepts (short queries are rare).
@@ -1909,6 +1965,7 @@ class ConceptNetwork(
                 candidates |= postings
 
         return candidates
+
     def _build_search_index(self) -> None:
         """Build the trigram inverted index from all concept names and aliases."""
         index: dict[str, set[str]] = {}
@@ -1921,6 +1978,7 @@ class ConceptNetwork(
                 for tri in _extract_trigrams(alias.lower()):
                     index.setdefault(tri, set()).add(cid)
         self._search_index = index
+
     def _score_concept_match(
         self,
         cid: str,
@@ -1968,9 +2026,7 @@ class ConceptNetwork(
                 # Score based on what fraction of query words matched
                 # Bonus if all words matched
                 elif matched_words == len(query_words):
-                    score = min(
-                        0.8 * (matched_words / len(query_words)) + 0.1, 0.9
-                    )
+                    score = min(0.8 * (matched_words / len(query_words)) + 0.1, 0.9)
                 else:
                     score = 0.8 * (matched_words / len(query_words))
 
@@ -1983,12 +2039,14 @@ class ConceptNetwork(
                 break
 
         return score
+
     def get_column(self, concept_id: str) -> str:
         """Get the primary cortical column a concept belongs to."""
         concept = self._concepts.get(concept_id)
         if concept is None:
             return "unknown"
         return _column_of(concept.origin, concept_id)
+
     def get_columns_for(self, concept_id: str) -> set[str]:
         """Get all columns a concept belongs to (multi-column membership)."""
         concept = self._concepts.get(concept_id)
@@ -1997,6 +2055,7 @@ class ConceptNetwork(
         if concept.columns:
             return concept.columns
         return {_column_of(concept.origin, concept_id)}
+
     def _laminar_weight(self, concept_id: str) -> float:
         """Layer-aware activation weight.
 
@@ -2010,6 +2069,7 @@ class ConceptNetwork(
         total = in_degree + out_degree
         # Output-biased concepts get a gain > 1; input-biased get < 1.
         return 1.0 + (out_degree - in_degree) / (total + 2)
+
     def get_column_activation(self, column: str) -> float:
         """Get the mean activation level of a column.
 
@@ -2038,16 +2098,15 @@ class ConceptNetwork(
         if count == 0:
             return 0.0
         return total / count
+
     def get_column_concepts(self, column: str) -> list[str]:
         """Get all concept IDs in a given column."""
         # Snapshotted: `_column_index` is a dict of *sets*, and
         # `add_concept` grows both the inner set and (for a new column)
         # the outer dict from the learner and consolidation threads.
         # Iterating either live raises. See `_concepts` in dynamics.py.
-        return [
-            cid for cid in list(self._column_index.get(column, ()))
-            if cid in self._concepts
-        ]
+        return [cid for cid in list(self._column_index.get(column, ())) if cid in self._concepts]
+
     def get_columns(self) -> dict[str, int]:
         """Get all columns and their sizes.
 
@@ -2060,6 +2119,7 @@ class ConceptNetwork(
             column: sum(1 for cid in list(cids) if cid in self._concepts)
             for column, cids in list(self._column_index.items())
         }
+
     def get_layer(self, concept_id: str) -> CorticalLayer:
         """Infer the cortical layer of a concept from its graph topology.
 
@@ -2086,6 +2146,7 @@ class ConceptNetwork(
         if in_strong and out_strong:
             return CorticalLayer.L2_3
         return CorticalLayer.L6
+
     def get_column_layers(self, column: str) -> dict[str, int]:
         """Get the layer distribution for a given column."""
         counts: dict[str, int] = {}
@@ -2096,6 +2157,7 @@ class ConceptNetwork(
             layer = self.get_layer(cid)
             counts[layer.value] = counts.get(layer.value, 0) + 1
         return counts
+
     def get_layer_distribution(self) -> dict[str, int]:
         """Get the global layer distribution across all columns."""
         counts: dict[str, int] = {}
@@ -2103,6 +2165,7 @@ class ConceptNetwork(
             layer = self.get_layer(cid)
             counts[layer.value] = counts.get(layer.value, 0) + 1
         return counts
+
     def categorize_all(self) -> dict[str, int]:
         """Run detect_category on all uncategorized concepts.
 
@@ -2130,6 +2193,7 @@ class ConceptNetwork(
                 concept.is_animacy_detected = True
                 counts[detected.value] = counts.get(detected.value, 0) + 1
         return counts
+
     def get_by_category(self, category: ConceptCategory) -> list[Concept]:
         """Get all concepts in a given category.
 
@@ -2142,6 +2206,7 @@ class ConceptNetwork(
         return [
             concept for concept in list(self._concepts.values()) if concept.category == category
         ]
+
     def classify_modalities(self) -> dict[str, int]:
         """Run detect_modality on all unclassified concepts.
 
@@ -2165,6 +2230,7 @@ class ConceptNetwork(
                 concept.modality = detected
                 counts[detected.value] = counts.get(detected.value, 0) + 1
         return counts
+
     def get_by_modality(self, modality: ConceptModality) -> list[Concept]:
         """Get all concepts in a given modality.
 
@@ -2177,6 +2243,7 @@ class ConceptNetwork(
         return [
             concept for concept in list(self._concepts.values()) if concept.modality == modality
         ]
+
     def detect_semantic_hubs(self, top_percent: float = 0.05) -> list[str]:
         """Detect semantic hubs using betweenness centrality.
 
@@ -2231,6 +2298,7 @@ class ConceptNetwork(
                 hubs.append(cid)
 
         return hubs
+
     def _compute_betweenness_centrality(self, max_sources: int = 200) -> dict[str, float]:
         """Compute approximate betweenness centrality for all concepts.
 
@@ -2279,9 +2347,8 @@ class ConceptNetwork(
                 centrality[cid] /= scale
 
         return centrality
-    def _betweenness_for_source(
-        self, source: str, all_cids: list[str]
-    ) -> dict[str, float]:
+
+    def _betweenness_for_source(self, source: str, all_cids: list[str]) -> dict[str, float]:
         """Compute dependency scores for a single source node (Brandes' BFS).
 
         Returns a delta dict where ``delta[w]`` is the dependency of
@@ -2298,6 +2365,14 @@ class ConceptNetwork(
         # Distance from source
         dist: dict[str, int] = {source: 0}
         queue: deque[str] = deque([source])
+        # Live membership set. Edges legitimately point at archived
+        # concepts (spill keeps edges for traversal, and the canonical
+        # edge log replays them into _edge_index), so an endpoint can be
+        # absent from every live-keyed table below — sigma[w] and
+        # pred[w] would KeyError on it. Ghost endpoints are dead ends in
+        # the working graph, not nodes: skip them rather than route
+        # shortest paths through cold storage.
+        live = sigma.keys()
 
         while queue:
             v = queue.popleft()
@@ -2305,6 +2380,8 @@ class ConceptNetwork(
             d_v = dist[v]
             for edge in self._edge_index.get(v, []):
                 w = edge.target
+                if w not in live:
+                    continue
                 if w not in dist:
                     dist[w] = d_v + 1
                     queue.append(w)
@@ -2321,10 +2398,12 @@ class ConceptNetwork(
                     delta[v] += (sigma[v] / sigma[w]) * (1.0 + delta[w])
 
         return delta
+
     @property
     def semantic_hubs(self) -> list[Concept]:
         """List of all concepts currently marked as semantic hubs."""
         return [concept for concept in list(self._concepts.values()) if concept.is_semantic_hub]
+
     def find_path(self, source: str, target: str, max_depth: int = 5) -> list[Edge] | None:
         """Find a path between two concepts using BFS.
 
@@ -2394,6 +2473,7 @@ class ConceptNetwork(
                 queue.append((neighbor, depth + 1))
 
         return None
+
     def _reconstruct_path(
         self,
         came_from: dict[str, tuple[str, Edge]],
@@ -2418,6 +2498,7 @@ class ConceptNetwork(
             node = prev
         edges.reverse()
         return edges
+
     def _resolve(self, name: str) -> str | None:
         """Resolve a name or alias to a concept id.
 
@@ -2470,11 +2551,7 @@ class ConceptNetwork(
             # Convert to a 0..1 score (rank 1 → 1.0, rank 10 → 0.1)
             sense_score = max(0.0, 1.0 - (sense_rank - 1) * 0.1)
             # Combine with confidence and activation
-            score = (
-                sense_score * 0.5
-                + concept.confidence * 0.3
-                + (concept.activation or 0.0) * 0.2
-            )
+            score = sense_score * 0.5 + concept.confidence * 0.3 + (concept.activation or 0.0) * 0.2
             if score > best_score:
                 best_score = score
                 best_id = cid
@@ -2486,6 +2563,7 @@ class ConceptNetwork(
         if self._archive is not None:
             return self._recall_from_archive_by_alias(normalized)
         return None
+
     def _resolve_all_senses(self, name: str) -> list[str]:
         """Resolve a name to ALL concept IDs that share it (all senses).
 
@@ -2494,6 +2572,7 @@ class ConceptNetwork(
         all meanings of a polysemous word.
         """
         return list(self._alias_map.get(_normalize_id(name), []))
+
     def resolve_in_context(self, name: str, context: str) -> str | None:
         """Resolve a polysemous name using definition and neighbor overlap."""
         candidates = self._resolve_all_senses(name)
@@ -2501,7 +2580,8 @@ class ConceptNetwork(
             return self._resolve(name)
 
         context_terms = {
-            term for term in re.findall(r"[^\W_]+", context.casefold())
+            term
+            for term in re.findall(r"[^\W_]+", context.casefold())
             if len(term) > 2 and term not in _FUNCTION_WORDS
         }
         if not context_terms:
@@ -2524,6 +2604,7 @@ class ConceptNetwork(
         if not ranked or max(score for score, _ in ranked) == 0.0:
             return self._resolve(name)
         return max(ranked, key=lambda item: item[0])[1]
+
     def remove_concept(self, name: str) -> bool:
         """Remove a concept and all its edges.
 
@@ -2543,9 +2624,7 @@ class ConceptNetwork(
         # phantom edge could never be removed again, and the next
         # `sync_edge_log()` snapshot would promote it from a stale
         # entry to explicitly canonical. Retract each one.
-        removed_edges = [
-            e for e in self._edges if e.source == cid or e.target == cid
-        ]
+        removed_edges = [e for e in self._edges if e.source == cid or e.target == cid]
         self._edges = [e for e in self._edges if e.source != cid and e.target != cid]
         self._retract_edges_from_log(removed_edges)
 
@@ -2596,8 +2675,12 @@ class ConceptNetwork(
                 col_cids.discard(cid)
 
         return True
+
     def remove_concepts_batch(
-        self, cids: set[str], *, preserve_archived_edges: bool = False,
+        self,
+        cids: set[str],
+        *,
+        preserve_archived_edges: bool = False,
     ) -> int:
         """Remove multiple concepts and their edges in a single pass.
 
@@ -2626,14 +2709,8 @@ class ConceptNetwork(
         # and the next save promotes those phantoms to canonical. This
         # path is on the sleep cycle (`clean_noise` routes through it), so
         # the exposure is every pruning pass, not a rare manual delete.
-        removed_edges = [
-            e for e in self._edges
-            if e.source in cids or e.target in cids
-        ]
-        self._edges = [
-            e for e in self._edges
-            if e.source not in cids and e.target not in cids
-        ]
+        removed_edges = [e for e in self._edges if e.source in cids or e.target in cids]
+        self._edges = [e for e in self._edges if e.source not in cids and e.target not in cids]
         self._retract_edges_from_log(removed_edges)
 
         # Also remove archived edges for permanently deleted concepts
@@ -2679,6 +2756,7 @@ class ConceptNetwork(
         self._search_index = None
 
         return removed
+
     def remove_edge(
         self,
         source: str,
@@ -2702,13 +2780,9 @@ class ConceptNetwork(
         self._edges.remove(edge)
         del self._edge_key_index[key]
         if src_id in self._edge_index:
-            self._edge_index[src_id] = [
-                e for e in self._edge_index[src_id] if e is not edge
-            ]
+            self._edge_index[src_id] = [e for e in self._edge_index[src_id] if e is not edge]
         if tgt_id in self._reverse_index:
-            self._reverse_index[tgt_id] = [
-                e for e in self._reverse_index[tgt_id] if e is not edge
-            ]
+            self._reverse_index[tgt_id] = [e for e in self._reverse_index[tgt_id] if e is not edge]
         if self._edge_log is not None:
             self._edge_log.retract_edge(src_id, tgt_id, relation)
         # Edge counts affect quality scores — invalidate the cache.
@@ -2736,12 +2810,10 @@ class ConceptNetwork(
             try:
                 self._edge_log.retract_edge(edge.source, edge.target, edge.relation)
             except (OSError, ValueError) as e:
-                logger.warning(
-                    f"edge log retraction failed for "
-                    f"{edge.source}->{edge.target}: {e}"
-                )
+                logger.warning(f"edge log retraction failed for {edge.source}->{edge.target}: {e}")
         # Edge counts affect quality scores — invalidate the cache.
         self._quality_concept_ids_cache = None
+
     def clean_noise(self, min_confidence: float = 0.5, min_edges: int = 1) -> list[str]:
         """Remove noise concepts from the network.
 
@@ -2823,7 +2895,8 @@ class ConceptNetwork(
             logger.error(
                 "clean_noise could not archive %d noise concepts (%s); "
                 "leaving them in working memory rather than deleting them",
-                len(items), e,
+                len(items),
+                e,
             )
             return []
 
@@ -2840,11 +2913,13 @@ class ConceptNetwork(
             logger.error(
                 "clean_noise archived %d noise concepts but %d are still "
                 "resident; working memory is not being shed",
-                archived, len(still_present),
+                archived,
+                len(still_present),
             )
         logger.info(
             "clean_noise archived %d noise concepts (archive now %d)",
-            archived, self.archive_size,
+            archived,
+            self.archive_size,
         )
         noise = [cid for cid in to_remove if cid not in self._concepts]
         return noise

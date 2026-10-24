@@ -78,21 +78,23 @@ _SCHEMA_PREFIX = "_gen:"
 
 # Relations that induce schema classes. The shared endpoint is the
 # *object* of the relation, so the class is "things bearing R to it".
-_SCHEMA_RELATIONS: frozenset[RelationType] = frozenset({
-    RelationType.CAUSES,
-    RelationType.ENABLES,
-    RelationType.PREVENTS,
-    RelationType.HARMS,
-    RelationType.LEADS_TO,
-    RelationType.EMERGES_FROM,
-    RelationType.CREATES,
-    RelationType.DEPENDS_ON,
-    RelationType.HAS_PROPERTY,
-    RelationType.CONTRADICTS,
-    RelationType.OPPOSITE_OF,
-    RelationType.GOAL_DIRECTED,
-    RelationType.PART_OF,
-})
+_SCHEMA_RELATIONS: frozenset[RelationType] = frozenset(
+    {
+        RelationType.CAUSES,
+        RelationType.ENABLES,
+        RelationType.PREVENTS,
+        RelationType.HARMS,
+        RelationType.LEADS_TO,
+        RelationType.EMERGES_FROM,
+        RelationType.CREATES,
+        RelationType.DEPENDS_ON,
+        RelationType.HAS_PROPERTY,
+        RelationType.CONTRADICTS,
+        RelationType.OPPOSITE_OF,
+        RelationType.GOAL_DIRECTED,
+        RelationType.PART_OF,
+    }
+)
 
 # Namespaces eligible as members/endpoints beyond plain world concepts:
 # the self-model categories and previously reified schemas. Everything
@@ -312,9 +314,7 @@ class SchemaInducer:
                 if member == schema.hub_id or member in ancestors:
                     continue
                 w = min(_MEMBER_WEIGHT_CAP, schema.member_weights.get(member, 0.4))
-                added += self._upsert(
-                    member, schema.hub_id, RelationType.IS_A, w
-                )
+                added += self._upsert(member, schema.hub_id, RelationType.IS_A, w)
 
             self._schemas.append(schema)
 
@@ -336,9 +336,7 @@ class SchemaInducer:
 
     # ─── Internals ───────────────────────────────────────────────
 
-    def _upsert(
-        self, src: str, tgt: str, rel: RelationType, weight: float
-    ) -> int:
+    def _upsert(self, src: str, tgt: str, rel: RelationType, weight: float) -> int:
         """Write an edge if new, else refresh a reified edge's weight.
 
         Returns 1 when a new edge was written, 0 otherwise.
@@ -346,9 +344,11 @@ class SchemaInducer:
         index = self.network._edge_key_index
         existing = index.get((src, tgt, rel))
         if existing is None:
-            return 1 if self.network.add_edge(
-                src, tgt, rel, weight, origin=_ORIGIN_REIFIED
-            ) is not None else 0
+            return (
+                1
+                if self.network.add_edge(src, tgt, rel, weight, origin=_ORIGIN_REIFIED) is not None
+                else 0
+            )
         # Refresh only edges this pass owns; leave earned edges alone.
         if existing.origin == _ORIGIN_REIFIED and weight > existing.weight:
             self.network.set_edge_weight(src, tgt, rel, weight)

@@ -76,10 +76,11 @@ threshold, and waking when it falls to a lower one, with ``C`` shifting
 those thresholds. In Genesis the two processes are embodied separately:
 the daemon's sleep-wake network owns onset (LC < 4 Hz) with its own
 homeostat and a Serkh–Forger circadian oscillator entrained to local
-light, while the mind maps ``S`` to the adenosine level
-(``AUTO_SLEEP_ADENOSINE``) and reads melatonin — the SCN's output — as
-the ``C`` signal: melatonin is a sleep-promoter in the arousal equation
-at circadian night. The wake rescue applies only while melatonin is
+light, while the mind reads ``S`` as a voluntary drive — the adenosine
+level feeds the self-sleep urge past
+``SLEEP_URGE_ADENOSINE_FLOOR`` — and reads melatonin, the SCN's output,
+as the ``C`` signal: melatonin is a sleep-promoter in the arousal
+equation at circadian night. The wake rescue applies only while melatonin is
 below ``WAKE_RESCUE_MELATONIN``; above it, the circadian drive takes
 precedence.
 
@@ -112,8 +113,6 @@ _EXPORTS: dict[str, str] = {
     "SleepStage": "thalamus.brain_waves",
     "SleepCycleTracker": "brainstem.architecture",
     "SleepMixin": "brainstem.sleep",
-    "SleepStageWorker": "brainstem.sleep",
-    "AUTO_SLEEP_ADENOSINE": "brainstem.thresholds",
     # The orexin-stabilization lag — the hypothalamic peptide holds
     # the monoaminergic pole of the flip-flop, so the grogginess after
     # the wake flip decays on orexin's timescale (co-claimed with

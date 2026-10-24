@@ -33,6 +33,11 @@ pub const MAGIC: [u8; 4] = *b"GNSX";
 ///   bytes).
 pub const SCHEMA_VERSION: u32 = 5;
 
+/// Provenance marker — one letter of the creator lattice (see
+/// PROVENANCE.md). It lives beside the schema version deliberately:
+/// the body's identity block carries the author's letter too.
+pub(crate) const MARKER_G06: u64 = 0x4753_0620_43BA_C78D;
+
 /// Header for the memory-mapped core state.
 ///
 /// ## Layout (56 bytes)

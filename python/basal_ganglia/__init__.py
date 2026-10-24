@@ -1,9 +1,48 @@
-"""Basal-ganglia action selection, gating, and reinforcement learning.
+"""Basal ganglia — action selection, reinforcement learning, and motor control.
+
+The basal ganglia are a group of subcortical nuclei critical for
+action selection, habit formation, and reinforcement learning. They
+receive input from the cortex and thalamus, process it through
+direct/indirect pathways, and output back to the cortex via the thalamus.
+
+Key structures:
+    - Striatum (input nucleus):
+      * Caudate nucleus — cognitive loops, goal-directed behavior
+      * Putamen — motor loops, procedural learning
+      * Nucleus accumbens (ventral striatum) — reward, motivation
+    - Globus pallidus (internal GPi, external GPe) — output nuclei
+    - Subthalamic nucleus (STN) — hyperdirect pathway
+    - Substantia nigra:
+      * Pars compacta (SNc) — dopamine source (VTA for ventral)
+      * Pars reticulata (SNr) — output nucleus
 
 The concrete selector is implemented in :mod:`basal_ganglia`. The
 reinforcement learner (``td.py``) and the action–outcome loop
 (``action_feedback.py``) live in this package; the procedural-memory
 components remain shared subsystems claimed from ``memory``.
+
+════════════════════════════════════════════════════════════════════════
+MATHEMATICAL FOUNDATION: DIRECT/INDIRECT PATHWAYS
+════════════════════════════════════════════════════════════════════════
+
+The basal ganglia implement action selection through parallel direct
+and indirect pathways:
+
+Direct pathway (facilitates movement):
+    Cortex → Striatum (D1 MSNs) → GPi/SNr (inhibition) → Thalamus (disinhibition) → Cortex
+    Dopamine (D1 receptors) enhances this pathway → Go signal
+
+Indirect pathway (suppresses movement):
+    Cortex → Striatum (D2 MSNs) → GPe (inhibition) → STN (disinhibition)
+        → GPi/SNr (excitation) → Thalamus (inhibition) → Cortex
+    Dopamine (D2 receptors) inhibits this pathway → No-Go signal
+
+Hyperdirect pathway (rapid global suppression):
+    Cortex → STN → GPi/SNr → Thalamus (inhibition) → Cortex
+
+Dopamine from SNc/VTA modulates the balance:
+    - High dopamine: direct pathway enhanced, indirect suppressed → movement facilitation
+    - Low dopamine: direct suppressed, indirect enhanced → bradykinesia (Parkinson's)
 
 ════════════════════════════════════════════════════════════════════════
 MATHEMATICAL FOUNDATION: THE ACTION–OUTCOME LOOP
@@ -82,9 +121,26 @@ _EXPORTS: dict[str, str] = {
     # GABA — the striatum's own inhibitory currency: direct/indirect
     # pathway gating lives here, not in a general pool
     "GABA": "basal_ganglia.gaba",
+    # Play — task selection scored by mastery and the actor-critic
+    # player that runs attempts; the environments it selects among
+    # live in ``worlds`` (the P and R of the MDP — the world, not
+    # the tissue)
+    "GameAttempt": "basal_ganglia.play",
+    "GamePlay": "basal_ganglia.play",
+    "normalize_offered": "basal_ganglia.play",
+    "COLLECTION": "basal_ganglia.play",
+    "GamePlayer": "basal_ganglia.player",
+    "PlayResult": "basal_ganglia.player",
+    "PlayStep": "basal_ganglia.player",
+    # Procedural category learning — dopamine prediction error
+    # shaping stimulus-response associations (COVIS-style)
+    "SorterAgent": "basal_ganglia.sorter_agent",
+    "PerceptualSorterAgent": "basal_ganglia.sorter_agent",
+    "RuleAgent": "basal_ganglia.rule_agent",
 }
 
 __all__ = [
+    "COLLECTION",
     "GABA",
     "HABIT_THRESHOLD",
     "ActionBid",
@@ -94,12 +150,20 @@ __all__ = [
     "BasalGanglia",
     "CausalHypothesis",
     "Discrepancy",
+    "GameAttempt",
+    "GamePlay",
+    "GamePlayer",
     "HabitBias",
     "MotorField",
+    "PerceptualSorterAgent",
+    "PlayResult",
+    "PlayStep",
     "ProceduralMemory",
+    "RuleAgent",
     "SelectionResult",
     "Skill",
     "SkillStrategy",
+    "SorterAgent",
     "TDLearner",
     "TDTransition",
     "Urge",
@@ -108,6 +172,7 @@ __all__ = [
     "WorldPolicy",
     "compose_motor_fields",
     "model_repeated_failure",
+    "normalize_offered",
 ]
 
 __getattr__ = view_getattr(_EXPORTS, __name__)

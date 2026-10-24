@@ -1283,12 +1283,26 @@ impl LtmStore {
 
         // Assign episode ID
         let episode_id = next_episode_id - 1;
-        self.bundles.ensure_next_episode_id(episode_id);
-        let code = episode_id_to_code(episode_id);
+        // Advance the bundle store's ID counter for every episode so
+        // it stays in lockstep with the index — but only real
+        // episodes' SDRs enter the superposition. Meta-memory
+        // entries (internal bookkeeping: modules 0/5/8/9) are
+        // flagged below and excluded from find_similar, so letting
+        // their SDRs in here would saturate the bundles with
+        // bookkeeping noise until the next startup rebuild.
+        let is_meta_memory = matches!(source_module, 0 | 5 | 8 | 9);
+        if is_meta_memory {
+            // `add_episode` carries the +1 id advance; without it the
+            // counter still lands at episode_id + 1.
+            self.bundles.ensure_next_episode_id(episode_id + 1);
+        } else {
+            self.bundles.ensure_next_episode_id(episode_id);
+            let code = episode_id_to_code(episode_id);
 
-        // Encode SDR and add to bundle store
-        let sdr = encode_episode(text, &emotional_tag, timestamp);
-        self.bundles.add_episode(&code, &sdr);
+            // Encode SDR and add to bundle store
+            let sdr = encode_episode(text, &emotional_tag, timestamp);
+            self.bundles.add_episode(&code, &sdr);
+        }
 
         // Make the bundle store durable BEFORE writing the metadata
         // entry that references this episode ID. Without this, a crash
@@ -1327,7 +1341,7 @@ impl LtmStore {
         // This catches all stores regardless of which code path
         // produced them (Python store_event, Rust store_meta, etc.).
         // See the migration in `open` for the full module list.
-        if matches!(source_module, 0 | 5 | 8 | 9) {
+        if is_meta_memory {
             entry.mark_meta_memory();
         }
 
@@ -1836,8 +1850,9 @@ impl LtmStore {
     }
 
     /// Get a reference to an index entry by slot (for compat).
-    pub fn index_entry_ref(&self, slot: usize) -> &IndexEntry {
-        &self.entries[slot]
+    /// Returns `None` for slots outside the index bounds.
+    pub fn index_entry_ref(&self, slot: usize) -> Option<&IndexEntry> {
+        self.entries.get(slot)
     }
 
     /// Get the most recently stored episode IDs.

@@ -437,9 +437,7 @@ class AttractorNetwork:
     Capacity: ~0.138 * N patterns for N units (Amit et al., 1985).
     """
 
-    def __init__(
-        self, size: int = 64, max_patterns: int = _DEFAULT_MAX_PATTERNS
-    ) -> None:
+    def __init__(self, size: int = 64, max_patterns: int = _DEFAULT_MAX_PATTERNS) -> None:
         """Initialize the attractor network with a square weight matrix.
 
         Args:
@@ -562,9 +560,7 @@ class AttractorNetwork:
         if overflow <= 0:
             return 0
         # Least-recently-retrieved first; oldest as the tiebreak.
-        ranked = sorted(
-            self._patterns.values(), key=lambda p: (p.retrieval_count, p.timestamp)
-        )
+        ranked = sorted(self._patterns.values(), key=lambda p: (p.retrieval_count, p.timestamp))
         for victim in ranked[:overflow]:
             self._patterns.pop(victim.id, None)
         return overflow
@@ -760,9 +756,7 @@ class SpreadingActivation:
         # Snapshot the items to avoid "dictionary changed size during
         # iteration" if activation spreads during the comprehension.
         return {
-            cid: level
-            for cid, (level, _) in list(self._activation.items())
-            if level >= threshold
+            cid: level for cid, (level, _) in list(self._activation.items()) if level >= threshold
         }
 
     def _decay_now(self) -> None:

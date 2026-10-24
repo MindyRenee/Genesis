@@ -1,0 +1,334 @@
+.TH GENESIS-CLI 1 "October 2026" "Genesis 0.2.0" "Genesis Manual"
+.SH NAME
+genesis-cli \- Genesis cognitive mind and interactive terminal
+.SH SYNOPSIS
+.nf
+\fBgenesis_cli.py\fR [\fB\-\-data\-dir\fR \fIDIR\fR] [\fB\-\-daemon\-socket\fR \fIPATH\fR]
+                  [\fB\-\-tail\fR] [\fB\-\-stop\fR] [\fB\-\-offline\fR]
+                  [\fB\-\-headless\fR]
+.fi
+.SH DESCRIPTION
+.B genesis-cli
+is the cognitive mind of Genesis and the interactive terminal through
+which a user converses with her. It creates and starts the cognitive
+Mind in-process, starts the Rust daemon and retina if needed, and
+handles the terminal directly.
+
+.PP
+The CLI owns the daemon and retina lifecycles as child processes. It
+passes its PID to the daemon via
+.I GENESIS_COGNITIVE_PID
+so the daemon can include the mind in interoception \(em reading its
+CPU/memory/IO metrics as part of feeling its body state. The daemon
+publishes a recommendation (cognitive_nice, io_class) that the mind
+applies to itself via GET_BODY_CONTROL.
+
+.PP
+While idle, spontaneous thoughts appear live as
+.I genesis~
+lines, generated from Genesis's concept network, self-composer, and
+emotional state \(em never from hardcoded templates.
+
+.PP
+\fBDo not run this script directly.\fR Use
+.BR run.sh (1)
+in a source checkout or the installed
+.BR genesis (1)
+console script, the only supported entry points. The CLI checks
+.I GENESIS_RUN
+and refuses to start otherwise. The arguments documented here are
+useful for understanding what the launchers run and for diagnostic
+invocations.
+
+.SH OPTIONS
+.TP
+.BR --data-dir " \fIDIR\fR"
+Data directory holding the core state file, STM ring buffer, LTM
+store, PID files, socket, and locks. Resolved exactly as the daemon
+resolves it:
+.I GENESIS_DATA_DIR ,
+then the checkout's
+.IR .genesis-data-dir ,
+then
+.IR $XDG_DATA_HOME /genesis ,
+then
+.IR ~/.local/share/genesis .
+.TP
+.BR --daemon-socket " \fIPATH\fR"
+Path to the daemon's Unix domain socket. Defaults to
+.IR <data-dir> /genesis.sock .
+.TP
+.B --tail
+Tail the daemon log and exit. Does not start the CLI or the
+cognitive mind. Useful for diagnostics.
+.TP
+.B --stop
+Stop the running session for this data dir (same staged teardown as
+.BR run.sh " \fB--stop\fR):"
+SIGINT the CLI, then SIGTERM the daemon and retina, each with its own
+grace period.
+.TP
+.B --offline
+Start in offline mode \(em skip all network access. Autonomous
+learning pauses; conversation and art continue.
+.TP
+.B --headless
+Resident mode \(em run without the interactive prompt, for the
+systemd service or other background supervision.
+.SH SLASH COMMANDS
+Commands typed during conversation. Each is a single token (except
+where an argument is shown).
+.SS State and introspection
+.TP
+.B /status
+Show Genesis's current state.
+.TP
+.B /feel
+Ask Genesis how she feels.
+.TP
+.B /introspect
+See Genesis's last cognitive process.
+.TP
+.B /learning
+What she's been learning on her own.
+.TP
+.B /thoughts
+Her recent spontaneous thoughts.
+.TP
+.B /world
+Her external world: presences, events, social isolation.
+.TP
+.B /regulate
+How she's been managing her emotions.
+.SS Memory and dreams
+.TP
+.B /dreams
+See what she dreamed.
+.TP
+.B /memories
+See her recent long-term memories.
+.SS Learning and requests
+.TP
+.B /requests
+See sites she wants to access.
+.TP
+.BR /approve " \fIURL\fR"
+Approve a site she requested.
+.TP
+.BR /deny " \fIURL\fR"
+Deny a site she requested.
+.TP
+.B /learn-code
+Study her own source code.
+.TP
+.BR /explore " [\fIpath\fR]"
+Explore local files and docs.
+.TP
+.B /code-summary
+Summary of her code self-knowledge.
+.TP
+.B /web-history \fR[\fIN\fR]
+See what she's been looking at online (last N, default 20).
+.SS Projects
+.TP
+.BR /create-project " \fIdesc\fR"
+Compose a new Python project from her knowledge.
+.TP
+.B /projects
+List projects she has created (active + archived).
+.TP
+.BR /archive-project " \fIname\fR"
+Compress a project to .tar.zst to reclaim space.
+.TP
+.BR /restore-project " \fIname\fR"
+Restore an archived project.
+.TP
+.B /manage-projects
+Autonomously archive projects to stay within bounds.
+.TP
+.BR /note-project " \fIname note\fR"
+Leave mentor feedback on a project.
+.TP
+.BR /review-notes " [\fIname\fR]"
+Have her read and absorb project notes.
+.TP
+.BR /read-notes " \fIname\fR"
+Show notes on a project without absorbing.
+.SS Self-improvement
+.TP
+.B /proposals
+See her code improvement proposals.
+.TP
+.B /clear-proposals
+Remove all pending proposals.
+.TP
+.BR /proposal " \fIN\fR"
+See details of proposal N.
+.TP
+.BR /accept " \fIN [reason]\fR"
+Approve a proposal (runs verification, applies if it passes).
+.TP
+.BR /reject " \fIN [reason]\fR"
+Reject a proposal with notes teaching the correct way.
+.TP
+.B /experiments
+See her verified self-improvement experiments.
+.TP
+.B /growth
+See her growth narrative.
+.TP
+.B /growth-report
+Markdown growth report.
+.SS Voice and vision
+.TP
+.B /voice
+Speak to Genesis (one utterance).
+.TP
+.B /voice-mode
+Continuous voice conversation.
+.TP
+.B /look
+Ask her what she sees through the retina.
+.TP
+.BR /look " at \fIpath\fR"
+Ask her to look at an image file.
+.TP
+.B /draw
+Ask her to draw what she feels right now.
+.TP
+.B /play
+Her game collection;
+.BR /play " add \fIfile\fR"
+hands her a game spec.
+.TP
+.BR /register-face " \fIname\fR"
+Teach her your face (look at the camera).
+.TP
+.B /faces
+Show known faces and who she last saw.
+.SS Direction and state control
+.TP
+.BR /mission " [\fItext\fR]"
+Set or show her top-level mission.
+.TP
+.B /sleep
+Put her to sleep (wakes on its own when rested).
+.TP
+.B /nap
+Short nap, wakes on its own when rested.
+.TP
+.B /wake
+Wake her from sleep or meditation.
+.TP
+.BR /meditate " [\fIsecs\fR]"
+Put her into meditation (default 60s).
+.TP
+.B /sleep-aid
+Emergency sleep aid for stress-induced insomnia.
+.SS Teaching, games, and ARC
+.TP
+.BR /teach " [\fItopic\fR]"
+Put her into teaching mode (focused learning).
+.TP
+.B /endteach
+Exit teaching mode, resume normal operation.
+.TP
+.BR /teach-questions
+Answer its queued questions one at a time.
+.TP
+.B /game
+Put her into game mode (focused play).
+.TP
+.B /endgame
+Exit game mode, resume normal operation.
+.TP
+.BR /arc " \fIids|--all [--steps N] [--fresh|--baseline (uniform|first)] [--delay S] [--recover S]\fR"
+Practice play or baseline evaluation on the ARC benchmark.
+\fB--delay\fR paces steps;
+\fB--recover\fR waits up to S seconds for her to settle at a
+wellness gate instead of abandoning the suite.
+.SS Stewardship
+.TP
+.B /steward
+Steward channel status: stamped, authenticated, principal,
+directives.
+.TP
+.BR /steward " release \fIN\fR"
+Lift directive N (authenticated sessions only).
+.TP
+.B /steward unbind
+Seal this session's authority until the next authenticated start.
+.SS Session
+.TP
+.B /help
+List commands.
+.TP
+.BR /quit ", " /exit ", " /q
+Exit. The mind saves cognitive state first; teardown waits rather
+than interrupting the save.
+.SH ENVIRONMENT
+.TP
+.B GENESIS_RUN
+Set by
+.BR run.sh (1)
+or the
+.BR genesis (1)
+console script; the CLI refuses to start without it.
+.TP
+.B GENESIS_COGNITIVE_PID
+Set by the CLI for the daemon's interoception (see
+.BR genesis-daemon (8)).
+.TP
+.B GENESIS_LOG_LEVEL
+Logging level (default INFO; DEBUG surfaces timing telemetry).
+.TP
+.B GENESIS_DISCORD_WEBHOOK
+Her public channel: the session mirror plus her own composed posts.
+.TP
+.B GENESIS_DISCORD_BOT_TOKEN
+Bot token that lets her read the public channel.
+.SH FILES
+.TP
+.IR $DATA_DIR/genesis_cli.pid
+PID file for the CLI; used by
+.B --stop
+to target this exact process.
+.TP
+.IR $DATA_DIR/cognitive_state.json
+Persisted cognitive state (concept network, inner life, sleep
+position) saved on shutdown and by the autosave thread.
+.TP
+.IR $DATA_DIR/cognitive_journal.jsonl
+Append-only journal of thoughts, dreams, learning, and world events.
+.TP
+.IR $DATA_DIR/workspace/
+A writable copy of her source tree for self-improvement edits
+(see
+.BR infrastructure/workspace.py
+in the source): edits land there, get verified by
+.IR scripts/verify_change.sh ,
+and are promoted back only on success.
+.TP
+.IR $DATA_DIR/experiments/admin/
+The privileged staging sandbox. The
+.B run_privileged
+tool executes a script she wrote here as root, via the root-owned
+helper
+.IR /usr/local/libexec/genesis/genesis_admin_helper.sh
+(installed with its NOPASSWD sudoers rule by
+.IR scripts/install_sudoers.sh ).
+Her acting loop reaches it through
+.B maintain
+intentions: staged
+.I *.sh
+files surface as work, are read back for review, then elevated. The
+helper denies catastrophic or self-widening shapes, rate-limits runs,
+and appends every attempt to the root-owned audit log
+.IR /var/log/genesis-admin.log
+before anything runs.
+.SH SEE ALSO
+.BR genesis (1),
+.BR genesis-daemon (8),
+.BR genesis-retina (1),
+.BR genesis-math (7),
+.BR genesis-reasoning (7)

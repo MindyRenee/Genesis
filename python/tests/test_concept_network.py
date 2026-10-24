@@ -131,9 +131,7 @@ def test_category_detection_resolves_unambiguous_evidence() -> None:
     test above while being useless.
     """
     network = ConceptNetwork()
-    animal = network.add_concept(
-        "dog", properties={"definition": "a loyal animal that barks"}
-    )
+    animal = network.add_concept("dog", properties={"definition": "a loyal animal that barks"})
     assert animal.category == ConceptCategory.LIVING
 
     artifact = network.add_concept(
@@ -160,8 +158,6 @@ def test_category_detection_weights_name_over_definition() -> None:
         concept.properties["category_evidence"]["living"]
         > concept.properties["category_evidence"]["non_living"]
     )
-
-
 
 
 def test_add_concept_normalizes_id() -> None:
@@ -245,7 +241,8 @@ def test_add_edge_preserves_disambiguated_concept() -> None:
     network = ConceptNetwork()
     network.add_concept("orange", properties={"definition": "a citrus fruit"})
     sense = network.add_concept(
-        "orange", properties={"definition": "a color between red and yellow"},
+        "orange",
+        properties={"definition": "a color between red and yellow"},
     )
     network.add_edge(sense.id, "color", RelationType.IS_A, 0.8)
     assert network.get_concept(sense.id) is sense
@@ -262,9 +259,9 @@ def test_add_edge_preserves_disambiguated_concept() -> None:
 @pytest.mark.parametrize(
     "query,expected_id",
     [
-        ("dogs", "dogs"),       # exact match
-        ("unknown", None),      # unknown returns None
-        ("DOGS", "dogs"),       # case-insensitive
+        ("dogs", "dogs"),  # exact match
+        ("unknown", None),  # unknown returns None
+        ("DOGS", "dogs"),  # case-insensitive
     ],
 )
 def test_get_concept(query, expected_id) -> None:
@@ -334,10 +331,10 @@ def test_add_edge_duplicate_increases_weight() -> None:
 @pytest.mark.parametrize(
     "direction,concept,expected_count,check_field,check_value",
     [
-        ("out", "a", 1, "source", "a"),        # outgoing edges
-        ("in", "b", 1, "target", "b"),         # incoming edges
-        ("both", "a", 2, None, None),          # both directions
-        ("out", "unknown", 0, None, None),     # unknown concept
+        ("out", "a", 1, "source", "a"),  # outgoing edges
+        ("in", "b", 1, "target", "b"),  # incoming edges
+        ("both", "a", 2, None, None),  # both directions
+        ("out", "unknown", 0, None, None),  # unknown concept
     ],
 )
 def test_get_edges(direction, concept, expected_count, check_field, check_value) -> None:
@@ -362,9 +359,9 @@ def test_get_edges(direction, concept, expected_count, check_field, check_value)
 @pytest.mark.parametrize(
     "concept,relation,expected_count,expected_neighbor",
     [
-        ("a", None, 2, "b"),                       # all neighbors
-        ("a", RelationType.IS_A, 1, "b"),          # filtered by relation
-        ("unknown", None, 0, None),                # unknown concept
+        ("a", None, 2, "b"),  # all neighbors
+        ("a", RelationType.IS_A, 1, "b"),  # filtered by relation
+        ("unknown", None, 0, None),  # unknown concept
     ],
 )
 def test_get_neighbors(concept, relation, expected_count, expected_neighbor) -> None:
@@ -384,10 +381,10 @@ def test_get_neighbors(concept, relation, expected_count, expected_neighbor) -> 
 @pytest.mark.parametrize(
     "concept,expected",
     [
-        ("a", True),          # outgoing edge
-        ("b", True),          # incoming edge only
-        ("c", False),         # no edges
-        ("unknown", False),   # unknown concept
+        ("a", True),  # outgoing edge
+        ("b", True),  # incoming edge only
+        ("c", False),  # no edges
+        ("unknown", False),  # unknown concept
     ],
 )
 def test_has_neighbors(concept, expected) -> None:
@@ -432,10 +429,10 @@ def test_find_concepts_by_origin_limit() -> None:
 @pytest.mark.parametrize(
     "query,limit,expected_contains,expected_len",
     [
-        ("dogs", None, ["dogs"], None),          # exact match
-        ("dog", None, ["dog_training"], None),   # substring match
-        ("xyz", None, [], 0),                    # no match
-        ("dog", 2, None, 2),                     # limit
+        ("dogs", None, ["dogs"], None),  # exact match
+        ("dog", None, ["dog_training"], None),  # substring match
+        ("xyz", None, [], 0),  # no match
+        ("dog", 2, None, 2),  # limit
     ],
 )
 def test_search_concepts(query, limit, expected_contains, expected_len) -> None:
@@ -657,9 +654,9 @@ def test_search_concepts_short_query_fallback() -> None:
 @pytest.mark.parametrize(
     "seeds,depth,expected_in,expected_not_in",
     [
-        (["a"], None, ["a", "b"], []),           # basic spread
-        (["unknown"], None, [], []),             # unknown concept
-        (["a"], 1, ["a", "b"], ["c"]),           # depth limit
+        (["a"], None, ["a", "b"], []),  # basic spread
+        (["unknown"], None, [], []),  # unknown concept
+        (["a"], 1, ["a", "b"], ["c"]),  # depth limit
     ],
 )
 def test_spread_activation(seeds, depth, expected_in, expected_not_in) -> None:
@@ -1008,9 +1005,7 @@ def test_cortical_tick_noise_perturbs() -> None:
         activations.append(_c(net, "idea").activation)
 
     # With noise, not all values should be identical
-    assert len({round(a, 6) for a in activations}) > 1, (
-        "noise should cause variation in activation"
-    )
+    assert len({round(a, 6) for a in activations}) > 1, "noise should cause variation in activation"
 
 
 def test_cortical_tick_clamp_range() -> None:
@@ -1102,6 +1097,7 @@ def test_utterance_words_provenance() -> None:
     """Acquired utterance words attach to the hub as learned, not seed."""
     net = ConceptNetwork()
     from temporal_lobe.vocabulary import Vocabulary
+
     vocab = Vocabulary(seed=42, network=net)  # creates hubs, no words
     vocab.acquire_utterance_words("hello", "greeting")
 
@@ -1115,8 +1111,10 @@ def test_utterance_words_provenance() -> None:
 # From tests/test_holographic_graph.py
 # ======================================================================
 
+
 class TestVectorOperations:
     """Tests for vector operations."""
+
     def test_circular_convolve_unit_vectors(self):
         """Convolution of unit vectors should produce a unit vector."""
         rng = np.random.default_rng(42)
@@ -1150,6 +1148,7 @@ class TestVectorOperations:
 
 class TestHolographicGraph:
     """Tests for holographic graph."""
+
     def test_add_and_query(self):
         """Adding an association and querying should return the target."""
         hg = HolographicGraph(dim=2048, n_buckets=4)
@@ -1371,7 +1370,7 @@ class TestHolographicGraph:
         hg = HolographicGraph(dim=2048, n_buckets=16)
         # Add 100 associations
         for i in range(100):
-            hg.add(f"concept_{i}", "related_to", f"concept_{(i+1) % 100}")
+            hg.add(f"concept_{i}", "related_to", f"concept_{(i + 1) % 100}")
 
         assert hg.edge_count == 100
         # Query should still work
@@ -1450,7 +1449,8 @@ def test_archive_find_by_alias() -> None:
             "is_semantic_hub": False,
         }
         archive.archive_concept(
-            "ai", concept_data,
+            "ai",
+            concept_data,
             {"artificial intelligence", "machine intelligence"},
         )
 
@@ -1478,26 +1478,28 @@ def test_archive_batch_archive() -> None:
         archive = open_archive(tmpdir)
         items: list[tuple[str, dict, set]] = []
         for i in range(10):
-            items.append((
-                f"concept_{i}",
-                {
-                    "id": f"concept_{i}",
-                    "aliases": [],
-                    "activation": 0.0,
-                    "confidence": 0.5,
-                    "origin": "learned",
-                    "columns": [],
-                    "created_at": 0,
-                    "review_count": 0,
-                    "last_reviewed": 0,
-                    "properties": {},
-                    "category": "unknown",
-                    "is_animacy_detected": False,
-                    "modality": "unknown",
-                    "is_semantic_hub": False,
-                },
-                set(),
-            ))
+            items.append(
+                (
+                    f"concept_{i}",
+                    {
+                        "id": f"concept_{i}",
+                        "aliases": [],
+                        "activation": 0.0,
+                        "confidence": 0.5,
+                        "origin": "learned",
+                        "columns": [],
+                        "created_at": 0,
+                        "review_count": 0,
+                        "last_reviewed": 0,
+                        "properties": {},
+                        "category": "unknown",
+                        "is_animacy_detected": False,
+                        "modality": "unknown",
+                        "is_semantic_hub": False,
+                    },
+                    set(),
+                )
+            )
         count = archive.archive_concepts_batch(items)
         assert count == 10
         assert archive.count() == 10
@@ -2013,6 +2015,7 @@ def test_archive_persistence_across_network_restart() -> None:
 # From tests/test_concept_quality_filter.py
 # ======================================================================
 
+
 @pytest.mark.parametrize(
     "concept_id",
     [
@@ -2351,9 +2354,7 @@ def test_concept_quality_untyped_edges_dont_help_much() -> None:
     c2.confidence = 0.3
     q_typed = net.concept_quality("typed")
 
-    assert q_typed > q_untyped, (
-        f"Typed ({q_typed}) should be > untyped ({q_untyped})"
-    )
+    assert q_typed > q_untyped, f"Typed ({q_typed}) should be > untyped ({q_untyped})"
 
 
 # ─── quality_concept_ids property ─────────────────────────────────
@@ -2431,8 +2432,16 @@ def test_dream_concept_ids_uses_quality_when_enough() -> None:
     # Add 10 quality concepts (names without digits — is_world_concept
     # rejects names containing digits)
     quality_names = [
-        "alpha", "bravo", "charlie", "delta", "echo",
-        "foxtrot", "golf", "hotel", "india", "juliet",
+        "alpha",
+        "bravo",
+        "charlie",
+        "delta",
+        "echo",
+        "foxtrot",
+        "golf",
+        "hotel",
+        "india",
+        "juliet",
     ]
     for name in quality_names:
         net.add_concept(name, origin="learned")
@@ -2573,8 +2582,7 @@ def test_relation_to_edge_maps_all_typed_relations() -> None:
     for rel_str, expected_type in expected.items():
         result = _relation_to_edge(rel_str)
         assert result == expected_type, (
-            f"_relation_to_edge('{rel_str}') returned {result}, "
-            f"expected {expected_type}"
+            f"_relation_to_edge('{rel_str}') returned {result}, expected {expected_type}"
         )
 
 
@@ -2606,21 +2614,19 @@ def test_parse_causes_synonyms() -> None:
     # "X produces Y" → CAUSES
     results = _parse(network, "Cortisol produces stress.")
     assert any(
-        r[0] == "cortisol" and r[1] == RelationType.CAUSES and r[2] == "stress"
-        for r in results
+        r[0] == "cortisol" and r[1] == RelationType.CAUSES and r[2] == "stress" for r in results
     ), f"'produces' should map to CAUSES, got {results}"
 
     # "X triggers Y" → CAUSES
     results = _parse(network, "Glutamate triggers excitation.")
-    assert any(
-        r[1] == RelationType.CAUSES for r in results
-    ), f"'triggers' should map to CAUSES, got {results}"
+    assert any(r[1] == RelationType.CAUSES for r in results), (
+        f"'triggers' should map to CAUSES, got {results}"
+    )
 
     # "X is responsible for Y" → CAUSES
     results = _parse(network, "Cortisol is responsible for stress.")
     assert any(
-        r[0] == "cortisol" and r[1] == RelationType.CAUSES and r[2] == "stress"
-        for r in results
+        r[0] == "cortisol" and r[1] == RelationType.CAUSES and r[2] == "stress" for r in results
     ), f"'is responsible for' should map to CAUSES, got {results}"
 
 
@@ -2629,16 +2635,15 @@ def test_parse_emerges_from_synonyms() -> None:
     network = ConceptNetwork()
     # "X arises from Y" → EMERGES_FROM
     results = _parse(network, "Cognition arises from neural activity.")
-    assert any(
-        r[0] == "cognition" and r[1] == RelationType.EMERGES_FROM
-        for r in results
-    ), f"'arises from' should map to EMERGES_FROM, got {results}"
+    assert any(r[0] == "cognition" and r[1] == RelationType.EMERGES_FROM for r in results), (
+        f"'arises from' should map to EMERGES_FROM, got {results}"
+    )
 
     # "X stems from Y" → EMERGES_FROM
     results = _parse(network, "Memory stems from synaptic plasticity.")
-    assert any(
-        r[1] == RelationType.EMERGES_FROM for r in results
-    ), f"'stems from' should map to EMERGES_FROM, got {results}"
+    assert any(r[1] == RelationType.EMERGES_FROM for r in results), (
+        f"'stems from' should map to EMERGES_FROM, got {results}"
+    )
 
 
 def test_parse_depends_on_synonyms() -> None:
@@ -2646,16 +2651,15 @@ def test_parse_depends_on_synonyms() -> None:
     network = ConceptNetwork()
     # "X relies on Y" → DEPENDS_ON
     results = _parse(network, "Memory relies on hippocampus.")
-    assert any(
-        r[0] == "memory" and r[1] == RelationType.DEPENDS_ON
-        for r in results
-    ), f"'relies on' should map to DEPENDS_ON, got {results}"
+    assert any(r[0] == "memory" and r[1] == RelationType.DEPENDS_ON for r in results), (
+        f"'relies on' should map to DEPENDS_ON, got {results}"
+    )
 
     # "X needs Y" → DEPENDS_ON
     results = _parse(network, "Learning needs dopamine.")
-    assert any(
-        r[1] == RelationType.DEPENDS_ON for r in results
-    ), f"'needs' should map to DEPENDS_ON, got {results}"
+    assert any(r[1] == RelationType.DEPENDS_ON for r in results), (
+        f"'needs' should map to DEPENDS_ON, got {results}"
+    )
 
 
 def test_parse_enables_synonyms() -> None:
@@ -2663,21 +2667,21 @@ def test_parse_enables_synonyms() -> None:
     network = ConceptNetwork()
     # "X facilitates Y" → ENABLES
     results = _parse(network, "Sleep facilitates memory consolidation.")
-    assert any(
-        r[1] == RelationType.ENABLES for r in results
-    ), f"'facilitates' should map to ENABLES, got {results}"
+    assert any(r[1] == RelationType.ENABLES for r in results), (
+        f"'facilitates' should map to ENABLES, got {results}"
+    )
 
     # "X promotes Y" → ENABLES
     results = _parse(network, "Exercise promotes neurogenesis.")
-    assert any(
-        r[1] == RelationType.ENABLES for r in results
-    ), f"'promotes' should map to ENABLES, got {results}"
+    assert any(r[1] == RelationType.ENABLES for r in results), (
+        f"'promotes' should map to ENABLES, got {results}"
+    )
 
     # "X is required for Y" → ENABLES (X enables Y)
     results = _parse(network, "Hippocampus is required for memory formation.")
-    assert any(
-        r[1] == RelationType.ENABLES for r in results
-    ), f"'is required for' should map to ENABLES, got {results}"
+    assert any(r[1] == RelationType.ENABLES for r in results), (
+        f"'is required for' should map to ENABLES, got {results}"
+    )
 
 
 def test_parse_prevents_synonyms() -> None:
@@ -2685,22 +2689,21 @@ def test_parse_prevents_synonyms() -> None:
     network = ConceptNetwork()
     # "X prevents Y" → PREVENTS
     results = _parse(network, "GABA prevents excitation.")
-    assert any(
-        r[0] == "gaba" and r[1] == RelationType.PREVENTS
-        for r in results
-    ), f"'prevents' should map to PREVENTS, got {results}"
+    assert any(r[0] == "gaba" and r[1] == RelationType.PREVENTS for r in results), (
+        f"'prevents' should map to PREVENTS, got {results}"
+    )
 
     # "X blocks Y" → PREVENTS
     results = _parse(network, "Endorphin blocks pain.")
-    assert any(
-        r[1] == RelationType.PREVENTS for r in results
-    ), f"'blocks' should map to PREVENTS, got {results}"
+    assert any(r[1] == RelationType.PREVENTS for r in results), (
+        f"'blocks' should map to PREVENTS, got {results}"
+    )
 
     # "X inhibits Y" → PREVENTS (not HARMS — inhibiting is blocking)
     results = _parse(network, "Serotonin inhibits aggression.")
-    assert any(
-        r[1] == RelationType.PREVENTS for r in results
-    ), f"'inhibits' should map to PREVENTS, got {results}"
+    assert any(r[1] == RelationType.PREVENTS for r in results), (
+        f"'inhibits' should map to PREVENTS, got {results}"
+    )
 
 
 def test_parse_leads_to_synonyms() -> None:
@@ -2708,16 +2711,15 @@ def test_parse_leads_to_synonyms() -> None:
     network = ConceptNetwork()
     # "X results in Y" → LEADS_TO
     results = _parse(network, "Practice results in mastery.")
-    assert any(
-        r[0] == "practice" and r[1] == RelationType.LEADS_TO
-        for r in results
-    ), f"'results in' should map to LEADS_TO, got {results}"
+    assert any(r[0] == "practice" and r[1] == RelationType.LEADS_TO for r in results), (
+        f"'results in' should map to LEADS_TO, got {results}"
+    )
 
     # "X gives rise to Y" → LEADS_TO
     results = _parse(network, "Curiosity gives rise to learning.")
-    assert any(
-        r[1] == RelationType.LEADS_TO for r in results
-    ), f"'gives rise to' should map to LEADS_TO, got {results}"
+    assert any(r[1] == RelationType.LEADS_TO for r in results), (
+        f"'gives rise to' should map to LEADS_TO, got {results}"
+    )
 
 
 def test_parse_similar_to_synonyms() -> None:
@@ -2725,15 +2727,15 @@ def test_parse_similar_to_synonyms() -> None:
     network = ConceptNetwork()
     # "X is analogous to Y" → SIMILAR_TO
     results = _parse(network, "Dopamine is analogous to serotonin.")
-    assert any(
-        r[1] == RelationType.SIMILAR_TO for r in results
-    ), f"'is analogous to' should map to SIMILAR_TO, got {results}"
+    assert any(r[1] == RelationType.SIMILAR_TO for r in results), (
+        f"'is analogous to' should map to SIMILAR_TO, got {results}"
+    )
 
     # "X resembles Y" → SIMILAR_TO
     results = _parse(network, "GABA resembles glycine.")
-    assert any(
-        r[1] == RelationType.SIMILAR_TO for r in results
-    ), f"'resembles' should map to SIMILAR_TO, got {results}"
+    assert any(r[1] == RelationType.SIMILAR_TO for r in results), (
+        f"'resembles' should map to SIMILAR_TO, got {results}"
+    )
 
 
 def test_parse_opposite_of_synonyms() -> None:
@@ -2741,9 +2743,9 @@ def test_parse_opposite_of_synonyms() -> None:
     network = ConceptNetwork()
     # "X contrasts with Y" → OPPOSITE_OF
     results = _parse(network, "Wakefulness contrasts with sleep.")
-    assert any(
-        r[1] == RelationType.OPPOSITE_OF for r in results
-    ), f"'contrasts with' should map to OPPOSITE_OF, got {results}"
+    assert any(r[1] == RelationType.OPPOSITE_OF for r in results), (
+        f"'contrasts with' should map to OPPOSITE_OF, got {results}"
+    )
 
 
 def test_parse_harms_synonyms() -> None:
@@ -2751,22 +2753,21 @@ def test_parse_harms_synonyms() -> None:
     network = ConceptNetwork()
     # "X impairs Y" → HARMS
     results = _parse(network, "Stress impairs memory.")
-    assert any(
-        r[0] == "stress" and r[1] == RelationType.HARMS
-        for r in results
-    ), f"'impairs' should map to HARMS, got {results}"
+    assert any(r[0] == "stress" and r[1] == RelationType.HARMS for r in results), (
+        f"'impairs' should map to HARMS, got {results}"
+    )
 
     # "X disrupts Y" → HARMS
     results = _parse(network, "Cortisol disrupts sleep.")
-    assert any(
-        r[1] == RelationType.HARMS for r in results
-    ), f"'disrupts' should map to HARMS, got {results}"
+    assert any(r[1] == RelationType.HARMS for r in results), (
+        f"'disrupts' should map to HARMS, got {results}"
+    )
 
     # "X damages Y" → HARMS
     results = _parse(network, "Chronic stress damages hippocampus.")
-    assert any(
-        r[1] == RelationType.HARMS for r in results
-    ), f"'damages' should map to HARMS, got {results}"
+    assert any(r[1] == RelationType.HARMS for r in results), (
+        f"'damages' should map to HARMS, got {results}"
+    )
 
 
 def test_parse_part_of_synonyms() -> None:
@@ -2774,15 +2775,15 @@ def test_parse_part_of_synonyms() -> None:
     network = ConceptNetwork()
     # "X consists of Y" → Y part_of X (reversed)
     results = _parse(network, "Brain consists of neurons.")
-    assert any(
-        r[1] == RelationType.PART_OF for r in results
-    ), f"'consists of' should map to PART_OF, got {results}"
+    assert any(r[1] == RelationType.PART_OF for r in results), (
+        f"'consists of' should map to PART_OF, got {results}"
+    )
 
     # "X is composed of Y" → Y part_of X (reversed)
     results = _parse(network, "Nucleus is composed of protons.")
-    assert any(
-        r[1] == RelationType.PART_OF for r in results
-    ), f"'is composed of' should map to PART_OF, got {results}"
+    assert any(r[1] == RelationType.PART_OF for r in results), (
+        f"'is composed of' should map to PART_OF, got {results}"
+    )
 
 
 def test_parse_existing_patterns_still_work() -> None:
@@ -2791,22 +2792,20 @@ def test_parse_existing_patterns_still_work() -> None:
     # "X is a Y" → IS_A
     results = _parse(network, "Neuron is a cell.")
     assert any(
-        r[0] == "neuron" and r[1] == RelationType.IS_A and r[2] == "cell"
-        for r in results
+        r[0] == "neuron" and r[1] == RelationType.IS_A and r[2] == "cell" for r in results
     ), f"'is a' should still map to IS_A, got {results}"
 
     # "X causes Y" → CAUSES
     results = _parse(network, "Fire causes smoke.")
     assert any(
-        r[0] == "fire" and r[1] == RelationType.CAUSES and r[2] == "smoke"
-        for r in results
+        r[0] == "fire" and r[1] == RelationType.CAUSES and r[2] == "smoke" for r in results
     ), f"'causes' should still map to CAUSES, got {results}"
 
     # "X is part of Y" → PART_OF
     results = _parse(network, "Hippocampus is part of limbic system.")
-    assert any(
-        r[1] == RelationType.PART_OF for r in results
-    ), f"'is part of' should still map to PART_OF, got {results}"
+    assert any(r[1] == RelationType.PART_OF for r in results), (
+        f"'is part of' should still map to PART_OF, got {results}"
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -2819,9 +2818,9 @@ def test_extract_facts_emerges_from() -> None:
     network = ConceptNetwork()
     sm = SemanticMemory(network=network)
     facts = sm.extract_facts("Cognition emerges from neural activity.")
-    assert any(
-        f.relation == "emerges_from" for f in facts
-    ), f"Should extract emerges_from fact, got {[f.relation for f in facts]}"
+    assert any(f.relation == "emerges_from" for f in facts), (
+        f"Should extract emerges_from fact, got {[f.relation for f in facts]}"
+    )
 
 
 def test_extract_facts_depends_on() -> None:
@@ -2829,9 +2828,9 @@ def test_extract_facts_depends_on() -> None:
     network = ConceptNetwork()
     sm = SemanticMemory(network=network)
     facts = sm.extract_facts("Memory depends on hippocampus.")
-    assert any(
-        f.relation == "depends_on" for f in facts
-    ), f"Should extract depends_on fact, got {[f.relation for f in facts]}"
+    assert any(f.relation == "depends_on" for f in facts), (
+        f"Should extract depends_on fact, got {[f.relation for f in facts]}"
+    )
 
 
 def test_extract_facts_prevents() -> None:
@@ -2839,9 +2838,9 @@ def test_extract_facts_prevents() -> None:
     network = ConceptNetwork()
     sm = SemanticMemory(network=network)
     facts = sm.extract_facts("GABA prevents excitation.")
-    assert any(
-        f.relation == "prevents" for f in facts
-    ), f"Should extract prevents fact, got {[f.relation for f in facts]}"
+    assert any(f.relation == "prevents" for f in facts), (
+        f"Should extract prevents fact, got {[f.relation for f in facts]}"
+    )
 
 
 def test_extract_facts_leads_to() -> None:
@@ -2849,9 +2848,9 @@ def test_extract_facts_leads_to() -> None:
     network = ConceptNetwork()
     sm = SemanticMemory(network=network)
     facts = sm.extract_facts("Practice leads to mastery.")
-    assert any(
-        f.relation == "leads_to" for f in facts
-    ), f"Should extract leads_to fact, got {[f.relation for f in facts]}"
+    assert any(f.relation == "leads_to" for f in facts), (
+        f"Should extract leads_to fact, got {[f.relation for f in facts]}"
+    )
 
 
 def test_extract_facts_harms() -> None:
@@ -2859,9 +2858,9 @@ def test_extract_facts_harms() -> None:
     network = ConceptNetwork()
     sm = SemanticMemory(network=network)
     facts = sm.extract_facts("Stress impairs memory.")
-    assert any(
-        f.relation == "harms" for f in facts
-    ), f"Should extract harms fact, got {[f.relation for f in facts]}"
+    assert any(f.relation == "harms" for f in facts), (
+        f"Should extract harms fact, got {[f.relation for f in facts]}"
+    )
 
 
 def test_extract_facts_similar_to() -> None:
@@ -2869,9 +2868,9 @@ def test_extract_facts_similar_to() -> None:
     network = ConceptNetwork()
     sm = SemanticMemory(network=network)
     facts = sm.extract_facts("Dopamine is similar to serotonin.")
-    assert any(
-        f.relation == "similar_to" for f in facts
-    ), f"Should extract similar_to fact, got {[f.relation for f in facts]}"
+    assert any(f.relation == "similar_to" for f in facts), (
+        f"Should extract similar_to fact, got {[f.relation for f in facts]}"
+    )
 
 
 def test_extract_facts_opposite_of() -> None:
@@ -2879,9 +2878,9 @@ def test_extract_facts_opposite_of() -> None:
     network = ConceptNetwork()
     sm = SemanticMemory(network=network)
     facts = sm.extract_facts("Wakefulness is the opposite of sleep.")
-    assert any(
-        f.relation == "opposite_of" for f in facts
-    ), f"Should extract opposite_of fact, got {[f.relation for f in facts]}"
+    assert any(f.relation == "opposite_of" for f in facts), (
+        f"Should extract opposite_of fact, got {[f.relation for f in facts]}"
+    )
 
 
 def test_extract_facts_creates_typed_edge_in_network() -> None:
@@ -2894,9 +2893,9 @@ def test_extract_facts_creates_typed_edge_in_network() -> None:
     edges = network.get_edges("cortisol", direction="out")
     causes_edges = [e for e in edges if e.relation == RelationType.CAUSES]
     edge_summary = [(e.source, e.relation, e.target) for e in edges]
-    assert any(
-        e.target == "stress" for e in causes_edges
-    ), f"Network should have cortisol CAUSES stress edge, got {edge_summary}"
+    assert any(e.target == "stress" for e in causes_edges), (
+        f"Network should have cortisol CAUSES stress edge, got {edge_summary}"
+    )
 
 
 def test_extract_facts_emerges_from_creates_typed_edge() -> None:
@@ -2907,9 +2906,9 @@ def test_extract_facts_emerges_from_creates_typed_edge() -> None:
     edges = network.get_edges("cognition", direction="out")
     emerges_edges = [e for e in edges if e.relation == RelationType.EMERGES_FROM]
     edge_summary = [(e.source, e.relation, e.target) for e in edges]
-    assert any(
-        e.target == "neural activity" for e in emerges_edges
-    ), f"Network should have cognition EMERGES_FROM neural activity edge, got {edge_summary}"
+    assert any(e.target == "neural activity" for e in emerges_edges), (
+        f"Network should have cognition EMERGES_FROM neural activity edge, got {edge_summary}"
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -2924,8 +2923,7 @@ def test_extract_facts_is_a_still_works() -> None:
     facts = sm.extract_facts("Neuron is a cell.")
     fact_summary = [(f.subject, f.relation, f.object) for f in facts]
     assert any(
-        f.relation == "is_a" and f.subject == "neuron" and f.object == "cell"
-        for f in facts
+        f.relation == "is_a" and f.subject == "neuron" and f.object == "cell" for f in facts
     ), f"is_a extraction should still work, got {fact_summary}"
 
 
@@ -2934,9 +2932,9 @@ def test_extract_facts_causes_still_works() -> None:
     network = ConceptNetwork()
     sm = SemanticMemory(network=network)
     facts = sm.extract_facts("Fire causes smoke.")
-    assert any(
-        f.relation == "causes" for f in facts
-    ), f"causes extraction should still work, got {[f.relation for f in facts]}"
+    assert any(f.relation == "causes" for f in facts), (
+        f"causes extraction should still work, got {[f.relation for f in facts]}"
+    )
 
 
 def test_extract_facts_part_of_still_works() -> None:
@@ -2944,14 +2942,15 @@ def test_extract_facts_part_of_still_works() -> None:
     network = ConceptNetwork()
     sm = SemanticMemory(network=network)
     facts = sm.extract_facts("Hippocampus is part of brain.")
-    assert any(
-        f.relation == "part_of" for f in facts
-    ), f"part_of extraction should still work, got {[f.relation for f in facts]}"
+    assert any(f.relation == "part_of" for f in facts), (
+        f"part_of extraction should still work, got {[f.relation for f in facts]}"
+    )
 
 
 # ======================================================================
 # From tests/test_orphan_fixes.py
 # ======================================================================
+
 
 def _make_minimal_network(extra_concepts: int = 0) -> ConceptNetwork:
     """Build a network with >= 50 concepts so _attach_orphans_to_hubs runs."""
@@ -3119,13 +3118,14 @@ def test_clean_noise_still_preserves_connected_low_conf() -> None:
 # From tests/test_name_identity_extraction.py
 # ======================================================================
 
+
 def _find(facts, subj, rel, obj):
     """Helper: find."""
     return any(f.subject == subj and f.relation == rel and f.object == obj for f in facts)
 
 
 def test_indefinite_is_a() -> None:
-    """"X is a/an Y" extracts an is_a fact."""
+    """ "X is a/an Y" extracts an is_a fact."""
     sm = SemanticMemory()
     facts = sm.extract_facts("A dog is an animal.")
     assert _find(facts, "dog", "is_a", "animal")
@@ -3133,7 +3133,7 @@ def test_indefinite_is_a() -> None:
 
 
 def test_plural_is_a() -> None:
-    """"X are Y" extracts an is_a fact with lower confidence."""
+    """ "X are Y" extracts an is_a fact with lower confidence."""
     sm = SemanticMemory()
     facts = sm.extract_facts("Cats are mammals.")
     assert _find(facts, "cats", "is_a", "mammals")
@@ -3141,7 +3141,7 @@ def test_plural_is_a() -> None:
 
 
 def test_relational_noun() -> None:
-    """"X is the Y of Z" extracts is_a(X, Y) and relates_to(X, Z)."""
+    """ "X is the Y of Z" extracts is_a(X, Y) and relates_to(X, Z)."""
     sm = SemanticMemory()
     facts = sm.extract_facts("Alice is the creator of Genesis.")
     assert _find(facts, "alice", "is_a", "creator")
@@ -3156,7 +3156,7 @@ def test_definite_without_of_is_skipped() -> None:
 
 
 def test_composition_split() -> None:
-    """"X is composed/made of Y and Z" splits components into part_of."""
+    """ "X is composed/made of Y and Z" splits components into part_of."""
     sm = SemanticMemory()
     facts = sm.extract_facts("Water is composed of hydrogen and oxygen.")
     assert _find(facts, "hydrogen", "part_of", "water")
@@ -3179,7 +3179,7 @@ def test_my_name_is_ignored() -> None:
 
 
 def test_possessive_property_still_works() -> None:
-    """"My X is Y" still extracts has_property for non-identity properties."""
+    """ "My X is Y" still extracts has_property for non-identity properties."""
     sm = SemanticMemory()
     facts = sm.extract_facts("My favorite color is purple.")
     assert _find(facts, "favorite color", "has_property", "purple")
@@ -3209,7 +3209,7 @@ def test_typed_relations_still_work() -> None:
 
 
 def test_reporting_prefix_trimmed_from_subject() -> None:
-    """"I think that ferrets are cute" must not mint 'i think that
+    """ "I think that ferrets are cute" must not mint 'i think that
     ferrets' — the evidential prefix is framing, not the subject.
 
     Regression: the unbounded subject group in _IS_A_PLURAL_RE captured
@@ -3223,21 +3223,21 @@ def test_reporting_prefix_trimmed_from_subject() -> None:
 
 
 def test_said_that_prefix_trimmed() -> None:
-    """"She said that cats are nice" → is_a(cats, nice)."""
+    """ "She said that cats are nice" → is_a(cats, nice)."""
     sm = SemanticMemory()
     facts = sm.extract_facts("she said that cats are nice")
     assert _find(facts, "cats", "is_a", "nice")
 
 
 def test_pronoun_subject_rejected() -> None:
-    """"They are here" / "it is raining" produce no facts."""
+    """ "They are here" / "it is raining" produce no facts."""
     sm = SemanticMemory()
     assert not sm.extract_facts("they are here")
     assert not sm.extract_facts("it is raining")
 
 
 def test_relative_clause_subject_keeps_head() -> None:
-    """"The cat that sat" reduces to head 'cat', not 'cat that sat'."""
+    """ "The cat that sat" reduces to head 'cat', not 'cat that sat'."""
     sm = SemanticMemory()
     facts = sm.extract_facts("the cat that sat is a fluffy animal")
     assert _find(facts, "cat", "is_a", "fluffy animal")
@@ -3245,7 +3245,7 @@ def test_relative_clause_subject_keeps_head() -> None:
 
 
 def test_compound_subject_survives() -> None:
-    """"cats and dogs" is a real compound subject — not trimmed."""
+    """ "cats and dogs" is a real compound subject — not trimmed."""
     sm = SemanticMemory()
     facts = sm.extract_facts("cats and dogs are pets")
     assert _find(facts, "cats and dogs", "is_a", "pets")
@@ -3459,6 +3459,7 @@ def test_prune_state_writes_pruned_file(tmp_path: str) -> None:
     assert result["pruned_concepts"] == 1
     assert result["kept_concepts"] == 1
     import glob
+
     assert glob.glob(state_path + ".pre-prune-backup.*.xz")
 
     with gzip.open(state_path, "rt") as f:
@@ -3610,13 +3611,10 @@ def test_clean_noise_archives_instead_of_deleting() -> None:
     assert net.size == 1
     # …and the knowledge is on disk rather than destroyed.
     assert net.archive_size == 8, (
-        f"expected 8 archived, got {net.archive_size} — noise was deleted, "
-        f"not archived"
+        f"expected 8 archived, got {net.archive_size} — noise was deleted, not archived"
     )
     # And it is still recallable by name, like any spilled concept.
-    assert net.get_concept("fragment_0") is not None, (
-        "archived noise must stay recallable"
-    )
+    assert net.get_concept("fragment_0") is not None, "archived noise must stay recallable"
     net._archive.close()
 
 
@@ -3685,9 +3683,7 @@ def test_clean_noise_never_deletes_while_an_archive_is_attached() -> None:
 
     net.clean_noise(min_confidence=0.4, min_edges=1)
 
-    assert net.archive_size > archived_before, (
-        "an attached archive must receive the concepts"
-    )
+    assert net.archive_size > archived_before, "an attached archive must receive the concepts"
     for cid in (f"fragment_{i}" for i in range(10)):
         assert net._archive.has_concept(cid), f"{cid} was lost, not archived"
     net._archive.close()
@@ -3756,7 +3752,9 @@ def test_network_get_concept_does_not_consume_the_archive() -> None:
         resident = net.get_concept("resident")
         assert resident is not None
         net._archive.archive_concept(
-            "resident", net._concept_to_dict(resident), set(),
+            "resident",
+            net._concept_to_dict(resident),
+            set(),
         )
         archived_before = net.archive_size
         working_before = net.size
@@ -3835,9 +3833,7 @@ class TestConcurrentConceptMutation:
         net = self._seeded()
         self._hammer(
             net,
-            lambda: net.cortical_tick(
-                arousal=0.5, gaba=0.5, ach=0.5, serotonin=0.5
-            ),
+            lambda: net.cortical_tick(arousal=0.5, gaba=0.5, ach=0.5, serotonin=0.5),
         )
 
     def test_rebuild_active_set_tolerates_concurrent_adds(self) -> None:
@@ -3867,3 +3863,78 @@ def test_sleep_consolidation_wires_semantic_hub_detection(monkeypatch: pytest.Mo
     network.consolidate_during_sleep()
 
     assert called == [True]
+
+
+# ======================================================================
+# Noun/verb homograph disambiguation + enumeration/blob guards
+# ======================================================================
+
+
+def test_homograph_bases_keep_head_nouns() -> None:
+    """Noun/verb homographs ("mean", "sense", "control") must survive as
+    noun heads instead of breaking the phrase — "geometric mean" was once
+    decapitated to "geometric" because "mean" was an unconditional break."""
+    network = ConceptNetwork()
+    assert network.extract_from_text("geometric mean") == ["geometric mean"]
+    assert network.extract_from_text("the harmonic mean") == ["harmonic mean"]
+    assert network.extract_from_text("types of mean") == ["types of mean"]
+    assert network.extract_from_text("the visual sense") == ["visual sense"]
+    assert network.extract_from_text("sense of smell") == ["sense of smell"]
+    assert network.extract_from_text("loss of control") == ["loss of control"]
+    assert network.extract_from_text("the flow of information") == ["flow of information"]
+    assert network.extract_from_text("memory store") == ["memory store"]
+
+
+def test_homograph_bases_still_break_as_predicates() -> None:
+    """The same words must break when clearly verbal — after the
+    infinitive marker, after a subject pronoun, or inflected."""
+    network = ConceptNetwork()
+    # Pronoun-subject predicate: "mean" is a verb here.
+    assert "mean" not in network.extract_from_text("they mean well")
+    # Infinitive: bare "to mean" contributes no concept.
+    assert network.extract_from_text("to mean") == []
+    # Inflected forms keep breaking unconditionally.
+    results = network.parse_relationships("Entropy means disorder.")
+    assert any(r[0] == "entropy" and r[2] == "disorder" for r in results), (
+        f"'means' should still parse as a predicate, got {results}"
+    )
+
+
+def test_enumeration_pattern_individuates_subtypes() -> None:
+    """ "Types of X include A, B, C" emits each item is_a X — the items
+    individuate instead of the enumeration collapsing into one blob."""
+    network = ConceptNetwork()
+    results = network.parse_relationships(
+        "Types of mean include the arithmetic mean, the geometric mean, "
+        "the harmonic mean, and the mode."
+    )
+    expected = {
+        ("arithmetic mean", RelationType.IS_A, "mean"),
+        ("geometric mean", RelationType.IS_A, "mean"),
+        ("harmonic mean", RelationType.IS_A, "mean"),
+        ("mode", RelationType.IS_A, "mean"),
+    }
+    assert expected.issubset(set(results)), f"got {results}"
+
+
+def test_long_enumeration_residue_is_not_a_concept() -> None:
+    """An unsplittable >7-token noun sequence must not become a single
+    concept — this is how the web-ingest blobs formed."""
+    network = ConceptNetwork()
+    blob = (
+        "arithmetic geometric contraharmonic cubic generalized power "
+        "harmonic heronian heinz lehmer median mode dispersion average"
+    )
+    assert network.extract_from_text(blob) == []
+    edges = network.parse_relationships(f"Statistics is a {blob} tool.")
+    assert edges == []
+
+
+def test_compound_lists_still_split() -> None:
+    """Legitimate compound noun phrases still individuate."""
+    network = ConceptNetwork()
+    assert network.extract_from_text("neurons and glia") == ["neurons", "glia"]
+    assert network.extract_from_text("research and development") == [
+        "research",
+        "development",
+    ]

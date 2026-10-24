@@ -31,8 +31,10 @@ def _cmd_capture(args: argparse.Namespace) -> int:
         snap = capture_snapshot(client, settle_ticks=args.settle, settle_dt=args.dt)
     snap.save(args.out)
     print(f"captured baseline -> {args.out}")
-    print(f"  phase={snap.phase_name} arousal={snap.arousal:.3f} "
-          f"valence={snap.valence:.3f} plasticity={snap.plasticity_gate:.3f}")
+    print(
+        f"  phase={snap.phase_name} arousal={snap.arousal:.3f} "
+        f"valence={snap.valence:.3f} plasticity={snap.plasticity_gate:.3f}"
+    )
     print(f"  coupling_drift={snap.coupling_drift:.4f}")
     return 0
 
@@ -99,8 +101,7 @@ def _cmd_assay(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
-        description="Genesis baseline / drift / chemical-assay harness "
-        "(isolated daemon only)."
+        description="Genesis baseline / drift / chemical-assay harness (isolated daemon only)."
     )
     sub = parser.add_subparsers(dest="command", required=True)
 

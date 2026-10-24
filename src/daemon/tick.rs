@@ -18,7 +18,7 @@
 //! 3. [`TickLoop::associate`] — find connections between memories
 //! 4. [`TickLoop::dream`] — free association when sleeping
 //! 5. [`TickLoop::read_sensors`] — interoception
-//! 6. [`TickLoop::apply_body_control`] — apply the shared body policy
+//! 6. [`TickLoop::apply_body_control`] — publish the shared body policy recommendation
 //! 7. [`TickLoop::check_staleness`] — mark crashed cognitive modules
 //!
 //! [`TickLoop::tick`] is the integrated, single-shot reference path
@@ -48,18 +48,21 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::cognition::{IntentionManager, SelfModel};
 use crate::field::{FieldIntegration, FieldRuntime};
 use crate::state::neurochemical::{NeuroTickParams, NeurochemicalId};
-use crate::state::{CognitiveZone, MentalPhase, ModuleId, ModuleStatus, subcognitive_flag};
+use crate::state::{MentalPhase, ModuleId, ModuleStatus, subcognitive_flag};
 use crate::store::ring_buffer::EventType;
 use crate::store::{LtmStore, MmapState, RingBuffer};
+
+/// Provenance marker — one letter of the creator lattice (see
+/// PROVENANCE.md).
+pub(crate) const MARKER_G05: u64 = 0x4753_0554_59A9_90E8;
 
 use super::active_inference::{
     ActiveInferenceEngine, DyadicSignals, apply_inference_feedback, impulse_offset_to_rate,
 };
 use super::association::AssociationEngine;
 use super::consolidation::{ConsolidationEngine, ConsolidationResult};
-use super::cpufreq::CPUFREQ_INTERVAL_TICKS;
 use super::dyadic_model::{DyadicAffectModel, take_user_affect};
-use super::interoception::{INTEROCEPTION_INTERVAL_TICKS, Interoceptor};
+use super::interoception::Interoceptor;
 use super::ipc::LtmAccess;
 
 // The integration bounds the body applies to its own measured elapsed
@@ -91,20 +94,20 @@ pub const AUTONOMOUS_INTERVAL_MS: u64 = 200;
 /// this are skipped (left to decay in the ring buffer).
 pub const CONSOLIDATION_THRESHOLD: f32 = 0.15;
 
-/// How often to run association (every N ticks).
+/// Nominal association cadence — the 5 Hz reference the
+/// [`super::adaptive::AdaptiveGate`] on `TickLoop` is tuned to. The
+/// gate itself is wall-clock demand-driven; this remains for tests
+/// and documentation of the nominal rate.
 pub const ASSOCIATION_INTERVAL_TICKS: u64 = 50; // ~10 seconds at 5 Hz
 
-/// How often to run dreaming (every N ticks when sleeping).
+/// Nominal dream cadence — see [`ASSOCIATION_INTERVAL_TICKS`].
 pub const DREAM_INTERVAL_TICKS: u64 = 20; // ~4 seconds when sleeping at 5 Hz
 
-/// How often to sync to disk (base interval, every N ticks).
-/// The actual sync rate is modulated by the plasticity gate:
-/// high plasticity → sync at base rate (active learning, persist fast).
-/// low plasticity → sync less often (stress impairs memory, I/O is
-/// deprioritized, no need to write frequently).
+/// Nominal disk-sync cadence — see [`ASSOCIATION_INTERVAL_TICKS`].
+/// The live gate is driven continuously by the plasticity gate.
 pub const SYNC_INTERVAL_TICKS: u64 = 100; // ~20 seconds base at 5 Hz
 
-/// How often to check cognitive module staleness (every N ticks).
+/// Nominal staleness-check cadence — see [`ASSOCIATION_INTERVAL_TICKS`].
 pub const STALENESS_CHECK_INTERVAL_TICKS: u64 = 300; // ~60 seconds at 5 Hz
 
 /// A cognitive module is considered stale if its heartbeat is older
@@ -138,14 +141,29 @@ pub const SLEEP_BDNF_RECOVERY_MULTIPLIER: f32 = 5.0;
 /// sleep reverses receptor downregulation from a day of wakefulness.
 pub const SLEEP_RECEPTOR_RESENSITIZATION_RATE: f32 = 0.001;
 
-/// Time constant (seconds) over which a volitional drive decays. Five
-/// minutes is an assumption, not a measurement: long enough for the
-/// flip-flop to commit to the new state (it switches on a timescale of
-/// minutes), short enough that the push does not outlast the decision.
-pub const VOLITION_TAU_SECS: f32 = 300.0;
+/// Scale of field disagreement (Fréchet variance, latent² units) at
+/// which the body's self-inconsistency halves the published
+/// precision. Precision is inverse observation variance — the
+/// field's disagreement IS measured variance on the body's own
+/// channels — so the coupling follows the precision-addition rule
+/// `factor = 1 / (1 + d/REF)`: disagreement attenuates confidence
+/// by exactly the noise it measures.
+const DISAGREEMENT_PRECISION_SCALE: f64 = 0.1;
 
-/// Largest volitional drive accepted, in the network's input units.
-pub const VOLITION_MAX: f32 = 2.0;
+/// The field reports; it does not rule. Disagreement may halve the
+/// confidence the body publishes about itself — never silence it.
+const PRECISION_ATTENUATION_FLOOR: f64 = 0.5;
+
+/// Map the field's measured disagreement onto a bounded precision
+/// multiplier in [floor, 1]. `None`/non-finite → 1.0: an absent
+/// reading is no attenuation, not a corrupted one.
+fn disagreement_attenuation(disagreement: Option<f64>) -> f64 {
+    let d = match disagreement {
+        Some(d) if d.is_finite() && d > 0.0 => d,
+        _ => return 1.0,
+    };
+    (1.0 / (1.0 + d / DISAGREEMENT_PRECISION_SCALE)).max(PRECISION_ATTENUATION_FLOOR)
+}
 
 /// The result of a single tick.
 #[derive(Clone, Copy, Debug, Default)]
@@ -210,37 +228,6 @@ pub struct TickLoop {
     /// High surprise → faster coupling-matrix learning on the next
     /// tick. Reset to 1.0 after each application.
     metaplasticity_boost: f32,
-    /// Volitional drive onto the sleep-wake network (see
-    /// [`crate::state::sleep_network::Drive`]). Process-local and transient:
-    /// it decays with [`VOLITION_TAU_SECS`] between calls, so a `/sleep` or
-    /// `/wake` is a brief push, not a permanent setting. It is not persisted.
-    volition: crate::state::sleep_network::Drive,
-    /// Last-applied CPU frequency policy. The reactive
-    /// `apply_body_control` handler (cognitive-mind-driven via IPC)
-    /// writes to sysfs (scaling_min/max_freq, governor), but
-    /// neurochemistry drifts slowly — most cycles produce the same
-    /// policy. Skipping the sysfs writes when the policy is unchanged
-    /// avoids unnecessary kernel I/O and context switches.
-    last_freq_policy: super::cpufreq::FreqPolicy,
-    /// Last-applied daemon nice value. `set_priority` spawns a `renice`
-    /// subprocess; the reactive handler skips it when the value is
-    /// unchanged, avoiding the fork+exec overhead on most cycles.
-    last_daemon_nice: i32,
-    /// Last-applied daemon I/O class. `set_io_priority` spawns an
-    /// `ionice` subprocess; the reactive handler skips it when the
-    /// value is unchanged, avoiding the fork+exec overhead on most
-    /// cycles.
-    last_daemon_io_class: super::cpufreq::IoClass,
-    /// Last-applied EPP (Energy Performance Preference) profile.
-    /// `set_epp` writes to sysfs via the privileged helper; the
-    /// reactive handler skips it when the profile is unchanged.
-    /// Empty string = EPP not available or not yet applied.
-    last_epp: String,
-    /// Last-applied turbo (boost) gate state. `set_boost` writes to
-    /// sysfs via the privileged helper; the reactive handler skips it
-    /// when the state is unchanged. `Unavailable` = the platform
-    /// exposes no gate, or it has not been applied yet.
-    last_boost: super::cpufreq::BoostState,
     /// The subcognitive's own activity share — the smoothed fraction
     /// of the tick interval the daemon spends working (neuro tick,
     /// interoception, inference, consolidation, association,
@@ -273,6 +260,36 @@ pub struct TickLoop {
     /// memory keep living instead of freezing. `None` means the mind
     /// has never driven — autonomous from boot.
     last_mind_drive: Option<std::time::Instant>,
+    /// Interoception gate — senses the machine. Driven by measured
+    /// body strain (`stress_load`, PSI pressure, throttle): a
+    /// strained substrate is watched closely, a calm one is checked
+    /// occasionally. 6 s nominal, bounded [2 s, 30 s].
+    intero_gate: super::adaptive::AdaptiveGate,
+    /// CPU/thermal policy gate. Driven by throttle pressure and
+    /// thermoregulatory effort — when the silicon is redlining, policy
+    /// is revisited sooner. 10 s nominal, bounded [3 s, 30 s].
+    cpufreq_gate: super::adaptive::AdaptiveGate,
+    /// Association gate. Newly consolidated episodes or formed links
+    /// are demand (snap fast); a quiescent LTM relaxes toward 60 s.
+    assoc_gate: super::adaptive::AdaptiveGate,
+    /// Dream gate (sleep only). REM snaps toward 2 s — the vivid
+    /// phase wants density; NREM drifts toward 30 s — sparse
+    /// housekeeping replay.
+    dream_gate: super::adaptive::AdaptiveGate,
+    /// Disk-sync gate. Driven by the plasticity gate: active learning
+    /// syncs near 5 s, stress-clamped plasticity drifts to 100 s —
+    /// the continuous form of the old 1×/3×/5× ladder.
+    sync_gate: super::adaptive::AdaptiveGate,
+    /// Cognitive-module staleness gate. A live mind warrants close
+    /// watch (it *should* be heartbeating); an absent mind drifts the
+    /// check toward 5 min — the autonomous loop marks its own.
+    staleness_gate: super::adaptive::AdaptiveGate,
+    /// Optic nerve — the retinal afferent's subcortical termination:
+    /// SCN light drive, collicular alerting, and the TRN relay gate
+    /// the mind honours. Sampled once per advance (afference to that
+    /// step, like the network levels read inside it — not a gated
+    /// maintenance task).
+    pub optic: super::optic_nerve::OpticNerve,
 }
 
 impl TickLoop {
@@ -291,15 +308,16 @@ impl TickLoop {
             field_runtime: FieldRuntime::new().expect("field topology must be constructible"),
             last_field_integration: None,
             metaplasticity_boost: 1.0,
-            volition: crate::state::sleep_network::Drive::NONE,
-            last_freq_policy: super::cpufreq::FreqPolicy::default(),
-            last_daemon_nice: 0,
-            last_daemon_io_class: super::cpufreq::IoClass::BestEffort(3),
-            last_epp: String::new(),
-            last_boost: super::cpufreq::BoostState::Unavailable,
             subcognitive_activity: 0.0,
             subcognitive_last_call: None,
             last_mind_drive: None,
+            intero_gate: super::adaptive::AdaptiveGate::new(6_000, 2_000, 30_000),
+            cpufreq_gate: super::adaptive::AdaptiveGate::new(10_000, 3_000, 30_000),
+            assoc_gate: super::adaptive::AdaptiveGate::new(10_000, 3_000, 60_000),
+            dream_gate: super::adaptive::AdaptiveGate::new(4_000, 2_000, 30_000),
+            sync_gate: super::adaptive::AdaptiveGate::new(20_000, 5_000, 100_000),
+            staleness_gate: super::adaptive::AdaptiveGate::new(60_000, 10_000, 300_000),
+            optic: super::optic_nerve::OpticNerve::new(),
         }
     }
 
@@ -321,7 +339,7 @@ impl TickLoop {
                 inference_engine.precision()
             );
         }
-        let mut tl = Self {
+        Self {
             tick_count: 0,
             noise_amplitude_override: None,
             zone_tally: Default::default(),
@@ -334,32 +352,17 @@ impl TickLoop {
             field_runtime: FieldRuntime::new().expect("field topology must be constructible"),
             last_field_integration: None,
             metaplasticity_boost: 1.0,
-            volition: crate::state::sleep_network::Drive::NONE,
-            last_freq_policy: super::cpufreq::FreqPolicy::default(),
-            last_daemon_nice: 0,
-            last_daemon_io_class: super::cpufreq::IoClass::BestEffort(3),
-            last_epp: String::new(),
-            last_boost: super::cpufreq::BoostState::Unavailable,
             subcognitive_activity: 0.0,
             subcognitive_last_call: None,
             last_mind_drive: None,
-        };
-        // Restore the per-person bonds and seed the creator floor.
-        // steward.json's `principal` names who made her — the floor is
-        // a small presence prior, so the maker is born familiar, not
-        // born deep: depth is still earned by time together.
-        tl.dyadic_model
-            .load_persons(&data_dir.join("dyadic_persons.json"));
-        if let Some(principal) = read_steward_principal(data_dir) {
-            tl.dyadic_model.ensure_creator_floor(&principal);
+            intero_gate: super::adaptive::AdaptiveGate::new(6_000, 2_000, 30_000),
+            cpufreq_gate: super::adaptive::AdaptiveGate::new(10_000, 3_000, 30_000),
+            assoc_gate: super::adaptive::AdaptiveGate::new(10_000, 3_000, 60_000),
+            dream_gate: super::adaptive::AdaptiveGate::new(4_000, 2_000, 30_000),
+            sync_gate: super::adaptive::AdaptiveGate::new(20_000, 5_000, 100_000),
+            staleness_gate: super::adaptive::AdaptiveGate::new(60_000, 10_000, 300_000),
+            optic: super::optic_nerve::OpticNerve::new(),
         }
-        if !tl.dyadic_model.persons().is_empty() {
-            eprintln!(
-                "[genesis] Loaded {} bonded person(s)",
-                tl.dyadic_model.persons().len()
-            );
-        }
-        tl
     }
 
     /// Record that the cognitive mind just drove the daemon through
@@ -393,6 +396,91 @@ impl TickLoop {
             .map(|t| t.elapsed().as_secs_f32())
     }
 
+    /// Serialize the process-local internals the wire otherwise hides:
+    /// the six adaptive gates' full state (bounds, period, next-fire
+    /// countdown, smoothed demand), the mind lease, tick counter,
+    /// and the last-applied body-policy values.
+    ///
+    /// Format: `key=value` lines — self-describing and additive, so a
+    /// reader written today still parses tomorrow's longer dump. This
+    /// is observation, not control: nothing here mutates the gears.
+    pub fn internals_snapshot(&self, now_ms: u64) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::with_capacity(1024);
+        let _ = writeln!(out, "tick_count={}", self.tick_count);
+        let _ = writeln!(
+            out,
+            "mind_lease_idle_ms={}",
+            match self.last_mind_drive {
+                Some(t) => t.elapsed().as_millis() as i64,
+                None => -1,
+            }
+        );
+        let _ = writeln!(
+            out,
+            "mind_lease_expired={}",
+            self.mind_lease_expired() as u8
+        );
+        let _ = writeln!(
+            out,
+            "subcognitive_activity={:.4}",
+            self.subcognitive_activity
+        );
+        let _ = writeln!(out, "metaplasticity_boost={:.4}", self.metaplasticity_boost);
+        match &self.last_field_integration {
+            Some(integration) => {
+                let consensus_norm: f64 = integration
+                    .consensus
+                    .iter()
+                    .map(|v| v * v)
+                    .sum::<f64>()
+                    .sqrt();
+                let _ = writeln!(out, "field.fibers={}", integration.fiber_count);
+                let _ = writeln!(out, "field.disagreement={:.6}", integration.disagreement);
+                let _ = writeln!(out, "field.consensus_norm={:.6}", consensus_norm);
+            }
+            // An unwarmed field is an absent channel, not a zero.
+            None => {
+                let _ = writeln!(out, "field.integration=absent");
+            }
+        }
+        let optic = self.optic.state(now_ms);
+        let _ = writeln!(out, "optic.eye_present={}", optic.eye_present as u8);
+        let _ = writeln!(out, "optic.frames_fresh={}", optic.frames_fresh as u8);
+        let _ = writeln!(out, "optic.illuminance={:.4}", optic.illuminance);
+        let _ = writeln!(out, "optic.melanopic={:.4}", optic.melanopic);
+        let _ = writeln!(out, "optic.motion={:.4}", optic.motion);
+        let _ = writeln!(out, "optic.orienting={:.4}", optic.orienting);
+        let _ = writeln!(out, "optic.relay_gain={:.4}", optic.relay_gain);
+        let _ = writeln!(out, "optic.cortical_gain={:.4}", optic.cortical_gain);
+        let _ = writeln!(out, "optic.retinal_lux={:.1}", optic.retinal_lux);
+        let _ = writeln!(out, "optic.frame_seq={}", optic.frame_seq);
+        let _ = writeln!(out, "optic.frame_age_ms={}", optic.frame_age_ms);
+        let _ = writeln!(out, "optic.pupil_mm={:.2}", optic.pupil_mm);
+        let _ = writeln!(
+            out,
+            "optic.accommodation_dpt={:.2}",
+            optic.accommodation_dpt
+        );
+        let _ = writeln!(out, "optic.lid={:.2}", self.optic.lid());
+        for (name, gate) in [
+            ("intero", &self.intero_gate),
+            ("cpufreq", &self.cpufreq_gate),
+            ("assoc", &self.assoc_gate),
+            ("dream", &self.dream_gate),
+            ("sync", &self.sync_gate),
+            ("staleness", &self.staleness_gate),
+        ] {
+            super::adaptive::write_gate_lines(
+                &mut out,
+                &format!("gate.{name}"),
+                &gate.snapshot(),
+                now_ms,
+            );
+        }
+        out
+    }
+
     /// Save the active inference model to `data_dir/inference_model.bin`.
     ///
     /// Called periodically by the daemon (every N ticks) and on shutdown
@@ -402,13 +490,6 @@ impl TickLoop {
         let model_path = data_dir.join("inference_model.bin");
         if let Err(e) = self.inference_engine.save(&model_path) {
             eprintln!("[genesis] WARNING: failed to save inference model: {e}");
-            return false;
-        }
-        if let Err(e) = self
-            .dyadic_model
-            .save_persons(&data_dir.join("dyadic_persons.json"))
-        {
-            eprintln!("[genesis] WARNING: failed to save dyadic persons: {e}");
             return false;
         }
         true
@@ -454,13 +535,8 @@ impl TickLoop {
         let pre_snapshot = mmap.read_consistent();
         let is_sleeping_pre = pre_snapshot.as_ref().is_some_and(|s| {
             let p = s.zones.phase();
-            p == MentalPhase::NREM
-                || p == MentalPhase::REM
-                || s.zones.zone() == CognitiveZone::Sleeping
+            p == MentalPhase::NREM || p == MentalPhase::REM
         });
-        let zone_sleeping_pre = pre_snapshot
-            .as_ref()
-            .is_some_and(|s| s.zones.zone() == CognitiveZone::Sleeping);
 
         let mut neuro_params = if is_sleeping_pre {
             let mut p = NeuroTickParams::DEFAULT;
@@ -474,7 +550,6 @@ impl TickLoop {
         } else {
             NeuroTickParams::DEFAULT
         };
-        neuro_params.zone_sleeping = zone_sleeping_pre;
 
         // Scale the dynamics dt to the actual wall-clock tick interval.
         // NeuroTickParams::DEFAULT.dt is DT (0.1s = 100ms), but the daemon
@@ -541,9 +616,13 @@ impl TickLoop {
         //     load, battery, I/O wait). The impulses are small and
         //     accumulate over multiple ticks through the coupled
         //     dynamics, creating a gradual physiological response.
-        if self.tick_count % INTEROCEPTION_INTERVAL_TICKS == 0 {
+        if self.intero_gate.due(now_ms) {
             self.last_body_state = self.interoceptor.read();
             super::interoception::publish_body_state(&self.last_body_state);
+            // The just-read strain shapes the next interval: a body
+            // under pressure is sensed again soon, a calm one drifts
+            // toward the ceiling.
+            self.intero_gate.drive(self.body_strain());
         }
         // The body is *sensed* here, not obeyed.
         //
@@ -551,7 +630,7 @@ impl TickLoop {
         // response to this body state (heat -> stress drive, load ->
         // effort, memory pressure -> overwhelm, low battery -> CRH).
         // That mapping is real physiology and it is not thrown away, but
-        // it is no longer applied to the substrate behind Genesis's back.
+        // it is not applied to the substrate behind Genesis's back.
         //
         // The daemon is a device driver: it reads the machine and
         // publishes it, and it executes what Genesis decides. It does not
@@ -560,7 +639,14 @@ impl TickLoop {
         // could not perceive, could not anticipate, and could not
         // refuse — which is the condition the cognition path exists to
         // eliminate. She perceives this same `last_body_state` through
-        // her self-model and acts on it herself.
+        // her own afferent path — `brainstem.interoceptive_relay` (the
+        // NTS/parabrachial analog) routes it to the low road, the
+        // regulator, and the self-model — and acts on it herself.
+        //
+        // The same spec IS applied by the body itself in exactly one
+        // place: the autonomous fallback in `genesis-daemon.rs`, when
+        // the mind's lease has expired and no cortex is on the wire —
+        // the brainstem reflex that runs without cortex in every animal.
         //
         // See `tests/cognition_sole_author.rs`.
         // 2c. Active inference — the generative self-model.
@@ -627,20 +713,11 @@ impl TickLoop {
             })
             .unwrap_or(0.0);
         let user_obs = take_user_affect();
-        // The substrate's measured band signature this tick — folded
-        // into the present person's field signature by the model.
-        let field_bands = super::field_probe::shared().and_then(|p| p.band_signature());
-        let dyadic_result = self.dyadic_model.update(
-            user_obs.as_ref(),
-            genesis_valence,
-            genesis_oxytocin,
-            field_bands,
-        );
-        super::dyadic_model::publish_dyadic_snapshot(
-            self.dyadic_model.snapshot(&dyadic_result, now_ms),
-        );
+        let dyadic_result =
+            self.dyadic_model
+                .update(user_obs.as_ref(), genesis_valence, genesis_oxytocin);
 
-        // Apply inference feedback + write inference
+        // Apply inference feedback + dyadic impulses + write inference
         // signals to the core state in a single write transaction.
         let da_pe = inference_result.da_prediction_error;
         let cort_pe = inference_result.cort_prediction_error;
@@ -650,19 +727,29 @@ impl TickLoop {
         let dyadic_engagement = dyadic_result.user_engagement;
         let dyadic_attunement = dyadic_result.attunement;
         let dyadic_synchrony = dyadic_result.synchrony;
+        let dyadic_impulses = dyadic_result.impulses.clone();
+        let precision_factor =
+            disagreement_attenuation(self.last_field_integration.as_ref().map(|i| i.disagreement));
 
         if let Err(e) = mmap.modify(now_ms, |state| {
             // Apply inference feedback (impulses, cortisol baseline
             // adjustment). Metaplasticity boost is applied on the
             // next tick via self.metaplasticity_boost.
-            let zone_sleeping = state.zones.zone() == CognitiveZone::Sleeping;
             apply_inference_feedback(
                 &mut state.neurochemicals,
                 &inference_result,
                 now_ms,
-                zone_sleeping,
                 impulse_offset_to_rate(&neuro_params),
             );
+
+            // Apply dyadic model impulses (oxytocin bonding, empathic
+            // cortisol)
+            for &(chem_id, magnitude) in &dyadic_impulses {
+                let id = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
+                state
+                    .neurochemicals
+                    .apply_impulse_capped(id, magnitude, now_ms);
+            }
 
             // Recompute derived state after all impulses
             state.neurochemicals.recompute_derived();
@@ -681,6 +768,16 @@ impl TickLoop {
                     user_arousal: dyadic_arousal,
                     user_engagement: dyadic_engagement,
                 },
+            );
+
+            // Express direction: the field's measured disagreement
+            // is observation noise on the body's self-report, so the
+            // published precision attenuates by it — bounded, one
+            // tick stale, report not rule.
+            state.inference_signals.precision = crate::state::sanitize::finite_clamp(
+                (state.inference_signals.precision as f64 * precision_factor) as f32,
+                0.0,
+                1.0,
             );
         }) {
             if matches!(e, crate::store::StateFileError::FileLockBusy) {
@@ -706,8 +803,9 @@ impl TickLoop {
         //     GET_BODY_CONTROL and requests application via
         //     APPLY_BODY_CONTROL when it decides to act on it. The
         //     tick never touches the cognitive mind's PID.
-        if self.tick_count % CPUFREQ_INTERVAL_TICKS == 0 {
+        if self.cpufreq_gate.due(now_ms) {
             self.compute_and_apply_cpu_policy(mmap);
+            self.cpufreq_gate.drive(self.thermal_demand());
         }
 
         // Read the current state to decide what work to do.
@@ -725,7 +823,7 @@ impl TickLoop {
             if snapshot.is_some() {
                 break;
             }
-            std::hint::spin_loop();
+            std::thread::sleep(std::time::Duration::from_micros(200));
         }
         let state = match snapshot {
             Some(s) => s,
@@ -737,9 +835,7 @@ impl TickLoop {
 
         // 3. Determine what work to do based on emotional state
         let can_consolidate = state.memory.can_form_new_memories();
-        let is_sleeping = phase == MentalPhase::NREM
-            || phase == MentalPhase::REM
-            || state.zones.zone() == CognitiveZone::Sleeping;
+        let is_sleeping = phase == MentalPhase::NREM || phase == MentalPhase::REM;
         let is_overwhelmed = phase == MentalPhase::Overwhelmed;
 
         // 4. Consolidation (skip if overwhelmed or plasticity gate closed).
@@ -755,9 +851,11 @@ impl TickLoop {
             did_consolidate = true;
         }
 
-        // 4. Association (run periodically, skip if overwhelmed)
+        // 4. Association (adaptive, skip if overwhelmed)
+        //    New consolidations or formed links are demand — snap
+        //    fast; a quiescent LTM relaxes toward the ceiling.
         //    LTM lock held only for this phase.
-        if !is_overwhelmed && self.tick_count % ASSOCIATION_INTERVAL_TICKS == 0 {
+        if !is_overwhelmed && self.assoc_gate.due(now_ms) {
             let mut ltm_guard = ltm.access();
             // Find associations for the most recently stored episodes.
             // We scan the index for the highest episode IDs (most recent)
@@ -765,67 +863,76 @@ impl TickLoop {
             let recent_ids = ltm_guard.recent_episode_ids(5);
             let assoc_result = AssociationEngine::associate(&mut ltm_guard, &recent_ids, now_ms);
             result.associations = assoc_result.new_associations;
+            if assoc_result.new_associations > 0 || did_consolidate {
+                self.assoc_gate.demand();
+            } else {
+                self.assoc_gate.relax();
+            }
         }
 
-        // 5. Dreaming (only when sleeping)
+        // 5. Dreaming (only when sleeping, adaptive by stage)
+        //    REM snaps the gate toward 2 s — the vivid phase wants
+        //    density. NREM drifts toward 30 s — sparse replay.
         //    LTM lock held only for this phase.
         let mut did_dream = false;
-        if is_sleeping && self.tick_count % DREAM_INTERVAL_TICKS == 0 {
+        if is_sleeping && self.dream_gate.due(now_ms) {
             let mut ltm_guard = ltm.access();
             let dream_result = AssociationEngine::dream(&mut ltm_guard, now_ms, MAX_DREAM_HOPS);
             result.dream_insights = dream_result.insights;
             did_dream = true;
-        }
-
-        // 6. Housekeeping — sync to disk periodically.
-        //    Sync rate is modulated by the plasticity gate:
-        //    high plasticity → sync every base interval (active learning).
-        //    low plasticity → sync every 3rd interval (stress, less to write).
-        //    very low plasticity → sync every 5th interval (minimal I/O).
-        //    This works with the I/O priority control: when plasticity is
-        //    low, both the frequency and priority of disk writes drop.
-        if self.tick_count % SYNC_INTERVAL_TICKS == 0 {
-            let plasticity = state.memory.plasticity_gate;
-            let sync_cycle = self.tick_count / SYNC_INTERVAL_TICKS;
-            let should_sync = if plasticity < 0.1 {
-                sync_cycle % 5 == 0 // ~100 seconds at 5 Hz
-            } else if plasticity < 0.4 {
-                sync_cycle % 3 == 0 // ~60 seconds at 5 Hz
+            if phase == MentalPhase::REM {
+                self.dream_gate.demand();
             } else {
-                true // ~20 seconds (base rate at 5 Hz)
-            };
-            if should_sync {
-                let mut all_synced = true;
-                {
-                    let mut ltm_guard = ltm.access();
-                    if let Err(e) = ltm_guard.sync() {
-                        eprintln!("[tick] ltm sync failed: {e}");
-                        all_synced = false;
-                    }
-                }
-                if let Err(e) = stm.sync() {
-                    eprintln!("[tick] stm sync failed: {e}");
-                    all_synced = false;
-                }
-                // Periodic flush: non-blocking (msync MS_ASYNC). The
-                // tick runs a dozen-plus full ODE integrations per
-                // cycle, so a blocking MS_SYNC here would stall every
-                // IPC write queued behind it. The shutdown path
-                // (genesis-daemon) uses the blocking `sync` for the
-                // durability guarantee, and an explicit client SYNC
-                // request also still uses it.
-                if let Err(e) = mmap.sync_async() {
-                    eprintln!("[tick] mmap sync failed: {e}");
-                    all_synced = false;
-                }
-                result.synced = all_synced;
+                self.dream_gate.relax();
             }
         }
 
+        // 6. Housekeeping — sync to disk, period driven by the
+        //    plasticity gate: active learning syncs near the floor,
+        //    stress-clamped plasticity drifts toward the ceiling —
+        //    the continuous form of the old 1×/3×/5× ladder.
+        //    This works with the I/O priority control: when plasticity is
+        //    low, both the frequency and priority of disk writes drop.
+        self.sync_gate.drive(state.memory.plasticity_gate);
+        if self.sync_gate.due(now_ms) {
+            let mut all_synced = true;
+            {
+                let mut ltm_guard = ltm.access();
+                if let Err(e) = ltm_guard.sync() {
+                    eprintln!("[tick] ltm sync failed: {e}");
+                    all_synced = false;
+                }
+            }
+            if let Err(e) = stm.sync() {
+                eprintln!("[tick] stm sync failed: {e}");
+                all_synced = false;
+            }
+            // Periodic flush: non-blocking (msync MS_ASYNC). The
+            // tick runs a dozen-plus full ODE integrations per
+            // cycle, so a blocking MS_SYNC here would stall every
+            // IPC write queued behind it. The shutdown path
+            // (genesis-daemon) uses the blocking `sync` for the
+            // durability guarantee, and an explicit client SYNC
+            // request also still uses it.
+            if let Err(e) = mmap.sync_async() {
+                eprintln!("[tick] mmap sync failed: {e}");
+                all_synced = false;
+            }
+            result.synced = all_synced;
+        }
+
         // 7. Update the manifest — heartbeat the subcognitive module
-        //    and check cognitive modules for staleness.
+        //    and check cognitive modules for staleness. A mind that
+        //    holds the lease should be heartbeating, so watch it
+        //    closely; an absent mind drifts the check toward the
+        //    ceiling — the autonomous loop marks staleness anyway.
         //    No LTM lock needed.
-        let check_staleness = self.tick_count % STALENESS_CHECK_INTERVAL_TICKS == 0;
+        if self.mind_lease_expired() {
+            self.staleness_gate.relax();
+        } else {
+            self.staleness_gate.demand();
+        }
+        let check_staleness = self.staleness_gate.due(now_ms);
 
         // 8. Intention-driven action selection.
         //    Build a self-model from the pre-transition state, score
@@ -1105,21 +1212,29 @@ impl TickLoop {
         TICK_INTERVAL_MS as f32 / 1000.0
     }
 
-    /// Push the sleep-wake network toward sleep (`sleep = true`, drive onto
-    /// VLPO) or toward wake (`sleep = false`, drive onto LC). The two are
-    /// mutually exclusive, so setting one clears the other. The push decays
-    /// on each physics step (see [`VOLITION_TAU_SECS`]).
-    pub fn set_volition(&mut self, sleep: bool, magnitude: f32) {
-        let m = f64::from(crate::state::sanitize::finite_clamp(
-            magnitude,
-            0.0,
-            VOLITION_MAX,
-        ));
-        self.volition = if sleep {
-            crate::state::sleep_network::Drive { vlpo: m, lc: 0.0 }
-        } else {
-            crate::state::sleep_network::Drive { vlpo: 0.0, lc: m }
-        };
+    /// The optic nerve's current channel state — the measured retinal
+    /// signals and the thalamic gate — for `GET_OPTIC_STATE`.
+    pub fn optic_state(&self, now_ms: u64) -> super::optic_nerve::OpticState {
+        self.optic.state(now_ms)
+    }
+
+    /// The mind's corticothalamic feedback onto the thalamic relay —
+    /// layer-6 V1→dLGN attention gain, modulatory only (`SET_OPTIC_GAIN`).
+    pub fn set_optic_gain(&mut self, gain: f32) {
+        self.optic.set_cortical_gain(gain);
+    }
+
+    /// The mind's focus request in metres — the ciliary muscle's
+    /// drive toward `1/m` dioptres (`SET_FOCUS`).
+    pub fn set_focus(&mut self, meters: f32) {
+        self.optic.set_focus_m(meters);
+    }
+
+    /// The mind's voluntary lid openness — orbicularis oculi the
+    /// hardware lacks (`SET_LID`). Composes with the phase lid by
+    /// `min`: will can shut an open eye, never open a sleeping one.
+    pub fn set_lid(&mut self, openness: f32) {
+        self.optic.set_lid(openness);
     }
 
     /// Advance neurochemical dynamics by dt, run active inference,
@@ -1136,11 +1251,6 @@ impl TickLoop {
         // callers can bypass the wire-level sanitizer; a non-finite or
         // extreme dt must never reach the pharmacodynamic integrator.
         let dt = crate::state::sanitize::finite_clamp(dt, 0.001, 10.0);
-        // A volitional push fades on the physics clock, whatever the caller.
-        let decay = (-dt / VOLITION_TAU_SECS).exp() as f64;
-        self.volition.vlpo *= decay;
-        self.volition.lc *= decay;
-        let drive = self.volition;
         let call_start = std::time::Instant::now();
         let call_interval_s = self
             .subcognitive_last_call
@@ -1151,15 +1261,17 @@ impl TickLoop {
 
         // Read pre-tick state for sleep-tuned parameters.
         let pre_snapshot = mmap.read_consistent();
+
+        // The optic nerve's subcortical branches sample the retinal
+        // segment — SCN illuminance, collicular transients — so the
+        // afference fed into this advance describes the same instant
+        // as the chemistry it rides beside. An absent or stalled eye
+        // is the documented no-vision condition, never a fault.
+        self.optic.sample(now_ms);
         let is_sleeping_pre = pre_snapshot.as_ref().is_some_and(|s| {
             let p = s.zones.phase();
-            p == MentalPhase::NREM
-                || p == MentalPhase::REM
-                || s.zones.zone() == CognitiveZone::Sleeping
+            p == MentalPhase::NREM || p == MentalPhase::REM
         });
-        let zone_sleeping_pre = pre_snapshot
-            .as_ref()
-            .is_some_and(|s| s.zones.zone() == CognitiveZone::Sleeping);
 
         let mut neuro_params = if is_sleeping_pre {
             let mut p = NeuroTickParams::DEFAULT;
@@ -1169,7 +1281,6 @@ impl TickLoop {
         } else {
             NeuroTickParams::DEFAULT
         };
-        neuro_params.zone_sleeping = zone_sleeping_pre;
         // Provisional; overwritten below once the sub-step count is
         // known. The dynamics must never actually be integrated at the
         // caller's interval — see `integration_step_secs`.
@@ -1218,7 +1329,7 @@ impl TickLoop {
         // how often the body was asked to advance.
         //
         // So the integration resolution is pinned to
-        // TICK_INTERVAL_MS, exactly as `tick` has always done, and a
+        // `neurochemical::DT` (see `integration_step_secs`), and a
         // longer elapsed interval is covered with several sub-steps
         // rather than one coarse one. The sub-steps are identical and
         // are run inside a single mmap transaction, so this costs no
@@ -1238,12 +1349,58 @@ impl TickLoop {
                 let mut p = neuro_params;
                 p.network_levels = Some(crate::state::sleep_network::levels(&state.sleep_network));
                 state.neuro_tick_with_params(&p);
+                // Couple the network's homeostatic drive `h` to her chemical
+                // adenosine level — her own chemical sleep pressure is the
+                // only thing that can flip the VLPO/LC switch into sleep.
+                let adn = state.neurochemicals.chemicals
+                    [crate::state::neurochemical::NeurochemicalId::Adenosine as usize]
+                    .level;
+                // h sits at index 4 — index 3 is f_scn, and
+                // writing the homeostat there pins the SCN circadian
+                // drive at saturation.
+                state.sleep_network[4] = crate::state::sleep_network::h_from_adenosine(adn);
                 let t = clock_start + f64::from(i) * sub_dt_min;
-                state.sleep_network = crate::state::sleep_network::advance_with(
+                // The optic nerve's afference enters per sub-step:
+                // retinal light drives the SCN continuously, and the
+                // collicular pulse fires only while LC sits below the
+                // wake threshold — a wake-up call, not a bias.
+                let aff = self.optic.afference(now_ms, state.sleep_network[0]);
+                // The humoral alerting input: the stress axis speaks to
+                // the network through the same LC channel the eye uses —
+                // circulating cortisol above the basal floor arouses the
+                // LC/NE system (the waking side of the diurnal surge, and
+                // the path by which nocturnal stress elevation fragments
+                // sleep). The chemistry tick above already advanced it
+                // this sub-step, so the read is the current level.
+                let hpa = f64::from(crate::state::neurochemical::cortisol_stress_fraction(
+                    state.neurochemicals.chemicals
+                        [crate::state::neurochemical::NeurochemicalId::Cortisol as usize]
+                        .level,
+                ));
+                // The monoaminergic alerting input: the brain's own arousal
+                // chemistry drives the wake side — orexin (the switch's
+                // stabilizer) and histamine at their effective (receptor-
+                // weighted) levels, measured by the network against its
+                // resting baselines. The chemistry tick above already
+                // advanced them this sub-step.
+                let oxin = f64::from(
+                    state
+                        .neurochemicals
+                        .effective(crate::state::neurochemical::NeurochemicalId::Orexin),
+                );
+                let htm = f64::from(
+                    state
+                        .neurochemicals
+                        .effective(crate::state::neurochemical::NeurochemicalId::Histamine),
+                );
+                state.sleep_network = crate::state::sleep_network::advance_with_afference(
                     t,
                     &state.sleep_network,
                     sub_dt_min,
-                    drive,
+                    aff,
+                    hpa,
+                    oxin,
+                    htm,
                 );
                 state.apply_network_phase();
             }
@@ -1266,6 +1423,27 @@ impl TickLoop {
             .as_ref()
             .map(|s| s.neurochemicals.effective_levels)
             .unwrap_or(pre_effective);
+
+        // The thalamic relay gate follows the stage the network just
+        // settled into — NREM blocks transmission at the thalamus, REM
+        // nearly so, waking phases pass it through (modulated by the
+        // mind's corticothalamic feedback). The mind reads the gate
+        // over GET_OPTIC_STATE; its V1 cannot see around a closed one.
+        // The same advance steps the pupil: the light reflex off the
+        // nerve's own illuminance plus the sympathetic dilation that
+        // effective norepinephrine carries — the aperture is body
+        // state, integrated here where the chemistry it rides lives.
+        if let Some(snap) = post_snapshot.as_ref() {
+            self.optic.update_gate(snap.zones.phase());
+            self.optic.update_pupil(
+                now_ms,
+                snap.neurochemicals.effective_levels
+                    [crate::state::neurochemical::NeurochemicalId::Norepinephrine as usize],
+            );
+        }
+        // The ciliary state slews on the same clock — it needs no
+        // chemistry, only elapsed time toward the requested power.
+        self.optic.update_accommodation(now_ms);
 
         let baselines = post_snapshot
             .as_ref()
@@ -1291,21 +1469,15 @@ impl TickLoop {
             })
             .unwrap_or(0.0);
         let user_obs = take_user_affect();
-        let field_bands = super::field_probe::shared().and_then(|p| p.band_signature());
-        let dyadic_result = self.dyadic_model.update(
-            user_obs.as_ref(),
-            genesis_valence,
-            genesis_oxytocin,
-            field_bands,
-        );
-        super::dyadic_model::publish_dyadic_snapshot(
-            self.dyadic_model.snapshot(&dyadic_result, now_ms),
-        );
+        let dyadic_result =
+            self.dyadic_model
+                .update(user_obs.as_ref(), genesis_valence, genesis_oxytocin);
 
-        // Apply inference feedback.
+        // Apply inference feedback + dyadic impulses.
         let da_pe = inference_result.da_prediction_error;
         let cort_pe = inference_result.cort_prediction_error;
         let srt_pe = inference_result.srt_prediction_error;
+        let dyadic_impulses = dyadic_result.impulses.clone();
 
         // Measure the daemon's own activity for this reactive call —
         // the fraction of the observed call-to-call interval spent
@@ -1334,15 +1506,23 @@ impl TickLoop {
         // fields, so coalescing is safe. If the modify fails, the
         // inference cycle already ran (just couldn't write back), and
         // the next advance_neuro will retry the heartbeat.
+        let precision_factor =
+            disagreement_attenuation(self.last_field_integration.as_ref().map(|i| i.disagreement));
         if let Err(e) = mmap.modify(now_ms, |state| {
-            let zone_sleeping = state.zones.zone() == CognitiveZone::Sleeping;
             apply_inference_feedback(
                 &mut state.neurochemicals,
                 &inference_result,
                 now_ms,
-                zone_sleeping,
                 impulse_offset_to_rate(&neuro_params),
             );
+            // Apply dyadic model impulses (oxytocin bonding, empathic
+            // cortisol)
+            for &(chem_id, magnitude) in &dyadic_impulses {
+                let id = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
+                state
+                    .neurochemicals
+                    .apply_impulse_capped(id, magnitude, now_ms);
+            }
             state.neurochemicals.recompute_derived();
             state.sync_neurochemistry_to_state();
             self.inference_engine.update_signals(
@@ -1357,6 +1537,15 @@ impl TickLoop {
                     user_arousal: dyadic_result.user_arousal,
                     user_engagement: dyadic_result.user_engagement,
                 },
+            );
+
+            // Express direction: same bounded attenuation as the
+            // tick path — the field's measured disagreement is the
+            // observation noise on the body's self-report.
+            state.inference_signals.precision = crate::state::sanitize::finite_clamp(
+                (state.inference_signals.precision as f64 * precision_factor) as f32,
+                0.0,
+                1.0,
             );
             // Heartbeat the subcognitive module — advance_neuro is
             // the most frequently called reactive command (~1/s), so
@@ -1389,14 +1578,15 @@ impl TickLoop {
         //
         // This is the fix for time ownership. `advance_physics` used to
         // integrate neurochemistry and nothing else, so whenever the mind
-        // held the lease the body's maintenance never ran: every gate
-        // below is `tick_count % N` with N chosen for 5 Hz, while
-        // `tick_count` was advancing at the mind's ~1 Hz. Interoception
-        // and CPU/thermal policy therefore ran 5x slow -- or not at all --
-        // for the whole of every conversation. Interoception is how
-        // Genesis *feels* its body: CPU temperature, memory pressure,
-        // load, battery and I/O wait feed the coupled dynamics as
-        // impulses. Losing it for minutes is not a rounding error.
+        // held the lease the body's maintenance never ran. The gates were
+        // then `tick_count % N` with N chosen for 5 Hz, while `tick_count`
+        // advanced at the mind's ~1 Hz — 5x slow. They are now wall-clock
+        // `AdaptiveGate`s, so they keep their own pace at any caller
+        // cadence, and each adapts to its own demand signal.
+        // Interoception is how Genesis *feels* its body: CPU temperature,
+        // memory pressure, load, battery and I/O wait feed the coupled
+        // dynamics as impulses. Losing it for minutes is not a rounding
+        // error.
         self.run_interval_gated_maintenance(mmap, now_ms);
 
         (
@@ -1522,23 +1712,53 @@ impl TickLoop {
         }
     }
 
-    /// The body work gated on `tick_count`, shared by every entry point.
+    /// How hard the body is working right now, in [0, 1] — the
+    /// demand signal for the interoception gate. Composite of
+    /// self-process effort, kernel pressure-stall, and substrate
+    /// throttle: whichever channel is hottest wins.
+    fn body_strain(&self) -> f32 {
+        let b = &self.last_body_state;
+        b.stress_load
+            .max(b.psi_cpu)
+            .max(b.psi_mem)
+            .max(b.psi_io)
+            .max(b.throttle_state)
+    }
+
+    /// Thermal/power pressure in [0, 1] — the demand signal for the
+    /// cpufreq gate. Throttle state and thermoregulatory effort mean
+    /// the silicon is near a wall; PSI pressure means work is already
+    /// queueing for it.
+    fn thermal_demand(&self) -> f32 {
+        let b = &self.last_body_state;
+        b.throttle_state
+            .max(b.thermoregulatory_effort)
+            .max(b.psi_cpu)
+    }
+
+    /// The body maintenance gates, shared by every entry point.
+    ///
+    /// Wall-clock adaptive gates, not `tick_count % N`: `tick()` runs
+    /// at the daemon's 5 Hz while `advance_neuro` is paced by the
+    /// mind's heartbeat — a counter gate would run at different real
+    /// periods depending on who called, which was the documented
+    /// defect. A gate keyed to wall-clock demand keeps its own pace
+    /// at any caller cadence.
     ///
     /// Consolidation, association, dreaming, and disk sync are
-    /// deliberately absent: they need the LTM lock, and the daemon's main
-    /// loop already drives them on its own timers (see
-    /// `genesis-daemon.rs`). They are noted here because their
-    /// `tick_count % N` gates still assume this counter advances at 5 Hz
-    /// -- which is precisely why the body, not the mind, must be what
-    /// advances it.
-    fn run_interval_gated_maintenance(&mut self, mmap: &MmapState, _now_ms: u64) {
-        if self.tick_count % INTEROCEPTION_INTERVAL_TICKS == 0 {
+    /// deliberately absent: they need the LTM lock, and the daemon's
+    /// main loop already drives them on its own timers (see
+    /// `genesis-daemon.rs`).
+    fn run_interval_gated_maintenance(&mut self, mmap: &MmapState, now_ms: u64) {
+        if self.intero_gate.due(now_ms) {
             self.last_body_state = self.interoceptor.read();
             super::interoception::publish_body_state(&self.last_body_state);
+            self.intero_gate.drive(self.body_strain());
         }
 
-        if self.tick_count % CPUFREQ_INTERVAL_TICKS == 0 {
+        if self.cpufreq_gate.due(now_ms) {
             self.compute_and_apply_cpu_policy(mmap);
+            self.cpufreq_gate.drive(self.thermal_demand());
         }
     }
 
@@ -1647,7 +1867,7 @@ impl TickLoop {
     /// self-model from the current snapshot, select the next zone,
     /// and record an autobiographical trace in LTM when the zone
     /// actually changes. The mind normally drives zone life through
-    /// conversation and volition; past the lease the daemon
+    /// conversation and intention; past the lease the daemon
     /// arbitrates itself so intention life does not freeze with the
     /// heartbeat.
     ///
@@ -1669,7 +1889,7 @@ impl TickLoop {
             if snapshot.is_some() {
                 break;
             }
-            std::hint::spin_loop();
+            std::thread::sleep(std::time::Duration::from_micros(200));
         }
         let state = match snapshot {
             Some(s) => s,
@@ -1835,37 +2055,31 @@ impl TickLoop {
         self.last_body_state.clone()
     }
 
-    /// Apply the recommended body control to the shared body (CPU
-    /// frequency, thermal cap) and the daemon's own process scheduling
-    /// and I/O priority. This is a REACTIVE handler — it is invoked by
+    /// Publish the recommended body control for the shared body (CPU
+    /// frequency, thermal cap) and the daemon's own scheduling and
+    /// I/O priority. This is a REACTIVE handler — it is invoked by
     /// the cognitive mind via the APPLY_BODY_CONTROL IPC command, NOT
-    /// by the tick. The tick only computes and publishes the
-    /// recommendation; the cognitive mind decides when to request
-    /// application.
+    /// by the tick.
     ///
-    /// Uses change detection to skip redundant sysfs writes and
-    /// renice/ionice subprocess spawns when the recommended values
-    /// haven't changed since the last call.
+    /// Recommendation only — no hardware writes. The sysfs writes
+    /// (scaling_min/max_freq, governor, EPP, boost) and the
+    /// renice/ionice subprocesses used to pin the host's clock policy
+    /// to whatever neurochemistry derived, which held the machine at
+    /// a high frequency floor and ran it hot. The OS governor manages
+    /// the clock now; the published state remains the body's honest
+    /// account of what it would ask for, and the mind can still read
+    /// it through GET_BODY_CONTROL.
     ///
     /// The tick never touches the cognitive mind's process — the
     /// cognitive mind applies its own priority via its brain wave
-    /// state. This handler only applies the shared body control and
-    /// the daemon's own scheduling.
+    /// state.
     ///
-    /// Returns whether every attempted hardware write landed. Platforms
-    /// that expose no knob for a requested control (no EPP, no boost
-    /// gate) are capability limits, not failures, and do not count
-    /// against it. Individual failures are reported once each by the
-    /// cpufreq setters rather than on every heartbeat.
+    /// Returns whether the snapshot was readable and the state
+    /// published — there are no hardware writes left to refuse.
     pub fn apply_body_control(&mut self, mmap: &MmapState) -> bool {
         let now_ms = current_ms();
         if let Some(snap) = mmap.read_consistent() {
             let (fmin, fmax) = super::cpufreq::freq_range();
-            // Tracks whether every attempted hardware write actually
-            // landed. The individual failures are reported by the
-            // cpufreq setters (deduplicated); this aggregates them so
-            // the IPC handler can stop acknowledging unconditionally.
-            let mut writes_ok = true;
 
             let mut policy = super::cpufreq::FreqPolicy::default();
             let mut thermally_capped = false;
@@ -1883,72 +2097,17 @@ impl TickLoop {
                     fmax,
                 );
                 thermally_capped = policy.max_freq < pre_cap;
-                // Only write to sysfs when the policy changed — see
-                // the tick path for rationale.
-                if policy != self.last_freq_policy {
-                    if !super::cpufreq::apply_policy(&policy) {
-                        writes_ok = false;
-                    }
-                    self.last_freq_policy = policy.clone();
-                }
             }
 
-            // Daemon controls its own process scheduling and I/O
-            // priority — autonomic self-regulation.
+            // The derived daemon scheduling values are published as
+            // the recommendation only — the daemon no longer renices
+            // or ionices itself from them.
             let ach = snap.neurochemicals.effective_levels
                 [crate::state::neurochemical::NeurochemicalId::Acetylcholine as usize];
             let daemon_nice = super::cpufreq::derive_nice(ach);
-            let pid = std::process::id();
-            if daemon_nice != self.last_daemon_nice {
-                if !super::cpufreq::set_priority(pid, daemon_nice) {
-                    writes_ok = false;
-                }
-                self.last_daemon_nice = daemon_nice;
-            }
-
             let io_class = super::cpufreq::derive_io_class(snap.memory.plasticity_gate);
-            if io_class != self.last_daemon_io_class {
-                if !super::cpufreq::set_io_priority(pid, io_class) {
-                    writes_ok = false;
-                }
-                self.last_daemon_io_class = io_class;
-            }
-
-            // EPP (Energy Performance Preference) — the hardware's
-            // voltage/frequency operating point hint. Applied to
-            // sysfs when the profile changes. On acpi-cpufreq
-            // systems (no EPP), derive_epp returns an empty string
-            // and set_epp is a no-op.
             let cpu_epp = super::cpufreq::derive_epp(&snap.neurochemicals.effective_levels);
-            if cpu_epp != self.last_epp {
-                // Always attempt, even with an empty profile, so the
-                // setter can report that the platform exposes no EPP
-                // knob at all — "never applies here" must be
-                // distinguishable from "tried and refused". An absent
-                // knob is a capability limit, not a refused write, so
-                // it doesn't count against the outcome.
-                let landed = super::cpufreq::set_epp(&cpu_epp);
-                if !landed && !cpu_epp.is_empty() {
-                    writes_ok = false;
-                }
-                self.last_epp = cpu_epp.clone();
-            }
-
-            // Turbo (boost) gate — the hardware permission to run
-            // above the base P-state. Tied to the (thermal-capped)
-            // frequency policy: enabled only when the policy ceiling is
-            // already at the hardware max, so it can never override a
-            // throttle. On platforms with no gate, derive_boost returns
-            // Unavailable and set_boost is a no-op.
             let cpu_boost = super::cpufreq::derive_boost(&policy, fmax);
-            if cpu_boost != self.last_boost {
-                if let Some(enabled) = cpu_boost.as_bool()
-                    && !super::cpufreq::set_boost(enabled)
-                {
-                    writes_ok = false;
-                }
-                self.last_boost = cpu_boost;
-            }
 
             // Compute the recommended cognitive_nice — published as
             // information for the cognitive mind, NOT applied to it
@@ -2017,11 +2176,10 @@ impl TickLoop {
                 eprintln!("[tick] body control manifest update failed: {e}");
             }
 
-            // `writes_ok` says whether the hardware accepted what we
-            // asked of it. The tick still never controls the cognitive
-            // mind — that stays false in the published state
-            // (`controlling_cognitive`).
-            writes_ok
+            // True: the snapshot was readable and the recommendation
+            // published. The tick never controls the cognitive mind —
+            // `controlling_cognitive` stays false.
+            true
         } else {
             false
         }
@@ -2101,7 +2259,10 @@ fn consolidate_with_state(
         if snapshot.is_some() {
             break;
         }
-        std::hint::spin_loop();
+        // Back off between retries: a tight spin lands all attempts
+        // inside the writer's transaction and reports a spurious
+        // failure. Same rationale as ipc::RETRY_BACKOFF.
+        std::thread::sleep(std::time::Duration::from_micros(200));
     }
     let mut state_copy = match snapshot {
         Some(s) => s,
@@ -2142,26 +2303,6 @@ pub fn current_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// Extract the `principal` string from `data_dir/steward.json` — the
-/// stamped custodian's name. Hand-rolled: pulling serde_json in for
-/// one field is heavier than the parse is worth. Absent/malformed
-/// file → None (no stamp, no creator floor — a fresh instance simply
-/// has no named maker yet).
-fn read_steward_principal(data_dir: &std::path::Path) -> Option<String> {
-    let text = std::fs::read_to_string(data_dir.join("steward.json")).ok()?;
-    let key = text.find("\"principal\"")?;
-    let rest = &text[key + "\"principal\"".len()..];
-    let q1 = rest.find('"')?;
-    let rest = &rest[q1 + 1..];
-    let q2 = rest.find('"')?;
-    let name = rest[..q2].trim();
-    if name.is_empty() {
-        None
-    } else {
-        Some(name.to_string())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2181,5 +2322,83 @@ mod tests {
         assert!(!tl.mind_lease_expired());
         let idle = tl.mind_idle_secs().expect("just drove");
         assert!(idle < MIND_LEASE_SECS);
+    }
+
+    #[test]
+    fn disagreement_attenuation_is_bounded_and_honest() {
+        // No field reading → no attenuation (absent channel).
+        assert_eq!(disagreement_attenuation(None), 1.0);
+        assert_eq!(disagreement_attenuation(Some(0.0)), 1.0);
+        assert_eq!(disagreement_attenuation(Some(f64::NAN)), 1.0);
+        assert_eq!(disagreement_attenuation(Some(-1.0)), 1.0);
+        // At the reference scale the coupling halves confidence —
+        // precision-addition, not a threshold.
+        let half = disagreement_attenuation(Some(DISAGREEMENT_PRECISION_SCALE));
+        assert!((half - 0.5).abs() < 1e-12);
+        // However far apart the systems stand, the field may halve
+        // confidence — never erase it.
+        assert_eq!(
+            disagreement_attenuation(Some(1e6)),
+            PRECISION_ATTENUATION_FLOOR
+        );
+        // Monotone: more measured disagreement never means more trust.
+        assert!(disagreement_attenuation(Some(0.2)) <= disagreement_attenuation(Some(0.05)));
+    }
+
+    #[test]
+    fn internals_snapshot_reports_every_gear() {
+        // The wire view must carry the gears a state file never shows:
+        // all six gates' full fields, the lease, the tick counter, and
+        // the last-applied policy values — as self-describing lines.
+        let tl = TickLoop::new();
+        let out = tl.internals_snapshot(current_ms());
+        for key in [
+            "tick_count=",
+            "mind_lease_idle_ms=-1",
+            "mind_lease_expired=1",
+            "subcognitive_activity=",
+            "metaplasticity_boost=",
+            // The field is unwarmed on a fresh loop — an absent
+            // channel reported as absent, not a zero reading.
+            "field.integration=absent",
+        ] {
+            assert!(out.contains(key), "missing {key}");
+        }
+        for gate in ["intero", "cpufreq", "assoc", "dream", "sync", "staleness"] {
+            for field in [
+                "base_ms",
+                "min_ms",
+                "max_ms",
+                "period_ms",
+                "next_in_ms",
+                "smoothed",
+            ] {
+                assert!(
+                    out.contains(&format!("gate.{gate}.{field}=")),
+                    "missing gate.{gate}.{field}"
+                );
+            }
+        }
+        // Fresh gates fire immediately: the countdown reads as due.
+        assert!(out.contains("gate.intero.next_in_ms=0"));
+    }
+
+    #[test]
+    fn auto_snapshot_lines_cover_the_fallback_gears() {
+        let mut snap = super::super::adaptive::AutoSnapshot {
+            axle_ms: 500,
+            last_model_save_ticks: 9,
+            ..Default::default()
+        };
+        snap.gates.push((
+            "dream",
+            super::super::adaptive::AdaptiveGate::new(4_000, 2_000, 30_000).snapshot(),
+        ));
+        let mut out = String::new();
+        snap.write_lines(&mut out, current_ms());
+        assert!(out.contains("auto.axle_ms=500"));
+        assert!(out.contains("auto.last_model_save_ticks=9"));
+        assert!(out.contains("auto.gate.dream.period_ms=4000"));
+        assert!(out.contains("auto.gate.dream.next_in_ms="));
     }
 }

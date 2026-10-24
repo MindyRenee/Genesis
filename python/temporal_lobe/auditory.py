@@ -67,6 +67,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from genesis_client.threads import call_on_named_thread, named_thread
+
 __all__ = ["AuditoryCortex", "SoundEvent"]
 
 logger = logging.getLogger(__name__)
@@ -154,9 +156,7 @@ def _get_window_and_freqs(n: int, sample_rate: int) -> tuple[np.ndarray, np.ndar
     return cached
 
 
-def _compute_features(
-    samples: np.ndarray, sample_rate: int
-) -> dict[str, float]:
+def _compute_features(samples: np.ndarray, sample_rate: int) -> dict[str, float]:
     """Compute spectral features from a block of audio samples.
 
     Args:
@@ -281,9 +281,10 @@ def _classify_sound(
     # (e.g. the very first block of the stream), fall back to the
     # inter-block flux aggregated across the event.
     if prev_features is not None:
-        flux = abs(rms - prev_features["rms"]) + abs(
-            centroid - prev_features["spectral_centroid"]
-        ) * 0.5
+        flux = (
+            abs(rms - prev_features["rms"])
+            + abs(centroid - prev_features["spectral_centroid"]) * 0.5
+        )
     else:
         flux = features["spectral_flux"]
 
@@ -310,12 +311,7 @@ def _classify_sound(
         return "music", float(min(confidence, 0.85))
 
     # Nature: moderate energy, broadband (high flatness), irregular
-    if (
-        flatness > 0.4
-        and rms > 0.01
-        and rms < 0.08
-        and zcr > 0.05
-    ):
+    if flatness > 0.4 and rms > 0.01 and rms < 0.08 and zcr > 0.05:
         confidence = 0.55 + flatness * 0.2
         return "nature", float(min(confidence, 0.75))
 
@@ -340,25 +336,21 @@ def _describe_sound(event: SoundEvent) -> str:
     "type | loudness | brightness | noisiness | duration"
     """
     loudness_label = (
-        "very loud" if event.loudness > 0.6
-        else "loud" if event.loudness > 0.3
-        else "moderate" if event.loudness > 0.1
+        "very loud"
+        if event.loudness > 0.6
+        else "loud"
+        if event.loudness > 0.3
+        else "moderate"
+        if event.loudness > 0.1
         else "quiet"
     )
     brightness_label = (
-        "bright" if event.brightness > 0.6
-        else "balanced" if event.brightness > 0.3
-        else "deep"
+        "bright" if event.brightness > 0.6 else "balanced" if event.brightness > 0.3 else "deep"
     )
     texture_label = (
-        "noisy" if event.noisiness > 0.15
-        else "tonal" if event.noisiness < 0.05
-        else "mixed"
+        "noisy" if event.noisiness > 0.15 else "tonal" if event.noisiness < 0.05 else "mixed"
     )
-    duration_label = (
-        "sustained" if event.duration > _SUSTAINED_THRESHOLD
-        else "brief"
-    )
+    duration_label = "sustained" if event.duration > _SUSTAINED_THRESHOLD else "brief"
     return (
         f"{event.sound_type} | {loudness_label} | {brightness_label} | "
         f"{texture_label} | {duration_label}"
@@ -388,6 +380,10 @@ class AuditoryCortex:
             capture is paused to prevent self-listening.
     """
 
+    # How long start() waits for a predecessor thread that is still
+    # exiting before refusing to spawn a second worker. Tests shrink it.
+    _START_JOIN_TIMEOUT_S = 5.0
+
     def __init__(
         self,
         callback: Callable[[SoundEvent], None],
@@ -403,6 +399,10 @@ class AuditoryCortex:
 
         self._running = False
         self._thread: threading.Thread | None = None
+        # Serializes start/stop — without it a start racing a stop
+        # loses the old thread's handle while the old loop resumes on
+        # the cleared flag, leaving a phantom second listener alive.
+        self._lifecycle_lock = threading.Lock()
 
         # Recent sound events (for debugging / inspection)
         self._recent: deque[SoundEvent] = deque(maxlen=50)
@@ -448,20 +448,32 @@ class AuditoryCortex:
         except (ImportError, OSError) as e:
             logger.warning(f"Auditory cortex: sounddevice unavailable ({e})")
             return False
-        self._running = True
-        self._thread = threading.Thread(
-            target=self._listen_loop, daemon=True, name="auditory-cortex"
-        )
-        self._thread.start()
+        with self._lifecycle_lock:
+            if self._running:
+                return True
+            if self._thread is not None and self._thread.is_alive():
+                # A stop() join may have timed out — wait for the old
+                # loop to finish rather than spawn beside it.
+                self._thread.join(timeout=self._START_JOIN_TIMEOUT_S)
+                if self._thread.is_alive():
+                    logger.error(
+                        "Auditory cortex: previous thread still alive after join — "
+                        "refusing to start a second one"
+                    )
+                    return False
+            self._running = True
+            self._thread = named_thread("auditory-cortex", self._listen_loop, comm="g-auditory")
+            self._thread.start()
         logger.info("Auditory cortex started — listening to sounds")
         return True
 
     def stop(self) -> None:
         """Stop the auditory cortex."""
-        self._running = False
-        if self._thread:
-            self._thread.join(timeout=3.0)
-            self._thread = None
+        with self._lifecycle_lock:
+            self._running = False
+            if self._thread:
+                self._thread.join(timeout=3.0)
+                self._thread = None
         logger.info("Auditory cortex stopped")
 
     def recent_events(self) -> list[SoundEvent]:
@@ -488,9 +500,7 @@ class AuditoryCortex:
         # normal jitter.
         audio_queue: queue.Queue[np.ndarray] = queue.Queue(maxsize=50)
 
-        def audio_callback(
-            indata: bytes, frames: int, time_info: object, status: object
-        ) -> None:
+        def audio_callback(indata: bytes, frames: int, time_info: object, status: object) -> None:
             """Capture audio block and queue it for processing."""
             if status:
                 logger.debug(f"[auditory] PortAudio status: {status}")
@@ -508,13 +518,22 @@ class AuditoryCortex:
         prev_features: dict[str, float] | None = None
 
         try:
-            with sd.RawInputStream(
-                samplerate=self.sample_rate,
-                blocksize=self.block_size,
-                dtype="float32",
-                channels=1,
-                callback=audio_callback,
-            ):
+            # Open the capture stream on an io-named thread: the
+            # PortAudio callback worker is born inside the open call
+            # and keeps the creating thread's comm name for life —
+            # opening it here labeled it a second g-auditory worker.
+            stream = call_on_named_thread(
+                "auditory-io",
+                lambda: sd.RawInputStream(
+                    samplerate=self.sample_rate,
+                    blocksize=self.block_size,
+                    dtype="float32",
+                    channels=1,
+                    callback=audio_callback,
+                ),
+                comm="g-auditory-io",
+            )
+            with stream:
                 while self._running:
                     try:
                         samples = audio_queue.get(timeout=0.2)
@@ -581,8 +600,7 @@ class AuditoryCortex:
             self._event_flux_sum += (
                 abs(features["rms"] - self._event_last_features["rms"])
                 + abs(
-                    features["spectral_centroid"]
-                    - self._event_last_features["spectral_centroid"]
+                    features["spectral_centroid"] - self._event_last_features["spectral_centroid"]
                 )
                 * 0.5
             )
@@ -606,23 +624,17 @@ class AuditoryCortex:
 
         # Aggregate features across the event
         count = self._event_count
-        avg_features = {
-            key: total / count for key, total in self._event_sums.items()
-        }
+        avg_features = {key: total / count for key, total in self._event_sums.items()}
         # Peak RMS for loudness
         avg_features["rms"] = self._event_peak_rms
 
         # Spectral flux: average change between consecutive blocks
         if self._event_flux_pairs:
-            avg_features["spectral_flux"] = (
-                self._event_flux_sum / self._event_flux_pairs
-            )
+            avg_features["spectral_flux"] = self._event_flux_sum / self._event_flux_pairs
         else:
             avg_features["spectral_flux"] = 0.0
 
-        sound_type, confidence = _classify_sound(
-            avg_features, duration, self._event_prev_features
-        )
+        sound_type, confidence = _classify_sound(avg_features, duration, self._event_prev_features)
 
         # Normalize loudness to 0-1 (0.5 RMS is very loud)
         loudness = min(self._event_peak_rms / 0.5, 1.0)

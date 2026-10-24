@@ -340,9 +340,7 @@ class Curiosity:
                 than seeking new topics).
         """
         with self._lock:
-            return self._generate_questions(
-                emotion, active_concepts, max_questions, brain_waves
-            )
+            return self._generate_questions(emotion, active_concepts, max_questions, brain_waves)
 
     def _generate_questions(
         self,
@@ -416,9 +414,7 @@ class Curiosity:
         with self._lock:
             return self._collect_focus_concepts(None)
 
-    def _collect_focus_concepts(
-        self, active_concepts: list[str] | None
-    ) -> list[str]:
+    def _collect_focus_concepts(self, active_concepts: list[str] | None) -> list[str]:
         """Determine which concepts to focus question generation on.
 
         When concepts are explicitly active (from conversation), we
@@ -454,16 +450,13 @@ class Curiosity:
         # (python:mind.deny_site), function words (and, it), and
         # empty vocabulary generate nonsense questions.
         candidates = [
-            (cid, act)
-            for cid, act in self.network.most_activated(20)
-            if is_world_concept(cid)
+            (cid, act) for cid, act in self.network.most_activated(20) if is_world_concept(cid)
         ]
         # Partition into high-quality and low-quality.
         # If we have enough high-quality concepts (≥3), use only those.
         # Otherwise, fall back to low-quality ones (better than nothing).
         high_q = [
-            cid for cid, _ in candidates
-            if self.network.concept_quality(cid) >= QUALITY_THRESHOLD
+            cid for cid, _ in candidates if self.network.concept_quality(cid) >= QUALITY_THRESHOLD
         ]
         base = high_q if len(high_q) >= 3 else [cid for cid, _ in candidates]
         # Broadcast topics lead; activation-selected concepts fill the
@@ -548,9 +541,7 @@ class Curiosity:
         # Determine which to ask vs. keep internal
         for q in questions:
             # Ask out loud if curiosity is high and it's about an active topic
-            q.should_ask = (
-                q.curiosity_score > 0.5 and not q.internal
-            )
+            q.should_ask = q.curiosity_score > 0.5 and not q.internal
 
         return questions[:max_questions]
 
@@ -674,7 +665,7 @@ class Curiosity:
             return None
 
         counts: dict[tuple[str, str], int] = {}
-        for window in self._concept_history:
+        for window in list(self._concept_history):
             for a, b in combinations(sorted(window), 2):
                 if a == b:
                     continue
@@ -710,9 +701,7 @@ class Curiosity:
     def _already_linked(self, a: str, b: str) -> bool:
         """Return True if a and b are already connected by any direct edge."""
         for edge in self.network.get_edges(a, "both"):
-            if (edge.source == a and edge.target == b) or (
-                edge.source == b and edge.target == a
-            ):
+            if (edge.source == a and edge.target == b) or (edge.source == b and edge.target == a):
                 return True
         return False
 
@@ -1075,13 +1064,9 @@ class Curiosity:
             exposure = data.get("exposure_counts", {})
             if not isinstance(exposure, dict):
                 raise TypeError("curiosity.exposure_counts must be an object")
-            self._exposure_counts = {
-                str(k): int(v) for k, v in exposure.items()
-            }
+            self._exposure_counts = {str(k): int(v) for k, v in exposure.items()}
 
             last_confidence = data.get("last_exposure_confidence", {})
             if not isinstance(last_confidence, dict):
                 raise TypeError("curiosity.last_exposure_confidence must be an object")
-            self._last_exposure_confidence = {
-                str(k): float(v) for k, v in last_confidence.items()
-            }
+            self._last_exposure_confidence = {str(k): float(v) for k, v in last_confidence.items()}

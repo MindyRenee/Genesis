@@ -12,15 +12,16 @@ logger = logging.getLogger(__name__)
 
 class ProposalsMixin:
     """Mixin for :class:`Mind` — see module docstring."""
+
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see mind.py).
         def __getattr__(self, name: str) -> Any: ...
 
-
     def proposals_status(self) -> str:
         """Return a summary of self-improvement proposals."""
         return self.self_improvement.proposals_summary()
+
     def get_proposal_detail(self, proposal_id: int) -> str:
         """Get full details of a specific proposal."""
         proposal = self.self_improvement.get_proposal(proposal_id)
@@ -31,6 +32,7 @@ class ProposalsMixin:
                 metadata={"proposal_id": proposal_id, "missing": True},
             )
         return proposal.describe_full()
+
     def clear_proposals(self) -> str:
         """Clear all self-improvement proposals."""
         count = self.self_improvement.clear_proposals()
@@ -38,6 +40,7 @@ class ProposalsMixin:
             f"cleared {count} proposals",
             metadata={"proposals_cleared": count},
         )
+
     def accept_proposal(self, proposal_id: int, feedback: str = "") -> str:
         """Approve a self-improvement proposal and run it as an experiment.
 
@@ -106,7 +109,8 @@ class ProposalsMixin:
                 # proposal with the correct approach.
                 notes = self._build_rejection_notes(proposal, record)
                 self.self_improvement.reject_proposal(
-                    proposal_id, notes,
+                    proposal_id,
+                    notes,
                 )
                 return self._render_self_report(
                     f"approved proposal {proposal_id}, "
@@ -138,8 +142,11 @@ class ProposalsMixin:
                     "rejection_notes": notes,
                 },
             )
+
     def _build_rejection_notes(
-        self, proposal: Proposal, record: ExperimentRecord,
+        self,
+        proposal: Proposal,
+        record: ExperimentRecord,
     ) -> str:
         """Build teaching notes for a rejected proposal.
 
@@ -163,11 +170,6 @@ class ProposalsMixin:
                 "be modified. Never tests, config, or the Rust "
                 "substrate. Propose changes to an experimentable "
                 "file instead.\n"
-            )
-        elif "daily limit" in record.reason:
-            notes += (
-                "- The daily experiment limit was reached. Wait until "
-                "tomorrow or ask the human to increase the limit.\n"
             )
         elif "py_compile" in record.reason:
             notes += (
@@ -200,11 +202,9 @@ class ProposalsMixin:
                 "Read the reason above carefully and adjust the "
                 "approach accordingly.\n"
             )
-        notes += (
-            "\nRewrite the proposal with the correct approach and "
-            "submit it again."
-        )
+        notes += "\nRewrite the proposal with the correct approach and submit it again."
         return notes
+
     def reject_proposal(self, proposal_id: int, feedback: str = "") -> str:
         """Reject a self-improvement proposal with teaching feedback.
 
@@ -215,7 +215,7 @@ class ProposalsMixin:
         opportunity.
         """
         if self.self_improvement.reject_proposal(proposal_id, feedback):
-                return self._render_self_report(
+            return self._render_self_report(
                 f"rejected proposal {proposal_id}, notes: {feedback}",
                 metadata={"proposal_id": proposal_id, "rejected": True, "feedback": feedback},
             )
@@ -224,6 +224,7 @@ class ProposalsMixin:
             confidence=0.3,
             metadata={"proposal_id": proposal_id, "reject_failed": True},
         )
+
     def experiments_status(self) -> str:
         """Return a summary of heuristic experiments (workstream D).
 

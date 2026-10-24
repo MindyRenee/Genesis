@@ -1,4 +1,5 @@
 target/
+build/
 __pycache__/
 *.pyc
 *.egg-info/
@@ -11,8 +12,14 @@ genesis_data/
 python/genesis_data/
 .genesis-data-dir
 .genesis-discord
+.genesis-discord-bot
 python/voices/
 launch/
+
+# Per-instance project notes — documents this machine's setup.
+# All markdown is local-only; only the public readme is tracked.
+*.md
+!/README.md
 
 # Eval harnesses and held-out corpora live outside this repo
 eval_heldout/
@@ -20,7 +27,22 @@ eval_transfer/
 environment_files/
 environment_files_heldout/
 
+# LaTeX build intermediates (the .tex and .pdf are tracked)
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc
+
 # Local-only artifacts
 recordings/
+notebooks/correlates_*.json
+*.sublime-workspace
 My Notes
 .vscode/
+
+# Agent-instruction files are local tooling config, not source.
+AGENTS.md
+
+# Stray package artifacts captured beside the checkout
+/arc_agi
+/kagglehub

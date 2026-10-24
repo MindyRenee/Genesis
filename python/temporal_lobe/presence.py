@@ -56,9 +56,9 @@ AMBIENT_PRESENCE_TIMEOUT = 900.0
 class PresenceKind(Enum):
     """What sort of entity a presence is."""
 
-    USER = "user"        # the human who talks to its through the main channel
-    VOICE = "voice"      # an unidentified speaker in the room
-    FACE = "face"        # someone it recognizes visually
+    USER = "user"  # the human who talks to its through the main channel
+    VOICE = "voice"  # an unidentified speaker in the room
+    FACE = "face"  # someone it recognizes visually
     AMBIENT = "ambient"  # background speech not directed at it
 
 
@@ -97,9 +97,7 @@ class Presence:
     last_addressed: float = 0.0
     topics: deque[str] = field(default_factory=lambda: deque(maxlen=20))
     facts: dict[str, str] = field(default_factory=dict)
-    sentiment_history: deque[tuple[float, float]] = field(
-        default_factory=lambda: deque(maxlen=50)
-    )
+    sentiment_history: deque[tuple[float, float]] = field(default_factory=lambda: deque(maxlen=50))
     belief: PresenceBelief = field(default_factory=PresenceBelief)
 
     @property

@@ -261,7 +261,6 @@ _LIKES_RE = re.compile(
 )
 
 
-
 # ─── Fact and Schema dataclasses ──────────────────────────────────────
 
 
@@ -542,9 +541,7 @@ class SemanticMemory:
 
         return facts
 
-    def _extract_contradiction_facts(
-        self, clause: str, now_ms: int, facts: list[Fact]
-    ) -> None:
+    def _extract_contradiction_facts(self, clause: str, now_ms: int, facts: list[Fact]) -> None:
         """Extract explicit contradiction and opposition relations."""
         for pattern, relation in (
             (_CONTRADICTS_RE, "contradicts"),
@@ -564,9 +561,7 @@ class SemanticMemory:
                         )
                     )
 
-    def _extract_part_of_facts(
-        self, clause: str, now_ms: int, facts: list[Fact]
-    ) -> None:
+    def _extract_part_of_facts(self, clause: str, now_ms: int, facts: list[Fact]) -> None:
         """Extract part_of and composition facts from the clause."""
         # part_of (check before generic "is" to avoid mis-parsing).
         for m in _PART_OF_RE.finditer(clause):
@@ -607,9 +602,7 @@ class SemanticMemory:
                         )
                     )
 
-    def _extract_relates_action_facts(
-        self, clause: str, now_ms: int, facts: list[Fact]
-    ) -> None:
+    def _extract_relates_action_facts(self, clause: str, now_ms: int, facts: list[Fact]) -> None:
         """Extract relates_to and action (causes) facts from the clause."""
         # relates_to / causes / enables via "X (relates|connects) to Y".
         for m in _RELATES_RE.finditer(clause):
@@ -639,9 +632,7 @@ class SemanticMemory:
                     )
                 )
 
-    def _extract_typed_relation_facts(
-        self, clause: str, now_ms: int, facts: list[Fact]
-    ) -> None:
+    def _extract_typed_relation_facts(self, clause: str, now_ms: int, facts: list[Fact]) -> None:
         """Extract typed relation facts (emerges_from, depends_on, etc.).
 
         These are checked before the generic is_a/has patterns so
@@ -749,9 +740,7 @@ class SemanticMemory:
                     )
                 )
 
-    def _extract_is_a_facts(
-        self, clause: str, now_ms: int, facts: list[Fact]
-    ) -> None:
+    def _extract_is_a_facts(self, clause: str, now_ms: int, facts: list[Fact]) -> None:
         """Extract is_a facts (indefinite, plural, relational) from the clause."""
         # "X is a/an Y" / "X was a/an Y" → is_a (indefinite category).
         for m in _IS_A_RE.finditer(clause):
@@ -821,9 +810,7 @@ class SemanticMemory:
                     )
                 )
 
-    def _extract_has_facts(
-        self, clause: str, now_ms: int, facts: list[Fact]
-    ) -> None:
+    def _extract_has_facts(self, clause: str, now_ms: int, facts: list[Fact]) -> None:
         """Extract has_property facts from the clause."""
         # "X has Y" → has_property.
         for m in _HAS_RE.finditer(clause):
@@ -1238,6 +1225,7 @@ class SemanticMemory:
         # Boost confidence for facts about primed concepts (semantic
         # priming from cognitive content).
         if self._primed_concepts:
+
             def _rank_key(f: Fact) -> float:
                 """Sort key: confidence boosted by priming for relevant concepts."""
                 priming = max(
@@ -1245,6 +1233,7 @@ class SemanticMemory:
                     self._primed_concepts.get(f.object.lower(), 0.0),
                 )
                 return f.confidence + priming * 0.3
+
             results.sort(key=_rank_key, reverse=True)
         else:
             results.sort(key=lambda f: f.confidence, reverse=True)
@@ -1300,9 +1289,7 @@ class SemanticMemory:
                     "parts": sorted(s.parts),
                     "properties": sorted(s.properties),
                     "functions": sorted(s.functions),
-                    "relations": {
-                        k: sorted(v) for k, v in (s.relations or {}).items()
-                    },
+                    "relations": {k: sorted(v) for k, v in (s.relations or {}).items()},
                     "instances": s.instances,
                     "abstraction_level": s.abstraction_level,
                     "created_at": s.created_at,
@@ -1392,17 +1379,12 @@ class SemanticMemory:
                 logger.warning(f"skipping malformed persisted schema: {e}")
 
         self.facts_extracted = int(data.get("facts_extracted", restored))
-        self.schemas_formed = int(
-            data.get("schemas_formed", len(self._schemas))
-        )
+        self.schemas_formed = int(data.get("schemas_formed", len(self._schemas)))
         self.consolidations = int(data.get("consolidations", 0))
         # Priming is intentionally not restored.
         self._primed_concepts = {}
         if restored:
-            logger.info(
-                f"restored {restored} semantic facts and "
-                f"{len(self._schemas)} schemas"
-            )
+            logger.info(f"restored {restored} semantic facts and {len(self._schemas)} schemas")
 
     @property
     def fact_count(self) -> int:
@@ -1454,38 +1436,104 @@ class SemanticMemory:
 # carries no recoverable subject. Kept separate from
 # _SUBJECT_PREFIX_WORDS because a trailing modal is different — "free
 # will" ends with one but is a legitimate subject.
-_SUBJECT_PRONOUNS = frozenset({
-    "i", "me", "we", "us", "you", "he", "she", "it", "they", "them",
-    "him", "her",
-})
+_SUBJECT_PRONOUNS = frozenset(
+    {
+        "i",
+        "me",
+        "we",
+        "us",
+        "you",
+        "he",
+        "she",
+        "it",
+        "they",
+        "them",
+        "him",
+        "her",
+    }
+)
 
 # Words that end an evidential clause prefix inside a captured subject:
 # "i think that ferrets are cute" captures "i think that ferrets" —
 # everything through the last such word is the speaker's framing
 # (pronoun + reporting verb), not the proposition's subject.
-_SUBJECT_PREFIX_WORDS = frozenset({
-    # pronouns
-    *_SUBJECT_PRONOUNS,
-    # auxiliaries / modals
-    "am", "is", "are", "was", "were", "be", "been",
-    "do", "does", "did", "have", "has", "had",
-    "can", "could", "will", "would", "shall", "should",
-    "may", "might", "must",
-    # reporting / mental-state verbs
-    "think", "thought", "believe", "know", "knew", "said", "say",
-    "says", "guess", "hope", "hoped", "feel", "felt", "hear", "heard",
-    "see", "saw", "mean", "meant", "suspect", "suppose", "told",
-    "reckon", "figure", "bet", "wish", "remember",
-})
+_SUBJECT_PREFIX_WORDS = frozenset(
+    {
+        # pronouns
+        *_SUBJECT_PRONOUNS,
+        # auxiliaries / modals
+        "am",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "do",
+        "does",
+        "did",
+        "have",
+        "has",
+        "had",
+        "can",
+        "could",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "may",
+        "might",
+        "must",
+        # reporting / mental-state verbs
+        "think",
+        "thought",
+        "believe",
+        "know",
+        "knew",
+        "said",
+        "say",
+        "says",
+        "guess",
+        "hope",
+        "hoped",
+        "feel",
+        "felt",
+        "hear",
+        "heard",
+        "see",
+        "saw",
+        "mean",
+        "meant",
+        "suspect",
+        "suppose",
+        "told",
+        "reckon",
+        "figure",
+        "bet",
+        "wish",
+        "remember",
+    }
+)
 
 # Complementisers / relative markers that terminate a subject NP:
 # "the cat that sat" → "the cat". When one directly follows a cut
 # prefix ("i think that ferrets" → "that ferrets"), it is the
 # object-clause complementiser and is dropped too.
-_SUBJECT_BREAK_WORDS = frozenset({
-    "that", "which", "who", "whom", "whose",
-    "because", "although", "though", "while", "if", "when",
-})
+_SUBJECT_BREAK_WORDS = frozenset(
+    {
+        "that",
+        "which",
+        "who",
+        "whom",
+        "whose",
+        "because",
+        "although",
+        "though",
+        "while",
+        "if",
+        "when",
+    }
+)
 
 
 def _clean_subject(phrase: str) -> str:
@@ -1507,7 +1555,7 @@ def _clean_subject(phrase: str) -> str:
         # nothing — the phrase is a subject in its own right.
         if w in _SUBJECT_PREFIX_WORDS and i + 1 < len(words):
             cut = i
-    words = words[cut + 1:]
+    words = words[cut + 1 :]
     if words and words[0] in _SUBJECT_BREAK_WORDS:
         words = words[1:]
     for i, w in enumerate(words):

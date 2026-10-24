@@ -302,9 +302,7 @@ class Discrepancy:
         mismatches = data.get("mismatches", {})
         missing = data.get("missing", [])
         return cls(
-            mismatches=(
-                dict(mismatches) if isinstance(mismatches, dict) else {}
-            ),
+            mismatches=(dict(mismatches) if isinstance(mismatches, dict) else {}),
             missing=[str(m) for m in missing] if isinstance(missing, list) else [],
             magnitude=float(data.get("magnitude", 0.0)),
             compared_fields=int(data.get("compared_fields", 0)),
@@ -369,11 +367,7 @@ class ActionRevision:
             kind = RevisionKind.NONE
         return cls(
             kind=kind,
-            action=(
-                ActionSpec.from_dict(action_data)
-                if isinstance(action_data, dict)
-                else None
-            ),
+            action=(ActionSpec.from_dict(action_data) if isinstance(action_data, dict) else None),
             reason=str(data.get("reason", "")),
             confidence=float(data.get("confidence", 0.0)),
         )
@@ -413,9 +407,7 @@ class ActionAttempt:
             "prediction": self.prediction.to_dict(),
             "created_at": self.created_at,
             "actual": self.actual.to_dict() if self.actual else None,
-            "discrepancy": (
-                self.discrepancy.to_dict() if self.discrepancy else None
-            ),
+            "discrepancy": (self.discrepancy.to_dict() if self.discrepancy else None),
             "hypotheses": [h.to_dict() for h in self.hypotheses],
             "revision": self.revision.to_dict() if self.revision else None,
             "completed_at": self.completed_at,
@@ -437,30 +429,20 @@ class ActionAttempt:
                 data.get("action", {}) if isinstance(data.get("action"), dict) else {}
             ),
             prediction=ActionPrediction.from_dict(
-                data.get("prediction", {})
-                if isinstance(data.get("prediction"), dict)
-                else {}
+                data.get("prediction", {}) if isinstance(data.get("prediction"), dict) else {}
             ),
             created_at=float(data.get("created_at", 0.0)),
-            actual=(
-                OutcomeState.from_dict(actual_data)
-                if isinstance(actual_data, dict)
-                else None
-            ),
+            actual=(OutcomeState.from_dict(actual_data) if isinstance(actual_data, dict) else None),
             discrepancy=(
                 Discrepancy.from_dict(discrepancy_data)
                 if isinstance(discrepancy_data, dict)
                 else None
             ),
-            hypotheses=[
-                CausalHypothesis.from_dict(h)
-                for h in hypotheses
-                if isinstance(h, dict)
-            ] if isinstance(hypotheses, list) else [],
+            hypotheses=[CausalHypothesis.from_dict(h) for h in hypotheses if isinstance(h, dict)]
+            if isinstance(hypotheses, list)
+            else [],
             revision=(
-                ActionRevision.from_dict(revision_data)
-                if isinstance(revision_data, dict)
-                else None
+                ActionRevision.from_dict(revision_data) if isinstance(revision_data, dict) else None
             ),
             completed_at=(
                 float(data["completed_at"])
@@ -567,8 +549,7 @@ class _ActionModel:
             "beta": self.beta,
             "outcome_counts": self.outcome_counts,
             "numeric_stats": {
-                field_name: stat.to_dict()
-                for field_name, stat in self.numeric_stats.items()
+                field_name: stat.to_dict() for field_name, stat in self.numeric_stats.items()
             },
             "failure_causes": self.failure_causes,
             "last_error_signature": self.last_error_signature,
@@ -597,11 +578,15 @@ class _ActionModel:
                 if isinstance(stat_data, dict):
                     numeric_stats[str(field_name)] = _NumericStat.from_dict(stat_data)
         failure_raw = data.get("failure_causes", {})
-        failure_causes = {
-            str(cause): int(count)
-            for cause, count in failure_raw.items()
-            if isinstance(count, (int, float))
-        } if isinstance(failure_raw, dict) else {}
+        failure_causes = (
+            {
+                str(cause): int(count)
+                for cause, count in failure_raw.items()
+                if isinstance(count, (int, float))
+            }
+            if isinstance(failure_raw, dict)
+            else {}
+        )
         return cls(
             key=str(data.get("key", "")),
             domain=str(data.get("domain", "")),
@@ -638,11 +623,13 @@ class ActionFeedback:
         causal_infer: Callable[
             [ActionSpec, Discrepancy, OutcomeState],
             Iterable[CausalHypothesis],
-        ] | None = None,
+        ]
+        | None = None,
         repair_suggester: Callable[
             [ActionSpec, list[CausalHypothesis], OutcomeState],
             ActionSpec | None,
-        ] | None = None,
+        ]
+        | None = None,
         attempt_listener: Callable[[ActionAttempt, str], None] | None = None,
         reward_learner: Callable[[ActionAttempt, float], float | None] | None = None,
         value_estimator: Callable[[ActionSpec], float | None] | None = None,
@@ -758,7 +745,8 @@ class ActionFeedback:
         learned_used = False
         if model.attempts:
             learned_used = self._apply_learned_expectation(
-                expected_fields, model,
+                expected_fields,
+                model,
             )
 
         expected_success = self._expected_success(expected_fields, model)
@@ -766,9 +754,7 @@ class ActionFeedback:
             expected_fields["ok"] = expected_success >= 0.5
             learned_used = learned_used or model.attempts > 0
         if "status" not in expected_fields:
-            expected_fields["status"] = (
-                "completed" if expected_success >= 0.5 else "failed"
-            )
+            expected_fields["status"] = "completed" if expected_success >= 0.5 else "failed"
             learned_used = learned_used or model.attempts > 0
 
         expected_state = OutcomeState(
@@ -795,10 +781,7 @@ class ActionFeedback:
 
         self._counter += 1
         attempt = ActionAttempt(
-            attempt_id=(
-                f"{action.domain}-{self._counter}-"
-                f"{int(time.time() * 1000)}"
-            ),
+            attempt_id=(f"{action.domain}-{self._counter}-{int(time.time() * 1000)}"),
             action=action,
             prediction=ActionPrediction(
                 expected=expected_state,
@@ -827,7 +810,8 @@ class ActionFeedback:
             logger.debug(f"action attempt listener failed: {e}")
 
     def _coerce_expected(
-        self, expected: OutcomeState | dict[str, Any] | None,
+        self,
+        expected: OutcomeState | dict[str, Any] | None,
     ) -> OutcomeState:
         """Normalize caller-supplied expectations."""
         if expected is None:
@@ -858,9 +842,7 @@ class ActionFeedback:
             # Blend the domain-declared prior with the learned posterior;
             # more attempts move the estimate toward experience.
             weight = min(0.85, model.attempts / (model.attempts + 3.0))
-            return _clamp01(
-                declared_p * (1.0 - weight) + model.expected_success * weight
-            )
+            return _clamp01(declared_p * (1.0 - weight) + model.expected_success * weight)
         return _clamp01(declared_p)
 
     def _apply_learned_expectation(
@@ -872,8 +854,7 @@ class ActionFeedback:
         learned = False
         for field_name, stat in model.numeric_stats.items():
             if stat.count >= 2 and (
-                field_name not in expected_fields
-                or _is_number(expected_fields.get(field_name))
+                field_name not in expected_fields or _is_number(expected_fields.get(field_name))
             ):
                 expected_fields[field_name] = stat.mean
                 learned = True
@@ -999,10 +980,7 @@ class ActionFeedback:
         magnitude = discrepancy.magnitude if discrepancy is not None else 0.0
         ok = actual.get("ok")
         if ok is True:
-            reward = (
-                _REWARD_MATCHED_SUCCESS
-                - _REWARD_SUCCESS_DISCREPANCY_WEIGHT * magnitude
-            )
+            reward = _REWARD_MATCHED_SUCCESS - _REWARD_SUCCESS_DISCREPANCY_WEIGHT * magnitude
         elif ok is False:
             cause = self._actual_cause(actual)
             if cause in _TERMINAL_CAUSES:
@@ -1010,10 +988,7 @@ class ActionFeedback:
             elif cause in _WAIT_CAUSES:
                 reward = _REWARD_WAIT
             else:
-                reward = (
-                    _REWARD_FAILURE
-                    - _REWARD_FAILURE_DISCREPANCY_WEIGHT * magnitude
-                )
+                reward = _REWARD_FAILURE - _REWARD_FAILURE_DISCREPANCY_WEIGHT * magnitude
         else:
             reward = _REWARD_UNSCORED - magnitude
         return max(-1.0, min(1.0, reward))
@@ -1075,18 +1050,12 @@ class ActionFeedback:
                 }
                 mismatch_weight += weight
 
-        magnitude = (
-            min(1.0, mismatch_weight / total_weight)
-            if total_weight > 0
-            else 0.0
-        )
+        magnitude = min(1.0, mismatch_weight / total_weight) if total_weight > 0 else 0.0
         return Discrepancy(
             mismatches=mismatches,
             missing=missing,
             magnitude=magnitude,
-            compared_fields=sum(
-                1 for value in expected.fields.values() if value is not None
-            ),
+            compared_fields=sum(1 for value in expected.fields.values() if value is not None),
         )
 
     # ─── Model update and grounding ───────────────────────────────
@@ -1170,9 +1139,7 @@ class ActionFeedback:
 
         discrepancy = attempt.discrepancy.magnitude if attempt.discrepancy else 0.0
         alpha = 0.25
-        model.discrepancy_ema = (
-            (1.0 - alpha) * model.discrepancy_ema + alpha * discrepancy
-        )
+        model.discrepancy_ema = (1.0 - alpha) * model.discrepancy_ema + alpha * discrepancy
 
         self._ground_observation(attempt, model)
 
@@ -1204,7 +1171,9 @@ class ActionFeedback:
         return cause or str(actual.get("status", "observed"))
 
     def _ground_observation(
-        self, attempt: ActionAttempt, model: _ActionModel,
+        self,
+        attempt: ActionAttempt,
+        model: _ActionModel,
     ) -> None:
         """Ground observed action/outcome evidence in the network."""
         actual = attempt.actual
@@ -1295,10 +1264,7 @@ class ActionFeedback:
                     positive=True,
                     weight=0.75,
                 )
-                if (
-                    attempt.prediction.expected.get("ok") is True
-                    and actual.get("ok") is False
-                ):
+                if attempt.prediction.expected.get("ok") is True and actual.get("ok") is False:
                     # The predicted success was directly disconfirmed.
                     self.probabilistic.observe_evidence(
                         action_cid,
@@ -1344,9 +1310,7 @@ class ActionFeedback:
                 )
             else:
                 existing.confidence = max(existing.confidence, _clamp01(confidence))
-                existing.evidence = list(dict.fromkeys(
-                    [*existing.evidence, *evidence_list]
-                ))[:8]
+                existing.evidence = list(dict.fromkeys([*existing.evidence, *evidence_list]))[:8]
 
         actual_cause = self._actual_cause(actual)
         if actual_cause:
@@ -1376,9 +1340,7 @@ class ActionFeedback:
                 "discrepancy",
             )
 
-        self._external_causes(
-            attempt, actual, actual_cause, discrepancy, model, add
-        )
+        self._external_causes(attempt, actual, actual_cause, discrepancy, model, add)
 
         if not hypotheses:
             add(
@@ -1430,7 +1392,9 @@ class ActionFeedback:
         if self.causal_infer is not None:
             try:
                 for hypothesis in self.causal_infer(
-                    attempt.action, discrepancy, actual,
+                    attempt.action,
+                    discrepancy,
+                    actual,
                 ):
                     add(
                         hypothesis.cause,
@@ -1592,11 +1556,7 @@ class ActionFeedback:
 
         return ActionRevision(
             kind=RevisionKind.DIAGNOSE,
-            reason=(
-                attempt.hypotheses[0].cause
-                if attempt.hypotheses
-                else "unknown discrepancy"
-            ),
+            reason=(attempt.hypotheses[0].cause if attempt.hypotheses else "unknown discrepancy"),
             confidence=max(0.35, discrepancy.magnitude),
         )
 
@@ -1618,7 +1578,8 @@ class ActionFeedback:
         if alternatives is None:
             return None
         candidates = [
-            candidate for candidate in alternatives
+            candidate
+            for candidate in alternatives
             if candidate.model_key != attempt.action.model_key
             or candidate.parameters != attempt.action.parameters
         ]
@@ -1717,21 +1678,15 @@ class ActionFeedback:
     def statistics(self) -> dict[str, Any]:
         """Return aggregate learning statistics."""
         with self._lock:
-            total_attempts = sum(
-                model.attempts for model in self._models.values()
-            )
-            total_successes = sum(
-                model.successes for model in self._models.values()
-            )
+            total_attempts = sum(model.attempts for model in self._models.values())
+            total_successes = sum(model.successes for model in self._models.values())
             return {
                 "models": len(self._models),
                 "pending": len(self._pending),
                 "history": len(self._history),
                 "attempts": total_attempts,
                 "successes": total_successes,
-                "success_rate": (
-                    total_successes / total_attempts if total_attempts else 0.0
-                ),
+                "success_rate": (total_successes / total_attempts if total_attempts else 0.0),
             }
 
     def to_dict(self) -> dict[str, Any]:
@@ -1740,12 +1695,8 @@ class ActionFeedback:
             return {
                 "version": 1,
                 "counter": self._counter,
-                "models": {
-                    key: model.to_dict() for key, model in self._models.items()
-                },
-                "history": [
-                    attempt.to_dict() for attempt in self._history[-100:]
-                ],
+                "models": {key: model.to_dict() for key, model in self._models.items()},
+                "history": [attempt.to_dict() for attempt in self._history[-100:]],
             }
 
     def restore_from_dict(self, data: dict[str, Any]) -> None:

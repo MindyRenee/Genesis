@@ -60,9 +60,7 @@ def test_grounder_uses_the_same_polysemy_resolution_as_network() -> None:
         properties={"definition": "the edge of a river"},
     )
 
-    grounded = SemanticGrounder(network).ground(
-        Proposition(subject="bank", predicate="exists")
-    )
+    grounded = SemanticGrounder(network).ground(Proposition(subject="bank", predicate="exists"))
 
     assert grounded.subject.concept_id == "bank"
     assert grounded.subject.confidence == 0.9
@@ -128,6 +126,7 @@ def test_grounder_context_changes_selected_sense() -> None:
 
     assert financial.subject.concept_id == "bank"
     assert river.subject.concept_id == "bank#2"
+
 
 pytestmark = [
     pytest.mark.usefixtures("learned_sentiment"),

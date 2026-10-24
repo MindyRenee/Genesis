@@ -76,9 +76,7 @@ def save_npz(path: str | os.PathLike[str], **arrays: Any) -> None:
     path = os.fspath(path)
     directory = os.path.dirname(os.path.abspath(path)) or "."
     os.makedirs(directory, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(
-        dir=directory, prefix=os.path.basename(path) + ".", suffix=".tmp"
-    )
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix=os.path.basename(path) + ".", suffix=".tmp")
     os.close(fd)
     try:
         with open(tmp, "wb") as f:

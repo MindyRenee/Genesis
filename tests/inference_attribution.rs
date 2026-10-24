@@ -117,7 +117,6 @@ fn run(
                 &mut state.neurochemicals,
                 &result,
                 start_ms + t as u64,
-                false,
                 impulse_offset_to_rate(&params),
             );
         }

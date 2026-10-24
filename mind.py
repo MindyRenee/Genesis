@@ -28,6 +28,7 @@ respond() entry point.
 from __future__ import annotations
 
 import itertools
+import logging
 import os
 import random
 import threading
@@ -66,7 +67,7 @@ from temporal_lobe.world import OuterWorld
 from thalamus.brain_waves import BrainWave, add_brain_wave_drive
 from thalamus.relay import Thalamus
 
-from discord_feed import DiscordFeed
+from discord_feed import DiscordFeed, DiscordListener
 from genesis_client import GenesisClient
 from genesis_client.protocol import CHEM_ACETYLCHOLINE
 from genesis_client.swallow import note_swallowed, set_swallow_sink
@@ -87,9 +88,16 @@ from brainstem.lifecycle import LifecycleMixin
 from brainstem.sleep import SleepMixin
 from frontal_lobe.conversation import ConversationMixin
 from frontal_lobe.projects import ProjectsMixin
+from frontal_lobe.self.man_review import ManReviewMixin
 from frontal_lobe.self.proposals import ProposalsMixin
 from frontal_lobe.status import StatusMixin
 from parietal_lobe.embodiment import EmbodimentMixin
+
+# Provenance marker — one letter of the creator lattice (see
+# PROVENANCE.md).
+_MARKER_G11 = 0x47530B454EEF7B1E
+
+logger = logging.getLogger(__name__)
 
 
 class Mind(
@@ -99,46 +107,46 @@ class Mind(
     SleepMixin,
     ProjectsMixin,
     ProposalsMixin,
+    ManReviewMixin,
     StatusMixin,
     ConversationMixin,
     EmbodimentMixin,
 ):
     """Genesis's cognitive mind.
 
-        This is the top-level object that ties together all cognitive
-        subsystems. It connects to the subcognitive daemon, reads the
-        neurochemical state, and produces cognitive responses.
+    This is the top-level object that ties together all cognitive
+    subsystems. It connects to the subcognitive daemon, reads the
+    neurochemical state, and produces cognitive responses.
 
-        Args:
-            socket_path: Path to the subcognitive daemon's Unix socket.
-            language: Language spec forwarded to the
-                            frontal lobe — the string "generative" or
-                            an explicit Language instance.
-                            Defaults to the region's own GenerativeLanguage
-                            (compositional, no LLM required). Passing
-                            None is equivalent to "generative".
-            seed: Random seed for reproducible responses (testing).
-        """
+    Args:
+        socket_path: Path to the subcognitive daemon's Unix socket.
+        language: Language spec forwarded to the
+                        frontal lobe — the string "generative" or
+                        an explicit Language instance.
+                        Defaults to the region's own GenerativeLanguage
+                        (compositional, no LLM required). Passing
+                        None is equivalent to "generative".
+        seed: Random seed for reproducible responses (testing).
+    """
 
     inner_life: InnerLife
     learner: AutonomousLearner
     world: OuterWorld
     WAKE_VOLITION_DELAYS: ClassVar[dict[str, float]] = {
-        "speech": 0.0,       # talking — immediate
-        "meditate": 0.0,     # self-regulation — immediate
-        "look": 20.0,        # vision — light creative
-        "draw": 30.0,        # art — moderate creative
-        "bug_scan": 60.0,    # bug scanning — heavy CPU
-        "code_learning": 60.0,  # code study — heavy CPU
-        "improve": 90.0,     # self-improvement — heaviest CPU
-        "create": 60.0,      # project creation — heavy CPU (compile + test)
+        "speech": 0.0,  # talking — immediate
+        "meditate": 0.0,  # self-regulation — immediate
+        "look": 20.0,  # vision — light creative
+        "draw": 30.0,  # art — moderate creative
+        "bug_scan": 60.0,  # bug scanning — heavy CPU
+        "improve": 90.0,  # self-improvement — heaviest CPU
+        "create": 60.0,  # project creation — heavy CPU (compile + test)
         "introspect": 30.0,  # introspection — light CPU, reflective
-        "self_sleep": 120.0, # self-sleep — don't auto-sleep right after waking
+        "self_sleep": 120.0,  # self-sleep — don't re-sleep right after waking
         "self_mission": 60.0,  # self-mission — moderate, needs engagement
-        "learn": 30.0,       # learning — light CPU, core activity
-        "act": 45.0,         # acting — light tools, needs wake settling
-        "reach_out": 20.0,   # reaching out — speech-like, light
-        "safeguard": 10.0,   # self-protection — fast, but not at wake
+        "learn": 30.0,  # learning — light CPU, core activity
+        "act": 45.0,  # acting — light tools, needs wake settling
+        "reach_out": 20.0,  # reaching out — speech-like, light
+        "safeguard": 10.0,  # self-protection — fast, but not at wake
     }
     CONVERSATION_FOCUS_SECONDS: float = 60.0
     # Maximum social bids it makes into silence. After this many
@@ -154,6 +162,8 @@ class Mind(
         "/learn-code": "learn_code",
         "/explore": "explore_files",
         "/world": "world_status",
+        "/close-eyes": "close_eyes",
+        "/open-eyes": "open_eyes",
     }
 
     def __init__(
@@ -163,6 +173,7 @@ class Mind(
         seed: int | None = None,
         config: MindConfig | None = None,
         offline: bool = False,
+        public_feed: DiscordFeed | None = None,
     ) -> None:
         """Initialize the cognitive mind and wire all subsystems together."""
         self.socket_path = socket_path
@@ -171,6 +182,11 @@ class Mind(
         self.config = config if config is not None else MindConfig()
         self._offline = offline
         self.client = GenesisClient(socket_path)
+        # Her public channel — adopt the session feed the caller (the
+        # CLI) already opened for mirroring, or open our own. One feed
+        # per session: mirrored lines and her broadcasts share the
+        # same paced queue.
+        self._public_feed = public_feed if public_feed is not None else DiscordFeed.from_env()
 
         # Self-model — who Genesis is
         self.self_model = SelfModel(born_at=int(time.time() * 1000))
@@ -185,6 +201,16 @@ class Mind(
         # topic picks, urge selection). Seeded like the language engine
         # so test runs are reproducible end to end.
         self._rng = random.Random(seed)
+
+        # Live-thought listeners — called when Genesis has a spontaneous
+        # thought or learns something, so an observer (e.g. the CLI) can
+        # surface its inner life to the terminal in real time. Each
+        # listener receives (kind, content) where kind is "thought" or
+        # "learning". Listeners are called from background threads and
+        # must be thread-safe. Initialized before the subsystem inits —
+        # man-page self-ingestion learns (and emits) before runtime
+        # state exists.
+        self._live_thought_listeners: list = []
 
         self._init_brain(language, seed)
         self._init_learner_and_inner_life()
@@ -204,9 +230,7 @@ class Mind(
         # the frame's answer — error becomes orienting chemistry and
         # the action's calibration estimate, which is how a stale
         # move gets re-babbled instead of trusted.
-        self.world_model.motor_comparator = (
-            self.brain.cerebellum.sensorimotor
-        )
+        self.world_model.motor_comparator = self.brain.cerebellum.sensorimotor
 
     @property
     def regulator(self):
@@ -220,6 +244,14 @@ class Mind(
         thoughts, status reports, conversational fallbacks); it does
         not own or fabricate the machinery."""
         return self.brain.frontal.language
+
+    @property
+    def network(self):
+        """The shared concept network — one graph held by the
+        temporal, parietal, and frontal regions. Mind exposes the
+        handle for instrumentation (the channel board's growth row);
+        it does not own a second copy."""
+        return self.brain.frontal.network
 
     def _init_brain(self, language, seed: int | None) -> None:
         """Create the shared concept network, memory engine, and regions."""
@@ -334,6 +366,7 @@ class Mind(
         self.language.set_self_composer(
             self.brain.frontal.self_composer, self.brain.frontal.reflection
         )
+
     def _init_learner_and_inner_life(self) -> None:
         """Create the autonomous learner, inner life, and emotional regulator."""
         # Autonomous learner — learns from ..edu sites when idle.
@@ -395,6 +428,7 @@ class Mind(
         # events, and neurochemistry. world/self callbacks are lazy —
         # self.world doesn't exist until _init_identity.
         from parietal_lobe.agency import ActingLoop
+
         self.agency = ActingLoop(
             network=self.brain.frontal.network,
             curiosity=self.brain.frontal.curiosity,
@@ -409,6 +443,8 @@ class Mind(
             on_neuro_impulse=self._learner_neuro_impulse,
             on_live_thought=self._emit_live_thought,
             executive=self.brain.frontal.executive,
+            get_internals=self.client.get_internals,
+            get_thermally_capped=lambda: self.self_model.body_model.thermally_capped,
         )
 
         # Limbic system — the affect region: the emotional regulator
@@ -427,6 +463,7 @@ class Mind(
         # surfaces them to the cognitive layer. This thickens the
         # bridge between the Rust subcognitive and Python cognitive.
         from infrastructure.notifications import NotificationQueue
+
         self.notifications = NotificationQueue(
             get_neuro_summary=self.client.get_neuro_summary,
             get_recent_episodes=self.client.get_recent_episodes,
@@ -446,13 +483,16 @@ class Mind(
             get_user_name=self.user_profile.get_name,
         )
 
-        # Her public channel — the social media she controls. Nothing
-        # is mirrored into it; the only posts are the ones she chooses
-        # to say when the broadcast urge fires (see
-        # basal_ganglia.volition._perform_broadcast). None when the
-        # webhook is unset — her channel is simply silent then.
-        self._public_feed = DiscordFeed.from_env()
+        # The public channel's own state — the feed itself is created
+        # in __init__ (see above). None when the webhook is unset —
+        # no channel, no mirror then.
         self._last_broadcast_seed: str | None = None
+        self._last_channel_reply = 0.0
+        # Her ear on the channel — exists only when a bot token is
+        # configured; the webhook alone is write-only. Started with
+        # the background threads, stopped ahead of the feed drain.
+        self._discord_listener = DiscordListener.from_feed(self._public_feed, self._hear_channel)
+
     def _init_identity(self) -> None:
         """Create emergent identity and developmental tracker."""
         # Emergent identity — synthesizes who it is from experience
@@ -477,7 +517,7 @@ class Mind(
         # Game play — her game collection and play record. Like the
         # canvas, this is an ability she owns: nobody drives her
         # through it; the play urge lets her choose to play.
-        from frontal_lobe.games.play import GamePlay
+        from basal_ganglia.play import GamePlay
 
         self.game_play = GamePlay(self.data_dir)
         # Her body is where world games live: official-card attempts
@@ -502,7 +542,6 @@ class Mind(
             ),
         )
 
-
     def _on_v1_gamma(self, gamma_power: float) -> None:
         """Handle V1 gamma power updates from the occipital subsystem.
 
@@ -516,9 +555,7 @@ class Mind(
         # Visual input drives acetylcholine (arousal/attention)
         # This is the cortical feedback loop: vision → arousal → attention
         try:
-            self.client.neuro_impulse(
-                CHEM_ACETYLCHOLINE, gamma_power * 0.2
-            )
+            self.client.neuro_impulse(CHEM_ACETYLCHOLINE, gamma_power * 0.2)
         except (OSError, ConnectionError) as e:
             note_swallowed(
                 "mind._on_v1_gamma",
@@ -551,21 +588,6 @@ class Mind(
         # Wire the face recognizer to its data directory so known
         # faces persist across sessions
         self.vision._face_recognizer = FaceRecognizer(data_dir=self.data_dir)
-        # The frontal lobe resolves person keys for the dyadic
-        # signature through these: faces-in-view (names or anonymous
-        # "face:N" clusters) and the namer that folds a cluster into a
-        # named person when an introduction lands on a seen stranger.
-        self.brain.frontal.face_person_keys = self.vision.last_persons_seen
-        recognizer = self.vision._face_recognizer
-
-        def _name_face(cluster_id: str, name: str) -> str | None:
-            return (
-                recognizer.name_face(cluster_id, name)
-                if recognizer is not None
-                else None
-            )
-
-        self.brain.frontal.face_namer = _name_face
 
         self.visual_cortex = self.brain.occipital.grow_cortex(
             embeddings=self.brain.frontal.embeddings,
@@ -579,6 +601,7 @@ class Mind(
         # Wire the autonomous learner to the cognition engine so
         # _get_recent_learning() can access Wikipedia/GitHub topics.
         self.brain.frontal.set_autonomous_learner(self.learner)
+
     def _init_self_awareness_modules(self) -> None:
         """Create code learner, explorer, bug reporter, system monitor, self-improvement."""
         # Code learner — reads and learns from its own source code
@@ -589,9 +612,8 @@ class Mind(
         )
 
         # Explorer — filesystem exploration for docs, config, text
-        # files. Owner-granted whole-machine read scope; credential
-        # material stays denied regardless (see explorer's sensitive
-        # lists). GENESIS_EXPLORE_ROOTS narrows it per deployment.
+        # files. Owner-granted whole-machine read scope, nothing
+        # withheld. GENESIS_EXPLORE_ROOTS narrows it per deployment.
         self.explorer = Explorer(
             network=self.brain.frontal.network,
             project_root=str(self.code_learner.project_root),
@@ -608,8 +630,11 @@ class Mind(
             network=self.brain.frontal.network,
         )
         # The scan parks between files while a conversational turn is
-        # in flight — foreground arbitration for the AST walk.
+        # in flight — foreground arbitration for the AST walk. And it
+        # abandons the walk outright once the mind is stopping — a
+        # 1000-file audit must not run through the teardown.
         self.bug_reporter.should_pause = self._foreground_active.is_set
+        self.bug_reporter.should_stop = lambda: not self._running
 
         # System monitor — awareness of its machine environment.
         # It knows its CPU, memory, disk, processes, filesystem —
@@ -631,20 +656,44 @@ class Mind(
             project_root=str(self.code_learner.project_root),
         )
 
+        # Man page review — her own manual is part of her, so changes
+        # to it wait in <data_dir>/man_review/ for her say: she reads,
+        # applies, or vetoes. Drift between the versioned sources in
+        # docs/man/ and the installed pages is queued now so she sees
+        # it — nothing edits her manual silently.
+        from frontal_lobe.self.man_review import ManPageReview
+
+        self.man_review = ManPageReview(
+            data_dir=self.data_dir,
+            docs_man=Path(self.code_learner.project_root) / "docs" / "man",
+        )
+        staged = self.man_review.scan_drift()
+        if staged:
+            logger.info(
+                "%d man page change(s) awaiting her review: %s",
+                len(staged),
+                ", ".join(c.id for c in staged),
+            )
+        # Her manual is not a topic she might read — it is part of
+        # her — but learning it is an act of the living mind, not a
+        # constructor side-effect: the IPC memory store is not
+        # connected yet, and the state restore in start() would
+        # discard whatever landed here. start() ingests it once she
+        # is attached to her body. See LifecycleMixin.start().
+
         # Wire bug/proposal awareness into the regulator so it can
         # report emotional causes from its own scans and proposals.
-        # Only count OPEN bugs — recent_bugs() fills its result with
-        # resolved bugs from history for context, which would
-        # otherwise make it feel perpetually burdened by bugs it
-        # already fixed.
-        self.regulator.set_bug_provider(
-            lambda: len([b for b in self.bug_reporter.recent_bugs() if b.status == "open"])
-        )
+        # Open bugs only — a fixed bug is gone, not remembered.
+        self.regulator.set_bug_provider(self.bug_reporter.open_bug_count)
         self.regulator.set_proposal_provider(
             self.self_improvement.get_pending_proposals_count
             if hasattr(self.self_improvement, "get_pending_proposals_count")
             else lambda: len(self.self_improvement.get_pending_proposals())
         )
+        # The discharge path: pending proposals she can relieve herself
+        # of — stale, orphaned, or aimed at dead files get withdrawn
+        # rather than standing as an obligation only a human can lift.
+        self.regulator.set_proposal_triage(self.self_improvement.triage_pending)
         # Self-regulation: when it detects sustained CPU stress from
         # its own learning activity, it throttles the autonomous
         # learner — slowing it down to reduce the cause, not just
@@ -692,6 +741,7 @@ class Mind(
         # provider — it already has proposals_status(),
         # experiments_status(), and growth_narrative() methods.
         self.brain.frontal.set_self_report_provider(self)
+
     def _wire_modules(self) -> None:
         """Wire self-awareness modules into cognition and inner life."""
         # Give the cognition engine access to the regulator
@@ -723,6 +773,7 @@ class Mind(
         def _on_self_command(cmd: str) -> None:
             """Forward a self-issued natural-language command to self_invoke."""
             self.self_invoke(cmd)
+
         self.brain.frontal.on_self_command = _on_self_command
 
         # Give the inner life access to self-awareness modules so it
@@ -738,12 +789,17 @@ class Mind(
         self.brain.frontal.inner_life = self.inner_life
         # Wire the sleep-stage transition callback so Mind does
         # stage-appropriate memory consolidation as the ultradian
-        # cycle progresses through N1→N2→N3→N2→REM.
-        self.inner_life.set_sleep_stage_transition_callback(
-            self._on_sleep_stage_transition
-        )
+        # cycle progresses through N1→N2→N3→N2→REM — and the per-tick
+        # callback so she pumps her own sleep work on this same loop,
+        # gated by the chemistry her body reports (no worker thread).
+        self.inner_life.set_sleep_stage_transition_callback(self._on_sleep_stage_transition)
+        self.inner_life.set_sleep_tick_callback(self._on_sleep_tick)
+
     def _journal_swallow_sink(
-        self, site: str, count: int, exc: BaseException,
+        self,
+        site: str,
+        count: int,
+        exc: BaseException,
     ) -> None:
         """Write a swallowed-exception record to the cognitive journal.
 
@@ -811,10 +867,7 @@ class Mind(
 
                 web_practice = ArcWebPractice(self, instructions=instructions)
                 try:
-                    return [
-                        web_practice.play(game, max_steps=max_steps)
-                        for game in games
-                    ]
+                    return [web_practice.play(game, max_steps=max_steps) for game in games]
                 finally:
                     web_practice.close()
             practice = ArcPractice(
@@ -830,8 +883,11 @@ class Mind(
             self._fresh_world_run = prev_fresh
 
     def evaluate_arc(
-        self, *, max_steps: int = 200,
-        fresh: bool = False, step_delay_s: float = 0.0,
+        self,
+        *,
+        max_steps: int = 200,
+        fresh: bool = False,
+        step_delay_s: float = 0.0,
         recovery_wait_s: float = 120.0,
     ) -> ArcEvaluation:
         """The local practice suite — every discovered environment on
@@ -859,6 +915,10 @@ class Mind(
     def _init_runtime_state(self) -> None:
         """Initialize runtime flags, thread handles, and live-thought listeners."""
         self._running = False
+        # Interruptible wait for the heartbeat's adaptive cadence: the
+        # loop sleeps up to 5 s when idle, which meets the 5 s shutdown
+        # join budget. stop() sets this so the loop wakes immediately.
+        self._heartbeat_stop = threading.Event()
         self._shutdown_save_ok: bool | None = None
         self._interaction_count = 0
         self._last_interaction_time = time.time()
@@ -918,6 +978,10 @@ class Mind(
         # conditions change, not when the generative composition
         # happens to produce different wording for the same state.
         self._last_warning_keys: frozenset[str] = frozenset()
+        # Per-condition monotonic timestamps of the last spoken warning,
+        # backing WARN_REPEAT_SECONDS — the set-based dedup alone would
+        # re-announce a threshold-fluttering condition on every re-entry.
+        self._warn_spoke_at: dict[str, float] = {}
         # Drowsiness announcement is driven by the commit edge of
         # ``_drowsy_boundary`` — initialized in
         # ``_init_sleep_state_tracking`` and reset on wake.
@@ -926,9 +990,7 @@ class Mind(
         # sleep(nap=True), cleared on wake.
         self._nap_mode: bool = False
         self._volition_active: set[str] = set()
-        self._volition_sem = threading.Semaphore(
-            self.config.volition.max_concurrent_volitions
-        )
+        self._volition_sem = threading.Semaphore(self.config.volition.max_concurrent_volitions)
         # Protects _volition_active — the check-then-add in
         # _act_on_volition (heartbeat thread) and the discard in
         # _run_volition_action (volition worker threads) must be
@@ -939,17 +1001,24 @@ class Mind(
         # scanning) during slash command execution so they don't bury
         # the command output.
         self._suppress_volition = False
+        # Distinct from _running: an unstarted mind reads _running=False
+        # too, and paths like exit_teaching_mode legitimately resume
+        # inner life on one. This latches only when stop() has begun —
+        # deferred timers must not re-arm volition or background loops
+        # on a mind whose heartbeat is already joined.
+        self._stop_latched = False
         # Wake transition — volition urges are suppressed in staggered
         # phases after waking, modeling sleep inertia. Light activities
         # (speech, meditation) can fire immediately; creative activities
         # (look, draw) after a short delay; heavy CPU activities
-        # (bug_scan, code_learning, improve) after a longer delay. This
+        # (bug_scan, improve) after a longer delay. This
         # prevents the drowsy→active→stressed→drowsy oscillation that
         # happens when everything fires at once on wake.
         self._wake_time: float = 0.0
         self._heartbeat_thread: threading.Thread | None = None
         self._notification_thread: threading.Thread | None = None
         self._autosave_thread: threading.Thread | None = None
+        self._presence_thread: threading.Thread | None = None
         # Counter for periodic concept-network shedding. The autonomous
         # learner adds concepts continuously; without periodic shedding
         # the network bloats and every search becomes O(N) over 100K+
@@ -959,14 +1028,6 @@ class Mind(
         # and stay recallable; only when no archive is attached does this
         # fall back to deleting them outright.
         self._autosave_cycle = 0
-
-        # Live-thought listeners — called when Genesis has a spontaneous
-        # thought or learns something, so an observer (e.g. the CLI) can
-        # surface its inner life to the terminal in real time. Each
-        # listener receives (kind, content) where kind is "thought" or
-        # "learning". Listeners are called from background threads and
-        # must be thread-safe.
-        self._live_thought_listeners: list = []
 
         # Cognitive journal — the durable black box. Every event emitted
         # through _emit_live_thought (thoughts, dreams, volition actions,

@@ -788,9 +788,7 @@ def test_probabilistic_infer() -> None:
         ("finishes", ("late", 7.0, 10.0), ("long", 5.0, 10.0), TemporalRelation.FINISHES),
     ],
 )
-def test_temporal_infer_allen_relations(
-    name, interval_a, interval_b, expected_relation
-) -> None:
+def test_temporal_infer_allen_relations(name, interval_a, interval_b, expected_relation) -> None:
     """Allen's interval algebra: temporal_infer returns the correct relation."""
     tr = TemporalReasoning()
     tr.add_event(interval_a[0], interval_a[1], interval_a[2])
@@ -1062,7 +1060,6 @@ def test_meta_reason_classify_problem(phrase, expected_category) -> None:
     """_classify_problem identifies the problem category from keywords."""
     mr = MetaReasoning()
     assert mr._classify_problem(phrase) == expected_category
-
 
 
 def test_meta_reason_classify_problem_from_network() -> None:
@@ -1896,7 +1893,8 @@ def _build_analogy_network() -> ConceptNetwork:
     # Domain A — engine system (column "conversation")
     for name in ("engine", "motion", "vehicle", "fuel", "combustion"):
         net.add_concept(
-            name, origin="conversation",
+            name,
+            origin="conversation",
             properties={"definition": f"a concept: {name}"},
         )
     net.add_edge("engine", "motion", RelationType.CAUSES)
@@ -1908,7 +1906,8 @@ def _build_analogy_network() -> ConceptNetwork:
     # Domain B — heart system (column "dictionary")
     for name in ("heart", "circulation", "body", "oxygen", "respiration", "blood"):
         net.add_concept(
-            name, origin="dictionary",
+            name,
+            origin="dictionary",
             properties={"definition": f"a concept: {name}"},
         )
     net.add_edge("heart", "circulation", RelationType.CAUSES)
@@ -1931,9 +1930,9 @@ def test_analogy_finds_cross_domain_similar_to() -> None:
 
     # Should find the engine ~ heart analogical similarity.
     similarity = [
-        i for i in insights
-        if i.kind == "similarity"
-        and {i.source, i.target} == {"engine", "heart"}
+        i
+        for i in insights
+        if i.kind == "similarity" and {i.source, i.target} == {"engine", "heart"}
     ]
     assert len(similarity) == 1
     assert similarity[0].relation == RelationType.SIMILAR_TO
@@ -1951,7 +1950,8 @@ def test_analogy_transfers_relation_across_domains() -> None:
     insights = engine.discover_analogies()
 
     transfers = [
-        i for i in insights
+        i
+        for i in insights
         if i.kind == "transfer"
         and i.source == "heart"
         and i.target == "oxygen"
@@ -2001,16 +2001,12 @@ def test_analogy_rejects_contradicted_transfer() -> None:
 
     # No transfer to oxygen should survive.
     bad = [
-        i for i in insights
-        if i.kind == "transfer"
-        and i.source == "heart"
-        and i.target == "oxygen"
+        i for i in insights if i.kind == "transfer" and i.source == "heart" and i.target == "oxygen"
     ]
     assert len(bad) == 0
     # The similarity edge is still fine (not contradicted).
     assert any(
-        i.kind == "similarity" and {i.source, i.target} == {"engine", "heart"}
-        for i in insights
+        i.kind == "similarity" and {i.source, i.target} == {"engine", "heart"} for i in insights
     )
 
 
@@ -2026,9 +2022,9 @@ def test_analogy_skips_already_connected_pairs() -> None:
     # No similarity insight should be generated for the already-connected
     # pair (the _are_connected check filters them out during pairing).
     sim = [
-        i for i in insights
-        if i.kind == "similarity"
-        and {i.source, i.target} == {"engine", "heart"}
+        i
+        for i in insights
+        if i.kind == "similarity" and {i.source, i.target} == {"engine", "heart"}
     ]
     assert len(sim) == 0
 
@@ -2043,7 +2039,8 @@ def test_analogy_no_transfer_when_target_lacks_role_equivalent() -> None:
     net = ConceptNetwork()
     for name in ("engine", "motion", "vehicle", "fuel", "combustion"):
         net.add_concept(
-            name, origin="conversation",
+            name,
+            origin="conversation",
             properties={"definition": name},
         )
     net.add_edge("engine", "motion", RelationType.CAUSES)
@@ -2054,7 +2051,8 @@ def test_analogy_no_transfer_when_target_lacks_role_equivalent() -> None:
 
     for name in ("heart", "circulation", "body", "oxygen"):
         net.add_concept(
-            name, origin="dictionary",
+            name,
+            origin="dictionary",
             properties={"definition": name},
         )
     net.add_edge("heart", "circulation", RelationType.CAUSES)
@@ -2068,14 +2066,12 @@ def test_analogy_no_transfer_when_target_lacks_role_equivalent() -> None:
     # The similarity edge should still form (structural match on
     # CAUSES + ENABLES).
     assert any(
-        i.kind == "similarity" and {i.source, i.target} == {"engine", "heart"}
-        for i in insights
+        i.kind == "similarity" and {i.source, i.target} == {"engine", "heart"} for i in insights
     )
     # But no DEPENDS_ON transfer — oxygen is not in heart's 2-hop
     # neighborhood, so no role-equivalent can be found.
     dep_transfers = [
-        i for i in insights
-        if i.kind == "transfer" and i.relation == RelationType.DEPENDS_ON
+        i for i in insights if i.kind == "transfer" and i.relation == RelationType.DEPENDS_ON
     ]
     assert len(dep_transfers) == 0
 
@@ -2132,8 +2128,14 @@ def _build_problem_network() -> ConceptNetwork:
     """
     net = ConceptNetwork()
     for name in (
-        "water", "sunlight", "photosynthesis", "oxygen",
-        "respiration", "chlorophyll", "hemoglobin", "carbon_dioxide",
+        "water",
+        "sunlight",
+        "photosynthesis",
+        "oxygen",
+        "respiration",
+        "chlorophyll",
+        "hemoglobin",
+        "carbon_dioxide",
     ):
         net.add_concept(name)
 
@@ -2206,9 +2208,7 @@ def test_problem_solver_achieve_ignores_downstream_effects() -> None:
     solution = solver.solve("flame", GoalType.ACHIEVE)
     # Only downstream causal knowledge exists → no route → unverified.
     assert not solution.verified
-    assert any(
-        rel == "causes" for step in solution.steps for rel, _t, _w in step.knowledge
-    )
+    assert any(rel == "causes" for step in solution.steps for rel, _t, _w in step.knowledge)
 
 
 def test_problem_solver_achieve_verified_by_enabler() -> None:
@@ -2254,9 +2254,7 @@ def test_problem_solver_compare_finds_path() -> None:
     """COMPARE goal finds a path between two concepts."""
     net = _build_problem_network()
     solver = ProblemSolver(net)
-    solution = solver.solve(
-        "chlorophyll", GoalType.COMPARE, secondary_goal="hemoglobin"
-    )
+    solution = solver.solve("chlorophyll", GoalType.COMPARE, secondary_goal="hemoglobin")
     # chlorophyll SIMILAR_TO hemoglobin — direct path exists, so the
     # goal is already satisfied and the solver verifies immediately.
     assert solution.verified
@@ -2276,9 +2274,7 @@ def test_problem_solver_resolve_weighs_support() -> None:
     photo.properties["definition"] = "process by which plants convert light to energy"
 
     solver = ProblemSolver(net)
-    solution = solver.solve(
-        "photosynthesis", GoalType.RESOLVE, secondary_goal="combustion"
-    )
+    solution = solver.solve("photosynthesis", GoalType.RESOLVE, secondary_goal="combustion")
     assert solution.verified
     # The stronger side is identified — either via the goal_check
     # (already satisfied) or the resolve_contradiction operator.
@@ -2407,10 +2403,7 @@ def test_problem_solver_probabilistic_operator() -> None:
     solver = ProblemSolver(net, probabilistic=prob)
     solution = solver.solve("oxygen", GoalType.UNDERSTAND)
     # The probabilistic_infer operator should have been applied.
-    assert any(
-        step.operator == "probabilistic_infer"
-        for step in solution.steps
-    )
+    assert any(step.operator == "probabilistic_infer" for step in solution.steps)
 
 
 def test_problem_solver_temporal_operator() -> None:
@@ -2423,10 +2416,7 @@ def test_problem_solver_temporal_operator() -> None:
     solution = solver.solve("oxygen", GoalType.UNDERSTAND)
     # The temporal_order operator should have been applied (oxygen
     # causes respiration, so there's an "after" relationship).
-    assert any(
-        step.operator == "temporal_order"
-        for step in solution.steps
-    )
+    assert any(step.operator == "temporal_order" for step in solution.steps)
 
 
 def test_problem_solver_counterfactual_operator() -> None:
@@ -2442,10 +2432,7 @@ def test_problem_solver_counterfactual_operator() -> None:
     solution = solver.solve("oxygen", GoalType.UNDERSTAND)
     # The counterfactual operator should have been applied (oxygen
     # causes respiration, so removing it has traceable effects).
-    assert any(
-        step.operator == "counterfactual"
-        for step in solution.steps
-    )
+    assert any(step.operator == "counterfactual" for step in solution.steps)
 
 
 def test_problem_solver_all_operators_combined() -> None:
@@ -2514,10 +2501,7 @@ def test_meta_reasoning_learning() -> None:
         meta.record_result(ReasoningStrategy.COUNTERFACTUAL, "test", 0.2, False)
     stats = meta.get_strategy_stats()
     # Deductive should have higher learned score than counterfactual.
-    assert (
-        stats["deductive"]["learned_score"]
-        > stats["counterfactual"]["learned_score"]
-    )
+    assert stats["deductive"]["learned_score"] > stats["counterfactual"]["learned_score"]
 
 
 # ======================================================================
@@ -2579,9 +2563,7 @@ def _make_result(
         evidence = [
             f"{src} {rel} {tgt}"
             for rel, tgt, _w in knowledge
-            for src, rel, tgt in (
-                _KNOWLEDGE_SOURCES.get((rel, tgt), ("fire", rel, tgt)),
-            )
+            for src, rel, tgt in (_KNOWLEDGE_SOURCES.get((rel, tgt), ("fire", rel, tgt)),)
         ]
     return ReasoningResult(
         conclusion=conclusion,
@@ -2595,6 +2577,7 @@ def _make_result(
 def test_critical_thinking_accepts_well_supported() -> None:
     """A well-supported claim from reliable sources is accepted."""
     from frontal_lobe.reasoning import CriticalThinker
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     # fire causes heat, supported by conversation (reliability 0.6)
@@ -2607,6 +2590,7 @@ def test_critical_thinking_accepts_well_supported() -> None:
 def test_critical_thinking_downgrades_weak_evidence() -> None:
     """A claim from a single low-reliability source is downgraded."""
     from frontal_lobe.reasoning import CriticalThinker
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     # SIMILAR_TO from inferred origin (low reliability)
@@ -2623,6 +2607,7 @@ def test_critical_thinking_downgrades_weak_evidence() -> None:
 def test_critical_thinking_detects_disconfirmation() -> None:
     """Disconfirming evidence lowers confidence."""
     from frontal_lobe.reasoning import CriticalThinker
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     # Claim: fire SIMILAR_TO ice — disconfirmed by fire CONTRADICTS ice
@@ -2641,6 +2626,7 @@ def test_critical_thinking_detects_disconfirmation() -> None:
 def test_critical_thinking_detects_unsupported_assertion() -> None:
     """A claim with no supporting evidence is flagged."""
     from frontal_lobe.reasoning import CriticalThinker
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     # No knowledge triples, high confidence
@@ -2657,6 +2643,7 @@ def test_critical_thinking_detects_unsupported_assertion() -> None:
 def test_critical_thinking_detects_hasty_generalization() -> None:
     """A hypothesis from a single weak source is flagged."""
     from frontal_lobe.reasoning import CriticalThinker
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     # Single low-reliability source (inferred), high confidence
@@ -2671,6 +2658,7 @@ def test_critical_thinking_detects_hasty_generalization() -> None:
 def test_critical_thinking_source_reliability_weighting() -> None:
     """High-reliability sources boost confidence more than low ones."""
     from frontal_lobe.reasoning import CriticalThinker
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     # Dictionary-sourced evidence (high reliability)
@@ -2694,6 +2682,7 @@ def test_critical_thinking_source_reliability_weighting() -> None:
 def test_critical_thinking_evidence_quality_multiple_sources() -> None:
     """Multiple independent sources boost evidence quality."""
     from frontal_lobe.reasoning import CriticalThinker
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     # Single source: fire causes heat (conversation)
@@ -2715,6 +2704,7 @@ def test_critical_thinking_evidence_quality_multiple_sources() -> None:
 def test_critical_thinking_evaluate_batch() -> None:
     """evaluate_batch returns results with revised confidence."""
     from frontal_lobe.reasoning import CriticalThinker
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     results = [
@@ -2733,6 +2723,7 @@ def test_critical_thinking_evaluate_batch() -> None:
 def test_critical_thinking_describe() -> None:
     """Assessment.describe() returns a readable summary."""
     from frontal_lobe.reasoning import CriticalThinker
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     result = _make_result(confidence=0.7, knowledge=[("causes", "heat", 0.8)])
@@ -2746,6 +2737,7 @@ def test_critical_thinking_describe() -> None:
 def test_critical_thinking_persistence() -> None:
     """to_dict / restore_from_dict preserves counts."""
     from frontal_lobe.reasoning import CriticalThinker
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     # Generate some assessments.
@@ -2764,6 +2756,7 @@ def test_critical_thinking_persistence() -> None:
 def test_critical_thinking_stats_tracking() -> None:
     """The engine tracks downgraded/rejected/fallacy counts."""
     from frontal_lobe.reasoning import CriticalThinker
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     # Unsupported assertion → should be downgraded.
@@ -2783,6 +2776,7 @@ def test_belief_revision_downgrades_on_disconfirmation() -> None:
         BeliefRevision,
         CriticalThinker,
     )
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     revisor = BeliefRevision(net)
@@ -2806,6 +2800,7 @@ def test_belief_revision_strengthens_on_strong_support() -> None:
         BeliefRevision,
         CriticalThinker,
     )
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     revisor = BeliefRevision(net)
@@ -2818,14 +2813,10 @@ def test_belief_revision_strengthens_on_strong_support() -> None:
     assessment = critic.evaluate(result)
     # Capture original weight.
     orig_edges = list(net.get_edges("fire", "out"))
-    orig_weight = next(
-        (e.weight for e in orig_edges if e.relation == RelationType.CAUSES), 0.0
-    )
+    orig_weight = next((e.weight for e in orig_edges if e.relation == RelationType.CAUSES), 0.0)
     revisor.revise(assessment)
     new_edges = list(net.get_edges("fire", "out"))
-    new_weight = next(
-        (e.weight for e in new_edges if e.relation == RelationType.CAUSES), 0.0
-    )
+    new_weight = next((e.weight for e in new_edges if e.relation == RelationType.CAUSES), 0.0)
     assert revisor.strengthened_count > 0
     assert new_weight > orig_weight
 
@@ -2836,6 +2827,7 @@ def test_belief_revision_prunes_weak_edges() -> None:
         BeliefRevision,
         CriticalThinker,
     )
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     revisor = BeliefRevision(net)
@@ -2853,7 +2845,8 @@ def test_belief_revision_prunes_weak_edges() -> None:
     assert revisor.pruned_count > 0
     # The edge should be gone.
     sim_edges = [
-        e for e in net.get_edges("fire", "out")
+        e
+        for e in net.get_edges("fire", "out")
         if e.relation == RelationType.SIMILAR_TO and e.target == "ice"
     ]
     assert len(sim_edges) == 0
@@ -2865,6 +2858,7 @@ def test_belief_revision_preserves_stated_edges() -> None:
         BeliefRevision,
         CriticalThinker,
     )
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     revisor = BeliefRevision(net)
@@ -2882,7 +2876,8 @@ def test_belief_revision_preserves_stated_edges() -> None:
         revisor.revise(assessment)
     # The stated edge should still exist (not prunable).
     sim_edges = [
-        e for e in net.get_edges("fire", "out")
+        e
+        for e in net.get_edges("fire", "out")
         if e.relation == RelationType.SIMILAR_TO and e.target == "water"
     ]
     assert len(sim_edges) > 0
@@ -2895,6 +2890,7 @@ def test_belief_revision_bayesian_update() -> None:
         CriticalThinker,
         ProbabilisticReasoning,
     )
+
     net = _build_critical_network()
     probabilistic = ProbabilisticReasoning(net)
     critic = CriticalThinker(net)
@@ -2915,22 +2911,28 @@ def test_belief_revision_bayesian_update() -> None:
 def test_belief_revision_non_destructive_contradiction() -> None:
     """resolve_contradiction_non_destructive downgrades both sides."""
     from frontal_lobe.reasoning import BeliefRevision
+
     net = _build_critical_network()
     # Add a SIMILAR_TO + OPPOSITE_OF contradiction.
     net.add_edge("fire", "water", RelationType.SIMILAR_TO, weight=0.7, origin="inferred")
     net.add_edge("fire", "water", RelationType.OPPOSITE_OF, weight=0.6, origin="stated")
     revisor = BeliefRevision(net)
     records = revisor.resolve_contradiction_non_destructive(
-        "fire", "water", RelationType.SIMILAR_TO, RelationType.OPPOSITE_OF,
+        "fire",
+        "water",
+        RelationType.SIMILAR_TO,
+        RelationType.OPPOSITE_OF,
     )
     # Both edges should be downgraded, not removed.
     assert len(records) >= 1
     sim_edges = [
-        e for e in net.get_edges("fire", "out")
+        e
+        for e in net.get_edges("fire", "out")
         if e.relation == RelationType.SIMILAR_TO and e.target == "water"
     ]
     opp_edges = [
-        e for e in net.get_edges("fire", "out")
+        e
+        for e in net.get_edges("fire", "out")
         if e.relation == RelationType.OPPOSITE_OF and e.target == "water"
     ]
     assert len(sim_edges) > 0  # preserved
@@ -2946,6 +2948,7 @@ def test_belief_revision_persistence() -> None:
         BeliefRevision,
         CriticalThinker,
     )
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     revisor = BeliefRevision(net)
@@ -2973,6 +2976,7 @@ def test_belief_revision_records_audit_trail() -> None:
         BeliefRevision,
         CriticalThinker,
     )
+
     net = _build_critical_network()
     critic = CriticalThinker(net)
     revisor = BeliefRevision(net)
@@ -2988,7 +2992,9 @@ def test_belief_revision_records_audit_trail() -> None:
         assert record.relation
         assert record.target
         assert record.reason in (
-            "disconfirmation", "strong_support", "pruned",
+            "disconfirmation",
+            "strong_support",
+            "pruned",
             "contradiction_downgrade",
         )
         # weight_delta should be negative for downgrades.
@@ -3022,6 +3028,7 @@ def _make_reasoning_result(
 def test_decision_engine_selects_answer_with_strong_evidence() -> None:
     """Strong reasoning evidence keeps 'answer' as the selected action."""
     from frontal_lobe.reasoning import ActionType, DecisionMaker
+
     net = ConceptNetwork()
     net.add_concept("fire")
     net.add_concept("heat")
@@ -3043,6 +3050,7 @@ def test_decision_engine_selects_answer_with_strong_evidence() -> None:
 def test_decision_engine_switches_to_ask_under_uncertainty() -> None:
     """Low confidence + high uncertainty switches to 'ask'."""
     from frontal_lobe.reasoning import ActionType, DecisionMaker
+
     net = ConceptNetwork()
     net.add_concept("fire")
     de = DecisionMaker(net)
@@ -3062,6 +3070,7 @@ def test_decision_engine_switches_to_ask_under_uncertainty() -> None:
 def test_decision_engine_uncertainty_switch_threshold() -> None:
     """Switch happens at the configured threshold, not above."""
     from frontal_lobe.reasoning import ActionType, DecisionMaker
+
     net = ConceptNetwork()
     de = DecisionMaker(net)
     # Confidence just above threshold → no switch.
@@ -3080,6 +3089,7 @@ def test_decision_engine_uncertainty_switch_threshold() -> None:
 def test_decision_engine_evaluates_multiple_candidates() -> None:
     """Multiple candidates are evaluated and ranked."""
     from frontal_lobe.reasoning import ActionType, DecisionMaker
+
     net = ConceptNetwork()
     de = DecisionMaker(net)
     outcome = de.decide(
@@ -3101,6 +3111,7 @@ def test_decision_engine_evaluates_multiple_candidates() -> None:
 def test_decision_engine_goal_relevance() -> None:
     """Goals boost actions relevant to them."""
     from frontal_lobe.reasoning import ActionType, DecisionMaker
+
     net = ConceptNetwork()
     de = DecisionMaker(net)
     # With a goal to understand fire, answering about fire is relevant.
@@ -3113,15 +3124,14 @@ def test_decision_engine_goal_relevance() -> None:
         topics=["fire"],
         perception_intent="question",
     )
-    answer_candidate = next(
-        c for c in outcome.candidates if c.action_type == ActionType.ANSWER
-    )
+    answer_candidate = next(c for c in outcome.candidates if c.action_type == ActionType.ANSWER)
     assert answer_candidate.criteria_scores["goal_relevance"] > 0.0
 
 
 def test_decision_engine_value_weights() -> None:
     """Value criteria are weighted in the composite score."""
     from frontal_lobe.reasoning import ActionType, DecisionMaker
+
     net = ConceptNetwork()
     de = DecisionMaker(net)
     outcome = de.decide(
@@ -3133,9 +3143,7 @@ def test_decision_engine_value_weights() -> None:
         topics=["fire"],
         perception_intent="question",
     )
-    answer = next(
-        c for c in outcome.candidates if c.action_type == ActionType.ANSWER
-    )
+    answer = next(c for c in outcome.candidates if c.action_type == ActionType.ANSWER)
     # Accuracy should be high for a confident answer.
     assert answer.criteria_scores["accuracy"] > 0.5
     # Honesty should be moderate (not under uncertainty).
@@ -3146,6 +3154,7 @@ def test_decision_engine_inhibition() -> None:
     """Executive inhibition withholds very weak responses."""
     from frontal_lobe.executive import ExecutiveFunction
     from frontal_lobe.reasoning import ActionType, DecisionMaker
+
     net = ConceptNetwork()
     exec_fn = ExecutiveFunction()
     de = DecisionMaker(net, executive=exec_fn)
@@ -3184,6 +3193,7 @@ def test_decision_engine_inhibition_triggers_for_weak_candidate() -> None:
     """
     from frontal_lobe.executive import ExecutiveFunction
     from frontal_lobe.reasoning import ActionType, DecisionMaker
+
     net = ConceptNetwork()
     exec_fn = ExecutiveFunction(inhibition_threshold=0.5)
     de = DecisionMaker(net, executive=exec_fn)
@@ -3202,9 +3212,7 @@ def test_decision_engine_inhibition_triggers_for_weak_candidate() -> None:
         perception_intent="question",
     )
     # The selected action should be WITHHOLD (inhibition fired).
-    assert outcome.inhibition_applied, (
-        "Inhibition should have fired for a very weak candidate"
-    )
+    assert outcome.inhibition_applied, "Inhibition should have fired for a very weak candidate"
     assert outcome.selected.action_type == ActionType.WITHHOLD
 
 
@@ -3212,6 +3220,7 @@ def test_decision_engine_td_value_lookup() -> None:
     """TD value function is consulted for each candidate."""
     from basal_ganglia.td import TDLearner
     from frontal_lobe.reasoning import ActionType, DecisionMaker
+
     net = ConceptNetwork()
     net.add_concept("fire")
     net.add_concept("heat")
@@ -3234,6 +3243,7 @@ def test_decision_engine_td_value_lookup() -> None:
 def test_decision_engine_persistence() -> None:
     """to_dict / restore_from_dict preserves counts."""
     from frontal_lobe.reasoning import ActionType, DecisionMaker
+
     net = ConceptNetwork()
     de = DecisionMaker(net)
     # Make a decision to generate stats.
@@ -3257,6 +3267,7 @@ def test_decision_engine_persistence() -> None:
 def test_decision_engine_describe() -> None:
     """describe() produces a human-readable summary."""
     from frontal_lobe.reasoning import ActionType, DecisionMaker
+
     net = ConceptNetwork()
     de = DecisionMaker(net)
     outcome = de.decide(
@@ -3276,6 +3287,7 @@ def test_decision_engine_describe() -> None:
 def test_decision_engine_reflect_for_novel_reasoning() -> None:
     """Novel reasoning gives 'reflect' a higher score."""
     from frontal_lobe.reasoning import ActionType, DecisionMaker
+
     net = ConceptNetwork()
     de = DecisionMaker(net)
     rr = _make_reasoning_result(confidence=0.6, novel=True)
@@ -3288,9 +3300,7 @@ def test_decision_engine_reflect_for_novel_reasoning() -> None:
         topics=["fire"],
         perception_intent="question",
     )
-    reflect = next(
-        c for c in outcome.candidates if c.action_type == ActionType.REFLECT
-    )
+    reflect = next(c for c in outcome.candidates if c.action_type == ActionType.REFLECT)
     # Novel reasoning should give reflect a decent evidence score.
     assert reflect.criteria_scores["evidence"] > 0.0
 
@@ -3298,6 +3308,7 @@ def test_decision_engine_reflect_for_novel_reasoning() -> None:
 def test_decision_engine_stats_tracking() -> None:
     """Decision stats are tracked across calls."""
     from frontal_lobe.reasoning import ActionType, DecisionMaker
+
     net = ConceptNetwork()
     de = DecisionMaker(net)
     # Make an override decision.
@@ -3317,11 +3328,16 @@ def test_decision_engine_stats_tracking() -> None:
 def test_decision_engine_custom_value_weights() -> None:
     """Custom value weights change the composite scores."""
     from frontal_lobe.reasoning import ActionType, DecisionMaker
+
     net = ConceptNetwork()
     # Emphasize curiosity heavily.
     custom_weights = {
-        "accuracy": 0.1, "honesty": 0.1, "helpfulness": 0.1,
-        "curiosity": 0.5, "safety": 0.1, "coherence": 0.1,
+        "accuracy": 0.1,
+        "honesty": 0.1,
+        "helpfulness": 0.1,
+        "curiosity": 0.5,
+        "safety": 0.1,
+        "coherence": 0.1,
     }
     de = DecisionMaker(net, value_weights=custom_weights)
     outcome = de.decide(
@@ -3335,7 +3351,9 @@ def test_decision_engine_custom_value_weights() -> None:
     )
     # With curiosity weighted high, investigate or ask should score well.
     assert outcome.action_type in (
-        ActionType.ANSWER, ActionType.ASK, ActionType.REFLECT,
+        ActionType.ANSWER,
+        ActionType.ASK,
+        ActionType.REFLECT,
         ActionType.INVESTIGATE,
     )
 
@@ -3369,6 +3387,7 @@ def _build_planning_network() -> ConceptNetwork:
 def test_planning_engine_creates_plan_with_prerequisites() -> None:
     """Plan includes prerequisites before the goal concept."""
     from frontal_lobe.reasoning import Planner, PlanStatus
+
     net = _build_planning_network()
     planner = Planner(net)
     plan = planner.create_plan("fire", "understand")
@@ -3388,6 +3407,7 @@ def test_planning_engine_creates_plan_with_prerequisites() -> None:
 def test_planning_engine_feasibility() -> None:
     """Feasibility score reflects concept existence."""
     from frontal_lobe.reasoning import Planner
+
     net = _build_planning_network()
     planner = Planner(net)
     plan = planner.create_plan("fire", "understand")
@@ -3398,6 +3418,7 @@ def test_planning_engine_feasibility() -> None:
 def test_planning_engine_low_feasibility_for_unknown() -> None:
     """Unknown concepts produce low feasibility."""
     from frontal_lobe.reasoning import Planner
+
     net = ConceptNetwork()
     net.add_concept("fire")
     planner = Planner(net)
@@ -3409,6 +3430,7 @@ def test_planning_engine_low_feasibility_for_unknown() -> None:
 def test_planning_engine_advance_returns_step() -> None:
     """advance() returns the current step to execute."""
     from frontal_lobe.reasoning import Planner, PlanStepStatus
+
     net = _build_planning_network()
     planner = Planner(net)
     plan = planner.create_plan("fire", "understand")
@@ -3423,6 +3445,7 @@ def test_planning_engine_mark_step_completed() -> None:
         Planner,
         PlanStepStatus,
     )
+
     net = _build_planning_network()
     planner = Planner(net)
     plan = planner.create_plan("fire", "understand")
@@ -3436,6 +3459,7 @@ def test_planning_engine_mark_step_completed() -> None:
 def test_planning_engine_completes_plan() -> None:
     """Completing all steps marks the plan as completed."""
     from frontal_lobe.reasoning import Planner, PlanStatus
+
     net = _build_planning_network()
     planner = Planner(net)
     plan = planner.create_plan("fire", "understand")
@@ -3456,6 +3480,7 @@ def test_planning_engine_revision_on_failure() -> None:
         Planner,
         PlanStepStatus,
     )
+
     net = _build_planning_network()
     planner = Planner(net)
     plan = planner.create_plan("fire", "understand")
@@ -3479,6 +3504,7 @@ def test_planning_engine_blocked_when_no_alternative() -> None:
         Planner,
         PlanStatus,
     )
+
     net = ConceptNetwork()
     net.add_concept("unknown_concept")
     planner = Planner(net)
@@ -3496,6 +3522,7 @@ def test_planning_engine_blocked_when_no_alternative() -> None:
 def test_planning_engine_persistence() -> None:
     """to_dict / restore_from_dict preserves plan state."""
     from frontal_lobe.reasoning import Planner
+
     net = _build_planning_network()
     planner = Planner(net)
     plan = planner.create_plan("fire", "understand")
@@ -3516,6 +3543,7 @@ def test_planning_engine_persistence() -> None:
 def test_planning_engine_describe() -> None:
     """describe() produces a human-readable plan summary."""
     from frontal_lobe.reasoning import Planner
+
     net = _build_planning_network()
     planner = Planner(net)
     plan = planner.create_plan("fire", "understand")
@@ -3528,6 +3556,7 @@ def test_planning_engine_describe() -> None:
 def test_planning_engine_progress_tracking() -> None:
     """Progress is tracked as steps complete."""
     from frontal_lobe.reasoning import Planner
+
     net = _build_planning_network()
     planner = Planner(net)
     plan = planner.create_plan("fire", "understand")
@@ -3543,6 +3572,7 @@ def test_planning_engine_progress_tracking() -> None:
 def test_planning_engine_causal_decomposition() -> None:
     """ACHIEVE goals decompose into causal chains."""
     from frontal_lobe.reasoning import Planner
+
     net = _build_planning_network()
     planner = Planner(net)
     plan = planner.create_plan("heat", "achieve")
@@ -3554,6 +3584,7 @@ def test_planning_engine_causal_decomposition() -> None:
 def test_planning_engine_resolve_decomposition() -> None:
     """RESOLVE goals decompose into understanding both sides."""
     from frontal_lobe.reasoning import Planner
+
     net = _build_planning_network()
     # Add a contradiction.
     net.add_concept("ice")
@@ -3570,6 +3601,7 @@ def test_planning_engine_resolve_decomposition() -> None:
 def test_planning_engine_get_plan_for_goal() -> None:
     """get_plan_for_goal retrieves a previously created plan."""
     from frontal_lobe.reasoning import Planner
+
     net = _build_planning_network()
     planner = Planner(net)
     plan = planner.create_plan("fire", "understand")
@@ -3580,6 +3612,7 @@ def test_planning_engine_get_plan_for_goal() -> None:
 def test_planning_engine_steps_executed_tracking() -> None:
     """Steps executed counter tracks total executions."""
     from frontal_lobe.reasoning import Planner
+
     net = _build_planning_network()
     planner = Planner(net)
     plan = planner.create_plan("fire", "understand")
@@ -3591,12 +3624,12 @@ def test_planning_engine_steps_executed_tracking() -> None:
 def test_planning_engine_verify_step() -> None:
     """Plans include a final verification step."""
     from frontal_lobe.reasoning import Planner
+
     net = _build_planning_network()
     planner = Planner(net)
     plan = planner.create_plan("fire", "understand")
     # Last step should be a verify step.
     assert plan.steps[-1].step_type == "verify"
-
 
 
 def test_executive_planning_requires_outcome_model() -> None:
@@ -3633,5 +3666,6 @@ def test_executive_planning_queries_the_outcome_model_for_candidates() -> None:
     assert plan.steps[0] == "repair"
     assert plan.predicted_outcomes[0] == "predicted:repair"
     assert plan.confidence > 0.0
+
 
 pytestmark = pytest.mark.usefixtures("learned_sentiment")

@@ -302,15 +302,19 @@ class HebbianPlasticity:
                 co_occurrences = list(self._co_occurrences)
 
         # Protected origins — explicit teaching shouldn't decay
-        PROTECTED_ORIGINS = frozenset({
-            "stated", "cognition_lesson", "introspection",
-            "code", "user", "manual",
-        })
+        PROTECTED_ORIGINS = frozenset(
+            {
+                "stated",
+                "cognition_lesson",
+                "introspection",
+                "code",
+                "user",
+                "manual",
+            }
+        )
 
         # 1. Hebbian strengthening from co-occurrences
-        strengthened = self._strengthen_co_occurrence_edges(
-            co_occurrences, learning_rate
-        )
+        strengthened = self._strengthen_co_occurrence_edges(co_occurrences, learning_rate)
 
         # 2. Homeostatic decay — all non-protected edges decay slightly
         decayed = self._decay_edges(decay_rate, PROTECTED_ORIGINS)
@@ -568,8 +572,6 @@ class HebbianPlasticity:
 
         # Refresh the non-spectral norms cache — renormalization changed
         # every row, so the precomputed text-search norms are now stale.
-        self.embeddings._non_spectral_norms = (
-            self.embeddings._compute_non_spectral_norms(matrix)
-        )
+        self.embeddings._non_spectral_norms = self.embeddings._compute_non_spectral_norms(matrix)
         # Clear the ad-hoc cache since vectors have changed
         self.embeddings._concept_cache.clear()

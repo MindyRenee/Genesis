@@ -39,82 +39,277 @@ import json
 import re
 from typing import TYPE_CHECKING, Any
 
+from infrastructure.text import is_blank
+
 if TYPE_CHECKING:
     from temporal_lobe.comprehension import Comprehension, ComprehensionResult
 
 _WORD_NUM = {
-    "a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4,
-    "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
-    "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14,
-    "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18,
-    "nineteen": 19, "twenty": 20,
+    "a": 1,
+    "an": 1,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
+    "twenty": 20,
 }
 
 # ── Verb senses (lexical semantics — predicate → role frame) ────
 # Possession/containment: "X has Y" ascribes Y to X.
-_CONTAINS = frozenset({
-    "has", "have", "had", "contains", "contain", "includes",
-    "include", "holds", "hold", "owns", "own", "got", "gets", "get",
-    "sports", "sport", "carries", "carry", "bears", "bear",
-    "needs", "need", "requires", "require",
-    # Reduced relatives surface as gerund predicates ("an object
-    # containing two parts" ≡ "that contains two parts").
-    "containing", "having", "including", "holding", "needing",
-    "requiring", "sporting", "bearing", "carrying",
-})
+_CONTAINS = frozenset(
+    {
+        "has",
+        "have",
+        "had",
+        "contains",
+        "contain",
+        "includes",
+        "include",
+        "holds",
+        "hold",
+        "owns",
+        "own",
+        "got",
+        "gets",
+        "get",
+        "sports",
+        "sport",
+        "carries",
+        "carry",
+        "bears",
+        "bear",
+        "needs",
+        "need",
+        "requires",
+        "require",
+        # Reduced relatives surface as gerund predicates ("an object
+        # containing two parts" ≡ "that contains two parts").
+        "containing",
+        "having",
+        "including",
+        "holding",
+        "needing",
+        "requiring",
+        "sporting",
+        "bearing",
+        "carrying",
+    }
+)
 # Placement: imperative verbs whose object is THEME + locations.
-_PLACE = frozenset({
-    "put", "place", "set", "lay", "position", "arrange", "stick",
-    "move", "stand",
-})
+_PLACE = frozenset(
+    {
+        "put",
+        "place",
+        "set",
+        "lay",
+        "position",
+        "arrange",
+        "stick",
+        "move",
+        "stand",
+    }
+)
 # Achieve-a-quantity: "make 9", "reach 12".
-_ACHIEVE = frozenset({
-    "make", "makes", "made", "making", "build", "builds", "built",
-    "building", "reach", "reaches", "reached", "reaching", "total",
-    "totals", "sum", "sums", "produce", "produces", "create",
-    "creates", "created", "form", "forms", "combine", "combines",
-})
+_ACHIEVE = frozenset(
+    {
+        "make",
+        "makes",
+        "made",
+        "making",
+        "build",
+        "builds",
+        "built",
+        "building",
+        "reach",
+        "reaches",
+        "reached",
+        "reaching",
+        "total",
+        "totals",
+        "sum",
+        "sums",
+        "produce",
+        "produces",
+        "create",
+        "creates",
+        "created",
+        "form",
+        "forms",
+        "combine",
+        "combines",
+    }
+)
 # Continuation: the predicate asks what follows.
-_PREDICT = frozenset({
-    "comes", "come", "continues", "continue", "goes", "go",
-    "follows", "follow", "repeats", "repeat", "extends", "extend",
-    "finishes", "finish", "completes", "complete",
-})
+_PREDICT = frozenset(
+    {
+        "comes",
+        "come",
+        "continues",
+        "continue",
+        "goes",
+        "go",
+        "follows",
+        "follow",
+        "repeats",
+        "repeat",
+        "extends",
+        "extend",
+        "finishes",
+        "finish",
+        "completes",
+        "complete",
+    }
+)
 _COPULA = frozenset({"is", "are", "was", "were", "am", "be", "been", "being"})
 # Locative verbs — the located thing is the subject, the relation
 # phrase sits in the object ("the star goes left of the moon").
-_LOCATIVE = frozenset({
-    "goes", "go", "sits", "sit", "stands", "stand", "belongs",
-    "belong", "stays", "stay", "lives", "live", "rests", "rest",
-    "lies", "lie",
-})
+_LOCATIVE = frozenset(
+    {
+        "goes",
+        "go",
+        "sits",
+        "sit",
+        "stands",
+        "stand",
+        "belongs",
+        "belong",
+        "stays",
+        "stay",
+        "lives",
+        "live",
+        "rests",
+        "rest",
+        "lies",
+        "lie",
+    }
+)
 
 # ── NP machinery ────────────────────────────────────────────────
 # Leading words that don't belong to an entity/attribute name.
-_NP_LEAD = frozenset({
-    "a", "an", "the", "some", "any", "each", "every", "all", "both",
-    "no", "none", "only", "just", "exactly", "precisely", "of",
-    "with", "having", "this", "that", "these", "those", "its",
-    "another", "one", "ones", "my", "your", "not", "n't", "never",
-})
+_NP_LEAD = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "some",
+        "any",
+        "each",
+        "every",
+        "all",
+        "both",
+        "no",
+        "none",
+        "only",
+        "just",
+        "exactly",
+        "precisely",
+        "of",
+        "with",
+        "having",
+        "this",
+        "that",
+        "these",
+        "those",
+        "its",
+        "another",
+        "one",
+        "ones",
+        "my",
+        "your",
+        "not",
+        "n't",
+        "never",
+    }
+)
 # Category nouns — filler in enumerations ("these parts", "all three
 # things"), never attribute names themselves.
-_CATEGORY_NOUNS = frozenset({
-    "part", "parts", "thing", "things", "item", "items", "piece",
-    "pieces", "feature", "features", "property", "properties",
-    "attribute", "attributes", "trait", "traits", "kind", "kinds",
-    "type", "types", "of", "them", "following", "these", "those",
-    "the", "one", "ones",
-})
+_CATEGORY_NOUNS = frozenset(
+    {
+        "part",
+        "parts",
+        "thing",
+        "things",
+        "item",
+        "items",
+        "piece",
+        "pieces",
+        "feature",
+        "features",
+        "property",
+        "properties",
+        "attribute",
+        "attributes",
+        "trait",
+        "traits",
+        "kind",
+        "kinds",
+        "type",
+        "types",
+        "of",
+        "them",
+        "following",
+        "these",
+        "those",
+        "the",
+        "one",
+        "ones",
+    }
+)
 # Entities a proposition can name without naming a task thing —
 # pronouns, fillers, discourse words.
-_NON_ENTITY = frozenset({
-    "i", "you", "he", "she", "it", "we", "they", "me", "him", "her",
-    "us", "them", "itself", "something", "anything", "everything",
-    "nothing", "one", "someone", "anyone", "everyone", "what",
-    "which", "who", "this", "that", "these", "those", "there",
-    "here", "now", "then", "so", "if",
-})
+_NON_ENTITY = frozenset(
+    {
+        "i",
+        "you",
+        "he",
+        "she",
+        "it",
+        "we",
+        "they",
+        "me",
+        "him",
+        "her",
+        "us",
+        "them",
+        "itself",
+        "something",
+        "anything",
+        "everything",
+        "nothing",
+        "one",
+        "someone",
+        "anyone",
+        "everyone",
+        "what",
+        "which",
+        "who",
+        "this",
+        "that",
+        "these",
+        "those",
+        "there",
+        "here",
+        "now",
+        "then",
+        "so",
+        "if",
+    }
+)
 
 _TOKEN_RE = re.compile(r"[a-z0-9][\w-]*")
 _COORD_SPLIT_RE = re.compile(r",|\band\b|\bor\b")
@@ -136,7 +331,8 @@ def _np_name(chunk: str) -> str:
     """NP chunk → entity/attribute name: determiners and quantifier
     words stripped, content joined ("the red star" → red_star)."""
     toks = [
-        t for t in _tokens(chunk)
+        t
+        for t in _tokens(chunk)
         if t not in _NP_LEAD and t not in _CATEGORY_NOUNS and _num(t) is None
     ]
     return "_".join(toks)
@@ -197,9 +393,7 @@ def _slug(text: str) -> str:
 def _name(family: str, spec: dict) -> str:
     """Deterministic offer name — re-describing the same problem
     re-lands on the same task; a different problem lands elsewhere."""
-    digest = hashlib.sha1(
-        json.dumps(spec, sort_keys=True).encode()
-    ).hexdigest()[:6]
+    digest = hashlib.sha1(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:6]
     return f"heard_{_slug(family)}_{digest}"
 
 
@@ -208,10 +402,15 @@ def _name(family: str, spec: dict) -> str:
 # [op-word(s)] [count] "of" <set>. Each op is a semantic operator on
 # the set, not a sentence pattern.
 _QUANT_LEAD: dict[str, str] = {
-    "exactly": "exactly", "precisely": "exactly",
-    "all": "all_of", "both": "all_of", "every": "all_of",
-    "any": "any_of", "some": "any_of",
-    "none": "none_of", "no": "none_of",
+    "exactly": "exactly",
+    "precisely": "exactly",
+    "all": "all_of",
+    "both": "all_of",
+    "every": "all_of",
+    "any": "any_of",
+    "some": "any_of",
+    "none": "none_of",
+    "no": "none_of",
 }
 
 
@@ -237,10 +436,14 @@ def _quantified(obj: str) -> tuple[str, int | None, str] | None:
     count: int | None = None
     # Multi-word quantifier openers, longest-match first.
     for phrase, qop in (
-        ("no more than", "at_most"), ("at most", "at_most"),
-        ("up to", "at_most"), ("at least", "at_least"),
-        ("no fewer than", "at_least"), ("a minimum of", "at_least"),
-        ("a maximum of", "at_most"), ("one or more", "at_least"),
+        ("no more than", "at_most"),
+        ("at most", "at_most"),
+        ("up to", "at_most"),
+        ("at least", "at_least"),
+        ("no fewer than", "at_least"),
+        ("a minimum of", "at_least"),
+        ("a maximum of", "at_most"),
+        ("one or more", "at_least"),
     ):
         plen = len(phrase.split())
         if " ".join(w(k) for k in range(plen)) == phrase:
@@ -345,10 +548,17 @@ def _attrs_from_object(obj: str, negated: bool) -> list[str] | None:
 # the senses map surface words to the same spatial meaning, so any
 # phrasing the parser normalizes here stays semantic.
 _REL_SENSES: dict[str, str] = {
-    "left": "left_of", "right": "right_of",
-    "next": "next_to", "beside": "next_to", "adjacent": "next_to",
-    "near": "next_to", "by": "next_to", "close": "next_to",
-    "far": "apart", "apart": "apart", "away": "apart",
+    "left": "left_of",
+    "right": "right_of",
+    "next": "next_to",
+    "beside": "next_to",
+    "adjacent": "next_to",
+    "near": "next_to",
+    "by": "next_to",
+    "close": "next_to",
+    "far": "apart",
+    "apart": "apart",
+    "away": "apart",
 }
 _REL_COMPLETE = frozenset({"of", "to", "from"})
 
@@ -375,8 +585,10 @@ def _rel_chunks(text: str) -> list[tuple[str, str]]:
             chunks.append(("and", ""))
             i += 1
             continue
-        if w in _REL_SENSES and i + 1 < len(toks) and (
-            toks[i + 1] in _REL_COMPLETE or w in ("beside", "near", "by")
+        if (
+            w in _REL_SENSES
+            and i + 1 < len(toks)
+            and (toks[i + 1] in _REL_COMPLETE or w in ("beside", "near", "by"))
         ):
             if np_words:
                 name = _np_name(" ".join(np_words))
@@ -429,6 +641,7 @@ def _rel_triples(chunks: list[tuple[str, str]]) -> list[tuple[str, str, str]]:
 
 # ── Frame → task-family compilers ───────────────────────────────
 
+
 def _classification_spec(result: ComprehensionResult) -> dict | None:
     """Assemble a rule-membership game from semantic frames.
 
@@ -444,9 +657,7 @@ def _classification_spec(result: ComprehensionResult) -> dict | None:
 
     resolved = getattr(result, "resolved_references", None) or {}
 
-    pred_raw_obj, items, asserted = _items_and_labels(
-        result, kinds, supers, resolved
-    )
+    pred_raw_obj, items, asserted = _items_and_labels(result, kinds, supers, resolved)
     if pred_raw_obj is None or not items:
         return None
 
@@ -518,6 +729,7 @@ def _items_and_labels(
     """Pass 2 — rule bodies (indefinite CONTAINS) and items/labels
     (definite CONTAINS / ISA onto a kind). Returns (rule object's raw
     text, items, asserted labels)."""
+
     def _entity_name(subject: str) -> str:
         """Pronoun subjects resolve through comprehension's
         reference map; definite NPs normalize directly."""
@@ -592,9 +804,25 @@ def _minimal_period(run: list[str]) -> int:
 # Words that may precede the marks in a role phrase ("in a b a b",
 # "the pattern goes a b a b") — stripped from the head only.
 _SEQ_LEAD_IN = {
-    "in", "on", "of", "the", "my", "this", "pattern", "sequence",
-    "series", "list", "line", "row", "string", "goes", "is", "are",
-    "like", "next", "comes",
+    "in",
+    "on",
+    "of",
+    "the",
+    "my",
+    "this",
+    "pattern",
+    "sequence",
+    "series",
+    "list",
+    "line",
+    "row",
+    "string",
+    "goes",
+    "is",
+    "are",
+    "like",
+    "next",
+    "comes",
 }
 _SEQ_GLUE = {"and", "or", "then"}
 
@@ -604,9 +832,7 @@ def _sequence_spec(result: ComprehensionResult) -> dict | None:
     if not (result.is_question or result.is_command):
         return None
     has_predict = any(
-        p.predicate.lower() in _PREDICT
-        or "next" in _tokens(p.object)
-        for p in result.propositions
+        p.predicate.lower() in _PREDICT or "next" in _tokens(p.object) for p in result.propositions
     )
     if not has_predict:
         return None
@@ -662,9 +888,7 @@ def _relations_spec(result: ComprehensionResult) -> dict | None:
         # copular/locative verbs put the relation phrase there with
         # the subject as the located thing ("the star IS left of
         # the moon"). Either way the field chunks the same.
-        if p.object and (
-            pred in _PLACE or pred in _COPULA or pred in _LOCATIVE
-        ):
+        if p.object and (pred in _PLACE or pred in _COPULA or pred in _LOCATIVE):
             field = f"{p.subject} {p.object}".strip()
             triples.extend(_rel_triples(_rel_chunks(field)))
     # Deduplicate while keeping order.
@@ -731,10 +955,7 @@ def _quantities_spec(result: ComprehensionResult) -> dict | None:
                     counts.add(n)
         if len(counts) < 2:
             continue
-        groups = [
-            {"name": f"group_of_{c}_{i}", "count": c}
-            for i, c in enumerate(sorted(counts))
-        ]
+        groups = [{"name": f"group_of_{c}_{i}", "count": c} for i, c in enumerate(sorted(counts))]
         spec: dict[str, Any] = {
             "family": "quantities",
             "target": target,
@@ -753,16 +974,40 @@ def _quantities_spec(result: ComprehensionResult) -> dict | None:
 # way to know "red" is a color, so accepts={"red"} matches any
 # block that mentions red.
 # Nouns that head a slot phrase ("a round hole", "the star slot").
-_SLOT_NOUNS = frozenset({
-    "hole", "holes", "slot", "slots", "opening", "openings",
-    "aperture", "apertures", "socket", "sockets", "gap", "gaps",
-})
+_SLOT_NOUNS = frozenset(
+    {
+        "hole",
+        "holes",
+        "slot",
+        "slots",
+        "opening",
+        "openings",
+        "aperture",
+        "apertures",
+        "socket",
+        "sockets",
+        "gap",
+        "gaps",
+    }
+)
 # Filler nouns that head a block phrase ("a red peg") — the words
 # are category labels, not attributes, so they are never criteria.
-_FILLER_NOUNS = _CATEGORY_NOUNS | frozenset({
-    "block", "blocks", "peg", "pegs", "shape", "shapes", "piece",
-    "pieces", "token", "tokens", "tile", "tiles",
-})
+_FILLER_NOUNS = _CATEGORY_NOUNS | frozenset(
+    {
+        "block",
+        "blocks",
+        "peg",
+        "pegs",
+        "shape",
+        "shapes",
+        "piece",
+        "pieces",
+        "token",
+        "tokens",
+        "tile",
+        "tiles",
+    }
+)
 # "the star hole takes a small star" — the object spells the slot's
 # acceptance criterion.
 _ACCEPTS = frozenset({"takes", "take", "accepts", "accept", "accepting"})
@@ -770,9 +1015,19 @@ _ACCEPTS = frozenset({"takes", "take", "accepts", "accept", "accepting"})
 # direction: registers the block without widening the criterion.
 _FIT = frozenset({"fits", "fit", "matches", "match", "suits", "suit"})
 # An imperative that turns a described sorter into a task.
-_SORT_DO = _PLACE | _ACCEPTS | frozenset({
-    "sort", "drop", "insert", "fill", "slide",
-})
+_SORT_DO = (
+    _PLACE
+    | _ACCEPTS
+    | frozenset(
+        {
+            "sort",
+            "drop",
+            "insert",
+            "fill",
+            "slide",
+        }
+    )
+)
 
 
 def _np_attrs(name: str, heads: frozenset[str]) -> set[str]:
@@ -856,9 +1111,7 @@ def _sorter_spec(result: ComprehensionResult) -> dict | None:
             sname = slot_name(p.subject)
             if sname is not None:
                 linked = True
-                attrs = slots.setdefault(
-                    sname, _np_attrs(sname, _SLOT_NOUNS)
-                )
+                attrs = slots.setdefault(sname, _np_attrs(sname, _SLOT_NOUNS))
                 for m in members(obj):
                     mname = _np_name(m)
                     attrs.update(_np_attrs(mname, _FILLER_NOUNS))
@@ -923,20 +1176,13 @@ def _build_sorter_spec(
     is wired in.
     """
     lid = not any(
-        "lid" in (p.subject + " " + (p.object or "")).lower()
-        and p.negated
+        "lid" in (p.subject + " " + (p.object or "")).lower() and p.negated
         for p in result.propositions
     )
     spec: dict[str, Any] = {
         "family": "sorter",
-        "slots": [
-            {"accepts": dict.fromkeys(sorted(attrs), "yes")}
-            for attrs in slots.values()
-        ],
-        "blocks": [
-            {"attrs": dict.fromkeys(sorted(attrs), "yes")}
-            for attrs in blocks.values()
-        ],
+        "slots": [{"accepts": dict.fromkeys(sorted(attrs), "yes")} for attrs in slots.values()],
+        "blocks": [{"attrs": dict.fromkeys(sorted(attrs), "yes")} for attrs in blocks.values()],
         "lid": lid,
         "perceptual": True,
     }
@@ -987,7 +1233,7 @@ def compile_problem(
     the ``ComprehensionResult`` it already computed. This wrapper
     exists for tests and tools that only have the text.
     """
-    if not text or not text.strip():
+    if is_blank(text):
         return None
     if comprehension is None:
         from temporal_lobe.comprehension import Comprehension

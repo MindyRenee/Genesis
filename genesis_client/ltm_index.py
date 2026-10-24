@@ -72,9 +72,7 @@ class LtmIndexEntry:
         return bool(self.flags & _FLAG_ARCHIVED)
 
 
-def scan_ltm_index(
-    meta_path: str | Path, source_module: int | None = None
-) -> list[LtmIndexEntry]:
+def scan_ltm_index(meta_path: str | Path, source_module: int | None = None) -> list[LtmIndexEntry]:
     """Read the LTM index file and return its entries, oldest first.
 
     Args:

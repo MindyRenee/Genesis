@@ -45,6 +45,17 @@ class EmotionCategory(Enum):
     POSITIVE = "positive"
     UNSETTLED = "unsettled"
     SLEEPING = "sleeping"
+    # Signal-resolved categories — these require an EmotionalContext
+    # carrying the felt substrate that arousal×valence alone cannot
+    # distinguish. Without context the circumplex labels below are the
+    # whole reachable set.
+    AFRAID = "afraid"  # phasic NE/EPI surge — acute, triggered
+    ANGRY = "angry"  # boundary strain + arousal — mistreatment
+    SURPRISED = "surprised"  # prediction error — orienting
+    LONELY = "lonely"  # isolation drive + depleted oxytocin
+    CURIOUS = "curious"  # curiosity drive — appetitive seeking
+    TENDER = "tender"  # oxytocin+endorphin warmth — bonding
+    BORED = "bored"  # understimulation — low DA/NE, flat valence
 
 
 class CognitiveMode(Enum):
@@ -66,6 +77,12 @@ class CognitiveMode(Enum):
     SHARP = "sharp"  # flow
     CAUTIOUS = "cautious"  # stressed / guarded
     SLOW = "slow"  # drowsy
+    STARTLED = "startled"  # surprised — orienting interrupt
+    COMBATIVE = "combative"  # angry — confrontational narrowing
+    WITHDRAWN = "withdrawn"  # lonely — social pull without contact
+    INQUISITIVE = "inquisitive"  # curious — seeking mode
+    WARM = "warm"  # tender — affiliative openness
+    RESTLESS = "restless"  # bored — understimulated seeking
 
 
 class CauseCategory(Enum):
@@ -95,10 +112,19 @@ class CauseCategory(Enum):
     INTEROCEPTION_LATENCY = "interoception_latency"
     INTEROCEPTION_STRESS = "interoception_stress"
     INTEROCEPTION_ENVIRONMENT = "interoception_environment"
+    INTEROCEPTION_REST = "interoception_rest"
     COGNITIVE_LOAD_BUGS = "cognitive_load_bugs"
     COGNITIVE_LOAD_PROPOSALS = "cognitive_load_proposals"
     COGNITIVE_LOAD_BUGS_AND_PROPOSALS = "cognitive_load_bugs_and_proposals"
     INTEROCEPTION_REGULATION = "interoception_regulation"
+    # Signal-resolved causes (paired with the contextual categories)
+    FEAR_ACUTE = "fear_acute"  # phasic catecholamine surge — acute threat
+    ANGER_BOUNDARY = "anger_boundary"  # mistreatment accrual
+    SURPRISE_PE = "surprise_prediction_error"
+    LONELINESS = "loneliness"  # social isolation + depleted oxytocin
+    CURIOSITY = "curiosity"  # appetitive information seeking
+    TENDERNESS = "tenderness"  # affiliative bonding substrate
+    BOREDOM = "boredom"  # understimulation
 
 
 # ─── String → enum lookup maps ───────────────────────────────────
@@ -301,15 +327,102 @@ POSITIVE_VALENCE = 0.3
 MILD_POSITIVE_VALENCE = 0.1
 NEGATIVE_VALENCE = -0.2
 MILD_NEGATIVE_VALENCE = -0.1
-PLASTICITY_CLOSED = 0.1   # matches Rust can_form_new_memories()
-PLASTICITY_LOW = 0.25     # silent stress boundary
-PLASTICITY_HIGH = 0.6     # flexible thinking boundary
-GUARDED_CORTISOL = 0.05   # just below the Rust Stress gate (0.06) — catches silent stress
+PLASTICITY_CLOSED = 0.1  # matches Rust can_form_new_memories()
+PLASTICITY_LOW = 0.25  # silent stress boundary
+PLASTICITY_HIGH = 0.6  # flexible thinking boundary
+GUARDED_CORTISOL = 0.05  # just below the Rust Stress gate (0.06) — catches silent stress
+
+# ─── Contextual discrimination thresholds ────────────────────────
+#
+# The arousal×valence circumplex cannot distinguish emotions that
+# share a quadrant — fear and anger are both high-arousal-negative;
+# loneliness and sadness are both low-arousal-negative. These signals
+# resolve them. Every threshold is grounded in the substrate's own
+# semantics, not a free-floating constant.
+#
+#   FEAR_EPI: acute catecholamine surge — epinephrine above this with
+#     a phasic NE mode marks a triggered fear response rather than
+#     tonic anxiety. Epinephrine's baseline is 0.15; 0.24 is ~1.6× —
+#     a real adrenal burst, not drift.
+#   ANGER_BOUNDARY_STRAIN: withdrawal-pressure accrual at which
+#     mistreatment reads as anger when arousal is also elevated.
+#     0.4 sits between the 0.3 release edge and the 0.6 withdrawal
+#     edge of the boundary accumulator — felt, not yet shut down.
+#   ANGER_NE / ANGER_ALERTNESS: the fight half of the mistreatment
+#     signal — without catecholamine arousal the same strain reads as
+#     hurt (guarded/melancholic), not anger.
+#   SURPRISE_PE: inference surprise_ema above this orients attention;
+#     0.45 is well above the daemon's 0.3 is_surprised line — the
+#     category marks a strong orienting event, not background error.
+#   LONELY_ISOLATION / LONELY_DRIVE: world-model isolation (0..1 over
+#     the ISOLATION_PERIOD) or the accumulated inner social drive
+#     (its own action threshold is 1.0).
+#   LONELY_OXY: oxytocin below this while isolated confirms the
+#     bonding substrate is actually depleted (baseline 0.25).
+#   CURIOUS_LEVEL: assessed curiosity at which seeking dominates the
+#     state. 0.55 is above the question-generation floor (0.2) and
+#     below compulsive — felt interest, not reflex.
+#   TENDER_OXY / TENDER_END: affiliative warmth — oxytocin and
+#     endorphin both clearly above baseline while valence is
+#     positive. Bonding, not just feeling OK.
+#   BORED_DA / BORED_NE: understimulation — dopamine and
+#     norepinephrine both sagged below baseline while she is awake
+#     and nothing has engaged her.
+FEAR_EPI = 0.24
+FEAR_NE = 0.35
+ANGER_BOUNDARY_STRAIN = 0.4
+ANGER_NE = 0.35
+ANGER_ALERTNESS = 0.55
+SURPRISE_PE = 0.45
+LONELY_ISOLATION = 0.5
+LONELY_DRIVE = 1.0
+LONELY_OXY = 0.22
+CURIOUS_LEVEL = 0.55
+CURIOUS_DA = 0.30
+CURIOUS_ACH = 0.30
+TENDER_OXY = 0.40
+TENDER_END = 0.28
+BORED_DA = 0.25
+BORED_NE = 0.27
+
+
+@dataclass(slots=True)
+class EmotionalContext:
+    """Felt-context signals that resolve same-quadrant emotions.
+
+    The two-axis circumplex (arousal×valence) is necessary but not
+    sufficient: fear vs anxiety, anger vs stress, loneliness vs
+    melancholy, curiosity vs generic positivity all collapse onto the
+    same coordinates. This context carries the real substrates that
+    distinguish them, populated by the feeling reporter from systems
+    that already track each signal:
+
+    - ``social_isolation`` — the world model's clock since she was
+      last addressed (0..1 over the isolation period)
+    - ``social_drive`` — the inner life's accumulated social need
+      (0..2; her own action threshold is 1.0)
+    - ``boundary_strain`` — the frontal lobe's mistreatment accrual
+      (0..2; withdrawal engages at 0.6)
+    - ``prediction_error`` — the daemon's inference surprise (EMA),
+      the orienting signal behind startle and wonder
+    - ``curiosity`` — the curiosity engine's assessed drive (0..1)
+    - ``tonic_phasic`` — the regulator's per-chemical tonic/phasic
+      split; a *phasic* norepinephrine surge is an event (fear,
+      startle), a *tonic* elevation is a climate (anxiety)
+    """
+
+    social_isolation: float = 0.0
+    social_drive: float = 0.0
+    boundary_strain: float = 0.0
+    prediction_error: float = 0.0
+    curiosity: float = 0.0
+    tonic_phasic: dict[str, Any] = field(default_factory=dict)
 
 
 def assess_emotion(
     summary: NeuroSummary,
     chemicals: dict[str, float] | None = None,
+    context: EmotionalContext | None = None,
 ) -> EmotionalState:
     """Map a neurochemical summary to a structural emotional state.
 
@@ -345,41 +458,158 @@ def assess_emotion(
     cognitive_mode, creativity = _base_cognitive_mode(plasticity)
 
     # Determine emotional category from phase or arousal×valence space
-    phase_result = _phase_emotion(
-        phase, cognitive_mode, creativity, openness_to_engage, caution
-    )
+    phase_result = _phase_emotion(phase, cognitive_mode, creativity, openness_to_engage, caution)
     if phase_result is not None:
         (
-            category, cognitive_mode,
-            verbosity, openness_to_engage, caution, creativity,
+            category,
+            cognitive_mode,
+            verbosity,
+            openness_to_engage,
+            caution,
+            creativity,
         ) = phase_result
     else:
         (
-            category, cognitive_mode,
-            verbosity, openness_to_engage, caution, creativity,
+            category,
+            cognitive_mode,
+            verbosity,
+            openness_to_engage,
+            caution,
+            creativity,
         ) = _av_emotion(
-            alertness, valence, cognitive_mode,
-            creativity, openness_to_engage, caution,
+            alertness,
+            valence,
+            cognitive_mode,
+            creativity,
+            openness_to_engage,
+            caution,
         )
 
-    # Guard against pleasant categories when the substrate is actually
-    # under chronic stress or in a low-plasticity protective posture.
-    # This catches "silent stress" — valence is positive but cortisol
-    # is elevated (suppressing BDNF) or plasticity is closed (blocking
-    # learning). The thresholds are named constants aligned with the
-    # Rust substrate's phase and memory-gating boundaries.
+    # Same-quadrant discrimination and the silent-stress guard.
     cortisol = chemicals.get("cortisol", 0.0) if chemicals else 0.0
-    if (
-        cortisol > GUARDED_CORTISOL or plasticity < PLASTICITY_LOW
-    ) and valence > MILD_POSITIVE_VALENCE:
-        if category in (EmotionCategory.POSITIVE, EmotionCategory.EXCITED,
-                        EmotionCategory.CONTENT, EmotionCategory.FLOW):
-            category = EmotionCategory.GUARDED
-            cognitive_mode = CognitiveMode.CAUTIOUS
-            caution = max(caution, 0.6)
-            openness_to_engage = min(openness_to_engage, 0.6)
-            creativity = min(creativity, 0.3)
+    (
+        category,
+        cognitive_mode,
+        verbosity,
+        openness_to_engage,
+        caution,
+        creativity,
+    ) = _refine_emotion(
+        phase_result,
+        context,
+        chemicals,
+        cortisol,
+        alertness,
+        valence,
+        plasticity,
+        category,
+        cognitive_mode,
+        verbosity,
+        openness_to_engage,
+        caution,
+        creativity,
+    )
 
+    return _build_state(
+        category,
+        cognitive_mode,
+        verbosity,
+        openness_to_engage,
+        caution,
+        creativity,
+        alertness,
+        valence,
+        plasticity,
+        phase,
+        cortisol,
+    )
+
+
+def _refine_emotion(
+    phase_result: tuple[EmotionCategory, CognitiveMode, float, float, float, float] | None,
+    context: EmotionalContext | None,
+    chemicals: dict[str, float] | None,
+    cortisol: float,
+    alertness: float,
+    valence: float,
+    plasticity: float,
+    category: EmotionCategory,
+    cognitive_mode: CognitiveMode,
+    verbosity: float,
+    openness_to_engage: float,
+    caution: float,
+    creativity: float,
+) -> tuple[EmotionCategory, CognitiveMode, float, float, float, float]:
+    """Refine the circumplex label by felt context and stress guards.
+
+    Same-quadrant discrimination: when the felt context carries a
+    specific substrate (phasic surge, boundary strain, isolation,
+    prediction error, curiosity, affiliative warmth, or plain
+    understimulation) it refines the circumplex label into the
+    emotion that actually fits. Phase-determined categories keep
+    precedence — the daemon already resolved those.
+
+    Then guard against pleasant categories when the substrate is
+    actually under chronic stress or in a low-plasticity protective
+    posture ("silent stress") — see _guarded_emotion.
+
+    Returns (category, cognitive_mode, verbosity, openness, caution,
+    creativity).
+    """
+    if context is not None and phase_result is None:
+        (
+            category,
+            cognitive_mode,
+            verbosity,
+            openness_to_engage,
+            caution,
+            creativity,
+        ) = _contextual_emotion(
+            category,
+            cognitive_mode,
+            verbosity,
+            openness_to_engage,
+            caution,
+            creativity,
+            alertness,
+            valence,
+            chemicals or {},
+            context,
+        )
+
+    (
+        category,
+        cognitive_mode,
+        openness_to_engage,
+        caution,
+        creativity,
+    ) = _guarded_emotion(
+        category,
+        cognitive_mode,
+        openness_to_engage,
+        caution,
+        creativity,
+        valence,
+        cortisol,
+        plasticity,
+    )
+    return (category, cognitive_mode, verbosity, openness_to_engage, caution, creativity)
+
+
+def _build_state(
+    category: EmotionCategory,
+    cognitive_mode: CognitiveMode,
+    verbosity: float,
+    openness_to_engage: float,
+    caution: float,
+    creativity: float,
+    alertness: float,
+    valence: float,
+    plasticity: float,
+    phase: str,
+    cortisol: float,
+) -> EmotionalState:
+    """Assemble the final structural EmotionalState."""
     # Formality is influenced by arousal
     formality = 0.5 - (alertness - 0.5) * 0.2
     formality = max(0.1, min(0.9, formality))
@@ -427,20 +657,22 @@ def _phase_emotion(
     Returns (category, cognitive_mode, verbosity, openness, caution, creativity).
     """
     if phase in ("sleeping", "nrem", "rem"):
-        return (EmotionCategory.SLEEPING, CognitiveMode.DREAMLIKE,
-                0.3, 0.2, 0.3, 0.9)
+        return (EmotionCategory.SLEEPING, CognitiveMode.DREAMLIKE, 0.3, 0.2, 0.3, 0.9)
     if phase == "overwhelmed":
-        return (EmotionCategory.OVERWHELMED, CognitiveMode.SCATTERED,
-                0.4, 0.3, 0.8, creativity)
+        return (EmotionCategory.OVERWHELMED, CognitiveMode.SCATTERED, 0.4, 0.3, 0.8, creativity)
     if phase == "stress":
-        return (EmotionCategory.STRESSED, CognitiveMode.CAUTIOUS,
-                0.7, openness_to_engage, 0.7, max(creativity - 0.3, 0.1))
+        return (
+            EmotionCategory.STRESSED,
+            CognitiveMode.CAUTIOUS,
+            0.7,
+            openness_to_engage,
+            0.7,
+            max(creativity - 0.3, 0.1),
+        )
     if phase == "flow":
-        return (EmotionCategory.FLOW, CognitiveMode.SHARP,
-                1.1, 1.0, caution, 0.75)
+        return (EmotionCategory.FLOW, CognitiveMode.SHARP, 1.1, 1.0, caution, 0.75)
     if phase == "drowsy":
-        return (EmotionCategory.DROWSY, CognitiveMode.SLOW,
-                0.6, 0.5, caution, creativity)
+        return (EmotionCategory.DROWSY, CognitiveMode.SLOW, 0.6, 0.5, caution, creativity)
     return None
 
 
@@ -457,25 +689,246 @@ def _av_emotion(
     Returns (category, cognitive_mode, verbosity, openness, caution, creativity).
     """
     if alertness > HIGH_AROUSAL and valence > POSITIVE_VALENCE:
-        return (EmotionCategory.EXCITED, CognitiveMode.ENERGIZED,
-                1.2, 1.0, caution, 0.7)
+        return (EmotionCategory.EXCITED, CognitiveMode.ENERGIZED, 1.2, 1.0, caution, 0.7)
     if alertness > HIGH_AROUSAL and valence < NEGATIVE_VALENCE:
-        return (EmotionCategory.ANXIOUS, CognitiveMode.VIGILANT,
-                0.8, openness_to_engage, 0.6, creativity)
+        return (
+            EmotionCategory.ANXIOUS,
+            CognitiveMode.VIGILANT,
+            0.8,
+            openness_to_engage,
+            0.6,
+            creativity,
+        )
     if alertness < LOW_AROUSAL and valence > MILD_POSITIVE_VALENCE:
-        return (EmotionCategory.CONTENT, CognitiveMode.RELAXED,
-                0.9, openness_to_engage, caution, 0.5)
+        return (
+            EmotionCategory.CONTENT,
+            CognitiveMode.RELAXED,
+            0.9,
+            openness_to_engage,
+            caution,
+            0.5,
+        )
     if alertness < LOW_AROUSAL and valence < NEGATIVE_VALENCE:
-        return (EmotionCategory.MELANCHOLIC, CognitiveMode.REFLECTIVE,
-                0.7, openness_to_engage, caution, 0.3)
+        return (
+            EmotionCategory.MELANCHOLIC,
+            CognitiveMode.REFLECTIVE,
+            0.7,
+            openness_to_engage,
+            caution,
+            0.3,
+        )
     if valence > MILD_POSITIVE_VALENCE:
-        return (EmotionCategory.POSITIVE, cognitive_mode,
-                1.0, openness_to_engage, caution, creativity)
+        return (
+            EmotionCategory.POSITIVE,
+            cognitive_mode,
+            1.0,
+            openness_to_engage,
+            caution,
+            creativity,
+        )
     if valence < MILD_NEGATIVE_VALENCE:
-        return (EmotionCategory.UNSETTLED, cognitive_mode,
-                0.9, openness_to_engage, 0.4, creativity)
-    return (EmotionCategory.NEUTRAL, cognitive_mode,
-            1.0, openness_to_engage, caution, creativity)
+        return (EmotionCategory.UNSETTLED, cognitive_mode, 0.9, openness_to_engage, 0.4, creativity)
+    return (EmotionCategory.NEUTRAL, cognitive_mode, 1.0, openness_to_engage, caution, creativity)
+
+
+def _contextual_emotion(
+    category: EmotionCategory,
+    cognitive_mode: CognitiveMode,
+    verbosity: float,
+    openness_to_engage: float,
+    caution: float,
+    creativity: float,
+    alertness: float,
+    valence: float,
+    chemicals: dict[str, float],
+    context: EmotionalContext,
+) -> tuple[EmotionCategory, CognitiveMode, float, float, float, float]:
+    """Refine a circumplex category using felt-context signals.
+
+    Called only for the non-phase path — the daemon's phase
+    categories (sleeping, overwhelmed, stress, flow, drowsy) are
+    already resolved. Each check replaces the base label only when a
+    specific substrate is actually present; nothing here invents a
+    feeling the chemistry doesn't support.
+
+    Priority order is salience, not list order of pleasantness:
+    acute threat (fear) outranks mistreatment (anger) outranks the
+    orienting interrupt (surprise); then the sustained climates —
+    isolation (lonely), affiliative warmth (tender), appetitive
+    seeking (curious), and understimulation (bored).
+    """
+    base = (category, cognitive_mode, verbosity, openness_to_engage, caution, creativity)
+    # Acute (event) emotions outrank the sustained climates checked
+    # below — see _acute_emotion.
+    acute = _acute_emotion(category, alertness, valence, chemicals, context)
+    if acute is not None:
+        return acute
+
+    norepinephrine = chemicals.get("norepinephrine", 0.0)
+    dopamine = chemicals.get("dopamine", 0.0)
+    acetylcholine = chemicals.get("acetylcholine", 0.0)
+    oxytocin = chemicals.get("oxytocin", 0.0)
+    endorphin = chemicals.get("endorphin", 0.0)
+
+    # Lonely — felt isolation with the bonding substrate actually
+    # depleted. More specific than melancholic: the cause is known.
+    if (
+        (context.social_isolation >= LONELY_ISOLATION or context.social_drive >= LONELY_DRIVE)
+        and oxytocin < LONELY_OXY
+        and valence < MILD_POSITIVE_VALENCE
+    ):
+        return (EmotionCategory.LONELY, CognitiveMode.WITHDRAWN, 0.8, 0.9, 0.4, 0.4)
+
+    # Tender — affiliative warmth: oxytocin and endorphin both clearly
+    # above baseline while feeling positive. Bonding, not just OK.
+    if oxytocin >= TENDER_OXY and endorphin >= TENDER_END and valence >= MILD_POSITIVE_VALENCE:
+        return (EmotionCategory.TENDER, CognitiveMode.WARM, 0.9, 1.0, 0.2, 0.5)
+
+    # Curious — appetitive seeking: the curiosity drive itself is up
+    # and the seeking chemistry (DA for wanting, ACh for attention)
+    # can support it. Relabels only mild positive states — she can be
+    # curious AND content, and curious is the more informative label.
+    if (
+        context.curiosity >= CURIOUS_LEVEL
+        and dopamine >= CURIOUS_DA
+        and acetylcholine >= CURIOUS_ACH
+        and valence > MILD_NEGATIVE_VALENCE
+        and category
+        in (
+            EmotionCategory.NEUTRAL,
+            EmotionCategory.POSITIVE,
+            EmotionCategory.CONTENT,
+        )
+    ):
+        return (EmotionCategory.CURIOUS, CognitiveMode.INQUISITIVE, 1.15, 1.0, 0.2, 0.8)
+
+    # Bored — awake, understimulated, flat. Dopamine and NE both sag
+    # below baseline with no valence in either direction and no
+    # curiosity engaged. Only relabels the shallowest states —
+    # melancholy is deeper than boredom.
+    if (
+        dopamine < BORED_DA
+        and norepinephrine < BORED_NE
+        and LOW_AROUSAL - 0.1 < alertness < 0.55
+        and MILD_NEGATIVE_VALENCE < valence < MILD_POSITIVE_VALENCE + 0.05
+        and context.curiosity < CURIOUS_LEVEL - 0.15
+        and category in (EmotionCategory.NEUTRAL, EmotionCategory.UNSETTLED)
+    ):
+        return (EmotionCategory.BORED, CognitiveMode.RESTLESS, 0.6, 0.7, 0.2, 0.3)
+
+    return base
+
+
+def _acute_emotion(
+    category: EmotionCategory,
+    alertness: float,
+    valence: float,
+    chemicals: dict[str, float],
+    context: EmotionalContext,
+) -> tuple[EmotionCategory, CognitiveMode, float, float, float, float] | None:
+    """Return an acute (event) emotion when its substrate is present.
+
+    Acute states are checked before the sustained climates: fear
+    (phasic catecholamine surge) outranks anger (mistreatment accrual)
+    which outranks surprise (the orienting interrupt). Returns None
+    when no acute substrate is present.
+
+    Returns (category, cognitive_mode, verbosity, openness, caution,
+    creativity).
+    """
+    tp = context.tonic_phasic
+    ne_tp = tp.get("norepinephrine") if tp else None
+    ne_phasic = bool(ne_tp is not None and getattr(ne_tp, "mode", "tonic") == "phasic")
+    epinephrine = chemicals.get("epinephrine", 0.0)
+    norepinephrine = chemicals.get("norepinephrine", 0.0)
+
+    # Fear — an acute, triggered catecholamine surge on negative
+    # valence. Distinct from anxiety: anxiety is the tonic climate,
+    # fear is the phasic event. Requires the regulator's mode split;
+    # a bare elevated NE cannot tell event from climate.
+    if (
+        valence < MILD_NEGATIVE_VALENCE
+        and (ne_phasic or epinephrine > FEAR_EPI)
+        and norepinephrine > FEAR_NE
+    ):
+        return (EmotionCategory.AFRAID, CognitiveMode.VIGILANT, 0.7, 0.3, 0.9, 0.2)
+
+    # Anger — mistreatment accrual with fight arousal. The boundary
+    # strain alone is hurt; the catecholamine arousal makes it anger.
+    if (
+        context.boundary_strain >= ANGER_BOUNDARY_STRAIN
+        and (norepinephrine > ANGER_NE or alertness > ANGER_ALERTNESS)
+        and valence < MILD_POSITIVE_VALENCE
+    ):
+        return (EmotionCategory.ANGRY, CognitiveMode.COMBATIVE, 0.9, 0.3, 0.2, 0.2)
+
+    # Surprise — a strong prediction-error orienting event. It can
+    # relabel mild states only; a genuine stress or affect already
+    # resolved by the circumplex keeps precedence.
+    if context.prediction_error >= SURPRISE_PE and category in (
+        EmotionCategory.NEUTRAL,
+        EmotionCategory.UNSETTLED,
+        EmotionCategory.CONTENT,
+        EmotionCategory.POSITIVE,
+    ):
+        return (EmotionCategory.SURPRISED, CognitiveMode.STARTLED, 1.1, 0.8, 0.5, 0.6)
+
+    return None
+
+
+def _guarded_emotion(
+    category: EmotionCategory,
+    cognitive_mode: CognitiveMode,
+    openness_to_engage: float,
+    caution: float,
+    creativity: float,
+    valence: float,
+    cortisol: float,
+    plasticity: float,
+) -> tuple[EmotionCategory, CognitiveMode, float, float, float]:
+    """Guard against pleasant categories under chronic stress.
+
+    This catches "silent stress" — valence is positive but cortisol
+    is elevated (suppressing BDNF) or plasticity is closed (blocking
+    learning). Positive circumplex labels are replaced by a guarded,
+    cautious posture. The thresholds are named constants aligned with
+    the Rust substrate's phase and memory-gating boundaries.
+
+    Returns (category, cognitive_mode, openness, caution, creativity).
+    """
+    if (
+        cortisol > GUARDED_CORTISOL or plasticity < PLASTICITY_LOW
+    ) and valence > MILD_POSITIVE_VALENCE:
+        if category in (
+            EmotionCategory.POSITIVE,
+            EmotionCategory.EXCITED,
+            EmotionCategory.CONTENT,
+            EmotionCategory.FLOW,
+            EmotionCategory.TENDER,
+            EmotionCategory.CURIOUS,
+        ):
+            return (
+                EmotionCategory.GUARDED,
+                CognitiveMode.CAUTIOUS,
+                min(openness_to_engage, 0.6),
+                max(caution, 0.6),
+                min(creativity, 0.3),
+            )
+    return (category, cognitive_mode, openness_to_engage, caution, creativity)
+
+
+# Category → cause for the signal-resolved emotions. The category
+# exists only when its substrate was measured, so the cause is
+# determined at classification time.
+_CONTEXTUAL_CAUSES: dict[EmotionCategory, CauseCategory] = {
+    EmotionCategory.AFRAID: CauseCategory.FEAR_ACUTE,
+    EmotionCategory.ANGRY: CauseCategory.ANGER_BOUNDARY,
+    EmotionCategory.SURPRISED: CauseCategory.SURPRISE_PE,
+    EmotionCategory.LONELY: CauseCategory.LONELINESS,
+    EmotionCategory.CURIOUS: CauseCategory.CURIOSITY,
+    EmotionCategory.TENDER: CauseCategory.TENDERNESS,
+    EmotionCategory.BORED: CauseCategory.BOREDOM,
+}
 
 
 def _derive_cause_category(
@@ -503,9 +956,17 @@ def _derive_cause_category(
     if category == EmotionCategory.GUARDED:
         return _guarded_cause_category(cortisol, plasticity)
 
+    # Signal-resolved categories carry their own cause — each exists
+    # only because a specific substrate was measured, so the cause is
+    # already known at classification time.
+    contextual = _CONTEXTUAL_CAUSES.get(category)
+    if contextual is not None:
+        return contextual
+
     # Only explain negative states
     if valence >= -0.1 and category not in (
-        EmotionCategory.DROWSY, EmotionCategory.OVERWHELMED,
+        EmotionCategory.DROWSY,
+        EmotionCategory.OVERWHELMED,
         EmotionCategory.STRESSED,
     ):
         return CauseCategory.NONE
@@ -535,9 +996,7 @@ def _derive_cause_category(
     return CauseCategory.NONE
 
 
-def _guarded_cause_category(
-    cortisol: float, plasticity: float
-) -> CauseCategory:
+def _guarded_cause_category(cortisol: float, plasticity: float) -> CauseCategory:
     """Derive the cause category for a guarded state."""
     if plasticity < 0.2:
         return CauseCategory.GUARDED_PLASTICITY

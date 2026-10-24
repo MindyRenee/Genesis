@@ -17,6 +17,35 @@ pub mod motor;
 pub use motor::MotorTarget;
 
 const EPS: f64 = 1.0e-12;
+/// Upper bound on the field's thermal state — disagreement heats
+/// the field only this far, so the Langevin kick stays a
+/// fluctuation around the consensus pull, never a takeover.
+const TEMPERATURE_CAP: f64 = 0.5;
+
+/// Provenance marker — one letter of the creator lattice (see
+/// PROVENANCE.md). This one is load-bearing: it is bound into the
+/// deterministic noise stream's seed below.
+pub(crate) const MARKER_G00: u64 = 0x4753_004D_4975_7005;
+/// Golden-ratio stream seed for the thermal kick, bound to the
+/// provenance lattice so the noise sequence itself carries a letter.
+pub(crate) const FIELD_NOISE_SEED: u64 = 0x9E37_79B9_7F4A_7C15;
+
+/// Fingerprint of the creator lattice (PROVENANCE.md): the XOR fold of
+/// all eight Rust provenance markers. The constants are referenced
+/// through this function, so removing one is a compile error, not a
+/// silent edit; it is logged at daemon startup and asserted by the
+/// provenance test. The Python-side markers are scanned by
+/// `scripts/provenance.py`.
+pub fn provenance_fingerprint() -> u64 {
+    MARKER_G00
+        ^ runtime::MARKER_G01
+        ^ engine::MARKER_G02
+        ^ motor::MARKER_G03
+        ^ crate::daemon::ipc::MARKER_G04
+        ^ crate::daemon::tick::MARKER_G05
+        ^ crate::state::header::MARKER_G06
+        ^ crate::store::mmap_state::MARKER_G07
+}
 pub type Vector = Vec<f64>;
 pub type Matrix = Vec<Vector>;
 
@@ -182,6 +211,91 @@ impl PoincareBall {
         }
         self.project(&scaled(v, z))
     }
+    /// Möbius addition — the gyrovector operation that plays the
+    /// role of vector addition on the ball (Ungar; curvature c > 0,
+    /// ball radius 1/√c):
+    ///
+    ///   x ⊕_c y = [(1 + 2c⟨x,y⟩ + c‖y‖²)x + (1 − c‖x‖²)y]
+    ///             / (1 + 2c⟨x,y⟩ + c²‖x‖²‖y‖²)
+    ///
+    /// Non-commutative and non-associative, but closed in the ball
+    /// and left-cancellative: (−x) ⊕_c (x ⊕_c y) = y — the identity
+    /// that makes the general log/exp pair below true inverses.
+    /// Adding a fixed element is a hyperbolic translation: it moves
+    /// every point the same geodesic distance.
+    pub fn mobius_add(&self, x: &[f64], y: &[f64]) -> Result<Vector, FieldError> {
+        self.validate_point(x)?;
+        self.validate_point(y)?;
+        let c = self.curvature;
+        let nx = dot(x, x);
+        let ny = dot(y, y);
+        let xy = dot(x, y);
+        if !(nx.is_finite() && ny.is_finite() && xy.is_finite()) {
+            return Err(FieldError::NonFiniteState);
+        }
+        let x_num = 1.0 + 2.0 * c * xy + c * ny;
+        let y_num = 1.0 - c * nx;
+        // The denominator is ≥ (1 − c‖x‖‖y‖)² > 0 inside the open
+        // ball — it can never vanish here, only underflow/overflow.
+        let denom = 1.0 + 2.0 * c * xy + c * c * nx * ny;
+        if !(x_num.is_finite() && y_num.is_finite() && denom.is_finite() && denom > 0.0) {
+            return Err(FieldError::NonFiniteState);
+        }
+        let mut out = vec![0.0; self.dimension];
+        for ((dst, &xi), &yi) in out.iter_mut().zip(x).zip(y) {
+            *dst = (x_num * xi + y_num * yi) / denom;
+        }
+        self.project(&out)
+    }
+    /// Möbius subtraction: (−x) ⊕_c y — the displacement from x to
+    /// y expressed as a ball point. A hyperbolic translation of y
+    /// back toward the origin: d(0, −x ⊕ y) = d(x, y).
+    fn mobius_sub(&self, x: &[f64], y: &[f64]) -> Result<Vector, FieldError> {
+        self.mobius_add(&scaled(x, -1.0), y)
+    }
+    /// Logarithm map at an arbitrary basepoint: the tangent vector
+    /// at x that points along the geodesic toward y, with the same
+    /// distance-normalized convention as `log_origin` (‖v‖ = the
+    /// geodesic distance the vector travels). Because x ↦ (−x) ⊕ x
+    /// is a hyperbolic translation to the origin, this is just
+    /// `log_origin` of the Möbius displacement.
+    pub fn log_at(&self, x: &[f64], y: &[f64]) -> Result<Vector, FieldError> {
+        self.log_origin(&self.mobius_sub(x, y)?)
+    }
+    /// Exponential map at an arbitrary basepoint: step from x along
+    /// the geodesic in direction v for ‖v‖ units of geodesic
+    /// distance — `x ⊕_c exp_origin(v)`. Inverse of `log_at` by
+    /// left-cancellation.
+    pub fn exp_at(&self, x: &[f64], v: &[f64]) -> Result<Vector, FieldError> {
+        self.validate_point(x)?;
+        self.mobius_add(x, &self.exp_origin(v)?)
+    }
+    /// The geodesic from x toward y at fraction t of the hyperbolic
+    /// distance: d(x, γ(t)) = t·d(x,y) exactly. γ(0) = x, γ(1) = y;
+    /// t outside [0,1] extrapolates along the same geodesic.
+    pub fn geodesic(&self, x: &[f64], y: &[f64], t: f64) -> Result<Vector, FieldError> {
+        if !t.is_finite() {
+            return Err(FieldError::NonFiniteState);
+        }
+        self.exp_at(x, &scaled(&self.log_at(x, y)?, t))
+    }
+    /// Geodesic point reflection through `through`: the point as far
+    /// past `through` as x is before it — the symmetric-space
+    /// involution s_c(x). `through` is the geodesic midpoint of x
+    /// and its image, and the map is its own inverse:
+    /// s_c(s_c(x)) = x.
+    pub fn point_reflection(&self, x: &[f64], through: &[f64]) -> Result<Vector, FieldError> {
+        self.geodesic(x, through, 2.0)
+    }
+    /// The point diametrically opposite x through the ball's center —
+    /// the origin case of `point_reflection`. In the ball model the
+    /// geodesic through the origin is the Euclidean diameter, so the
+    /// antipode is exactly −x: d(x, −x) = 2·d(0, x), an involution
+    /// whose only fixed point is the origin.
+    pub fn antipode(&self, x: &[f64]) -> Result<Vector, FieldError> {
+        self.validate_point(x)?;
+        Ok(scaled(x, -1.0))
+    }
     fn validate_point(&self, x: &[f64]) -> Result<(), FieldError> {
         if self.contains(x) {
             Ok(())
@@ -189,13 +303,12 @@ impl PoincareBall {
             Err(FieldError::InvalidPoint)
         }
     }
-    pub fn origin_barycenter(&self, points: &[Vector]) -> Result<Vector, FieldError> {
-        if points.is_empty() {
-            return Err(FieldError::EmptyState);
-        }
-        if points.iter().any(|p| p.len() != self.dimension) {
-            return Err(FieldError::DimensionMismatch);
-        }
+    /// The tangent-space mean at the origin — the Euclidean average
+    /// of the lifted log coordinates, mapped back. Exact for a
+    /// single point and the right seed for `frechet_mean`; away
+    /// from the origin it is only the barycenter's first
+    /// approximation, since the log map distorts with distance.
+    fn tangent_barycenter(&self, points: &[Vector]) -> Result<Vector, FieldError> {
         let tangents = points
             .iter()
             .map(|p| self.log_origin(p))
@@ -226,6 +339,47 @@ impl PoincareBall {
         }
         self.exp_origin(&mean)
     }
+    /// The Fréchet mean: the point minimizing Σᵢ d²(m, xᵢ) — the
+    /// true center of mass on the manifold, where the tangent-space
+    /// mean is only its origin approximation. Computed by Karcher
+    /// iteration: `m ← exp_m(meanᵢ log_m(xᵢ))`, steepest descent on
+    /// ½Σd² (whose Riemannian gradient is −Σ log_m(xᵢ)). The ball
+    /// is a Hadamard manifold — complete, simply connected,
+    /// nonpositive curvature — so the minimizer exists, is unique,
+    /// and the unit-step iteration converges to it. Seeded at the
+    /// tangent barycenter, which is already the exact answer at the
+    /// origin, so near-origin sets converge in one or two steps.
+    pub fn frechet_mean(&self, points: &[Vector]) -> Result<Vector, FieldError> {
+        if points.is_empty() {
+            return Err(FieldError::EmptyState);
+        }
+        if points.iter().any(|p| p.len() != self.dimension) {
+            return Err(FieldError::DimensionMismatch);
+        }
+        let mut m = self.tangent_barycenter(points)?;
+        let count = points.len() as f64;
+        for _ in 0..64 {
+            let mut step = vec![0.0; self.dimension];
+            for p in points {
+                let v = self.log_at(&m, p)?;
+                for (s, &vi) in step.iter_mut().zip(&v) {
+                    *s += vi;
+                }
+            }
+            let step = scaled(&step, 1.0 / count);
+            let step_norm = norm(&step);
+            if !step_norm.is_finite() {
+                return Err(FieldError::NonFiniteState);
+            }
+            // The step IS the negative gradient — its vanishing is
+            // the Fréchet condition itself.
+            if step_norm < 1.0e-9 {
+                return Ok(m);
+            }
+            m = self.exp_at(&m, &step)?;
+        }
+        Ok(m)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -242,7 +396,12 @@ impl SubsystemLayer {
             gain: 1.0,
         }
     }
-    pub fn evolve(&mut self, derivative: &[f64], dt: f64) -> Result<(), FieldError> {
+    /// Euler update by `dt·gain·derivative` on this layer alone.
+    /// The layer is geometry-agnostic — the caller owns the
+    /// manifold: `SystemFiber::evolve` re-projects the result into
+    /// the ball. Crate-private so no other path can strand a layer
+    /// outside the manifold.
+    pub(crate) fn evolve(&mut self, derivative: &[f64], dt: f64) -> Result<(), FieldError> {
         if derivative.len() != self.state.len() {
             return Err(FieldError::DimensionMismatch);
         }
@@ -418,12 +577,19 @@ impl SystemFiber {
         {
             return Err(FieldError::NonFiniteState);
         }
+        let effective_dt = dt * self.engine.time_scale;
+        if !effective_dt.is_finite() || effective_dt < 0.0 {
+            return Err(FieldError::InvalidTime);
+        }
+        if effective_dt == 0.0 {
+            return Ok(());
+        }
         let mut next_layers = self.layers.clone();
         for (layer, derivative) in next_layers.iter_mut().zip(derivatives) {
-            layer.evolve(derivative, dt)?;
+            layer.evolve(derivative, effective_dt)?;
             layer.state = self.manifold.project(&layer.state)?;
         }
-        let next_clock = self.engine_clock + dt;
+        let next_clock = self.engine_clock + effective_dt;
         if !next_clock.is_finite() {
             return Err(FieldError::InvalidTime);
         }
@@ -435,7 +601,7 @@ impl SystemFiber {
         if self.layers.is_empty() {
             return Err(FieldError::EmptyState);
         }
-        self.manifold.origin_barycenter(
+        self.manifold.frechet_mean(
             &self
                 .layers
                 .iter()
@@ -573,8 +739,17 @@ pub struct GlobalField {
     pub transports: Vec<GaugeTransport>,
     pub integration_gain: f64,
     pub disagreement: f64,
+    /// The field's thermal state — the amplitude of the fluctuation
+    /// the consensus pull permits. Starts at zero: the field is
+    /// born ordered, and only unresolved disagreement heats it (see
+    /// `synchronize` — the temperature floor snaps to the current
+    /// disagreement and relaxes at `cooling_rate`).
     pub temperature: f64,
     pub cooling_rate: f64,
+    /// Deterministic pseudo-noise state for the thermal kick —
+    /// a fixed-seed xorshift64* stream, so the fluctuation model is
+    /// stochastic in structure and reproducible in sequence.
+    pub rng_state: u64,
 }
 impl GlobalField {
     pub fn new(manifold: PoincareBall) -> Self {
@@ -584,8 +759,9 @@ impl GlobalField {
             transports: Vec::new(),
             integration_gain: 1.0,
             disagreement: 0.0,
-            temperature: 1.0,
+            temperature: 0.0,
             cooling_rate: 0.1,
+            rng_state: FIELD_NOISE_SEED ^ MARKER_G00,
         }
     }
     pub fn add_fiber(&mut self, fiber: SystemFiber) -> Result<(), FieldError> {
@@ -626,6 +802,46 @@ impl GlobalField {
         }
         self.transports.push(transport);
         Ok(())
+    }
+    /// Opposite of `add_fiber`: detach a subsystem carrier and hand
+    /// it back. Strict — nothing is silently cascaded: a fiber still
+    /// referenced by a transport cannot leave (remove the routes
+    /// first), and the reference fiber (`fibers[0]`, the anchor
+    /// `synchronize` corrects against) can only leave last, since
+    /// dropping it earlier would silently re-anchor every remaining
+    /// correction.
+    pub fn remove_fiber(&mut self, id: &str) -> Result<SystemFiber, FieldError> {
+        let index = self
+            .fibers
+            .iter()
+            .position(|f| f.id == id)
+            .ok_or(FieldError::MissingFiber)?;
+        let referenced = self.transports.iter().any(|t| t.from == id || t.to == id);
+        if referenced || (index == 0 && self.fibers.len() > 1) {
+            return Err(FieldError::FiberInUse);
+        }
+        Ok(self.fibers.remove(index))
+    }
+    /// Opposite of `add_transport`: sever the directed edge
+    /// `from → to` and hand it back.
+    pub fn remove_transport(&mut self, from: &str, to: &str) -> Result<GaugeTransport, FieldError> {
+        let index = self
+            .transports
+            .iter()
+            .position(|t| t.from == from && t.to == to)
+            .ok_or(FieldError::MissingTransport)?;
+        Ok(self.transports.remove(index))
+    }
+    /// The diametric opposite of the field's current localization —
+    /// the antipode of the fresh consensus. Same distance from the
+    /// origin, on the far side: where the subsystems would sit if
+    /// they collectively opposed what they now agree on. `None`
+    /// when there is no consensus to oppose (empty field).
+    pub fn anticonsensus(&self) -> Result<Option<Vector>, FieldError> {
+        match self.consensus()? {
+            Some(c) => Ok(Some(self.manifold.antipode(&c)?)),
+            None => Ok(None),
+        }
     }
     fn transport_paths(
         &self,
@@ -755,7 +971,7 @@ impl GlobalField {
         if states.is_empty() {
             Ok(None)
         } else {
-            Ok(Some(self.manifold.origin_barycenter(&states)?))
+            Ok(Some(self.manifold.frechet_mean(&states)?))
         }
     }
     pub fn step(&mut self, dt: f64) -> Result<Option<Vector>, FieldError> {
@@ -770,7 +986,9 @@ impl GlobalField {
         *self = next;
         Ok(consensus)
     }
-    pub fn synchronize(&mut self, dt: f64) -> Result<Option<Vector>, FieldError> {
+    /// Shared validation for both integration directions — a
+    /// finite, nonnegative step and a sane thermostat.
+    fn validate_integration(&self, dt: f64) -> Result<(), FieldError> {
         if !dt.is_finite() || dt < 0.0 {
             return Err(FieldError::InvalidTime);
         }
@@ -783,45 +1001,127 @@ impl GlobalField {
         {
             return Err(FieldError::InvalidDynamics);
         }
-        let states = self.transported_states()?;
-        if states.is_empty() {
-            return Ok(None);
-        }
-        let consensus = self.manifold.origin_barycenter(&states)?;
+        Ok(())
+    }
+    /// The measured tension and the integration parameters both
+    /// directions share: disagreement is the Fréchet variance of the
+    /// transported states against the just-computed consensus —
+    /// measured *before* the move, the tension the step resolves.
+    /// `gain` is the bounded pull fraction; `sigma` the
+    /// overdamped-Langevin kick amplitude √(2γT·dt) per tangent
+    /// component — the fluctuation-dissipation relation with
+    /// mobility γ = integration_gain, sampling the field's
+    /// *pre-update* temperature so a cold field is exact. And the
+    /// next temperature: disagreement heats the field, so the floor
+    /// snaps up to the current tension (capped so the kick stays a
+    /// fluctuation, not a takeover) and relaxes at `cooling_rate` —
+    /// snap fast, drift slow, the adaptive-gate asymmetry.
+    fn thermal_plan(
+        &self,
+        states: &[Vector],
+        consensus: &Vector,
+        dt: f64,
+    ) -> Result<(f64, f64, f64, f64), FieldError> {
         let mut disagreement = 0.0;
-        for state in &states {
-            let d = self.manifold.distance(state, &consensus)?;
+        for state in states {
+            let d = self.manifold.distance(state, consensus)?;
             disagreement += d * d;
         }
         let next_disagreement = disagreement / states.len() as f64;
         let gain = (self.integration_gain.max(0.0) * dt).clamp(0.0, 1.0);
+        let sigma = (2.0 * self.integration_gain.max(0.0) * self.temperature * dt).sqrt();
+        if !sigma.is_finite() {
+            return Err(FieldError::NonFiniteState);
+        }
+        let next_temperature = (self.temperature - self.cooling_rate * dt)
+            .max(0.0)
+            .max(next_disagreement.min(TEMPERATURE_CAP));
+        Ok((next_disagreement, gain, sigma, next_temperature))
+    }
+    /// The correction machinery shared by `synchronize` and
+    /// `diverge`: every non-reference fiber moves `signed_gain` of
+    /// the way toward (positive) or away from (negative)
+    /// `target_tangent` — expressed in the reference frame, mapped
+    /// back through the transport inverse — plus a thermal kick of
+    /// amplitude `sigma`. Then all staged states commit at once, so
+    /// a failure mid-loop leaves the field untouched.
+    fn pull_toward(
+        &mut self,
+        target_tangent: &Vector,
+        signed_gain: f64,
+        sigma: f64,
+    ) -> Result<(), FieldError> {
+        let mut rng = self.rng_state;
         let reference_id = self.fibers[0].id.clone();
-        let consensus_tangent = self.manifold.log_origin(&consensus)?;
         let mut next_states: Vec<(usize, Vec<Vector>)> =
             Vec::with_capacity(self.fibers.len().saturating_sub(1));
         for i in 1..self.fibers.len() {
             let matrix = self.path_matrix(&self.fibers[i].id, &reference_id)?;
             let inv = matrix_inverse(&matrix)?;
-            let local_target_tangent = mat_vec(&inv, &consensus_tangent)?;
+            let local_target_tangent = mat_vec(&inv, target_tangent)?;
             let current = self.fibers[i].state()?;
             let current_tangent = self.fibers[i].manifold.log_origin(&current)?;
-            let correction = scaled(&sub(&local_target_tangent, &current_tangent), gain);
+            let correction = scaled(&sub(&local_target_tangent, &current_tangent), signed_gain);
             let manifold = self.fibers[i].manifold.clone();
             let mut states_for_fiber = Vec::with_capacity(self.fibers[i].layers.len());
             for layer in &self.fibers[i].layers {
                 let tangent = manifold.log_origin(&layer.state)?;
-                let next = manifold.exp_origin(&add(&tangent, &correction))?;
+                let mut updated = add(&tangent, &correction);
+                if sigma > 0.0 {
+                    for v in updated.iter_mut() {
+                        *v += sigma * gaussian(&mut rng);
+                    }
+                }
+                let next = manifold.exp_origin(&updated)?;
                 states_for_fiber.push(next);
             }
             next_states.push((i, states_for_fiber));
         }
-        let next_temperature = (self.temperature - self.cooling_rate * dt).max(0.0);
-        self.disagreement = next_disagreement;
         for (i, states_for_fiber) in next_states {
             for (layer, next) in self.fibers[i].layers.iter_mut().zip(states_for_fiber) {
                 layer.state = next;
             }
         }
+        self.rng_state = rng;
+        Ok(())
+    }
+    pub fn synchronize(&mut self, dt: f64) -> Result<Option<Vector>, FieldError> {
+        self.validate_integration(dt)?;
+        let states = self.transported_states()?;
+        if states.is_empty() {
+            return Ok(None);
+        }
+        let consensus = self.manifold.frechet_mean(&states)?;
+        let (next_disagreement, gain, sigma, next_temperature) =
+            self.thermal_plan(&states, &consensus, dt)?;
+        let consensus_tangent = self.manifold.log_origin(&consensus)?;
+        self.pull_toward(&consensus_tangent, gain, sigma)?;
+        self.disagreement = next_disagreement;
+        self.temperature = next_temperature;
+        Ok(Some(consensus))
+    }
+    /// The opposite of `synchronize`: the same step with its sign
+    /// negated — gradient *ascent* on the disagreement potential
+    /// instead of descent. Each non-reference fiber moves away from
+    /// the consensus along its own tangent rather than toward it;
+    /// a fiber already at consensus feels no push, so divergence
+    /// amplifies existing deviation rather than manufacturing it.
+    /// Same thermal bookkeeping either way — divergence is a
+    /// direction, not an exemption. Returns the consensus the field
+    /// moved away from (the repeller, where `synchronize` returns
+    /// the attractor).
+    pub fn diverge(&mut self, dt: f64) -> Result<Option<Vector>, FieldError> {
+        self.validate_integration(dt)?;
+        let states = self.transported_states()?;
+        if states.is_empty() {
+            return Ok(None);
+        }
+        let consensus = self.manifold.frechet_mean(&states)?;
+        let (next_disagreement, gain, sigma, next_temperature) =
+            self.thermal_plan(&states, &consensus, dt)?;
+        let consensus_tangent = self.manifold.log_origin(&consensus)?;
+        self.pull_toward(&consensus_tangent, -gain, sigma)?;
+        self.disagreement = next_disagreement;
         self.temperature = next_temperature;
         Ok(Some(consensus))
     }
@@ -833,6 +1133,27 @@ fn identity(n: usize) -> Matrix {
         row[i] = 1.0;
     }
     m
+}
+
+/// xorshift64* → uniform on [0,1). Fixed-seed deterministic
+/// pseudo-noise: the fluctuation model is stochastic in structure
+/// and reproducible in sequence — no external entropy, no
+/// dependency.
+fn next_f64(state: &mut u64) -> f64 {
+    let mut x = *state;
+    x ^= x >> 12;
+    x ^= x << 25;
+    x ^= x >> 27;
+    *state = x;
+    (x.wrapping_mul(0x2545_F491_4F6C_DD1D) >> 11) as f64 * (1.0 / (1u64 << 53) as f64)
+}
+
+/// Box–Muller N(0,1) from two uniforms — one branch is enough per
+/// draw; the stream stays deterministic.
+fn gaussian(state: &mut u64) -> f64 {
+    let u1 = 1.0 - next_f64(state); // (0,1] — ln stays finite
+    let u2 = next_f64(state);
+    (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos()
 }
 fn mat_mul(a: &Matrix, b: &Matrix) -> Result<Matrix, FieldError> {
     if a.is_empty()
@@ -1077,6 +1398,7 @@ pub enum FieldError {
     InvalidDynamics,
     DuplicateId,
     MissingFiber,
+    FiberInUse,
 }
 impl fmt::Display for FieldError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1193,9 +1515,47 @@ mod tests {
         let m = PoincareBall::new(2, 1.0e-300).unwrap();
         let a = vec![1.0e149, 0.0];
         let b = vec![-1.0e149, 0.0];
-        let center = m.origin_barycenter(&[a, b]).unwrap();
+        let center = m.frechet_mean(&[a, b]).unwrap();
         assert!(center.iter().all(|v| v.is_finite()));
         assert!(norm(&center) < 1.0e-12);
+    }
+
+    #[test]
+    fn frechet_mean_is_where_the_tangent_gradient_vanishes() {
+        // The defining property, not a Euclidean proxy: at the
+        // Fréchet mean, Σᵢ log_m(xᵢ) = 0 — the Riemannian gradient
+        // of ½Σd² vanishes.
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        let pts = vec![
+            vec![0.4, 0.2],
+            vec![-0.3, 0.5],
+            vec![0.1, -0.35],
+            vec![-0.2, -0.2],
+        ];
+        let mean = m.frechet_mean(&pts).unwrap();
+        let mut grad = vec![0.0; 2];
+        for p in &pts {
+            let v = m.log_at(&mean, p).unwrap();
+            grad[0] += v[0];
+            grad[1] += v[1];
+        }
+        assert!(norm(&grad) < 1.0e-7, "residual gradient: {grad:?}");
+        // And it beats its own seed: the tangent barycenter sits at
+        // a strictly larger Σd² than the iterated mean (unless the
+        // points were symmetric to begin with).
+        let seed = m.tangent_barycenter(&pts).unwrap();
+        let objective = |c: &Vector| -> f64 {
+            pts.iter()
+                .map(|p| m.distance(c, p).unwrap().powi(2))
+                .sum::<f64>()
+        };
+        assert!(objective(&mean) <= objective(&seed) + 1.0e-12);
+        // Symmetric pair: the mean is the geodesic midpoint.
+        let a = vec![0.3, -0.1];
+        let b = vec![-0.2, 0.4];
+        let mid = m.frechet_mean(&[a.clone(), b.clone()]).unwrap();
+        let full = m.distance(&a, &b).unwrap();
+        assert!((m.distance(&a, &mid).unwrap() - 0.5 * full).abs() < 1.0e-7);
     }
 
     #[test]
@@ -1270,6 +1630,272 @@ mod tests {
             SystemFiber::new("x", m, vec![layer]),
             Err(FieldError::InvalidDynamics)
         );
+    }
+
+    #[test]
+    fn evolve_applies_engine_time_scale_like_step() {
+        // `evolve` must respect the engine's time scale the same way
+        // `step` does: a fiber at 2× moves the layer by dt·2·gain·dx
+        // and advances its clock by the scaled interval.
+        let m = PoincareBall::new(1, 1.0).unwrap();
+        let mut engine = SystemEngine::zero(1, 1);
+        engine.time_scale = 2.0;
+        let mut fiber =
+            SystemFiber::with_engine("x", m, vec![SubsystemLayer::new("a", vec![0.0])], engine)
+                .unwrap();
+        fiber.evolve(&[vec![0.5]], 0.1).unwrap();
+        assert!((fiber.layers[0].state[0] - 0.1).abs() < 1.0e-12);
+        assert!((fiber.engine_clock - 0.2).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn evolve_projects_departed_state_back_into_the_ball() {
+        // A derivative that pushes a layer outside the ball must
+        // come back through the manifold: the layer state stays a
+        // valid ball point, not a raw Euler overshoot.
+        let m = PoincareBall::new(1, 1.0).unwrap();
+        let mut fiber =
+            SystemFiber::new("x", m, vec![SubsystemLayer::new("a", vec![0.9])]).unwrap();
+        fiber.evolve(&[vec![1.0]], 0.5).unwrap();
+        assert!(fiber.manifold.contains(&fiber.layers[0].state));
+    }
+
+    #[test]
+    fn mobius_addition_identity_inverse_and_left_cancellation() {
+        let m = PoincareBall::new(3, 1.0).unwrap();
+        let x = vec![0.2, -0.1, 0.3];
+        let y = vec![-0.15, 0.25, -0.1];
+        let zero = vec![0.0; 3];
+        // Identity: x ⊕ 0 = x.
+        for (a, b) in x.iter().zip(m.mobius_add(&x, &zero).unwrap().iter()) {
+            assert!((a - b).abs() < 1.0e-12);
+        }
+        // Inverse: (−x) ⊕ x = 0.
+        assert!(norm(&m.mobius_add(&scaled(&x, -1.0), &x).unwrap()) < 1.0e-12);
+        // Left cancellation: (−x) ⊕ (x ⊕ y) = y — the property the
+        // general log/exp pair rides on.
+        let back = m
+            .mobius_add(&scaled(&x, -1.0), &m.mobius_add(&x, &y).unwrap())
+            .unwrap();
+        for (a, b) in y.iter().zip(back.iter()) {
+            assert!((a - b).abs() < 1.0e-9);
+        }
+    }
+
+    #[test]
+    fn log_exp_at_arbitrary_basepoint_round_trips() {
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        let x = vec![0.3, -0.2];
+        let y = vec![-0.1, 0.4];
+        let v = m.log_at(&x, &y).unwrap();
+        // The tangent's norm is the geodesic distance — same
+        // distance-normalized convention as log_origin.
+        assert!((norm(&v) - m.distance(&x, &y).unwrap()).abs() < 1.0e-9);
+        let recovered = m.exp_at(&x, &v).unwrap();
+        for (a, b) in y.iter().zip(recovered.iter()) {
+            assert!((a - b).abs() < 1.0e-9);
+        }
+    }
+
+    #[test]
+    fn geodesic_fraction_matches_distance_fraction() {
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        let x = vec![0.2, -0.3];
+        let y = vec![-0.4, 0.1];
+        let full = m.distance(&x, &y).unwrap();
+        for (a, b) in x.iter().zip(m.geodesic(&x, &y, 0.0).unwrap().iter()) {
+            assert!((a - b).abs() < 1.0e-9);
+        }
+        for (a, b) in y.iter().zip(m.geodesic(&x, &y, 1.0).unwrap().iter()) {
+            assert!((a - b).abs() < 1.0e-9);
+        }
+        let mid = m.geodesic(&x, &y, 0.5).unwrap();
+        assert!((m.distance(&x, &mid).unwrap() - 0.5 * full).abs() < 1.0e-9);
+        assert!((m.distance(&mid, &y).unwrap() - 0.5 * full).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn disagreement_heats_the_field_and_fluctuation_is_deterministic() {
+        fn build() -> GlobalField {
+            let manifold = PoincareBall::new(1, 1.0).unwrap();
+            let mut field = GlobalField::new(manifold);
+            field.cooling_rate = 0.0; // isolate the heating term
+            field
+                .add_fiber(
+                    SystemFiber::new(
+                        "a",
+                        field.manifold.clone(),
+                        vec![SubsystemLayer::new("s", vec![0.1])],
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+            field
+                .add_fiber(
+                    SystemFiber::new(
+                        "b",
+                        field.manifold.clone(),
+                        vec![SubsystemLayer::new("s", vec![0.4])],
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+            field
+                .add_transport(GaugeTransport::new("b", "a", vec![vec![1.0]]).unwrap())
+                .unwrap();
+            field
+        }
+        // A cold field starts deterministic: temperature 0 → sigma 0.
+        let mut cold = build();
+        let before = cold.fibers[1].layers[0].state.clone();
+        cold.synchronize(0.1).unwrap();
+        // The disagreement snapped the temperature floor up — the
+        // field remembers the tension it is relaxing.
+        assert!(cold.temperature > 0.0);
+        assert!(cold.temperature <= TEMPERATURE_CAP + 1.0e-12);
+        // Two identical fields take identical kicks — stochastic in
+        // structure, reproducible in sequence.
+        let mut a = build();
+        let mut b = build();
+        a.synchronize(0.1).unwrap(); // heats both fields
+        b.synchronize(0.1).unwrap();
+        a.synchronize(0.1).unwrap(); // now hot: the Langevin kick fires
+        b.synchronize(0.1).unwrap();
+        assert_eq!(a.fibers[1].layers[0].state, b.fibers[1].layers[0].state);
+        assert_eq!(a.rng_state, b.rng_state);
+        assert_ne!(a.fibers[1].layers[0].state, before);
+    }
+
+    #[test]
+    fn antipode_is_an_involution_that_doubles_the_origin_distance() {
+        let m = PoincareBall::new(3, 1.0).unwrap();
+        let x = vec![0.2, -0.1, 0.3];
+        let neg = m.antipode(&x).unwrap();
+        assert_eq!(neg, scaled(&x, -1.0));
+        // Through the center: d(x, −x) = 2·d(0, x).
+        let origin = vec![0.0; 3];
+        assert!(
+            (m.distance(&x, &neg).unwrap() - 2.0 * m.distance(&x, &origin).unwrap()).abs() < 1.0e-9
+        );
+        // The map is its own inverse, fixing only the origin.
+        assert_eq!(m.antipode(&neg).unwrap(), x);
+        assert_eq!(m.antipode(&origin).unwrap(), origin);
+    }
+
+    #[test]
+    fn point_reflection_places_the_center_at_the_geodesic_midpoint() {
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        let x = vec![0.2, -0.3];
+        let c = vec![-0.1, 0.15];
+        let image = m.point_reflection(&x, &c).unwrap();
+        // c is the geodesic midpoint of x and its image.
+        let d = m.distance(&x, &image).unwrap();
+        assert!((m.distance(&x, &c).unwrap() - 0.5 * d).abs() < 1.0e-9);
+        assert!((m.distance(&c, &image).unwrap() - 0.5 * d).abs() < 1.0e-9);
+        // Cartan involution: reflecting again returns x.
+        let back = m.point_reflection(&image, &c).unwrap();
+        for (a, b) in x.iter().zip(back.iter()) {
+            assert!((a - b).abs() < 1.0e-9);
+        }
+        // The origin case is the antipode — up to the rounding the
+        // geodesic path accumulates over the direct negation.
+        let origin = vec![0.0; 2];
+        let reflected = m.point_reflection(&x, &origin).unwrap();
+        for (a, b) in m.antipode(&x).unwrap().iter().zip(reflected.iter()) {
+            assert!((a - b).abs() < 1.0e-9);
+        }
+    }
+
+    fn two_fiber_field() -> GlobalField {
+        let manifold = PoincareBall::new(1, 1.0).unwrap();
+        let mut field = GlobalField::new(manifold);
+        field.cooling_rate = 0.0;
+        field
+            .add_fiber(
+                SystemFiber::new(
+                    "a",
+                    field.manifold.clone(),
+                    vec![SubsystemLayer::new("s", vec![0.1])],
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        field
+            .add_fiber(
+                SystemFiber::new(
+                    "b",
+                    field.manifold.clone(),
+                    vec![SubsystemLayer::new("s", vec![0.4])],
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        field
+            .add_transport(GaugeTransport::new("b", "a", vec![vec![1.0]]).unwrap())
+            .unwrap();
+        field
+    }
+
+    #[test]
+    fn diverge_grows_disagreement_where_synchronize_shrinks_it() {
+        let mut contracted = two_fiber_field();
+        let mut expanded = two_fiber_field();
+        // A zero step measures without moving — the standing
+        // variance the two directions then act on.
+        expanded.synchronize(0.0).unwrap();
+        let d0 = expanded.disagreement;
+        assert!(d0 > 0.0);
+        contracted.synchronize(0.2).unwrap();
+        expanded.diverge(0.2).unwrap();
+        // The stored disagreement is the pre-move tension; measure
+        // again to see where each direction left the field.
+        contracted.synchronize(0.0).unwrap();
+        expanded.synchronize(0.0).unwrap();
+        // Descent pulled fiber b toward the consensus: variance
+        // down. Ascent pushed it away: variance up.
+        assert!(contracted.disagreement < d0);
+        assert!(expanded.disagreement > d0);
+        // Same thermostat either way — and the diverged field is
+        // the hotter one, since its tension is now the larger.
+        assert!(expanded.temperature >= contracted.temperature);
+    }
+
+    #[test]
+    fn anticonsensus_is_the_far_side_of_consensus() {
+        let mut field = two_fiber_field();
+        field.synchronize(0.1).unwrap();
+        let consensus = field.consensus().unwrap().unwrap();
+        let anti = field.anticonsensus().unwrap().unwrap();
+        assert_eq!(anti, scaled(&consensus, -1.0));
+        // Nothing agreed → nothing to oppose: an empty field has
+        // neither a consensus nor an anticonsensus.
+        let empty = GlobalField::new(PoincareBall::new(1, 1.0).unwrap());
+        assert_eq!(empty.anticonsensus().unwrap(), None);
+    }
+
+    #[test]
+    fn removal_is_the_strict_opposite_of_addition() {
+        let mut field = two_fiber_field();
+        // A referenced fiber cannot leave while its routes stand.
+        assert_eq!(field.remove_fiber("b"), Err(FieldError::FiberInUse));
+        // The anchor fiber cannot leave while others remain.
+        assert_eq!(field.remove_fiber("a"), Err(FieldError::FiberInUse));
+        // Sever the route first — remove_transport hands it back.
+        let transport = field.remove_transport("b", "a").unwrap();
+        assert_eq!(transport.from, "b");
+        assert_eq!(
+            field.remove_transport("b", "a"),
+            Err(FieldError::MissingTransport)
+        );
+        // Now b may leave — and it leaves as the fiber it was.
+        let fiber = field.remove_fiber("b").unwrap();
+        assert_eq!(fiber.id, "b");
+        assert_eq!(field.fibers.len(), 1);
+        // The lone anchor may finally go; the field is empty, not
+        // corrupted.
+        field.remove_fiber("a").unwrap();
+        assert!(field.fibers.is_empty());
+        assert_eq!(field.remove_fiber("a"), Err(FieldError::MissingFiber));
     }
 }
 
@@ -1357,5 +1983,60 @@ mod global_step_tests {
         assert_eq!(field.disagreement, before_disagreement);
         assert_eq!(field.temperature, before_temperature);
         assert_eq!(field.cooling_rate, before_cooling_rate);
+    }
+
+    #[test]
+    fn provenance_lattice_verifies() {
+        // The creator lattice (PROVENANCE.md): every marker carries the
+        // 0x4753 tag, its index, its message fragment, and an
+        // fnv1a-24 chaincheck that commits to the previous fragment.
+        // This test is the excision tripwire — a removed or edited
+        // letter breaks the fingerprint and the chain checks.
+        fn fnv24(data: &[u8]) -> u32 {
+            let mut h: u32 = 0x811C_9DC5;
+            for &b in data {
+                h = (h ^ b as u32).wrapping_mul(0x0100_0193);
+            }
+            h & 0xFF_FFFF
+        }
+
+        let markers: [u64; 8] = [
+            MARKER_G00,
+            runtime::MARKER_G01,
+            engine::MARKER_G02,
+            motor::MARKER_G03,
+            crate::daemon::ipc::MARKER_G04,
+            crate::daemon::tick::MARKER_G05,
+            crate::state::header::MARKER_G06,
+            crate::store::mmap_state::MARKER_G07,
+        ];
+
+        let mut prev: [u8; 2] = *b"GS";
+        let mut fragment = Vec::new();
+        for (idx, &m) in markers.iter().enumerate() {
+            assert_eq!(m >> 48, 0x4753, "marker {idx} lost its tag");
+            assert_eq!(
+                ((m >> 40) & 0xFF) as usize,
+                idx,
+                "marker {idx} out of position"
+            );
+            let frag = [((m >> 32) & 0xFF) as u8, ((m >> 24) & 0xFF) as u8];
+            let mut buf = vec![0x47, 0x53, idx as u8];
+            buf.extend_from_slice(&frag);
+            buf.extend_from_slice(&prev);
+            assert_eq!(
+                (m & 0xFF_FFFF) as u32,
+                fnv24(&buf),
+                "chain check failed at marker {idx}"
+            );
+            fragment.extend_from_slice(&frag);
+            prev = frag;
+        }
+        assert_eq!(
+            &fragment[..7],
+            b"MINDY B",
+            "the field's half of the message drifted"
+        );
+        assert_eq!(provenance_fingerprint(), 0x007f_63f1_b36f);
     }
 }

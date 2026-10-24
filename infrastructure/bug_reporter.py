@@ -40,12 +40,8 @@ Bugs are tracked in two files in the data directory:
 - ``bug_reports.jsonl`` — a **running list** of currently-open issues.
   One JSON object per line. Rewritten each scan so it always reflects
   the current state. An issue is only present if it's still found in
-  the code. When an issue is fixed, it's removed from this file.
-
-- ``bug_reports_history.jsonl`` — an **audit trail** of resolved issues.
-  When an issue is no longer found, it's moved here with a
-  ``resolved_at`` timestamp. This lets Genesis talk about its track
-  record ("I've fixed 12 issues") without cluttering the running list.
+  the code. When an issue is fixed, it's removed from this file —
+  fixed means gone; no history or tally of past bugs is kept.
 
 Each entry contains:
 
@@ -234,8 +230,7 @@ _BUG_PATTERN_KNOWLEDGE: dict[str, BugPatternKnowledge] = {
         category="rust_todo",
         concepts=["code", "error"],
         consequence=(
-            "todo! or unimplemented! means the function isn't finished — "
-            "calling it will panic"
+            "todo! or unimplemented! means the function isn't finished — calling it will panic"
         ),
         docs_query="todo unimplemented macro",
         docs_language="rust",
@@ -387,9 +382,8 @@ class BugReport:
 
     def describe(self) -> str:
         """First-person description of the bug."""
-        return (
-            f"in {self.file} at line {self.line}, noticed {self.description}"
-            + (f" — {self.suggestion.lower()}" if self.suggestion else "")
+        return f"in {self.file} at line {self.line}, noticed {self.description}" + (
+            f" — {self.suggestion.lower()}" if self.suggestion else ""
         )
 
 
@@ -400,12 +394,15 @@ class BugScanResult:
     total_files: int = 0
     total_bugs: int = 0
     new_bugs: int = 0  # bugs not seen in previous scans
-    resolved_bugs: int = 0  # bugs that were open last scan but are gone now
     errors: int = 0
     warnings: int = 0
     style_issues: int = 0
     bugs: list[BugReport] = field(default_factory=list)
     scanned_files: set[str] = field(default_factory=set)
+    # (file, category) pairs open last scan and clean this scan —
+    # the fixes: dropped from the running list but surfaced here so
+    # the repair is known, not merely absent.
+    resolved: list[tuple[str, str]] = field(default_factory=list)
 
     @property
     def has_bugs(self) -> bool:
@@ -417,11 +414,6 @@ class BugScanResult:
         """True if any bugs are new (not seen in previous scans)."""
         return self.new_bugs > 0
 
-    @property
-    def has_resolved_bugs(self) -> bool:
-        """True if any previously-open bugs were resolved since last scan."""
-        return self.resolved_bugs > 0
-
     def by_category(self) -> dict[str, list[BugReport]]:
         """Group bugs by category."""
         grouped: dict[str, list[BugReport]] = {}
@@ -431,12 +423,12 @@ class BugScanResult:
 
     def summary(self) -> str:
         """Human-readable summary."""
-        if not self.has_bugs and not self.has_resolved_bugs:
+        if not self.has_bugs:
             return f"Scanned {self.total_files} files. No issues found."
         parts = [
             f"Scanned {self.total_files} files. "
             f"Found {self.total_bugs} issues "
-            f"({self.new_bugs} new, {self.resolved_bugs} resolved): "
+            f"({self.new_bugs} new): "
             f"{self.errors} errors, {self.warnings} warnings, "
             f"{self.style_issues} style."
         ]
@@ -487,9 +479,7 @@ def _catches_base_exception(node: ast.expr | None) -> bool:
     if node is None:
         return False
     names = node.elts if isinstance(node, ast.Tuple) else [node]
-    return any(
-        isinstance(n, ast.Name) and n.id == "BaseException" for n in names
-    )
+    return any(isinstance(n, ast.Name) and n.id == "BaseException" for n in names)
 
 
 def iter_block_statements(body: list[ast.stmt]) -> Iterator[ast.stmt]:
@@ -585,10 +575,7 @@ class _PythonBugVisitor(ast.NodeVisitor):
                 suggestion="Use 'except Exception:' to avoid catching system exits",
             )
         # Check for pass-only except body
-        if (
-            len(node.body) == 1
-            and isinstance(node.body[0], ast.Pass)
-        ):
+        if len(node.body) == 1 and isinstance(node.body[0], ast.Pass):
             self._add_bug(
                 line=node.lineno,
                 severity="warning",
@@ -653,9 +640,7 @@ class _PythonBugVisitor(ast.NodeVisitor):
         if any(isinstance(v, ast.FormattedValue) for v in node.values):
             return
         line_text = (
-            self.source_lines[node.lineno - 1]
-            if 0 < node.lineno <= len(self.source_lines)
-            else ""
+            self.source_lines[node.lineno - 1] if 0 < node.lineno <= len(self.source_lines) else ""
         )
         if "{" in line_text:
             return
@@ -791,10 +776,7 @@ class _PythonBugVisitor(ast.NodeVisitor):
         args = node.args.args
         if not args:
             return
-        missing = [
-            a.arg for a in args
-            if a.annotation is None and a.arg != "self"
-        ]
+        missing = [a.arg for a in args if a.annotation is None and a.arg != "self"]
         if missing and node.returns is None:
             self._add_bug(
                 line=node.lineno,
@@ -818,10 +800,7 @@ class _PythonBugVisitor(ast.NodeVisitor):
                     line=next_stmt.lineno,
                     severity="warning",
                     category="unreachable_code",
-                    description=(
-                        f"Unreachable code after {type(stmt).__name__.lower()} "
-                        f"statement"
-                    ),
+                    description=(f"Unreachable code after {type(stmt).__name__.lower()} statement"),
                     suggestion="Remove the dead code after the return/raise",
                 )
 
@@ -847,10 +826,7 @@ class _PythonBugVisitor(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         """Check for print() outside __main__ blocks."""
-        if (
-            isinstance(node.func, ast.Name)
-            and node.func.id == "print"
-        ):
+        if isinstance(node.func, ast.Name) and node.func.id == "print":
             # Skip print() in test files — tests use print() for
             # debug output, which is standard practice.
             if "test" in self.filepath.lower():
@@ -905,8 +881,7 @@ class _PythonBugVisitor(ast.NodeVisitor):
                 severity="style",
                 category="none_comparison",
                 description=(
-                    f"Comparison to None with '{op_str}' — "
-                    f"should use 'is' / 'is not' (PEP 8)"
+                    f"Comparison to None with '{op_str}' — should use 'is' / 'is not' (PEP 8)"
                 ),
                 suggestion=(
                     f"Replace '{op_str} None' with "
@@ -937,10 +912,7 @@ class _PythonBugVisitor(ast.NodeVisitor):
                         f"Comparison to the boolean literal "
                         f"'{operand.value}' with '==' — test truthiness instead"
                     ),
-                    suggestion=(
-                        "Use 'if x:' / 'if not x:' rather than "
-                        "'x == True' / 'x == False'"
-                    ),
+                    suggestion=("Use 'if x:' / 'if not x:' rather than 'x == True' / 'x == False'"),
                 )
                 return
 
@@ -957,9 +929,7 @@ class _PythonBugVisitor(ast.NodeVisitor):
                 continue
             left_operand = operands[i]
             right_operand = node.comparators[i]
-            if not (
-                is_literal_operand(left_operand) or is_literal_operand(right_operand)
-            ):
+            if not (is_literal_operand(left_operand) or is_literal_operand(right_operand)):
                 continue
             op_str = "is" if isinstance(op, ast.Is) else "is not"
             self._add_bug(
@@ -971,8 +941,7 @@ class _PythonBugVisitor(ast.NodeVisitor):
                     f"'is' tests identity, not equality"
                 ),
                 suggestion=(
-                    "Use '==' / '!=' to compare values; reserve 'is' "
-                    "for None and other singletons"
+                    "Use '==' / '!=' to compare values; reserve 'is' for None and other singletons"
                 ),
             )
 
@@ -1010,8 +979,7 @@ class _PythonBugVisitor(ast.NodeVisitor):
                 severity="warning",
                 category="type_equality_check",
                 description=(
-                    "Comparing type(x) to a class ignores subclasses — "
-                    "use isinstance(x, T) instead"
+                    "Comparing type(x) to a class ignores subclasses — use isinstance(x, T) instead"
                 ),
                 suggestion=(
                     "Replace with isinstance(x, T) (or not isinstance(...)) "
@@ -1071,8 +1039,7 @@ class _PythonBugVisitor(ast.NodeVisitor):
                         f"silently discarding errors"
                     ),
                     suggestion=(
-                        "Move the control-flow out of finally; a finally "
-                        "block should only clean up"
+                        "Move the control-flow out of finally; a finally block should only clean up"
                     ),
                 )
 
@@ -1092,9 +1059,7 @@ class _PythonBugVisitor(ast.NodeVisitor):
 _RUST_UNWRAP_RE = re.compile(r"\.unwrap\(\)", re.MULTILINE)
 _RUST_TODO_RE = re.compile(r"\b(todo!|unimplemented!)\(", re.MULTILINE)
 _RUST_UNSAFE_RE = re.compile(r"\bunsafe\s*\{", re.MULTILINE)
-_RUST_FN_RE = re.compile(
-    r"^\s*(pub\s+)?(async\s+)?fn\s+(\w+)", re.MULTILINE
-)
+_RUST_FN_RE = re.compile(r"^\s*(pub\s+)?(async\s+)?fn\s+(\w+)", re.MULTILINE)
 
 
 def _scan_rust_file(filepath: str, source: str) -> list[BugReport]:
@@ -1164,10 +1129,7 @@ def _scan_rust_file(filepath: str, source: str) -> list[BugReport]:
                     line=line_no,
                     severity=unsafe_severity,
                     category="rust_unsafe_no_comment",
-                    description=(
-                        "unsafe block without a SAFETY comment"
-                        " explaining why it's safe"
-                    ),
+                    description=("unsafe block without a SAFETY comment explaining why it's safe"),
                     suggestion="Add a '// SAFETY: ...' comment explaining the invariant",
                 )
             )
@@ -1252,11 +1214,6 @@ class BugReporter:
             from infrastructure.config import default_data_dir
 
             self.log_path = default_data_dir() / "bug_reports.jsonl"
-        # History file — resolved issues are moved here so the running
-        # list stays clean. Sits next to the main log.
-        self.history_path = self.log_path.with_name(
-            self.log_path.stem + "_history.jsonl"
-        )
         self._last_scan: BugScanResult | None = None
         # Concept network — used to check if Genesis actually understands
         # the bugs it's reporting. Without this, it's pattern-matching,
@@ -1268,8 +1225,8 @@ class BugReporter:
         # to detect when issues are resolved. Keyed by (file, category)
         # — line numbers shift as code evolves, but the issue identity
         # is stable per file+category. When a previously-open issue is
-        # no longer found, it's moved to the history file and Genesis
-        # gets credit for the fix.
+        # no longer found, it's surfaced as resolved so the fix is
+        # acknowledged — the running list itself holds no history.
         self._open_keys: set[tuple[str, str]] = set()
         # Real package directories under python/ — the core-package
         # boundary for checks that must not fire on top-level CLI and
@@ -1282,6 +1239,11 @@ class BugReporter:
         # interactive think() path for the GIL. Mind wires it to the
         # conversation-active event; None means never yield.
         self.should_pause: Any = None
+        # Shutdown hook: when this callable returns True the scan
+        # abandons the walk between files instead of running through
+        # teardown. Mind wires it to its running flag; None means
+        # never abort.
+        self.should_stop: Any = None
         self._load_open_keys()
 
     def _find_core_dirs(self) -> frozenset[str]:
@@ -1345,6 +1307,11 @@ class BugReporter:
             if result.total_files >= max_files:
                 break
 
+            # Shutdown in progress — abandon the walk rather than
+            # scan through the teardown and into the stores closing.
+            if self.should_stop is not None and self.should_stop():
+                break
+
             # Foreground turn in flight — park between files so the
             # interactive think() path keeps the CPU. Checked per file
             # (the loop's natural chunk boundary), not per AST node:
@@ -1368,18 +1335,17 @@ class BugReporter:
                 result.style_issues += 1
         result.total_bugs = len(result.bugs)
 
-        # Log new bugs and detect resolved ones
-        new_count, resolved_count = self._log_bugs(
-            result.bugs, result.scanned_files
-        )
+        # Log new bugs; fixed ones leave the running list and are
+        # surfaced as resolved so the repair is known, not just absent.
+        new_count, resolved = self._log_bugs(result.bugs, result.scanned_files)
         result.new_bugs = new_count
-        result.resolved_bugs = resolved_count
+        result.resolved = sorted(resolved)
 
         self._last_scan = result
         logger.debug(
             f"Bug scan complete: {result.total_files} files, "
             f"{result.total_bugs} bugs found "
-            f"({new_count} new, {resolved_count} resolved)"
+            f"({new_count} new)"
         )
         return result
 
@@ -1417,9 +1383,7 @@ class BugReporter:
     # Directories that contain Genesis's own source — scanned first
     # so that max_files limits don't skip its code in favor of
     # examples, or Rust files.
-    _PRIORITY_DIRS: ClassVar[tuple[str, ...]] = (
-        "python/",
-    )
+    _PRIORITY_DIRS: ClassVar[tuple[str, ...]] = ("python/",)
 
     def _iter_source_files(self, include_tests: bool = True) -> Iterator[Path]:
         """Yield source files to scan.
@@ -1440,16 +1404,12 @@ class BugReporter:
             # third-party code, not Genesis's.
             parts = path.relative_to(self.project_root).parts
             if any(
-                part in self._SKIP_DIRS
-                or part.startswith(".venv")
-                or part == "site-packages"
+                part in self._SKIP_DIRS or part.startswith(".venv") or part == "site-packages"
                 for part in parts
             ):
                 continue
             # Skip test files if not included
-            if not include_tests and (
-                "test" in path.name.lower() or "tests" in parts
-            ):
+            if not include_tests and ("test" in path.name.lower() or "tests" in parts):
                 continue
             # Skip large files
             try:
@@ -1509,7 +1469,7 @@ class BugReporter:
 
     def _log_bugs(
         self, bugs: list[BugReport], scanned_files: set[str] | None = None
-    ) -> tuple[int, int]:
+    ) -> tuple[int, set[tuple[str, str]]]:
         """Maintain the running list of open issues.
 
         The log file is rewritten each scan so it always reflects the
@@ -1518,10 +1478,12 @@ class BugReporter:
         code evolves, but the issue identity is stable per file+category.
 
         - Issues found this scan that weren't in the open set are "new".
-        - Issues that were open but are no longer found are "resolved" —
-          they're moved to the history file and removed from the running
-          list. But only if their file was actually scanned this cycle
-          (a file skipped due to max_files limit may still have the bug).
+        - Issues that were open but are no longer found leave the open
+          set and the running list, and are returned as resolved keys so
+          the repair can be acknowledged. Fixed means gone — nothing is
+          counted or archived. But only if their file was actually
+          scanned this cycle (a file skipped due to max_files limit may
+          still have the bug).
         - Issues from files NOT scanned this cycle are **preserved** —
           carried forward unchanged in both the open set and the running
           list. A partial scan (max_files limit) must not silently drop
@@ -1532,7 +1494,10 @@ class BugReporter:
         Thread-safe via _log_lock since both the bug-scan thread and
         the improvement thread call scan().
 
-        Returns (new_count, resolved_count).
+        Returns (newly-seen count, resolved keys) — resolved meaning
+        previously open and now clean in a file this scan covered:
+        the fix is dropped from the running list but reported, so its
+        only durable trace is that it was fixed.
         """
         with self._log_lock:
             if scanned_files is None:
@@ -1553,28 +1518,25 @@ class BugReporter:
 
             # Detect newly opened issues
             new_bugs = [
-                bug for bug in deduped_bugs
-                if (bug.file, bug.category) not in self._open_keys
+                bug for bug in deduped_bugs if (bug.file, bug.category) not in self._open_keys
             ]
 
-            # Detect resolved issues — were open, now gone.
-            # Only mark as resolved if the file was actually scanned
-            # this cycle. If a file was skipped (e.g., max_files limit),
-            # its bugs may not appear even though they still exist.
-            resolved_keys: set[tuple[str, str]] = set()
+            # Issues that were open but no longer appear leave the
+            # open set — a scanned-clean key is a fix, dropped from the
+            # running list but reported so the repair is known rather
+            # than merely absent. The only classification that matters
+            # is which gone keys to carry forward: a file skipped this
+            # cycle (max_files limit) may still have its bug, so those
+            # keys are preserved. A key whose file was scanned clean —
+            # or whose file is gone entirely — is resolved.
             preserved_keys: set[tuple[str, str]] = set()
+            resolved_keys: set[tuple[str, str]] = set()
             for key in self._open_keys - current_keys:
                 file_path, _category = key
-                if (
-                    file_path in scanned_files
-                    or not (self.project_root / file_path).exists()
-                ):
-                    # Scanned and clean, or the file is gone entirely
-                    # (moved/deleted) — either way the report is stale.
-                    resolved_keys.add(key)
-                else:
-                    # File wasn't scanned — carry the bug forward
+                if file_path not in scanned_files and (self.project_root / file_path).exists():
                     preserved_keys.add(key)
+                else:
+                    resolved_keys.add(key)
 
             # Carry forward BugReport entries for unscanned files so
             # they remain in the running list. Read them from the
@@ -1589,18 +1551,11 @@ class BugReporter:
             # Ensure directory exists
             self.log_path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
 
-            # Archive resolved issues to the history file BEFORE rewriting
-            # the running list — _archive_resolved reads the current log
-            # to extract resolved entries, so it must run before the
-            # log is overwritten.
-            if resolved_keys:
-                self._archive_resolved(resolved_keys)
-
             # Rewrite the running list with currently-open issues
             # (current findings + preserved bugs from unscanned files)
             self._write_running_list(deduped_bugs)
 
-            return len(new_bugs), len(resolved_keys)
+            return len(new_bugs), resolved_keys
 
     def open_reports(self) -> list[BugReport]:
         """The currently-open issues, without rescanning.
@@ -1625,14 +1580,12 @@ class BugReporter:
             if key not in self._open_keys:
                 return False
             self._open_keys.discard(key)
-            # _archive_resolved rewrites the running list itself, so
-            # the resolved entry leaves the log and lands in history.
-            self._archive_resolved({key})
+            # _drop_resolved rewrites the running list itself, so the
+            # discharged entry leaves the log and is gone.
+            self._drop_resolved({key})
         return True
 
-    def _load_preserved_bugs(
-        self, preserved_keys: set[tuple[str, str]] | None
-    ) -> list[BugReport]:
+    def _load_preserved_bugs(self, preserved_keys: set[tuple[str, str]] | None) -> list[BugReport]:
         """Load BugReport entries from the running list for unscanned files.
 
         When a partial scan (max_files limit) skips files, their
@@ -1658,18 +1611,26 @@ class BugReporter:
             except (json.JSONDecodeError, KeyError):
                 continue
             key = (entry.get("file", ""), entry.get("category", ""))
+            # The running list should hold only open issues, but a
+            # non-open entry here must not read as an open bug —
+            # consumers (proposals, autonomous fixes) would act on
+            # a resolved report.
+            if entry.get("status", "open") != "open":
+                continue
             if preserved_keys is None or key in preserved_keys:
-                preserved.append(BugReport(
-                    file=entry.get("file", ""),
-                    line=entry.get("line", 0),
-                    severity=entry.get("severity", ""),
-                    category=entry.get("category", ""),
-                    description=entry.get("description", ""),
-                    suggestion=entry.get("suggestion", ""),
-                    timestamp=entry.get("timestamp", ""),
-                    status=entry.get("status", "open"),
-                    resolved_at=entry.get("resolved_at", ""),
-                ))
+                preserved.append(
+                    BugReport(
+                        file=entry.get("file", ""),
+                        line=entry.get("line", 0),
+                        severity=entry.get("severity", ""),
+                        category=entry.get("category", ""),
+                        description=entry.get("description", ""),
+                        suggestion=entry.get("suggestion", ""),
+                        timestamp=entry.get("timestamp", ""),
+                        status=entry.get("status", "open"),
+                        resolved_at=entry.get("resolved_at", ""),
+                    )
+                )
         return preserved
 
     def _write_running_list(self, open_bugs: list[BugReport]) -> None:
@@ -1680,26 +1641,21 @@ class BugReporter:
         stale resolved entries.
         """
         try:
-            lines = [
-                json.dumps(bug.to_dict()) + "\n"
-                for bug in open_bugs
-            ]
-            self.log_path.write_text(
-                "".join(lines), encoding="utf-8"
-            )
+            lines = [json.dumps(bug.to_dict()) + "\n" for bug in open_bugs]
+            self.log_path.write_text("".join(lines), encoding="utf-8")
         except OSError as e:
             note_swallowed(
                 "infrastructure.bug_reporter._write_running_list",
                 e,
             )
 
-    def _archive_resolved(self, resolved_keys: set[tuple[str, str]]) -> None:
-        """Move resolved issues from the running list to the history file.
+    def _drop_resolved(self, resolved_keys: set[tuple[str, str]]) -> None:
+        """Drop resolved issues from the running list.
 
-        Reads the current running list, extracts entries matching the
-        resolved keys, appends them to the history file with a
-        ``resolved_at`` timestamp, then rewrites the running list
-        without the resolved entries.
+        Reads the current running list and rewrites it without the
+        resolved entries. No history is recorded — the running list is
+        the whole of her bug state, and a fix's only trace is the bug
+        being gone.
         """
         if not self.log_path.exists():
             return
@@ -1709,9 +1665,7 @@ class BugReporter:
         except OSError:
             return
 
-        now = time.strftime("%Y-%m-%dT%H:%M:%S")
         remaining: list[str] = []
-        archived: list[str] = []
         for line in lines:
             if not line.strip():
                 continue
@@ -1722,23 +1676,8 @@ class BugReporter:
                 continue
 
             key = (entry.get("file", ""), entry.get("category", ""))
-            if key in resolved_keys:
-                entry["status"] = "resolved"
-                entry["resolved_at"] = now
-                archived.append(json.dumps(entry) + "\n")
-            else:
+            if key not in resolved_keys:
                 remaining.append(line)
-
-        # Append resolved entries to history
-        if archived:
-            try:
-                with self.history_path.open("a", encoding="utf-8") as f:
-                    f.writelines(archived)
-            except OSError as e:
-                note_swallowed(
-                    "infrastructure.bug_reporter._archive_resolved",
-                    e,
-                )
 
         # Rewrite running list without the resolved entries
         try:
@@ -1748,7 +1687,7 @@ class BugReporter:
             )
         except OSError as e:
             note_swallowed(
-                "infrastructure.bug_reporter._archive_resolved",
+                "infrastructure.bug_reporter._drop_resolved",
                 e,
             )
 
@@ -1841,9 +1780,8 @@ class BugReporter:
     def recent_bugs(self, n: int = 10) -> list[BugReport]:
         """Return the most recent bugs from the running list.
 
-        The running list contains only currently-open issues. If fewer
-        than ``n`` open issues exist, recent resolved issues from the
-        history file are included to fill out the result.
+        The running list contains only currently-open issues — a fixed
+        bug is gone and never comes back to pad the result.
         """
         bugs: list[BugReport] = []
         # Read open issues from the running list
@@ -1871,83 +1809,7 @@ class BugReporter:
                     "infrastructure.bug_reporter.recent_bugs",
                     e,
                 )
-        # If we need more, pull recent resolved issues from history
-        if len(bugs) < n and self.history_path.exists():
-            try:
-                lines = self.history_path.read_text(encoding="utf-8").strip().split("\n")
-                for line in reversed(lines):
-                    if len(bugs) >= n:
-                        break
-                    if line.strip():
-                        data = json.loads(line)
-                        bugs.append(
-                            BugReport(
-                                file=data["file"],
-                                line=data["line"],
-                                severity=data["severity"],
-                                category=data["category"],
-                                description=data["description"],
-                                suggestion=data.get("suggestion", ""),
-                                timestamp=data.get("timestamp", ""),
-                                status=data.get("status", "resolved"),
-                                resolved_at=data.get("resolved_at", ""),
-                            )
-                        )
-            except (OSError, json.JSONDecodeError, KeyError) as e:
-                note_swallowed(
-                    "infrastructure.bug_reporter.recent_bugs",
-                    e,
-                )
         return bugs[:n]
-
-    def bug_track_record(self) -> dict[str, int]:
-        """Return a summary of Genesis's bug-fixing track record.
-
-        Open issues are counted from the running list; resolved issues
-        are counted from the history file. This is how it can talk
-        about its own progress — "I've fixed 12 issues, 8 still open."
-        """
-        record: dict[str, int] = {
-            "total_reported": 0,
-            "open": 0,
-            "resolved": 0,
-        }
-        # Count open issues from the running list
-        if self.log_path.exists():
-            try:
-                with self.log_path.open("r", encoding="utf-8") as f:
-                    for line in f:
-                        if not line.strip():
-                            continue
-                        try:
-                            json.loads(line)
-                        except (json.JSONDecodeError, KeyError):
-                            continue
-                        record["open"] += 1
-            except OSError as e:
-                note_swallowed(
-                    "infrastructure.bug_reporter.bug_track_record",
-                    e,
-                )
-        # Count resolved issues from the history file
-        if self.history_path.exists():
-            try:
-                with self.history_path.open("r", encoding="utf-8") as f:
-                    for line in f:
-                        if not line.strip():
-                            continue
-                        try:
-                            json.loads(line)
-                        except (json.JSONDecodeError, KeyError):
-                            continue
-                        record["resolved"] += 1
-            except OSError as e:
-                note_swallowed(
-                    "infrastructure.bug_reporter.bug_track_record",
-                    e,
-                )
-        record["total_reported"] = record["open"] + record["resolved"]
-        return record
 
     def categories_to_study(self) -> list[str]:
         """Return bug categories it found but doesn't understand.
@@ -2025,9 +1887,7 @@ class BugReporter:
 
         return " ".join(parts)
 
-    def _describe_understood_bugs(
-        self, understood_bugs: list[BugReport], parts: list[str]
-    ) -> None:
+    def _describe_understood_bugs(self, understood_bugs: list[BugReport], parts: list[str]) -> None:
         """Report understood bugs with severity counts and explanations.
 
         Uses thought templates from the concept network for concern
@@ -2071,9 +1931,7 @@ class BugReporter:
                 f"{first.description.lower()}"
             )
 
-    def _describe_not_understood(
-        self, not_understood_cats: list[str], parts: list[str]
-    ) -> None:
+    def _describe_not_understood(self, not_understood_cats: list[str], parts: list[str]) -> None:
         """Report not-understood categories honestly.
 
         Uses structural descriptions (counts) only — no authored

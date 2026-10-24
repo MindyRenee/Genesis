@@ -1,6 +1,5 @@
 """Tests for the sleep compression module."""
 
-
 from dataclasses import dataclass
 
 import pytest
@@ -11,6 +10,7 @@ from temporal_lobe.concepts import ConceptNetwork
 @dataclass
 class _MockEpisode:
     """Minimal episode mock matching RecentEpisode's interface."""
+
     episode_id: int
     timestamp: int
     salience: float
@@ -70,6 +70,7 @@ def small_network():
 
 class TestSleepCompressor:
     """Tests for sleep compressor."""
+
     def test_init(self, tmp_path):
         """SleepCompressor should initialize correctly."""
         sc = SleepCompressor(data_dir=str(tmp_path))
@@ -107,9 +108,9 @@ class TestSleepCompressor:
         assert sc.holographic_graph.edge_count == 1, (
             "holographic graph was wiped by a rebuild with no bridge edges"
         )
-        assert [r[0] for r in sc.holographic_graph.query(
-            "dog", "related_to", top_k=5
-        )].count("cat") == 1
+        assert [r[0] for r in sc.holographic_graph.query("dog", "related_to", top_k=5)].count(
+            "cat"
+        ) == 1
 
     def test_holographize_migrates_bridges(self, tmp_path, small_network):
         """Holographize should migrate bridge edges and keep real edges."""
@@ -117,8 +118,9 @@ class TestSleepCompressor:
 
         initial_edges = len(small_network.edges)
         initial_bridges = sum(
-            1 for e in small_network.edges if e.origin in
-            {"semantic_bridge", "hub_attachment", "associative_bridge", "bridge"}
+            1
+            for e in small_network.edges
+            if e.origin in {"semantic_bridge", "hub_attachment", "associative_bridge", "bridge"}
         )
 
         stats = sc.compress(network=small_network, embeddings=None)
@@ -133,28 +135,21 @@ class TestSleepCompressor:
         # Verify no bridge origins remain in the explicit graph
         for edge in small_network.edges:
             assert edge.origin not in {
-                "semantic_bridge", "hub_attachment", "associative_bridge", "bridge"
+                "semantic_bridge",
+                "hub_attachment",
+                "associative_bridge",
+                "bridge",
             }
 
-    def test_homeostasis_scales_weights(self, tmp_path, small_network):
-        """Synaptic homeostasis should scale down all edge weights."""
+    def test_compress_deletes_no_edges(self, tmp_path, small_network):
+        """Compression migrates but never mass-deletes: every edge that
+        leaves the in-memory graph went to a queryable store (hologram
+        or LTM index) — there is no homeostasis kill floor."""
         sc = SleepCompressor(data_dir=str(tmp_path))
-
-        # Record original weights of non-bridge edges
-        original_weights = {
-            (e.source, e.target, e.relation): e.weight
-            for e in small_network.edges
-            if e.origin not in {"semantic_bridge", "hub_attachment",
-                                "associative_bridge", "bridge"}
-        }
-
-        sc.compress(network=small_network, embeddings=None)
-
-        # Check that remaining edges have been scaled
-        for edge in small_network.edges:
-            key = (edge.source, edge.target, edge.relation)
-            if key in original_weights:
-                assert edge.weight < original_weights[key]
+        before = len(small_network.edges)
+        stats = sc.compress(network=small_network, embeddings=None)
+        migrated = stats.get("bridges_migrated", 0)
+        assert before - len(small_network.edges) <= migrated
 
     def test_compress_without_embeddings(self, tmp_path, small_network):
         """Compression should work without embeddings (skip VQ)."""
@@ -163,9 +158,8 @@ class TestSleepCompressor:
 
         # VQ should be skipped
         assert stats.get("vq_trained", 0) == 0
-        # But holographize and homeostasis should run
+        # But holographize should still run
         assert "bridges_migrated" in stats
-        assert "homeostasis_scaled" in stats
 
     def test_save_load_persistence(self, tmp_path, small_network):
         """Compression state should persist across instances."""
@@ -227,8 +221,6 @@ class TestSleepCompressor:
             "bridges_migrated",
             "explicit_edges_remaining",
             "holographic_edges",
-            "homeostasis_scaled",
-            "homeostasis_pruned",
             "elapsed_s",
         ]
         for field in expected_fields:
@@ -289,11 +281,141 @@ class TestSleepCompressor:
         # Verify exactly the right episodes were deleted: everything
         # outside the retained top-100.
         retained_ids = {e.episode_id for e in episodes[2400:2500]}
-        expected_deleted = {
-            e.episode_id for e in episodes
-            if e.episode_id not in retained_ids
-        }
+        expected_deleted = {e.episode_id for e in episodes if e.episode_id not in retained_ids}
         assert ltm.archived_ids == expected_deleted
+
+    def test_ltm_compaction_preserves_dream_episodes(self, tmp_path):
+        """Dream insights (source_module=9) must never be archived.
+
+        Regression test for sleep compression erasing the dream record.
+        ``_phase_compact_ltm`` used to page every active episode into
+        the salience economy and archive all but the top
+        ``max_ltm_episodes``. Dream insights are stored at a fixed 0.70
+        salience, which can never compete in a global top-N once the
+        store holds more than N higher-salience episodes — so every N3
+        pass archived every dream it saw. ``get_recent_episodes``
+        reads only the active list, so wake residues, ``/sleep``
+        status, and dream notifications all read empty even though
+        the dreams existed (archived, not deleted — but invisible to
+        every surface that consumes them).
+        """
+        net = ConceptNetwork()
+        net.add_concept("dog", origin="stated")
+
+        # 10 real-content episodes at distinct retention-eligible
+        # saliences 0.60–0.87 (cap 5 → ids 5–9 retained, 0–4 compacted)
+        # plus 5 dream insights at the fixed 0.70 dream salience.
+        episodes = [
+            _MockEpisode(
+                episode_id=i,
+                timestamp=i,
+                salience=0.6 + i * 0.03,
+                event_type=0,
+                source_module=4,
+                text=f"dog episode {i}",
+            )
+            for i in range(10)
+        ] + [
+            _MockEpisode(
+                episode_id=100 + i,
+                timestamp=100 + i,
+                salience=0.7,
+                event_type=2,
+                source_module=9,
+                text=f"[dream-insight] episode {i} connects to episode {i + 1}",
+            )
+            for i in range(5)
+        ]
+        ltm = _MockLTMClient(episodes)
+
+        sc = SleepCompressor(
+            data_dir=str(tmp_path),
+            max_ltm_episodes=5,
+            salience_threshold=0.6,
+        )
+        stats = sc.compress(network=net, embeddings=None, ltm_client=ltm)
+
+        dream_ids = {100 + i for i in range(5)}
+        # Not one dream episode archived, however the ranking fell out.
+        assert ltm.archived_ids.isdisjoint(dream_ids)
+        # The retention cap applies to real content only: top 5 of the
+        # ten 0.9-salience episodes retained, the rest archived.
+        assert ltm.archived_ids == {0, 1, 2, 3, 4}
+        assert stats["ltm_retained"] == 5
+        assert stats["ltm_archived"] == 5
+        assert stats["ltm_dreams_preserved"] == 5
+        assert stats["ltm_total_seen"] == 15
+
+    def test_ltm_compaction_skips_when_client_disconnected(self, tmp_path):
+        """A dead control channel must skip phase 3, not half-run it.
+
+        search_episodes rides the daemon's read channel and can succeed
+        while archive_episode (control channel) raises ConnectionError
+        on every call — the Oct-2026 pass that committed extracted
+        associations while archiving nothing. The is_connected preflight
+        skips the phase cleanly; clients without the attribute (test
+        mocks) are treated as connected.
+        """
+        net = ConceptNetwork()
+        net.add_concept("dog", origin="stated")
+
+        episodes = [
+            _MockEpisode(
+                episode_id=i,
+                timestamp=i,
+                salience=0.1,
+                event_type=0,
+                source_module=4,
+                text=f"dog episode {i}",
+            )
+            for i in range(10)
+        ]
+
+        class _DeadLTMClient(_MockLTMClient):
+            """Client whose control channel is down (search would work,
+            archive cannot)."""
+
+            is_connected = False
+
+        ltm = _DeadLTMClient(episodes)
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        stats = sc.compress(network=net, embeddings=None, ltm_client=ltm)
+
+        assert stats["ltm_skipped"] == 1
+        assert stats["ltm_total_seen"] == 0
+        assert stats["ltm_archived"] == 0
+        assert ltm.archived_ids == set()
+
+    def test_ltm_compaction_counts_archive_failures(self, tmp_path):
+        """Archive failures must be counted, not silently swallowed."""
+        net = ConceptNetwork()
+        net.add_concept("dog", origin="stated")
+
+        episodes = [
+            _MockEpisode(
+                episode_id=i,
+                timestamp=i,
+                salience=0.1,
+                event_type=0,
+                source_module=4,
+                text=f"dog episode {i}",
+            )
+            for i in range(5)
+        ]
+
+        class _FailingArchiveClient(_MockLTMClient):
+            """archive_episode raises on every call (mid-pass drop)."""
+
+            def archive_episode(self, episode_id: int) -> bool:
+                raise OSError("connection lost mid-pass")
+
+        ltm = _FailingArchiveClient(episodes)
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        stats = sc.compress(network=net, embeddings=None, ltm_client=ltm)
+
+        assert stats["ltm_archived"] == 0
+        assert stats["ltm_archive_failed"] == 5
+        assert stats["ltm_replayed"] == 5
 
     def test_ltm_pagination_partial_failure(self, tmp_path):
         """LTM compaction should process fetched episodes if daemon disconnects mid-pagination."""
@@ -314,6 +436,7 @@ class TestSleepCompressor:
 
         class _DisconnectingLTMClient(_MockLTMClient):
             """Simulates daemon disconnect after the first page."""
+
             _call_count = 0
 
             def search_episodes(self, limit=1000, offset=0):
@@ -348,17 +471,15 @@ class TestSleepCompressor:
 
         # Record original state
         original_edge_count = len(small_network.edges)
-        original_weights = {
-            (e.source, e.target, e.relation): e.weight
-            for e in small_network.edges
-        }
+        original_weights = {(e.source, e.target, e.relation): e.weight for e in small_network.edges}
 
-        # Patch _apply_homeostasis to raise, simulating a mid-pass failure
-        # after phase 2 (holographize) has already mutated the network.
-        def _boom(network):
-            """Raise RuntimeError to simulate a mid-pass homeostasis failure."""
+        # Patch the final save-step hook to raise, simulating a mid-pass
+        # failure after holographize has already mutated the network.
+        def _boom(*_args):
+            """Raise RuntimeError to simulate a mid-pass save failure."""
             raise RuntimeError("simulated failure")
-        sc._apply_homeostasis = _boom  # type: ignore[method-assign]
+
+        sc._maybe_rebuild_holographic_graph = _boom  # type: ignore[method-assign]
 
         stats = sc.compress(network=small_network, embeddings=None)
 

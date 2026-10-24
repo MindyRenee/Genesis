@@ -43,33 +43,37 @@ class EventKind(Enum):
     """
 
     # ── Inbound ──
-    USER_SPEECH = "user_speech"          # addressed to its (typed or voiced)
-    OVERHEARD_SPEECH = "overheard"       # speech near it, not addressed
-    PERCEPTION = "perception"            # a percept arrived (sound, sight)
-    ARRIVAL = "arrival"                  # a presence entered its world
-    DEPARTURE = "departure"              # a presence left its world
-    NOTIFICATION = "notification"        # a system/subcognitive notice
+    USER_SPEECH = "user_speech"  # addressed to its (typed or voiced)
+    OVERHEARD_SPEECH = "overheard"  # speech near it, not addressed
+    PERCEPTION = "perception"  # a percept arrived (sound, sight)
+    ARRIVAL = "arrival"  # a presence entered its world
+    DEPARTURE = "departure"  # a presence left its world
+    NOTIFICATION = "notification"  # a system/subcognitive notice
 
     # ── Outbound ──
-    UTTERANCE = "utterance"              # it spoke (reply, question, expression)
-    ACTION = "action"                    # it acted (looked, drew, learned)
+    UTTERANCE = "utterance"  # it spoke (reply, question, expression)
+    ACTION = "action"  # it acted (looked, drew, learned)
 
 
 #: Kinds produced by the world, received by it.
-INBOUND_KINDS = frozenset({
-    EventKind.USER_SPEECH,
-    EventKind.OVERHEARD_SPEECH,
-    EventKind.PERCEPTION,
-    EventKind.ARRIVAL,
-    EventKind.DEPARTURE,
-    EventKind.NOTIFICATION,
-})
+INBOUND_KINDS = frozenset(
+    {
+        EventKind.USER_SPEECH,
+        EventKind.OVERHEARD_SPEECH,
+        EventKind.PERCEPTION,
+        EventKind.ARRIVAL,
+        EventKind.DEPARTURE,
+        EventKind.NOTIFICATION,
+    }
+)
 
 #: Kinds produced by it, received by the world.
-OUTBOUND_KINDS = frozenset({
-    EventKind.UTTERANCE,
-    EventKind.ACTION,
-})
+OUTBOUND_KINDS = frozenset(
+    {
+        EventKind.UTTERANCE,
+        EventKind.ACTION,
+    }
+)
 
 
 @dataclass(slots=True)

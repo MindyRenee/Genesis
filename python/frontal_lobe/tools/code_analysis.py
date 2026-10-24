@@ -40,31 +40,70 @@ __all__ = [
 
 # Calls to these builtins carry no structural signal — they fire
 # constantly and would drown the real call graph.
-_BUILTIN_CALLS = frozenset({
-    "print", "len", "range", "str", "int", "float", "bool", "list",
-    "dict", "set", "tuple", "type", "isinstance", "issubclass",
-    "enumerate", "zip", "map", "filter", "sorted", "min", "max",
-    "sum", "abs", "round", "repr", "format", "open", "getattr",
-    "setattr", "hasattr", "super", "any", "all", "next", "iter",
-    "ord", "chr", "hex", "id", "hash", "callable", "vars", "dir",
-})
+_BUILTIN_CALLS = frozenset(
+    {
+        "print",
+        "len",
+        "range",
+        "str",
+        "int",
+        "float",
+        "bool",
+        "list",
+        "dict",
+        "set",
+        "tuple",
+        "type",
+        "isinstance",
+        "issubclass",
+        "enumerate",
+        "zip",
+        "map",
+        "filter",
+        "sorted",
+        "min",
+        "max",
+        "sum",
+        "abs",
+        "round",
+        "repr",
+        "format",
+        "open",
+        "getattr",
+        "setattr",
+        "hasattr",
+        "super",
+        "any",
+        "all",
+        "next",
+        "iter",
+        "ord",
+        "chr",
+        "hex",
+        "id",
+        "hash",
+        "callable",
+        "vars",
+        "dir",
+    }
+)
 
 
 @dataclass(slots=True)
 class SymbolInfo:
     """One named definition in a Python file."""
 
-    name: str                # short name ("parse_file")
-    qualified: str           # dotted path ("module.Parser.parse_file")
-    kind: str                # "module" | "class" | "function" | "method"
+    name: str  # short name ("parse_file")
+    qualified: str  # dotted path ("module.Parser.parse_file")
+    kind: str  # "module" | "class" | "function" | "method"
     line: int
     end_line: int
     params: list[str] = field(default_factory=list)
-    returns: str = ""        # return annotation, unparsed
+    returns: str = ""  # return annotation, unparsed
     decorators: list[str] = field(default_factory=list)
     docstring: str = ""
-    complexity: int = 1      # cyclomatic: decision points + 1
-    calls: list[str] = field(default_factory=list)   # dotted callee names
+    complexity: int = 1  # cyclomatic: decision points + 1
+    calls: list[str] = field(default_factory=list)  # dotted callee names
     raises: list[str] = field(default_factory=list)  # exception types raised
     is_async: bool = False  # an `async def`, not a plain `def`
 
@@ -78,8 +117,8 @@ class SymbolInfo:
 class CallEdge:
     """A resolved call relationship between two named symbols."""
 
-    caller: str   # qualified name of the enclosing callable
-    callee: str   # dotted callee name, as written ("self.run", "ast.parse")
+    caller: str  # qualified name of the enclosing callable
+    callee: str  # dotted callee name, as written ("self.run", "ast.parse")
 
 
 @dataclass(slots=True)
@@ -191,7 +230,8 @@ class _ScopeVisitor(ast.NodeVisitor):
         in_class = bool(self._class_stack) and self._scope[-1] == self._class_stack[-1]
         kind = "method" if in_class else "function"
         info = self._add_symbol(
-            node, kind,
+            node,
+            kind,
             params=self._params(node.args),
             returns=ast.unparse(node.returns) if node.returns else "",
             decorators=[ast.unparse(d) for d in node.decorator_list],
@@ -279,8 +319,14 @@ def _complexity(node: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
     """Cyclomatic complexity: 1 + number of decision points."""
     score = 1
     decision_nodes = (
-        ast.If, ast.For, ast.AsyncFor, ast.While, ast.ExceptHandler,
-        ast.Assert, ast.IfExp, ast.Match,
+        ast.If,
+        ast.For,
+        ast.AsyncFor,
+        ast.While,
+        ast.ExceptHandler,
+        ast.Assert,
+        ast.IfExp,
+        ast.Match,
     )
     for sub in ast.walk(node):
         if isinstance(sub, decision_nodes):
@@ -302,9 +348,7 @@ def analyze_python_source(source: str, path: str = "<string>") -> FileAnalysis:
     """
     tree = ast.parse(source, filename=path)
     analysis = analyze_python_tree(tree, path)
-    analysis.lines = source.count("\n") + (
-        1 if source and not source.endswith("\n") else 0
-    )
+    analysis.lines = source.count("\n") + (1 if source and not source.endswith("\n") else 0)
     return analysis
 
 
@@ -356,8 +400,7 @@ def impact_of(analysis: FileAnalysis, symbol: str) -> dict[str, object]:
         for callee in callees:
             callers_of.setdefault(callee, set()).add(caller)
 
-    direct = sorted(callers_of.get(match.name, set()) |
-                    callers_of.get(match.qualified, set()))
+    direct = sorted(callers_of.get(match.name, set()) | callers_of.get(match.qualified, set()))
     seen: set[str] = set(direct)
     queue = list(direct)
     while queue:
@@ -397,7 +440,8 @@ def summarize(analysis: FileAnalysis) -> dict[str, object]:
     for sym in analysis.symbols:
         by_kind[sym.kind] = by_kind.get(sym.kind, 0) + 1
     hot_spots = sorted(
-        analysis.functions, key=lambda s: -s.complexity,
+        analysis.functions,
+        key=lambda s: -s.complexity,
     )[:5]
     return {
         "path": analysis.path,
@@ -411,7 +455,8 @@ def summarize(analysis: FileAnalysis) -> dict[str, object]:
         "avg_complexity": round(analysis.avg_complexity, 2),
         "hot_spots": [
             {"name": s.qualified, "complexity": s.complexity, "line": s.line}
-            for s in hot_spots if s.complexity > 1
+            for s in hot_spots
+            if s.complexity > 1
         ],
         "symbols": [
             {

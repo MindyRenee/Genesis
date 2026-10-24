@@ -58,9 +58,7 @@ def test_fast_factual_route_records_the_turn(engine):
     eng, network, memory = engine
     network.add_concept("quoll", confidence=0.8)
 
-    early = eng._think_early_routes(
-        "what is a quoll?", perceive("what is a quoll?")
-    )
+    early = eng._think_early_routes("what is a quoll?", perceive("what is a quoll?"))
     assert early is not None
     response, _state = early
 
@@ -85,9 +83,7 @@ def test_pending_question_answer_records_the_turn(engine):
     eng, _network, memory = engine
     eng._pending_question_concepts["wug"] = "what is a wug?"
 
-    early = eng._think_early_routes(
-        "a wug is a small bird", perceive("a wug is a small bird")
-    )
+    early = eng._think_early_routes("a wug is a small bird", perceive("a wug is a small bird"))
     assert early is not None
 
     last = eng.working_memory.get_last_turn()
@@ -108,9 +104,7 @@ def test_followup_pronoun_answers_about_the_previous_focus(engine):
     network.add_concept("insects", confidence=0.8)
     network.add_edge("quoll", "insects", RelationType.DEPENDS_ON, 0.9)
 
-    first = eng._think_early_routes(
-        "what is a quoll?", perceive("what is a quoll?")
-    )
+    first = eng._think_early_routes("what is a quoll?", perceive("what is a quoll?"))
     assert first is not None
 
     # Turn 2 — run the real anaphora stage, then the early router with
@@ -147,9 +141,7 @@ def test_plural_target_resolves_to_the_stored_concept(engine):
     network.add_concept("cat", confidence=0.8)
     network.add_edge("animal", "cat", RelationType.RELATED_TO, 0.9)
 
-    early = eng._think_early_routes(
-        "tell me about animals", perceive("tell me about animals")
-    )
+    early = eng._think_early_routes("tell me about animals", perceive("tell me about animals"))
     assert early is not None
     _response, state = early
     # The routed target normalized to the stored singular concept.
@@ -164,9 +156,7 @@ def test_consumes_plural_target_reaches_the_consumer(engine):
     network.add_concept("meat", confidence=0.8)
     network.add_edge("wolf", "meat", RelationType.DEPENDS_ON, 0.9)
 
-    early = eng._think_early_routes(
-        "what do wolves eat?", perceive("what do wolves eat?")
-    )
+    early = eng._think_early_routes("what do wolves eat?", perceive("what do wolves eat?"))
     assert early is not None
     _response, state = early
     knowledge = state.thought.metadata.get("knowledge") or []
@@ -179,9 +169,7 @@ def test_comparison_normalizes_each_side(engine):
     network.add_concept("wolf", confidence=0.8)
     network.add_concept("dog", confidence=0.8)
 
-    early = eng._think_early_routes(
-        "wolves vs dogs", perceive("wolves vs dogs")
-    )
+    early = eng._think_early_routes("wolves vs dogs", perceive("wolves vs dogs"))
     if early is None:
         pytest.skip("comparison route did not fire")
     _response, state = early
@@ -192,9 +180,7 @@ def test_comparison_normalizes_each_side(engine):
 def test_non_routed_input_still_falls_through(engine):
     """A plain statement with no route keeps going to the full pipeline."""
     eng, _network, memory = engine
-    early = eng._think_early_routes(
-        "the sky was quiet today", perceive("the sky was quiet today")
-    )
+    early = eng._think_early_routes("the sky was quiet today", perceive("the sky was quiet today"))
     assert early is None
     # Nothing recorded — the main pipeline's store/track stage owns it.
     assert len(memory.conversation) == 0

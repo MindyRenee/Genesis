@@ -38,8 +38,13 @@ class TestBrushParameters:
     def test_all_parameters_settable(self):
         sheet = _sheet()
         sheet.set_brush(
-            size=23.5, opacity=0.4, hardness=0.2, scatter=0.9,
-            texture=0.7, erase=True, blend="multiply",
+            size=23.5,
+            opacity=0.4,
+            hardness=0.2,
+            scatter=0.9,
+            texture=0.7,
+            erase=True,
+            blend="multiply",
         )
         b = sheet._brush
         assert b.size == 23.5
@@ -52,8 +57,7 @@ class TestBrushParameters:
 
     def test_parameters_clamp_not_reject(self):
         sheet = _sheet()
-        sheet.set_brush(size=-5, opacity=7.0, hardness=-1, scatter=2,
-                        texture=-0.5)
+        sheet.set_brush(size=-5, opacity=7.0, hardness=-1, scatter=2, texture=-0.5)
         b = sheet._brush
         assert b.size == 0.5
         assert b.opacity == 1.0
@@ -100,11 +104,11 @@ class TestToolLabels:
     def test_label_never_substitutes_settings(self):
         """No name — known or invented — changes the dialed brush."""
         sheet = _sheet()
-        sheet.set_brush(size=12.0, opacity=0.5, hardness=0.3,
-                        scatter=0.6, texture=0.8, blend="multiply")
+        sheet.set_brush(
+            size=12.0, opacity=0.5, hardness=0.3, scatter=0.6, texture=0.8, blend="multiply"
+        )
         before = sheet._brush.copy()
-        for name in ("pencil", "eraser", "glitter", "airbrush",
-                     "anything she calls it"):
+        for name in ("pencil", "eraser", "glitter", "airbrush", "anything she calls it"):
             sheet.pick_tool(name)
             assert sheet._brush == before, name
 
@@ -153,8 +157,7 @@ class TestMarks:
                 sheet.set_color(20, 120, 60)
                 sheet.set_brush(size=4)
                 if op == "polygon":
-                    sheet.polygon([(40, 40), (120, 50), (80, 110)],
-                                  fill=fill)
+                    sheet.polygon([(40, 40), (120, 50), (80, 110)], fill=fill)
                 else:
                     getattr(sheet, op)(40, 30, 90, 60, fill=fill)
                 assert _alpha(sheet).max() > 0, (op, fill)
@@ -190,8 +193,7 @@ class TestMarks:
     def test_nan_points_filtered(self):
         sheet = _sheet()
         sheet.set_color(0, 0, 0)
-        sheet.stroke([(10, 10), (math.inf, 50), (math.nan, math.nan),
-                      (60, 60)])
+        sheet.stroke([(10, 10), (math.inf, 50), (math.nan, math.nan), (60, 60)])
         assert _alpha(sheet).max() > 0
 
 
@@ -259,8 +261,7 @@ class TestArtHistory:
     def test_malformed_history_shape_tolerated(self, tmp_path):
         drawings = tmp_path / "drawings"
         drawings.mkdir(parents=True)
-        (drawings / "style_profile.json").write_text(
-            json.dumps({"drawings": "not-a-list"}))
+        (drawings / "style_profile.json").write_text(json.dumps({"drawings": "not-a-list"}))
         canvas = _canvas(tmp_path)
         assert canvas.art_history == []
         assert canvas.tool_recency() == {}
@@ -269,8 +270,15 @@ class TestArtHistory:
         canvas = _canvas(tmp_path)
         now = time.time()
         canvas._history = [
-            {"ts": now - i, "tools": [f"t{i}"], "gestures": [],
-             "hues": [], "colors": [], "strokes": 1, "mood": ""}
+            {
+                "ts": now - i,
+                "tools": [f"t{i}"],
+                "gestures": [],
+                "hues": [],
+                "colors": [],
+                "strokes": 1,
+                "mood": "",
+            }
             for i in range(canvas._HISTORY_LIMIT + 20)
         ]
         canvas.new_sheet()
@@ -330,13 +338,21 @@ class TestPainter:
         canvas = _canvas(tmp_path)
         canvas.new_sheet()
         painter = Painter(seed=9)
-        for gesture in ("line", "polyline", "curve", "arc", "loop",
-                        "zigzag", "scribble", "spiral", "wave", "dabs"):
+        for gesture in (
+            "line",
+            "polyline",
+            "curve",
+            "arc",
+            "loop",
+            "zigzag",
+            "scribble",
+            "spiral",
+            "wave",
+            "dabs",
+        ):
             pts = painter._gesture_points(gesture, canvas)
             assert len(pts) >= 2, gesture
-            assert all(
-                math.isfinite(x) and math.isfinite(y) for x, y in pts
-            ), gesture
+            assert all(math.isfinite(x) and math.isfinite(y) for x, y in pts), gesture
 
     def test_novelty_weight_curve(self):
         w = Painter._novelty_weight

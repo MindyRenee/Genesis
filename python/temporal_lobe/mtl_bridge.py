@@ -49,6 +49,7 @@ def _write_json_atomically(path: Path, data: object) -> None:
             )
         raise
 
+
 _DATA_DIR = default_data_dir() / "visual_cortex"
 _MTL_FILE = _DATA_DIR / "memory_bridge.npz"
 
@@ -58,9 +59,11 @@ _MTL_FILE = _DATA_DIR / "memory_bridge.npz"
 #: without bound. The most recent examples are kept.
 _MAX_EXAMPLES = 500
 
+
 @dataclass
 class TrainingExample:
     """A single visual teaching example."""
+
     vtc_vector: list[float]  # VTC feature vector
     concept_name: str  # concept ID in the network
     timestamp: float
@@ -145,12 +148,14 @@ class MemoryBridge:
             concept_name: concept ID (e.g., "tree").
             concept_embedding: embedding vector for the concept.
         """
-        self._examples.append(TrainingExample(
-            vtc_vector=vtc_vector.tolist(),
-            concept_name=concept_name,
-            timestamp=time.time(),
-            correct=True,
-        ))
+        self._examples.append(
+            TrainingExample(
+                vtc_vector=vtc_vector.tolist(),
+                concept_name=concept_name,
+                timestamp=time.time(),
+                correct=True,
+            )
+        )
         self._concept_embeddings[concept_name] = concept_embedding.copy()
         if len(self._examples) > _MAX_EXAMPLES:
             # Evict the oldest examples and drop embedding entries for
@@ -237,7 +242,8 @@ class MemoryBridge:
         # whose embedding hasn't been re-learned yet. Indexing it
         # directly would KeyError.
         positive = [
-            ex for ex in self._examples
+            ex
+            for ex in self._examples
             if ex.correct and ex.concept_name in self._concept_embeddings
         ]
         if not positive:
@@ -245,10 +251,9 @@ class MemoryBridge:
 
         # Build matrices
         V = np.array([ex.vtc_vector for ex in positive], dtype=np.float64)  # (n, vtc_dim)
-        E = np.array([
-            self._concept_embeddings[ex.concept_name]
-            for ex in positive
-        ], dtype=np.float64)  # (n, embedding_dim)
+        E = np.array(
+            [self._concept_embeddings[ex.concept_name] for ex in positive], dtype=np.float64
+        )  # (n, embedding_dim)
 
         if V.shape[0] == 0:
             return
@@ -270,9 +275,9 @@ class MemoryBridge:
             return
         predicted_e = V @ self.W.T
         e_error = E - predicted_e
-        self._embedding_reconstruction_mse = float(np.mean(e_error ** 2))
-        self._embedding_reconstruction_relative_error = (
-            self._embedding_reconstruction_mse / max(float(np.mean(E ** 2)), 1e-12)
+        self._embedding_reconstruction_mse = float(np.mean(e_error**2))
+        self._embedding_reconstruction_relative_error = self._embedding_reconstruction_mse / max(
+            float(np.mean(E**2)), 1e-12
         )
         e_norm = np.linalg.norm(E, axis=1)
         p_norm = np.linalg.norm(predicted_e, axis=1)
@@ -283,10 +288,10 @@ class MemoryBridge:
         self._embedding_reconstruction_cosine = float(np.mean(cosine))
 
         reconstructed_v = E @ self._W_pinv.T
-        v_error = V - reconstructed_v
-        self._vtc_cycle_reconstruction_mse = float(np.mean(v_error ** 2))
-        self._vtc_cycle_reconstruction_relative_error = (
-            self._vtc_cycle_reconstruction_mse / max(float(np.mean(V ** 2)), 1e-12)
+        v_error: np.ndarray = V - reconstructed_v
+        self._vtc_cycle_reconstruction_mse = float(np.mean(v_error**2))
+        self._vtc_cycle_reconstruction_relative_error = self._vtc_cycle_reconstruction_mse / max(
+            float(np.mean(V**2)), 1e-12
         )
 
     @property

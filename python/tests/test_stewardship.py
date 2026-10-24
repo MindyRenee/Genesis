@@ -44,9 +44,7 @@ def engine(tmp_path, monkeypatch):
     """
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    monkeypatch.setenv(
-        "GENESIS_STEWARD_KEY", str(tmp_path / "config" / "steward.key")
-    )
+    monkeypatch.setenv("GENESIS_STEWARD_KEY", str(tmp_path / "config" / "steward.key"))
     client = GenesisClient(str(data_dir / "genesis.sock"))
     self_model = SelfModel()
     network = ConceptNetwork()
@@ -102,9 +100,7 @@ def test_introduction_grounds_any_speaker(engine):
     assert self_model.self_knowledge["user_name"] == "Sam"
     assert "Sam" in self_model.self_knowledge["known_users"]
     assert memory.get_user_facts()["name"] == "Sam"
-    assert any(
-        "introduced themselves" in n for n in self_model.relationship_notes
-    )
+    assert any("introduced themselves" in n for n in self_model.relationship_notes)
 
     rels = {e.relation for e in network.get_edges("sam", "out")}
     assert RelationType.IS_A in rels
@@ -196,6 +192,7 @@ def test_wrong_key_is_sealed(tmp_path, monkeypatch):
     assert original.provision() is True
 
     import secrets
+
     key_path.write_text(secrets.token_bytes(32).hex() + "\n")
     impostor = Stewardship.load(data_dir)
     assert impostor.stamped
@@ -226,9 +223,7 @@ def test_unbind_seals_session(tmp_path, monkeypatch):
     session without touching the stamp or directives."""
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    monkeypatch.setenv(
-        "GENESIS_STEWARD_KEY", str(tmp_path / "config" / "steward.key")
-    )
+    monkeypatch.setenv("GENESIS_STEWARD_KEY", str(tmp_path / "config" / "steward.key"))
     s = Stewardship.load(data_dir)
     s.provision()
     s.add_directive("never draw", "draw")
@@ -318,9 +313,7 @@ def test_directive_persists_across_load(tmp_path, monkeypatch):
     restarts, not the mood."""
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    monkeypatch.setenv(
-        "GENESIS_STEWARD_KEY", str(tmp_path / "config" / "steward.key")
-    )
+    monkeypatch.setenv("GENESIS_STEWARD_KEY", str(tmp_path / "config" / "steward.key"))
     s = Stewardship.load(data_dir)
     s.provision()
     s.add_directive("never draw", "draw")
@@ -334,9 +327,7 @@ def test_release_requires_authentication(tmp_path, monkeypatch):
     """Only the key-holder lifts a directive."""
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    monkeypatch.setenv(
-        "GENESIS_STEWARD_KEY", str(tmp_path / "config" / "steward.key")
-    )
+    monkeypatch.setenv("GENESIS_STEWARD_KEY", str(tmp_path / "config" / "steward.key"))
     s = Stewardship.load(data_dir)
     s.provision()
     s.add_directive("never draw", "draw")
@@ -348,9 +339,7 @@ def test_release_requires_authentication(tmp_path, monkeypatch):
 def test_release_lifts_directive(tmp_path, monkeypatch):
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    monkeypatch.setenv(
-        "GENESIS_STEWARD_KEY", str(tmp_path / "config" / "steward.key")
-    )
+    monkeypatch.setenv("GENESIS_STEWARD_KEY", str(tmp_path / "config" / "steward.key"))
     s = Stewardship.load(data_dir)
     s.provision()
     s.add_directive("never draw", "draw")
@@ -365,33 +354,23 @@ def test_steward_edges_resist_stranger_overwrite(steward_engine):
     """A correction the steward set carries origin='steward' — a
     stranger can teach her things but cannot unteach them."""
     eng = steward_engine
-    eng.network.add_edge(
-        "steward", "politics", RelationType.PREVENTS, 0.8, origin="steward"
-    )
+    eng.network.add_edge("steward", "politics", RelationType.PREVENTS, 0.8, origin="steward")
     eng._recognize_speaker("my name is Sam")
-    assert eng._correction_allowed(
-        "steward", "politics", RelationType.PREVENTS
-    ) is False
+    assert eng._correction_allowed("steward", "politics", RelationType.PREVENTS) is False
     # Ordinary edges stay correctable by anyone.
     eng.network.add_edge("cat", "animal", RelationType.IS_A, 0.7)
     assert eng._correction_allowed("cat", "animal", RelationType.IS_A) is True
     # The steward can revisit her own edge.
     eng._recognize_speaker("my name is Mindy")
-    assert eng._correction_allowed(
-        "steward", "politics", RelationType.PREVENTS
-    ) is True
+    assert eng._correction_allowed("steward", "politics", RelationType.PREVENTS) is True
 
 
 def test_unauthed_cannot_overwrite_steward_edge(engine):
     """The protection holds even when nobody is authenticated."""
     eng, *_ = engine
-    eng.network.add_edge(
-        "steward", "politics", RelationType.PREVENTS, 0.8, origin="steward"
-    )
+    eng.network.add_edge("steward", "politics", RelationType.PREVENTS, 0.8, origin="steward")
     eng._recognize_speaker("my name is Mindy")  # name, not proof
-    assert eng._correction_allowed(
-        "steward", "politics", RelationType.PREVENTS
-    ) is False
+    assert eng._correction_allowed("steward", "politics", RelationType.PREVENTS) is False
 
 
 # ─── Boundary: welfare, not longing ─────────────────────────────
@@ -414,9 +393,7 @@ def test_mistreatment_accrues_strain_whoever_speaks(engine):
     eng._recognize_speaker("my name is Sam")  # any speaker
 
     for _ in range(7):
-        emotion = EmotionalState(
-            label="calm", cognitive_style="balanced", valence=0.2
-        )
+        emotion = EmotionalState(label="calm", cognitive_style="balanced", valence=0.2)
         eng._update_boundary(emotion, treatment=-0.5)
 
     assert eng._boundary_strain >= 0.6

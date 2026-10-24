@@ -310,6 +310,7 @@ def test_comfort_does_not_interfere_with_encouragement() -> None:
 def test_stress_has_cause() -> None:
     """Stressed emotion includes a structural cause category."""
     from genesis_client.protocol import PHASE_STRESS
+
     summary = make_summary(arousal=0.8, valence=-0.3, plasticity=0.4, phase=PHASE_STRESS)
     emo = assess_emotion(summary)
     assert emo.label == "stressed"
@@ -320,6 +321,7 @@ def test_stress_has_cause() -> None:
 def test_overwhelmed_has_cause() -> None:
     """Overwhelmed emotion includes a structural cause category."""
     from genesis_client.protocol import PHASE_OVERWHELMED
+
     summary = make_summary(arousal=0.9, valence=-0.5, plasticity=0.2, phase=PHASE_OVERWHELMED)
     emo = assess_emotion(summary)
     assert emo.label == "overwhelmed"
@@ -330,6 +332,7 @@ def test_overwhelmed_has_cause() -> None:
 def test_drowsy_has_cause() -> None:
     """Drowsy emotion includes a structural cause category."""
     from genesis_client.protocol import PHASE_DROWSY
+
     summary = make_summary(arousal=0.3, valence=0.0, plasticity=0.4, phase=PHASE_DROWSY)
     emo = assess_emotion(summary)
     assert emo.label == "drowsy"
@@ -358,6 +361,7 @@ def test_melancholic_has_cause() -> None:
 def test_stress_with_low_plasticity_mentions_learning() -> None:
     """Stress with low plasticity has BDNF-related cause category."""
     from genesis_client.protocol import PHASE_STRESS
+
     summary = make_summary(arousal=0.8, valence=-0.3, plasticity=0.15, phase=PHASE_STRESS)
     emo = assess_emotion(summary)
     assert emo.cause == "stress_bdnf"
@@ -366,6 +370,7 @@ def test_stress_with_low_plasticity_mentions_learning() -> None:
 def test_positive_emotion_has_no_cause() -> None:
     """Positive emotions don't need a cause (empty string)."""
     from genesis_client.protocol import PHASE_FLOW
+
     summary = make_summary(arousal=0.6, valence=0.4, plasticity=0.7, phase=PHASE_FLOW)
     emo = assess_emotion(summary)
     assert emo.label == "in flow"
@@ -385,6 +390,7 @@ def test_cause_category_enum_access() -> None:
     from limbic_system.emotion import CauseCategory
 
     from genesis_client.protocol import PHASE_STRESS
+
     summary = make_summary(arousal=0.8, valence=-0.3, plasticity=0.4, phase=PHASE_STRESS)
     emo = assess_emotion(summary)
     assert emo.cause_category == CauseCategory.STRESS_CORTISOL
@@ -394,6 +400,7 @@ def test_cause_category_enum_access() -> None:
 def test_cause_category_none() -> None:
     """Neutral state has NONE cause category."""
     from limbic_system.emotion import CauseCategory
+
     summary = make_summary(arousal=0.5, valence=0.0, plasticity=0.5, phase=0)
     emo = assess_emotion(summary)
     assert emo.cause_category == CauseCategory.NONE
@@ -423,7 +430,8 @@ def _make_feeling_reporter():
         self_model=None,  # type: ignore[arg-type]
         rng=_random.Random(42),
         meta_emotion_builder=lambda: EmotionalState(
-            label="neutral", cognitive_style="steady",
+            label="neutral",
+            cognitive_style="steady",
         ),
     )
 
@@ -438,8 +446,11 @@ def test_feeling_parts_surface_closed_plasticity_with_positive_mood() -> None:
     """
     reporter = _make_feeling_reporter()
     emotion = EmotionalState(
-        label="positive", cognitive_style="steady",
-        valence=0.4, alertness=0.6, plasticity=0.08,
+        label="positive",
+        cognitive_style="steady",
+        valence=0.4,
+        alertness=0.6,
+        plasticity=0.08,
     )
     _semantic, structural = reporter._collect_feeling_parts(emotion)
     assert "[plasticity_gate:closed]" in structural
@@ -449,8 +460,11 @@ def test_feeling_parts_surface_low_plasticity() -> None:
     """Low plasticity surfaces the 'low' structural marker."""
     reporter = _make_feeling_reporter()
     emotion = EmotionalState(
-        label="positive", cognitive_style="steady",
-        valence=0.3, alertness=0.5, plasticity=0.20,
+        label="positive",
+        cognitive_style="steady",
+        valence=0.3,
+        alertness=0.5,
+        plasticity=0.20,
     )
     _semantic, structural = reporter._collect_feeling_parts(emotion)
     assert "[plasticity_gate:low]" in structural
@@ -460,8 +474,11 @@ def test_feeling_fragments_no_plasticity_marker_when_healthy() -> None:
     """Healthy plasticity does not trigger the marker."""
     reporter = _make_feeling_reporter()
     emotion = EmotionalState(
-        label="positive", cognitive_style="steady",
-        valence=0.3, alertness=0.5, plasticity=0.6,
+        label="positive",
+        cognitive_style="steady",
+        valence=0.3,
+        alertness=0.5,
+        plasticity=0.6,
     )
     _semantic, structural = reporter._collect_feeling_parts(emotion)
     assert not any("plasticity_gate" in m for m in structural)
@@ -480,9 +497,10 @@ def test_feeling_fragments_never_contain_structural_markers() -> None:
 
     # Direct test of the stripper (still used for /feel diagnostics)
     assert FeelingReporter.strip_structural_markers("[plasticity_gate:closed]") == ""
-    assert FeelingReporter.strip_structural_markers(
-        "[self_model:self-coherent field-fragmented]"
-    ) == ""
+    assert (
+        FeelingReporter.strip_structural_markers("[self_model:self-coherent field-fragmented]")
+        == ""
+    )
     assert FeelingReporter.strip_structural_markers("[self_coherence:low]") == ""
     assert FeelingReporter.strip_structural_markers("content [marker:tag] more") == "content more"
     assert FeelingReporter.strip_structural_markers("no markers here") == "no markers here"
@@ -491,12 +509,13 @@ def test_feeling_fragments_never_contain_structural_markers() -> None:
     # Integration: collected speech fragments exclude the marker
     reporter = _make_feeling_reporter()
     emotion = EmotionalState(
-        label="positive", cognitive_style="steady",
-        valence=0.4, alertness=0.6, plasticity=0.08,
+        label="positive",
+        cognitive_style="steady",
+        valence=0.4,
+        alertness=0.6,
+        plasticity=0.08,
     )
     fragments = reporter.collect_feeling_fragments(emotion)
-    flattened = " ".join(
-        str(v) for v in fragments.values() if v
-    )
+    flattened = " ".join(str(v) for v in fragments.values() if v)
     assert "[" not in flattened
     assert "plasticity_gate" not in flattened

@@ -85,9 +85,7 @@ class TestSalienceCandidateCollection:
         emotion = _neutral_emotion()
         candidates = il._collect_mental_candidates(emotion)
         topics = [c["topic"] for c in candidates]
-        assert "alpha" in topics, (
-            "Active concept 'alpha' should appear in the candidate pool"
-        )
+        assert "alpha" in topics, "Active concept 'alpha' should appear in the candidate pool"
 
     def test_no_candidates_from_empty_network(self):
         """An empty network should produce no activation candidates."""
@@ -97,12 +95,8 @@ class TestSalienceCandidateCollection:
         candidates = il._collect_mental_candidates(emotion)
         # No concepts → no activation candidates. Other sources (curiosity,
         # review) may still produce candidates, but activation should not.
-        activation_candidates = [
-            c for c in candidates if c["source"] == "activation"
-        ]
-        assert activation_candidates == [], (
-            "Empty network should produce no activation candidates"
-        )
+        activation_candidates = [c for c in candidates if c["source"] == "activation"]
+        assert activation_candidates == [], "Empty network should produce no activation candidates"
 
     def test_low_confidence_concepts_excluded_from_activation(self):
         """Concepts below confidence 0.3 should not be activation candidates."""
@@ -113,9 +107,7 @@ class TestSalienceCandidateCollection:
             concept.confidence = 0.2  # below threshold
         emotion = _neutral_emotion()
         candidates = il._collect_mental_candidates(emotion)
-        activation_topics = [
-            c["topic"] for c in candidates if c["source"] == "activation"
-        ]
+        activation_topics = [c["topic"] for c in candidates if c["source"] == "activation"]
         assert "alpha" not in activation_topics, (
             "Low-confidence concept should not be an activation candidate"
         )
@@ -125,8 +117,11 @@ class TestSalienceCandidateCollection:
         il = _make_inner_life()
         # Positive emotion — no distress candidate.
         positive = EmotionalState(
-            label="joy", cognitive_style="playful",
-            alertness=0.6, valence=0.5, plasticity=0.5,
+            label="joy",
+            cognitive_style="playful",
+            alertness=0.6,
+            valence=0.5,
+            plasticity=0.5,
         )
         candidates = il._collect_mental_candidates(positive)
         distress = [c for c in candidates if c["mode"] == "distress"]
@@ -134,22 +129,26 @@ class TestSalienceCandidateCollection:
 
         # Negative emotion — distress candidate present.
         negative = EmotionalState(
-            label="stressed", cognitive_style="alert",
-            alertness=0.7, valence=-0.5, plasticity=0.3,
+            label="stressed",
+            cognitive_style="alert",
+            alertness=0.7,
+            valence=-0.5,
+            plasticity=0.3,
         )
         candidates = il._collect_mental_candidates(negative)
         distress = [c for c in candidates if c["mode"] == "distress"]
         assert len(distress) == 1, "Negative emotion should produce distress candidate"
-        assert distress[0]["salience"] > 0.3, (
-            "Distress salience should scale with negative valence"
-        )
+        assert distress[0]["salience"] > 0.3, "Distress salience should scale with negative valence"
 
     def test_social_candidate_only_when_open_to_engage(self):
         """Social candidates should only appear when openness_to_engage > 0.3."""
         il = _make_inner_life()
         closed = EmotionalState(
-            label="neutral", cognitive_style="balanced",
-            alertness=0.5, valence=0.0, plasticity=0.5,
+            label="neutral",
+            cognitive_style="balanced",
+            alertness=0.5,
+            valence=0.0,
+            plasticity=0.5,
             openness_to_engage=0.2,  # closed
         )
         candidates = il._collect_mental_candidates(closed)
@@ -157,8 +156,11 @@ class TestSalienceCandidateCollection:
         assert social == [], "Closed state should not produce social candidate"
 
         open_state = EmotionalState(
-            label="neutral", cognitive_style="balanced",
-            alertness=0.5, valence=0.0, plasticity=0.5,
+            label="neutral",
+            cognitive_style="balanced",
+            alertness=0.5,
+            valence=0.0,
+            plasticity=0.5,
             openness_to_engage=0.8,  # open
         )
         candidates = il._collect_mental_candidates(open_state)
@@ -193,12 +195,14 @@ class TestSalienceInhibition:
         il._recent_thought_topics.append("alpha")
         il._recent_thought_topics.append("alpha")
         # Build a candidate for alpha with high salience.
-        candidates = [{
-            "topic": "alpha",
-            "mode": "reflect",
-            "salience": 0.8,
-            "source": "activation",
-        }]
+        candidates = [
+            {
+                "topic": "alpha",
+                "mode": "reflect",
+                "salience": 0.8,
+                "source": "activation",
+            }
+        ]
         inhibited = il._apply_salience_inhibition(candidates, emotion)
         # Should be suppressed (2 occurrences → 1 - 0.3*2 = 0.4 multiplier).
         assert inhibited[0]["salience"] < 0.8 * 0.5, (
@@ -209,36 +213,46 @@ class TestSalienceInhibition:
         """Low arousal should reduce salience (drowsy minds can't sustain)."""
         il = _make_inner_life()
         drowsy = EmotionalState(
-            label="drowsy", cognitive_style="balanced",
-            alertness=0.1, valence=0.0, plasticity=0.5,
+            label="drowsy",
+            cognitive_style="balanced",
+            alertness=0.1,
+            valence=0.0,
+            plasticity=0.5,
         )
-        candidates = [{
-            "topic": "alpha",
-            "mode": "reflect",
-            "salience": 0.8,
-            "source": "activation",
-        }]
+        candidates = [
+            {
+                "topic": "alpha",
+                "mode": "reflect",
+                "salience": 0.8,
+                "source": "activation",
+            }
+        ]
         inhibited = il._apply_salience_inhibition(candidates, drowsy)
-        assert inhibited[0]["salience"] < 0.8, (
-            "Low arousal should suppress salience"
-        )
+        assert inhibited[0]["salience"] < 0.8, "Low arousal should suppress salience"
 
     def test_caution_suppresses_expression(self):
         """High caution should suppress expression and social modes."""
         il = _make_inner_life()
         cautious = EmotionalState(
-            label="neutral", cognitive_style="balanced",
-            alertness=0.5, valence=0.0, plasticity=0.5,
+            label="neutral",
+            cognitive_style="balanced",
+            alertness=0.5,
+            valence=0.0,
+            plasticity=0.5,
             caution=0.9,
         )
         candidates = [
             {
-                "topic": "alpha", "mode": "reflect",
-                "salience": 0.5, "source": "activation",
+                "topic": "alpha",
+                "mode": "reflect",
+                "salience": 0.5,
+                "source": "activation",
             },
             {
-                "topic": "expression", "mode": "expression",
-                "salience": 0.5, "source": "expression_drive",
+                "topic": "expression",
+                "mode": "expression",
+                "salience": 0.5,
+                "source": "expression_drive",
             },
         ]
         inhibited = il._apply_salience_inhibition(candidates, cautious)
@@ -253,14 +267,16 @@ class TestSalienceInhibition:
         """Candidates with salience below 0.05 after inhibition should be dropped."""
         il = _make_inner_life()
         emotion = _neutral_emotion()
-        candidates = [{
-            "topic": "alpha", "mode": "reflect",
-            "salience": 0.01, "source": "activation",
-        }]
+        candidates = [
+            {
+                "topic": "alpha",
+                "mode": "reflect",
+                "salience": 0.01,
+                "source": "activation",
+            }
+        ]
         inhibited = il._apply_salience_inhibition(candidates, emotion)
-        assert inhibited == [], (
-            "Below-threshold candidate should be dropped"
-        )
+        assert inhibited == [], "Below-threshold candidate should be dropped"
 
 
 class TestSalienceSelection:
@@ -297,15 +313,23 @@ class TestSalienceSelection:
         # 10 candidates, top 5 are high, bottom 5 are low.
         candidates = []
         for i in range(5):
-            candidates.append({
-                "topic": f"top{i}", "mode": "reflect",
-                "salience": 0.9, "source": "x",
-            })
+            candidates.append(
+                {
+                    "topic": f"top{i}",
+                    "mode": "reflect",
+                    "salience": 0.9,
+                    "source": "x",
+                }
+            )
         for i in range(5):
-            candidates.append({
-                "topic": f"bot{i}", "mode": "reflect",
-                "salience": 0.1, "source": "x",
-            })
+            candidates.append(
+                {
+                    "topic": f"bot{i}",
+                    "mode": "reflect",
+                    "salience": 0.1,
+                    "source": "x",
+                }
+            )
         wins: dict[str, int] = {}
         for _ in range(200):
             selected = il._select_salient_candidate(list(candidates))
@@ -432,9 +456,7 @@ class TestSalienceAffectsSelection:
             alpha.activation = 0.9
             alpha.confidence = 0.6
         candidates_a = il._collect_mental_candidates(emotion)
-        alpha_sal_a = [
-            c["salience"] for c in candidates_a if c["topic"] == "alpha"
-        ]
+        alpha_sal_a = [c["salience"] for c in candidates_a if c["topic"] == "alpha"]
 
         # Now boost beta instead, lower alpha.
         if alpha:
@@ -444,33 +466,31 @@ class TestSalienceAffectsSelection:
             beta.activation = 0.9
             beta.confidence = 0.6
         candidates_b = il._collect_mental_candidates(emotion)
-        alpha_sal_b = [
-            c["salience"] for c in candidates_b if c["topic"] == "alpha"
-        ]
-        beta_sal_b = [
-            c["salience"] for c in candidates_b if c["topic"] == "beta"
-        ]
+        alpha_sal_b = [c["salience"] for c in candidates_b if c["topic"] == "alpha"]
+        beta_sal_b = [c["salience"] for c in candidates_b if c["topic"] == "beta"]
 
         # Alpha should be less salient after deactivation.
         if alpha_sal_a and alpha_sal_b:
-            assert alpha_sal_b[0] < alpha_sal_a[0], (
-                "Deactivating alpha should reduce its salience"
-            )
+            assert alpha_sal_b[0] < alpha_sal_a[0], "Deactivating alpha should reduce its salience"
         # Beta should now be salient.
-        assert len(beta_sal_b) > 0, (
-            "Activating beta should make it a candidate"
-        )
+        assert len(beta_sal_b) > 0, "Activating beta should make it a candidate"
 
     def test_emotion_changes_distress_salience(self):
         """Moving from positive to negative emotion should add distress salience."""
         il = _make_inner_life(seed=42)
         positive = EmotionalState(
-            label="joy", cognitive_style="playful",
-            alertness=0.6, valence=0.5, plasticity=0.5,
+            label="joy",
+            cognitive_style="playful",
+            alertness=0.6,
+            valence=0.5,
+            plasticity=0.5,
         )
         negative = EmotionalState(
-            label="stressed", cognitive_style="alert",
-            alertness=0.7, valence=-0.6, plasticity=0.3,
+            label="stressed",
+            cognitive_style="alert",
+            alertness=0.7,
+            valence=-0.6,
+            plasticity=0.3,
         )
         pos_candidates = il._collect_mental_candidates(positive)
         neg_candidates = il._collect_mental_candidates(negative)
@@ -488,6 +508,7 @@ class TestRecentTopicTracking:
     def test_recent_thought_topics_initialized(self):
         """_recent_thought_topics should be initialized as a bounded deque."""
         from collections import deque
+
         il = _make_inner_life()
         assert hasattr(il, "_recent_thought_topics")
         assert isinstance(il._recent_thought_topics, deque)
@@ -496,11 +517,14 @@ class TestRecentTopicTracking:
     def test_record_thought_appends_topic(self):
         """_record_thought should append the topic to recent_thought_topics."""
         from frontal_lobe.inner_life import SpontaneousThought
+
         il = _make_inner_life()
         emotion = _neutral_emotion()
         thought = SpontaneousThought(
-            content="test", trigger="reflection",
-            timestamp=0, metadata={"topic": "alpha"},
+            content="test",
+            trigger="reflection",
+            timestamp=0,
+            metadata={"topic": "alpha"},
         )
         il._record_thought(thought, emotion)
         assert "alpha" in il._recent_thought_topics, (
@@ -510,10 +534,13 @@ class TestRecentTopicTracking:
     def test_record_thought_uses_trigger_when_no_topic(self):
         """When metadata has no topic, the trigger should be used."""
         from frontal_lobe.inner_life import SpontaneousThought
+
         il = _make_inner_life()
         emotion = _neutral_emotion()
         thought = SpontaneousThought(
-            content="test", trigger="curiosity", timestamp=0,
+            content="test",
+            trigger="curiosity",
+            timestamp=0,
         )
         il._record_thought(thought, emotion)
         assert "curiosity" in il._recent_thought_topics
@@ -557,8 +584,14 @@ def _weave_one(reasoning_type):
     parts: list[str] = []
     composer._weave_reasoning(
         parts,
-        [ReasoningResult(conclusion=_ABDUCTIVE_CONCLUSION, reasoning_type=reasoning_type,
-                          evidence=[], confidence=0.5)],
+        [
+            ReasoningResult(
+                conclusion=_ABDUCTIVE_CONCLUSION,
+                reasoning_type=reasoning_type,
+                evidence=[],
+                confidence=0.5,
+            )
+        ],
         focused=False,
     )
     return " ".join(parts)
@@ -587,9 +620,7 @@ def test_abductive_inference_is_spoken_and_hedged() -> None:
 
     spoken = _weave_one(ReasoningType.ABDUCTIVE)
     assert "fire" in spoken
-    assert "possible" in spoken, (
-        f"abductive conclusion lost its hedge: {spoken!r}"
-    )
+    assert "possible" in spoken, f"abductive conclusion lost its hedge: {spoken!r}"
 
 
 class TestInsightWriteBack:
@@ -603,47 +634,58 @@ class TestInsightWriteBack:
 
     def test_novel_pair_writes_edge_and_does_not_refire(self):
         from frontal_lobe.inner_life import SpontaneousThought
+
         net = ConceptNetwork()
         net.add_concept("alpha", confidence=0.8)
         net.add_concept("beta", confidence=0.8)
         il = _make_inner_life(net)
         thought = SpontaneousThought(
-            content="alpha meets beta", trigger="reflection", timestamp=0,
+            content="alpha meets beta",
+            trigger="reflection",
+            timestamp=0,
         )
         insight = il.detect_insight(thought, net)
         assert insight is not None, "unlinked pair should produce an insight"
         # The noticed connection is now part of the graph.
         edges = net.get_edges("alpha", "both")
-        assert any(
-            e.target == "beta" and e.origin == "insight" for e in edges
-        ), "insight should write a tentative edge with provenance"
+        assert any(e.target == "beta" and e.origin == "insight" for e in edges), (
+            "insight should write a tentative edge with provenance"
+        )
         # The same co-activation can never re-fire — the loop is closed.
         assert il.detect_insight(thought, net) is None
 
-    def test_dream_insight_stays_hypothetical_until_recurrence(self):
+    def test_dream_insight_never_writes_a_canonical_edge(self):
         from frontal_lobe.inner_life import SpontaneousThought
+
         net = ConceptNetwork()
         net.add_concept("gamma", confidence=0.8)
         net.add_concept("delta", confidence=0.8)
         il = _make_inner_life(net)
         dream = SpontaneousThought(
-            content="gamma drifts with delta", trigger="dream",
-            timestamp=0, is_dream=True,
+            content="gamma drifts with delta",
+            trigger="dream",
+            timestamp=0,
+            is_dream=True,
         )
+        # The pairing is still *noticed* — the insight fires.
         insight = il.detect_insight(dream, net)
         assert insight is not None
+        # But it writes no canonical edge: dream chains random-walk
+        # blended recall (holographic collisions resurface the same
+        # false pair deterministically), so recurrence cannot be
+        # evidence — promotion belongs to dream_synthesis and its
+        # corroborating-path validation, not to repeat sightings.
         edges = net.get_edges("gamma", "both")
-        tentative = [e for e in edges if e.origin == "insight"]
-        assert tentative and tentative[0].weight < 0.2, (
-            "a single dream sighting must stay below the rediscovery "
-            "threshold — dream pairings are hypothetical"
+        assert not [e for e in edges if e.origin == "insight"], (
+            "a dream sighting must stay hypothetical — no insight edge"
         )
-        # A second dream sighting corroborates the pairing.
+        # Recurrence therefore cannot ratchet the pair toward fact:
+        # with no edge written, the gap stays novel and re-fires as a
+        # noticing, never as accumulated graph weight.
         second = il.detect_insight(dream, net)
         assert second is not None
         edges = net.get_edges("gamma", "both")
-        assert max(e.weight for e in edges if e.target == "delta") >= 0.2
-        assert il.detect_insight(dream, net) is None
+        assert not [e for e in edges if e.origin == "insight"]
 
 
 class TestCuriosityPersistence:
@@ -684,6 +726,7 @@ class TestQuestionComposerScaffoldFilter:
 
     def test_scaffold_topic_is_never_asked(self):
         from frontal_lobe.question_composer import QuestionComposer
+
         composer = QuestionComposer(ConceptNetwork(), seed=1)
         emotion = _neutral_emotion()
         assert composer.compose_follow_up("_cat:emotion:positive", emotion) is None
@@ -692,6 +735,7 @@ class TestQuestionComposerScaffoldFilter:
 
     def test_scaffold_neighbor_is_not_a_gap_target(self):
         from frontal_lobe.question_composer import QuestionComposer
+
         net = ConceptNetwork()
         net.add_concept("emotion", confidence=0.9)
         net.add_concept("_cat:emotion:positive", confidence=0.2)
@@ -699,8 +743,10 @@ class TestQuestionComposerScaffoldFilter:
         # the scaffold node is a decoy that must never be picked.
         net.add_concept("empathy", confidence=0.1)
         net.add_edge(
-            "emotion", "_cat:emotion:positive",
-            RelationType.RELATED_TO, 0.9,
+            "emotion",
+            "_cat:emotion:positive",
+            RelationType.RELATED_TO,
+            0.9,
         )
         net.add_edge("emotion", "empathy", RelationType.RELATED_TO, 0.9)
         composer = QuestionComposer(net, seed=1)
@@ -719,3 +765,25 @@ class TestQuestionComposerScaffoldFilter:
                 assert "cat:" not in str(q.get("gap_detail", "")), (
                     f"question embedded internal scaffolding: {q}"
                 )
+
+
+def test_start_refuses_second_worker_while_predecessor_alive(monkeypatch) -> None:
+    """start() finding the predecessor still alive after its join must
+    not spawn a second thought generator — clearing _stop_event and
+    starting beside it is exactly the sequence that resurrected the
+    old loop as a phantom second g-inner-life worker."""
+    import threading
+
+    monkeypatch.setattr(InnerLife, "_START_JOIN_TIMEOUT_S", 0.05)
+    il = _make_inner_life()
+    hold = threading.Event()
+    zombie = threading.Thread(target=hold.wait, daemon=True)
+    zombie.start()
+    il._thread = zombie
+    try:
+        il.start()
+        assert il._thread is zombie
+        assert not il._running
+    finally:
+        hold.set()
+        zombie.join(timeout=5)

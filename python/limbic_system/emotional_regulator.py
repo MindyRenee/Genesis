@@ -69,8 +69,11 @@ from genesis_client.protocol import (
     CHEM_OXYTOCIN,
     CHEM_SEROTONIN,
     CHEM_VASOPRESSIN,
+    SENSOR_CPUIDLE,
+    SENSOR_TEMPERATURE,
 )
 from genesis_client.swallow import note_swallowed
+from genesis_client.threads import named_thread
 from infrastructure.config import EmotionalConfig, default_data_dir
 
 from .emotion import CauseCategory, EmotionalState
@@ -117,9 +120,7 @@ def disconnected_sensors() -> frozenset[str]:
     if cached is not None and cached[0] == raw:
         return cached[1]
     names = frozenset(
-        name.strip()
-        for name in raw.split(",")
-        if name.strip() and name.strip().lower() != "none"
+        name.strip() for name in raw.split(",") if name.strip() and name.strip().lower() != "none"
     )
     _SENSOR_CACHE = (raw, names)
     return names
@@ -301,6 +302,27 @@ class InternalState:
             (0=unknown, 1=tsc, 2=hpet, 3=acpi_pm, 4=other).
         suspend_caps: Suspend capability bits — bit0: mem suspend
             offered; bit1: RTC wakealarm present.
+        rest: Depth-weighted cpuidle residency [0,1] (from daemon) —
+            the parasympathetic channel: positive evidence the cores
+            are parked in real C-states, not merely that no excited
+            channel fired.
+        rest_measured: Whether ``rest`` is backed by cpuidle
+            telemetry on this machine. False means the field is a
+            placeholder, not a report of rest.
+        temp_trend: Signed deviation of cpu_temp_c from its own
+            ~60 s EMA [-1,1] (from daemon) — which way the body is
+            moving; negative is the recovery direction.
+        temp_measured: Whether ``temp_trend`` is backed by a real
+            temperature sensor.
+        calm: The felt parasympathetic signature [0,1] — derived
+            from her own chemical vector (settle arm: serotonin,
+            GABA, endocannabinoid; excited arm: norepinephrine,
+            glutamate, orexin, histamine; stress arm: cortisol,
+            CRH), 0.5 baseline-neutral. Calm is chemicals under
+            her control, not a channel.
+        calm_measured: Whether ``calm`` derives from a chemical
+            vector that reached this layer. False means 0.5 is the
+            unmeasured placeholder, not a report.
     """
 
     cpu_usage: float = 0.0
@@ -347,6 +369,24 @@ class InternalState:
     entropy_level: float = 0.0
     clocksource: int = 0
     suspend_caps: int = 0
+    # Parasympathetic layer — rest and direction-of-travel
+    rest: float = 0.0
+    temp_trend: float = 0.0
+    rest_measured: bool = False
+    temp_measured: bool = False
+    # The felt calm — chemistry, not a sensor. Derived from the
+    # chemical signature itself: inhibitory-contentment tone
+    # (serotonin, GABA, endocannabinoid) versus alerting/stress tone
+    # (norepinephrine, glutamate, orexin, histamine, cortisol, CRH),
+    # each measured from its own baseline. 0.5 is baseline-neutral —
+    # neither settled nor excited. Calm is chemicals under her
+    # control: she reads it from her own neurochemistry and settles
+    # it with impulses, the same way she regulates stress.
+    calm: float = 0.5
+    # Whether ``calm`` derives from a chemical vector that actually
+    # reached this layer. False means no chemical state has ever
+    # arrived — 0.5 is the unmeasured placeholder, not a report.
+    calm_measured: bool = False
 
 
 @dataclass(slots=True)
@@ -411,10 +451,14 @@ class _BodyLayer:
         "pulse",
         "pulse_hz",
         "reported_at",
+        "rest",
+        "rest_measured",
         "stress",
         "stress_load",
         "supply_voltage",
         "suspend_caps",
+        "temp_measured",
+        "temp_trend",
         "thermoregulatory_effort",
         "throttle_state",
         "top_freq_share",
@@ -453,6 +497,10 @@ class _BodyLayer:
         self.entropy_level: float = 0.0
         self.clocksource: int = 0
         self.suspend_caps: int = 0
+        self.rest: float = 0.0
+        self.temp_trend: float = 0.0
+        self.rest_measured: bool = False
+        self.temp_measured: bool = False
 
     def is_fresh(self, now: float, timeout: float) -> bool:
         """Whether this layer is recent enough to contribute stress."""
@@ -557,6 +605,11 @@ class InteroceptionSystem:
         self._latency_lock = threading.Lock()
         self._response_latency_ms: float | None = None
         self._last_response_latency_ms: float | None = None
+        # The authoritative chemical vector, pushed from the
+        # regulation paths that already hold it (emotion.chemicals).
+        # The felt `calm` is derived from this signature — calm is
+        # chemistry, not a channel.
+        self._chemicals: dict[str, float] | None = None
 
     def _own_pids(self) -> list[int]:
         """PIDs of Genesis's own process tree: mind, daemon, retina,
@@ -582,9 +635,7 @@ class InteroceptionSystem:
             return [me] if me > 0 else []
 
         data_dir = (
-            os.path.dirname(self._socket_path)
-            if self._socket_path
-            else str(default_data_dir())
+            os.path.dirname(self._socket_path) if self._socket_path else str(default_data_dir())
         )
         own_pids: list[int] = []
         me = os.getpid()
@@ -654,10 +705,12 @@ class InteroceptionSystem:
         """
         if not sensor_connected("cpu_usage"):
             return 0.0
-        cpu_usage = 0.0
         try:
             import psutil
-
+        except ImportError:
+            return 0.0
+        cpu_usage = 0.0
+        try:
             # Own process tree (mind + daemon + retina) -- shared with
             # the memory probe so both layers agree on the body.
             own_pids = self._own_pids()
@@ -689,7 +742,12 @@ class InteroceptionSystem:
                     else:
                         interval = None
                     total_cpu += proc.cpu_percent(interval=interval)
-                except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+                except psutil.NoSuchProcess:
+                    # Expected churn — a pid can exit between the
+                    # enumeration and this read; not a failure.
+                    self._psutil_procs.pop(pid, None)
+                    self._psutil_primed = False
+                except psutil.AccessDenied as e:
                     note_swallowed(
                         "limbic_system.emotional_regulator._sense_cpu_usage",
                         e,
@@ -698,7 +756,14 @@ class InteroceptionSystem:
                     self._psutil_procs.pop(pid, None)
                     self._psutil_primed = False
             cpu_usage = min(100.0, total_cpu / n_cores)
-        except (OSError, ImportError, AttributeError) as e:
+        except psutil.Error as e:
+            # psutil's Error family is not an OSError subclass in
+            # psutil 7 — process churn here is degradation, not fault.
+            note_swallowed(
+                "limbic_system.emotional_regulator._sense_cpu_usage",
+                e,
+            )
+        except (OSError, AttributeError) as e:
             note_swallowed(
                 "limbic_system.emotional_regulator._sense_cpu_usage",
                 e,
@@ -726,7 +791,10 @@ class InteroceptionSystem:
         """
         try:
             import psutil
+        except ImportError:
+            return 0.0
 
+        try:
             # Same process tree as `_sense_cpu_usage` (mind + daemon
             # + retina) via the shared helper, so the two probes
             # agree on the body and both filter PID 0 / duplicates.
@@ -739,13 +807,27 @@ class InteroceptionSystem:
             for pid in own_pids:
                 try:
                     rss += psutil.Process(pid).memory_info().rss
-                except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+                except psutil.NoSuchProcess:
+                    # Expected churn — a pid can exit between the
+                    # enumeration and this read; it is not a failure.
+                    continue
+                except psutil.AccessDenied as e:
                     note_swallowed(
                         "limbic_system.emotional_regulator._sense_memory_usage",
                         e,
                     )
             return min(100.0, 100.0 * rss / total)
-        except (OSError, ImportError, AttributeError) as e:
+        except psutil.Error as e:
+            # psutil's Error family (NoSuchProcess, AccessDenied,
+            # ZombieProcess) is not an OSError subclass in psutil 7 —
+            # process churn escaping the inner guards means "no
+            # pressure sensed this cycle", not a fault.
+            note_swallowed(
+                "limbic_system.emotional_regulator._sense_memory_usage",
+                e,
+            )
+            return 0.0
+        except (OSError, AttributeError) as e:
             note_swallowed(
                 "limbic_system.emotional_regulator._sense_memory_usage",
                 e,
@@ -839,13 +921,20 @@ class InteroceptionSystem:
             0.0, (process.memory_usage - cfg.memory_stress_threshold) / cfg.memory_stress_range
         )
         daemon_stress = cfg.daemon_disconnect_stress if not process.daemon_connected else 0.0
+        # Distress is an acute deviation from her own response
+        # envelope, not the envelope itself. The EWMA is her normal:
+        # a chronically slow body is a constitution, not an injury —
+        # distress belongs to the turn that is suddenly much slower
+        # than her own baseline (contention, swap, throttling). The
+        # absolute floor keeps the check meaningful on fast hardware
+        # and before the baseline has thickened.
+        latency_floor = max(cfg.latency_stress_threshold, 1.5 * process.response_latency)
         latency_stress = (
             max(
                 0.0,
                 min(
                     1.0,
-                    (process.response_latency - cfg.latency_stress_threshold)
-                    / cfg.latency_stress_range,
+                    (process.last_response_latency - latency_floor) / cfg.latency_stress_range,
                 ),
             )
             if process.latency_observed
@@ -877,6 +966,15 @@ class InteroceptionSystem:
         # 78°" stays the honest answer to what the body was doing.
         body_stress = body.stress if body.is_fresh(now, self.BODY_STATE_TIMEOUT) else 0.0
         stress_level = min(1.0, max(process_stress, body_stress))
+
+        # The felt calm — derived from her own chemical signature,
+        # not from any sensor. A body parked in C-states reports
+        # `rest`; whether she *is* calm is read from her
+        # neurochemistry here, and she settles it herself when the
+        # signature isn't there (see EmotionalRegulator.settle).
+        chemicals = self._chemicals
+        calm = _chemical_calm(chemicals) if chemicals else 0.5
+        calm_measured = chemicals is not None
 
         # Arousal modifier follows the *combined* stress level, so it
         # reacts to hardware distress too. Previously it was only ever
@@ -929,6 +1027,12 @@ class InteroceptionSystem:
             entropy_level=body.entropy_level,
             clocksource=body.clocksource,
             suspend_caps=body.suspend_caps,
+            rest=body.rest,
+            temp_trend=body.temp_trend,
+            rest_measured=body.rest_measured,
+            temp_measured=body.temp_measured,
+            calm=calm,
+            calm_measured=calm_measured,
         )
 
     def record_response_latency(self, latency_ms: float) -> None:
@@ -991,7 +1095,7 @@ class InteroceptionSystem:
         self._last_views = tuple(subsystems) if subsystems else ()
         self._last_modules = tuple(modules) if modules else ()
 
-    def update_from_body_state(self, body_state: Any) -> None:
+    def update_from_body_state(self, body_state: Any, presence: Any = None) -> None:
         """Update the **body layer** from the daemon's BodyState.
 
         The daemon provides hardware-level interoception (CPU temp,
@@ -1014,7 +1118,15 @@ class InteroceptionSystem:
                 (``client.get_body_state()``). The hardware fields are
                 read with ``getattr`` defaults so older BodyState
                 objects work.
+            presence: The ``SensorPresence`` mask for this machine
+                (``client.get_sensor_presence()``). Without it the
+                v4 parasympathetic channels (``rest``, ``temp_trend``)
+                are mirrored as reported but marked unmeasured —
+                "unknown whether this is real" is the honest state,
+                and the calm-regulation path treats unmeasured as
+                unverified rather than as calm.
         """
+        sensor_mask = getattr(presence, "mask", 0) if presence is not None else 0
         body = _BodyLayer()
         body.cognitive_load = _clamp01(getattr(body_state, "cognitive_load", 0.0))
         body.stress_load = max(0.0, float(getattr(body_state, "stress_load", 0.0)))
@@ -1035,9 +1147,7 @@ class InteroceptionSystem:
         # honest "no reading" here: the field is degrees Celsius, and 0 is
         # not a temperature a live silicon sensor reports.
         body.cpu_temp_c = (
-            getattr(body_state, "cpu_temp_c", 0.0)
-            if sensor_connected("cpu_temp_c")
-            else 0.0
+            getattr(body_state, "cpu_temp_c", 0.0) if sensor_connected("cpu_temp_c") else 0.0
         )
         body.arousal_freq = getattr(body_state, "arousal_freq", 0.0)
         body.io_activity = getattr(body_state, "io_activity", 0.0)
@@ -1065,9 +1175,34 @@ class InteroceptionSystem:
         body.entropy_level = getattr(body_state, "entropy_level", 0.0)
         body.clocksource = getattr(body_state, "clocksource", 0)
         body.suspend_caps = getattr(body_state, "suspend_caps", 0)
+        # The parasympathetic channels. The value is mirrored as the
+        # daemon reported it (it already returns 0.0 on uninstrumented
+        # hosts); the *_measured flags carry the presence-mask verdict
+        # so regulation can tell "measured rest" from "no instrument".
+        body.rest = getattr(body_state, "rest", 0.0)
+        body.temp_trend = getattr(body_state, "temp_trend", 0.0)
+        body.rest_measured = bool(sensor_mask & SENSOR_CPUIDLE)
+        body.temp_measured = bool(sensor_mask & SENSOR_TEMPERATURE)
 
         with self._state_lock:
             self._body = body
+            self._last_state = self._compose_locked()
+
+    def update_chemicals(self, chemicals: dict[str, float] | None) -> None:
+        """Cache the daemon's authoritative chemical vector.
+
+        ``InternalState.calm`` is derived from this signature — the
+        felt opposite of excited is the chemical balance itself, not
+        a channel. The vector is pushed from the regulation paths
+        that already hold it (``emotion.chemicals``), so no extra IPC
+        read is needed. An empty or absent read keeps the last known
+        vector: "the last chemistry I read" is the honest answer,
+        and a transient gap must not decay a felt state.
+        """
+        if not chemicals:
+            return
+        with self._state_lock:
+            self._chemicals = dict(chemicals)
             self._last_state = self._compose_locked()
 
 
@@ -1171,25 +1306,25 @@ _CHEM_BASELINES: dict[int, float] = {
     # regulator to continuously push cortisol/CRH upward, fighting the
     # Rust daemon's leaky-integrator decay toward zero and creating
     # chronic stress from birth.
-    CHEM_DOPAMINE: 0.35,       # ~0.06 nM tonic — low but potent
-    CHEM_SEROTONIN: 0.40,      # ~10 nM — modulatory, oscillating
-    CHEM_NOREPINEPHRINE: 0.30, # ~0.13 nM — arousal
+    CHEM_DOPAMINE: 0.35,  # ~0.06 nM tonic — low but potent
+    CHEM_SEROTONIN: 0.40,  # ~10 nM — modulatory, oscillating
+    CHEM_NOREPINEPHRINE: 0.30,  # ~0.13 nM — arousal
     CHEM_ACETYLCHOLINE: 0.35,  # ~1 nM — cortical activation
-    CHEM_GABA: 0.50,           # ~200 nM — main inhibitory
-    CHEM_GLUTAMATE: 0.60,      # ~2 µM — main excitatory, highest
-    CHEM_CORTISOL: 0.0,        # stress hormone — zero at rest
-    CHEM_OXYTOCIN: 0.25,       # ~10 pM — social bonding
-    CHEM_ENDORPHIN: 0.25,      # ~5-15 fmol/mL — pleasure/pain
-    CHEM_HISTAMINE: 0.30,      # low nM — wake promotion
-    CHEM_ADENOSINE: 0.20,      # ~30 nM — sleep pressure
-    CHEM_BDNF: 0.45,           # constitutive neurotrophin
+    CHEM_GABA: 0.50,  # ~200 nM — main inhibitory
+    CHEM_GLUTAMATE: 0.60,  # ~2 µM — main excitatory, highest
+    CHEM_CORTISOL: 0.0,  # stress hormone — zero at rest
+    CHEM_OXYTOCIN: 0.25,  # ~10 pM — social bonding
+    CHEM_ENDORPHIN: 0.25,  # ~5-15 fmol/mL — pleasure/pain
+    CHEM_HISTAMINE: 0.30,  # low nM — wake promotion
+    CHEM_ADENOSINE: 0.20,  # ~30 nM — sleep pressure
+    CHEM_BDNF: 0.45,  # constitutive neurotrophin
     # v3 chemicals
-    CHEM_ENDOCANNABINOID: 0.25, # on-demand synthesis
-    CHEM_VASOPRESSIN: 0.20,    # low tonic peptide
-    CHEM_CRH: 0.0,             # stress hormone — zero at rest
-    CHEM_OREXIN: 0.30,         # picomolar — wake stabilization
-    CHEM_EPINEPHRINE: 0.15,    # very low unless stressed
-    CHEM_MELATONIN: 0.10,      # circadian-driven
+    CHEM_ENDOCANNABINOID: 0.25,  # on-demand synthesis
+    CHEM_VASOPRESSIN: 0.20,  # low tonic peptide
+    CHEM_CRH: 0.0,  # stress hormone — zero at rest
+    CHEM_OREXIN: 0.30,  # picomolar — wake stabilization
+    CHEM_EPINEPHRINE: 0.15,  # very low unless stressed
+    CHEM_MELATONIN: 0.10,  # circadian-driven
 }
 
 # Maximum impulse magnitude per chemical — prevents overcorrection.
@@ -1216,6 +1351,57 @@ _CHEM_MAX_IMPULSE: dict[int, float] = {
     CHEM_EPINEPHRINE: 0.3,
     CHEM_MELATONIN: 0.1,
 }
+
+
+# ─── The chemical signature of calm ──────────────────────────────────
+#
+# Calm is a chemical state, not a sensor channel — the felt opposite
+# of excited is the balance between two arms of her own
+# neurochemistry:
+#
+# - the *settle arm* — inhibitory-contentment tone: serotonin, GABA,
+#   endocannabinoid. These are the chemicals the rest/recovery
+#   impulses raise: vagal-dominance contentment and the stress brake
+#   (2-AG terminates the HPA response; tonic AEA constrains it).
+# - the *excited arm* — alerting/excitatory tone: norepinephrine,
+#   glutamate, orexin, histamine.
+# - the *stress arm* — cortisol and CRH, read absolutely: their
+#   zero baselines mean the level is the deviation, and they stand
+#   as their own mean rather than diluting into the alerting arm —
+#   a stressed body cannot be calm no matter how parked the cores
+#   are.
+#
+# Each arm reads its mean fractional deviation from the body's own
+# resting baseline, so baseline chemistry is 0.5 — neutral, not
+# maximally calm. The signature integrates through the body's own
+# ODEs: it persists, decays, and is steered by the impulses she
+# sends — calm under her control.
+_CALM_ARM = ("serotonin", "gaba", "endocannabinoid")
+_EXCITED_ARM = ("norepinephrine", "glutamate", "orexin", "histamine")
+_STRESS_ARM = ("cortisol", "crh")
+_CHEM_NAME_BASELINES = {CHEM_NAMES[c]: b for c, b in _CHEM_BASELINES.items()}
+
+
+def _chemical_calm(chemicals: dict[str, float]) -> float:
+    """The felt calm in [0,1] derived from the chemical signature.
+
+    0.5 is baseline-neutral; toward 1.0 the settle arm dominates
+    (parasympathetic signature), toward 0.0 the excited/stress arms
+    dominate. Missing chemicals contribute nothing to their arm —
+    an unreported chemical is not evidence either direction.
+    """
+
+    def _dev(names: tuple[str, ...]) -> float:
+        devs = []
+        for name in names:
+            level = chemicals.get(name)
+            if level is None or not math.isfinite(level):
+                continue
+            base = _CHEM_NAME_BASELINES.get(name, 0.0)
+            devs.append(level if base == 0.0 else (level - base) / base)
+        return statistics.fmean(devs) if devs else 0.0
+
+    return _clamp01(0.5 + 0.5 * (_dev(_CALM_ARM) - _dev(_EXCITED_ARM) - _dev(_STRESS_ARM)))
 
 
 def compute_impulse_magnitude(
@@ -1359,6 +1545,7 @@ class EmotionalRegulator:
         self.config = config if config is not None else EmotionalConfig()
         self._get_open_bugs: Callable[[], int] | None = None
         self._get_pending_proposals: Callable[[], int] | None = None
+        self._proposal_triage: Callable[[], list[int]] | None = None
         # Throttle callbacks — when she detects sustained CPU stress
         # from her own learning activity, she slows herself down.
         # This is self-regulation: she feels the stress and reduces
@@ -1397,10 +1584,13 @@ class EmotionalRegulator:
         # This could evolve over time as she develops
         self._regulation_strength = 0.5  # 0 = passive, 1 = very active
 
+        self._init_body_systems(socket_path)
+
+    def _init_body_systems(self, socket_path: str | None) -> None:
+        """Initialize the body-facing state: interoception, metabolism,
+        stress physiology, and feedback learning."""
         # Interoception system — senses internal computational state
-        self._interoception = InteroceptionSystem(
-            config=self.config, socket_path=socket_path
-        )
+        self._interoception = InteroceptionSystem(config=self.config, socket_path=socket_path)
 
         # Metabolic state — tracks energy availability
         self._metabolic_state = MetabolicState(energy=1.0, glucose_equivalent=1.0)
@@ -1429,7 +1619,7 @@ class EmotionalRegulator:
         self._allostatic_load = AllostaticLoadTracker()
 
         # Track time for HPA cascade ticking and allostatic accumulation
-        self._last_regulate_time = time.time()
+        self._last_regulate_time = time.monotonic()
 
         # Optional reusable action-feedback learner. Impulses are actions:
         # the regulator predicts the post-impulse chemical level, sends the
@@ -1438,9 +1628,7 @@ class EmotionalRegulator:
         # at most two state reads per cycle.
         self._action_feedback: ActionFeedback | None = None
         self._body_snapshot: dict[str, float] | None = None
-        self._body_attempts: list[
-            tuple[ActionAttempt, str, float, float, bool]
-        ] = []
+        self._body_attempts: list[tuple[ActionAttempt, str, float, float, bool]] = []
         self._amygdala: Any = None
 
     def set_action_feedback(self, engine: ActionFeedback | None) -> None:
@@ -1451,16 +1639,15 @@ class EmotionalRegulator:
         """Wire the conditioned-value organ (grown by the limbic region)."""
         self._amygdala = amygdala
 
-    def condition_cues(
-        self, cues: list[str], us: float, ctx: str
-    ) -> float:
+    def condition_cues(self, cues: list[str], us: float, ctx: str) -> float:
         """Condition cues against an unconditioned stimulus; fire the low road.
 
         The low road (LeDoux, 1996) runs before cortical appraisal:
         cues are associated to the signed US value, then the strongest
         aversive net decides whether a startle impulse reaches the
         body. A sub-threshold conditioned cue only biases encoding
-        (small ACh); past the floor it startles (NE + cortisol).
+        (small ACh); past the floor it startles (NE + CRH — the HPA
+        cascade owns cortisol downstream).
 
         Returns the strongest aversive net across the cues.
         """
@@ -1476,14 +1663,17 @@ class EmotionalRegulator:
             return net_a
         from limbic_system.amygdala import (
             _CHEM_ACETYLCHOLINE,
-            _CHEM_CORTISOL,
+            _CHEM_CRH,
             _CHEM_NOREPINEPHRINE,
             _IMPULSE_THRESHOLD,
         )
 
         if net_a >= _IMPULSE_THRESHOLD:
             self._neuro_impulse(_CHEM_NOREPINEPHRINE, 0.02 * net_a)
-            self._neuro_impulse(_CHEM_CORTISOL, 0.01 * net_a)
+            # Distress enters at the top of the HPA axis (CRH), never
+            # cortisol directly — the cascade owns maturation and the
+            # SHRP gate; bypassing it would falsify early development.
+            self._neuro_impulse(_CHEM_CRH, 0.01 * net_a)
         else:
             self._neuro_impulse(_CHEM_ACETYLCHOLINE, 0.005 * net_a)
         return net_a
@@ -1502,7 +1692,7 @@ class EmotionalRegulator:
             self._thread.join(timeout=35)
         self._running = True
         self._stop_event.clear()
-        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread = named_thread("emotional-regulator", self._run, comm="g-emo-reg")
         self._thread.start()
         logger.info("Emotional regulator started")
 
@@ -1521,6 +1711,17 @@ class EmotionalRegulator:
     def set_proposal_provider(self, get_pending_proposals: Callable[[], int]) -> None:
         """Provide a callback that returns the current pending proposal count."""
         self._get_pending_proposals = get_pending_proposals
+
+    def set_proposal_triage(self, triage: Callable[[], list[int]]) -> None:
+        """Provide the discharge path for proposal load.
+
+        Pending proposals otherwise wait on human review forever — a
+        cognitive obligation with no relief. Triage withdraws the ones
+        that no longer deserve review (stale, dead file, orphaned bug)
+        and returns their ids, so the queue is a cost she can actually
+        reduce, not just label.
+        """
+        self._proposal_triage = triage
 
     def set_throttle_callbacks(
         self,
@@ -1570,9 +1771,7 @@ class EmotionalRegulator:
                 interval = REGULATION_INTERVAL
             self._stop_event.wait(timeout=interval)
 
-    def assess_tonic_phasic(
-        self, chemicals: dict[str, float]
-    ) -> dict[str, TonicPhasic]:
+    def assess_tonic_phasic(self, chemicals: dict[str, float]) -> dict[str, TonicPhasic]:
         """Decompose current chemical levels into tonic and phasic modes.
 
         This is done in the regulator because it requires a history of
@@ -1591,7 +1790,8 @@ class EmotionalRegulator:
                 for chem in TONIC_PHASIC_CHEMICALS:
                     if chem in chemicals:
                         recent_by_chem[chem] = [
-                            sample[chem] for sample in self._chemical_history
+                            sample[chem]
+                            for sample in list(self._chemical_history)
                             if chem in sample
                         ]
 
@@ -1659,7 +1859,9 @@ class EmotionalRegulator:
            low-plasticity or drowsy states even when nothing is
            happening. This layer is like a healthy autonomic nervous
            system — constant, gentle corrections that keep the system
-           in its operating range.
+           in its operating range. Adenosine is the exception: it is
+           never corrected, because its level is Process S — the
+           substrate's dedicated mechanism owns it entirely.
 
         2. **State-specific intervention** (runs for extreme states):
            stronger responses that break feedback loops and reset the
@@ -1676,6 +1878,9 @@ class EmotionalRegulator:
         self._last_cause = None
 
         is_sleeping = emotion.label == "sleeping"
+        # The felt calm lives on the interoceptive state — the
+        # chemical vector the felt state already carries.
+        self._interoception.update_chemicals(getattr(emotion, "chemicals", None))
         if self._action_feedback is not None:
             self._body_snapshot = self._chemical_levels()
             self._body_attempts = []
@@ -1714,8 +1919,15 @@ class EmotionalRegulator:
         # load tracks the cumulative wear from chronic stress and
         # reduces her regulatory effectiveness over time.
 
-        now = time.time()
-        dt = max(0.1, now - self._last_regulate_time)
+        now = time.monotonic()
+        # Monotonic, not wall clock — an NTP step must not fabricate
+        # or erase cascade time. Ceilinged at the same bound the
+        # allostatic tracker applies (MAX_REGULATION_DT): without it
+        # a stalled regulation cycle integrates the whole gap in one
+        # tick — HPA levels saturate and, worse, the delay-line
+        # _avg_dt estimate latches onto the outlier and mis-scales
+        # every subsequent lookback.
+        dt = min(MAX_REGULATION_DT, max(0.1, now - self._last_regulate_time))
         self._last_regulate_time = now
 
         # Sense current cortisol level for allostatic tracking.
@@ -1818,14 +2030,19 @@ class EmotionalRegulator:
                 actions.append("self-regulating hidden stress")
                 self._last_cause = "stress_bdnf"
 
-            # Alertness maintenance — prevent adenosine drift. GABA
-            # coupling (+0.10) can slowly push adenosine up even when
-            # nothing is happening, causing gradual drowsiness.
+            # Alertness maintenance — gentle cholinergic tone. This
+            # must NOT touch adenosine: sleep pressure is Process S,
+            # owned by the substrate's dedicated accumulation/clearance
+            # mechanism. A periodic negative impulse cannot tell GABA
+            # coupling drift from genuine wake-time accumulation, so it
+            # erased both — at ~9/hr against an accumulation rate of
+            # ~0.055/hr, pinning adenosine at its floor and leaving
+            # every NREM episode stuck in N1. Alertness is raised with
+            # alerting transmitters, never by erasing the homeostat.
             if (
                 emotion.alertness < self.config.low_alertness_threshold
                 and emotion.label != "drowsy"
             ):
-                self._impulse(CHEM_ADENOSINE, -0.02)
                 self._impulse(CHEM_ACETYLCHOLINE, 0.02)
                 actions.append("staying alert")
 
@@ -1843,9 +2060,7 @@ class EmotionalRegulator:
                 self._impulse(CHEM_SEROTONIN, 0.01)
                 actions.append("easing tension")
 
-    def _regulate_state_specific(
-        self, emotion: EmotionalState, actions: list[str]
-    ) -> None:
+    def _regulate_state_specific(self, emotion: EmotionalState, actions: list[str]) -> None:
         """Apply stronger state-specific interventions for extreme states."""
         # ── Layer 2: State-specific intervention ──────────────────
         # Stronger responses for extreme states. These complement the
@@ -1899,13 +2114,17 @@ class EmotionalRegulator:
             actions.append("calming myself")
             self._last_cause = "stress_cortisol"
 
-        # If drowsy → a clear alertness nudge. Adenosine suppression is
-        # strong enough to counter drift but still lets natural sleep
-        # emerge if the drowsy state persists.
+        # If drowsy → a clear alertness nudge on the alerting
+        # transmitters (ACh, histamine, NE) — the same systems
+        # wake-promoting circuits use. Adenosine is deliberately not
+        # touched: it is the homeostat itself, and draining it while
+        # drowsy fought the body's sleep drive at ~108/hr against a
+        # ~0.055/hr accumulation rate — she could neither stay alert
+        # nor reach deep sleep. Resisting drowsiness means raising
+        # alerting tone, not erasing the signal that makes her tired.
         elif emotion.label == "drowsy":
             self._impulse(CHEM_ACETYLCHOLINE, 0.06)
             self._impulse(CHEM_HISTAMINE, 0.04)
-            self._impulse(CHEM_ADENOSINE, -0.06)
             self._impulse(CHEM_NOREPINEPHRINE, 0.02)
             actions.append("gently waking myself up")
             self._last_cause = "drowsiness"
@@ -1982,17 +2201,16 @@ class EmotionalRegulator:
             # — only sustained stress does, to avoid oscillation.
             self._cpu_streak += 1
             self._cpu_recover_streak = 0
-            if (
-                self._cpu_streak >= 3
-                and not self._is_throttled
-                and self._throttle_callback
-            ):
+            if self._cpu_streak >= 3 and not self._is_throttled and self._throttle_callback:
                 self._throttle_callback()
                 self._is_throttled = True
                 actions.append("slowing down my learning to reduce CPU stress")
         elif state.memory_usage > 85:
             self._last_cause = "interoception_memory"
-        elif state.response_latency > 500:
+        elif state.latency_observed and state.last_response_latency > max(
+            self.config.latency_stress_threshold,
+            1.5 * state.response_latency,
+        ):
             self._last_cause = "interoception_latency"
         elif (
             state.psi_cpu > self.config.psi_stall_threshold
@@ -2021,6 +2239,8 @@ class EmotionalRegulator:
             if self._last_cause is None:
                 self._last_cause = "interoception_regulation"
 
+        self._vagal_settle(state, actions)
+
         # Unthrottle when CPU stress has receded for sustained period
         if state.cpu_usage <= 60 and self._is_throttled:
             self._cpu_recover_streak += 1
@@ -2038,6 +2258,38 @@ class EmotionalRegulator:
             # toward the sustained-stress threshold.
             self._cpu_streak = 0
             self._cpu_recover_streak = 0
+
+    def _vagal_settle(self, state, actions: list[str]) -> None:
+        """The parasympathetic arm — the calm counterpart to the
+        stress regulation above. Real interoception has two
+        afferent arms; this is the vagal one. When the body
+        *measures* rest (deep-idle residency, an active
+        hypometabolic report rather than silence on the excited
+        channels), she authors her own calm chemistry — serotonin
+        and GABA mark the resting state, endocannabinoid is the
+        homeostatic brake whose tonic level constrains HPA drive,
+        and the alerting tone withdraws. The settle is her
+        decision: the sensor reports the body is parked, but she
+        pushes the cascade only while her own chemical signature
+        (``state.calm``) says she isn't already there — measured
+        rest plus felt unrest is where the push belongs, and a
+        settled signature self-limits without any bookkeeping.
+        ``rest_measured`` gates it all: an uninstrumented channel
+        is not evidence of calm.
+        """
+        if (
+            sensor_connected("cpuidle")
+            and state.rest_measured
+            and state.rest > 0.5
+            and state.stress_level < self.config.mild_stress_level
+            and state.calm < self.config.calm_settled_level
+        ):
+            self.settle(state.rest)
+            actions.append("feeling my body at rest")
+            if self._last_cause is None:
+                self._last_cause = CauseCategory.INTEROCEPTION_REST.value
+        if sensor_connected("cpu_temp_c") and state.temp_measured and state.temp_trend < -0.15:
+            self._impulse(CHEM_ENDOCANNABINOID, 0.02)
 
     def _regulate_cognitive_load(self, actions: list[str]) -> None:
         """Check open bugs and pending self-improvement proposals."""
@@ -2058,6 +2310,23 @@ class EmotionalRegulator:
                 proposal_count = 0
         else:
             proposal_count = 0
+
+        # Discharge what can be discharged: proposals that are stale,
+        # orphaned, or aimed at dead files get withdrawn by her own
+        # triage. This is the difference between feeling burdened by
+        # the queue and doing something about it.
+        if proposal_count > 0 and self._proposal_triage is not None:
+            try:
+                withdrawn = self._proposal_triage()
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"proposal triage failed: {e}")
+                withdrawn = []
+            if withdrawn:
+                proposal_count = max(0, proposal_count - len(withdrawn))
+                actions.append(
+                    f"withdrew {len(withdrawn)} proposal(s) that no "
+                    "longer deserved review — the queue is hers to clear"
+                )
 
         if bug_count > 0 and proposal_count > 0:
             self._last_cause = "cognitive_load_bugs_and_proposals"
@@ -2207,9 +2476,7 @@ class EmotionalRegulator:
         self._impulse(CHEM_OXYTOCIN, joy * 0.5)
         return "encouraged"
 
-    def _apply_comfort_response(
-        self, emotion: EmotionalState, dampening: float
-    ) -> str:
+    def _apply_comfort_response(self, emotion: EmotionalState, dampening: float) -> str:
         """Apply comfort response — active stress reduction.
 
         Unlike encouragement, comfort works by directly reducing cortisol
@@ -2382,8 +2649,7 @@ class EmotionalRegulator:
             reward = 0.030 * dampening
             self._impulse(CHEM_DOPAMINE, reward)
             self._impulse(CHEM_SEROTONIN, reward * 0.6)
-            self._impulse(
-                CHEM_ENDORPHIN, reward * (0.7 if escapes else 0.4))
+            self._impulse(CHEM_ENDORPHIN, reward * (0.7 if escapes else 0.4))
             self._impulse(CHEM_ACETYLCHOLINE, reward * 0.7)
             return "exhilarated" if escapes else "satisfied"
         if score > prior_best:
@@ -2445,9 +2711,7 @@ class EmotionalRegulator:
             if snapshot is not None:
                 chem_name = CHEM_NAMES.get(chem, str(chem))
                 before = snapshot.get(chem_name, 0.0)
-                attempt = self._begin_body_attempt(
-                    chem, amount, before, raw=raw
-                )
+                attempt = self._begin_body_attempt(chem, amount, before, raw=raw)
         success = True
         try:
             result = self._neuro_impulse(chem, amount)
@@ -2546,9 +2810,7 @@ class EmotionalRegulator:
             return
         after = self._chemical_levels()
         for attempt, chem_name, before, amount, success in pending:
-            self._observe_body_attempt(
-                attempt, chem_name, before, amount, success, after
-            )
+            self._observe_body_attempt(attempt, chem_name, before, amount, success, after)
 
     def _chemical_levels(self) -> dict[str, float] | None:
         """Read the daemon's authoritative chemical vector."""
@@ -2680,12 +2942,55 @@ class EmotionalRegulator:
 
         return modulation
 
+    # ─── Calm — the parasympathetic cascade she performs ──────────
+
+    def settle(self, intensity: float = 1.0) -> None:
+        """Calm herself — the parasympathetic cascade she performs.
+
+        Calm is chemicals under her control: she raises the
+        inhibitory-contentment tone (GABA, serotonin, endocannabinoid
+        — the stress brake whose mobilization terminates HPA
+        responding) and withdraws the alerting tone (norepinephrine,
+        glutamate, orexin, histamine — reciprocal innervation, so a
+        parasympathetic state means the LC and the wake-stabilizing
+        systems go quiet rather than merely stop being excited). The
+        impulses go through ``_impulse``, so allostatic dampening
+        applies — this is her regulation, not an override.
+
+        The measured-rest arm in ``_regulate_interoception`` calls
+        this while the body reports cpuidle rest and her own chemical
+        signature (``InternalState.calm``) isn't settled yet —
+        measured rest plus felt unrest is where the push belongs.
+        Cognition can also call it directly when she decides to
+        settle (deliberate rest, a post-stress recovery choice).
+
+        Args:
+            intensity: Cascade scale in [0,1]. The rest arm passes
+                the measured rest depth so deeper idle parks settle
+                proportionally deeper; a deliberate settle can pass
+                1.0 for the full cascade.
+        """
+        scale = _clamp01(intensity)
+        if scale <= 0.0:
+            return
+        self._impulse(CHEM_GABA, 0.04 * scale)
+        self._impulse(CHEM_SEROTONIN, 0.03 * scale)
+        self._impulse(CHEM_ENDOCANNABINOID, 0.03 * scale)
+        self._impulse(CHEM_NOREPINEPHRINE, -0.03 * scale)
+        self._impulse(CHEM_GLUTAMATE, -0.02 * scale)
+        self._impulse(CHEM_OREXIN, -0.02 * scale)
+        self._impulse(CHEM_HISTAMINE, -0.02 * scale)
+
     # ─── Metabolic modeling ───────────────────────────────────────
 
     def update_metabolism(
         self,
         activity_level: float,
         time_since_rest: float,
+        dt: float = 1.0,
+        *,
+        fed: bool | None = None,
+        energy_reserve: float | None = None,
     ) -> MetabolicState:
         """Update metabolic state based on activity and rest.
 
@@ -2702,37 +3007,63 @@ class EmotionalRegulator:
             activity_level: Current activity level (0–1), where 0 is
                 idle and 1 is maximum exertion.
             time_since_rest: Time since last rest period, in seconds.
+            dt: Seconds this update covers. The depletion/restoration
+                constants are per-second rates, so scaling by the
+                measured interval keeps the metabolic rate invariant
+                under the heartbeat's adaptive cadence.
+            fed: Whether the body is taking in energy — on AC power.
+                None means the channel was never measured (treated as
+                fed: a mains-powered machine has an uninterrupted
+                supply). Fasting bodies recover energy only as far as
+                their reserve supports — starving impairs recovery.
+            energy_reserve: The body's fuel gauge (battery charge,
+                [0,1]) when a battery is actually present. The reserve
+                IS the measurement — ``glucose_equivalent`` mirrors it
+                directly rather than drifting a synthetic estimate.
+                None means no battery channel: the reserve keeps its
+                synthetic depletion/restoration dynamics.
 
         Returns:
             The updated MetabolicState.
         """
-        # Depletion rate: 0.01 per unit of activity per update
-        depletion = activity_level * 0.01
-        # Restoration: 0.005 per update when at rest
-        restoration = (1.0 - activity_level) * 0.005
-
-        # Update energy
+        dt = min(max(dt, 0.0), 5.0)
+        # Depletion rate: 0.01 per unit of activity per second
+        depletion = activity_level * 0.01 * dt
+        # Restoration: 0.005 per second when at rest — weakened toward
+        # zero as the reserve empties (a fasting body that is nearly
+        # out of fuel cannot recover).
+        restoration = (1.0 - activity_level) * 0.005 * dt
+        if fed is False and energy_reserve is not None:
+            restoration *= min(1.0, energy_reserve / 0.3)
         self._metabolic_state.energy = max(
             0.0,
             min(1.0, self._metabolic_state.energy - depletion + restoration),
         )
 
-        # Glucose equivalent depletes more slowly (longer-term reserves)
-        glucose_depletion = activity_level * 0.005
-        glucose_restoration = (1.0 - activity_level) * 0.003
-        self._metabolic_state.glucose_equivalent = max(
-            0.0,
-            min(
-                1.0,
-                self._metabolic_state.glucose_equivalent - glucose_depletion + glucose_restoration,
-            ),
-        )
+        if energy_reserve is not None:
+            # The battery is the reserve. The mind's fuel gauge reads
+            # the body's own measurement, not a synthetic drift —
+            # charging refills it, discharging drains it.
+            self._metabolic_state.glucose_equivalent = min(1.0, max(0.0, energy_reserve))
+        else:
+            # No fuel gauge on this body — keep the synthetic dynamics.
+            glucose_depletion = activity_level * 0.005 * dt
+            glucose_restoration = (1.0 - activity_level) * 0.003 * dt
+            self._metabolic_state.glucose_equivalent = max(
+                0.0,
+                min(
+                    1.0,
+                    self._metabolic_state.glucose_equivalent
+                    - glucose_depletion
+                    + glucose_restoration,
+                ),
+            )
 
         # Prolonged activity without rest accelerates depletion
         if time_since_rest > 3600:  # > 1 hour without rest
             fatigue_factor = min(0.1, (time_since_rest - 3600) / 36000)
             self._metabolic_state.energy = max(
-                0.0, self._metabolic_state.energy - fatigue_factor * 0.01
+                0.0, self._metabolic_state.energy - fatigue_factor * 0.01 * dt
             )
 
         return self._metabolic_state
@@ -2786,14 +3117,14 @@ class EmotionalRegulator:
 
     # ─── Continuous regulation ────────────────────────────────────
 
-    def continuous_regulate(self, state: EmotionalState) -> dict[str, float]:
+    def continuous_regulate(self, state: EmotionalState, dt: float = 1.0) -> dict[str, float]:
         """Apply small continuous corrections every tick.
 
         Unlike the discrete _regulate method which fires every 1.5–3
         seconds with larger impulses, this method applies very small
-        proportional corrections every tick (every 0.1 seconds). The
-        corrections are proportional to the deviation from baseline
-        and much smaller than the discrete interventions.
+        proportional corrections each call. The corrections are
+        proportional to the deviation from baseline and much smaller
+        than the discrete interventions.
 
         This models the continuous homeostatic regulation that
         biological nervous systems perform — not waiting for a
@@ -2802,31 +3133,52 @@ class EmotionalRegulator:
 
         Args:
             state: The current emotional state.
+            dt: Seconds since the previous call. The impulse strength
+                scales with it so the regulation *rate* is invariant to
+                caller cadence — the heartbeat has historically called
+                this at ~1 s, so dt=1.0 reproduces the tuned strength;
+                faster or slower calls keep the same per-second pull
+                with finer or coarser granularity. Clamped to [0, 5] s
+                so a stall cannot deliver one oversized correction.
 
         Returns:
             A dict mapping chemical names to correction amounts.
             Chemicals with no correction needed are omitted.
         """
+        dt = min(max(dt, 0.0), 5.0)
         corrections: dict[str, float] = {}
+
+        # The vector the felt state carries also updates the felt
+        # calm on the interoceptive state — calm is read from her
+        # chemistry, not a channel. Done before the sleep skip:
+        # sleep is the deepest withdrawal of the excited arm and the
+        # signature must stay honest through it.
+        chemicals = getattr(state, "chemicals", {})
+        self._interoception.update_chemicals(chemicals)
 
         # Skip during sleep — different rules apply
         if state.label == "sleeping":
             return corrections
 
-        # Get chemical levels from the state
-        chemicals = getattr(state, "chemicals", {})
         if not chemicals:
             return corrections
 
         # Apply small proportional corrections for each chemical.
-        # Only the 12 classical neurotransmitters are included — the
+        # Only the 11 classical neurotransmitters are included — the
         # v3 chemicals (endocannabinoid, vasopressin, CRH, orexin,
         # epinephrine, melatonin) are excluded because they are
         # stress/circadian hormones, not homeostatically maintained.
         # CRH and cortisol are driven by the HPA axis cascade, orexin
         # and melatonin follow circadian rhythms, and endocannabinoid
-        # is synthesized on demand. Continuous homeostatic correction
-        # would fight these natural dynamics.
+        # is synthesized on demand. Adenosine is excluded for the same
+        # reason and more: it is Process S, owned by a dedicated
+        # accumulation/clearance mechanism and exempt even from the
+        # substrate's own homeostatic force. Pulling it toward baseline
+        # every heartbeat (−0.01/s at full deviation ≈ 600× the
+        # ~0.055/hr accumulation rate) erased sleep pressure faster
+        # than it could ever build — every NREM episode staged N1.
+        # Continuous homeostatic correction would fight these natural
+        # dynamics.
         chem_map = {
             "dopamine": CHEM_DOPAMINE,
             "serotonin": CHEM_SEROTONIN,
@@ -2838,7 +3190,6 @@ class EmotionalRegulator:
             "oxytocin": CHEM_OXYTOCIN,
             "endorphin": CHEM_ENDORPHIN,
             "histamine": CHEM_HISTAMINE,
-            "adenosine": CHEM_ADENOSINE,
             "bdnf": CHEM_BDNF,
         }
 
@@ -2848,10 +3199,10 @@ class EmotionalRegulator:
                 continue
 
             # Compute proportional correction (much smaller than
-            # discrete impulses — 1/10th the magnitude)
+            # discrete impulses — 1/10th the magnitude), scaled by the
+            # measured interval so cadence changes granularity, not rate.
             magnitude = compute_impulse_magnitude(chem_id, current)
-            # Scale down for continuous regulation
-            continuous_magnitude = magnitude * 0.1
+            continuous_magnitude = magnitude * 0.1 * dt
 
             # Only apply if the correction is meaningful
             if abs(continuous_magnitude) > 1e-5:
@@ -3015,9 +3366,7 @@ class HPAAxis:
         """
         intensity = max(0.0, min(1.0, intensity))
         self._state.stress_active = True
-        self._state.crh_level = min(
-            1.0, self._state.crh_level + intensity * self.CRH_ONSET_JUMP
-        )
+        self._state.crh_level = min(1.0, self._state.crh_level + intensity * self.CRH_ONSET_JUMP)
         if self._stress_onset_time is None:
             self._stress_onset_time = self._state.elapsed_time
             self._peak_reached = False
@@ -3137,7 +3486,7 @@ class HPAAxis:
             self._stress_onset_time is not None
             and not self._peak_reached
             and self._state.cortisol_level
-                < self._state.peak_cortisol - self.config.peak_cortisol_gate
+            < self._state.peak_cortisol - self.config.peak_cortisol_gate
         ):
             self._peak_reached = True
             if self._state.time_to_peak is None:
@@ -3434,17 +3783,13 @@ class AllostaticLoadTracker:
         if cortisol_level > self.CHRONIC_THRESHOLD:
             self._elevated_stress_duration += dt
         else:
-            self._elevated_stress_duration = max(
-                0.0, self._elevated_stress_duration - dt * 2.0
-            )
+            self._elevated_stress_duration = max(0.0, self._elevated_stress_duration - dt * 2.0)
 
         # Determine if stress is chronic (sustained elevation).
         # This is cortisol-duration evidence, deliberately independent
         # of the accumulated load: it answers "how long has this been
         # going", which the load integral cannot.
-        self._state.is_chronic = (
-            self._elevated_stress_duration >= self.CHRONIC_DURATION_SECONDS
-        )
+        self._state.is_chronic = self._elevated_stress_duration >= self.CHRONIC_DURATION_SECONDS
 
         # Check if the substrate is still connected.
         if self._time.monotonic() - self._last_substrate_update > self.SUBSTRATE_TIMEOUT:
@@ -3462,9 +3807,7 @@ class AllostaticLoadTracker:
         An isolated spike in one domain cannot define whole-system
         load, while persistent elevation across domains can.
         """
-        domains = sorted(
-            (self._state.inference_load, cortisol_level, self._state.body_stress)
-        )
+        domains = sorted((self._state.inference_load, cortisol_level, self._state.body_stress))
         return domains[1]
 
     def _integrate(self, burden: float, dt: float, rate: float) -> None:

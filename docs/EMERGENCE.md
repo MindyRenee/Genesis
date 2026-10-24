@@ -124,13 +124,20 @@ unwritten: ~7.6 h asleep/day, ~4 REM bouts/night, a ~99-minute REM
 cycle, first REM at 84 minutes.
 
 And the signature that this is a real dynamical system rather than a
-scripted imitation: **it gets one thing wrong in a way nobody coded**.
-In adults REM bouts lengthen toward morning; this network produces
-25, 33.5, 28.5, 21 minutes — the last is shortest. The discrepancy is
-pinned as an *ignored, failing* test
-(`rem_bouts_lengthen_across_the_night`, sleep_network.rs:479) rather
-than tuned away. Unanticipated failure modes are the strongest evidence
-of emergence: scripted systems don't surprise their authors.
+scripted imitation: **it gets one thing wrong in a way nobody coded —
+and the wrongness turned out to be inherited**. In adults REM bouts
+lengthen toward morning; this network produces 25.2, 33.5, 28.8, 21.2
+minutes — the last is shortest. For a while the discrepancy sat as an
+ignored, failing test. Then the upstream model
+(`DinizBehnBooth_SWnetworkModel.m`, ModelDB 244485) was rerun on
+2026-10-19 and produced the same rise-then-fall durations — the gap is
+the published model's, not a transcription error. The port is now
+pinned to the source's own bout durations by a passing test
+(`rem_bout_durations_match_the_source_model`, sleep_network.rs), and
+the mismatch with adult physiology is documented as the source's
+known limitation rather than tuned away. Unanticipated behaviors are
+the strongest evidence of emergence — even when the surprise is that
+the literature carries the bug too.
 
 ## Emergent pathologies — observed, diagnosed, fixed
 
@@ -189,10 +196,10 @@ PYTHONPATH=$G/genesis/python:$G/genesis-eval \
     python3 -m validation.run_probes --tier breakthrough
 cd $G/genesis-eval/validation/rust-probes && cargo test  # dose-response
 
-# the failing-on-purpose test
+# the source-fidelity pin (the upstream model's own REM bout durations)
 cd $G/genesis
 . ./scripts/cargo-env.sh && cargo test --release -- \
-    rem_bouts_lengthen_across_the_night --ignored
+    rem_bout_durations_match_the_source_model
 
 # live-state artifacts
 j=~/.local/share/genesis/cognitive_journal.jsonl

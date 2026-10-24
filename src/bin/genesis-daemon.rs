@@ -69,9 +69,15 @@ struct Config {
 
 impl Default for Config {
     fn default() -> Self {
+        // The shared resolution order — GENESIS_DATA_DIR, then the
+        // checkout's .genesis-data-dir pin, then XDG, then
+        // ~/.local/share — the same chain run.sh and every Python tool
+        // use. A bare launch (no --data-dir) must land on the same
+        // state tree they read, not a checkout-local ./genesis_data.
+        let data_dir = genesis::data_dir();
         Self {
-            data_dir: PathBuf::from("./genesis_data"),
-            socket_path: PathBuf::from("./genesis_data/genesis.sock"),
+            socket_path: data_dir.join("genesis.sock"),
+            data_dir,
             stm_capacity: 256,
             ltm_capacity: 65_536,
         }
@@ -80,6 +86,7 @@ impl Default for Config {
 
 fn parse_args() -> Config {
     let mut config = Config::default();
+    let mut socket_explicit = false;
     let mut args = std::env::args().skip(1);
 
     while let Some(arg) = args.next() {
@@ -90,7 +97,9 @@ fn parse_args() -> Config {
                     std::process::exit(1);
                 });
                 config.data_dir = PathBuf::from(dir);
-                config.socket_path = config.data_dir.join("genesis.sock");
+                if !socket_explicit {
+                    config.socket_path = config.data_dir.join("genesis.sock");
+                }
             }
             "--socket" => {
                 let path = args.next().unwrap_or_else(|| {
@@ -98,6 +107,7 @@ fn parse_args() -> Config {
                     std::process::exit(1);
                 });
                 config.socket_path = PathBuf::from(path);
+                socket_explicit = true;
             }
             "--stm-capacity" => {
                 let cap = args.next().unwrap_or_else(|| {
@@ -135,7 +145,9 @@ fn parse_args() -> Config {
                 println!("Usage: genesis-daemon [OPTIONS]");
                 println!();
                 println!("Options:");
-                println!("  --data-dir <dir>       Data directory (default: ./genesis_data)");
+                println!(
+                    "  --data-dir <dir>       Data directory (default: resolved — see data_dir.rs)"
+                );
                 println!(
                     "  --socket <path>        Unix socket path (default: <data-dir>/genesis.sock)"
                 );
@@ -335,9 +347,46 @@ fn main() {
         }
     };
 
+    // Continuity sentinel — record this boot and learn how the
+    // previous session ended. `dark_ms` comes from the state file's
+    // own last-write timestamp, measured by `MmapState::open` before
+    // it was overwritten; the sentinel supplies the *manner* of the
+    // stop. The mind reads the same file on wake, so an unclean stop
+    // — power loss, kill, crash — is something she knows happened,
+    // not a seam she trips over.
+    let boot = genesis::daemon::continuity::note_boot(
+        &config.data_dir,
+        !mmap.was_created(),
+        mmap.offline_gap_ms(),
+        now_ms,
+    );
+    if boot.had_previous && boot.prev_unclean {
+        let bound = if boot.dark_upper_bound {
+            "at least "
+        } else {
+            ""
+        };
+        eprintln!(
+            "[genesis] continuity: previous session left no clean stop \
+             (power loss, kill, or crash) — dark for {}{}",
+            bound,
+            genesis::daemon::continuity::fmt_dark(boot.dark_ms),
+        );
+    } else if boot.had_previous {
+        eprintln!(
+            "[genesis] continuity: previous session stopped cleanly — \
+             dark for {}",
+            genesis::daemon::continuity::fmt_dark(boot.dark_ms),
+        );
+    }
+
     eprintln!("[genesis]   stm entries: {}", stm.count());
     eprintln!("[genesis]   ltm episodes: {}", ltm.count());
     eprintln!("[genesis] Subcognitive initialized.");
+    eprintln!(
+        "[genesis]   provenance: 0x{:012x}",
+        genesis::field::provenance_fingerprint()
+    );
 
     // ── Wake recovery ──
     // If the daemon opened an existing state file (restart, not first
@@ -366,14 +415,16 @@ fn main() {
     let mmap = Arc::new(mmap);
 
     // Physical field probe — the body listening to its own substrate.
-    // A dedicated thread measures real electron-flow dynamics
+    // A dedicated thread measures real substrate dynamics
     // (instruction throughput, scheduler jitter, P-state transitions,
-    // interrupt flux) at ~250 Hz and decomposes them at the wave
-    // bands' center frequencies; the mind reads the signature over
+    // interrupt flux, and real power draw where sensors report it)
+    // at ~250 Hz and decomposes them at the wave bands' center
+    // frequencies; the mind reads the signature over
     // GET_FIELD_PROBE and injects it into the wave oscillator as
     // outer stimulus. The probe also writes a carrier — its work is
     // modulated at the body's own phase rhythm, so the die's real
-    // current carries a component at the organism's beat.
+    // current carries a component at the organism's beat (measured
+    // back through the power channel, not assumed).
     {
         use genesis::state::MentalPhase;
         let probe_mmap = mmap.clone();
@@ -421,10 +472,23 @@ fn main() {
     // handler. The handler wraps the TickLoop and dispatches reactive
     // commands to it, falling through to default_handler for
     // everything else.
+    // The autonomous fallback's own gears, published for
+    // GET_INTERNALS. The main loop below writes one snapshot per
+    // iteration; the IPC handler reads it. Everything inside is a
+    // plain copy, so a reader can never stall the fallback by
+    // holding the lock.
+    let auto_internals = Arc::new(Mutex::new(
+        genesis::daemon::adaptive::AutoSnapshot::default(),
+    ));
+
     let ipc_mmap = mmap.clone();
     let ipc_stm = stm.clone();
     let ipc_ltm = ltm.clone();
-    let handler = reactive_handler(tick_loop.clone(), config.data_dir.clone());
+    let handler = reactive_handler(
+        tick_loop.clone(),
+        config.data_dir.clone(),
+        auto_internals.clone(),
+    );
 
     let ipc_thread = match std::thread::Builder::new()
         .name("genesis-ipc".to_string())
@@ -467,39 +531,76 @@ fn main() {
     // outward action. Everything else the integrated tick does —
     // zone arbitration included — runs here, so no TickLoop method
     // only lives in the test-only reference path.
-    let mut last_staleness_check = std::time::Instant::now();
-    const STALENESS_CHECK_INTERVAL: Duration = Duration::from_secs(60);
-    let mut last_auto_associate = std::time::Instant::now();
-    let mut last_auto_dream = std::time::Instant::now();
-    let mut last_auto_sensor = std::time::Instant::now();
-    let mut last_auto_sync = std::time::Instant::now();
-    let mut last_auto_body = std::time::Instant::now();
-    let mut last_auto_zone = std::time::Instant::now();
-    let mut last_auto_model_save = std::time::Instant::now();
-    const AUTO_ASSOCIATE_INTERVAL: Duration = Duration::from_secs(10);
-    const AUTO_DREAM_INTERVAL: Duration = Duration::from_secs(4);
-    const AUTO_SENSOR_INTERVAL: Duration = Duration::from_secs(5);
-    const AUTO_SYNC_INTERVAL: Duration = Duration::from_secs(20);
-    const AUTO_BODY_INTERVAL: Duration = Duration::from_secs(10);
-    // Zone arbitration runs at most every few seconds past the
-    // lease — intentions evolve slowly, and each pass writes a
-    // manifest transaction plus a possible LTM trace.
-    const AUTO_ZONE_INTERVAL: Duration = Duration::from_secs(5);
-    const AUTO_MODEL_SAVE_INTERVAL: Duration = Duration::from_secs(60);
+    // Adaptive wall-clock gates, not fixed Instant periods: each gear
+    // spins at the rate its own signal demands, bounded so nothing
+    // stalls or redlines (see src/daemon/adaptive.rs). Nominal
+    // periods match the old constants; [min, max] is the operating
+    // range the signal may move within.
+    use genesis::daemon::AdaptiveGate;
+    let mut staleness_gate = AdaptiveGate::new(60_000, 10_000, 300_000);
+    let mut assoc_gate = AdaptiveGate::new(10_000, 3_000, 60_000);
+    let mut dream_gate = AdaptiveGate::new(4_000, 2_000, 30_000);
+    let mut sensor_gate = AdaptiveGate::new(5_000, 2_000, 15_000);
+    let mut sync_gate = AdaptiveGate::new(20_000, 5_000, 100_000);
+    let mut body_gate = AdaptiveGate::new(10_000, 3_000, 30_000);
+    // Zone arbitration nominally every few seconds past the lease —
+    // intentions evolve slowly, and each pass writes a manifest
+    // transaction plus a possible LTM trace.
+    let mut zone_gate = AdaptiveGate::new(5_000, 2_000, 30_000);
+    let mut model_save_gate = AdaptiveGate::new(60_000, 20_000, 300_000);
+    let mut last_model_save_ticks = 0u32;
+    // The fallback's own axle is adaptive too: deep NREM idles at
+    // ~1 Hz, REM at 2 Hz, and anything else holds the 5 Hz reference
+    // cadence the dynamics were tuned at.
+    let mut axle_ms: u64 = genesis::daemon::tick::AUTONOMOUS_INTERVAL_MS;
     while !shutdown_flag.load(std::sync::atomic::Ordering::Relaxed)
         && !ipc_shutdown_flag.load(std::sync::atomic::Ordering::Relaxed)
     {
-        std::thread::sleep(Duration::from_millis(
-            genesis::daemon::tick::AUTONOMOUS_INTERVAL_MS,
-        ));
+        std::thread::sleep(Duration::from_millis(axle_ms));
+        let now_ms = genesis::daemon::tick::current_ms();
+
+        // One read feeds the axle and the phase-driven gates below.
+        let phase = mmap.read_consistent().map(|s| s.zones.phase());
+        axle_ms = match phase {
+            Some(genesis::state::MentalPhase::NREM) => 1_000,
+            Some(genesis::state::MentalPhase::REM) => 500,
+            _ => genesis::daemon::tick::AUTONOMOUS_INTERVAL_MS,
+        };
+
+        // Publish the fallback's own gears for GET_INTERNALS — one
+        // snapshot per iteration, before any gate fires this pass.
+        // Placed ahead of every `continue` below so the view stays
+        // current whether or not the lease is held.
+        if let Ok(mut snap) = auto_internals.lock() {
+            snap.gates.clear();
+            snap.gates.extend_from_slice(&[
+                ("staleness", staleness_gate.snapshot()),
+                ("assoc", assoc_gate.snapshot()),
+                ("dream", dream_gate.snapshot()),
+                ("sensor", sensor_gate.snapshot()),
+                ("sync", sync_gate.snapshot()),
+                ("body", body_gate.snapshot()),
+                ("zone", zone_gate.snapshot()),
+                ("model_save", model_save_gate.snapshot()),
+            ]);
+            snap.axle_ms = axle_ms;
+            snap.last_model_save_ticks = last_model_save_ticks;
+        }
 
         // Staleness detection runs regardless of lease — a crashed
         // mind's modules must read Stopped even while the fallback
-        // keeps the body alive.
-        if last_staleness_check.elapsed() >= STALENESS_CHECK_INTERVAL {
-            last_staleness_check = std::time::Instant::now();
+        // keeps the body alive. A live mind warrants close watch; an
+        // absent one drifts the check toward the ceiling.
+        if staleness_gate.due(now_ms) {
             match tick_loop.try_lock() {
-                Ok(mut tl) => tl.check_staleness(&mmap),
+                Ok(mut tl) => {
+                    tl.check_staleness(&mmap);
+                    if tl.mind_lease_expired() {
+                        staleness_gate.relax();
+                    } else {
+                        staleness_gate.demand();
+                    }
+                }
                 Err(e) => {
                     lock_refusal("tick_loop", e);
                 }
@@ -572,34 +673,69 @@ fn main() {
         // Consolidation is self-gating (plasticity, overwhelm, empty
         // STM) — call whenever autonomous and let it decide.
         tl.consolidate(&mmap, &stm, ltm_store);
-        if last_auto_associate.elapsed() >= AUTO_ASSOCIATE_INTERVAL {
-            last_auto_associate = std::time::Instant::now();
-            tl.associate(&mmap, ltm_store);
-        }
-        // Dream only when sleeping — same gate the integrated tick
-        // uses (phase or zone), so waking autonomous never dreams.
-        if last_auto_dream.elapsed() >= AUTO_DREAM_INTERVAL {
-            let sleeping = mmap.read_consistent().is_some_and(|s| {
-                use genesis::state::{CognitiveZone, MentalPhase};
-                let p = s.zones.phase();
-                p == MentalPhase::NREM
-                    || p == MentalPhase::REM
-                    || s.zones.zone() == CognitiveZone::Sleeping
-            });
-            if sleeping {
-                last_auto_dream = std::time::Instant::now();
-                tl.dream(&mmap, ltm_store);
+        if assoc_gate.due(now_ms) {
+            if tl.associate(&mmap, ltm_store) > 0 {
+                assoc_gate.demand();
+            } else {
+                assoc_gate.relax();
             }
         }
-        if last_auto_sensor.elapsed() >= AUTO_SENSOR_INTERVAL {
-            last_auto_sensor = std::time::Instant::now();
-            tl.read_sensors(&mmap);
+        // Dream only when sleeping — the body's own phase is the gate,
+        // so waking autonomous never dreams. REM snaps the gate fast;
+        // NREM drifts it sparse; waking relaxes it toward its ceiling.
+        if dream_gate.due(now_ms) {
+            use genesis::state::MentalPhase;
+            let sleeping = phase.is_some_and(|p| p == MentalPhase::NREM || p == MentalPhase::REM);
+            if sleeping {
+                tl.dream(&mmap, ltm_store);
+                if phase == Some(MentalPhase::REM) {
+                    dream_gate.demand();
+                } else {
+                    dream_gate.relax();
+                }
+            } else {
+                dream_gate.relax();
+            }
         }
-        // Intention expiry + zone arbitration + trace. Same
-        // 5 s gating rationale as above; skipped while the mind
-        // holds the lease by the outer check.
-        if last_auto_zone.elapsed() >= AUTO_ZONE_INTERVAL {
-            last_auto_zone = std::time::Instant::now();
+        if sensor_gate.due(now_ms) {
+            let body = tl.read_sensors(&mmap);
+            // The brainstem-level interoceptive reflex. With the
+            // mind's lease expired there is no cortex on the wire
+            // to perceive the body, so the body applies its own
+            // afferent spec directly — the NTS/parabrachial →
+            // autonomic loop that runs below cortex in every animal
+            // (lamina I → catecholamine cell groups → hypothalamic
+            // neuroendocrine; PBN → preoptic drive). When the lease
+            // IS held this block never runs: the same BodyState is
+            // published for the mind's own brainstem relay, which
+            // routes it through the regions — the daemon never
+            // double-drives a response the mind is authoring.
+            if let Err(e) = mmap.modify(now_ms, |state| {
+                for (id, mag) in tl.interoceptor.neuro_impulses(&body, &state.neurochemicals) {
+                    state.neurochemicals.apply_impulse_capped(id, mag, now_ms);
+                }
+            }) {
+                eprintln!("[genesis] WARNING: interoceptive reflex failed: {e}");
+            }
+            // Strain on the just-read body shapes the next poll:
+            // a pressured substrate is watched closely.
+            sensor_gate.drive(
+                body.stress_load
+                    .max(body.psi_cpu)
+                    .max(body.psi_mem)
+                    .max(body.throttle_state),
+            );
+        }
+        // Intention expiry + zone arbitration + trace. Sleep drifts
+        // the cadence — few zone decisions arrive while dreaming;
+        // wake keeps it near the nominal few seconds. Skipped while
+        // the mind holds the lease by the outer check.
+        zone_gate.drive(match phase {
+            Some(genesis::state::MentalPhase::NREM) => 0.0,
+            Some(genesis::state::MentalPhase::REM) => 0.3,
+            _ => 1.0,
+        });
+        if zone_gate.due(now_ms) {
             tl.arbitrate_zone(&mmap, ltm_store);
         }
         // Guards drop here (LTM, then TickLoop).
@@ -608,11 +744,18 @@ fn main() {
 
         // Body-control recommendation publish (compute + publish
         // only — never application). Needs the TickLoop alone.
-        if last_auto_body.elapsed() >= AUTO_BODY_INTERVAL {
-            last_auto_body = std::time::Instant::now();
+        if body_gate.due(now_ms) {
             match tick_loop.try_lock() {
                 Ok(mut tl) if tl.mind_lease_expired() => {
                     tl.publish_body_recommendation(&mmap);
+                    // Thermal/throttle pressure on the last-read body
+                    // revisits policy sooner; a cool machine drifts.
+                    let b = &tl.last_body_state;
+                    body_gate.drive(
+                        b.throttle_state
+                            .max(b.thermoregulatory_effort)
+                            .max(b.psi_cpu),
+                    );
                 }
                 Ok(_) => {}
                 Err(e) => {
@@ -624,12 +767,19 @@ fn main() {
         // Generative-model checkpoint so autonomous learning is
         // durable. The mind saves every 60 s while alive; this covers
         // mindless stretches. Shutdown always saves regardless.
-        if last_auto_model_save.elapsed() >= AUTO_MODEL_SAVE_INTERVAL {
-            last_auto_model_save = std::time::Instant::now();
+        // Demand follows learning: new inference ticks mean new model
+        // state worth persisting; an unchanged engine relaxes.
+        if model_save_gate.due(now_ms) {
             match tick_loop.try_lock() {
                 Ok(tl) if tl.mind_lease_expired() => {
-                    if !tl.save_inference_model(&config.data_dir) {
-                        eprintln!("[genesis] WARNING: autonomous inference save failed");
+                    if tl.inference_engine.tick_count() != last_model_save_ticks {
+                        if !tl.save_inference_model(&config.data_dir) {
+                            eprintln!("[genesis] WARNING: autonomous inference save failed");
+                        }
+                        last_model_save_ticks = tl.inference_engine.tick_count();
+                        model_save_gate.demand();
+                    } else {
+                        model_save_gate.relax();
                     }
                 }
                 Ok(_) => {}
@@ -641,8 +791,14 @@ fn main() {
 
         // Periodic non-blocking flush so autonomous life is durable.
         // Shutdown and explicit SYNC still use the blocking path.
-        if last_auto_sync.elapsed() >= AUTO_SYNC_INTERVAL {
-            last_auto_sync = std::time::Instant::now();
+        // Plasticity drives the period — same continuous form as the
+        // integrated tick's sync gate.
+        let plasticity = mmap
+            .read_consistent()
+            .map(|s| s.memory.plasticity_gate)
+            .unwrap_or(0.5);
+        sync_gate.drive(plasticity);
+        if sync_gate.due(now_ms) {
             let _ = mmap.sync_async();
         }
     }
@@ -746,6 +902,15 @@ fn main() {
             clean_shutdown = false;
         }
     }
+
+    // Mark the session's clean stop — the stop itself was deliberate
+    // regardless of whether every sync succeeded. Any exit that never
+    // reaches here leaves the sentinel open, and the next boot reads
+    // it as the unclean stop it was.
+    genesis::daemon::continuity::note_clean_stop(
+        &config.data_dir,
+        genesis::daemon::tick::current_ms(),
+    );
 
     if !clean_shutdown {
         eprintln!("[genesis] Shutdown incomplete — persistent state may be stale.");

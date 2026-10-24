@@ -204,8 +204,12 @@ class ThoughtComposer:
         # each attempt draws different facts, so retries produce
         # different sentences.
         content = self._weave_non_repetitive(
-            concept_name, knowledge, reasoning_results, emotion,
-            focused=focused, mode=mode,
+            concept_name,
+            knowledge,
+            reasoning_results,
+            emotion,
+            focused=focused,
+            mode=mode,
         )
         if content is None:
             return None
@@ -218,7 +222,8 @@ class ThoughtComposer:
         # the user wants facts, not speculation.
         if focused:
             reasoning_conclusions = [
-                r.conclusion for r in reasoning_results[:2]
+                r.conclusion
+                for r in reasoning_results[:2]
                 if r.reasoning_type != ReasoningType.HYPOTHESIS
             ]
         else:
@@ -272,8 +277,12 @@ class ThoughtComposer:
         """
         for _attempt in range(3):
             content = self._weave_knowledge(
-                concept_name, knowledge, reasoning_results, emotion,
-                focused=focused, mode=mode,
+                concept_name,
+                knowledge,
+                reasoning_results,
+                emotion,
+                focused=focused,
+                mode=mode,
             )
             if not content:
                 return None
@@ -469,9 +478,7 @@ class ThoughtComposer:
                     return result
         return None
 
-    def _check_dependency(
-        self, source: str, target: str, a: str, b: str
-    ) -> ReasoningResult | None:
+    def _check_dependency(self, source: str, target: str, a: str, b: str) -> ReasoningResult | None:
         """Check if source depends_on target and explain why.
 
         Returns the reasoning result if a DEPENDS_ON edge exists
@@ -728,10 +735,7 @@ class ThoughtComposer:
                         emotion=emotion.label,
                         topics=[a, b],
                         confidence=why_result.confidence,
-                        metadata=(
-                            {"qualification": qualification}
-                            if qualification else {}
-                        ),
+                        metadata=({"qualification": qualification} if qualification else {}),
                     )
 
             # 2. Try explain_relation — finds direct edges, multi-hop
@@ -764,7 +768,10 @@ class ThoughtComposer:
         return None
 
     def _build_candidate_pairs(
-        self, connected_pair, topics: list[str], lower_q: str,
+        self,
+        connected_pair,
+        topics: list[str],
+        lower_q: str,
     ) -> list[tuple[str, str]]:
         """Build candidate concept pairs for causal/evaluative questions.
 
@@ -777,8 +784,12 @@ class ThoughtComposer:
             candidate_pairs.append(connected_pair)
         explicit = [t for t in topics if t.lower() in lower_q]
         _STRUCTURE_POS = {
-            "pronoun", "article", "conjunction",
-            "preposition", "determiner", "auxiliary",
+            "pronoun",
+            "article",
+            "conjunction",
+            "preposition",
+            "determiner",
+            "auxiliary",
         }
         content_explicit = []
         for t in explicit:
@@ -795,9 +806,7 @@ class ThoughtComposer:
                 candidate_pairs.append(pair)
         return candidate_pairs
 
-    def _collect_qualification(
-        self, subject: str, object_: str
-    ) -> dict[str, Any] | None:
+    def _collect_qualification(self, subject: str, object_: str) -> dict[str, Any] | None:
         """Collect qualification data showing what else matters beyond
         the direct relationship.
 
@@ -931,8 +940,12 @@ class ThoughtComposer:
         # If ALL topics are structure words (e.g., "What is the?"),
         # don't sort — the user is asking about that specific word.
         _STRUCTURE_POS = {
-            "pronoun", "article", "conjunction",
-            "preposition", "determiner", "auxiliary",
+            "pronoun",
+            "article",
+            "conjunction",
+            "preposition",
+            "determiner",
+            "auxiliary",
         }
 
         def _is_structure_word(topic: str) -> bool:
@@ -1015,9 +1028,7 @@ class ThoughtComposer:
         has_known = bool(rel_facts) or any(
             r.reasoning_type != ReasoningType.HYPOTHESIS for r in reasoning_results
         )
-        has_unknown = any(
-            r.reasoning_type == ReasoningType.HYPOTHESIS for r in reasoning_results
-        )
+        has_unknown = any(r.reasoning_type == ReasoningType.HYPOTHESIS for r in reasoning_results)
         if has_known and has_unknown:
             confidence = 0.5
         elif has_known:
@@ -1031,8 +1042,12 @@ class ThoughtComposer:
         # from what it knows, it stays silent rather than reciting
         # a pre-written reflection template.
         content = self._weave_knowledge(
-            topic, knowledge, reasoning_results, emotion,
-            focused=False, mode="full",
+            topic,
+            knowledge,
+            reasoning_results,
+            emotion,
+            focused=False,
+            mode="full",
         )
 
         if not content:
@@ -1083,16 +1098,11 @@ class ThoughtComposer:
 
         return None
 
-    def _find_hypothesis_between(
-        self, c1: str, c2: str, emotion: EmotionalState
-    ) -> Thought | None:
+    def _find_hypothesis_between(self, c1: str, c2: str, emotion: EmotionalState) -> Thought | None:
         """Find a hypothesis connecting two concepts and express it as a thought."""
         results = self.reasoner.reason_about(c1)
         for r in results:
-            if (
-                r.reasoning_type == ReasoningType.HYPOTHESIS
-                and c2.lower() in r.conclusion.lower()
-            ):
+            if r.reasoning_type == ReasoningType.HYPOTHESIS and c2.lower() in r.conclusion.lower():
                 return Thought(
                     content=r.conclusion,
                     intent="reflect",
@@ -1298,9 +1308,7 @@ class ThoughtComposer:
 
         return knowledge[: depth + 4]  # limit to depth+4 facts
 
-    def _extract_definition(
-        self, knowledge: list[tuple[str, str, float]]
-    ) -> str | None:
+    def _extract_definition(self, knowledge: list[tuple[str, str, float]]) -> str | None:
         """Extract the definition from a knowledge list, if present."""
         for rel, target, _weight in knowledge:
             if rel == "is defined as" and target and target != "NO DEF":
@@ -1395,8 +1403,7 @@ class ThoughtComposer:
 
         # Filter reasoning that would leak code concepts into speech.
         clean_reasoning = [
-            r for r in reasoning_results
-            if not self._is_noisy_conclusion(r.conclusion)
+            r for r in reasoning_results if not self._is_noisy_conclusion(r.conclusion)
         ]
 
         # Add reasoning conclusions. The _is_noisy_conclusion filter
@@ -1534,10 +1541,21 @@ class ThoughtComposer:
             return True
         # Subject or target is a bare relation verb (without "to"/"of")
         relation_verbs = {
-            "related", "relates", "connects", "connected",
-            "similar", "opposite", "contradicts",
-            "causes", "creates", "enables", "depends", "emerges",
-            "produces", "leads", "harms",
+            "related",
+            "relates",
+            "connects",
+            "connected",
+            "similar",
+            "opposite",
+            "contradicts",
+            "causes",
+            "creates",
+            "enables",
+            "depends",
+            "emerges",
+            "produces",
+            "leads",
+            "harms",
         }
         if subj_lower in relation_verbs or targ_lower in relation_verbs:
             return True
@@ -1558,17 +1576,41 @@ class ThoughtComposer:
             return True
         # Targets that are just relation verb phrases
         if targ_lower in {
-            "related to", "connects to", "has to do with",
-            "part of", "is a", "is an", "is the",
-            "similar to", "opposite of",
-            "related", "relates", "connects", "connected",
-            "similar", "opposite", "instance",
+            "related to",
+            "connects to",
+            "has to do with",
+            "part of",
+            "is a",
+            "is an",
+            "is the",
+            "similar to",
+            "opposite of",
+            "related",
+            "relates",
+            "connects",
+            "connected",
+            "similar",
+            "opposite",
+            "instance",
         }:
             return True
         # Pure function words
-        if targ_lower in {"is", "are", "was", "were", "be", "been",
-                          "yes", "no", "true", "false",
-                          "thing", "something", "anything", "everything"}:
+        if targ_lower in {
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "yes",
+            "no",
+            "true",
+            "false",
+            "thing",
+            "something",
+            "anything",
+            "everything",
+        }:
             return True
         return False
 
@@ -1590,32 +1632,91 @@ class ThoughtComposer:
         existing_text = " ".join(parts).lower()
         # Remove common stopwords — they don't carry semantic content
         _STOPWORDS = {
-            "a", "an", "the", "is", "are", "was", "were", "be", "been",
-            "being", "have", "has", "had", "do", "does", "did", "will",
-            "would", "could", "should", "may", "might", "must", "can",
-            "of", "to", "in", "on", "at", "by", "for", "with", "from",
-            "as", "and", "or", "but", "not", "no", "if", "then", "that",
-            "this", "these", "those", "it", "its", "i", "you", "he",
-            "she", "they", "we", "me", "him", "her", "them", "us",
-            "my", "your", "his", "their", "our", "who", "what", "which",
-            "how", "why", "when", "where", "through", "also", "because",
+            "a",
+            "an",
+            "the",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "must",
+            "can",
+            "of",
+            "to",
+            "in",
+            "on",
+            "at",
+            "by",
+            "for",
+            "with",
+            "from",
+            "as",
+            "and",
+            "or",
+            "but",
+            "not",
+            "no",
+            "if",
+            "then",
+            "that",
+            "this",
+            "these",
+            "those",
+            "it",
+            "its",
+            "i",
+            "you",
+            "he",
+            "she",
+            "they",
+            "we",
+            "me",
+            "him",
+            "her",
+            "them",
+            "us",
+            "my",
+            "your",
+            "his",
+            "their",
+            "our",
+            "who",
+            "what",
+            "which",
+            "how",
+            "why",
+            "when",
+            "where",
+            "through",
+            "also",
+            "because",
         }
         # Words must be tokenized without punctuation — "mammal."
         # (with the sentence-final period) never equals "mammal" and
         # silently drops the overlap below the dedup threshold.
-        existing_content = (
-            set(re.findall(r"[a-z0-9']+", existing_text)) - _STOPWORDS
-        )
+        existing_content = set(re.findall(r"[a-z0-9']+", existing_text)) - _STOPWORDS
 
         filtered: list[ReasoningResult] = []
         for r in reasoning_results:
             # Strip parenthetical asides for comparison
             conclusion_text = re.sub(r"\s*\([^)]*\)", "", r.conclusion)
             conclusion_text = conclusion_text.replace("_", " ").lower()
-            conclusion_words = (
-                set(re.findall(r"[a-z0-9']+", conclusion_text))
-                - _STOPWORDS
-            )
+            conclusion_words = set(re.findall(r"[a-z0-9']+", conclusion_text)) - _STOPWORDS
             if not conclusion_words:
                 continue
             # If all content words of the conclusion already appear in
@@ -1655,10 +1756,7 @@ class ThoughtComposer:
             # Exclude hypotheses in focused mode — the user wants
             # facts, not transitive speculation. Only include
             # DEDUCTIVE, CAUSAL, and ANALOGICAL results.
-            factual = [
-                r for r in reasoning_results
-                if r.reasoning_type != ReasoningType.HYPOTHESIS
-            ]
+            factual = [r for r in reasoning_results if r.reasoning_type != ReasoningType.HYPOTHESIS]
             if not factual:
                 return
             selected = factual[:1]
@@ -1751,14 +1849,8 @@ class ThoughtComposer:
         #    the combination of this concept and a close neighbor.
         #    This is gated by creativity (high creativity enables deeper
         #    associative leaps) and only fires occasionally to avoid noise.
-        if (
-            emotion.creativity > 0.4
-            and self._rng.random() < 0.3
-            and discovered_related is not None
-        ):
-            self._weave_compositional_discovery(
-                parts, concept_name, discovered_related, emotion
-            )
+        if emotion.creativity > 0.4 and self._rng.random() < 0.3 and discovered_related is not None:
+            self._weave_compositional_discovery(parts, concept_name, discovered_related, emotion)
 
     def _weave_compositional_discovery(
         self,
@@ -1794,9 +1886,8 @@ class ThoughtComposer:
                 continue
             edges_a = self.network.get_edges(concept_a, direction="out")
             edges_b = self.network.get_edges(concept_b, direction="out")
-            already_known = (
-                any(e.target == discovered for e in edges_a)
-                or any(e.target == discovered for e in edges_b)
+            already_known = any(e.target == discovered for e in edges_a) or any(
+                e.target == discovered for e in edges_b
             )
             if already_known:
                 continue
@@ -1817,9 +1908,7 @@ class ThoughtComposer:
             parts.append(phrase)
             break  # One compositional discovery is enough per thought
 
-    def _weave_followup(
-        self, parts: list[str], concept_name: str, emotion: EmotionalState
-    ) -> None:
+    def _weave_followup(self, parts: list[str], concept_name: str, emotion: EmotionalState) -> None:
         """Append a follow-up question or personal reflection (creativity-gated)."""
         if emotion.creativity > 0.3 and self._rng.random() < 0.5:
             self._weave_followup_question(parts, concept_name, emotion)
@@ -1837,7 +1926,7 @@ class ThoughtComposer:
         if not q_data:
             return
         # Compose the question text through the GenerativeLanguage
-        if hasattr(self, '_language') and self._language:
+        if hasattr(self, "_language") and self._language:
             q_text = self._language.compose_question(q_data, emotion)
             if q_text:
                 parts.append(q_text)
@@ -1880,17 +1969,15 @@ class ThoughtComposer:
             if subj_lower in {"she", "he", "they", "it"}:
                 subject_phrase = subj_lower
             elif subj_lower in {"her", "him", "them"}:
-                subject_phrase = {"her": "she", "him": "he",
-                                  "them": "they"}[subj_lower]
+                subject_phrase = {"her": "she", "him": "he", "them": "they"}[subj_lower]
             else:
                 # Pronouns are learned, not assigned — "genesis"
                 # resolves to "it" unless the network has a learned
                 # gender property for it.
                 from temporal_lobe.morphology import person_pronoun
+
                 ref = "genesis" if subj_lower in {"i", "me"} else subject
-                subject_phrase, _plural = person_pronoun(
-                    ref, self.network
-                )
+                subject_phrase, _plural = person_pronoun(ref, self.network)
         else:
             subject_phrase = subject
 
@@ -1901,6 +1988,7 @@ class ThoughtComposer:
         # Try graph-based verb lookup first — construct phrasings from
         # relation verbs retrieved via EXPRESSES edges from hubs.
         from temporal_lobe.concepts import RelationType as _RT
+
         rt_match = None
         for rt in _RT:
             if rt.value == relation or rt.value == relation.replace(" ", "_"):
@@ -1936,6 +2024,7 @@ class ThoughtComposer:
                 # "Dreams relates to" → "Dreams relate to"
                 # "Memory causes" → "Memory causes" (singular, no change)
                 from temporal_lobe.morphology import agree_verb_phrase, copula
+
                 is_plural = not use_pronoun and copula(subject) == "are"
                 options = []
                 for verb in graph_verbs:
@@ -2014,7 +2103,7 @@ class ThoughtComposer:
         if emotion.label and emotion.label != "neutral":
             emotion_words = self.network.find_emotion_words(emotion.label)
             if emotion_words:
-                word = emotion_words[0].replace('_', ' ')
+                word = emotion_words[0].replace("_", " ")
                 parts.append(f"feeling {word}")
 
         # Sentence-case the actual reasoning conclusion.
@@ -2028,7 +2117,7 @@ class ThoughtComposer:
         if result.confidence < 0.5 and emotion.has_cause:
             cause_words = self.network.find_cause_words(emotion.cause)
             if cause_words:
-                parts.append(cause_words[0].replace('_', ' ').capitalize() + ".")
+                parts.append(cause_words[0].replace("_", " ").capitalize() + ".")
 
         # Join as distinct sentences. Strip any existing final
         # punctuation from each part so we don't get double periods.
@@ -2142,10 +2231,7 @@ def _all_resolutions(word: str, network) -> list[str]:
         if word.endswith("es"):
             if network.get_concept(word[:-2]) and word[:-2] not in results:
                 results.append(word[:-2])
-            if (
-                network.get_concept(word[:-2] + "ing")
-                and word[:-2] + "ing" not in results
-            ):
+            if network.get_concept(word[:-2] + "ing") and word[:-2] + "ing" not in results:
                 results.append(word[:-2] + "ing")
     return results
 
@@ -2196,4 +2282,3 @@ def _split_definition(
         else:
             rel_facts_raw.append((rel, target, weight))
     return definition, rel_facts_raw
-

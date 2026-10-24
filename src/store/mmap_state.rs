@@ -83,13 +83,17 @@ use std::path::Path;
 use core::sync::atomic::{AtomicU64, Ordering, fence};
 
 use libc::{
-    LOCK_EX, LOCK_NB, LOCK_UN, MAP_FAILED, MAP_SHARED, MS_ASYNC, MS_SYNC, PROT_READ, PROT_WRITE,
-    c_void, close, fdatasync, flock, ftruncate, mmap, msync, munmap,
+    LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN, MAP_FAILED, MAP_SHARED, MS_ASYNC, MS_SYNC, PROT_READ,
+    PROT_WRITE, c_void, close, fdatasync, flock, ftruncate, mmap, msync, munmap,
 };
 
 use crate::state::legacy_v3::GenesisCoreStateV3;
 use crate::state::legacy_v4::GenesisCoreStateV4;
 use crate::state::{CoreStateError, GenesisCoreState};
+
+/// Provenance marker — one letter of the creator lattice (see
+/// PROVENANCE.md) — the persistence layer itself carries one.
+pub(crate) const MARKER_G07: u64 = 0x4753_0752_4594_E4D0;
 
 /// The logical file size — one 4K page. The state struct (3480 bytes)
 /// fits comfortably, with the rest as padding.
@@ -204,6 +208,12 @@ pub struct MmapState {
     /// on this rather than risk writing to a potentially-torn shared
     /// state.
     write_lock: std::sync::Mutex<()>,
+    /// How long the body was dark before this open, in milliseconds —
+    /// `now - header.last_updated` measured before the open path
+    /// overwrote it. Zero for a newly created state. The daemon's
+    /// continuity sentinel reports this so the mind knows how long
+    /// the interruption lasted, not just that it happened.
+    offline_ms: u64,
 }
 
 // SAFETY: `MmapState` can be sent between threads and shared by
@@ -349,6 +359,7 @@ impl MmapState {
             fd,
             created: true,
             write_lock: std::sync::Mutex::new(()),
+            offline_ms: 0,
         })
     }
 
@@ -496,6 +507,15 @@ impl MmapState {
                     if legacy.header.state_size as usize
                         != core::mem::size_of::<GenesisCoreStateV4>()
                     {
+                        // SAFETY: `fd`/`ptr` are the valid, exclusively
+                        // owned descriptors of the mapping made above;
+                        // unlock before unmapping and never touch
+                        // either again on this path.
+                        unsafe {
+                            Self::unlock_file(fd);
+                            munmap(ptr as *mut c_void, mapped_len());
+                            close(fd);
+                        }
                         return Err(StateFileError::VerificationFailed(e));
                     }
                     let widened = legacy.into_current();
@@ -527,6 +547,15 @@ impl MmapState {
                     {
                         // A v3 label on a file of some other size is a
                         // damaged or foreign file, not a migration.
+                        // SAFETY: `fd`/`ptr` are the valid, exclusively
+                        // owned descriptors of the mapping made above;
+                        // unlock before unmapping and never touch
+                        // either again on this path.
+                        unsafe {
+                            Self::unlock_file(fd);
+                            munmap(ptr as *mut c_void, mapped_len());
+                            close(fd);
+                        }
                         return Err(StateFileError::VerificationFailed(e));
                     }
                     let widened = legacy.into_current();
@@ -601,6 +630,43 @@ impl MmapState {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
+        // Offline rest: the persisted `last_updated` is the last moment
+        // the body was live, so the gap to now is downtime the
+        // integrator never saw. For Process S that gap is rest — the
+        // glymphatic channel clears adenosine whether the body is
+        // asleep or powered off — so apply the same sleep-side decay
+        // the per-tick integrator uses (chi_s = 4.2 h,
+        // Daan/Beersma/Borbély 1984) over the measured gap. A
+        // seconds-long restart keeps the day's accumulated pressure;
+        // an overnight outage clears it. This must run here, before
+        // `last_updated` is overwritten below — and it replaces the
+        // flat "restart ≈ slept" reset the mind used to apply at
+        // launch, which on a frequently restarted host pinned
+        // adenosine at the resting floor so the homeostat could never
+        // reach sleep onset.
+        let offline_ms = open_now_ms.saturating_sub(snapshot.header.last_updated);
+        let offline_hours = offline_ms as f64 / 3_600_000.0;
+        if offline_hours > 0.0 {
+            let adn = &mut snapshot.neurochemicals.chemicals
+                [crate::state::NeurochemicalId::Adenosine as usize];
+            let lower_asymptote = 0.20_f64;
+            let level = f64::from(adn.level);
+            let rested = lower_asymptote
+                + (-offline_hours
+                    / f64::from(
+                        crate::state::NeuroTickParams::DEFAULT.adenosine_clearance_tau_hours,
+                    ))
+                .exp()
+                    * (level - lower_asymptote);
+            let rested = crate::state::finite_clamp(rested as f32, 0.0, 1.0);
+            if level - f64::from(rested) > 0.005 {
+                eprintln!(
+                    "[state] offline rest: {offline_hours:.2}h down, \
+                     adenosine {level:.2} -> {rested:.2}"
+                );
+            }
+            adn.level = rested;
+        }
         snapshot
             .neurochemicals
             .set_circadian_phase(local_phase_of_day(open_now_ms));
@@ -684,6 +750,7 @@ impl MmapState {
             fd,
             created: false,
             write_lock: std::sync::Mutex::new(()),
+            offline_ms,
         })
     }
 
@@ -703,6 +770,16 @@ impl MmapState {
         }
     }
     // ─── Reads ───────────────────────────────────────────────────
+
+    /// How long the body was dark before this `open`, in milliseconds.
+    ///
+    /// Zero for a state this process created (or for a file whose
+    /// `last_updated` was in the future — the subtraction saturates).
+    /// See [`Self::open`]'s offline-rest block for how the same gap
+    /// feeds adenosine clearance.
+    pub fn offline_gap_ms(&self) -> u64 {
+        self.offline_ms
+    }
 
     /// Get an owned copy of the core state via a volatile byte read.
     ///
@@ -747,7 +824,11 @@ impl MmapState {
     ///
     /// # Example
     ///
-    /// ```ignore
+    /// ```
+    /// # use genesis::store::mmap_state::MmapState;
+    /// # let path = std::env::temp_dir()
+    /// #     .join(format!("genesis-mmap-doctest-{}", std::process::id()));
+    /// # let mmap = MmapState::open_or_create(&path, 1, 0).expect("open");
     /// // Retry up to 8 times for a consistent snapshot.
     /// let mut snapshot = None;
     /// for _ in 0..8 {
@@ -755,8 +836,10 @@ impl MmapState {
     ///     if snapshot.is_some() {
     ///         break;
     ///     }
-    ///     std::hint::spin_loop();
+    ///     std::thread::sleep(std::time::Duration::from_micros(200));
     /// }
+    /// assert!(snapshot.is_some());
+    /// # let _ = std::fs::remove_file(&path);
     /// ```
     pub fn read_consistent(&self) -> Option<GenesisCoreState> {
         // SAFETY: `self.ptr` is a valid mmap'd region for the lifetime
@@ -812,6 +895,29 @@ impl MmapState {
             return None;
         }
         Some(copy)
+    }
+
+    /// Consistent read serialized against writers by the same
+    /// cross-process `flock` that [`modify`](Self::modify) holds for
+    /// its entire transaction.
+    ///
+    /// This is the escalation path for seqlock readers whose retries
+    /// keep landing inside a write window: `LOCK_SH` blocks until any
+    /// exclusive (writer) lock is released, so the volatile copy
+    /// cannot overlap a publish — even a wedged seqlock (a panic that
+    /// left the counter odd) cannot stall it. Unlike
+    /// [`read_consistent`] it can block briefly while a writer
+    /// publishes, so callers should try the lock-free path first.
+    pub fn read_consistent_locked(&self) -> Result<GenesisCoreState, StateFileError> {
+        // SAFETY: `self.fd` is a valid open file descriptor kept alive
+        // for the lifetime of this MmapState.
+        unsafe { Self::lock_file_shared(self.fd) }?;
+        // Under LOCK_SH no writer's exclusive lock is held, so this
+        // volatile copy cannot race a publish.
+        let state = self.read();
+        // SAFETY: `self.fd` is valid and we hold the lock.
+        unsafe { Self::unlock_file(self.fd) };
+        Ok(state)
     }
 
     // ─── Writes ──────────────────────────────────────────────────
@@ -1265,12 +1371,31 @@ impl MmapState {
         Ok(())
     }
 
+    /// Acquire the cross-process advisory lock in shared mode,
+    /// blocking until any exclusive (writer) lock is released.
+    ///
+    /// `modify` serializes its whole transaction under `LOCK_EX`, so
+    /// a shared holder can only ever observe complete publishes.
+    ///
+    /// # Safety
+    ///
+    /// `fd` must be a valid open file descriptor.
+    unsafe fn lock_file_shared(fd: i32) -> Result<(), StateFileError> {
+        // SAFETY: `fd` is a valid open file descriptor. `flock` is
+        // async-signal-safe and does not allocate.
+        let rc = unsafe { flock(fd, LOCK_SH) };
+        if rc != 0 {
+            return Err(StateFileError::Io(std::io::Error::last_os_error()));
+        }
+        Ok(())
+    }
+
     /// Release the cross-process advisory lock.
     ///
     /// # Safety
     ///
     /// `fd` must be a valid open file descriptor that currently holds
-    /// a lock acquired by [`lock_file`].
+    /// a lock acquired by [`lock_file`] or [`lock_file_shared`].
     unsafe fn unlock_file(fd: i32) {
         // SAFETY: `fd` is a valid open file descriptor.
         unsafe {
@@ -1470,6 +1595,127 @@ mod tests {
         assert_eq!(snapshot.inference_signals.policy_authority, 0.0);
         assert_eq!(snapshot.verify(), Ok(()));
         assert_eq!(snapshot.verify_checksum(), Ok(()));
+
+        drop(reopened);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn open_rejects_mismatched_legacy_v4_size_and_releases_flock() {
+        use crate::state::legacy_v4::GenesisCoreStateV4;
+
+        let path = temp_state_path();
+        let current = GenesisCoreState::new(42, 1_800_000_000_000);
+        let mut legacy = GenesisCoreStateV4 {
+            header: current.header,
+            neurochemicals: current.neurochemicals,
+            zones: current.zones,
+            memory: current.memory,
+            manifest: current.manifest,
+            ions: current.ions,
+            checksum: 0,
+            inference_signals: current.inference_signals,
+        };
+        legacy.header.version = 4;
+        // A v4 label on a file whose recorded size is not the v4
+        // struct size is a damaged/foreign file — rejected, not
+        // migrated. This is the early-return path that used to leak
+        // the fd, the mapping, and the exclusive flock.
+        legacy.header.state_size = 0xDEAD;
+        let mut file = vec![0u8; 4096];
+        // SAFETY: `legacy` is a repr(C) POD struct live on the stack;
+        // the slice covers exactly its size and does not outlive it.
+        let raw = unsafe {
+            core::slice::from_raw_parts(
+                &legacy as *const GenesisCoreStateV4 as *const u8,
+                core::mem::size_of::<GenesisCoreStateV4>(),
+            )
+        };
+        file[..raw.len()].copy_from_slice(raw);
+        std::fs::write(&path, &file).unwrap();
+
+        for attempt in 0..2 {
+            match MmapState::open(&path) {
+                Err(StateFileError::VerificationFailed(_)) => {}
+                Err(StateFileError::FileLockBusy) => {
+                    panic!("attempt {attempt}: the failed open leaked the exclusive flock")
+                }
+                Err(e) => panic!("attempt {attempt}: unexpected error {e}"),
+                Ok(_) => panic!("attempt {attempt}: damaged file opened successfully"),
+            }
+        }
+        let _ = std::fs::remove_file(&path);
+    }
+
+    fn adenosine_level(s: &GenesisCoreState) -> f32 {
+        s.neurochemicals.chemicals[crate::state::NeurochemicalId::Adenosine as usize].level
+    }
+
+    #[test]
+    fn open_clears_adenosine_over_a_long_offline_gap() {
+        let path = temp_state_path();
+        let now_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        let offline_hours = 8.0_f64;
+        let state = MmapState::create(&path, 42, now_ms).unwrap();
+        state
+            .modify(now_ms, |s| {
+                s.neurochemicals.chemicals[crate::state::NeurochemicalId::Adenosine as usize]
+                    .level = 0.80;
+                s.header.last_updated = now_ms - (offline_hours * 3_600_000.0) as u64;
+            })
+            .unwrap();
+        state.sync().unwrap();
+        drop(state);
+
+        let reopened = MmapState::open(&path).unwrap();
+        let snapshot = reopened.read_consistent().expect("state reads");
+        let rested = adenosine_level(&snapshot);
+
+        // rested = 0.20 + exp(-offline_h / tau) * (level - 0.20), the
+        // same decay the per-tick sleep-side clearance applies.
+        let tau = f64::from(crate::state::NeuroTickParams::DEFAULT.adenosine_clearance_tau_hours);
+        let expected = 0.20 + (-offline_hours / tau).exp() * (0.80 - 0.20);
+        assert!(
+            (f64::from(rested) - expected).abs() < 0.02,
+            "rested {rested} != expected {expected}"
+        );
+        assert!(rested < 0.80, "an 8h gap must clear sleep pressure");
+
+        drop(reopened);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn open_preserves_adenosine_across_a_short_restart() {
+        let path = temp_state_path();
+        let now_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        let state = MmapState::create(&path, 42, now_ms).unwrap();
+        state
+            .modify(now_ms, |s| {
+                s.neurochemicals.chemicals[crate::state::NeurochemicalId::Adenosine as usize]
+                    .level = 0.80;
+            })
+            .unwrap();
+        state.sync().unwrap();
+        drop(state);
+
+        let reopened = MmapState::open(&path).unwrap();
+        let snapshot = reopened.read_consistent().expect("state reads");
+        let rested = adenosine_level(&snapshot);
+
+        // A seconds-long restart is ~0 offline hours: exp(~0) ~= 1, so
+        // the day's accumulated pressure survives. This is the whole
+        // point of the fix — a restart is not a sleep episode.
+        assert!(
+            rested > 0.75,
+            "a short restart must preserve adenosine, got {rested}"
+        );
 
         drop(reopened);
         let _ = std::fs::remove_file(&path);

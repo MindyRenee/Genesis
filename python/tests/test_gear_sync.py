@@ -6,8 +6,9 @@ Genesis runs two clocks that must stay in step:
   staging, interoception — integrating at ``TICK_INTERVAL_MS`` = 200 ms,
   i.e. 5 Hz;
 * the **mind** (cognitive process) — the brain-wave oscillator and the
-  IPC that drives the body — running its own loop at ``time.sleep(1.0)``,
-  i.e. 1 Hz.
+  IPC that drives the body — running its own loop at a nominal 1 Hz;
+  the cadence is adaptive (``_cadence``, 0.2–5.0 s on engagement) but
+  its base period and bounds are pinned below.
 
 Like meshed gears they turn at different speeds and must keep a fixed
 ratio, or they slip. The ratio is 5:1, and it is exact: one mind
@@ -36,8 +37,10 @@ from genesis_client.protocol import DT_MAX, DT_MIN
 # purpose: a test that imports the production constant cannot catch the
 # constant being changed. `test_constants_match_source` below greps the
 # sources to prove these still agree with them.
-BODY_TICK_MS = 200          # src/daemon/tick.rs: TICK_INTERVAL_MS
-MIND_HEARTBEAT_S = 1.0      # mind/heartbeat.py: time.sleep(1.0)
+BODY_TICK_MS = 200  # src/daemon/tick.rs: TICK_INTERVAL_MS
+MIND_HEARTBEAT_S = 1.0  # heartbeat.py: _cadence base period (adaptive)
+MIND_HEARTBEAT_MIN_S = 0.2  # heartbeat.py: _cadence minimum (engaged)
+MIND_HEARTBEAT_MAX_S = 5.0  # heartbeat.py: _cadence maximum (idle/asleep)
 AUTONOMOUS_INTERVAL_MS = 200  # tick.rs: AUTONOMOUS_INTERVAL_MS
 
 BODY_HZ = 1000.0 / BODY_TICK_MS
@@ -100,26 +103,26 @@ def test_both_gears_receive_the_same_dt() -> None:
         if elapsed >= DT_MIN and chem_dt != wave_dt:
             mismatches += 1
     assert mismatches == 0, (
-        f"{mismatches} intervals where the two gears were handed "
-        f"different dt values"
+        f"{mismatches} intervals where the two gears were handed different dt values"
     )
 
 
 def test_demand_intervals_are_all_inside_the_shared_ceiling() -> None:
     """Every dt either gear can actually produce must be reachable by both.
 
-    The mind's loop sleeps 1.0 s, so the nominal interval is 1 s. Even a
-    badly delayed heartbeat is expected to stay well inside DT_MAX; the
-    clamp is a guard against a genuine stall (suspend, GC pause), not a
-    routine bound. Checking the common cases documents that the shared
-    ceiling is not doing routine truncation work.
+    The mind's loop waits on an adaptive cadence — nominal 1.0 s,
+    bounded to [0.2, 5.0] s by engagement. Even its slowest heartbeat
+    stays well inside DT_MAX; the clamp is a guard against a genuine
+    stall (suspend, GC pause), not a routine bound. Checking the common
+    cases documents that the shared ceiling is not doing routine
+    truncation work.
     """
+    assert MIND_HEARTBEAT_MAX_S < DT_MAX
     for nominal in (0.2, 0.5, MIND_HEARTBEAT_S, 1.5, 2.0, 3.0, 5.0):
         chem_dt = min(DT_MAX, max(DT_MIN, nominal))
         wave_dt = min(DT_MAX, max(0.0, nominal))
         assert chem_dt == wave_dt == nominal, (
-            f"a {nominal}s heartbeat is being altered: chemistry "
-            f"{chem_dt}, waves {wave_dt}"
+            f"a {nominal}s heartbeat is being altered: chemistry {chem_dt}, waves {wave_dt}"
         )
 
 
@@ -162,11 +165,18 @@ def test_constants_match_source() -> None:
     assert m, "AUTONOMOUS_INTERVAL_MS not found in tick.rs"
     assert int(m.group(1)) == AUTONOMOUS_INTERVAL_MS
 
-    heartbeat = (
-        root / "python" / "brainstem" / "heartbeat.py"
-    ).read_text(encoding="utf-8")
-    assert "time.sleep(1.0)" in heartbeat, (
-        "the mind's heartbeat sleep changed; update MIND_HEARTBEAT_S"
+    heartbeat = (root / "python" / "brainstem" / "heartbeat.py").read_text(encoding="utf-8")
+    m = re.search(
+        r"_cadence = _AdaptiveInterval\(([\d.]+),\s*([\d.]+),\s*([\d.]+)\)",
+        heartbeat,
+    )
+    assert m, "_cadence _AdaptiveInterval not found in heartbeat.py"
+    base, lo, hi = (float(g) for g in m.groups())
+    assert base == MIND_HEARTBEAT_S, (
+        "the mind's heartbeat base cadence changed; update MIND_HEARTBEAT_S"
+    )
+    assert (lo, hi) == (MIND_HEARTBEAT_MIN_S, MIND_HEARTBEAT_MAX_S), (
+        "the mind's cadence bounds changed; update MIND_HEARTBEAT_MIN_S / MIND_HEARTBEAT_MAX_S"
     )
 
 
@@ -198,15 +208,15 @@ def test_frequencies_remain_anatomically_identifiable() -> None:
 
     freqs = BrainWaveOscillator._FREQS
     assert set(freqs) == set(BrainWave)
-    # Slowest is infraslow, fastest is lambda; both as documented.
-    assert freqs[BrainWave.EPSILON] == 0.25
-    assert freqs[BrainWave.LAMBDA] == 150.0
+    # Slowest is infraslow, fastest is epsilon; both as documented.
+    assert freqs[BrainWave.INFRASLOW] == 0.25
+    assert freqs[BrainWave.EPSILON] == 150.0
 
     # Bands are ordered by frequency, so "dominant band" is meaningful
     # and each anatomical label stays attached to the right rhythm.
     by_freq = sorted(BrainWave, key=lambda b: freqs[b])
-    assert by_freq[0] is BrainWave.EPSILON
-    assert by_freq[-1] is BrainWave.LAMBDA
+    assert by_freq[0] is BrainWave.INFRASLOW
+    assert by_freq[-1] is BrainWave.EPSILON
     values = [freqs[b] for b in by_freq]
     assert values == sorted(values)
     assert len(set(values)) == len(values), "band frequencies must be distinct"

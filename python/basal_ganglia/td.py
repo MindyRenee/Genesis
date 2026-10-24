@@ -364,9 +364,7 @@ class TDLearner:
                 if isinstance(trace_key, tuple):
                     concept_id, trace_action = trace_key
                     key = (concept_id, trace_action)
-                    current = self._action_weights.get(
-                        key, self._weights.get(concept_id, 1.0)
-                    )
+                    current = self._action_weights.get(key, self._weights.get(concept_id, 1.0))
                     self._action_weights[key] = current + alpha_delta * trace
                 else:
                     current = self._weights.get(trace_key, 1.0)

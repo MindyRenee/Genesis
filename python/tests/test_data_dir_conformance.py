@@ -51,11 +51,14 @@ HOSTILE_XDG = "/sandbox/private/data"
 def _run(cmd: list[str], env: dict[str, str], cwd: Path | None = None) -> str:
     """Run a command, returning stdout, and fail loudly on error."""
     proc = subprocess.run(
-        cmd, env=env, cwd=cwd or REPO, capture_output=True, text=True, timeout=60,
+        cmd,
+        env=env,
+        cwd=cwd or REPO,
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
-    assert proc.returncode == 0, (
-        f"{cmd} failed ({proc.returncode}):\n{proc.stdout}\n{proc.stderr}"
-    )
+    assert proc.returncode == 0, f"{cmd} failed ({proc.returncode}):\n{proc.stdout}\n{proc.stderr}"
     return proc.stdout
 
 
@@ -106,14 +109,41 @@ def resolve_prune_dead_concepts(env: dict[str, str]) -> str:
 def resolve_migrate_edges(env: dict[str, str]) -> str:
     """scripts/migrate_edges_to_log.py — rewrites the canonical edge log."""
     return _python_default(
-        REPO / "scripts/migrate_edges_to_log.py", env, "_default_data_dir",
+        REPO / "scripts/migrate_edges_to_log.py",
+        env,
+        "_default_data_dir",
     )
 
 
 def resolve_abstraction_gradient(env: dict[str, str]) -> str:
     """eval/abstraction_gradient.py — reads the canonical edge log."""
     return _python_default(
-        REPO / "eval/abstraction_gradient.py", env, "_default_data_dir",
+        REPO / "eval/abstraction_gradient.py",
+        env,
+        "_default_data_dir",
+    )
+
+
+def resolve_arc_offer(env: dict[str, str]) -> str:
+    """scripts/arc_offer.py — writes offered-game specs."""
+    return _python_default(REPO / "scripts/arc_offer.py", env, "_default_data_dir")
+
+
+def resolve_arc_play_evidence(env: dict[str, str]) -> str:
+    """scripts/arc_play_evidence.py — reads gameplay state."""
+    return _python_default(
+        REPO / "scripts/arc_play_evidence.py",
+        env,
+        "_default_data_dir",
+    )
+
+
+def resolve_discord_pulse(env: dict[str, str]) -> str:
+    """scripts/discord_pulse.py — reads journal/state for pulse posts."""
+    return _python_default(
+        REPO / "scripts/discord_pulse.py",
+        env,
+        "_default_data_dir",
     )
 
 
@@ -121,7 +151,8 @@ def resolve_config_py(env: dict[str, str]) -> str:
     """infrastructure/config.py — the in-process default."""
     out = _run(
         [
-            "python3", "-c",
+            "python3",
+            "-c",
             "import sys; sys.path[:0] = ['python', '.'];"
             "from infrastructure.config import default_data_dir;"
             "print(default_data_dir())",
@@ -135,7 +166,8 @@ def resolve_setup_embeddings(env: dict[str, str]) -> str:
     """setup_embeddings.py — builds an index over the concept set."""
     out = _run(
         [
-            "python3", "-c",
+            "python3",
+            "-c",
             "import importlib.util, sys;"
             "sys.path[:0] = ['python', '.'];"
             "spec = importlib.util.spec_from_file_location("
@@ -159,7 +191,8 @@ def _python_default(script: Path, env: dict[str, str], attr: str) -> str:
     """Read a module-level default resolver without running its main()."""
     out = _run(
         [
-            "python3", "-c",
+            "python3",
+            "-c",
             f"import importlib.util, sys;"
             f"sys.path[:0] = ['python', '.'];"
             f"spec = importlib.util.spec_from_file_location('m', {str(script)!r});"
@@ -181,6 +214,9 @@ DIR_RESOLVERS = {
     "config.py": resolve_config_py,
     "setup_embeddings.py": resolve_setup_embeddings,
     "abstraction_gradient.py": resolve_abstraction_gradient,
+    "arc_offer.py": resolve_arc_offer,
+    "arc_play_evidence.py": resolve_arc_play_evidence,
+    "discord_pulse.py": resolve_discord_pulse,
 }
 
 # Asset resolvers legitimately answer "which directory holds <asset>?",
@@ -334,6 +370,9 @@ def test_every_resolver_in_the_repo_is_covered() -> None:
         "genesis_cli.py",
         "ltm_index.py",
         "abstraction_gradient.py",
+        "discord_pulse.py",  # GENESIS_DATA_DIR default resolution
+        "arc_play_evidence.py",
+        "arc_offer.py",
     }
     # Files that reference the location without resolving it: this test,
     # the Rust resolver (mirrored test suite), and a client docstring
@@ -343,6 +382,9 @@ def test_every_resolver_in_the_repo_is_covered() -> None:
         "data_dir.rs",
         "__init__.py",  # genesis_client usage example in the module docstring
         "install.sh",  # names the default in user-facing output, never resolves it
+        "verify_change.sh",  # names the workspace path in a comment only
+        "learning.py",  # resolves $XDG_DATA_HOME/man for man pages, never the data dir
+        "man_review.py",  # same — resolves $XDG_DATA_HOME/man, not the data dir
     }
 
     suspicious: list[str] = []
@@ -351,10 +393,7 @@ def test_every_resolver_in_the_repo_is_covered() -> None:
             continue
         rel = path.relative_to(REPO)
         parts = rel.parts
-        if (
-            parts[0] in {"target", ".git", "tests"}
-            or parts[0].startswith(".venv")
-        ):
+        if parts[0] in {"target", "build", ".git", "tests"} or parts[0].startswith(".venv"):
             continue
         if parts[0] == "python" and parts[1:2] == ("tests",):
             continue

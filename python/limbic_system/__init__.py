@@ -13,6 +13,8 @@ and forms the substrate of the self.
 Key structures:
     - Amygdala — emotional evaluation, fear conditioning, reward
       salience. Tags sensory input with emotional valence.
+      * Basolateral complex — sensory integration, associative learning
+      * Centromedial nucleus — output to hypothalamus/brainstem (fear responses)
     - Hippocampus — memory formation and retrieval (anatomically
       limbic; the memory systems are documented in ``temporal_lobe``,
       which claims them).
@@ -69,6 +71,23 @@ Pipeline:
 ════════════════════════════════════════════════════════════════════════
 MATHEMATICAL FOUNDATION
 ════════════════════════════════════════════════════════════════════════
+
+Amygdala — Dual Pathway Model
+-------------------------------
+
+The amygdala processes emotional input through two pathways (LeDoux, 1996):
+
+Low road (fast, subcortical):
+    Thalamus → Amygdala (centromedial nucleus)
+    * Bypasses cortex, ~12ms latency
+    * Coarse, rapid threat detection
+    * Triggers automatic fear responses
+
+High road (slow, cortical):
+    Thalamus → Sensory cortex → Amygdala (basolateral complex)
+    * Full sensory processing, ~300ms latency
+    * Contextual evaluation, can override low road
+    * Enables conditioned fear extinction
 
 Amygdala — Emotional Evaluation
 ---------------------------------
@@ -388,6 +407,7 @@ _EXPORTS: dict[str, str] = {
     "CauseCategory": "limbic_system.emotion",
     "CognitiveMode": "limbic_system.emotion",
     "EmotionalState": "limbic_system.emotion",
+    "EmotionalContext": "limbic_system.emotion",
     "EmotionCategory": "limbic_system.emotion",
     "assess_emotion": "limbic_system.emotion",
     # The organ itself — conditioned appetitive/aversive value fields

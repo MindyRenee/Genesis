@@ -91,9 +91,7 @@ def test_resting_state_passes_sanity_gate() -> None:
         snap = capture_snapshot(client, settle_ticks=SETTLE, settle_dt=ASSAY_DT)
     assert check_snapshot_vs_defaults(snap).passed
     assert snap.phase in PHASE_NAMES
-    assert _finite(
-        [snap.arousal, snap.valence, snap.plasticity_gate, *snap.chemicals.values()]
-    )
+    assert _finite([snap.arousal, snap.valence, snap.plasticity_gate, *snap.chemicals.values()])
     assert 0.0 <= snap.arousal <= 1.0
     assert -1.0 <= snap.valence <= 1.0
 
@@ -166,10 +164,16 @@ def test_full_assay_covers_all_chemicals_and_stays_stable() -> None:
     for e in result.effects:
         assert e.phase_pre in PHASE_NAMES.values()
         assert e.phase_slow in PHASE_NAMES.values()
-        assert _finite([
-            e.d_arousal_slow, e.d_valence_slow, e.d_plasticity_slow,
-            e.pre_self, e.post_fast_self, e.post_slow_self,
-        ])
+        assert _finite(
+            [
+                e.d_arousal_slow,
+                e.d_valence_slow,
+                e.d_plasticity_slow,
+                e.pre_self,
+                e.post_fast_self,
+                e.post_slow_self,
+            ]
+        )
         d_fast = e.post_fast_self - e.pre_self
         if e.name in SLOW_GLUCOCORTICOID:
             continue

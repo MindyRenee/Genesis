@@ -139,15 +139,17 @@ class NotificationQueue:
                 self._initialized = True
             elif current_phase != self._last_phase:
                 # Phase changed — enqueue notification.
-                self._enqueue(Notification(
-                    kind="phase_changed",
-                    message=f"Phase shifted from '{self._last_phase}' to '{current_phase}'",
-                    timestamp=now_ms,
-                    data={
-                        "old_phase": self._last_phase,
-                        "new_phase": current_phase,
-                    },
-                ))
+                self._enqueue(
+                    Notification(
+                        kind="phase_changed",
+                        message=f"Phase shifted from '{self._last_phase}' to '{current_phase}'",
+                        timestamp=now_ms,
+                        data={
+                            "old_phase": self._last_phase,
+                            "new_phase": current_phase,
+                        },
+                    )
+                )
                 enqueued += 1
                 self._last_phase = current_phase
 
@@ -166,31 +168,28 @@ class NotificationQueue:
         # with old insights.
         if not self._dream_initialized:
             if recent:
-                self._last_dream_episode_id = max(
-                    ep.episode_id for ep in recent
-                )
+                self._last_dream_episode_id = max(ep.episode_id for ep in recent)
             self._dream_initialized = True
             return enqueued
 
         if recent:
             # Find dream insights newer than the last seen one.
-            new_insights = [
-                ep for ep in recent
-                if ep.episode_id > self._last_dream_episode_id
-            ]
+            new_insights = [ep for ep in recent if ep.episode_id > self._last_dream_episode_id]
             if new_insights:
                 # Sort by episode_id to update the high-water mark correctly.
                 new_insights.sort(key=lambda e: e.episode_id)
                 for ep in new_insights:
-                    self._enqueue(Notification(
-                        kind="dream_insight",
-                        message=f"dream insight: {ep.text[:120]}",
-                        timestamp=now_ms,
-                        data={
-                            "episode_id": ep.episode_id,
-                            "text": ep.text,
-                        },
-                    ))
+                    self._enqueue(
+                        Notification(
+                            kind="dream_insight",
+                            message=f"dream insight: {ep.text[:120]}",
+                            timestamp=now_ms,
+                            data={
+                                "episode_id": ep.episode_id,
+                                "text": ep.text,
+                            },
+                        )
+                    )
                     enqueued += 1
                 self._last_dream_episode_id = new_insights[-1].episode_id
 

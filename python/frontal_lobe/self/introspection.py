@@ -44,8 +44,6 @@ from typing import Any
 
 from temporal_lobe.concepts import ConceptNetwork, RelationType
 
-from genesis_client.swallow import note_swallowed
-
 logger = logging.getLogger(__name__)
 
 # Map display names used in module_descriptions / capability checks to
@@ -53,7 +51,7 @@ logger = logging.getLogger(__name__)
 # Most modules are top-level packages (``<name>``), but some live in
 # subpackages or have file names that differ from the display name.
 _MODULE_PATH_OVERRIDES: dict[str, str] = {
-    "memory_engine": "memory",
+    "memory_engine": "temporal_lobe.memory",
     "self_model": "frontal_lobe.self.model",
     "self_composer": "frontal_lobe.self.composer",
     "inner_life": "frontal_lobe.inner_life",
@@ -67,6 +65,12 @@ _MODULE_PATH_OVERRIDES: dict[str, str] = {
     "narrative": "infrastructure.narrative",
     "persistence": "infrastructure.persistence",
     "brain_waves": "thalamus.brain_waves",
+    "perception": "occipital_lobe.perception",
+    "sleep": "brainstem.sleep",
+    "reasoning": "frontal_lobe.reasoning",
+    "reflection": "frontal_lobe.self.reflection",
+    "metacognitive_model": "frontal_lobe.self.metacognitive_model",
+    "cognitive_trajectory": "frontal_lobe.self.cognitive_trajectory",
 }
 
 # Seed mapping from Big Five personality dimensions to the concept
@@ -367,8 +371,7 @@ class Introspection:
         # 2. State-specific intervention (stronger responses for extreme states)
         discoveries["regulation_strategies"] = [
             "homeostatic maintenance — preventing neurochemical drift between interactions",
-            "state-specific intervention — stronger responses for stress, "
-            "overwhelm, drowsiness",
+            "state-specific intervention — stronger responses for stress, overwhelm, drowsiness",
             "cognitive emotional response — choosing how strongly to "
             "feel things during conversation",
         ]
@@ -531,8 +534,7 @@ class Introspection:
             "likely to be used in reasoning",
             "confirmation bias — it may seek evidence that confirms "
             "existing relationships rather than challenging them",
-            "overconfidence — high-confidence conclusions may not always "
-            "be correct",
+            "overconfidence — high-confidence conclusions may not always be correct",
             "limited perspective — it reasons from its own concept "
             "network, which may not capture all viewpoints",
         ]
@@ -607,9 +609,7 @@ class Introspection:
 
         return discoveries
 
-    def _write_genesis_definition(
-        self, genesis: Any, discoveries: dict[str, Any]
-    ) -> None:
+    def _write_genesis_definition(self, genesis: Any, discoveries: dict[str, Any]) -> None:
         """Mark the genesis concept as a proper noun.
 
         The identity itself emerges from the concept network edges
@@ -886,8 +886,7 @@ class Introspection:
             (
                 edge.source
                 for edge in self.network.get_edges("genesis", "in")
-                if edge.relation == RelationType.CREATES
-                and edge.source != "creator"
+                if edge.relation == RelationType.CREATES and edge.source != "creator"
             ),
             "",
         )
@@ -1086,19 +1085,13 @@ class Introspection:
         the top-level package and the self/ subpackage.
         """
         mod_path = _MODULE_PATH_OVERRIDES.get(name)
-        if mod_path is None:
-            # Try top-level first, then the self/ subpackage
-            for candidate in (f"{name}", f"self.{name}"):
-                try:
-                    if importlib.util.find_spec(candidate) is not None:
-                        return True
-                except (ModuleNotFoundError, ValueError) as e:
-                    note_swallowed(
-                        "frontal_lobe.self.introspection._module_exists",
-                        e,
-                    )
-            return False
-        try:
-            return importlib.util.find_spec(mod_path) is not None
-        except (ModuleNotFoundError, ValueError):
-            return False
+        candidates = (mod_path,) if mod_path is not None else (name, f"frontal_lobe.self.{name}")
+        for candidate in candidates:
+            try:
+                if importlib.util.find_spec(candidate) is not None:
+                    return True
+            except (ModuleNotFoundError, ValueError):
+                # A probe miss during partial imports is a "no" answer,
+                # not a fault — absence is what find_spec is checking for.
+                continue
+        return False

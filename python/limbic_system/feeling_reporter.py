@@ -197,10 +197,19 @@ class FeelingReporter:
         # or offering comfort — those paths handle it naturally.
         lower_input = user_input.lower()
         feeling_triggers = (
-            "how are you", "how do you feel", "are you okay",
-            "what's wrong", "are you alright", "how's it going",
-            "it's okay", "don't worry", "i'm here", "take your time",
-            "breathe", "you're doing", "you're okay",
+            "how are you",
+            "how do you feel",
+            "are you okay",
+            "what's wrong",
+            "are you alright",
+            "how's it going",
+            "it's okay",
+            "don't worry",
+            "i'm here",
+            "take your time",
+            "breathe",
+            "you're doing",
+            "you're okay",
         )
         if any(t in lower_input for t in feeling_triggers):
             return response
@@ -215,9 +224,16 @@ class FeelingReporter:
         # Don't surface if the response already mentions feeling bad
         lower_response = response.lower()
         distress_markers = (
-            "stressed", "overwhelm", "anxious", "not okay",
-            "struggling", "hard time", "cortisol", "tense",
-            "too much", "can't process",
+            "stressed",
+            "overwhelm",
+            "anxious",
+            "not okay",
+            "struggling",
+            "hard time",
+            "cortisol",
+            "tense",
+            "too much",
+            "can't process",
         )
         if any(m in lower_response for m in distress_markers):
             return response
@@ -265,9 +281,7 @@ class FeelingReporter:
             semantic.append(("emotion", word.replace("_", " ")))
 
         # ── Cognitive mode ───────────────────────────────────────
-        mode_words = self._network.find_cognitive_mode_words(
-            emotion.cognitive_style
-        )
+        mode_words = self._network.find_cognitive_mode_words(emotion.cognitive_style)
         if mode_words and emotion.cognitive_style not in ("steady", "normal"):
             word = self._rng.choice(mode_words[:3])
             semantic.append(("mode", word.replace("_", " ")))
@@ -277,21 +291,21 @@ class FeelingReporter:
             cause_words = self._network.find_cause_words(emotion.cause)
             if cause_words:
                 word = self._rng.choice(cause_words[:3])
-                semantic.append(("cause", word.replace('_', ' ')))
+                semantic.append(("cause", word.replace("_", " ")))
 
         # ── Plasticity / learning capacity ───────────────────────
         if emotion.plasticity <= 0.1:
             plat_words = self._network.find_plasticity_words("closed")
             if plat_words:
                 word = self._rng.choice(plat_words[:3])
-                semantic.append(("plasticity", word.replace('_', ' ')))
+                semantic.append(("plasticity", word.replace("_", " ")))
             else:
                 structural.append("[plasticity_gate:closed]")
         elif emotion.plasticity < 0.25:
             plat_words = self._network.find_plasticity_words("low")
             if plat_words:
                 word = self._rng.choice(plat_words[:3])
-                semantic.append(("plasticity", word.replace('_', ' ')))
+                semantic.append(("plasticity", word.replace("_", " ")))
             else:
                 structural.append("[plasticity_gate:low]")
 
@@ -438,9 +452,11 @@ class FeelingReporter:
 
         if not parts:
             # Compose the "nothing wrong" response through the language engine
-            valence_label = ("positive" if emotion.valence > 0.2
-                             else ("unsettled" if emotion.valence < -0.2
-                                   else "neutral"))
+            valence_label = (
+                "positive"
+                if emotion.valence > 0.2
+                else ("unsettled" if emotion.valence < -0.2 else "neutral")
+            )
             wellness_thought = Thought(
                 content="well",
                 intent="self_report",
@@ -515,11 +531,12 @@ class FeelingReporter:
                 "env_disk_percent": snap.disk_percent,
                 "env_project_size_mb": snap.project_size_mb,
                 "env_project_files": snap.project_file_count,
-                "env_ip": (snap.ip_address
-                           if snap.ip_address and snap.ip_address != "127.0.0.1"
-                           else None),
-                "env_uptime_hours": (snap.uptime_seconds / 3600
-                                     if snap.uptime_seconds > 3600 else None),
+                "env_ip": (
+                    snap.ip_address if snap.ip_address and snap.ip_address != "127.0.0.1" else None
+                ),
+                "env_uptime_hours": (
+                    snap.uptime_seconds / 3600 if snap.uptime_seconds > 3600 else None
+                ),
                 "env_concerns": concerns,
             },
         )
@@ -657,7 +674,7 @@ class FeelingReporter:
             elif desc.startswith("Correction:"):
                 # This is a negation event (e.g., "Correction: tardigrade
                 # is NOT related to six") — extract what was removed
-                removed_edges.append(desc[len("Correction: "):])
+                removed_edges.append(desc[len("Correction: ") :])
             else:
                 # This is a learned fact (e.g., "tardigrade has eight leg")
                 learned_facts.append(desc)
@@ -714,8 +731,11 @@ class FeelingReporter:
     # ─── Empathy ─────────────────────────────────────────────────
 
     def compose_empathy_response(
-        self, emotion: EmotionalState, sentiment: float,
-        sentiment_label: str, emotion_word: str = "",
+        self,
+        emotion: EmotionalState,
+        sentiment: float,
+        sentiment_label: str,
+        emotion_word: str = "",
     ) -> Thought | None:
         """Compose an empathetic response from its knowledge of the emotion.
 
@@ -734,7 +754,9 @@ class FeelingReporter:
         # it actually knows about sadness, fear, joy, etc.
         if emotion_word:
             thought = self._composer.compose_about(
-                emotion_word, emotion, mode="definition",
+                emotion_word,
+                emotion,
+                mode="definition",
             )
             if thought and thought.confidence > 0.3:
                 knowledge = thought.content
@@ -756,8 +778,7 @@ class FeelingReporter:
                 confidence=0.6,
                 metadata={
                     "reasoning": [
-                        f"doesn't know {word} well enough yet "
-                        "to say something meaningful"
+                        f"doesn't know {word} well enough yet to say something meaningful"
                     ],
                     "sentiment": "difficult",
                     "topic": word,
@@ -789,8 +810,11 @@ class FeelingReporter:
         )
 
     def _shape_empathy_from_knowledge(
-        self, knowledge: str, emotion_word: str,
-        sentiment: float, emotion: EmotionalState,
+        self,
+        knowledge: str,
+        emotion_word: str,
+        sentiment: float,
+        emotion: EmotionalState,
     ) -> Thought:
         """Shape concept-network knowledge into an empathetic response.
 
@@ -804,7 +828,7 @@ class FeelingReporter:
         knowledge_lower = knowledge.lower()
         prefix = f"{emotion_word} is "
         if knowledge_lower.startswith(prefix):
-            understanding = knowledge[len(prefix):]
+            understanding = knowledge[len(prefix) :]
         else:
             understanding = knowledge
 
@@ -836,9 +860,7 @@ class FeelingReporter:
                 "reasoning": reasoning,
                 "topic": emotion_word,
                 "sentiment": (
-                    "negative" if sentiment < -0.2
-                    else "positive" if sentiment > 0.2
-                    else "neutral"
+                    "negative" if sentiment < -0.2 else "positive" if sentiment > 0.2 else "neutral"
                 ),
             },
         )
@@ -886,8 +908,11 @@ class FeelingReporter:
         # It doesn't know enough to compose — let the language engine
         # generate its response from the acknowledge intent and its state.
         thought = Thought(
-            content=("acknowledged" if not (autonomy and autonomy.weight > 0.5)
-                     else "prefers to be asked"),
+            content=(
+                "acknowledged"
+                if not (autonomy and autonomy.weight > 0.5)
+                else "prefers to be asked"
+            ),
             intent="acknowledge",
             emotion=emotion.label,
             confidence=0.4,

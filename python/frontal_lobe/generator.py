@@ -40,6 +40,8 @@ from temporal_lobe.base import Language, Thought
 from temporal_lobe.statistical_learner import StatisticalLanguageLearner
 from temporal_lobe.vocabulary import Vocabulary
 
+from infrastructure.text import sentences as _sentences
+
 from .grammar import Grammar, Literal, SentenceStructure, Slot
 from .graph_walk import GraphWalkGenerator
 from .prosody import ProsodyGenerator, ProsodyPattern
@@ -53,7 +55,6 @@ __all__ = ["GenerativeLanguage"]
 # omitted by construction rather than stripped out after substitution.
 _MULTISPACE_RE = re.compile(r"  +")
 _SPACE_BEFORE_PUNCT_RE = re.compile(r"\s+([.,;!?])")
-_SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[.!?])\s+")
 _WORD_RE = re.compile(r"[^\W_]+", re.UNICODE)
 
 # Repeated-word pattern — catches "and and", "the the", etc. that slip
@@ -73,20 +74,47 @@ _INCOMPLETE_COPULA_BOUNDARY_RE = re.compile(
 #   ("Right. — that's", "Yes. , I")
 # - continuation marks crowding a final punctuation position
 #   ("wondering —?", "curious about,?", "trails off—.")
-_CONTINUATION_ARTIFACT_RE = re.compile(
-    r"[.!?]\s+[—–-]|[,;:—–-]+\s*[.!?]"
-)
+_CONTINUATION_ARTIFACT_RE = re.compile(r"[.!?]\s+[—–-]|[,;:—–-]+\s*[.!?]")
 
 
 # Words that carry no propositional content on their own — pronouns
 # and copulas. A sentence built from only these ("I.", "I'm I.",
 # "it is it.") is degenerate: it articulates nothing.
-_DEGENERATE_WORDS = frozenset({
-    "i", "me", "my", "you", "your", "he", "she", "it", "its", "we",
-    "our", "they", "their", "them", "him", "her", "us", "this", "that",
-    "these", "those", "i'm", "i am", "am", "is", "are", "was", "were",
-    "be", "been", "being",
-})
+_DEGENERATE_WORDS = frozenset(
+    {
+        "i",
+        "me",
+        "my",
+        "you",
+        "your",
+        "he",
+        "she",
+        "it",
+        "its",
+        "we",
+        "our",
+        "they",
+        "their",
+        "them",
+        "him",
+        "her",
+        "us",
+        "this",
+        "that",
+        "these",
+        "those",
+        "i'm",
+        "i am",
+        "am",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+    }
+)
 
 
 # Contraction fragments after tokenization — "I'm" splits into
@@ -107,7 +135,8 @@ def _is_degenerate_sentence(sentence: str) -> bool:
     if len(words) > 4:
         return False
     content = [
-        w for w in words
+        w
+        for w in words
         if w not in _CONTRACTION_FRAGMENTS
         and w not in {"am", "is", "are", "was", "were", "be", "been", "being"}
     ]
@@ -141,20 +170,81 @@ def _is_plain_content_frame(structure: SentenceStructure) -> bool:
             return False
     return has_content
 
+
 # Function words excluded from content-word overlap comparison in the
 # near-duplicate dedup. These are pronouns, articles, and short
 # function words that vary freely between near-identical sentences
 # ("I'm still working this out" vs "I'm still working it out").
-_DEDUP_FUNCTION_WORDS = frozenset({
-    "the", "a", "an", "is", "are", "was", "were", "be", "been",
-    "of", "to", "in", "on", "at", "for", "with", "by", "from", "as",
-    "and", "or", "but", "so", "if", "when", "while", "though",
-    "i", "you", "he", "she", "it", "we", "they", "this", "that",
-    "my", "your", "its", "our", "their", "me", "him", "her", "us",
-    "not", "no", "do", "does", "did", "have", "has", "had",
-    "can", "could", "will", "would", "should", "may", "might",
-    "about", "out", "up", "all", "any", "some",
-})
+_DEDUP_FUNCTION_WORDS = frozenset(
+    {
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "of",
+        "to",
+        "in",
+        "on",
+        "at",
+        "for",
+        "with",
+        "by",
+        "from",
+        "as",
+        "and",
+        "or",
+        "but",
+        "so",
+        "if",
+        "when",
+        "while",
+        "though",
+        "i",
+        "you",
+        "he",
+        "she",
+        "it",
+        "we",
+        "they",
+        "this",
+        "that",
+        "my",
+        "your",
+        "its",
+        "our",
+        "their",
+        "me",
+        "him",
+        "her",
+        "us",
+        "not",
+        "no",
+        "do",
+        "does",
+        "did",
+        "have",
+        "has",
+        "had",
+        "can",
+        "could",
+        "will",
+        "would",
+        "should",
+        "may",
+        "might",
+        "about",
+        "out",
+        "up",
+        "all",
+        "any",
+        "some",
+    }
+)
 
 
 class GenerativeLanguage(Language):
@@ -185,7 +275,10 @@ class GenerativeLanguage(Language):
         self._graph_walk: GraphWalkGenerator | None = None
         if network is not None:
             self._graph_walk = GraphWalkGenerator(
-                network, self.voice, self_model.personality, seed,
+                network,
+                self.voice,
+                self_model.personality,
+                seed,
             )
 
         # Embedding store — wired after construction (it depends on
@@ -372,7 +465,9 @@ class GenerativeLanguage(Language):
             # Apply voice to the raw content
             sentences = self._split_into_sentences(content)
             text = self.voice.apply(
-                sentences, emotion, thought.intent,
+                sentences,
+                emotion,
+                thought.intent,
                 brain_waves=self.current_brain_waves,
             )
         else:
@@ -396,7 +491,9 @@ class GenerativeLanguage(Language):
         # introspection but not applied to the text, because converting
         # . to ? would change the sentence type from statement to question.
         prosody = self._prosody.generate(
-            emotion.label, emotion.valence, emotion.arousal,
+            emotion.label,
+            emotion.valence,
+            emotion.arousal,
         )
         self._last_prosody = prosody
         text = self._prosody.apply(text, prosody, apply_intonation=False)
@@ -433,7 +530,7 @@ class GenerativeLanguage(Language):
         # minor variation like an inserted "perhaps") is always a
         # composition bug, not intentional emphasis. Split on sentence
         # boundaries, deduplicate with fuzzy matching, and rejoin.
-        sentences = _SENTENCE_BOUNDARY_RE.split(text)
+        sentences = _sentences(text)
         if len(sentences) > 1:
             seen: list[set[str]] = []  # word-bag of each kept sentence
             seen_content: list[set[str]] = []  # content-word bag
@@ -451,10 +548,7 @@ class GenerativeLanguage(Language):
                 # "I'm still working this out" vs "I'm still working
                 # it out" share {still, working, out} — clearly the
                 # same phrase with a pronoun swap.
-                content_words = {
-                    w for w in words if len(w) > 2
-                    and w not in _DEDUP_FUNCTION_WORDS
-                }
+                content_words = {w for w in words if len(w) > 2 and w not in _DEDUP_FUNCTION_WORDS}
                 # Fuzzy dedup: if >65% of ALL words overlap with a kept
                 # sentence, it's a near-duplicate. The threshold was
                 # 0.85 but that missed pronoun swaps ("this" → "it")
@@ -472,9 +566,8 @@ class GenerativeLanguage(Language):
                     # when total-word overlap is below the threshold.
                     prev_content = seen_content[i]
                     if content_words and prev_content:
-                        c_overlap = (
-                            len(content_words & prev_content)
-                            / len(content_words | prev_content)
+                        c_overlap = len(content_words & prev_content) / len(
+                            content_words | prev_content
                         )
                         if c_overlap > 0.60:
                             is_dup = True
@@ -537,9 +630,17 @@ class GenerativeLanguage(Language):
         # vocabulary turns into candidates — never as a finished
         # sentence that bypasses the engine.
         if intent in (
-            "inform", "self_report", "philosophize", "correct",
-            "discuss_code", "empathize", "encourage", "express_emotion",
-            "reflect", "unknown", "introduce",
+            "inform",
+            "self_report",
+            "philosophize",
+            "correct",
+            "discuss_code",
+            "empathize",
+            "encourage",
+            "express_emotion",
+            "reflect",
+            "unknown",
+            "introduce",
         ):
             return False
 
@@ -683,11 +784,7 @@ class GenerativeLanguage(Language):
         if _CONTINUATION_ARTIFACT_RE.search(text):
             score -= 0.2
 
-        sentences = [
-            sentence.strip()
-            for sentence in _SENTENCE_BOUNDARY_RE.split(text)
-            if sentence.strip()
-        ]
+        sentences = [s for s in _sentences(text) if s.strip()]
         malformed = 0
         incomplete_heads = {"a", "an", "the", "and", "but", "or", "to"}
         incomplete_predicates = {"am", "is", "are", "was", "were", "be", "been"}
@@ -696,10 +793,7 @@ class GenerativeLanguage(Language):
             first_letter = next((c for c in sentence if c.isalpha()), "")
             incomplete = bool(sentence_tokens) and (
                 sentence_tokens[-1] in incomplete_heads
-                or (
-                    len(sentence_tokens) <= 3
-                    and sentence_tokens[-1] in incomplete_predicates
-                )
+                or (len(sentence_tokens) <= 3 and sentence_tokens[-1] in incomplete_predicates)
             )
             if (
                 sentence[-1] not in ".!?"
@@ -744,7 +838,7 @@ class GenerativeLanguage(Language):
 
         units = self._comparison_units(tokens)
         greatest_overlap = 0.0
-        for previous in self._recent_outputs:
+        for previous in list(self._recent_outputs):
             previous_units = self._comparison_units(self._tokens(previous))
             union = units | previous_units
             if union:
@@ -759,7 +853,7 @@ class GenerativeLanguage(Language):
         """Use trigrams for long text and lexical units for short text."""
         if len(tokens) < 3:
             return {(token,) for token in tokens}
-        return {tuple(tokens[i:i + 3]) for i in range(len(tokens) - 2)}
+        return {tuple(tokens[i : i + 3]) for i in range(len(tokens) - 2)}
 
     def _compose_grammar(self, thought: Thought, emotion: EmotionalState) -> str:
         """Compose text using grammar + vocabulary (the fallback path)."""
@@ -769,21 +863,15 @@ class GenerativeLanguage(Language):
         # Determine how many sentences to generate
         num_sentences = self._determine_length(intent, emotion, thought)
 
-        pool, num_sentences = self._structure_pool(
-            intent, context, num_sentences
-        )
+        pool, num_sentences = self._structure_pool(intent, context, num_sentences)
 
         # Select the first (content-bearing) sentence structure
         emotion_weight = emotion.creativity * 0.5 + emotion.openness_to_engage * 0.5
-        first_structure = self.grammar.select_structure(
-            intent, emotion_weight, pool=pool
-        )
+        first_structure = self.grammar.select_structure(intent, emotion_weight, pool=pool)
 
         # Generate the first sentence (carries the {content} slot)
         sentences: list[str] = []
-        first_sentence = self._fill_structure(
-            first_structure, context, emotion, thought
-        )
+        first_sentence = self._fill_structure(first_structure, context, emotion, thought)
         if first_sentence:
             sentences.append(first_sentence)
 
@@ -797,9 +885,7 @@ class GenerativeLanguage(Language):
             followup = self.grammar.select_followup(intent, emotion_weight)
             if followup is None:
                 break  # no follow-up structures for this intent
-            sentence = self._fill_structure(
-                followup, context, emotion, thought
-            )
+            sentence = self._fill_structure(followup, context, emotion, thought)
             if sentence:
                 sentences.append(sentence)
 
@@ -817,10 +903,7 @@ class GenerativeLanguage(Language):
         if not sentences:
             # Fall back to the raw content — unless it too is
             # degenerate. A lone "I" is unverbalized, not an utterance.
-            sentences = (
-                [] if _is_degenerate_sentence(thought.content)
-                else [thought.content]
-            )
+            sentences = [] if _is_degenerate_sentence(thought.content) else [thought.content]
         if not sentences:
             return ""
 
@@ -865,9 +948,7 @@ class GenerativeLanguage(Language):
             # from the concept network instead of using pre-composed text
             "knowledge": thought.metadata.get("knowledge"),
             "definition": thought.metadata.get("definition"),
-            "topic": thought.metadata.get("topic") or (
-                thought.topics[0] if thought.topics else ""
-            ),
+            "topic": thought.metadata.get("topic") or (thought.topics[0] if thought.topics else ""),
             "reasoning": thought.metadata.get("reasoning"),
             # Episodic memory metadata — a cleaned, highly-relevant
             # episode from LTM that the vocabulary weaves into the
@@ -919,8 +1000,9 @@ class GenerativeLanguage(Language):
             "vision_scene": thought.metadata.get("vision_scene"),
             # Vision status — when perception itself failed or is
             # unavailable ("unavailable", "mid_update", "unprocessed",
-            # "load_failed"), the vocabulary composes its report of
-            # *that* instead of leaving a raw status word in the slot.
+            # "load_failed", "gated"), the vocabulary composes its
+            # report of *that* instead of leaving a raw status word
+            # in the slot.
             "vision_status": thought.metadata.get("vision_status"),
             # Played-game result — the play layer's structured
             # outcome (family, solved, score, answer payload). The
@@ -1007,7 +1089,10 @@ class GenerativeLanguage(Language):
                         if len(tail) >= 2:
                             prev_prev_word = tail[-2]
                 word = self.vocabulary.fill_slot(
-                    seg.name, context, emotion, personality,
+                    seg.name,
+                    context,
+                    emotion,
+                    personality,
                     prev_word=prev_word,
                     prev_prev_word=prev_prev_word,
                 )
@@ -1023,8 +1108,7 @@ class GenerativeLanguage(Language):
                     and prev_literal.rstrip().endswith(("I am", "I'm"))
                     and (
                         word.startswith(("I am ", "I'm ", "I "))
-                        or word.rstrip(".!?").strip().lower()
-                        in ("i", "i'm", "i am")
+                        or word.rstrip(".!?").strip().lower() in ("i", "i'm", "i am")
                     )
                 ):
                     word = self._strip_leading_pronoun(word)
@@ -1038,10 +1122,7 @@ class GenerativeLanguage(Language):
                     nxt = segments[i + 1] if i + 1 < len(segments) else None
                     if isinstance(nxt, Literal):
                         lead = nxt.text.lstrip()
-                        if (
-                            lead[:1] in ("—", "–", ",", ";", ":")
-                            or lead[:1].islower()
-                        ):
+                        if lead[:1] in ("—", "–", ",", ";", ":") or lead[:1].islower():
                             word = word.rstrip(".!?").rstrip()
                 parts.append(word)
 
@@ -1087,16 +1168,12 @@ class GenerativeLanguage(Language):
         care about X" — so those frames are removed from the pool.
         """
         has_lead = any(
-            isinstance(f, (tuple, list)) and len(f) == 2
-            and f[0] in ("name", "trait", "comp")
+            isinstance(f, (tuple, list)) and len(f) == 2 and f[0] in ("name", "trait", "comp")
             for f in fragments
         )
         if has_lead:
             return structures
-        safe = [
-            s for s in structures
-            if not GenerativeLanguage._is_copula_content_frame(s)
-        ]
+        safe = [s for s in structures if not GenerativeLanguage._is_copula_content_frame(s)]
         return safe or structures
 
     @staticmethod
@@ -1128,7 +1205,7 @@ class GenerativeLanguage(Language):
         """
         for prefix in ("I am ", "I'm ", "I "):
             if word.startswith(prefix):
-                return word[len(prefix):]
+                return word[len(prefix) :]
         if word.rstrip(".!?").strip().lower() in ("i", "i'm", "i am"):
             return ""
         return word
@@ -1212,9 +1289,7 @@ class GenerativeLanguage(Language):
 
     def _split_into_sentences(self, text: str) -> list[str]:
         """Split text into sentences for voice processing."""
-        # Split on sentence boundaries
-        parts = _SENTENCE_BOUNDARY_RE.split(text)
-        return [p.strip() for p in parts if p.strip()]
+        return [s for s in _sentences(text) if s.strip()]
 
     # ─── Language interface ──────────────────────────
 
@@ -1270,9 +1345,7 @@ class GenerativeLanguage(Language):
             from frontal_lobe.self.composer import SelfComposer
 
             composer = SelfComposer()
-            fragments = composer.identity_fragments(
-                self.self_model, self._network, emotion
-            )
+            fragments = composer.identity_fragments(self.self_model, self._network, emotion)
         thought = Thought(
             content=self.self_model.name or "identity",
             intent="self_report",
@@ -1308,7 +1381,9 @@ class GenerativeLanguage(Language):
         """Apply variation to existing text."""
         sentences = self._split_into_sentences(text)
         return self.voice.apply(
-            sentences, emotion, "inform",
+            sentences,
+            emotion,
+            "inform",
             brain_waves=self.current_brain_waves,
         )
 
@@ -1351,8 +1426,11 @@ class GenerativeLanguage(Language):
                 intent="ask",
                 emotion=emotion.label,
                 confidence=0.4,
-                topics=([question_data.get("target_concept", "")]
-                         if question_data.get("target_concept") else []),
+                topics=(
+                    [question_data.get("target_concept", "")]
+                    if question_data.get("target_concept")
+                    else []
+                ),
             )
             text = self.generate(thought, emotion)
         return text

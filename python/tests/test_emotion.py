@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 # From tests/test_emotional_regulator.py
 # ======================================================================
 
+
 def make_emotion(
     label: str = "neutral",
     alertness: float = 0.5,
@@ -128,13 +129,19 @@ def test_maintenance_good_plasticity_no_bdnf_boost() -> None:
     assert CHEM_BDNF not in amounts, f"Should not boost BDNF when healthy, got {amounts}"
 
 
-def test_maintenance_low_alertness_clears_adenosine() -> None:
-    """When alertness is low (but not drowsy), it clears adenosine."""
+def test_maintenance_low_alertness_never_touches_adenosine() -> None:
+    """When alertness is low, it boosts ACh — adenosine stays untouched.
+
+    Process S is the substrate's homeostat: periodic negative impulses
+    erased genuine wake-time accumulation alongside coupling drift,
+    pinning sleep pressure at its floor so every NREM episode staged
+    N1. Regulation acts on alerting transmitters only.
+    """
     reg, impulses = capture_impulses()
     emotion = make_emotion(label="neutral", alertness=0.35)
     reg._regulate(emotion)
     amounts = chem_amounts(impulses)
-    assert amounts.get(CHEM_ADENOSINE, 0) < 0, f"Expected adenosine reduction, got {amounts}"
+    assert CHEM_ADENOSINE not in amounts, f"Must not touch adenosine, got {amounts}"
     assert amounts.get(CHEM_ACETYLCHOLINE, 0) > 0, f"Expected ACh boost, got {amounts}"
 
 
@@ -166,10 +173,9 @@ def test_maintenance_low_alertness_skipped_when_drowsy() -> None:
     emotion = make_emotion(label="drowsy", alertness=0.25, plasticity=0.5)
     reg._regulate(emotion)
     amounts = chem_amounts(impulses)
-    # Drowsy branch should send stronger adenosine reduction
-    assert amounts.get(CHEM_ADENOSINE, 0) <= -0.05, (
-        f"Expected strong adenosine clear, got {amounts}"
-    )
+    # Drowsy branch wakes through alerting transmitters — the
+    # homeostat itself must never be drained by regulation.
+    assert CHEM_ADENOSINE not in amounts, f"Must not drain adenosine while drowsy, got {amounts}"
 
 
 # ── State-specific intervention tests ──────────────────────────
@@ -206,9 +212,7 @@ def test_drowsy_strong_wake_up() -> None:
     amounts = chem_amounts(impulses)
     assert amounts.get(CHEM_ACETYLCHOLINE, 0) >= 0.06, f"Expected strong ACh, got {amounts}"
     assert amounts.get(CHEM_HISTAMINE, 0) >= 0.04, f"Expected strong histamine, got {amounts}"
-    assert amounts.get(CHEM_ADENOSINE, 0) <= -0.05, (
-        f"Expected strong adenosine clear, got {amounts}"
-    )
+    assert CHEM_ADENOSINE not in amounts, f"Wake-up must not drain the homeostat, got {amounts}"
 
 
 def test_sleeping_boosts_bdnf() -> None:
@@ -323,15 +327,12 @@ def test_describe_regulation() -> None:
     assert "regulated" in desc.lower() or "restoring" in desc.lower()
 
 
-
 # ─── update_from_body_state field mapping ─────────────────────
 
 
-def test_interoception_latency_uses_observed_response_not_benchmark() -> None:
+def test_interoception_latency_uses_observed_response_not_benchmark(tmp_path) -> None:
     """Latency must come from the real interaction path, not a microbenchmark."""
-    from limbic_system.emotional_regulator import InteroceptionSystem
-
-    intero = InteroceptionSystem()
+    intero = _intero(0.0, tmp_path)
     state = intero.sense_internal_state()
     assert state.latency_observed is False
     assert state.response_latency == 0.0
@@ -341,7 +342,10 @@ def test_interoception_latency_uses_observed_response_not_benchmark() -> None:
     assert state.latency_observed is True
     assert 599.0 <= state.response_latency <= 601.0
     assert 599.0 <= state.last_response_latency <= 601.0
-    assert state.stress_level > 0.0
+    # One sample is a baseline, not a deviation: no stress yet. Latency
+    # stress is self-relative — distress belongs to a turn that is
+    # acutely slower than her own envelope, not to being a slow body.
+    assert state.stress_level == 0.0
 
     # The smoothed state retains recent history, but the causal diagnosis
     # must be based on the current observed turn rather than stale EWMA data.
@@ -349,6 +353,11 @@ def test_interoception_latency_uses_observed_response_not_benchmark() -> None:
     state = intero.sense_internal_state()
     assert 100.0 < state.response_latency < 600.0
     assert 99.0 <= state.last_response_latency <= 101.0
+
+    # An acute spike — far above the current baseline — is distress.
+    intero.record_response_latency(5000.0)
+    state = intero.sense_internal_state()
+    assert state.stress_level > 0.0
 
 
 def test_update_from_body_state_maps_all_fields() -> None:
@@ -407,9 +416,7 @@ def test_update_from_body_state_maps_all_fields() -> None:
     assert abs(state.metabolic_rate - 0.85) < 0.01, f"metabolic_rate: {state.metabolic_rate}"
     # Voltage fields — electrical state of the body
     assert abs(state.core_voltage - 1.25) < 0.01, f"core_voltage: {state.core_voltage}"
-    assert abs(state.supply_voltage - 10.3) < 0.01, (
-        f"supply_voltage: {state.supply_voltage}"
-    )
+    assert abs(state.supply_voltage - 10.3) < 0.01, f"supply_voltage: {state.supply_voltage}"
 
 
 # ─── HPA axis CRH routing tests ────────────────────────────────
@@ -442,8 +449,7 @@ def test_hpa_axis_sends_crh_not_cortisol() -> None:
     # only send CRH.
     crh_total = amounts.get(CHEM_CRH, 0.0)
     assert crh_total > 0, (
-        f"Expected CRH impulse from HPA axis, got CRH={crh_total}, "
-        f"all impulses={impulses}"
+        f"Expected CRH impulse from HPA axis, got CRH={crh_total}, all impulses={impulses}"
     )
 
 
@@ -486,14 +492,14 @@ def test_hpa_axis_no_direct_cortisol_from_cascade() -> None:
     # which is negative and fine.
     positive_cortisol = [a for a in cortisol_impulses if a > 0]
     assert len(positive_cortisol) == 0, (
-        f"Expected no positive cortisol from HPA cascade, got "
-        f"positive cortisol={positive_cortisol}"
+        f"Expected no positive cortisol from HPA cascade, got positive cortisol={positive_cortisol}"
     )
 
 
 # ======================================================================
 # Sentiment analysis tests
 # ======================================================================
+
 
 def test_positive_message():
     """Test positive message."""
@@ -627,18 +633,14 @@ def test_phrase_kind_of_alone_is_neutral():
     phrase recognition "kind of" scored positive.
     """
     result = analyze_sentiment("kind of")
-    assert abs(result["compound"]) < 0.1, (
-        f"'kind of' should be neutral, got {result['compound']}"
-    )
+    assert abs(result["compound"]) < 0.1, f"'kind of' should be neutral, got {result['compound']}"
     assert result["sentiment_words"] == 0
 
 
 def test_standalone_kind_is_sentiment():
     """Phrase handling must not swallow a standalone positive 'kind'."""
     result = analyze_sentiment("she is kind")
-    assert result["compound"] > 0.0, (
-        f"'she is kind' should be positive, got {result['compound']}"
-    )
+    assert result["compound"] > 0.0, f"'she is kind' should be positive, got {result['compound']}"
 
 
 def test_intensifier_a_lot():
@@ -696,9 +698,7 @@ def test_punctuation_boost():
     punct = analyze_sentiment("great!!!")
     assert punct["compound"] > plain["compound"] or (
         abs(punct["compound"] - plain["compound"]) < 0.05
-    ), (
-        f"'great!!!' ({punct['compound']}) should be > 'great' ({plain['compound']})"
-    )
+    ), f"'great!!!' ({punct['compound']}) should be > 'great' ({plain['compound']})"
 
 
 # ─── Mixed sentiment ──────────────────────────────────────────────
@@ -758,9 +758,7 @@ def test_proportions_sum_to_one():
     for msg in ["good", "bad", "good and bad", "neutral text"]:
         result = analyze_sentiment(msg)
         total = result["positive"] + result["negative"] + result["neutral"]
-        assert abs(total - 1.0) < 0.1, (
-            f"proportions for '{msg}' sum to {total}, expected ~1.0"
-        )
+        assert abs(total - 1.0) < 0.1, f"proportions for '{msg}' sum to {total}, expected ~1.0"
 
 
 # ─── Lexicon coverage for common affect words ─────────────────────
@@ -787,34 +785,43 @@ def test_stress_is_negative_sentiment():
 def test_common_distress_words_recognized():
     """A set of common distress words must all be in the lexicon."""
     for word in [
-        "stressed", "stressful", "anxious", "worry", "upset",
-        "lonely", "afraid", "nervous", "miserable", "hopeless",
-        "overwhelmed", "exhausted", "frustrated",
+        "stressed",
+        "stressful",
+        "anxious",
+        "worry",
+        "upset",
+        "lonely",
+        "afraid",
+        "nervous",
+        "miserable",
+        "hopeless",
+        "overwhelmed",
+        "exhausted",
+        "frustrated",
     ]:
         result = analyze_sentiment(word)
-        assert result["compound"] < 0.0, (
-            f"'{word}' should be negative: {result['compound']}"
-        )
+        assert result["compound"] < 0.0, f"'{word}' should be negative: {result['compound']}"
 
 
 def test_common_positive_words_recognized():
     """A set of common positive words must all be in the lexicon."""
     for word in [
-        "content", "thankful", "cheerful", "satisfied",
-        "confident", "optimistic", "serene",
+        "content",
+        "thankful",
+        "cheerful",
+        "satisfied",
+        "confident",
+        "optimistic",
+        "serene",
     ]:
         result = analyze_sentiment(word)
-        assert result["compound"] > 0.0, (
-            f"'{word}' should be positive: {result['compound']}"
-        )
+        assert result["compound"] > 0.0, f"'{word}' should be positive: {result['compound']}"
 
 
 def test_stress_negation_flips():
     """'not stressed' should be positive, not neutral."""
     result = analyze_sentiment("I am not stressed at all")
-    assert result["compound"] > 0.0, (
-        f"'not stressed' should be positive: {result['compound']}"
-    )
+    assert result["compound"] > 0.0, f"'not stressed' should be positive: {result['compound']}"
 
 
 def test_allostatic_load_requires_converging_domains() -> None:
@@ -858,8 +865,9 @@ def test_allostatic_load_recovers_inside_hysteresis_band() -> None:
     back down — the allostatic trap.
     """
     tracker = AllostaticLoadTracker()
-    band_mid = (AllostaticLoadTracker.RECOVER_THRESHOLD
-                + AllostaticLoadTracker.ACCUMULATE_THRESHOLD) / 2.0
+    band_mid = (
+        AllostaticLoadTracker.RECOVER_THRESHOLD + AllostaticLoadTracker.ACCUMULATE_THRESHOLD
+    ) / 2.0
 
     tracker.set_inference_load(0.9)
     tracker.set_body_stress(0.9)
@@ -874,15 +882,15 @@ def test_allostatic_load_recovers_inside_hysteresis_band() -> None:
         tracker.record_stress(band_mid, dt=8.0)
 
     assert tracker.get_allostatic_load() == 0.0, (
-        "sustained mild stress must drain the load, not pin it: "
-        f"{tracker.get_allostatic_load()}"
+        f"sustained mild stress must drain the load, not pin it: {tracker.get_allostatic_load()}"
     )
 
 
 def test_allostatic_band_drains_slower_than_full_recovery() -> None:
     """The band is a slow drain, not a full one — that's the hysteresis."""
-    band_mid = (AllostaticLoadTracker.RECOVER_THRESHOLD
-                + AllostaticLoadTracker.ACCUMULATE_THRESHOLD) / 2.0
+    band_mid = (
+        AllostaticLoadTracker.RECOVER_THRESHOLD + AllostaticLoadTracker.ACCUMULATE_THRESHOLD
+    ) / 2.0
 
     def loaded_tracker() -> AllostaticLoadTracker:
         """A tracker holding a load well clear of the 0.0 floor.
@@ -913,12 +921,11 @@ def test_allostatic_band_drains_slower_than_full_recovery() -> None:
     full_step = before_full - full.get_allostatic_load()
 
     assert 0.0 < band_step < full_step, (
-        f"band drain ({band_step}) must be positive but slower than "
-        f"full recovery ({full_step})"
+        f"band drain ({band_step}) must be positive but slower than full recovery ({full_step})"
     )
-    assert band_step == pytest.approx(
-        full_step * AllostaticLoadTracker.BAND_RECOVERY_FACTOR
-    ), "band drain should be exactly BAND_RECOVERY_FACTOR of full recovery"
+    assert band_step == pytest.approx(full_step * AllostaticLoadTracker.BAND_RECOVERY_FACTOR), (
+        "band drain should be exactly BAND_RECOVERY_FACTOR of full recovery"
+    )
 
 
 def test_allostatic_load_timescale_matches_rust_engine() -> None:
@@ -977,9 +984,7 @@ def test_allostatic_load_treats_nan_as_no_load() -> None:
     tracker2.set_body_stress(nan)
     for _ in range(50):
         tracker2.record_stress(nan, dt=1.0)
-    assert tracker2.get_allostatic_load() < loaded, (
-        "NaN domains must not raise the load"
-    )
+    assert tracker2.get_allostatic_load() < loaded, "NaN domains must not raise the load"
 
 
 def test_allostatic_load_treats_inf_as_no_load() -> None:
@@ -1003,27 +1008,24 @@ def test_allostatic_load_clamps_out_of_range_inputs() -> None:
 def test_suspend_does_not_accumulate_allostatic_load() -> None:
     """A long gap between regulation cycles is not hours of stress.
 
-    `_last_regulate_time` is wall-clock, so a suspend/resume or a long
+    `_last_regulate_time` is monotonic, so a suspend/resume or a long
     pause hands the next cycle an enormous dt. Both consumers of that
-    dt integrate it linearly, so without a clamp the system read a
-    sleep as sustained stress. An 8 h gap used to produce load=0.864
-    and `is_chronic` in a single cycle.
+    dt integrate it, so without a clamp the system read a sleep as
+    sustained stress. An 8 h gap used to produce load=0.864 and
+    `is_chronic` in a single cycle.
     """
     regulator = EmotionalRegulator()
     regulator.allostatic_load_tracker.set_inference_load(0.45)
 
     # Pretend the last regulation cycle was 8 hours ago.
-    regulator._last_regulate_time = time.time() - 8 * 3600
+    regulator._last_regulate_time = time.monotonic() - 8 * 3600
 
-    emotion = make_emotion(
-        label="neutral", alertness=0.4, valence=0.0, plasticity=0.6
-    )
+    emotion = make_emotion(label="neutral", alertness=0.4, valence=0.0, plasticity=0.6)
     emotion.chemicals = {"cortisol": 0.5}
     regulator._regulate(emotion)
 
     assert regulator.allostatic_load() < 0.1, (
-        f"an 8 h suspend must not read as chronic overload, got "
-        f"{regulator.allostatic_load()}"
+        f"an 8 h suspend must not read as chronic overload, got {regulator.allostatic_load()}"
     )
     assert not regulator.allostatic_load_tracker.is_chronic_stress(), (
         "a suspend must not set the chronic-stress flag"
@@ -1033,7 +1035,7 @@ def test_suspend_does_not_accumulate_allostatic_load() -> None:
 def test_regulation_dt_is_clamped() -> None:
     """The regulation dt must never exceed MAX_REGULATION_DT."""
     regulator = EmotionalRegulator()
-    regulator._last_regulate_time = time.time() - 100000.0
+    regulator._last_regulate_time = time.monotonic() - 100000.0
     emotion = make_emotion()
     emotion.chemicals = {"cortisol": 0.0}
     regulator._regulate(emotion)
@@ -1055,23 +1057,20 @@ def test_chronic_allostatic_cause_survives_later_regulators() -> None:
     unreachable.
     """
     regulator = EmotionalRegulator()
-    emotion = make_emotion(
-        label="stressed", alertness=0.9, valence=-0.6, plasticity=0.2
-    )
+    emotion = make_emotion(label="stressed", alertness=0.9, valence=-0.6, plasticity=0.2)
     emotion.chemicals = {"cortisol": 0.55}
     regulator.allostatic_load_tracker.set_inference_load(0.5)
 
     # Enough cycles to clear CHRONIC_DURATION_SECONDS of elevation.
     for _ in range(60):
-        regulator._last_regulate_time = time.time() - 8.0
+        regulator._last_regulate_time = time.monotonic() - 8.0
         regulator._regulate(emotion)
 
     assert regulator.allostatic_load_tracker.is_chronic_stress(), (
         "fixture should produce a chronic stress pattern"
     )
     assert regulator.last_cause == "chronic_allostatic", (
-        f"chronic cause must win over proximate causes, got "
-        f"{regulator.last_cause!r}"
+        f"chronic cause must win over proximate causes, got {regulator.last_cause!r}"
     )
 
 
@@ -1083,7 +1082,7 @@ def test_non_chronic_cycle_does_not_report_chronic_cause() -> None:
     regulator.allostatic_load_tracker.set_inference_load(0.0)
 
     for _ in range(5):
-        regulator._last_regulate_time = time.time() - 8.0
+        regulator._last_regulate_time = time.monotonic() - 8.0
         regulator._regulate(emotion)
 
     assert regulator.last_cause != "chronic_allostatic"
@@ -1248,9 +1247,7 @@ def test_body_update_does_not_clobber_process_layer(tmp_path) -> None:
     cpu_stress = (88.0 - 70.0) / 30.0
     io = _intero(88.0, tmp_path)
     io.sense_internal_state()
-    io.update_from_body_state(
-        _fake_body(cognitive_load=0.1, stress_load=0.0, cpu_temp_c=40.0)
-    )
+    io.update_from_body_state(_fake_body(cognitive_load=0.1, stress_load=0.0, cpu_temp_c=40.0))
 
     state = io.last_state
     assert state is not None
@@ -1418,8 +1415,7 @@ def test_crowded_machine_tags_environment_not_effort() -> None:
     regulator._regulate_interoception(actions)
 
     assert regulator.last_cause == "interoception_environment", (
-        f"stalls without own-CPU must attribute to the environment, "
-        f"got {regulator.last_cause!r}"
+        f"stalls without own-CPU must attribute to the environment, got {regulator.last_cause!r}"
     )
 
 
@@ -1463,6 +1459,7 @@ def test_own_effort_still_tags_cpu_not_environment() -> None:
 # the disconnected branch would be the untested default.
 # ======================================================================
 
+
 def test_disconnected_cpu_is_never_read(tmp_path, monkeypatch) -> None:
     """The gate sits in the reader, so a disconnected sensor reports nothing.
 
@@ -1489,9 +1486,7 @@ def test_disconnected_cpu_contributes_no_stress(tmp_path, monkeypatch) -> None:
     io.sense_internal_state()
     state = io.last_state
     assert state is not None
-    assert state.stress_level < 1e-6, (
-        f"disconnected CPU still drove stress: {state.stress_level}"
-    )
+    assert state.stress_level < 1e-6, f"disconnected CPU still drove stress: {state.stress_level}"
 
 
 def test_disconnected_temp_reports_neutral(tmp_path, monkeypatch) -> None:
@@ -1544,9 +1539,7 @@ def test_connected_cpu_stress_still_lands(tmp_path, monkeypatch) -> None:
     assert abs(state.stress_level - 0.6) < 1e-6, state.stress_level
 
 
-def test_cognitive_load_still_stresses_when_sensors_disconnected(
-    tmp_path, monkeypatch
-) -> None:
+def test_cognitive_load_still_stresses_when_sensors_disconnected(tmp_path, monkeypatch) -> None:
     """Her own effort is not a hardware sensor, so it survives."""
     monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "cpu_usage,cpu_temp_c")
     io = _intero(5.0, tmp_path)
@@ -1590,3 +1583,230 @@ def test_sensor_set_is_read_at_call_time(monkeypatch) -> None:
 
 
 pytestmark = pytest.mark.usefixtures("learned_sentiment")
+
+
+# ======================================================================
+# Calm is chemicals, under her control
+#
+# The felt opposite of excited is not a channel: `InternalState.calm`
+# derives from the chemical signature itself — serotonin/GABA/
+# endocannabinoid above baseline against norepinephrine/glutamate/
+# orexin/histamine plus the stress hormones. The rest sensor reports
+# the body is parked; whether to *be* calm is her decision — she
+# settles only while her own signature says she isn't there.
+# ======================================================================
+
+
+def _baseline_chemicals() -> dict[str, float]:
+    """The resting chemical vector — every arm at its own baseline."""
+    return {
+        "dopamine": 0.35,
+        "serotonin": 0.40,
+        "norepinephrine": 0.30,
+        "acetylcholine": 0.35,
+        "gaba": 0.50,
+        "glutamate": 0.60,
+        "cortisol": 0.0,
+        "oxytocin": 0.25,
+        "endorphin": 0.25,
+        "histamine": 0.30,
+        "adenosine": 0.20,
+        "bdnf": 0.45,
+        "endocannabinoid": 0.25,
+        "vasopressin": 0.20,
+        "crh": 0.0,
+        "orexin": 0.30,
+        "epinephrine": 0.15,
+        "melatonin": 0.10,
+    }
+
+
+def test_chemical_calm_baseline_is_neutral() -> None:
+    """Baseline chemistry is neither settled nor excited."""
+    from limbic_system.emotional_regulator import _chemical_calm
+
+    assert _chemical_calm(_baseline_chemicals()) == pytest.approx(0.5)
+
+
+def test_chemical_calm_settle_arm_dominates() -> None:
+    """Serotonin/GABA/endocannabinoid above baseline reads as calm."""
+    from limbic_system.emotional_regulator import _chemical_calm
+
+    chemicals = _baseline_chemicals()
+    chemicals["serotonin"] += 0.15
+    chemicals["gaba"] += 0.10
+    chemicals["endocannabinoid"] += 0.10
+    assert _chemical_calm(chemicals) > 0.5
+
+
+def test_chemical_calm_excited_arm_dominates() -> None:
+    """Alerting tone above baseline reads as not-calm."""
+    from limbic_system.emotional_regulator import _chemical_calm
+
+    chemicals = _baseline_chemicals()
+    chemicals["norepinephrine"] += 0.30
+    chemicals["glutamate"] += 0.20
+    chemicals["orexin"] += 0.15
+    chemicals["histamine"] += 0.10
+    assert _chemical_calm(chemicals) < 0.5
+
+
+def test_chemical_calm_stress_collapses() -> None:
+    """Cortisol/CRH are zero-baseline — any level is deviation.
+
+    A stressed body cannot be calm no matter how parked the cores
+    are: the stress hormones enter the excited arm absolutely.
+    """
+    from limbic_system.emotional_regulator import _chemical_calm
+
+    chemicals = _baseline_chemicals()
+    chemicals["cortisol"] = 0.5
+    chemicals["crh"] = 0.2
+    assert _chemical_calm(chemicals) < 0.4
+
+
+def test_calm_unmeasured_is_neutral(tmp_path) -> None:
+    """No chemical vector ever read — calm is the placeholder, not a report."""
+    io = _intero(5.0, tmp_path)
+    io.update_from_body_state(_fake_body(rest=0.9, stress_load=0.0))
+    state = io.last_state
+    assert state is not None
+    assert state.calm_measured is False
+    assert state.calm == 0.5
+
+
+def test_update_chemicals_composes_calm(tmp_path) -> None:
+    """Pushing the chemical vector moves the felt calm."""
+    io = _intero(5.0, tmp_path)
+    io.update_chemicals(_baseline_chemicals())
+    state = io.last_state
+    assert state is not None
+    assert state.calm_measured is True
+    assert state.calm == pytest.approx(0.5)
+
+    excited = _baseline_chemicals()
+    excited["norepinephrine"] += 0.4
+    excited["glutamate"] += 0.3
+    io.update_chemicals(excited)
+    state = io.last_state
+    assert state is not None
+    assert state.calm < 0.5
+
+
+def test_settle_sends_parasympathetic_cascade() -> None:
+    """settle() authors the calm: inhibitory up, alerting withdrawn."""
+    regulator, impulses = capture_impulses()
+    regulator.settle(1.0)
+
+    amounts = chem_amounts(impulses)
+    from genesis_client.protocol import (
+        CHEM_ENDOCANNABINOID,
+        CHEM_GLUTAMATE,
+        CHEM_OREXIN,
+    )
+
+    for chem in (CHEM_GABA, CHEM_SEROTONIN, CHEM_ENDOCANNABINOID):
+        assert amounts.get(chem, 0.0) > 0.0, f"{chem} not raised"
+    for chem in (CHEM_NOREPINEPHRINE, CHEM_GLUTAMATE, CHEM_OREXIN, CHEM_HISTAMINE):
+        assert amounts.get(chem, 0.0) < 0.0, f"{chem} not withdrawn"
+
+
+def test_settle_scales_with_intensity() -> None:
+    """A half-depth settle emits a half-strength cascade."""
+    regulator, impulses = capture_impulses()
+    regulator.settle(0.5)
+    half = chem_amounts(impulses)
+
+    impulses.clear()
+    regulator.settle(1.0)
+    full = chem_amounts(impulses)
+
+    assert full[CHEM_GABA] == pytest.approx(2.0 * half[CHEM_GABA])
+
+
+def test_measured_rest_settles_when_not_calm(monkeypatch) -> None:
+    """Measured rest + unsettled chemistry → she settles.
+
+    The body's cpuidle report is the afferent; her own chemical
+    signature decides whether to act on it.
+    """
+    monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "none")
+    from limbic_system.emotional_regulator import InternalState
+
+    regulator, impulses = capture_impulses()
+    resting = InternalState(
+        cpu_usage=5.0,
+        memory_usage=10.0,
+        daemon_connected=True,
+        response_latency=0.0,
+        stress_level=0.0,
+        rest=0.8,
+        rest_measured=True,
+        calm=0.3,  # excited signature — far from settled
+        calm_measured=True,
+    )
+    regulator._interoception.sense_internal_state = lambda: resting  # type: ignore[method-assign]
+
+    regulator._regulate_interoception([])
+
+    amounts = chem_amounts(impulses)
+    from genesis_client.protocol import CHEM_ENDOCANNABINOID
+
+    assert amounts.get(CHEM_GABA, 0.0) > 0.0, "rest should settle her"
+    assert amounts.get(CHEM_ENDOCANNABINOID, 0.0) > 0.0
+    assert amounts.get(CHEM_NOREPINEPHRINE, 0.0) < 0.0
+    assert regulator.last_cause == "interoception_rest"
+
+
+def test_measured_rest_does_not_settle_when_already_calm(monkeypatch) -> None:
+    """Rest measured but her signature says settled — no push.
+
+    This is the self-limiting half: the sensor informs, her chemistry
+    decides. Once she is chemically calm the same measured rest stops
+    producing impulses without any bookkeeping.
+    """
+    monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "none")
+    from limbic_system.emotional_regulator import InternalState
+
+    regulator, impulses = capture_impulses()
+    resting = InternalState(
+        cpu_usage=5.0,
+        memory_usage=10.0,
+        daemon_connected=True,
+        response_latency=0.0,
+        stress_level=0.0,
+        rest=0.9,
+        rest_measured=True,
+        calm=0.8,  # already settled
+        calm_measured=True,
+    )
+    regulator._interoception.sense_internal_state = lambda: resting  # type: ignore[method-assign]
+
+    regulator._regulate_interoception([])
+
+    amounts = chem_amounts(impulses)
+    assert amounts.get(CHEM_GABA, 0.0) == 0.0, "settled chemistry should not settle again"
+
+
+def test_unmeasured_rest_never_settles(monkeypatch) -> None:
+    """No cpuidle telemetry — a claimed rest field is not evidence."""
+    monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "none")
+    from limbic_system.emotional_regulator import InternalState
+
+    regulator, impulses = capture_impulses()
+    resting = InternalState(
+        cpu_usage=5.0,
+        memory_usage=10.0,
+        daemon_connected=True,
+        response_latency=0.0,
+        stress_level=0.0,
+        rest=0.9,
+        rest_measured=False,  # no sensor behind it
+        calm=0.3,
+        calm_measured=True,
+    )
+    regulator._interoception.sense_internal_state = lambda: resting  # type: ignore[method-assign]
+
+    regulator._regulate_interoception([])
+
+    assert impulses == [], "unmeasured rest is not evidence of calm"

@@ -251,7 +251,9 @@ class DriftDiffusionModel:
         )
 
     def tick(
-        self, dt: float = 1.0, brain_waves: BrainWaveState | None = None,
+        self,
+        dt: float = 1.0,
+        brain_waves: BrainWaveState | None = None,
     ) -> DecisionResult | None:
         """Advance accumulation by dt and check for a decision.
 
@@ -294,17 +296,13 @@ class DriftDiffusionModel:
         inhibitions: dict[str, float] = {}
         if self.lateral_inhibition > 0 and len(self._accumulators) > 1:
             levels = {
-                name: acc.evidence
-                for name, acc in self._accumulators.items()
-                if not acc.decided
+                name: acc.evidence for name, acc in self._accumulators.items() if not acc.decided
             }
             if len(levels) > 1:
                 total = sum(levels.values())
                 for name, level in levels.items():
                     others_mean = (total - level) / (len(levels) - 1)
-                    inhibitions[name] = (
-                        self.lateral_inhibition * max(0.0, others_mean) * dt
-                    )
+                    inhibitions[name] = self.lateral_inhibition * max(0.0, others_mean) * dt
 
         for name, acc in self._accumulators.items():
             if acc.decided:

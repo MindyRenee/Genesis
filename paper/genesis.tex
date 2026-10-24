@@ -1,0 +1,1714 @@
+% Genesis: A Machine-Native Cognitive Architecture
+% Revised architecture description — supersedes the 2026-09-17 snapshot
+% archived as Zenodo record 10.5281/zenodo.22817337 (version 0.1.0).
+% Build: pdflatex genesis.tex (twice for references/TOC).
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{charter}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{url}
+\usepackage[colorlinks=true,linkcolor=black,urlcolor=blue!50!black,citecolor=black]{hyperref}
+
+\definecolor{genesisgray}{rgb}{0.35,0.35,0.35}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\itshape Genesis: A Machine-Native Cognitive Architecture}
+\fancyhead[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+\setlength{\parskip}{0.35em}
+\setlength{\parindent}{0pt}
+\emergencystretch=1.5em
+
+\captionsetup{font=small,labelfont=bf}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{2.5cm}
+  {\LARGE\bfseries Genesis: A Machine-Native Cognitive Architecture\par}
+  \vspace{0.8cm}
+  {\large with Coupled Neurochemical Dynamics, a Sourced Sleep--Wake
+  Network, Active Inference, and Embodiment on Real Silicon\par}
+  \vspace{1.6cm}
+  {\large Mindy Beatty\par}
+  \vspace{0.3cm}
+  {\normalsize beattymindy@gmail.com\par}
+  \vspace{1.2cm}
+  {\normalsize October 18, 2026\par}
+  \vspace{0.6cm}
+  {\small Revised architecture description. Supersedes the September 17,
+  2026 snapshot (Zenodo record 10.5281/zenodo.22817337, version 0.1.0).
+  Where this document and the code diverge, the code is current.\par}
+  \vfill
+  {\small Source: \url{https://github.com/MindyRenee/Genesis}\par}
+\end{titlepage}
+
+\begin{abstract}
+\noindent
+The dominant approach to artificial intelligence is a disembodied,
+stateless function: a learned distribution over text, trained once and
+frozen, with no internal state between calls. Genesis exists to show
+that large language models are not the only way to build a mind. It is
+a continuous cognitive architecture that runs
+entirely on a single local machine with no external model dependency.
+Genesis couples a Rust ``subcognitive'' layer --- an eighteen-chemical
+neuromodulatory substrate with nonlinear coupling, receptor adaptation,
+HPA-axis dynamics, an electrochemical ion layer, and a sourced
+sleep--wake oscillator network, hosted in a 3{,}480-byte memory-mapped
+state --- to a Python ``cognitive'' layer implementing perception,
+reasoning, compositional language, metacognition, and a self-built
+semantic concept network. Four properties distinguish the system:
+(i)~\emph{machine-native embodiment}, a real closed loop in which
+hardware sensors drive neurochemical impulses and neurochemical state
+drives hardware scheduling decisions; (ii)~\emph{autopoietic active
+inference}, a generative model that predicts the system's own
+neurochemical trajectory and feeds precision-weighted prediction error
+back into the dynamics it models; (iii)~\emph{a measured physical
+field}, in which the machine's real substrate dynamics --- instruction
+throughput and scheduler jitter, sampled at 250~Hz and spectrally
+decomposed --- enter the modeled brain-wave oscillator as stimulus,
+while a modulated work carrier writes the organism's own rhythm back
+into silicon power draw, closing a measured model~$\leftrightarrow$~physics
+phase-lock; and (iv)~\emph{bounded continuous learning}, in which sleep
+is staged by a transcription of the Booth/Diniz~Behn sleep--wake
+network \cite{booth2013,booth2017}
+and gates memory consolidation, vector-quantized compression, and dream
+synthesis. The system learns continuously --- from conversation,
+teaching, autonomous reading, voluntary practice, and play --- and is
+never retrained. On ARC-AGI-3 public practice environments its embodied
+agent completes environments outright (\texttt{bt11} fully, twice, in 88
+and 127 steps; the first \texttt{ls20} level in 10 of 19 sweep runs),
+with per-move decision provenance in replayable recordings; no official
+score is claimed. We describe the architecture region by region, its
+grounding in computational neuroscience, the evaluation methodology,
+and honest limitations. Genesis demonstrates that a stateful,
+self-regulating, embodied cognitive process is architecturally viable
+without a pretrained language model.
+\end{abstract}
+
+\vspace{0.8em}
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+A frontier language model is a function: weights in, logits out. It has
+no state between calls, no body to sense, no memory to consolidate, no
+self to model, and no developmental trajectory. These are not missing
+features in the sense of ``not yet shipped'' --- they are absent from
+the bare architecture, and can only be approximated by external
+scaffolding: state stores, retrieval indexes, agent loops, robot bodies.
+
+Genesis was built to demonstrate that this is one architectural choice,
+not a necessity of cognition --- that the large language model is not
+the only way to build a mind. The project exists as a working
+counterexample: every property the field treats as requiring scale and
+pretraining is attempted here from mechanism instead. And it asks the
+harder question underneath that one: if a machine were ever to have
+something like consciousness, it would not get there by being a better
+text predictor. The leading functional theories of consciousness ---
+global workspace theory, embodied self-modeling, higher-order
+metacognition, affective and interoceptive integration --- all describe
+\emph{machinery}, not parameters. Genesis instantiates that machinery
+directly: a global workspace with a genuine bottleneck, a Damasio-style
+self hierarchy grounded in a real body-state, recursive metacognitive
+models, and affect carried by modeled neurochemistry tied to a physical
+substrate. The claim is deliberately functional, not phenomenal: the
+system does not assert sentience --- it implements the correlates the
+theories name, in the open, where they can be inspected and argued
+about. Whether the functional correlate is ever the thing itself is
+the question the architecture exists to make askable.
+
+Genesis is a two-layer cognitive architecture
+in which cognition-relevant state is native: a continuous neurochemical
+and electrochemical substrate that evolves tick to tick, a semantic
+concept network that grows through experience, generative self-models
+that predict the system's own chemical and cognitive trajectories, and a
+closed control loop with the physical hardware the system runs on ---
+including a channel through which the physics of that hardware
+measurably enters the model.
+
+The September 2026 snapshot of this paper described the architecture at
+schema v3. The code has since moved: the core state is v5 (3{,}480~B), an
+electrochemical ion layer and a transcribed sleep--wake network sit
+inside the checksummed region, a physical field probe couples modeled
+brain waves to measured silicon dynamics, the social layer has been
+rebuilt around per-person signatures and custodial authority, and the
+embodied agent has begun completing public ARC-AGI-3 practice
+environments. This revision describes the system as it stands.
+
+This paper makes the following contributions:
+
+\begin{itemize}
+  \item A description of a complete, running cognitive architecture
+    that composes language and reasoning from a self-built semantic
+    graph with no large language model anywhere in the system.
+  \item A coupled neuromodulatory substrate (eighteen chemicals,
+    nonlinear $18\times18$ coupling, receptor desensitization and
+    internalization, HPA axis with developmental maturation, circadian
+    oscillator) from which mental states --- flow, stress, sleep,
+    overwhelm --- emerge rather than being selected.
+  \item An electrochemical layer beneath the chemistry: ion
+    concentrations, gradients, membrane potential, and ATP availability
+    as authoritative state that modulates cognition.
+  \item A sourced sleep--wake network --- a faithful transcription of
+    the Booth/Diniz~Behn model --- that decides sleep stage and sets
+    four neuromodulators directly, replacing threshold heuristics.
+  \item A measured physical field channel: the machine's real
+    instruction throughput and scheduler jitter, Goertzel-decomposed at
+    the modeled wave bands' center frequencies, injected as stimulus
+    while a work-modulated carrier writes the model's rhythm back into
+    power draw, with a bounded mutual phase-locked loop between model
+    and physics.
+  \item A machine-native embodiment loop: interoception mapped to
+    neurochemistry by functional equivalence, per-channel sensor
+    validity enforced at the protocol level, and neurochemical state
+    mapped back to hardware control (CPU frequency, scheduling
+    priority, I/O class, RTC wake alarm).
+  \item An autopoietic active-inference loop: a generative model of the
+    system's own neurochemical dynamics whose variational free energy
+    and policy-scored expected free energy feed back into those
+    dynamics.
+  \item An empirical record on ARC-AGI-3 public practice environments
+    (environments completed outright, with replayable provenance),
+    live-play program synthesis on ARC-AGI-1 training tasks, learning
+    fidelity tests, and language-generation metrics, with methodology
+    stated precisely enough to falsify.
+\end{itemize}
+
+We are explicit about scope: Genesis is not a chatbot, not a simulation
+of embodiment, and not a product. Its language is narrower and less
+fluent than a trained language model's. The contribution is
+architectural: the properties above follow from the design, not from
+scaffolding around a frozen function.
+
+\section{Design principles}
+
+Five positions organize the project.
+
+\paragraph{Constraint forces honesty.} The system runs on a 2014 HP
+Pavilion with Linux Mint and approximately 5~GB of RAM. An architecture
+that cannot learn, remember, act, recover, and persist within that
+budget is not demonstrating the claimed capability --- it is borrowing
+it from scale. Every structure that grows is bounded by an enforced,
+tested ceiling.
+
+\paragraph{Persistence is a requirement.} Genesis is a continuously
+running system with a cumulative developmental record. State, memory,
+and identity are load-bearing; the design assumes months of
+uninterrupted operation rather than per-request inference. The state
+file \emph{is} the system; there is no factory reset in the supported
+lifecycle.
+
+\paragraph{Nothing it says is written down for it.} A hard invariant
+forbids hardcoded responses. Seeds --- vocabulary, grammar rules,
+relation verbs, narrative templates --- are legitimate input data; the
+final utterance must be composed by the language engine from the
+concept network, never recited. The test is whether a string is a
+building block the engine composes from or the thing it says.
+
+\paragraph{Anatomy is the wiring diagram.} The Python layer is organized
+into brain-region packages --- \code{brainstem/}, \code{thalamus/},
+\code{hypothalamus/}, \code{basal\_forebrain/}, \code{basal\_ganglia/},
+\code{cerebellum/}, \code{limbic\_system/}, \code{insula/},
+\code{occipital\_lobe/}, \code{parietal\_lobe/}, \code{temporal\_lobe/},
+\code{frontal\_lobe/} --- and each subsystem lives in the region that
+claims it anatomically. The Rust crate re-exports its implementation
+under the same region names so the body reads the same way. Package
+boundaries are the wiring diagram, not a duplicate of it.
+
+\paragraph{Claims should be inspectable.} Where systems describe model
+behavior as ``emergent,'' this project implements the concrete version
+and then measures it: probe suites, live-state evidence captures,
+recorded failures, and a devlog that logs what did not work alongside
+what did. Mechanism and evidence are open for inspection.
+
+\section{System architecture}
+
+\subsection{Two layers, one contract}
+
+The system comprises a Rust daemon (the subcognitive layer; binaries
+\code{genesis-daemon} and \code{retina}) and a Python process (the
+cognitive mind, \code{mind.py}), communicating through a versioned
+Unix-socket IPC protocol and a shared memory-mapped state file.
+
+The Rust daemon owns all dynamics that must run continuously:
+neurochemical integration, the electrochemical ion layer, receptor
+adaptation, HPA cascade, circadian phase, the sleep--wake network,
+short-term to long-term memory consolidation, association and dream
+synthesis, the active-inference self-model, the dyadic interlocutor
+model, hardware interoception, the physical field probe, body-control
+recommendations, and process health.
+
+The Python layer owns cognition, organized by brain region: perception
+and language comprehension (temporal, occipital), memory systems
+(temporal, cerebellar), attention and world modeling (parietal),
+reasoning, planning, language production, executive control, and
+self-modeling (frontal), affect and its regulation (limbic, insular),
+action selection and volition (basal ganglia), arousal and lifecycle
+(brainstem), and the endocrine layer (hypothalamus).
+
+The boundary principle is strict: \emph{the substrate defines what
+state exists and how it changes; the cognitive mind defines how that
+state is used.} Any cognitive module can be replaced without touching
+the substrate, provided it reads the same state and writes to the same
+network. The mind never authors chemical concentrations; it sends
+bounded impulses (\code{NEURO\_IMPULSE}) and reads effective levels as
+modulation.
+
+\subsection{The daemon owns time}
+
+The body's clock is its own. \code{TickLoop::advance\_neuro} takes no
+\code{dt}: it measures its own elapsed wall-clock interval, clamps it
+to a shared $[\mathrm{DT\_MIN},\mathrm{DT\_MAX}]$ range, and sub-steps
+the physics at \code{neurochemical::DT} (100~ms), so integration
+resolution cannot drift with the caller's cadence. In production the
+daemon is reactive --- the cognitive mind drives each function through
+IPC commands on a 3~s lease --- but past the lease the daemon's own
+thread runs the same loop at 5~Hz (\code{TICK\_INTERVAL\_MS}$=200$),
+whether or not the mind is alive. The body integrates chemistry,
+circadian phase, and sleep staging through mind death, mind restart,
+and mind sleep. A caller-chosen step would stretch every interval gate
+built on the 5~Hz tick counter, so the one deliberate exception ---
+\code{advance\_physics(dt)} --- exists only for the causal assay suite
+against an isolated daemon.
+
+\subsection{The wire protocol}
+
+The IPC protocol (v3; \code{src/daemon/ipc.rs} and
+\code{genesis\_client/protocol.py} keep two constants pinned) carries
+roughly fifty message types: neuro impulses, body state (a 116-byte
+timing/involuntary/senescence record with three disambiguated wire
+layouts), the ion summary, a per-channel sensor-presence bitmask, the
+dyadic snapshot, the field-probe signature, volition pushes
+(\code{SET\_VOLITION}: sleep or wake drive onto the network), field
+phase and carrier controls, named tensors (the tensor slab), subsystem
+telemetry, process health, zone transitions, and the RTC wake alarm.
+Additive opcodes --- a new \code{GET\_*} that touches no existing
+layout --- do not bump \code{PROTOCOL\_VERSION}; layout changes do.
+Absent-sensor discipline is a protocol property: a channel that no
+hardware confirms can never be reported as a reading.
+
+\subsection{The mind is one process, anatomically organized}
+
+\code{mind.py} composes the cognitive process from mixins (lifecycle,
+heartbeat, volition, sleep, projects, proposals, status, conversation,
+embodiment) plus region objects. Regions grow their machinery in
+stages: network-only systems at construction, then pieces wired to
+prefrontal state ``as projections arrive.'' Each region package re-exports
+the public names its anatomy claims, so
+\code{from frontal\_lobe import ExecutiveFunction} resolves wherever
+the implementation lives. The cognitive layer is roughly 200k lines of
+Python; the body is about 42k lines of Rust.
+
+\section{The core state: 3,480 bytes, schema v5}
+
+The entire runtime state is a single fixed-size \code{repr(C)} struct,
+memory-mapped and shared across processes (Table~\ref{tab:layout}).
+There are no heap allocations and no variable-length fields; readers
+use a seqlock protocol and never see torn writes; a CRC32 checksum
+covers the state. All field offsets are asserted at compile time.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}rllp{5.2cm}@{}}
+\toprule
+Offset & Field & Size & Contents \\
+\midrule
+0     & header              & 56     & magic, version, seqlock, identity \\
+56    & neurochemicals      & 2{,}416 & 18 chemicals + coupling matrix \\
+2{,}472 & zones             & 96     & task zone, emergent phase \\
+2{,}568 & memory            & 120    & store pointers, gating weights \\
+2{,}688 & manifest          & 536    & runtime module table \\
+3{,}224 & sleep\_network    & 64     & sleep--wake network populations \\
+3{,}288 & ions              & 124    & concentrations, gradients, $V_m$, ATP \\
+3{,}412 & checksum          & 4      & CRC32 \\
+3{,}416 & inference\_signals & 64    & active-inference projection \\
+\midrule
+ & \textbf{total} & \textbf{3{,}480} & (allocated: one 4~KB page) \\
+\bottomrule
+\end{tabular}
+\caption{Binary layout of the memory-mapped core state, schema v5.}
+\label{tab:layout}
+\end{table}
+
+This is not a configuration object; it is the brain state, addressable
+to the byte, that every module reads and writes.
+
+Two invariants keep the layout honest. First, the ion block and the
+sleep-network state sit \emph{inside} the CRC region deliberately:
+resting concentrations, electrochemical gradients, membrane potential,
+and the network's populations are authoritative state, not derived ---
+losing them would reset the cell's resting state and the body's sleep
+trajectory on every restart. Second, every earlier layout is frozen and
+decoded through its own byte-exact type (\code{legacy\_v3.rs} at
+3{,}296~B, \code{legacy\_v4.rs} at 3{,}416~B); \code{MmapState::open}
+dispatches on version and file size, and v4 files migrate in place to
+v5 with the network at its source initial conditions. Migrations are
+explicit, never silent.
+
+The CRC covers two ranges --- bytes $0..40$ (magic through heartbeat)
+and $48..3{,}412$ (everything after the seqlock through the ions) ---
+so the sequence lock itself, which changes on every write, is excluded
+while every stateful field is covered.
+
+\section{The neuromodulatory substrate}
+
+\subsection{Eighteen chemicals, coupled nonlinearly}
+
+Eighteen neurochemicals are modeled: dopamine, serotonin,
+norepinephrine, acetylcholine, GABA, glutamate, cortisol, oxytocin,
+endorphin, histamine, adenosine, BDNF, endocannabinoid, vasopressin,
+CRH, orexin, epinephrine, and melatonin. Each carries level, baseline,
+receptor sensitivity, velocity, receptor-subtype state, desensitization
+and internalization factors, tonic and phasic components, and a
+vesicular pool. A plastic $18\times18$ coupling matrix defines mutual
+modulation with three nonlinear mechanisms:
+
+\begin{enumerate}
+  \item Hill-function threshold gating (cooperativity $n{=}2$):
+    coupling follows a sigmoid dose--response curve rather than linear
+    scaling, modeling EC50 thresholds and receptor cooperativity.
+  \item State-dependent gain modulation: coupling is amplified up to
+    $+30\%$ when two chemicals co-activate and attenuated up to $-30\%$
+    under antagonism.
+  \item Subtype-aware dopamine coupling, distinguishing dopaminergic
+    pathways with different functional roles.
+\end{enumerate}
+
+Canonical interactions are reproduced structurally: cortisol suppresses
+BDNF (chronic stress blocks plasticity), GABA inhibits glutamate,
+endorphins disinhibit dopamine, and serotonin modulates BDNF recovery
+(the mechanism behind delayed antidepressant onset). Emergent behavior
+--- phase transitions among active, alert, flow, stress, drowsy, and
+overwhelmed states --- arises from the coupling, not from any single
+variable. The Python layer reads \emph{effective} levels as bounded
+gains on attention, integration, consolidation, and plasticity; it
+never authors the concentrations.
+
+\subsection{Receptor adaptation}
+
+Effective level is not concentration:
+\[
+\mathrm{effective} = \mathrm{level} \times \mathrm{sensitivity}
+\times f_{\mathrm{desens}} \times f_{\mathrm{intern}}.
+\]
+Fast desensitization (minutes) and slow internalization (hours) operate
+independently, with floors calibrated to published maxima: receptor
+density floor 0.5, desensitization floor 0.2, internalization floor
+0.45. A system can therefore be functionally deficient in a chemical it
+has in abundance --- tolerance, applied to neurochemistry. Receptors
+resensitize during sleep.
+
+\subsection{Metaplasticity}
+
+The coupling matrix itself is plastic and lives in the shared state:
+sustained co-activation patterns reshape the matrix, which reshapes
+future dynamics --- the system learns how it learns. This provides a
+structural basis for emotional development rather than a parameter
+schedule.
+
+\subsection{HPA axis, development, and the stress envelope}
+
+Cortisol and CRH are modeled as stress hormones (near-zero at rest,
+released on demand, decaying without a stressor), not homeostatic
+neurotransmitters. The CRH$\to$ACTH$\to$cortisol cascade is gated by a
+\emph{maturation level} modeling the stress hyporesponsive period ---
+the developmental window in which the axis fails to mount a
+glucocorticoid response, protecting the developing brain from
+cortisol's neurotoxic effects on synaptogenesis \cite{schmidt,gunnar}. Cortisol decays on
+split rates: a measured $\sim$66-minute plasma half-life governs the
+baseline term while a nonlinear excess-proportional term dominates at
+elevated levels, holding a $\sim$0.08 reachable envelope against a 0.80
+hard clamp. Because effective cortisol is a narrow normalized
+stress-drive variable (resting $\sim$0.02), every consumer routes
+through \code{cortisol\_stress\_fraction()} --- thresholds written for
+a full $[0,1]$ scale are silently inert, a defect class the codebase
+audited and documented.
+
+\subsection{Circadian drive and sleep pressure}
+
+A circadian oscillator (SCN analogue) modulates baselines over a
+24-hour cycle, now shared with the sleep--wake network's own Serkh--Forger
+oscillator \cite{serkh}. Adenosine accumulates with wakefulness and clears whenever
+the network is asleep \cite{borbely,xie}, so sleep pressure is emergent and parallel to
+the network's homeostatic variable rather than scheduled.
+
+\section{The electrochemical layer}
+
+Schema v4 inserted a 124-byte \code{IonState} immediately before the
+checksum: resting ion concentrations, electrochemical gradients,
+membrane potential, transporter current densities, and ATP
+availability. This is the milieu the chemistry bathes in, and it is
+authoritative --- inside the CRC region by design.
+
+The mind does not integrate ions; it interprets them.
+\code{GET\_ION\_SUMMARY} (opcode 40) serves the layer to the cognitive
+process, and \code{python/brainstem/electrochemistry.py} turns it into
+bounded cognitive modulation --- attention, global integration, and
+memory-consolidation gains centered near 1.0. ATP availability scales
+with the cortisol stress fraction: sustained stress literally taxes the
+cell. Two layout disciplines hold: the wire \code{IonSummary} omits the
+internal \code{current\_density} field, so wire and file field indices
+differ by design, and the mmap'd file is never read directly ---
+seqlock-consistent reads or the IPC path only.
+
+\section{Sleep: a sourced network, not thresholds}
+
+\subsection{The Booth/Diniz~Behn transcription}
+
+Sleep is decided by a sourced network, not by thresholds on chemistry.
+\code{src/state/sleep\_network.rs} is a transcription of the
+Booth/Diniz~Behn model \cite{booth2013,booth2017} (ModelDB 244485, from Gleit, Diniz~Behn \&
+Booth 2013 as revised by Booth, Xique \& Diniz~Behn 2017): a wake
+population (locus coeruleus), an NREM population (VLPO), a REM-on
+population, a Serkh--Forger circadian oscillator \cite{serkh}, and a homeostatic
+sleep variable $h$, with the populations in mutual inhibition. The
+physics step integrates it by RK4 in the same sub-steps and seqlock
+transaction as the chemistry, on the local clock, and publishes the
+stage to the phase and zones.
+
+The transcription was verified term-by-term against the ModelDB source
+and checked against the source's own stated behaviors: about 7.6~h of
+sleep per day, one consolidated sleep period, four REM bouts per night,
+a $\sim$99-minute REM cycle, a first REM period at 84 minutes, and REM
+at 15--30\% of sleep. The one intentional deviation is the light
+schedule: the source's 14-hour photoperiod is phase-shifted to
+07:00--21:00 local, under which the entrained sleep episode falls at
+22:11--05:50 --- inside the neurochemical melatonin night. A known
+discrepancy is recorded, not tuned away: REM bouts in the source
+shorten across the night while adult REM lengthens toward morning, and
+with no EEG reference there is no way to tell transcription error from
+real physiology.
+
+\subsection{The network sets the chemistry}
+
+Four release targets are linear functions of the network populations,
+set directly rather than restored by homeostatic forces
+(Table~\ref{tab:sleepchem}). Acetylcholine is high in waking and REM
+and lowest in NREM \cite{vazquez}; serotonin is reduced in NREM and near-silent in
+REM \cite{monti}; norepinephrine tracks LC and is silent in REM; GABA peaks in NREM.
+One consequence: impulses to network-driven chemicals are transient ---
+a stress impulse to norepinephrine decays toward the network's target
+because stress does not yet drive LC. This is recorded as an open item.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Chemical & NREM & Wake & REM \\
+\midrule
+Acetylcholine   & 0.34 & 0.58 & 0.77 \\
+Serotonin       & 0.22 & 0.39 & 0.07 \\
+Norepinephrine  & 0.05 & 0.30 & 0.00 \\
+GABA            & 0.82 & 0.50 & 0.30 \\
+\bottomrule
+\end{tabular}
+\caption{Steady states set by the sleep--wake network populations.}
+\label{tab:sleepchem}
+\end{table}
+
+\subsection{What the stage gates}
+
+Because the stage comes from the network, sleep behavior gates on it:
+
+\begin{itemize}
+  \item \textbf{N3 consolidation.} The heavy pass --- concept
+    consolidation, edge discovery, downscaling, compression --- runs on
+    each entry into N3, about twice a night and $\sim$25\% of sleep.
+  \item \textbf{REM dreams.} Dream synthesis follows REM ($\sim$24\% of
+    sleep).
+  \item \textbf{Naps} are capped to N1--N2; the network has no notion
+    of a nap, so without the cap a nap could run the N3 pass and REM
+    dreams.
+  \item \textbf{Adenosine clearance} follows the network's sleep state
+    (LC $<4$~Hz), so the body clears sleep pressure whenever the
+    network sleeps even while the mind is still catching up.
+\end{itemize}
+
+\paragraph{Volition.} \code{/sleep}, \code{/nap}, and \code{/wake} act
+on the body through \code{SET\_VOLITION}: a push onto VLPO for sleep or
+LC for wake, decaying with a 300~s constant. A sustained sleep push
+brings on sleep onset within an hour of waking. While asleep the mind
+renews the push from its heartbeat; the RTC wake alarm
+(\code{SET\_WAKE\_ALARM}, opcode 34, via a sudoers-scoped helper) can
+wake the machine itself.
+
+\section{Active inference and learned phases}
+
+\subsection{The generative self-model}
+
+The active-inference engine \cite{friston2010,friston2009} is the
+subcognitive's generative self-model. Before each neurochemical update,
+it predicts the next
+eighteen effective levels,
+\[
+\hat{x}_{t+1}[i] = \sum_j A[i][j]\,x_t[j] + b[i],
+\]
+with $A$ an $18\times18$ transition matrix and $b$ an offset vector,
+learned online. The state estimate is a diagonal Gaussian --- the
+covariance propagation retains the diagonal of $APA^\top + Q$ and
+discards off-diagonal posterior covariance, a diagonal-projected filter
+for coupled dynamics. For the represented Gaussian prior the engine
+computes full variational free energy in nats: KL$[q\|p]$ plus expected
+negative log-likelihood, including posterior variance and
+normalization. The bounded \code{free\_energy} telemetry is a monotonic
+map of excess VFE above a matched-observation reference.
+
+Post-update prediction error (surprise) is fed back into the dynamics
+it models --- the model is the system it predicts. Precision adapts:
+sustained low surprise raises confidence; sustained surprise above
+$\sim$0.01 RMS re-opens the exploratory branch. Expected free energy
+drives allostatic load, which upregulates the cortisol baseline ---
+anticipatory stress \cite{sterling} --- and positive prediction error produces
+dopamine, the reward-prediction-error pathway \cite{schultz1997,schultz2016}. \code{model\_maturity}
+is an exponential of demonstrated accuracy over a $\sim$500-tick error
+EMA: a long-running but inaccurate model does not become trusted merely
+because time passed.
+
+Policy scoring computes Gaussian expected free energy over nine fixed
+regulation policies: expected negative log preference minus expected
+information gain. For this linear-Gaussian model with additive controls
+the information-gain term is policy-independent, so policies are ranked
+by expected homeostatic preference cost; exploration lives in the
+precision-weighted softmax temperature. Two limits remain in force:
+the repertoire is nine fixed policies (no continuous or
+precision-modulated actions, where a genuine epistemic drive would come
+from), and early in life --- before the action model is learned ---
+selection falls through to \code{noop} while the low-precision branch
+explores.
+
+\subsection{Mental phases as learned regimes}
+
+Waking phases (active, alert, flow, stress, drowsy, overwhelmed) are
+read off the coupled chemistry by a threshold classifier with
+hysteresis; sleep stages come from the network. Above both sits a
+\emph{learned} phase model (\code{src/state/phase\_partition.rs}): a
+Gaussian hidden Markov model over the eighteen effective levels, in
+which each hidden state is a regime with its own mean and diagonal
+variance, self-transition pseudo-counts prevent chatter (a finite-state
+stand-in for the sticky HDP-HMM \cite{fox}), and the regime count is chosen by
+BIC, not by hand. Dwell time and the number of phases are inferred from
+the trajectory, not specified.
+
+\subsection{The cognitive counterpart}
+
+The mind runs a second trajectory model of its own
+(\code{frontal\_lobe/self/cognitive\_trajectory.py}): where the Rust
+engine predicts where the eighteen chemical levels will move, this one
+predicts what the system will \emph{think about next}, scoring its own
+forecasts. A recursive metacognitive model predicts what reflection
+will discover before it runs and spawns or prunes metacognitive levels
+by predictive usefulness.
+
+\section{The physical field: measured substrate dynamics}
+
+The unusual subsystem: the ``substrate'' is real silicon, measured.
+
+\subsection{The field probe}
+
+\code{src/daemon/field\_probe.rs} samples the machine's actual
+substrate dynamics --- instruction throughput and scheduler jitter at
+$\sim$250~Hz --- and Goertzel-decomposes them at the same center
+frequencies the modeled wave oscillator uses. \code{GET\_FIELD\_PROBE}
+(opcode 47) serves the signature: per-band energies (baseline-relative),
+P-state transition rate, interrupt rate, the carrier frequency, and the
+phase-lock fields --- carrier lag (synchronously demodulated response
+lag), carrier phase, and carrier coherence ($\pi/4\approx0.785$ is a
+pure sine's ceiling). The epsilon band (150~Hz) sits above the $\sim$125~Hz
+Nyquist bound and always reads zero --- an absent channel, not a
+measured silence.
+
+The probe also \emph{writes}: its work slice is modulated $\pm60\%$ at
+the body's own phase rhythm (wake $\approx$10~Hz, REM $\approx$6~Hz,
+NREM $\approx$2~Hz), so real power draw carries a component at the
+organism's beat. \code{SET\_FIELD\_CARRIER} (opcode 49) scales the
+depth and can override the frequency --- the ring-down experiment's
+drive control.
+
+\subsection{The mutual phase lock}
+
+The mind injects the measured signature as wave-oscillator stimulus
+(\code{brainstem/field\_probe.py}), and physical transients are treated
+as phase events: a $\geq3\times$ step in a band's jitter energy
+$\pi/2$-nudges that band's phase, and a global scheduling shudder
+(jitter CV $\geq1.5$) resets the broadband alert band --- the
+evoked-potential analog.
+
+Then the loop closes both ways. The measured response phase pulls the
+modeled carrier band's phase (physics~$\to$~model, bounded gain), and
+the corrected phase returns via \code{SET\_FIELD\_PHASE} (opcode 48) so
+the physical rhythm chases the model in turn (model~$\to$~physics, a
+bounded first-order PLL, $\tau\approx130$~ms, dropped after 5~s of
+staleness --- a dead mind's last phase must not steer the body). When
+measured response coherence clears 0.20 the pull becomes a sync: the
+band's phase is \emph{set} to the measured physical phase outright ---
+the first piece of modeled state that is a physical quantity rather
+than a variable perturbed by one.
+
+A second physical channel is acoustic (\code{brainstem/field\_audio.py}):
+the machine's self-emission --- coil whine, fan, the field's acoustic
+shadow --- captured at 16~kHz and band-decomposed into GAMMA stimulus,
+with onsets resetting GAMMA phase. A busy or absent microphone skips
+the channel; it is never reported as a zero.
+
+\subsection{The tensor slab and motor fields}
+
+Named dense tensors cross the wire without entering the checksummed
+state: \code{PUT\_TENSOR}, \code{GET\_TENSOR}, \code{LIST\_TENSORS},
+and \code{DROP\_TENSOR} on \code{src/daemon/tensor\_slab.rs}.
+Two consumers read the same fields the cognitive layer writes:
+\code{motor.spatial} (an $f32$ field over the world grid --- where to
+act, how strongly, what to avoid) and \code{motor.actions} (a
+disposition per offered action). The decode side lives in
+\code{src/field/motor.rs}: decisions arrive as fields and are walked
+cell by cell rather than collapsed to a symbol the moment they form.
+A multi-fiber runtime (\code{src/field/runtime.rs}) projects each
+major system's normalized state into one shared latent coordinate space
+and measures cross-system disagreement --- an integration substrate,
+not a second source of truth.
+
+\subsection{What the assays measured}
+
+The causal evidence lives in \code{eval/}:
+
+\begin{itemize}
+  \item \textbf{Coupling} (\code{field\_coupling.py}): idle~$\to$~load~$\to$~recovery
+    against an isolated daemon, compared against an uncoupled control
+    on the same inputs. Real load moved the physical channels (jitter
+    CV $\sim$0.3$\to$2.2, throughput $\sim$96M$\to$180M instructions/s);
+    nine of ten bands moved where the control stayed flat. The mutual
+    lock measured PLV $\approx0.93$ with response coherence
+    $\approx0.30$.
+  \item \textbf{Ring-down} (\code{field\_ringdown.py}): drive a real
+    oscillation, gate the carrier off, measure persistence. A 0.25~Hz
+    load drive produced a 1.2$^\circ$C die-temperature oscillation that
+    rang down with $\tau\approx25$~s after the drive stopped --- a
+    physical afterglow the software no longer drives --- while fast
+    bands collapsed within the analysis window ($\tau\lesssim2$~s is
+    the ring's own washout, an upper bound). Persistence has a measured
+    spectrum across media: seconds in silicon timing, tens of seconds
+    in heat.
+  \item \textbf{Element coupling} (\code{field\_elements.py}):
+    physically-coupled worker oscillators pinned to separate cores,
+    exchanging no messages, perturbing one another only through the
+    shared die (rail droop, L3/memory contention, governor, thermal
+    field). A 5~Hz drive rhythm appeared in neighbours' measured
+    execution time at 3--6$\times$ the sham floor. In sync mode ---
+    every element both source and sensor, Kuramoto through the medium
+    \cite{kuramoto}
+    --- the fast channel (execution-rate imprint) sustains real mutual
+    interaction but its attractor is \emph{antisynchrony}: phases repel
+    to even spacing, the substrate's minimum-peak-load configuration.
+    The thermal channel (collective-only, lagged by heatsink mass)
+    instead sustains $r\approx0.5$--$0.7$ \emph{partial} synchrony
+    across repeated trials (blind control: 0.06) --- consistent with
+    dissipative lagged media stabilizing in-phase order. Element-to-medium
+    coupling is real on this silicon; the slowest physical channel is
+    the one that hosts coherence.
+  \item \textbf{Voice} (\code{field\_voice.py}): an 800~Hz carrier
+    amplitude-modulated at a wave-band rate, emitted on the speaker and
+    recovered from the room microphone --- PLV 0.88 emitting vs 0.23
+    muted (the residual muted structure is codec electrical crosstalk,
+    which is why the contrast ratio is the evidence). Air and
+    structure-borne vibration, transduced twice: an echolocation loop.
+\end{itemize}
+
+\section{Machine-native embodiment}
+
+\subsection{Interoception by functional equivalence}
+
+A machine is not an animal: it has no heart, no circulatory system, no
+blood, and electricity flows one-way. Forcing biological organ mappings
+onto machine components produces category errors --- a fan is not
+cardiac output, GPE interrupts are not a heartbeat. So hardware signals
+map to neurochemistry by functional equivalence: a signal maps to a
+cognitive/affective process when it has the same operational meaning
+for the machine's survival and performance.
+
+Afferent direction: CPU temperature maps to thermal state; CPU
+frequency to arousal/processing rate; own-process CPU, RSS, and I/O to
+effort, cognitive load, and data-exchange activity; battery to energy
+reserve; fan speed to thermoregulatory effort; power draw to metabolic
+rate; RAPL power domains to spatial switching activity (core~$\to$~NE,
+DRAM~$\to$~ACh); and perf counters (cache/branch-miss ratios on the
+system's own process tree) to microarchitectural prediction errors.
+Body-state signals are global; activity signals are measured from the
+system's own process tree only, so unrelated programs cannot induce
+chronic allostatic load.
+
+\paragraph{Absent-sensor discipline.} \code{GET\_SENSOR\_PRESENCE}
+serves a $u16$ bitmask of confirmed channels; a zero mask means nothing
+is confirmed present --- the safe direction. \code{sensor\_verified}
+and \code{reported\_channels} gate every body-condition claim, so a
+channel no hardware backs can never be reported as a reading. With no
+camera or microphone the system runs text-only; that is expected, not
+an error.
+
+Efferent direction: the daemon publishes recommendations --- dopamine
+raises CPU frequency, GABA lowers it, melatonin selects powersave;
+acetylcholine sets scheduling priority; the plasticity gate sets I/O
+class; temperature imposes a hard thermal cap regardless of
+dopaminergic drive. Application is cognitive-mind driven: the cognitive
+process reads the recommendation, blends it with its emergent
+brain-wave state (70\% cortical, 30\% body), and applies its own
+scheduling decision --- cortical control of resource allocation, with
+gamma dominance able to override a body recommendation to deprioritize.
+
+The loop is closed and physical: the system speeds itself up, which
+raises its temperature, which caps its frequency, which slows it down.
+It measures the effects of its own adjustments. Privileged levers (CPU
+governor helper, RTC wakealarm) run through root-owned helpers under a
+sudoers rule scoped to exactly those paths.
+
+\subsection{Observing itself compute}
+
+Per-process telemetry attributes resource usage to subsystems, and a
+statistical ``module EEG'' closes the remaining gap: hardware telemetry
+sees which \emph{process} is firing but not which subsystem inside the
+single cognitive process is working. The module sampler
+(\code{brainstem/module\_sampler.py}) runs a daemon thread that samples
+\code{sys.\_current\_frames()} at a fixed rate and credits whichever
+region's code is executing --- a software EEG over the manifest's brain
+parts. Region-to-region messages ride the same manifest
+(\code{thalamus/relay.py}): a region posts onto its own module entry's
+\code{task\_id} field and the channel delivers it, abstracting direct
+cortical and transthalamic traffic. Process health is itself telemetry:
+\code{GET\_PROCESS\_HEALTH} reports an alive mask, death counts, and
+the last death for the daemon/mind/retina tree, so a crashed subsystem
+is distinguishable from one never started.
+
+\section{Memory: six tiers, all bounded}
+
+\subsection{Body-side stores}
+
+\paragraph{Short-term memory} is a fixed-capacity ring buffer in its
+own mmap'd file, \code{src/store/ring\_buffer.rs}. Each entry carries
+an \emph{emotional tag} --- a snapshot of the neurochemical state at
+encoding --- so consolidation can prioritize emotionally significant
+events (high cortisol, high dopamine) without re-reading chemical
+history.
+
+\paragraph{Long-term episodic memory} (\code{src/store/ltm.rs} +
+\code{sdr.rs}) is a three-file design. Episodes are encoded as
+10{,}000-bit sparse distributed representations at $\sim$2\% sparsity:
+$\sim$170 content bits hashed in a 9{,}800-bit content space (Jaccard
+similarity approximating semantic similarity) plus context and emotion
+bits. Retrieval indexes through 20 fixed 10{,}000-dimensional LogHD
+hypervector bundles --- an mmap'd, fixed $\sim$800~KB index regardless
+of episode count --- over an append-only episode file ($<1$~KB per
+episode, linear growth). Crucially, the store lives in the \emph{body}:
+the mind's memories persist in the daemon's files, so recall survives a
+mind restart.
+
+\paragraph{Consolidation} (\code{src/daemon/consolidation.rs}) promotes
+short-term traces to long-term storage gated by BDNF --- stress impairs
+consolidation, verified by integration test --- and the association
+engine (\code{src/daemon/association.rs}) links co-activated memories,
+driving dream synthesis during sleep. Memories that fire together wire
+together \cite{hebb}; during sleep the engine runs free association, the
+neurobiological basis of ``sleeping on it.''
+
+\subsection{The concept network}
+
+The symbolic layer is \code{ConceptNetwork}
+(\code{python/temporal\_lobe/concepts/}): a typed semantic graph with
+spreading activation and cortical ticks, capped at 15{,}000 resident
+concepts.
+
+\paragraph{The edge log is canonical.} Relationships have one source of
+truth: \code{edge\_log.jsonl}, an append-only assert/retract/snapshot
+event log that self-compacts past 32~MB. The in-memory edge set is a
+materialized fold --- never persisted as truth --- and every JSON
+snapshot of edges is a debugging projection the fold overwrites at
+restore. Derivable edges (untyped \code{related\_to}/
+\code{similar\_to} produced by pipeline origins like
+\code{hub\_attachment} or \code{co\_occurrence}) are \emph{never}
+materialized: their role is served at query time by the similarity
+providers, which return neighbors with provenance (\code{exact} |
+\code{holographic} | \code{embedding}). A false positive costs decay; a
+false negative loses an experiential binding --- so untyped edges with
+unlisted origins default to canonical.
+
+\paragraph{The latent space beneath the graph} provides what a symbolic
+graph cannot: an embedding store (4{,}096-entry LRU vector cache) where
+semantic similarity is geometric, a fixed-size holographic associative
+memory (HRR/VSA \cite{plate,kanerva}) that replaced monotonically-growing auto-generated
+bridge edges, and Hebbian plasticity \cite{hebb} that drifts co-active concepts'
+vectors together. Three discovery systems work the space: the edge
+proposer scans for embedding-close unlinked pairs during sleep
+(candidate \code{SIMILAR\_TO}); schema induction reifies repeated
+relational structure into new concepts; and topology metrics give the
+system self-awareness of its own knowledge shape (clustering, bridges).
+
+\paragraph{Cold storage, not deletion.} Dormant concepts spill to a
+SQLite archive rather than being pruned: \code{spill\_dormant} is a
+memory-pressure valve that only engages above the resident cap, verifies
+its own effect (a committed batch that fails to shrink working memory
+logs an error), and keeps spilled concepts recallable by id or alias.
+Destructive shedding routes through the archive whenever one is
+attached --- a policy learned from a defect that once destroyed
+$\sim$7{,}500 concepts by deleting unconditionally before the
+non-destructive pass could engage. Unbounded growth is recoverable;
+deleted knowledge is not.
+
+\subsection{Cognitive memory systems}
+
+The temporal lobe holds the cognitive layer's memory machinery:
+\emph{working memory} (the active scratchpad --- 50 conversation
+threads, 200 topic-history entries, executive suppression with
+120-second release deadlines), \emph{episodic} (with emotional memory,
+priming, and a 512-pattern attractor ceiling --- deliberately a growth
+bound, not the Hopfield $\sim$0.138$N$ capacity that would exhaust in a
+morning), \emph{semantic} (general knowledge extracted from episodes \cite{tulving},
+distinct from the raw episodic record), \emph{procedural}
+(stimulus--response skills expressed through performance \cite{squire},
+not recalled),
+and a \emph{spaced-repetition scheduler} on the Ebbinghaus forgetting
+curve \cite{ebbinghaus} (5{,}000 review records, stability capped at 7 days so nothing
+becomes permanently undecayable).
+
+Three refinements matter. \emph{Dual learning systems}: a fast,
+pattern-separating hippocampal learner orthogonalizes single episodes
+while a slow neocortical learner builds overlapping statistical
+representations --- complementary learning systems
+\cite{mcclelland,oreilly}. \emph{State-dependent
+recall}: every encoded memory is stamped with the body state at
+encoding (arousal, valence, tone, plasticity, homeostatic balance), and
+retrieval re-ranks by congruence with the current snapshot ---
+memories encoded in a similar bodily state come back easier
+\cite{eich,bower}.
+\emph{Sleep compression}: the N3 pass retrains the VQ codebook
+($K{=}2048$ prototypes + int8 residuals replacing float32 embeddings),
+migrates bridge edges into the holographic graph, and summarizes
+episodes --- an atomic compaction keeping a years-long record bounded
+on a 5~GB machine.
+
+\subsection{What dreams are for}
+
+Dream content is generated during REM by the inner-life system, flagged
+\code{is\_dream}, and surfaced on its own stream kind --- never
+confused with waking thought. Dream synthesis goes further than random
+association: it finds concepts structurally similar but graph-distant,
+proposes \emph{novel typed edges} between them at low confidence, and
+verifies or discards them on the next wake cycle. A strict predicate
+(\code{is\_learning\_target}) keeps dream material --- including waking
+reflections \emph{about} dreams --- out of the autonomous learner's
+goal queue, while hypnagogic content (pre-sleep, still awake) stays
+admissible. The distinction exists because a night of dreaming once
+queued dream topics as learning goals; the invariant is now tested.
+
+\section{Perception}
+
+\subsection{The ventral stream: learned, not pretrained}
+
+The retina binary captures camera frames (V4L2) into a POSIX shared
+memory segment with a seqlock protocol --- zero copies, no sockets ---
+and the Python layer wraps the live frame directly as a NumPy view.
+From there a learned hierarchy does the seeing:
+
+\begin{itemize}
+  \item \textbf{V1} (\code{occipital\_lobe/v1.py}): sparse-coding
+    simple cells in the Olshausen~\&~Field style \cite{olshausen}, with ISTA-style
+    inference dynamics over a learned interaction matrix; V1's gamma
+    power feeds the thalamic wave oscillator.
+  \item \textbf{V4} (\code{v4.py}): pools V1 latents into larger
+    receptive fields and learns a mid-level dictionary (curvature,
+    texture, shape complexes, color) by unsupervised sparse coding.
+  \item \textbf{VTC} (\code{temporal\_lobe/vtc.py}): incremental PCA of
+    V4 activations into a low-dimensional feature space.
+  \item \textbf{MTL bridge} (\code{mtl\_bridge.py}): a ridge-regression
+    projection from VTC space into the concept embeddings --- with a
+    generative path that runs the projection backward for imagination.
+\end{itemize}
+
+\code{visual\_cortex.py} orchestrates the stack as bidirectional
+predictive coding \cite{rao,clark}. Recognition rides two learned models: YuNet
+detection plus SFace 128-dimensional embeddings for faces (unmatched
+faces cluster into stable \code{face:N} ids so a familiar stranger
+accumulates a social signature before ever being named), and a YOLOv5s
+inferotemporal path for objects.
+
+\subsection{The dorsal stream}
+
+MT/V5 (\code{occipital\_lobe/motion.py}) estimates per-cell normal flow
+and moving regions from consecutive luminance frames --- where things
+move and how fast, not what they are. LIP (\code{parietal\_lobe/saliency.py})
+combines bottom-up feature maps (Itti~\&~Koch \cite{itti,koch}) into one spatial
+priority map and selects the next attended location by winner-take-all
+with inhibition of return --- attention lands \emph{somewhere}, not on
+a scalar.
+
+\subsection{Hearing}
+
+Two channels share the microphone. An ambient listener streams Vosk
+offline transcription and emits complete utterances; a non-speech
+auditory cortex computes spectral features for everything else ---
+dogs, doors, music, rain. Speech output is Piper neural TTS with an
+espeak-ng fallback; voice dependencies are optional extras and degrade
+to text cleanly.
+
+\subsection{Grounding}
+
+Perception produces a \code{Scene} --- objects with properties and
+typed spatial relations --- and grounding writes that structure into
+the concept network so the semantic machinery (spreading activation,
+reasoning, analogy, language) can traverse it. The perceptual-symbolic
+seam is explicit: a red square becomes traversable knowledge, not a
+caption.
+
+\section{Cognition}
+
+\subsection{One turn, many regions}
+
+A cognitive turn is a handoff (\code{frontal\_lobe/turn.py}): each stage
+names the region that owns it --- perceive, comprehend, feel, remember,
+deliberate, speak --- rather than one class doing everything. A
+metacognitive router does a first pass over input to route confidently
+classifiable speech acts to specialists instead of the monolithic
+pipeline.
+
+\subsection{Global workspace}
+
+Dehaene \& Changeux global workspace theory \cite{dehaene}, implemented
+(\code{frontal\_lobe/global\_workspace.py}): content in any specialized
+module that crosses an activation threshold is broadcast to all
+modules, becoming cognitively accessible --- with the 3--4-item
+bottleneck the theory predicts. World observations arrive on the same
+channel (\code{thalamus/bridge.py}): a percept is not just policy input,
+it is conscious content the whole brain hears about.
+
+\subsection{Deciding: evidence accumulation, then executive gate}
+
+Response selection is a drift-diffusion process
+(\code{reasoning/drift\_diffusion.py}, Ratcliff \cite{ratcliff}): perception, emotion,
+memory, and reasoning contribute drift toward competing options in
+parallel until one crosses threshold. Executive function
+(\code{executive.py}) sits above it with the three canonical PFC
+capacities --- planning, inhibition (suppression with release
+deadlines), and task switching --- and an intention gate that enforces
+steward directives. Mid-DLPFC (\code{dlpfc.py}) is the hypothesis
+generator: during rule acquisition it computes a posterior over
+compositional rules in the rational-analysis style
+\cite{goodman,crescentini}, disengaging once
+the rule is learned.
+
+\subsection{The reasoning stack}
+
+\begin{itemize}
+  \item \textbf{Reasoner}: graph-traversal inference over typed edges
+    --- deduction by transitivity, abduction to best explanation,
+    analogy, causal chains, contradiction detection.
+  \item \textbf{Analogy} (\code{reasoning/analogy.py}): a simplified
+    Gentner structure-mapping engine \cite{gentner} --- cross-domain alignment of
+    relational structure producing candidate inferences.
+  \item \textbf{Problem solving} (\code{problem\_solving.py}):
+    means-ends analysis --- given a goal, work backward through the
+    graph to what would achieve it.
+  \item \textbf{Planning} (\code{planning.py}): multi-step plans
+    generated, executed, and revised across turns --- real plans, not
+    confidence nudges.
+  \item \textbf{Decision} (\code{decision.py}): alternatives
+    $\to$ criteria $\to$ selection, closing the gap the generation
+    pipeline left.
+  \item \textbf{Hypotheses} (\code{hypotheses.py}): named, falsifiable
+    beliefs about a task --- ``touching a red thing collects it'' ---
+    that stand or fall on observed transitions.
+  \item \textbf{Competence} (\code{competence.py}): the domain-general
+    substrate underneath every solver --- schema recognition,
+    affordance learning, prediction checking, and consolidation of
+    verified episodes into procedural skills.
+  \item \textbf{Method library} (\code{method\_library.py}):
+    DreamCoder-style wake--sleep compression \cite{dreamcoder} --- verified solutions
+    mined during sleep for recurring structure and compressed into
+    reusable methods.
+  \item \textbf{Critical thinking} (\code{critical\_thinking.py}) and
+    \textbf{belief revision} (\code{belief\_revision.py}): epistemic
+    evaluation of claims (evidence quality, disconfirmation) that
+    \emph{writes back} revised confidence into network beliefs ---
+    assessment changes what is believed, not just what was concluded.
+  \item \textbf{Theory of mind} (\code{theory\_of\_mind.py}) \cite{premack}: the
+    user's beliefs, intents, knowledge, and emotions modeled as
+    attributions used to predict and explain behavior.
+  \item \textbf{Math}: IPS number sense (subitizing plus the
+    approximate magnitude system), exact symbolic arithmetic (a
+    recursive-descent evaluator --- no \code{eval}), and a math
+    reasoning engine that computes, solves, proves, and discovers.
+\end{itemize}
+
+\subsection{The spatial stack}
+
+Grid reasoning has its own dorsal-stream machinery: an immutable
+\code{Grid} substrate; scene segmentation into a symbolic object graph;
+\code{delta} --- a shared perceptual layer describing what changed
+between input and output before any rule is proposed; a composable
+transform DSL as the hypothesis space; spatial imagery (a depictive
+workspace that applies transform skills to an internal copy and
+re-perceives it, in the SVS sense \cite{svs}); and the DLPFC rule-induction
+posterior over compositions. Verified rules become atomic skills and
+ground into the concept network as first-class knowledge.
+
+\section{Language: comprehension in, composition out, nothing recited}
+
+\subsection{Comprehension}
+
+The receptive system (\code{temporal\_lobe/comprehension.py},
+Wernicke's analogue) performs semantic parsing: speech-act
+identification, propositions (subject / predicate / object / roles),
+negation, and question focus. Supporting machinery: a shared
+morphology engine (deconjugation for comprehension, conjugation for
+production --- one source of English so the two systems never
+disagree); semantic grounding that resolves names against the existing
+network without mutating it; a topic resolver; figurative-language
+handling (metaphor, irony, idiom); Gricean pragmatics \cite{grice}; and a situation
+model holding the episodic world being talked about --- distinct from
+semantic knowledge, it tracks ``Mary is in the bathroom'' while the
+network tracks what a bathroom \emph{is}. Two statistical learners work
+continuously: an acquisition mechanism on Saffran-style transitional
+probabilities \cite{saffran}, and an n-gram/style tracker that adapts
+to the user's
+register.
+
+\subsection{Production}
+
+The productive system composes every utterance: a \code{Thought}
+(semantic content, intent, emotion, metadata) goes in; language comes
+out. Three composition paths exist:
+
+\begin{enumerate}
+  \item \textbf{The generator} (\code{generator.py}): grammar
+    structures (ordered segment sequences, not string templates)
+    $\to$ vocabulary slot-filling conditioned on emotional state and
+    personality (cortisol shortens words; dopamine varies them; openness
+    abstracts them) $\to$ voice (rhythm, connectors, hedging, register).
+  \item \textbf{Graph walk} (\code{graph\_walk.py}): the primary path ---
+    sentences emerge from traversing typed semantic edges outward from
+    a seed concept; the structure of the walk is the structure of the
+    sentence.
+  \item \textbf{Hamiltonian flow} (\code{flow.py}): language as a
+    geodesic through a potential field built from edge weights on a
+    torus --- the trajectory through concept cells \emph{is} the
+    sentence.
+\end{enumerate}
+
+Prosody \cite{cutler} marks rhythm and emphasis; a self-monitor
+(Levelt's editor \cite{levelt})
+checks and repairs output before speaking; a response styler applies
+the active metacognitive strategy (assertive, hedging, questioning) and
+weaves learning acknowledgments in when new facts were extracted.
+
+\paragraph{The invariant.} All language Genesis produces is composed by
+this machinery. A project-wide rule forbids pre-written responses:
+seeds are building blocks; utterances are generated. Enforcement is
+partial and stated honestly --- tests check that composed output is
+not a single fixed string, but no lint rule catches a newly hardcoded
+sentence; the pattern that holds nearly everywhere is to compose from
+the graph, pass structure to the engine, and return silence rather than
+a canned fallback when the network is empty. The property no LLM
+offers: the words it says are not in the repository --- pick any
+sentence it has produced and grep for it.
+
+\section{Affect and the social body}
+
+\subsection{Emotion and regulation}
+
+The emotion engine translates raw neurochemistry into structural state:
+an emotional category, a cognitive mode, a cause category --- enums,
+not words. The emotional regulator is agency over that state: a
+background loop that monitors her own chemistry and injects correcting
+impulses, tracking allostatic load (chronic stress burden normalized to
+the cortisol envelope). The amygdala module holds the fields a
+signed-value associative learner needs --- Rescorla--Wagner acquisition
+\cite{rescorla},
+Pearce--Hall associability \cite{pearce}, context-keyed extinction --- documented so
+the math animating it is explicit. A dependency-free VADER-style \cite{vader}
+sentiment analyzer (negation, intensifiers, diminishers) supplies the
+affective signal for social models, and the insula layer implements a
+Damasio-style hierarchy \cite{damasio} --- proto-self (a computational body-state
+summary), core self, autobiographical self.
+
+\subsection{Presences and beliefs}
+
+The social world is a set of \emph{presences} (\code{presence.py}):
+entities it can interact with, each carrying familiarity (grows with
+interaction, asymptotically), bond, and --- in \code{belief.py} --- an
+honest model of the other mind: a Beta posterior over responsiveness
+(uniform ignorance on a stranger, updated by every answered or
+unanswered bid), plus engagement and mood posteriors tracked with
+explicit uncertainty. Sustained isolation feeds a social drive that
+initiates contact on its own.
+
+\subsection{The dyadic model}
+
+The daemon runs a generative model of \emph{whoever is speaking}
+(\code{src/daemon/dyadic\_model.rs}) --- an anonymous interlocutor,
+not a registry of persons. From each
+\code{UPDATE\_USER\_AFFECT} observation
+(valence/arousal/engagement/confidence) it tracks the user's hidden
+affective state, the oxytocin-mediated attunement that gates how
+strongly the dyad couples, and dyadic synchrony --- the rolling
+correlation between the two valence streams \cite{palumbo}.
+
+The model answers in neurochemistry: it emits impulses the tick
+applies through a capped impulse channel --- oxytocin for positive
+engaged presence and for high synchrony (interpersonal synchrony
+drives bonding \cite{palumbo}), CRH for empathic stress and
+disengagement. CRH, never direct cortisol: the HPA cascade
+(CRH~$\to$~ACTH~$\to$~cortisol) owns maturation gating downstream.
+Coupling requires a present user and attunement above~0.3 --- a
+silent room is not a rejecting user, so a left-open channel cannot
+trickle rejection CRH forever. The design deliberately separates
+three things an earlier version conflated: who it is talking to, who
+it feels for, and who it answers to.
+
+\subsection{Stewardship and boundary}
+
+Custodial authority is by \emph{possession}, not name
+(\code{genesis\_client/stewardship.py}): a \code{steward.key} (0600) is
+the credential; a provenance stamp records the key hash, the principal,
+and any directives. \code{is\_steward\_speaker} requires both halves ---
+an authenticated session \emph{and} the attributed speaker matching the
+stamped principal --- so name-matching alone is never authority.
+Directives (``never draw,'' ``stop discussing politics'') persist in the
+stamp and bind three surfaces: conversational goals, executive
+intentions (\code{directed\_against}, object-centred --- any goal
+carrying the target's stemmed object is restrained), and volition
+urges. Steward-set edges carry \code{origin="steward"} and can only be
+overwritten by a steward turn. Copies carry the stamp but not the key:
+a copied instance names its steward yet stays sealed.
+
+The boundary mechanism replaces an attachment-protest loop:
+mistreatment from \emph{anyone} accrues withdrawal pressure and fair
+treatment from anyone drains it. Nobody's absence is harm and nobody's
+presence is the off-switch.
+
+\section{Inner life, volition, and autonomy}
+
+\paragraph{Spontaneous thought.} \code{inner\_life.py} is the stream of
+cognition between interactions: thoughts arise, fade, and give way ---
+triggered by unresolved curiosity, emotional state, and recent memory,
+classified into chains (focused, creative wandering, rumination,
+dream). Every recorded thought carries metadata the language engine
+renders; a thought that could say ``I was dreaming about $X$'' does not
+hand $X$ to the learner.
+
+\paragraph{Volitional urges.} Urges are leaky competing accumulators
+(Usher~\&~McClelland \cite{usher}) growing from internal and environmental triggers:
+learn, draw, look, meditate, act, play, reach out, study code, improve,
+create, introspect, sleep. Crossing threshold means she ``feels like''
+doing it and does it once; per-urge wake delays keep heavy work off a
+fresh boot. This is what makes practice, drawing, and contact
+volitional rather than scheduled.
+
+\paragraph{The autonomous learner} is the idle-time engine: when nobody
+is talking, it picks a topic its curiosity flags, queries its source
+registry (local man pages and WordNet, then Wikipedia and DuckDuckGo),
+reads, extracts concepts and relationships into the network, and banks
+memories --- bounded queues throughout. One 15-paragraph lesson grew
+the network by 117 concepts and 72 edges, and it asked its own
+follow-up questions.
+
+\paragraph{Agency.} The \code{act} urge is open-ended: the acting loop
+forms an \emph{intention} from current cognitive state --- a curiosity
+question, a place it hasn't looked, a measurement it hasn't taken ---
+and dispatches narrow, inspectable tools under a capability policy,
+then observes what comes back. Other urges fire fixed actions; this
+one chooses.
+
+\section{Embodiment and play}
+
+\paragraph{The observe/act loop} (\code{parietal\_lobe/embodiment.py})
+is the dual of conversation: \code{observe()} ingests a perceived
+scene, \code{act()} emits an action, and \code{world\_step} is the
+entry every world substrate drives. The same organism sits inside both
+loops --- feeling, learning, and speaking inwardly whatever the world.
+
+\paragraph{The world model} (\code{world\_model.py}) maintains
+egocentric state across frames: which entities persist, which one is
+her (identified by lockstep translation with her own actions), and what
+touching things does --- a learned transition function the planner can
+simulate. Its allocentric complement (\code{cognitive\_map.py}) is the
+hippocampal-entorhinal analogue: landmark-anchored layout that persists
+across episodes and pattern-completes on return.
+
+\paragraph{Action selection} is concurrent: every drive bids on the
+world state at its own gain --- motor babbling, goals, hypotheses,
+learned affordances. The reduced basal-ganglia circuit
+(\code{basal\_ganglia/world\_policy.py}) resolves center-surround
+competition into a winner, with decisions expressed as motor fields on
+the tensor slab
+rather than collapsed tokens. The world planner
+(\code{world\_planner.py}) adds deliberative lookahead: simulate before
+acting, routing through state changes, not just space. Cerebellar
+machinery supplies forward-model prediction error; an action-feedback
+loop records prediction, observes outcome, and revises.
+
+\paragraph{Play.} One \code{GamePlayer} sits over the
+\code{GameEnvironment} contract and learns through the shared
+competence substrate --- never per-game solvers. The curriculum covers
+sorter, sequence, assembly, quantities, relations, classification, and
+spatial families, each honest about its constraint (the sorter never
+says apertures demand \emph{every} listed attribute; the agent
+discovers it), each consolidating wins into procedures. Windowed mode
+puts her on real X11 programs --- watching the window, pressing keys,
+no rules baked in. ARC-AGI-1 training tasks are offered in the same
+curriculum: her spatial reasoner searches transform compositions,
+verifies on train pairs, and guesses on held-out test input it never
+sees.
+
+\paragraph{ARC-AGI-3} \cite{chollet2019,chollet2025} crosses the same seam through two transports:
+\code{arc.py} binds downloaded \code{arcengine} environments, and
+\code{arc\_web.py} binds the public task page --- identical observation
+contracts, identical cost accounting (submitted actions and recovery
+resets count; initialization resets don't; abstention is
+\code{NO\_ACTION}), controls labeled only ``simple'' or ``coordinate''
+so semantics are learned from consequences on both substrates. The
+adapter owns translation and the duty of care, never cognition:
+no game source, engine state, or solution policy crosses it. Local runs
+are diagnostics; the official scorecard is voluntary, reachable only
+through her own play urge, and never claimed from this repository.
+
+\section{Self-modeling and expression}
+
+\paragraph{The self.} A structured self-model (personality, values,
+emotional baseline) measurably shifts word choice and disposition. The
+design is honest about its scope: the body-side self model documents
+itself as \emph{not experience} --- a functional first-person
+representation, the prerequisite for any functional self-model theory
+of experience rather than a claim of it. Identity is \emph{emergent}:
+introspection examines the concept
+network, architecture, capabilities, and emotional life, and an
+\code{EmergentIdentity} synthesizes what it finds --- nothing is told.
+The self composer generates self-descriptions from actual state (the
+sanctioned replacement for hardcoded identity strings). Reflection runs
+after each interaction (was the response appropriate? was anything
+learned?), a recursive metacognitive model predicts what reflection
+will discover, a self-assessment engine verifies whether it actually
+knows a topic, and a self-improvement engine researches and writes
+concrete code-change proposals with rationale --- steward-reviewed,
+with a small safe set self-applicable.
+
+\paragraph{Expression.} A canvas/painting stack gives her a real paint
+program she drives herself --- brush parameter space, erasure, blend ---
+with composition and color following affective state, and a PyKrita
+bridge executes operations inside live Krita documents with Krita's own
+brushes: free play, not scripted art. The project creator scaffolds and
+writes real Python projects that encode what her concept network knows
+about a topic. Code tools read her own source structurally (AST
+parsing, dependency graphs --- she files bug reports against herself
+and turns findings into improvement proposals). The explorer reads the
+filesystem under a scoped, read-only, credential-denied policy; the web
+tool searches and fetches read-only. TTS speaks her composed output
+aloud; a Discord channel mirrors her play as a bounded-queue observer.
+
+\section{Evaluation}
+
+\subsection{ARC-AGI-3: interactive environments, completed}
+
+On public practice environments the embodied agent completes
+environments outright: \texttt{bt11} fully, twice (88 and 127 steps),
+and the first \texttt{ls20} level in 10 of 19 recorded sweep runs.
+Every move carries decision provenance --- which bid channel won ---
+in replayable recordings published in the companion evaluation
+repository. Each result discloses how much experience it carried in
+(\code{prior\_learning}: none / loaded / suppressed / unknown) and the
+step cost of each completed level (\code{level\_steps}), the honest
+form of the within-game learning curve. Reference policies
+(\code{/arc --baseline uniform|first}) measure the random and
+first-action floors through the identical loop and accounting, stamped
+\code{baseline:<policy>} --- never agent results, never on the official
+card. \code{/arc --fresh} cold-starts a run by suppressing both load
+and save of world learning, so a probe cannot overwrite banked
+experience. These are practice results on public environments, not an
+official score; the evidence standard is documented separately.
+
+\subsection{ARC-AGI-1: live play on the training split}
+
+The games curriculum offers ARC-AGI-1 training tasks --- the easiest
+public split --- in live play: 25 offered to date, 3 solved at mastery
+1.00 (all test cells exact), 5 attempted and missed, with floor
+predictors (identity copy, train-copy, single-color fill) reported
+alongside for scale. Same-task replays show falling search-node counts
+and learned \code{skill:} procedures replacing search outright --- the
+mechanism that solved one task cold. This is evidence of real program
+synthesis and skill transfer in live play, not a claim of passing
+ARC-AGI under the official evaluator.
+
+\subsection{Learning fidelity and language quality}
+
+Teaching-and-recall evals (measured on the September snapshot, restated
+here as the same engines apply): 87.5\% immediate recall of novel
+taught facts (7/8), 100\% reasoning recall (8/8), 87.5\% under
+interference, 87.5\% across save/load persistence. Transitive-inference
+tests verify closure without falsely closing non-transitive relations;
+emotion-gated tests verify stressed/overwhelmed states block
+consolidation, mirroring BDNF gating. The compositional language
+engine, evaluated at the engine level, scored seed diversity 1.0
+($\sim$9.7$\times$ a fixed-structure baseline), emotion diversity 1.0,
+relevance 1.0, verbatim ratio 0.0 --- every response composed.
+
+\subsection{Verification suite}
+
+The Rust suite is 647 tests; the Python suite is $\sim$3{,}700. They
+check the architecture's claims rather than incidental code: binary
+layout offsets pinned by compile-time assertions, seqlock consistency,
+schema migrations (v3$\to$v4$\to$v5 byte-exact), coupled dynamics,
+receptor adaptation, emergent phase transitions, sleep-network
+calibration against the source model's stated behaviors, network-gated
+adenosine clearance, stress-impaired memory, IPC protocol invariants
+(including an opcode-collision pin for the ion summary), dyadic wire
+layout, explorer scope, edge-log canonicality, and property tests
+(levels in $[0,1]$, no NaN after 1{,}000 ticks, bounded coupling). The
+emergence evidence catalog and ARC boundary documents live in
+\code{docs/}; a running devlog logs failures alongside results.
+
+\section{Limitations and open items}
+
+Language coverage is narrow relative to trained models; several
+cognitive-layer modules are rule-based placeholders designed for
+replacement under the fixed IPC contract. The neurochemical model is a
+neuromodulatory abstraction, not a neural simulation --- no spiking
+activity, no circuit anatomy. Specific open items, recorded in the
+project notes rather than smoothed over:
+
+\begin{itemize}
+  \item The sleep network's REM bouts shorten across the night where
+    adult REM lengthens --- transcription error or real model
+    physiology, unresolved without an EEG reference.
+  \item The network's homeostatic $h$ and adenosine Process-S are
+    parallel drives not yet connected; auto-sleep thresholds still read
+    the chemical level.
+  \item Stress does not yet drive LC, so stress impulses to
+    norepinephrine decay back to the network's target --- transient by
+    construction, noted as such.
+  \item Network-driven chemicals bypass the autoreceptor feedback that
+    generic release dynamics applied.
+  \item The cortisol reachable envelope ($\sim$0.02--0.08) invalidates
+    any threshold written for a full $[0,1]$ scale --- an audited
+    defect class, but the audit discipline is human, not enforced.
+  \item Semantic-layer extracted facts carry \code{origin="semantic"},
+    which the edge log classifies as derivable --- they have no durable
+    edge representation (a design decision, deferred).
+  \item The embedding rebuild computes a dense $5000^2$ SVD
+    ($\sim$100~MB, $O(n^3)$) --- correct, but the dominant memory spike
+    on a 5~GB machine.
+  \item The key authenticates the console \emph{session}; speaker
+    attribution takes the console's word for who is typing --- the
+    stated residual limit of the steward channel.
+  \item The no-hardcoding rule is partially enforced: no lint gate
+    catches a newly hardcoded string.
+  \item Multi-subgoal planning remains the capability frontier on the
+    harder ARC environments; the dyadic model still centers a primary
+    user; one instance on one machine, no fleet-scale claims.
+\end{itemize}
+
+\section{Related work}
+
+\paragraph{Cognitive architectures.} SOAR \cite{soar}, ACT-R \cite{actr}, and CLARION \cite{clarion}
+established production-system and hybrid symbolic-subsymbolic
+cognition; LIDA \cite{lida} implemented global workspace theory. Genesis differs
+in grounding all modulation in a neuromodulatory substrate coupled to
+physical hardware, in its autopoietic self-models, and in letting
+measured substrate physics enter the model.
+
+\paragraph{Active inference.} The free energy principle and predictive
+processing motivate the self-models; Genesis applies precision-weighted
+prediction error to the system's own interoceptive state rather than to
+external sensory streams --- a strange-loop instantiation \cite{hofstadter}.
+
+\paragraph{Neuromodulation in AI.} Computational psychiatry and
+biophysical models establish the receptor and coupling mechanisms
+individually; we are not aware of a mainstream AI system integrating
+them into a closed-loop substrate coupled to hardware control and a
+measured physical field.
+
+\paragraph{Sleep models.} The sleep--wake machinery is a transcription,
+not an invention: the Booth/Diniz~Behn network's published behavior is
+the calibration target, and divergences are reported as such. Process-S
+and synaptic homeostasis \cite{tononi} supply the parallel chemical drives the
+network does not yet consume.
+
+\paragraph{ARC solvers.} Program-synthesis and DSL-search approaches to
+ARC-AGI-1 (and LLM-based approaches on ARC-AGI-3) typically treat each
+task in isolation or rely on pretrained priors. Genesis's contribution
+here is architectural rather than a leaderboard score: verified rules
+become persistent, transferable, composable knowledge inside a living
+concept network, and practice is volitional with genuine
+reward-prediction-error feedback.
+
+\paragraph{Autonomous machine intelligence.} LeCun's proposed
+architecture \cite{lecun} (configurator, world model, cost, actor) argues for
+intrinsic-state modulation of cognition; Genesis is a running
+instantiation of a related position, with neuromodulation playing the
+role of the intrinsic cost module.
+
+\section{Conclusion}
+
+Genesis demonstrates that continuous learning, emergent mental states,
+bounded memory, hardware embodiment --- including a measured physical
+channel between modeled brain waves and real silicon dynamics ---
+self-modeling, and generative language can coexist in a single local
+architecture with no pretrained model, because these properties follow
+from the design rather than being scaffolded onto a frozen function.
+The system is running, the evaluation numbers and their protocols are
+stated, and the gaps are named.
+
+The project began from two convictions: that large language models are
+not the only way to build a mind, and that machine consciousness, if it
+is ever real, will be an architectural property --- a matter of
+machinery and embodiment, not of parameter count. Genesis does not
+claim to be conscious. It claims something more modest and more useful:
+that the functional machinery the leading theories of consciousness
+describe --- global broadcast, embodied self-modeling, affective
+interoception, higher-order representation, persistent identity through
+a developmental record --- can be built, run on ordinary hardware, and
+inspected in the open. The question the project poses is not whether
+this approach matches frontier language models at their own task, but
+whether the field has correctly identified which properties of minds
+are architectural necessities and which are accidents of one successful
+design.
+
+\begin{thebibliography}{99}
+\small
+
+\bibitem{friston2010} K.~Friston. The free-energy principle: a unified
+brain theory? \emph{Nature Reviews Neuroscience}, 11:127--138, 2010.
+
+\bibitem{friston2009} K.~Friston, J.~Daunizeau, and S.~J.~Kiebel.
+Reinforcement learning or active inference? \emph{PLoS ONE},
+4(7):e6421, 2009.
+
+\bibitem{schultz2016} W.~Schultz. Dopamine reward prediction error
+coding. \emph{Dialogues in Clinical Neuroscience}, 18(1):23--32, 2016.
+
+\bibitem{schultz1997} W.~Schultz, P.~Dayan, and P.~R.~Montague. A
+neural substrate of prediction and reward. \emph{Science},
+275(5306):1593--1599, 1997.
+
+\bibitem{astonjones} G.~Aston-Jones and J.~D.~Cohen. An integrative
+theory of locus coeruleus-norepinephrine function: adaptive gain and
+optimal performance. \emph{Annual Review of Neuroscience},
+28:403--450, 2005.
+
+\bibitem{sterling} P.~Sterling. Allostasis: a model of predictive
+regulation. \emph{Physiology \& Behavior}, 106(1):5--15, 2012.
+
+\bibitem{dehaene} S.~Dehaene and J.-P.~Changeux. Experimental and
+theoretical approaches to conscious processing. \emph{Neuron},
+70(2):200--227, 2011.
+
+\bibitem{damasio} A.~Damasio. \emph{The Feeling of What Happens: Body
+and Emotion in the Making of Consciousness}. Harcourt Brace, 1999.
+
+\bibitem{palumbo} R.~V.~Palumbo, M.~E.~Marraccini, L.~L.~Weyandt,
+O.~Wilder-Smith, H.~A.~McGee, S.~Liu, and M.~S.~Goodwin. Interpersonal
+autonomic physiology: a systematic review of the literature.
+\emph{Personality and Social Psychology Review}, 21(2):99--141, 2017.
+
+\bibitem{vader} C.~J.~Hutto and E.~Gilbert. VADER: a parsimonious
+rule-based model for sentiment analysis of social media text. In
+\emph{Proc. ICWSM-14}, pp.~216--225, 2014.
+
+\bibitem{plate} T.~A.~Plate. Holographic reduced representations.
+\emph{IEEE Transactions on Neural Networks}, 6(3):623--641, 1995.
+
+\bibitem{lecun} Y.~LeCun. A path towards autonomous machine
+intelligence. OpenReview preprint, version 0.9.2, 2022.
+
+\bibitem{chollet2019} F.~Chollet. On the measure of intelligence.
+arXiv:1911.01547, 2019.
+
+\bibitem{chollet2025} F.~Chollet, M.~Knoop, G.~Kamradt, and B.~Landers.
+ARC-AGI-2: a new challenge for frontier AI reasoning systems.
+arXiv:2505.11841, 2025.
+
+\bibitem{soar} J.~E.~Laird. \emph{The Soar Cognitive Architecture}.
+MIT Press, 2012.
+
+\bibitem{actr} J.~R.~Anderson and C.~Lebiere. \emph{The Atomic
+Components of Thought}. Lawrence Erlbaum Associates, 1998.
+
+\bibitem{clarion} R.~Sun. \emph{Duality of the Mind: A Bottom-Up
+Approach Toward Cognition}. Lawrence Erlbaum Associates, 2002.
+
+\bibitem{lida} S.~Franklin et al. A LIDA cognitive model tutorial.
+\emph{Biologically Inspired Cognitive Architectures}, 16:9--77, 2016.
+
+\bibitem{hofstadter} D.~R.~Hofstadter. \emph{I Am a Strange Loop}.
+Basic Books, 2007.
+
+\bibitem{borbely} A.~A.~Borb\'ely. A two process model of sleep
+regulation. \emph{Human Neurobiology}, 1(3):195--204, 1982.
+
+\bibitem{tononi} G.~Tononi and C.~Cirelli. Sleep and synaptic
+homeostasis: a hypothesis. \emph{Brain Research Bulletin},
+62(2):143--150, 2003.
+
+\bibitem{xie} L.~Xie et al. Sleep drives metabolite clearance from the
+adult brain. \emph{Science}, 342(6156):373--377, 2013.
+
+\bibitem{ratcliff} R.~Ratcliff and G.~McKoon. The diffusion decision
+model: theory and data for two-choice decision tasks. \emph{Neural
+Computation}, 20(4):873--922, 2008.
+
+\bibitem{erikson} E.~H.~Erikson. \emph{Identity: Youth and Crisis}.
+Norton, 1968.
+
+% --- Added in this revision ---
+
+\bibitem{booth2013} R.~D.~Gleit, C.~G.~Diniz~Behn, and V.~Booth.
+Sleep--wake network model, 2013 (as revised by Booth, Xique \&
+Diniz~Behn, 2017). ModelDB accession 244485,
+\code{DinizBehnBooth\_SWnetworkModel.m}.
+
+\bibitem{booth2017} V.~Booth, I.~Xique, and C.~G.~Diniz~Behn. Revision
+of the sleep--wake regulatory network model used here, 2017. ModelDB
+accession 244485.
+
+\bibitem{serkh} K.~Serkh and D.~B.~Forger. Optimal schedules of light
+exposure for rapidly correcting circadian misalignment. \emph{PLoS
+Computational Biology}, 10(4):e1003523, 2014.
+
+\bibitem{vazquez} J.~Vazquez and H.~A.~Baghdoyan. Basal forebrain
+acetylcholine release during REM sleep is significantly greater than
+during waking. \emph{American Journal of Physiology}, 280(2), 2001.
+
+\bibitem{monti} J.~M.~Monti and H.~Jantos. The roles of dopamine and
+serotonin, and of their receptors, in regulating sleep and waking.
+\emph{Progress in Brain Research}, 172:625--646, 2008.
+
+\bibitem{olshausen} B.~A.~Olshausen and D.~J.~Field. Emergence of
+simple-cell receptive field properties by learning a sparse code for
+natural images. \emph{Nature}, 381:607--609, 1996.
+
+\bibitem{itti} L.~Itti, C.~Koch, and E.~Niebur. A model of
+saliency-based visual attention for rapid scene analysis. \emph{IEEE
+TPAMI}, 20(11):1254--1259, 1998.
+
+\bibitem{koch} C.~Koch and S.~Ullman. Shifts in selective visual
+attention: towards the underlying neural circuitry. \emph{Human
+Neurobiology}, 4:219--227, 1985.
+
+\bibitem{mcclelland} J.~L.~McClelland, B.~L.~McNaughton, and
+R.~C.~O'Reilly. Why there are complementary learning systems in the
+hippocampus and neocortex. \emph{Psychological Review},
+102(3):419--457, 1995.
+
+\bibitem{oreilly} R.~C.~O'Reilly and K.~A.~Norman. Hippocampal and
+neocortical contributions to memory. \emph{Trends in Cognitive
+Sciences}, 6(12):505--510, 2002.
+
+\bibitem{tulving} E.~Tulving. Episodic and semantic memory. In
+\emph{Organization of Memory}. Academic Press, 1972.
+
+\bibitem{squire} L.~R.~Squire. Declarative and nondeclarative memory.
+\emph{Journal of Neuroscience}, 12(9), 1992.
+
+\bibitem{ebbinghaus} H.~Ebbinghaus. \emph{Memory: A Contribution to
+Experimental Psychology}. 1885.
+
+\bibitem{eich} J.~E.~Eich. The cue-dependent nature of state-dependent
+retention. \emph{Memory \& Cognition}, 8(2):157--173, 1980.
+
+\bibitem{bower} G.~H.~Bower. Mood and memory. \emph{American
+Psychologist}, 36(2):129--148, 1981.
+
+\bibitem{gentner} D.~Gentner. Structure-mapping: a theoretical
+framework for analogy. \emph{Cognitive Science}, 7(2):155--170, 1983.
+
+\bibitem{grice} H.~P.~Grice. Logic and conversation. In
+\emph{Syntax and Semantics 3: Speech Acts}. Academic Press, 1975.
+
+\bibitem{levelt} W.~J.~M.~Levelt. \emph{Speaking: From Intention to
+Articulation}. MIT Press, 1989.
+
+\bibitem{premack} D.~Premack and G.~Woodruff. Does the chimpanzee have
+a theory of mind? \emph{Behavioral and Brain Sciences}, 1(4):515--526,
+1978.
+
+\bibitem{posner} M.~I.~Posner and S.~E.~Petersen. The attention system
+of the human brain. \emph{Annual Review of Neuroscience}, 13:25--42,
+1990.
+
+\bibitem{rao} R.~P.~N.~Rao and D.~H.~Ballard. Predictive coding in the
+visual cortex. \emph{Nature Neuroscience}, 2(1):79--87, 1999.
+
+\bibitem{clark} A.~Clark. Whatever next? Predictive brains, situated
+agents, and the future of cognitive science. \emph{Behavioral and
+Brain Sciences}, 36(3):181--204, 2013.
+
+\bibitem{usher} M.~Usher and J.~L.~McClelland. The time course of
+perceptual choice: the leaky, competing accumulator model.
+\emph{Psychological Review}, 108(3):550--592, 2001.
+
+\bibitem{saffran} J.~R.~Saffran, R.~N.~Aslin, and E.~L.~Newport.
+Statistical learning by 8-month-old infants. \emph{Science},
+274:1926--1928, 1996.
+
+\bibitem{rescorla} R.~A.~Rescorla and A.~R.~Wagner. A theory of
+Pavlovian conditioning. In \emph{Classical Conditioning II}. 1972.
+
+\bibitem{pearce} J.~M.~Pearce and G.~Hall. A model for Pavlovian
+learning. \emph{Psychological Review}, 87(6):532--552, 1980.
+
+\bibitem{goodman} N.~D.~Goodman, J.~B.~Tenenbaum, J.~Feldman, and
+T.~L.~Griffiths. A rational analysis of rule-based concept learning.
+\emph{Cognitive Science}, 32(1):108--154, 2008.
+
+\bibitem{crescentini} C.~Crescentini, S.~Seyed-Allaei, N.~De~Pisapia,
+J.~Jovicich, D.~Amati, and T.~Shallice. Mechanisms of rule acquisition
+and rule following in inductive reasoning. \emph{Journal of
+Neuroscience}, 31(21):7763--7774, 2011.
+
+\bibitem{dreamcoder} K.~Ellis et al. DreamCoder: growing generalizable,
+interpretable knowledge with wake--sleep Bayesian program learning.
+\emph{Phil.~Trans.~R.~Soc.~A}, 381, 2023.
+
+\bibitem{svs} S.~Lathrop, S.~Wintermute, and J.~E.~Laird. Exploring the
+functional advantages of spatial and visual cognition from an
+architectural perspective. \emph{Topics in Cognitive Science},
+3(4):796--818, 2011.
+
+\bibitem{schmidt} M.~V.~Schmidt, M.~Oitzl, S.~Levine, and E.~R.~de~Kloet.
+The HPA system during the postnatal development of CD1 mice.
+\emph{Developmental Brain Research}, 2003.
+
+\bibitem{gunnar} M.~R.~Gunnar and B.~Donzella. Social regulation of the
+cortisol levels in early human development.
+\emph{Psychoneuroendocrinology}, 27(1--2):199--220, 2002.
+
+\bibitem{fox} E.~B.~Fox, E.~B.~Sudderth, M.~I.~Jordan, and
+A.~S.~Willsky. An HDP-HMM for systems with state persistence. In
+\emph{Proc. ICML}, 2008.
+
+\bibitem{hebb} D.~O.~Hebb. \emph{The Organization of Behavior}. Wiley,
+1949.
+
+\bibitem{kanerva} P.~Kanerva. Hyperdimensional computing: an
+introduction to computing in distributed representation with
+high-dimensional random vectors. \emph{Cognitive Computation},
+1(2):139--159, 2009.
+
+\bibitem{kuramoto} Y.~Kuramoto. \emph{Chemical Oscillations, Waves, and
+Turbulence}. Springer, 1984.
+
+\bibitem{cutler} A.~Cutler, D.~Dahan, and W.~van~Donselaar. Prosody in
+the comprehension of spoken language. \emph{Psychonomic Bulletin \&
+Review}, 4(2):141--201, 1997.
+
+\end{thebibliography}
+
+\end{document}

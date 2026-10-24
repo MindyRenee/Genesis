@@ -54,29 +54,33 @@ logger = logging.getLogger(__name__)
 # edges. Combined with an untyped relation these edges carry no
 # information the embedding field cannot recompute, so they are
 # derivable and never enter the canonical log.
-DERIVABLE_ORIGINS: frozenset[str] = frozenset({
-    "hub_attachment",
-    "co_occurrence",
-    "associative_bridge",
-    "semantic_bridge",
-    "semantic_connect",
-    "semantic",
-    "bridge_creation",
-    "bridge",
-    "global_connect",
-    "dedupe",
-    "inferred",
-})
+DERIVABLE_ORIGINS: frozenset[str] = frozenset(
+    {
+        "hub_attachment",
+        "co_occurrence",
+        "associative_bridge",
+        "semantic_bridge",
+        "semantic_connect",
+        "semantic",
+        "bridge_creation",
+        "bridge",
+        "global_connect",
+        "dedupe",
+        "inferred",
+    }
+)
 
 # Relations that are pure geometry — a typed relation is always a
 # factual claim (even a weakly provenanced one), but these three only
 # assert "these are associated", which is exactly what similarity
 # measures. With a derivable origin they are redundant storage.
-GEOMETRIC_RELATIONS: frozenset[RelationType] = frozenset({
-    RelationType.RELATED_TO,
-    RelationType.BRIDGES,
-    RelationType.SIMILAR_TO,
-})
+GEOMETRIC_RELATIONS: frozenset[RelationType] = frozenset(
+    {
+        RelationType.RELATED_TO,
+        RelationType.BRIDGES,
+        RelationType.SIMILAR_TO,
+    }
+)
 
 # Provenance tier for network-learned claims: origins of the form
 # ``web:<domain>`` (e.g. ``web:en.wikipedia.org``) mark edges whose
@@ -131,9 +135,10 @@ def web_domain_of(origin: str) -> str | None:
     if origin == "web":
         return "unknown"
     if origin.startswith(WEB_ORIGIN_PREFIX):
-        domain = origin[len(WEB_ORIGIN_PREFIX):]
+        domain = origin[len(WEB_ORIGIN_PREFIX) :]
         return domain or "unknown"
     return None
+
 
 def is_derivable_edge(relation: RelationType | str, origin: str) -> bool:
     """True if this edge is pipeline-generated geometry, not an earned fact.
@@ -263,15 +268,17 @@ class EdgeLog:
         if is_derivable_edge(relation, origin):
             return False
         with self._lock:
-            self._write({
-                "op": "assert",
-                "source": source,
-                "target": target,
-                "relation": relation.value,
-                "weight": weight,
-                "origin": origin,
-                "created_at": created_at,
-            })
+            self._write(
+                {
+                    "op": "assert",
+                    "source": source,
+                    "target": target,
+                    "relation": relation.value,
+                    "weight": weight,
+                    "origin": origin,
+                    "created_at": created_at,
+                }
+            )
             if self._fh is not None:
                 self._fh.flush()
         return True
@@ -284,12 +291,14 @@ class EdgeLog:
     ) -> None:
         """Append a tombstone for an edge triple."""
         with self._lock:
-            self._write({
-                "op": "retract",
-                "source": source,
-                "target": target,
-                "relation": relation.value,
-            })
+            self._write(
+                {
+                    "op": "retract",
+                    "source": source,
+                    "target": target,
+                    "relation": relation.value,
+                }
+            )
             if self._fh is not None:
                 self._fh.flush()
 
@@ -438,14 +447,10 @@ class EdgeLog:
                 }
                 for _, e in sorted(live.items())
             ]
-            fd, tmp = tempfile.mkstemp(
-                dir=self._path.parent, prefix="edge_log_", suffix=".tmp"
-            )
+            fd, tmp = tempfile.mkstemp(dir=self._path.parent, prefix="edge_log_", suffix=".tmp")
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
-                    payload = json.dumps(
-                        {"op": "snapshot", "edges": edges}, separators=(",", ":")
-                    )
+                    payload = json.dumps({"op": "snapshot", "edges": edges}, separators=(",", ":"))
                     f.write(payload + "\n")
                     f.flush()
                     os.fsync(f.fileno())

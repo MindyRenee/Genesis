@@ -40,8 +40,12 @@ def test_transfer_learning_maps_roles_without_shared_vocabulary() -> None:
     net = learner.network
 
     for concept in (
-        "engine", "piston", "fuel",
-        "compiler", "token", "source",
+        "engine",
+        "piston",
+        "fuel",
+        "compiler",
+        "token",
+        "source",
     ):
         net.add_concept(concept, confidence=0.9, origin="test")
 
@@ -107,8 +111,7 @@ def test_transfer_learning_only_reinforces_existing_roles() -> None:
     net.add_edge("compiler", "source", RelationType.DEPENDS_ON, 0.8, origin="test")
 
     before = {
-        (e.target, e.relation.value): e.weight
-        for e in net.get_edges("compiler", direction="out")
+        (e.target, e.relation.value): e.weight for e in net.get_edges("compiler", direction="out")
     }
 
     result = learner.transfer_learning("engine", "compiler")
@@ -119,8 +122,7 @@ def test_transfer_learning_only_reinforces_existing_roles() -> None:
         key = (edge.target, edge.relation.value)
         if key in before:
             assert edge.weight >= before[key], (
-                f"role {key} should be reinforced, not weakened: "
-                f"{before[key]} -> {edge.weight}"
+                f"role {key} should be reinforced, not weakened: {before[key]} -> {edge.weight}"
             )
             if edge.weight > before[key]:
                 reinforced += 1
@@ -134,14 +136,14 @@ def test_transfer_learning_only_reinforces_existing_roles() -> None:
     # Transfer should reinforce the mapped target role, not inject the
     # source-domain node into the target domain as a false fact.
     assert not any(
-        edge.target == "piston" and edge.origin == "transferred"
-        for edge in target_edges
+        edge.target == "piston" and edge.origin == "transferred" for edge in target_edges
     )
 
 
 # ======================================================================
 # From tests/test_autonomous_learner.py
 # ======================================================================
+
 
 def _make_learner(
     get_emotion: object = None,
@@ -526,6 +528,7 @@ def test_learner_start_after_stop_restarts_cleanly() -> None:
 # From tests/test_dual_system.py
 # ======================================================================
 
+
 @pytest.fixture
 def network() -> ConceptNetwork:
     """Network."""
@@ -673,6 +676,7 @@ def test_concept_list_input(learner) -> None:
 # From tests/test_stdp.py
 # ======================================================================
 
+
 @pytest.fixture
 def network_stdp() -> ConceptNetwork:
     """Network stdp."""
@@ -794,8 +798,7 @@ def test_stdp_non_monotonic_timestamps_finds_in_window_pairs(stdp) -> None:
     stdp.record_spike("dog", 10.0)
     stats = stdp.get_statistics()
     assert stats["total_potentiated"] >= 2, (
-        f"Expected >= 2 potentiated pairs from in-window spikes, "
-        f"got {stats['total_potentiated']}"
+        f"Expected >= 2 potentiated pairs from in-window spikes, got {stats['total_potentiated']}"
     )
 
 
@@ -1117,10 +1120,7 @@ def test_action_value_persistence_roundtrip(network_td_learning) -> None:
     td2 = TDLearner(network_td_learning, lam=0.0)
     restore_td_learner(td2, data)
     assert td2._action_weights == td._action_weights
-    assert td2.get_trace("tree", action="answer") == td.get_trace(
-        "tree", action="answer"
-    )
-
+    assert td2.get_trace("tree", action="answer") == td.get_trace("tree", action="answer")
 
 
 def test_trace_persistence_roundtrip(network_td_learning) -> None:
@@ -1177,6 +1177,7 @@ def test_trace_pruned_after_decay(network_td_learning) -> None:
 # ======================================================================
 # From tests/test_plasticity.py
 # ======================================================================
+
 
 @pytest.fixture
 def network_plasticity() -> ConceptNetwork:
@@ -1364,9 +1365,7 @@ class TestHebbianPlasticity:
 
         # Compute the experiential-only cosine similarity (the Hebbian signal)
         exp_start = (
-            embeddings_plasticity._spectral_dim
-            if embeddings_plasticity._spectral_dim > 0
-            else 0
+            embeddings_plasticity._spectral_dim if embeddings_plasticity._spectral_dim > 0 else 0
         )
 
         def exp_cos_sim(va, vb):
@@ -1416,9 +1415,7 @@ class TestHebbianPlasticity:
         assert v_dog_before is not None
 
         exp_start = (
-            embeddings_plasticity._spectral_dim
-            if embeddings_plasticity._spectral_dim > 0
-            else 0
+            embeddings_plasticity._spectral_dim if embeddings_plasticity._spectral_dim > 0 else 0
         )
 
         def exp_cos_sim(va, vb):
@@ -1473,9 +1470,7 @@ class TestHebbianPlasticity:
         assert v_dog is not None
 
         exp_start = (
-            embeddings_plasticity._spectral_dim
-            if embeddings_plasticity._spectral_dim > 0
-            else 0
+            embeddings_plasticity._spectral_dim if embeddings_plasticity._spectral_dim > 0 else 0
         )
         norm_tree_before = float(np.linalg.norm(v_tree[exp_start:]))
         norm_dog_before = float(np.linalg.norm(v_dog[exp_start:]))
@@ -1903,10 +1898,7 @@ def test_web_study_tags_edge_origin() -> None:
     )
     assert rels, "parser should extract at least one typed relationship"
     for subject, _rel, obj in rels:
-        edges = [
-            e for e in learner.network.get_edges(subject, direction="out")
-            if e.target == obj
-        ]
+        edges = [e for e in learner.network.get_edges(subject, direction="out") if e.target == obj]
         assert edges, f"missing edge {subject} -> {obj}"
         assert all(e.origin == "web:en.wikipedia.org" for e in edges)
 
@@ -1914,15 +1906,10 @@ def test_web_study_tags_edge_origin() -> None:
 def test_local_study_keeps_learned_origin() -> None:
     """Without a source record, extraction keeps the historical origin."""
     learner = _make_learner()
-    rels = learner._extract_and_add_relationships(
-        "A neutron star is a stellar remnant."
-    )
+    rels = learner._extract_and_add_relationships("A neutron star is a stellar remnant.")
     assert rels, "parser should extract at least one typed relationship"
     for subject, _rel, obj in rels:
-        edges = [
-            e for e in learner.network.get_edges(subject, direction="out")
-            if e.target == obj
-        ]
+        edges = [e for e in learner.network.get_edges(subject, direction="out") if e.target == obj]
         assert edges, f"missing edge {subject} -> {obj}"
         assert all(e.origin == "learned" for e in edges)
 
@@ -1946,8 +1933,12 @@ def test_web_study_records_concept_sources_capped() -> None:
     for i in range(WEB_SOURCES_CAP + 5):
         learner._record_web_source(
             concept,
-            {"url": f"https://example{i}.com/x", "domain": f"example{i}.com",
-             "source": "web", "at": i},
+            {
+                "url": f"https://example{i}.com/x",
+                "domain": f"example{i}.com",
+                "source": "web",
+                "at": i,
+            },
         )
     assert len(concept.properties["web_sources"]) <= WEB_SOURCES_CAP
 

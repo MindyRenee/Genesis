@@ -41,34 +41,96 @@ _PUNCT_LETTER_RE = re.compile(r"([.!?])([A-Z])")
 
 # Sentence-initial words that already act as connectors.
 _EXISTING_CONNECTORS = {
-    "but", "and", "so", "though", "although", "yet",
-    "still", "however", "what's", "plus", "that's",
-    "of", "naturally", "admittedly", "even", "course",
+    "but",
+    "and",
+    "so",
+    "though",
+    "although",
+    "yet",
+    "still",
+    "however",
+    "what's",
+    "plus",
+    "that's",
+    "of",
+    "naturally",
+    "admittedly",
+    "even",
+    "course",
 }
 # Words that indicate a reflective or self-referential sentence —
 # adding a connector before these breaks the flow.
 _REFLECTIVE_STARTERS = {
-    "the", "a", "an", "my", "our", "this", "that",
-    "here's", "there's", "it's", "i'm", "i've", "i'd",
-    "i", "i'll", "what", "when", "where", "why", "how",
-    "plus", "interestingly", "honestly", "right",
-    "mm", "okay", "sure", "of", "naturally",
-    "admittedly", "even", "course", "still",
+    "the",
+    "a",
+    "an",
+    "my",
+    "our",
+    "this",
+    "that",
+    "here's",
+    "there's",
+    "it's",
+    "i'm",
+    "i've",
+    "i'd",
+    "i",
+    "i'll",
+    "what",
+    "when",
+    "where",
+    "why",
+    "how",
+    "plus",
+    "interestingly",
+    "honestly",
+    "right",
+    "mm",
+    "okay",
+    "sure",
+    "of",
+    "naturally",
+    "admittedly",
+    "even",
+    "course",
+    "still",
 }
 # Negation words that signal a contrastive relationship
 # with the previous sentence.
 _NEGATION_STARTS = {
-    "not", "no", "never", "none", "nor", "neither",
-    "without", "isn't", "aren't", "wasn't", "weren't",
-    "don't", "doesn't", "didn't", "won't", "can't",
-    "couldn't", "shouldn't", "wouldn't",
+    "not",
+    "no",
+    "never",
+    "none",
+    "nor",
+    "neither",
+    "without",
+    "isn't",
+    "aren't",
+    "wasn't",
+    "weren't",
+    "don't",
+    "doesn't",
+    "didn't",
+    "won't",
+    "can't",
+    "couldn't",
+    "shouldn't",
+    "wouldn't",
 }
 # Words that signal an elaborative relationship — the
 # sentence builds on the previous one.
 _ELABORATION_STARTS = {
-    "another", "also", "furthermore", "moreover",
-    "additionally", "specifically", "particularly",
-    "especially", "indeed", "in",
+    "another",
+    "also",
+    "furthermore",
+    "moreover",
+    "additionally",
+    "specifically",
+    "particularly",
+    "especially",
+    "indeed",
+    "in",
 }
 
 
@@ -217,9 +279,7 @@ class Voice:
             return new_sentences
 
         # Low alertness or theta-dominant → sometimes merge short sentences
-        should_merge = (
-            emotion.alertness < 0.3 and self._rng.random() < merge_prob
-        ) or (
+        should_merge = (emotion.alertness < 0.3 and self._rng.random() < merge_prob) or (
             brain_waves is not None
             and brain_waves.dominant == BrainWave.THETA
             and self._rng.random() < merge_prob
@@ -247,7 +307,10 @@ class Voice:
         return sentences
 
     def _add_connectors(
-        self, sentences: list[str], emotion: EmotionalState, intent: str = "",
+        self,
+        sentences: list[str],
+        emotion: EmotionalState,
+        intent: str = "",
     ) -> list[str]:
         """Add connectors between sentences for natural flow.
 
@@ -300,9 +363,7 @@ class Voice:
                 and not is_question
                 and self._rng.random() < 0.25
             ):
-                connector = self._semantic_connector(
-                    first_word, connectors, last_connector
-                )
+                connector = self._semantic_connector(first_word, connectors, last_connector)
                 # Lowercase first letter after connector (unless "I" or "I'm")
                 s = self._lowercase_after_connector(s)
                 result.append(f"{connector} {s}")
@@ -322,18 +383,31 @@ class Voice:
         """
         if emotion.creativity > 0.6:
             return [
-                "And", "But", "And yet", "What's more,",
-                "Still,", "Of course,", "Naturally,",
+                "And",
+                "But",
+                "And yet",
+                "What's more,",
+                "Still,",
+                "Of course,",
+                "Naturally,",
             ]
         if emotion.caution > 0.5:
             return [
-                "But", "Though", "That said,", "Still,",
-                "Admittedly,", "Even so,",
+                "But",
+                "Though",
+                "That said,",
+                "Still,",
+                "Admittedly,",
+                "Even so,",
             ]
         if emotion.valence > 0.3:
             return [
-                "And", "Plus,", "What's more,", "And so,",
-                "Of course,", "Naturally,",
+                "And",
+                "Plus,",
+                "What's more,",
+                "And so,",
+                "Of course,",
+                "Naturally,",
             ]
         return ["But", "And", "Still,", "Yet"]
 
@@ -348,19 +422,13 @@ class Voice:
         if first_word in _NEGATION_STARTS:
             # Contrastive: the sentence negates or contrasts
             # with the previous one.
-            return self._rng.choice(
-                ["But", "Yet", "And yet", "Still,"]
-            )
+            return self._rng.choice(["But", "Yet", "And yet", "Still,"])
         if first_word in _ELABORATION_STARTS:
             # Elaborative: the sentence builds on the previous.
-            return self._rng.choice(
-                ["And", "What's more,", "Plus,", "Of course,"]
-            )
+            return self._rng.choice(["And", "What's more,", "Plus,", "Of course,"])
         return self._pick_connector(connectors, last_connector)
 
-    def _pick_connector(
-        self, connectors: list[str], last_connector: str | None
-    ) -> str:
+    def _pick_connector(self, connectors: list[str], last_connector: str | None) -> str:
         """Pick a connector, avoiding repeating the last one."""
         connector = self._rng.choice(connectors)
         # Avoid repeating the same connector
@@ -419,13 +487,31 @@ class Voice:
             # hedging these produces awkward double-hedges like
             # "I'd I think like to understand" or "I'm perhaps here"
             already_hedged_prefixes = (
-                "i think", "i believe", "perhaps", "maybe", "possibly",
-                "it seems", "i'm not sure", "i'd like", "i'd love",
-                "i'm still", "i'm here", "i'm present", "i'm glad",
-                "i'm curious", "i wonder", "let me", "here's",
-                "i've learned", "i've added", "i didn't know",
-                "that's new", "i just learned", "i hear you",
-                "i can hear", "i want to understand",
+                "i think",
+                "i believe",
+                "perhaps",
+                "maybe",
+                "possibly",
+                "it seems",
+                "i'm not sure",
+                "i'd like",
+                "i'd love",
+                "i'm still",
+                "i'm here",
+                "i'm present",
+                "i'm glad",
+                "i'm curious",
+                "i wonder",
+                "let me",
+                "here's",
+                "i've learned",
+                "i've added",
+                "i didn't know",
+                "that's new",
+                "i just learned",
+                "i hear you",
+                "i can hear",
+                "i want to understand",
             )
             result = []
             for s in sentences:
@@ -459,8 +545,7 @@ class Voice:
             # Don't insert hedges after articles — "A perhaps clear
             # liquid" is broken English. Articles need to be followed
             # directly by their noun phrase.
-            if first_word_lower in ("a", "an", "the", "this", "that",
-                                     "these", "those"):
+            if first_word_lower in ("a", "an", "the", "this", "that", "these", "those"):
                 return s
             return f"{words[0]} {self._rng.choice(hedges)} {words[1]}"
         return s
@@ -484,10 +569,7 @@ class Voice:
         if self._style_source is not None:
             profile = self._style_source.user_style_profile()
             if profile.get("total_sentences", 0) >= 5:
-                user_bias = (
-                    profile.get("formal_score", 0.0)
-                    - profile.get("casual_score", 0.0)
-                )
+                user_bias = profile.get("formal_score", 0.0) - profile.get("casual_score", 0.0)
                 formality += user_bias * 0.3
 
         if formality > 0.55:

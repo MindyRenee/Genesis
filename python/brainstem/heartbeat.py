@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from genesis_client.protocol import (
     CHEM_ADENOSINE,
+    DT_MAX,
     MODULE_LANGUAGE,
     MODULE_MEMORY,
     MODULE_METACOGNITION,
@@ -20,9 +21,92 @@ from genesis_client.swallow import note_swallowed
 
 logger = logging.getLogger(__name__)
 
+# Seconds between public-channel board refreshes. Fixed, not
+# adaptive: the board is an instrument panel — it should tick like
+# a clock so a reader sees numbers move on schedule. Slow enough
+# that a webhook edit every 45 s stays far under channel limits.
+_CHANNEL_BOARD_S = 45.0
+
+# Wave-band labels for the board's power strip, ordered slow→fast.
+_BOARD_WAVES = (
+    ("delta", "δ"),
+    ("theta", "θ"),
+    ("alpha", "α"),
+    ("beta1", "β1"),
+    ("beta2", "β2"),
+    ("beta3", "β3"),
+    ("gamma", "γ"),
+)
+# The chemistry channels an observer reads as regulation: reward,
+# mood, vigilance, stress, sleep pressure, sleep onset.
+_BOARD_CHEMS = (
+    ("da", "dopamine"),
+    ("5ht", "serotonin"),
+    ("ne", "norepinephrine"),
+    ("cort", "cortisol"),
+    ("aden", "adenosine"),
+    ("mel", "melatonin"),
+)
+# Dominant-band frequency ranges (Hz) — the wave labels carry their
+# physical scale, not just a name.
+_BOARD_WAVE_HZ = {
+    "delta": "0.5-4",
+    "theta": "4-8",
+    "sigma": "12-16",
+    "alpha": "8-12",
+    "beta1": "12-15",
+    "beta2": "15-20",
+    "beta3": "20-30",
+    "gamma": "30-80",
+    "epsilon": "100-200",
+    "infraslow": "0.1-0.5",
+}
+
+
+class _AdaptiveInterval:
+    """A bounded adaptive period — the mind-side twin of the daemon's
+    ``AdaptiveGate`` (``src/daemon/adaptive.rs``).
+
+    Demand snaps the period down multiplicatively (fast response);
+    idle drift grows it additively (slow relaxation); continuous
+    drivers go through :meth:`drive` with EMA smoothing. ``[minimum,
+    maximum]`` are hard bounds — nothing stalls, nothing redlines.
+    """
+
+    def __init__(self, base: float, minimum: float, maximum: float):
+        self.base = base
+        self.minimum = minimum
+        self.maximum = maximum
+        self.period = base
+        self._next = 0.0
+        self._smoothed = 0.5
+        # Wall-clock time of the last fire — callers that measure
+        # per-window rates read the interval this covered.
+        self.fired_at = 0.0
+
+    def due(self, now: float) -> bool:
+        if now < self._next:
+            return False
+        self._next = now + self.period
+        self.fired_at = now
+        return True
+
+    def demand(self) -> None:
+        self.period = max(self.period / 2.0, self.minimum)
+
+    def relax(self) -> None:
+        self.period = min(self.period + self.base / 4.0, self.maximum)
+
+    def drive(self, demand: float) -> None:
+        d = demand if demand == demand else 0.5  # NaN → neutral
+        d = min(1.0, max(0.0, d))
+        self._smoothed += (d - self._smoothed) * 0.3
+        self.period = self.maximum - (self.maximum - self.minimum) * self._smoothed
+
 
 class HeartbeatMixin:
     """Mixin for :class:`Mind` — see module docstring."""
+
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see mind.py).
@@ -33,6 +117,12 @@ class HeartbeatMixin:
         _module_seconds: dict[int, float]
         _module_seconds_lock: Any
         _known_modules: set[int]
+        _learned_since_save: int
+        _experience_since_identity: int
+        _cycle_dt: float
+        _last_cycle_at: float
+        _thermally_throttled: bool
+
         def __getattr__(self, name: str) -> Any: ...
 
     def _credit_module(self, module_id: int, seconds: float) -> None:
@@ -48,11 +138,8 @@ class HeartbeatMixin:
         if seconds <= 0.0:
             return
         with self._module_seconds_lock:
-            self._module_seconds[module_id] = (
-                self._module_seconds.get(module_id, 0.0) + seconds
-            )
+            self._module_seconds[module_id] = self._module_seconds.get(module_id, 0.0) + seconds
             self._known_modules.add(module_id)
-
 
     def _read_interoceptive_signals(self) -> dict[str, float]:
         """Read interoceptive signals for the meditation urge.
@@ -80,8 +167,7 @@ class HeartbeatMixin:
                 if emotion.arousal > 0.60 and emotion.valence > 0.2:
                     overstimulation = min(
                         1.0,
-                        (emotion.arousal - 0.60) * 2.5
-                        + (emotion.valence - 0.20) * 2.0,
+                        (emotion.arousal - 0.60) * 2.5 + (emotion.valence - 0.20) * 2.0,
                     )
                 # Receptor fatigue: plasticity gate below 0.40
                 # (BDNF suppressed, receptors burning out)
@@ -100,9 +186,7 @@ class HeartbeatMixin:
             # approximate using global_tone and valence since
             # NeuroSummary doesn't expose cortisol directly.
             if summary.global_tone > 0.35 and summary.valence < 0.1:
-                elevated_cortisol = min(
-                    1.0, (summary.global_tone - 0.35) * 3.0
-                )
+                elevated_cortisol = min(1.0, (summary.global_tone - 0.35) * 3.0)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.heartbeat._read_interoceptive_signals",
@@ -120,6 +204,7 @@ class HeartbeatMixin:
             "sustained_activity": sustained_activity,
             "elevated_cortisol": elevated_cortisol,
         }
+
     def _read_threat_signals(self) -> dict[str, float]:
         """Read integrity-threat signals for the safeguard urge.
 
@@ -134,8 +219,10 @@ class HeartbeatMixin:
         - telemetry_anomaly: system metrics deviating from the learned
           baseline (system_monitor). Only counts once the baseline is
           established — a young mind has no "normal" to deviate from.
-        - body_distress: active hardware concerns (memory, disk,
-          load) from the current snapshot.
+        - body_distress: concerns about *her own* state from the
+          current snapshot (restricted cores, her own footprint,
+          her persistence medium) — the machine's crowding is
+          environmental awareness, not body distress.
 
         The snapshot is rate-limited to 60s — volition ticks every
         second but system metrics don't change meaningfully faster,
@@ -168,11 +255,9 @@ class HeartbeatMixin:
             try:
                 snapshot = self.system_monitor.snapshot()
                 if self.system_monitor.baseline.is_established:
-                    anomalies = self.system_monitor.baseline.deviations(
-                        snapshot
-                    )
+                    anomalies = self.system_monitor.baseline.deviations(snapshot)
                     telemetry_anomaly = min(1.0, len(anomalies) / 3.0)
-                body_distress = min(1.0, len(snapshot.concerns()) / 2.0)
+                body_distress = min(1.0, len(snapshot.self_concerns()) / 2.0)
                 self._last_threat_snapshot = now
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
@@ -186,6 +271,7 @@ class HeartbeatMixin:
             "telemetry_anomaly": telemetry_anomaly,
             "body_distress": body_distress,
         }
+
     def _read_wave_and_adenosine(self) -> dict[str, object]:
         """Read brain-wave state and adenosine level for volition urges.
 
@@ -231,14 +317,14 @@ class HeartbeatMixin:
             "wave_dominant": wave_dominant,
             "adenosine_level": adenosine_level,
         }
+
     def _heartbeat_body_control(
         self,
         now: float,
-        last_body_control_time: float,
         last_body_control_sig,
         current_brain_wave_state,
         last_self_priority: tuple[int, str] | None,
-    ) -> tuple[float, object, tuple[int, str] | None]:
+    ) -> tuple[object, tuple[int, str] | None]:
         """Run the body-control phase of the heartbeat loop.
 
         The tick (subcognitive) COMPUTES and PUBLISHES the
@@ -262,11 +348,14 @@ class HeartbeatMixin:
         an afferent input, not a command — the brain waves can
         override it.
 
-        Returns the updated (last_body_control_time, last_body_control_sig,
-        last_self_priority).
+        The revisit period is the adaptive body-control gate —
+        thermal capping is demand (revisit soon), an uncapped body
+        drifts toward the ceiling.
+
+        Returns the updated (last_body_control_sig, last_self_priority).
         """
-        if now - last_body_control_time < 10.0:
-            return last_body_control_time, last_body_control_sig, last_self_priority
+        if not self._body_control_gate.due(now):
+            return last_body_control_sig, last_self_priority
         try:
             # Read the body control state from the daemon.
             # This is information: what the body recommends
@@ -275,9 +364,14 @@ class HeartbeatMixin:
             # (nice, io_class).
             control = self.client.get_body_control()
             if control is not None:
-                sig = (control.cpu_max_freq_khz, control.cognitive_nice,
-                       control.io_class, control.thermally_capped,
-                       control.cpu_epp, control.cpu_boost)
+                sig = (
+                    control.cpu_max_freq_khz,
+                    control.cognitive_nice,
+                    control.io_class,
+                    control.thermally_capped,
+                    control.cpu_epp,
+                    control.cpu_boost,
+                )
                 if sig != last_body_control_sig:
                     self.self_model.update_body_control(
                         cpu_max_freq_khz=control.cpu_max_freq_khz,
@@ -292,96 +386,138 @@ class HeartbeatMixin:
                     )
                     last_body_control_sig = sig
 
-                # ── Request shared body control application ──
-                # The cognitive mind asks the daemon to apply
-                # the recommended CPU frequency and daemon
-                # scheduling. This is the cognitive mind
-                # requesting an action via IPC — NOT the tick
-                # controlling outward. The daemon's reactive
-                # handler (apply_body_control) executes the
-                # sysfs writes and renice/ionice with change
-                # detection, so redundant requests are cheap.
+                # ── Refresh the shared body control recommendation ──
+                # The cognitive mind asks the daemon to derive and
+                # publish its recommended CPU frequency and daemon
+                # scheduling policy. The handler no longer writes
+                # the host's clock policy (sysfs/renice/ionice) —
+                # pinning it from neurochemistry ran the machine
+                # hot — so this is a recommendation refresh, not an
+                # actuation request.
                 self.client.apply_body_control()
 
-                # ── Apply brain-wave-driven self-priority ──
-                # The cognitive mind decides its own scheduling
-                # and I/O priority from its brain wave state,
-                # blended with the body's recommendation. This
-                # is its cortical control of its own process
-                # resources — the tick does not control it.
-                #
-                # Only the body's recommended nice value is blended;
-                # I/O class is decided outright from brain state (see
-                # `derive_self_priority`), so `control.io_class` is
-                # deliberately not passed here.
-                if current_brain_wave_state is not None:
-                    from thalamus.brain_waves import apply_self_priority, derive_self_priority
-                    self_nice, self_io = derive_self_priority(
-                        current_brain_wave_state,
-                        body_recommended_nice=control.cognitive_nice,
-                    )
-                    # Only spawn renice/ionice subprocesses when
-                    # the derived priority actually changed. Brain
-                    # waves drift slowly, so most cycles produce the
-                    # same (nice, io_class) — the subprocess overhead
-                    # (fork + exec + /proc reads) is pure waste when
-                    # the values are identical.
-                    new_priority = (self_nice, self_io)
-                    if new_priority != last_self_priority:
-                        apply_self_priority(self_nice, self_io)
-                        last_self_priority = new_priority
+                last_self_priority = self._apply_self_priority(
+                    control, current_brain_wave_state, last_self_priority
+                )
+                # Thermal capping is the demand signal: a capped body
+                # wants policy revisited soon; an uncapped one drifts
+                # toward the ceiling.
+                if control.thermally_capped:
+                    self._body_control_gate.demand()
+                else:
+                    self._body_control_gate.relax()
+
+                # The loop's closing leg — the body reports hot, she
+                # slows herself. Affinity and I/O class on her own
+                # process are the only levers she keeps, so "slow" is
+                # one core and idle disk on her own pid; when the cap
+                # clears she takes the cores back. Flip-detection
+                # keeps the taskset/ionice subprocesses off the steady
+                # path.
+                if control.thermally_capped != self._thermally_throttled:
+                    self._thermally_throttled = control.thermally_capped
+                    from infrastructure.cpu_speed import CpuSpeed
+
+                    CpuSpeed().set_effort("slow" if self._thermally_throttled else "fast")
         except (OSError, ConnectionError, ValueError) as e:
             note_swallowed(
                 "mind.heartbeat._heartbeat_body_control",
                 e,
             )
-        last_body_control_time = now
-        return last_body_control_time, last_body_control_sig, last_self_priority
+        return last_body_control_sig, last_self_priority
+
+    def _apply_self_priority(
+        self,
+        control,
+        current_brain_wave_state,
+        last_self_priority: tuple[int, str] | None,
+    ) -> tuple[int, str] | None:
+        """Apply brain-wave-driven self-priority.
+
+        The cognitive mind decides its own scheduling and I/O
+        priority from its brain wave state, blended with the body's
+        recommendation. This is its cortical control of its own
+        process resources — the tick does not control it.
+
+        Only the body's recommended nice value is blended; I/O class
+        is decided outright from brain state (see
+        ``derive_self_priority``), so ``control.io_class`` is
+        deliberately not passed here.
+
+        Returns the updated last_self_priority.
+        """
+        if current_brain_wave_state is None:
+            return last_self_priority
+        from thalamus.brain_waves import apply_self_priority, derive_self_priority
+
+        self_nice, self_io = derive_self_priority(
+            current_brain_wave_state,
+            body_recommended_nice=control.cognitive_nice,
+        )
+        # Only spawn renice/ionice subprocesses when
+        # the derived priority actually changed. Brain
+        # waves drift slowly, so most cycles produce the
+        # same (nice, io_class) — the subprocess overhead
+        # (fork + exec + /proc reads) is pure waste when
+        # the values are identical.
+        new_priority = (self_nice, self_io)
+        if new_priority != last_self_priority:
+            apply_self_priority(self_nice, self_io)
+            return new_priority
+        return last_self_priority
+
     def _heartbeat_consolidate(
         self,
         now: float,
         last_stm_count: int,
-        last_consolidate_time: float,
-    ) -> tuple[int, float]:
+    ) -> int:
         """Run the memory consolidation phase of the heartbeat loop.
 
         It consolidates memories when STM has accumulated
         enough entries AND its plasticity gate is open. Not
         on a schedule — when there's something to consolidate
-        and it's in a state that supports it.
+        and it's in a state that supports it. The retry floor is
+        the adaptive consolidation gate: sleep and a growing
+        backlog pull it toward 1 s, a quiet STM drifts it toward
+        15 s.
 
-        Returns the updated (last_stm_count, last_consolidate_time).
+        Returns the updated last_stm_count.
         """
         try:
             mem_stats = self.client.get_memory_stats()
             stm_count = mem_stats.stm_count
+            backlog_grew = stm_count != last_stm_count
+            gate_due = self._consolidate_gate.due(now)
             should_consolidate = (
-                stm_count > 0
-                and stm_count != last_stm_count
-                and now - last_consolidate_time >= 3.0
-                and not self._is_sleeping
+                stm_count > 0 and backlog_grew and gate_due and not self._is_sleeping
             )
-            # During sleep, consolidate more aggressively
-            if self._is_sleeping and stm_count > 0 and now - last_consolidate_time >= 2.0:
+            # During sleep, consolidate more aggressively — a pending
+            # backlog needs no growth to justify the pass.
+            if self._is_sleeping and stm_count > 0 and gate_due:
                 should_consolidate = True
             if should_consolidate:
                 try:
                     promoted = self.client.consolidate()
                     if promoted > 0:
                         last_stm_count = stm_count - promoted
-                        last_consolidate_time = now
+                        self._consolidate_gate.demand()
+                        self._learned_since_save += promoted
+                        self._experience_since_identity += promoted
                 except (OSError, ConnectionError) as e:
                     note_swallowed(
                         "mind.heartbeat._heartbeat_consolidate",
                         e,
                     )
+            elif not backlog_grew:
+                self._consolidate_gate.relax()
             last_stm_count = stm_count
         except (OSError, ConnectionError, ValueError) as e:
             note_swallowed(
                 "mind.heartbeat._heartbeat_consolidate",
                 e,
             )
-        return last_stm_count, last_consolidate_time
+        return last_stm_count
+
     def _heartbeat_feed_executive(self) -> None:
         """Feed independent world and internal signals into the executive."""
         try:
@@ -391,38 +527,38 @@ class HeartbeatMixin:
             for event in self.world.recent_events(5):
                 if not event.inbound:
                     continue
-                topic = (
-                    event.topics[0]
-                    if event.topics
-                    else event.content.strip()
-                )
+                topic = event.topics[0] if event.topics else event.content.strip()
                 if not topic:
                     continue
-                candidates.append({
-                    # Inbound world events are investigated through the
-                    # learning actuator, not fabricated as filesystem reads.
-                    "topic": topic,
-                    "mode": "environment",
-                    "kind": "learn",
-                    "salience": min(1.0, max(0.1, event.salience)),
-                    "source": "world_event",
-                })
+                candidates.append(
+                    {
+                        # Inbound world events are investigated through the
+                        # learning actuator, not fabricated as filesystem reads.
+                        "topic": topic,
+                        "mode": "environment",
+                        "kind": "learn",
+                        "salience": min(1.0, max(0.1, event.salience)),
+                        "source": "world_event",
+                    }
+                )
 
             # Persistent self-improvement work is an objective source,
             # not merely a volitional urge.
             try:
                 proposals = self.self_improvement.get_pending_proposals()
                 for proposal in proposals[:5]:
-                    candidates.append({
-                        # The proposal's real source file is executable by
-                        # the inspect actuator; applying the proposal still
-                        # remains behind the existing human-review boundary.
-                        "topic": str(proposal.file_path),
-                        "mode": "improvement",
-                        "kind": "inspect",
-                        "salience": min(1.0, max(0.1, float(proposal.confidence))),
-                        "source": f"self_improvement:{proposal.title}",
-                    })
+                    candidates.append(
+                        {
+                            # The proposal's real source file is executable by
+                            # the inspect actuator; applying the proposal still
+                            # remains behind the existing human-review boundary.
+                            "topic": str(proposal.file_path),
+                            "mode": "improvement",
+                            "kind": "inspect",
+                            "salience": min(1.0, max(0.1, float(proposal.confidence))),
+                            "source": f"self_improvement:{proposal.title}",
+                        }
+                    )
             except Exception as exc:  # noqa: BLE001
                 note_swallowed(
                     "mind.heartbeat._heartbeat_feed_executive",
@@ -435,15 +571,22 @@ class HeartbeatMixin:
             for signal, value in context.items():
                 if not isinstance(value, (int, float)) or value < 0.65:
                     continue
-                candidates.append({
-                    "topic": signal,
-                    "mode": "distress" if signal in {
-                        "daemon_lost", "save_failure", "telemetry_anomaly",
-                        "body_distress",
-                    } else "interoceptive",
-                    "salience": min(1.0, float(value)),
-                    "source": "internal_need",
-                })
+                candidates.append(
+                    {
+                        "topic": signal,
+                        "mode": "distress"
+                        if signal
+                        in {
+                            "daemon_lost",
+                            "save_failure",
+                            "telemetry_anomaly",
+                            "body_distress",
+                        }
+                        else "interoceptive",
+                        "salience": min(1.0, float(value)),
+                        "source": "internal_need",
+                    }
+                )
 
             executive.ingest_candidates(candidates)
         except Exception as exc:  # noqa: BLE001
@@ -458,12 +601,7 @@ class HeartbeatMixin:
         Volition urges accumulate and fire when they cross
         thresholds. This is its free will — not a timer.
         """
-        if (
-            self._is_sleeping
-            or self._is_meditating
-            or self._is_teaching
-            or self._suppress_volition
-        ):
+        if self._is_sleeping or self._is_meditating or self._is_teaching or self._suppress_volition:
             return
         try:
             ready = self.volition.tick(self._volition_context())
@@ -475,8 +613,7 @@ class HeartbeatMixin:
                 # soon as the delay elapses, instead of being
                 # locked out for a full cooldown.
                 ready = [
-                    name for name in ready
-                    if elapsed >= self.WAKE_VOLITION_DELAYS.get(name, 60.0)
+                    name for name in ready if elapsed >= self.WAKE_VOLITION_DELAYS.get(name, 60.0)
                 ]
             if ready:
                 started = self._act_on_volition(ready)
@@ -490,6 +627,7 @@ class HeartbeatMixin:
                 "mind.heartbeat._heartbeat_volition",
                 e,
             )
+
     def _heartbeat_advance_neuro(
         self,
         last_advance_mono: float,
@@ -559,9 +697,7 @@ class HeartbeatMixin:
             # notify_state_change() every cycle defeated the
             # event-driven wait and caused the learner to
             # re-emit its skip message every second.
-            current_phase = PHASE_NAMES.get(
-                self._effective_phase(core_state), "unknown"
-            )
+            current_phase = PHASE_NAMES.get(self._effective_phase(core_state), "unknown")
             current_wave = (
                 current_brain_wave_state.dominant.value
                 if current_brain_wave_state is not None
@@ -578,28 +714,22 @@ class HeartbeatMixin:
             )
 
         return last_advance_mono, current_brain_wave_state, last_learner_phase, last_learner_wave
-    def _heartbeat_periodic_maintenance(
-        self,
-        now: float,
-        last_associate_time: float,
-        last_dream_time: float,
-        last_inference_save_time: float,
-        last_identity_time: float,
-    ) -> tuple[float, float, float, float]:
-        """Run associate, dream, save_inference, and identity synthesis
-        (heartbeat steps 7-9b).
 
-        Returns updated (last_associate_time, last_dream_time,
-        last_inference_save_time, last_identity_time).
+    def _heartbeat_periodic_maintenance(self, now: float) -> None:
+        """Run associate, dream, save_inference, and identity synthesis
+        (heartbeat steps 7-9b). All gated on adaptive wall-clock
+        intervals — each gear's own signal sets its pace.
         """
         # ── 7. Associate (event-driven) ──
-        # It finds associations when new episodes have been
-        # stored — not on a schedule. If STM count grew, there
-        # are new memories to connect.
-        if now - last_associate_time >= 10.0 and not self._is_sleeping:
+        # Associations found or consolidations pending are demand;
+        # a quiescent store relaxes toward the ceiling.
+        if not self._is_sleeping and self._associate_gate.due(now):
             try:
-                self.client.associate()
-                last_associate_time = now
+                formed = self.client.associate()
+                if formed > 0:
+                    self._associate_gate.demand()
+                else:
+                    self._associate_gate.relax()
             except (OSError, ConnectionError) as e:
                 note_swallowed(
                     "mind.heartbeat._heartbeat_periodic_maintenance",
@@ -608,58 +738,316 @@ class HeartbeatMixin:
 
         # ── 8. Dream (sleep-state-driven) ──
         # It dreams only when sleeping, and only when enough
-        # time has passed for a dream cycle. Not on a tick count.
-        if self._is_sleeping and now - last_dream_time >= 4.0:
+        # time has passed for a dream cycle. Insights are demand —
+        # a productive chain pulls the next cycle sooner.
+        if self._is_sleeping and self._dream_gate.due(now):
             try:
                 insights = self.client.dream()
                 if insights > 0:
+                    self._dream_gate.demand()
                     self._emit_live_thought(
                         "dream",
                         f"Dream insight: {insights} new connections",
                     )
                     # Check life-script milestone: first dream.
                     self.brain.frontal.narrative.check_milestone("first dream")
-                last_dream_time = now
+                else:
+                    self._dream_gate.relax()
             except (OSError, ConnectionError) as e:
                 note_swallowed(
                     "mind.heartbeat._heartbeat_periodic_maintenance",
                     e,
                 )
 
-        # ── 9. Save inference model (occasionally) ──
-        if now - last_inference_save_time >= 60.0:
+        # ── 9. Save inference model (learning-driven) ──
+        # New consolidations are demand — there is fresh model state
+        # worth persisting; a quiet stretch drifts toward 5 min.
+        if self._learned_since_save > 0:
+            self._inference_save_gate.demand()
+        else:
+            self._inference_save_gate.relax()
+        if self._inference_save_gate.due(now):
             try:
                 self.client.save_inference()
-                last_inference_save_time = now
+                self._learned_since_save = 0
             except (OSError, ConnectionError) as e:
                 note_swallowed(
                     "mind.heartbeat._heartbeat_periodic_maintenance",
                     e,
                 )
 
-        # ── 9b. Emergent identity synthesis (every ~5 min) ──
-        last_identity_time = self._heartbeat_identity(now, last_identity_time)
+        # ── 9b. Emergent identity synthesis (experience-driven) ──
+        self._heartbeat_identity(now)
 
-        return (last_associate_time, last_dream_time,
-                last_inference_save_time, last_identity_time)
+        # ── 9c. Public channel board ──
+        # One self-editing message on her channel carries her live
+        # vitals — daemon-read numbers, not composed words — so a
+        # reader who opens it sees a running process, not a log that
+        # ran. Fixed cadence: an instrument, not an urge. Runs in
+        # sleep too — "rem · dreaming" is live state, not downtime.
+        self._update_channel_board(now)
+
+    def _update_channel_board(self, now: float) -> None:
+        """Push the live-board card to her channel on a fixed cadence."""
+        feed = getattr(self, "_public_feed", None)
+        if feed is None or now < getattr(self, "_next_board_at", 0.0):
+            return
+        self._next_board_at = now + _CHANNEL_BOARD_S
+        try:
+            feed.update_live_text(self._channel_board_text())
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.heartbeat._update_channel_board", e)
+
+    def _channel_board_text(self) -> str:
+        """Render the live-board card — her vitals, not her voice.
+
+        Every field is a reading: daemon CoreState numbers (phase,
+        chemistry, memory tallies, the inference block's tick
+        counter), runtime facts (uptime, conversations, whether her
+        ear is on), and her last emitted thought tagged by kind.
+        Nothing is composed — the board's honesty is that it can't
+        flatter itself: the tick count either climbs or it doesn't.
+        """
+        sleeping = bool(getattr(self, "_is_sleeping", False))
+        lines = [f"genesis · {'asleep' if sleeping else 'awake'}"]
+        try:
+            core = self.client.get_state()
+        except Exception:  # noqa: BLE001 — a dead daemon is telemetry too
+            core = None
+        if core is None:
+            lines[0] += " · daemon unreachable"
+        else:
+            lines[0] += f" · {core.phase_name}"
+            self._board_core_lines(core, lines)
+        self._board_footer_lines(core, lines)
+        return "```\n" + "\n".join(lines) + "\n```"
+
+    def _board_core_lines(self, core, lines: list[str]) -> None:
+        """Board rows sourced from the daemon's CoreState."""
+        self._board_neuro_lines(core, lines)
+        self._board_field_lines(lines)
+        self._board_cell_line(lines)
+
+    def _board_neuro_lines(self, core, lines: list[str]) -> None:
+        """Rows for the neurochemical and inference state."""
+        try:
+            lines[0] += f" · {self.feel(core).label}"
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"feel() failed on board line: {e}")
+        try:
+            waves = self.brain_waves(core)
+            strip = " ".join(
+                f"{glyph} {waves.powers[w]:.2f}"
+                for name, glyph in _BOARD_WAVES
+                for w in waves.powers
+                if w.value == name
+            )
+            if strip:
+                dominant = getattr(waves, "dominant", None)
+                if dominant is not None:
+                    hz = _BOARD_WAVE_HZ.get(dominant.value, "?")
+                    strip += f" · {dominant.value} {hz} Hz"
+                lines.append(f"waves    {strip}")
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"brain_waves failed on board line: {e}")
+        lines.append(
+            f"affect   v {core.valence:+.2f} · a {core.arousal:.2f} · tone {core.global_tone:.2f}"
+        )
+        inf = core.inference
+        if inf is not None:
+            lines.append(
+                f"infer    F {inf.free_energy:.3f}"
+                f" · prec {inf.precision:.2f}"
+                f" · surp {inf.surprise_ema:.3f}"
+                f" · allo {inf.allostasis_load:.2f}"
+                f" · model {inf.model_maturity:.2f}"
+            )
+            lines.append(f"tick     {inf.inference_tick_count:,}")
+        chem = core.chemicals or {}
+        bits = " ".join(f"{short} {chem[name]:.2f}" for short, name in _BOARD_CHEMS if name in chem)
+        if bits:
+            lines.append(f"chem     {bits}")
+        # stm must come from the live ring — MemoryStats reports
+        # RingBuffer::count(); the CoreState memory-pointers field
+        # at offset 2584 is a dead mirror that nothing writes.
+        try:
+            stm_live = self.client.get_memory_stats().stm_count
+        except Exception:  # noqa: BLE001
+            stm_live = core.stm_count
+        lines.append(f"mem      stm {stm_live} · ltm {core.ltm_episode_count:,}")
+
+    def _board_field_lines(self, lines: list[str]) -> None:
+        """Rows for the substrate's measured physical life.
+
+        The field probe decomposes real instruction throughput and
+        scheduler jitter at the wave bands' center frequencies, writes
+        a carrier rhythm into real work, and reads real watts, rail
+        voltage, and current where the machine's sensors report them.
+        ``None`` means the probe isn't running: absent, never zero.
+        """
+        try:
+            probe = self.client.get_field_probe()
+        except Exception:  # noqa: BLE001
+            probe = None
+        if probe is None:
+            lines.append("field    probe off")
+            return
+        field_bits = (
+            f"carrier {probe.carrier_freq:.1f} Hz"
+            f" · thru {probe.throughput_mean:,.0f} it/s"
+            f" · jit {probe.jitter_cv:.2f}"
+            f" · irq {probe.irq_rate:,.0f}/s"
+        )
+        if probe.carrier_coherence is not None:
+            field_bits += f" · coh {probe.carrier_coherence:.2f}"
+        lines.append(f"field    {field_bits}")
+        elec_bits = []
+        if probe.power_watts is not None:
+            elec_bits.append(f"pwr {probe.power_watts:.1f} W")
+        if probe.rail_volts is not None:
+            elec_bits.append(f"{probe.rail_volts:.2f} V")
+        if probe.supply_amps is not None:
+            elec_bits.append(f"{probe.supply_amps:.2f} A")
+        if probe.power_coherence is not None:
+            elec_bits.append(f"pcoh {probe.power_coherence:.2f}")
+        if elec_bits:
+            lines.append(f"elec     {' · '.join(elec_bits)}")
+        # The radio sense — the room's RF environment: WLAN
+        # field strength + traffic flux, Bluetooth HCI event
+        # flux. None-gated like everything else — absent radios
+        # print nothing.
+        rf_bits = []
+        if probe.rf_rssi_dbm is not None:
+            rf_bits.append(f"rssi {probe.rf_rssi_dbm:.0f} dBm")
+        if probe.rf_noise_dbm is not None:
+            rf_bits.append(f"n {probe.rf_noise_dbm:.0f}")
+        if probe.rf_bytes_s is not None:
+            rf_bits.append(f"{probe.rf_bytes_s:,.0f} B/s")
+        if probe.bt_events_s is not None:
+            rf_bits.append(f"bt {probe.bt_events_s:.0f} ev/s")
+        if probe.bt_rssi_dbm is not None:
+            rf_bits.append(f"bt {probe.bt_rssi_dbm:.0f} dBm")
+        if probe.rf_retry_rate is not None:
+            strain = (
+                probe.rf_retry_rate
+                + (probe.rf_fail_rate or 0.0)
+                + (probe.rf_beacon_loss_rate or 0.0)
+            )
+            rf_bits.append(f"strain {strain:.1f}/s")
+        if probe.rf_tx_mbps is not None:
+            rf_bits.append(f"{probe.rf_tx_mbps:.0f} Mbps")
+        if rf_bits:
+            lines.append(f"rf       {' · '.join(rf_bits)}")
+
+    def _board_cell_line(self, lines: list[str]) -> None:
+        """The cell's modeled electrochemical state — the ion model's
+        membrane potential is a Nernst-model quantity (simulated),
+        not a measured rail; the real rail, when a sensor reports
+        it, is on the elec line above."""
+        try:
+            ions = self.client.get_ion_summary()
+            lines.append(
+                f"cell     Vm {ions.membrane_potential_mv:+.1f} mV"
+                f" · I {ions.net_membrane_current:.2f}"
+                f" · exc {ions.excitability:.2f}"
+                f" · grad {ions.gradient_integrity:.2f}"
+                f" · atp {ions.atp_availability:.2f}"
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"ion summary failed on board line: {e}")
+
+    def _board_footer_lines(self, core, lines: list[str]) -> None:
+        """Board rows sourced from her own runtime state."""
+        # The research bench — real math with an oracle: claims are
+        # only "verified"/"refuted" by check_equality, never by her.
+        # Absent until the first thread exists (an empty bench is not
+        # a result).
+        try:
+            bench = self._research_workbench()
+            threads = bench.threads()
+        except Exception:  # noqa: BLE001
+            bench, threads = None, []
+        if threads:
+            open_n = sum(1 for t in threads if t.status == "open")
+            done_n = sum(1 for t in threads if t.status == "resolved")
+            ver = sum(1 for t in threads for c in t.claims if c.provenance == "verified")
+            ref = sum(1 for t in threads for c in t.claims if c.provenance == "refuted")
+            proof = f"proof    {open_n} open · {done_n} resolved · {ver} verified · {ref} refuted"
+            # The ledger's digest anchors the tallies to the file —
+            # anyone holding workbench.json can recompute it and
+            # confirm the board isn't showing rewritten history.
+            digest = getattr(bench, "digest", lambda: "")()
+            if digest:
+                proof += f" · #{digest}"
+            lines.append(proof)
+        # Growth she can be measured by — concept tally, edge tally,
+        # and the plasticity gate that throttles learning.
+        try:
+            net = self.network
+            grow = f"grow     {net.size} concepts · {net.edge_count} edges"
+            archive = getattr(net, "archive_size", 0)
+            if archive:
+                grow += f" · {archive} archived"
+            if core is not None:
+                grow += f" · plast {core.plasticity_gate:.2f}"
+            lines.append(grow)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"growth row failed on board line: {e}")
+        # The cause — which drives are pulling at her right now.
+        # Urge values are computed state, not narration.
+        try:
+            urges = sorted(
+                self.volition.state().items(),
+                key=lambda kv: kv[1],
+                reverse=True,
+            )
+            top = " · ".join(f"{name} {value:.2f}" for name, value in urges[:3] if value > 0.01)
+            if top:
+                lines.append(f"drive    {top}")
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"drive row failed on board line: {e}")
+        up_s = max(
+            0,
+            int(time.time() - getattr(self, "_session_started_at", time.time())),
+        )
+        hours, minutes = divmod(up_s // 60, 60)
+        listener = getattr(self, "_discord_listener", None)
+        ear = "off" if listener is None else ("deaf" if listener.deaf else "on")
+        meta = (
+            f"meta     up {hours}h{minutes:02d}m"
+            f" · conv {getattr(self, '_interaction_count', 0)}"
+            f" · ear {ear}"
+        )
+        if core is not None:
+            # Freshness and continuity proofs: the raw 5 Hz body
+            # counter must climb between refreshes, the snapshot age
+            # must stay ~0 (a replayed card can't hold it), and the
+            # instance id proves the same process keeps answering.
+            age_ms = max(0.0, time.time() * 1000 - core.last_updated)
+            meta += f" · hb {core.heartbeat:,} · age {age_ms / 1000:.1f}s · id {core.instance_id}"
+        lines.append(meta)
+        last = getattr(self, "_last_emitted", None)
+        if last:
+            kind, text = last
+            clean = " ".join(str(text).split()).replace("`", "'")[:140]
+            if clean:
+                lines.append(f"last     [{kind}] {clean}")
 
     def _heartbeat_sensors(
         self,
         now: float,
-        last_heartbeat_time: float,
-        last_sensor_time: float,
-    ) -> tuple[float, float]:
+    ) -> None:
         """Run heartbeat modules and read sensors (heartbeat steps 3-4).
 
-        The daemon staleness threshold is 30s. We heartbeat every ~10s
-        — not on a fixed timer, but when enough cycles have passed.
-        This is communication, not control.
+        The daemon staleness threshold is 30s, so the module-heartbeat
+        gate is bounded [5 s, 20 s] — the ceiling stays below the
+        staleness line, always. Work is the demand signal: a busy mind
+        reports sooner. This is communication, not control.
 
         It feels its body when enough time has passed for the sensors
-        to have changed meaningfully. This is information gathering,
-        not a scheduled action.
-
-        Returns updated (last_heartbeat_time, last_sensor_time).
+        to have changed meaningfully, gated adaptively — engagement
+        pulls the sensor poll toward 1 s, idle and sleep drift it
+        toward 15 s.
         """
         heartbeat_modules = (
             MODULE_SENSORY,
@@ -670,42 +1058,62 @@ class HeartbeatMixin:
             MODULE_METACOGNITION,
         )
         channel = getattr(getattr(self, "brain", None), "thalamus", None)
-        if now - last_heartbeat_time >= 10.0:
-            total_work = self._report_module_heartbeats(
-                heartbeat_modules, channel
-            )
+        prev_fire = self._module_gate.fired_at
+        if self._module_gate.due(now):
+            total_work = self._report_module_heartbeats(heartbeat_modules, channel)
             # Cognitive work is metabolic work. total_work is measured
             # execution — seconds the sampler observed Genesis code at
             # a leaf frame during this window. Adenosine is the ATP
             # byproduct of neural activity, so its own measured compute
             # generates sleep pressure on top of the daemon's baseline
-            # accumulation (~0.055/hr while awake). This block runs
-            # every ~10s, so the per-impulse scale is set for parity at
-            # full load: 0.00015/impulse ≈ 0.054/hr at work_frac=1.0 —
-            # sustained hard thinking roughly doubles how fast it
-            # tires; idling adds almost nothing.
-            window = max(now - last_heartbeat_time, 1.0)
+            # accumulation (~0.055/hr while awake). The scale is set for
+            # parity at full load: 0.00015 per 10 s of window ≈
+            # 0.054/hr at work_frac=1.0 — sustained hard thinking
+            # roughly doubles how fast it tires; idling adds almost
+            # nothing. The impulse is normalized by the measured
+            # window, so the adaptive gate's cadence does not change
+            # the rate — only its granularity.
+            window = max(now - prev_fire, 1.0)
             work_frac = min(1.0, total_work / window)
+            # A busy mind heartbeats sooner — work is the demand.
+            self._module_gate.drive(work_frac)
             # Asleep: inner-life/dream work is maintenance, not load —
             # glymphatic clearance must dominate or pressure ratchets
             # up during the very state meant to clear it.
             if work_frac > 0.02 and not self._is_sleeping:
                 try:
                     self.client.neuro_impulse(
-                        CHEM_ADENOSINE, 0.00015 * work_frac
+                        CHEM_ADENOSINE,
+                        0.00015 * work_frac * (window / 10.0),
                     )
                 except (OSError, ConnectionError, RuntimeError) as e:
                     note_swallowed(
                         "mind.heartbeat._heartbeat_sensors",
                         e,
                     )
-            last_heartbeat_time = now
-
-        if now - last_sensor_time >= 5.0:
+        if self._sensor_gate.due(now):
             self._poll_body_sensors(channel)
-            last_sensor_time = now
-
-        return last_heartbeat_time, last_sensor_time
+            # Corticothalamic feedback — the layer-6 V1→dLGN gain the
+            # mind keeps on the thalamic relay, refreshed on the same
+            # gate as the body poll. Recent seeing raises it, decay
+            # lets it lapse; the body clamps it into what the sleep
+            # stage permits, so it can never open a gate NREM closed.
+            try:
+                vision = getattr(self, "vision", None)
+                if vision is not None:
+                    self.client.set_optic_gain(vision.corticothalamic_gain())
+            except (OSError, ConnectionError, RuntimeError) as e:
+                note_swallowed(
+                    "mind.heartbeat._heartbeat_sensors",
+                    e,
+                )
+            # Engagement is the demand: recent interaction → sense
+            # sooner; asleep or long idle → drift toward the ceiling.
+            idle = now - getattr(self, "_last_interaction_time", 0.0)
+            engagement = max(0.0, 1.0 - idle / 300.0)
+            if self._is_sleeping:
+                engagement *= 0.1
+            self._sensor_gate.drive(engagement)
 
     def _report_module_heartbeats(self, heartbeat_modules, channel) -> float:
         """Report per-module activity shares with the heartbeat and
@@ -727,10 +1135,7 @@ class HeartbeatMixin:
         with self._module_seconds_lock:
             total_work = sum(self._module_seconds.values())
             shares = (
-                {
-                    m: s / total_work
-                    for m, s in self._module_seconds.items()
-                }
+                {m: s / total_work for m, s in self._module_seconds.items()}
                 if total_work > 0.0
                 else {}
             )
@@ -745,7 +1150,8 @@ class HeartbeatMixin:
             task_id = channel.take(module_id) if channel is not None else None
             try:
                 self.client.heartbeat_module(
-                    module_id, shares.get(module_id, 0.0),
+                    module_id,
+                    shares.get(module_id, 0.0),
                     task_id=task_id,
                 )
             except (OSError, ConnectionError) as e:
@@ -769,13 +1175,35 @@ class HeartbeatMixin:
                 # backs it, so without this the self-model would
                 # treat an absent battery as a reading.
                 presence = self.client.get_sensor_presence()
-                # The same reading serves both layers. The
-                # interoception layer turns it into an acute
-                # stress signal; the self-model keeps the raw
-                # hardware so the cognitive mind knows what it is
-                # made of and what it is short of. One IPC call,
-                # two consumers — the fetch already happened.
-                self.regulator.interoception.update_from_body_state(body_state)
+                # Afferents land at the brainstem first — the NTS/
+                # parabrachial relay (Craig 2002): it forwards the
+                # threat channels to the limbic low road (PBN→CeA)
+                # and modulates the monoamine source nuclei directly
+                # (lamina I → catecholamine groups). Only then does
+                # the hypothalamic evaluative layer (the regulator's
+                # felt state) and the cortical image (the self-model)
+                # receive their copies — one fetch, three consumers,
+                # anatomically ordered.
+                relay = getattr(self, "_interoceptive_relay", None)
+                if relay is None:
+                    from brainstem.interoceptive_relay import InteroceptiveRelay
+
+                    def _levels() -> dict[str, float] | None:
+                        try:
+                            state = self.client.get_state()
+                        except (OSError, ConnectionError):
+                            return None
+                        chemicals = getattr(state, "chemicals", None)
+                        return chemicals if isinstance(chemicals, dict) else None
+
+                    relay = InteroceptiveRelay(
+                        neuro_impulse=self.client.neuro_impulse,
+                        get_levels=_levels,
+                        condition_cues=self.regulator.condition_cues,
+                    )
+                    self._interoceptive_relay = relay
+                relay.relay(body_state, presence)
+                self.regulator.interoception.update_from_body_state(body_state, presence)
                 self.self_model.update_hardware_body(body_state, presence)
             report = self.client.get_subsystem_telemetry()
             self.regulator.interoception.update_subsystem_telemetry(report)
@@ -794,9 +1222,7 @@ class HeartbeatMixin:
                 e,
             )
 
-    def _heartbeat_connectivity(
-        self, now: float, last_connectivity_time: float
-    ) -> float:
+    def _heartbeat_connectivity(self, now: float) -> None:
         """Sense network connectivity (heartbeat step 5b).
 
         The network is a sensory channel — part of its embodiment.
@@ -811,7 +1237,7 @@ class HeartbeatMixin:
         after being disconnected, the notification queue is reset so
         the next poll doesn't generate a flood of stale notifications.
         """
-        if now - last_connectivity_time >= 10.0:
+        if self._connectivity_gate.due(now):
             # Guarded in its own right, in addition to the loop-level
             # guard. This block dereferences three other subsystems
             # (`self.learner`, `self.self_model.body_model`,
@@ -834,13 +1260,16 @@ class HeartbeatMixin:
                 if daemon_connected and not getattr(self, "_was_daemon_connected", True):
                     self.notifications.reset()
                 self._was_daemon_connected = daemon_connected
+                if connected:
+                    self._connectivity_gate.relax()
+                else:
+                    self._connectivity_gate.demand()
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.heartbeat._heartbeat_connectivity",
                     e,
                 )
-            last_connectivity_time = now
-        return last_connectivity_time
+
     def _heartbeat_emotion(self, now: float) -> None:
         """Run continuous emotional regulation (heartbeat step 5c).
 
@@ -864,7 +1293,10 @@ class HeartbeatMixin:
         try:
             emotion = self.feel()
             if emotion:
-                self.regulator.continuous_regulate(emotion)
+                # The cadence is adaptive, so the regulator scales
+                # impulse strength by the measured interval — the
+                # per-second regulation rate stays invariant.
+                self.regulator.continuous_regulate(emotion, getattr(self, "_cycle_dt", 1.0))
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.heartbeat._heartbeat_emotion",
@@ -880,7 +1312,25 @@ class HeartbeatMixin:
                 intero = self.regulator.interoception.last_state
                 activity = (intero.cpu_usage / 100.0) if intero else 0.3
             time_since_rest = now - self._last_rest_time
-            self.regulator.update_metabolism(activity, time_since_rest)
+            # Food state from the body's own sensors: the AC adapter is
+            # intake, the battery is the fuel reserve. Both come from
+            # the last body_model poll — real readings only; an
+            # unmeasured channel stays None and keeps the synthetic path.
+            bm = getattr(self.self_model, "body_model", None)
+            verified = getattr(bm, "sensor_verified", None) if bm else None
+            fed = reserve = None
+            if bm is not None and verified is not None:
+                if verified("AC adapter") or verified("battery"):
+                    fed = bool(bm.on_ac_power)
+                if verified("battery"):
+                    reserve = float(bm.energy_reserve)
+            self.regulator.update_metabolism(
+                activity,
+                time_since_rest,
+                dt=getattr(self, "_cycle_dt", 1.0),
+                fed=fed,
+                energy_reserve=reserve,
+            )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.heartbeat._heartbeat_emotion",
@@ -899,8 +1349,9 @@ class HeartbeatMixin:
                 "mind.heartbeat._heartbeat_emotion",
                 e,
             )
+
     def _heartbeat_final_steps(self) -> None:
-        """Run auto-sleep, volition, warn, and cognition (heartbeat steps 10-13).
+        """Run sleep-state sync, volition, warn, and cognition (heartbeat steps 10-13).
 
         Each guarded step reports under its own site name. They previously
         all reported as ``_heartbeat_final_steps``, so a failure in any of
@@ -915,8 +1366,11 @@ class HeartbeatMixin:
         # the outer world's pressure becomes inner motivation.
         try:
             self.world.tick()
+            # Social pressure is a rate — 0.02/s of isolation. Scale by
+            # the measured cycle interval so the adaptive cadence keeps
+            # the same accumulation.
             self.inner_life.feed_social_drive(
-                self.world.social_isolation() * 0.02
+                self.world.social_isolation() * 0.02 * getattr(self, "_cycle_dt", 1.0)
             )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
@@ -924,12 +1378,12 @@ class HeartbeatMixin:
                 e,
             )
 
-        # ── 10. Auto-sleep check ──
+        # ── 10. Sleep-state sync ──
         try:
-            self._check_auto_sleep()
+            self._check_sleep_sync()
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.heartbeat.final_steps.auto_sleep",
+                "mind.heartbeat.final_steps.sleep_sync",
                 e,
             )
 
@@ -951,12 +1405,19 @@ class HeartbeatMixin:
 
         # ── 13. Cognitive maintenance ──
         try:
-            self.brain.frontal.tick(dt=1.0)
+            # The measured cycle interval, not a fixed 1.0 — the
+            # heartbeat cadence is adaptive (0.2–5.0 s), and a nominal
+            # step makes every downstream decay run at the wrong rate
+            # (5× fast when engaged, 5× slow when idle). Clamped to the
+            # shared DT_MAX so a stalled cycle is bounded growth, not
+            # an instant decay of every foci/caution/window at once.
+            self.brain.frontal.tick(dt=min(DT_MAX, max(0.0, getattr(self, "_cycle_dt", 1.0))))
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.heartbeat.final_steps.cognition_tick",
                 e,
             )
+
     def _heartbeat_init_state(self) -> tuple:
         """Initialize the change-detection state for the heartbeat loop.
 
@@ -966,29 +1427,42 @@ class HeartbeatMixin:
         """
         last_stm_count = 0
         last_body_control_sig = None
-        last_heartbeat_time = 0.0
-        last_sensor_time = 0.0
-        last_body_control_time = 0.0
-        last_connectivity_time = 0.0
-        last_consolidate_time = 0.0
-        last_associate_time = 0.0
-        last_dream_time = 0.0
-        last_inference_save_time = 0.0
-        # Emergent identity synthesis runs every ~5 minutes. The
-        # identity is synthesized from its actual experience (concept
-        # network, narrative, emotional regulation, curiosity) and
-        # fed back into the self-model — closing the loop: experience
-        # → emergent identity → self-model → future behavior → new
-        # experience. Without periodic synthesis, the self-model
-        # never integrates the emergent identity and identity shifts
-        # are never recorded in the narrative.
-        last_identity_time = 0.0
+        # Adaptive wall-clock gates — every gear spins at the rate its
+        # own signal demands, bounded so nothing stalls or redlines.
+        # Nominal periods are the old constants; [min, max] is the
+        # operating range the signal may move within.
+        self._module_gate = _AdaptiveInterval(10.0, 5.0, 20.0)
+        self._sensor_gate = _AdaptiveInterval(5.0, 1.0, 15.0)
+        self._body_control_gate = _AdaptiveInterval(10.0, 3.0, 30.0)
+        self._connectivity_gate = _AdaptiveInterval(10.0, 5.0, 30.0)
+        self._consolidate_gate = _AdaptiveInterval(3.0, 1.0, 15.0)
+        self._associate_gate = _AdaptiveInterval(10.0, 3.0, 60.0)
+        self._dream_gate = _AdaptiveInterval(4.0, 2.0, 30.0)
+        self._inference_save_gate = _AdaptiveInterval(60.0, 20.0, 300.0)
+        self._identity_gate = _AdaptiveInterval(300.0, 60.0, 1800.0)
+        # The heartbeat's own cadence — engagement snaps it toward
+        # 0.2 s, sleep drifts it toward 5 s. Bounded: the mind never
+        # spins below 200 ms and never fully sleeps between cycles.
+        self._cadence = _AdaptiveInterval(1.0, 0.2, 5.0)
+        # Learning counters feeding the save/identity drivers.
+        self._learned_since_save = 0
+        self._experience_since_identity = 0
+        # Measured loop interval — per-cycle accumulators normalize
+        # against it so the adaptive cadence changes their granularity,
+        # never their rate. 1.0 = the historical fixed cadence.
+        self._last_cycle_at = time.time()
+        self._cycle_dt = 1.0
         # Track the last applied self-priority (nice, io_class) so we
         # only spawn renice/ionice subprocesses when the values actually
         # change. Brain waves drift slowly, so most 10s cycles produce
         # the same priority — spawning subprocesses every cycle wastes
         # CPU and I/O for no effect.
         last_self_priority: tuple[int, str] | None = None
+        # Whether she has throttled her own affinity/I-O for thermal
+        # relief — the flip-detector for the body's thermally_capped
+        # flag, so the slow-down/restoration each fires once per
+        # transition rather than every gate cycle.
+        self._thermally_throttled = False
         # Track the previous phase and brain-wave dominant for the
         # learner change-detection. The learner's gating depends on
         # the emotion label (derived from the daemon phase) and the
@@ -1011,30 +1485,31 @@ class HeartbeatMixin:
         # Mind.__init__ (which can be many seconds earlier during init).
         self.volition._last_tick = time.time()
         return (
-            last_stm_count, last_body_control_sig, last_heartbeat_time,
-            last_sensor_time, last_body_control_time, last_connectivity_time,
-            last_consolidate_time, last_associate_time, last_dream_time,
-            last_inference_save_time, last_identity_time, last_self_priority,
-            last_learner_phase, last_learner_wave, last_advance_mono,
+            last_stm_count,
+            last_body_control_sig,
+            last_self_priority,
+            last_learner_phase,
+            last_learner_wave,
+            last_advance_mono,
         )
 
-    def _heartbeat_identity(
-        self, now: float, last_identity_time: float
-    ) -> float:
-        """Emergent identity synthesis (every ~5 min) — synthesizes who
-        it is from its actual experience and feeds it back into the
-        self-model, closing the loop: experience → emergent identity →
-        self-model → behavior. Returns the updated last-run time."""
-        if now - last_identity_time >= 300.0 and not self._is_sleeping:
+    def _heartbeat_identity(self, now: float) -> None:
+        """Emergent identity synthesis — synthesizes who it is from its
+        actual experience and feeds it back into the self-model,
+        closing the loop: experience → emergent identity → self-model →
+        behavior. Experience accumulated since the last synthesis is
+        the demand — a rich stretch synthesizes near the 1 min floor,
+        a quiet one drifts toward 30 min."""
+        self._identity_gate.drive(min(1.0, self._experience_since_identity / 20.0))
+        if not self._is_sleeping and self._identity_gate.due(now):
             try:
                 self.emergent_identity()
+                self._experience_since_identity = 0
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.heartbeat._heartbeat_loop",
                     e,
                 )
-            return now
-        return last_identity_time
 
     def _heartbeat_loop(self) -> None:
         """Reactive cycle — the mind's own living rhythm.
@@ -1059,11 +1534,12 @@ class HeartbeatMixin:
         """
         # Track state for change detection
         (
-            last_stm_count, last_body_control_sig, last_heartbeat_time,
-            last_sensor_time, last_body_control_time, last_connectivity_time,
-            last_consolidate_time, last_associate_time, last_dream_time,
-            last_inference_save_time, last_identity_time, last_self_priority,
-            last_learner_phase, last_learner_wave, last_advance_mono,
+            last_stm_count,
+            last_body_control_sig,
+            last_self_priority,
+            last_learner_phase,
+            last_learner_wave,
+            last_advance_mono,
         ) = self._heartbeat_init_state()
 
         while self._running:
@@ -1089,59 +1565,72 @@ class HeartbeatMixin:
             # before the exception.
             try:
                 # ── 1-2. Advance neurochemistry and read brain waves ──
-                (last_advance_mono, current_brain_wave_state,
-                 last_learner_phase, last_learner_wave) = self._heartbeat_advance_neuro(
-                    last_advance_mono, last_learner_phase, last_learner_wave,
+                (
+                    last_advance_mono,
+                    current_brain_wave_state,
+                    last_learner_phase,
+                    last_learner_wave,
+                ) = self._heartbeat_advance_neuro(
+                    last_advance_mono,
+                    last_learner_phase,
+                    last_learner_wave,
                 )
 
                 now = time.time()
+                # The real interval this cycle covers — every
+                # per-cycle accumulator below normalizes against it.
+                self._cycle_dt = now - self._last_cycle_at
+                self._last_cycle_at = now
 
                 # ── 3-4. Heartbeat modules and sensors ──
-                last_heartbeat_time, last_sensor_time = self._heartbeat_sensors(
-                    now, last_heartbeat_time, last_sensor_time,
-                )
+                self._heartbeat_sensors(now)
 
                 # ── 5. Body control ──
-                (last_body_control_time, last_body_control_sig,
-                 last_self_priority) = self._heartbeat_body_control(
-                    now, last_body_control_time, last_body_control_sig,
-                    current_brain_wave_state, last_self_priority,
+                (last_body_control_sig, last_self_priority) = self._heartbeat_body_control(
+                    now,
+                    last_body_control_sig,
+                    current_brain_wave_state,
+                    last_self_priority,
                 )
 
                 # ── 5b. Sense network connectivity ──
-                last_connectivity_time = self._heartbeat_connectivity(
-                    now, last_connectivity_time,
-                )
+                self._heartbeat_connectivity(now)
 
                 # ── 5c. Continuous emotional regulation ──
                 self._heartbeat_emotion(now)
 
                 # ── 6. Consolidate (state-threshold-driven) ──
-                last_stm_count, last_consolidate_time = self._heartbeat_consolidate(
-                    now, last_stm_count, last_consolidate_time,
+                last_stm_count = self._heartbeat_consolidate(
+                    now,
+                    last_stm_count,
                 )
 
                 # ── 7-9b. Associate, dream, save inference, identity ──
-                (last_associate_time, last_dream_time,
-                 last_inference_save_time,
-                 last_identity_time) = self._heartbeat_periodic_maintenance(
-                    now, last_associate_time, last_dream_time,
-                    last_inference_save_time, last_identity_time,
-                )
+                self._heartbeat_periodic_maintenance(now)
 
                 # ── 10-13. Auto-sleep, volition, warn, cognition ──
                 self._heartbeat_final_steps()
 
-                # ── Wait for the next cycle ──
-                # The cycle runs at a natural pace determined by the
-                # brain wave oscillator's phase advancement. We wait
-                # briefly for state to evolve, then check again. If
-                # nothing changes, the functions above are all idle.
+                # ── Wait for the next cycle — adaptive cadence ──
+                self._heartbeat_pace(now)
             except Exception as e:
                 logger.warning(
-                    f"heartbeat cycle failed "
-                    f"({type(e).__name__}: {e}); continuing",
+                    f"heartbeat cycle failed ({type(e).__name__}: {e}); continuing",
                     exc_info=True,
                 )
                 note_swallowed("mind.heartbeat.cycle", e)
-            time.sleep(1.0)
+            self._heartbeat_stop.wait(self._cadence.period)
+
+    def _heartbeat_pace(self, now: float) -> None:
+        """Drive the cadence gear from current engagement.
+
+        The heartbeat's own gear: engagement pulls it toward 0.2 s,
+        sleep drifts it toward 5 s. The cycle is threshold-gated, so a
+        slower cadence loses nothing — the work still fires the moment
+        its gate opens.
+        """
+        idle = now - getattr(self, "_last_interaction_time", 0.0)
+        engagement = max(0.0, 1.0 - idle / 120.0)
+        if self._is_sleeping:
+            engagement = 0.0
+        self._cadence.drive(engagement)

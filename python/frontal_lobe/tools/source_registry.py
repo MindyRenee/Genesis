@@ -151,11 +151,7 @@ class WordNetSource:
         if not content:
             return None
 
-        related = [
-            term.replace("_", " ")
-            for entry in entries
-            for term in entry.hypernyms
-        ]
+        related = [term.replace("_", " ") for entry in entries for term in entry.hypernyms]
         return SourceResult(
             url=f"wordnet:{word}",
             title=f"WordNet: {word}",
@@ -328,7 +324,7 @@ class SourceCache:
 # disk cache instead. Cached Wikipedia articles remain readable
 # offline; this only stops new network fetches. Flip back to True to
 # re-enable — nothing is removed.
-WIKIPEDIA_ENABLED = True
+WIKIPEDIA_ENABLED = False
 
 _WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
 _WIKIPEDIA_REST = "https://en.wikipedia.org/api/rest_v1/page/summary/"
@@ -356,9 +352,7 @@ def _wikipedia_search(topic: str, limit: int = 3) -> list[str]:
     try:
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            data = json.loads(
-                resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore")
-            )
+            data = json.loads(resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore"))
         results = data.get("query", {}).get("search", [])
         return [r["title"] for r in results if "title" in r]
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
@@ -382,15 +376,13 @@ def _wikipedia_fetch(article_title: str) -> SourceResult | None:
     try:
         req = urllib.request.Request(summary_url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            data = json.loads(
-                resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore")
-            )
+            data = json.loads(resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore"))
         summary = data.get("extract", "")
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
         note_swallowed(
             "frontal_lobe.tools.source_registry._wikipedia_fetch",
             e,
-        )# summary is optional
+        )  # summary is optional
 
     # Get the full article content (plain text via extracts API)
     params = urllib.parse.urlencode(
@@ -407,9 +399,7 @@ def _wikipedia_fetch(article_title: str) -> SourceResult | None:
     try:
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            data = json.loads(
-                resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore")
-            )
+            data = json.loads(resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore"))
         pages = data.get("query", {}).get("pages", {})
         if not pages:
             return None
@@ -469,9 +459,7 @@ def wikipedia_lead_image(article_title: str, thumb_size: int = 320) -> bytes | N
     try:
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            data = json.loads(
-                resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore")
-            )
+            data = json.loads(resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore"))
         pages = data.get("query", {}).get("pages", {})
         if not pages:
             return None
@@ -529,13 +517,46 @@ def _extract_related_topics(content: str) -> list[str]:
 
 
 # Default man-page search paths. These are the standard locations on
-# Debian/Ubuntu and most Linux distributions. The source scans every
-# man<section> subdirectory under each path.
+# Debian/Ubuntu and most Linux distributions, plus the user-local dir
+# first — manpath orders ~/.local/share/man ahead of the system dirs,
+# so locally-installed pages (Genesis's own docs/man/ pages land
+# there via scripts/install.sh) shadow any stale system copies.
 _DEFAULT_MAN_PATHS = (
+    str(Path.home() / ".local" / "share" / "man"),
     "/usr/share/man",
     "/usr/local/share/man",
     "/usr/local/man",
 )
+
+
+def _resolve_man_paths() -> tuple[str, ...]:
+    """Resolve the man-page search paths the way ``man`` itself does.
+
+    ``manpath`` (or ``man --path``) prints the real search list —
+    user-local dirs first, exactly the order ``man`` resolves them —
+    so Genesis sees every page a human at a terminal sees, including
+    her own manual pages under ``~/.local/share/man``. Falls back to
+    the common layout (user dir first) when neither tool exists.
+    """
+    for cmd in (["manpath"], ["man", "--path"]):
+        if shutil.which(cmd[0]) is None:
+            continue
+        try:
+            out = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if out.returncode == 0:
+            paths = tuple(p for p in out.stdout.strip().split(":") if p and Path(p).is_dir())
+            if paths:
+                return paths
+    return _DEFAULT_MAN_PATHS
+
 
 # Man sections, in the order ``man`` itself resolves them. Section 1
 # (user commands) is most useful to Genesis, so it comes first.
@@ -580,18 +601,21 @@ class ManPageSource:
 
     def __init__(
         self,
-        man_paths: tuple[str, ...] = _DEFAULT_MAN_PATHS,
+        man_paths: tuple[str, ...] | None = None,
         sections: tuple[str, ...] = _MAN_SECTIONS,
         max_text: int = _MAX_MAN_TEXT,
     ) -> None:
         """Initialize the man page source.
 
         Args:
-            man_paths: Directories to search for man pages.
+            man_paths: Directories to search for man pages, or None to
+                resolve them the way ``man`` itself does (``manpath``
+                output — every dir in the real search list, user-local
+                first, including ``~/.local/share/man``).
             sections: Man page sections to search (e.g. "1", "8").
             max_text: Maximum characters of text to extract per page.
         """
-        self._man_paths = man_paths
+        self._man_paths = tuple(man_paths) if man_paths else _resolve_man_paths()
         self._sections = sections
         self._max_text = max_text
 
@@ -783,7 +807,7 @@ class ManPageSource:
         # NAME/DESCRIPTION text is still readable.
         cleaned: list[str] = []
         for line in raw.splitlines():
-            if line.startswith(".\\\""):
+            if line.startswith('.\\"'):
                 continue
             if line.startswith(".TH") or line.startswith(".SH") or line.startswith(".PP"):
                 cleaned.append(line.lstrip("."))
@@ -1089,8 +1113,15 @@ _DEFAULT_DOC_PATH = "/usr/share/doc"
 # These are the files that actually teach, not changelogs or copyrights.
 _DOC_FILE_PRIORITIES: list[tuple[str, ...]] = [
     ("INTRO", "INTRO.gz"),
-    ("README", "README.gz", "README.md", "README.md.gz", "README.txt",
-     "README.rst", "README.rst.gz"),
+    (
+        "README",
+        "README.gz",
+        "README.md",
+        "README.md.gz",
+        "README.txt",
+        "README.rst",
+        "README.rst.gz",
+    ),
     ("FAQ", "FAQ.gz", "FAQ.md", "FAQ.md.gz", "FAQ.txt"),
     ("DESIGN", "DESIGN.gz", "DESIGN.md", "DESIGN.md.gz"),
     ("HACKING", "HACKING.gz", "HACKING.md", "HACKING.md.gz"),
@@ -1099,8 +1130,15 @@ _DOC_FILE_PRIORITIES: list[tuple[str, ...]] = [
 ]
 
 # Files to skip — licenses, changelogs, copyright (not educational).
-_DOC_SKIP = {"copyright", "changelog", "changelog.debian.gz", "news.gz",
-             "news.debian.gz", "thanks.gz", "authors.gz"}
+_DOC_SKIP = {
+    "copyright",
+    "changelog",
+    "changelog.debian.gz",
+    "news.gz",
+    "news.debian.gz",
+    "thanks.gz",
+    "authors.gz",
+}
 
 # How much of a doc file to return.
 _MAX_DOC_TEXT = 20000
@@ -1200,9 +1238,7 @@ class PackageDocSource:
         """
         if not self._doc_path.is_dir():
             return []
-        return sorted(
-            d.name for d in self._doc_path.iterdir() if d.is_dir()
-        )
+        return sorted(d.name for d in self._doc_path.iterdir() if d.is_dir())
 
     # ── internal helpers ──────────────────────────────────────────
 
@@ -1349,9 +1385,21 @@ def _duckduckgo_search(topic: str, limit: int = 5) -> list[str]:
                 if not any(
                     skip in url.lower()
                     for skip in (
-                        ".pdf", ".jpg", ".png", ".gif", ".css", ".js",
-                        ".dtd", ".xml", ".rss", ".json", ".ico", ".svg",
-                        ".woff", ".woff2", "duckduckgo",
+                        ".pdf",
+                        ".jpg",
+                        ".png",
+                        ".gif",
+                        ".css",
+                        ".js",
+                        ".dtd",
+                        ".xml",
+                        ".rss",
+                        ".json",
+                        ".ico",
+                        ".svg",
+                        ".woff",
+                        ".woff2",
+                        "duckduckgo",
                     )
                 ):
                     seen.add(url)
@@ -1396,8 +1444,11 @@ class GitHubSource:
         self._timeout = timeout
 
     def search_repos(
-        self, topic: str, limit: int = 3,
-        min_stars: int = 50, min_forks: int = 5,
+        self,
+        topic: str,
+        limit: int = 3,
+        min_stars: int = 50,
+        min_forks: int = 5,
     ) -> list[SourceResult]:
         """Search GitHub for repositories matching a topic.
 
@@ -1422,25 +1473,35 @@ class GitHubSource:
                 the code worth building on.
         """
         # Search with stars sorting — best projects first
-        params = urllib.parse.urlencode({
-            "q": f"{topic} stars:>={min_stars}",
-            "sort": "stars",
-            "order": "desc",
-            "per_page": str(min(limit * 3, 10)),  # fetch more, filter locally
-        })
+        params = urllib.parse.urlencode(
+            {
+                "q": f"{topic} stars:>={min_stars}",
+                "sort": "stars",
+                "order": "desc",
+                "per_page": str(min(limit * 3, 10)),  # fetch more, filter locally
+            }
+        )
         url = f"{self._API_SEARCH}?{params}"
 
         try:
-            req = urllib.request.Request(url, headers={
-                "Accept": "application/vnd.github.v3+json",
-                "User-Agent": "Genesis-AI/1.0 (autonomous learner)",
-            })
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "Accept": "application/vnd.github.v3+json",
+                    "User-Agent": "Genesis-AI/1.0 (autonomous learner)",
+                },
+            )
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
                 data = json.loads(
                     resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore")
                 )
-        except (urllib.error.URLError, urllib.error.HTTPError, OSError,
-                json.JSONDecodeError, TimeoutError):
+        except (
+            urllib.error.URLError,
+            urllib.error.HTTPError,
+            OSError,
+            json.JSONDecodeError,
+            TimeoutError,
+        ):
             return []
 
         results: list[SourceResult] = []
@@ -1477,24 +1538,29 @@ class GitHubSource:
                 content_parts.append(f"\nREADME:\n{readme_content}")
             content = "\n".join(content_parts)
 
-            results.append(SourceResult(
-                url=item.get("html_url", f"https://github.com/{repo_full}"),
-                title=f"{repo_full} (GitHub)",
-                content=content,
-                source_name="github",
-                summary=description,
-                related_topics=topics[:5],
-            ))
+            results.append(
+                SourceResult(
+                    url=item.get("html_url", f"https://github.com/{repo_full}"),
+                    title=f"{repo_full} (GitHub)",
+                    content=content,
+                    source_name="github",
+                    summary=description,
+                    related_topics=topics[:5],
+                )
+            )
         return results
 
     def _fetch_readme(self, repo_full: str) -> str:
         """Fetch and decode the README of a repository."""
         url = self._API_README.format(repo=repo_full)
         try:
-            req = urllib.request.Request(url, headers={
-                "Accept": "application/vnd.github.v3.raw",
-                "User-Agent": "Genesis-AI/1.0 (autonomous learner)",
-            })
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "Accept": "application/vnd.github.v3.raw",
+                    "User-Agent": "Genesis-AI/1.0 (autonomous learner)",
+                },
+            )
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
                 raw = resp.read(_MAX_RESPONSE_BYTES + 1)
                 # READMEs can be base64-encoded or raw depending on
@@ -1503,12 +1569,13 @@ class GitHubSource:
                     return raw.decode("utf-8")[:8000]
                 except UnicodeDecodeError:
                     return raw.decode("latin-1")[:8000]
-        except (urllib.error.URLError, urllib.error.HTTPError, OSError,
-                TimeoutError):
+        except (urllib.error.URLError, urllib.error.HTTPError, OSError, TimeoutError):
             return ""
 
     def fetch_file(
-        self, repo_full: str, path: str,
+        self,
+        repo_full: str,
+        path: str,
     ) -> SourceResult | None:
         """Fetch a specific file from a public GitHub repo.
 
@@ -1525,10 +1592,13 @@ class GitHubSource:
             path=urllib.parse.quote(path, safe=""),
         )
         try:
-            req = urllib.request.Request(url, headers={
-                "Accept": "application/vnd.github.v3.raw",
-                "User-Agent": "Genesis-AI/1.0 (autonomous learner)",
-            })
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "Accept": "application/vnd.github.v3.raw",
+                    "User-Agent": "Genesis-AI/1.0 (autonomous learner)",
+                },
+            )
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
                 raw = resp.read(_MAX_RESPONSE_BYTES + 1)
                 try:
@@ -1542,8 +1612,7 @@ class GitHubSource:
                 source_name="github",
                 summary=f"Source file from {repo_full}",
             )
-        except (urllib.error.URLError, urllib.error.HTTPError, OSError,
-                TimeoutError):
+        except (urllib.error.URLError, urllib.error.HTTPError, OSError, TimeoutError):
             return None
 
 
@@ -1743,9 +1812,7 @@ class SourceRegistry:
                     self._cache.put(result, topic)
         return got_content
 
-    def _query_duckduckgo(
-        self, topic: str, max_results: int, results: list[SourceResult]
-    ) -> None:
+    def _query_duckduckgo(self, topic: str, max_results: int, results: list[SourceResult]) -> None:
         """Fallback DuckDuckGo Lite search for discovery."""
         ddg_urls = _duckduckgo_search(topic, limit=max_results - len(results))
         for url in ddg_urls:
@@ -1933,8 +2000,7 @@ class SourceRegistry:
     @property
     def source_names(self) -> list[str]:
         """Names of all registered sources (including offline)."""
-        names = ["wordnet", "man_pages",
-                 "info_pages", "package_docs", "github"]
+        names = ["wordnet", "man_pages", "info_pages", "package_docs", "github"]
         if self._cache:
             names.append("cache")
         return names

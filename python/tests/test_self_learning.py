@@ -9,6 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import itertools
 import logging
 import os
 import tempfile
@@ -48,10 +49,10 @@ from infrastructure.bug_reporter import BugReport
 logger = logging.getLogger(__name__)
 
 
-
 # ======================================================================
 # From tests/test_self_improvement.py
 # ======================================================================
+
 
 def _make_test_file(content: str) -> tuple[str, str]:
     """Create a temporary Python file with the given content.
@@ -330,7 +331,7 @@ def bar(y):
         assert stats["bugfix"]["accepted"] == 2
         assert stats["bugfix"]["rejected"] == 1
         assert stats["bugfix"]["total"] == 3
-        assert abs(stats["bugfix"]["rate"] - 2/3) < 0.01
+        assert abs(stats["bugfix"]["rate"] - 2 / 3) < 0.01
 
     def test_category_confidence_adjusts_with_feedback(self):
         """Test category confidence adjusts with feedback."""
@@ -469,25 +470,44 @@ def bar(y):
         # Pending proposal targeting a real file with a matching
         # snippet — should survive.
         live = Proposal(
-            id=1, title="live", category=ProposalCategory.BUGFIX,
-            file_path="target.py", description="d", rationale="r",
-            expected_benefit="b", original_code="old code here",
-            proposed_code="new", confidence=0.5,
+            id=1,
+            title="live",
+            category=ProposalCategory.BUGFIX,
+            file_path="target.py",
+            description="d",
+            rationale="r",
+            expected_benefit="b",
+            original_code="old code here",
+            proposed_code="new",
+            confidence=0.5,
         )
         # Pending proposal targeting a deleted file — should be dropped.
         stale = Proposal(
-            id=2, title="stale", category=ProposalCategory.BUGFIX,
-            file_path="genesis_live/app.py", description="d", rationale="r",
-            expected_benefit="b", original_code="old", proposed_code="new",
+            id=2,
+            title="stale",
+            category=ProposalCategory.BUGFIX,
+            file_path="genesis_live/app.py",
+            description="d",
+            rationale="r",
+            expected_benefit="b",
+            original_code="old",
+            proposed_code="new",
             confidence=0.5,
         )
         # Accepted proposal targeting a deleted file — should survive
         # (audit trail is preserved regardless of file existence).
         accepted_gone = Proposal(
-            id=3, title="accepted-gone", category=ProposalCategory.BUGFIX,
-            file_path="genesis_live/app.py", description="d", rationale="r",
-            expected_benefit="b", original_code="old", proposed_code="new",
-            confidence=0.5, status=ProposalStatus.ACCEPTED,
+            id=3,
+            title="accepted-gone",
+            category=ProposalCategory.BUGFIX,
+            file_path="genesis_live/app.py",
+            description="d",
+            rationale="r",
+            expected_benefit="b",
+            original_code="old",
+            proposed_code="new",
+            confidence=0.5,
+            status=ProposalStatus.ACCEPTED,
         )
         engine._proposals.extend([live, stale, accepted_gone])
 
@@ -552,6 +572,24 @@ except:
         assert "None" in proposed
         assert "items" in proposed
 
+    def test_fix_mutable_default_all_params(self):
+        """Every mutable default gets a sentinel — a signature with
+        several must not leave the earlier ones permanently None,
+        and an annotated default must name the parameter, not its type."""
+        content = "def foo(a=[], b: dict = {}):\n    return a, b\n"
+        root, _rel = _make_test_file(content)
+        engine = SelfImprovement(project_root=root)
+
+        with open(os.path.join(root, "test_module.py")) as f:
+            lines = f.read().splitlines(keepends=True)
+
+        result = engine._fix_mutable_default(lines, 1)
+        assert result is not None
+        _original, proposed, _desc, _benefit = result
+        assert "a = [] if a is None else a" in proposed
+        assert "b = {} if b is None else b" in proposed
+        compile(proposed, "<proposal>", "exec")
+
     def test_fix_print_in_code(self):
         """Test fix print in code."""
         content = """def foo():
@@ -576,10 +614,10 @@ except:
         output, not a stray debug leftover — converting it to
         logger.info() would drop the stream choice and silence it
         (info() filters below WARNING by default). Skip instead."""
-        content = '''def foo():
+        content = """def foo():
     print("[genesis] error", file=sys.stderr)
     return 1
-'''
+"""
         root, _rel = _make_test_file(content)
         engine = SelfImprovement(project_root=root)
 
@@ -816,13 +854,19 @@ def bar(y):
         all_sources = [p.source for p in engine.get_all_proposals()]
         assert len(all_sources) == len(set(all_sources)), "Duplicate proposals found"
 
-    def test_cooldown_prevents_rapid_generation(self):
-        """Test cooldown prevents rapid generation."""
+    def test_rapid_generation_is_not_throttled(self):
+        """Generation is deliberately unthrottled — verification gates land.
+
+        ``_last_generation_time`` is telemetry, not a rate limit: a
+        recent timestamp must not suppress a generation cycle.
+        """
         engine = SelfImprovement(project_root=".")
-        engine._last_generation_time = time.time() - 0.5  # recent (within 1s cooldown)
+        engine._last_generation_time = time.time()  # recent — telemetry only
 
         proposals = engine.generate_proposals(max_proposals=5)
-        assert proposals == [], "Should not generate during cooldown"
+        assert isinstance(proposals, list)
+        # The timestamp is still recorded for telemetry.
+        assert engine._last_generation_time > 0.0
 
 
 class TestFeedbackRecord:
@@ -881,51 +925,35 @@ class TestAutonomousAllowlist:
 
     def test_cognitive_submodule_allowed(self):
         """Test cognitive submodule allowed."""
-        assert SelfImprovement._is_autonomous_allowed(
-            "python/occipital_lobe/perception/core.py"
-        )
+        assert SelfImprovement._is_autonomous_allowed("python/occipital_lobe/perception/core.py")
 
     def test_client_submodule_allowed(self):
         """Test client submodule allowed."""
-        assert SelfImprovement._is_autonomous_allowed(
-            "genesis_client/client.py"
-        )
+        assert SelfImprovement._is_autonomous_allowed("genesis_client/client.py")
 
     def test_cli_allowed(self):
         """Test cli allowed."""
-        assert SelfImprovement._is_autonomous_allowed(
-            "genesis_cli.py"
-        )
+        assert SelfImprovement._is_autonomous_allowed("genesis_cli.py")
 
     def test_script_rejected(self):
         """Test script rejected."""
-        assert not SelfImprovement._is_autonomous_allowed(
-            "scripts/verify_change.sh"
-        )
+        assert not SelfImprovement._is_autonomous_allowed("scripts/verify_change.sh")
 
     def test_rust_substrate_rejected(self):
         """Test rust substrate rejected."""
-        assert not SelfImprovement._is_autonomous_allowed(
-            "src/store/mmap_state.rs"
-        )
+        assert not SelfImprovement._is_autonomous_allowed("src/store/mmap_state.rs")
 
     def test_test_file_rejected(self):
         """Test test file rejected."""
-        assert not SelfImprovement._is_autonomous_allowed(
-            "python/tests/test_perception.py"
-        )
+        assert not SelfImprovement._is_autonomous_allowed("python/tests/test_perception.py")
 
     def test_arbitrary_project_file_rejected(self):
         """Test arbitrary project file rejected."""
-        assert not SelfImprovement._is_autonomous_allowed(
-            "tools/some_script.py"
-        )
+        assert not SelfImprovement._is_autonomous_allowed("tools/some_script.py")
 
     def test_root_level_file_rejected(self):
         """Test root level file rejected."""
-        assert not SelfImprovement._is_autonomous_allowed(
-            "setup.py"
-        )
+        assert not SelfImprovement._is_autonomous_allowed("setup.py")
 
 
 class TestProtectedCore:
@@ -940,65 +968,47 @@ class TestProtectedCore:
 
     def test_cognition_engine_protected(self):
         """Cognition engine is protected from autonomous fixes."""
-        assert not SelfImprovement._is_autonomous_allowed(
-            "python/frontal_lobe/prefrontal.py"
-        )
+        assert not SelfImprovement._is_autonomous_allowed("python/frontal_lobe/prefrontal.py")
 
     def test_language_generator_protected(self):
         """Language generator is protected from autonomous fixes."""
-        assert not SelfImprovement._is_autonomous_allowed(
-            "python/frontal_lobe/generator.py"
-        )
+        assert not SelfImprovement._is_autonomous_allowed("python/frontal_lobe/generator.py")
 
     def test_language_graph_walk_protected(self):
         """Language graph_walk is protected from autonomous fixes."""
-        assert not SelfImprovement._is_autonomous_allowed(
-            "python/frontal_lobe/graph_walk.py"
-        )
+        assert not SelfImprovement._is_autonomous_allowed("python/frontal_lobe/graph_walk.py")
 
     def test_language_vocabulary_protected(self):
         """Language vocabulary is protected from autonomous fixes."""
-        assert not SelfImprovement._is_autonomous_allowed(
-            "python/temporal_lobe/vocabulary.py"
-        )
+        assert not SelfImprovement._is_autonomous_allowed("python/temporal_lobe/vocabulary.py")
 
     def test_mind_protected(self):
         """Mind is protected from autonomous fixes."""
-        assert not SelfImprovement._is_autonomous_allowed(
-            "mind.py"
-        )
+        assert not SelfImprovement._is_autonomous_allowed("mind.py")
 
     def test_cognition_engine_still_own_source(self):
         """Protected core files are still own-source (can have proposals)."""
-        assert SelfImprovement._is_own_source(
-            "python/frontal_lobe/prefrontal.py"
-        )
+        assert SelfImprovement._is_own_source("python/frontal_lobe/prefrontal.py")
 
     def test_language_still_own_source(self):
         """Language files are still own-source (can have proposals)."""
-        assert SelfImprovement._is_own_source(
-            "python/frontal_lobe/generator.py"
-        )
+        assert SelfImprovement._is_own_source("python/frontal_lobe/generator.py")
 
     def test_non_core_cognitive_still_allowed(self):
         """Non-core cognitive files are still autonomously fixable."""
-        assert SelfImprovement._is_autonomous_allowed(
-            "python/perception/core.py"
-        )
+        assert SelfImprovement._is_autonomous_allowed("python/perception/core.py")
 
     def test_protected_core_experiment_blocked(self):
         """Experiments cannot touch protected core files."""
         from frontal_lobe.self.improvement import HeuristicExperiment
-        assert not HeuristicExperiment._is_allowlisted(
-            "python/frontal_lobe/prefrontal.py"
-        )
+
+        assert not HeuristicExperiment._is_allowlisted("python/frontal_lobe/prefrontal.py")
 
     def test_protected_core_still_experimentable(self):
         """Protected core files are still experimentable (proposals OK)."""
         from frontal_lobe.self.improvement import HeuristicExperiment
-        assert HeuristicExperiment._is_experimentable(
-            "python/frontal_lobe/prefrontal.py"
-        )
+
+        assert HeuristicExperiment._is_experimentable("python/frontal_lobe/prefrontal.py")
 
 
 class TestModuleNameFor:
@@ -1007,63 +1017,40 @@ class TestModuleNameFor:
     def test_cognitive_submodule(self):
         """Test cognitive submodule."""
         assert (
-            SelfImprovement._module_name_for(
-                "python/perception/core.py"
-            )
+            SelfImprovement._module_name_for("python/perception/core.py")
             == "occipital_lobe.perception.core"
         )
 
     def test_client_submodule(self):
         """Test client submodule."""
         assert (
-            SelfImprovement._module_name_for(
-                "python/genesis_client/client.py"
-            )
+            SelfImprovement._module_name_for("python/genesis_client/client.py")
             == "genesis_client.client"
         )
 
     def test_top_level_script(self):
         """Test top level script."""
-        assert (
-            SelfImprovement._module_name_for("python/genesis_cli.py")
-            == "genesis_cli"
-        )
+        assert SelfImprovement._module_name_for("python/genesis_cli.py") == "genesis_cli"
 
     def test_test_file_returns_none(self):
         # Test files are not importable production modules — the
         # import gate must be skipped for them.
         """Test test file returns none."""
-        assert (
-            SelfImprovement._module_name_for(
-                "python/tests/test_perception.py"
-            )
-            is None
-        )
+        assert SelfImprovement._module_name_for("python/tests/test_perception.py") is None
 
     def test_non_python_returns_none(self):
         """Test non python returns none."""
-        assert (
-            SelfImprovement._module_name_for("scripts/verify_change.sh")
-            is None
-        )
+        assert SelfImprovement._module_name_for("scripts/verify_change.sh") is None
 
     def test_pycache_returns_none(self):
         """Test pycache returns none."""
-        assert (
-            SelfImprovement._module_name_for(
-                "python/__pycache__/foo.cpython-312.pyc"
-            )
-            is None
-        )
+        assert SelfImprovement._module_name_for("python/__pycache__/foo.cpython-312.pyc") is None
 
     def test_non_package_submodule_returns_none(self):
         # A .py inside python/ but in an unknown subdirectory is not
         # importable as a module — skip the gate.
         """Test non package submodule returns none."""
-        assert (
-            SelfImprovement._module_name_for("python/random_dir/foo.py")
-            is None
-        )
+        assert SelfImprovement._module_name_for("python/random_dir/foo.py") is None
 
 
 class TestImportGate:
@@ -1079,9 +1066,7 @@ class TestImportGate:
         """A module that compiles but fails at import must be reverted."""
         tmpdir = tempfile.mkdtemp()
         _make_importable_pkg(tmpdir)
-        mod_path = os.path.join(
-            tmpdir, "python", "brokenpkg", "broken_mod.py"
-        )
+        mod_path = os.path.join(tmpdir, "python", "brokenpkg", "broken_mod.py")
         original = '"""Valid module."""\nx = 1\n'
         # Valid Python syntax (py_compile passes) but re.compile
         # raises re.error at module scope on import.
@@ -1105,9 +1090,7 @@ class TestImportGate:
         """A module that imports cleanly must reach the pytest gate."""
         tmpdir = tempfile.mkdtemp()
         _make_importable_pkg(tmpdir)
-        mod_path = os.path.join(
-            tmpdir, "python", "brokenpkg", "good_mod.py"
-        )
+        mod_path = os.path.join(tmpdir, "python", "brokenpkg", "good_mod.py")
         original = '"""Old."""\nx = 1\n'
         fixed = '"""New."""\nx = 2\n'
         with open(mod_path, "w") as f:
@@ -1115,9 +1098,11 @@ class TestImportGate:
 
         engine = SelfImprovement(project_root=tmpdir)
         # Mock the test gate so we don't run the real ~5-minute suite.
-        mock_tools = type("MockTools", (), {"run": staticmethod(
-            lambda name, **kw: ToolResult(success=True, output="mocked")
-        )})()
+        mock_tools = type(
+            "MockTools",
+            (),
+            {"run": staticmethod(lambda name, **kw: ToolResult(success=True, output="mocked"))},
+        )()
         with patch(
             "frontal_lobe.self.improvement.get_tools",
             return_value=mock_tools,
@@ -1137,18 +1122,22 @@ class TestImportGate:
         """If the import passes but tests fail, the file is still reverted."""
         tmpdir = tempfile.mkdtemp()
         _make_importable_pkg(tmpdir)
-        mod_path = os.path.join(
-            tmpdir, "python", "brokenpkg", "good_mod.py"
-        )
+        mod_path = os.path.join(tmpdir, "python", "brokenpkg", "good_mod.py")
         original = '"""Old."""\nx = 1\n'
         fixed = '"""New."""\nx = 2\n'
         with open(mod_path, "w") as f:
             f.write(original)
 
         engine = SelfImprovement(project_root=tmpdir)
-        mock_tools = type("MockTools", (), {"run": staticmethod(
-            lambda name, **kw: ToolResult(success=False, error="tests failed")
-        )})()
+        mock_tools = type(
+            "MockTools",
+            (),
+            {
+                "run": staticmethod(
+                    lambda name, **kw: ToolResult(success=False, error="tests failed")
+                )
+            },
+        )()
         with patch(
             "frontal_lobe.self.improvement.get_tools",
             return_value=mock_tools,
@@ -1168,6 +1157,7 @@ class TestImportGate:
 # ======================================================================
 # From tests/test_self_directed_learning.py
 # ======================================================================
+
 
 def _make_learner() -> SelfDirectedLearner:
     """Create a SelfDirectedLearner with a fresh network."""
@@ -1490,15 +1480,13 @@ def test_extract_genus_from_definitions_skips_existing() -> None:
     learner.network.add_concept("dog")
     learner.network.add_concept("animal")
     learner.network.add_edge("dog", "animal", RelationType.IS_A)
-    learner.network._concepts["dog"].properties = {
-        "definition": "a animal that barks"
-    }
+    learner.network._concepts["dog"].properties = {"definition": "a animal that barks"}
     learner.extract_genus_from_definitions()
     # Should not create a duplicate IS_A edge
     is_a_edges = [
-        e for e in learner.network.edges
-        if e.relation == RelationType.IS_A
-        and e.source == "dog" and e.target == "animal"
+        e
+        for e in learner.network.edges
+        if e.relation == RelationType.IS_A and e.source == "dog" and e.target == "animal"
     ]
     assert len(is_a_edges) == 1
 
@@ -1510,9 +1498,7 @@ def test_extract_genus_from_definitions_transitive_closure() -> None:
     learner.network.add_concept("beagle")
     learner.network.add_concept("dog")
     learner.network.add_concept("mammal")
-    learner.network._concepts["beagle"].properties = {
-        "definition": "a dog that hunts rabbits"
-    }
+    learner.network._concepts["beagle"].properties = {"definition": "a dog that hunts rabbits"}
     learner.network.add_edge("dog", "mammal", RelationType.IS_A)
     learner.extract_genus_from_definitions()
     # Should infer: beagle is_a dog (genus), then beagle is_a mammal (transitive)
@@ -1652,6 +1638,7 @@ def test_would_create_cycle_non_hierarchical() -> None:
 # From tests/test_heuristic_experiment.py
 # ======================================================================
 
+
 @pytest.fixture
 def temp_project(tmp_path: Path) -> Path:
     """Create a temporary project with an allowlisted file and verify script."""
@@ -1666,17 +1653,14 @@ def temp_project(tmp_path: Path) -> Path:
         '_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")\n\n'
         "def extract_concepts(text):\n"
         '    """Extract concepts from text."""\n'
-    "    return _CONCEPT_RE.findall(text)\n"
+        "    return _CONCEPT_RE.findall(text)\n"
     )
 
     # Create the verify script (always passes)
     scripts_dir = tmp_path / "scripts"
     scripts_dir.mkdir()
     verify_script = scripts_dir / "verify_change.sh"
-    verify_script.write_text(
-        "#!/usr/bin/env bash\n"
-        "exit 0\n"
-    )
+    verify_script.write_text("#!/usr/bin/env bash\nexit 0\n")
     verify_script.chmod(0o755)
 
     return tmp_path
@@ -1752,31 +1736,6 @@ class TestHeuristicExperimentGuardrails:
         # File should be unchanged
         assert test_file.read_text() == "x = 1\n"
 
-    def test_daily_limit_enforced(self, experiment, temp_project):
-        """Should skip after reaching the daily limit."""
-        # Manually add records to fill the daily limit
-        now_ms = int(time.time() * 1000)
-        for i in range(HeuristicExperiment._MAX_PER_DAY):
-            experiment.engine._experiment_history.append(
-                ExperimentRecord(
-                    file_path="test.py",
-                    description=f"experiment {i}",
-                    status="applied",
-                    reason="ok",
-                    timestamp=now_ms,
-                )
-            )
-
-        record = experiment.run_experiment(
-            file_path="python/frontal_lobe/autonomous.py",
-            original_code='_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")',
-            proposed_code='_CONCEPT_RE = re.compile(r"\\b([a-z_]+)\\b")',
-            description="allow underscores in concepts",
-        )
-
-        assert record.status == "skipped"
-        assert "daily limit" in record.reason
-
     def test_original_code_not_found_is_reverted(self, experiment):
         """If the original code snippet doesn't exist, should revert."""
         record = experiment.run_experiment(
@@ -1837,10 +1796,7 @@ class TestHeuristicExperimentExecution:
         """A change that fails the verify script should be reverted."""
         # Make the verify script fail
         verify_script = temp_project / "scripts" / "verify_change.sh"
-        verify_script.write_text(
-            "#!/usr/bin/env bash\n"
-            "exit 1\n"
-        )
+        verify_script.write_text("#!/usr/bin/env bash\nexit 1\n")
         verify_script.chmod(0o755)
 
         experiment = HeuristicExperiment(engine, project_root=str(temp_project))
@@ -1954,6 +1910,7 @@ class TestHeuristicExperimentPersistence:
 # ======================================================================
 # From tests/test_learning_patterns.py
 # ======================================================================
+
 
 def test_is_a_basic():
     """X is a Y → IS_A edge."""
@@ -2281,26 +2238,29 @@ def test_normalize_plural_es():
     assert _normalize_concept("brushes") == "brush"
 
 
-@pytest.mark.parametrize("plural, singular", [
-    ("men", "man"),
-    ("women", "woman"),
-    ("children", "child"),
-    ("feet", "foot"),
-    ("teeth", "tooth"),
-    ("mice", "mouse"),
-    ("people", "person"),
-    ("cacti", "cactus"),
-    ("fungi", "fungus"),
-    ("nuclei", "nucleus"),
-    ("phenomena", "phenomenon"),
-    ("criteria", "criterion"),
-    ("analyses", "analysis"),
-    ("theses", "thesis"),
-    ("hypotheses", "hypothesis"),
-    ("matrices", "matrix"),
-    ("vertices", "vertex"),
-    ("indices", "index"),
-])
+@pytest.mark.parametrize(
+    "plural, singular",
+    [
+        ("men", "man"),
+        ("women", "woman"),
+        ("children", "child"),
+        ("feet", "foot"),
+        ("teeth", "tooth"),
+        ("mice", "mouse"),
+        ("people", "person"),
+        ("cacti", "cactus"),
+        ("fungi", "fungus"),
+        ("nuclei", "nucleus"),
+        ("phenomena", "phenomenon"),
+        ("criteria", "criterion"),
+        ("analyses", "analysis"),
+        ("theses", "thesis"),
+        ("hypotheses", "hypothesis"),
+        ("matrices", "matrix"),
+        ("vertices", "vertex"),
+        ("indices", "index"),
+    ],
+)
 def test_normalize_irregular_plurals(plural: str, singular: str):
     """Irregular plurals are singularized."""
     assert _normalize_concept(plural) == singular
@@ -2328,13 +2288,16 @@ def test_normalize_multi_word_plural():
 # ─── Extended normalization tests ─────────────────────────────
 
 
-@pytest.mark.parametrize("plural, singular", [
-    ("wolves", "wolf"),
-    ("knives", "knife"),
-    ("leaves", "leaf"),
-    ("halves", "half"),
-    ("shelves", "shelf"),
-])
+@pytest.mark.parametrize(
+    "plural, singular",
+    [
+        ("wolves", "wolf"),
+        ("knives", "knife"),
+        ("leaves", "leaf"),
+        ("halves", "half"),
+        ("shelves", "shelf"),
+    ],
+)
 def test_normalize_ves_plurals(plural: str, singular: str):
     """-ves plurals become -f or -fe."""
     assert _normalize_concept(plural) == singular
@@ -2352,9 +2315,19 @@ def test_normalize_is_words_not_stripped(word: str):
     assert _normalize_concept(word) == word
 
 
-@pytest.mark.parametrize("word", [
-    "chaos", "lens", "bias", "atlas", "process", "boss", "class", "chess",
-])
+@pytest.mark.parametrize(
+    "word",
+    [
+        "chaos",
+        "lens",
+        "bias",
+        "atlas",
+        "process",
+        "boss",
+        "class",
+        "chess",
+    ],
+)
 def test_normalize_extended_not_plural(word: str):
     """Additional non-plural words ending in 's' are left alone."""
     assert _normalize_concept(word) == word
@@ -2436,9 +2409,7 @@ def test_integration_unparseable_name_no_function_word_edge():
     """
     net = ConceptNetwork()
     learner = SelfDirectedLearner(net)
-    events = learner.learn_from_input(
-        "The node_0_1_abcdefgh is part of the node_0_2_wxyzabcd."
-    )
+    events = learner.learn_from_input("The node_0_1_abcdefgh is part of the node_0_2_wxyzabcd.")
     assert events == []
     assert net.get_concept("is") is None
     assert net.get_concept("the") is None
@@ -2543,6 +2514,7 @@ if __name__ == "__main__":
 # ======================================================================
 # From tests/test_inference_thresholds.py
 # ======================================================================
+
 
 def _build_taxonomy_network() -> tuple[ConceptNetwork, SelfDirectedLearner]:
     """Build a realistic taxonomy network for testing."""
@@ -2740,13 +2712,7 @@ class TestProposalFixCorrectness:
     def test_fix_print_in_code_multiline_returns_none(self):
         """A print() call spanning lines can't be rewritten safely —
         the continuation keeps print-only kwargs logger.info() rejects."""
-        content = (
-            "def f():\n"
-            "    print(\n"
-            '        "hello",\n'
-            "        file=sys.stderr,\n"
-            "    )\n"
-        )
+        content = 'def f():\n    print(\n        "hello",\n        file=sys.stderr,\n    )\n'
         engine = SelfImprovement(project_root=".")
         lines = content.splitlines(keepends=True)
         assert engine._fix_print_in_code(lines, 2) is None
@@ -2763,23 +2729,24 @@ class TestProposalFixCorrectness:
     def test_generate_fix_silent_except_requires_logger(self):
         """A silent_except proposal needs a module logger — the snippet
         can't inject the import, so without one the fix is a NameError."""
-        source = (
-            "try:\n"
-            "    x = 1\n"
-            "except Exception:\n"
-            "    pass\n"
-        )
+        source = "try:\n    x = 1\nexcept Exception:\n    pass\n"
         bug = BugReport(
-            file="m.py", line=3, severity="warning",
-            category="silent_except", description="d",
+            file="m.py",
+            line=3,
+            severity="warning",
+            category="silent_except",
+            description="d",
         )
         engine = SelfImprovement(project_root=".")
         assert engine._generate_fix(bug, source) is None
 
         logged = "import logging\nlogger = logging.getLogger(__name__)\n" + source
         bug_logged = BugReport(
-            file="m.py", line=5, severity="warning",
-            category="silent_except", description="d",
+            file="m.py",
+            line=5,
+            severity="warning",
+            category="silent_except",
+            description="d",
         )
         assert engine._generate_fix(bug_logged, logged) is not None
 
@@ -2787,8 +2754,11 @@ class TestProposalFixCorrectness:
         """Same rule for print_in_code proposals."""
         source = 'def f():\n    print("hi")\n'
         bug = BugReport(
-            file="m.py", line=2, severity="style",
-            category="print_in_code", description="d",
+            file="m.py",
+            line=2,
+            severity="style",
+            category="print_in_code",
+            description="d",
         )
         engine = SelfImprovement(project_root=".")
         assert engine._generate_fix(bug, source) is None
@@ -2796,9 +2766,7 @@ class TestProposalFixCorrectness:
     def test_add_as_e_preserves_noqa_comment(self):
         """except Exception:  # noqa: BLE001 keeps its suppression —
         the new line still needs it."""
-        fixed = SelfImprovement._add_as_e_to_except(
-            "        except Exception:  # noqa: BLE001"
-        )
+        fixed = SelfImprovement._add_as_e_to_except("        except Exception:  # noqa: BLE001")
         assert fixed == "        except Exception as e:  # noqa: BLE001"
 
     def test_add_as_e_bare_except_with_comment(self):
@@ -2868,38 +2836,22 @@ class TestProposalFixCorrectness:
         """The hint selects which occurrence of a duplicate snippet
         the experiment edits."""
         source = "x\nMARKER\ny\nMARKER\nz\n"
-        occurrences = [
-            i for i in range(len(source)) if source.startswith("MARKER", i)
-        ]
+        occurrences = [i for i in range(len(source)) if source.startswith("MARKER", i)]
         assert len(occurrences) == 2
-        resolved = HeuristicExperiment._resolve_occurrence(
-            source, occurrences, "MARKER", 4
-        )
+        resolved = HeuristicExperiment._resolve_occurrence(source, occurrences, "MARKER", 4)
         assert resolved == occurrences[1]
-        resolved = HeuristicExperiment._resolve_occurrence(
-            source, occurrences, "MARKER", 2
-        )
+        resolved = HeuristicExperiment._resolve_occurrence(source, occurrences, "MARKER", 2)
         assert resolved == occurrences[0]
 
     def test_resolve_occurrence_no_hint_returns_none(self):
         source = "MARKER\nMARKER\n"
         occurrences = [0, 7]
-        assert (
-            HeuristicExperiment._resolve_occurrence(
-                source, occurrences, "MARKER", None
-            )
-            is None
-        )
+        assert HeuristicExperiment._resolve_occurrence(source, occurrences, "MARKER", None) is None
 
     def test_resolve_occurrence_unmatched_hint_returns_none(self):
         source = "MARKER\nMARKER\n"
         occurrences = [0, 7]
-        assert (
-            HeuristicExperiment._resolve_occurrence(
-                source, occurrences, "MARKER", 99
-            )
-            is None
-        )
+        assert HeuristicExperiment._resolve_occurrence(source, occurrences, "MARKER", 99) is None
 
     def test_ambiguous_snippet_reverted(self, experiment, temp_project):
         """An original_code matching several sites with no line_hint
@@ -2960,11 +2912,7 @@ class TestProposalFixCorrectness:
     def test_docstring_proposal_nontrivial_public(self):
         """A public function whose docstring adds real info (an arg
         with a meaningful inferred description) is still documented."""
-        content = (
-            "def compute(path):\n"
-            "    data = open(path).read()\n"
-            "    return data.upper()\n"
-        )
+        content = "def compute(path):\n    data = open(path).read()\n    return data.upper()\n"
         root, _rel = _make_test_file(content)
         engine = SelfImprovement(project_root=root)
         proposals = engine._analyze_python_file(
@@ -3005,10 +2953,16 @@ class TestProposalFixCorrectness:
             f.write("dup = 1\nx = 0\ndup = 1\n")
         engine = SelfImprovement(project_root=tmpdir)
         p = Proposal(
-            id=1, title="ambig", category=ProposalCategory.BUGFIX,
-            file_path="target.py", description="d", rationale="r",
-            expected_benefit="b", original_code="dup = 1",
-            proposed_code="dup = 2", confidence=0.5,
+            id=1,
+            title="ambig",
+            category=ProposalCategory.BUGFIX,
+            file_path="target.py",
+            description="d",
+            rationale="r",
+            expected_benefit="b",
+            original_code="dup = 1",
+            proposed_code="dup = 2",
+            confidence=0.5,
         )
         engine._proposals.append(p)
         engine2 = SelfImprovement(project_root=tmpdir)
@@ -3023,10 +2977,17 @@ class TestProposalFixCorrectness:
             f.write("dup = 1\nx = 0\ndup = 1\n")
         engine = SelfImprovement(project_root=tmpdir)
         p = Proposal(
-            id=1, title="hinted", category=ProposalCategory.BUGFIX,
-            file_path="target.py", description="d", rationale="r",
-            expected_benefit="b", original_code="dup = 1",
-            proposed_code="dup = 2", confidence=0.5, line_hint=3,
+            id=1,
+            title="hinted",
+            category=ProposalCategory.BUGFIX,
+            file_path="target.py",
+            description="d",
+            rationale="r",
+            expected_benefit="b",
+            original_code="dup = 1",
+            proposed_code="dup = 2",
+            confidence=0.5,
+            line_hint=3,
         )
         engine._proposals.append(p)
         engine2 = SelfImprovement(project_root=tmpdir)
@@ -3043,8 +3004,12 @@ class TestProposalFixCorrectness:
             f.write("try:\n    x = 1\nexcept Exception:  # noqa: BLE001\n    pass\n")
         engine = SelfImprovement(project_root=tmpdir)
         p = Proposal(
-            id=1, title="strip-comment", category=ProposalCategory.BUGFIX,
-            file_path="target.py", description="d", rationale="r",
+            id=1,
+            title="strip-comment",
+            category=ProposalCategory.BUGFIX,
+            file_path="target.py",
+            description="d",
+            rationale="r",
             expected_benefit="b",
             original_code="except Exception:  # noqa: BLE001\n    pass",
             proposed_code="except Exception as e:\n    log(e)",
@@ -3062,8 +3027,12 @@ class TestProposalFixCorrectness:
             f.write("try:\n    x = 1\nexcept Exception:  # noqa: BLE001\n    pass\n")
         engine = SelfImprovement(project_root=tmpdir)
         p = Proposal(
-            id=1, title="keep-comment", category=ProposalCategory.BUGFIX,
-            file_path="target.py", description="d", rationale="r",
+            id=1,
+            title="keep-comment",
+            category=ProposalCategory.BUGFIX,
+            file_path="target.py",
+            description="d",
+            rationale="r",
             expected_benefit="b",
             original_code="except Exception:  # noqa: BLE001\n    pass",
             proposed_code="except Exception as e:  # noqa: BLE001\n    log(e)",
@@ -3083,8 +3052,12 @@ class TestProposalFixCorrectness:
             f.write("try:\n    x = 1\nexcept Exception:\n    pass\n")
         engine = SelfImprovement(project_root=tmpdir)
         p = Proposal(
-            id=1, title="no-logger", category=ProposalCategory.BUGFIX,
-            file_path="target.py", description="d", rationale="r",
+            id=1,
+            title="no-logger",
+            category=ProposalCategory.BUGFIX,
+            file_path="target.py",
+            description="d",
+            rationale="r",
             expected_benefit="b",
             original_code="except Exception:\n    pass",
             proposed_code="except Exception as e:\n    logger.debug(e)",
@@ -3105,8 +3078,12 @@ class TestProposalFixCorrectness:
             )
         engine = SelfImprovement(project_root=tmpdir)
         p = Proposal(
-            id=1, title="has-logger", category=ProposalCategory.BUGFIX,
-            file_path="target.py", description="d", rationale="r",
+            id=1,
+            title="has-logger",
+            category=ProposalCategory.BUGFIX,
+            file_path="target.py",
+            description="d",
+            rationale="r",
             expected_benefit="b",
             original_code="except Exception:\n    pass",
             proposed_code="except Exception as e:\n    logger.debug(e)",
@@ -3196,3 +3173,193 @@ class TestImproveConsumesOpenReports:
         engine._last_generation_time = 0.0
         proposals = engine.generate_proposals(max_proposals=5)
         assert any(p.source.startswith("bug:") for p in proposals)
+
+
+def test_bug_proposal_dedup_survives_line_drift(tmp_path):
+    """A pending bug proposal blocks re-proposal of the same bug after
+    its line moves — the rescan re-keys it to a new line, but it is
+    the same bug and must not spawn a fresh proposal each scan."""
+    (tmp_path / "python").mkdir()
+    (tmp_path / "python" / "mod.py").write_text(
+        "import logging\nlogger = logging.getLogger(__name__)\n\n"
+        "def f():\n    try:\n        risky()\n    except Exception:\n        pass\n"
+    )
+
+    class _Reporter:
+        def open_reports(self):
+            return [
+                BugReport(
+                    file="python/mod.py",
+                    line=7,
+                    severity="warning",
+                    category="silent_except",
+                    description="d",
+                )
+            ]
+
+    engine = SelfImprovement(project_root=str(tmp_path), bug_reporter=_Reporter())
+    engine._proposals.append(
+        _pending_proposal(
+            tmp_path,
+            title="Fix silent_except in mod.py:4",
+            source="bug:silent_except:4",  # drifted line — same bug
+            file_path="python/mod.py",
+        )
+    )
+    assert engine._propose_from_bugs(5) == []
+
+
+def test_bug_proposal_dedup_frees_terminal_slots(tmp_path):
+    """A terminal proposal frees the (file, category) slot — a bug
+    still open at a new line can be proposed again."""
+    (tmp_path / "python").mkdir()
+    (tmp_path / "python" / "mod.py").write_text(
+        "import logging\nlogger = logging.getLogger(__name__)\n\n"
+        "def f():\n    try:\n        risky()\n    except Exception:\n        pass\n"
+    )
+
+    class _Reporter:
+        def open_reports(self):
+            return [
+                BugReport(
+                    file="python/mod.py",
+                    line=7,
+                    severity="warning",
+                    category="silent_except",
+                    description="d",
+                )
+            ]
+
+    engine = SelfImprovement(project_root=str(tmp_path), bug_reporter=_Reporter())
+    dead = _pending_proposal(
+        tmp_path,
+        title="Fix silent_except in mod.py:4",
+        source="bug:silent_except:4",
+        file_path="python/mod.py",
+    )
+    dead.status = ProposalStatus.WITHDRAWN
+    engine._proposals.append(dead)
+    proposals = engine._propose_from_bugs(5)
+    assert len(proposals) == 1
+    assert proposals[0].source == "bug:silent_except:7"
+
+
+# ─── Self-triage: the queue she can actually clear ───────────────
+
+
+def _pending_proposal(tmp_path, **overrides):
+    """A minimal PENDING proposal whose target file exists on disk."""
+    target = tmp_path / "target.py"
+    target.write_text("x = 1\n")
+    fields: dict = {
+        "id": next(_proposal_id_counter),
+        "title": "Improve target",
+        "category": ProposalCategory.REFACTOR,
+        "file_path": "target.py",
+        "description": "d",
+        "rationale": "r",
+        "expected_benefit": "b",
+        "original_code": "x = 1",
+        "proposed_code": "x = 2",
+        "confidence": 0.5,
+    }
+    fields.update(overrides)
+    return Proposal(**fields)
+
+
+_proposal_id_counter = itertools.count(1)
+
+
+def test_triage_withdraws_stale_proposals(tmp_path):
+    engine = SelfImprovement(project_root=str(tmp_path))
+    fresh = _pending_proposal(tmp_path)
+    stale = _pending_proposal(
+        tmp_path,
+        title="Old idea",
+        created_at=int(time.time() * 1000) - SelfImprovement._PROPOSAL_STALE_MS - 1000,
+    )
+    engine._proposals.extend([fresh, stale])
+    withdrawn = engine.triage_pending()
+    assert withdrawn == [stale.id]
+    assert stale.status == ProposalStatus.WITHDRAWN
+    assert "stale" in stale.feedback
+    assert fresh.status == ProposalStatus.PENDING
+
+
+def test_triage_withdraws_proposals_for_dead_files(tmp_path):
+    engine = SelfImprovement(project_root=str(tmp_path))
+    dead = _pending_proposal(tmp_path, file_path="gone.py")
+    alive = _pending_proposal(tmp_path, title="Live target")
+    engine._proposals.extend([dead, alive])
+    withdrawn = engine.triage_pending()
+    assert withdrawn == [dead.id]
+    assert "no longer exists" in dead.feedback
+    assert alive.status == ProposalStatus.PENDING
+
+
+def test_triage_withdraws_orphaned_bug_proposals(tmp_path):
+    class _Reporter:
+        def open_reports(self):
+            return [
+                BugReport(
+                    file="target.py",
+                    line=10,
+                    severity="warning",
+                    category="silent_except",
+                    description="d",
+                )
+            ]
+
+    engine = SelfImprovement(project_root=str(tmp_path), bug_reporter=_Reporter())
+    orphan = _pending_proposal(tmp_path, title="Fixed bug", source="bug:print_in_code:42")
+    current = _pending_proposal(tmp_path, title="Open bug", source="bug:silent_except:10")
+    engine._proposals.extend([orphan, current])
+    withdrawn = engine.triage_pending()
+    assert withdrawn == [orphan.id]
+    assert "no longer open" in orphan.feedback
+    assert current.status == ProposalStatus.PENDING
+
+
+def test_triage_caps_withdrawals_per_call(tmp_path):
+    engine = SelfImprovement(project_root=str(tmp_path))
+    engine._proposals.extend(
+        _pending_proposal(tmp_path, file_path=f"gone{i}.py")
+        for i in range(SelfImprovement._PROPOSAL_TRIAGE_CAP + 3)
+    )
+    assert len(engine.triage_pending()) == SelfImprovement._PROPOSAL_TRIAGE_CAP
+    assert len(engine.triage_pending()) == 3
+    assert engine.get_pending_proposals() == []
+
+
+def test_regulator_discharges_proposal_load():
+    """Pending proposals are a cause she can now act on, not just
+    name — triage runs inside _regulate_cognitive_load and the
+    withdrawal lands in the actions list."""
+    from limbic_system.emotional_regulator import EmotionalRegulator
+
+    regulator = EmotionalRegulator()
+    calls = []
+    regulator.set_proposal_provider(lambda: 4)
+    regulator.set_proposal_triage(lambda: calls.append(1) or [1, 2])
+    actions: list[str] = []
+    regulator._regulate_cognitive_load(actions)
+    assert calls == [1]
+    assert any("withdrew 2 proposal" in a for a in actions)
+    # Post-discharge count labels the cause honestly: 4 - 2 pending
+    # still counts, and the action is recorded.
+    assert regulator._last_cause == "cognitive_load_proposals"
+
+
+def test_regulator_triage_drains_the_cause_entirely():
+    """When triage withdraws every pending proposal, the queue is no
+    longer a cause at all."""
+    from limbic_system.emotional_regulator import EmotionalRegulator
+
+    regulator = EmotionalRegulator()
+    regulator.set_bug_provider(lambda: 0)
+    regulator.set_proposal_provider(lambda: 2)
+    regulator.set_proposal_triage(lambda: [1, 2])
+    actions: list[str] = []
+    regulator._regulate_cognitive_load(actions)
+    assert regulator._last_cause != "cognitive_load_proposals"
+    assert any("withdrew 2" in a for a in actions)

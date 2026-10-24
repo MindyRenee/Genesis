@@ -513,9 +513,7 @@ class PredictiveCodingLayer:
                 dist, self._emotion_intents.get(context.emotional_state.lower())
             )
         if 0 <= context.time_of_day <= 23:
-            self._mix_conditioned_intents(
-                dist, self._hour_intents.get(context.time_of_day)
-            )
+            self._mix_conditioned_intents(dist, self._hour_intents.get(context.time_of_day))
 
         # Mix in a global marginal prior. This keeps rare but
         # important intents (greetings, farewells) in the running even
@@ -528,9 +526,7 @@ class PredictiveCodingLayer:
                 for intent, count in self._intent_marginal.items():
                     local = dist.get(intent, 0.0)
                     global_prob = count / global_total
-                    dist[intent] = (
-                        local * (1.0 - global_weight) + global_prob * global_weight
-                    )
+                    dist[intent] = local * (1.0 - global_weight) + global_prob * global_weight
 
         if not dist:
             return [], 0.0

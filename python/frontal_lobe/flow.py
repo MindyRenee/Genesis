@@ -193,10 +193,7 @@ class FlowGenerator:
         # matrix's top eigenvectors.
         angle_matrix = self._spectral_angles(concept_ids, idx_map)
 
-        self._angles = {
-            cid: angle_matrix[idx_map[cid]]
-            for cid in concept_ids
-        }
+        self._angles = {cid: angle_matrix[idx_map[cid]] for cid in concept_ids}
         self._concept_ids = concept_ids
         self._angle_matrix = angle_matrix
 
@@ -209,26 +206,27 @@ class FlowGenerator:
                 weights[si] += edge.weight
             if ti is not None:
                 weights[ti] += edge.weight
-        self._weights = {
-            cid: float(weights[idx_map[cid]])
-            for cid in concept_ids
-        }
+        self._weights = {cid: float(weights[idx_map[cid]]) for cid in concept_ids}
         self._weight_vector = weights
 
         # Build relation channels
         self._channels = []
         for edge in self._network._edges:
-            self._channels.append((
-                edge.source,
-                edge.target,
-                edge.relation.value,
-                edge.weight,
-            ))
+            self._channels.append(
+                (
+                    edge.source,
+                    edge.target,
+                    edge.relation.value,
+                    edge.weight,
+                )
+            )
 
         self._built = True
         logger.debug(
             "Flow field built: %d concepts, %d channels, dim=%d",
-            n, len(self._channels), _FLOW_DIM,
+            n,
+            len(self._channels),
+            _FLOW_DIM,
         )
 
     def set_angles_from_embedding(
@@ -247,8 +245,7 @@ class FlowGenerator:
         # Use only the first _FLOW_DIM dimensions
         d = min(_FLOW_DIM, angle_matrix.shape[1])
         self._angles = {
-            cid: angle_matrix[i, :d].astype(np.float32)
-            for i, cid in enumerate(concept_ids)
+            cid: angle_matrix[i, :d].astype(np.float32) for i, cid in enumerate(concept_ids)
         }
         self._concept_ids = concept_ids
         self._angle_matrix = angle_matrix[:, :d].astype(np.float32)
@@ -511,9 +508,7 @@ class FlowGenerator:
         idx = int(np.argmin(dist))
         return self._concept_ids[idx]
 
-    def _relation_between(
-        self, source: str, target: str
-    ) -> tuple[str, float] | None:
+    def _relation_between(self, source: str, target: str) -> tuple[str, float] | None:
         """Find the relation type and weight between two concepts.
 
         Returns (relation_verb, weight) if an edge exists, else None.
@@ -548,21 +543,15 @@ class FlowGenerator:
             # often already a finite clause ("... a type of art"),
             # and a leading "is" makes "Drawing is is a type of art".
             cleaned = defn.strip().strip(" .;:!?").removeprefix("is ").strip()
-            segments = [
-                segment.strip()
-                for segment in cleaned.split(".")
-                if segment.strip()
-            ]
+            segments = [segment.strip() for segment in cleaned.split(".") if segment.strip()]
             if len(segments) > 1:
-                complete = [
-                    segment for segment in segments
-                    if len(segment.split()) >= 3
-                ]
+                complete = [segment for segment in segments if len(segment.split()) >= 3]
                 if complete:
                     cleaned = complete[0]
             lower = cleaned.lower()
-            if lower.startswith(("related to", "connects to", "part of",
-                                  "is a kind of", "is a type of")):
+            if lower.startswith(
+                ("related to", "connects to", "part of", "is a kind of", "is a type of")
+            ):
                 return None
             if len(cleaned) > 200:
                 return cleaned[:197].rsplit(" ", 1)[0] + "…"
@@ -654,7 +643,10 @@ class FlowGenerator:
 
         # Emit words from the trajectory
         return self._compose_from_trajectory(
-            seed, trajectory, emotion, thought,
+            seed,
+            trajectory,
+            emotion,
+            thought,
         )
 
     def _extract_seed(self, thought: Thought) -> str | None:
@@ -760,13 +752,17 @@ class FlowGenerator:
             return None
 
         # Build from edges directly
-        return self._build_sentence(seed, [seed] + [
-            e.target if e.source == seed else e.source
-            for e in edges[:4]
-            if self._is_speakable(
+        return self._build_sentence(
+            seed,
+            [seed]
+            + [
                 e.target if e.source == seed else e.source
-            )
-        ], emotion, None)
+                for e in edges[:4]
+                if self._is_speakable(e.target if e.source == seed else e.source)
+            ],
+            emotion,
+            None,
+        )
 
     def _build_sentence(
         self,
@@ -812,12 +808,8 @@ class FlowGenerator:
 
         # Animacy-aware pronouns for the seed — "it" is wrong for
         # people and plural subjects.
-        seed_pron, seed_plural = person_pronoun(
-            seed, self._network, seed_display
-        )
-        seed_obj, _ = person_pronoun(
-            seed, self._network, seed_display, for_object=True
-        )
+        seed_pron, seed_plural = person_pronoun(seed, self._network, seed_display)
+        seed_obj, _ = person_pronoun(seed, self._network, seed_display, for_object=True)
 
         clauses = self._relation_clauses(
             seed, concepts, seed_display, seed_pron, seed_obj, seed_plural
@@ -884,16 +876,11 @@ class FlowGenerator:
                     if e.target == seed:
                         rel = (e.relation.value, e.weight)
                         # Reverse the clause: "memory enables it"
-                        verb = self._verb_for_relation(
-                            e.relation.value, seed_obj
-                        )
+                        verb = self._verb_for_relation(e.relation.value, seed_obj)
                         if verb:
-                            verb = agree_verb_phrase(
-                                verb, is_plural_np(display)
-                            )
+                            verb = agree_verb_phrase(verb, is_plural_np(display))
                             clauses.append(
-                                (f"{display} {verb} {seed_obj}",
-                                 e.relation.value, False)
+                                (f"{display} {verb} {seed_obj}", e.relation.value, False)
                             )
                         break
                 continue
@@ -902,26 +889,25 @@ class FlowGenerator:
 
             # Determine direction: does seed → cid or cid → seed?
             edges_out = self._network.get_edges(seed, "out")
-            seed_is_source = any(
-                e.target == cid for e in edges_out
-            )
-            verb = self._verb_for_relation(
-                rel_type, display if seed_is_source else seed_obj
-            )
+            seed_is_source = any(e.target == cid for e in edges_out)
+            verb = self._verb_for_relation(rel_type, display if seed_is_source else seed_obj)
             if not verb:
                 continue
             if seed_is_source:
                 clauses.append(
-                    (f"{seed_pron} "
-                     f"{agree_verb_phrase(verb, seed_plural)} {display}",
-                     rel_type, True)
+                    (
+                        f"{seed_pron} {agree_verb_phrase(verb, seed_plural)} {display}",
+                        rel_type,
+                        True,
+                    )
                 )
             else:
                 clauses.append(
-                    (f"{display} "
-                     f"{agree_verb_phrase(verb, is_plural_np(display))} "
-                     f"{seed_obj}",
-                     rel_type, False)
+                    (
+                        f"{display} {agree_verb_phrase(verb, is_plural_np(display))} {seed_obj}",
+                        rel_type,
+                        False,
+                    )
                 )
         return clauses
 
@@ -931,9 +917,14 @@ class FlowGenerator:
     # (conjunctions/adverbs), not response content — they shape how
     # clauses are linked, not what is said.
     _CAUSAL_RELATIONS = frozenset({"causes", "leads_to", "creates"})
-    _CONTRAST_RELATIONS = frozenset({
-        "harms", "prevents", "contradicts", "opposite_of",
-    })
+    _CONTRAST_RELATIONS = frozenset(
+        {
+            "harms",
+            "prevents",
+            "contradicts",
+            "opposite_of",
+        }
+    )
     _FACILITATIVE_RELATIONS = frozenset({"enables", "depends_on"})
     _TEMPORAL_RELATIONS = frozenset({"temporal_order", "emerges_from"})
 
@@ -994,11 +985,8 @@ class FlowGenerator:
         use_relative = (
             has_definition
             and first_subj_is_seed
-            and first_rel in (
-                self._FACILITATIVE_RELATIONS
-                | self._CAUSAL_RELATIONS
-                | self._TEMPORAL_RELATIONS
-            )
+            and first_rel
+            in (self._FACILITATIVE_RELATIONS | self._CAUSAL_RELATIONS | self._TEMPORAL_RELATIONS)
             and self._rng.random() < 0.4
         )
 
@@ -1097,14 +1085,11 @@ class FlowGenerator:
         if first in ("I", "I'm", "I've", "I'd", "I'll"):
             return clause
         # Pronouns should be lowercased after a connector.
-        if first in ("It", "They", "He", "She", "This", "That",
-                     "These", "Those", "We", "You"):
+        if first in ("It", "They", "He", "She", "This", "That", "These", "Those", "We", "You"):
             return first.lower() + (" " + words[1] if len(words) > 1 else "")
         return clause
 
-    def _verb_for_relation(
-        self, rel_type: str, object_display: str = ""
-    ) -> str | None:
+    def _verb_for_relation(self, rel_type: str, object_display: str = "") -> str | None:
         """Map a relation type to a verb phrase.
 
         Uses the same seed verbs as the graph walk, but without

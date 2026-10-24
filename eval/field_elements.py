@@ -35,11 +35,11 @@ def _out(*args: object) -> None:
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "genesis_client"))
 
-SAMPLE_HZ = 250.0          # matches the daemon probe cadence
-DRIVE_HZ = 5.0             # inside the theta/alpha range she models
+SAMPLE_HZ = 250.0  # matches the daemon probe cadence
+DRIVE_HZ = 5.0  # inside the theta/alpha range she models
 TRIAL_SEC = 24.0
-WORK_ITERS = 400           # ~a few hundred µs per slice on this die
-DEPTH = 0.7                # fraction of slice spent idle at trough
+WORK_ITERS = 400  # ~a few hundred µs per slice on this die
+DEPTH = 0.7  # fraction of slice spent idle at trough
 
 # ---------------------------------------------------------------- worker
 
@@ -53,10 +53,19 @@ def _mix(seed: int, iters: int) -> int:
     return x
 
 
-def _worker(core: int, worker_id: int, drive_hz: float, depth: float,
-            modulated: bool, q: mp.Queue, stop: Any,
-            sync: bool = False, sync_k: float = 0.0,
-            sync_delay: float = 0.0, sync_thermal: bool = False) -> None:
+def _worker(
+    core: int,
+    worker_id: int,
+    drive_hz: float,
+    depth: float,
+    modulated: bool,
+    q: mp.Queue,
+    stop: Any,
+    sync: bool = False,
+    sync_k: float = 0.0,
+    sync_delay: float = 0.0,
+    sync_thermal: bool = False,
+) -> None:
     os.sched_setaffinity(0, {core})
     # Collective-only, naturally-lagged channel: die temperature. No single
     # element can dominate it and the heatsink's thermal mass IS the
@@ -81,7 +90,7 @@ def _worker(core: int, worker_id: int, drive_hz: float, depth: float,
     # metronome-on-a-platform literature says a lagged medium response is
     # what makes in-phase lock stable, and instant droop on this die is
     # reactive — delaying the sense leg is the lag the physics lacks.
-    theta = (worker_id * 2.0 + 0.7)  # deterministic de-phased starts
+    theta = worker_id * 2.0 + 0.7  # deterministic de-phased starts
     baseline = 0.0
     omega0 = drive_hz * 2.0 * math.pi
     delay_n = round(sync_delay / window)
@@ -179,9 +188,19 @@ def _run_arm(arm: Arm, cores: list[int]) -> dict[int, list[tuple[float, float, f
     for i, core in enumerate(cores):
         p = mp.Process(
             target=_worker,
-            args=(core, i, arm.drive_hz, DEPTH,
-                  arm.modulated and i == 0, q, stop, arm.sync, arm.sync_k,
-                  arm.sync_delay, arm.sync_thermal),
+            args=(
+                core,
+                i,
+                arm.drive_hz,
+                DEPTH,
+                arm.modulated and i == 0,
+                q,
+                stop,
+                arm.sync,
+                arm.sync_k,
+                arm.sync_delay,
+                arm.sync_thermal,
+            ),
             daemon=True,
         )
         p.start()
@@ -206,20 +225,19 @@ def _order_parameter(thetas: list[float]) -> float:
     n = len(thetas)
     if n < 2:
         return 0.0
-    return abs(sum(math.cos(t) for t in thetas) / n
-               + 1j * sum(math.sin(t) for t in thetas) / n)
+    return abs(sum(math.cos(t) for t in thetas) / n + 1j * sum(math.sin(t) for t in thetas) / n)
 
 
-def _order_trajectory(series: dict[int, list[tuple[float, float, float | None]]],
-                      chunks: int = 8) -> list[float]:
+def _order_trajectory(
+    series: dict[int, list[tuple[float, float, float | None]]], chunks: int = 8
+) -> list[float]:
     """Kuramoto order parameter r per chunk of the trial, aligned by index."""
     n = min((len(v) for v in series.values()), default=0)
     out = []
     per = n // chunks
     for c in range(chunks):
         end_i = (c + 1) * per - 1
-        thetas = [t for v in series.values()
-                  if end_i < len(v) and (t := v[end_i][2]) is not None]
+        thetas = [t for v in series.values() if end_i < len(v) and (t := v[end_i][2]) is not None]
         out.append(_order_parameter(thetas))
     return out
 
@@ -239,17 +257,26 @@ def main() -> None:
         thermal = len(sys.argv) > 6 and sys.argv[6] == "thermal"
         chan = "THERMAL (k10temp)" if thermal else "execution-rate imprint"
         _out("FIELD-ELEMENTS EMERGENT-SYNC ASSAY")
-        _out(f"cores={cores} omega0={f_val}Hz depth={DEPTH} K={k_val} "
-              f"delay={d_val}s channel={chan} trial={t_val}s")
+        _out(
+            f"cores={cores} omega0={f_val}Hz depth={DEPTH} K={k_val} "
+            f"delay={d_val}s channel={chan} trial={t_val}s"
+        )
         _out("each element is source AND sensor — coupling via the die")
         _out()
         arms = [(f"COUPLED K={k_val} d={d_val}", k_val)]
         if not (len(sys.argv) > 7 and sys.argv[7] == "noblind"):
             arms.append(("BLIND (oscillate, don't feel)", 0.0))
         for label, k in arms:
-            arm = Arm(label, modulated=False, sync=True, sync_k=k,
-                      sync_delay=d_val, sync_thermal=thermal,
-                      drive_hz=f_val, trial_sec=t_val)
+            arm = Arm(
+                label,
+                modulated=False,
+                sync=True,
+                sync_k=k,
+                sync_delay=d_val,
+                sync_thermal=thermal,
+                drive_hz=f_val,
+                trial_sec=t_val,
+            )
             _out(f"--- {label} ---")
             series = _run_arm(arm, cores)
             traj = _order_trajectory(series)
@@ -281,8 +308,10 @@ def main() -> None:
             amp, phase = _goertzel(xs, eff_hz, DRIVE_HZ)
             mean = sum(xs) / len(xs)
             rel = amp / mean if mean else 0.0
-            _out(f"  worker{wid}: n={len(xs)} eff_rate={eff_hz:.0f}Hz "
-                  f"amp@{DRIVE_HZ}Hz={rel*100:.2f}% phase={phase:+.2f}rad")
+            _out(
+                f"  worker{wid}: n={len(xs)} eff_rate={eff_hz:.0f}Hz "
+                f"amp@{DRIVE_HZ}Hz={rel * 100:.2f}% phase={phase:+.2f}rad"
+            )
             results.setdefault(arm.label, {})[wid] = rel
     _out()
     driven = results.get("DRIVEN (w0 modulates)", {})
@@ -292,7 +321,7 @@ def main() -> None:
         for wid in sorted(driven):
             d, s = driven[wid], sham.get(wid, 0.0)
             ratio = d / s if s > 1e-9 else float("inf")
-            _out(f"  worker{wid}: {d*100:.2f}% vs {s*100:.2f}%  SNR={ratio:.1f}x")
+            _out(f"  worker{wid}: {d * 100:.2f}% vs {s * 100:.2f}%  SNR={ratio:.1f}x")
         med = sorted(driven.values())[len(driven) // 2]
         med_s = sorted(sham.values())[len(sham) // 2]
         coupled = med > 2 * med_s

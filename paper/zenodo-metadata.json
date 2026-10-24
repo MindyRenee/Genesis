@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "title": "Genesis: A Machine-Native Cognitive Architecture",
+    "upload_type": "publication",
+    "publication_type": "preprint",
+    "description": "<p>Genesis is a two-layer cognitive architecture that runs on a single machine with no external model &mdash; no transformer, no pretrained weights. A Rust daemon integrates an 18-chemical neuromodulatory substrate, an electrochemical ion layer, a sourced sleep&ndash;wake network (Booth/Diniz&nbsp;Behn), active inference over its own chemical trajectory, and memory consolidation on a 5&nbsp;Hz body clock; a Python cognitive layer handles perception, reasoning, compositional language, and self-modeling over a self-built semantic network. The system is embodied on real silicon: hardware sensors drive neurochemistry, neurochemistry drives real CPU control, and a physical field probe closes a measured phase-lock between modeled brain waves and actual processor dynamics. The project exists to show that large language models are not the only way to build a mind &mdash; and that the functional machinery the leading theories of consciousness describe (global workspace broadcast, embodied self-modeling, affective interoception, higher-order representation) can be implemented and inspected in the open. Source: https://github.com/MindyRenee/Genesis</p><p>Version 0.2.0 supersedes the 0.1.0 snapshot: schema v5 (3,480-byte core state), 5&nbsp;Hz tick, sleep staged by the Booth/Diniz&nbsp;Behn network rather than adenosine thresholds, the electrochemical ion layer, per-person dyadic signatures, the physical-field coupling channel and its assays, and revised ARC practice evidence.</p>",
+    "creators": [
+      {
+        "name": "Beatty, Mindy"
+      }
+    ],
+    "version": "0.2.0",
+    "publication_date": "2026-10-18",
+    "access_right": "open",
+    "license": "cc-by-4.0",
+    "keywords": [
+      "cognitive architecture",
+      "active inference",
+      "ARC-AGI",
+      "neuromodulatory dynamics",
+      "artificial intelligence",
+      "embodiment",
+      "free energy principle",
+      "machine consciousness",
+      "global workspace theory"
+    ],
+    "related_identifiers": [
+      {
+        "identifier": "https://github.com/MindyRenee/Genesis",
+        "relation": "isSupplementedBy",
+        "resource_type": "software",
+        "scheme": "url"
+      }
+    ],
+    "notes": "Supersedes version 0.1.0 (10.5281/zenodo.22817337, 2026-09-17). The archived 0.1.0 PDF documents schema v3 and predates the ion layer, sleep-wake network, and physical-field probe."
+  }
+}

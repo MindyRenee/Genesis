@@ -671,6 +671,57 @@ fn test_emergent_phase_rem() {
     assert_eq!(stage(&ASLEEP_REM, vec.phase()), MentalPhase::REM);
 }
 
+/// Regression: a network-stamped sleep stage used to be erased by the
+/// next `recompute_derived()`. The waking classifier cannot produce
+/// NREM or REM, so every recompute — the inference-feedback pass in
+/// `advance_neuro`, the impulse and baseline IPC handlers,
+/// `wake_recovery` — rewrote the phase byte to a waking phase. The
+/// wire therefore never reported the body asleep: the mind held a
+/// waking zone while the network sat in NREM, and adenosine stayed
+/// pinned at its clearance floor. The classifier now abstains on
+/// sleep stages; only `apply_network_phase` enters or exits them.
+#[test]
+fn test_network_sleep_stage_survives_recompute_derived() {
+    let mut state = GenesisCoreState::new(1, 1000);
+    state.sleep_network = ASLEEP_NET;
+    state.apply_network_phase();
+    assert_eq!(state.zones.phase(), MentalPhase::NREM);
+    assert_eq!(state.neurochemicals.phase(), MentalPhase::NREM);
+
+    // The wipe path: a recompute must not erase the network's stamp.
+    state.neurochemicals.recompute_derived();
+    state.sync_neurochemistry_to_state();
+    assert_eq!(
+        state.neurochemicals.phase(),
+        MentalPhase::NREM,
+        "recompute_derived erased the network's NREM stamp"
+    );
+    assert_eq!(
+        state.zones.phase(),
+        MentalPhase::NREM,
+        "sync_neurochemistry_to_state erased the zone's NREM stamp"
+    );
+
+    // REM is a sleep stage too — same abstention.
+    state.sleep_network = ASLEEP_REM;
+    state.apply_network_phase();
+    assert_eq!(state.neurochemicals.phase(), MentalPhase::REM);
+    state.neurochemicals.recompute_derived();
+    state.sync_neurochemistry_to_state();
+    assert_eq!(state.neurochemicals.phase(), MentalPhase::REM);
+    assert_eq!(state.zones.phase(), MentalPhase::REM);
+
+    // And waking still clears it: once LC is back above the sleep-onset
+    // threshold, apply_network_phase replaces the stamp with a waking
+    // phase and the classifier resumes.
+    state.sleep_network = genesis::state::sleep_network::INITIAL;
+    state.apply_network_phase();
+    assert_eq!(state.zones.phase(), MentalPhase::Active);
+    assert_eq!(state.neurochemicals.phase(), MentalPhase::Active);
+    state.neurochemicals.recompute_derived();
+    assert_eq!(state.neurochemicals.phase(), MentalPhase::Active);
+}
+
 #[test]
 fn test_network_stage_does_not_chatter_across_a_sleep_episode() {
     // The sleep stage now comes from the sleep-wake network. Across two
@@ -1399,25 +1450,21 @@ fn test_adenosine_clearance_rate_during_sleep() {
 }
 
 #[test]
-fn test_zone_sleeping_runs_adenosine_clearance() {
-    // When the cognitive zone is Sleeping (the mind called /sleep), the
-    // adenosine sleep-pressure mechanism must treat the system as asleep
-    // even though the emergent neurochemical phase is still Active — the
-    // zone is the cognitive layer's authority on sleep state
-    // (CoreState::sync_neurochemistry_to_state forces the reported phase
-    // to NREM). Without zone_sleeping, /sleep on a rested system
-    // *accumulates* adenosine toward the exhaustion override (~0.90),
-    // so the sleep can persist for ~days instead of draining what
-    // little pressure exists.
+fn test_declared_sleep_does_not_drain_adenosine() {
+    // The body's sleep signal is the network plus the stamped phase,
+    // never the mind's zone. A /sleep the body cannot cross must keep
+    // accumulating adenosine — Process S rises during wake, and the
+    // rising pressure is what finally flips the switch (Daan, Beersma
+    // & Borbély 1984; glymphatic clearance rides the NREM *state*,
+    // Xie et al., Science 2013, not the intention to sleep).
     let mut state = GenesisCoreState::new(1, 1000);
     let params = NeuroTickParams {
         metaplasticity_rate: 0.0,
-        zone_sleeping: true,
         ..NeuroTickParams::COMPRESSED
     };
 
     // Rested chemistry: moderate adenosine (0.30), normal histamine —
-    // the emergent phase stays Active; only the zone says Sleeping.
+    // the emergent phase stays Active and the network is not driven.
     // SAFETY: the test thread is the only writer to this local state;
     // no concurrent write transaction is active.
     unsafe { state.write_begin(0) };
@@ -1433,12 +1480,12 @@ fn test_zone_sleeping_runs_adenosine_clearance() {
         .level = 0.40;
     state.write_end();
 
-    let mut lowest_adn = f32::MAX;
+    let mut highest_adn = 0.0f32;
     for _ in 0..100 {
         // SAFETY: single-threaded test — exclusive access to a live state struct.
         unsafe { state.write_begin(0) };
         // Hold histamine high so the emergent phase can never enter
-        // sleep on its own — isolates the zone_sleeping pathway.
+        // sleep on its own — isolates the wake-mode pathway.
         state
             .neurochemicals
             .get_mut(NeurochemicalId::Histamine)
@@ -1450,19 +1497,19 @@ fn test_zone_sleeping_runs_adenosine_clearance() {
             .get(NeurochemicalId::Adenosine)
             .unwrap()
             .level;
-        lowest_adn = lowest_adn.min(adn);
+        highest_adn = highest_adn.max(adn);
         state.write_end();
     }
 
     let phase = MentalPhase::from_u8(state.neurochemicals.emergent_phase);
     assert!(
         phase != MentalPhase::NREM && phase != MentalPhase::REM,
-        "precondition failed: emergent phase entered {phase:?} without zone authority"
+        "precondition failed: emergent phase entered {phase:?} without a sleep network"
     );
     assert!(
-        lowest_adn < 0.30,
-        "zone_sleeping should drain adenosine via glymphatic clearance, \
-         but the level never fell below 0.30 (min={lowest_adn})"
+        highest_adn > 0.30,
+        "wake-mode handling must keep accumulating adenosine, \
+         but the level never rose above 0.30 (max={highest_adn})"
     );
 }
 

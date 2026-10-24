@@ -259,7 +259,11 @@ def create_project(
     ]
 
     return _write_and_verify(
-        result, get_tools(), name, projects_root, files_to_write,
+        result,
+        get_tools(),
+        name,
+        projects_root,
+        files_to_write,
     )
 
 
@@ -270,10 +274,7 @@ def _refuse_internal_topic(description: str) -> ProjectResult | None:
     (``_cat:cause:guarded_cortisol`` → ``catcauseguarded_cortisol``)
     and leaks internals into user-facing projects."""
     if ":" in description.strip():
-        logger.debug(
-            f"create_project: refusing internal symbol topic "
-            f"{description!r}"
-        )
+        logger.debug(f"create_project: refusing internal symbol topic {description!r}")
         return ProjectResult(
             name="",
             path="",
@@ -282,9 +283,7 @@ def _refuse_internal_topic(description: str) -> ProjectResult | None:
     return None
 
 
-def _refuse_existing(
-    name: str, description: str, projects_root: str
-) -> ProjectResult | None:
+def _refuse_existing(name: str, description: str, projects_root: str) -> ProjectResult | None:
     """If a project about this exact topic already exists, don't create
     a duplicate. The old behavior appended _2, _3, _4 … producing
     modes, modes_2, modes_3, modes_4, modes_5, modes_6, modes_7,
@@ -293,10 +292,7 @@ def _refuse_existing(
     The caller (_pick_creation_topic) is responsible for filtering
     already-built topics, but this is a safety net."""
     if Path(projects_root, name).exists():
-        logger.debug(
-            f"create_project: '{name}' already exists, skipping "
-            f"(topic: {description!r})"
-        )
+        logger.debug(f"create_project: '{name}' already exists, skipping (topic: {description!r})")
         return ProjectResult(
             name=name,
             path=str(Path(projects_root, name)),
@@ -493,7 +489,9 @@ def archive_project(name: str, data_dir: str) -> bool:
         # tar --zstd -cf <archive> -C <projects> <name>
         result = subprocess.run(
             ["tar", "--zstd", "-cf", str(archive_path), "-C", str(projects_dir), name],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         if result.returncode != 0:
             logger.debug(f"archive_project: tar failed: {result.stderr}")
@@ -552,7 +550,9 @@ def restore_project(name: str, data_dir: str) -> bool:
     try:
         result = subprocess.run(
             ["tar", "--zstd", "-xf", str(archive_path), "-C", str(projects_dir)],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         if result.returncode != 0:
             logger.debug(f"restore_project: tar failed: {result.stderr}")
@@ -745,13 +745,15 @@ def list_projects(data_dir: str) -> list[dict[str, Any]]:
             if not child.is_dir() or child.name == _ARCHIVE_DIR:
                 continue
             file_count = sum(1 for f in child.rglob("*") if f.is_file())
-            projects.append({
-                "name": child.name,
-                "path": str(child),
-                "files": file_count,
-                "size_bytes": _dir_size(child),
-                "status": "active",
-            })
+            projects.append(
+                {
+                    "name": child.name,
+                    "path": str(child),
+                    "files": file_count,
+                    "size_bytes": _dir_size(child),
+                    "status": "active",
+                }
+            )
 
     # Archived projects
     archive = projects_dir / _ARCHIVE_DIR
@@ -760,13 +762,15 @@ def list_projects(data_dir: str) -> list[dict[str, Any]]:
             if not f.is_file() or not f.name.endswith(".tar.zst"):
                 continue
             name = f.name[: -len(".tar.zst")]
-            projects.append({
-                "name": name,
-                "path": str(f),
-                "files": 0,
-                "size_bytes": f.stat().st_size,
-                "status": "archived",
-            })
+            projects.append(
+                {
+                    "name": name,
+                    "path": str(f),
+                    "files": 0,
+                    "size_bytes": f.stat().st_size,
+                    "status": "archived",
+                }
+            )
 
     return projects
 

@@ -416,7 +416,7 @@ def _new_level(level: int) -> _MetacognitiveLevel:
     bias = [0.5 if level == 0 else 0.0] * NUM_TARGETS
     precision = max(
         MIN_PRECISION,
-        BASE_PRECISION * (LEVEL_PRECISION_DECAY ** level),
+        BASE_PRECISION * (LEVEL_PRECISION_DECAY**level),
     )
     return _MetacognitiveLevel(
         level=level,
@@ -745,7 +745,7 @@ class CognitiveProcessModel:
             # unused slots).
             level_targets = level.predict(features)
             level_targets[0] = below.surprise_ema
-            lr_n = BASE_LEARNING_RATE * (LEVEL_LR_DECAY ** n)
+            lr_n = BASE_LEARNING_RATE * (LEVEL_LR_DECAY**n)
             surprise_n = level.update(features, level_targets, lr_n)
             level.observations += 1
             level.update_surprise_ema(surprise_n)
@@ -764,10 +764,7 @@ class CognitiveProcessModel:
         else:
             top.consecutive_high_surprise = 0
 
-        if (
-            top.consecutive_high_surprise >= SPAWN_PERSISTENCE
-            and len(self._levels) < MAX_LEVELS
-        ):
+        if top.consecutive_high_surprise >= SPAWN_PERSISTENCE and len(self._levels) < MAX_LEVELS:
             new_lvl = _new_level(len(self._levels))
             self._levels.append(new_lvl)
             top.consecutive_high_surprise = 0
@@ -784,10 +781,7 @@ class CognitiveProcessModel:
         if len(self._levels) > 1:
             for n in range(len(self._levels) - 1, 0, -1):
                 lvl = self._levels[n]
-                if (
-                    lvl.observations >= PRUNE_MIN_AGE
-                    and lvl.surprise_ema < PRUNE_THRESHOLD
-                ):
+                if lvl.observations >= PRUNE_MIN_AGE and lvl.surprise_ema < PRUNE_THRESHOLD:
                     self._levels.pop(n)
                     pruned = True
                     logger.debug(
@@ -807,25 +801,17 @@ class CognitiveProcessModel:
     ) -> MetacognitiveFeedback:
         """Compute the metacognitive feedback signal for the cognition engine."""
         actual_p_insight = 1.0 if insights else 0.0
-        actual_mean_conf = (
-            sum(i.confidence for i in insights) / len(insights)
-            if insights
-            else 0.5
-        )
+        actual_mean_conf = sum(i.confidence for i in insights) / len(insights) if insights else 0.5
         actual_count = len(insights)
         actual_type_dist = _type_distribution(insights)
 
         error_insight = actual_p_insight - prediction.p_insight
         error_confidence = actual_mean_conf - prediction.expected_confidence
         error_count = (actual_count / 5.0) - (prediction.expected_count / 5.0)
-        error_type = _distribution_error(
-            prediction.p_insight_type, actual_type_dist
-        )
+        error_type = _distribution_error(prediction.p_insight_type, actual_type_dist)
 
         # Level-1 surprise = RMS of per-target errors.
-        level1_surprise = math.sqrt(
-            (error_insight ** 2 + error_confidence ** 2 + error_count ** 2) / 3.0
-        )
+        level1_surprise = math.sqrt((error_insight**2 + error_confidence**2 + error_count**2) / 3.0)
         level1_surprise = max(0.0, min(1.0, level1_surprise))
 
         # Aggregate metacognitive surprise across all levels: weighted
@@ -836,7 +822,7 @@ class CognitiveProcessModel:
             total_weight = 0.0
             weighted_sum = 0.0
             for n, lvl in enumerate(self._levels):
-                w = LEVEL_PRECISION_DECAY ** n
+                w = LEVEL_PRECISION_DECAY**n
                 weighted_sum += w * lvl.surprise_ema
                 total_weight += w
             meta_surprise = weighted_sum / total_weight if total_weight > 0 else 0.0
@@ -844,9 +830,7 @@ class CognitiveProcessModel:
             meta_surprise = 0.0
         meta_surprise = max(0.0, min(1.0, meta_surprise))
 
-        predicted_self_correction = (
-            prediction.p_insight_type.get("self_correction", 0.0) > 0.3
-        )
+        predicted_self_correction = prediction.p_insight_type.get("self_correction", 0.0) > 0.3
 
         return MetacognitiveFeedback(
             error_insight=error_insight,
@@ -918,9 +902,7 @@ class CognitiveProcessModel:
                 f"obs={lvl.observations}"
             )
         if self.feedback is not None:
-            lines.append(
-                f"  feedback: meta_surprise={self.feedback.metacognitive_surprise:.3f}"
-            )
+            lines.append(f"  feedback: meta_surprise={self.feedback.metacognitive_surprise:.3f}")
         return "\n".join(lines)
 
     # ── Persistence ─────────────────────────────────────────────

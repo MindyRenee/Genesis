@@ -62,8 +62,16 @@ def _out(*args: object) -> None:
 
 
 BAND_NAMES = [
-    "epsilon", "delta", "theta", "alpha", "sigma",
-    "beta1", "beta2", "beta3", "gamma", "lambda",
+    "infraslow",
+    "delta",
+    "theta",
+    "alpha",
+    "sigma",
+    "beta1",
+    "beta2",
+    "beta3",
+    "gamma",
+    "epsilon",
 ]
 
 
@@ -159,6 +167,7 @@ def run(samples_per_phase: int = 10, settle_s: float = 5.0) -> dict:
 
 def _analyze(rows: list[dict]) -> dict:
     """Band deltas, channel movement, and the phase-lock leg."""
+
     def phase_mean(arm: str, phase: str, band: str) -> float:
         vals = [r[arm][band] for r in rows if r["phase"] == phase]
         return sum(vals) / max(1, len(vals))
@@ -170,22 +179,10 @@ def _analyze(rows: list[dict]) -> dict:
         "verdict": [],
     }
     for band in BAND_NAMES:
-        c_delta = phase_mean("coupled", "load", band) - phase_mean(
-            "coupled", "idle", band
-        )
-        u_delta = phase_mean("control", "load", band) - phase_mean(
-            "control", "idle", band
-        )
-        xs = [
-            r["sig"]["jitter_cv"]
-            for r in rows
-            if r["sig"] is not None
-        ]
-        ys = [
-            r["coupled"][band]
-            for r in rows
-            if r["sig"] is not None
-        ]
+        c_delta = phase_mean("coupled", "load", band) - phase_mean("coupled", "idle", band)
+        u_delta = phase_mean("control", "load", band) - phase_mean("control", "idle", band)
+        xs = [r["sig"]["jitter_cv"] for r in rows if r["sig"] is not None]
+        ys = [r["coupled"][band] for r in rows if r["sig"] is not None]
         n = min(len(xs), len(ys))
         report["bands"][band] = {
             "control_load_delta": round(u_delta, 4),
@@ -195,16 +192,8 @@ def _analyze(rows: list[dict]) -> dict:
 
     # Channel-level: did the physical channels themselves move?
     for ch in ("jitter_cv", "throughput_mean", "pstate_rate", "irq_rate"):
-        idle_v = [
-            r["sig"][ch]
-            for r in rows
-            if r["phase"] == "idle" and r["sig"] is not None
-        ]
-        load_v = [
-            r["sig"][ch]
-            for r in rows
-            if r["phase"] == "load" and r["sig"] is not None
-        ]
+        idle_v = [r["sig"][ch] for r in rows if r["phase"] == "idle" and r["sig"] is not None]
+        load_v = [r["sig"][ch] for r in rows if r["phase"] == "load" and r["sig"] is not None]
         if idle_v and load_v:
             report["channels"][ch] = {
                 "idle_mean": round(sum(idle_v) / len(idle_v), 4),
@@ -232,9 +221,7 @@ def _analyze(rows: list[dict]) -> dict:
         if r["sig"] is not None and r["sig"]["carrier_coherence"] is not None
     ]
     if coh:
-        report["phase_lock"]["mean_coherence"] = round(
-            sum(coh) / len(coh), 3
-        )
+        report["phase_lock"]["mean_coherence"] = round(sum(coh) / len(coh), 3)
     report["verdict"].append(
         f"phase lock: PLV={lock['plv']:.3f} over {int(lock['n'])} samples"
         + (
@@ -262,9 +249,7 @@ def main() -> None:
     _out("physical channels (the substrate actually moved):")
     for ch, d in report["channels"].items():
         _out(f"  {ch:16s} idle={d['idle_mean']:<12} load={d['load_mean']}")
-    _out(
-        f"\n{'band':9s} {'ctrl Δ':>9s} {'coupled Δ':>10s} {'jitter r':>9s}"
-    )
+    _out(f"\n{'band':9s} {'ctrl Δ':>9s} {'coupled Δ':>10s} {'jitter r':>9s}")
     for band, d in report["bands"].items():
         _out(
             f"{band:9s} {d['control_load_delta']:>+9.4f} "

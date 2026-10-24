@@ -18,7 +18,7 @@ deferred, so the wave clock fell permanently behind and never caught up:
     5.0s     5.000s    1.000s      -80%
 
 Because phase is the source of every phase-derived quantity —
-cross-frequency coupling, REM's epsilon-gated alpha, sleep-stage
+cross-frequency coupling, REM's infraslow-gated alpha, sleep-stage
 timing — the whole wave system ran slow and reported itself healthy:
 amplitudes relaxed on the full interval and still looked right.
 
@@ -101,7 +101,7 @@ def test_two_second_gap_advances_full_interval():
 
     Pre-fix this lost 50% of the interval permanently. Compared against
     the full-2s expectation rather than "not equal to 1 s", because for
-    slow bands a 1 s and 2 s advance can coincide modulo 2pi (EPSILON at
+    slow bands a 1 s and 2 s advance can coincide modulo 2pi (INFRASLOW at
     0.25 Hz advances exactly pi either way) -- so the discriminating
     check is the full-interval one.
     """
@@ -141,7 +141,7 @@ def test_phase_is_exact_regardless_of_subdivision():
 
     Advancing 5 s in one call and as fifty 0.1 s steps must agree to
     floating-point precision. Note the *kind* of agreement: for a band
-    whose 5 s is a whole number of cycles (lambda, 150 Hz -> 750), the
+    whose 5 s is a whole number of cycles (epsilon, 150 Hz -> 750), the
     single call returns exactly 0.0 while the accumulated sum lands
     ~1e-14 away. That residue is pure float summation, orders of
     magnitude below anything downstream can observe -- and crucially it
@@ -159,9 +159,9 @@ def test_phase_is_exact_regardless_of_subdivision():
         delta = _phase_delta(stepped._phase[band], one_shot._phase[band])
         assert delta < 1e-9, f"{band.value} drifted {delta}"
 
-    # The single call is exact where it can be: lambda completes a whole
+    # The single call is exact where it can be: epsilon completes a whole
     # number of cycles in 5 s and returns to phase 0.
-    assert _phase_delta(one_shot._phase[BrainWave.LAMBDA], 0.0) < 1e-12
+    assert _phase_delta(one_shot._phase[BrainWave.EPSILON], 0.0) < 1e-12
 
     # Error is bounded by float precision and does not accumulate with
     # the interval -- 100 s in one call is as exact as 1 s.
@@ -221,8 +221,9 @@ def test_exponential_relaxation_is_exact_under_subdivision():
     assert s5 == pytest.approx(s1, rel=1e-15)
     assert math.exp(-0.5 / 2.0) == pytest.approx(math.exp(-0.1 / 2.0) ** 5, rel=1e-15)
 
-    # Relaxation toward a constant target: exact for any split, and
-    # equal to the closed form.
+    # Convergence toward a constant limit-cycle radius: the radial
+    # logistic map composes exactly for any split, and equals its
+    # closed form u(t) = u0·A²/(A²·e^{-t/τ} + u0·(1−e^{-t/τ})).
     def run_relax(n: int) -> float:
         o = BrainWaveOscillator()
         o._phase = dict.fromkeys(BrainWave, 0.0)
@@ -234,7 +235,10 @@ def test_exponential_relaxation_is_exact_under_subdivision():
             o._relax_once(0.5 / n, targets)
         return o._amplitude[band]
 
-    analytic = 0.1 + (targets[band] - 0.1) * (1.0 - math.exp(-0.5 / tau))
+    u0 = 0.1 * 0.1
+    a2 = targets[band] * targets[band]
+    e = math.exp(-0.5 / tau)
+    analytic = math.sqrt(u0 * a2 / (a2 * e + u0 * (1.0 - e)))
     assert run_relax(1) == pytest.approx(analytic, rel=1e-12)
     assert run_relax(5) == pytest.approx(analytic, rel=1e-12)
     assert run_relax(20) == pytest.approx(analytic, rel=1e-12)
@@ -264,14 +268,14 @@ def test_exponential_relaxation_is_exact_under_subdivision():
 # Bands whose period is long relative to the sub-step. PAC modulation
 # on these converges cleanly with sampling density.
 _SLOW_BANDS = (
-    BrainWave.EPSILON,
+    BrainWave.INFRASLOW,
     BrainWave.DELTA,
     BrainWave.THETA,
     BrainWave.ALPHA,
     BrainWave.SIGMA,
 )
 # Bands fast enough that a 0.1 s sub-step spans many of their cycles
-# (lambda: 15 cycles per sub-step), so the slow-band PAC modulator is
+# (epsilon: 15 cycles per sub-step), so the slow-band PAC modulator is
 # sampled at effectively a fixed phase. Their residual does not converge
 # with more sub-steps — it is an aliasing limit of the coupling, not
 # integration error, and is bounded by _PAC_DEPTH.
@@ -280,12 +284,14 @@ _FAST_BANDS = (
     BrainWave.BETA2,
     BrainWave.BETA3,
     BrainWave.GAMMA,
-    BrainWave.LAMBDA,
+    BrainWave.EPSILON,
 )
 
 # Measured convergence of the frame-rate independence test against the
-# 0.1 s reference, over 2 s: n=1 -> 1e-2, n=5 -> 4e-4, n=10 -> 1.2e-4,
-# n>=20 -> bounded at 1e-4 by fast-band PAC aliasing. See
+# 0.1 s reference, over 2 s: the PAC modulator is applied as its exact
+# interval mean (not a start-of-step sample), so the residual is only
+# the amplitude-coupling factor — n=20 -> 1e-4, n=50 -> 2e-5, n=100 ->
+# 7e-6 vs the n=2000 limit. See
 # test_fast_band_pac_has_a_bounded_aliasing_floor.
 _FRAME_RATE_TOL = 2e-4
 
@@ -295,14 +301,14 @@ def test_frame_rate_independence(steps: int):
     """Wave time is the same regardless of how often assess() runs.
 
     Phase is exact by construction. Amplitudes agree to the measured
-    PAC sampling floor (~1e-4), which is the value of _PAC_DEPTH, not a
-    fudge factor.
+    coupling floor (~1e-4 at the 0.1 s resolution) — what's left after
+    the exact interval-mean modulation, not a fudge factor.
 
     The splits start at 20 (= 2 s / _MAX_SUBSTEP, the resolution the
     integrator actually uses) and go finer. Coarser splits are not
     tested here because the integrator never produces them; the 0.1 s
     resolution is the coarsest it will emit, and a hypothetical
-    single-step 2 s integration is 1e-2 off by construction — that is
+    single-step 2 s integration is ~5e-3 off by construction — that is
     the whole reason for sub-stepping, not a property to assert here.
     """
     total = 2.0
@@ -345,8 +351,7 @@ def test_coarse_splits_are_measurably_worse():
     coarse._relax_once(2.0, targets)
 
     worst = max(
-        abs(coarse._amplitude[b] - reference._amplitude[b])
-        / reference._amplitude[b]
+        abs(coarse._amplitude[b] - reference._amplitude[b]) / reference._amplitude[b]
         for b in BrainWave
     )
     assert worst > 10 * _FRAME_RATE_TOL, (
@@ -376,20 +381,17 @@ def test_slow_band_amplitude_converges_with_sampling():
         for _ in range(steps):
             other._relax_once(2.0 / steps, targets)
         for band in _SLOW_BANDS:
-            assert other._amplitude[band] == pytest.approx(
-                reference._amplitude[band], rel=1e-12
-            )
+            assert other._amplitude[band] == pytest.approx(reference._amplitude[band], rel=1e-12)
 
 
 def test_fast_band_pac_has_a_bounded_aliasing_floor():
-    """Fast bands carry a PAC sampling residual, bounded by _PAC_DEPTH.
+    """Fast bands carry a coupling residual, bounded by _PAC_DEPTH.
 
-    lambda oscillates at 150 Hz, so a 0.1 s sub-step spans 15 of its
-    cycles and the slow-band modulator is effectively sampled at a
-    fixed phase. Refining the split therefore does not converge — this
-    pins that the residual stays inside the modulation depth instead of
-    growing, which is the property that matters (it is coupling error,
-    not time lost).
+    The modulator is applied as its exact interval mean, so what
+    remains between resolutions is the amplitude-coupling factor —
+    ~1e-4 at the production 0.1 s resolution. This pins that the
+    residual stays bounded well inside the modulation depth instead
+    of growing: it is coupling error, not time lost.
     """
     targets = _targets(BrainWaveOscillator())
     residuals = []
@@ -404,19 +406,13 @@ def test_fast_band_pac_has_a_bounded_aliasing_floor():
     base = residuals[0]
     for band in _FAST_BANDS:
         for other in residuals[1:]:
-            assert other[band] == pytest.approx(
-                base[band], rel=_FRAME_RATE_TOL
-            )
+            assert other[band] == pytest.approx(base[band], rel=_FRAME_RATE_TOL)
         # The spread across split resolutions is bounded by the
         # modulation depth, scaled by how far the band has actually
         # relaxed — the residual is coupling error, not lost time, so
         # it must not grow without bound as the split gets finer.
-        spread = max(
-            abs(r[band] - base[band]) for r in residuals
-        )
-        assert spread <= BrainWaveOscillator._PAC_DEPTH * max(
-            abs(base[band]), 1e-9
-        )
+        spread = max(abs(r[band] - base[band]) for r in residuals)
+        assert spread <= BrainWaveOscillator._PAC_DEPTH * max(abs(base[band]), 1e-9)
 
 
 def test_substep_count_respects_bound():
@@ -424,7 +420,7 @@ def test_substep_count_respects_bound():
 
     At DT_MAX (10 s) the ideal 0.1 s resolution would want 100
     sub-steps; the bound caps the work. Sub-steps must still cover the
-    interval exactly, so no time is lost — only the PAC sampling rate
+    interval exactly, so no time is lost — only the coupling sampling
     degrades, which the exponential terms are immune to.
     """
     osc = BrainWaveOscillator()
@@ -467,6 +463,7 @@ def test_normal_interval_uses_configured_resolution():
     assert len(calls) == 10
     assert all(dt == pytest.approx(0.1) for dt in calls)
 
+
 # ── End-to-end: the real assess() path, across a slow heartbeat ──
 
 
@@ -484,9 +481,7 @@ def _run_heartbeat(gaps: list[float], monkeypatch) -> list:
     def fake_monotonic() -> float:
         return clock["t"]
 
-    monkeypatch.setattr(
-        "thalamus.brain_waves.time.monotonic", fake_monotonic
-    )
+    monkeypatch.setattr("thalamus.brain_waves.time.monotonic", fake_monotonic)
     # Prime the oscillator's clock. A fresh instance has _last_time None,
     # and assess() then falls back to a 0.1 s default for its first
     # interval regardless of what the clock says -- so without this the
@@ -614,8 +609,7 @@ def test_phase_is_frame_rate_independent_for_integral_schedules():
             osc._advance_phase_exact(chunk)
         for band in BrainWave:
             assert _phase_delta(osc._phase[band], reference._phase[band]) < 1e-9, (
-                f"{band.value}: {steps} x {chunk}s disagrees with one "
-                f"{total}s advance"
+                f"{band.value}: {steps} x {chunk}s disagrees with one {total}s advance"
             )
 
 
@@ -638,13 +632,13 @@ def test_integral_cycle_counts_return_exactly_to_start():
     start phase, exactly, for every such pair.
     """
     cases = (
-        (BrainWave.THETA, 2.0, 11),    # 5.5 Hz x 2 s
-        (BrainWave.SIGMA, 5.0, 70),     # 14 Hz x 5 s
-        (BrainWave.SIGMA, 2.0, 28),     # 14 Hz x 2 s
-        (BrainWave.BETA1, 2.0, 27),     # 13.5 Hz x 2 s
-        (BrainWave.BETA3, 3.0, 75),     # 25 Hz x 3 s
-        (BrainWave.GAMMA, 1.5, 75),     # 50 Hz x 1.5 s
-        (BrainWave.LAMBDA, 10.0, 1500),  # 150 Hz x 10 s (the DT_MAX end)
+        (BrainWave.THETA, 2.0, 11),  # 5.5 Hz x 2 s
+        (BrainWave.SIGMA, 5.0, 70),  # 14 Hz x 5 s
+        (BrainWave.SIGMA, 2.0, 28),  # 14 Hz x 2 s
+        (BrainWave.BETA1, 2.0, 27),  # 13.5 Hz x 2 s
+        (BrainWave.BETA3, 3.0, 75),  # 25 Hz x 3 s
+        (BrainWave.GAMMA, 1.5, 75),  # 50 Hz x 1.5 s
+        (BrainWave.EPSILON, 10.0, 1500),  # 150 Hz x 10 s (the DT_MAX end)
     )
     for band, dt, turns in cases:
         freq = BrainWaveOscillator._FREQS[band]
@@ -684,8 +678,7 @@ def test_fractional_cycle_counts_are_not_snapped():
     osc._advance_phase_exact(0.2)
     two_pi = 2.0 * math.pi
     assert _phase_delta(osc._phase[BrainWave.THETA], two_pi * 0.1) < 1e-12, (
-        f"1.1 turns must leave a 0.1-turn residue; got "
-        f"{osc._phase[BrainWave.THETA]}"
+        f"1.1 turns must leave a 0.1-turn residue; got {osc._phase[BrainWave.THETA]}"
     )
 
     # And the snap threshold is not so loose that it eats real fractions.
@@ -695,16 +688,15 @@ def test_fractional_cycle_counts_are_not_snapped():
 def test_snap_epsilon_is_well_above_float_noise():
     """_TURN_SNAP_EPS must exceed float64 error at every reachable count.
 
-    The largest cycle count within DT_MAX is lambda's 150 Hz over 10 s =
+    The largest cycle count within DT_MAX is epsilon's 150 Hz over 10 s =
     1500 turns, where float64 spacing is 2^-52 * 1500 ~ 3.3e-13 turns.
     The tolerance has to clear that by a wide margin, or integral cycles
     stop snapping; and it has to stay far below any meaningful fraction
     of a turn.
     """
-    worst_spacing = 2.0 ** -52 * (150.0 * 10.0)  # turns
+    worst_spacing = 2.0**-52 * (150.0 * 10.0)  # turns
     assert _TURN_SNAP_EPS > 1000 * worst_spacing, (
-        f"snap epsilon {_TURN_SNAP_EPS} is not comfortably above float "
-        f"noise {worst_spacing}"
+        f"snap epsilon {_TURN_SNAP_EPS} is not comfortably above float noise {worst_spacing}"
     )
     # 1e-9 turns is 6.3e-9 rad — invisible downstream.
     assert 2.0 * math.pi * _TURN_SNAP_EPS < 1e-8
@@ -753,11 +745,7 @@ def test_naive_reductions_leave_a_full_turn_residue():
         inc = two_pi * BrainWaveOscillator._FREQS[band] * dt
         turns = inc / two_pi
         nearest = round(turns)
-        snapped = (
-            0.0
-            if abs(turns - nearest) <= _TURN_SNAP_EPS
-            else inc - two_pi * nearest
-        )
+        snapped = 0.0 if abs(turns - nearest) <= _TURN_SNAP_EPS else inc - two_pi * nearest
         assert snapped == 0.0, f"{band.value} should snap to exactly 0"
 
 
@@ -800,9 +788,7 @@ def test_integral_cycle_snap_is_a_precision_tidy_up_not_a_behavioural_fix():
         # 10.999999999999998). Both are float artefacts of an integral
         # count, and the snap collapses both to exactly 0.
         residue_turns = (inc - two_pi * math.floor(inc / two_pi)) / two_pi
-        artefact = min(
-            abs(residue_turns), abs(residue_turns - 1.0)
-        )
+        artefact = min(abs(residue_turns), abs(residue_turns - 1.0))
         assert artefact < 1e-14, (
             "a floor-only residue is either ~0 or ~1 turn; if this grew, "
             "the snap would have become load-bearing and this test's "

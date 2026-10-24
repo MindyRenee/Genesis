@@ -117,7 +117,7 @@ source_bytes() {
 find_project_dirs() {
     find . \
         \( -path "./.git" -o -path "./.venv" -o -path "./.venv*" \
-           -o -path "./python/venv" -o -path "./target" \
+           -o -path "./python/venv" -o -path "./target" -o -path "./build" \
            -o -path "./genesis_data" -o -path "./python/voices" \
            -o -path "./eval_heldout" -o -path "./eval_transfer" \
            -o -path "./environment_files" -o -path "./environment_files_heldout" \
@@ -128,7 +128,7 @@ find_project_dirs() {
 find_project_files() {
     find . \
         \( -path "./.git" -o -path "./.venv" -o -path "./.venv*" \
-           -o -path "./python/venv" -o -path "./target" \
+           -o -path "./python/venv" -o -path "./target" -o -path "./build" \
            -o -path "./genesis_data" -o -path "./python/voices" \
            -o -path "./eval_heldout" -o -path "./eval_transfer" \
            -o -path "./environment_files" -o -path "./environment_files_heldout" \
@@ -168,6 +168,7 @@ ARTIFACT_DIRS=(
     "target/release"
     "target/doc"
     "target/tmp"
+    "build"
 )
 
 # Source directories — never touched by --clean
@@ -703,6 +704,14 @@ do_check() {
 clean_caches() {
     echo "${BOLD}Cleaning caches, bytecode, and package metadata...${NC}"
     local freed=0
+
+    if [ -d "build" ]; then
+        local b
+        b=$(dir_bytes "build")
+        freed=$(( freed + b ))
+        rm -rf "build"
+        echo "  ${GREEN}✓${NC} removed build ($(bytes_to_human "$b"))"
+    fi
 
     # __pycache__, tool caches, and packaging metadata can appear in any
     # package root, including python/ from commands run inside that tree.

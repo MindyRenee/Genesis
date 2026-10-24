@@ -16,10 +16,7 @@ def test_active_goals_make_investigation_selectable() -> None:
         topics=["photosynthesis"],
         perception_intent="question",
     )
-    assert any(
-        candidate.action_type == ActionType.INVESTIGATE
-        for candidate in outcome.candidates
-    )
+    assert any(candidate.action_type == ActionType.INVESTIGATE for candidate in outcome.candidates)
 
 
 def test_no_active_goals_do_not_add_investigation() -> None:
@@ -34,10 +31,7 @@ def test_no_active_goals_do_not_add_investigation() -> None:
         topics=[],
         perception_intent="question",
     )
-    assert all(
-        candidate.action_type != ActionType.INVESTIGATE
-        for candidate in outcome.candidates
-    )
+    assert all(candidate.action_type != ActionType.INVESTIGATE for candidate in outcome.candidates)
 
 
 def test_decision_outcome_carries_bg_conflict() -> None:
@@ -59,11 +53,11 @@ def test_decision_outcome_carries_bg_conflict() -> None:
     )
     assert 0.0 <= outcome.conflict <= 1.0
     selectable = [
-        c for c in outcome.candidates
-        if c.action_type != ActionType.WITHHOLD and not c.inhibited
+        c for c in outcome.candidates if c.action_type != ActionType.WITHHOLD and not c.inhibited
     ]
     assert selectable
     assert all(c.bg_conflict == outcome.conflict for c in selectable)
+
 
 def test_hardware_distress_blocks_exploration_but_preserves_conversation() -> None:
     """Daemon-owned distress must constrain optional exploration."""
@@ -84,10 +78,7 @@ def test_hardware_distress_blocks_exploration_but_preserves_conversation() -> No
         topics=["photosynthesis"],
         perception_intent="question",
     )
-    investigate = next(
-        c for c in outcome.candidates
-        if c.action_type == ActionType.INVESTIGATE
-    )
+    investigate = next(c for c in outcome.candidates if c.action_type == ActionType.INVESTIGATE)
     assert investigate.inhibited
     assert investigate.composite_score == 0.0
     assert outcome.action_type != ActionType.INVESTIGATE
@@ -114,8 +105,5 @@ def test_resource_constraint_is_inert_without_hardware_verdict() -> None:
         topics=["photosynthesis"],
         perception_intent="question",
     )
-    investigate = next(
-        c for c in outcome.candidates
-        if c.action_type == ActionType.INVESTIGATE
-    )
+    investigate = next(c for c in outcome.candidates if c.action_type == ActionType.INVESTIGATE)
     assert not investigate.inhibited

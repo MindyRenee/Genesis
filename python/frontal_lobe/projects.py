@@ -25,11 +25,11 @@ logger = logging.getLogger(__name__)
 
 class ProjectsMixin:
     """Mixin for :class:`Mind` — see module docstring."""
+
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see mind.py).
         def __getattr__(self, name: str) -> Any: ...
-
 
     def create_project(self, description: str):
         """Create a Python project from a description.
@@ -52,6 +52,7 @@ class ProjectsMixin:
             data_dir=self.data_dir,
             network=self.brain.frontal.network,
         )
+
     def list_projects(self) -> list[dict]:
         """List all projects Genesis has created.
 
@@ -61,6 +62,7 @@ class ProjectsMixin:
         are compressed ``.tar.zst`` files.
         """
         return list_projects(self.data_dir)
+
     def archive_project(self, name: str) -> bool:
         """Archive a project to ``.tar.zst`` and reclaim its space.
 
@@ -69,9 +71,11 @@ class ProjectsMixin:
         the expanded files.
         """
         return _archive_project(name, self.data_dir)
+
     def restore_project(self, name: str) -> bool:
         """Restore an archived project from its ``.tar.zst`` archive."""
         return _restore_project(name, self.data_dir)
+
     def manage_projects(self) -> list[str]:
         """Autonomously manage project storage to stay within bounds.
 
@@ -80,6 +84,7 @@ class ProjectsMixin:
         archived.
         """
         return manage_project_lifecycle(self.data_dir)
+
     def _projects_status_summary(self) -> dict[str, Any]:
         """Return a compact summary of its project portfolio for status().
 
@@ -104,6 +109,7 @@ class ProjectsMixin:
             "total": len(projects),
             "total_size_bytes": total_size,
         }
+
     def note_project(self, project_name: str, note: str) -> bool:
         """Leave a mentor's note on one of Genesis's projects.
 
@@ -120,12 +126,14 @@ class ProjectsMixin:
             True if the note was written, False if the project doesn't exist.
         """
         return leave_project_note(self.data_dir, project_name, note)
+
     def read_project_notes(self, project_name: str) -> str | None:
         """Read the notes left on a project.
 
         Returns the raw notes text, or None if there are no notes.
         """
         return read_project_notes(self.data_dir, project_name)
+
     def absorb_project_notes(self, project_name: str | None = None) -> str:
         """Read and absorb mentor notes from project(s).
 
@@ -168,10 +176,7 @@ class ProjectsMixin:
             # significant learning event, not a transient one.
             try:
                 chem = self.client.get_state()
-                tag = [
-                    float(chem.chemicals.get(CHEM_NAMES[i], 0.0))
-                    for i in range(12)
-                ]
+                tag = [float(chem.chemicals.get(CHEM_NAMES[i], 0.0)) for i in range(12)]
                 self.memory.store_memory(
                     text=f"Mentor notes on project '{pname}': {notes[:500]}",
                     salience=0.9,
@@ -199,8 +204,7 @@ class ProjectsMixin:
             summaries.append(pname)
 
         summary_text = (
-            f"absorbed mentor notes on {absorbed_count} project(s): "
-            f"{', '.join(summaries)}"
+            f"absorbed mentor notes on {absorbed_count} project(s): {', '.join(summaries)}"
         )
 
         # Emit a live thought about what it learned
@@ -231,10 +235,16 @@ class ProjectsMixin:
                 },
             )
             self.brain.frontal.network.add_edge(
-                pname, feedback_concept, RelationType.RELATED_TO, 0.8,
+                pname,
+                feedback_concept,
+                RelationType.RELATED_TO,
+                0.8,
             )
             self.brain.frontal.network.add_edge(
-                "genesis", feedback_concept, RelationType.RELATED_TO, 0.7,
+                "genesis",
+                feedback_concept,
+                RelationType.RELATED_TO,
+                0.7,
             )
         except Exception as e:  # noqa: BLE001
             note_swallowed(

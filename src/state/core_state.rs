@@ -98,7 +98,7 @@ use super::manifest::RuntimeManifest;
 use super::memory::MemoryPointers;
 use super::neurochemical::{ActiveRegion, NeuroTickParams, NeurochemicalId, NeurochemicalVector};
 use super::sleep_network::{INITIAL as SLEEP_INITIAL, State as SleepState};
-use super::zones::{ActiveZones, CognitiveZone, MentalPhase};
+use super::zones::ActiveZones;
 
 use core::sync::atomic::{AtomicU64, Ordering, fence};
 
@@ -226,21 +226,17 @@ impl GenesisCoreState {
     /// Take the sleep stage from the sleep-wake network and publish it to the
     /// neurochemical phase and the zones.
     ///
-    /// The network decides sleep and its stages. The chemistry still names
-    /// the waking phases. The zone's sleeping override applies here too, so a
-    /// mind that is cognitively asleep is never shown a waking phase.
+    /// The network decides sleep and its stages; the chemistry still names
+    /// the waking phases. No override is applied here: the published phase
+    /// is always the switch's own state. The organism has no "declared
+    /// sleep" — biology has none either; Process S tracks the physiological
+    /// state, not the intention, so a cognitively asleep mind whose body
+    /// could not cross sees the truth (a waking phase) and its desync check
+    /// joins the body in whichever direction it actually went.
     pub fn apply_network_phase(&mut self) {
         let phase = super::sleep_network::stage(&self.sleep_network, self.neurochemicals.phase());
         self.neurochemicals.emergent_phase = phase as u8;
-        let zone_phase = if self.zones.zone() == CognitiveZone::Sleeping {
-            match phase {
-                MentalPhase::REM => MentalPhase::REM,
-                _ => MentalPhase::NREM,
-            }
-        } else {
-            phase
-        };
-        self.zones.sync_phase(zone_phase);
+        self.zones.sync_phase(phase);
     }
 
     /// Propagate the neurochemical system's derived state to the
@@ -249,26 +245,15 @@ impl GenesisCoreState {
     /// This must be called after every neurochemical tick to keep
     /// the rest of the state consistent with neurochemistry.
     pub fn sync_neurochemistry_to_state(&mut self) {
-        // Sync emergent phase
+        // Sync emergent phase. The phase is published exactly as the
+        // chemistry/network computed it — the zone's Sleeping
+        // declaration does not touch it. Sleep stages reach this byte
+        // only via `apply_network_phase` (the classifier abstains on
+        // them), so during real sleep the stamped NREM/REM survives
+        // here; a mind that merely *claims* sleep while its body stays
+        // awake is honestly shown a waking phase.
         let neuro_phase = self.neurochemicals.phase();
-        // When the cognitive mind has explicitly set the zone to
-        // Sleeping (user called /sleep), force the emergent phase to
-        // NREM (or REM if already in REM). Without this, the
-        // neurochemical phase oscillates between "drowsy" and
-        // "active" because adenosine hasn't risen high enough to
-        // cross the sleep threshold — even though the mind is
-        // cognitively asleep. The zone is the cognitive-layer
-        // authority on sleep state; the neurochemical phase should
-        // respect it.
-        let phase = if self.zones.zone() == CognitiveZone::Sleeping {
-            match neuro_phase {
-                MentalPhase::REM => MentalPhase::REM,
-                _ => MentalPhase::NREM,
-            }
-        } else {
-            neuro_phase
-        };
-        self.zones.sync_phase(phase);
+        self.zones.sync_phase(neuro_phase);
 
         // Sync emotional gating weights
         self.memory.update_gating(

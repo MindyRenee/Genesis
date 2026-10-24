@@ -5,11 +5,12 @@ from __future__ import annotations
 import logging
 import sqlite3
 import time
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
 from genesis_client.swallow import note_swallowed
 
-from .classify import _BRIDGE_ORIGINS, _column_of, _strip_prefix
+from .classify import _column_of, _strip_prefix
 from .edge_log import is_derivable_edge
 from .types import Concept, Edge, RelationType
 
@@ -18,11 +19,11 @@ logger = logging.getLogger(__name__)
 
 class ConsolidationMixin:
     """Mixin for :class:`ConceptNetwork` — see module docstring."""
+
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see the package's core module).
         def __getattr__(self, name: str) -> Any: ...
-
 
     def create_bridge(self, concept_a: str, concept_b: str, weight: float = 0.3) -> Edge | None:
         """Create a pioneer bridge between two concepts in different columns.
@@ -44,6 +45,7 @@ class ConsolidationMixin:
         return self.add_edge(
             concept_a, concept_b, RelationType.BRIDGES, weight=weight, origin="bridge"
         )
+
     def get_bridges(self, concept_id: str) -> list[Edge]:
         """Get all bridge edges connected to a concept (deduplicated)."""
         edges = self.get_edges(concept_id, direction="both")
@@ -57,6 +59,7 @@ class ConsolidationMixin:
                 seen.add(id(e))
                 unique.append(e)
         return unique
+
     def backfill_columns(self) -> dict[str, int]:
         """Backfill column membership for all existing concepts.
 
@@ -71,8 +74,8 @@ class ConsolidationMixin:
         **Bridge creation only runs for concepts that were actually
         backfilled** (had empty `columns`). If no backfilling was
         needed, bridges are not recreated — they either already exist
-        or were intentionally pruned during sleep consolidation.
-        Recreating them every startup would defeat the pruning and
+        or were shed to a compressed store during sleep consolidation.
+        Recreating them every startup would undo that migration and
         cause unbounded edge growth (13K bridges per startup).
 
         Returns a dict with backfill statistics.
@@ -95,6 +98,7 @@ class ConsolidationMixin:
             "concepts_backfilled": len(backfilled_ids),
             "bridges_created": bridges_created,
         }
+
     def _backfill_column_membership_tracked(self) -> set[str]:
         """Populate and remap column sets, returning the set of backfilled concept IDs."""
         backfilled_ids: set[str] = set()
@@ -110,20 +114,20 @@ class ConsolidationMixin:
             else:
                 # Remap existing columns using current _column_of logic
                 new_cols = {
-                    "identity" if col == "introspection" else col
-                    for col in concept.columns
+                    "identity" if col == "introspection" else col for col in concept.columns
                 }
                 if new_cols != concept.columns:
                     concept.columns = new_cols
                     backfilled_ids.add(cid)
 
         return backfilled_ids
+
     def _create_pioneer_bridges(self, backfilled_ids: set[str] | None = None) -> int:
         """Create pioneer bridges between same-base-name concepts across columns.
 
         If ``backfilled_ids`` is provided, only create bridges involving
         at least one backfilled concept. This prevents recreating bridges
-        that were intentionally pruned during sleep consolidation.
+        that were already shed to compressed stores during sleep.
         """
         bridges_created = 0
 
@@ -164,9 +168,8 @@ class ConsolidationMixin:
                     )
 
         return bridges_created
-    def _add_bridge_if_new(
-        self, a: str, b: str, weight: float, origin: str
-    ) -> int:
+
+    def _add_bridge_if_new(self, a: str, b: str, weight: float, origin: str) -> int:
         """Add a bridge edge between two concepts if it doesn't already exist.
 
         Returns 1 if a new bridge was created, 0 otherwise.
@@ -175,14 +178,11 @@ class ConsolidationMixin:
         if existing is None:
             existing = self._edge_key_index.get((b, a, RelationType.BRIDGES))
         if existing is None:
-            self.add_edge(
-                a, b, RelationType.BRIDGES, weight=weight, origin=origin
-            )
+            self.add_edge(a, b, RelationType.BRIDGES, weight=weight, origin=origin)
             return 1
         return 0
-    def _try_create_bridge(
-        self, a: str, b: str, backfilled_ids: set[str] | None
-    ) -> int:
+
+    def _try_create_bridge(self, a: str, b: str, backfilled_ids: set[str] | None) -> int:
         """Try to create a pioneer bridge between two concepts.
 
         Returns 1 if a new bridge was created, 0 otherwise.
@@ -192,13 +192,10 @@ class ConsolidationMixin:
         """
         # If filtering by backfilled IDs, skip pairs where
         # neither concept was just backfilled
-        if (
-            backfilled_ids is not None
-            and a not in backfilled_ids
-            and b not in backfilled_ids
-        ):
+        if backfilled_ids is not None and a not in backfilled_ids and b not in backfilled_ids:
             return 0
         return self._add_bridge_if_new(a, b, 0.3, "bridge")
+
     def _create_semantic_bridges(self, backfilled_ids: set[str] | None = None) -> int:
         """Create semantic bridges between related concepts across columns.
 
@@ -241,6 +238,7 @@ class ConsolidationMixin:
         bridges_created += self._create_code_to_code_bridges(code_concepts, backfilled_ids)
 
         return bridges_created
+
     def _create_manual_semantic_bridges(self, backfilled_ids: set[str] | None = None) -> int:
         """Create bridges via manual semantic mapping for key concepts."""
         bridges_created = 0
@@ -284,6 +282,7 @@ class ConsolidationMixin:
                 )
 
         return bridges_created
+
     def _build_code_concept_index(
         self,
     ) -> tuple[list[tuple[str, str]], dict[str, list[str]]]:
@@ -316,6 +315,7 @@ class ConsolidationMixin:
                 code_word_index.setdefault(w, []).append(code_cid)
 
         return code_concepts, code_word_index
+
     def _create_substring_and_word_bridges(
         self,
         code_concepts: list[tuple[str, str]],
@@ -350,11 +350,10 @@ class ConsolidationMixin:
             for code_cid in code_word_index.get(cid_lower, []):
                 if code_cid == cid:
                     continue
-                bridges_created += self._add_bridge_if_new(
-                    cid, code_cid, 0.3, "semantic_bridge"
-                )
+                bridges_created += self._add_bridge_if_new(cid, code_cid, 0.3, "semantic_bridge")
 
         return bridges_created
+
     def _create_code_to_code_bridges(
         self,
         code_concepts: list[tuple[str, str]],
@@ -387,14 +386,11 @@ class ConsolidationMixin:
 
             pairs = list(itertools.combinations(cids, 2))[:20]  # cap at 20 per word
             for a, b in pairs:
-                bridges_created += self._add_bridge_if_new(
-                    a, b, 0.15, "semantic_bridge"
-                )
+                bridges_created += self._add_bridge_if_new(a, b, 0.15, "semantic_bridge")
 
         return bridges_created
-    def _compute_sleep_bridge_limits(
-        self, n: int, edge_count: int
-    ) -> tuple[int, int]:
+
+    def _compute_sleep_bridge_limits(self, n: int, edge_count: int) -> tuple[int, int]:
         """Compute max bridges and hub attachments for sleep consolidation.
 
         Bridge creation scales DOWN as the network grows — a large
@@ -416,6 +412,7 @@ class ConsolidationMixin:
             return 100, 200
         else:
             return 50, 200
+
     def _run_sleep_associative_processing(self) -> int:
         """Run REM-sleep associative bridging and hub attachment.
 
@@ -447,20 +444,17 @@ class ConsolidationMixin:
         hub_bridges = self._attach_orphans_to_hubs(max_new=hub_max)
 
         return bridges_created + hub_bridges
-    def _pre_spill_archive_edges(self) -> None:
-        """Archive edges for dormant concepts before edge pruning.
 
-        Edge pruning (``_strengthen_and_prune_edges``) runs early in
-        ``consolidate_during_sleep``. If we wait until ``spill_dormant``
-        (which runs late, after pruning) to archive edges, the edges
-        involving dormant concepts will already have been pruned and
-        there will be nothing to archive.
+    def _pre_spill_archive_edges(self) -> None:
+        """Archive edges for dormant concepts before the pass touches them.
 
         This method identifies the same dormant concepts that
         ``spill_dormant`` would spill (activation < threshold, origin
         not protected, review_count == 0) and archives their edges
-        BEFORE pruning happens. The edges stay in working memory too
-        (for fast traversal), but the archive copy survives pruning.
+        before anything else in the pass runs. The edges stay in
+        working memory too (for fast traversal), but the archive copy
+        survives whatever happens next — nothing is pruned anymore,
+        so this is belt-and-suspenders durability, not rescue.
 
         This is idempotent — ``archive_edges_batch`` uses INSERT OR
         REPLACE, so calling it multiple times for the same edges is
@@ -473,10 +467,15 @@ class ConsolidationMixin:
             return
 
         # Mirror the spill criteria from spill_dormant
-        protected = frozenset({
-            "identity", "introspection", "foundational",
-            "seeded", "structural",
-        })
+        protected = frozenset(
+            {
+                "identity",
+                "introspection",
+                "foundational",
+                "seeded",
+                "structural",
+            }
+        )
         activation_threshold = 0.01
 
         # Find dormant concepts (same criteria as spill_dormant)
@@ -501,19 +500,19 @@ class ConsolidationMixin:
             # one is noise; without this filter the pre-spill pass wrote
             # rows the spill pass would have skipped, and the two passes
             # disagreed about what "the edges of a dormant concept" are.
-            if self._edge_log is not None and is_derivable_edge(
-                edge.relation, edge.origin
-            ):
+            if self._edge_log is not None and is_derivable_edge(edge.relation, edge.origin):
                 continue
             if edge.source in dormant_ids or edge.target in dormant_ids:
-                edge_dicts.append({
-                    "source": edge.source,
-                    "target": edge.target,
-                    "relation": edge.relation.value,
-                    "weight": edge.weight,
-                    "created_at": edge.created_at,
-                    "origin": edge.origin,
-                })
+                edge_dicts.append(
+                    {
+                        "source": edge.source,
+                        "target": edge.target,
+                        "relation": edge.relation.value,
+                        "weight": edge.weight,
+                        "created_at": edge.created_at,
+                        "origin": edge.origin,
+                    }
+                )
 
         if edge_dicts:
             try:
@@ -523,23 +522,33 @@ class ConsolidationMixin:
                     "temporal_lobe.concepts.consolidation._pre_spill_archive_edges",
                     e,
                 )
-    def consolidate_during_sleep(self, max_in_memory: int = 15000) -> dict[str, int]:
+
+    def consolidate_during_sleep(
+        self,
+        max_in_memory: int | None = None,
+        policy: Any = None,
+    ) -> dict[str, int]:
         """Consolidate the concept network during sleep.
 
         This is the concept-network analogue of the Rust daemon's
-        dreaming pass. During sleep, the network:
+        dreaming pass, modelled on what sleep actually does to a
+        brain (Diekelmann & Born, 2010). During sleep, the network:
 
-        1. **Strengthens** edges that have been activated (high weight
-           or recently used). Well-established connections get stronger.
-        2. **Prunes** weak edges (weight < 0.1) that haven't been
-           reinforced. This is synaptic pruning — the brain removes
-           unused connections during sleep.
-        3. **Boosts** confidence of well-connected concepts. Concepts
+        1. **Strengthens** edges whose endpoints were co-active —
+           replay-driven potentiation (Hebbian LTP), plus established
+           traces (w > 0.4) modelling spontaneous replay. There is no
+           deletion pass: human forgetting is decay, interference,
+           and demotion, not a threshold sweep.
+        2. **Boosts** confidence of well-connected concepts. Concepts
            with many connections are probably real and important.
-        4. **Decays** activation of all concepts. Sleep clears
+        3. **Decays** activation of all concepts. Sleep clears
            short-term activation, preparing for a fresh day.
+        4. **Bridges** — REM-style associative recombination: links
+           concepts that share neighbors and attaches orphans to
+           hubs (schema assimilation; Lewis & Durrant, 2011).
         5. **Removes** isolated low-confidence concepts (calls
-           clean_noise). Sleep is when the brain takes out the trash.
+           clean_noise, which archives them first). Sleep is when
+           the brain takes out the trash — into long-term storage.
         6. **Spills** dormant concepts to the long-term archive (if
            attached). Instead of deleting dormant knowledge, it moves
            to disk where it can be recalled on demand. This is the
@@ -550,65 +559,95 @@ class ConsolidationMixin:
         Args:
             max_in_memory: Maximum concepts to keep in working memory.
                 If the network exceeds this, dormant concepts are
-                spilled to the archive.
+                spilled to the archive. ``None`` uses the policy's
+                ``max_in_memory``.
+            policy: A ``MaintenancePolicy`` — her own upkeep knobs
+                (``infrastructure/maintenance_policy.py``). ``None``
+                uses the defaults.
 
         Returns a dict with counts:
         - 'strengthened': number of edges strengthened
-        - 'pruned': number of edges pruned
         - 'boosted': number of concepts boosted
         - 'decay_cleared': number of concepts decayed
         - 'noise_removed': number of noise concepts removed
         - 'bridges_created': number of associative + hub bridges created
         - 'spilled': number of concepts moved to long-term archive
         """
-        # ── Pre-spill: Archive edges for dormant concepts BEFORE pruning ──
-        # Edge pruning happens in step 1 below. If we wait until step 6
-        # (spill_dormant) to archive edges, the edges involving dormant
-        # concepts will already have been pruned and there will be
-        # nothing to archive. By snapshotting the dormant concepts and
-        # archiving their edges NOW, we preserve the relationships even
-        # if they're later pruned from working memory.
+        # ── Pre-spill: Archive edges for dormant concepts before ──
+        # anything else in this pass touches them. Edges of concepts
+        # about to go dormant are snapshotted to the archive NOW so
+        # the relationships survive whatever happens below —
+        # spill_dormant removes the concept rows, and the archive is
+        # the only place the association map would remain.
+        if policy is None:
+            from infrastructure.maintenance_policy import MaintenancePolicy
+
+            policy = MaintenancePolicy()
+        stats: dict[str, int] = {}
+        for _phase, out in self.consolidate_during_sleep_steps(
+            max_in_memory=max_in_memory, policy=policy
+        ):
+            stats.update(out)
+        return stats
+
+    def consolidate_during_sleep_steps(
+        self,
+        max_in_memory: int | None = None,
+        policy: Any = None,
+    ) -> Iterator[tuple[str, dict[str, int]]]:
+        """The same consolidation as self-limiting physiology.
+
+        Yields ``(phase, stats)`` after each committed micro-phase, so
+        a sleep loop can advance it gradually — one phase per credit —
+        and drop it mid-yield when the stage ends. Human N3 has no
+        "pass that must finish": each slice here is safe on its own,
+        and whatever remains unrun is simply consolidation that did
+        not happen tonight.
+        """
+        if policy is None:
+            from infrastructure.maintenance_policy import MaintenancePolicy
+
+            policy = MaintenancePolicy()
+        if max_in_memory is None:
+            max_in_memory = policy.max_in_memory
+
         self._pre_spill_archive_edges()
 
-        strengthened, pruned = self._strengthen_and_prune_edges()
+        strengthened = self._strengthen_edges(policy)
         self._rebuild_edge_indices()
+        yield "strengthen", {"strengthened": strengthened}
+
         boosted = self._boost_concept_confidence()
         decay_cleared = self._decay_concept_activations()
+        yield "confidence+decay", {"boosted": boosted, "decay_cleared": decay_cleared}
 
-        # ── 5-7: Associative bridging, hub attachment, THEN noise removal
-        # Order matters: we must try to connect orphans to hubs BEFORE
-        # pruning them. Otherwise we'd delete concepts that could have
-        # been connected. The old order (prune → connect) caused
-        # permanent orphan accumulation because clean_noise ran first
-        # and removed zero-edge concepts before _attach_orphans_to_hubs
-        # ever had a chance to connect them.
+        # Associative bridging, hub attachment, THEN noise archival.
+        # Order matters: orphans must get a chance to connect to hubs
+        # BEFORE clean_noise judges them.
         bridges_created = self._run_sleep_associative_processing()
-        # Semantic-hub status is derived from the post-bridging graph so the
-        # dynamics layer can apply its hub spread/decay modifiers. Sleep is
-        # the topology-maintenance boundary, avoiding centrality analysis on
-        # every cortical tick.
+        # Semantic-hub status is derived from the post-bridging graph so
+        # the dynamics layer can apply its hub spread/decay modifiers.
         self.detect_semantic_hubs()
+        yield "bridging", {"bridges_created": bridges_created}
 
-        # ── 5: Remove noise (sleep takes out the trash) ──────────
-        # Now prune concepts that STILL have no edges after hub
-        # attachment attempted. These are truly unconnectable noise.
-        noise_removed = len(self.clean_noise(min_confidence=0.4, min_edges=1))
+        # Concepts that STILL have no edges after hub attachment are
+        # unconnectable fragments — clean_noise archives them, never
+        # deletes.
+        noise_removed = len(
+            self.clean_noise(
+                min_confidence=policy.noise_min_confidence,
+                min_edges=policy.noise_min_edges,
+            )
+        )
+        yield "noise", {"noise_removed": noise_removed}
 
-        # ── 6: Spill dormant concepts to long-term archive ───────
-        # After noise removal, move remaining dormant concepts to the
-        # archive (if attached). This keeps working memory bounded
-        # while preserving knowledge. The activation decay in step 4
-        # has just pushed many concepts below the spill threshold,
-        # making this the ideal moment to spill.
+        # Activation decay has pushed many concepts below the spill
+        # threshold — the ideal moment to demote the dormant.
         spilled = self.spill_dormant(max_in_memory=max_in_memory)
+        yield "spill", {"spilled": spilled}
 
-        # ── 7: Vacuum the archive to reclaim disk space ──────────
-        # Recalls (transparent lookups that pull concepts back from
-        # the archive) and permanent deletions (remove_concept) leave
-        # free pages in the SQLite file. VACUUM rebuilds the database
-        # compactly. This is expensive, so only run it when the
-        # archive was actually modified this cycle (concepts spilled
-        # or noise removed, which deletes archived edges).
+        # Recalls and deletions leave free pages; VACUUM rebuilds the
+        # file compactly — only when the archive was touched.
         if self._archive is not None and (spilled > 0 or noise_removed > 0):
             try:
                 self._archive.vacuum()
@@ -618,54 +657,50 @@ class ConsolidationMixin:
                     e,
                 )
 
-        return {
-            "strengthened": strengthened,
-            "pruned": pruned,
-            "boosted": boosted,
-            "decay_cleared": decay_cleared,
-            "noise_removed": noise_removed,
-            "bridges_created": bridges_created,
-            "spilled": spilled,
-        }
-    def _strengthen_and_prune_edges(self) -> tuple[int, int]:
-        """Strengthen active edges and prune weak ones."""
+    def _strengthen_edges(self, policy: Any = None) -> int:
+        """Replay-driven potentiation — the way sleep actually strengthens.
+
+        Human sleep has no deletion sweep: synapses are potentiated
+        when their endpoints are co-active during replay (Hebbian
+        LTP — "fire together, wire together"), and forgetting happens
+        by decay, interference, and demotion — never by a threshold
+        pass that erases every weak edge. This pass replaces the old
+        prune loop with the biological rule:
+
+        - **Co-activation** — an edge strengthens when *both* endpoint
+          concepts carry residual activation (they were exercised
+          recently — activations decay during the day and are only
+          cleared further down this pass, so what is still active now
+          is what she used today).
+        - **Established traces** — edges already strong (w > 0.4) get
+          the same logistic boost, modelling spontaneous replay of
+          consolidated memories during slow oscillations.
+
+        Everything else is left alone: weak or dormant edges simply
+        fade through waking decay, synaptic downscaling, and — when
+        their concepts go dormant — demotion to the archive. Nothing
+        here deletes.
+
+        The gain is logistic, ``w += α(1 − w)``: diminishing returns
+        as w → 1 prevent saturation and preserve discriminative power
+        (the old fixed ``+0.05`` saturated every strong edge to 1.0).
+        """
+        rate = policy.strengthen_rate if policy is not None else 0.05
         strengthened = 0
-        pruned = 0
-
-        # ── 1 & 2: Strengthen active edges, prune weak ones ──────
-        #
-        # Strengthening uses logistic growth: w += α * (1 - w)
-        # This gives diminishing returns — edges near 1.0 get smaller
-        # increments than edges near 0.5, preventing saturation and
-        # preserving discriminative power. The fixed increment (w += 0.05)
-        # caused all strong edges to saturate at 1.0, making them
-        # indistinguishable.
-        #
-        # Logistic growth: w_new = w + α * (1 - w)
-        # At w=0.5: increment = 0.05 * 0.5 = 0.025
-        # At w=0.9: increment = 0.05 * 0.1 = 0.005
-        # At w=0.99: increment = 0.05 * 0.01 = 0.0005
-        STRENGTHEN_RATE = 0.05
-        edges_to_keep = []
-        for edge in list(self._edges):
-            # Pruning threshold depends on origin:
-            # - Taught knowledge (protected): prune at 0.1 (original)
-            # - Auto-generated bridges: prune at 0.3 (aggressive)
-            #   Bridge edges start at 0.15 and were never pruned because
-            #   the 0.1 floor was below their creation weight. The higher
-            #   threshold ensures weak bridges get recycled.
-            threshold = 0.3 if edge.origin in _BRIDGE_ORIGINS else 0.1
-            if edge.weight < threshold:
-                pruned += 1
-                continue  # remove this edge
-            # Logistic strengthening (diminishing returns)
-            if edge.weight > 0.4:
-                edge.weight = min(1.0, edge.weight + STRENGTHEN_RATE * (1.0 - edge.weight))
+        for edge in self._edges:
+            src = self._concepts.get(edge.source)
+            tgt = self._concepts.get(edge.target)
+            coactive = (
+                src is not None
+                and tgt is not None
+                and (src.activation or 0.0) > 0.0
+                and (tgt.activation or 0.0) > 0.0
+            )
+            if coactive or edge.weight > 0.4:
+                edge.weight = min(1.0, edge.weight + rate * (1.0 - edge.weight))
                 strengthened += 1
-            edges_to_keep.append(edge)
+        return strengthened
 
-        self._edges: list[Edge] = edges_to_keep
-        return strengthened, pruned
     def _rebuild_edge_indices(self) -> None:
         """Rebuild edge indices after edge modification."""
         # Rebuild edge indices
@@ -676,6 +711,7 @@ class ConsolidationMixin:
             self._edge_index.setdefault(edge.source, []).append(edge)
             self._reverse_index.setdefault(edge.target, []).append(edge)
             self._edge_key_index[(edge.source, edge.target, edge.relation)] = edge
+
     def _boost_concept_confidence(self) -> int:
         """Boost confidence of well-connected concepts."""
         boosted = 0
@@ -688,6 +724,7 @@ class ConsolidationMixin:
                 boosted += 1
 
         return boosted
+
     def _decay_concept_activations(self) -> int:
         """Decay activation of all concepts during sleep."""
         decay_cleared = 0
@@ -700,6 +737,7 @@ class ConsolidationMixin:
                 decay_cleared += 1
 
         return decay_cleared
+
     def _create_associative_bridges(self, max_new: int = 50) -> int:
         """Create bridges between concepts that share common neighbors.
 
@@ -724,8 +762,16 @@ class ConsolidationMixin:
             neighbors.setdefault(edge.source, set()).add(edge.target)
             neighbors.setdefault(edge.target, set()).add(edge.source)
 
-        # Only consider concepts with 2+ neighbors
-        candidates = {cid: neigh for cid, neigh in neighbors.items() if len(neigh) >= 2}
+        # Only consider concepts with 2+ neighbors. Restrict to live
+        # concepts: _edges legitimately carries endpoints that were
+        # spilled to the archive (spill keeps edges for traversal), and
+        # the lookups below index _concepts — a ghost endpoint would
+        # KeyError them.
+        candidates = {
+            cid: neigh
+            for cid, neigh in neighbors.items()
+            if len(neigh) >= 2 and cid in self._concepts
+        }
 
         if len(candidates) < 2:
             return 0
@@ -742,15 +788,19 @@ class ConsolidationMixin:
                 break
             a = cids[i]
             a_neigh = candidates[a]
-            a_cols = self._concepts[a].columns or set()
+            a_concept = self._concepts.get(a)
+            if a_concept is None:
+                # Removed on another thread (clean_noise / spill)
+                # between the candidates snapshot and now.
+                continue
+            a_cols = a_concept.columns or set()
             for j in range(i + 1, len(cids)):
                 if created >= max_new:
                     break
-                created += self._try_associative_bridge(
-                    a, cids[j], a_neigh, candidates, a_cols
-                )
+                created += self._try_associative_bridge(a, cids[j], a_neigh, candidates, a_cols)
 
         return created
+
     def _try_associative_bridge(
         self,
         a: str,
@@ -773,7 +823,10 @@ class ConsolidationMixin:
         if len(shared) < 2:
             return 0
         # Prefer cross-column bridges
-        b_cols = self._concepts[b].columns or set()
+        b_concept = self._concepts.get(b)
+        if b_concept is None:
+            return 0
+        b_cols = b_concept.columns or set()
         cross_domain = not (a_cols & b_cols)
         # Create the bridge
         weight = 0.2 + 0.1 * min(len(shared), 5)  # 0.3–0.7
@@ -787,6 +840,7 @@ class ConsolidationMixin:
             origin="associative_bridge",
         )
         return 1
+
     def _attach_orphans_to_hubs(self, max_new: int = 200) -> int:
         """Connect orphaned concepts (≤2 edges) to relevant hubs.
 
@@ -816,7 +870,7 @@ class ConsolidationMixin:
             degree[edge.source] = degree.get(edge.source, 0) + 1
             degree[edge.target] = degree.get(edge.target, 0) + 1
 
-        hubs = {cid: deg for cid, deg in degree.items() if deg >= 5}
+        hubs = {cid: deg for cid, deg in degree.items() if deg >= 5 and cid in self._concepts}
         if not hubs:
             return 0
 
@@ -840,10 +894,7 @@ class ConsolidationMixin:
         # This was the root cause of 7,961 disconnected "learned" concepts
         # that Genesis "knew" but could never use in reasoning.
         orphans = [cid for cid, deg in degree.items() if deg <= 2]
-        zero_edge_concepts = [
-            cid for cid in self._concepts
-            if cid not in degree
-        ]
+        zero_edge_concepts = [cid for cid in self._concepts if cid not in degree]
         orphans.extend(zero_edge_concepts)
 
         # Don't try to attach concepts that are below the clean_noise
@@ -852,8 +903,9 @@ class ConsolidationMixin:
         # hubs (which would give them edges and let them survive).
         MIN_ATTACHMENT_CONFIDENCE = 0.4
         orphans = [
-            cid for cid in orphans
-            if self._concepts[cid].confidence >= MIN_ATTACHMENT_CONFIDENCE
+            cid
+            for cid in orphans
+            if cid in self._concepts and self._concepts[cid].confidence >= MIN_ATTACHMENT_CONFIDENCE
         ]
 
         if not orphans:
@@ -868,9 +920,11 @@ class ConsolidationMixin:
             if created >= max_new:
                 break
             created = self._connect_orphan(
-                orphan, hub_words, super_hub_cids, created, max_new, _re, _rng)
+                orphan, hub_words, super_hub_cids, created, max_new, _re, _rng
+            )
 
         return created
+
     def _connect_orphan(
         self,
         orphan: str,
@@ -957,6 +1011,7 @@ class ConsolidationMixin:
                 created += 1
 
         return created
+
     def connect_all_orphans(self) -> int:
         """One-shot: connect EVERY weakly-connected concept to super hubs.
 
@@ -1008,6 +1063,7 @@ class ConsolidationMixin:
                 created += 1
 
         return created
+
     def get_review_queue(self, now_ms: int | None = None, max_items: int = 10) -> list[str]:
         """Get concepts due for review (spaced repetition).
 
@@ -1036,6 +1092,7 @@ class ConsolidationMixin:
         # Sort by urgency (most overdue first)
         due.sort(key=lambda x: -x[0])
         return [cid for _, cid in due[:max_items]]
+
     def _compute_review_overdue(self, concept: Concept, now_ms: int) -> int | None:
         """Compute how overdue a concept is for review, or None if not due.
 
@@ -1064,6 +1121,7 @@ class ConsolidationMixin:
         if time_since >= interval:
             return time_since - interval
         return None
+
     def review_concept(
         self, concept_id: str, success: bool = True, now_ms: int | None = None
     ) -> None:

@@ -35,6 +35,7 @@ import time
 from typing import Any
 
 from discord_feed import DiscordFeed
+from infrastructure.text import is_blank
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +82,7 @@ def render_frame_png(grid: list[list[int]], scale: int = _SCALE) -> bytes:
         "RGB",
         (w, h),
         b"".join(
-            bytes(PALETTE[v] if 0 <= v < len(PALETTE) else PALETTE[5])
-            for row in grid
-            for v in row
+            bytes(PALETTE[v] if 0 <= v < len(PALETTE) else PALETTE[5]) for row in grid for v in row
         ),
     )
     img = img.resize((w * scale, h * scale), Image.Resampling.NEAREST)
@@ -133,9 +132,7 @@ def _digest_learning(before: dict, after: dict) -> list[str]:
     new_t = len(after.get("transforms", {})) - len(before.get("transforms", {}))
     if new_t > 0:
         out.append(f"learned {new_t} state transform(s)")
-    sc_new = set(after.get("state_changers", [])) - set(
-        before.get("state_changers", [])
-    )
+    sc_new = set(after.get("state_changers", [])) - set(before.get("state_changers", []))
     for c in sorted(sc_new):
         out.append(f"found a state-changer (color-{c})")
     bk_b = before.get("blocked_kinds", {})
@@ -199,7 +196,7 @@ class ArcShowcase:
 
     def on_thought(self, kind: str, content: str) -> None:
         """Relay a live thought verbatim — her words, her cadence."""
-        if not self._feed or not content.strip():
+        if not self._feed or is_blank(content):
             return
         now = time.monotonic()
         if now - self._last_thought < _THOUGHT_MIN_GAP:
@@ -259,16 +256,12 @@ class ArcShowcase:
         learned: list[str] = []
         if model is not None:
             try:
-                learned = _digest_learning(
-                    self._life_snapshot, model.export_learning()
-                )
+                learned = _digest_learning(self._life_snapshot, model.export_learning())
             except Exception:  # noqa: BLE001 — observer must not raise
                 learned = []
         header = f"life {self._lives} ended — {outcome} (level {level + 1})"
         body = "\n".join(f"· {line}" for line in learned[:6])
-        self._feed.post(
-            f"**{header}**" + (f"\n{body}" if body else "\n· no new findings")
-        )
+        self._feed.post(f"**{header}**" + (f"\n{body}" if body else "\n· no new findings"))
         if model is not None:
             try:
                 self._life_snapshot = model.export_learning()

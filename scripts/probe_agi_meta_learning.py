@@ -90,14 +90,16 @@ def discover(
                 after,
                 success=after["solved"],
             )
-            records.append({
-                "domain": trial.family.domain,
-                "target": trial.target,
-                "feature_value": trial.feature_value,
-                "action": action,
-                "success": after["solved"],
-                "prediction_score": check.score,
-            })
+            records.append(
+                {
+                    "domain": trial.family.domain,
+                    "target": trial.target,
+                    "feature_value": trial.feature_value,
+                    "action": action,
+                    "success": after["solved"],
+                    "prediction_score": check.score,
+                }
+            )
 
             if after["solved"]:
                 competence.record_episode(
@@ -144,21 +146,19 @@ def run_trial(
             action = max(predicted, key=lambda item: (item[0], item[1]))[1]
             mode = "model"
         else:
-            action = trial.family.actions[
-                (exploration_cursor + offset) % len(trial.family.actions)
-            ]
+            action = trial.family.actions[(exploration_cursor + offset) % len(trial.family.actions)]
             mode = "explore"
 
         after = step(trial.family, trial, action)
-        check = competence.record_transition(
-            context, action, state, after, success=after["solved"]
+        check = competence.record_transition(context, action, state, after, success=after["solved"])
+        records.append(
+            {
+                "action": action,
+                "mode": mode,
+                "success": after["solved"],
+                "prediction_score": check.score,
+            }
         )
-        records.append({
-            "action": action,
-            "mode": mode,
-            "success": after["solved"],
-            "prediction_score": check.score,
-        })
 
         if after["solved"]:
             competence.record_episode(
@@ -249,20 +249,14 @@ def main() -> None:
         "measurements": {
             "fresh_interactions": sum(e["attempts"] for e in baseline_records),
             "pretrained_source_interactions": len(source_records),
-            "pretrained_target_interactions": sum(
-                e["attempts"] for e in pretrained_records
-            ),
+            "pretrained_target_interactions": sum(e["attempts"] for e in pretrained_records),
             "fresh_successes": sum(e["success"] for e in baseline_records),
-            "pretrained_successes": sum(
-                e["success"] for e in pretrained_records
-            ),
+            "pretrained_successes": sum(e["success"] for e in pretrained_records),
             "fresh_model_selections": sum(
-                r["mode"] == "model"
-                for e in baseline_records for r in e["records"]
+                r["mode"] == "model" for e in baseline_records for r in e["records"]
             ),
             "pretrained_model_selections": sum(
-                r["mode"] == "model"
-                for e in pretrained_records for r in e["records"]
+                r["mode"] == "model" for e in pretrained_records for r in e["records"]
             ),
             "pretrained_cross_domain_retrievals": sum(
                 bool(e["cross_domain_retrievals"]) for e in pretrained_records

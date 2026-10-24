@@ -82,20 +82,24 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 # Relations that are transitive (A R C and C R B implies A R B)
-_TRANSITIVE_RELATIONS: frozenset[RelationType] = frozenset({
-    RelationType.IS_A,
-    RelationType.PART_OF,
-    RelationType.CAUSES,
-    RelationType.DEPENDS_ON,
-})
+_TRANSITIVE_RELATIONS: frozenset[RelationType] = frozenset(
+    {
+        RelationType.IS_A,
+        RelationType.PART_OF,
+        RelationType.CAUSES,
+        RelationType.DEPENDS_ON,
+    }
+)
 
 # Relations that indicate contradiction
-_CONTRADICTION_RELATIONS: frozenset[RelationType] = frozenset({
-    RelationType.OPPOSITE_OF,
-    RelationType.CONTRADICTS,
-    RelationType.PREVENTS,
-    RelationType.HARMS,
-})
+_CONTRADICTION_RELATIONS: frozenset[RelationType] = frozenset(
+    {
+        RelationType.OPPOSITE_OF,
+        RelationType.CONTRADICTS,
+        RelationType.PREVENTS,
+        RelationType.HARMS,
+    }
+)
 
 # Minimum number of corroborating paths needed to promote a hypothetical edge
 _MIN_CORROBORATIONS = 2
@@ -367,9 +371,7 @@ class DreamSynthesis:
         return sig
 
     @staticmethod
-    def _predict_relation(
-        signature: frozenset[tuple[str, str]]
-    ) -> tuple[RelationType | None, str]:
+    def _predict_relation(signature: frozenset[tuple[str, str]]) -> tuple[RelationType | None, str]:
         """Predict the relation type from the shared structural signature.
 
         Returns (relation, reason) or (None, "") if no prediction.
@@ -430,13 +432,15 @@ class DreamSynthesis:
             if contradicted:
                 self._drop_hypothetical_edge(proposal)
                 self._rejected_count += 1
-                results.append(DreamValidationResult(
-                    proposal=proposal,
-                    corroborations=corroborations,
-                    contradicted=True,
-                    promoted=False,
-                    reason="contradicted by existing OPPOSITE_OF/CONTRADICTS edge",
-                ))
+                results.append(
+                    DreamValidationResult(
+                        proposal=proposal,
+                        corroborations=corroborations,
+                        contradicted=True,
+                        promoted=False,
+                        reason="contradicted by existing OPPOSITE_OF/CONTRADICTS edge",
+                    )
+                )
             elif corroborations >= _MIN_CORROBORATIONS:
                 self._promote_edge(proposal)
                 insight = DreamInsight(
@@ -455,29 +459,31 @@ class DreamSynthesis:
                 # every sleep cycle in a long-running daemon and
                 # to_dict serializes the whole list.
                 if len(self._validated_insights) > 500:
-                    del self._validated_insights[
-                        : len(self._validated_insights) - 500
-                    ]
-                results.append(DreamValidationResult(
-                    proposal=proposal,
-                    corroborations=corroborations,
-                    contradicted=False,
-                    promoted=True,
-                    reason=f"promoted: {corroborations} corroborating paths",
-                ))
+                    del self._validated_insights[: len(self._validated_insights) - 500]
+                results.append(
+                    DreamValidationResult(
+                        proposal=proposal,
+                        corroborations=corroborations,
+                        contradicted=False,
+                        promoted=True,
+                        reason=f"promoted: {corroborations} corroborating paths",
+                    )
+                )
                 logger.info(f"Dream insight validated: {insight.describe()}")
             else:
-                results.append(DreamValidationResult(
-                    proposal=proposal,
-                    corroborations=corroborations,
-                    contradicted=False,
-                    promoted=False,
-                    reason=(
-                        f"insufficient evidence: {corroborations}/"
-                        f"{_MIN_CORROBORATIONS} corroborations — "
-                        f"remains hypothetical"
-                    ),
-                ))
+                results.append(
+                    DreamValidationResult(
+                        proposal=proposal,
+                        corroborations=corroborations,
+                        contradicted=False,
+                        promoted=False,
+                        reason=(
+                            f"insufficient evidence: {corroborations}/"
+                            f"{_MIN_CORROBORATIONS} corroborations — "
+                            f"remains hypothetical"
+                        ),
+                    )
+                )
 
         promoted = sum(1 for r in results if r.promoted)
         rejected = sum(1 for r in results if r.contradicted)
@@ -542,11 +548,13 @@ class DreamSynthesis:
         # 3. Shared hub: both A and B connect to a common concept H
         #    via the same relation type
         src_targets = {
-            e.target for e in self.network.get_edges(src, "out")
+            e.target
+            for e in self.network.get_edges(src, "out")
             if e.relation == rel and e.origin != _ORIGIN_DREAM_SYNTHESIS
         }
         tgt_targets = {
-            e.target for e in self.network.get_edges(tgt, "out")
+            e.target
+            for e in self.network.get_edges(tgt, "out")
             if e.relation == rel and e.origin != _ORIGIN_DREAM_SYNTHESIS
         }
         shared = src_targets & tgt_targets
@@ -578,10 +586,7 @@ class DreamSynthesis:
         """
         # Find the existing edge and update it directly
         for edge in self.network.get_edges(proposal.source, "out"):
-            if (
-                edge.target == proposal.target
-                and edge.relation == proposal.relation
-            ):
+            if edge.target == proposal.target and edge.relation == proposal.relation:
                 edge.weight = _PROMOTED_WEIGHT
                 edge.origin = _ORIGIN_DREAM_VALIDATED
                 return
@@ -601,10 +606,7 @@ class DreamSynthesis:
         The edge remains but is effectively negligible.
         """
         for edge in self.network.get_edges(proposal.source, "out"):
-            if (
-                edge.target == proposal.target
-                and edge.relation == proposal.relation
-            ):
+            if edge.target == proposal.target and edge.relation == proposal.relation:
                 edge.weight = 0.01
                 edge.origin = "dream-rejected"
                 return
@@ -633,13 +635,15 @@ class DreamSynthesis:
         for edge in self.network.edges:
             if edge.origin != _ORIGIN_DREAM_SYNTHESIS:
                 continue
-            pending.append(DreamProposal(
-                source=edge.source,
-                target=edge.target,
-                relation=edge.relation,
-                structural_similarity=0.0,  # not needed for validation
-                predicted_from="pending review",
-            ))
+            pending.append(
+                DreamProposal(
+                    source=edge.source,
+                    target=edge.target,
+                    relation=edge.relation,
+                    structural_similarity=0.0,  # not needed for validation
+                    predicted_from="pending review",
+                )
+            )
 
         if not pending:
             return []
@@ -679,14 +683,16 @@ class DreamSynthesis:
                 relation = RelationType(relation_str)
             except ValueError:
                 relation = RelationType.RELATED_TO
-            self._validated_insights.append(DreamInsight(
-                source=item["source"],
-                target=item["target"],
-                relation=relation,
-                corroborations=item.get("corroborations", 0),
-                insight_text=item.get("insight_text", ""),
-                timestamp=item.get("timestamp", 0),
-            ))
+            self._validated_insights.append(
+                DreamInsight(
+                    source=item["source"],
+                    target=item["target"],
+                    relation=relation,
+                    corroborations=item.get("corroborations", 0),
+                    insight_text=item.get("insight_text", ""),
+                    timestamp=item.get("timestamp", 0),
+                )
+            )
         stats = data.get("stats", {})
         self._proposed_count = stats.get("proposed_count", 0)
         self._rejected_count = stats.get("rejected_count", 0)

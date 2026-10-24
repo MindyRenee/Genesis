@@ -52,9 +52,7 @@ def test_unwarmed_listener_injects_nothing(monkeypatch) -> None:
     from brainstem import field_audio
     from thalamus import brain_waves
 
-    monkeypatch.setattr(
-        field_audio, "_get_listener", lambda: _StubListener(None)
-    )
+    monkeypatch.setattr(field_audio, "_get_listener", lambda: _StubListener(None))
     seen = []
     monkeypatch.setattr(
         brain_waves,
@@ -76,9 +74,7 @@ def test_live_signature_stimulates_gamma(monkeypatch) -> None:
         "transient": False,
         "blocks": 100.0,
     }
-    monkeypatch.setattr(
-        field_audio, "_get_listener", lambda: _StubListener(sig)
-    )
+    monkeypatch.setattr(field_audio, "_get_listener", lambda: _StubListener(sig))
     seen = []
     monkeypatch.setattr(
         brain_waves,
@@ -100,9 +96,7 @@ def test_transient_resets_gamma_phase(monkeypatch) -> None:
         "transient": True,
         "blocks": 100.0,
     }
-    monkeypatch.setattr(
-        field_audio, "_get_listener", lambda: _StubListener(sig)
-    )
+    monkeypatch.setattr(field_audio, "_get_listener", lambda: _StubListener(sig))
     brain_waves.perturb_wave_phase(BrainWave.GAMMA, 1.9)
     assert field_audio.apply_audio_stimulus() is True
     assert brain_waves.wave_phase_of(BrainWave.GAMMA) == 0.0

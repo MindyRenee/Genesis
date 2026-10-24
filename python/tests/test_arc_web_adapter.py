@@ -51,12 +51,8 @@ class _FakeBrowser:
 
     def call(self, method, **params):
         self.calls.append(method)
-        if (
-            method == "Input.dispatchKeyEvent"
-            and params.get("type") == "rawKeyDown"
-        ) or (
-            method == "Input.dispatchMouseEvent"
-            and params.get("type") == "mousePressed"
+        if (method == "Input.dispatchKeyEvent" and params.get("type") == "rawKeyDown") or (
+            method == "Input.dispatchMouseEvent" and params.get("type") == "mousePressed"
         ):
             self._publish()
         return {}
@@ -102,8 +98,10 @@ class _StubMind:
             reasons=("asleep",) if not self._ready else (),
         )
 
-    def world_step(self, frame, available_actions=None, info=None):
-        self.turns.append({"frame": frame, "actions": available_actions, "info": info})
+    def world_step(self, frame, available_actions=None, info=None, through=None):
+        self.turns.append(
+            {"frame": frame, "actions": available_actions, "info": info, "through": through}
+        )
         desc = self._descriptors[(len(self.turns) - 1) % len(self._descriptors)]
         if desc is None:
             return None
@@ -166,15 +164,15 @@ def test_coordinate_actions_marked_by_structure_not_hand():
 def test_recovery_reset_counts_like_sdk_path():
     """Death recovery is a submitted action with a reset's cost."""
     frames = [
-        _frame(),                         # session start (init reset)
-        _frame(state="GAME_OVER"),        # her first move kills her
-        _frame(),                         # world after the reset
+        _frame(),  # session start (init reset)
+        _frame(state="GAME_OVER"),  # her first move kills her
+        _frame(),  # world after the reset
         _frame(state="WIN", levels=1, win=1),
     ]
     mind = _StubMind()
     result = _practice(mind, frames).play("fake", max_steps=10)
     assert result.won and result.state == "WIN"
-    assert result.steps == 3   # action + recovery reset + action
+    assert result.steps == 3  # action + recovery reset + action
     assert result.resets == 2  # initialization + recovery
     assert mind.episodes == ["over", "win"]
 
@@ -183,7 +181,7 @@ def test_chosen_reset_counts_as_reset():
     """Her own RESET bid is both a step and a reset — like the SDK."""
     frames = [
         _frame(),
-        _frame(),                          # after her reset
+        _frame(),  # after her reset
         _frame(),
         _frame(state="WIN", levels=1, win=1),
     ]
@@ -241,16 +239,16 @@ def test_death_recompletion_appends_again():
     """A level re-completed after a death appends a second cost."""
     frames = [
         _frame(levels=0),
-        _frame(levels=1),                  # completes level one
+        _frame(levels=1),  # completes level one
         _frame(state="GAME_OVER", levels=1),  # dies on level two
-        _frame(levels=0),                  # world restarts
-        _frame(levels=1),                  # re-completes level one
+        _frame(levels=0),  # world restarts
+        _frame(levels=1),  # re-completes level one
         _frame(state="WIN", levels=2, win=2),
     ]
     result = _practice(_StubMind(), frames).play("fake", max_steps=10)
     assert result.won
     assert result.level_steps == [1, 1, 1]
-    assert result.steps == 5   # 4 submitted actions + 1 recovery reset
+    assert result.steps == 5  # 4 submitted actions + 1 recovery reset
     assert result.resets == 2
 
 
@@ -281,9 +279,7 @@ def test_play_refuses_outside_game_mode():
 
 def test_dead_transport_after_move_is_not_budget(monkeypatch):
     """A page that goes quiet mid-run reports TRANSPORT_DEAD."""
-    monkeypatch.setattr(
-        ArcWebPractice, "_wait_frame", lambda self, marker, timeout=6.0: None
-    )
+    monkeypatch.setattr(ArcWebPractice, "_wait_frame", lambda self, marker, timeout=6.0: None)
     result = _practice(_StubMind(), [_frame()]).play("fake", max_steps=3)
     assert result.state == "TRANSPORT_DEAD"
     assert result.steps == 1

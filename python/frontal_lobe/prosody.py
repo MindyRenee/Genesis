@@ -306,9 +306,7 @@ class ProsodyGenerator:
         # (e.g. the early-hesitation pause generate() sets at low
         # arousal). Otherwise compute positions from clause boundaries.
         if prosody.pause_positions:
-            pause_positions = [
-                p for p in prosody.pause_positions if 0 <= p < len(words) - 1
-            ]
+            pause_positions = [p for p in prosody.pause_positions if 0 <= p < len(words) - 1]
             if pause_positions:
                 return ProsodyGenerator._insert_pauses(words, pause_positions)
 
@@ -347,8 +345,14 @@ class ProsodyGenerator:
             # enough to be real clauses.
             elif (
                 i > 2
-                and word.lower().rstrip(",.!?;:") in (
-                    "but", "and", "so", "yet", "because", "though",
+                and word.lower().rstrip(",.!?;:")
+                in (
+                    "but",
+                    "and",
+                    "so",
+                    "yet",
+                    "because",
+                    "though",
                 )
                 and i < len(words) - 1
                 and (i - clause_start) >= 6

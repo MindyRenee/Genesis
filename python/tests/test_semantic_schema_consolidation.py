@@ -1,4 +1,5 @@
 """Regression tests for semantic schema consolidation."""
+
 from temporal_lobe.memory.semantic import Fact, SemanticMemory
 
 
@@ -14,6 +15,7 @@ def test_schema_counts_observation_once_not_once_per_fact():
     assert schema is not None
     assert schema.instances == 1
     assert schema.abstraction_level < 0.5
+
 
 def test_schema_instances_accumulate_across_observations():
     memory = SemanticMemory()

@@ -51,8 +51,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
-sys.path[:0] = [str(Path(__file__).resolve().parent.parent / "python"),
-               str(Path(__file__).resolve().parent.parent)]
+sys.path[:0] = [
+    str(Path(__file__).resolve().parent.parent / "python"),
+    str(Path(__file__).resolve().parent.parent),
+]
 
 from temporal_lobe.concepts.edge_log import EdgeLog, open_edge_log  # noqa: E402
 from temporal_lobe.concepts.types import Edge  # noqa: E402
@@ -83,7 +85,8 @@ def _merge_concept(canonical: dict, incoming: dict) -> dict:
         )
     for key in ("activation", "confidence", "review_count", "last_reviewed"):
         merged[key] = max(
-            canonical.get(key) or 0, incoming.get(key) or 0,
+            canonical.get(key) or 0,
+            incoming.get(key) or 0,
         )
     # Earliest creation wins: it is the concept's real age, and a later
     # copy must not make an older idea look newly learned.
@@ -166,10 +169,7 @@ def main() -> int:
             edge_kept += 1
     known = set(by_id)
     orphaned = [e for e in edges.values() if e.source not in known or e.target not in known]
-    edges = {
-        k: e for k, e in edges.items()
-        if e.source in known and e.target in known
-    }
+    edges = {k: e for k, e in edges.items() if e.source in known and e.target in known}
     print(
         f"edges: {len(edges)} total "
         f"({dst_edges} canonical + {edge_added} from fork, {edge_kept} merged, "

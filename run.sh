@@ -11,8 +11,12 @@
 # Flags can be combined in any order: ./run.sh --offline --stop
 #
 # Optional: put a Discord channel webhook URL in .genesis-discord
-# (gitignored) or export GENESIS_DISCORD_WEBHOOK to mirror the whole
-# terminal session to Discord as a read-only feed.
+# (gitignored) or export GENESIS_DISCORD_WEBHOOK to give her a public
+# channel — it mirrors the terminal session and carries the posts she
+# composes (broadcasts, drawings, project announcements). To let the
+# public talk back to her there, export GENESIS_DISCORD_BOT_TOKEN or
+# put the bot token in .genesis-discord-bot — a webhook is
+# write-only, so hearing the channel needs the bot identity.
 
 set -m
 
@@ -41,13 +45,21 @@ if [ -z "${GENESIS_DATA_DIR:-}" ] && [ -f .genesis-data-dir ]; then
     export GENESIS_DATA_DIR
 fi
 
-# Same pattern for the Discord mirror: an uncommitted, gitignored
+# Same pattern for the Discord channel: an uncommitted, gitignored
 # .genesis-discord file holds the webhook URL so the secret stays out
 # of the repo and shell history. Explicit GENESIS_DISCORD_WEBHOOK
 # always wins.
 if [ -z "${GENESIS_DISCORD_WEBHOOK:-}" ] && [ -f .genesis-discord ]; then
     GENESIS_DISCORD_WEBHOOK=$(head -n1 .genesis-discord)
     export GENESIS_DISCORD_WEBHOOK
+fi
+
+# And the same for her ear: .genesis-discord-bot holds the bot token
+# that lets her hear the public on the channel. Explicit
+# GENESIS_DISCORD_BOT_TOKEN always wins.
+if [ -z "${GENESIS_DISCORD_BOT_TOKEN:-}" ] && [ -f .genesis-discord-bot ]; then
+    GENESIS_DISCORD_BOT_TOKEN=$(head -n1 .genesis-discord-bot)
+    export GENESIS_DISCORD_BOT_TOKEN
 fi
 
 DATA_DIR=$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' \
@@ -80,7 +92,11 @@ _matches_pid() {
     case "${pidfile##*/}" in
         genesis_cli.pid)
             [[ "${args[0]##*/}" == python* ]] || return 1
-            [[ "${args[1]:-}" == */genesis_cli.py || "${args[1]:-}" == genesis_cli.py ]] || return 1
+            # The dev entry point (python genesis_cli.py) and the
+            # installed console script (python .../bin/genesis) are
+            # the same process — the --data-dir check below still
+            # binds identity to this instance.
+            [[ "${args[1]:-}" == */genesis_cli.py || "${args[1]:-}" == genesis_cli.py || "${args[1]:-}" == */genesis || "${args[1]:-}" == genesis ]] || return 1
             ;;
         genesis_daemon.pid)
             [ "${args[0]##*/}" = genesis-daemon ] || return 1
@@ -250,8 +266,13 @@ else
     echo "$PWD" > "$MARKER"
 fi
 
-# Refuse to start if a Genesis session is already running for this data dir.
-if _is_running; then
+# Refuse to start if a Genesis mind is already running for this data dir.
+# Only the CLI blocks a new start: a surviving daemon/retina with no CLI
+# is the body outliving its last mind — the CLI adopts it rather than
+# being refused, so mind and body are never deliberately kept apart.
+# A CLI mid-teardown still matches here and refuses, which is correct:
+# a new start must never interrupt a state save.
+if _find_pid "$DATA_DIR/genesis_cli.pid" >/dev/null 2>&1; then
     echo "  Genesis is already running. Stop it with: ./run.sh --stop"
     exit 1
 fi
@@ -299,4 +320,16 @@ export GENESIS_RUN=1
 #
 # OFFLINE_ARG was parsed from the command line above (--offline for
 # no network access).
-PYTHONPATH="$PWD/python:${PYTHONPATH:-}" python3 genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:-}
+#
+# One interpreter for every launch path: the installed venv is the
+# canonical runtime — created with --system-site-packages, it sees
+# everything system python does plus its own pinned overrides, so
+# dev runs and the service can never drift onto different deps.
+# No fallback — a missing venv is a failed install, not a cue to
+# silently run on a different dependency set.
+VENV_PY="${GENESIS_INSTALL_HOME:-$HOME/.local/lib/genesis}/venv/bin/python"
+if [ ! -x "$VENV_PY" ]; then
+    echo "[genesis] $VENV_PY not found — run scripts/install.sh first"
+    exit 1
+fi
+PYTHONPATH="$PWD/python:${PYTHONPATH:-}" "$VENV_PY" genesis_cli.py --data-dir "$DATA_DIR" ${ONLINE_ARG:-}

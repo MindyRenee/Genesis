@@ -110,16 +110,13 @@ def _propose_recolor(examples: list[Example]) -> list[Transform]:
 def _propose_crop(examples: list[Example]) -> list[Transform]:
     """Propose cropping to content when every output is smaller."""
     if not all(
-        out.shape[0] <= inp.shape[0] and out.shape[1] <= inp.shape[1]
-        and out.shape != inp.shape
+        out.shape[0] <= inp.shape[0] and out.shape[1] <= inp.shape[1] and out.shape != inp.shape
         for inp, out in examples
     ):
         return []
     return [
         Transform("crop_to_content", lambda g: g.crop_to_content()),
-        Transform(
-            "crop_to_content_bg0", lambda g: g.crop_to_content(background=0)
-        ),
+        Transform("crop_to_content_bg0", lambda g: g.crop_to_content(background=0)),
     ]
 
 
@@ -127,11 +124,7 @@ def _propose_scale(examples: list[Example]) -> list[Transform]:
     """Propose integer upscaling when output dims are a constant multiple."""
     ratios: set[int] = set()
     for inp, out in examples:
-        if (
-            inp.width == 0
-            or out.width % inp.width != 0
-            or out.height % inp.height != 0
-        ):
+        if inp.width == 0 or out.width % inp.width != 0 or out.height % inp.height != 0:
             return []
         rw, rh = out.width // inp.width, out.height // inp.height
         if rw != rh or rw < 2:
@@ -147,7 +140,8 @@ def _propose_tile(examples: list[Example]) -> list[Transform]:
     """Propose tiling when output dims are a constant multiple."""
     for inp, out in examples:
         if (
-            inp.height == 0 or inp.width == 0
+            inp.height == 0
+            or inp.width == 0
             or out.width % inp.width != 0
             or out.height % inp.height != 0
         ):
@@ -160,9 +154,7 @@ def _propose_tile(examples: list[Example]) -> list[Transform]:
     return [Transform("tile", lambda g: g.tile(rr, rc), {"reps": (rr, rc)})]
 
 
-def _apply_gravity(
-    grid: Grid, direction: str, color: int | None = None
-) -> Grid:
+def _apply_gravity(grid: Grid, direction: str, color: int | None = None) -> Grid:
     """Move objects to an edge; with ``color``, only that color falls."""
     scene = perceive(grid, compute_relations=False)
     # Move every object in one pass — clear all sources first, then
@@ -203,12 +195,7 @@ def _apply_erase(grid: Grid, color: int) -> Grid:
 
 def _apply_select_color(grid: Grid, color: int) -> Grid:
     scene = perceive(grid, background=0, compute_relations=False)
-    cells = frozenset(
-        cell
-        for obj in scene.objects
-        if obj.color == color
-        for cell in obj.cells
-    )
+    cells = frozenset(cell for obj in scene.objects if obj.color == color for cell in obj.cells)
     return grid.crop_to_cells(cells) if cells else grid
 
 
@@ -216,9 +203,7 @@ def _apply_recolor_object(grid: Grid, which: str, color: int) -> Grid:
     scene = perceive(grid, compute_relations=False)
     if not scene.objects:
         return grid
-    obj = (max if which == "largest" else min)(
-        scene.objects, key=lambda o: o.size
-    )
+    obj = (max if which == "largest" else min)(scene.objects, key=lambda o: o.size)
     return grid.overlay(obj.cells, color)
 
 
@@ -246,11 +231,7 @@ def _apply_fill_enclosed(grid: Grid, color: int) -> Grid:
             ):
                 seen.add((nr, nc))
                 queue.append((nr, nc))
-    enclosed = frozenset(
-        (r, c)
-        for r, c, v in grid.iter_cells()
-        if v == bg and (r, c) not in seen
-    )
+    enclosed = frozenset((r, c) for r, c, v in grid.iter_cells() if v == bg and (r, c) not in seen)
     return grid.overlay(enclosed, color) if enclosed else grid
 
 
@@ -282,9 +263,7 @@ def _mk_shift(dr: int, dc: int, clamp: bool = False) -> TransformFn:
     return lambda g: _apply_shift(g, dr, dc, clamp)
 
 
-def _apply_shift(
-    grid: Grid, dr: int, dc: int, clamp: bool = False
-) -> Grid:
+def _apply_shift(grid: Grid, dr: int, dc: int, clamp: bool = False) -> Grid:
     """Move every non-zero cell by a fixed offset.
 
     Cells that would leave the frame are clipped (``clamp=False``)
@@ -307,9 +286,7 @@ def _mk_link_blocks() -> TransformFn:
     return _apply_link_blocks
 
 
-def _eight_conn_components(
-    grid: Grid, color: int
-) -> list[set[tuple[int, int]]]:
+def _eight_conn_components(grid: Grid, color: int) -> list[set[tuple[int, int]]]:
     seen: set[tuple[int, int]] = set()
     comps: list[set[tuple[int, int]]] = []
     for r, c, v in grid.iter_cells():
@@ -340,7 +317,8 @@ def _apply_link_blocks(grid: Grid) -> Grid:
     """Answer 8 if some 8-connected region of 8s touches two distinct
     2x2 blocks of 2s, else 0. Output is a 1x1 verdict."""
     blocks = [
-        comp for comp in _eight_conn_components(grid, 2)
+        comp
+        for comp in _eight_conn_components(grid, 2)
         if len(comp) == 4
         and {r for r, _ in comp} == set(range(min(r for r, _ in comp), min(r for r, _ in comp) + 2))
         and {c for _, c in comp} == set(range(min(c for _, c in comp), min(c for _, c in comp) + 2))
@@ -349,11 +327,7 @@ def _apply_link_blocks(grid: Grid) -> Grid:
     for region in _eight_conn_components(grid, 8):
         touched = 0
         for block in blocks:
-            if any(
-                abs(r - br) <= 1 and abs(c - bc) <= 1
-                for r, c in region
-                for br, bc in block
-            ):
+            if any(abs(r - br) <= 1 and abs(c - bc) <= 1 for r, c in region for br, bc in block):
                 touched += 1
                 if touched == 2:
                     break
@@ -375,13 +349,10 @@ def _mk_cross_halos(table: _HaloTable) -> TransformFn:
                 continue
             for dr, dc, k in halo:
                 nr, nc = r + dr, c + dc
-                if (
-                    0 <= nr < grid.height
-                    and 0 <= nc < grid.width
-                    and rows[nr][nc] == 0
-                ):
+                if 0 <= nr < grid.height and 0 <= nc < grid.width and rows[nr][nc] == 0:
                     rows[nr][nc] = k
         return Grid.from_lists(rows)
+
     return _fn
 
 
@@ -403,6 +374,7 @@ def _mk_count_blocks(color: int, width: int) -> TransformFn:
     def _fn(grid: Grid) -> Grid:
         n = _count_squares(grid, color)
         return Grid.from_lists([[color] * n + [0] * (width - n)])
+
     return _fn
 
 
@@ -456,13 +428,9 @@ def _apply_nearest_border(grid: Grid) -> Grid:
     """Two monochrome border lines flank the grid on opposite edges;
     every interior marker cell takes the nearer border's color."""
     left = _edge_color([grid.at(r, 0) for r in range(grid.height)])
-    right = _edge_color(
-        [grid.at(r, grid.width - 1) for r in range(grid.height)]
-    )
+    right = _edge_color([grid.at(r, grid.width - 1) for r in range(grid.height)])
     top = _edge_color([grid.at(0, c) for c in range(grid.width)])
-    bot = _edge_color(
-        [grid.at(grid.height - 1, c) for c in range(grid.width)]
-    )
+    bot = _edge_color([grid.at(grid.height - 1, c) for c in range(grid.width)])
     if left is not None and right is not None:
         near, far, size = left, right, grid.width
         axis = "column"
@@ -483,6 +451,7 @@ def _apply_nearest_border(grid: Grid) -> Grid:
 def _mk_ghost_pair(color: int) -> TransformFn:
     def apply(grid: Grid) -> Grid:
         return _apply_ghost_pair(grid, color)
+
     return apply
 
 
@@ -525,17 +494,11 @@ def _apply_ghost_pair(grid: Grid, color: int) -> Grid:
                 continue
             ca = sorted(a.cells)
             cb = sorted(b.cells)
-            if not any(
-                abs(r1 - r2) <= 1 and abs(c1 - c2) <= 1
-                for r1, c1 in ca
-                for r2, c2 in cb
-            ):
+            if not any(abs(r1 - r2) <= 1 and abs(c1 - c2) <= 1 for r1, c1 in ca for r2, c2 in cb):
                 continue
             at, al = min(r for r, _ in ca), min(c for _, c in ca)
             bt, bl = min(r for r, _ in cb), min(c for _, c in cb)
-            if sorted((r - at, c - al) for r, c in ca) != sorted(
-                (r - bt, c - bl) for r, c in cb
-            ):
+            if sorted((r - at, c - al) for r, c in ca) != sorted((r - bt, c - bl) for r, c in cb):
                 continue
             n = len(ca)
             sau = sum(r - c for r, c in ca)
@@ -562,12 +525,11 @@ def _apply_ghost_pair(grid: Grid, color: int) -> Grid:
 def _mk_axes_stamp(color: int, transpose: bool) -> TransformFn:
     def apply(grid: Grid) -> Grid:
         return _apply_axes_stamp(grid, color, transpose)
+
     return apply
 
 
-def _apply_axes_stamp(
-    grid: Grid, color: int, transpose: bool
-) -> Grid:
+def _apply_axes_stamp(grid: Grid, color: int, transpose: bool) -> Grid:
     """All marks live on two axes: a template line (the row — or
     column, when transposed — carrying a pattern) and a selector line
     marking which parallel lines receive the pattern. Every selected
@@ -595,6 +557,7 @@ def _apply_axes_stamp(
 def _mk_ring_unique(color: int) -> TransformFn:
     def apply(grid: Grid) -> Grid:
         return _apply_ring_unique(grid, color)
+
     return apply
 
 
@@ -606,7 +569,7 @@ def _apply_ring_unique(grid: Grid, color: int) -> Grid:
     uniq = [v for v, n in counts.items() if n == 1 and v != 0]
     if len(uniq) != 1:
         return grid
-    (cr, cc), = list(grid.cells_with(uniq[0]))
+    ((cr, cc),) = list(grid.cells_with(uniq[0]))
     rows = [[0] * grid.width for _ in range(grid.height)]
     rows[cr][cc] = uniq[0]
     for dr in (-1, 0, 1):
@@ -622,6 +585,7 @@ def _apply_ring_unique(grid: Grid, color: int) -> Grid:
 def _mk_attract_to(anchor: int) -> TransformFn:
     def apply(grid: Grid) -> Grid:
         return _apply_attract_to(grid, anchor)
+
     return apply
 
 
@@ -639,27 +603,18 @@ def _apply_attract_to(grid: Grid, anchor: int) -> Grid:
     mcc = sum(c for _, c in movers[0].cells) / len(movers[0].cells)
     dr, dc = acr - mcr, acc - mcc
     step_r = int(dr > 0) - int(dr < 0) if abs(dr) >= abs(dc) else 0
-    step_c = (
-        int(dc > 0) - int(dc < 0) if step_r == 0 else 0
-    )
+    step_c = int(dc > 0) - int(dc < 0) if step_r == 0 else 0
     if step_r == 0 and step_c == 0:
         return grid
     acells = anchors[0].cells
     cur: set[tuple[int, int]] = set(movers[0].cells)
     while True:
         moved = {(r + step_r, c + step_c) for r, c in cur}
-        if not all(
-            0 <= r < grid.height and 0 <= c < grid.width
-            for r, c in moved
-        ):
+        if not all(0 <= r < grid.height and 0 <= c < grid.width for r, c in moved):
             break
         if moved & acells:
             break
-        if any(
-            abs(r - ar) <= 1 and abs(c - ac) <= 1
-            for r, c in moved
-            for ar, ac in acells
-        ):
+        if any(abs(r - ar) <= 1 and abs(c - ac) <= 1 for r, c in moved for ar, ac in acells):
             cur = moved
             break
         cur = moved
@@ -686,15 +641,11 @@ def _apply_stamp_at_marks(grid: Grid) -> Grid:
     if axis == "row":
         return _apply_stamp_at_marks(grid.reflect_diag()).reflect_diag()
 
-    left = [(r, c, v) for r, c, v in grid.iter_cells()
-            if c < idx and v != 0]
-    right = [(r, c, v) for r, c, v in grid.iter_cells()
-             if c > idx and v != 0]
+    left = [(r, c, v) for r, c, v in grid.iter_cells() if c < idx and v != 0]
+    right = [(r, c, v) for r, c, v in grid.iter_cells() if c > idx and v != 0]
     if not left or not right:
         return grid
-    block, marks = (left, right) if len(left) >= len(right) else (
-        right, left
-    )
+    block, marks = (left, right) if len(left) >= len(right) else (right, left)
     top = min(r for r, _, _ in block)
     left_c = min(c for _, c, _ in block)
     height = max(r for r, _, _ in block) - top + 1
@@ -727,9 +678,7 @@ def _mk_radial_map(color: int) -> TransformFn:
                 continue
             mr, mc = min(
                 marks,
-                key=lambda m: min(
-                    max(abs(r - m[0]), abs(c - m[1])) for r, c in obj.cells
-                ),
+                key=lambda m: min(max(abs(r - m[0]), abs(c - m[1])) for r, c in obj.cells),
             )
             for r, c in obj.cells:
                 nr = 1 + (r > mr) - (r < mr)
@@ -751,19 +700,18 @@ def _apply_fill_busiest(grid: Grid) -> Grid:
     div_rows = [
         r
         for r in range(grid.height)
-        if grid.at(r, 0) != 0
-        and len({grid.at(r, c) for c in range(grid.width)}) == 1
+        if grid.at(r, 0) != 0 and len({grid.at(r, c) for c in range(grid.width)}) == 1
     ]
     div_cols = [
         c
         for c in range(grid.width)
-        if grid.at(0, c) != 0
-        and len({grid.at(r, c) for r in range(grid.height)}) == 1
+        if grid.at(0, c) != 0 and len({grid.at(r, c) for r in range(grid.height)}) == 1
     ]
     if not div_rows or not div_cols:
         return grid
 
     def bands(dividers: list[int], size: int) -> list[tuple[int, int]]:
+        """Contiguous ``(start, end)`` spans split at ``dividers`` within ``size``."""
         spans = []
         start = 0
         for d in [*dividers, size]:
@@ -814,9 +762,7 @@ def _mk_fill_lanes(color: int) -> TransformFn:
                     fill[r][c] = True
         for c in range(grid.width):
             nz = [r for r in range(grid.height) if rows[r][c]]
-            if len(nz) >= 2 and all(
-                rows[r][c] == 0 for r in range(nz[0] + 1, nz[-1])
-            ):
+            if len(nz) >= 2 and all(rows[r][c] == 0 for r in range(nz[0] + 1, nz[-1])):
                 for r in range(nz[0] + 1, nz[-1]):
                     fill[r][c] = True
         for r in range(grid.height):
@@ -838,17 +784,16 @@ def _apply_cross_fill(grid: Grid) -> Grid:
     div_rows = [
         r
         for r in range(grid.height)
-        if grid.at(r, 0) != 0
-        and len({grid.at(r, c) for c in range(grid.width)}) == 1
+        if grid.at(r, 0) != 0 and len({grid.at(r, c) for c in range(grid.width)}) == 1
     ]
     div_cols = [
         c
         for c in range(grid.width)
-        if grid.at(0, c) != 0
-        and len({grid.at(r, c) for r in range(grid.height)}) == 1
+        if grid.at(0, c) != 0 and len({grid.at(r, c) for r in range(grid.height)}) == 1
     ]
 
     def bands(dividers: list[int], size: int) -> list[tuple[int, int]]:
+        """Contiguous ``(start, end)`` spans split at ``dividers`` within ``size``."""
         spans = []
         start = 0
         for d in [*dividers, size]:
@@ -894,11 +839,7 @@ def _apply_eye_ray(grid: Grid) -> Grid:
     cr = sum(r for r, _ in cells) / len(cells)
     cc = sum(c for _, c in cells) / len(cells)
     dr, dc = cr - er, cc - ec
-    step = (
-        (1 if dr > 0 else -1, 0)
-        if abs(dr) >= abs(dc)
-        else (0, 1 if dc > 0 else -1)
-    )
+    step = (1 if dr > 0 else -1, 0) if abs(dr) >= abs(dc) else (0, 1 if dc > 0 else -1)
     if dr == 0 and dc == 0:
         return grid
     rows = grid.to_lists()
@@ -938,6 +879,7 @@ def _apply_rot_symmetrize(grid: Grid) -> Grid:
 def _mk_draw_lines(table: dict[int, str]) -> TransformFn:
     """Each seed cell emits a full row or column in its own color;
     column lines are laid first, row lines win crossings."""
+
     def _fn(grid: Grid) -> Grid:
         rows = grid.to_lists()
         for v, axis in table.items():
@@ -951,6 +893,7 @@ def _mk_draw_lines(table: dict[int, str]) -> TransformFn:
                     for cc in range(grid.width):
                         rows[r][cc] = v
         return Grid.from_lists(rows)
+
     return _fn
 
 
@@ -987,10 +930,7 @@ def _apply_stamp_recolor(grid: Grid) -> Grid:
                     seen.add((nr, nc))
                     queue.append((nr, nc))
         comps.append(comp)
-    stamps = [
-        comp for comp in comps
-        if len({grid.at(r, c) for r, c in comp}) > 1
-    ]
+    stamps = [comp for comp in comps if len({grid.at(r, c) for r, c in comp}) > 1]
     if len(stamps) != 1:
         return grid
     stamp = stamps[0]
@@ -998,8 +938,7 @@ def _apply_stamp_recolor(grid: Grid) -> Grid:
     sc = min(c for _, c in stamp)
     pattern = {(r - sr, c - sc): grid.at(r, c) for r, c in stamp}
     mask = set(pattern)
-    rows = [[grid.at(r, c) for c in range(grid.width)]
-            for r in range(grid.height)]
+    rows = [[grid.at(r, c) for c in range(grid.width)] for r in range(grid.height)]
     for r, c in stamp:
         rows[r][c] = 0
     for comp in comps:
@@ -1050,9 +989,7 @@ def _apply_unwind_tile(grid: Grid) -> Grid:
             best = max(counts.values())
             winners = [v for v, n in counts.items() if n == best]
             rows[i][j] = (
-                winners[0] if len(winners) == 1
-                else votes[0] if votes[0] in winners
-                else winners[0]
+                winners[0] if len(winners) == 1 else votes[0] if votes[0] in winners else winners[0]
             )
     return Grid.from_lists(rows)
 
@@ -1089,17 +1026,12 @@ def _apply_dual_frame(grid: Grid) -> Grid:
     """Two marker dots split the grid into two horizontal bands, each
     drawn as a frame: a full-width bar at the band's outer edge and at
     the dot's row, with side columns in the band's color."""
-    dots = [
-        (r, c, v)
-        for r, c, v in grid.iter_cells()
-        if v != 0
-    ]
+    dots = [(r, c, v) for r, c, v in grid.iter_cells() if v != 0]
     if len(dots) != 2:
         return grid
     (r1, _, top_color), (r2, _, bot_color) = sorted(dots)
     mid = (r1 + r2) // 2
-    bars = {0: top_color, r1: top_color, r2: bot_color,
-            grid.height - 1: bot_color}
+    bars = {0: top_color, r1: top_color, r2: bot_color, grid.height - 1: bot_color}
     rows = [[0] * grid.width for _ in range(grid.height)]
     for r in range(grid.height):
         side = top_color if r <= mid else bot_color
@@ -1151,8 +1083,7 @@ def _mk_repeat_down() -> TransformFn:
 
 def _apply_repeat_down(grid: Grid) -> Grid:
     """Append a full copy of the grid below itself."""
-    rows = [[grid.at(r, c) for c in range(grid.width)]
-            for r in range(grid.height)]
+    rows = [[grid.at(r, c) for c in range(grid.width)] for r in range(grid.height)]
     rows += [row[:] for row in rows[: grid.height]]
     return Grid.from_lists(rows)
 
@@ -1165,8 +1096,7 @@ def _apply_extend_down(grid: Grid, n: int) -> Grid:
     p = _row_period(grid)
     if p is None:
         return grid
-    rows = [[grid.at(r, c) for c in range(grid.width)]
-            for r in range(grid.height)]
+    rows = [[grid.at(r, c) for c in range(grid.width)] for r in range(grid.height)]
     for i in range(n):
         rows.append(rows[(grid.height + i) % p][:])
     return Grid.from_lists(rows)
@@ -1186,6 +1116,10 @@ def _row_period(grid: Grid) -> int | None:
 
 def _mk_mark_diagonals(color: int) -> TransformFn:
     return lambda g: _apply_mark_diagonals(g, color)
+
+
+def _mk_corner_completion(color: int) -> TransformFn:
+    return lambda g: _apply_corner_completion(g, color)
 
 
 def _mk_intersect_halves(color: int) -> TransformFn:
@@ -1249,11 +1183,7 @@ def _apply_rank_bars(grid: Grid) -> Grid:
     rank: the tallest bar becomes 1, next 2, and so on."""
     runs: list[tuple[int, list[tuple[int, int]]]] = []
     for c in range(grid.width):
-        cells = [
-            (r, c)
-            for r in range(grid.height)
-            if grid.at(r, c) != 0
-        ]
+        cells = [(r, c) for r in range(grid.height) if grid.at(r, c) != 0]
         if not cells:
             continue
         # only contiguous runs count as bars
@@ -1273,14 +1203,9 @@ def _apply_bridge_endpoints(grid: Grid, marker: int) -> Grid:
     """On each row with exactly two marks, draw a bridge between
     them: the left color fills to the midpoint, the right color
     fills back, and the midpoint cell gets the marker color."""
-    rows = [[grid.at(r, c) for c in range(grid.width)]
-            for r in range(grid.height)]
+    rows = [[grid.at(r, c) for c in range(grid.width)] for r in range(grid.height)]
     for r in range(grid.height):
-        marks = [
-            (c, grid.at(r, c))
-            for c in range(grid.width)
-            if grid.at(r, c) != 0
-        ]
+        marks = [(c, grid.at(r, c)) for c in range(grid.width) if grid.at(r, c) != 0]
         if len(marks) != 2:
             continue
         (a, ca), (b, cb) = marks
@@ -1323,13 +1248,13 @@ def _mk_classify_shape(
 def _mask_key(grid: Grid) -> tuple[tuple[int, ...], ...]:
     """Color-invariant shape: which cells are filled, as 0/1 rows."""
     return tuple(
-        tuple(1 if grid.at(r, c) != 0 else 0 for c in range(grid.width))
-        for r in range(grid.height)
+        tuple(1 if grid.at(r, c) != 0 else 0 for c in range(grid.width)) for r in range(grid.height)
     )
 
 
 def _apply_classify_shape(
-    grid: Grid, table: dict[tuple[tuple[int, ...], ...], int],
+    grid: Grid,
+    table: dict[tuple[tuple[int, ...], ...], int],
 ) -> Grid:
     """Map a pattern's shape (ignoring color) to a 1x1 label."""
     return Grid.from_lists([[table.get(_mask_key(grid), 0)]])
@@ -1385,12 +1310,7 @@ def _apply_intersect_halves(grid: Grid, color: int) -> Grid:
     if left.shape != right.shape:
         return grid
     rows = [
-        [
-            color
-            if left.at(r, c) != 0 and right.at(r, c) != 0
-            else 0
-            for c in range(left.width)
-        ]
+        [color if left.at(r, c) != 0 and right.at(r, c) != 0 else 0 for c in range(left.width)]
         for r in range(left.height)
     ]
     return Grid.from_lists(rows)
@@ -1408,12 +1328,10 @@ def _cross_lines(grid: Grid) -> tuple[int, int] | None:
     """Find a divider cross: one full monochrome row and one full
     monochrome column (any colors, but non-zero lines win)."""
     rows_all = [
-        r for r in range(grid.height)
-        if len({grid.at(r, c) for c in range(grid.width)}) == 1
+        r for r in range(grid.height) if len({grid.at(r, c) for c in range(grid.width)}) == 1
     ]
     cols_all = [
-        c for c in range(grid.width)
-        if len({grid.at(r, c) for r in range(grid.height)}) == 1
+        c for c in range(grid.width) if len({grid.at(r, c) for r in range(grid.height)}) == 1
     ]
     rows_i = [r for r in rows_all if grid.at(r, 0) != 0] or rows_all
     cols_i = [c for c in cols_all if grid.at(0, c) != 0] or cols_all
@@ -1429,9 +1347,7 @@ def _apply_pick_quadrant(grid: Grid) -> Grid:
     if found is None:
         return grid
     ri, ci = found
-    div_colors = {
-        grid.at(ri, c) for c in range(grid.width)
-    } | {
+    div_colors = {grid.at(ri, c) for c in range(grid.width)} | {
         grid.at(r, ci) for r in range(grid.height)
     }
     counts: dict[int, int] = {}
@@ -1474,12 +1390,7 @@ def _apply_empty_halves(grid: Grid, color: int) -> Grid:
     if left.shape != right.shape:
         return grid
     rows = [
-        [
-            color
-            if left.at(r, c) == 0 and right.at(r, c) == 0
-            else 0
-            for c in range(left.width)
-        ]
+        [color if left.at(r, c) == 0 and right.at(r, c) == 0 else 0 for c in range(left.width)]
         for r in range(left.height)
     ]
     return Grid.from_lists(rows)
@@ -1505,10 +1416,7 @@ def _apply_diff_halves(grid: Grid, color: int) -> Grid:
     if left.shape != right.shape:
         return grid
     rows = [
-        [
-            color if left.at(r, c) != right.at(r, c) else 0
-            for c in range(left.width)
-        ]
+        [color if left.at(r, c) != right.at(r, c) else 0 for c in range(left.width)]
         for r in range(left.height)
     ]
     return Grid.from_lists(rows)
@@ -1517,20 +1425,39 @@ def _apply_diff_halves(grid: Grid, color: int) -> Grid:
 def _apply_mark_diagonals(grid: Grid, color: int) -> Grid:
     """Fill empty cells that touch a non-zero cell at a diagonal
     corner — the four diagonal neighbors only, not orthogonal."""
-    rows = [[grid.at(r, c) for c in range(grid.width)]
-            for r in range(grid.height)]
+    rows = [[grid.at(r, c) for c in range(grid.width)] for r in range(grid.height)]
     for r, c, v in grid.iter_cells():
         if v != 0:
             continue
         for dr, dc in ((-1, -1), (-1, 1), (1, -1), (1, 1)):
             nr, nc = r + dr, c + dc
-            if (
-                0 <= nr < grid.height
-                and 0 <= nc < grid.width
-                and grid.at(nr, nc) != 0
-            ):
+            if 0 <= nr < grid.height and 0 <= nc < grid.width and grid.at(nr, nc) != 0:
                 rows[r][c] = color
                 break
+    return Grid.from_lists(rows)
+
+
+def _apply_corner_completion(grid: Grid, color: int) -> Grid:
+    """Close the open corner of every 2×2 block holding exactly
+    three same-colored cells — the empty fourth takes the mark
+    color. Candidates read the input snapshot: a completed corner
+    does not itself seed further completions."""
+    rows = [[grid.at(r, c) for c in range(grid.width)] for r in range(grid.height)]
+    for r in range(grid.height - 1):
+        for c in range(grid.width - 1):
+            quad = (
+                grid.at(r, c),
+                grid.at(r, c + 1),
+                grid.at(r + 1, c),
+                grid.at(r + 1, c + 1),
+            )
+            if sum(1 for v in quad if v == 0) != 1:
+                continue
+            vals = {v for v in quad if v != 0}
+            if len(vals) != 1:
+                continue
+            i = quad.index(0)
+            rows[r + i // 2][c + i % 2] = color
     return Grid.from_lists(rows)
 
 
@@ -1631,6 +1558,7 @@ def _color_builders(
     params: dict[str, object],
 ) -> dict[str, Callable[[], Transform | None]]:
     """Families parameterized by a ``color`` entry."""
+
     def _color() -> int | None:
         v = params.get("color")
         return v if isinstance(v, int) else None
@@ -1670,6 +1598,7 @@ def _direction_builders(
 ) -> dict[str, Callable[[], Transform | None]]:
     """Families parameterized by a ``direction`` entry (gravity,
     settle) plus the raw direction-keyed builders."""
+
     def _dir() -> str | None:
         d = params.get("direction")
         return d if d in ("down", "up", "left", "right") else None
@@ -1680,10 +1609,14 @@ def _direction_builders(
 
     dir_builders: dict[str, Callable[[str], Transform | None]] = {
         "gravity": lambda d: (
-            Transform(f"gravity_{d}_{c}", _mk_gravity(d, c), {"direction": d, "color": c})
-            if (c := _color()) is not None
-            else Transform(f"gravity_{d}", _mk_gravity(d), {"direction": d})
-        ) if d else None,
+            (
+                Transform(f"gravity_{d}_{c}", _mk_gravity(d, c), {"direction": d, "color": c})
+                if (c := _color()) is not None
+                else Transform(f"gravity_{d}", _mk_gravity(d), {"direction": d})
+            )
+            if d
+            else None
+        ),
         "settle": lambda d: (
             Transform(f"settle_{d}", _mk_settle(d), {"direction": d}) if d else None
         ),
@@ -1705,6 +1638,7 @@ def _param_builders(
 ) -> dict[str, Callable[[], Transform | None]]:
     """Families parameterized by non-direction entries — dr/dc/clamp,
     n, axis, tables, markers, anchors."""
+
     def _color() -> int | None:
         v = params.get("color")
         return v if isinstance(v, int) else None
@@ -1761,9 +1695,7 @@ def _param_builders(
         t = params.get("transpose")
         if not (isinstance(c, int) and isinstance(t, bool)):
             return None
-        return Transform(
-            "axes_stamp", _mk_axes_stamp(c, t), {"color": c, "transpose": t}
-        )
+        return Transform("axes_stamp", _mk_axes_stamp(c, t), {"color": c, "transpose": t})
 
     def _attract_to() -> Transform | None:
         a = params.get("anchor")
@@ -1779,8 +1711,11 @@ def _param_builders(
 
     def _shear() -> Transform | None:
         dr, dc = params.get("dr"), params.get("dc")
-        return Transform("shear", _mk_shear(dr, dc), {"dr": dr, "dc": dc}) \
-            if isinstance(dr, int) and isinstance(dc, int) else None
+        return (
+            Transform("shear", _mk_shear(dr, dc), {"dr": dr, "dc": dc})
+            if isinstance(dr, int) and isinstance(dc, int)
+            else None
+        )
 
     out: dict[str, Callable[[], Transform | None]] = {
         "shift": _shift,
@@ -1803,6 +1738,7 @@ def _table_param_builders(
 ) -> dict[str, Callable[[], Transform | None]]:
     """Builders parameterized by a ``table`` entry — classify_shape,
     cross_halos, draw_lines."""
+
     def _classify_shape() -> Transform | None:
         table = params.get("table")
         if not isinstance(table, dict):
@@ -1815,9 +1751,7 @@ def _table_param_builders(
             return None
         halo_map: _HaloTable = {}
         for key, halo in raw.items():
-            halo_map[int(key)] = tuple(
-                (int(dr), int(dc), int(k)) for dr, dc, k in halo
-            )
+            halo_map[int(key)] = tuple((int(dr), int(dc), int(k)) for dr, dc, k in halo)
         return Transform("cross_halos", _mk_cross_halos(halo_map), {"table": raw})
 
     def _draw_lines() -> Transform | None:
@@ -2074,10 +2008,9 @@ def _propose_denoise(examples: list[Example]) -> list[Transform]:
                     v = out_rows[r][c]
                     if v == bg or v == dominant:
                         continue
-                    inside = (
-                        row_min.get(r, c) < c < row_max.get(r, c)
-                        or col_min.get(c, r) < r < col_max.get(c, r)
-                    )
+                    inside = row_min.get(r, c) < c < row_max.get(r, c) or col_min.get(
+                        c, r
+                    ) < r < col_max.get(c, r)
                     if inside:
                         out_rows[r][c] = dominant
                         changed = True
@@ -2104,9 +2037,7 @@ def _propose_periodic_completion(examples: list[Example]) -> list[Transform]:
     and fill background cells from it. Zeros are treated as unknown.
     """
 
-    def complete(
-        g: Grid, unknowns: frozenset[int]
-    ) -> Grid | None:
+    def complete(g: Grid, unknowns: frozenset[int]) -> Grid | None:
         """Smallest-period completion of g, or None if impossible.
 
         Cells whose color is in ``unknowns`` are treated as missing
@@ -2133,10 +2064,7 @@ def _propose_periodic_completion(examples: list[Example]) -> list[Transform]:
                     pattern[key] = v
                 if not ok or len(pattern) < ph * pw:
                     continue
-                rows = [
-                    [pattern[(r % ph, c % pw)] for c in range(w)]
-                    for r in range(h)
-                ]
+                rows = [[pattern[(r % ph, c % pw)] for c in range(w)] for r in range(h)]
                 return Grid.from_lists(rows)
         return None
 
@@ -2155,24 +2083,21 @@ def _propose_periodic_completion(examples: list[Example]) -> list[Transform]:
         # Fire only when every pair is explained by period completion.
         if all(
             inp.shape == out.shape
-            and complete(inp, mask if mask is not None else rare_mask(inp))
-            == out
+            and complete(inp, mask if mask is not None else rare_mask(inp)) == out
             for inp, out in examples
         ):
             if mask is not None:
+
                 def apply(g: Grid, m: frozenset[int] = mask) -> Grid:
                     return complete(g, m) or g
 
-                transforms.append(
-                    Transform("periodic_complete", apply, {})
-                )
+                transforms.append(Transform("periodic_complete", apply, {}))
             else:
+
                 def apply_masked(g: Grid) -> Grid:
                     return complete(g, rare_mask(g)) or g
 
-                transforms.append(
-                    Transform("periodic_complete_masked", apply_masked, {})
-                )
+                transforms.append(Transform("periodic_complete_masked", apply_masked, {}))
     return transforms
 
 
@@ -2210,31 +2135,23 @@ def _propose_translate_complete(examples: list[Example]) -> list[Transform]:
         if complete(first_inp, mask0) != first_out:
             continue
         if mask is not None:
+
             def apply(g: Grid, m: frozenset[int] = mask) -> Grid:
                 return complete(g, m) or g
 
             if all(apply(inp) == out for inp, out in examples[1:]):
-                transforms.append(
-                    Transform("translate_complete", apply, {})
-                )
+                transforms.append(Transform("translate_complete", apply, {}))
         else:
+
             def apply_masked(g: Grid) -> Grid:
                 return complete(g, rare_mask(g)) or g
 
-            if all(
-                apply_masked(inp) == out for inp, out in examples[1:]
-            ):
-                transforms.append(
-                    Transform(
-                        "translate_complete_masked", apply_masked, {}
-                    )
-                )
+            if all(apply_masked(inp) == out for inp, out in examples[1:]):
+                transforms.append(Transform("translate_complete_masked", apply_masked, {}))
     return transforms
 
 
-def _lattice_fill(
-    g: Grid, vs: list[tuple[int, int]], unknowns: frozenset[int]
-) -> Grid | None:
+def _lattice_fill(g: Grid, vs: list[tuple[int, int]], unknowns: frozenset[int]) -> Grid | None:
     """Fill g assuming the period lattice generated by vectors vs."""
     h, w = g.height, g.width
     parent = list(range(h * w))
@@ -2262,14 +2179,10 @@ def _lattice_fill(
     classes = {find(r * w + c) for r in range(h) for c in range(w)}
     if any(root not in value for root in classes):
         return None
-    return Grid.from_lists(
-        [[value[find(r * w + c)] for c in range(w)] for r in range(h)]
-    )
+    return Grid.from_lists([[value[find(r * w + c)] for c in range(w)] for r in range(h)])
 
 
-def _lattice_consistent(
-    g: Grid, v: tuple[int, int], unknowns: frozenset[int]
-) -> bool:
+def _lattice_consistent(g: Grid, v: tuple[int, int], unknowns: frozenset[int]) -> bool:
     """True when vector v links no cells with conflicting values."""
     h, w = g.height, g.width
     parent = list(range(h * w))
@@ -2358,8 +2271,7 @@ def _propose_symmetrize(examples: list[Example]) -> list[Transform]:
                 return []  # existing cells may not change
 
     return [
-        Transform(f"symmetrize_{a}", _mk_symmetrize(a), {"axis": a})
-        for a in ("v", "h", "rot180")
+        Transform(f"symmetrize_{a}", _mk_symmetrize(a), {"axis": a}) for a in ("v", "h", "rot180")
     ]
 
 
@@ -2368,6 +2280,7 @@ def _mk_symmetrize(axis: str) -> TransformFn:
     only onto background cells. ``axis`` is ``v`` (mirror across the
     center column), ``h`` (center row), ``rot180`` (center point), or
     ``diag`` (main diagonal, square grids)."""
+
     def apply(g: Grid) -> Grid:
         bg = g.most_common_color()
         rows = g.to_lists()
@@ -2470,8 +2383,7 @@ def _propose_select_by_color(examples: list[Example]) -> list[Transform]:
     bbox of all objects of that color.
     """
     if not all(
-        out.shape[0] <= inp.shape[0] and out.shape[1] <= inp.shape[1]
-        for inp, out in examples
+        out.shape[0] <= inp.shape[0] and out.shape[1] <= inp.shape[1] for inp, out in examples
     ):
         return []
     colors: set[int] = set()
@@ -2510,26 +2422,16 @@ def _propose_mirror_copy(examples: list[Example]) -> list[Transform]:
             for obj in scene.objects:
                 top, left, bottom, right = obj.bbox
                 if direction == "right":
-                    new_cells = frozenset(
-                        (r, right + (right - c) + 1) for r, c in obj.cells
-                    )
+                    new_cells = frozenset((r, right + (right - c) + 1) for r, c in obj.cells)
                 elif direction == "left":
-                    new_cells = frozenset(
-                        (r, left - (c - left) - 1) for r, c in obj.cells
-                    )
+                    new_cells = frozenset((r, left - (c - left) - 1) for r, c in obj.cells)
                 elif direction == "down":
-                    new_cells = frozenset(
-                        (bottom + (bottom - r) + 1, c) for r, c in obj.cells
-                    )
+                    new_cells = frozenset((bottom + (bottom - r) + 1, c) for r, c in obj.cells)
                 else:  # up
-                    new_cells = frozenset(
-                        (top - (r - top) - 1, c) for r, c in obj.cells
-                    )
+                    new_cells = frozenset((top - (r - top) - 1, c) for r, c in obj.cells)
                 # Only place the copy if it fits entirely on background.
                 if all(
-                    0 <= r < g.height
-                    and 0 <= c < g.width
-                    and result.at(r, c) == scene.background
+                    0 <= r < g.height and 0 <= c < g.width and result.at(r, c) == scene.background
                     for r, c in new_cells
                 ):
                     result = result.overlay(new_cells, obj.color)
@@ -2569,8 +2471,7 @@ def _propose_recolor_touching(examples: list[Example]) -> list[Transform]:
             touching = {
                 rel.object
                 for rel in scene.relations
-                if rel.subject == largest.index
-                and rel.kind.value == "touching"
+                if rel.subject == largest.index and rel.kind.value == "touching"
             }
             result = g
             for idx in touching:
@@ -2579,10 +2480,7 @@ def _propose_recolor_touching(examples: list[Example]) -> list[Transform]:
 
         return apply
 
-    return [
-        Transform("recolor_touching", make(c), {"color": c})
-        for c in sorted(new_colors)
-    ]
+    return [Transform("recolor_touching", make(c), {"color": c}) for c in sorted(new_colors)]
 
 
 def _propose_gravity_color(examples: list[Example]) -> list[Transform]:
@@ -2666,7 +2564,8 @@ def _propose_shift(examples: list[Example]) -> list[Transform]:
                 out.at(
                     min(max(r + dr, 0), inp.height - 1),
                     min(max(c + dc, 0), inp.width - 1),
-                ) == v
+                )
+                == v
                 for r, c, v in inp.iter_cells()
                 if v != 0
             ):
@@ -2678,7 +2577,9 @@ def _propose_shift(examples: list[Example]) -> list[Transform]:
         for dr, dc in sorted(candidates)
         for t in (
             Transform(
-                "shift", _mk_shift(dr, dc), {"dr": dr, "dc": dc},
+                "shift",
+                _mk_shift(dr, dc),
+                {"dr": dr, "dc": dc},
             ),
             Transform(
                 "shift",
@@ -2692,10 +2593,7 @@ def _propose_shift(examples: list[Example]) -> list[Transform]:
 def _propose_self_tile(examples: list[Example]) -> list[Transform]:
     """Propose self-stenciling when output dims are input dims squared."""
     for inp, out in examples:
-        if (
-            out.height != inp.height * inp.height
-            or out.width != inp.width * inp.width
-        ):
+        if out.height != inp.height * inp.height or out.width != inp.width * inp.width:
             return []
     return [Transform("self_tile", _mk_self_tile(), {})]
 
@@ -2717,6 +2615,32 @@ def _propose_mark_diagonals(examples: list[Example]) -> list[Transform]:
         Transform(
             "mark_diagonals",
             _mk_mark_diagonals(c),
+            {"color": c},
+        )
+        for c in sorted(new_colors)
+    ]
+
+
+def _propose_corner_completion(examples: list[Example]) -> list[Transform]:
+    """Propose closing the open corner of 2×2 blocks.
+
+    Signature: same shape, and the output only *adds* cells — each
+    the missing fourth of a 2×2 square whose other three cells share
+    one color. The mark color is read off the cells that appeared.
+    """
+    for inp, out in examples:
+        if inp.shape != out.shape:
+            return []
+    new_colors: set[int] = set()
+    for inp, out in examples:
+        for r, c, v in out.iter_cells():
+            if v != inp.at(r, c):
+                new_colors.add(v)
+    new_colors.discard(0)
+    return [
+        Transform(
+            "corner_completion",
+            _mk_corner_completion(c),
             {"color": c},
         )
         for c in sorted(new_colors)
@@ -2763,7 +2687,9 @@ def _propose_intersect_halves(examples: list[Example]) -> list[Transform]:
     colors.discard(0)
     return [
         Transform(
-            "intersect_halves", _mk_intersect_halves(c), {"color": c},
+            "intersect_halves",
+            _mk_intersect_halves(c),
+            {"color": c},
         )
         for c in sorted(colors)
     ]
@@ -2783,7 +2709,9 @@ def _propose_empty_halves(examples: list[Example]) -> list[Transform]:
     colors.discard(0)
     return [
         Transform(
-            "empty_halves", _mk_empty_halves(c), {"color": c},
+            "empty_halves",
+            _mk_empty_halves(c),
+            {"color": c},
         )
         for c in sorted(colors)
     ]
@@ -2803,7 +2731,9 @@ def _propose_diff_halves(examples: list[Example]) -> list[Transform]:
     colors.discard(0)
     return [
         Transform(
-            "diff_halves", _mk_diff_halves(c), {"color": c},
+            "diff_halves",
+            _mk_diff_halves(c),
+            {"color": c},
         )
         for c in sorted(colors)
     ]
@@ -2840,9 +2770,7 @@ def _propose_dual_frame(examples: list[Example]) -> list[Transform]:
     for inp, out in examples:
         if inp.shape != out.shape:
             return []
-        if sum(
-            1 for _, _, v in inp.iter_cells() if v != 0
-        ) != 2:
+        if sum(1 for _, _, v in inp.iter_cells() if v != 0) != 2:
             return []
     return [Transform("dual_frame", _mk_dual_frame(), {})]
 
@@ -2856,10 +2784,7 @@ def _propose_align_tops(examples: list[Example]) -> list[Transform]:
     colors: set[int] = set()
     for inp, _ in examples:
         colors |= {v for _, _, v in inp.iter_cells() if v != 0}
-    return [
-        Transform("align_tops", _mk_align_tops(c), {"color": c})
-        for c in sorted(colors)
-    ]
+    return [Transform("align_tops", _mk_align_tops(c), {"color": c}) for c in sorted(colors)]
 
 
 def _propose_unwind_tile(examples: list[Example]) -> list[Transform]:
@@ -2935,26 +2860,18 @@ def _propose_cross_halos(examples: list[Example]) -> list[Transform]:
             elif seeds:
                 ambiguous.append((k, seeds))
     for k, seeds in ambiguous:
-        prefer = {
-            sv for sv, _, _ in seeds
-            if any(hk == k for _, _, hk in table.get(sv, ()))
-        }
+        prefer = {sv for sv, _, _ in seeds if any(hk == k for _, _, hk in table.get(sv, ()))}
         claimants = prefer or {sv for sv, _, _ in seeds}
         for sv, sdr, sdc in seeds:
             if sv in claimants:
                 table.setdefault(sv, set()).add((sdr, sdc, k))
     if not any(table.values()):
         return []
-    halo_table: _HaloTable = {
-        color: tuple(sorted(halo))
-        for color, halo in table.items()
-        if halo
-    }
+    halo_table: _HaloTable = {color: tuple(sorted(halo)) for color, halo in table.items() if halo}
     cand = Transform(
         "cross_halos",
         _mk_cross_halos(halo_table),
-        {"table": {str(c): [list(h) for h in hs]
-                   for c, hs in halo_table.items()}},
+        {"table": {str(c): [list(h) for h in hs] for c, hs in halo_table.items()}},
     )
     for inp, out in examples:
         if cand.apply(inp) != out:
@@ -2995,18 +2912,12 @@ def _propose_nearest_border(examples: list[Example]) -> list[Transform]:
         if inp.shape != out.shape:
             return []
         vertical = (
-            _edge_color([inp.at(r, 0) for r in range(inp.height)])
-            is not None
-            and _edge_color(
-                [inp.at(r, inp.width - 1) for r in range(inp.height)]
-            ) is not None
+            _edge_color([inp.at(r, 0) for r in range(inp.height)]) is not None
+            and _edge_color([inp.at(r, inp.width - 1) for r in range(inp.height)]) is not None
         )
         horizontal = (
-            _edge_color([inp.at(0, c) for c in range(inp.width)])
-            is not None
-            and _edge_color(
-                [inp.at(inp.height - 1, c) for c in range(inp.width)]
-            ) is not None
+            _edge_color([inp.at(0, c) for c in range(inp.width)]) is not None
+            and _edge_color([inp.at(inp.height - 1, c) for c in range(inp.width)]) is not None
         )
         if not (vertical or horizontal):
             return []
@@ -3023,9 +2934,7 @@ def _propose_ghost_pair(examples: list[Example]) -> list[Transform]:
         for r, c, v in inp.iter_cells():
             if v != 0 and out.at(r, c) != v:
                 return []
-        new = {v for _, _, v in out.iter_cells()} - {
-            v for _, _, v in inp.iter_cells()
-        }
+        new = {v for _, _, v in out.iter_cells()} - {v for _, _, v in inp.iter_cells()}
         if candidates is None:
             candidates = new
         else:
@@ -3048,9 +2957,7 @@ def _propose_axes_stamp(examples: list[Example]) -> list[Transform]:
         for r, c, v in inp.iter_cells():
             if v != 0 and out.at(r, c) != v:
                 return []
-        new = {v for _, _, v in out.iter_cells()} - {
-            v for _, _, v in inp.iter_cells()
-        }
+        new = {v for _, _, v in out.iter_cells()} - {v for _, _, v in inp.iter_cells()}
         if candidates is None:
             candidates = new
         else:
@@ -3079,21 +2986,14 @@ def _propose_ring_unique(examples: list[Example]) -> list[Transform]:
         counts = inp.color_counts()
         if len([v for v, n in counts.items() if n == 1 and v != 0]) != 1:
             return []
-        ring = Counter(
-            v for _, _, v in out.iter_cells() if v != 0
-        ).most_common()
+        ring = Counter(v for _, _, v in out.iter_cells() if v != 0).most_common()
         if not ring or ring[0][1] < 2:
             return []
         ring_color = ring[0][0]
-        colors = {ring_color} if colors is None else colors | {
-            ring_color
-        }
+        colors = {ring_color} if colors is None else colors | {ring_color}
     if not colors:
         return []
-    return [
-        Transform("ring_unique", _mk_ring_unique(c), {"color": c})
-        for c in sorted(colors)
-    ]
+    return [Transform("ring_unique", _mk_ring_unique(c), {"color": c}) for c in sorted(colors)]
 
 
 def _propose_attract_to(examples: list[Example]) -> list[Transform]:
@@ -3110,10 +3010,7 @@ def _propose_attract_to(examples: list[Example]) -> list[Transform]:
         colors = have if colors is None else colors & have
     if not colors:
         return []
-    return [
-        Transform("attract_to", _mk_attract_to(c), {"anchor": c})
-        for c in sorted(colors)
-    ]
+    return [Transform("attract_to", _mk_attract_to(c), {"anchor": c}) for c in sorted(colors)]
 
 
 def _propose_stamp_at_marks(
@@ -3128,16 +3025,10 @@ def _propose_stamp_at_marks(
             return []
         axis, idx = found
         if axis == "column":
-            if not all(
-                inp.at(r, idx) == out.at(r, idx)
-                for r in range(inp.height)
-            ):
+            if not all(inp.at(r, idx) == out.at(r, idx) for r in range(inp.height)):
                 return []
         else:
-            if not all(
-                inp.at(idx, c) == out.at(idx, c)
-                for c in range(inp.width)
-            ):
+            if not all(inp.at(idx, c) == out.at(idx, c) for c in range(inp.width)):
                 return []
     return [Transform("stamp_at_marks", _mk_stamp_at_marks(), {})]
 
@@ -3150,19 +3041,11 @@ def _propose_radial_map(examples: list[Example]) -> list[Transform]:
     for inp, out in examples:
         if out.shape != (3, 3):
             return []
-        have = {
-            v
-            for _, _, v in inp.iter_cells()
-            if v != 0
-            and _mk_radial_map(v)(inp) == out
-        }
+        have = {v for _, _, v in inp.iter_cells() if v != 0 and _mk_radial_map(v)(inp) == out}
         colors = have if colors is None else colors & have
     if not colors:
         return []
-    return [
-        Transform("radial_map", _mk_radial_map(c), {"color": c})
-        for c in sorted(colors)
-    ]
+    return [Transform("radial_map", _mk_radial_map(c), {"color": c}) for c in sorted(colors)]
 
 
 def _propose_fill_busiest(examples: list[Example]) -> list[Transform]:
@@ -3181,9 +3064,7 @@ def _propose_fill_lanes(examples: list[Example]) -> list[Transform]:
     every output-only color can replay the lane rule exactly."""
     if any(inp.shape != out.shape for inp, out in examples):
         return []
-    colors = {
-        v for _, out in examples for _, _, v in out.iter_cells()
-    } - {0}
+    colors = {v for _, out in examples for _, _, v in out.iter_cells()} - {0}
     return [
         Transform("fill_lanes", _mk_fill_lanes(c), {"color": c})
         for c in sorted(colors)
@@ -3197,9 +3078,7 @@ def _propose_eye_ray(examples: list[Example]) -> list[Transform]:
     for inp, out in examples:
         if inp.shape != out.shape:
             return []
-        counts = Counter(
-            v for _, _, v in inp.iter_cells() if v != 0
-        )
+        counts = Counter(v for _, _, v in inp.iter_cells() if v != 0)
         if len(counts) != 2 or 1 not in counts.values():
             return []
     if all(_apply_eye_ray(inp) == out for inp, out in examples):
@@ -3230,17 +3109,11 @@ def _propose_draw_lines(examples: list[Example]) -> list[Transform]:
         for r, c, v in inp.iter_cells():
             if v == 0:
                 continue
-            row_hits = sum(
-                1 for cc in range(out.width) if out.at(r, cc) == v
-            )
-            col_hits = sum(
-                1 for rr in range(out.height) if out.at(rr, c) == v
-            )
+            row_hits = sum(1 for cc in range(out.width) if out.at(r, cc) == v)
+            col_hits = sum(1 for rr in range(out.height) if out.at(rr, c) == v)
             if row_hits == col_hits:
                 ambiguous.add(v)
-            elif v in guessed and guessed[v] != (
-                "row" if row_hits > col_hits else "column"
-            ):
+            elif v in guessed and guessed[v] != ("row" if row_hits > col_hits else "column"):
                 ambiguous.add(v)
             else:
                 guessed[v] = "row" if row_hits > col_hits else "column"
@@ -3261,7 +3134,8 @@ def _propose_draw_lines(examples: list[Example]) -> list[Transform]:
             continue
         seen.add(key)
         cand = Transform(
-            "draw_lines", _mk_draw_lines(table),
+            "draw_lines",
+            _mk_draw_lines(table),
             {"table": {str(k): a for k, a in table.items()}},
         )
         if all(cand.apply(inp) == out for inp, out in examples):
@@ -3281,9 +3155,10 @@ def _propose_count_blocks(examples: list[Example]) -> list[Transform]:
     for inp, out in examples:
         row = [out.at(0, c) for c in range(width)]
         possible = {
-            c for c in inp.colors() if c != 0
-            and row == [c] * _count_squares(inp, c) + [0] * (
-                width - _count_squares(inp, c))
+            c
+            for c in inp.colors()
+            if c != 0
+            and row == [c] * _count_squares(inp, c) + [0] * (width - _count_squares(inp, c))
         }
         candidates = possible if candidates is None else candidates & possible
         if not candidates:
@@ -3291,8 +3166,7 @@ def _propose_count_blocks(examples: list[Example]) -> list[Transform]:
     if not candidates:
         return []
     return [
-        Transform("count_blocks", _mk_count_blocks(c, width),
-                  {"color": c, "width": width})
+        Transform("count_blocks", _mk_count_blocks(c, width), {"color": c, "width": width})
         for c in sorted(candidates)
     ]
 
@@ -3317,10 +3191,7 @@ def _propose_classify_shape(examples: list[Example]) -> list[Transform]:
         shapes.add(inp.shape)
     if len(shapes) != 1:
         return []
-    return [
-        Transform("classify_shape", _mk_classify_shape(table),
-                  {"table": table})
-    ]
+    return [Transform("classify_shape", _mk_classify_shape(table), {"table": table})]
 
 
 def _propose_settle(examples: list[Example]) -> list[Transform]:
@@ -3335,7 +3206,9 @@ def _propose_settle(examples: list[Example]) -> list[Transform]:
             return []
     return [
         Transform(
-            f"settle_{d}", _mk_settle(d), {"direction": d},
+            f"settle_{d}",
+            _mk_settle(d),
+            {"direction": d},
         )
         for d in ("down", "up", "left", "right")
     ]
@@ -3353,7 +3226,9 @@ def _propose_bridge_endpoints(examples: list[Example]) -> list[Transform]:
     markers.discard(0)
     return [
         Transform(
-            "bridge_endpoints", _mk_bridge_endpoints(m), {"marker": m},
+            "bridge_endpoints",
+            _mk_bridge_endpoints(m),
+            {"marker": m},
         )
         for m in sorted(markers)
     ]
@@ -3380,22 +3255,14 @@ def _propose_cross_rays(examples: list[Example]) -> list[Transform]:
     for inp, out in examples:
         if inp.shape != out.shape:
             return []
-        dots = sum(
-            1
-            for r in range(inp.height)
-            for c in range(inp.width)
-            if inp.at(r, c) != 0
-        )
+        dots = sum(1 for r in range(inp.height) for c in range(inp.width) if inp.at(r, c) != 0)
         if dots < 2 or dots > 4:
             return []
     new_colors: set[int] = set()
     for inp, out in examples:
         new_colors |= set(out.colors()) - set(inp.colors())
     new_colors.discard(0)
-    return [
-        Transform("cross_rays", _mk_cross_rays(cl), {"clash": cl})
-        for cl in sorted(new_colors)
-    ]
+    return [Transform("cross_rays", _mk_cross_rays(cl), {"clash": cl}) for cl in sorted(new_colors)]
 
 
 #: All proposal generators. Order matters only for readability — the
@@ -3428,6 +3295,7 @@ PROPOSERS: tuple[Callable[[list[Example]], list[Transform]], ...] = (
     _propose_shift,
     _propose_self_tile,
     _propose_mark_diagonals,
+    _propose_corner_completion,
     _propose_extend_down,
     _propose_repeat_down,
     _propose_intersect_halves,
@@ -3551,9 +3419,7 @@ def parameterized_ops(input_grid: Grid) -> list[tuple[str, Op]]:
             continue
         ops.append((f"keep_color_{color}", _declining(_mk_select(color))))
         ops.append((f"erase_color_{color}", _declining(_mk_erase(color))))
-        ops.append(
-            (f"fill_enclosed_{color}", _declining(_mk_fill_enclosed(color)))
-        )
+        ops.append((f"fill_enclosed_{color}", _declining(_mk_fill_enclosed(color))))
         ops.append(
             (
                 f"recolor_largest_{color}",
@@ -3595,9 +3461,7 @@ def _single_example(
     return before, after
 
 
-def _verified(
-    op: Op, before: Grid, after: Grid
-) -> Op | None:
+def _verified(op: Op, before: Grid, after: Grid) -> Op | None:
     """The op only if it actually reproduces the observed change."""
     try:
         out = op(before)
@@ -3691,9 +3555,7 @@ def infer_recolor_map(examples: list[Example]) -> Op | None:
         return None
     mapping: dict[int, int] = {}
     consistent = True
-    for (_r, _c, v1), (_r2, _c2, v2) in zip(
-        before.iter_cells(), after.iter_cells(), strict=True
-    ):
+    for (_r, _c, v1), (_r2, _c2, v2) in zip(before.iter_cells(), after.iter_cells(), strict=True):
         if mapping.setdefault(v1, v2) != v2:
             # One source color mapped to two destinations, so this is
             # not a recoloring.

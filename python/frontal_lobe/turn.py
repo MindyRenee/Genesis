@@ -41,13 +41,12 @@ class Turn:
         # words — anaphora resolution rewrites "you" and would mark
         # every second-person question as being about Genesis.
         t1 = _time.perf_counter()
-        perception, prediction_error = engine._think_perceive_and_error(
-            raw_input, prediction
-        )
+        perception, prediction_error = engine._think_perceive_and_error(raw_input, prediction)
         timing["perceive"] = _time.perf_counter() - t1
         logger.debug(
             "perceive done in %.3fs, topics=%s",
-            timing["perceive"], perception.topics[:5],
+            timing["perceive"],
+            perception.topics[:5],
         )
 
         engine._think_learn_emotion_label(raw_input)
@@ -66,20 +65,44 @@ class Turn:
         engine._think_cognitive_surprise()
 
         (
-            emotion, _brain_waves, _user_model, _damasio_feeling, _memory_mode,
-            _memory_context, _reasoning_results, goal,
-            thought, _ddm_result, _workspace_item_summaries,
-            response, _repairs, answer_assessment,
-            _semantic_facts, state,
+            emotion,
+            _brain_waves,
+            _user_model,
+            _damasio_feeling,
+            _memory_mode,
+            _memory_context,
+            _reasoning_results,
+            goal,
+            thought,
+            _ddm_result,
+            _workspace_item_summaries,
+            response,
+            _repairs,
+            answer_assessment,
+            _semantic_facts,
+            state,
         ) = engine._think_run_pipeline(
-            resolved, perception, prediction_error, recent_turns,
-            learning_events, comprehension, timing, t0,
+            resolved,
+            perception,
+            prediction_error,
+            recent_turns,
+            learning_events,
+            comprehension,
+            timing,
+            t0,
         )
         timing["total"] = _time.perf_counter() - t0
         logger.debug("think() timing: %s", timing)
         return engine._think_post_response(
-            state, response, goal, perception, emotion, thought,
-            prediction, prediction_error, insights=None,
+            state,
+            response,
+            goal,
+            perception,
+            emotion,
+            thought,
+            prediction,
+            prediction_error,
+            insights=None,
             answer_assessment=answer_assessment,
             learning_events=learning_events,
             comprehension_result=comprehension,

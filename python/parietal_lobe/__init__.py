@@ -424,10 +424,18 @@ _EXPORTS: dict[str, str] = {
     "SaliencyMap": "parietal_lobe.saliency",
     "SaliencyResult": "parietal_lobe.saliency",
     # MT/V5 — per-cell normal flow and the moving regions it groups
+    # Now receives input from V1 M-pathway (dorsal stream)
     "MotionCell": "occipital_lobe.motion",
     "MotionField": "occipital_lobe.motion",
     "MotionProcessor": "occipital_lobe.motion",
     "MotionRegion": "occipital_lobe.motion",
+    # MSTd — two-view geometry across successive looks; heading and
+    # depth-from-parallax for the dorsal stream (co-claimed with
+    # occipital_lobe, where the estimator is defined)
+    "EpipolarProcessor": "occipital_lobe.epipolar",
+    "TwoViewReport": "occipital_lobe.epipolar",
+    # V1 M-pathway input (dorsal stream from occipital)
+    "VisualField": "occipital_lobe.v1",
     "PhonologicalLoop": "temporal_lobe.memory.working",
     "VisuoSpatialSketchpad": "temporal_lobe.memory.working",
     "WorkingMemory": "temporal_lobe.memory.working",
@@ -467,6 +475,18 @@ _EXPORTS: dict[str, str] = {
     "try_math": "frontal_lobe.reasoning.math_reasoning",
     "CalcResult": "parietal_lobe.math.arithmetic",
     "NumberSense": "parietal_lobe.math.number_sense",
+    # Descriptive statistics over collections — the same IPS
+    # magnitude machinery asked about a sample rather than a
+    # quantity.
+    "StatSummary": "parietal_lobe.math.statistics",
+    "summarize": "parietal_lobe.math.statistics",
+    # The formal layer — SymPy-backed symbolic manipulation and the
+    # equality oracle. Generation and verdict stay separate: cognition
+    # proposes, check_equality alone returns the verdict.
+    "compute": "parietal_lobe.math.symbolic",
+    "check_equality": "parietal_lobe.math.symbolic",
+    "SymbolicResult": "parietal_lobe.math.symbolic",
+    "Verdict": "parietal_lobe.math.symbolic",
     # The discourse situation model — the episodic state of the world
     # the current conversation describes (event comprehension;
     # distinct from the semantic network)
@@ -474,6 +494,30 @@ _EXPORTS: dict[str, str] = {
     "EntityState": "parietal_lobe.situation_model",
     "SituationEvent": "parietal_lobe.situation_model",
     "SituationModel": "parietal_lobe.situation_model",
+    # The correspondence theory of truth — Beta posteriors on whether
+    # a proposition corresponds to the state of affairs the
+    # situation model has settled (Verdict exported as TruthVerdict —
+    # the name is taken by the symbolic math layer)
+    "Correspondence": "parietal_lobe.correspondence",
+    "CorrespondenceLedger": "parietal_lobe.correspondence",
+    "Claim": "parietal_lobe.correspondence",
+    "TruthVerdict": "parietal_lobe.correspondence",
+    # Demonstration scenes — paired exemplar panels detected in a
+    # frame and handed to the prefrontal inductor (the parietal
+    # half of abstraction from examples: PPC holds the bound
+    # relational representations RLPFC integrates)
+    "ExemplarSession": "parietal_lobe.exemplars",
+    "ExemplarTarget": "parietal_lobe.exemplars",
+    # Strip perception — wall/segment parsing of bordered panels
+    # and the periodic runs inside them (the ventral scene-geometry
+    # the inductor consumes; perception lives here, not in frontal)
+    "segment": "parietal_lobe.strips",
+    "segment_ex": "parietal_lobe.strips",
+    "tile_seq": "parietal_lobe.strips",
+    "unit_shape": "parietal_lobe.strips",
+    "orbit": "parietal_lobe.strips",
+    "join_run": "parietal_lobe.strips",
+    "join": "parietal_lobe.strips",
     # Relational reasoning (IPS) and the egocentric world model
     "AbstractReasoner": "parietal_lobe.abstract_reasoning",
     "RelationalComplexity": "parietal_lobe.abstract_reasoning",
@@ -503,6 +547,15 @@ _EXPORTS: dict[str, str] = {
     "InnerLife": "frontal_lobe.inner_life",
     # The region itself — dorsal attention + situation model
     "ParietalLobe": "parietal_lobe.parietal",
+    # The task competencies the play loop drives — transform search
+    # over grids, relational arrangement, piece fitting, numerosity.
+    # The worlds they solve live in ``worlds`` (the P and R of the
+    # MDP); these are the agent side — the parietal tissue.
+    "SpatialAgent": "parietal_lobe.spatial.agent",
+    "SpatialReasoner": "parietal_lobe.spatial.solver",
+    "RelationsAgent": "parietal_lobe.relations",
+    "AssemblyAgent": "parietal_lobe.assembly",
+    "QuantitiesAgent": "parietal_lobe.quantities",
 }
 
 __all__ = sorted(_EXPORTS)

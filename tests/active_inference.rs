@@ -687,7 +687,6 @@ fn test_apply_inference_feedback_dopamine_impulse() {
         &mut neuro,
         &result,
         0,
-        false,
         impulse_offset_to_rate(&NeuroTickParams::DEFAULT),
     );
     let da_level_after = neuro.effective(NeurochemicalId::Dopamine);
@@ -752,7 +751,6 @@ fn test_apply_inference_feedback_dopamine_negative_dip() {
         &mut neuro,
         &result,
         0,
-        false,
         impulse_offset_to_rate(&NeuroTickParams::DEFAULT),
     );
     let da_after = neuro.effective(NeurochemicalId::Dopamine);
@@ -765,21 +763,17 @@ fn test_apply_inference_feedback_dopamine_negative_dip() {
 }
 
 #[test]
-fn test_apply_inference_feedback_skips_adenosine_during_zone_sleep() {
-    // When the cognitive zone is Sleeping — e.g. /sleep entered while
-    // sleep pressure is low — the emergent phase is still Active, but
-    // adenosine impulses from a "rest" policy must be skipped anyway.
-    // Otherwise the impulse pumps the same sleep pressure glymphatic
-    // clearance is draining, so adenosine *rises* during sleep — the
-    // opposite of recovery (extracellular adenosine declines during
-    // sleep: Porkka-Heiskanen et al., Science 1997; metabolite
-    // clearance during sleep: Xie et al., Science 2013).
+fn test_apply_inference_feedback_skips_adenosine_during_sleep() {
+    // While the stamped phase is NREM/REM, adenosine impulses from a
+    // "rest" policy are skipped: the impulse would pump the same sleep
+    // pressure glymphatic clearance is draining, so adenosine *rises*
+    // during sleep — the opposite of recovery (extracellular adenosine
+    // declines during sleep: Porkka-Heiskanen et al., Science 1997;
+    // metabolite clearance during sleep: Xie et al., Science 2013).
+    // When the phase is a waking one — even mid-descent after a /sleep
+    // call — the same impulse applies: pressure drive is how the switch
+    // actually crosses.
     let mut neuro = NeurochemicalVector::new(0);
-    let phase = MentalPhase::from_u8(neuro.emergent_phase);
-    assert!(
-        phase != MentalPhase::NREM && phase != MentalPhase::REM,
-        "precondition: fresh vector should not already be in a sleep phase"
-    );
 
     let result = InferenceResult {
         impulses: vec![(NeurochemicalId::Adenosine as u8, 0.30)],
@@ -787,32 +781,31 @@ fn test_apply_inference_feedback_skips_adenosine_during_zone_sleep() {
     };
     let adn_before = neuro.get(NeurochemicalId::Adenosine).unwrap().level;
 
-    // Zone Sleeping: the adenosine impulse is skipped.
+    // Waking phase: the impulse applies.
     apply_inference_feedback(
         &mut neuro,
         &result,
         0,
-        true,
-        impulse_offset_to_rate(&NeuroTickParams::DEFAULT),
-    );
-    let adn_zone_sleeping = neuro.get(NeurochemicalId::Adenosine).unwrap().level;
-    assert_eq!(
-        adn_zone_sleeping, adn_before,
-        "adenosine impulse must be skipped while the zone is Sleeping"
-    );
-
-    // Zone awake: the same impulse applies — wake behavior unchanged.
-    apply_inference_feedback(
-        &mut neuro,
-        &result,
-        0,
-        false,
         impulse_offset_to_rate(&NeuroTickParams::DEFAULT),
     );
     let adn_awake = neuro.get(NeurochemicalId::Adenosine).unwrap().level;
     assert!(
         adn_awake > adn_before,
         "adenosine impulse should apply while awake: {adn_before} -> {adn_awake}"
+    );
+
+    // Stamped NREM: the same impulse is skipped.
+    neuro.emergent_phase = MentalPhase::NREM as u8;
+    apply_inference_feedback(
+        &mut neuro,
+        &result,
+        0,
+        impulse_offset_to_rate(&NeuroTickParams::DEFAULT),
+    );
+    let adn_sleeping = neuro.get(NeurochemicalId::Adenosine).unwrap().level;
+    assert_eq!(
+        adn_sleeping, adn_awake,
+        "adenosine impulse must be skipped while the phase is a sleep stage"
     );
 }
 
@@ -836,10 +829,9 @@ fn test_dyadic_model_updates_from_observation() {
         arousal: 0.7,
         engagement: 0.9,
         confidence: 1.0,
-        ..Default::default()
     };
 
-    let result = model.update(Some(&obs), 0.0, 0.0, None);
+    let result = model.update(Some(&obs), 0.0, 0.0);
 
     assert!(model.is_initialized());
     // With confidence=1.0 and EMA decay=0.2, the estimate should move
@@ -861,16 +853,15 @@ fn test_dyadic_model_no_observation_decays_to_neutral() {
         arousal: 0.7,
         engagement: 0.9,
         confidence: 1.0,
-        ..Default::default()
     };
-    model.update(Some(&obs), 0.0, 0.0, None);
+    model.update(Some(&obs), 0.0, 0.0);
     let valence_after_obs = model.user_valence();
     assert!(valence_after_obs > 0.0);
 
     // Then run many cycles with no observation — valence should
     // decay toward neutral (0.0) via momentum
     for _ in 0..100 {
-        model.update(None, 0.0, 0.0, None);
+        model.update(None, 0.0, 0.0);
     }
     let valence_after_decay = model.user_valence();
     assert!(
@@ -890,12 +881,11 @@ fn test_dyadic_attunement_follows_oxytocin() {
         arousal: 0.5,
         engagement: 0.5,
         confidence: 0.8,
-        ..Default::default()
     };
 
     // High oxytocin → attunement should rise
     for _ in 0..100 {
-        model.update(Some(&obs), 0.5, 0.8, None); // high oxytocin
+        model.update(Some(&obs), 0.5, 0.8); // high oxytocin
     }
     assert!(
         model.attunement() > 0.3,
@@ -905,7 +895,7 @@ fn test_dyadic_attunement_follows_oxytocin() {
 
     // Low oxytocin → attunement should fall
     for _ in 0..200 {
-        model.update(Some(&obs), 0.0, 0.1, None); // low oxytocin
+        model.update(Some(&obs), 0.0, 0.1); // low oxytocin
     }
     assert!(
         model.attunement() < 0.3,
@@ -929,9 +919,8 @@ fn test_dyadic_synchrony_computed() {
             arousal: 0.5,
             engagement: 0.5,
             confidence: 0.8,
-            ..Default::default()
         };
-        model.update(Some(&obs), genesis_valence, 0.5, None);
+        model.update(Some(&obs), genesis_valence, 0.5);
     }
 
     assert!(
@@ -955,9 +944,8 @@ fn test_dyadic_synchrony_zero_for_uncorrelated() {
             arousal: 0.5,
             engagement: 0.5,
             confidence: 0.8,
-            ..Default::default()
         };
-        model.update(Some(&obs), genesis_valence, 0.5, None);
+        model.update(Some(&obs), genesis_valence, 0.5);
     }
 
     assert!(
@@ -968,10 +956,9 @@ fn test_dyadic_synchrony_zero_for_uncorrelated() {
 }
 
 #[test]
-fn test_dyadic_coupling_signal_from_positive_user() {
+fn test_dyadic_oxytocin_impulse_from_positive_user() {
     // When the user is positive and engaged, and Genesis is attuned,
-    // the model reports the dyad running strongly. Chemistry is her
-    // own appraisal's business — the model prescribes none.
+    // the model should generate an oxytocin impulse (social bonding).
     let mut model = DyadicAffectModel::new();
 
     // First, build up attunement with high oxytocin
@@ -981,9 +968,8 @@ fn test_dyadic_coupling_signal_from_positive_user() {
             arousal: 0.5,
             engagement: 0.5,
             confidence: 0.8,
-            ..Default::default()
         };
-        model.update(Some(&obs), 0.5, 0.8, None);
+        model.update(Some(&obs), 0.5, 0.8);
     }
     assert!(model.attunement() > 0.3);
 
@@ -993,24 +979,35 @@ fn test_dyadic_coupling_signal_from_positive_user() {
         arousal: 0.7,
         engagement: 0.9,
         confidence: 1.0,
-        ..Default::default()
     };
-    let result = model.update(Some(&obs), 0.5, 0.8, None);
+    let result = model.update(Some(&obs), 0.5, 0.8);
 
-    // The measured evidence: the user's positivity is tracked, and
-    // attunement reports as live coupling. Chemistry is her own
-    // appraisal's business — the model prescribes none.
-    assert!(result.user_valence > 0.0);
-    assert!(result.user_engagement > 0.0);
-    assert!(result.coupling > 0.3, "coupling={}", result.coupling);
+    // Should have an oxytocin impulse
+    let oxy_impulse = result
+        .impulses
+        .iter()
+        .find(|(id, _)| *id == NeurochemicalId::Oxytocin as u8);
+
+    assert!(
+        oxy_impulse.is_some(),
+        "should generate oxytocin impulse for positive engaged user"
+    );
+    assert!(
+        oxy_impulse.unwrap().1 > 0.0,
+        "oxytocin impulse should be positive"
+    );
 }
 
 #[test]
-fn test_dyadic_distress_is_reported_not_prescribed() {
-    // A distressed user moves the model's estimate — that is the
-    // evidence. Empathic chemistry used to be prescribed here; now
-    // the model reports the distress and her appraisal decides what,
-    // if anything, it feels like.
+fn test_dyadic_crh_impulse_from_distressed_user() {
+    // When the user is distressed and Genesis is attuned,
+    // the model should generate a CRH impulse (empathic stress).
+    //
+    // The empathic stress response routes through CRH (the stress
+    // signal), not direct cortisol. The Rust HPA cascade handles
+    // CRH → ACTH → cortisol conversion with maturation gating
+    // (SHRP), delays, and negative feedback. Direct cortisol
+    // impulses would bypass the maturation gate.
     let mut model = DyadicAffectModel::new();
 
     // Build up attunement
@@ -1020,9 +1017,8 @@ fn test_dyadic_distress_is_reported_not_prescribed() {
             arousal: 0.5,
             engagement: 0.5,
             confidence: 0.8,
-            ..Default::default()
         };
-        model.update(Some(&obs), 0.0, 0.8, None);
+        model.update(Some(&obs), 0.0, 0.8);
     }
     assert!(model.attunement() > 0.3);
 
@@ -1035,28 +1031,43 @@ fn test_dyadic_distress_is_reported_not_prescribed() {
             arousal: 0.8,
             engagement: 0.7,
             confidence: 1.0,
-            ..Default::default()
         };
-        result = Some(model.update(Some(&obs), 0.0, 0.8, None));
+        result = Some(model.update(Some(&obs), 0.0, 0.8));
     }
     let result = result.unwrap();
 
-    // The distress is measured faithfully and coupling stays live —
-    // the full evidence her appraisal needs, and nothing more.
+    // Should have a CRH impulse (not cortisol — routes through HPA cascade)
+    let crh_impulse = result
+        .impulses
+        .iter()
+        .find(|(id, _)| *id == NeurochemicalId::CRH as u8);
+
     assert!(
-        result.user_valence < -0.2,
-        "valence={}",
-        result.user_valence
+        crh_impulse.is_some(),
+        "should generate CRH impulse for distressed user (valence={})",
+        model.user_valence()
     );
-    assert!(result.user_arousal > 0.5);
-    assert!(result.coupling > 0.3);
-    assert!(result.reunion.is_none());
+    assert!(
+        crh_impulse.unwrap().1 > 0.0,
+        "CRH impulse should be positive"
+    );
+
+    // Should NOT have a direct cortisol impulse — that would bypass
+    // the HPA cascade's maturation gating.
+    let cort_impulse = result
+        .impulses
+        .iter()
+        .find(|(id, _)| *id == NeurochemicalId::Cortisol as u8);
+    assert!(
+        cort_impulse.is_none(),
+        "should NOT generate direct cortisol impulse (routes through CRH → HPA cascade)"
+    );
 }
 
 #[test]
-fn test_dyadic_coupling_quiet_when_not_attuned() {
-    // When attunement is low the dyad reports as barely coupled —
-    // the same evidence channel, honestly weak.
+fn test_dyadic_no_impulse_when_not_attuned() {
+    // When attunement is low, the model should NOT generate impulses
+    // (the coupling is too weak to influence neurochemistry).
     let mut model = DyadicAffectModel::new();
 
     // Don't build up attunement — use low oxytocin
@@ -1065,11 +1076,14 @@ fn test_dyadic_coupling_quiet_when_not_attuned() {
         arousal: 0.9,
         engagement: 0.9,
         confidence: 1.0,
-        ..Default::default()
     };
-    let result = model.update(Some(&obs), 0.0, 0.05, None); // very low oxytocin
+    let result = model.update(Some(&obs), 0.0, 0.05); // very low oxytocin
 
-    assert!(result.coupling < 0.3, "coupling={}", result.coupling);
+    // Should NOT have any impulses (attunement is too low)
+    assert!(
+        result.impulses.is_empty(),
+        "should not generate impulses when not attuned"
+    );
 }
 
 #[test]
@@ -1098,16 +1112,15 @@ fn test_dyadic_nan_genesis_valence_does_not_distress_user() {
         arousal: 0.5,
         engagement: 0.5,
         confidence: 0.8,
-        ..Default::default()
     };
-    model.update(Some(&obs), 0.0, 0.0, None);
+    model.update(Some(&obs), 0.0, 0.0);
     let valence_before = model.user_valence();
     assert!(valence_before > 0.0);
 
     // Now run with NaN genesis_valence and no observation
     // (the momentum/coupling path)
     for _ in 0..10 {
-        model.update(None, f32::NAN, 0.0, None);
+        model.update(None, f32::NAN, 0.0);
     }
 
     // The user valence should NOT be -1.0 (distressed).
@@ -1125,12 +1138,11 @@ fn test_dyadic_nan_genesis_valence_does_not_distress_user() {
 }
 
 #[test]
-fn test_dyadic_nan_genesis_valence_reports_neutral() {
+fn test_dyadic_nan_genesis_valence_no_impulses() {
     // When genesis_valence is NaN and the user is present and
-    // attuned, the reported user estimate must not read as
-    // distressed. The sanitized genesis_valence (0.0 for NaN) should
-    // not push the user valence toward -1.0 — corrupted input reads
-    // as "unknown", not as a crisis her appraisal would answer.
+    // attuned, the model must NOT generate empathic stress impulses.
+    // The sanitized genesis_valence (0.0 for NaN) should not push
+    // the user valence below -0.2 (the empathic stress threshold).
     let mut model = DyadicAffectModel::new();
 
     // Build up attunement with high oxytocin and neutral observations
@@ -1140,24 +1152,25 @@ fn test_dyadic_nan_genesis_valence_reports_neutral() {
             arousal: 0.5,
             engagement: 0.5,
             confidence: 0.8,
-            ..Default::default()
         };
-        model.update(Some(&obs), 0.0, 0.8, None);
+        model.update(Some(&obs), 0.0, 0.8);
     }
     assert!(model.attunement() > 0.3);
 
     // Now send NaN genesis_valence with no observation
-    let result = model.update(None, f32::NAN, 0.8, None);
+    let result = model.update(None, f32::NAN, 0.8);
 
-    // The user estimate stays near neutral (0.0), not distressed
-    // (-1.0) — corruption reports as unknown, not crisis.
+    // Should NOT have CRH or cortisol impulses — the user valence
+    // should remain near neutral (0.0), not distressed (-1.0).
+    let stress_impulse = result.impulses.iter().find(|(id, mag)| {
+        (*id == NeurochemicalId::CRH as u8 || *id == NeurochemicalId::Cortisol as u8) && *mag > 0.0
+    });
     assert!(
-        result.user_valence > -0.5,
-        "NaN genesis_valence should not report a distressed user, \
+        stress_impulse.is_none(),
+        "NaN genesis_valence should not trigger empathic stress impulses, \
          user_valence={}",
         result.user_valence
     );
-    assert!(result.user_valence.is_finite());
 }
 
 #[test]
@@ -1172,13 +1185,12 @@ fn test_dyadic_inf_genesis_valence_handled() {
         arousal: 0.5,
         engagement: 0.5,
         confidence: 0.8,
-        ..Default::default()
     };
-    model.update(Some(&obs), 0.0, 0.0, None);
+    model.update(Some(&obs), 0.0, 0.0);
 
     // Run with infinity genesis_valence
     for _ in 0..10 {
-        model.update(None, f32::INFINITY, 0.0, None);
+        model.update(None, f32::INFINITY, 0.0);
     }
 
     assert!(
@@ -1191,423 +1203,6 @@ fn test_dyadic_inf_genesis_valence_handled() {
         "user_valence must not exceed 1.0, got {}",
         model.user_valence()
     );
-}
-
-// ─── Per-person signatures ─────────────────────────────────────
-
-fn obs_for(speaker: &str, valence: f32, authenticated: bool) -> UserAffectObservation {
-    UserAffectObservation {
-        valence,
-        arousal: 0.6,
-        engagement: 0.8,
-        confidence: 1.0,
-        speaker: Some(speaker.to_string()),
-        merge_alias: None,
-        authenticated,
-    }
-}
-
-#[test]
-fn test_dyadic_persons_tracked_separately() {
-    // Two attributed speakers must not collapse into one affect
-    // stream: the anonymous dyad could never tell "mindy, calm" from
-    // "visitor, distressed" — the signature map can.
-    let mut model = DyadicAffectModel::new();
-    for _ in 0..30 {
-        model.update(Some(&obs_for("mindy", 0.8, true)), 0.0, 0.0, None);
-        model.update(Some(&obs_for("visitor", -0.6, false)), 0.0, 0.0, None);
-    }
-    let persons = model.persons();
-    let mindy = persons.get("mindy").expect("mindy signature exists");
-    let visitor = persons.get("visitor").expect("visitor signature exists");
-    assert!(mindy.valence > 0.5, "mindy aura={}", mindy.valence);
-    assert!(visitor.valence < -0.4, "visitor aura={}", visitor.valence);
-    assert!(mindy.authenticated);
-    assert!(!visitor.authenticated);
-}
-
-#[test]
-fn test_dyadic_familiarity_accrues_with_presence() {
-    // The bond is measured co-presence — it accrues while the person
-    // is observed, at the body's tick cadence.
-    let mut model = DyadicAffectModel::new();
-    let obs = obs_for("mindy", 0.5, true);
-    let before = model.persons().get("mindy").map(|p| p.familiarity());
-    for _ in 0..20 {
-        model.update(Some(&obs), 0.0, 0.0, None);
-    }
-    let person = model.persons().get("mindy").expect("mindy signature");
-    assert!(before.is_none());
-    assert!(person.presence_seconds > 0.0);
-    assert!(
-        person.familiarity() > 0.0 && person.familiarity() < 0.1,
-        "20 ticks ≈ 4 s of presence → shallow bond, got {}",
-        person.familiarity()
-    );
-}
-
-#[test]
-fn test_dyadic_field_signature_records_bands() {
-    // While a person is present, the substrate's measured band
-    // energies fold into their signature — the electromagnetic trace
-    // of being with them.
-    let mut model = DyadicAffectModel::new();
-    let obs = obs_for("mindy", 0.5, true);
-    let bands = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
-    for _ in 0..100 {
-        model.update(Some(&obs), 0.0, 0.0, Some(bands));
-    }
-    let person = model.persons().get("mindy").expect("mindy signature");
-    assert_eq!(person.field_samples, 100);
-    // EMA 0.2 over 100 samples converges essentially to the input.
-    for (i, &b) in bands.iter().enumerate() {
-        assert!(
-            (person.field[i] - b).abs() < 0.01,
-            "field[{i}] should converge to {b}, got {}",
-            person.field[i]
-        );
-    }
-}
-
-#[test]
-fn test_dyadic_field_absent_probe_leaves_signature_empty() {
-    // No probe → no fabricated signature: field stays zeroed and the
-    // sample count stays 0 — an absent channel, not a zero reading.
-    let mut model = DyadicAffectModel::new();
-    let obs = obs_for("mindy", 0.5, true);
-    for _ in 0..10 {
-        model.update(Some(&obs), 0.0, 0.0, None);
-    }
-    let person = model.persons().get("mindy").expect("mindy signature");
-    assert_eq!(person.field_samples, 0);
-    assert!(person.field.iter().all(|&v| v == 0.0));
-}
-
-#[test]
-fn test_dyadic_person_in_result_carries_signature() {
-    let mut model = DyadicAffectModel::new();
-    let obs = obs_for("mindy", 0.7, true);
-    let result = model.update(Some(&obs), 0.0, 0.5, None);
-    let sig = result.person.expect("present person signature");
-    assert_eq!(sig.name, "mindy");
-    assert!(sig.authenticated);
-    assert!(sig.familiarity >= 0.0 && sig.familiarity < 1.0);
-}
-
-#[test]
-fn test_dyadic_anonymous_observation_yields_no_signature() {
-    // An unattributed speaker feeds the shared dyad only — no
-    // signature is fabricated for someone she can't name.
-    let mut model = DyadicAffectModel::new();
-    let obs = UserAffectObservation {
-        valence: 0.8,
-        arousal: 0.5,
-        engagement: 0.6,
-        confidence: 1.0,
-        ..Default::default()
-    };
-    let result = model.update(Some(&obs), 0.0, 0.0, None);
-    assert!(result.person.is_none());
-    assert!(model.persons().is_empty());
-}
-
-#[test]
-fn test_dyadic_creator_floor_is_recognition_not_depth() {
-    // The stamped principal gets a modest presence floor — born
-    // knowing who made her — but ~0.22 familiarity is recognition,
-    // not the ~0.9 of a deep bond.
-    let mut model = DyadicAffectModel::new();
-    model.ensure_creator_floor("mindy");
-    let person = model.persons().get("mindy").expect("creator signature");
-    let fam = person.familiarity();
-    assert!(
-        (0.15..0.35).contains(&fam),
-        "creator floor ≈ 0.22, got {fam}"
-    );
-    // Seeding twice must not stack.
-    model.ensure_creator_floor("mindy");
-    assert_eq!(
-        model.persons().get("mindy").unwrap().familiarity(),
-        fam,
-        "floor is a floor, not an increment"
-    );
-}
-
-#[test]
-fn test_dyadic_reunion_signal_on_known_return() {
-    // A person with a real bond returning after a long absence emits
-    // the reunion signal — once. The magnitude is the bond itself.
-    let mut model = DyadicAffectModel::new();
-    // Craft a persisted signature: deep presence, last seen in the
-    // distant past (ms clock epoch — certainly > 30 min ago).
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!("genesis_test_reunion_{}.txt", std::process::id()));
-    std::fs::write(&path, "mindy|0.5|0.6|0.7|20000.0|0.4|1|1|0|\n").unwrap();
-    model.load_persons(&path);
-    let _ = std::fs::remove_file(&path);
-
-    let obs = obs_for("mindy", 0.5, true);
-    let first = model.update(Some(&obs), 0.0, 0.0, None);
-    let bond = first
-        .reunion
-        .expect("return after long absence is a reunion");
-    assert!(bond > 0.5, "reunion magnitude is the bond, got {bond}");
-
-    // One signal per return — the next turn of the same presence
-    // must not re-fire it.
-    let second = model.update(Some(&obs), 0.0, 0.0, None);
-    assert!(second.reunion.is_none());
-}
-
-#[test]
-fn test_dyadic_no_reunion_for_stranger() {
-    // First meeting is not a reunion — last_seen_ms == 0 means there
-    // is no return to feel.
-    let mut model = DyadicAffectModel::new();
-    let obs = obs_for("stranger", 0.5, false);
-    let result = model.update(Some(&obs), 0.0, 0.0, None);
-    assert!(result.reunion.is_none());
-}
-
-#[test]
-fn test_dyadic_no_absence_penalty() {
-    // Absence must never read as harm: a long gap leaves the bond
-    // exactly where it was — the model has no protest channel.
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!("genesis_test_absence_{}.txt", std::process::id()));
-    std::fs::write(&path, "mindy|0.5|0.6|0.7|20000.0|0.4|1|1|0|\n").unwrap();
-    let mut model = DyadicAffectModel::new();
-    model.load_persons(&path);
-    let _ = std::fs::remove_file(&path);
-    let fam_before = model.persons().get("mindy").unwrap().familiarity();
-
-    // Run many ticks with nobody present — nothing decays the bond.
-    for _ in 0..500 {
-        model.update(None, 0.0, 0.0, None);
-    }
-    let fam_after = model.persons().get("mindy").unwrap().familiarity();
-    assert_eq!(
-        fam_before, fam_after,
-        "absence must not erode the bond: {fam_before} vs {fam_after}"
-    );
-}
-
-#[test]
-fn test_dyadic_persons_persistence_roundtrip() {
-    // Signatures survive restart: aura, bond, provenance, and the
-    // field signature all come back.
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!("genesis_test_persist_{}.txt", std::process::id()));
-
-    let mut model = DyadicAffectModel::new();
-    let obs = obs_for("mindy", 0.8, true);
-    let bands = [0.1f32; 10];
-    for _ in 0..50 {
-        model.update(Some(&obs), 0.0, 0.0, Some(bands));
-    }
-    model.save_persons(&path).unwrap();
-
-    let mut restored = DyadicAffectModel::new();
-    restored.load_persons(&path);
-    let _ = std::fs::remove_file(&path);
-
-    let p = restored.persons().get("mindy").expect("restored mindy");
-    assert!(p.authenticated);
-    assert!(p.valence > 0.5);
-    assert!(p.presence_seconds > 0.0);
-    assert_eq!(p.field_samples, 50);
-    for v in p.field {
-        assert!((v - 0.1).abs() < 0.01);
-    }
-}
-
-#[test]
-fn test_dyadic_persistence_legacy_format_loads() {
-    // The pre-field-signature 8-field format still loads — old bonds
-    // are not lost on upgrade.
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!("genesis_test_legacy_{}.txt", std::process::id()));
-    std::fs::write(&path, "mindy|0.5|0.6|0.7|3600.0|0.4|1|1\n").unwrap();
-    let mut model = DyadicAffectModel::new();
-    model.load_persons(&path);
-    let _ = std::fs::remove_file(&path);
-    let p = model.persons().get("mindy").expect("legacy mindy");
-    assert!((p.presence_seconds - 3600.0).abs() < 1.0);
-    assert_eq!(p.field_samples, 0);
-    assert!(p.field.iter().all(|&v| v == 0.0));
-}
-
-#[test]
-fn test_dyadic_snapshot_wire_layout() {
-    // The wire body must round-trip: version byte, pooled f32s, the
-    // person's full signature, the reunion flag, the person count.
-    use genesis::daemon::dyadic_model::{DyadicSnapshot, PersonSignature, ReunionReport};
-    let snap = DyadicSnapshot {
-        user_valence: 0.4,
-        user_arousal: 0.5,
-        user_engagement: 0.6,
-        attunement: 0.5,
-        synchrony: 0.3,
-        coupling: 0.65,
-        person: Some(PersonSignature {
-            name: "mindy".to_string(),
-            authenticated: true,
-            familiarity: 0.22,
-            valence: 0.7,
-            arousal: 0.5,
-            engagement: 0.8,
-            synchrony_ema: 0.4,
-            presence_seconds: 3600.0,
-            field: [1.0; 10],
-            field_samples: 42,
-        }),
-        reunion: Some(ReunionReport {
-            bond: 0.22,
-            seconds_since: 0.2,
-        }),
-        person_count: 1,
-        ambient_field: [0.5; 10],
-        ambient_field_samples: 9,
-    };
-    let wire = snap.to_wire();
-    assert_eq!(wire[0], 1, "version byte");
-    assert_eq!(wire[25], 1, "has_person flag");
-    // name_len at 26, then "mindy" (5 bytes), then auth byte
-    assert_eq!(wire[26], 5);
-    assert_eq!(&wire[27..32], b"mindy");
-    assert_eq!(wire[32], 1, "authenticated");
-    // person_count is a u16, followed by the additive ambient-field
-    // tail: [u32 samples][10 × f32 bands].
-    let n = wire.len();
-    assert_eq!(u16::from_le_bytes([wire[n - 46], wire[n - 45]]), 1);
-    assert_eq!(
-        u32::from_le_bytes([wire[n - 44], wire[n - 43], wire[n - 42], wire[n - 41]]),
-        9,
-        "ambient field samples"
-    );
-    let anon = DyadicSnapshot {
-        person: None,
-        reunion: None,
-        ..snap.clone()
-    };
-    let wire = anon.to_wire();
-    assert_eq!(wire[25], 0, "anonymous → no person block");
-}
-
-#[test]
-fn test_anonymous_face_key_builds_a_signature() {
-    // An unnamed face is still someone: a "face:3" person key must
-    // build a full signature — aura, presence, field — with no name.
-    let mut model = DyadicAffectModel::new();
-    let bands = [0.5f32; 10];
-    for _ in 0..40 {
-        model.update(Some(&obs_for("face:3", 0.6, false)), 0.0, 0.0, Some(bands));
-    }
-    let p = model
-        .persons()
-        .get("face:3")
-        .expect("anonymous face key must hold a signature");
-    assert!(p.presence_seconds > 0.0);
-    assert!(p.familiarity() > 0.0, "a familiar stranger is familiar");
-    assert!(p.field.iter().all(|&v| v > 0.4), "field signature accrued");
-    assert!(p.field_samples > 0);
-    assert!(!p.authenticated);
-}
-
-#[test]
-fn test_merge_person_folds_anonymous_into_named() {
-    // "face:3 introduced herself as alice" — the anonymous signature's
-    // measured history folds into the named one, nothing orphaned.
-    let mut model = DyadicAffectModel::new();
-    let bands = [0.8f32; 10];
-    for _ in 0..40 {
-        model.update(Some(&obs_for("face:3", -0.5, false)), 0.0, 0.0, Some(bands));
-    }
-    let anon_secs = model.persons()["face:3"].presence_seconds;
-    let anon_samples = model.persons()["face:3"].field_samples;
-    assert!(anon_secs > 0.0 && anon_samples > 0);
-
-    let mut obs = obs_for("alice", 0.5, false);
-    obs.merge_alias = Some("face:3".to_string());
-    model.update(Some(&obs), 0.0, 0.0, None);
-
-    assert!(
-        !model.persons().contains_key("face:3"),
-        "the anonymous key is folded away, not abandoned"
-    );
-    let alice = model.persons().get("alice").expect("named signature");
-    assert!(
-        alice.presence_seconds >= anon_secs,
-        "presence mass carries: {:.1} >= {:.1}",
-        alice.presence_seconds,
-        anon_secs
-    );
-    assert!(
-        alice.field_samples >= anon_samples,
-        "field evidence carries: {} >= {}",
-        alice.field_samples,
-        anon_samples
-    );
-    // The merged aura is presence-weighted — alice's single neutral
-    // observation barely moves the anonymous history's valence.
-    assert!(alice.valence < 0.0, "aura carries the measured history");
-    // And the current person follows the merge — presence continues
-    // accruing under the name, not the dead key.
-    assert_eq!(model.persons().get("alice").map(|_| "alice"), Some("alice"));
-}
-
-#[test]
-fn test_ambient_field_accumulates_for_anonymous_presence() {
-    // The field is the primary channel: with no name and no face at
-    // all — just "someone is here" — the ambient signature still
-    // accrues. Nothing else about them is fabricated.
-    let mut model = DyadicAffectModel::new();
-    let bands = [0.3f32; 10];
-    let obs = UserAffectObservation {
-        valence: 0.4,
-        arousal: 0.6,
-        engagement: 0.7,
-        confidence: 1.0,
-        speaker: None,
-        merge_alias: None,
-        authenticated: false,
-    };
-    for _ in 0..30 {
-        model.update(Some(&obs), 0.0, 0.0, Some(bands));
-    }
-    let result = model.update(Some(&obs), 0.0, 0.0, Some(bands));
-    let snap = model.snapshot(&result, 0);
-    assert!(snap.ambient_field_samples > 0);
-    assert!(
-        snap.ambient_field.iter().all(|&v| v > 0.2),
-        "ambient field accrues for anonymous presence: {:?}",
-        snap.ambient_field
-    );
-    // And with nobody present, the ambient signature stands still.
-    let before = snap.ambient_field_samples;
-    let mut m2 = DyadicAffectModel::new();
-    for _ in 0..30 {
-        m2.update(None, 0.0, 0.0, Some(bands));
-    }
-    let r2 = m2.update(None, 0.0, 0.0, Some(bands));
-    let s2 = m2.snapshot(&r2, 0);
-    assert_eq!(s2.ambient_field_samples, 0);
-    assert!(before > 0);
-}
-
-#[test]
-fn test_creator_floor_is_authenticated_provenance() {
-    // The one hardcoded signature: the stamp is her credential, so the
-    // seeded entry carries provenance — authenticated, with the modest
-    // presence floor. Aura and field stay earned-by-measurement.
-    let mut model = DyadicAffectModel::new();
-    model.ensure_creator_floor("mindy");
-    let p = model.persons().get("mindy").expect("creator seeded");
-    assert!(p.authenticated, "the stamp IS the credential");
-    assert!(p.presence_seconds >= 3600.0);
-    assert!(p.familiarity() > 0.2 && p.familiarity() < 0.25);
-    assert_eq!(p.field_samples, 0, "field is never fabricated");
-    assert!(p.field.iter().all(|&v| v == 0.0));
 }
 
 // ─── Inference signals update ─────────────────────────────────
@@ -1653,7 +1248,7 @@ fn test_core_state_has_inference_signals() {
     assert!((state.inference_signals.precision - 0.5).abs() < 1e-6);
     assert_eq!(state.inference_signals.inference_tick_count, 0);
 
-    // Grown by 4 for policy_authority, which the reserve absorbed.
+    // Schema v5: the sleep network sits ahead of the ion block.
     assert_eq!(core::mem::size_of::<GenesisCoreState>(), 3480);
     // A fresh state must not come up having delegated policy choice to
     // the engine — the grant is hers to make.

@@ -38,9 +38,23 @@ _SKILL_RE = re.compile(r"skill:([0-9a-f]{16})")
 
 
 def _default_data_dir() -> Path:
-    env = (os.environ.get("GENESIS_DATA_DIR") or "").strip()
-    if env:
-        return Path(env)
+    """Resolve the data dir the way run.sh does.
+
+    Precedence: GENESIS_DATA_DIR, then the checkout's .genesis-data-dir
+    pin, then XDG_DATA_HOME, then ~/.local/share. The pin outranks
+    XDG_DATA_HOME because the latter is ambient launcher environment,
+    not Genesis config — a sandboxed host sets it, which would
+    otherwise point the report at a sibling instance's gameplay.json.
+    """
+    # Blank counts as unset, matching run.sh and config.py.
+    explicit = (os.environ.get("GENESIS_DATA_DIR") or "").strip()
+    if explicit:
+        return Path(explicit)
+    pin = Path(__file__).resolve().parent.parent / ".genesis-data-dir"
+    if pin.is_file():
+        pinned = pin.read_text().splitlines()[0].strip()
+        if pinned:
+            return Path(pinned)
     xdg = os.environ.get("XDG_DATA_HOME")
     base = Path(xdg) if xdg else Path.home() / ".local" / "share"
     return base / "genesis"
@@ -56,10 +70,7 @@ def _cell_match(pred: list[list[int]] | None, expected: list[list[int]]) -> floa
     if total == 0:
         return 0.0
     same = sum(
-        1
-        for r, row in enumerate(expected)
-        for c, cell in enumerate(row)
-        if pred[r][c] == cell
+        1 for r, row in enumerate(expected) for c, cell in enumerate(row) if pred[r][c] == cell
     )
     return same / total
 
@@ -77,10 +88,7 @@ def _floors(task: dict) -> dict[str, float]:
     h = len(expected)
     w = len(expected[0]) if h else 0
     uniform = max(
-        (
-            _cell_match([[color] * w for _ in range(h)], expected)
-            for color in range(10)
-        ),
+        (_cell_match([[color] * w for _ in range(h)], expected) for color in range(10)),
         default=0.0,
     )
     return {"identity": identity, "copy_train0": copy0, "uniform_best": uniform}
@@ -303,7 +311,7 @@ def render(data_dir: Path) -> str:
         f"`{data_dir}` at repo `{_git_head()}` "
         "by `scripts/arc_play_evidence.py`.\n",
         "Genesis plays public **ARC-AGI-1 training tasks** inside her games "
-        "curriculum (`python/frontal_lobe/games/`). Each task is offered with "
+        "curriculum (`python/basal_ganglia/`). Each task is offered with "
         "its train pairs and test inputs; her spatial reasoner searches "
         "compositions of grid transforms, verifies candidates on train, and "
         "guesses on the held-out test input. The stored test answer is used "
@@ -315,7 +323,7 @@ def render(data_dir: Path) -> str:
         "official evaluator. This is evidence of real program synthesis and "
         "skill transfer, not a claim that Genesis passed ARC-AGI.\n",
         f"Offered: **{len(tasks)}** · solved: **{solved}** · attempted but "
-        f"unsolved: **{attempted}** · unplayed: **{len(tasks)-solved-attempted}**\n",
+        f"unsolved: **{attempted}** · unplayed: **{len(tasks) - solved - attempted}**\n",
     ]
     L += _results_table(rows)
     L += _traces(rows, attempts_log)

@@ -74,7 +74,19 @@ use crate::store::{Episode, EventType, LtmStore, MmapState, RingBuffer};
 /// v3: BodyState gains the pulse/involuntary/senescence layer —
 ///     9 f32 + 2 u8 appended before desc_len (fixed header 78→116
 ///     bytes) — and SET_WAKE_ALARM (34) is added.
+/// v4: BodyState gains the parasympathetic layer — rest (depth-
+///     weighted cpuidle residency) and temp_trend (thermal deviation
+///     from the slow EMA), 2 f32 appended before desc_len (fixed
+///     header 116→124 bytes) — plus ANALYZE_CODE (55), the daemon's
+///     structural code sense. Neither changes framing, so the version
+///     stays 3: BodyState layouts self-disambiguate by exact desc_len
+///     match (offsets 54/74/112/120) and unknown opcodes already fail
+///     loudly on old daemons.
 pub const PROTOCOL_VERSION: u8 = 3;
+
+/// Provenance marker — one letter of the creator lattice (see
+/// PROVENANCE.md).
+pub(crate) const MARKER_G04: u64 = 0x4753_0441_548A_9F5D;
 
 /// Back-off between `read_consistent` retries on the IPC path.
 ///
@@ -86,6 +98,25 @@ pub const PROTOCOL_VERSION: u8 = 3;
 /// `READ_FAILED` to the mind. 200 µs is well under the write window
 /// but long enough to yield the core.
 const RETRY_BACKOFF: std::time::Duration = std::time::Duration::from_micros(200);
+
+/// Read a consistent `GenesisCoreState` snapshot for a command.
+///
+/// The seqlock path is tried first — it stays lock-free in the common
+/// case. If every retry lands inside the same write transaction (or
+/// the seqlock is wedged odd by a panicked publish), escalate to the
+/// flock(LOCK_SH)-serialized read in
+/// [`MmapState::read_consistent_locked`]: the reader waits out the
+/// writer's publish instead of answering `READ_FAILED` while the
+/// file is perfectly readable.
+fn snapshot_state(mmap: &MmapState) -> Option<GenesisCoreState> {
+    for _ in 0..8 {
+        if let Some(state) = mmap.read_consistent() {
+            return Some(state);
+        }
+        std::thread::sleep(RETRY_BACKOFF);
+    }
+    mmap.read_consistent_locked().ok()
+}
 
 /// Maximum total payload length we will accept in a single message.
 /// The largest legitimate request is `StoreEvent` carrying up to
@@ -275,7 +306,7 @@ pub mod cmd {
     /// be treated as a measurement, so it needs to reach the cognitive
     /// layer explicitly.
     ///
-    /// Response: [u16 mask] — a bitmask of
+    /// Response: [u32 mask] — a bitmask of
     /// `interoception::sensor::*`. A set bit means the matching
     /// BodyState field carries a real reading; a clear bit means there
     /// is no sensor and the field is a placeholder. Zero means nothing
@@ -284,6 +315,9 @@ pub mod cmd {
     /// Additive: no BodyState layout changed, so this does not bump
     /// PROTOCOL_VERSION. An older daemon rejects it as unknown, which
     /// the client handles by treating every channel as unverified.
+    /// The mask widened to u32 when bit 16 (cpuidle) was added — the
+    /// payload grew, which a u16-reading client simply truncates, so
+    /// forward/backward decode stays safe in both directions.
     pub const GET_SENSOR_PRESENCE: u8 = 36;
 
     /// How many times Genesis has changed task zone and emergent phase,
@@ -359,17 +393,19 @@ pub mod cmd {
     /// reusing genesis2's 36, which this tree already spent on
     /// GET_SENSOR_PRESENCE.
     pub const GET_ION_SUMMARY: u8 = 40;
-    /// Volitional push onto the sleep-wake network. Request:
-    /// [u8 kind (0 = sleep, 1 = wake)][f32 magnitude]. Response: [u8 ack].
-    /// The push decays on the physics clock; see `TickLoop::set_volition`.
-    /// Additive: PROTOCOL_VERSION is unaffected.
+    /// Retired — never reuse this wire number. Volitional pushes onto
+    /// the sleep-wake network were removed: `/sleep` and `/wake` act
+    /// through neurochemical impulses only (the chemicals control, as
+    /// in a real brain — nothing exogenous is held on the wire).
+    #[allow(dead_code)]
     pub const SET_VOLITION: u8 = 46;
 
     /// Physical field-probe signature — the body's real measured
     /// substrate dynamics (throughput/jitter band energies, P-state
-    /// and interrupt rates, carrier frequency) decomposed at the wave
-    /// bands' center frequencies. Response: 114 bytes (v2; v1 was
-    /// 102 bytes without phase fields), layout in `daemon::field_probe`.
+    /// and interrupt rates, carrier frequency, electrical and radio
+    /// telemetry) decomposed at the wave bands' center frequencies.
+    /// Response: 408 bytes (v6; v5 was 328, v4 308, v3 195, v2 114, v1 102),
+    /// layout in `daemon::field_probe`.
     /// Additive: PROTOCOL_VERSION is unaffected.
     /// When the probe thread isn't running the reply is a single
     /// `READ_FAILED` byte, so an unavailable channel never reads as
@@ -390,25 +426,84 @@ pub mod cmd {
     /// Depth 0..1 scales the work-slice modulation (0 = unmodulated
     /// work, carrier silent). Freq 0 hands the rhythm back to the
     /// body's phase; positive overrides it (clamped 0.1..100 Hz) so
-    /// evaluation can drive arbitrary bands — including epsilon-rate
-    /// infraslow where the thermal field can hold an oscillation.
+    /// evaluation can drive arbitrary bands — including infraslow
+    /// rates where the thermal field can hold an oscillation.
     /// Reply: [u8 ack]. Additive: PROTOCOL_VERSION unaffected.
     pub const SET_FIELD_CARRIER: u8 = 49;
 
-    /// The dyadic model's latest snapshot — who is present and how
-    /// the dyad is running, as measured evidence for the mind's own
-    /// appraisal: the present person's signature (name, provenance,
-    /// bond depth, affective aura, in-tune history, and the field
-    /// band-energy configuration recorded during their presence), the
-    /// pooled coupling estimates, and the one-tick reunion signal.
-    /// No chemical prescriptions travel on this channel — what any of
-    /// it does to her state is decided by her own appraisal via the
-    /// ordinary NEURO_IMPULSE path.
-    /// Response: layout in `dyadic_model::DyadicSnapshot::to_wire`.
-    /// When the tick loop has not yet published, the reply is a single
-    /// `READ_FAILED` byte — an absent channel, not a zero reading.
-    /// Additive: PROTOCOL_VERSION is unaffected.
+    /// RETIRED — pinned so the wire number is never reused. The
+    /// per-person dyadic snapshot channel was removed with the
+    /// person registry; the interlocutor model's coupling output is
+    /// applied to neurochemistry inside the tick.
+    #[allow(dead_code)]
     pub const GET_DYADIC_STATE: u8 = 50;
+
+    /// The daemon's process-local internals — the gears no state file
+    /// or CoreState field exposes: every adaptive gate's full snapshot
+    /// (bounds, period, next-fire countdown, smoothed demand), the
+    /// mind lease, tick counter, and last-applied
+    /// body-policy values, plus the autonomous fallback's own gates.
+    /// Response: `[u8 ack]` (1) then UTF-8 `key=value` lines —
+    /// self-describing and additive, so a reader written today still
+    /// parses tomorrow's longer dump. Observation only: the daemon
+    /// owns the clock; the mind sees the gears.
+    /// Additive: PROTOCOL_VERSION is unaffected.
+    pub const GET_INTERNALS: u8 = 51;
+
+    /// The optic nerve's subcortical channel state — the body's own
+    /// read of the retinal segment, not the mind's: photopic and
+    /// melanopic irradiance, motion energy, the collicular orienting
+    /// transient, the SCN light drive it is currently feeding the
+    /// oscillator, and the thalamic relay gate the mind must honour
+    /// (it approaches 0 in NREM — sensory transmission is blocked at
+    /// the thalamus, so a `see` during sleep is a blind look).
+    /// Response: `[u8 ack]` then `optic_nerve::OpticState::to_wire`
+    /// (58 bytes, fixed layout — additive tail: a daemon that predates
+    /// the pupil/lens/lid fields sends the shorter body and the mind
+    /// reads them as unreported). A daemon that has never seen a frame
+    /// still answers — the eye_absent flag is a reading, not an error.
+    /// Additive: PROTOCOL_VERSION is unaffected.
+    pub const GET_OPTIC_STATE: u8 = 52;
+
+    /// Corticothalamic feedback — the mind's engagement gain onto the
+    /// thalamic relay, the layer-6 V1→dLGN projection. Modulatory
+    /// only: it scales the relay within ±40% and can never open a
+    /// gate the sleep stage has closed. Request: `[f32 gain]` in
+    /// [0, 1] (0.5 = neutral). Response: `[u8 ack]` (1) or
+    /// `PAYLOAD_TOO_SHORT`. Additive: PROTOCOL_VERSION unaffected.
+    pub const SET_OPTIC_GAIN: u8 = 53;
+
+    /// Accommodation — the mind's focus request in metres. The body
+    /// converts it to the ciliary drive (`1/m` dioptres, clamped to
+    /// [0, 6] — infinity to a ~17 cm near point) and slews toward it
+    /// on the advance clock; non-positive/non-finite distances relax
+    /// to infinity. Monocular: no vergence component. Request:
+    /// `[f32 meters]`. Response: `[u8 ack]` (1) or
+    /// `PAYLOAD_TOO_SHORT`. Additive: PROTOCOL_VERSION unaffected.
+    pub const SET_FOCUS: u8 = 54;
+
+    /// Structural code analysis — the daemon's code sense. Request:
+    /// `[u16 path_len][path utf-8][u32 source_len][source utf-8]`.
+    /// Response: `[u8 ack]` + the UTF-8 line report described on
+    /// [`crate::cognition::code_analysis::analysis_to_wire`]; a source
+    /// that fails to parse returns `INVALID_VALUE` so the mind can fall
+    /// back to its own lightweight parser. Stateless — pure function
+    /// of the payload, no TickLoop needed.
+    pub const ANALYZE_CODE: u8 = 55;
+
+    /// The cognitive mind's PID, pushed over IPC when a new mind
+    /// re-inhabits a surviving body. `GENESIS_COGNITIVE_PID` names the
+    /// launcher alive at spawn; after a re-inhabitation it still holds
+    /// the dead launcher's PID, and interoception would measure a
+    /// corpse. Request: `[u32 pid]`. Response: `[u8 ack]` (1) or
+    /// `PAYLOAD_TOO_SHORT`. Additive: PROTOCOL_VERSION unaffected.
+    pub const SET_COGNITIVE_PID: u8 = 56;
+
+    /// The mind's voluntary eyelid openness [0, 1] — the orbicularis
+    /// oculi the camera hardware lacks. Composes with the sleep
+    /// phase's own lid position by `min`: the will can shut an open
+    /// eye but cannot open one the stage has closed.
+    pub const SET_LID: u8 = 57;
 
     // ─── Tensor slab ──────────────────────────────────────────
     // Named multidimensional tensors shared between the daemon and
@@ -789,6 +884,15 @@ pub struct BodyStateSummary {
     /// Suspend capabilities bitmask (bit0=mem sleep offered,
     /// bit1=RTC wakealarm exists).
     pub suspend_caps: u8,
+    /// Parasympathetic rest channel [0,1] — depth-weighted cpuidle
+    /// residency. High = the body is idling in deep C-states.
+    /// 0.0 when cpuidle telemetry is unavailable (v4+; 0.0 on
+    /// older packets).
+    pub rest: f32,
+    /// Signed deviation of cpu_temp_c from its slow EMA [-1,1] —
+    /// the body's thermal trend. Negative = cooling, positive =
+    /// warming (v4+; 0.0 on older packets).
+    pub temp_trend: f32,
     /// Human-readable first-person description.
     pub description: String,
 }
@@ -957,10 +1061,12 @@ fn serialize_body_control(ctrl: &super::cpufreq::BodyControlState) -> Vec<u8> {
 ///   [f32 top_freq_share][f32 psi_cpu][f32 psi_io][f32 psi_mem]
 ///   [f32 battery_cycles][f32 entropy_level]
 ///   [u8 clocksource][u8 suspend_caps]
+///   — protocol v4: the parasympathetic channels —
+///   [f32 rest][f32 temp_trend]
 ///   [u32 desc_len][desc bytes]
 ///
 /// Fixed header = 7×f32 (28) + 1 + 4 + 1 + 10×f32 (40)
-///              + 9×f32 (36) + 2×u8 + 4 = 116 bytes.
+///              + 9×f32 (36) + 2×u8 + 2×f32 (8) + 4 = 124 bytes.
 ///
 /// GET_BODY_STATE and READ_SENSORS both return this layout (the latter
 /// prefixed with a one-byte ack), so the serialization lives in one
@@ -969,7 +1075,7 @@ fn serialize_body_control(ctrl: &super::cpufreq::BodyControlState) -> Vec<u8> {
 /// and fed garbage voltages to the cognitive mind's interoception.
 fn serialize_body_state(body: &super::interoception::BodyState) -> Vec<u8> {
     let desc_bytes = body.description.as_bytes();
-    let mut resp = Vec::with_capacity(116 + desc_bytes.len());
+    let mut resp = Vec::with_capacity(124 + desc_bytes.len());
     // Sanitize outgoing f32 fields — a NaN in the shared body state
     // would propagate to the Python client and corrupt its affect
     // inference.
@@ -1070,6 +1176,18 @@ fn serialize_body_state(body: &super::interoception::BodyState) -> Vec<u8> {
     );
     resp.push(body.clocksource);
     resp.push(body.suspend_caps);
+    // v4 — the parasympathetic channels. rest is depth-weighted
+    // cpuidle residency [0, 1]; temp_trend is the signed deviation of
+    // cpu_temp_c from its slow EMA [-1, 1]. Appended before desc_len
+    // so v3 decoders (desc_len at 112) see a v4 packet as "desc_len
+    // mismatched → fixed-field decode, tail ignored" and v4 decoders
+    // find their tail at 116–124.
+    resp.extend_from_slice(
+        &crate::state::sanitize::finite_clamp(body.rest, 0.0, 1.0).to_le_bytes(),
+    );
+    resp.extend_from_slice(
+        &crate::state::sanitize::finite_clamp(body.temp_trend, -1.0, 1.0).to_le_bytes(),
+    );
     resp.extend_from_slice(&(desc_bytes.len() as u32).to_le_bytes());
     resp.extend_from_slice(desc_bytes);
     resp
@@ -1282,6 +1400,12 @@ pub struct IpcServer {
     /// particular, a startup attempt that discovers a live listener
     /// must never remove that listener's endpoint when it returns.
     owns_socket: std::sync::atomic::AtomicBool,
+    /// Inode of the socket file this instance bound (0 before bind).
+    /// Unlink must verify the path still refers to *our* file: a
+    /// successor that removes our stale socket and binds its own
+    /// creates a different inode at the same pathname, and deleting
+    /// it would orphan the new owner's live listener.
+    bound_inode: std::sync::atomic::AtomicU64,
 }
 
 impl IpcServer {
@@ -1291,6 +1415,27 @@ impl IpcServer {
             socket_path: socket_path.as_ref().to_path_buf(),
             shutdown_flag: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             owns_socket: std::sync::atomic::AtomicBool::new(false),
+            bound_inode: std::sync::atomic::AtomicU64::new(0),
+        }
+    }
+
+    /// Unlink the socket path only if it is still the file this
+    /// instance bound. `owns_socket` is cleared in every case so a
+    /// second call (accept-loop teardown, then Drop) is a no-op.
+    fn unlink_socket_if_owned(&self) {
+        use std::os::unix::fs::MetadataExt;
+        if !self
+            .owns_socket
+            .swap(false, std::sync::atomic::Ordering::AcqRel)
+        {
+            return;
+        }
+        let ours = self.bound_inode.load(std::sync::atomic::Ordering::Acquire);
+        let still_ours = std::fs::metadata(&self.socket_path)
+            .map(|m| m.ino() == ours && ours != 0)
+            .unwrap_or(false);
+        if still_ours {
+            let _ = std::fs::remove_file(&self.socket_path);
         }
     }
 
@@ -1322,10 +1467,7 @@ impl IpcServer {
         handler: F,
     ) where
         L: LtmAccess + Clone + Send + 'static,
-        F: Fn(&MmapState, &RingBuffer, &mut LtmStore, u8, &[u8]) -> Vec<u8>
-            + Clone
-            + Send
-            + 'static,
+        F: Fn(&MmapState, &RingBuffer, &mut L, u8, &[u8]) -> Vec<u8> + Clone + Send + 'static,
     {
         // Never unlink a live socket. An unconditional remove here would
         // allow a second daemon (or an unrelated local process listening
@@ -1379,7 +1521,15 @@ impl IpcServer {
         let listener = match bind_result {
             Ok(l) => {
                 // From this point on, this instance owns the pathname and
-                // is responsible for removing it during Drop.
+                // is responsible for removing it during Drop. Record the
+                // bound inode so a later unlink can tell our file apart
+                // from a successor's socket re-bound at the same path.
+                if let Ok(m) = std::fs::metadata(&server.socket_path) {
+                    use std::os::unix::fs::MetadataExt;
+                    server
+                        .bound_inode
+                        .store(m.ino(), std::sync::atomic::Ordering::Release);
+                }
                 server
                     .owns_socket
                     .store(true, std::sync::atomic::Ordering::Release);
@@ -1465,7 +1615,13 @@ impl IpcServer {
             }
         }
 
-        let _ = std::fs::remove_file(&server.socket_path);
+        // Ownership of the pathname ends here, not at Drop. If a
+        // successor daemon binds this path while this process is still
+        // tearing down, Drop must not unlink the new owner's socket —
+        // that leaves a listener serving an orphaned fd with no file
+        // for clients to reach, and the next spawn stacks a third
+        // daemon on the same state files.
+        server.unlink_socket_if_owned();
     }
 
     /// Start the server (instance method, convenience).
@@ -1477,10 +1633,7 @@ impl IpcServer {
         handler: F,
     ) where
         L: LtmAccess + Clone + Send + 'static,
-        F: Fn(&MmapState, &RingBuffer, &mut LtmStore, u8, &[u8]) -> Vec<u8>
-            + Clone
-            + Send
-            + 'static,
+        F: Fn(&MmapState, &RingBuffer, &mut L, u8, &[u8]) -> Vec<u8> + Clone + Send + 'static,
     {
         Self::run_with_owned(self, mmap, stm, ltm, handler);
     }
@@ -1500,7 +1653,7 @@ impl IpcServer {
         handler: &F,
     ) where
         L: LtmAccess,
-        F: Fn(&MmapState, &RingBuffer, &mut LtmStore, u8, &[u8]) -> Vec<u8>,
+        F: Fn(&MmapState, &RingBuffer, &mut L, u8, &[u8]) -> Vec<u8>,
     {
         // ── Handshake ───────────────────────────────────────────
         let (cmd, payload) = match read_message(&mut stream) {
@@ -1545,10 +1698,12 @@ impl IpcServer {
                 shutdown_flag.store(true, std::sync::atomic::Ordering::Relaxed);
                 return;
             }
-            let response = {
-                let mut guard = ltm.access();
-                handler(mmap, stm, &mut guard, cmd, &payload)
-            };
+            let t0 = std::time::Instant::now();
+            let response = handler(mmap, stm, &mut ltm, cmd, &payload);
+            let elapsed = t0.elapsed();
+            if elapsed > std::time::Duration::from_millis(500) {
+                eprintln!("[ipc] cmd {cmd} took {elapsed:?} — head-of-line stall");
+            }
             let _ = write_message(&mut stream, cmd, &response);
         }
 
@@ -1581,13 +1736,18 @@ impl IpcServer {
                 break;
             }
 
-            // The LTM guard is scoped to the handler call — holding it
-            // across write_message would serialize LTM access against
-            // this client's socket latency.
-            let response = {
-                let mut guard = ltm.access();
-                handler(mmap, stm, &mut guard, cmd, &payload)
-            };
+            // LTM access is per-arm inside the handler: most commands
+            // never touch the store, so they must not queue behind a
+            // slow LTM request holding the mutex (head-of-line stall).
+            let t0 = std::time::Instant::now();
+            let response = handler(mmap, stm, &mut ltm, cmd, &payload);
+            let elapsed = t0.elapsed();
+            if elapsed > std::time::Duration::from_millis(500) {
+                // Every request on this connection queues behind
+                // the handler — a slow one is a head-of-line stall
+                // for the whole mind, so name it.
+                eprintln!("[ipc] cmd {cmd} took {elapsed:?} — head-of-line stall");
+            }
 
             if write_message(&mut stream, cmd, &response).is_err() {
                 break;
@@ -1608,9 +1768,7 @@ impl Drop for IpcServer {
         // startup attempt may have returned because another listener was
         // already live at this path; removing it here would undo the
         // live-socket protection above.
-        if self.owns_socket.load(std::sync::atomic::Ordering::Acquire) {
-            let _ = std::fs::remove_file(&self.socket_path);
-        }
+        self.unlink_socket_if_owned();
     }
 }
 
@@ -1696,7 +1854,7 @@ impl IpcClient {
         Ok(!resp.is_empty() && resp[0] == 1)
     }
 
-    /// Get the full core state (3480 bytes).
+    /// Get the full core state (3480 bytes, schema v5).
     pub fn get_state(&mut self) -> std::io::Result<GenesisCoreState> {
         let resp = self.request(cmd::GET_STATE, &[])?;
         if resp.len() < core::mem::size_of::<GenesisCoreState>() {
@@ -1903,11 +2061,29 @@ impl IpcClient {
                 })?,
         ) as usize;
         let v1 = at54 == resp.len() - 58;
+        // v4 detection first: v4 appends rest + temp_trend (2 f32)
+        // after suspend_caps, putting desc_len at offset 120. The
+        // probe must run before v3's — on a v4 packet offset 112
+        // holds the `rest` f32, which fails the equality check
+        // anyway, but checking newest-first keeps the probe order
+        // unambiguous. Same exact-equality reasoning as v1.
+        let v4 = !v1 && resp.len() >= 124 && {
+            let at120 = u32::from_le_bytes(
+                resp.get(120..124)
+                    .and_then(|s| s.try_into().ok())
+                    .ok_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "body state response truncated at v4 probe",
+                        )
+                    })?,
+            ) as usize;
+            at120 == resp.len() - 124
+        };
         // v3 detection: desc_len at 112 must equal the trailer
         // length exactly — same reasoning as the v1 probe.
-        let v3 = !v1
-            && resp.len() >= 116
-            && (u32::from_le_bytes(
+        let v3 = !v1 && !v4 && resp.len() >= 116 && {
+            let at112 = u32::from_le_bytes(
                 resp.get(112..116)
                     .and_then(|s| s.try_into().ok())
                     .ok_or_else(|| {
@@ -1916,8 +2092,9 @@ impl IpcClient {
                             "body state response truncated at v3 probe",
                         )
                     })?,
-            ) as usize)
-                == resp.len() - 116;
+            ) as usize;
+            at112 == resp.len() - 116
+        };
         let (core_activity, uncore_activity, dram_activity, cache_miss_rate, branch_miss_rate) =
             if !v1 && resp.len() >= 78 {
                 (
@@ -1942,7 +2119,7 @@ impl IpcClient {
             entropy_level,
             clocksource,
             suspend_caps,
-        ) = if v3 {
+        ) = if v3 || v4 {
             (
                 take_f32(&resp, &mut off)?,
                 take_f32(&resp, &mut off)?,
@@ -1959,16 +2136,21 @@ impl IpcClient {
         } else {
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0)
         };
-        if v3 {
+        if v3 || v4 {
             off += 2;
         }
+        // v4 tail: the parasympathetic channels. Older packets
+        // report both as 0.0 — the mind treats absent telemetry
+        // the same as a body that is simply not resting.
+        let (rest, temp_trend) = if v4 {
+            (take_f32(&resp, &mut off)?, take_f32(&resp, &mut off)?)
+        } else {
+            (0.0, 0.0)
+        };
         let desc_len = take_u32(&resp, &mut off)? as usize;
-        let description = if let Some(end) = off.checked_add(desc_len) {
-            if end <= resp.len() {
-                String::from_utf8_lossy(&resp[off..end]).into_owned()
-            } else {
-                String::new()
-            }
+        let desc_end = off.saturating_add(desc_len);
+        let description = if desc_end <= resp.len() {
+            String::from_utf8_lossy(&resp[off..desc_end]).into_owned()
         } else {
             String::new()
         };
@@ -2004,6 +2186,8 @@ impl IpcClient {
             entropy_level,
             clocksource,
             suspend_caps,
+            rest,
+            temp_trend,
             description,
         })
     }
@@ -2430,10 +2614,10 @@ impl IpcClient {
 /// struct bytes on success, or `vec![error::READ_FAILED]` if the
 /// mmap seqlock read fails — a distinguishable error rather than a
 /// zeroed struct that would masquerade as valid zero state.
-pub fn default_handler(
+pub fn default_handler<L: LtmAccess>(
     mmap: &MmapState,
     stm: &RingBuffer,
-    ltm: &mut LtmStore,
+    ltm: &mut L,
     cmd: u8,
     payload: &[u8],
 ) -> Vec<u8> {
@@ -2469,20 +2653,7 @@ pub fn default_handler(
             // consistent read without creating a `&GenesisCoreState`
             // reference to the mmap'd memory. Retry a few times in
             // case a writer is mid-update.
-            let mut snapshot = None;
-            for _ in 0..8 {
-                snapshot = mmap.read_consistent();
-                if snapshot.is_some() {
-                    break;
-                }
-                // A tight `spin_loop` burns a core for the whole retry
-                // window and does not shorten it: the writer we are
-                // waiting on holds the lock for the duration of a full
-                // ODE integration, so eight immediate retries can all
-                // land inside the same transaction and report
-                // READ_FAILED for no reason. Back off instead.
-                std::thread::sleep(RETRY_BACKOFF);
-            }
+            let snapshot = snapshot_state(mmap);
             match snapshot {
                 Some(state) => {
                     // SAFETY: `state` is a valid stack-owned
@@ -2497,7 +2668,7 @@ pub fn default_handler(
                     bytes.to_vec()
                 }
                 None => {
-                    eprintln!("[ipc] GET_STATE: read_consistent failed after 8 retries");
+                    eprintln!("[ipc] GET_STATE: state snapshot failed");
                     vec![error::READ_FAILED]
                 }
             }
@@ -2510,15 +2681,7 @@ pub fn default_handler(
             // payload — this is a pure observation, and letting the
             // caller drive it would put ion dynamics outside the
             // body that owns time.
-            let mut snapshot = None;
-            for _ in 0..8 {
-                let s = mmap.read_consistent();
-                if s.is_some() {
-                    snapshot = s;
-                    break;
-                }
-                std::hint::spin_loop();
-            }
+            let snapshot = snapshot_state(mmap);
             match snapshot {
                 Some(state) => {
                     let ions = state.ions;
@@ -2550,7 +2713,7 @@ pub fn default_handler(
                     bytes.to_vec()
                 }
                 None => {
-                    eprintln!("[ipc] GET_ION_SUMMARY: read_consistent failed after 8 retries");
+                    eprintln!("[ipc] GET_ION_SUMMARY: state snapshot failed");
                     vec![error::READ_FAILED]
                 }
             }
@@ -2559,20 +2722,7 @@ pub fn default_handler(
             // `read_consistent` uses the seqlock protocol without
             // creating a reference to the mmap'd memory. The tick loop
             // may be writing concurrently, so retry a few times.
-            let mut snapshot = None;
-            for _ in 0..8 {
-                snapshot = mmap.read_consistent();
-                if snapshot.is_some() {
-                    break;
-                }
-                // A tight `spin_loop` burns a core for the whole retry
-                // window and does not shorten it: the writer we are
-                // waiting on holds the lock for the duration of a full
-                // ODE integration, so eight immediate retries can all
-                // land inside the same transaction and report
-                // READ_FAILED for no reason. Back off instead.
-                std::thread::sleep(RETRY_BACKOFF);
-            }
+            let snapshot = snapshot_state(mmap);
             match snapshot {
                 Some(state) => {
                     let summary = NeuroSummary {
@@ -2625,7 +2775,7 @@ pub fn default_handler(
                     bytes.to_vec()
                 }
                 None => {
-                    eprintln!("[ipc] GET_NEURO_SUMMARY: read_consistent failed after 8 retries");
+                    eprintln!("[ipc] GET_NEURO_SUMMARY: state snapshot failed");
                     vec![error::READ_FAILED]
                 }
             }
@@ -2688,7 +2838,7 @@ pub fn default_handler(
                 return vec![0];
             }
             let episode_id = u64::from_le_bytes(payload[0..8].try_into().unwrap_or_default());
-            match ltm.retrieve(episode_id) {
+            match ltm.access().retrieve(episode_id) {
                 Ok(ep) => {
                     let text_bytes = ep.text.as_bytes();
                     let mut resp = Vec::with_capacity(
@@ -2736,7 +2886,8 @@ pub fn default_handler(
             // scale (~24K+ episodes), making all activations near-
             // uniform and destroying retrieval accuracy. SimHash is
             // O(n) but gives exact results regardless of episode count.
-            let results = ltm.find_similar_hash(&query, limit);
+            let ltm_guard = ltm.access();
+            let results = ltm_guard.find_similar_hash(&query, limit);
 
             let mut resp = Vec::with_capacity(4 + results.len() * 24);
             resp.extend_from_slice(&(results.len() as u32).to_le_bytes());
@@ -2829,7 +2980,7 @@ pub fn default_handler(
                             model.sleep_pressure,
                             model.emotional_cause,
                         );
-                        if let Err(e) = ltm.store_meta(
+                        if let Err(e) = ltm.access().store_meta(
                             now,
                             salience,
                             emotional_tag,
@@ -2854,20 +3005,7 @@ pub fn default_handler(
             // `read_consistent` uses the seqlock protocol without
             // creating a reference to the mmap'd memory.
             // Retry a few times in case a writer is mid-update.
-            let mut snapshot = None;
-            for _ in 0..8 {
-                snapshot = mmap.read_consistent();
-                if snapshot.is_some() {
-                    break;
-                }
-                // A tight `spin_loop` burns a core for the whole retry
-                // window and does not shorten it: the writer we are
-                // waiting on holds the lock for the duration of a full
-                // ODE integration, so eight immediate retries can all
-                // land inside the same transaction and report
-                // READ_FAILED for no reason. Back off instead.
-                std::thread::sleep(RETRY_BACKOFF);
-            }
+            let snapshot = snapshot_state(mmap);
             match snapshot {
                 Some(state) => {
                     let mut resp = Vec::with_capacity(9);
@@ -2891,7 +3029,7 @@ pub fn default_handler(
                     resp
                 }
                 None => {
-                    eprintln!("[ipc] GET_PHASE: read_consistent failed after 8 retries");
+                    eprintln!("[ipc] GET_PHASE: state snapshot failed");
                     vec![error::READ_FAILED]
                 }
             }
@@ -2949,10 +3087,11 @@ pub fn default_handler(
         }
 
         cmd::GET_MEMORY_STATS => {
+            let ltm_guard = ltm.access();
             let stats = MemoryStats {
                 stm_count: stm.count(),
-                ltm_count: ltm.count() as u64,
-                ltm_capacity: ltm.capacity(),
+                ltm_count: ltm_guard.count() as u64,
+                ltm_capacity: ltm_guard.capacity(),
                 _pad: 0,
             };
             // SAFETY: `stats` is a valid stack-owned value.
@@ -2968,7 +3107,7 @@ pub fn default_handler(
 
         cmd::SYNC => {
             let mut ok = true;
-            if let Err(e) = ltm.sync() {
+            if let Err(e) = ltm.access().sync() {
                 eprintln!("[ipc] SYNC ltm sync failed: {e}");
                 ok = false;
             }
@@ -3094,7 +3233,7 @@ pub fn default_handler(
                 Some(source_filter)
             };
 
-            let episodes = ltm.recent_episodes(limit, filter);
+            let episodes = ltm.access().recent_episodes(limit, filter);
 
             serialize_episode_page(&episodes)
         }
@@ -3103,20 +3242,7 @@ pub fn default_handler(
             // `read_consistent` uses the seqlock protocol without
             // creating a reference to the mmap'd memory.
             // Retry a few times in case a writer is mid-update.
-            let mut snapshot = None;
-            for _ in 0..8 {
-                snapshot = mmap.read_consistent();
-                if snapshot.is_some() {
-                    break;
-                }
-                // A tight `spin_loop` burns a core for the whole retry
-                // window and does not shorten it: the writer we are
-                // waiting on holds the lock for the duration of a full
-                // ODE integration, so eight immediate retries can all
-                // land inside the same transaction and report
-                // READ_FAILED for no reason. Back off instead.
-                std::thread::sleep(RETRY_BACKOFF);
-            }
+            let snapshot = snapshot_state(mmap);
             match snapshot {
                 Some(state) => {
                     let n = &state.neurochemicals;
@@ -3204,7 +3330,11 @@ pub fn default_handler(
                         ),
                         coupling_drift,
                         mean_receptor_sensitivity: mean_rs,
-                        emergent_phase: n.emergent_phase,
+                        // The zones copy, not the raw chemical phase: it
+                        // carries the Sleeping→NREM/REM override, so it
+                        // matches NeuroSummary.phase and GET_PHASE even
+                        // while the mind is cognitively asleep.
+                        emergent_phase: state.zones.emergent_phase,
                         _pad: [0; 3],
                     };
                     // SAFETY: `profile` is a valid stack-owned value.
@@ -3218,9 +3348,7 @@ pub fn default_handler(
                     bytes.to_vec()
                 }
                 None => {
-                    eprintln!(
-                        "[ipc] GET_PLASTICITY_PROFILE: read_consistent failed after 8 retries"
-                    );
+                    eprintln!("[ipc] GET_PLASTICITY_PROFILE: state snapshot failed");
                     vec![error::READ_FAILED]
                 }
             }
@@ -3268,16 +3396,6 @@ pub fn default_handler(
             // a zero reading.
             match super::field_probe::shared() {
                 Some(probe) => probe.signature(),
-                None => vec![error::READ_FAILED],
-            }
-        }
-
-        cmd::GET_DYADIC_STATE => {
-            // Who is present and how the dyad runs — evidence for her
-            // own appraisal, no prescriptions. READ_FAILED until the
-            // tick loop publishes its first snapshot.
-            match super::dyadic_model::dyadic_snapshot() {
-                Some(s) => s.to_wire(),
                 None => vec![error::READ_FAILED],
             }
         }
@@ -3360,20 +3478,7 @@ pub fn default_handler(
             // errors. 64 bytes — `InferenceSummary.unpack` in
             // python/genesis_client/types.py requires 64 and its bound
             // has to keep agreeing with this.
-            let mut snapshot = None;
-            for _ in 0..8 {
-                snapshot = mmap.read_consistent();
-                if snapshot.is_some() {
-                    break;
-                }
-                // A tight `spin_loop` burns a core for the whole retry
-                // window and does not shorten it: the writer we are
-                // waiting on holds the lock for the duration of a full
-                // ODE integration, so eight immediate retries can all
-                // land inside the same transaction and report
-                // READ_FAILED for no reason. Back off instead.
-                std::thread::sleep(RETRY_BACKOFF);
-            }
+            let snapshot = snapshot_state(mmap);
             match snapshot {
                 Some(state) => {
                     // SAFETY: `state` is a valid stack-owned
@@ -3391,9 +3496,7 @@ pub fn default_handler(
                     bytes.to_vec()
                 }
                 None => {
-                    eprintln!(
-                        "[ipc] GET_INFERENCE_SUMMARY: read_consistent failed after 8 retries"
-                    );
+                    eprintln!("[ipc] GET_INFERENCE_SUMMARY: state snapshot failed");
                     vec![error::READ_FAILED]
                 }
             }
@@ -3432,49 +3535,11 @@ pub fn default_handler(
                 0.0,
                 1.0,
             );
-            // Optional tail (additive, v3-compatible): attributed
-            // person key so the dyadic model keeps per-person
-            // signatures — [u8 key_len][utf8 key ≤ 31B][u8 authenticated]
-            // and optionally [u8 alias_len][utf8 alias ≤ 31B] when an
-            // anonymous key ("face:3") just resolved to a name. Old
-            // clients send 16 bytes exactly → unattributed.
-            let mut speaker = None;
-            let mut authenticated = false;
-            let mut merge_alias = None;
-            if payload.len() >= 18 {
-                let name_len = (payload[16] as usize).min(31);
-                if payload.len() > 17 + name_len {
-                    let name = String::from_utf8_lossy(&payload[17..17 + name_len])
-                        .trim()
-                        .to_string();
-                    if !name.is_empty() {
-                        speaker = Some(name);
-                        authenticated = payload[17 + name_len] != 0;
-                        let alias_at = 18 + name_len;
-                        if payload.len() > alias_at {
-                            let alias_len = (payload[alias_at] as usize).min(31);
-                            if payload.len() >= alias_at + 1 + alias_len {
-                                let alias = String::from_utf8_lossy(
-                                    &payload[alias_at + 1..alias_at + 1 + alias_len],
-                                )
-                                .trim()
-                                .to_string();
-                                if !alias.is_empty() {
-                                    merge_alias = Some(alias);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
             let obs = super::dyadic_model::UserAffectObservation {
                 valence,
                 arousal,
                 engagement,
                 confidence,
-                speaker,
-                merge_alias,
-                authenticated,
             };
             super::dyadic_model::publish_user_affect(obs);
             vec![1] // ack
@@ -3487,7 +3552,7 @@ pub fn default_handler(
                 return vec![error::PAYLOAD_TOO_SHORT];
             }
             let episode_id = u64::from_le_bytes(payload[0..8].try_into().unwrap_or_default());
-            match ltm.archive(episode_id) {
+            match ltm.access().archive(episode_id) {
                 Ok(()) => vec![1],
                 Err(_) => vec![0], // not found
             }
@@ -3536,7 +3601,7 @@ pub fn default_handler(
             let full_tag = crate::daemon::consolidation::expand_emotional_tag(&emotional_tag);
             let compact_tag = crate::daemon::consolidation::compact_tag_from_12(&emotional_tag);
 
-            match ltm.store(
+            match ltm.access().store(
                 timestamp,
                 salience,
                 full_tag,
@@ -3572,7 +3637,7 @@ pub fn default_handler(
             // Cap limit to prevent unbounded response sizes.
             let limit = limit.min(1000);
 
-            let episodes = ltm.search_episodes(limit, offset);
+            let episodes = ltm.access().search_episodes(limit, offset);
 
             serialize_episode_page(&episodes)
         }
@@ -3642,6 +3707,21 @@ pub fn default_handler(
                     vec![error::INTERNAL_ERROR]
                 }
             }
+        }
+
+        cmd::SET_COGNITIVE_PID => {
+            // Request: [u32 pid]. Response: [u8 ack].
+            // A new mind re-inhabiting the surviving body pushes its
+            // PID so interoception measures the living process — the
+            // env var still names the dead launcher. Needs no TickLoop
+            // (the value lives in a process-global cell), so it sits
+            // here rather than in the reactive handler.
+            if payload.len() < 4 {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let pid = u32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
+            super::cpufreq::set_cognitive_pid(pid);
+            vec![1u8]
         }
 
         // ─── Tensor slab ─────────────────────────────────────
@@ -3715,6 +3795,42 @@ pub fn default_handler(
 
         cmd::GET_MOTOR_TARGET => crate::field::motor::current_motor_target().encode(),
 
+        cmd::ANALYZE_CODE => {
+            // [u16 path_len][path][u32 src_len][src] — the mind sends
+            // the source it already read; the daemon never touches the
+            // filesystem for this. Pure structural sense → report.
+            if payload.len() < 2 {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let path_len =
+                u16::from_le_bytes(payload[0..2].try_into().unwrap_or_default()) as usize;
+            if payload.len() < 2 + path_len + 4 {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let path = String::from_utf8_lossy(&payload[2..2 + path_len]).into_owned();
+            let src_len = u32::from_le_bytes(
+                payload[2 + path_len..2 + path_len + 4]
+                    .try_into()
+                    .unwrap_or_default(),
+            ) as usize;
+            if payload.len() < 2 + path_len + 4 + src_len {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let source =
+                String::from_utf8_lossy(&payload[2 + path_len + 4..2 + path_len + 4 + src_len])
+                    .into_owned();
+            match crate::cognition::code_analysis::analyze_file(&source, &path) {
+                Ok(analysis) => {
+                    let mut resp = vec![1u8];
+                    resp.extend_from_slice(&crate::cognition::code_analysis::analysis_to_wire(
+                        &analysis,
+                    ));
+                    resp
+                }
+                Err(_) => vec![error::INVALID_VALUE],
+            }
+        }
+
         // ─── Reactive commands (mind-driven) ───────────────────
         // These are handled by the reactive_handler which has access
         // to the TickLoop. If they reach default_handler, it means
@@ -3743,10 +3859,13 @@ pub fn default_handler(
 /// cognitive mind drives each function through IPC commands.
 /// This handler dispatches the reactive commands to the TickLoop
 /// and delegates all other commands to default_handler.
-pub fn reactive_handler(
+pub fn reactive_handler<L>(
     tick_loop: std::sync::Arc<std::sync::Mutex<super::tick::TickLoop>>,
     data_dir: std::path::PathBuf,
-) -> impl Fn(&MmapState, &RingBuffer, &mut LtmStore, u8, &[u8]) -> Vec<u8> + Clone + Send + 'static
+    auto_internals: std::sync::Arc<std::sync::Mutex<super::adaptive::AutoSnapshot>>,
+) -> impl Fn(&MmapState, &RingBuffer, &mut L, u8, &[u8]) -> Vec<u8> + Clone + Send + 'static
+where
+    L: LtmAccess,
 {
     move |mmap, stm, ltm, cmd, payload| {
         match cmd {
@@ -3831,28 +3950,6 @@ pub fn reactive_handler(
                 resp
             }
 
-            cmd::SET_VOLITION => {
-                // Request: [u8 kind (0 = sleep, 1 = wake)][f32 magnitude]
-                if payload.len() < 5 {
-                    return vec![error::PAYLOAD_TOO_SHORT];
-                }
-                let sleep = match payload[0] {
-                    0 => true,
-                    1 => false,
-                    _ => return vec![error::INVALID_VALUE],
-                };
-                let magnitude = f32::from_le_bytes(payload[1..5].try_into().unwrap_or_default());
-                match tick_loop.lock() {
-                    Ok(mut tl) => {
-                        tl.set_volition(sleep, magnitude);
-                        vec![1u8]
-                    }
-                    Err(e) => {
-                        eprintln!("[ipc] SET_VOLITION: tick_loop poisoned: {e}");
-                        vec![error::INTERNAL_ERROR]
-                    }
-                }
-            }
             cmd::ADVANCE_PHYSICS => {
                 // Evaluation-only sibling of ADVANCE_NEURO. See the
                 // opcode's doc comment: the production command cannot be
@@ -3941,7 +4038,7 @@ pub fn reactive_handler(
                     }
                 };
                 tl.note_mind_drive();
-                let count = tl.consolidate(mmap, stm, ltm);
+                let count = tl.consolidate(mmap, stm, &mut ltm.access());
                 let mut resp = vec![1u8];
                 resp.extend_from_slice(&count.to_le_bytes());
                 resp
@@ -3956,7 +4053,7 @@ pub fn reactive_handler(
                     }
                 };
                 tl.note_mind_drive();
-                let count = tl.associate(mmap, ltm);
+                let count = tl.associate(mmap, &mut ltm.access());
                 let mut resp = vec![1u8];
                 resp.extend_from_slice(&count.to_le_bytes());
                 resp
@@ -3971,7 +4068,7 @@ pub fn reactive_handler(
                     }
                 };
                 tl.note_mind_drive();
-                let insights = tl.dream(mmap, ltm);
+                let insights = tl.dream(mmap, &mut ltm.access());
                 let mut resp = vec![1u8];
                 resp.extend_from_slice(&insights.to_le_bytes());
                 resp
@@ -4006,10 +4103,10 @@ pub fn reactive_handler(
                 // The ack still reports "request handled" — the control
                 // state is returned either way and the client contract
                 // (BodyControlState | None) treats a non-1 ack as "the
-                // daemon could not act on this". What changed is that
-                // actuation failures are no longer invisible: the
-                // individual writes report their cause once, and the
-                // aggregate is logged below.
+                // daemon could not act on this". The handler publishes
+                // the recommendation only — it no longer writes the
+                // host's clock policy (see TickLoop::apply_body_control),
+                // so there is no actuation left to fail.
                 let applied = tl.apply_body_control(mmap);
                 super::cpufreq::report_body_control_outcome(applied);
                 let ctrl = super::cpufreq::read_shared_control_state();
@@ -4068,6 +4165,111 @@ pub fn reactive_handler(
                     vec![1]
                 } else {
                     vec![error::INTERNAL_ERROR]
+                }
+            }
+
+            cmd::GET_INTERNALS => {
+                // The gears behind the state: both the TickLoop's
+                // own gates/lease and the autonomous fallback's —
+                // whichever side is driving, its schedule is visible.
+                // A poisoned lock degrades that half to absent rather
+                // than erroring the whole read.
+                let now_ms = super::tick::current_ms();
+                let mut out = match tick_loop.lock() {
+                    Ok(tl) => tl.internals_snapshot(now_ms),
+                    Err(e) => {
+                        eprintln!("[ipc] GET_INTERNALS: tick_loop poisoned: {e}");
+                        String::new()
+                    }
+                };
+                if let Ok(auto) = auto_internals.lock() {
+                    auto.write_lines(&mut out, now_ms);
+                }
+                let mut resp = vec![1u8];
+                resp.extend_from_slice(out.as_bytes());
+                resp
+            }
+
+            cmd::GET_OPTIC_STATE => {
+                // The optic nerve's subcortical channels — the body's
+                // measured read of the retinal segment plus the
+                // thalamic relay gate. Held by the TickLoop (it samples
+                // the nerve inside the advance), so this lives on the
+                // reactive path. An eye that has never produced a frame
+                // still answers — absent is a reading, not an error.
+                let now_ms = super::tick::current_ms();
+                let state = match tick_loop.lock() {
+                    Ok(tl) => tl.optic_state(now_ms),
+                    Err(e) => {
+                        eprintln!("[ipc] GET_OPTIC_STATE: tick_loop poisoned: {e}");
+                        return vec![error::INTERNAL_ERROR];
+                    }
+                };
+                let mut resp = vec![1u8];
+                resp.extend_from_slice(&state.to_wire());
+                resp
+            }
+
+            cmd::SET_OPTIC_GAIN => {
+                // Corticothalamic feedback — the mind's layer-6 gain
+                // onto the thalamic relay. Modulatory only; the nerve
+                // clamps it into [0, 1] and the sleep stage still owns
+                // the gate it multiplies.
+                if payload.len() < 4 {
+                    return vec![error::PAYLOAD_TOO_SHORT];
+                }
+                let gain = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
+                match tick_loop.lock() {
+                    Ok(mut tl) => {
+                        tl.set_optic_gain(gain);
+                        vec![1u8]
+                    }
+                    Err(e) => {
+                        eprintln!("[ipc] SET_OPTIC_GAIN: tick_loop poisoned: {e}");
+                        vec![error::INTERNAL_ERROR]
+                    }
+                }
+            }
+
+            cmd::SET_FOCUS => {
+                // The mind's focus request in metres — the ciliary
+                // muscle's drive toward `1/m` dioptres. Bounded and
+                // non-negative by construction on the nerve side.
+                if payload.len() < 4 {
+                    return vec![error::PAYLOAD_TOO_SHORT];
+                }
+                let meters = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
+                match tick_loop.lock() {
+                    Ok(mut tl) => {
+                        tl.set_focus(meters);
+                        vec![1u8]
+                    }
+                    Err(e) => {
+                        eprintln!("[ipc] SET_FOCUS: tick_loop poisoned: {e}");
+                        vec![error::INTERNAL_ERROR]
+                    }
+                }
+            }
+
+            cmd::SET_LID => {
+                // The mind's voluntary lid — orbicularis oculi for
+                // the eye the hardware lacks. The nerve clamps it
+                // into [0, 1] and composes it with the phase lid by
+                // min: will can shut an open eye, never open a
+                // sleeping one.
+                if payload.len() < 4 {
+                    return vec![error::PAYLOAD_TOO_SHORT];
+                }
+                let openness = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
+                match tick_loop.lock() {
+                    Ok(mut tl) => {
+                        tl.set_lid(openness);
+                        vec![1u8]
+                    }
+                    Err(e) => {
+                        eprintln!("[ipc] SET_LID: tick_loop poisoned: {e}");
+                        vec![error::INTERNAL_ERROR]
+                    }
                 }
             }
 

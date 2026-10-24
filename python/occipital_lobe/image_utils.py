@@ -26,6 +26,7 @@ def load_image(path: str | Path) -> np.ndarray | None:
     """
     try:
         from PIL import Image
+
         img: Image.Image = Image.open(path)
         if img.mode != "RGB":
             img = img.convert("RGB")
@@ -90,6 +91,7 @@ def resize_for_vision(
 
     try:
         from PIL import Image
+
         img = Image.fromarray(frame)
         img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
         return np.array(img, dtype=np.uint8)

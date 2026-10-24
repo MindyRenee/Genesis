@@ -38,6 +38,7 @@ _CHEM_DOPAMINE = 0
 _CHEM_NOREPINEPHRINE = 2
 _CHEM_ACETYLCHOLINE = 3
 _CHEM_CORTISOL = 6
+_CHEM_CRH = 14
 
 # ── Learning constants ────────────────────────────────────────────
 # β: base learning rate — fast enough for single-trial conditioning
@@ -141,9 +142,7 @@ class Amygdala:
         delta_r = lam_r - self.net_appetitive(cue, ctx)
         alpha = self.associability.get(cue, _ALPHA_MIN)
         if delta_a > 0.0:
-            self.v_aversive[cue] = min(
-                1.0, self.v_aversive.get(cue, 0.0) + alpha * _BETA * delta_a
-            )
+            self.v_aversive[cue] = min(1.0, self.v_aversive.get(cue, 0.0) + alpha * _BETA * delta_a)
             self.conditioning_events += 1
         elif delta_a < 0.0:
             ea = self.e_aversive.setdefault(ctx, {})
@@ -196,15 +195,12 @@ class Amygdala:
         }
 
     def restore(self, data: dict) -> None:
+        """Restore associative weights and counters from a saved dict."""
         self.v_aversive = dict(data.get("v_aversive") or {})
         self.v_appetitive = dict(data.get("v_appetitive") or {})
         self.associability = dict(data.get("associability") or {})
-        self.e_aversive = {
-            k: dict(v) for k, v in (data.get("e_aversive") or {}).items()
-        }
-        self.e_appetitive = {
-            k: dict(v) for k, v in (data.get("e_appetitive") or {}).items()
-        }
+        self.e_aversive = {k: dict(v) for k, v in (data.get("e_aversive") or {}).items()}
+        self.e_appetitive = {k: dict(v) for k, v in (data.get("e_appetitive") or {}).items()}
         self.conditioning_events = int(data.get("conditioning_events") or 0)
         self.extinction_events = int(data.get("extinction_events") or 0)
         self.low_road_fires = int(data.get("low_road_fires") or 0)

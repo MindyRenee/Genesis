@@ -464,9 +464,14 @@ def test_restore_merges_only_unambiguous_legacy_duplicates():
             {"id": "bank#2", "aliases": ["banking"], "properties": {}},
             {"id": "money"},
         ],
-        "edges": [{
-            "source": "bank#2", "target": "money", "relation": "related_to", "weight": 0.7,
-        }],
+        "edges": [
+            {
+                "source": "bank#2",
+                "target": "money",
+                "relation": "related_to",
+                "weight": 0.7,
+            }
+        ],
     }
     fresh = ConceptNetwork()
     restore_network(fresh, data)
@@ -646,9 +651,7 @@ def test_allostatic_restore_clamps_corrupt_load():
 
         # And the effectiveness it implies must stay in [0.3, 1.0].
         effectiveness = max(0.3, 1.0 - load * 0.5)
-        assert 0.3 <= effectiveness <= 1.0, (
-            f"restored load {bad} -> effectiveness {effectiveness}"
-        )
+        assert 0.3 <= effectiveness <= 1.0, f"restored load {bad} -> effectiveness {effectiveness}"
 
 
 def test_allostatic_restore_tolerates_corrupt_duration():
@@ -721,6 +724,48 @@ def test_allostatic_serialization_is_compact():
     # A flat scalar dict, not a list of samples.
     assert set(payload["state"]) == {"allostatic_load", "is_chronic"}
 
+
+def test_cognitive_map_save_state_is_json_serializable():
+    """CognitiveMap.save_state() must emit only str dict keys.
+
+    Regression: transition destinations and content Counters are keyed
+    by int place ids and were saved raw, so every autosave died on
+    'Dict key must be str' and the map was never persisted.
+    """
+    import json as _json
+    from collections import Counter
+
+    from temporal_lobe.cognitive_map import CognitiveMap, ContextMap
+
+    ctx = ContextMap(signature=frozenset({(0, 0, 0, 0)}), bounds=(10, 10))
+    ctx.transitions[(1, "move")] = Counter({2: 3, 5: 1})
+    ctx.contents[1] = Counter({7: 2})
+    m = CognitiveMap()
+    m.contexts.append(ctx)
+
+    state = m.save_state()
+
+    _json.dumps(state)  # raises TypeError if any dict key is not a str
+
+
+def test_cognitive_map_save_load_round_trip():
+    """The str-keyed save payload restores to the int-keyed map."""
+    from collections import Counter
+
+    from temporal_lobe.cognitive_map import CognitiveMap, ContextMap
+
+    ctx = ContextMap(signature=frozenset({(0, 0, 0, 0)}), bounds=(10, 10))
+    ctx.transitions[(1, "move")] = Counter({2: 3, 5: 1})
+    ctx.contents[1] = Counter({7: 2})
+    m = CognitiveMap()
+    m.contexts.append(ctx)
+
+    restored = CognitiveMap()
+    restored.load_state(m.save_state())
+
+    rctx = restored.contexts[0]
+    assert rctx.transitions[(1, "move")] == Counter({2: 3, 5: 1})
+    assert rctx.contents[1] == Counter({7: 2})
 
 
 def run_all():

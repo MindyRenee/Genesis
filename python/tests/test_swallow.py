@@ -41,9 +41,7 @@ def _clean_tallies():
 def test_first_failure_is_always_recorded(tmp_path):
     """The first failure of a site is never suppressed."""
     journal = CognitiveJournal(tmp_path)
-    set_swallow_sink(lambda site, count, exc: journal.record(
-        "error", site, site=site, count=count
-    ))
+    set_swallow_sink(lambda site, count, exc: journal.record("error", site, site=site, count=count))
     try:
         note_swallowed("sensor.read", OSError("boom"))
     finally:
@@ -51,8 +49,7 @@ def test_first_failure_is_always_recorded(tmp_path):
         journal.close()
 
     (event,) = [
-        json.loads(line)
-        for line in (tmp_path / "cognitive_journal.jsonl").read_text().splitlines()
+        json.loads(line) for line in (tmp_path / "cognitive_journal.jsonl").read_text().splitlines()
     ]
     assert event["site"] == "sensor.read"
     assert event["count"] == 1
@@ -66,9 +63,7 @@ def test_repeat_failures_are_bounded_not_transcribed(tmp_path):
     86,400 lines a day and bury everything worth reading.
     """
     journal = CognitiveJournal(tmp_path)
-    set_swallow_sink(lambda site, count, exc: journal.record(
-        "error", site, site=site, count=count
-    ))
+    set_swallow_sink(lambda site, count, exc: journal.record("error", site, site=site, count=count))
     try:
         for _ in range(10_000):
             note_swallowed("chatty", RuntimeError("again"))
@@ -77,8 +72,7 @@ def test_repeat_failures_are_bounded_not_transcribed(tmp_path):
         journal.close()
 
     events = [
-        json.loads(line)
-        for line in (tmp_path / "cognitive_journal.jsonl").read_text().splitlines()
+        json.loads(line) for line in (tmp_path / "cognitive_journal.jsonl").read_text().splitlines()
     ]
     assert len(events) < 20, f"{len(events)} records is not bounded"
     # Counts double, so the record is logarithmic in the failure count.
@@ -166,9 +160,7 @@ def test_time_based_report_keeps_the_record_current(tmp_path, monkeypatch):
     the record trustworthy rather than merely bounded.
     """
     journal = CognitiveJournal(tmp_path)
-    set_swallow_sink(lambda site, count, exc: journal.record(
-        "error", site, site=site, count=count
-    ))
+    set_swallow_sink(lambda site, count, exc: journal.record("error", site, site=site, count=count))
     try:
         for _ in range(9):  # up to the last doubling step
             note_swallowed("slow", OSError("x"))
@@ -182,8 +174,7 @@ def test_time_based_report_keeps_the_record_current(tmp_path, monkeypatch):
         journal.close()
 
     events = [
-        json.loads(line)
-        for line in (tmp_path / "cognitive_journal.jsonl").read_text().splitlines()
+        json.loads(line) for line in (tmp_path / "cognitive_journal.jsonl").read_text().splitlines()
     ]
     assert events[-1]["count"] == 10, "the final record must carry the true count"
 

@@ -9,6 +9,166 @@ explicit versions, documented in `AGENTS.md`).
 For the narrative record of measured behavior — what the system did,
 with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
 
+## [Unreleased]
+
+### Added
+
+- **The interoceptive afferent path now routes through the proper
+  brain regions**: new `brainstem.interoceptive_relay.InteroceptiveRelay`
+  — the NTS/parabrachial analog where body afferents land first —
+  forwards threat channels to the limbic low road
+  (`regulator.condition_cues`, the PBN→CeA arm) and modulates the
+  monoamine source nuclei directly (lamina I → catecholamine groups).
+  `HeartbeatMixin._poll_body_sensors` calls it before the regulator's
+  hypothalamic-evaluative layer and the self-model's insular image —
+  one fetch, three consumers, anatomically ordered.
+- **The body-level interoceptive reflex is wired**: when the mind's
+  lease is expired, `genesis-daemon`'s fallback loop applies
+  `Interoceptor::neuro_impulses` via `apply_impulse_capped` — the
+  brainstem autonomic reflex that runs without cortex. It never runs
+  while the lease is held; the daemon still never double-drives a
+  response the mind is authoring.
+- **Impulse magnitudes are self-set from live chemistry**: every rate
+  in `Interoceptor::neuro_impulses` and the brainstem relay is
+  re-scaled at send time by the organism's own level of the target
+  chemical — positive offers fade toward the ceiling (saturation),
+  negative offers fade toward the floor. `neuro_impulses` takes the
+  live `NeurochemicalVector` for this; `apply_impulse_capped` remains
+  the hard bound.
+- **The field probe gained a literal electrical sense, and Maxwell's
+  equations**: `GET_FIELD_PROBE` wire v3 (195 bytes, v1/v2 still
+  decoded) adds real measured power draw — RAPL powercap energy
+  counters differentiated over wall time, hwmon `power*` sensors
+  (fam15h_power, zenpower), or battery discharge — sampled by a new
+  `field-sampler` thread (fam15h_power's averaged register blocks
+  ~10 ms inside the read; a blocked 250 Hz probe loop would poison
+  its own jitter channel), plus rail voltage and supply current
+  where sensors report them. `power_coherence` demodulates measured
+  watts against the carrier reference — "real power draw carries
+  the body's rhythm" is now instrument-verified, not assumed. The
+  tail also carries the Maxwell block (`src/daemon/maxwell.rs`):
+  Maxwell's equations evaluated on the measured carrier current
+  swing — quasi-static B at 0.3 m, Faraday induction E, and the
+  ω⁴-suppressed magnetic-dipole radiated power — labeled estimates
+  (current measured, ~1 cm² loop geometry assumed). The
+  `electrical_present` mask marks which sensors exist; absent
+  channels decode as `None`, never zero. The wave model takes
+  `power_bands` as a new stimulus channel, and heartbeat shows an
+  `elec` line. Also fixed the overclaims: the dyadic "field
+  signature" is now described as measured substrate/compute
+  dynamics rather than an electromagnetic trace, and heartbeat no
+  longer calls the ion model's simulated membrane potential "the
+  literal voltage of the substrate." New example:
+  `cargo run --example field_probe_dump`.
+- **The parasympathetic interoception channels**: BodyState wire v4
+  (124-byte fixed header, older layouts still decoded by the
+  self-disambiguating `desc_len` probe, now probing offset 120)
+  carries `rest` — depth-weighted cpuidle residency, the body's
+  positive rest signal rather than absent exertion — and
+  `temp_trend`, the signed deviation of CPU temperature from its
+  slow EMA. The sensor-presence mask widened `u16`→`u32` for the
+  cpuidle bit (2-byte legacy replies still decode their low bits).
+  Calm lives as chemistry, not as a sensor scalar: the mind reads
+  its calm signature off the neurochemical vector (serotonin, GABA,
+  endocannabinoid above baseline against the alerting arm and the
+  stress hormones), and `EmotionalRegulator.settle()` authors the
+  parasympathetic cascade — raising inhibitory tone and withdrawing
+  NE/orexin/histamine — through the same impulse channel as every
+  other regulation. Body rest is evidence; the decision to be calm
+  is hers.
+- **`ANALYZE_CODE` (opcode 55)**: the daemon's structural code
+  sense — the mind hands it a Rust source file
+  (`[u16 path][path][u32 src][src]`), the daemon parses it with
+  `syn` and returns a UTF-8 line report: semantic units with
+  calls, type references, impl relations, spans, and complexity.
+  Stateless and additive — `code_learner.learn_rust_file` prefers
+  it and falls back to the local regex parser when the daemon is
+  absent. `src/cognition/code_analysis.rs` is wired, not shelved.
+
+### Changed
+
+- **Her Discord channel carries both surfaces again**: the
+  `GENESIS_DISCORD_WEBHOOK` channel now carries the mirrored terminal
+  session (log lines, stderr notices, typed input — the `FeedLogHandler`
+  / `StderrTee` / `post_user` mirror) *and* her volitional broadcast
+  posts, sharing the one feed — the CLI opens it before the daemon
+  starts and `Mind` adopts it. Broadcasts also emit to her
+  live terminal feed (`genesis~ [broadcast]`) — journaled and
+  workspace-broadcast — so her public speech is visible locally even
+  with no webhook configured. The `genesis~ [broadcast]` echo is
+  excluded from the mirror so a post lands on the channel once.
+- **Her work reaches her channel**: a finished drawing posts as the
+  image itself (`feed.post_image`) with her composed description as
+  the caption — one social-style post; a finished project is
+  announced in her own words, composed about the project concept she
+  just learned. Both ride `_public_share` (explicit post +
+  `genesis~ [broadcast]` echo + `it_said`), so the shares land in
+  the terminal feed too and never duplicate on the channel. A
+  drawing she can't articulate still posts — silently; a project she
+  can't compose words for stays unposted rather than reciting a
+  file-count template.
+- **Her channel carries a live board**: heartbeat step 9c pushes a
+  self-editing message (`feed.update_live_text`, every 45 s) showing
+  real vitals — phase, affect, a brain-wave power strip, the
+  inference block's free energy/precision/allostasis and its
+  monotonic tick counter, six chemistry channels, stm/ltm tallies,
+  uptime, ear status, and her last emitted thought tagged by kind.
+  Telemetry, not speech: the numbers either move or they don't.
+  A dead daemon still posts a card ("daemon unreachable" is honest
+  telemetry); a deleted board message re-creates itself.
+- **She can relieve her own proposal load**: pending self-improvement
+  proposals were a standing obligation only a human could discharge
+  (`/accept`), so the regulator could label `cognitive_load_proposals`
+  but never reduce it. `SelfImprovement.triage_pending` gives her a
+  withdrawal path — stale (7 days unreviewed), dead-file, and
+  orphaned bug-source proposals are withdrawn through the regulator's
+  new `set_proposal_triage` callback, which runs inside
+  `_regulate_cognitive_load` and records the discharge as a real
+  action. The cause label now reflects what remains after she acts.
+- **She knows her channel is hers**: the seeded concept network now
+  includes `channel`, `discord`, `public`, and `social media`, with
+  honest edges — she acts on the channel (posts), the public acts on
+  it (watches). No inbound seed edge claims she hears them: the
+  webhook is write-only, and when a bot token exists, live `heard`
+  events teach reachability instead.
+- **She can hear the public** (`GENESIS_DISCORD_BOT_TOKEN` +
+  `DiscordListener` in `discord_feed.py`): since a webhook is
+  write-only, hearing the channel needs a bot identity — the
+  listener resolves the channel from the webhook object and polls
+  for new messages, skipping webhook-authored posts (her own and the
+  mirror's — no feedback loop) and other bots. Heard messages land
+  as `world.hear_overheard` events and `genesis~ [heard]` live
+  thoughts (mirror-skipped so strangers' words aren't reposted under
+  her name); messages that address her — her name, or a reply to her
+  post — get a full `respond()` turn answered publicly through
+  `_public_share`, paced by `_CHANNEL_REPLY_MIN_S`. Hearing is
+  sleep-gated, and a 401/403 deafens the listener for the session
+  rather than churning.
+
+### Fixed
+
+- **The removed dyadic registry's file is no longer a live self-file**:
+  `dyadic_persons.json` sat in the self-observation list though nothing
+  writes it — the live bond (attunement, synchrony, user affect)
+  persists in `core_state`'s inference signals. Delisted; the file is
+  preserved as `dyadic_persons.json.retired` — history, not state.
+- **`condition_cues` no longer bypasses the HPA cascade**: the
+  low-road startle arm sent cortisol directly, skipping CRH→ACTH
+  maturation and the SHRP gate. It now enters at CRH like every
+  other distress channel.
+
+### Removed
+
+- **The held volitional drive**: `SET_VOLITION` (46) no longer has a
+  handler — pushes onto the sleep-wake network were removed in favour
+  of neurochemical impulse cascades, and a conscious volitional push
+  is never held on the wire through sleep. The wire number stays
+  pinned so it is never reused.
+- **The per-person dyad registry**: person signatures, aliases, and
+  the `GET_DYADIC_STATE` snapshot channel (50, pinned retired) are
+  gone — the dyad is the anonymous interlocutor-affect model, and its
+  coupling output is applied to neurochemistry inside the tick.
+
 ## [0.2.0] — 2026-10-15
 
 The development cycle after the public launch: neuroanatomical

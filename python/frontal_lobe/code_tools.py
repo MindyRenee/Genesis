@@ -48,7 +48,13 @@ class CodeToolHandler:
     # Action words that trigger tool dispatch. Substring matching is
     # intentional — "test" matches "test", "tests", and "pytest".
     _ACTION_WORDS: tuple[str, ...] = (
-        "compile", "test", "read", "show", "check", "analyze", "impact",
+        "compile",
+        "test",
+        "read",
+        "show",
+        "check",
+        "analyze",
+        "impact",
     )
 
     def __init__(
@@ -221,7 +227,9 @@ class CodeToolHandler:
             resolved = self._resolve_project_path(path)
             target = resolved if resolved is not None else path
             result = self._tools.run(
-                "run_pytest", target=target, project_root=".",
+                "run_pytest",
+                target=target,
+                project_root=".",
             )
             if result.success:
                 tail = result.output.strip().split("\n")[-1]
@@ -274,9 +282,7 @@ class CodeToolHandler:
                     result = self._tools.run("compile_python", path=resolved)
                     outputs.append(result.output or result.error)
                 wants_read = "read" in action or "show" in action
-                bare_check = "check" in action and not (
-                    "compile" in action or "test" in action
-                )
+                bare_check = "check" in action and not ("compile" in action or "test" in action)
                 if wants_read or bare_check:
                     result = self._tools.run("read_file", path=resolved, limit=300)
                     outputs.append(result.output or result.error)

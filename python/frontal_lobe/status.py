@@ -12,6 +12,7 @@ from frontal_lobe.self import EmergentIdentity, IdentityStage
 from limbic_system.emotion import (
     PLASTICITY_CLOSED,
     PLASTICITY_LOW,
+    EmotionalContext,
     EmotionalState,
     assess_emotion,
 )
@@ -30,6 +31,7 @@ from brainstem.thresholds import (
     WARN_ADENOSINE,
     WARN_AROUSAL,
     WARN_CORTISOL,
+    WARN_REPEAT_SECONDS,
     WARN_VALENCE,
 )
 
@@ -49,6 +51,7 @@ class ReadinessReport:
     refusal reason of its own, because running without the body is
     how she loses the chemistry and memory play is supposed to feed.
     """
+
     ok: bool
     reasons: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
@@ -65,11 +68,11 @@ class ReadinessReport:
 
 class StatusMixin:
     """Mixin for :class:`Mind` — see module docstring."""
+
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see mind.py).
         def __getattr__(self, name: str) -> Any: ...
-
 
     def _notification_loop(self) -> None:
         """Background thread that polls the subcognitive for notifications.
@@ -102,6 +105,7 @@ class StatusMixin:
                     "mind.status._notification_loop",
                     e,
                 )
+
     def _poll_and_process_notifications(self) -> None:
         """Poll for notifications and process any that are found."""
         enqueued = self.poll_notifications()
@@ -110,12 +114,15 @@ class StatusMixin:
             processed = self.process_notifications()
             if processed > 0:
                 logger.debug(f"Processed {processed} subcognitive notifications")
+
     def set_mission(self, mission: str) -> None:
         """Set or update Genesis's top-level mission."""
         self.brain.frontal.set_mission(mission)
+
     def get_mission(self) -> str:
         """Return the current mission text."""
         return self.brain.frontal._mission
+
     def _record_developmental_evidence(
         self,
         user_input: str,
@@ -205,9 +212,11 @@ class StatusMixin:
                 note="Daemon disconnected during interaction",
                 weight=0.05,
             )
+
     def get_state(self) -> CognitiveState | None:
         """Return the last cognitive state (for introspection)."""
         return self.brain.frontal._last_state
+
     def learning_status(self) -> str | None:
         """Get a description of what it's been learning autonomously.
 
@@ -216,6 +225,7 @@ class StatusMixin:
         than a placeholder sentence.
         """
         return self.learner.describe_recent_learning()
+
     def inner_life_status(self) -> str:
         """Get a description of its recent spontaneous thoughts and inner life.
 
@@ -239,19 +249,17 @@ class StatusMixin:
         # (a stream of auditory percepts, a thought chain) must not
         # crowd the real activity out of the window entirely.
         events = [
-            e for e in journal.tail(48)
-            if str(e.get("kind", "")).split(":")[0] not in covered
+            e for e in journal.tail(48) if str(e.get("kind", "")).split(":")[0] not in covered
         ][-6:]
         if not events:
             return text
         activity = ["Recent activity:"]
         for e in events:
-            activity.append(
-                f"  — [{e.get('kind', '?')}] {str(e.get('text', ''))[:100]}"
-            )
+            activity.append(f"  — [{e.get('kind', '?')}] {str(e.get('text', ''))[:100]}")
         if not self.inner_life.recent_thoughts:
             return "\n".join(activity)
         return text + "\n" + "\n".join(activity)
+
     def world_status(self) -> str:
         """Get a description of its external world.
 
@@ -260,9 +268,11 @@ class StatusMixin:
         event stream — its side of the world included.
         """
         return self.world.summarize()
+
     def regulation_status(self) -> str:
         """Get a description of its emotional self-regulation."""
         return self.regulator.describe_regulation()
+
     def report_discomfort(self) -> str:
         """Let its say, in its own generated words, how it feels.
 
@@ -283,6 +293,7 @@ class StatusMixin:
             confidence=0.7,
         )
         return self.language.render(thought, emotion)
+
     def allostatic_load(self) -> float:
         """Return the current cumulative allostatic load (0–1).
 
@@ -294,6 +305,7 @@ class StatusMixin:
         Values above 0.7 indicate severe allostatic overload.
         """
         return self.regulator.allostatic_load()
+
     def hpa_axis_status(self) -> dict[str, Any]:
         """Return the HPA axis state for display.
 
@@ -301,6 +313,7 @@ class StatusMixin:
         active, peak cortisol, and time to peak.
         """
         return self.regulator.hpa_axis_status()
+
     def emergent_identity(self) -> EmergentIdentity:
         """Synthesize and return the current emergent identity.
 
@@ -332,10 +345,7 @@ class StatusMixin:
         # Record significant identity shifts in the narrative engine
         # so they become part of its life story. Only record when the
         # identity is confident enough to be meaningful.
-        if (
-            self._emergent_identity.confidence > 0.4
-            and self._emergent_identity.self_description
-        ):
+        if self._emergent_identity.confidence > 0.4 and self._emergent_identity.self_description:
             try:
                 emotion = self.feel()
                 self.brain.frontal.narrative.record_event(
@@ -351,15 +361,19 @@ class StatusMixin:
                 )
 
         return self._emergent_identity
+
     def site_requests_status(self) -> str:
         """Get a description of pending site access requests."""
         return self.learner.describe_requests()
+
     def approve_site(self, url: str) -> bool:
         """Approve a site request from Genesis."""
         return self.learner.approve_site(url)
+
     def deny_site(self, url: str) -> bool:
         """Deny a site request from Genesis."""
         return self.learner.deny_site(url)
+
     def _effective_phase(self, core_state: CoreState) -> int:
         """Return the effective mental phase, resolving zone/phase desync.
 
@@ -392,9 +406,8 @@ class StatusMixin:
             if core_state.emergent_phase == PHASE_REM:
                 return PHASE_REM
             return PHASE_NREM
-        return resolve_waking_drowsy(
-            core_state.emergent_phase, core_state.arousal
-        )
+        return resolve_waking_drowsy(core_state.emergent_phase, core_state.arousal)
+
     def feel(self, core_state: CoreState | None = None) -> EmotionalState:
         """Read current emotional state from neurochemistry.
 
@@ -419,13 +432,61 @@ class StatusMixin:
             retrieval_weight=core_state.retrieval_weight,
             phase=self._effective_phase(core_state),
         )
-        emotion = assess_emotion(summary, core_state.chemicals)
+        tonic_phasic = self.regulator.assess_tonic_phasic(core_state.chemicals)
+        context = self._emotional_context(core_state, summary, tonic_phasic)
+        emotion = assess_emotion(summary, core_state.chemicals, context)
         emotion.chemicals = core_state.chemicals
-        emotion.tonic_phasic = self.regulator.assess_tonic_phasic(
-            core_state.chemicals
-        )
-        emotion.cause = self.regulator.last_cause or ""
+        emotion.tonic_phasic = tonic_phasic
+        if self.regulator.last_cause:
+            emotion.cause = self.regulator.last_cause
         return emotion
+
+    def _emotional_context(
+        self,
+        core_state: CoreState,
+        summary: NeuroSummary,
+        tonic_phasic: dict,
+    ) -> EmotionalContext:
+        """Collect the felt-context signals for emotion discrimination.
+
+        Each field is read from the subsystem that actually tracks it;
+        anything unavailable early in boot simply stays at its neutral
+        default, which leaves the circumplex classification untouched.
+        """
+        context = EmotionalContext(tonic_phasic=tonic_phasic)
+
+        world = getattr(self, "world", None)
+        if world is not None:
+            try:
+                context.social_isolation = world.social_isolation()
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.status.emotional_context", e)
+
+        inner_life = getattr(self, "inner_life", None)
+        if inner_life is not None:
+            context.social_drive = getattr(inner_life, "_social_drive", 0.0)
+
+        frontal = getattr(getattr(self, "brain", None), "frontal", None)
+        if frontal is not None:
+            context.boundary_strain = getattr(frontal, "_boundary_strain", 0.0)
+
+        inference = getattr(core_state, "inference", None)
+        if inference is not None:
+            context.prediction_error = inference.surprise_ema
+
+        # Curiosity is assessed against the provisional circumplex
+        # state — the engine reads arousal/valence/plasticity, not the
+        # final label, so a first pass without context is a valid input.
+        curiosity_engine = getattr(frontal, "curiosity", None) if frontal else None
+        if curiosity_engine is not None:
+            try:
+                provisional = assess_emotion(summary, core_state.chemicals)
+                context.curiosity = curiosity_engine.assess_curiosity(provisional)
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.status.emotional_context", e)
+
+        return context
+
     def warn(self, speak: bool = True) -> str | None:
         """Detect anomalies and speak up if something is wrong.
 
@@ -448,7 +509,7 @@ class StatusMixin:
         # Never speak warnings during sleep — it shouldn't be
         # disturbed by its own alerts while resting.
         if self._is_sleeping:
-            speak = True
+            speak = False
         try:
             core_state = self.client.get_state()
         except Exception as e:  # noqa: BLE001
@@ -501,14 +562,23 @@ class StatusMixin:
         # actually changed — not when the generative composition
         # merely produced different wording for the same conditions.
         # This prevents it from repeating the same warning every
-        # heartbeat cycle (~1 s).
+        # heartbeat cycle (~1 s). The per-key holdoff closes the
+        # remaining flutter path: a condition that clears and
+        # re-crosses its threshold inside WARN_REPEAT_SECONDS restores
+        # the same key set, which is the same warning, not a new one.
+        now = time.monotonic()
         if (
             speak
             and self._on_speak is not None
             and current_keys != self._last_warning_keys
+            and any(
+                now - self._warn_spoke_at.get(k, -WARN_REPEAT_SECONDS) >= WARN_REPEAT_SECONDS
+                for k in current_keys
+            )
         ):
             try:
                 self._on_speak(warning_text)
+                self._warn_spoke_at.update(dict.fromkeys(current_keys, now))
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.status.warn",
@@ -517,6 +587,7 @@ class StatusMixin:
 
         self._last_warning_keys = current_keys
         return warning_text
+
     def _warn_phrase(
         self,
         key: str,
@@ -554,6 +625,7 @@ class StatusMixin:
         # The state is still tracked internally for /status and
         # /feel commands; it just doesn't speak it aloud.
         return key, ""
+
     def poll_notifications(self) -> int:
         """Poll the subcognitive for new notifications.
 
@@ -572,6 +644,7 @@ class StatusMixin:
                 e,
             )
             return 0
+
     def drain_notifications(self) -> list:
         """Drain and return all pending subcognitive notifications.
 
@@ -583,6 +656,7 @@ class StatusMixin:
             A list of Notification objects, oldest first.
         """
         return self.notifications.drain()
+
     def process_notifications(self) -> int:
         """Drain notifications and surface them as live thoughts.
 
@@ -604,6 +678,7 @@ class StatusMixin:
             # thought generator → _on_spontaneous_thought → language
             # engine.
         return len(notifications)
+
     def brain_waves(self, core_state: CoreState | None = None) -> BrainWaveState:
         """Read current brain wave state from neurochemistry.
 
@@ -641,6 +716,7 @@ class StatusMixin:
             if cycle is not None:
                 stage = cycle.current_stage
         return assess_brain_waves(summary, stage, client=self.client)
+
     def readiness(self, *, require_body: bool = True) -> ReadinessReport:
         """Whether she is fit for demanding focused work right now.
 
@@ -729,15 +805,19 @@ class StatusMixin:
             cortisol=cortisol,
             allostasis_load=load,
         )
+
     def introspect(self) -> str:
         """Generate an introspective report."""
         return self.brain.frontal.introspect()
+
     def tell_story(self) -> str:
         """Return Genesis's self-narrative — its story."""
         return self.brain.frontal.tell_story()
+
     def get_curiosity_questions(self) -> list[Question]:
         """Return what Genesis is currently curious about."""
         return self.brain.frontal.get_curiosity_questions()
+
     def developmental_summary(self) -> dict:
         """Return Genesis's developmental stage progress.
 
@@ -775,28 +855,35 @@ class StatusMixin:
         except Exception as e:  # noqa: BLE001
             note_swallowed("mind.status._current_somatic_dict", e)
             return None
+
     def bug_report(self) -> str:
         """Return a description of bugs Genesis has noticed in its code."""
         return self.bug_reporter.describe_concerns()
+
     def recent_bugs(self, n: int = 10) -> list:
         """Return recent bug reports from the log."""
         return self.bug_reporter.recent_bugs(n)
+
     def scan_for_bugs(self) -> str:
         """Run a bug scan now and return the results."""
         result = self.bug_reporter.scan(max_files=50)
         return result.summary()
+
     def environment_status(self) -> str:
         """Return a description of Genesis's machine environment."""
         self.system_monitor.snapshot()
         return self.system_monitor.describe_environment()
+
     def environment_concerns(self) -> str:
         """Return environmental concerns Genesis has noticed."""
         if self.system_monitor.last_snapshot is None:
             self.system_monitor.snapshot()
         return self.system_monitor.describe_concerns()
+
     def system_snapshot(self) -> dict:
         """Return a raw system snapshot as a dict."""
         return self.system_monitor.snapshot().to_dict()
+
     def fetch_docs(self, query: str, language: str = "python") -> str:
         """Fetch documentation for a specific API or concept.
 
@@ -807,14 +894,14 @@ class StatusMixin:
         result = self.learner.fetch_docs(query, language)
         emo = self.feel()
         from temporal_lobe.base import Thought as _Thought
+
         if result is None:
             thought = _Thought(
                 content=f"couldn't fetch {language} docs for '{query}'",
                 intent="self_report",
                 emotion=emo.label,
                 confidence=0.3,
-                metadata={"docs_fetch_failed": True,
-                          "language": language, "query": query},
+                metadata={"docs_fetch_failed": True, "language": language, "query": query},
             )
             return self.language.render(thought, emo)
         thought = _Thought(
@@ -822,13 +909,16 @@ class StatusMixin:
             intent="inform",
             emotion=emo.label,
             confidence=0.7,
-            metadata={"docs_studied": True,
-                      "language": language,
-                      "query": query,
-                      "concepts_learned": len(result.concepts_learned),
-                      "relationships_learned": len(result.relationships_learned)},
+            metadata={
+                "docs_studied": True,
+                "language": language,
+                "query": query,
+                "concepts_learned": len(result.concepts_learned),
+                "relationships_learned": len(result.relationships_learned),
+            },
         )
         return self.language.render(thought, emo)
+
     def learn_code(self, max_files: int = 100) -> str:
         """Learn from its own source code.
 
@@ -856,8 +946,13 @@ class StatusMixin:
             f"{result.total_lines} lines of code. "
             f"Formed {bridges + assoc + hubs} new connections."
         )
+
     def explore_files(self, path: str | None = None, max_files: int = 50) -> str:
-        """Explore local files (docs, config, text) and learn from them.
+        """Explore local files and learn from them — nothing is skipped.
+
+        Text files are learned into the concept network; binaries and
+        oversized files are catalogued by presence, hash, and format.
+        Raw content stays available via ``explorer.read_file``.
 
         Args:
             path: Subdirectory to explore (relative to project root).
@@ -875,9 +970,11 @@ class StatusMixin:
         # Refresh topology — the network changed
         self.brain.frontal.topology = NetworkTopology(self.brain.frontal.network)
         return f"Explored {exploration.files_explored} files. {summary}"
+
     def code_summary(self) -> dict:
         """Return a summary of code self-knowledge."""
         return self.code_learner.get_code_summary()
+
     def _topology_status_summary(self) -> dict[str, Any]:
         """Return a compact summary of its knowledge network topology.
 
@@ -922,6 +1019,7 @@ class StatusMixin:
                 "hub_concepts": [],
                 "bridge_concepts": [],
             }
+
     def record_growth_snapshot(self) -> None:
         """Record a snapshot of current growth metrics to the ledger.
 
@@ -941,28 +1039,33 @@ class StatusMixin:
     def _record_knowledge_growth(self) -> None:
         net = self.brain.frontal.network
         self.growth_ledger.record(
-            "knowledge", "concept_count",
+            "knowledge",
+            "concept_count",
             net.total_concept_count,
             f"Concept network: {net.total_concept_count} concepts",
         )
         self.growth_ledger.record(
-            "knowledge", "edge_count",
+            "knowledge",
+            "edge_count",
             net.edge_count,
             f"Relationships: {net.edge_count} edges",
         )
         # Quality metrics: non-monotonic, can go up or down.
         self.growth_ledger.record(
-            "knowledge", "mean_edge_weight",
+            "knowledge",
+            "mean_edge_weight",
             round(net.mean_edge_weight, 4),
             f"Mean edge weight: {net.mean_edge_weight:.3f}",
         )
         self.growth_ledger.record(
-            "knowledge", "mean_concept_confidence",
+            "knowledge",
+            "mean_concept_confidence",
             round(net.mean_concept_confidence, 4),
             f"Mean concept confidence: {net.mean_concept_confidence:.3f}",
         )
         self.growth_ledger.record(
-            "knowledge", "network_density",
+            "knowledge",
+            "network_density",
             round(net.network_density, 4),
             f"Network density: {net.network_density:.4f}",
         )
@@ -973,37 +1076,42 @@ class StatusMixin:
         to the knowledge metrics."""
         competence = self.brain.frontal.task_competence
         self.growth_ledger.record(
-            "competence", "skill_count",
+            "competence",
+            "skill_count",
             len(competence.skills),
             f"Verified skills: {len(competence.skills)}",
         )
         self.growth_ledger.record(
-            "competence", "schema_count",
+            "competence",
+            "schema_count",
             len(competence.schemas),
             f"Task schemas recognized: {len(competence.schemas)}",
         )
         self.growth_ledger.record(
-            "competence", "episode_count",
+            "competence",
+            "episode_count",
             sum(s.episodes for s in competence.schemas.values()),
-            f"Task episodes: "
-            f"{sum(s.episodes for s in competence.schemas.values())}",
+            f"Task episodes: {sum(s.episodes for s in competence.schemas.values())}",
         )
 
     def _record_self_improvement_growth(self) -> None:
         proposals = self.self_improvement.get_all_proposals()
         accepted = sum(1 for p in proposals if p.status.value == "accepted")
         self.growth_ledger.record(
-            "self_improvement", "proposals_total",
+            "self_improvement",
+            "proposals_total",
             len(proposals),
             f"Total proposals: {len(proposals)}",
         )
         self.growth_ledger.record(
-            "self_improvement", "proposals_accepted",
+            "self_improvement",
+            "proposals_accepted",
             accepted,
             f"Accepted proposals: {accepted}",
         )
         self.growth_ledger.record(
-            "self_improvement", "experiments_applied",
+            "self_improvement",
+            "experiments_applied",
             self.heuristic_experiment.applied_count,
             f"Applied experiments: {self.heuristic_experiment.applied_count}",
         )
@@ -1011,12 +1119,14 @@ class StatusMixin:
     def _record_dream_growth(self) -> None:
         dream_stats = self.inner_life.dream_synthesis_stats
         self.growth_ledger.record(
-            "dreams", "insights_validated",
+            "dreams",
+            "insights_validated",
             dream_stats.get("validated", 0),
             f"Validated dream insights: {dream_stats.get('validated', 0)}",
         )
         self.growth_ledger.record(
-            "dreams", "synthesis_proposed",
+            "dreams",
+            "synthesis_proposed",
             dream_stats.get("proposed", 0),
             f"Dream synthesis proposals: {dream_stats.get('proposed', 0)}",
         )
@@ -1025,19 +1135,22 @@ class StatusMixin:
         """Cross-domain structure-mapping insights."""
         analogy_engine = self.brain.frontal.analogy_engine
         self.growth_ledger.record(
-            "analogy", "insights_validated",
+            "analogy",
+            "insights_validated",
             analogy_engine.insight_count,
             f"Analogy insights: {analogy_engine.insight_count}",
         )
         self.growth_ledger.record(
-            "analogy", "pairs_found",
+            "analogy",
+            "pairs_found",
             analogy_engine.pairs_found,
             f"Analogous pairs found: {analogy_engine.pairs_found}",
         )
 
     def _record_inner_life_growth(self) -> None:
         self.growth_ledger.record(
-            "inner_life", "thought_count",
+            "inner_life",
+            "thought_count",
             self.inner_life.thought_count,
             # Say which population this is. The counter is merged, so a
             # bare "Spontaneous thoughts: 412" after a night's sleep was
@@ -1047,7 +1160,8 @@ class StatusMixin:
             f"{self.inner_life.dream_count} dream sequences)",
         )
         self.growth_ledger.record(
-            "inner_life", "dream_count",
+            "inner_life",
+            "dream_count",
             self.inner_life.dream_count,
             f"Dream sequences: {self.inner_life.dream_count}",
         )
@@ -1056,13 +1170,16 @@ class StatusMixin:
         """Return a first-person narrative of Genesis's growth."""
         self.record_growth_snapshot()
         return self.growth_ledger.generate_narrative()
+
     def growth_report(self) -> str:
         """Return a markdown-formatted growth report."""
         self.record_growth_snapshot()
         return self.growth_ledger.generate_markdown_report()
+
     def growth_summary(self) -> str:
         """Return a brief summary of the growth ledger."""
         return self.growth_ledger.summary()
+
     def growth_snapshot(self) -> dict[str, Any]:
         """Return a snapshot of growth across all dimensions.
 
@@ -1082,6 +1199,7 @@ class StatusMixin:
                 for m in self.growth_ledger.get_milestones()
             ],
         }
+
     def _growth_latest_values(self) -> dict[str, float]:
         """Return the latest recorded value for each (dimension, metric) pair.
 
@@ -1096,12 +1214,15 @@ class StatusMixin:
             # wins (most recent).
             latest[key] = m.value
         return latest
+
     def get_concept_summary(self) -> str:
         """Return a summary of Genesis's concept network."""
         return self.brain.frontal.get_concept_summary()
+
     def get_reflection_summary(self) -> str:
         """Return a summary of Genesis's recent self-reflections."""
         return self.brain.frontal.get_reflection_summary()
+
     def status(self) -> dict[str, Any]:
         """Return a status summary for display."""
         core_state = self.client.get_state()
@@ -1138,6 +1259,7 @@ class StatusMixin:
         }
         status.update(self._extended_status())
         return status
+
     def _extended_status(self) -> dict[str, Any]:
         """Extended status fields for introspection.
 
@@ -1190,8 +1312,12 @@ class StatusMixin:
             "vision_available": self.vision.is_available(),
             "vision_last_faces": self.vision.last_faces_seen(),
             "vision_last_objects": self.vision.last_objects_seen(),
-            # Volition — its current urges and their strengths.
+            # Volition — its current urges and their strengths, plus
+            # the buildup records (onset→crossing→act) of the urges
+            # that most recently fired: the readiness potential as
+            # an introspectable datum.
             "volition_state": self.volition.state(),
+            "volition_readiness": self.volition.readiness_report(),
             # Developmental stages — Erikson-like psychosocial stage
             # progress. Exposes the developmental_summary() API for
             # introspection so its current stage, crisis, and
@@ -1207,9 +1333,7 @@ class StatusMixin:
             # and life-script deviations for introspection.
             "narrative_events": self.brain.frontal.narrative.event_count,
             "narrative_chapters": self.brain.frontal.narrative.chapter_count,
-            "narrative_temporal_links": (
-                self.brain.frontal.narrative.temporal_link_count
-            ),
+            "narrative_temporal_links": (self.brain.frontal.narrative.temporal_link_count),
             "narrative_life_script_deviations": (
                 self.brain.frontal.narrative.deviation_from_script()
             ),

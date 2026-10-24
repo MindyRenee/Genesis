@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import struct
 from dataclasses import dataclass, field
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from .protocol import (
     _F32,
@@ -34,14 +34,13 @@ __all__ = [
     "BodyControlState",
     "BodyState",
     "CoreState",
-    "DyadicSnapshot",
     "Episode",
     "InferenceSummary",
     "IonSummary",
     "MemoryStats",
     "ModuleTelemetry",
     "NeuroSummary",
-    "PersonSignature",
+    "OpticState",
     "PhaseInfo",
     "PingResponse",
     "PlasticityProfile",
@@ -303,11 +302,7 @@ class PlasticityProfile:
         # Recovering: BDNF is meaningful but not yet high, cortisol
         # is dropping below the stress threshold. The system is
         # transitioning out of a protective state.
-        if (
-            0.25 < self.plasticity_gate <= 0.55
-            and cort_frac < 0.45
-            and self.bdnf_tonic > 0.30
-        ):
+        if 0.25 < self.plasticity_gate <= 0.55 and cort_frac < 0.45 and self.bdnf_tonic > 0.30:
             return LEARNING_POSTURE_RECOVERING
 
         return LEARNING_POSTURE_NEUTRAL
@@ -810,7 +805,10 @@ class CoreState:
     # mind's 1 Hz cadence dictate the body's integration rate.
     inference: InferenceSummary | None
     # The sleep-wake network's homeostatic sleep pressure, as a fraction of
-    # its maximum (0 = none, 1 = the source's hmax). Drives NREM depth.
+    # its maximum (0 = none, 1 = the source's hmax). In a live daemon h is
+    # slaved to chemical adenosine, so it reads the remaining need — it
+    # decays as sleep clears it, which makes it a discharge gauge rather
+    # than a depth signal.
     sleep_pressure: float = 0.0
 
     @property
@@ -880,8 +878,9 @@ class CoreState:
         )
 
 
-# The sleep network's homeostatic variable h is sleep_network[4] (f64), at
-# offset 3224 + 4 * 8 = 3256. Its maximum is the source's hmax, 323.88.
+# The sleep network's homeostatic variable h is a f64 inside the
+# network block at offset 3224 — index 4, offset 3256. Its maximum is
+# the source's hmax, 323.88.
 _SLEEP_PRESSURE_OFFSET = 3256
 _SLEEP_PRESSURE_MAX = 323.88
 
@@ -891,7 +890,8 @@ def _unpack_sleep_pressure(data: bytes) -> float:
 
 
 def _unpack_inference_signals(data: bytes) -> InferenceSummary | None:
-    """Unpack the 64-byte InferenceSignals block at offset 3416.
+    """Unpack the 64-byte InferenceSignals block — the last field of
+    the state, so ``len(data) - 64`` locates it across schemas.
 
     Layout (see `InferenceSignals` in src/state/inference.rs)::
 
@@ -919,16 +919,17 @@ def _unpack_inference_signals(data: bytes) -> InferenceSummary | None:
     raced a writer can also come back short, and losing the block is far
     better than losing the whole snapshot.
     """
-    # 3416, not the v3 offset of 3228: schema v4 inserted the 124-byte
-    # ion block, and schema v5 the 64-byte sleep network, which pushed the
-    # checksum and this block later.
-    # Reading 3228 in a v4 reply lands inside IonState, so the parse
-    # succeeded and returned ion concentrations labelled as inference
-    # signals — plausible numbers feeding the regulator rather than an
-    # error. Allostasis load came back as 1.2 against a true 0.78.
-    offset = 3416
-    if len(data) < offset + 64:
+    # The block is the last field of the state in every schema that
+    # carries it (v3 3228, v4 3352, v5 3416) — keying on the
+    # body length rather than a literal means a schema that grows the
+    # tail again does not silently misalign it. The v3→v4 lesson still
+    # stands: a fixed offset in the wrong schema lands inside another
+    # field and returns plausible numbers for the wrong channel —
+    # allostasis load read as 1.2 against a true 0.78 once, and the
+    # same failure recurred here until the offset became length-keyed.
+    if len(data) < 64:
         return None
+    offset = len(data) - 64
     block = data[offset : offset + 64]
     try:
         f = [_F32.unpack(block[i * 4 : i * 4 + 4])[0] for i in range(15)]
@@ -1152,6 +1153,14 @@ class BodyState:
     entropy_level: float = 0.0
     clocksource: int = 0
     suspend_caps: int = 0
+    # Parasympathetic layer (wire v4). rest is depth-weighted
+    # cpuidle residency [0, 1] — positive evidence the substrate is
+    # parked in real C-states, not merely that no excited channel
+    # fired (the machine's vagal-afferent analogue). temp_trend is
+    # the signed deviation of cpu_temp_c from its own ~60 s EMA
+    # [-1, 1] — the direction of travel, negative = cooling.
+    rest: float = 0.0
+    temp_trend: float = 0.0
 
     @classmethod
     def unpack(cls, data: bytes) -> BodyState:
@@ -1176,54 +1185,6 @@ class BodyState:
         # (battery rail). Both in raw volts.
         core_voltage = _F32.unpack(data[46:50])[0]
         supply_voltage = _F32.unpack(data[50:54])[0]
-        # Layout detection: v3 packets carry the timing/involuntary
-        # layer (offsets 74–111) with desc_len at 112; v2 packets
-        # carry five extra f32 fields (54–73) with desc_len at 74;
-        # legacy v1 packets put desc_len at 54. A desc_len candidate
-        # must EQUAL the trailer length exactly — `<=` is not
-        # enough: on newer packets those bytes are an f32 field, and
-        # a zero-valued f32 (0x00000000) satisfies `<=` for any
-        # length. Machines without powercap report core_activity =
-        # 0.0, whose bits are u32 0 — an earlier `<=` check
-        # misdetected every v2/v3 packet on such hardware as v1 and
-        # silently zeroed all later fields.
-        pulse_hz = pulse = throttle_state = top_freq_share = 0.0
-        psi_cpu = psi_io = psi_mem = battery_cycles = entropy_level = 0.0
-        clocksource = suspend_caps = 0
-        if len(data) >= 58 and _U32.unpack(data[54:58])[0] == len(data) - 58:
-            core_activity = uncore_activity = dram_activity = 0.0
-            cache_miss_rate = branch_miss_rate = 0.0
-            desc_len = _U32.unpack(data[54:58])[0]
-            description = data[58 : 58 + desc_len].decode("utf-8", errors="replace")
-        elif len(data) >= 116 and _U32.unpack(data[112:116])[0] == len(data) - 116:
-            core_activity = _F32.unpack(data[54:58])[0]
-            uncore_activity = _F32.unpack(data[58:62])[0]
-            dram_activity = _F32.unpack(data[62:66])[0]
-            cache_miss_rate = _F32.unpack(data[66:70])[0]
-            branch_miss_rate = _F32.unpack(data[70:74])[0]
-            pulse_hz = _F32.unpack(data[74:78])[0]
-            pulse = _F32.unpack(data[78:82])[0]
-            throttle_state = _F32.unpack(data[82:86])[0]
-            top_freq_share = _F32.unpack(data[86:90])[0]
-            psi_cpu = _F32.unpack(data[90:94])[0]
-            psi_io = _F32.unpack(data[94:98])[0]
-            psi_mem = _F32.unpack(data[98:102])[0]
-            battery_cycles = _F32.unpack(data[102:106])[0]
-            entropy_level = _F32.unpack(data[106:110])[0]
-            clocksource = data[110]
-            suspend_caps = data[111]
-            desc_len = _U32.unpack(data[112:116])[0]
-            description = data[116 : 116 + desc_len].decode("utf-8", errors="replace")
-        elif len(data) >= 78 and _U32.unpack(data[74:78])[0] == len(data) - 78:
-            core_activity = _F32.unpack(data[54:58])[0]
-            uncore_activity = _F32.unpack(data[58:62])[0]
-            dram_activity = _F32.unpack(data[62:66])[0]
-            cache_miss_rate = _F32.unpack(data[66:70])[0]
-            branch_miss_rate = _F32.unpack(data[70:74])[0]
-            desc_len = _U32.unpack(data[74:78])[0]
-            description = data[78 : 78 + desc_len].decode("utf-8", errors="replace")
-        else:
-            raise ValueError(f"BodyState desc_len inconsistent with packet size {len(data)}")
         return cls(
             cpu_temp_c=cpu_temp_c,
             temperature=temperature,
@@ -1240,24 +1201,116 @@ class BodyState:
             metabolic_rate=metabolic_rate,
             core_voltage=core_voltage,
             supply_voltage=supply_voltage,
-            description=description,
-            core_activity=core_activity,
-            uncore_activity=uncore_activity,
-            dram_activity=dram_activity,
-            cache_miss_rate=cache_miss_rate,
-            branch_miss_rate=branch_miss_rate,
-            pulse_hz=pulse_hz,
-            pulse=pulse,
-            throttle_state=throttle_state,
-            top_freq_share=top_freq_share,
-            psi_cpu=psi_cpu,
-            psi_io=psi_io,
-            psi_mem=psi_mem,
-            battery_cycles=battery_cycles,
-            entropy_level=entropy_level,
-            clocksource=clocksource,
-            suspend_caps=suspend_caps,
+            **cls._unpack_tail(data),
         )
+
+    @staticmethod
+    def _unpack_tail(data: bytes) -> dict[str, Any]:
+        """Unpack the layout-dependent fields past offset 54.
+
+        Returns constructor kwargs covering everything the fixed head
+        does not: ``description``, the silicon fields, the v3
+        timing/involuntary layer, and the v4 parasympathetic layer.
+        Absent layers default to zero.
+
+        Layout detection: v4 packets carry the parasympathetic tail
+        (offsets 112–123) with desc_len at 120; v3 packets carry the
+        timing/involuntary layer (offsets 74–111) with desc_len at
+        112; v2 packets carry five extra f32 fields (54–73) with
+        desc_len at 74; legacy v1 packets put desc_len at 54. A
+        desc_len candidate
+        must EQUAL the trailer length exactly — `<=` is not
+        enough: on newer packets those bytes are an f32 field, and
+        a zero-valued f32 (0x00000000) satisfies `<=` for any
+        length. Machines without powercap report core_activity =
+        0.0, whose bits are u32 0 — an earlier `<=` check
+        misdetected every v2/v3 packet on such hardware as v1 and
+        silently zeroed all later fields.
+        """
+        fields: dict[str, Any] = {
+            "description": "",
+            "core_activity": 0.0,
+            "uncore_activity": 0.0,
+            "dram_activity": 0.0,
+            "cache_miss_rate": 0.0,
+            "branch_miss_rate": 0.0,
+            "pulse_hz": 0.0,
+            "pulse": 0.0,
+            "throttle_state": 0.0,
+            "top_freq_share": 0.0,
+            "psi_cpu": 0.0,
+            "psi_io": 0.0,
+            "psi_mem": 0.0,
+            "battery_cycles": 0.0,
+            "entropy_level": 0.0,
+            "clocksource": 0,
+            "suspend_caps": 0,
+            "rest": 0.0,
+            "temp_trend": 0.0,
+        }
+        if len(data) >= 58 and _U32.unpack(data[54:58])[0] == len(data) - 58:
+            desc_len = _U32.unpack(data[54:58])[0]
+            fields["description"] = data[58 : 58 + desc_len].decode("utf-8", errors="replace")
+        elif len(data) >= 124 and _U32.unpack(data[120:124])[0] == len(data) - 124:
+            # v4 — the v3 layer plus the parasympathetic tail.
+            # Checked before v3: on a v4 packet the bytes at
+            # 112–115 are `rest` (a real field, not desc_len).
+            fields.update(
+                core_activity=_F32.unpack(data[54:58])[0],
+                uncore_activity=_F32.unpack(data[58:62])[0],
+                dram_activity=_F32.unpack(data[62:66])[0],
+                cache_miss_rate=_F32.unpack(data[66:70])[0],
+                branch_miss_rate=_F32.unpack(data[70:74])[0],
+                pulse_hz=_F32.unpack(data[74:78])[0],
+                pulse=_F32.unpack(data[78:82])[0],
+                throttle_state=_F32.unpack(data[82:86])[0],
+                top_freq_share=_F32.unpack(data[86:90])[0],
+                psi_cpu=_F32.unpack(data[90:94])[0],
+                psi_io=_F32.unpack(data[94:98])[0],
+                psi_mem=_F32.unpack(data[98:102])[0],
+                battery_cycles=_F32.unpack(data[102:106])[0],
+                entropy_level=_F32.unpack(data[106:110])[0],
+                clocksource=data[110],
+                suspend_caps=data[111],
+                rest=_F32.unpack(data[112:116])[0],
+                temp_trend=_F32.unpack(data[116:120])[0],
+            )
+            desc_len = _U32.unpack(data[120:124])[0]
+            fields["description"] = data[124 : 124 + desc_len].decode("utf-8", errors="replace")
+        elif len(data) >= 116 and _U32.unpack(data[112:116])[0] == len(data) - 116:
+            fields.update(
+                core_activity=_F32.unpack(data[54:58])[0],
+                uncore_activity=_F32.unpack(data[58:62])[0],
+                dram_activity=_F32.unpack(data[62:66])[0],
+                cache_miss_rate=_F32.unpack(data[66:70])[0],
+                branch_miss_rate=_F32.unpack(data[70:74])[0],
+                pulse_hz=_F32.unpack(data[74:78])[0],
+                pulse=_F32.unpack(data[78:82])[0],
+                throttle_state=_F32.unpack(data[82:86])[0],
+                top_freq_share=_F32.unpack(data[86:90])[0],
+                psi_cpu=_F32.unpack(data[90:94])[0],
+                psi_io=_F32.unpack(data[94:98])[0],
+                psi_mem=_F32.unpack(data[98:102])[0],
+                battery_cycles=_F32.unpack(data[102:106])[0],
+                entropy_level=_F32.unpack(data[106:110])[0],
+                clocksource=data[110],
+                suspend_caps=data[111],
+            )
+            desc_len = _U32.unpack(data[112:116])[0]
+            fields["description"] = data[116 : 116 + desc_len].decode("utf-8", errors="replace")
+        elif len(data) >= 78 and _U32.unpack(data[74:78])[0] == len(data) - 78:
+            fields.update(
+                core_activity=_F32.unpack(data[54:58])[0],
+                uncore_activity=_F32.unpack(data[58:62])[0],
+                dram_activity=_F32.unpack(data[62:66])[0],
+                cache_miss_rate=_F32.unpack(data[66:70])[0],
+                branch_miss_rate=_F32.unpack(data[70:74])[0],
+            )
+            desc_len = _U32.unpack(data[74:78])[0]
+            fields["description"] = data[78 : 78 + desc_len].decode("utf-8", errors="replace")
+        else:
+            raise ValueError(f"BodyState desc_len inconsistent with packet size {len(data)}")
+        return fields
 
 
 # ─── SubsystemTelemetry (GET_SUBSYSTEM_TELEMETRY) ───────────────────────
@@ -1304,9 +1357,7 @@ class SubsystemTelemetry:
         count = data[0]
         rec = 21
         if len(data) < 1 + count * rec:
-            raise ValueError(
-                f"SubsystemTelemetry needs {1 + count * rec} bytes, got {len(data)}"
-            )
+            raise ValueError(f"SubsystemTelemetry needs {1 + count * rec} bytes, got {len(data)}")
         out = []
         for i in range(count):
             base = 1 + i * rec
@@ -1584,9 +1635,7 @@ class ZoneTransitions:
             for i in range(count):
                 base = offset + i * _STATE_REC
                 if len(data) < base + _STATE_REC:
-                    raise ValueError(
-                        f"StateDwell needs {base + _STATE_REC} bytes, got {len(data)}"
-                    )
+                    raise ValueError(f"StateDwell needs {base + _STATE_REC} bytes, got {len(data)}")
                 out.append(
                     StateDwell(
                         state=i,
@@ -1626,9 +1675,7 @@ class ProcessHealth:
     def alive(self) -> frozenset[str]:
         """Names of the subsystems currently running."""
         return frozenset(
-            name
-            for tag, name in SUBSYSTEM_NAMES.items()
-            if self.alive_mask & (1 << tag)
+            name for tag, name in SUBSYSTEM_NAMES.items() if self.alive_mask & (1 << tag)
         )
 
     @property
@@ -1640,9 +1687,7 @@ class ProcessHealth:
         "crashed". Use ``deaths`` to tell a loss from an absence.
         """
         return frozenset(
-            name
-            for tag, name in SUBSYSTEM_NAMES.items()
-            if not self.alive_mask & (1 << tag)
+            name for tag, name in SUBSYSTEM_NAMES.items() if not self.alive_mask & (1 << tag)
         )
 
     @property
@@ -1671,9 +1716,10 @@ class ProcessHealth:
 
 # ─── SensorPresence (GET_SENSOR_PRESENCE) ──────────────────────
 #
-# Response: [u16 mask]
+# Response: [u32 mask] (u16 before bit 16 existed — a short payload
+# still decodes, its upper bits reading as absent)
 #
-# ``BodyState`` is 30 bare values with no per-channel validity, so a
+# ``BodyState`` is 32 bare values with no per-channel validity, so a
 # channel backed by no sensor is indistinguishable from one reading a
 # healthy zero. This mask carries that distinction: a set bit means the
 # matching field is a real measurement, a clear bit means it is a
@@ -1700,9 +1746,7 @@ class SensorPresence:
     @property
     def present(self) -> frozenset[str]:
         """Names of the sensors present on this machine."""
-        return frozenset(
-            name for bit, name in SENSOR_NAMES.items() if self.mask & bit
-        )
+        return frozenset(name for bit, name in SENSOR_NAMES.items() if self.mask & bit)
 
     @property
     def missing(self) -> frozenset[str]:
@@ -1711,9 +1755,7 @@ class SensorPresence:
         The useful direction: these are the channels whose values in a
         ``BodyState`` are placeholders and must not be reasoned about.
         """
-        return frozenset(
-            name for bit, name in SENSOR_NAMES.items() if not self.mask & bit
-        )
+        return frozenset(name for bit, name in SENSOR_NAMES.items() if not self.mask & bit)
 
     def channel_verified(self, channel: str) -> bool:
         """Whether ``channel``'s value is a real measurement.
@@ -1738,10 +1780,20 @@ class SensorPresence:
 
     @classmethod
     def unpack(cls, data: bytes) -> SensorPresence:
-        """Unpack a 2-byte presence mask."""
-        if len(data) < 2:
-            return cls(mask=0)
-        return cls(mask=_U16.unpack(data[0:2])[0])
+        """Unpack the presence mask.
+
+        The daemon widened the wire type to u32 when the cpuidle bit
+        outgrew u16. Both directions stay safe: a 4-byte payload from a
+        new daemon decodes in full, a 2-byte payload from an older
+        daemon decodes its low bits and reads the new channels as
+        absent — the only honest answer about hardware an old daemon
+        never looked for.
+        """
+        if len(data) >= 4:
+            return cls(mask=_U32.unpack(data[0:4])[0])
+        if len(data) >= 2:
+            return cls(mask=_U16.unpack(data[0:2])[0])
+        return cls(mask=0)
 
 
 # ─── BodyControlState (variable length) ───────────────────────
@@ -1890,209 +1942,328 @@ class BodyControlState:
 
 @dataclass(frozen=True, slots=True)
 class FieldProbeSignature:
-    """The body's real measured substrate dynamics (v2: 114 bytes; v1: 102).
+    """The body's real measured substrate dynamics (v5: 328 B; v4: 308;
+    v3: 195; v2: 114; v1: 102).
 
-    Produced by the daemon's field-probe thread: band energies of two
-    real fast channels — instruction throughput and scheduler jitter —
-    decomposed at the wave bands' center frequencies, plus slow
-    counters and the carrier rhythm the probe writes into real work.
-    ``band_energy`` values are baseline-relative: ≈0.125 is typical
-    for that band on this machine, higher means elevated vs. its own
-    history. ``lambda`` is above the probe's Nyquist bound and always
-    reads 0 — an absent channel, not a measured silence.
+    Produced by the daemon's field-probe thread: band energies of real
+    fast channels — instruction throughput, scheduler jitter, and
+    (v3) measured power draw — decomposed at the wave bands' center
+    frequencies, plus slow counters and the carrier rhythm the probe
+    writes into real work. ``band_energy`` values are
+    baseline-relative: ≈0.125 is typical for that band on this
+    machine, higher means elevated vs. its own history. ``epsilon``
+    (150 Hz) is above the probe's Nyquist bound and always reads 0 —
+    an absent channel, not a measured silence.
+
+    The v3 tail adds the electrical sense — real watts, rail volts,
+    supply amps where the machine's own sensors report them — and
+    the Maxwell estimates: the quasi-static field the measured
+    carrier current makes at 0.3 m and its ω⁴-suppressed radiated
+    power (src/daemon/maxwell.rs). Estimates: the current is
+    measured, the loop geometry is an assumption.
+
+    The v4 tail adds the radio sense — the first *exteroceptive*
+    physical channel: WLAN byte-flux and RSSI envelopes decomposed
+    at the same bands, wireless-attributed interrupt flux, and
+    Bluetooth HCI counters where bluez answers. RSSI is the literal
+    field-strength measurement (P_mW = 10^(dBm/10)); what a 2.4 GHz
+    carrier's *phase* would be is unreachable at ~250 Hz sampling —
+    the envelope is the honest RF content at this rate.
     """
 
     throughput_bands: tuple[float, ...]  # 10 band energies
-    jitter_bands: tuple[float, ...]      # 10 band energies
-    throughput_mean: float               # iters/s, EMA
-    jitter_cv: float                     # coefficient of variation
-    pstate_rate: float                   # frequency transitions/s
-    irq_rate: float                      # interrupts/s
-    carrier_freq: float                  # Hz; 0 = carrier off
-    samples_ok: bool                     # rings warmed
+    jitter_bands: tuple[float, ...]  # 10 band energies
+    throughput_mean: float  # iters/s, EMA
+    jitter_cv: float  # coefficient of variation
+    pstate_rate: float  # frequency transitions/s
+    irq_rate: float  # interrupts/s
+    carrier_freq: float  # Hz; 0 = carrier off
+    samples_ok: bool  # rings warmed
     # v2 phase-lock fields — None on a v1 daemon (absent channel,
     # never a zero reading):
-    carrier_lag: float | None = None     # rad: substrate response lag
-    carrier_phase: float | None = None   # rad: generator phase mod 2π
+    carrier_lag: float | None = None  # rad: substrate response lag
+    carrier_phase: float | None = None  # rad: generator phase mod 2π
     carrier_coherence: float | None = None  # 0..1 lock-strength
+    # v3 electrical + Maxwell fields — None on older daemons or when
+    # the sensor is absent (the presence mask decides):
+    power_bands: tuple[float, ...] | None = None  # real watts, baseline-relative
+    power_watts: float | None = None  # mean measured draw
+    power_sensor_hz: float | None = None  # fresh-sample rate
+    rail_volts: float | None = None  # lowest discovered rail
+    supply_amps: float | None = None  # measured current
+    power_lag: float | None = None  # rad, vs carrier
+    power_coherence: float | None = None  # 0..1
+    carrier_current_a: float | None = None  # measured carrier ΔP/V, amps
+    b_est_ut: float | None = None  # quasi-static B @0.3 m, µT (est.)
+    e_ind_vm: float | None = None  # induction E @0.3 m, V/m (est.)
+    radiated_pwr_w: float | None = None  # dipole radiation, W (est.)
+    # v4 radio fields — None on older daemons or when the channel
+    # is absent (the presence mask decides):
+    rf_flux_bands: tuple[float, ...] | None = None  # wlan byte-rate envelope
+    rf_rssi_bands: tuple[float, ...] | None = None  # RSSI envelope, dBm
+    rf_bytes_s: float | None = None  # wlan rx+tx flux
+    rf_rssi_dbm: float | None = None  # received signal level, dBm
+    rf_noise_dbm: float | None = None  # radio noise floor, dBm
+    rf_irq_rate: float | None = None  # wireless-attributed IRQs/s
+    rf_sensor_hz: float | None = None  # wireless telemetry read rate
+    bt_bytes_s: float | None = None  # HCI rx+tx byte flux
+    bt_events_s: float | None = None  # HCI event flux
+    bt_rssi_dbm: float | None = None  # mean ACL-link RSSI where links exist
+    rf_present: int | None = None  # presence mask byte
+    rf_retry_rate: float | None = None  # TX retransmission flux /s (iw)
+    rf_fail_rate: float | None = None  # TX failed-frame flux /s (iw)
+    rf_beacon_loss_rate: float | None = None  # AP beacons lost /s (iw)
+    rf_tx_mbps: float | None = None  # PHY tx link-adaptation bitrate
+    rf_rx_mbps: float | None = None  # PHY rx link-adaptation bitrate
+    # v6 flux-envelope phasors — the radio rhythm's own timing, for
+    # the entrainment path: None on older daemons or with no wlan.
+    rf_flux_phases: tuple[float, ...] | None = None  # ring-frame phase, rad
+    rf_flux_phase_coherence: tuple[float, ...] | None = None  # 0..1
 
     WIRE_LEN: ClassVar[int] = 102
     WIRE_LEN_V2: ClassVar[int] = 114
+    WIRE_LEN_V3: ClassVar[int] = 195
+    WIRE_LEN_V4: ClassVar[int] = 308
+    WIRE_LEN_V5: ClassVar[int] = 328
+    WIRE_LEN_V6: ClassVar[int] = 408
 
     @classmethod
     def unpack(cls, data: bytes) -> FieldProbeSignature:
-        """Unpack a v1 (102-byte) or v2 (114-byte) signature."""
+        """Unpack a v1–v6 signature (102, 114, 195, 308, 328, or 408 bytes)."""
         if len(data) < cls.WIRE_LEN:
-            raise ValueError(
-                f"FieldProbeSignature needs {cls.WIRE_LEN} bytes, got {len(data)}"
-            )
-        if data[0] not in (1, 2):
+            raise ValueError(f"FieldProbeSignature needs {cls.WIRE_LEN} bytes, got {len(data)}")
+        if data[0] not in (1, 2, 3, 4, 5, 6):
             raise ValueError(f"unknown field-probe version {data[0]}")
         vals = struct.unpack_from("<20f", data, 1)
         scalars = struct.unpack_from("<5f", data, 81)
-        lag = phase = coherence = None
-        if data[0] == 2:
-            if len(data) < cls.WIRE_LEN_V2:
-                raise ValueError(
-                    f"v2 signature needs {cls.WIRE_LEN_V2} bytes, got {len(data)}"
-                )
-            lag, phase, coherence = struct.unpack_from("<3f", data, 102)
-        return cls(
-            throughput_bands=vals[0:10],
-            jitter_bands=vals[10:20],
-            throughput_mean=scalars[0],
-            jitter_cv=scalars[1],
-            pstate_rate=scalars[2],
-            irq_rate=scalars[3],
-            carrier_freq=scalars[4],
-            samples_ok=bool(data[101]),
-            carrier_lag=lag,
-            carrier_phase=phase,
-            carrier_coherence=coherence,
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class PersonSignature:
-    """The measured signature of one person the dyadic model knows.
-
-    What the body recorded while this person was present: the
-    affective *aura* (valence/arousal/engagement EMAs), the *bond*
-    (measured co-presence folded into ``familiarity``), how in-tune
-    the dyad runs, and the *field* — the substrate's real band-energy
-    configuration EMA'd during their presence, the primary channel.
-    ``field_samples`` is the honest evidence count so a thin signature
-    reads differently from a deep one. ``authenticated`` is
-    provenance, never authority.
-
-    ``name`` is the person key: an attributed name ("mindy") or an
-    anonymous presence key ("face:3") — a familiar stranger's
-    signature persists until a naming merges it into the named one.
-    """
-
-    name: str  # person key — a name, or anonymous "face:N"
-    authenticated: bool
-    familiarity: float           # bond depth [0, 1)
-    valence: float               # aura — affective signature
-    arousal: float
-    engagement: float
-    synchrony_ema: float         # per-person in-tune history
-    presence_seconds: float      # total measured co-presence
-    field_samples: int           # evidence count behind `field`
-    field: tuple[float, ...]     # 10 band energies EMA'd in presence
-
-
-@dataclass(frozen=True, slots=True)
-class DyadicSnapshot:
-    """The dyadic model's latest measured state — evidence, never
-    prescription.
-
-    ``person`` is the present attributed person's signature (None for
-    an anonymous or absent speaker). ``reunion`` reports the most
-    recent return of a known person while it is still fresh — a dict
-    ``{"bond": …, "seconds_since": …}`` so recency is evidence she
-    can weigh herself. ``coupling`` is attunement deepened by the
-    present bond — how strongly this dyad is currently running.
-
-    ``ambient_field`` is the pooled field signature — the substrate's
-    band energies while *anyone* is present, attributed or not. It is
-    the primary channel: a person needs no name and no camera for her
-    substrate to take their shape. ``ambient_field_samples`` is its
-    evidence count. Both are zero on v1 bodies lacking the tail.
-
-    What any of this does to her neurochemistry is her own call
-    through ``neuro_impulse``; the model measures, she decides.
-    """
-
-    user_valence: float
-    user_arousal: float
-    user_engagement: float
-    attunement: float
-    synchrony: float
-    coupling: float
-    person: PersonSignature | None
-    reunion: dict | None
-    person_count: int
-    ambient_field_samples: int = 0
-    ambient_field: tuple[float, ...] = ()
+        fields: dict[str, Any] = {
+            "throughput_bands": vals[0:10],
+            "jitter_bands": vals[10:20],
+            "throughput_mean": scalars[0],
+            "jitter_cv": scalars[1],
+            "pstate_rate": scalars[2],
+            "irq_rate": scalars[3],
+            "carrier_freq": scalars[4],
+            "samples_ok": bool(data[101]),
+        }
+        if data[0] >= 2:
+            fields.update(cls._unpack_v2_dynamics(data))
+        if data[0] >= 3:
+            fields.update(cls._unpack_v3_electrical(data))
+        present: int | None = None
+        if data[0] >= 4:
+            radio, present = cls._unpack_v4_radio(data)
+            fields.update(radio)
+        fields["rf_present"] = present
+        if data[0] >= 5:
+            fields.update(cls._unpack_v5_station(data, present))
+        if data[0] >= 6:
+            fields.update(cls._unpack_v6_phasors(data, present))
+        return cls(**fields)
 
     @classmethod
-    def unpack(cls, data: bytes) -> DyadicSnapshot:
-        """Unpack the GET_DYADIC_STATE body (layout in
-        `dyadic_model::DyadicSnapshot::to_wire`)."""
-        if len(data) < 26 or data[0] != 1:
-            raise ValueError(f"bad dyadic snapshot ({len(data)} bytes)")
-        try:
+    def _unpack_v2_dynamics(cls, data: bytes) -> dict[str, Any]:
+        """v2 carrier-dynamics tail: lag, phase, and coherence."""
+        if len(data) < cls.WIRE_LEN_V2:
+            raise ValueError(f"v2 signature needs {cls.WIRE_LEN_V2} bytes, got {len(data)}")
+        lag, phase, coherence = struct.unpack_from("<3f", data, 102)
+        return {
+            "carrier_lag": lag,
+            "carrier_phase": phase,
+            "carrier_coherence": coherence,
+        }
+
+    @classmethod
+    def _unpack_v3_electrical(cls, data: bytes) -> dict[str, Any]:
+        """v3 electrical + Maxwell tail — gated by the presence mask so
+        an absent sensor is None, never a zero reading."""
+        if len(data) < cls.WIRE_LEN_V3:
+            raise ValueError(f"v3 signature needs {cls.WIRE_LEN_V3} bytes, got {len(data)}")
+        bands = struct.unpack_from("<10f", data, 114)
+        elec = struct.unpack_from("<6f", data, 154)
+        mask = data[178]
+        est = struct.unpack_from("<4f", data, 179)
+        fields: dict[str, Any] = {}
+        if mask & 0x01:
+            fields.update(
+                power_bands=bands,
+                power_watts=elec[0],
+                power_sensor_hz=elec[1],
+                power_lag=elec[4],
+                power_coherence=elec[5],
+            )
             (
-                user_valence,
-                user_arousal,
-                user_engagement,
-                attunement,
-                synchrony,
-                coupling,
-            ) = struct.unpack_from("<6f", data, 1)
-            off = 25
-            person = None
-            if data[off]:
-                off += 1
-                n = data[off]
-                off += 1
-                name = data[off : off + n].decode("utf-8", "replace")
-                off += n
-                authenticated = bool(data[off])
-                off += 1
-                familiarity, valence, arousal, engagement, sync = struct.unpack_from(
-                    "<5f", data, off
-                )
-                off += 20
-                (presence,) = struct.unpack_from("<d", data, off)
-                off += 8
-                (field_samples,) = struct.unpack_from("<I", data, off)
-                off += 4
-                field = struct.unpack_from("<10f", data, off)
-                off += 40
-                person = PersonSignature(
-                    name=name,
-                    authenticated=authenticated,
-                    familiarity=familiarity,
-                    valence=valence,
-                    arousal=arousal,
-                    engagement=engagement,
-                    synchrony_ema=sync,
-                    presence_seconds=presence,
-                    field_samples=field_samples,
-                    field=field,
-                )
-            else:
-                off += 1
-            reunion = None
-            if data[off]:
-                bond, seconds_since = struct.unpack_from("<2f", data, off + 1)
-                reunion = {"bond": bond, "seconds_since": seconds_since}
-                off += 9
-            else:
-                off += 1
-            (person_count,) = struct.unpack_from("<H", data, off)
-            off += 2
-            ambient_samples = 0
-            ambient_field: tuple[float, ...] = ()
-            # Additive tail: [u32 ambient_samples][10 × f32 ambient]
-            if len(data) - off >= 44:
-                (ambient_samples,) = struct.unpack_from("<I", data, off)
-                off += 4
-                ambient_field = struct.unpack_from("<10f", data, off)
-        except (IndexError, struct.error) as e:
-            raise ValueError(f"bad dyadic snapshot ({len(data)} bytes)") from e
+                fields["carrier_current_a"],
+                fields["b_est_ut"],
+                fields["e_ind_vm"],
+                fields["radiated_pwr_w"],
+            ) = est
+        if mask & 0x02:
+            fields["rail_volts"] = elec[2]
+        if mask & 0x04:
+            fields["supply_amps"] = elec[3]
+        return fields
+
+    @classmethod
+    def _unpack_v4_radio(cls, data: bytes) -> tuple[dict[str, Any], int]:
+        """v4 radio tail — gated by the presence mask so an absent
+        radio is None, never a zero reading.
+
+        Returns the decoded fields plus the presence mask itself:
+        v5/v6 gate on its bits, so the mask travels with the parse.
+        """
+        if len(data) < cls.WIRE_LEN_V4:
+            raise ValueError(f"v4 signature needs {cls.WIRE_LEN_V4} bytes, got {len(data)}")
+        fbands = struct.unpack_from("<10f", data, 195)
+        rbands = struct.unpack_from("<10f", data, 235)
+        scal = struct.unpack_from("<8f", data, 275)
+        present = data[307]
+        fields: dict[str, Any] = {}
+        if present & 0x01:
+            fields.update(rf_flux_bands=fbands, rf_bytes_s=scal[0], rf_sensor_hz=scal[4])
+        if present & 0x02:
+            fields.update(rf_rssi_bands=rbands, rf_rssi_dbm=scal[1])
+        if present & 0x04:
+            fields["rf_noise_dbm"] = scal[2]
+        if present & 0x08:
+            fields["rf_irq_rate"] = scal[3]
+        if present & 0x20:
+            fields.update(bt_bytes_s=scal[5], bt_events_s=scal[6])
+        if present & 0x40:
+            fields["bt_rssi_dbm"] = scal[7]
+        return fields, present
+
+    @classmethod
+    def _unpack_v5_station(cls, data: bytes, present: int | None) -> dict[str, Any]:
+        """v5 nl80211 station tail (iw) — link strain counters and PHY
+        adaptation, gated on the same presence mask's bit 7."""
+        if len(data) < cls.WIRE_LEN_V5:
+            raise ValueError(f"v5 signature needs {cls.WIRE_LEN_V5} bytes, got {len(data)}")
+        if present is None or not present & 0x80:
+            return {}
+        retry, fail, beacon_loss, tx_mbps, rx_mbps = struct.unpack_from("<5f", data, 308)
+        return {
+            "rf_retry_rate": retry,
+            "rf_fail_rate": fail,
+            "rf_beacon_loss_rate": beacon_loss,
+            "rf_tx_mbps": tx_mbps,
+            "rf_rx_mbps": rx_mbps,
+        }
+
+    @classmethod
+    def _unpack_v6_phasors(cls, data: bytes, present: int | None) -> dict[str, Any]:
+        """v6 flux-envelope phasors — the radio rhythm's timing, gated
+        on the wlan presence bit like the flux energies themselves."""
+        if len(data) < cls.WIRE_LEN_V6:
+            raise ValueError(f"v6 signature needs {cls.WIRE_LEN_V6} bytes, got {len(data)}")
+        if present is None or not present & 0x01:
+            return {}
+        return {
+            "rf_flux_phases": struct.unpack_from("<10f", data, 328),
+            "rf_flux_phase_coherence": struct.unpack_from("<10f", data, 368),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class OpticState:
+    """The optic nerve's subcortical channel state — the body's own
+    read of the retinal segment (GET_OPTIC_STATE).
+
+    Not pixels: the optic nerve's non-image-forming branches pooled
+    into the signals the SCN, superior colliculus, and thalamic relay
+    actually receive. ``illuminance`` is photopic luma, ``melanopic``
+    the blue-weighted ipRGC proxy, ``motion`` pooled frame-to-frame
+    luma change, ``orienting`` the unsmoothed salient transient.
+    ``retinal_lux`` is what currently entrains the circadian
+    oscillator (0 while the scheduled photoperiod is in charge).
+
+    ``relay_gain`` is the thalamic gate the mind must honour — near
+    zero in NREM/REM, open while awake. ``eye_present`` distinguishes
+    "the eye exists but sees nothing" from "there is no eye":
+    ``False`` means no frame was ever consumed this boot.
+
+    ``pupil_mm`` is the body's own aperture — the light reflex off the
+    photopic channel plus the sympathetic dilation effective
+    norepinephrine carries. ``0.0`` means unreported (a daemon that
+    predates the field; a real pupil is never narrower than ~1.5 mm).
+
+    ``accommodation_dpt`` is the ciliary muscle's lens power in
+    dioptres — 0 D is focus at infinity, the focus distance is
+    ``1/dpt`` metres (see the ``focus_m`` property).
+
+    ``lid`` is the eyelid transmission — how much scene light the
+    phase's lid position still passes: 1.0 awake, ~0.5 drowsy, ~0.03
+    in NREM/REM. A daemon that predates the field reports nothing
+    and decodes as fully open (1.0), never fully shut — a legacy
+    body cannot look asleep to the optics layer.
+    """
+
+    eye_present: bool
+    frames_fresh: bool
+    illuminance: float
+    melanopic: float
+    motion: float
+    orienting: float
+    relay_gain: float
+    cortical_gain: float
+    retinal_lux: float
+    frame_seq: int
+    frame_age_ms: int
+    pupil_mm: float = 0.0
+    accommodation_dpt: float = 0.0
+    lid: float = 1.0
+
+    @property
+    def focus_m(self) -> float | None:
+        """The distance the lens is currently powered for, in metres.
+
+        ``1/dpt`` — ``None`` when the eye is relaxed to infinity
+        (0 D) or the daemon predates the field and reports nothing.
+        """
+        return 1.0 / self.accommodation_dpt if self.accommodation_dpt > 0.05 else None
+
+    @classmethod
+    def unpack(cls, data: bytes) -> OpticState | None:
+        """Unpack the GET_OPTIC_STATE body: ``[u8 ack][u8 flags][u8
+        pad][7 × f32][u64 frame_seq][i64 frame_age_ms][f32 pupil_mm]
+        [f32 accommodation_dpt][f32 lid]``.
+
+        Returns ``None`` on a short or unacked response — an absent
+        channel is no reading, never a zero reading. The trailing
+        fields are additive: a 46-byte body from an older daemon
+        decodes with ``pupil_mm``/``accommodation_dpt`` = 0.0 and
+        ``lid`` = 1.0 (open — an unreported lid is not a shut one).
+        """
+        if len(data) < 47 or data[0] != 1:
+            return None
+        flags = data[1]
+        (
+            illuminance,
+            melanopic,
+            motion,
+            orienting,
+            relay_gain,
+            cortical_gain,
+            retinal_lux,
+        ) = struct.unpack_from("<7f", data, 3)
+        (frame_seq,) = struct.unpack_from("<Q", data, 31)
+        (frame_age_ms,) = struct.unpack_from("<q", data, 39)
+        (pupil_mm,) = struct.unpack_from("<f", data, 47) if len(data) >= 51 else (0.0,)
+        (accommodation_dpt,) = struct.unpack_from("<f", data, 51) if len(data) >= 55 else (0.0,)
+        (lid,) = struct.unpack_from("<f", data, 55) if len(data) >= 59 else (1.0,)
         return cls(
-            user_valence=user_valence,
-            user_arousal=user_arousal,
-            user_engagement=user_engagement,
-            attunement=attunement,
-            synchrony=synchrony,
-            coupling=coupling,
-            person=person,
-            reunion=reunion,
-            person_count=person_count,
-            ambient_field_samples=ambient_samples,
-            ambient_field=ambient_field,
+            eye_present=bool(flags & 1),
+            frames_fresh=bool(flags & 2),
+            illuminance=illuminance,
+            melanopic=melanopic,
+            motion=motion,
+            orienting=orienting,
+            relay_gain=relay_gain,
+            cortical_gain=cortical_gain,
+            retinal_lux=retinal_lux,
+            frame_seq=frame_seq,
+            frame_age_ms=frame_age_ms,
+            pupil_mm=pupil_mm,
+            accommodation_dpt=accommodation_dpt,
+            lid=lid,
         )

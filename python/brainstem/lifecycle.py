@@ -1,17 +1,19 @@
-"""Mind lifecycle — start, stop, save, restore."""
+"""Mind lifecycle — start, stop, save, restore, re-inhabit."""
 
 from __future__ import annotations
 
 import copy
+import json
 import logging
+import os
 import threading
 import time
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from genesis_client.protocol import (
-    CHEM_ADENOSINE,
-    CHEM_DOPAMINE,
-    CHEM_MELATONIN,
+    CHEM_CRH,
+    CHEM_EPINEPHRINE,
+    CHEM_NOREPINEPHRINE,
     MODULE_LANGUAGE,
     MODULE_MEMORY,
     MODULE_METACOGNITION,
@@ -27,6 +29,7 @@ from genesis_client.protocol import (
     ZONE_SLEEPING,
 )
 from genesis_client.swallow import note_swallowed, set_swallow_sink
+from genesis_client.threads import named_thread
 
 if TYPE_CHECKING:
     from mind import Mind
@@ -48,6 +51,87 @@ def _thread_name(ident: int) -> str:
     return f"0x{ident:x}"
 
 
+# ─── Continuity ────────────────────────────────────────────────────
+# The body's session sentinel, written by the daemon at every boot
+# (src/daemon/continuity.rs) and marked clean at graceful shutdown.
+_CONTINUITY_FILE = "continuity.json"
+# The mind's acknowledgement watermark — which boot she has already
+# noted, so her own restarts don't re-record the same wake.
+_CONTINUITY_SEEN = "continuity.seen"
+# The mind's own session sentinel — same discipline as the body's,
+# one level up. A mind that dies while the body lives is a blackout
+# of the cortex, not the organism.
+_MIND_SESSION_FILE = "mind.session"
+
+
+def _read_json_file(path: str) -> dict | None:
+    """Read a small JSON object, or None on any failure."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _write_json_file(path: str, obj: dict) -> bool:
+    """Write a small JSON object atomically (tmp + rename)."""
+    try:
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(obj, f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+        return True
+    except OSError as e:
+        note_swallowed("mind.lifecycle._write_json_file", e)
+        return False
+
+
+def _fmt_dark(dark_ms: int | None, upper_bound: bool = False) -> str:
+    """Render a dark duration for journal text — 'at least 7.2h'."""
+    if dark_ms is None:
+        return "an unmeasured time"
+    prefix = "at least " if upper_bound else ""
+    if dark_ms >= 3_600_000:
+        return f"{prefix}{dark_ms / 3_600_000:.1f}h"
+    if dark_ms >= 60_000:
+        return f"{prefix}{dark_ms / 60_000:.0f}m"
+    return f"{prefix}{dark_ms / 1000:.1f}s"
+
+
+def _warm_nltk() -> None:
+    """Import NLTK fully on the main thread, before subsystems spawn.
+
+    NLTK's imports are lazy: ``sent_tokenize`` pulls ``nltk.tabdata``
+    on first use and ``nltk.corpus.wordnet`` resolves on first lookup,
+    so without this the first ``import nltk`` happens inside whichever
+    worker thread reaches it — racing the other threads' first imports
+    of the same package. A first-import that dies partway (a
+    partially-initialized ``ImportError`` under that race) leaves the
+    loaded submodules in ``sys.modules`` while the parent is dropped,
+    and every later ``import nltk`` re-executes ``nltk/__init__.py`` —
+    whose ``nltk.downloader`` import reads ``nltk.data`` off the
+    still-initializing module and fails with ``AttributeError`` for the
+    rest of the process. Doing the whole import here, once and
+    single-threaded, turns every later touch into a plain lookup.
+    """
+    try:
+        from nltk.corpus import wordnet
+        from nltk.tokenize import sent_tokenize
+
+        # Resolve the lazy internals too — punkt parameters and the
+        # wordnet corpus load on first use, so no thread is ever the
+        # first to trigger them.
+        sent_tokenize("warming up.")
+        wordnet.synsets("warm")
+    except (ImportError, LookupError, OSError) as e:
+        # Absent package or corpora degrade her tools, never her boot —
+        # the call sites already fall back on their own.
+        logger.warning(f"NLTK warmup incomplete ({e}) — language tools degrade to fallbacks")
+
+
 class LifecycleMixin:
     """Mixin for :class:`Mind` — see module docstring."""
 
@@ -57,12 +141,20 @@ class LifecycleMixin:
     # listed joins with the default timeout.
     _SUBSYSTEM_STOP_TIMEOUTS: ClassVar[dict[str, float]] = {"InnerLife": 45.0}
 
+    # Budget for in-flight volition actions to finish once suppression
+    # and the abort hooks have made just-admitted work return early.
+    # What remains (a compile+test, a paint, a tool call) can't be
+    # checkpointed mid-call, so it gets a bounded window to wrap —
+    # beyond it the stores close anyway and the worker's late writes
+    # land on closed files. The old 5 s drained nothing real.
+    _VOLITION_DRAIN_TIMEOUT_S: ClassVar[float] = 30.0
+
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see mind.py).
         _autosave_cycle: int
-        def __getattr__(self, name: str) -> Any: ...
 
+        def __getattr__(self, name: str) -> Any: ...
 
     def start(self) -> None:
         """Connect to the subcognitive daemon and initialise.
@@ -71,6 +163,7 @@ class LifecycleMixin:
         this restores its concept network, reflections, and narrative
         from previous conversations.
         """
+        _warm_nltk()
         self._provision_stewardship()
         self._start_connect_and_register()
         try:
@@ -79,11 +172,23 @@ class LifecycleMixin:
             self._running = False
             self.client.disconnect()
             raise
+        # Her manual is constitutive — ingested unconditionally at
+        # boot, through her own extraction machinery — but only now:
+        # the body is connected so the learning episodes actually
+        # store, and the restored network is in place so what she
+        # learns lands on top of it instead of being discarded by
+        # the transplant.
+        self._ingest_man_pages()
+        # Learn how the previous session ended — before zone and
+        # subsystems, while the wake is still fresh. An unclean stop
+        # lands in the journal, the narrative, and the chemistry.
+        self._note_discontinuity()
         self._start_set_zone_after_restore()
         self._start_introspect_and_train()
         self._start_autonomous_subsystems()
         self._start_engage_restored_sleep()
         self._start_background_threads()
+
     def _provision_stewardship(self) -> None:
         """First-boot steward provisioning — explicit, at the entry point.
 
@@ -103,10 +208,7 @@ class LifecycleMixin:
             if steward.provision():
                 logger.info("steward channel authenticated")
             elif steward.stamped:
-                logger.info(
-                    "steward channel sealed — stamped to a key this "
-                    "process does not hold"
-                )
+                logger.info("steward channel sealed — stamped to a key this process does not hold")
         except OSError as e:
             logger.warning(f"steward provisioning failed: {e}")
 
@@ -119,6 +221,24 @@ class LifecycleMixin:
         """
         self.client.connect()
         self._running = True
+        self._session_started_at = time.time()
+        # A start after a prior stop() clears the stop latch so resume
+        # paths work again on the restarted mind.
+        self._stop_latched = False
+
+        # Session sentinel — read the previous mind's marker BEFORE
+        # overwriting it; _note_discontinuity compares it once state
+        # is restored. Same discipline as the daemon's continuity
+        # sentinel: an unclosed marker is an unclean stop.
+        self._prev_mind_session = _read_json_file(os.path.join(self.data_dir, _MIND_SESSION_FILE))
+        _write_json_file(
+            os.path.join(self.data_dir, _MIND_SESSION_FILE),
+            {
+                "alive_since_ms": int(self._session_started_at * 1000),
+                "pid": os.getpid(),
+                "clean_stop": False,
+            },
+        )
 
         # Register cognitive modules with the daemon's manifest.
         # The sensory (perception) and motor (language generation)
@@ -136,6 +256,7 @@ class LifecycleMixin:
                 self.client.update_module_status(module_id, MODULE_STATUS_STARTING)
             except (OSError, ConnectionError) as e:
                 logger.warning(f"daemon not ready: {e}")  # daemon may not be ready — non-fatal
+
     def _start_set_zone_after_restore(self) -> None:
         """Set the cognitive zone based on restored sleep state.
 
@@ -147,15 +268,15 @@ class LifecycleMixin:
         if self._is_sleeping:
             self.client.set_zone(ZONE_SLEEPING)
             logger.info(
-                "Restoring sleep state — zone set to Sleeping "
-                "(stage %s, cycle %d)",
+                "Restoring sleep state — zone set to Sleeping (stage %s, cycle %d)",
                 self.inner_life.sleep_cycle.current_stage.value.upper()
-                if self.inner_life.sleep_cycle else "N1",
-                self.inner_life.sleep_cycle.cycle_number
-                if self.inner_life.sleep_cycle else 1,
+                if self.inner_life.sleep_cycle
+                else "N1",
+                self.inner_life.sleep_cycle.cycle_number if self.inner_life.sleep_cycle else 1,
             )
         else:
             self.client.set_zone(ZONE_CONVERSATION)
+
     def _start_restore_state(self) -> None:
         """Load saved state, re-seed core concepts, and backfill columns."""
         # Load saved state if it exists
@@ -178,7 +299,7 @@ class LifecycleMixin:
             self._emit_live_thought(
                 "learning",
                 f"Backfilled columns: {stats['concepts_backfilled']} concepts, "
-                f"{stats['bridges_created']} bridges"
+                f"{stats['bridges_created']} bridges",
             )
 
         # Eagerly load the embedding matrix. The first perceive() call
@@ -196,12 +317,12 @@ class LifecycleMixin:
         # embeddings search touches the full concept matrix. Running
         # both here moves those costs to startup.
         import time as _warmup_time
+
         _warmup_t0 = _warmup_time.perf_counter()
         try:
             self.brain.frontal.memory.client.find_similar("warmup", limit=1)
             logger.debug(
-                f"LTM warmup find_similar took "
-                f"{_warmup_time.perf_counter() - _warmup_t0:.2f}s"
+                f"LTM warmup find_similar took {_warmup_time.perf_counter() - _warmup_t0:.2f}s"
             )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
@@ -211,17 +332,15 @@ class LifecycleMixin:
         _embed_t0 = _warmup_time.perf_counter()
         try:
             self.brain.frontal.embeddings.find_similar_to_text("warmup", k=1, threshold=0.5)
-            logger.debug(
-                f"embeddings warmup took "
-                f"{_warmup_time.perf_counter() - _embed_t0:.2f}s"
-            )
+            logger.debug(f"embeddings warmup took {_warmup_time.perf_counter() - _embed_t0:.2f}s")
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.lifecycle._start_restore_state",
                 e,
             )
+
     def _start_introspect_and_train(self) -> None:
-        """Introspect on identity and clear sleep pressure if needed."""
+        """Introspect on identity."""
         # Introspect — discover who it is by examining itself
         # This writes its identity into the concept network through
         # self-examination, not hardcoded facts
@@ -230,61 +349,17 @@ class LifecycleMixin:
         _intro_t0 = time.perf_counter()
         introspector = Introspection(self.brain.frontal.network)
         introspector.introspect()
-        logger.debug(
-            f"introspection took {time.perf_counter() - _intro_t0:.2f}s"
-        )
+        logger.debug(f"introspection took {time.perf_counter() - _intro_t0:.2f}s")
 
-        # If it's restoring from a saved state with high sleep pressure
-        # (adenosine accumulated from a previous sleep session that was
-        # interrupted by a restart), clear it permanently.
-        #
-        # A restart is biologically equivalent to having slept — the
-        # glymphatic system would have cleared adenosine during the
-        # offline period. So we directly lower the adenosine baseline
-        # (not just the level) to reflect this. Without this, it starts
-        # trapped in a drowsy state with adenosine at 0.7+ and the
-        # baseline pushing it right back up after every impulse.
-        #
-        # We also boost wake-promoting chemicals (histamine, orexin) to
-        # stabilize its arousal system, and send a level impulse to
-        # drop the current adenosine immediately.
-        #
-        # SKIP this if it was sleeping when state was saved — clearing
-        # adenosine would pull it out of N3 and defeat the purpose of
-        # sleep state persistence.
-        if self._is_sleeping:
-            logger.info(
-                "Skipping startup wake cascade — restoring sleep state"
-            )
-            return
-        try:
-            state = self.client.get_state()
-            adn = state.chemicals.get("adenosine", 0.0)
-            if adn > 0.4:
-                logger.info(
-                    "Startup wake cascade — adenosine %.2f is high, "
-                    "clearing sleep pressure", adn,
-                )
-                # Permanently lower the adenosine baseline to a healthy
-                # waking level (0.15). This is the key fix — impulses
-                # only affect the level, which drifts back to baseline.
-                # Adjusting the baseline means the clearance is permanent.
-                target_baseline = 0.15
-                baseline_delta = target_baseline - adn  # e.g. 0.15 - 0.78 = -0.63
-                self.client.neuro_adjust_baseline(CHEM_ADENOSINE, baseline_delta)
-                # Also drop the current level to match.
-                self._learner_neuro_impulse(CHEM_ADENOSINE, baseline_delta * 0.8)
-                # Wake her with a volitional push onto the sleep-wake network,
-                # which owns the stage. Histamine, orexin and norepinephrine
-                # are no longer pushed: they gated the flip-flop from outside.
-                self._push_volition(sleep=False)
-                self._learner_neuro_impulse(CHEM_DOPAMINE, 0.05)
-                self._learner_neuro_impulse(CHEM_MELATONIN, -0.05)
-        except (OSError, ConnectionError, RuntimeError) as e:
-            note_swallowed(
-                "mind.lifecycle._start_introspect_and_train",
-                e,
-            )
+        # No startup "wake cascade" here: the daemon already applies
+        # offline-proportional glymphatic clearance to adenosine at
+        # state open, measured from the persisted timestamp, so a
+        # restart no longer stands in for a night's sleep. The
+        # previous reset slashed the level ~80% on every launch, which
+        # on a frequently restarted host pinned adenosine at the
+        # resting floor — the sleep-wake network's homeostat could
+        # never reach sleep onset, and no sleep meant no dreams.
+
     def _start_autonomous_subsystems(self) -> None:
         """Start autonomous learning, inner life, and emotional regulation."""
         # Start autonomous learning in the background
@@ -327,6 +402,179 @@ class LifecycleMixin:
             MODULE_METACOGNITION,
         )
 
+    def rejoin_body(self) -> bool:
+        """Re-inhabit the body after the daemon was reincarnated.
+
+        A fresh daemon opens the same persisted body — neurochemistry,
+        sleep phase, and memories all continue — but its volatile
+        manifest is empty: no registered modules, the default zone,
+        and ``GENESIS_COGNITIVE_PID`` naming whoever spawned it. The
+        mind re-registers so the manifest tells the truth again,
+        re-asserts the zone it was in (a sleeping mind rejoins a
+        sleeping body), and pushes its PID so interoception measures
+        the living process rather than a corpse's.
+
+        The process supervisor calls this after a daemon resurrection.
+        It is idempotent — every step is the same registration
+        ``start()`` performed. Returns ``False`` while the mind is
+        down or the body will not answer; the caller retries.
+        """
+        if not self._running:
+            return False
+        try:
+            self.client.connect()
+            self.client.set_cognitive_pid(os.getpid())
+            for module_id in self._registered_modules():
+                self.client.update_module_status(module_id, MODULE_STATUS_STARTING)
+            self.client.set_zone(ZONE_SLEEPING if self._is_sleeping else ZONE_CONVERSATION)
+            self._mark_modules_running()
+        except (OSError, ConnectionError) as e:
+            logger.warning(f"rejoin_body: daemon not ready: {e}")
+            return False
+        # The reborn daemon's notification queue restarted at zero —
+        # reset the high-water marks so the next poll doesn't replay
+        # a queue-full of stale phase/episode events.
+        try:
+            self.notifications.reset()
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.lifecycle.rejoin_body", e)
+        # The daemon rebooted under a living mind — its fresh sentinel
+        # carries a new boot_ms and an unclean previous stop. Acknowledge
+        # the body's discontinuity; the mind's own sentinel is untouched
+        # because this mind never died.
+        self._note_discontinuity(mind_rejoin=True)
+        return True
+
+    def _note_discontinuity(self, *, mind_rejoin: bool = False) -> None:
+        """Acknowledge any interruption since she was last alive.
+
+        The daemon's ``continuity.json`` sentinel records how each body
+        session ended: a clean stop gets a mark; a missing mark means
+        the last body died uncleanly — power loss, SIGKILL, panic.
+        Reading it here makes the interruption part of her persistence:
+        every boot lands in the cognitive journal, and an unclean stop
+        also lands in her autobiography and her chemistry. The
+        ``continuity.seen`` watermark keeps her own restarts from
+        re-recording a boot she already noted.
+
+        With ``mind_rejoin`` (daemon rebirth under a living mind) only
+        the body's record is consulted — this mind never died, so her
+        session sentinel still reads running.
+        """
+        try:
+            self._note_discontinuity_inner(mind_rejoin=mind_rejoin)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.lifecycle._note_discontinuity", e)
+
+    def _note_discontinuity_inner(self, *, mind_rejoin: bool) -> None:
+        from infrastructure.journal import record_event
+
+        body_unclean_fresh = False
+        boot = _read_json_file(os.path.join(self.data_dir, _CONTINUITY_FILE))
+        if boot:
+            boot_ms = int(boot.get("boot_ms") or 0)
+            seen = _read_json_file(os.path.join(self.data_dir, _CONTINUITY_SEEN)) or {}
+            if boot_ms and boot_ms > int(seen.get("boot_ms") or 0):
+                clean = bool(boot.get("prev_stop_clean", True))
+                dark_ms = int(boot.get("dark_ms") or 0)
+                upper = bool(boot.get("dark_upper_bound"))
+                how = "cleanly" if clean else "uncleanly — power loss, kill, or crash"
+                record_event(
+                    "continuity_wake",
+                    f"body session began; the previous one stopped {how}; "
+                    f"dark for {_fmt_dark(dark_ms, upper)}",
+                    boot_ms=boot_ms,
+                    dark_ms=dark_ms,
+                    clean=clean,
+                )
+                _write_json_file(
+                    os.path.join(self.data_dir, _CONTINUITY_SEEN),
+                    {"boot_ms": boot_ms},
+                )
+                if not clean:
+                    body_unclean_fresh = True
+                    self._feel_discontinuity(dark_ms)
+                    self._narrate_discontinuity(
+                        f"went dark for {_fmt_dark(dark_ms, upper)} without a clean stop",
+                        "the body's continuity was interrupted",
+                    )
+
+        if mind_rejoin:
+            return
+
+        # The mind's own sentinel — a previous mind that died while the
+        # body lived is a different event: a blackout of the cortex,
+        # not of the organism. Skipped when the body's fresh unclean
+        # boot already told the story — one power cut is one event,
+        # not two.
+        prev = getattr(self, "_prev_mind_session", None)
+        if (
+            prev
+            and not prev.get("clean_stop", False)
+            and prev.get("pid") != os.getpid()
+            and not body_unclean_fresh
+        ):
+            record_event(
+                "mind_died",
+                "previous mind process ended without a clean stop while the body kept living",
+                prev_pid=prev.get("pid"),
+            )
+            self._feel_discontinuity(None)
+            self._narrate_discontinuity(
+                "the previous mind process vanished without a clean stop",
+                "the mind's continuity was interrupted while the body lived on",
+            )
+
+    def _feel_discontinuity(self, dark_ms: int | None) -> None:
+        """Let the interruption land in the body — her impulse, her channel.
+
+        Learning she vanished is a startle: orienting norepinephrine,
+        a phasic epinephrine edge, a small CRH survival signal — the
+        same afferents a stumble would use. Applied through
+        ``neuro_impulse`` deliberately: the daemon is a device driver
+        and does not author her internal state, so the felt signature
+        of the discovery is hers — traceable to a judgement she made,
+        decaying on the chemicals' own half-lives while the regulator
+        shapes it from there. Magnitude scales with the dark gap —
+        a blip still startles, a day's outage lands harder.
+        """
+        scale = min(1.0, 0.5 + (dark_ms or 0) / 3_600_000.0 * 0.05)
+        try:
+            self.client.neuro_impulse(CHEM_NOREPINEPHRINE, 0.06 * scale)
+            self.client.neuro_impulse(CHEM_EPINEPHRINE, 0.05 * scale)
+            self.client.neuro_impulse(CHEM_CRH, 0.03 * scale)
+        except (OSError, ConnectionError, AttributeError) as e:
+            note_swallowed("mind.lifecycle._feel_discontinuity", e)
+
+    def _narrate_discontinuity(self, summary: str, significance: str) -> None:
+        """Write the interruption into her autobiography.
+
+        The emotion stamped on the event is read from the body at this
+        moment — post-wake-recovery plus the impulse she just applied —
+        not a fabricated one. ``record_event`` stores structural data
+        (summary, significance, chemical label); composing what it
+        means is the language engine's work, not the record's.
+        """
+        from limbic_system.emotion import EmotionalState, assess_emotion
+
+        try:
+            emotion = assess_emotion(self.client.get_neuro_summary())
+        except Exception:  # noqa: BLE001 — client absent (tests, offline)
+            emotion = EmotionalState(
+                label="surprised",
+                cognitive_style="startled",
+                cause="substrate_unavailable",
+            )
+        try:
+            self.brain.frontal.narrative.record_event(
+                summary=summary,
+                significance=significance,
+                emotion=emotion,
+                concepts=["interruption", "self"],
+            )
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.lifecycle._narrate_discontinuity", e)
+
     def _mark_modules_stopping(self) -> None:
         """Move live modules to `Stopping` before they are torn down.
 
@@ -342,6 +590,7 @@ class LifecycleMixin:
                     "mind.lifecycle._mark_modules_stopping",
                     e,
                 )
+
     def _start_engage_restored_sleep(self) -> None:
         """Engage the sleep mechanism if restoring a saved sleep state.
 
@@ -369,10 +618,11 @@ class LifecycleMixin:
             "Engaged sleep mechanism on restore — learners paused, "
             "inner life in sleep mode (stage %s, cycle %d)",
             self.inner_life.sleep_cycle.current_stage.value.upper()
-            if self.inner_life.sleep_cycle else "N1",
-            self.inner_life.sleep_cycle.cycle_number
-            if self.inner_life.sleep_cycle else 1,
+            if self.inner_life.sleep_cycle
+            else "N1",
+            self.inner_life.sleep_cycle.cycle_number if self.inner_life.sleep_cycle else 1,
         )
+
     def _start_background_threads(self) -> None:
         """Start heartbeat, notification, and autosave threads.
 
@@ -385,10 +635,10 @@ class LifecycleMixin:
         # Start the module heartbeat thread — periodically refreshes
         # the cognitive modules' heartbeat timestamps in the manifest
         # so the daemon knows they're alive.
-        self._heartbeat_thread: threading.Thread | None = threading.Thread(
-            target=self._heartbeat_loop,
-            name="module-heartbeat",
-            daemon=True,
+        self._heartbeat_thread: threading.Thread | None = named_thread(
+            "module-heartbeat",
+            self._heartbeat_loop,
+            comm="g-heartbeat",
         )
         self._heartbeat_thread.start()
 
@@ -403,10 +653,10 @@ class LifecycleMixin:
         # enqueuing notifications for the cognitive layer to process.
         # This thickens the bridge between the Rust subcognitive and
         # Python cognitive layers.
-        self._notification_thread: threading.Thread | None = threading.Thread(
-            target=self._notification_loop,
-            name="subcognitive-notifications",
-            daemon=True,
+        self._notification_thread: threading.Thread | None = named_thread(
+            "subcognitive-notifications",
+            self._notification_loop,
+            comm="g-notify",
         )
         self._notification_thread.start()
 
@@ -415,12 +665,102 @@ class LifecycleMixin:
         # The concept network grows continuously through autonomous
         # learning and conversation; without periodic saves, a crash
         # would lose everything since the last clean shutdown.
-        self._autosave_thread: threading.Thread | None = threading.Thread(
-            target=self._autosave_loop,
-            name="autosave",
-            daemon=True,
+        self._autosave_thread: threading.Thread | None = named_thread(
+            "autosave",
+            self._autosave_loop,
+            comm="g-autosave",
         )
         self._autosave_thread.start()
+
+        # Start the presence heartbeat — periodically samples the retina
+        # for faces and reports measured co-presence to the daemon's
+        # dyadic model. Presence accrues only while an observation is
+        # fresh (60s window); without sampling, co-presence only ever
+        # registered during active conversation — a caretaker who sits
+        # nearby all day measured about an hour of presence, and the
+        # affective signature that familiarity grows from starved.
+        self._presence_thread: threading.Thread | None = named_thread(
+            "presence-heartbeat",
+            self._presence_loop,
+            comm="g-presence",
+        )
+        self._presence_thread.start()
+
+        # Start the channel listener — her ear on the public feed.
+        # None unless GENESIS_DISCORD_BOT_TOKEN is set; starting it
+        # here (not in __init__) keeps construction free of the
+        # channel-resolve GET.
+        listener = getattr(self, "_discord_listener", None)
+        if listener is not None:
+            listener.start()
+
+    # Presence sampling cadence — kept under the daemon's 60 s
+    # observation window (PRESENCE_TIMEOUT_TICKS at 200 ms) so an
+    # observed person accrues co-presence continuously.
+    _PRESENCE_INTERVAL_S = 45.0
+
+    def _presence_loop(self) -> None:
+        """Background thread that reports measured co-presence.
+
+        Each cycle reads the latest retina frame and runs face
+        detection only — no V1 coding, no object recognition, no
+        cognition — then sends a zero-confidence user-affect
+        observation. The zero confidence makes the daemon's EMA weight
+        zero, so the observation updates *who is here* without writing
+        anything about how they feel: presence is measured, affect
+        stays earned.
+        """
+        while self._running:
+            waited = 0.0
+            while waited < self._PRESENCE_INTERVAL_S and self._running:
+                time.sleep(1.0)
+                waited += 1.0
+            if not self._running:
+                break
+            try:
+                self._sample_presence()
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.lifecycle._presence_loop", e)
+
+    def _sample_presence(self) -> None:
+        """Sample who is visibly present and report it to the dyad.
+
+        Presence is pooled — the dyadic model tracks one dyad, whoever
+        is there. Faces still get recognized so the vision layer keeps
+        its own person memory; only the co-presence signal reaches the
+        body. While asleep she does not perceive, so sampling is
+        skipped and co-presence stops accruing.
+        """
+        if self._is_sleeping:
+            return
+        from occipital_lobe.perception.retina import latest_frame
+        from occipital_lobe.perception.vision import _yuyv_to_rgb
+
+        frame = latest_frame(copy=True)
+        if frame is None:
+            return
+        try:
+            rgb = frame if frame.ndim == 3 and frame.shape[2] == 3 else _yuyv_to_rgb(frame)
+            self.vision.recognize_faces_in(rgb)
+        except (FileNotFoundError, OSError):
+            # Absent retina segment or missing DNN model files are
+            # the no-vision degradation — sampling just does nothing.
+            return
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.lifecycle._sample_presence", e)
+            return
+        if not self.vision.last_persons_seen():
+            return
+        try:
+            self.client.update_user_affect(
+                0.0,
+                0.0,
+                0.0,
+                confidence=0.0,
+            )
+        except (OSError, ConnectionError) as e:
+            note_swallowed("mind.lifecycle._sample_presence", e)
+
     def _autosave_loop(self) -> None:
         """Background thread that periodically saves cognitive state.
 
@@ -495,6 +835,7 @@ class LifecycleMixin:
                 # autosave failure shouldn't crash the thread
                 self._autosave_failures += 1
                 logger.warning(f"autosave failed: {e}")
+
     def _archive_dormant_concepts(self) -> None:
         """Archive dormant concepts from working memory to long-term storage.
 
@@ -530,10 +871,15 @@ class LifecycleMixin:
             else:
                 # Fallback: no archive attached, prune destructively
                 _DEAD_THRESHOLD = 0.01
-                _PROTECTED = frozenset({
-                    "identity", "introspection", "foundational",
-                    "seeded", "structural",
-                })
+                _PROTECTED = frozenset(
+                    {
+                        "identity",
+                        "introspection",
+                        "foundational",
+                        "seeded",
+                        "structural",
+                    }
+                )
                 to_remove: set[str] = set()
                 for cid, concept in list(network._concepts.items()):
                     if concept.origin in _PROTECTED:
@@ -566,6 +912,7 @@ class LifecycleMixin:
                 "mind.lifecycle._archive_dormant_concepts",
                 e,
             )
+
     def restore_archive(self) -> int:
         """Recall all archived concepts back into working memory.
 
@@ -599,13 +946,33 @@ class LifecycleMixin:
             return True
 
         self._running = False
+        # Wake the heartbeat if it is inside its adaptive cadence sleep
+        # — the idle period reaches 5 s, which meets the 5 s join
+        # budget; the wait is interruptible for exactly this reason.
+        self._heartbeat_stop.set()
         self._suppress_volition = True
+        # Latched once — deferred resume timers consult this, not
+        # _running, so an unstarted mind's resume paths still work.
+        self._stop_latched = True
         clean_shutdown = True
 
         # Stop the module sampler first — it only measures, nothing
         # depends on it, and stopping it here keeps it out of the
         # shutdown accounting.
         self._module_sampler.stop()
+
+        # Stop her ear next — before any teardown runs. While the
+        # listener lives, a public message can still be delivered
+        # into hear_overheard / _emit_live_thought, mutating world
+        # and journal state in the middle of the save below. A stuck
+        # join is not a shutdown failure; any reply already queued
+        # still gets the feed's drain window at the end.
+        listener = getattr(self, "_discord_listener", None)
+        if listener is not None:
+            try:
+                listener.stop()
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.lifecycle.stop.listener", e)
 
         clean_shutdown &= self._join_service_threads()
         clean_shutdown &= self._stop_subsystems()
@@ -631,10 +998,20 @@ class LifecycleMixin:
         if journal is not None:
             journal.close()
         from infrastructure.journal import set_active
+
         set_active(None)
         # Detach the swallow sink too, so a late catch site in a
         # shutting-down subsystem cannot write to a closed journal.
         set_swallow_sink(None)
+
+        # Mark this mind's session sentinel — the next mind to inhabit
+        # the data dir reads clean_stop and knows this one said
+        # goodbye. Done last of all writes: it is the marker that this
+        # teardown completed, not a journaled event.
+        prev_session = _read_json_file(os.path.join(self.data_dir, _MIND_SESSION_FILE)) or {}
+        prev_session["clean_stop"] = True
+        prev_session["stopped_at_ms"] = int(time.time() * 1000)
+        _write_json_file(os.path.join(self.data_dir, _MIND_SESSION_FILE), prev_session)
 
         return clean_shutdown
 
@@ -642,23 +1019,28 @@ class LifecycleMixin:
         """Join the heartbeat, autosave, and notification threads.
 
         The heartbeat goes BEFORE saving state: it calls
-        _check_auto_sleep() every second, which can auto-wake it if
-        adenosine is low. Without joining the heartbeat first, there
-        is a race — the heartbeat wakes it between /quit and
-        _save_state(), so the saved state says is_sleeping=False even
-        though it was asleep when the user quit. Joining the heartbeat
-        ensures its sleep state at the moment of /quit is what gets
-        saved. Join without a timeout: a timed-out writer would still
+        _check_sleep_sync() every second, which can wake it to sync
+        when the body's phase has already left sleep. Without joining
+        the heartbeat first, there is a race — the heartbeat wakes it
+        between /quit and _save_state(), so the saved state says
+        is_sleeping=False even though it was asleep when the user
+        quit. Joining the heartbeat ensures its sleep state at the
+        moment of /quit is what gets saved. Join without a timeout: a timed-out writer would still
         be alive when the archive is closed below. The autosave join
         prevents an in-flight autosave racing the shutdown save.
         """
         clean = True
-        for thread, name in (
-            (self._heartbeat_thread, "heartbeat"),
-            (self._autosave_thread, "autosave"),
-            (self._notification_thread, "notifications"),
+        # The autosave join gets a budget that covers a full in-flight
+        # save — serializing ~16 MB gzipped state takes ~15 s on this
+        # hardware, far past the default 5 s join, and the save is real
+        # work worth finishing rather than a stuck thread.
+        for thread, name, timeout in (
+            (self._heartbeat_thread, "heartbeat", 5.0),
+            (self._autosave_thread, "autosave", 60.0),
+            (self._notification_thread, "notifications", 5.0),
+            (self._presence_thread, "presence-heartbeat", 5.0),
         ):
-            clean &= self._join_shutdown_thread(thread, name)
+            clean &= self._join_shutdown_thread(thread, name, timeout=timeout)
         return clean
 
     def _stop_subsystems(self) -> bool:
@@ -684,7 +1066,7 @@ class LifecycleMixin:
             note_swallowed(
                 "mind.lifecycle.stop",
                 e,
-            )# user pressed Ctrl+C — still try to save
+            )  # user pressed Ctrl+C — still try to save
             clean = False
         for subsystem in (self.learner, self.inner_life, self.regulator):
             name = type(subsystem).__name__
@@ -710,23 +1092,23 @@ class LifecycleMixin:
         state this ordering exists to prevent.
         """
         clean = True
-        _volition_deadline = time.monotonic() + 5.0
-        while self._volition_active and time.monotonic() < _volition_deadline:
+        _volition_deadline = time.monotonic() + self._VOLITION_DRAIN_TIMEOUT_S
+        announced = False
+        while True:
+            with self._volition_lock:
+                pending = sorted(self._volition_active)
+            if not pending or time.monotonic() >= _volition_deadline:
+                break
+            if not announced:
+                logger.info("waiting for volition workers: %s", ", ".join(pending))
+                announced = True
             time.sleep(0.05)
-        if self._volition_active:
-            logger.warning("volition workers did not clear during shutdown; continuing")
+        if pending:
+            logger.warning(
+                "volition workers did not clear during shutdown; continuing: %s",
+                ", ".join(pending),
+            )
             clean = False
-
-        sleep_worker = getattr(self, "_sleep_stage_worker", None)
-        if sleep_worker is not None:
-            if not sleep_worker.stop(
-                timeout=self._SUBSYSTEM_STOP_TIMEOUTS["InnerLife"]
-            ):
-                logger.warning(
-                    "sleep-stage worker did not exit; a consolidation pass "
-                    "may still have been running",
-                )
-                clean = False
 
         clean &= self._join_shutdown_thread(self._active_think_worker, "think")
         return clean
@@ -795,7 +1177,7 @@ class LifecycleMixin:
                 note_swallowed(
                     "mind.lifecycle.stop",
                     e,
-                )# daemon may already be gone
+                )  # daemon may already be gone
 
         # Try to tell the daemon we're idle, but don't crash if it's dead
         try:
@@ -805,7 +1187,7 @@ class LifecycleMixin:
             note_swallowed(
                 "mind.lifecycle.stop",
                 e,
-            )# daemon may already be gone
+            )  # daemon may already be gone
 
         try:
             self.client.disconnect()
@@ -840,7 +1222,8 @@ class LifecycleMixin:
             if remaining <= 0:
                 logger.warning(
                     "%s thread did not exit within %.0fs during shutdown",
-                    name, timeout,
+                    name,
+                    timeout,
                 )
                 # Dump every thread's stack. A shutdown timeout is
                 # otherwise undiagnosable: the log says a thread would not
@@ -866,7 +1249,9 @@ class LifecycleMixin:
                             if entry.strip():
                                 logger.warning(
                                     "%s waiting on %s at %s",
-                                    name, tname, entry.strip(),
+                                    name,
+                                    tname,
+                                    entry.strip(),
                                 )
                 except Exception:
                     logger.debug("stack dump unavailable", exc_info=True)
@@ -912,19 +1297,25 @@ class LifecycleMixin:
             total_cat = sum(cat_counts.values())
             logger.info(
                 "Startup categorization: %d concepts categorized (%s)",
-                total_cat, cat_counts,
+                total_cat,
+                cat_counts,
             )
         if mod_counts:
             total_mod = sum(mod_counts.values())
             logger.info(
                 "Startup modality classification: %d concepts classified (%s)",
-                total_mod, mod_counts,
+                total_mod,
+                mod_counts,
             )
 
     def _restore_saved_components(self, data) -> None:
         """Validate and commit each saved component as one transaction."""
         from frontal_lobe.self import Reflection, SelfModel
         from temporal_lobe.concepts import ConceptNetwork
+
+        # Repair reports staged by _stage_cognitive_systems; journaled
+        # only after the commit below lands.
+        self._staged_repair_reports: list[dict] = []
 
         from infrastructure.narrative import Narrator
         from infrastructure.persistence import (
@@ -947,9 +1338,7 @@ class LifecycleMixin:
             restore_reflection(staged_reflection, data["reflection"])
             pending.append((self.brain.frontal.reflection, staged_reflection))
         if "narrative" in data:
-            staged_narrative = Narrator(
-                self.self_model, self.brain.frontal.network
-            )
+            staged_narrative = Narrator(self.self_model, self.brain.frontal.network)
             staged_narrative.events.clear()
             staged_narrative.chapters.clear()
             staged_narrative._current_chapter = None
@@ -961,14 +1350,14 @@ class LifecycleMixin:
                 born_at=self.self_model.born_at,
             )
             restore_self_model(staged_self_model, data["self_model"])
-            scalar_updates.extend((
-                (self.self_model, "personality", staged_self_model.personality),
-                (self.self_model, "self_knowledge", staged_self_model.self_knowledge),
-            ))
+            scalar_updates.extend(
+                (
+                    (self.self_model, "personality", staged_self_model.personality),
+                    (self.self_model, "self_knowledge", staged_self_model.self_knowledge),
+                )
+            )
 
-        pending.extend(
-            self._stage_cognitive_systems(data, scalar_updates)
-        )
+        pending.extend(self._stage_cognitive_systems(data, scalar_updates))
 
         # All saved payloads have now been restored into scratch
         # objects. Commit only after validation succeeds so a malformed
@@ -979,6 +1368,26 @@ class LifecycleMixin:
             vars(target).update(vars(staged))
         for target, name, value in scalar_updates:
             setattr(target, name, value)
+
+        # The transaction committed — now the repairs are real and
+        # can be journaled. A repair of the self-model is a
+        # discontinuity she should know happened.
+        if self._staged_repair_reports:
+            from infrastructure.journal import record_event
+
+            for item in self._staged_repair_reports:
+                report = item["report"]
+                record_event(
+                    "self_repair",
+                    f"{item['component']} repaired from "
+                    f"{item['repair'].get('repaired_from', 'repairs/')}: {report}",
+                    component=item["component"],
+                    stage_restored=report.get("stage_restored"),
+                    resolutions_raised=len(report.get("resolutions_raised") or []),
+                    history_recovered=report.get("history_recovered", 0),
+                )
+                logger.info("%s repaired: %s", item["component"], report)
+            self._staged_repair_reports = []
 
         if staged_network is not None:
             # The save may contain concepts that were spilled to the
@@ -999,8 +1408,16 @@ class LifecycleMixin:
         staged = object.__new__(component.__class__)
         state = {}
         wiring_terms = (
-            "network", "client", "embedding", "reporter", "monitor",
-            "curiosity", "cortex", "callback", "mind", "engine",
+            "network",
+            "client",
+            "embedding",
+            "reporter",
+            "monitor",
+            "curiosity",
+            "cortex",
+            "callback",
+            "mind",
+            "engine",
         )
         for name, value in vars(component).items():
             if any(term in name for term in wiring_terms) or callable(value):
@@ -1024,16 +1441,131 @@ class LifecycleMixin:
         restore(staged, payload)
         pending.append((target, staged))
 
+    def _load_repair_states(self) -> dict[str, dict]:
+        """Read ``<data_dir>/repairs/*.json`` — her self-repair sidecar.
+
+        A repair file records the highest state a self-component is
+        known to have reached — a floor, not a ceiling — written by
+        her or by an operator when a save is known to have lost ground
+        (the developmental tracker wiped back to stage one is the case
+        this exists for). Format per file::
+
+            {"kind": "developmental_tracker",
+             "repaired_from": "cognitive_state.bak.1792210585",
+             "repaired_at": "2026-10-23T...",
+             "note": "why this floor exists",
+             "state": { ...the component's to_dict payload... }}
+
+        Files with no ``kind``/``state`` or unparseable JSON are
+        skipped — a bad repair never blocks boot. The files live in
+        her data dir, so she can read, write, or retire them herself;
+        applying one is idempotent because reconcile() only raises,
+        never lowers.
+        """
+        repairs: dict[str, dict] = {}
+        repairs_dir = os.path.join(self.data_dir, "repairs")
+        try:
+            names = sorted(os.listdir(repairs_dir))
+        except OSError:
+            return repairs
+        for name in names:
+            if not name.endswith(".json"):
+                continue
+            doc = _read_json_file(os.path.join(repairs_dir, name))
+            if not isinstance(doc, dict):
+                continue
+            kind = doc.get("kind")
+            state = doc.get("state")
+            if isinstance(kind, str) and isinstance(state, dict):
+                repairs[kind] = doc
+        return repairs
+
     def _stage_cognitive_systems(
         self,
         data: dict[str, Any],
         scalar_updates: list[tuple[Any, str, Any]],
     ) -> list[tuple[Any, Any]]:
         """Restore optional systems into scratch objects before commit."""
+        from infrastructure.persistence import restore_emergent_identity
+
+        pending: list[tuple[Any, Any]] = []
+        for key, target, restore in self._restoration_table():
+            if key in data:
+                self._stage_restoration(pending, target, restore, data[key])
+
+        # Repairs sidecar — known-good floors for self-state that a
+        # stale or wiped save can lose. A repair file records the
+        # highest state a component is known to have reached; the
+        # component's reconcile() merges it as a floor inside this
+        # same staging transaction, so a bad repair cannot commit
+        # half-applied. Development is monotonic: a checkpoint that
+        # shows a later stage means loss, not regression. Reports are
+        # journaled by the caller only after the commit lands — a
+        # repair that is staged but aborted never happened.
+        repair = self._load_repair_states().get("developmental_tracker")
+        if repair is not None:
+            staged_tracker = None
+            for target, staged in pending:
+                if target is self._developmental_tracker:
+                    staged_tracker = staged
+                    break
+            if staged_tracker is None:
+                staged_tracker = self._stage_component(self._developmental_tracker)
+                pending.append((self._developmental_tracker, staged_tracker))
+            report = staged_tracker.reconcile(repair.get("state") or {})
+            if report.get("changed"):
+                self._staged_repair_reports.append(
+                    {"component": "developmental_tracker", "repair": repair, "report": report}
+                )
+
+        if "emergent_identity" in data:
+            staged = self._stage_component(self._emergent_identity)
+            sources, _desc, _conf, _coh = restore_emergent_identity(
+                staged, data["emergent_identity"]
+            )
+            pending.append((self._emergent_identity, staged))
+            scalar_updates.append((self, "_experience_identity_sources", sources))
+        if "autonomous_learner" in data:
+            self._stage_restoration(
+                pending,
+                self.learner,
+                lambda t, p: t.restore_state(p),
+                data["autonomous_learner"],
+            )
+        if "dream_synthesis" in data:
+            try:
+                self._stage_restoration(
+                    pending,
+                    self.inner_life._dream_synthesis,
+                    lambda t, p: t.restore_from_dict(p),
+                    data["dream_synthesis"],
+                )
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "mind.lifecycle._stage_cognitive_systems",
+                    e,
+                )
+        if "sleep_state" in data:
+            is_sleeping, user_sleep, cycle, start_time, start_cycles = self._stage_sleep_state(
+                data["sleep_state"]
+            )
+            scalar_updates.extend(
+                (
+                    (self, "_is_sleeping", is_sleeping),
+                    (self, "_user_initiated_sleep", user_sleep),
+                    (self, "_sleep_start_time", start_time),
+                    (self, "_sleep_start_cycles", start_cycles),
+                    (self.inner_life, "_sleep_cycle", cycle),
+                )
+            )
+        self._stage_inner_life(data, scalar_updates)
+        return pending
+
+    def _restoration_table(self) -> tuple:
+        """The (state-key, target, restore-fn) rows staged in order."""
         from infrastructure.persistence import (
             restore_allostatic_load,
             restore_attractor,
-            restore_emergent_identity,
             restore_emotional_memory,
             restore_error_monitor,
             restore_hpa_axis,
@@ -1049,8 +1581,7 @@ class LifecycleMixin:
             restore_theory_of_mind,
         )
 
-        pending: list[tuple[Any, Any]] = []
-        restorations = (
+        return (
             ("predictive_coding", self.brain.frontal.predictive_coding, restore_predictive_coding),
             ("theory_of_mind", self.brain.frontal.theory_of_mind, restore_theory_of_mind),
             ("procedural_memory", self.brain.frontal.procedural_memory, restore_procedural_memory),
@@ -1093,48 +1624,6 @@ class LifecycleMixin:
             ("curiosity", self.brain.frontal.curiosity, lambda t, p: t.restore_from_dict(p)),
             ("cognitive_map", self.brain.temporal.cognitive_map, lambda t, p: t.load_state(p)),
         )
-        for key, target, restore in restorations:
-            if key in data:
-                self._stage_restoration(pending, target, restore, data[key])
-
-        if "emergent_identity" in data:
-            staged = self._stage_component(self._emergent_identity)
-            sources, _desc, _conf, _coh = restore_emergent_identity(
-                staged, data["emergent_identity"]
-            )
-            pending.append((self._emergent_identity, staged))
-            scalar_updates.append((self, "_experience_identity_sources", sources))
-        if "autonomous_learner" in data:
-            self._stage_restoration(
-                pending,
-                self.learner,
-                lambda t, p: t.restore_state(p),
-                data["autonomous_learner"],
-            )
-        if "dream_synthesis" in data:
-            try:
-                self._stage_restoration(
-                    pending,
-                    self.inner_life._dream_synthesis,
-                    lambda t, p: t.restore_from_dict(p),
-                    data["dream_synthesis"],
-                )
-            except Exception as e:  # noqa: BLE001
-                note_swallowed(
-                    "mind.lifecycle._stage_cognitive_systems",
-                    e,
-                )
-        if "sleep_state" in data:
-            is_sleeping, user_sleep, cycle = self._stage_sleep_state(
-                data["sleep_state"]
-            )
-            scalar_updates.extend((
-                (self, "_is_sleeping", is_sleeping),
-                (self, "_user_initiated_sleep", user_sleep),
-                (self.inner_life, "_sleep_cycle", cycle),
-            ))
-        self._stage_inner_life(data, scalar_updates)
-        return pending
 
     def _stage_inner_life(
         self,
@@ -1157,11 +1646,13 @@ class LifecycleMixin:
                     e,
                 )
             else:
-                scalar_updates.extend((
-                    (self.inner_life, "_thought_count", counts[0]),
-                    (self.inner_life, "_dream_count", counts[1]),
-                    (self.inner_life, "_lucid_dream_count", counts[2]),
-                ))
+                scalar_updates.extend(
+                    (
+                        (self.inner_life, "_thought_count", counts[0]),
+                        (self.inner_life, "_dream_count", counts[1]),
+                        (self.inner_life, "_lucid_dream_count", counts[2]),
+                    )
+                )
                 logger.info(
                     "Restored inner life state: thoughts=%d, dreams=%d, lucid=%d",
                     *counts,
@@ -1169,9 +1660,7 @@ class LifecycleMixin:
         else:
             logger.debug("inner_life_state not found in saved state")
 
-    def _stage_sleep_state(
-        self, data: dict[str, Any]
-    ) -> tuple[bool, bool, Any]:
+    def _stage_sleep_state(self, data: dict[str, Any]) -> tuple[bool, bool, Any, float, int]:
         """Validate sleep state without mutating the live mind.
 
         This restores the in-memory ``_is_sleeping`` flag and the cycle
@@ -1194,6 +1683,7 @@ class LifecycleMixin:
         is_sleeping = bool(data.get("is_sleeping", False))
         user_initiated_sleep = bool(data.get("user_initiated_sleep", False))
 
+        tracker = None
         cycle_data = data.get("sleep_cycle")
         if cycle_data is not None:
             tracker = SleepCycleTracker()
@@ -1204,8 +1694,27 @@ class LifecycleMixin:
                 tracker.cycle_number,
                 tracker.time_in_stage,
             )
-            return is_sleeping, user_initiated_sleep, tracker
-        return is_sleeping, user_initiated_sleep, None
+
+        # Episode bookkeeping the auto-wake gates measure against.
+        # Saves written before these fields existed get conservative
+        # defaults: an unknown-age episode is treated as fresh
+        # (the min-sleep floor holds) and as still on its first cycle
+        # (the first-cycle floor holds until one more completes) —
+        # both err toward staying asleep, never toward a forced wake.
+        start_time = data.get("sleep_start_time")
+        if not isinstance(start_time, (int, float)) or start_time <= 0:
+            start_time = time.time() if is_sleeping else 0.0
+        start_cycles = data.get("sleep_start_cycles")
+        if not isinstance(start_cycles, int) or start_cycles < 0:
+            start_cycles = tracker.cycles_completed if tracker is not None else 0
+        return (
+            is_sleeping,
+            user_initiated_sleep,
+            tracker,
+            float(start_time),
+            int(start_cycles),
+        )
+
     def _resync_network_references(self) -> None:
         """Refresh derived state after the network content transplant.
 
@@ -1220,6 +1729,7 @@ class LifecycleMixin:
         """
         self.brain.frontal.embeddings._loaded = False
         self.brain.frontal.embeddings._concept_matrix = None
+
     def _save_state(self) -> bool:
         """Save cognitive state to disk. Returns False on I/O failure."""
         from infrastructure.persistence import save_state, serialize_sleep_state
@@ -1235,6 +1745,8 @@ class LifecycleMixin:
                 is_sleeping=self._is_sleeping,
                 user_initiated_sleep=self._user_initiated_sleep,
                 sleep_cycle=self.inner_life.sleep_cycle,
+                sleep_start_time=self._sleep_start_time,
+                sleep_start_cycles=self._sleep_start_cycles,
             )
             save_state(
                 self.data_dir,

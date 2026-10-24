@@ -63,17 +63,27 @@ def test_clusters_survive_restart(tmp_path):
     emb = _unit_embedding(1)
     rec = FaceRecognizer(data_dir=tmp_path)
     key, _ = rec._match_or_cluster(emb)
+    rec._match_or_cluster(_near(emb))  # second sighting confirms it
     rec2 = FaceRecognizer(data_dir=tmp_path)
     key2, tier = rec2._match_or_cluster(_near(emb))
     assert key2 == key
     assert tier == "familiar"
-    assert rec2.cluster_sightings(key) == 2
+    assert rec2.cluster_sightings(key) == 3
+
+
+def test_provisional_cluster_not_persisted(tmp_path):
+    """A one-shot detection is provisional — usually detector noise —
+    and must not survive a restart as a durable 'person'."""
+    rec = FaceRecognizer(data_dir=tmp_path)
+    key, _ = rec._match_or_cluster(_unit_embedding(1))
+    assert rec.cluster_sightings(key) == 1
+    rec2 = FaceRecognizer(data_dir=tmp_path)
+    assert rec2.cluster_sightings(key) == 0
 
 
 def test_name_face_folds_cluster_into_named(tmp_path):
     """Naming "face:1" → alice: the cluster's sightings become alice's
-    known embeddings, the anonymous key retires, and the caller gets
-    the folded id for the dyadic merge alias."""
+    known embeddings and the anonymous key retires."""
     rec = FaceRecognizer(data_dir=tmp_path)
     emb = _unit_embedding(1)
     key, _ = rec._match_or_cluster(emb)

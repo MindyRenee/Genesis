@@ -36,9 +36,7 @@ class WorldPlanner:
     def __init__(self, model: WorldModel) -> None:
         self._model = model
 
-    def next_action(
-        self, goal_cells: set[Cell], available: list[str]
-    ) -> str | None:
+    def next_action(self, goal_cells: set[Cell], available: list[str]) -> str | None:
         """First action of the shortest plan reaching the goal.
 
         A* over simulated states — the plan found is step-minimal in
@@ -98,17 +96,10 @@ class WorldPlanner:
         whole reachable map to get there.
         """
         model = self._model
-        moves = [
-            a for a in available
-            if model.effect_of(a) not in (None, (0, 0))
-        ]
+        moves = [a for a in available if model.effect_of(a) not in (None, (0, 0))]
         if not moves:
             return {}, None
-        stride = max(
-            abs(dr) + abs(dc)
-            for a in moves
-            for dr, dc in (model.effect_of(a),)
-        ) or 1
+        stride = max(abs(dr) + abs(dc) for a in moves for dr, dc in (model.effect_of(a),)) or 1
 
         def heuristic(cells: frozenset[Cell]) -> float:
             # Her footprint's anchor tracks with her; distance in
@@ -126,9 +117,7 @@ class WorldPlanner:
             start: (None, None),
         }
         best_g: dict[SimState, int] = {start: 0}
-        frontier: list[tuple[float, int, int, SimState]] = [
-            (heuristic(start.cells), 0, 0, start)
-        ]
+        frontier: list[tuple[float, int, int, SimState]] = [(heuristic(start.cells), 0, 0, start)]
         serial = 1
         expansions = 0
         while frontier and expansions < _MAX_EXPANSIONS:
@@ -141,7 +130,19 @@ class WorldPlanner:
                 continue
             expansions += 1
             for action in moves:
-                nxt = model.simulate(state, action)
+                # Optimistic expansion — D*-lite's assumption: cells
+                # whose passability is unmeasured are hypothesized
+                # open, so a route can lead somewhere she has not
+                # already walked. Only learned refusals (blocked,
+                # refused, condemned contacts) still veto. The plan
+                # is verified stepwise against reality anyway — a
+                # falsified premise replans at the next decision
+                # point with the wall now known. Without this the
+                # reachable set is the walked set, and on a fresh
+                # level she cannot plan anywhere she has not already
+                # been — which is how exploration, not pursuit, ends
+                # up spending the whole episode.
+                nxt = model.simulate(state, action, explore_unknown=True)
                 if nxt is None:
                     continue
                 ng = g + 1

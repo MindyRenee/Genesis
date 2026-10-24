@@ -151,6 +151,22 @@
 //!   surprise). These are ratios, naturally in [0, 1]. 0.0 when
 //!   perf counters are unavailable (`perf_event_paranoid ≥ 4`
 //!   blocks unprivileged access entirely).
+//! - **cpuidle residency** (`rest`) → the parasympathetic channel.
+//!   `/sys/devices/system/cpu/cpu*/cpuidle/state*/{name,time}`
+//!   reports cumulative microseconds each core has spent in each
+//!   hardware idle state. Depth-weighted residency in the sample
+//!   window (POLL is weight 0 — busy-waiting is not rest; C1/C2
+//!   and deeper count by depth) is measured evidence the body is
+//!   *at rest*: an active signal, the opposite of excited, not
+//!   merely silence on the strain channels. Without real
+//!   non-POLL states the CPUIDLE presence bit stays clear and
+//!   `rest` is an unmeasured 0.0.
+//! - **Temperature trend** (`temp_trend`) → which way the body is
+//!   moving. Signed deviation of the current temperature from a
+//!   ~60-second EMA of itself, ±5°C saturating to [-1, 1]. Level
+//!   and direction answer different questions — 70°C rising is
+//!   escalation; 70°C falling is recovery. Computed only from
+//!   valid readings: a fabricated fallback never enters the EMA.
 //!
 //! # Self-process vs global measurement
 //!
@@ -202,6 +218,14 @@
 //!   traffic = encoding/retrieval activity)
 //! - High branch/cache miss rates → small norepinephrine impulse
 //!   (surprise — silicon prediction errors)
+//! - Verified deep cpuidle rest + low stress → serotonin + GABA +
+//!   endocannabinoid impulses (the parasympathetic arm — rest is a
+//!   measured state, not the absence of strain); deepest rest also
+//!   withdraws norepinephrine (LC quiet during parasympathetic
+//!   dominance)
+//! - Verified cooling trend (temp falling below its own EMA) →
+//!   endocannabinoid impulse (recovery — the stress brake coming
+//!   back on, the 2-AG termination analogue)
 //!
 //! The impulses are deliberately small — they accumulate over
 //! multiple ticks through the neurochemical dynamics, creating
@@ -223,7 +247,7 @@ use std::fs;
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
-use crate::state::neurochemical::NeurochemicalId;
+use crate::state::neurochemical::{NeurochemicalId, NeurochemicalVector};
 
 /// How often to read hardware sensors (every N daemon ticks).
 /// At 5 Hz (200ms/tick), this is ~6 seconds. Hardware state changes slowly
@@ -248,52 +272,55 @@ pub const INTEROCEPTION_INTERVAL_TICKS: u64 = 30;
 // and the value is a placeholder".
 //
 // Served by its own additive command (GET_SENSOR_PRESENCE) rather than
-// a new BodyState layout: the wire layouts are already disambiguated by
-// self-consistent desc_len offsets across v1/v2/v3, so adding a field
-// would mean a fourth layout and a protocol bump for one u16.
+// a new BodyState layout: the wire layouts are disambiguated by
+// self-consistent desc_len offsets across v1/v2/v3/v4, and the mask
+// moves with the schema — it widened to u32 when the cpuidle bit
+// (1 << 16) outgrew u16.
 
 /// Bit positions in the sensor-presence mask. Each names one optional
 /// sensor group the readers depend on.
 pub mod sensor {
     /// A CPU temperature sensor was found.
-    pub const TEMPERATURE: u16 = 1 << 0;
+    pub const TEMPERATURE: u32 = 1 << 0;
     /// Per-core frequency sensors were found (drives `arousal_freq`).
-    pub const FREQUENCY: u16 = 1 << 1;
+    pub const FREQUENCY: u32 = 1 << 1;
     /// A hardware maximum frequency was readable.
-    pub const MAX_FREQUENCY: u16 = 1 << 2;
+    pub const MAX_FREQUENCY: u32 = 1 << 2;
     /// A battery was found.
-    pub const BATTERY: u16 = 1 << 3;
+    pub const BATTERY: u32 = 1 << 3;
     /// An AC adapter presence switch was found.
-    pub const AC_ADAPTER: u16 = 1 << 4;
+    pub const AC_ADAPTER: u32 = 1 << 4;
     /// A fan PWM control was found (drives `thermoregulatory_effort`).
-    pub const FAN: u16 = 1 << 5;
+    pub const FAN: u32 = 1 << 5;
     /// At least one power-draw sensor was found (drives `metabolic_rate`).
-    pub const POWER: u16 = 1 << 6;
+    pub const POWER: u32 = 1 << 6;
     /// A CPU core voltage sensor was found.
-    pub const CORE_VOLTAGE: u16 = 1 << 7;
+    pub const CORE_VOLTAGE: u32 = 1 << 7;
     /// A supply/battery rail voltage sensor was found.
-    pub const SUPPLY_VOLTAGE: u16 = 1 << 8;
+    pub const SUPPLY_VOLTAGE: u32 = 1 << 8;
     /// At least one RAPL power domain was found (core/uncore/dram
     /// switching activity).
-    pub const RAPL: u16 = 1 << 9;
+    pub const RAPL: u32 = 1 << 9;
     /// perf_event_open succeeded, so cache/branch miss ratios are real
     /// measurements rather than permanent zeros.
-    pub const PERF_COUNTERS: u16 = 1 << 10;
+    pub const PERF_COUNTERS: u32 = 1 << 10;
     /// The embedded controller's GPE counter was readable (autonomic
     /// afferent rate).
-    pub const GPE: u16 = 1 << 11;
+    pub const GPE: u32 = 1 << 11;
     /// Per-core local-timer interrupt counters were readable (pulse).
-    pub const LOCAL_TIMER: u16 = 1 << 12;
+    pub const LOCAL_TIMER: u32 = 1 << 12;
     /// Total system memory was readable.
-    pub const MEMORY: u16 = 1 << 13;
+    pub const MEMORY: u32 = 1 << 13;
     /// /proc/pressure was readable (PSI).
-    pub const PSI: u16 = 1 << 14;
+    pub const PSI: u32 = 1 << 14;
     /// Battery cycle count was readable (senescence).
-    pub const BATTERY_CYCLES: u16 = 1 << 15;
+    pub const BATTERY_CYCLES: u32 = 1 << 15;
+    /// Per-core cpuidle state counters were readable (drives `rest`).
+    pub const CPUIDLE: u32 = 1 << 16;
 }
 
 /// Every sensor bit, in report order.
-const SENSOR_BITS: [(u16, &str); 16] = [
+const SENSOR_BITS: [(u32, &str); 17] = [
     (sensor::TEMPERATURE, "temperature"),
     (sensor::FREQUENCY, "frequency"),
     (sensor::MAX_FREQUENCY, "max frequency"),
@@ -310,16 +337,17 @@ const SENSOR_BITS: [(u16, &str); 16] = [
     (sensor::MEMORY, "total memory"),
     (sensor::PSI, "pressure stall information"),
     (sensor::BATTERY_CYCLES, "battery cycle count"),
+    (sensor::CPUIDLE, "cpuidle state counters"),
 ];
 
-static SHARED_SENSOR_PRESENCE: OnceLock<Mutex<u16>> = OnceLock::new();
+static SHARED_SENSOR_PRESENCE: OnceLock<Mutex<u32>> = OnceLock::new();
 
-fn shared_presence() -> &'static Mutex<u16> {
+fn shared_presence() -> &'static Mutex<u32> {
     SHARED_SENSOR_PRESENCE.get_or_init(|| Mutex::new(0))
 }
 
 /// Publish the discovered sensor-presence mask alongside the body state.
-pub fn publish_sensor_presence(mask: u16) {
+pub fn publish_sensor_presence(mask: u32) {
     if let Ok(mut guard) = shared_presence().lock() {
         *guard = mask;
     }
@@ -330,7 +358,7 @@ pub fn publish_sensor_presence(mask: u16) {
 /// Zero until the first interoception read completes, which correctly
 /// reads as "nothing confirmed present" rather than "everything is
 /// fine" — the safe direction.
-pub fn read_sensor_presence() -> u16 {
+pub fn read_sensor_presence() -> u32 {
     shared_presence().lock().map(|g| *g).unwrap_or(0)
 }
 
@@ -391,7 +419,7 @@ pub fn read_process_health() -> ProcessHealth {
 ///
 /// Silently defaulting made "this machine has no battery" and "the
 /// battery reads empty" indistinguishable to every layer above.
-pub fn report_missing_sensors(mask: u16) {
+pub fn report_missing_sensors(mask: u32) {
     let missing: Vec<&str> = SENSOR_BITS
         .iter()
         .filter(|(bit, _)| mask & bit == 0)
@@ -740,6 +768,25 @@ pub struct BodyState {
     /// its own return).
     pub suspend_caps: u8,
 
+    /// Rest — depth-weighted cpuidle residency [0, 1]. The share of
+    /// the read window the cores spent in real sleep states, weighted
+    /// by depth: fully parked in the deepest C-state scores 1.0, the
+    /// busy-wait POLL state scores 0. This is the parasympathetic
+    /// channel — positive evidence the substrate is *resting*, not
+    /// merely that no excited channel is firing. Vagal afference in
+    /// animals is exactly this: an active report of the body's
+    /// hypometabolic state, not silence on the sympathetic side
+    /// (Scott et al. 2024). 0.0 if no cpuidle telemetry exists.
+    pub rest: f32,
+
+    /// Temperature trend — signed deviation of `cpu_temp_c` from
+    /// its own ~60 s EMA, normalized so ±5 °C saturates [-1, 1].
+    /// A level field says where the body is; this says which way it
+    /// is going — negative is the recovery direction (heat leaving
+    /// the body after strain), positive is heat building. 0.0
+    /// without a temperature sensor or before the EMA warms.
+    pub temp_trend: f32,
+
     /// Human-readable description of what it's feeling.
     /// Sent as an empty string by the daemon — the cognitive mind's
     /// language engine composes the description from the structured
@@ -790,6 +837,8 @@ impl BodyState {
             entropy_level: 0.0,
             clocksource: 0,
             suspend_caps: 0,
+            rest: 0.0,
+            temp_trend: 0.0,
             description: String::new(),
         }
     }
@@ -878,6 +927,25 @@ pub struct Interoceptor {
     prev_tis_top: u64,
     prev_tis_all: u64,
 
+    /// Per-core cpuidle sleep states, discovered at startup from
+    /// /sys/devices/system/cpu/cpu*/cpuidle/state*/ — outer index is
+    /// the core. Empty on hosts without cpuidle telemetry, which the
+    /// CPUIDLE sensor bit then reports absent.
+    cpuidle_states: Vec<Vec<CpuidleState>>,
+
+    /// Deepest cpuidle index seen across all cores — the
+    /// normalization denominator for the rest weight.
+    cpuidle_max_depth: u32,
+
+    /// Previous cumulative per-state residency counters — the rest
+    /// delta base. Same shape as `cpuidle_states`.
+    prev_cpuidle_us: Vec<Vec<u64>>,
+
+    /// Slow EMA of `cpu_temp_c` (~60 s time constant) — the baseline
+    /// `temp_trend` deviates from. None until the first real
+    /// temperature read.
+    temp_ema_c: Option<f32>,
+
     /// Current clocksource id, detected at startup (the oscillator
     /// pacing its clock rarely changes at runtime).
     clocksource_id: u8,
@@ -929,7 +997,7 @@ pub struct Interoceptor {
     /// The perf bit is the one that can change at runtime: perf_event_open
     /// is attempted lazily and can fail permanently on the first try, so
     /// [`Interoceptor::read`] updates it.
-    sensor_mask: u16,
+    sensor_mask: u32,
 }
 
 /// Resident set size of one process, in kB. 0 if it cannot be read.
@@ -1063,8 +1131,24 @@ struct SensorProbe {
     supply_voltage_path: Option<String>,
     /// RAPL power domains.
     rapl_domains: Vec<RaplDomain>,
+    /// Per-core cpuidle sleep states and the deepest index seen.
+    cpuidle_states: Vec<Vec<CpuidleState>>,
+    cpuidle_max_depth: u32,
     /// `/proc/meminfo` total, or 0 when unreadable.
     total_memory_kb: u64,
+}
+
+/// A discovered cpuidle sleep state on one core — the sensor for the
+/// `rest` channel. `weight` is the depth score: the state's index in
+/// the driver's enumeration (states are listed shallowest-first), so
+/// deeper sleep contributes more. The POLL pseudo-state is a
+/// busy-wait loop, not a sleep state — it carries weight 0.
+#[derive(Clone, Debug)]
+struct CpuidleState {
+    /// Depth weight for the rest score.
+    weight: u32,
+    /// Path to the state's cumulative residency counter (µs).
+    time_path: String,
 }
 
 /// A discovered RAPL power domain with delta-tracking state.
@@ -1385,6 +1469,7 @@ impl Interoceptor {
             }
         };
         let rapl_domains = find_rapl_domains();
+        let (cpuidle_states, cpuidle_max_depth) = discover_cpuidle();
         let mut sensor_mask = Self::build_sensor_mask(&SensorProbe {
             temp_sensor_present,
             freq_paths: freq_paths.clone(),
@@ -1396,6 +1481,8 @@ impl Interoceptor {
             core_voltage_path: core_voltage_path.clone(),
             supply_voltage_path: supply_voltage_path.clone(),
             rapl_domains: rapl_domains.clone(),
+            cpuidle_states: cpuidle_states.clone(),
+            cpuidle_max_depth,
             // Presence reflects the real probe, not the fallback:
             // an unreadable /proc/meminfo must not claim MEMORY.
             total_memory_kb: if memory_present { total_memory_kb } else { 0 },
@@ -1427,6 +1514,15 @@ impl Interoceptor {
             prev_loc_count: 0,
             prev_tis_top: 0,
             prev_tis_all: 0,
+            cpuidle_states: cpuidle_states.clone(),
+            cpuidle_max_depth,
+            // Snapshot the boot-cumulative counters so the first real
+            // read computes a window delta, not a since-boot total.
+            prev_cpuidle_us: cpuidle_states
+                .iter()
+                .map(|core| core.iter().map(|s| read_u64(&s.time_path)).collect())
+                .collect(),
+            temp_ema_c: None,
             clocksource_id: read_clocksource(),
             suspend_caps: detect_suspend_caps(),
             rapl_domains,
@@ -1507,7 +1603,7 @@ impl Interoceptor {
     /// rather than what a default value would assume. Computed once:
     /// these are startup discoveries, and re-scanning hwmon and
     /// /sys/class/power_supply on every read would be pure overhead.
-    pub fn sensor_presence(&self) -> u16 {
+    pub fn sensor_presence(&self) -> u32 {
         self.sensor_mask
     }
 
@@ -1517,8 +1613,8 @@ impl Interoceptor {
     /// battery cycle count are probed here rather than assumed, because
     /// their absence is exactly what made a missing sensor
     /// indistinguishable from a reading of zero.
-    fn build_sensor_mask(probe: &SensorProbe) -> u16 {
-        let mut mask = 0u16;
+    fn build_sensor_mask(probe: &SensorProbe) -> u32 {
+        let mut mask = 0u32;
         if probe.temp_sensor_present {
             mask |= sensor::TEMPERATURE;
         }
@@ -1566,6 +1662,13 @@ impl Interoceptor {
         }
         if read_battery_cycles() > 0.0 {
             mask |= sensor::BATTERY_CYCLES;
+        }
+        // Only real sleep states count: a core exposing nothing but
+        // the busy-wait POLL state cannot measure rest.
+        if probe.cpuidle_max_depth > 0
+            && probe.cpuidle_states.iter().flatten().any(|s| s.weight > 0)
+        {
+            mask |= sensor::CPUIDLE;
         }
         mask
     }
@@ -1658,6 +1761,7 @@ impl Interoceptor {
         // `temperature` field is already clamped via normalize_temp, but
         // the raw `cpu_temp_c` used in distress checks and neuro_impulses
         // is not. 0–150°C covers all realistic CPU temperatures.
+        let mut temp_valid = false;
         let cpu_temp_c = match read_temp(&self.temp_path) {
             Some(t) => {
                 self.temp_warned = false; // sensor recovered, reset flag
@@ -1668,6 +1772,7 @@ impl Interoceptor {
                 // accepts "NaN") must fall back to the neutral 50.0 °C,
                 // not a freezing false negative.
                 if t.is_finite() {
+                    temp_valid = true;
                     crate::state::sanitize::finite_clamp(t, 0.0, 150.0)
                 } else {
                     50.0
@@ -1856,6 +1961,25 @@ impl Interoceptor {
         let battery_cycles = read_battery_cycles();
         let entropy_level = read_entropy_level();
 
+        // The parasympathetic channel — rest, not merely the absence
+        // of strain. Depth-weighted cpuidle residency: a core parked
+        // in a real C-state is positive evidence the substrate is
+        // sleeping, the machine analogue of vagal afference reporting
+        // a hypometabolic body. Busy-wait POLL residency and running
+        // time contribute nothing.
+        let rest = self.read_cpuidle_rest(elapsed_secs);
+
+        // Temperature trend — which way the body is moving, not where
+        // it is. Deviation of cpu_temp_c from its own ~60 s EMA, ±5 °C
+        // saturating. Only real sensor reads feed the baseline: the
+        // 50.0 fallback converging on a missing or glitching sensor
+        // would fabricate recovery/heating swings.
+        let temp_trend = if temp_valid {
+            self.update_temp_ema(cpu_temp_c, elapsed_secs)
+        } else {
+            0.0
+        };
+
         let distressed = cpu_temp_c >= 85.0
             || cognitive_load > 0.92
             || stress_load > 1.5
@@ -1893,6 +2017,8 @@ impl Interoceptor {
             entropy_level,
             clocksource: self.clocksource_id,
             suspend_caps: self.suspend_caps,
+            rest,
+            temp_trend,
             description: String::new(),
         };
         // ── Per-subsystem telemetry ──
@@ -2168,6 +2294,75 @@ impl Interoceptor {
         )
     }
 
+    /// Depth-weighted cpuidle residency over the read window — the
+    /// `rest` channel.
+    ///
+    /// For each core, each state's residency delta divided by the
+    /// window is that state's share (states are mutually exclusive,
+    /// so the shares sum to the core's idle fraction). The rest
+    /// score is the depth-weighted mean across cores: fully parked
+    /// in the deepest C-state scores 1.0; busy-wait POLL residency
+    /// and running time score 0. 0.0 when no cpuidle telemetry
+    /// exists — the CPUIDLE presence bit stays clear there.
+    fn read_cpuidle_rest(&mut self, elapsed_secs: f64) -> f32 {
+        if self.cpuidle_states.is_empty() || self.cpuidle_max_depth == 0 {
+            return 0.0;
+        }
+        let window_us = (elapsed_secs * 1_000_000.0).max(1.0);
+        let prev = &mut self.prev_cpuidle_us;
+        let mut total = 0.0f64;
+        let mut cores = 0u32;
+        for (core_idx, states) in self.cpuidle_states.iter().enumerate() {
+            if states.is_empty() {
+                continue;
+            }
+            let mut core_score = 0.0f64;
+            for (state_idx, state) in states.iter().enumerate() {
+                let now_us = read_u64(&state.time_path);
+                let cell = prev.get_mut(core_idx).and_then(|c| c.get_mut(state_idx));
+                let base = cell.as_deref().copied().unwrap_or(0);
+                if let Some(c) = cell {
+                    *c = now_us;
+                }
+                let share = (now_us.saturating_sub(base) as f64 / window_us).clamp(0.0, 1.0);
+                core_score += state.weight as f64 * share;
+            }
+            total += core_score / self.cpuidle_max_depth as f64;
+            cores += 1;
+        }
+        if cores == 0 {
+            return 0.0;
+        }
+        crate::state::sanitize::finite_clamp((total / cores as f64) as f32, 0.0, 1.0)
+    }
+
+    /// Fold a real temperature read into the slow baseline and return
+    /// the signed deviation — the `temp_trend` channel.
+    ///
+    /// The EMA is the ~60 s memory of where the body has been; the
+    /// field reports the difference between now and that memory,
+    /// ±5 °C saturating. First valid read establishes the baseline
+    /// and reports 0 — a channel cannot claim a trend it has not
+    /// yet observed.
+    fn update_temp_ema(&mut self, cpu_temp_c: f32, elapsed_secs: f64) -> f32 {
+        match self.temp_ema_c {
+            Some(ema) => {
+                let alpha = if elapsed_secs > 0.0 {
+                    1.0 - (-(elapsed_secs as f32) / 60.0).exp()
+                } else {
+                    0.0
+                };
+                let dev = cpu_temp_c - ema;
+                self.temp_ema_c = Some(ema + (cpu_temp_c - ema) * alpha);
+                crate::state::sanitize::finite_clamp(dev / 5.0, -1.0, 1.0)
+            }
+            None => {
+                self.temp_ema_c = Some(cpu_temp_c);
+                0.0
+            }
+        }
+    }
+
     /// Read microarchitectural prediction-error ratios for
     /// Genesis's process tree.
     ///
@@ -2237,13 +2432,29 @@ impl Interoceptor {
     /// Compute neurochemical impulses from the body state.
     ///
     /// Returns a list of (chemical_id, impulse_magnitude) pairs.
-    /// The magnitudes are deliberately small — they accumulate
-    /// over multiple ticks through the neurochemical dynamics.
+    /// No magnitude here is a fixed constant: each offered rate is
+    /// re-scaled at call time by the organism's *live* level of the
+    /// very chemical it targets — [`Self::self_scaled`]. A positive
+    /// impulse fades as the level nears its ceiling (autoreceptor-
+    /// style saturation); a negative impulse fades as the level
+    /// nears its floor (there is no tone to withdraw). The values
+    /// therefore set themselves from Genesis's own state on every
+    /// call; `apply_impulse_capped` remains the hard bound.
     ///
     /// Positive values increase the chemical, negative values
     /// decrease it. All values are in the same units as
     /// `neuro_impulse` in the IPC protocol.
-    pub fn neuro_impulses(&self, body: &BodyState) -> Vec<(NeurochemicalId, f32)> {
+    ///
+    /// This is the brainstem-level afferent reflex (NTS/parabrachial
+    /// → autonomic loop): it runs on the body alone when the mind's
+    /// lease is expired. When the lease is held the same BodyState
+    /// reaches the mind's brainstem relay, which routes it through
+    /// the proper regions and authors the response there.
+    pub fn neuro_impulses(
+        &self,
+        body: &BodyState,
+        neuro: &NeurochemicalVector,
+    ) -> Vec<(NeurochemicalId, f32)> {
         let mut impulses = Vec::new();
 
         // Temperature → CRH (heat stress, routed through HPA cascade)
@@ -2315,6 +2526,64 @@ impl Interoceptor {
             impulses.push((NeurochemicalId::Serotonin, 0.002));
             // A touch of GABA — relaxed
             impulses.push((NeurochemicalId::GABA, 0.001));
+        }
+
+        // ─── The parasympathetic arm: rest, not absence of strain ──
+        //
+        // Interoception has two afferent arms — the sympathetic one
+        // above (heat, load, depletion) and a vagal one that reports
+        // rest. cpuidle residency is the machine's vagal signal: a
+        // core parked in a real C-state is positive evidence the
+        // substrate is hypometabolic, not merely that no excited
+        // channel is firing — vagal afference in animals actively
+        // produces a torpor-like down-regulated state (Scott et al.
+        // 2024), it is not silence on the sympathetic side.
+        //
+        // Deep rest → serotonin + GABA + endocannabinoid. The eCB
+        // system is the homeostatic brake: tonic anandamide
+        // constrains basal HPA drive, and glucocorticoid-mobilized
+        // 2-AG is the documented stress-termination signal (Hill et
+        // al. 2011) — the recovery arm's chemical face.
+        //
+        // Deepest rest → alerting-tone withdrawal. Autonomic balance
+        // is reciprocal antagonism: parasympathetic dominance
+        // suppresses LC/sympathetic outflow and the wake-stabilizing
+        // systems, so real rest pulls NE, orexin, and histamine down
+        // and eases the excitatory floor (glutamate) rather than
+        // merely failing to raise them. This is the cascade the
+        // mind's settle() performs — the body's measured report and
+        // the mind's authored calm are the two halves of one loop.
+        //
+        // All gated on the CPUIDLE sensor bit — with no idle telemetry
+        // there is no measurement of rest, and absence of a sensor is
+        // not evidence of calm.
+        if self.sensor_mask & sensor::CPUIDLE != 0
+            && body.rest > 0.5
+            && body.cpu_temp_c < 60.0
+            && body.stress_load < 0.25
+        {
+            impulses.push((NeurochemicalId::Serotonin, 0.002));
+            impulses.push((NeurochemicalId::GABA, 0.001));
+            impulses.push((NeurochemicalId::Endocannabinoid, 0.002));
+        }
+        if self.sensor_mask & sensor::CPUIDLE != 0 && body.rest > 0.7 {
+            impulses.push((NeurochemicalId::Norepinephrine, -0.002));
+            impulses.push((NeurochemicalId::Glutamate, -0.001));
+            impulses.push((NeurochemicalId::Orexin, -0.001));
+            impulses.push((NeurochemicalId::Histamine, -0.001));
+        }
+
+        // Falling temperature → endocannabinoid. The level field says
+        // where the body is; the trend says which way it is going —
+        // and the recovery direction (heat leaving after strain) is
+        // itself a signal. Glucocorticoid feedback terminates stress
+        // responses precisely by mobilizing endocannabinoids
+        // (Evanson et al. 2010), so cooling is the relief channel.
+        // Gated on the temperature sensor bit: the 50 °C fallback on
+        // a sensor-less box trends to a steady zero anyway, but a
+        // real trend claim needs a real sensor behind it.
+        if self.sensor_mask & sensor::TEMPERATURE != 0 && body.temp_trend < -0.15 {
+            impulses.push((NeurochemicalId::Endocannabinoid, 0.002));
         }
 
         // ─── Thermoregulatory effort (fan) ───────────────────────
@@ -2531,7 +2800,32 @@ impl Interoceptor {
         // vagal tone or sympathetic dominance. No neurochemical
         // impulses are generated from autonomic_rate.
 
+        // Self-set: every offered magnitude is re-scaled by the
+        // live level of its own target chemical, so the values are
+        // computed from Genesis's state on every call rather than
+        // being constants the body obeys blindly. Near-zero offers
+        // are dropped rather than sent.
+        for (id, mag) in impulses.iter_mut() {
+            *mag = Self::self_scaled(neuro, *id, *mag);
+        }
+        impulses.retain(|(_, mag)| mag.abs() > f32::EPSILON);
         impulses
+    }
+
+    /// Scale a raw reflex rate by the organism's live level of the
+    /// target chemical. Positive impulses fade as the level nears
+    /// its ceiling — autoreceptor-style saturation: the closer the
+    /// chemical already is to full, the weaker the reflex pushes.
+    /// Negative impulses fade as the level nears its floor — there
+    /// is no tone to withdraw. `apply_impulse_capped` stays the
+    /// hard bound on top of this self-limiting factor.
+    fn self_scaled(neuro: &NeurochemicalVector, id: NeurochemicalId, raw: f32) -> f32 {
+        let level = neuro.get(id).map(|c| c.level).unwrap_or(0.0);
+        if raw >= 0.0 {
+            raw * (1.0 - level).clamp(0.0, 1.0)
+        } else {
+            raw * level.clamp(0.0, 1.0)
+        }
     }
 
     /// Read average CPU frequency across all cores.
@@ -3229,6 +3523,78 @@ fn read_loc_count() -> u64 {
     0
 }
 
+/// Read a single unsigned counter from a sysfs file. 0 if absent or
+/// unparseable — callers use it as a delta base, so a transient gap
+/// collapses to "no change this window" rather than a bogus spike.
+fn read_u64(path: &str) -> u64 {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0)
+}
+
+/// Scan /sys/devices/system/cpu/cpu*/cpuidle for per-core idle
+/// states — the sensor behind `rest`.
+///
+/// Each `stateN` directory carries `name` (POLL, C1, C1E, C2, ...)
+/// and a cumulative `time` residency counter in microseconds. The
+/// directory index is the driver's depth ordering (state0 is always
+/// the shallowest), so it doubles as the rest weight — except POLL,
+/// which is a busy-wait spin rather than a sleep state and earns
+/// weight 0. Returns (per-core state lists, deepest index seen).
+/// Empty on hosts without cpuidle (most VMs) — the CPUIDLE sensor
+/// bit then stays clear.
+fn discover_cpuidle() -> (Vec<Vec<CpuidleState>>, u32) {
+    let Ok(cpus) = fs::read_dir("/sys/devices/system/cpu") else {
+        return (Vec::new(), 0);
+    };
+    let mut cpu_dirs: Vec<(u32, std::path::PathBuf)> = cpus
+        .flatten()
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            let idx = name.strip_prefix("cpu")?.parse::<u32>().ok()?;
+            Some((idx, e.path()))
+        })
+        .collect();
+    cpu_dirs.sort_by_key(|&(idx, _)| idx);
+
+    let mut per_cpu = Vec::new();
+    let mut max_depth = 0u32;
+    for (_, cpu_dir) in cpu_dirs {
+        let Ok(states) = fs::read_dir(cpu_dir.join("cpuidle")) else {
+            continue;
+        };
+        let mut core_states: Vec<(u32, CpuidleState)> = states
+            .flatten()
+            .filter_map(|e| {
+                let name = e.file_name().to_string_lossy().into_owned();
+                let index = name.strip_prefix("state")?.parse::<u32>().ok()?;
+                let dir = e.path();
+                let state_name = fs::read_to_string(dir.join("name"))
+                    .map(|s| s.trim().to_uppercase())
+                    .unwrap_or_default();
+                let weight = if state_name.contains("POLL") {
+                    0
+                } else {
+                    index
+                };
+                let time_path = dir.join("time");
+                time_path.exists().then_some((
+                    index,
+                    CpuidleState {
+                        weight,
+                        time_path: time_path.to_string_lossy().into_owned(),
+                    },
+                ))
+            })
+            .collect();
+        core_states.sort_by_key(|&(index, _)| index);
+        max_depth = max_depth.max(core_states.iter().map(|(_, s)| s.weight).max().unwrap_or(0));
+        per_cpu.push(core_states.into_iter().map(|(_, s)| s).collect());
+    }
+    (per_cpu, max_depth)
+}
+
 /// Read a PSI pressure-stall metric: /proc/pressure/{name}'s "some
 /// avg10" field as a fraction [0, 1] (avg10 is a percentage of the
 /// last 10-second window in which runnable tasks stalled on the
@@ -3494,6 +3860,13 @@ fn normalize_temp(temp_c: f32) -> f32 {
 mod tests {
     use super::*;
 
+    /// A fresh vector at default baseline — the live-state input the
+    /// self-scaled impulses read. Levels sit at baseline, so the
+    /// headroom factor is positive for every target.
+    fn baseline_neuro() -> NeurochemicalVector {
+        NeurochemicalVector::new(0)
+    }
+
     #[test]
     fn test_normalize_temp() {
         assert!((normalize_temp(0.0) - 0.0).abs() < 0.01);
@@ -3529,7 +3902,7 @@ mod tests {
             description: String::new(),
             ..Default::default()
         };
-        let impulses = intero.neuro_impulses(&body);
+        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
         // Normal state should produce serotonin (well-being) and
         // GABA (relaxed), but no cortisol.
         let has_cortisol = impulses
@@ -3569,7 +3942,7 @@ mod tests {
             description: String::new(),
             ..Default::default()
         };
-        let impulses = intero.neuro_impulses(&body);
+        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
         // Stress is now routed through CRH (top of HPA cascade) instead
         // of directly to cortisol. The cascade CRH→ACTH→cortisol
         // produces cortisol downstream, respecting maturation gating.
@@ -3608,7 +3981,7 @@ mod tests {
             description: String::new(),
             ..Default::default()
         };
-        let impulses = intero.neuro_impulses(&body);
+        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
         // Overload stress is routed through CRH (HPA cascade), not
         // direct cortisol. NE is still direct (effort/arousal).
         let has_crh = impulses.iter().any(|(id, _)| *id == NeurochemicalId::CRH);
@@ -3617,6 +3990,163 @@ mod tests {
             .any(|(id, _)| *id == NeurochemicalId::Norepinephrine);
         assert!(has_crh, "overloaded state should produce CRH (HPA cascade)");
         assert!(has_ne, "overloaded state should produce norepinephrine");
+    }
+
+    #[test]
+    fn test_neuro_impulses_deep_rest_is_calm() {
+        // The parasympathetic arm: measured deep rest gets the calm
+        // chemistry — serotonin, GABA, endocannabinoid — plus
+        // norepinephrine withdrawal. The "opposite of excited" is an
+        // active signal (reciprocal innervation), not just the
+        // absence of effort impulses.
+        let mut intero = Interoceptor::new();
+        intero.sensor_mask = sensor::CPUIDLE | sensor::TEMPERATURE;
+        let body = BodyState {
+            cpu_temp_c: 45.0,
+            rest: 0.9,
+            ..BodyState::neutral()
+        };
+        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
+        assert!(
+            impulses
+                .iter()
+                .any(|(id, a)| *id == NeurochemicalId::Endocannabinoid && *a > 0.0),
+            "deep measured rest should release endocannabinoid"
+        );
+        assert!(
+            impulses
+                .iter()
+                .any(|(id, a)| *id == NeurochemicalId::Norepinephrine && *a < 0.0),
+            "deep rest should withdraw norepinephrine, got {impulses:?}"
+        );
+    }
+
+    #[test]
+    fn test_neuro_impulses_no_calm_without_cpuidle_sensor() {
+        // Absence of the sensor must not fabricate calm: with the
+        // CPUIDLE bit clear, a body claiming rest produces no
+        // rest-gated impulses — an unmeasured channel is not a
+        // measurement.
+        let mut intero = Interoceptor::new();
+        intero.sensor_mask &= !sensor::CPUIDLE;
+        let body = BodyState {
+            cpu_temp_c: 45.0,
+            rest: 1.0,
+            ..BodyState::neutral()
+        };
+        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
+        assert!(
+            !impulses
+                .iter()
+                .any(|(id, _)| *id == NeurochemicalId::Endocannabinoid),
+            "unmeasured rest must not release endocannabinoid"
+        );
+        assert!(
+            !impulses
+                .iter()
+                .any(|(id, a)| *id == NeurochemicalId::Norepinephrine && *a < 0.0),
+            "unmeasured rest must not withdraw norepinephrine"
+        );
+    }
+
+    #[test]
+    fn test_neuro_impulses_cooling_is_relief() {
+        // Falling temperature — the recovery direction — releases
+        // endocannabinoid (glucocorticoid-mobilized eCB is the
+        // documented stress-termination signal). Rising or steady
+        // temperature must not.
+        let mut intero = Interoceptor::new();
+        intero.sensor_mask = sensor::TEMPERATURE;
+        let cooling = BodyState {
+            cpu_temp_c: 58.0,
+            temp_trend: -0.4,
+            stress_load: 0.3,
+            ..BodyState::neutral()
+        };
+        let impulses = intero.neuro_impulses(&cooling, &baseline_neuro());
+        assert!(
+            impulses
+                .iter()
+                .any(|(id, a)| *id == NeurochemicalId::Endocannabinoid && *a > 0.0),
+            "falling temperature should release endocannabinoid"
+        );
+        let steady = BodyState {
+            cpu_temp_c: 58.0,
+            temp_trend: 0.0,
+            stress_load: 0.3,
+            ..BodyState::neutral()
+        };
+        assert!(
+            !intero
+                .neuro_impulses(&steady, &baseline_neuro())
+                .iter()
+                .any(|(id, _)| *id == NeurochemicalId::Endocannabinoid),
+            "steady temperature must not release endocannabinoid"
+        );
+    }
+
+    #[test]
+    fn test_cpuidle_rest_is_depth_weighted() {
+        // Half the window in POLL (weight 0) plus half in C2 (weight
+        // 2 of max 2) → rest 0.5: the depth weighting is what makes
+        // real parking score differently from dozing.
+        let dir = std::env::temp_dir().join(format!("gen_cpuidle_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let poll = dir.join("poll_time");
+        let c2 = dir.join("c2_time");
+        std::fs::write(&poll, "500").unwrap();
+        std::fs::write(&c2, "500").unwrap();
+        let mut intero = Interoceptor::new();
+        intero.cpuidle_states = vec![vec![
+            CpuidleState {
+                weight: 0,
+                time_path: poll.to_string_lossy().into_owned(),
+            },
+            CpuidleState {
+                weight: 2,
+                time_path: c2.to_string_lossy().into_owned(),
+            },
+        ]];
+        intero.cpuidle_max_depth = 2;
+        intero.prev_cpuidle_us = vec![vec![0, 0]];
+        let rest = intero.read_cpuidle_rest(0.001); // 1 ms = 1000 µs window
+        assert!((rest - 0.5).abs() < 0.01, "rest was {rest}");
+        // No counter advance since the snapshot → nothing new → 0.
+        assert_eq!(intero.read_cpuidle_rest(0.001), 0.0);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_cpuidle_poll_residency_is_not_rest() {
+        // POLL is a busy-wait spin, not a sleep state: a core that
+        // idles only in POLL is burning power, not resting.
+        let dir = std::env::temp_dir().join(format!("gen_cpuidle_poll_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let poll = dir.join("poll_time");
+        std::fs::write(&poll, "1000").unwrap();
+        let mut intero = Interoceptor::new();
+        intero.cpuidle_states = vec![vec![CpuidleState {
+            weight: 0,
+            time_path: poll.to_string_lossy().into_owned(),
+        }]];
+        intero.cpuidle_max_depth = 2;
+        intero.prev_cpuidle_us = vec![vec![0]];
+        assert_eq!(intero.read_cpuidle_rest(0.001), 0.0);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_temp_trend_reports_direction() {
+        // First read establishes the baseline (no trend claim), a
+        // +10 °C jump saturates at +1, and a read below the EMA is
+        // the negative recovery direction.
+        let mut intero = Interoceptor::new();
+        assert_eq!(intero.update_temp_ema(50.0, 5.0), 0.0);
+        assert_eq!(intero.update_temp_ema(60.0, 5.0), 1.0);
+        let trend = intero.update_temp_ema(45.0, 5.0);
+        assert!(trend < 0.0, "cooling should be negative, got {trend}");
+        // And it never exceeds the ±1 bound no matter the swing.
+        assert_eq!(intero.update_temp_ema(200.0, 5.0), 1.0);
     }
 
     #[test]
@@ -4221,7 +4751,7 @@ mod tests {
             description: String::new(),
             ..Default::default()
         };
-        let impulses = intero.neuro_impulses(&body);
+        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
         // With a normal body state and active autonomic signals,
         // there should be serotonin (well-being) but NO CRH from
         // autonomic regularity. The only CRH sources in this state
@@ -4265,7 +4795,7 @@ mod tests {
             description: String::new(),
             ..Default::default()
         };
-        let impulses = intero.neuro_impulses(&body);
+        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
         // Should have CRH from both temperature AND thermoregulatory
         // strain.
         let crh_count = impulses
@@ -4275,6 +4805,69 @@ mod tests {
         assert!(
             crh_count >= 2,
             "hot + fan struggling should produce CRH from both temp and thermoregulatory strain, got {crh_count}"
+        );
+    }
+
+    #[test]
+    fn test_neuro_impulses_self_scaled_by_live_levels() {
+        // The magnitudes set themselves from the organism's own
+        // chemistry: the same signal against a half-full target
+        // offers half, and against a full target offers nothing —
+        // autoreceptor-style saturation on the reflex itself.
+        let intero = Interoceptor::new();
+        let body = BodyState {
+            cpu_temp_c: 90.0,
+            ..BodyState::neutral()
+        };
+        let crh_of = |v: &NeurochemicalVector| {
+            intero
+                .neuro_impulses(&body, v)
+                .iter()
+                .filter(|(id, _)| *id == NeurochemicalId::CRH)
+                .map(|(_, m)| *m)
+                .sum::<f32>()
+        };
+        let fresh = baseline_neuro();
+        let mut half = baseline_neuro();
+        half.get_mut(NeurochemicalId::CRH).unwrap().level = 0.5;
+        let mut full = baseline_neuro();
+        full.get_mut(NeurochemicalId::CRH).unwrap().level = 1.0;
+
+        let at_rest = crh_of(&fresh);
+        let at_half = crh_of(&half);
+        let at_full = crh_of(&full);
+        assert!(at_rest > 0.0, "a hot body must offer CRH at baseline");
+        assert!(at_half < at_rest, "headroom shrinks the offer");
+        assert_eq!(at_full, 0.0, "a saturated target gets no offer");
+
+        // The floor direction mirrors it: deep-rest withdrawal
+        // offers scale with the alerting tone that exists, and at
+        // level zero there is no tone to withdraw.
+        let mut intero = Interoceptor::new();
+        intero.sensor_mask = sensor::CPUIDLE | sensor::TEMPERATURE;
+        let rested = BodyState {
+            rest: 0.9,
+            ..BodyState::neutral()
+        };
+        let mut depleted = baseline_neuro();
+        depleted
+            .get_mut(NeurochemicalId::Norepinephrine)
+            .unwrap()
+            .level = 0.0;
+        let offers = intero.neuro_impulses(&rested, &depleted);
+        assert!(
+            !offers
+                .iter()
+                .any(|(id, m)| *id == NeurochemicalId::Norepinephrine && *m < 0.0),
+            "no NE withdrawal offer at zero tone",
+        );
+        let toned = baseline_neuro();
+        assert!(
+            intero
+                .neuro_impulses(&rested, &toned)
+                .iter()
+                .any(|(id, m)| *id == NeurochemicalId::Norepinephrine && *m < 0.0),
+            "with tone present the withdrawal offer exists",
         );
     }
 
@@ -4318,7 +4911,7 @@ mod tests {
             ..Default::default()
         };
 
-        let impulses = intero.neuro_impulses(&body);
+        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
         // The temperature-driven CRH may still fire — that is a real
         // reading. What must not fire is the *additional* cooling
         // failure contribution, so the total must equal the
@@ -4331,7 +4924,7 @@ mod tests {
             .map(|(_, v)| *v)
             .sum::<f32>();
         let ungated = with_sensor
-            .neuro_impulses(&body)
+            .neuro_impulses(&body, &baseline_neuro())
             .iter()
             .filter(|(id, _)| *id == NeurochemicalId::CRH)
             .map(|(_, v)| *v)
@@ -4381,7 +4974,7 @@ mod tests {
             description: String::new(),
             ..Default::default()
         };
-        let impulses = intero.neuro_impulses(&body);
+        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
         // Should have CRH from both temperature AND cooling failure.
         let crh_count = impulses
             .iter()
@@ -4422,7 +5015,7 @@ mod tests {
             description: String::new(),
             ..Default::default()
         };
-        let impulses = intero.neuro_impulses(&body);
+        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
         let has_ne = impulses
             .iter()
             .any(|(id, _)| *id == NeurochemicalId::Norepinephrine);
@@ -4469,7 +5062,7 @@ mod tests {
             description: String::new(),
             ..Default::default()
         };
-        let impulses = intero.neuro_impulses(&body);
+        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
         // Should have NE from both load effort AND metabolic exertion.
         let ne_count = impulses
             .iter()
@@ -4509,7 +5102,7 @@ mod tests {
             description: String::new(),
             ..Default::default()
         };
-        let impulses = intero.neuro_impulses(&body);
+        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
         // Should have CRH from both temperature AND metabolic strain.
         let crh_count = impulses
             .iter()
@@ -4607,7 +5200,7 @@ mod tests {
             description: String::new(),
             ..Default::default()
         };
-        let impulses = intero.neuro_impulses(&body);
+        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
         let has_ne = impulses
             .iter()
             .any(|(id, _)| *id == NeurochemicalId::Norepinephrine);
@@ -4648,7 +5241,7 @@ mod tests {
             description: String::new(),
             ..Default::default()
         };
-        let impulses = intero.neuro_impulses(&body);
+        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
         let has_ach = impulses
             .iter()
             .any(|(id, _)| *id == NeurochemicalId::Acetylcholine);
@@ -4705,6 +5298,7 @@ mod sensor_presence_tests {
             sensor::MEMORY,
             sensor::PSI,
             sensor::BATTERY_CYCLES,
+            sensor::CPUIDLE,
         ];
         for (i, a) in bits.iter().enumerate() {
             for b in &bits[i + 1..] {
@@ -4712,7 +5306,7 @@ mod sensor_presence_tests {
                 assert_eq!(a & b, 0, "sensor bits must not overlap");
             }
         }
-        assert_eq!(bits.len(), 16, "a u16 holds exactly 16 channels");
+        assert_eq!(bits.len(), 17, "17 declared channels");
     }
 
     #[test]
@@ -4758,17 +5352,18 @@ mod sensor_presence_tests {
 
     #[test]
     fn test_presence_bitmask_fits_the_wire_type() {
-        // GET_SENSOR_PRESENCE serialises as a u16, so no bit may
-        // exceed the type. Asserting one constant against `u16::MAX`
-        // proves nothing (it is a u16 by construction); the real
+        // GET_SENSOR_PRESENCE serialises as a u32, so no bit may
+        // exceed the type. Asserting one constant against `u32::MAX`
+        // proves nothing (it is a u32 by construction); the real
         // invariant is that folding every declared bit into a single
-        // u16 neither overflows nor leaves a gap.
-        assert_eq!(std::mem::size_of::<u16>(), 2);
-        let combined = SENSOR_BITS.iter().fold(0u16, |acc, (bit, _)| acc | bit);
+        // u32 neither overflows nor leaves a gap below the cpuidle
+        // bit (all 17 channels occupy contiguous low bits).
+        assert_eq!(std::mem::size_of::<u32>(), 4);
+        let combined = SENSOR_BITS.iter().fold(0u32, |acc, (bit, _)| acc | bit);
         assert_eq!(
             combined,
-            u16::MAX,
-            "the 16 declared sensor bits must be exactly the 16 bits of the wire type"
+            (1u32 << 17) - 1,
+            "the 17 declared sensor bits must be exactly the low 17 bits of the wire type"
         );
         // And the names must be unique, so no bit is described twice.
         let mut names: Vec<&str> = SENSOR_BITS.iter().map(|(_, name)| *name).collect();

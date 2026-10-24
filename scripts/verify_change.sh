@@ -41,8 +41,17 @@ log "Step 1: py_compile check"
 # Compile all Python source — the region packages, genesis_client,
 # the CLI, and the test suite. A syntax error in any of these can
 # break Genesis at runtime even if the tests happen to pass.
-if ! find "$PYTHON_DIR" -name '*.py' -not -path '*__pycache__*' -not -path '*/.*' -print0 \
-    | xargs -0 python3 -m py_compile; then
+#
+# Run find from inside PYTHON_DIR: the '*/.*' exclusion is meant to
+# skip hidden dirs inside the tree (.git, caches), but when
+# PYTHON_DIR is absolute and itself lives under a dotfile parent —
+# e.g. ~/.local/share/genesis/workspace/python — every emitted path
+# contains '/.' and the filter silently drops ALL files. py_compile
+# then ran with no filenames and failed every experiment. The -r
+# keeps an empty list from invoking py_compile bare, which exits
+# non-zero with only a usage error.
+if ! (cd "$PYTHON_DIR" && find . -name '*.py' -not -path '*__pycache__*' -not -path '*/.*' -print0 \
+    | xargs -0 -r python3 -m py_compile); then
     fail "py_compile failed"
     exit 1
 fi
@@ -57,8 +66,14 @@ log "Step 1b: import check"
 # catch this early, before the slow test gate. Optional dependencies
 # (vosk, sounddevice) are lazily imported inside functions, so a
 # blanket import here cannot fail on machines without them.
+#
+# The support packages (genesis_client, infrastructure, eval) live
+# BESIDE python/ in the tree, so the tree root must be on PYTHONPATH —
+# python/tests/conftest.py arranges the same thing for the pytest gate.
+# Without it, every module that imports a sibling package fails here.
+TREE_ROOT="$(cd "$(dirname "$PYTHON_DIR")" && pwd)"
 if ! (
-    cd "$PYTHON_DIR" && python3 - <<'PYEOF'
+    cd "$PYTHON_DIR" && PYTHONPATH="$TREE_ROOT${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PYEOF'
 import importlib
 import pkgutil
 import sys

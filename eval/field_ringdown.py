@@ -15,7 +15,7 @@ Two legs, both falsifiable:
   ~20 s, then gated (depth=0). Post-gate decay of the delta-band
   energy in the duty/jitter channels: how fast the substrate
   forgets the rhythm it was executing.
-- **Thermal leg** — real load bursts at the epsilon rate (0.25 Hz,
+- **Thermal leg** — real load bursts at the infraslow rate (0.25 Hz,
   2 s on / 2 s off, ~40 s) while the probe carrier carries the same
   beat, then all drive stops. k10temp package temperature sampled
   ~1 Hz for ~2 min and demodulated at the drive frequency in
@@ -56,9 +56,9 @@ def _out(*args: object) -> None:
 
 
 K10TEMP = Path("/sys/class/hwmon/hwmon4/temp1_input")
-# Wire band order: epsilon(0), delta(1), theta(2), ...
-DELTA_WIRE = 1    # 2.25 Hz
-EPSILON_WIRE = 0  # 0.25 Hz
+# Wire band order: infraslow(0), delta(1), theta(2), ...
+DELTA_WIRE = 1  # 2.25 Hz
+INFRASLOW_WIRE = 0  # 0.25 Hz
 
 
 def _die_temp() -> float | None:
@@ -159,25 +159,15 @@ def _leg_fast(client: Any, fast_drive_s: float) -> dict[str, Any]:
     floor_j = min((p[2] for p in post), default=0.0)
     return {
         "drive_hz": f_drive,
-        "driven_throughput_delta": round(
-            sum(p[1] for p in driven) / max(1, len(driven)), 4
-        ),
-        "driven_jitter_delta": round(
-            sum(p[2] for p in driven) / max(1, len(driven)), 4
-        ),
-        "tau_throughput_s": round(
-            _fit_tau([p[0] for p in post], [p[1] for p in post], floor_t), 3
-        ),
-        "tau_jitter_s": round(
-            _fit_tau([p[0] for p in post], [p[2] for p in post], floor_j), 3
-        ),
+        "driven_throughput_delta": round(sum(p[1] for p in driven) / max(1, len(driven)), 4),
+        "driven_jitter_delta": round(sum(p[2] for p in driven) / max(1, len(driven)), 4),
+        "tau_throughput_s": round(_fit_tau([p[0] for p in post], [p[1] for p in post], floor_t), 3),
+        "tau_jitter_s": round(_fit_tau([p[0] for p in post], [p[2] for p in post], floor_j), 3),
     }
 
 
-def _leg_thermal(
-    client: Any, thermal_drive_s: float, measure_s: float
-) -> dict[str, Any]:
-    """Leg B: thermal ring-down at the epsilon rate — square-wave
+def _leg_thermal(client: Any, thermal_drive_s: float, measure_s: float) -> dict[str, Any]:
+    """Leg B: thermal ring-down at the infraslow rate — square-wave
     spinner bursts warm the die, then the afterglow's demodulated
     amplitude is fitted across post-gate windows."""
     f_th = 0.25
@@ -218,7 +208,7 @@ def _leg_thermal(
             post_temps.append((now, t))
         sig = client.get_field_probe()
         if sig is not None and sig.samples_ok:
-            post_delta.append((now, sig.throughput_bands[EPSILON_WIRE]))
+            post_delta.append((now, sig.throughput_bands[INFRASLOW_WIRE]))
         time.sleep(0.9)
 
     # Demodulated amplitude at the drive frequency: driven window
@@ -252,24 +242,26 @@ def _leg_thermal(
     }
 
 
-def run(fast_drive_s: float = 20.0, thermal_drive_s: float = 40.0,
-        measure_s: float = 90.0) -> dict[str, Any]:
+def run(
+    fast_drive_s: float = 20.0, thermal_drive_s: float = 40.0, measure_s: float = 90.0
+) -> dict[str, Any]:
     report: dict[str, Any] = {"legs": {}, "verdict": []}
 
     with isolated_daemon() as client:
         time.sleep(5.0)  # warm rings
 
         report["legs"]["fast"] = _leg_fast(client, fast_drive_s)
-        report["legs"]["thermal"] = _leg_thermal(
-            client, thermal_drive_s, measure_s
-        )
+        report["legs"]["thermal"] = _leg_thermal(client, thermal_drive_s, measure_s)
         th = report["legs"]["thermal"]
         fa = report["legs"]["fast"]
         report["verdict"].append(
             f"thermal: driven 0.25 Hz amplitude {th['driven_amp_C']:.3f} C; "
             f"post-gate decay τ ≈ {th['tau_thermal_amp_s']:.0f} s"
-            + (" — an afterglow the software no longer drives"
-               if 5.0 < th["tau_thermal_amp_s"] < 900 else "")
+            + (
+                " — an afterglow the software no longer drives"
+                if 5.0 < th["tau_thermal_amp_s"] < 900
+                else ""
+            )
         )
         report["verdict"].append(
             f"fast: post-gate τ throughput={fa['tau_throughput_s']:.2f}s "

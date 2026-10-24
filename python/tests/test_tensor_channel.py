@@ -48,9 +48,7 @@ def test_tensor_roundtrip_2d_grid():
 
 
 def test_tensor_roundtrip_3d_and_4d():
-    t = Tensor.from_lists(
-        [[[0.5, 1.5], [2.5, 3.5]], [[4.5, 5.5], [6.5, 7.5]]], DType.F32
-    )
+    t = Tensor.from_lists([[[0.5, 1.5], [2.5, 3.5]], [[4.5, 5.5], [6.5, 7.5]]], DType.F32)
     assert t.shape == (2, 2, 2)
     back = Tensor.unpack(t.pack())
     assert back == t
@@ -96,9 +94,15 @@ def test_pack_name_bounds():
 # ─── In-process fake daemon ───────────────────────────────────
 
 
+# The real daemon's tensor slab is shared process state — every
+# connection sees the same store. The client keeps a second read
+# channel, so the fake shares its slab across connections too.
+_FAKE_SLAB: dict[str, Tensor] = {}
+
+
 def _fake_daemon(sock: socket.socket) -> None:
     """Mirror of the Rust slab's wire semantics (tensor_slab.rs)."""
-    slab: dict[str, Tensor] = {}
+    slab = _FAKE_SLAB
     try:
         while True:
             cmd, payload = read_message(sock)
@@ -188,6 +192,7 @@ def _motor_target(slab: dict[str, Tensor]) -> bytes:
 @pytest.fixture()
 def daemon_client(tmp_path):
     """A GenesisClient wired to a live fake daemon."""
+    _FAKE_SLAB.clear()
     path = tmp_path / "genesis.sock"
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     server.bind(str(path))
@@ -236,12 +241,8 @@ def test_client_motor_target_decode(daemon_client):
     field = [[0.0] * 8 for _ in range(8)]
     field[2][4] = 1.0
     daemon_client.put_tensor("motor.spatial", Tensor.from_lists(field, DType.F32))
-    daemon_client.put_tensor(
-        "motor.actions", Tensor.from_lists([0.1, 0.9, 0.4], DType.F32)
-    )
-    daemon_client.put_tensor(
-        "motor.action_ids", Tensor.from_lists([1, 3, 5], DType.U8)
-    )
+    daemon_client.put_tensor("motor.actions", Tensor.from_lists([0.1, 0.9, 0.4], DType.F32))
+    daemon_client.put_tensor("motor.action_ids", Tensor.from_lists([1, 3, 5], DType.U8))
     target = daemon_client.get_motor_target()
     assert target.has_action and target.action_id == 3
     assert target.has_cell and (target.x, target.y) == (32, 16)
@@ -251,3 +252,25 @@ def test_client_motor_target_decode(daemon_client):
 def test_motor_target_empty_slab():
     resp = unpack_motor_target(b"\x00\xff" + b"\x00" * 12)
     assert not resp.has_action and not resp.has_cell
+    assert not resp.has_distribution
+
+
+def test_motor_target_decodes_the_distribution_tail():
+    """v2 additive tail: flags bit2 + 16 bytes of field shape."""
+    resp = unpack_motor_target(
+        bytes([0b111])
+        + b"\x02"
+        + struct.pack("<f", 0.9)
+        + struct.pack("<HHf", 12, 34, 0.5)
+        + struct.pack("<ffff", 24.0, 40.0, 6.5, 0.3)
+    )
+    assert resp.has_action and resp.action_id == 2
+    assert (resp.x, resp.y) == (12, 34)
+    assert resp.has_distribution
+    assert resp.centroid_x == pytest.approx(24.0)
+    assert resp.centroid_y == pytest.approx(40.0)
+    assert resp.spread == pytest.approx(6.5)
+    assert resp.entropy == pytest.approx(0.3)
+    # Flagged but truncated tail is a decode error, not silent loss.
+    with pytest.raises(ValueError):
+        unpack_motor_target(bytes([0b100]) + b"\x00" * 13)

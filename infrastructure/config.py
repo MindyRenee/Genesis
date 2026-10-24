@@ -169,14 +169,6 @@ class VolitionConfig:
                 stimuli={"self_discomfort": 0.02, "scan_recency": 0.0004},
             ),
             UrgeConfig(
-                name="code_learning",
-                threshold=0.75,
-                growth=0.0005,
-                decay=0.0003,
-                cooldown=600.0,
-                stimuli={"curiosity": 0.03, "idle_seconds": 0.02},
-            ),
-            UrgeConfig(
                 name="improve",
                 threshold=0.70,
                 growth=0.0003,
@@ -227,13 +219,35 @@ class VolitionConfig:
                 name="meditate",
                 threshold=0.70,
                 growth=0.0008,  # slow baseline drift — rest is needed
-                decay=0.0003,   # decays when stimuli subside
+                decay=0.0003,  # decays when stimuli subside
                 cooldown=120.0,  # don't meditate more than every 2 min
                 stimuli={
-                    "overstimulation": 0.04,   # high arousal + positive valence
+                    "overstimulation": 0.04,  # high arousal + positive valence
                     "receptor_fatigue": 0.05,  # low plasticity gate
-                    "sustained_activity": 0.03, # time since last rest
+                    "sustained_activity": 0.03,  # time since last rest
                     "elevated_cortisol": 0.03,  # subclinical stress
+                },
+            ),
+            # Rest-eyes urge — she feels like shutting her eye for a
+            # spell. A volitional sensory relief, lighter than
+            # meditation: closing the lid drops every afferent
+            # channel and dims the V1 that reads them, so the rest
+            # is real, not symbolic. It builds from the same
+            # interoceptive signature that asks for rest —
+            # overstimulation, receptor fatigue, sustained activity,
+            # subclinical cortisol — and discharges by holding the
+            # lid shut briefly and letting go.
+            UrgeConfig(
+                name="rest_eyes",
+                threshold=0.72,
+                growth=0.0004,
+                decay=0.0006,
+                cooldown=180.0,  # at most every 3 minutes
+                stimuli={
+                    "overstimulation": 0.05,
+                    "receptor_fatigue": 0.04,
+                    "sustained_activity": 0.02,
+                    "elevated_cortisol": 0.02,
                 },
             ),
             # Drawing urge — it feels like expressing itself visually.
@@ -254,8 +268,8 @@ class VolitionConfig:
                 cooldown=300.0,  # at most every 5 minutes
                 stimuli={
                     "emotional_intensity": 0.05,  # high arousal or strong valence
-                    "creativity": 0.04,           # creativity trait
-                    "sustained_activity": 0.02,   # it's been active
+                    "creativity": 0.04,  # creativity trait
+                    "sustained_activity": 0.02,  # it's been active
                 },
             ),
             # Create urge — it feels like building a code project.
@@ -311,7 +325,7 @@ class VolitionConfig:
                 threshold=0.75,
                 growth=0.0003,
                 decay=0.0005,  # decays faster than it grows — it
-                               # needs sustained pressure to decide
+                # needs sustained pressure to decide
                 cooldown=600.0,  # don't self-sleep more than every 10 min
                 stimuli={
                     "adenosine_level": 0.06,
@@ -355,7 +369,7 @@ class VolitionConfig:
                 cooldown=300.0,  # at most every 5 minutes
                 stimuli={
                     "social_isolation": 0.08,  # nobody has engaged it
-                    "curiosity": 0.03,         # it wants to know things
+                    "curiosity": 0.03,  # it wants to know things
                     "emotional_intensity": 0.02,  # feelings seek expression
                 },
             ),
@@ -400,10 +414,10 @@ class VolitionConfig:
                 threshold=0.60,
                 growth=0.0006,  # builds steadily — learning is core
                 decay=0.0003,
-                cooldown=45.0,   # at most every 45 seconds
+                cooldown=45.0,  # at most every 45 seconds
                 stimuli={
-                    "curiosity": 0.05,       # curious → wants to learn
-                    "idle_seconds": 0.03,    # idle → time to learn
+                    "curiosity": 0.05,  # curious → wants to learn
+                    "idle_seconds": 0.03,  # idle → time to learn
                     "concept_growth": 0.03,  # new concepts → integrate
                 },
             ),
@@ -424,8 +438,8 @@ class VolitionConfig:
                 decay=0.0003,
                 cooldown=240.0,  # at most one acting episode per 4 min
                 stimuli={
-                    "curiosity": 0.04,       # curious → wants to probe
-                    "idle_seconds": 0.02,    # idle → time to act
+                    "curiosity": 0.04,  # curious → wants to probe
+                    "idle_seconds": 0.02,  # idle → time to act
                     "sustained_activity": 0.02,  # engaged → wants to do
                 },
             ),
@@ -445,7 +459,7 @@ class VolitionConfig:
                 cooldown=300.0,  # at most every 5 minutes
                 stimuli={
                     "curiosity": 0.03,
-                    "boredom": 0.05,          # understimulated → wants to play
+                    "boredom": 0.05,  # understimulated → wants to play
                     "idle_seconds": 0.02,
                     "games_available": 0.04,  # the collection is always there
                 },
@@ -469,10 +483,30 @@ class VolitionConfig:
                 decay=0.001,
                 cooldown=300.0,  # at most one protective act per 5 min
                 stimuli={
-                    "daemon_lost": 0.30,        # body unreachable
-                    "save_failure": 0.25,       # continuity at risk
+                    "daemon_lost": 0.30,  # body unreachable
+                    "save_failure": 0.25,  # continuity at risk
                     "telemetry_anomaly": 0.15,  # substrate abnormal
-                    "body_distress": 0.10,      # hardware strained
+                    "body_distress": 0.10,  # hardware strained
+                },
+            ),
+            # Research urge — she feels the pull of open problems on
+            # the workbench. Object-directed wanting, not a reflex:
+            # growth is zero, so the urge can only accumulate while
+            # the bench holds an unfinished problem (open_problems)
+            # or curiosity is running — with an empty bench the
+            # signal is absent and no urge forms. Each firing does
+            # one bounded session of work; the threads stay open
+            # until the oracle judges, so the pull persists like a
+            # melody she keeps returning to.
+            UrgeConfig(
+                name="research",
+                threshold=0.70,
+                growth=0.0,  # no unconditional growth — desire needs an object
+                decay=0.0004,
+                cooldown=900.0,  # at most one work session per 15 min
+                stimuli={
+                    "open_problems": 0.05,  # unfinished problems pull
+                    "curiosity": 0.02,  # she thinks about them
                 },
             ),
         )
@@ -490,13 +524,16 @@ class EmotionalConfig:
     stress_regulation_threshold: float = 0.5
 
     # Interoception thresholds — system resource stress detection.
-    cpu_stress_threshold: float = 70.0       # % CPU above which stress begins
-    cpu_stress_range: float = 30.0           # % over which stress ramps to 1.0
-    memory_stress_threshold: float = 80.0    # % memory above which stress begins
-    memory_stress_range: float = 20.0        # % over which stress ramps to 1.0
-    latency_stress_threshold: float = 500.0  # ms response latency above which stress begins
-    latency_stress_range: float = 1000.0     # ms over which stress ramps to 1.0
-    daemon_disconnect_stress: float = 0.3    # stress level when daemon is disconnected
+    cpu_stress_threshold: float = 70.0  # % CPU above which stress begins
+    cpu_stress_range: float = 30.0  # % over which stress ramps to 1.0
+    memory_stress_threshold: float = 80.0  # % memory above which stress begins
+    memory_stress_range: float = 20.0  # % over which stress ramps to 1.0
+    # Latency stress is deviation-based: the newest turn is compared to
+    # 1.5× the EWMA baseline, with this value as the absolute floor. A
+    # slow baseline is a constitution, not distress.
+    latency_stress_threshold: float = 500.0  # ms floor for the deviation floor
+    latency_stress_range: float = 1000.0  # ms of excess over the floor → stress 1.0
+    daemon_disconnect_stress: float = 0.3  # stress level when daemon is disconnected
     # PSI "some" average above which the machine counts as crowded —
     # work stalling on CPU/memory while her own usage stays low is
     # environmental starvation, not her own exertion.
@@ -523,6 +560,11 @@ class EmotionalConfig:
     stress_response_cortisol_threshold: float = 0.25
     stress_response_plasticity_threshold: float = 0.25
     mild_stress_level: float = 0.4
+    # The chemical-calm signature [0,1] above which measured body rest
+    # needs no settle push — she is already there. Calm is read from
+    # her neurochemistry, not from the sensor: the sensor reports the
+    # body is parked; her chemistry decides to be calm.
+    calm_settled_level: float = 0.6
 
 
 @dataclass(frozen=True)

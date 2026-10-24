@@ -180,10 +180,7 @@ def transfer_episode(
         }
         for match in context.skills
     ]
-    foreign = [
-        match for match in context.skills
-        if match.skill.signature.domain != task.domain
-    ]
+    foreign = [match for match in context.skills if match.skill.signature.domain != task.domain]
 
     # Do not substitute the environment's correct_action here. That would
     # turn retrieval into an oracle-assisted transfer result. Action rebinding
@@ -249,20 +246,15 @@ def main() -> None:
             "learned_skills": competence.skill_count,
             "learned_schemas": competence.schema_count,
             "transitions": competence.transition_count,
-            "transfer_survived_serialization": (
-                restored_transfer["transfer_available"]
-            ),
+            "transfer_survived_serialization": (restored_transfer["transfer_available"]),
             "transfer_retrieval_available": transfer["transfer_available"],
-            "restored_transfer_retrieval_available": (
-                restored_transfer["transfer_available"]
-            ),
+            "restored_transfer_retrieval_available": (restored_transfer["transfer_available"]),
         },
         "interpretation": [
             "A positive acquisition result means the competence substrate "
             "learned an externally verified procedure through environment "
             "feedback.",
-            "This does not establish AGI: the environment is deterministic "
-            "and deliberately small.",
+            "This does not establish AGI: the environment is deterministic and deliberately small.",
             "A stronger subsequent probe should vary task rules, hide the "
             "correct action, require exploration, introduce failures, and "
             "measure whether Genesis discovers the transferable abstraction "

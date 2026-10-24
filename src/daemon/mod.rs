@@ -47,14 +47,24 @@
 //! ```
 
 pub mod active_inference;
+pub mod adaptive;
 pub mod association;
 pub mod consolidation;
+/// Session sentinel — clean vs unclean stops, and how long the body
+/// was dark. The mind reads it so interruptions are remembered, not
+/// discovered as seams.
+pub mod continuity;
 pub mod cpufreq;
 pub mod dyadic_model;
 pub mod field_probe;
 pub mod hpa_development;
 pub mod interoception;
 pub mod ipc;
+/// Maxwell's equations applied to the measured carrier current.
+pub mod maxwell;
+/// Optic nerve — the retinal afferent's subcortical branches (SCN,
+/// superior colliculus, pretectum, TRN relay gate).
+pub mod optic_nerve;
 /// RTC wake alarm — scheduling its own return from suspension.
 pub mod rtc_wake;
 /// Named multidimensional tensor slab — shared numeric state between
@@ -63,6 +73,7 @@ pub mod tensor_slab;
 pub mod tick;
 
 pub use active_inference::{ActiveInferenceEngine, InferenceResult, apply_inference_feedback};
+pub use adaptive::AdaptiveGate;
 pub use association::{ASSOCIATION_THRESHOLD, AssociationEngine, AssociationResult, DreamResult};
 pub use consolidation::{ConsolidationEngine, ConsolidationResult};
 pub use cpufreq::{

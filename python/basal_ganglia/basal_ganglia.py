@@ -25,6 +25,7 @@ def _clip(value: float, lower: float, upper: float) -> float:
 @dataclass(frozen=True, slots=True)
 class ActionBid:
     """One candidate action entering the selection circuit."""
+
     action: str
     salience: float
 
@@ -32,6 +33,7 @@ class ActionBid:
 @dataclass(frozen=True, slots=True)
 class SelectionResult:
     """Inspectable state of one basal-ganglia selection computation."""
+
     selected: str | None
     salience: dict[str, float]
     d1_drive: dict[str, float]
@@ -95,10 +97,17 @@ class BasalGanglia:
         base_threshold: float = 0.15,
         max_drive: float = 2.0,
     ) -> None:
-        if not all(math.isfinite(v) for v in (
-            tonic_output, control_gain, dopamine_gain,
-            hyperdirect_gain, base_threshold, max_drive,
-        )):
+        if not all(
+            math.isfinite(v)
+            for v in (
+                tonic_output,
+                control_gain,
+                dopamine_gain,
+                hyperdirect_gain,
+                base_threshold,
+                max_drive,
+            )
+        ):
             raise ValueError("selector parameters must be finite")
         if tonic_output <= 0 or control_gain < 0 or dopamine_gain < 0:
             raise ValueError("invalid selector gain")
@@ -121,9 +130,15 @@ class BasalGanglia:
         """Run one selection computation."""
         if not bids:
             return SelectionResult(
-                selected=None, salience={}, d1_drive={}, d2_drive={},
-                stn_control=0.0, hyperdirect_brake=0.0,
-                output_inhibition={}, disinhibition={}, conflict=0.0,
+                selected=None,
+                salience={},
+                d1_drive={},
+                d2_drive={},
+                stn_control=0.0,
+                hyperdirect_brake=0.0,
+                output_inhibition={},
+                disinhibition={},
+                conflict=0.0,
                 effective_threshold=self.base_threshold,
             )
         if not math.isfinite(dopamine_rpe):
@@ -142,19 +157,13 @@ class BasalGanglia:
         rpe = _clip(dopamine_rpe, -1.0, 1.0)
         d1_drive, d2_drive = self._channel_drives(salience, rpe)
 
-        stn_control = self.control_gain * (
-            sum(d2_drive.values()) / len(d2_drive)
-        )
+        stn_control = self.control_gain * (sum(d2_drive.values()) / len(d2_drive))
 
         ranked = sorted(salience.values(), reverse=True)
         top = ranked[0]
         second = ranked[1] if len(ranked) > 1 else 0.0
         derived_conflict = 0.0 if top <= 0 else _clip(second / top, 0.0, 1.0)
-        effective_conflict = (
-            derived_conflict
-            if conflict is None
-            else _clip(conflict, 0.0, 1.0)
-        )
+        effective_conflict = derived_conflict if conflict is None else _clip(conflict, 0.0, 1.0)
         hyperdirect_brake = self.hyperdirect_gain * effective_conflict
         # Conflict raises the release bar: near-tied bids are exactly the
         # case where the model should hesitate, so the threshold carries
@@ -170,11 +179,7 @@ class BasalGanglia:
             disinhibition,
             key=lambda action: (disinhibition[action], salience[action]),
         )
-        selected = (
-            winner
-            if disinhibition[winner] >= effective_threshold
-            else None
-        )
+        selected = winner if disinhibition[winner] >= effective_threshold else None
 
         return SelectionResult(
             selected=selected,
@@ -235,10 +240,7 @@ class BasalGanglia:
         by the threshold instead.
         """
         output_inhibition = {
-            action: (
-                self.tonic_output + stn_control
-                + hyperdirect_brake - d1_drive[action]
-            )
+            action: (self.tonic_output + stn_control + hyperdirect_brake - d1_drive[action])
             for action in salience
         }
         disinhibition = {

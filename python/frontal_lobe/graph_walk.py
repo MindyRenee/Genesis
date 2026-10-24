@@ -69,6 +69,8 @@ from temporal_lobe.morphology import (
     property_verb_candidates,
 )
 
+from infrastructure.text import is_blank
+
 from .voice import Voice
 
 if TYPE_CHECKING:
@@ -107,45 +109,142 @@ _RELATION_VERB_SEEDS: dict[str, list[str]] = {
 
 # Relations that produce causal/facilitative sentences (preferred by
 # high alertness and positive valence).
-_CAUSAL_RELATIONS = frozenset({
-    "causes", "enables", "leads_to", "creates",
-})
+_CAUSAL_RELATIONS = frozenset(
+    {
+        "causes",
+        "enables",
+        "leads_to",
+        "creates",
+    }
+)
 
 # Relations that produce inhibitory/negative sentences (preferred by
 # negative valence).
-_INHIBITORY_RELATIONS = frozenset({
-    "harms", "prevents", "contradicts", "opposite_of",
-})
+_INHIBITORY_RELATIONS = frozenset(
+    {
+        "harms",
+        "prevents",
+        "contradicts",
+        "opposite_of",
+    }
+)
 
 # Relations that are too generic to produce interesting sentences on
 # their own (low priority for walking, but not excluded).
-_GENERIC_RELATIONS = frozenset({
-    "related_to", "bridges",
-})
+_GENERIC_RELATIONS = frozenset(
+    {
+        "related_to",
+        "bridges",
+    }
+)
 
 # Code-structure relations — not used for language generation.
-_CODE_RELATIONS = frozenset({
-    "calls", "defines",
-})
+_CODE_RELATIONS = frozenset(
+    {
+        "calls",
+        "defines",
+    }
+)
 
 # Function words and relation-verb words that should never be used as
 # seed concepts for graph walks. Using these as seeds produces malformed
 # output like "If I look at myself and and" when "and" is picked as the
 # seed concept from a content string.
-_FUNCTION_WORDS = frozenset({
-    "a", "an", "the", "and", "or", "but", "if", "of", "to", "in",
-    "on", "at", "by", "for", "with", "as", "is", "are", "was",
-    "were", "be", "been", "being", "have", "has", "had", "do",
-    "does", "did", "will", "would", "could", "should", "may",
-    "might", "must", "can", "that", "this", "these", "those",
-    "it", "its", "i", "me", "my", "we", "us", "our", "you",
-    "your", "he", "she", "they", "them", "not", "no", "so",
-    "than", "then", "there", "here", "what", "which", "who",
-    "how", "why", "when", "where", "all", "any", "some", "more",
-    "most", "such", "very", "just", "also", "only", "even",
-    "about", "into", "from", "up", "down", "out", "over",
-    "under", "again", "further", "once",
-})
+_FUNCTION_WORDS = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "and",
+        "or",
+        "but",
+        "if",
+        "of",
+        "to",
+        "in",
+        "on",
+        "at",
+        "by",
+        "for",
+        "with",
+        "as",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "can",
+        "that",
+        "this",
+        "these",
+        "those",
+        "it",
+        "its",
+        "i",
+        "me",
+        "my",
+        "we",
+        "us",
+        "our",
+        "you",
+        "your",
+        "he",
+        "she",
+        "they",
+        "them",
+        "not",
+        "no",
+        "so",
+        "than",
+        "then",
+        "there",
+        "here",
+        "what",
+        "which",
+        "who",
+        "how",
+        "why",
+        "when",
+        "where",
+        "all",
+        "any",
+        "some",
+        "more",
+        "most",
+        "such",
+        "very",
+        "just",
+        "also",
+        "only",
+        "even",
+        "about",
+        "into",
+        "from",
+        "up",
+        "down",
+        "out",
+        "over",
+        "under",
+        "again",
+        "further",
+        "once",
+    }
+)
 
 # Maximum number of clauses per sentence before splitting into a new
 # sentence. Prevents run-on sentences from high-branching concepts.
@@ -162,11 +261,29 @@ _MAX_TOTAL_CLAUSES = 6
 # "possible", "about"), the pronoun goes *before* it: "makes it
 # possible", "brings it about". These are grammatical building blocks,
 # not response content.
-_PREPOSITIONS = frozenset({
-    "to", "from", "of", "on", "in", "with", "by", "for", "at",
-    "toward", "towards", "into", "onto", "upon", "against",
-    "as", "like", "before", "after",
-})
+_PREPOSITIONS = frozenset(
+    {
+        "to",
+        "from",
+        "of",
+        "on",
+        "in",
+        "with",
+        "by",
+        "for",
+        "at",
+        "toward",
+        "towards",
+        "into",
+        "onto",
+        "upon",
+        "against",
+        "as",
+        "like",
+        "before",
+        "after",
+    }
+)
 
 # Complementizers and subordinators that open a clausal object
 # ("makes possible that art exists"). Clausal objects are heavy and
@@ -176,6 +293,7 @@ _CLAUSAL_OBJECT_RE = re.compile(
     r"where|for\s+\w+\s+to)\b",
     re.IGNORECASE,
 )
+
 
 class GraphWalkGenerator:
     """Generate sentences by walking the concept network.
@@ -210,6 +328,7 @@ class GraphWalkGenerator:
         self._embeddings = embeddings
         # Hamiltonian flow generator — primary composition path
         from .flow import FlowGenerator
+
         self._flow = FlowGenerator(network, seed=seed or 42)
         self._flow_built = False
 
@@ -275,12 +394,8 @@ class GraphWalkGenerator:
             return True
         if thought.metadata.get("pragmatic_force"):
             return True
-        if (
-            thought.intent == "self_report"
-            and (
-                thought.metadata.get("self_fragments")
-                or thought.metadata.get("field")
-            )
+        if thought.intent == "self_report" and (
+            thought.metadata.get("self_fragments") or thought.metadata.get("field")
         ):
             return True
         # Vision thoughts carry the retina's structured percept
@@ -290,10 +405,7 @@ class GraphWalkGenerator:
         # word "see", so an unguarded walk seeds on "see" itself and
         # produces associative knowledge statements about seeing
         # instead of a report of what it actually saw.
-        if (
-            thought.metadata.get("vision_scene")
-            or thought.metadata.get("vision_status")
-        ):
+        if thought.metadata.get("vision_scene") or thought.metadata.get("vision_status"):
             return True
         return False
 
@@ -374,7 +486,7 @@ class GraphWalkGenerator:
         max_branch = self._branch_factor(emotion)
 
         topic_set: set[str] = set()
-        for t in (thought.topics or []):
+        for t in thought.topics or []:
             topic_set.add(t.lower().strip())
         topic_set.add(seed_concept.lower())
 
@@ -387,7 +499,7 @@ class GraphWalkGenerator:
             return None
 
         text = self._voice.apply(sentences, emotion, thought.intent)
-        if not text or not text.strip():
+        if is_blank(text):
             return None
 
         return text
@@ -530,8 +642,7 @@ class GraphWalkGenerator:
                 # Take top N by score, respecting branch factor
                 top_edges = scored[:max_branch]
 
-                self._collect_edges(current, top_edges, visited, results,
-                                    next_frontier)
+                self._collect_edges(current, top_edges, visited, results, next_frontier)
 
             frontier = next_frontier
             if not frontier:
@@ -545,7 +656,11 @@ class GraphWalkGenerator:
         # graph edges it was explicitly taught.
         if len(results) < _MAX_TOTAL_CLAUSES:
             self._add_latent_discoveries(
-                seed, results, visited, emotion, topic_set,
+                seed,
+                results,
+                visited,
+                emotion,
+                topic_set,
             )
 
         return results
@@ -596,9 +711,7 @@ class GraphWalkGenerator:
             # the choice for relations whose frames differ by
             # complement type (has_property: "is clear" vs
             # "has fur").
-            verb = self._verb_for_relation(
-                edge.relation, object_id
-            )
+            verb = self._verb_for_relation(edge.relation, object_id)
             if not verb:
                 continue
 
@@ -648,7 +761,9 @@ class GraphWalkGenerator:
 
         try:
             similar = self._embeddings.find_similar_concepts(
-                seed, k=3, threshold=0.55,
+                seed,
+                k=3,
+                threshold=0.55,
             )
         except Exception:  # noqa: BLE001
             return
@@ -795,8 +910,12 @@ class GraphWalkGenerator:
         opening = self._compose_opening(emotion, seed_display, thought)
         is_hedge = self._is_hedge_opening(opening)
         opening_sentence, edges = self._opening_sentence(
-            opening, is_hedge, definition,
-            seed_concept, seed_display, edges,
+            opening,
+            is_hedge,
+            definition,
+            seed_concept,
+            seed_display,
+            edges,
         )
         if opening_sentence is None:
             # No definition and no edges — can't compose
@@ -810,9 +929,7 @@ class GraphWalkGenerator:
         # Other subjects use _display_name which already returns
         # correct casing (lowercase for common nouns, capitalized for
         # proper nouns).
-        seed_pron, seed_plural = person_pronoun(
-            seed_concept, self._network, seed_display
-        )
+        seed_pron, seed_plural = person_pronoun(seed_concept, self._network, seed_display)
         clauses: list[str] = []
         for subject_id, verb, object_id, _weight in edges:
             if subject_id == seed_concept:
@@ -822,9 +939,7 @@ class GraphWalkGenerator:
                 subject = self._display_name(subject_id)
                 subj_plural = is_plural_np(subject)
             obj = self._object_phrase(object_id, seed_concept)
-            verb_obj = agree_verb_phrase(
-                self._verb_object(verb, obj), subj_plural
-            )
+            verb_obj = agree_verb_phrase(self._verb_object(verb, obj), subj_plural)
             clause = f"{subject} {verb_obj}"
             clauses.append(clause)
 
@@ -869,10 +984,7 @@ class GraphWalkGenerator:
             clean_def = self._clean_definition(definition)
             if clean_def:
                 if is_hedge:
-                    return (
-                        f"{opening} {seed_display} "
-                        f"{copula(seed_display)} {clean_def}."
-                    ), edges
+                    return (f"{opening} {seed_display} {copula(seed_display)} {clean_def}."), edges
                 if has_opening:
                     # Prepositional opening → join with main clause via comma.
                     # "When I think about python, python is a programming language."
@@ -886,14 +998,16 @@ class GraphWalkGenerator:
                 # No opening — start directly with the definition.
                 # Capitalize the seed display for sentence start.
                 first = seed_display[0].upper() + seed_display[1:]
-                return (
-                    f"{first} {copula(seed_display)} {clean_def}."
-                ), edges
+                return (f"{first} {copula(seed_display)} {clean_def}."), edges
 
         if edges:
             # No usable definition — start with the first edge
             return self._compose_first_clause(
-                opening, is_hedge, seed_concept, seed_display, edges[0],
+                opening,
+                is_hedge,
+                seed_concept,
+                seed_display,
+                edges[0],
             ), edges[1:]
 
         return None, edges
@@ -923,9 +1037,7 @@ class GraphWalkGenerator:
         else:
             subject = self._display_name(first_src)
         obj = self._object_phrase(first_obj, seed_concept)
-        verb_obj = agree_verb_phrase(
-            self._verb_object(first_verb, obj), is_plural_np(subject)
-        )
+        verb_obj = agree_verb_phrase(self._verb_object(first_verb, obj), is_plural_np(subject))
         if is_hedge:
             return f"{opening} {subject} {verb_obj}."
         if opening:
@@ -959,9 +1071,7 @@ class GraphWalkGenerator:
 
     # Accusative pronouns that trigger pre-particle placement
     # ("makes it possible", "brings it about")
-    _OBJECT_PRONOUN_SET = frozenset(
-        {"it", "her", "him", "them", "me", "us", "you"}
-    )
+    _OBJECT_PRONOUN_SET = frozenset({"it", "her", "him", "them", "me", "us", "you"})
 
     def _verb_object(self, verb: str, obj: str) -> str:
         """Combine a verb with its object, applying pronoun-placement.
@@ -1074,9 +1184,7 @@ class GraphWalkGenerator:
 
     # ─── Helpers ───────────────────────────────────────────────
 
-    def _verb_for_relation(
-        self, relation: RelationType, object_id: str = ""
-    ) -> str | None:
+    def _verb_for_relation(self, relation: RelationType, object_id: str = "") -> str | None:
         """Get a verb phrase for a relation type.
 
         Prefers learned verbs from the concept network, falls back
@@ -1094,9 +1202,7 @@ class GraphWalkGenerator:
 
         if rel_key == "has_property":
             return self._rng.choice(
-                property_verb_candidates(
-                    self._display_name(object_id), learned
-                )
+                property_verb_candidates(self._display_name(object_id), learned)
             )
 
         if learned:
@@ -1219,24 +1325,23 @@ class GraphWalkGenerator:
         if not definition:
             return ""
         defn = definition.strip().strip(" .;:!?")
-        segments = [
-            segment.strip()
-            for segment in defn.split(".")
-            if segment.strip()
-        ]
+        segments = [segment.strip() for segment in defn.split(".") if segment.strip()]
         if len(segments) > 1:
-            complete = [
-                segment for segment in segments
-                if len(segment.split()) >= 3
-            ]
+            complete = [segment for segment in segments if len(segment.split()) >= 3]
             if complete:
                 defn = complete[0]
         # Skip if it looks like a relationship fact
         lower = defn.lower()
-        if any(lower.startswith(p) for p in (
-            "related to", "connects to", "part of",
-            "is a kind of", "is a type of",
-        )):
+        if any(
+            lower.startswith(p)
+            for p in (
+                "related to",
+                "connects to",
+                "part of",
+                "is a kind of",
+                "is a type of",
+            )
+        ):
             return ""
         # Skip if it's too long (likely a paragraph, not a definition)
         if len(defn) > 200:

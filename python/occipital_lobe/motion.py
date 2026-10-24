@@ -28,21 +28,21 @@ import numpy as np
 _FLOW_CELL_PX = 40
 # Minimum temporal change and spatial gradient for a cell to carry
 # flow. Below these the aperture problem makes the estimate worthless.
-_MIN_TEMPORAL_CHANGE = 6.0   # mean |It| in 0-255 units
-_MIN_GRADIENT = 4.0          # mean gradient magnitude
-_MAX_SPEED = 50.0            # px/frame — clips implausible jumps
+_MIN_TEMPORAL_CHANGE = 6.0  # mean |It| in 0-255 units
+_MIN_GRADIENT = 4.0  # mean gradient magnitude
+_MAX_SPEED = 50.0  # px/frame — clips implausible jumps
 
 
 @dataclass(slots=True)
 class MotionCell:
     """Flow estimate for one coarse cell of the visual field."""
 
-    y: float          # cell centre, pixel-space row
-    x: float          # cell centre, pixel-space column
-    u: float          # horizontal velocity (px/frame, +right)
-    v: float          # vertical velocity (px/frame, +down)
-    speed: float      # magnitude
-    confidence: float # how well-conditioned the local estimate was
+    y: float  # cell centre, pixel-space row
+    x: float  # cell centre, pixel-space column
+    u: float  # horizontal velocity (px/frame, +right)
+    v: float  # vertical velocity (px/frame, +down)
+    speed: float  # magnitude
+    confidence: float  # how well-conditioned the local estimate was
 
 
 @dataclass(slots=True)
@@ -50,9 +50,9 @@ class MotionRegion:
     """A contiguous group of cells moving together."""
 
     cells: list[MotionCell] = field(default_factory=list)
-    y: float = 0.0    # centroid, pixel space
+    y: float = 0.0  # centroid, pixel space
     x: float = 0.0
-    u: float = 0.0    # mean velocity
+    u: float = 0.0  # mean velocity
     v: float = 0.0
     speed: float = 0.0
 
@@ -63,7 +63,7 @@ class MotionField:
 
     cells: list[MotionCell] = field(default_factory=list)
     regions: list[MotionRegion] = field(default_factory=list)
-    global_motion: float = 0.0   # fraction of cells moving (ego-motion proxy)
+    global_motion: float = 0.0  # fraction of cells moving (ego-motion proxy)
     dominant_direction: float = 0.0  # radians of the mean flow vector
 
     @property
@@ -114,9 +114,9 @@ class MotionProcessor:
         for cy in range(0, h - cell + 1, cell):
             for cx in range(0, w - cell + 1, cell):
                 mc = self._cell_flow(
-                    gy[cy:cy + cell, cx:cx + cell],
-                    gx[cy:cy + cell, cx:cx + cell],
-                    it[cy:cy + cell, cx:cx + cell],
+                    gy[cy : cy + cell, cx : cx + cell],
+                    gx[cy : cy + cell, cx : cx + cell],
+                    it[cy : cy + cell, cx : cx + cell],
                 )
                 if mc is None:
                     continue
@@ -125,10 +125,16 @@ class MotionProcessor:
                 if speed > _MAX_SPEED:
                     u, v = u * _MAX_SPEED / speed, v * _MAX_SPEED / speed
                     speed = _MAX_SPEED
-                cells.append(MotionCell(
-                    y=cy + cell / 2, x=cx + cell / 2,
-                    u=u, v=v, speed=speed, confidence=conf,
-                ))
+                cells.append(
+                    MotionCell(
+                        y=cy + cell / 2,
+                        x=cx + cell / 2,
+                        u=u,
+                        v=v,
+                        speed=speed,
+                        confidence=conf,
+                    )
+                )
 
         field = MotionField(cells=cells)
         if cells:
@@ -142,7 +148,9 @@ class MotionProcessor:
 
     @staticmethod
     def _cell_flow(
-        gy: np.ndarray, gx: np.ndarray, it: np.ndarray,
+        gy: np.ndarray,
+        gx: np.ndarray,
+        it: np.ndarray,
     ) -> tuple[float, float, float] | None:
         """Least-squares normal flow for one cell (local Lucas-Kanade)."""
         if float(np.abs(it).mean()) < _MIN_TEMPORAL_CHANGE:
@@ -161,9 +169,7 @@ class MotionProcessor:
                 [float((flat_gx * flat_gy).sum()), float((flat_gy * flat_gy).sum())],
             ]
         )
-        b = -np.array(
-            [float((flat_gx * flat_it).sum()), float((flat_gy * flat_it).sum())]
-        )
+        b = -np.array([float((flat_gx * flat_it).sum()), float((flat_gy * flat_it).sum())])
         det = a[0, 0] * a[1, 1] - a[0, 1] * a[1, 0]
         # Confidence from conditioning — a degenerate aperture direction
         # (det → 0) means only the component along the gradient is known.
@@ -179,7 +185,8 @@ class MotionProcessor:
 
     @staticmethod
     def _group_regions(
-        cells: list[MotionCell], cell_px: int,
+        cells: list[MotionCell],
+        cell_px: int,
     ) -> list[MotionRegion]:
         """Group adjacent cells with coherent direction into regions."""
         by_grid: dict[tuple[int, int], MotionCell] = {}
@@ -198,16 +205,19 @@ class MotionProcessor:
                     continue
                 c = by_grid[k]
                 # Same region only if directions roughly agree (< ~60°).
-                if abs(math.atan2(
-                    math.sin(math.atan2(c.v, c.u) - seed_dir),
-                    math.cos(math.atan2(c.v, c.u) - seed_dir),
-                )) > 1.05:
+                if (
+                    abs(
+                        math.atan2(
+                            math.sin(math.atan2(c.v, c.u) - seed_dir),
+                            math.cos(math.atan2(c.v, c.u) - seed_dir),
+                        )
+                    )
+                    > 1.05
+                ):
                     continue
                 seen.add(k)
                 members.append(c)
-                stack.extend(
-                    [(k[0] + dy, k[1] + dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1)]
-                )
+                stack.extend([(k[0] + dy, k[1] + dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1)])
             if members:
                 r = MotionRegion(cells=members)
                 r.y = sum(c.y for c in members) / len(members)

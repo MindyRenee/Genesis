@@ -40,9 +40,9 @@ class MagnitudeJudgment:
 
     a: float
     b: float
-    relation: str           # "less" | "equal" | "greater"
-    confidence: float       # 0..1 — low near the Weber threshold
-    exact: bool             # True when both within subitizing range
+    relation: str  # "less" | "equal" | "greater"
+    confidence: float  # 0..1 — low near the Weber threshold
+    exact: bool  # True when both within subitizing range
 
 
 class NumberSense:

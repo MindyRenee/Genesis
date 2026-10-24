@@ -342,9 +342,7 @@ class ExecutiveFunction:
         # layer owns search and value aggregation; the caller owns the
         # world model.
         for action in possible_actions:
-            plan = self._simulate_action_plan(
-                action, possible_actions, outcome_predictor, goal
-            )
+            plan = self._simulate_action_plan(action, possible_actions, outcome_predictor, goal)
             if plan.expected_value > best_plan.expected_value:
                 best_plan = plan
 
@@ -453,7 +451,8 @@ class ExecutiveFunction:
             current.actionable = current.actionable or actionable
             return current
         intention = ExecutiveIntention(
-            objective=objective.strip(), reason=reason,
+            objective=objective.strip(),
+            reason=reason,
             priority=max(0.0, min(1.0, priority)),
             confidence=max(0.0, min(1.0, confidence)),
             expected_outcome=expected_outcome,
@@ -475,13 +474,11 @@ class ExecutiveFunction:
         as executed merely because it won the global competition.
         """
         actionable = [
-            c for c in candidates
+            c
+            for c in candidates
             if c.actionable
             and c.status == "pending"
-            and (
-                allowed_kinds is None
-                or c.objective.split(":", 1)[0] in allowed_kinds
-            )
+            and (allowed_kinds is None or c.objective.split(":", 1)[0] in allowed_kinds)
         ]
         if not actionable:
             return None
@@ -519,9 +516,7 @@ class ExecutiveFunction:
             error = 0.0 if intention.expected_outcome else 0.25
         else:
             intention.status = (
-                "abandoned"
-                if intention.attempts >= _INTENTION_MAX_ATTEMPTS
-                else "pending"
+                "abandoned" if intention.attempts >= _INTENTION_MAX_ATTEMPTS else "pending"
             )
             error = 1.0
         kind = intention.kind
@@ -547,10 +542,7 @@ class ExecutiveFunction:
         rescheduled — a goal that cannot be achieved is not a goal,
         and endlessly retrying it starves every other intention.
         """
-        if (
-            intention.status == "abandoned"
-            or intention.attempts >= _INTENTION_MAX_ATTEMPTS
-        ):
+        if intention.status == "abandoned" or intention.attempts >= _INTENTION_MAX_ATTEMPTS:
             intention.status = "abandoned"
             note = f"abandoned after {intention.attempts} attempts"
             if reason:
@@ -642,9 +634,7 @@ class ExecutiveFunction:
             if intention.actionable and intention.status in {"pending", "active"}
         )
 
-    def ingest_candidates(
-        self, candidates: list[dict[str, object]]
-    ) -> list[ExecutiveIntention]:
+    def ingest_candidates(self, candidates: list[dict[str, object]]) -> list[ExecutiveIntention]:
         """Convert salient cognitive signals into persistent objectives.
 
         Signal producers provide meaning and salience; the executive owns
@@ -688,11 +678,13 @@ class ExecutiveFunction:
             kind = str(candidate.get("kind", mode_kind.get(mode, "observe"))).strip()
             if kind not in {"learn", "inspect", "explore", "observe", "measure"}:
                 continue
-            actionable = bool(candidate.get(
-                "actionable",
-                kind in {"learn", "inspect", "explore", "observe", "measure"}
-                and mode not in {"interoceptive", "embodiment", "body_deviation", "distress"},
-            ))
+            actionable = bool(
+                candidate.get(
+                    "actionable",
+                    kind in {"learn", "inspect", "explore", "observe", "measure"}
+                    and mode not in {"interoceptive", "embodiment", "body_deviation", "distress"},
+                )
+            )
             objective = f"{kind}:{topic}"
             intention = self.form_intention(
                 objective,
