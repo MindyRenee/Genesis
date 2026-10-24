@@ -534,11 +534,12 @@ class Mind(
         self.brain.frontal.set_problem_intake(
             self.game_play,
             self.world,
-            lambda score, prior_best, solved: self.regulator.respond_to_play(
+            lambda score, prior_best, solved, details=None: self.regulator.respond_to_play(
                 self.feel(),
                 score=score,
                 prior_best=prior_best,
                 solved=solved,
+                details=details,
             ),
         )
 

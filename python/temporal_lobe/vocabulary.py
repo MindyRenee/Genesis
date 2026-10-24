@@ -2605,6 +2605,27 @@ class Vocabulary:
                 "not able to crack it yet",
                 f"still puzzling over it{pct}",
             ]
+        # A held task that's been re-read reports the revision work
+        # — the counterexamples banked and readings tried are real
+        # data, not decoration.
+        try:
+            revisions = int(result.get("revisions") or 0)
+        except (TypeError, ValueError):
+            revisions = 0
+        try:
+            loopholes = int(result.get("open_loopholes") or 0)
+        except (TypeError, ValueError):
+            loopholes = 0
+        if revisions:
+            candidates += [
+                f"re-read it {revisions} ways, still working on it",
+                "tried another reading of it — still not there",
+            ]
+        if loopholes and not revisions:
+            candidates += [
+                f"found {loopholes} cracks in my reading of it",
+                "know where my reading of it breaks — still working",
+            ]
         return self._pick_problem_frame(candidates, emotion)
 
     def _system_result_frame(self, result: dict[str, Any], emotion: EmotionalState) -> str | None:

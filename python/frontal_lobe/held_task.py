@@ -17,6 +17,7 @@ the problem gives way.
 from __future__ import annotations
 
 import json
+import math
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -25,6 +26,10 @@ from typing import Any
 #: Bounded memory — a held task accrues evidence and attempts
 #: without a natural flush, so each ledger keeps only the tail.
 _MAX_LEDGER = 50
+
+#: Value learning rate — how much of each prediction error the
+#: held expectation absorbs per outcome (α in V ← V + α·δ).
+_VALUE_LR = 0.3
 
 #: A held task untouched this long is abandoned state, not a live
 #: problem — it is not reloaded across boots.
@@ -82,6 +87,64 @@ class Loophole:
         )
 
 
+def goal_of(spec: dict[str, Any]) -> dict[str, Any]:
+    """The goal of a task — the end calculation, not the task's name.
+
+    A goal is the state that closes the computation: the 4 in
+    2+2=?. Each family carries its target in different fields —
+    the number the counts must sum to, the continuation the pattern
+    implies, the arrangement the relations require — so this
+    extracts the end-state itself: ∃x closing the spec.
+
+    Nothing here *satisfies* anything — satisfaction is the body's
+    response to the state being reached (the reward signal, not the
+    math object).
+    """
+    family = str(spec.get("family", ""))
+    if family == "quantities":
+        return {"equals": spec.get("target")}
+    if family == "sequence":
+        return {
+            "extends": list(spec.get("pattern") or []),
+            "to": spec.get("length"),
+        }
+    if family == "relations":
+        return {"arrangement": list(spec.get("goals") or [])}
+    if family == "classification":
+        return {
+            "partition": spec.get("predicate"),
+            "items": len(spec.get("items") or []),
+        }
+    if family == "sorter":
+        return {
+            "seating": {
+                "blocks": len(spec.get("blocks") or []),
+                "slots": len(spec.get("slots") or []),
+            }
+        }
+    if family in ("assembly", "grid"):
+        return {"structure": len(spec.get("pieces") or [])}
+    return {"result": True}
+
+
+def goal_text(goal: dict[str, Any]) -> str:
+    """The end state as a reason seed — data for the composer,
+    not a sentence she recites."""
+    if "equals" in goal:
+        return f"reach {goal['equals']}"
+    if "extends" in goal:
+        return "continue the pattern"
+    if "arrangement" in goal:
+        return "the arrangement the relations require"
+    if "partition" in goal:
+        return "the rule that sorts them"
+    if "seating" in goal:
+        return "every block seated"
+    if "structure" in goal:
+        return "the finished structure"
+    return "the answer"
+
+
 @dataclass
 class HeldTask:
     """A task held in mind: working spec plus the memory around it.
@@ -89,6 +152,9 @@ class HeldTask:
     Attributes:
         spec: The current normalized task spec — the reading the
             next attempt will play.
+        goal: The end calculation — the binding that closes the
+            computation (extracted from the spec, refreshed on
+            revision).
         status: "open" while work continues, "solved" once an
             attempt lands it.
         revisions: Every amendment the spec has taken, oldest first.
@@ -108,12 +174,32 @@ class HeldTask:
     loopholes: list[Loophole] = field(default_factory=list)
     attempts: list[dict[str, Any]] = field(default_factory=list)
     cycles: int = 0
+    #: Second-order state — the distribution over readings.
+    #: log-weight per hypothesis (spec name → w); ``_NULL`` is the
+    #: residual "some reading I haven't formed" hypothesis, held at
+    #: weight 0 so failed readings push mass onto it. The posterior
+    #: over readings is softmax(w); confidence is its top mass —
+    #: metacognition as a function, not a stored number.
+    beliefs: dict[str, float] = field(default_factory=dict)
+    goal: dict[str, Any] = field(default_factory=dict)
+    #: The held prediction — V(s), the expected value of the current
+    #: reading. Not a number recomputed on demand: a maintained
+    #: memory representation (OFC/ventral striatum carry expected
+    #: value) that the prediction error itself rewrites —
+    #: V ← V + α·δ, so the same δ the body broadcasts is what
+    #: updates it. ``last_delta`` is the most recent error signal;
+    #: transient, but carried here so the felt response reads the
+    #: same δ the memory learned from.
+    expected_value: float = 0.5
+    last_delta: float = 0.0
 
     def __post_init__(self) -> None:
         if not self.created_ms:
             self.created_ms = int(time.time() * 1000)
         if not self.updated_ms:
             self.updated_ms = self.created_ms
+        if not self.goal:
+            self.goal = goal_of(self.spec)
 
     # ─── Mutation ────────────────────────────────────────────────
 
@@ -132,6 +218,7 @@ class HeldTask:
         self.revisions = self.revisions[-_MAX_LEDGER:]
         old_family = self.spec.get("family", "")
         self.spec = spec
+        self.goal = goal_of(spec)
         self.cycles = 0
         # A revision reopens a solved task only when the shape moved
         # — the old answer belongs to the old problem.
@@ -163,27 +250,104 @@ class HeldTask:
         """Loopholes no revision has answered yet."""
         return [lh for lh in self.loopholes if not lh.addressed]
 
+    def distance(self) -> float:
+        """Distance to the goal — the means-ends difference.
+
+        The best score across attempts is how far the closest reading
+        got toward the end calculation; the distance is what remains:
+        1.0 untouched, 0.0 reached.
+        """
+        if self.status == "solved":
+            return 0.0
+        if not self.attempts:
+            return 1.0
+        return max(0.0, 1.0 - max(e["score"] for e in self.attempts))
+
+    # ─── Beliefs — the second-order function ─────────────────────
+
+    _NULL = "__unread__"
+
+    def learn_reading(self, name: str) -> None:
+        """Register a hypothesis — a candidate reading of the task.
+
+        Every reading enters at the null prior (weight 0); attempts
+        move the weights, never the list order.
+        """
+        self.beliefs.setdefault(name, 0.0)
+        self.beliefs.setdefault(self._NULL, 0.0)
+
+    def posterior(self) -> dict[str, float]:
+        """softmax over log-weights — the distribution over readings."""
+        if not self.beliefs:
+            return {}
+        w_max = max(self.beliefs.values())
+        exps = {n: math.exp(w - w_max) for n, w in self.beliefs.items()}
+        total = sum(exps.values()) or 1.0
+        return {n: v / total for n, v in exps.items()}
+
+    def confidence(self, name: str | None = None) -> float:
+        """Posterior mass on a reading — how sure she is *of it*.
+
+        ``name`` defaults to the current spec's: "how sure am I that
+        this is the right way to read the task" — a computed
+        quantity, not a dial.
+        """
+        post = self.posterior()
+        if not post:
+            return 0.5
+        key = name or str(self.spec.get("name", ""))
+        return post.get(key, 0.0)
+
+    def top_reading(self) -> tuple[str, float]:
+        """The most probable hypothesis and its mass."""
+        post = self.posterior()
+        if not post:
+            return "", 0.0
+        top = max(post.items(), key=lambda kv: kv[1])
+        return top
+
     def record_attempt(self, attempt: Any) -> None:
-        """Fold a play outcome into the ledgers.
+        """Fold a play outcome into the ledgers and the beliefs.
 
         The attempt is evidence *and* history: the outcome lands in
         the attempts ledger, a solved attempt flips the task status,
         and an unsolved one is logged as a loophole on the current
         reading — never as a verdict that the task is impossible.
+        The reading's log-weight takes the update: solved is
+        absorbing certainty, unsolved adds ln(score) of negative
+        evidence — Bayesian in spirit, bounded in form.
         """
-        entry = {
+        entry: dict[str, Any] = {
             "ms": int(time.time() * 1000),
             "solved": bool(getattr(attempt, "solved", False)),
             "score": float(getattr(attempt, "score", 0.0) or 0.0),
+        }
+        # δ = r − V(s) is computed here, where V lives: the
+        # outcome arrives, is compared against the held
+        # prediction, and the error signal rewrites the prediction
+        # itself — V ← V + α·δ (TD learning; the phasic dopamine
+        # signal IS the teaching signal). The same δ is what the
+        # body broadcasts.
+        r = 1.0 if entry["solved"] else float(entry["score"])
+        self.last_delta = r - self.expected_value
+        self.expected_value += _VALUE_LR * self.last_delta
+        entry.update({
             "rule": str(getattr(attempt, "rule", "") or ""),
             "failure": str(getattr(attempt, "failure", "") or ""),
             "total_attempts": int(getattr(attempt, "total_attempts", 0) or 0),
-        }
+            "name": str(getattr(attempt, "task", "") or self.spec.get("name", "")),
+        })
         self.attempts.append(entry)
         self.attempts = self.attempts[-_MAX_LEDGER:]
+        name: str = entry["name"] or str(self.spec.get("name", ""))
+        self.beliefs.setdefault(name, 0.0)
+        self.beliefs.setdefault(self._NULL, 0.0)
         if entry["solved"]:
             self.status = "solved"
+            # Absorbing certainty — the oracle verified this reading.
+            self.beliefs[name] = 10.0
         else:
+            self.beliefs[name] += math.log(max(float(entry["score"]), 0.05))
             self.add_loopholes(
                 [
                     Loophole(
@@ -207,6 +371,9 @@ class HeldTask:
             "attempts": len(self.attempts),
             "cycles": self.cycles,
             "open_loopholes": len(self.open_loopholes()),
+            "confidence": round(self.confidence(), 3),
+            "goal": self.goal,
+            "distance": round(self.distance(), 3),
             "age_s": max(0, int(time.time() * 1000) - self.created_ms) // 1000,
         }
 
@@ -221,6 +388,10 @@ class HeldTask:
             "loopholes": [lh.to_dict() for lh in self.loopholes],
             "attempts": self.attempts,
             "cycles": self.cycles,
+            "beliefs": dict(self.beliefs),
+            "goal": self.goal,
+            "expected_value": self.expected_value,
+            "last_delta": self.last_delta,
         }
 
     @classmethod
@@ -238,6 +409,10 @@ class HeldTask:
             loopholes=[Loophole.from_dict(lh) for lh in data.get("loopholes", [])],
             attempts=list(data.get("attempts", []))[-_MAX_LEDGER:],
             cycles=int(data.get("cycles", 0)),
+            beliefs={str(k): float(v) for k, v in dict(data.get("beliefs", {})).items()},
+            goal=dict(data.get("goal", {})),
+            expected_value=float(data.get("expected_value", 0.5)),
+            last_delta=float(data.get("last_delta", 0.0)),
         )
         return task
 
@@ -247,8 +422,10 @@ class HeldTask:
         """Persist the held task — the memory of held information."""
         try:
             path.write_text(json.dumps(self.to_dict(), indent=2) + "\n")
-        except OSError:
-            pass
+        except OSError as e:
+            from genesis_client.swallow import note_swallowed
+
+            note_swallowed("frontal_lobe.held_task.save", e)
 
     @classmethod
     def load(cls, path: Path) -> HeldTask | None:

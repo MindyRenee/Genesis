@@ -1202,6 +1202,26 @@ _EXTRACTORS = (
 )
 
 
+def candidate_specs(result: ComprehensionResult) -> list[dict]:
+    """Every spec the extractors can build from this comprehension.
+
+    ``interpret_problem`` commits to the first hit; a held task keeps
+    all of them so a later utterance can revise toward a different
+    interpretation rather than only refining the first parse.
+    """
+    if not result.propositions or len(result.raw_text) > 4000:
+        return []
+    specs = []
+    for extractor in _EXTRACTORS:
+        try:
+            spec = extractor(result)
+        except Exception:  # noqa: BLE001 — intake never crashes think()
+            spec = None
+        if spec is not None:
+            specs.append(spec)
+    return specs
+
+
 def interpret_problem(result: ComprehensionResult) -> dict | None:
     """Interpret a comprehension result as a task spec, or None.
 
@@ -1211,16 +1231,8 @@ def interpret_problem(result: ComprehensionResult) -> dict | None:
     verifiable task; ``normalize_offered`` validates solvability and
     consistency before it becomes one.
     """
-    if not result.propositions or len(result.raw_text) > 4000:
-        return None
-    for extractor in _EXTRACTORS:
-        try:
-            spec = extractor(result)
-        except Exception:  # noqa: BLE001 — intake never crashes think()
-            spec = None
-        if spec is not None:
-            return spec
-    return None
+    specs = candidate_specs(result)
+    return specs[0] if specs else None
 
 
 def compile_problem(

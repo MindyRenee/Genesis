@@ -2613,10 +2613,14 @@ class EmotionalRegulator:
         """Consciously respond to the outcome of playing a game.
 
         This is her affective loop on play — the attempt actually
-        changes how she feels, not just what she records. Grounded
-        in reward prediction error (Schultz, 1998): dopamine bursts
-        on better-than-expected outcomes and dips on worse-than-
-        expected ones, proportional to the error.
+        changes how she feels, not just what she records. The drive
+        is one computation, reward prediction error δ = r − V(s)
+        (Schultz, 1998): V is her own expectation — the held-task
+        posterior over her reading when she's tracking a problem,
+        else her best score so far. Dopamine scales with positive
+        δ and dips with negative δ; co-release (serotonin,
+        endorphin, norepinephrine, acetylcholine) follows the same
+        signal modulated by the episode's state.
 
         ``details`` carries the episode's texture — deaths, narrow
         escapes, scores — because *how* a game went changes what
@@ -2645,31 +2649,48 @@ class EmotionalRegulator:
         deaths = int(details.get("deaths", 0) or 0)
         escapes = int(details.get("escapes", 0) or 0)
         dampening = self._compute_emotional_dampening(emotion)
+
+        # δ = r − V(s) — the reward-prediction error is the drive
+        # (Schultz 1998). When she is tracking a problem, δ arrives
+        # already computed by the held-task value memory (the same
+        # δ that rewrote V); otherwise it forms here against her
+        # best score so far.
+        r = 1.0 if solved else float(score)
+        if details.get("delta") is not None:
+            delta = float(details["delta"])
+        else:
+            delta = r - float(prior_best)
+        delta = max(-1.0, min(1.0, delta))
+
+        # Each neuromodulator takes its own projection of the same
+        # episode. Dopamine carries the signed error itself —
+        # predicted reward barely moves it, surprise bursts, a
+        # miss dips by how wrong she was. Norepinephrine tracks
+        # |δ| plus accumulated blockage — arousal and the sting.
+        # Serotonin tracks attainment r, not error — satisfaction
+        # exists even when the win was expected. Endorphin is
+        # relief, which requires threat survived. Acetylcholine
+        # tracks |δ| — encode most what was least predicted.
+        self._impulse(CHEM_DOPAMINE, 0.030 * dampening * delta)
+        self._impulse(
+            CHEM_NOREPINEPHRINE,
+            0.012 * dampening * (abs(delta) + 0.5 * min(deaths, 4) / 4.0),
+        )
+        self._impulse(CHEM_SEROTONIN, 0.018 * dampening * r)
+        self._impulse(
+            CHEM_ENDORPHIN,
+            0.014 * dampening * r * (1.0 if escapes else 0.5),
+        )
+        self._impulse(CHEM_ACETYLCHOLINE, 0.012 * dampening * abs(delta))
+
+        # The label classifies the episode for her language — the
+        # felt thing is the impulse vector above, not this name.
         if solved:
-            reward = 0.030 * dampening
-            self._impulse(CHEM_DOPAMINE, reward)
-            self._impulse(CHEM_SEROTONIN, reward * 0.6)
-            self._impulse(CHEM_ENDORPHIN, reward * (0.7 if escapes else 0.4))
-            self._impulse(CHEM_ACETYLCHOLINE, reward * 0.7)
             return "exhilarated" if escapes else "satisfied"
         if score > prior_best:
-            progress = 0.015 * dampening
-            self._impulse(CHEM_DOPAMINE, progress)
-            self._impulse(CHEM_NOREPINEPHRINE, progress * 0.5)
-            self._impulse(CHEM_ACETYLCHOLINE, progress * 0.7)
             return "encouraged"
-        frustration = 0.010 * dampening
         if deaths >= 2:
-            # Blocked by the game again and again — the deeper dip
-            # is frustration, the extra NE the sting that keeps it
-            # from going numb.
-            self._impulse(CHEM_DOPAMINE, -frustration)
-            self._impulse(CHEM_NOREPINEPHRINE, frustration * 1.5)
-            self._impulse(CHEM_ACETYLCHOLINE, frustration * 0.8)
             return "frustrated"
-        self._impulse(CHEM_DOPAMINE, -frustration * 0.6)
-        self._impulse(CHEM_NOREPINEPHRINE, frustration)
-        self._impulse(CHEM_ACETYLCHOLINE, frustration * 0.8)
         return "determined"
 
     def _impulse(self, chem: int, amount: float) -> None:

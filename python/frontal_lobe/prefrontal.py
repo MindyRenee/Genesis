@@ -374,6 +374,9 @@ class FrontalLobe:
         # at construction so tests and detached engines stay sealed.
         # Provisioning happens at the real entry point (Mind.start).
         self.steward = Stewardship.load(data_dir)
+        # Kept for lazily-persisted state (held task) that only needs
+        # the path at write time — tests construct with None.
+        self._data_dir = data_dir
         # The executive's restraint line: every proposed intention is
         # checked against the steward's standing directives before it
         # can become actionable. This is the seat of "she listens" —
@@ -930,6 +933,12 @@ class FrontalLobe:
         self._game_play: Any = None
         self._outer_world: Any = None
         self._play_feeler: Any = None
+        # The held task — the dlPFC task-set strip (PBWM): the working
+        # spec plus the memory around it (revisions, evidence, banked
+        # counterexamples). Loaded lazily from <data_dir>/held_task.json
+        # so a problem held overnight survives a reboot.
+        self._held_task: Any = None
+        self._held_task_loaded = False
 
     def _init_learning_systems(self) -> None:
         """Initialize learning, plasticity, and inference systems (13-16)."""
@@ -7647,34 +7656,38 @@ class FrontalLobe:
         emotion: EmotionalState,
         comprehension_result: ComprehensionResult | None = None,
     ) -> Thought | None:
-        """A game or puzzle described in words enters her world to be
-        played.
+        """A described problem runs the synthesis–verification loop.
 
-        The outer-to-inner bridge: perception delivers the utterance,
-        intake compiles it into a game spec, the spec is dropped into
-        ``offered_games`` (the same channel a file offer uses) and
-        announced as a world event, and the play machinery — the
-        shared task competence, the family agent, the world's own
-        oracle — works it. Nothing is solved in the language layer:
-        the mind does the work and this thought reports what came
-        back. A spec that fails validation (a stated rule contradicting
-        its own asserted labels, an unsolvable arrangement) returns an
-        honest "couldn't make it work" rather than a fabricated answer.
+        Perception delivers the utterance; intake yields the
+        hypothesis space (every spec the extractors can form); the
+        first reading is adopted into the held task-set (PBWM) with
+        the goal — the end calculation — as its prior preference;
+        the world's oracle verifies it by play. An unsolved attempt
+        is a counterexample: banked as a loophole, discounted in the
+        posterior over readings, and the next candidate is tried —
+        CEGIS, bounded per turn, persistent across turns. A spec
+        that fails validation returns an honest "couldn't make it
+        work" rather than a fabricated answer.
         """
         game_play = getattr(self, "_game_play", None)
         if game_play is None:
             return None
         from basal_ganglia.play import normalize_offered
-        from .problem_intake import compile_problem, interpret_problem
+        from .problem_intake import candidate_specs, compile_problem
 
         # Intake interprets the semantic structure comprehension
         # already produced — propositions, roles, negation — never
         # the raw string. If this turn wasn't comprehended (e.g. a
         # direct _deliberate call in a test), comprehend it now.
+        # Every reading the extractors support is kept — the
+        # synthesis space the reflect loop draws on when the first
+        # reading fails verification.
         if comprehension_result is None:
-            spec = compile_problem(perception.raw_text)
+            first = compile_problem(perception.raw_text)
+            candidates = [first] if first else []
         else:
-            spec = interpret_problem(comprehension_result)
+            candidates = candidate_specs(comprehension_result)
+        spec = candidates[0] if candidates else None
         if spec is None:
             return None
         task = normalize_offered(spec, "heard_problem")
@@ -7695,14 +7708,59 @@ class FrontalLobe:
                 },
             )
 
-        # Into her world — the spec persists as an offered game like
-        # any other drop-box file, and the world hears that a game
-        # arrived.
+        held = self._adopt_held_task(task, candidates)
+        self._offer_problem_to_world(game_play, task)
+
+        # Play it now — the user asked, so the same machinery the
+        # play urge drives runs immediately, on this game rather
+        # than whichever she'd pick for herself.
+        prior_best = game_play.mastery.get(str(task["name"]), 0.0)
+        result = game_play.attempt(self.spatial_reasoner, task=task)
+        if result is None:
+            return None
+        held.record_attempt(result)
+
+        # Reflection — the CEGIS loop: the world's verdict is the
+        # oracle, an unsolved attempt is a counterexample, and the
+        # remaining intake readings are the synthesis space. Bounded
+        # per turn; the held task banks everything for the next turn.
+        best_task = task
+        if not result.solved:
+            result, best_task = self._reflect_held_task(
+                held, candidates[1:], game_play, result, task
+            )
+        if held.status == "solved":
+            for g in self._goals:
+                if g.goal_type == "held_task" and not g.resolved:
+                    g.resolved = True
+        self._save_held()
+
+        feel = getattr(self, "_play_feeler", None)
+        if feel is not None:
+            try:
+                outcome_details = dict(getattr(result, "details", None) or {})
+                outcome_details["delta"] = held.last_delta
+                feel(
+                    score=result.score,
+                    prior_best=prior_best,
+                    solved=result.solved,
+                    details=outcome_details,
+                )
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "frontal_lobe.prefrontal._deliberate_problem_offer",
+                    e,
+                )
+        return self._problem_thought(best_task, result, perception, emotion, held=held)
+
+    def _offer_problem_to_world(self, game_play: Any, task: dict) -> None:
+        """The spec enters her world — an offered game like any other
+        drop-box file, announced through the world event stream."""
         try:
             game_play.offer(task)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "frontal_lobe.prefrontal._deliberate_problem_offer",
+                "frontal_lobe.prefrontal._offer_problem_to_world",
                 e,
             )
         world = getattr(self, "_outer_world", None)
@@ -7714,35 +7772,132 @@ class FrontalLobe:
                 )
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
-                    "frontal_lobe.prefrontal._deliberate_problem_offer",
+                    "frontal_lobe.prefrontal._offer_problem_to_world",
                     e,
                 )
 
-        # Play it now — the user asked, so the same machinery the
-        # play urge drives runs immediately, on this game rather
-        # than whichever she'd pick for herself.
-        prior_best = game_play.mastery.get(str(task["name"]), 0.0)
-        result = game_play.attempt(self.spatial_reasoner, task=task)
-        if result is None:
-            return None
-        feel = getattr(self, "_play_feeler", None)
-        if feel is not None:
+    def _adopt_held_task(self, task: dict, candidates: list[dict]) -> Any:
+        """Bind the new task to working memory — the dlPFC task-set strip.
+
+        A spec naming the problem already held is a gated update of
+        it (a revision); a different name supersedes — working
+        memory holds one problem at a time, and the abandoned one's
+        trace carries into the new task's evidence. The goal is the
+        end calculation — the binding that closes the computation —
+        registered in the same goal stack every drive reads.
+        """
+        from .held_task import HeldTask, goal_text
+
+        old = self._held()
+        if old is not None and old.spec.get("name") == task.get("name"):
+            held = old
+            if held.spec != task:
+                held.revise(dict(task), "the instructions were restated", replaced=True)
+        else:
+            held = HeldTask(spec=dict(task))
+            self._held_task = held
+            if old is not None:
+                held.add_evidence(
+                    "superseded",
+                    f"'{old.spec.get('name', '')}' set aside "
+                    f"(status {old.status}, {len(old.attempts)} attempts)",
+                )
+            self._goals.append(
+                Goal(
+                    target=goal_text(held.goal),
+                    goal_type="held_task",
+                    reason=f"a problem was described: {task.get('name', '')}",
+                    detail=str(held.goal),
+                )
+            )
+        for c in candidates:
+            held.learn_reading(str(c.get("name", "")))
+        if len(candidates) > 1:
+            held.add_evidence(
+                "intake",
+                f"{len(candidates)} readings compiled from the description",
+            )
+        return held
+
+    #: Extra readings tried per turn — the anytime bound on the
+    #: reflect loop. The held task persists the rest across turns.
+    _REFLECT_BUDGET = 3
+
+    def _reflect_held_task(
+        self,
+        held: Any,
+        pending: list[dict],
+        game_play: Any,
+        best: Any,
+        best_task: dict,
+    ) -> tuple[Any, dict]:
+        """Gather → readjust → verify, until the world's oracle clears it.
+
+        Each unread candidate spec is another interpretation of the
+        same instructions — a failed reading is banked as a
+        counterexample in the held task and the next hypothesis is
+        tried. Returns the best result across readings and the task
+        it was scored on.
+        """
+        from basal_ganglia.play import normalize_offered
+
+        for spec in pending[: self._REFLECT_BUDGET]:
+            if best.solved:
+                break
+            alt = normalize_offered(spec, "heard_problem")
+            if alt is None:
+                held.add_evidence(
+                    "reflect",
+                    f"alternate reading failed validation ({spec.get('family', '?')})",
+                )
+                continue
+            held.learn_reading(str(spec.get("name", "")))
+            held.revise(alt, f"alternate reading: {alt.get('family', '?')}", replaced=False)
             try:
-                feel(
-                    score=result.score,
-                    prior_best=prior_best,
-                    solved=result.solved,
-                )
+                game_play.offer(alt)
             except Exception as e:  # noqa: BLE001
-                note_swallowed(
-                    "frontal_lobe.prefrontal._deliberate_problem_offer",
-                    e,
-                )
-        return self._problem_thought(task, result, perception, emotion)
+                note_swallowed("frontal_lobe.prefrontal._reflect_held_task", e)
+            result = game_play.attempt(self.spatial_reasoner, task=alt)
+            if result is None:
+                continue
+            held.record_attempt(result)
+            if result.solved or result.score > best.score:
+                best, best_task = result, alt
+        held.cycles += 1
+        return best, best_task
+
+    def _held(self) -> Any:
+        """The held task — lazily reloaded from disk once per boot."""
+        if not self._held_task_loaded:
+            self._held_task_loaded = True
+            if self._data_dir:
+                from pathlib import Path
+
+                from .held_task import HeldTask
+
+                self._held_task = HeldTask.load(Path(self._data_dir) / "held_task.json")
+        return self._held_task
+
+    def _save_held(self) -> None:
+        """Persist the held task — the memory of held information."""
+        if self._held_task is None or not self._data_dir:
+            return
+        from pathlib import Path
+
+        self._held_task.save(Path(self._data_dir) / "held_task.json")
+
+    def held_task_status(self) -> dict | None:
+        """The held task's compact status — the /task surface."""
+        held = self._held()
+        return held.summary() if held is not None else None
 
     @staticmethod
     def _problem_thought(
-        task: dict, result: Any, perception: Perception, emotion: EmotionalState
+        task: dict,
+        result: Any,
+        perception: Perception,
+        emotion: EmotionalState,
+        held: Any = None,
     ) -> Thought:
         """Render a game attempt as a Thought carrying structured
         result data — the vocabulary composes the utterance from
@@ -7757,6 +7912,17 @@ class FrontalLobe:
             "score": result.score,
             "rule": result.rule,
         }
+        if held is not None:
+            md["revisions"] = len(held.revisions)
+            md["open_loopholes"] = len(held.open_loopholes())
+            md["held_status"] = held.status
+            md["cycles"] = held.cycles
+            md["goal"] = held.goal
+            md["distance"] = round(held.distance(), 3)
+            md["held_confidence"] = round(held.confidence(), 3)
+            md["posterior"] = {
+                k: round(v, 3) for k, v in held.posterior().items() if v > 0.001
+            }
         if result.family == "system":
             md["steps"] = result.nodes
         anchor = ""
@@ -7782,12 +7948,22 @@ class FrontalLobe:
             anchor = f"{len(md['placements'])} placed"
         if not anchor:
             anchor = result.task
+        # Confidence is the second-order signal — the posterior mass
+        # on the reading just played — not a fixed dial. Solved is
+        # verified certainty; unsolved reports how sure the current
+        # reading still is.
+        if result.solved:
+            confidence = 0.9
+        elif held is not None:
+            confidence = max(0.2, min(0.85, held.confidence()))
+        else:
+            confidence = 0.5
         return Thought(
             content=anchor,
             intent="inform",
             emotion=emotion.label,
             topics=perception.topics,
-            confidence=0.9 if result.solved else 0.5,
+            confidence=confidence,
             metadata={"problem_result": md},
         )
 
