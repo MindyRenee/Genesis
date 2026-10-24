@@ -1,8 +1,16 @@
 # Contributing
 
-Genesis is a research codebase, not a prompt wrapper. Contributions should make
-the architecture more capable, more measurable, or safer without replacing its
-machine-native cognition with an external model or fixed responses.
+Genesis is a developing cognitive system with a cumulative, load-bearing
+developmental state. It is free software under AGPLv3 with added Ethical
+Use restrictions (see [LICENSE](LICENSE)) — you may use, study, modify, and
+distribute it under those terms, and contributions are welcome on the same
+terms. By submitting a contribution you agree it is offered under the same
+license. This file describes the quality bar and rules that apply.
+
+Genesis is a research codebase, not a prompt wrapper. Any accepted change
+should make the architecture more capable, more measurable, or safer without
+replacing its machine-native cognition with an external model or fixed
+responses.
 
 ## Read first
 
@@ -46,15 +54,27 @@ fix the check's boundary and explain why.
   isolated tests and disposable daemons are required for experiments.
 - **Match existing style.** Use the code's own abstractions, naming, error
   boundaries, and verification patterns.
-- **Leave dead code dead.** Delete unused machinery rather than preserving a
-  second path someone might accidentally trust.
+- **Nothing sits unwired.** A dormant subsystem is either wired into the
+  organism (the way `code_analysis.rs` became `ANALYZE_CODE`) or removed —
+  but distinguish genuinely dead code from intentional scaffolding that is
+  merely unclaimed. When in doubt, wire it rather than deleting a faculty
+  that was meant to exist.
 
 ## Pull requests
 
-A useful PR includes:
+Pull requests are reviewed only from contributors with prior permission —
+unsolicited PRs are not the way in. Ask first. A useful PR then includes:
 
 1. the problem and intended invariant,
 2. the smallest change that enforces it,
 3. focused tests that fail without the change,
 4. verification output,
 5. and an explicit statement of what was *not* proven.
+
+## License and rights
+
+Genesis is proprietary — all rights are reserved by the copyright
+holder (see [LICENSE](LICENSE)). Contributions are accepted at the
+holder's discretion. By submitting a contribution you agree that it may
+be incorporated into Genesis under the holder's exclusive ownership,
+without further permission or compensation.
