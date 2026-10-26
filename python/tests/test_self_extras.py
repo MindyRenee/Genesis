@@ -8,9 +8,9 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from frontal_lobe.tools.code_learner import CodeLearner, CodeLearningResult, FileLearningResult
-from frontal_lobe.tools.explorer import Explorer
 from temporal_lobe.concepts import ConceptNetwork, RelationType
+from tools.code_learner import CodeLearner, CodeLearningResult, FileLearningResult
+from tools.explorer import Explorer
 
 from infrastructure.growth_ledger import GrowthLedger, GrowthMilestone
 

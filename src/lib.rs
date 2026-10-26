@@ -26,6 +26,13 @@ pub mod sleep;
 pub mod thalamus;
 pub mod tools;
 
+// ─── The spine ───────────────────────────────────────────────────
+// The map that holds the layout together — every region and the
+// mind-side package it projects to. The mind declares the same
+// table back (python/topology.py); the two halves join over the
+// region names.
+pub mod topology;
+
 // ─── Implementation ──────────────────────────────────────────────
 pub mod cognition;
 pub mod daemon;

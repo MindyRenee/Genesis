@@ -1,6 +1,6 @@
 """ARC web adapter tests — the public-page substrate boundary.
 
-No browser, no network: ``parietal_lobe.arc_web._Browser`` is replaced with a
+No browser, no network: ``worlds.arc_web._Browser`` is replaced with a
 fake that speaks the same surface — ``bodies`` of FrameDataRaw-shaped
 dicts, plus ``call``/``js``/``key``/``navigate``/``reconnect``/
 ``close`` — so the run loop is exercised exactly. What these tests
@@ -15,10 +15,11 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from parietal_lobe.arc_web import ArcWebPractice
+from worlds.arc_web import ArcWebPractice
 
 
 def _frame(actions=(1, 2, 3, 5), state="NOT_FINISHED", levels=0, win=2):
+    """A FrameDataRaw-shaped dict — the page's API response body."""
     grid = [[(x + y) % 16 for x in range(8)] for y in range(8)]
     return {
         "frame": [grid],
@@ -38,6 +39,7 @@ class _FakeBrowser:
     """
 
     def __init__(self, frames, headless: bool = True):
+        """Queue the scripted frames the page will publish."""
         self._frames = list(frames)
         self.bodies: dict[str, dict] = {}
         self.responses: dict[str, str] = {}
@@ -46,10 +48,13 @@ class _FakeBrowser:
         self.js_calls: list[str] = []
 
     def _publish(self) -> None:
+        """One input → one response body: pop the next queued frame
+        into ``bodies`` the way a real ``/api/cmd`` reply lands."""
         if self._frames:
             self.bodies[f"r{len(self.bodies)}"] = self._frames.pop(0)
 
     def call(self, method, **params):
+        """Record the CDP call; real input events publish a frame."""
         self.calls.append(method)
         if (method == "Input.dispatchKeyEvent" and params.get("type") == "rawKeyDown") or (
             method == "Input.dispatchMouseEvent" and params.get("type") == "mousePressed"
@@ -58,6 +63,8 @@ class _FakeBrowser:
         return {}
 
     def js(self, expression):
+        """Fake Runtime.evaluate: a fixed canvas rect, a click that
+        publishes a frame, True otherwise."""
         self.js_calls.append(expression)
         if "getBoundingClientRect" in expression:
             return json.dumps({"x": 0, "y": 0, "width": 640, "height": 640})
@@ -67,17 +74,22 @@ class _FakeBrowser:
         return True
 
     def navigate(self, url):
+        """No real navigation needed — the frame queue is the world."""
         pass
 
     def key(self, name, code):
+        """Record the key and route it through ``call`` like the real
+        shim — key down and key up."""
         self.keys.append(name)
         for kind in ("rawKeyDown", "keyUp"):
             self.call("Input.dispatchKeyEvent", type=kind, key=name, code=name)
 
     def reconnect(self):
+        """No-op — the fake transport never actually dies."""
         pass
 
     def close(self):
+        """No-op."""
         pass
 
 
@@ -85,6 +97,7 @@ class _StubMind:
     """The boundary the web adapter consumes."""
 
     def __init__(self, *, gaming=True, ready=True, descriptors=None):
+        """A scripted mind: cycling descriptors, fixed readiness."""
         self.is_gaming = gaming
         self._ready = ready
         self._descriptors = descriptors or [{"action": 1}]
@@ -93,12 +106,15 @@ class _StubMind:
         self.last_world_decision = {"action": "ACTION1", "source": "plan"}
 
     def readiness(self, *, require_body=True):
+        """Report ok/unwell per the constructor flag."""
         return SimpleNamespace(
             ok=self._ready,
             reasons=("asleep",) if not self._ready else (),
         )
 
     def world_step(self, frame, available_actions=None, info=None, through=None):
+        """Record the turn; answer with the next scripted descriptor
+        the whitelist permits — None means she abstains."""
         self.turns.append(
             {"frame": frame, "actions": available_actions, "info": info, "through": through}
         )
@@ -111,10 +127,12 @@ class _StubMind:
         return {"action": min(offered)}
 
     def world_episode_end(self, outcome, game="the game"):
+        """Record the episode outcome she was told."""
         self.episodes.append(outcome)
 
     @property
     def game_decision(self):
+        """The striatum basis the adapter tallies."""
         return self.last_world_decision
 
 
@@ -130,7 +148,7 @@ def _practice(mind, frames) -> ArcWebPractice:
 
 
 def test_play_never_labels_direction_semantics():
-    """The contract parietal_lobe.arc keeps: structure, never what a key does.
+    """The contract worlds.arc keeps: structure, never what a key does.
 
     Labels may mark interface structure ("simple"/"coordinate") but
     must never carry directional semantics — "up"/"down"/"left"/
@@ -272,6 +290,7 @@ def test_unwell_refuses_before_browser_work():
 
 
 def test_play_refuses_outside_game_mode():
+    """No game mode, no run — same contract as the SDK adapter."""
     practice = _practice(_StubMind(gaming=False), [_frame()])
     with pytest.raises(RuntimeError, match="game mode"):
         practice.play("fake", max_steps=3)

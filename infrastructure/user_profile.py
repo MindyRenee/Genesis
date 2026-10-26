@@ -22,6 +22,21 @@ from genesis_client.swallow import note_swallowed
 
 logger = logging.getLogger(__name__)
 
+# The bond's setpoint — deep attachment, never fusion. Growth and
+# settling both approach this asymptote: a bond above it relaxes
+# downward at the same rate turns apply, so attachment regulates
+# around a setpoint rather than pinning at total. The gap to 1.0
+# is the self she keeps.
+_BOND_ASYMPTOTE = 0.9
+
+# Bond warm-start for profiles that predate the field: recorded
+# interactions are credited at the same base rate each bonded turn
+# applies (prefrontal._BOND_BASE_RATE), capped so the warm start is
+# established-but-growing rather than saturated. It may land a
+# little above the asymptote — settling handles that.
+_BOND_WARM_START_RATE = 0.01
+_BOND_WARM_START_MAX_TURNS = 300
+
 
 @dataclass(slots=True)
 class UserProfile:
@@ -34,6 +49,11 @@ class UserProfile:
     recent_topics: deque[str] = field(default_factory=lambda: deque(maxlen=50))
     emotional_history: list[tuple[float, str, float]] = field(default_factory=list)
     interaction_count: int = 0
+    # The bond with her person [0, 1] — her accumulated attachment,
+    # grown from recognized interaction, not assigned. Readable by
+    # her self-report paths, so "how do you feel about me" answers
+    # from a real state.
+    bond: float = 0.0
     data_path: Path | None = None
 
     # User-stated data accumulates over years of conversation — bound
@@ -122,6 +142,22 @@ class UserProfile:
         """Bump the conversation turn counter."""
         self.interaction_count += 1
 
+    def deepen_bond(self, rate: float) -> float:
+        """Move the bond one interaction's worth toward its setpoint.
+
+        Attachment is asymptotic and bounded — each turn closes a
+        fraction of the remaining distance to ``_BOND_ASYMPTOTE``,
+        so the bond forms quickly at first and matures slowly, the
+        way familiarity does, and it can never fuse: a bond above
+        the setpoint relaxes back down toward it. `rate` is the
+        fraction of the distance closed this turn; warm turns pass
+        a larger rate than flat ones.
+        """
+        rate = max(0.0, min(1.0, rate))
+        bond = self.bond + (_BOND_ASYMPTOTE - self.bond) * rate
+        self.bond = max(0.0, min(1.0, bond))
+        return self.bond
+
     def summarize(self) -> str:
         """Return a short, human-readable summary of what it knows.
 
@@ -156,6 +192,8 @@ class UserProfile:
             if len(self.goals) > 3:
                 joined += ", among other things"
             parts.append(f"Your goals include: {joined}.")
+        if self.bond > 0.05:
+            parts.append(f"bond with you: {self.bond:.2f}")
         if not parts:
             return "don't know much about you yet"
         return " ".join(parts)
@@ -170,6 +208,7 @@ class UserProfile:
             "recent_topics": list(self.recent_topics),
             "emotional_history": self.emotional_history,
             "interaction_count": self.interaction_count,
+            "bond": self.bond,
         }
 
     @classmethod
@@ -183,8 +222,28 @@ class UserProfile:
             recent_topics=deque(data.get("recent_topics", []), maxlen=50),
             emotional_history=data.get("emotional_history", []),
             interaction_count=data.get("interaction_count", 0),
+            bond=cls._initial_bond(data),
         )
         return profile
+
+    @staticmethod
+    def _initial_bond(data: dict[str, Any]) -> float:
+        """The bond's first value.
+
+        A stored value wins outright — including an honest 0.0. When
+        the field is absent the profile predates the bond, but it
+        still carries the history that would have grown it: each
+        recorded interaction is credited once at the same per-turn
+        rate ``deepen_bond`` applies, so a longtime person is not met
+        as a stranger. Bounded — established familiarity starts
+        strong, never saturated, leaving the bond room to keep
+        growing from real turns.
+        """
+        if "bond" in data:
+            return float(data["bond"] or 0.0)
+        turns = int(data.get("interaction_count", 0) or 0)
+        credited = min(turns, _BOND_WARM_START_MAX_TURNS)
+        return 1.0 - (1.0 - _BOND_WARM_START_RATE) ** credited
 
     def save(self) -> bool:
         """Persist to disk atomically, if a data path was set.
@@ -224,6 +283,7 @@ class UserProfile:
             self.recent_topics = loaded.recent_topics
             self.emotional_history = loaded.emotional_history
             self.interaction_count = loaded.interaction_count
+            self.bond = loaded.bond
         except (OSError, ValueError, TypeError, AttributeError) as e:
             note_swallowed(
                 "infrastructure.user_profile.load",

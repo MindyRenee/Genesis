@@ -87,7 +87,7 @@ repository tree *is* the anatomy it implements. `mind.py` sits at
 the root holding `self.brain` — the connectome whose attributes are
 the region packages under `python/`. Self appears twice —
 `src/self_/` (the body's model of itself, named `self_` because the
-keyword owns the word) and `python/frontal_lobe/self/` (the mind's)
+keyword owns the word) and `python/self/` (the mind's)
 — and inside the latter the ladder continues: `SelfModel` →
 `MinimalSelf` → `self_model_coherence` (a self evaluating how well
 its own model predicts it), with Damasio's `ProtoSelf → CoreSelf →

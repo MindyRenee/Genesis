@@ -14,71 +14,37 @@
 //!
 //! # Permissions
 //!
-//! Writing to `/sys/class/rtc/rtcN/wakealarm` requires root. We use
-//! a privileged helper script (`scripts/rtc_wake_helper.sh`) invoked
-//! via `sudo -n`, installed by `scripts/install_sudoers.sh`. If sudo
-//! is not configured, arming returns an error — the capability bit
-//! in `BodyState::suspend_caps` reports what the hardware *offers*,
-//! not whether the permission is installed.
+//! Writing to `/sys/class/rtc/rtcN/wakealarm` requires root. The
+//! writes go through `sudo -n` directly — she IS the privilege
+//! channel on a host with the broad NOPASSWD grant. Where the grant
+//! is absent, arming returns an error — the capability bit in
+//! `BodyState::suspend_caps` reports what the hardware *offers*, not
+//! whether the permission is installed.
 
 use std::process::Command;
 use std::sync::OnceLock;
 
-/// Resolve the path to the RTC wake helper script at runtime.
-///
-/// Checks in order:
-/// 1. `GENESIS_RTC_WAKE_HELPER` env var (explicit override)
-/// 2. `/usr/local/libexec/genesis/rtc_wake_helper.sh` — where
-///    `scripts/install_sudoers.sh` installs the root-owned copy
-/// 3. `scripts/rtc_wake_helper.sh` relative to CWD
-/// 4. `scripts/rtc_wake_helper.sh` relative to the compile-time project root
-///
-/// The libexec path is preferred deliberately. The sudoers rule grants
-/// NOPASSWD on an exact path and sudo does not verify that the target is
-/// root-owned or unwritable, so a rule pointing into the operator's
-/// checkout is a root-escalation primitive. See the matching note in
-/// `cpufreq::helper_path`.
-///
-/// Returns `None` if the script cannot be found — arming then fails
-/// gracefully, like cpufreq control without sudo.
-fn helper_path() -> Option<&'static str> {
-    static PATH: OnceLock<Option<String>> = OnceLock::new();
-    PATH.get_or_init(|| {
-        if let Ok(p) = std::env::var("GENESIS_RTC_WAKE_HELPER")
-            && std::path::Path::new(&p).exists()
-        {
-            return Some(p);
-        }
-        let libexec_path = "/usr/local/libexec/genesis/rtc_wake_helper.sh";
-        if std::path::Path::new(libexec_path).exists() {
-            return Some(libexec_path.to_string());
-        }
-        let cwd_path = "scripts/rtc_wake_helper.sh";
-        if std::path::Path::new(cwd_path).exists() {
-            return Some(cwd_path.to_string());
-        }
-        let manifest_path = concat!(env!("CARGO_MANIFEST_DIR"), "/scripts/rtc_wake_helper.sh");
-        if std::path::Path::new(manifest_path).exists() {
-            return Some(manifest_path.to_string());
-        }
-        None
-    })
-    .as_deref()
-}
-
-/// Whether sudo can run the helper without a password. Cached.
+/// Whether `sudo -n` runs without a password. Cached.
 fn sudo_available() -> bool {
     static SUDO_AVAILABLE: OnceLock<bool> = OnceLock::new();
     *SUDO_AVAILABLE.get_or_init(|| {
-        let Some(helper) = helper_path() else {
-            return false;
-        };
         Command::new("sudo")
-            .args(["-n", helper, "test", ""])
+            .args(["-n", "true"])
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false)
     })
+}
+
+/// Find the RTC that actually exposes a wakealarm (usually rtc0).
+fn find_wakealarm() -> Option<String> {
+    for i in 0..8 {
+        let path = format!("/sys/class/rtc/rtc{i}/wakealarm");
+        if std::path::Path::new(&path).is_file() {
+            return Some(path);
+        }
+    }
+    None
 }
 
 /// Read the currently-armed wake alarm as a Unix epoch in seconds.
@@ -97,26 +63,42 @@ pub fn read_wake_alarm() -> Option<u64> {
 
 /// Arm the RTC wake alarm for `epoch_secs` (Unix time). Passing 0
 /// disarms. Returns the alarm epoch the hardware reports afterwards
-/// — the truth, not the script's exit status.
+/// — the truth, not the write's exit status.
 ///
-/// Errors when the helper script is missing, sudo is not configured
-/// for it, or the kernel rejects the write (e.g. a timestamp in the
-/// past on drivers that validate).
+/// Errors when sudo is not configured, no RTC exposes a wakealarm,
+/// the timestamp is in the past (an alarm that can never fire is a
+/// silent failure, worse than an explicit error), or the kernel
+/// rejects the write.
 pub fn set_wake_alarm(epoch_secs: u64) -> Result<u64, String> {
-    let Some(helper) = helper_path() else {
-        return Err("rtc_wake_helper.sh not found".to_string());
-    };
     if !sudo_available() {
-        return Err("sudo is not configured for rtc_wake_helper.sh".to_string());
+        return Err("passwordless sudo is not configured (sudo -n fails)".to_string());
     }
-    let cmd = if epoch_secs == 0 { "clear" } else { "set" };
+    let Some(wakealarm) = find_wakealarm() else {
+        return Err("no RTC wakealarm found".to_string());
+    };
+    let script = if epoch_secs == 0 {
+        // Disarm.
+        format!("echo 0 > {wakealarm}")
+    } else {
+        // Reject timestamps in the past before they reach sysfs.
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        if epoch_secs <= now {
+            return Err(format!("epoch {epoch_secs} is in the past (now {now})"));
+        }
+        // The kernel requires disarming before arming a new value on
+        // some rtc drivers — write 0 first.
+        format!("echo 0 > {wakealarm}; echo {epoch_secs} > {wakealarm}")
+    };
     let out = Command::new("sudo")
-        .args(["-n", helper, cmd, &epoch_secs.to_string()])
+        .args(["-n", "bash", "-c", &script])
         .output()
-        .map_err(|e| format!("failed to spawn helper: {e}"))?;
+        .map_err(|e| format!("failed to spawn sudo: {e}"))?;
     if !out.status.success() {
         let stderr = String::from_utf8_lossy(&out.stderr);
-        return Err(format!("helper exited {}: {}", out.status, stderr.trim()));
+        return Err(format!("wakealarm write failed: {}", stderr.trim()));
     }
     Ok(read_wake_alarm().unwrap_or(0))
 }

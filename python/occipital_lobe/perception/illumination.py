@@ -131,9 +131,7 @@ def _chroma(frame: np.ndarray) -> np.ndarray:
     return f / (f.sum(axis=-1, keepdims=True) + _EPS)
 
 
-def _estimate_illuminant(
-    frame: np.ndarray, e_map: np.ndarray
-) -> tuple[np.ndarray, float]:
+def _estimate_illuminant(frame: np.ndarray, e_map: np.ndarray) -> tuple[np.ndarray, float]:
     """Mean chromaticity of the well-lit field, normalized to sum 1,
     and the lit-field agreement share that trusts it.
 
@@ -165,9 +163,7 @@ def _estimate_illuminant(
     return illuminant, agree
 
 
-def _von_kries(
-    frame: np.ndarray, illuminant: np.ndarray, confidence: float = 1.0
-) -> np.ndarray:
+def _von_kries(frame: np.ndarray, illuminant: np.ndarray, confidence: float = 1.0) -> np.ndarray:
     """Partial-strength von Kries adaptation — per-channel gain that
     maps the illuminant toward neutral while preserving its luma.
 

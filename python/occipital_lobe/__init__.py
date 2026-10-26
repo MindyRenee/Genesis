@@ -444,7 +444,7 @@ _EXPORTS: dict[str, str] = {
     "EpipolarProcessor": "occipital_lobe.epipolar",
     "TwoViewReport": "occipital_lobe.epipolar",
     "MemoryBridge": "temporal_lobe.mtl_bridge",
-    "Retina": "occipital_lobe.perception.retina",
+    "Retina": "genesis_client.retina",
     "TrainingExample": "temporal_lobe.mtl_bridge",
     "VTCFeatureSpace": "temporal_lobe.vtc",
     "Vision": "occipital_lobe.perception.vision",
@@ -479,6 +479,16 @@ _EXPORTS: dict[str, str] = {
     "LGNOutput": "occipital_lobe.lgn",
     "LGNRelay": "occipital_lobe.lgn",
     "lgn_from_retina": "occipital_lobe.lgn",
+    # Cone opponency — retinal/LGN color math (sRGB→LMS, opponent
+    # channels, CIE Lab) feeding the M/P/K separation
+    "srgb_to_linear": "occipital_lobe.color",
+    "srgb_to_xyz": "occipital_lobe.color",
+    "xyz_to_lms": "occipital_lobe.color",
+    "srgb_to_lms": "occipital_lobe.color",
+    "cone_opponent": "occipital_lobe.color",
+    "hue_angle": "occipital_lobe.color",
+    "chroma": "occipital_lobe.color",
+    "xyz_to_lab": "occipital_lobe.color",
     # V4 — mid-level visual cortex (chromatic, shape processing)
     "V4Model": "occipital_lobe.v4",
     # Visual pathway orchestrator — retina → LGN → V1 → dorsal/ventral streams
@@ -520,14 +530,22 @@ __all__ = [
     "VisualPathway",
     "VisualPathwayOutput",
     "VisualPercept",
+    "chroma",
+    "cone_opponent",
     "create_visual_pathway",
     "decode_image_bytes",
     "defocus_sigma",
+    "hue_angle",
     "irradiance_gain",
     "lgn_from_retina",
     "load_image",
     "resize_for_vision",
     "retinal_irradiance",
+    "srgb_to_linear",
+    "srgb_to_lms",
+    "srgb_to_xyz",
+    "xyz_to_lab",
+    "xyz_to_lms",
 ]
 
 __getattr__ = view_getattr(_EXPORTS, __name__)

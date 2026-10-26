@@ -127,10 +127,30 @@ class HebbianPlasticity:
         self._waking_update_count = 0
         self._sleep_update_count = 0
 
+        # Third-factor neuromodulatory gate — signed dopamine signal.
+        # Hebb's rule alone is correlation learning (Δw ∝ pre·post);
+        # biologically, long-term plasticity is a THREE-factor rule
+        # (Fremaux & Gerstner, 2016): the pre/post product is gated by
+        # a neuromodulator. Here the DA signal is stored signed in
+        # [-1,1] and mapped to a nonnegative rate gain 1+DA: a
+        # positive RPE doubles plasticity, a full dip silences it
+        # (LTD-suppression), zero RPE is the neutral baseline.
+        self._modulator = 0.0
+
         # Statistics
         self.total_updates = 0
         self.total_attracted = 0
         self.total_repelled = 0
+
+    def set_modulator(self, modulator: float) -> None:
+        """Set the signed dopamine third-factor signal in [-1, 1]."""
+        if not np.isfinite(modulator):
+            return
+        self._modulator = max(-1.0, min(1.0, float(modulator)))
+
+    def get_modulator(self) -> float:
+        """Return the current signed third-factor signal."""
+        return self._modulator
 
     # ─── Public API ─────────────────────────────────────────────
 
@@ -419,7 +439,11 @@ class HebbianPlasticity:
         else:
             count = self._waking_update_count
             decay = self.WAKING_LR_DECAY
-        return base_lr / (1.0 + count / decay)
+        # Three-factor gate: the Robbins-Monro rate is scaled by the
+        # dopaminergic third factor (1 + DA). DA = +1 → 2× plasticity,
+        # DA = −1 → full suppression, DA = 0 → neutral baseline.
+        gain = max(0.0, 1.0 + self._modulator)
+        return (base_lr / (1.0 + count / decay)) * gain
 
     def _hebbian_attract(
         self, concept_a: str, concept_b: str, lr: float, is_sleep: bool = False

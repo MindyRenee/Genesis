@@ -115,6 +115,27 @@ class SaliencyMap:
         self._ior: list[tuple[int, int, float]] = []  # (my, mx, expires)
         self._goal_map: np.ndarray | None = None
         self.last: SaliencyResult | None = None
+        # LC→LIP norepinephrine gain — phasic NE sharpens the priority
+        # map's effective contrast (Aston-Jones & Cohen 2005). Stored
+        # as the exponent gamma in [0.5, 1.5]: NE high → γ>1 → peaks
+        # dominate (sharp selectivity); NE low → γ<1 → map flattens
+        # (distractible). 1.0 is linear/neutral.
+        self._ne_gamma = 1.0
+
+    def set_norepinephrine(self, level: float) -> None:
+        """Set the LC–NE drive on the priority map.
+
+        ``level`` is the body's effective norepinephrine in ~[0,1].
+        The map applies priority^γ with γ = 0.5 + level, so rising NE
+        progressively exponentiates the map — the phasic-mode gain of
+        Aston-Jones & Cohen (2005): task-relevant peaks win harder,
+        background salience loses contrast.
+        """
+        import math
+
+        if not math.isfinite(level):
+            return
+        self._ne_gamma = 0.5 + max(0.0, min(1.0, float(level)))
 
     # ── Feature maps ─────────────────────────────────────────────
 
@@ -207,6 +228,15 @@ class SaliencyMap:
             priority += normed[name] * np.float32(weights[name] / total_w)
         if self._goal_map is not None:
             priority = (priority * np.float32(0.6) + self._goal_map * np.float32(0.4)).astype(
+                np.float32
+            )
+
+        # LC–NE contrast gain: priority^γ sharpens (γ>1) or flattens
+        # (γ<1) the winner-take-all landscape without moving cells —
+        # norepinephrine modulates salience contrast, not salience
+        # content (Aston-Jones & Cohen, 2005).
+        if self._ne_gamma != 1.0:
+            priority = np.power(np.clip(priority, 0.0, None), np.float32(self._ne_gamma)).astype(
                 np.float32
             )
 

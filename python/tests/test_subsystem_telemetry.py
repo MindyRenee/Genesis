@@ -21,7 +21,7 @@ import struct
 from dataclasses import FrozenInstanceError
 
 import pytest
-from frontal_lobe.self.model import SelfModel
+from self.self_model import SelfModel
 
 from genesis_client.protocol import (
     MODULE_DREAMING,

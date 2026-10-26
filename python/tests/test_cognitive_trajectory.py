@@ -13,7 +13,7 @@ from __future__ import annotations
 import math
 
 import pytest
-from frontal_lobe.self.cognitive_trajectory import CognitiveTrajectoryModel
+from self.cognitive_trajectory import CognitiveTrajectoryModel
 
 # Persistence decay: predict(x) → x * 0.7
 _DECAY = 0.7

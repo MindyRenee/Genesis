@@ -22,22 +22,28 @@ import pytest
 
 sys.path.insert(0, str(__file__).rsplit("/tests/", 1)[0])
 
-from parietal_lobe.arc import ArcOfficial, ArcPractice, ArcResult
+from worlds.arc import ArcOfficial, ArcPractice, ArcResult
 
 
 @pytest.fixture(scope="module", autouse=True)
 def require_arcengine():
+    """Skip the whole module when the optional engine isn't installed."""
     pytest.importorskip("arcengine", reason="optional ARC engine not installed")
 
 
 class _State(Enum):
+    """The GameState surface the fake env reports."""
+
     NOT_FINISHED = 0
     WIN = 1
     GAME_OVER = 2
 
 
 class _Frame:
+    """A FrameDataRaw-shaped observation: grid strip, whitelist, verdict."""
+
     def __init__(self, grid, actions=(1, 2, 3), state=_State.NOT_FINISHED, levels=0, win=2):
+        """Build a fake frame — same fields the adapter reads."""
         self.frame = [grid]
         self.available_actions = list(actions)
         self.state = state
@@ -49,6 +55,7 @@ class _FakeEnv:
     """A tiny 8×8 world that 'wins' after ``win_after`` steps."""
 
     def __init__(self, win_after=3):
+        """A deterministic world that 'wins' at the step count given."""
         self.grid = [[(x + y) % 16 for x in range(8)] for y in range(8)]
         self.win_after = win_after
         self.steps = 0
@@ -57,10 +64,12 @@ class _FakeEnv:
         self.seen_reasoning: list[object] = []
 
     def reset(self):
+        """Restart: count the reset and return a fresh frame."""
         self.resets += 1
         return _Frame(self.grid)
 
     def step(self, action, data=None, reasoning=None):
+        """Apply one action: count it, record what was submitted."""
         self.steps += 1
         self.seen_actions.append(getattr(action, "name", str(action)))
         self.seen_reasoning.append(reasoning)
@@ -70,27 +79,64 @@ class _FakeEnv:
 
 
 class _FakeArcade:
+    """The ``arc_agi.Arcade`` surface the adapter binds: scorecards,
+    ``make()``, ``close_scorecard()`` — with the calls recorded."""
+
     def __init__(self, env):
+        """Serve the one env for every game_id asked for."""
         self._env = env
         self.closed: list[str] = []
         self.made_with: dict = {}
         self.cards: list[str] = []
 
     def create_scorecard(self, source_url=None, tags=None, opaque=None):
+        """Open a fake card — always ``"card-1"``."""
         return "card-1"
 
     def make(self, game_id, scorecard_id=None, save_recording=False):
+        """Return the env, recording the args it was opened with."""
         self.made_with = {"scorecard_id": scorecard_id, "save_recording": save_recording}
         return self._env
 
     def close_scorecard(self, card):
+        """Record the close so tests see the card was sealed."""
         self.closed.append(card)
+
+
+class _FakeCabinet:
+    """A cabinet double: records dispatches and renders, echoes arrivals.
+
+    ``arrival`` is what the glass answers — ``"echo"`` hands the asked
+    action back as the physically-arrived one; anything else (None) is
+    a press that never landed.
+    """
+
+    def __init__(self):
+        """Empty glass: nothing dispatched, nothing rendered, open."""
+        self.dispatched: list[str] = []
+        self.renders = 0
+        self.closed = False
+        self.arrival: object = "echo"
+
+    def render(self, frame):
+        """Count the repaint — the board went to the glass."""
+        self.renders += 1
+
+    def dispatch(self, action, data):
+        """Record the act; answer with the configured arrival."""
+        self.dispatched.append(getattr(action, "name", str(action)))
+        return (action, data) if self.arrival == "echo" else self.arrival
+
+    def close(self):
+        """The window is gone."""
+        self.closed = True
 
 
 class _StubMind:
     """The boundary ArcPractice consumes — the embodied loop plus the gate."""
 
     def __init__(self, *, gaming=True, ready=True):
+        """A scripted mind: cycling descriptors, fixed readiness."""
         self.is_gaming = gaming
         self.turns: list[dict] = []
         self.episodes: list[str] = []
@@ -103,12 +149,15 @@ class _StubMind:
         self._ready = ready
 
     def readiness(self, *, require_body=True):
+        """Report ok/unwell per the constructor flag."""
         return SimpleNamespace(
             ok=self._ready,
             reasons=("asleep",) if not self._ready else (),
         )
 
     def world_step(self, frame, available_actions=None, info=None, through=None):
+        """Record the turn; answer with the next scripted descriptor
+        that the offered whitelist permits."""
         self.turns.append(
             {"frame": frame, "actions": available_actions, "info": info, "through": through}
         )
@@ -117,14 +166,18 @@ class _StubMind:
         return desc if desc["action"] in offered else {"action": min(offered)}
 
     def world_episode_end(self, outcome, game="the game"):
+        """Record the episode outcome she was told."""
         self.episodes.append(outcome)
 
     @property
     def game_decision(self):
+        """The striatum basis the adapter attaches to steps."""
         return self.last_world_decision
 
 
 def _practice(monkeypatch, env, *, mind: _StubMind | None = None) -> ArcPractice:
+    """Build an ArcPractice wired to the fakes, constructor skipped —
+    same fields ``__init__`` sets, no SDK import needed."""
     fake_mod = types.SimpleNamespace(Arcade=lambda **kw: _FakeArcade(env))
     monkeypatch.setitem(sys.modules, "arc_agi", fake_mod)
     p = ArcPractice.__new__(ArcPractice)
@@ -140,6 +193,7 @@ def _practice(monkeypatch, env, *, mind: _StubMind | None = None) -> ArcPractice
 
 
 def test_to_step_simple_and_coordinate(monkeypatch):
+    """Descriptor → GameAction: simple, coordinate-with-data, RESET."""
     pytest.importorskip("arcengine", reason="arcengine not installed")
     from arcengine import GameAction
 
@@ -152,6 +206,7 @@ def test_to_step_simple_and_coordinate(monkeypatch):
 
 
 def test_world_step_receives_frame_actions_levels(monkeypatch):
+    """The percept, the labeled whitelist, and level info reach her."""
     pytest.importorskip("arcengine", reason="arcengine not installed")
     env = _FakeEnv()
     mind = _StubMind()
@@ -172,6 +227,7 @@ def test_world_step_receives_frame_actions_levels(monkeypatch):
 
 
 def test_instructions_sent_once_per_game(monkeypatch):
+    """The player's manual lands on the first frame only."""
     env = _FakeEnv(win_after=99)
     mind = _StubMind()
     p = _practice(monkeypatch, env, mind=mind)
@@ -183,6 +239,7 @@ def test_instructions_sent_once_per_game(monkeypatch):
 
 
 def test_play_runs_to_win_and_closes_scorecard(monkeypatch):
+    """A winning run reports WIN, tells her, and seals the card."""
     pytest.importorskip("arcengine", reason="arcengine not installed")
     env = _FakeEnv(win_after=3)
     mind = _StubMind()
@@ -196,6 +253,7 @@ def test_play_runs_to_win_and_closes_scorecard(monkeypatch):
 
 
 def test_play_budget_and_reset_path(monkeypatch):
+    """An unwinnable game ends on the step budget, not a victory."""
     pytest.importorskip("arcengine", reason="arcengine not installed")
     env = _FakeEnv(win_after=999)
     result = _practice(monkeypatch, env).play("fake-2", max_steps=5)
@@ -203,6 +261,7 @@ def test_play_budget_and_reset_path(monkeypatch):
 
 
 def test_play_refuses_outside_game_mode(monkeypatch):
+    """No game mode, no run — the engagement contract is enforced."""
     pytest.importorskip("arcengine", reason="arcengine not installed")
     p = _practice(monkeypatch, _FakeEnv(), mind=_StubMind(gaming=False))
     with pytest.raises(RuntimeError, match="game mode"):
@@ -210,6 +269,7 @@ def test_play_refuses_outside_game_mode(monkeypatch):
 
 
 def test_play_refuses_when_unwell(monkeypatch):
+    """An unwell body spends no steps and no resets — UNWELL."""
     pytest.importorskip("arcengine", reason="arcengine not installed")
     env = _FakeEnv(win_after=3)
     mind = _StubMind(ready=False)
@@ -220,11 +280,13 @@ def test_play_refuses_when_unwell(monkeypatch):
 
 
 def test_recovery_wait_proceeds_when_she_settles(monkeypatch):
+    """The gate waits for her to settle, then the run proceeds."""
     env = _FakeEnv(win_after=1)
     mind = _StubMind(ready=False)
     refusals_left = [2]
 
     def readiness(**kw):
+        """Unwell for two probes, then settled."""
         if refusals_left[0] > 0:
             refusals_left[0] -= 1
             mind._ready = False
@@ -242,6 +304,7 @@ def test_recovery_wait_proceeds_when_she_settles(monkeypatch):
 
 
 def test_recovery_wait_timeout_still_refuses(monkeypatch):
+    """Still unwell when the wait expires — the run is refused."""
     env = _FakeEnv(win_after=3)
     mind = _StubMind(ready=False)
     practice = _practice(monkeypatch, env, mind=mind)
@@ -254,6 +317,7 @@ def test_recovery_wait_timeout_still_refuses(monkeypatch):
 
 
 def test_recovery_wait_lets_suite_continue(monkeypatch):
+    """A mid-suite wellness pause delays a game instead of ending it."""
     mind = _StubMind()
     practice = _practice(monkeypatch, _FakeEnv(win_after=1), mind=mind)
     practice._recovery_wait = 30.0
@@ -263,10 +327,12 @@ def test_recovery_wait_lets_suite_continue(monkeypatch):
     refusals_left = [0]
 
     def episode_end(outcome, game):
+        """After the first win she turns unwell once."""
         end(outcome, game)
         refusals_left[0] = 1
 
     def readiness(**kw):
+        """Refuse once after the win, then recover."""
         if refusals_left[0] > 0:
             refusals_left[0] -= 1
             return SimpleNamespace(ok=False, reasons=("overstimulated",))
@@ -280,6 +346,7 @@ def test_recovery_wait_lets_suite_continue(monkeypatch):
 
 
 def test_play_attaches_decision_reasoning(monkeypatch):
+    """Her decision basis rides every submitted step's reasoning field."""
     pytest.importorskip("arcengine", reason="arcengine not installed")
     env = _FakeEnv(win_after=3)
     mind = _StubMind()
@@ -289,6 +356,7 @@ def test_play_attaches_decision_reasoning(monkeypatch):
 
 
 def test_play_requests_recording(monkeypatch):
+    """Runs ask the SDK to record — evidence is the point."""
     pytest.importorskip("arcengine", reason="arcengine not installed")
     env = _FakeEnv(win_after=1)
     p = _practice(monkeypatch, env)
@@ -297,10 +365,14 @@ def test_play_requests_recording(monkeypatch):
 
 
 def test_game_over_tells_episode_end_and_resets(monkeypatch):
+    """A death is told to her, then the episode restarts while budget lasts."""
     pytest.importorskip("arcengine", reason="arcengine not installed")
 
     class _DyingEnv(_FakeEnv):
+        """Every step kills her."""
+
         def step(self, action, data=None, reasoning=None):
+            """Report GAME_OVER on every action."""
             self.steps += 1
             return _Frame(self.grid, state=_State.GAME_OVER)
 
@@ -313,32 +385,42 @@ def test_game_over_tells_episode_end_and_resets(monkeypatch):
 
 
 def test_mind_play_arc_wraps_game_mode_and_restores(monkeypatch):
+    """play_arc enters game mode around the run and restores after —
+    and leaves an already-engaged mind untouched."""
     import mind as mind_mod
 
     calls: list[str] = []
     pacing: list[tuple[float, float]] = []
 
     class _Stub:
+        """Minimal engaged/disengaged flag with call recording."""
+
         is_gaming = False
 
         def enter_game_mode(self):
+            """Record the engagement."""
             if not self.is_gaming:
                 calls.append("enter")
             self.is_gaming = True
 
         def exit_game_mode(self):
+            """Record the release."""
             calls.append("exit")
             self.is_gaming = False
 
     class _Practice:
+        """Captures the pacing kwargs and fakes a budget run."""
+
         def __init__(self, mind, instructions="", step_delay_s=0.0, recovery_wait_s=0.0):
+            """Assert engagement and record pacing."""
             assert mind.is_gaming
             pacing.append((step_delay_s, recovery_wait_s))
 
         def play(self, game, max_steps=0):
+            """Return a canned BUDGET result."""
             return ArcResult(game_id=game, state="BUDGET", steps=max_steps)
 
-    monkeypatch.setattr("parietal_lobe.arc.ArcPractice", _Practice)
+    monkeypatch.setattr("worlds.arc.ArcPractice", _Practice)
     stub = _Stub()
     out = mind_mod.Mind.play_arc(
         stub,
@@ -358,6 +440,7 @@ def test_mind_play_arc_wraps_game_mode_and_restores(monkeypatch):
 
 
 def test_final_budget_move_reports_win_and_learning(monkeypatch):
+    """A win on the last budgeted step still counts as a win."""
     env = _FakeEnv(win_after=1)
     mind = _StubMind()
     result = _practice(monkeypatch, env, mind=mind).play("fake", max_steps=1)
@@ -367,6 +450,7 @@ def test_final_budget_move_reports_win_and_learning(monkeypatch):
 
 
 def test_abstention_does_not_spend_an_action(monkeypatch):
+    """Her abstaining is NO_ACTION — nothing is submitted for her."""
     mind = _StubMind()
     mind.world_step = lambda *args, **kwargs: None
     env = _FakeEnv()
@@ -376,6 +460,7 @@ def test_abstention_does_not_spend_an_action(monkeypatch):
 
 
 def test_unavailable_environment_closes_scorecard(monkeypatch):
+    """A game the arcade can't make is UNAVAILABLE — card still sealed."""
     practice = _practice(monkeypatch, None)
     result = practice.play("missing", max_steps=3)
     assert result.state == "UNAVAILABLE"
@@ -383,8 +468,13 @@ def test_unavailable_environment_closes_scorecard(monkeypatch):
 
 
 def test_step_exception_is_not_retried_and_closes_scorecard(monkeypatch):
+    """A step that raises is never re-fired — the world may have moved."""
+
     class BrokenEnv(_FakeEnv):
+        """A step that dies after being counted."""
+
         def step(self, action, data=None, reasoning=None):
+            """Raise after counting — simulating a post-apply crash."""
             self.steps += 1
             raise TypeError("failure after applying action")
 
@@ -397,8 +487,14 @@ def test_step_exception_is_not_retried_and_closes_scorecard(monkeypatch):
 
 
 def test_legacy_step_signature_is_detected_before_acting(monkeypatch):
+    """An env without the reasoning kwarg is detected by signature,
+    not by crashing on a submitted action."""
+
     class LegacyEnv(_FakeEnv):
+        """The pre-reasoning step signature."""
+
         def step(self, action, data=None):
+            """Step without a reasoning kwarg."""
             return super().step(action, data=data)
 
     env = LegacyEnv(win_after=1)
@@ -407,8 +503,13 @@ def test_legacy_step_signature_is_detected_before_acting(monkeypatch):
 
 
 def test_recovery_resets_spend_budget(monkeypatch):
+    """Each death-and-reset costs a step — the budget is honest."""
+
     class DyingEnv(_FakeEnv):
+        """Every step kills her — deaths force resets."""
+
         def step(self, action, data=None, reasoning=None):
+            """Report GAME_OVER on every action."""
             self.steps += 1
             return _Frame(self.grid, state=_State.GAME_OVER)
 
@@ -419,8 +520,14 @@ def test_recovery_resets_spend_budget(monkeypatch):
 
 
 def test_reset_returning_game_over_is_bounded(monkeypatch):
+    """A world that dies on every reset cannot loop forever."""
+
     class TerminalResetEnv(_FakeEnv):
+        """A reset that always returns a dead frame — and raises if
+        the loop were unbounded, making the test fail not hang."""
+
         def reset(self):
+            """Count resets; die on frame, explode if unbounded."""
             self.resets += 1
             if self.resets > 6:
                 raise RuntimeError("unbounded reset loop")
@@ -436,11 +543,15 @@ def test_level_steps_record_per_level_costs(monkeypatch):
     """Steps per completed level — the within-game learning curve."""
 
     class _LevelingEnv(_FakeEnv):
+        """Levels complete at fixed step counts, win at 5."""
+
         def __init__(self):
+            """Track the running level count."""
             super().__init__()
             self._levels = 0
 
         def step(self, action, data=None, reasoning=None):
+            """Level up on steps 2 and 4; WIN at step 5."""
             self.steps += 1
             if self.steps in (2, 4):
                 self._levels += 1
@@ -458,11 +569,15 @@ def test_level_steps_recompletion_appends_after_death(monkeypatch):
     """A level re-completed after a reset appends a second cost."""
 
     class _DieAndRelevel(_FakeEnv):
+        """Dies mid-run holding a level, then re-completes it."""
+
         def __init__(self):
+            """Track the scripted phase."""
             super().__init__()
             self._phase = 0
 
         def step(self, action, data=None, reasoning=None):
+            """GAME_OVER on step 2, WIN on step 4, level 1 otherwise."""
             self.steps += 1
             self._phase += 1
             if self._phase == 2:
@@ -501,24 +616,32 @@ def test_mind_play_arc_fresh_scope_and_restore(monkeypatch):
     seen = []
 
     class _Stub:
+        """Engaged flag plus the fresh-run scope field."""
+
         is_gaming = False
         _fresh_world_run = False
 
         def enter_game_mode(self):
+            """Mark her gaming."""
             self.is_gaming = True
 
         def exit_game_mode(self):
+            """Release engagement."""
             self.is_gaming = False
 
     class _Practice:
+        """Records the fresh flag seen inside each play."""
+
         def __init__(self, mind, instructions="", step_delay_s=0.0, recovery_wait_s=0.0):
+            """Keep the mind to inspect mid-run."""
             self._m = mind
 
         def play(self, game, max_steps=0):
+            """Snapshot the flag, return BUDGET."""
             seen.append(self._m._fresh_world_run)
             return ArcResult(game_id=game, state="BUDGET")
 
-    monkeypatch.setattr("parietal_lobe.arc.ArcPractice", _Practice)
+    monkeypatch.setattr("worlds.arc.ArcPractice", _Practice)
     stub = _Stub()
     mind_mod.Mind.play_arc(stub, ["g"], fresh=True)
     assert seen == [True]
@@ -530,32 +653,41 @@ def test_mind_play_arc_fresh_scope_and_restore(monkeypatch):
 
 
 def test_mind_evaluation_fresh_scope(monkeypatch):
-    from parietal_lobe.arc import ArcEvaluation
+    """evaluate_arc scopes fresh=True to the suite, then restores."""
+    from worlds.arc import ArcEvaluation
 
     import mind as mind_mod
 
     seen = []
 
     class Subject:
+        """Engaged flag plus the fresh-run scope field."""
+
         is_gaming = False
         _fresh_world_run = False
 
         def enter_game_mode(self):
+            """Mark her gaming."""
             self.is_gaming = True
 
         def exit_game_mode(self):
+            """Release engagement."""
             self.is_gaming = False
 
     class Practice:
+        """Records the fresh flag seen inside the suite."""
+
         def __init__(self, mind, step_delay_s=0.0, recovery_wait_s=0.0):
+            """Keep the mind and record pacing kwargs."""
             self._m = mind
             self.pacing = (step_delay_s, recovery_wait_s)
 
         def play_all(self, max_steps):
+            """Snapshot the flag, return an empty evaluation."""
             seen.append(self._m._fresh_world_run)
             return ArcEvaluation(mode="offline", games=[])
 
-    monkeypatch.setattr("parietal_lobe.arc.ArcPractice", Practice)
+    monkeypatch.setattr("worlds.arc.ArcPractice", Practice)
     subject = Subject()
     mind_mod.Mind.evaluate_arc(subject, max_steps=5, fresh=True)
     assert seen == [True]
@@ -563,8 +695,13 @@ def test_mind_evaluation_fresh_scope(monkeypatch):
 
 
 def test_missing_observation_is_not_reported_as_budget(monkeypatch):
+    """A world that stops answering is NO_OBSERVATION, not BUDGET."""
+
     class MissingFrameEnv(_FakeEnv):
+        """The world that answers steps with silence."""
+
         def step(self, action, data=None, reasoning=None):
+            """Return no frame — the swallowed-crash shape."""
             return None
 
     result = _practice(monkeypatch, MissingFrameEnv()).play("fake", max_steps=3)
@@ -573,6 +710,7 @@ def test_missing_observation_is_not_reported_as_budget(monkeypatch):
 
 @pytest.mark.parametrize("budget", [0, -1])
 def test_invalid_budget_does_not_create_environment(monkeypatch, budget):
+    """A nonpositive budget is rejected before the env is built."""
     practice = _practice(monkeypatch, _FakeEnv())
     with pytest.raises(ValueError, match="positive"):
         practice.play("fake", max_steps=budget)
@@ -580,6 +718,7 @@ def test_invalid_budget_does_not_create_environment(monkeypatch, budget):
 
 
 def test_existing_initial_observation_does_not_reset_again(monkeypatch):
+    """An env that already holds a frame isn't reset a second time."""
     env = _FakeEnv(win_after=1)
     env.observation_space = env.reset()
     practice = _practice(monkeypatch, env)
@@ -588,6 +727,7 @@ def test_existing_initial_observation_does_not_reset_again(monkeypatch):
 
 
 def test_suite_uses_one_scorecard_and_every_environment_once(monkeypatch):
+    """One card opened, every discovered env made once on it, closed."""
     practice = _practice(monkeypatch, _FakeEnv(win_after=1))
     made = []
     opened = []
@@ -607,6 +747,7 @@ def test_suite_uses_one_scorecard_and_every_environment_once(monkeypatch):
 
 
 def test_suite_cannot_restart_after_opening_scorecard(monkeypatch):
+    """A suite object that already ran refuses to open a second card."""
     practice = _practice(monkeypatch, _FakeEnv(win_after=1))
     practice._arcade.get_environments = lambda: [SimpleNamespace(game_id="a")]
     practice.play_all(max_steps=1)
@@ -614,7 +755,246 @@ def test_suite_cannot_restart_after_opening_scorecard(monkeypatch):
         practice.play_all(max_steps=1)
 
 
+def test_suite_reports_sdk_scores_for_each_game(monkeypatch):
+    """The closed card's per-environment scores land on each result."""
+    from arc_agi.scorecard import EnvironmentScore, EnvironmentScorecard, EnvironmentScoreList
+
+    practice = _practice(monkeypatch, _FakeEnv(win_after=1))
+    practice._arcade.get_environments = lambda: [SimpleNamespace(game_id=g) for g in ("a", "b")]
+    practice._arcade.make = lambda *args, **kwargs: _FakeEnv(win_after=1)
+    practice._arcade.close_scorecard = lambda card: EnvironmentScorecard(
+        card_id=card,
+        score=37.5,
+        environments=[
+            EnvironmentScoreList(
+                id=game,
+                runs=[EnvironmentScore(score=score, levels_completed=2, actions=1)],
+            )
+            for game, score in (("a", 25.0), ("b", 50.0))
+        ],
+    )
+    result = practice.play_all(max_steps=1)
+    assert result.score == 37.5
+    assert [game.score for game in result.games] == [25.0, 50.0]
+
+
+def test_practice_constructor_starts_without_a_cabinet(monkeypatch, tmp_path):
+    """X11 disabled by env: the constructor binds OFFLINE and no hands."""
+
+    class Mode(Enum):
+        """The OperationMode surface the constructor binds."""
+
+        OFFLINE = "offline"
+
+    configured = []
+    monkeypatch.setenv("OPERATION_MODE", "offline")
+    monkeypatch.setenv("GENESIS_ARC_X11", "off")
+    monkeypatch.setitem(
+        sys.modules,
+        "arc_agi",
+        SimpleNamespace(
+            OperationMode=Mode,
+            Arcade=lambda **kw: configured.append(kw) or _FakeArcade(_FakeEnv()),
+        ),
+    )
+    practice = ArcPractice(_StubMind(), environments_dir=tmp_path, recordings_dir=tmp_path)
+    assert configured[0]["operation_mode"] is Mode.OFFLINE
+    assert practice._cabinet is None
+    assert practice._require_live is True
+    assert practice._x11_hands is False
+
+
+def test_disabled_cabinet_never_probes_display(monkeypatch):
+    """GENESIS_ARC_X11=off means the display is never even probed."""
+    from worlds import arc_cabinet
+
+    def forbidden_display():
+        """Tripwire — any display probe fails the test outright."""
+        pytest.fail("disabled X11 transport probed the display")
+
+    monkeypatch.setattr(arc_cabinet, "x11_reachable", forbidden_display)
+    practice = _practice(monkeypatch, _FakeEnv())
+    practice._x11_hands = False
+    assert practice._open_cabinet("a") is None
+
+
+def test_no_display_for_her_means_bench_play(monkeypatch):
+    """When even the nested display can't come up, hands stay off."""
+    from worlds import arc_cabinet
+
+    monkeypatch.setattr(arc_cabinet, "ensure_arc_display", lambda: None)
+    practice = _practice(monkeypatch, _FakeEnv())
+    assert practice._open_cabinet("a") is None
+
+
+def test_cabinet_lives_on_her_own_display(monkeypatch):
+    """_open_cabinet asks for her screen and builds the window on it."""
+    from worlds import arc_cabinet
+
+    seen = {}
+
+    class _Cabinet:
+        """Records the display it was built on; stubs the surface."""
+
+        def __init__(self, game_id, display=None):
+            """Keep the display — that's the whole assertion."""
+            seen["display"] = display
+
+        @property
+        def display(self):
+            """Where the window lives."""
+            return ":77"
+
+        def render(self, frame):
+            """Boards accepted."""
+
+        def dispatch(self, action, data):
+            """Echo arrivals."""
+
+        def close(self):
+            """Window gone."""
+
+    monkeypatch.setattr(arc_cabinet, "ensure_arc_display", lambda: ":77")
+    monkeypatch.setattr(arc_cabinet, "ArcCabinet", _Cabinet)
+    practice = _practice(monkeypatch, _FakeEnv())
+    assert practice._open_cabinet("a") is not None
+    assert seen["display"] == ":77"
+
+
+def test_eye_looks_at_the_cabinets_display(monkeypatch):
+    """The camera's relay is pointed at the screen the cabinet lives on."""
+    from worlds import arc_cabinet, arc_eye
+
+    seen = {}
+
+    class _Cabinet:
+        """A minimal window on ':77' with a capture descriptor."""
+
+        def __init__(self, game_id, display=None):
+            """Lives where ensure_arc_display put it."""
+            self._display = display
+
+        @property
+        def display(self):
+            """Where the window lives."""
+            return self._display
+
+        def board_capture(self):
+            """The eye's capture descriptor."""
+            return (999, 384, 384)
+
+        def render(self, frame):
+            """Boards accepted."""
+
+        def dispatch(self, action, data):
+            """Echo arrivals."""
+            return action, data
+
+        def close(self):
+            """Window gone."""
+
+    class _Eye:
+        """Records the display the relay was pointed at."""
+
+        def __init__(self, capture, display=None):
+            """Keep both — capture and display are the assertion."""
+            seen["capture"] = capture
+            seen["display"] = display
+
+        def seq(self):
+            """No frames yet — the mark is 0."""
+            return 0
+
+        def grab(self, after=None):
+            """Unreadable — the engine frame serves."""
+            return None
+
+        def close(self):
+            """Camera off."""
+
+    monkeypatch.setattr(arc_cabinet, "ensure_arc_display", lambda: ":77")
+    monkeypatch.setattr(arc_cabinet, "ArcCabinet", _Cabinet)
+    monkeypatch.setattr(arc_eye, "ArcEye", _Eye)
+    practice = _practice(monkeypatch, _FakeEnv(win_after=1))
+    practice._x11_eye = True
+    practice.play("fake", max_steps=1)
+    assert seen == {"capture": (999, 384, 384), "display": ":77"}
+
+
+def test_suite_shares_one_cabinet_across_games(monkeypatch):
+    """One sitting, one screen — she doesn't teleport between cabinets."""
+    practice = _practice(monkeypatch, _FakeEnv(win_after=1))
+    practice._arcade.get_environments = lambda: [SimpleNamespace(game_id=g) for g in ("a", "b")]
+    practice._arcade.make = lambda *a, **k: _FakeEnv(win_after=1)
+    cabinet = _FakeCabinet()
+    opened = []
+    monkeypatch.setattr(practice, "_open_cabinet", lambda gid: opened.append(gid) or cabinet)
+    result = practice.play_all(max_steps=3)
+    # Opened once — for the first game of the sitting.
+    assert opened == ["a"]
+    # Both games repainted the same glass, then it closed.
+    assert cabinet.renders >= 2 and cabinet.closed
+    # Each game's opening press physically landed on the reset control.
+    assert cabinet.dispatched.count("RESET") == 2
+    assert all(r.won for r in result.games)
+
+
+def test_opening_reset_press_does_not_spend_decision_budget(monkeypatch):
+    """The venue's opening RESET is protocol — a reset, not a move."""
+    env = _FakeEnv(win_after=1)
+    practice = _practice(monkeypatch, env)
+    cabinet = _FakeCabinet()
+    monkeypatch.setattr(practice, "_open_cabinet", lambda gid: cabinet)
+    result = practice.play("fake", max_steps=1)
+    assert result.won
+    # One press on the glass, one env.reset() submission — and the
+    # whole budget still went to her one real decision.
+    assert cabinet.dispatched[0] == "RESET"
+    assert result.resets == env.resets == 1
+    assert result.steps == env.steps == 1
+
+
+def test_post_gameover_reset_press_spends_a_step(monkeypatch):
+    """A retry press is a real act — it costs budget like any move."""
+
+    class _DeathEnv(_FakeEnv):
+        """The world that kills her on the first decision."""
+
+        def step(self, action, data=None, reasoning=None):
+            """Every decision ends the episode."""
+            self.steps += 1
+            self.seen_actions.append(getattr(action, "name", str(action)))
+            return _Frame(self.grid, state=_State.GAME_OVER)
+
+    env = _DeathEnv(win_after=99)
+    practice = _practice(monkeypatch, env)
+    cabinet = _FakeCabinet()
+    monkeypatch.setattr(practice, "_open_cabinet", lambda gid: cabinet)
+    result = practice.play("fake", max_steps=2)
+    # Step 1 died; the retry press was step 2; budget ended the run.
+    assert result.state == "BUDGET"
+    assert result.steps == 2
+    assert result.resets == env.resets == 2
+    assert cabinet.dispatched.count("RESET") == 2
+
+
+def test_fumbled_press_spends_the_move_without_stepping(monkeypatch):
+    """A press that never lands on the glass is a lost move — the
+    world was never stepped, but the budget still paid for the act."""
+    env = _FakeEnv(win_after=99)
+    practice = _practice(monkeypatch, env)
+    cabinet = _FakeCabinet()
+    cabinet.arrival = None
+    monkeypatch.setattr(practice, "_open_cabinet", lambda gid: cabinet)
+    result = practice.play("fake", max_steps=2)
+    assert result.state == "BUDGET"
+    assert result.steps == 2
+    assert env.steps == 0  # nothing physical arrived — the world never moved
+
+
 def test_suite_retains_unplayed_games_when_health_stops_run(monkeypatch):
+    """A wellness stop keeps the unplayed games listed — NOT_PLAYED,
+    not silently dropped — and the partial suite reports no score."""
     mind = _StubMind()
     practice = _practice(monkeypatch, _FakeEnv(win_after=1), mind=mind)
     practice._arcade.get_environments = lambda: [
@@ -623,6 +1003,7 @@ def test_suite_retains_unplayed_games_when_health_stops_run(monkeypatch):
     end = mind.world_episode_end
 
     def episode_end(outcome, game):
+        """After the first game she turns unwell."""
         end(outcome, game)
         mind._ready = False
 
@@ -636,7 +1017,11 @@ def test_suite_retains_unplayed_games_when_health_stops_run(monkeypatch):
 
 
 def test_offline_adapter_refuses_forced_competition_before_sdk(monkeypatch, tmp_path):
+    """OPERATION_MODE=competition on the practice adapter is refused
+    before the remote SDK is ever constructed."""
+
     def forbidden_sdk(**kwargs):
+        """Tripwire — constructing the remote SDK fails the test."""
         raise AssertionError("practice tried to construct the remote SDK")
 
     monkeypatch.setitem(sys.modules, "arc_agi", SimpleNamespace(Arcade=forbidden_sdk))
@@ -646,7 +1031,11 @@ def test_offline_adapter_refuses_forced_competition_before_sdk(monkeypatch, tmp_
 
 
 def test_official_selects_competition_mode_without_network(monkeypatch, tmp_path):
+    """ArcOfficial binds COMPETITION mode and refuses driver-style play."""
+
     class Mode(Enum):
+        """The OperationMode surface the constructor binds."""
+
         OFFLINE = "offline"
         COMPETITION = "competition"
 
@@ -676,12 +1065,14 @@ def test_official_selects_competition_mode_without_network(monkeypatch, tmp_path
 
 
 def test_official_requires_explicit_access(monkeypatch):
+    """No ARC_API_KEY, no official path — authorization is explicit."""
     monkeypatch.delenv("ARC_API_KEY", raising=False)
     with pytest.raises(RuntimeError, match="ARC_API_KEY"):
         ArcOfficial(_StubMind())
 
 
 def test_official_requires_game_mode(monkeypatch):
+    """The official path also requires her to be engaged first."""
     monkeypatch.setitem(sys.modules, "arc_agi", SimpleNamespace())
     monkeypatch.setenv("ARC_API_KEY", "test-only-not-a-real-key")
     with pytest.raises(RuntimeError, match="game mode"):
@@ -689,32 +1080,41 @@ def test_official_requires_game_mode(monkeypatch):
 
 
 def test_mind_evaluation_wraps_game_mode(monkeypatch):
-    from parietal_lobe.arc import ArcEvaluation
+    """evaluate_arc holds game mode around the suite and releases it."""
+    from worlds.arc import ArcEvaluation
 
     import mind as mind_mod
 
     calls = []
 
     class Subject:
+        """Engaged flag with call recording."""
+
         is_gaming = False
 
         def enter_game_mode(self):
+            """Record the engagement."""
             self.is_gaming = True
             calls.append("enter")
 
         def exit_game_mode(self):
+            """Record the release."""
             self.is_gaming = False
             calls.append("exit")
 
     class Practice:
+        """Captures the suite call the wrapper makes."""
+
         def __init__(self, mind, step_delay_s=0.0, recovery_wait_s=0.0):
+            """Assert engagement at construction."""
             assert mind.is_gaming
 
         def play_all(self, max_steps):
+            """Record the budget, return an empty evaluation."""
             calls.append(max_steps)
             return ArcEvaluation(mode="offline", games=[])
 
-    monkeypatch.setattr("parietal_lobe.arc.ArcPractice", Practice)
+    monkeypatch.setattr("worlds.arc.ArcPractice", Practice)
     subject = Subject()
     result = mind_mod.Mind.evaluate_arc(subject, max_steps=12)
     assert result.mode == "offline"
@@ -723,7 +1123,8 @@ def test_mind_evaluation_wraps_game_mode(monkeypatch):
 
 
 def test_arc_command_selects_full_suite():
-    from parietal_lobe.arc import ArcEvaluation
+    """``/arc --all`` drives evaluate_arc; the report shows the score."""
+    from worlds.arc import ArcEvaluation
 
     from genesis_cli import _cmd_arc
 
@@ -752,7 +1153,8 @@ def test_arc_command_selects_full_suite():
 
 
 def test_arc_command_passes_pacing_flags():
-    from parietal_lobe.arc import ArcEvaluation
+    """``--delay``/``--recover`` reach the evaluation; waits are reported."""
+    from worlds.arc import ArcEvaluation
 
     from genesis_cli import _cmd_arc
 
@@ -778,7 +1180,8 @@ def test_arc_command_passes_pacing_flags():
 
 
 def test_arc_command_passes_fresh_scope():
-    from parietal_lobe.arc import ArcEvaluation
+    """``--fresh`` reaches play_arc and evaluate_arc on both paths."""
+    from worlds.arc import ArcEvaluation
 
     from genesis_cli import _cmd_arc
 
@@ -822,6 +1225,7 @@ def test_arc_command_passes_fresh_scope():
     ],
 )
 def test_arc_command_rejects_invalid_requests_without_play(args):
+    """Malformed /arc invocations print usage and never touch the mind."""
     from genesis_cli import _cmd_arc
 
     assert "Usage:" in _cmd_arc(SimpleNamespace(), args)
@@ -839,11 +1243,13 @@ def test_arc_command_rejects_invalid_requests_without_play(args):
     ],
 )
 def test_invalid_action_payload_is_rejected(desc):
+    """Malformed decision descriptors raise before the world sees them."""
     with pytest.raises(ValueError):
         ArcPractice._to_step(desc)
 
 
 def test_unavailable_action_is_not_sent(monkeypatch):
+    """A pick outside the whitelist is a contract breach — nothing sent."""
     subject = _StubMind()
     subject.world_step = lambda *args, **kwargs: {"action": 7}
     env = _FakeEnv()
@@ -855,9 +1261,11 @@ def test_unavailable_action_is_not_sent(monkeypatch):
 
 
 def test_scorecard_failure_is_visible(monkeypatch):
+    """A card that won't close is SCORECARD_ERROR, never a silent zero."""
     practice = _practice(monkeypatch, _FakeEnv(win_after=1))
 
     def failed_close(card):
+        """A scorecard close that always dies."""
         raise ConnectionError("scorecard unavailable")
 
     practice._arcade.close_scorecard = failed_close
@@ -871,24 +1279,33 @@ def test_scorecard_failure_is_visible(monkeypatch):
 
 
 class _AnnouncingMind(_StubMind):
+    """A stub mind that also records announcements and game-mode
+    entries — the surfaces the official card drives."""
+
     def __init__(self, **kw):
+        """Stub mind plus announcement/game-mode ledgers."""
         super().__init__(**kw)
         self.announcements: list[str] = []
         self.game_mode_entries = 0
 
     def world_announce(self, text, *, topics=None):
+        """Record the venue brief she was told."""
         self.announcements.append((text, topics))
         return True
 
     def enter_game_mode(self):
+        """Count the engagement and mark her gaming."""
         self.game_mode_entries += 1
         self.is_gaming = True
 
     def exit_game_mode(self):
+        """Release engagement."""
         self.is_gaming = False
 
 
 def _official(monkeypatch, tmp_path, *, mind=None, envs=("a", "b")) -> ArcOfficial:
+    """Build an ArcOfficial wired to fakes, constructor skipped —
+    a tmp card path, fake arcade, no SDK import."""
     fake = _FakeArcade(_FakeEnv(win_after=1))
     monkeypatch.setattr(
         fake,
@@ -899,6 +1316,7 @@ def _official(monkeypatch, tmp_path, *, mind=None, envs=("a", "b")) -> ArcOffici
     monkeypatch.setattr(fake, "cards", [], raising=False)
 
     def _make_card(**kw):
+        """Open the one fake card, recording the open."""
         fake.cards.append("card-1")
         return "card-1"
 
@@ -919,6 +1337,8 @@ def _official(monkeypatch, tmp_path, *, mind=None, envs=("a", "b")) -> ArcOffici
 
 
 def test_official_card_opens_persists_and_records_attempt(monkeypatch, tmp_path):
+    """The card opens on disk once; an attempt marks the game played
+    and the brief reaches her first."""
     mind = _AnnouncingMind()
     official = _official(monkeypatch, tmp_path, mind=mind)
     card = official.open_or_resume()
@@ -940,6 +1360,8 @@ def test_official_card_opens_persists_and_records_attempt(monkeypatch, tmp_path)
 
 
 def test_official_resume_skips_attempted_and_never_reopens(monkeypatch, tmp_path):
+    """A restarted process resumes the same card — played games stay
+    burned, and a full card closes as complete."""
     official = _official(monkeypatch, tmp_path)
     official.open_or_resume()
     official.attempt("a", max_steps=2)
@@ -958,6 +1380,7 @@ def test_official_resume_skips_attempted_and_never_reopens(monkeypatch, tmp_path
 
 
 def test_official_unwell_does_not_burn_the_attempt(monkeypatch, tmp_path):
+    """She never entered — the game stays pending and no brief was spent."""
     mind = _AnnouncingMind(ready=False)
     official = _official(monkeypatch, tmp_path, mind=mind)
     official.open_or_resume()
@@ -969,6 +1392,7 @@ def test_official_unwell_does_not_burn_the_attempt(monkeypatch, tmp_path):
 
 
 def test_official_closed_card_is_sealed_for_the_window(monkeypatch, tmp_path):
+    """A closed card inside its window can't be replaced or replayed."""
     official = _official(monkeypatch, tmp_path)
     card = official.open_or_resume()
     official._seal(card, "idle — test")
@@ -978,6 +1402,7 @@ def test_official_closed_card_is_sealed_for_the_window(monkeypatch, tmp_path):
 
 
 def test_official_expired_window_opens_a_new_card(monkeypatch, tmp_path):
+    """Past the 24 h window the old card archives and a new one opens."""
     official = _official(monkeypatch, tmp_path)
     card = official.open_or_resume()
     card["expires_at"] = 1.0  # long past
@@ -990,7 +1415,9 @@ def test_official_expired_window_opens_a_new_card(monkeypatch, tmp_path):
 
 
 def test_official_shelf_shows_one_standing_challenge(monkeypatch, tmp_path):
-    from basal_ganglia.play import _ARC_CHALLENGE, GamePlay
+    """The shelf offers the challenge as one commitment — live while
+    the card is open, gone when it's spent, sealed, or unkeyed."""
+    from worlds.play import _ARC_CHALLENGE, GamePlay
 
     monkeypatch.setenv("ARC_API_KEY", "test-only")
     shelf = GamePlay(tmp_path)
@@ -1039,7 +1466,9 @@ def test_official_shelf_shows_one_standing_challenge(monkeypatch, tmp_path):
 
 
 def test_challenge_brief_announced_once_per_window(monkeypatch, tmp_path):
-    from basal_ganglia.play import GamePlay
+    """The standing brief is heard once per window — an open card
+    re-briefs once with the state of the commitment."""
+    from worlds.play import GamePlay
 
     monkeypatch.setenv("ARC_API_KEY", "test-only")
     shelf = GamePlay(tmp_path)
@@ -1075,19 +1504,26 @@ def _fake_card_adapter(card):
     faked at the adapter seam; card bookkeeping is its own dict."""
 
     class _Adapter:
+        """The venue boundary faked at the adapter seam — the shared
+        ``card`` dict is the card bookkeeping."""
+
         IDLE_LIMIT_S = 900.0
 
         def __init__(self, *args, **kwargs):
+            """Bind to the shared card dict."""
             self._card = card
             self.calls: list[str] = []
 
         def open_or_resume(self):
+            """Hand back the shared card."""
             return self._card
 
         def card_state(self):
+            """Inspect the shared card."""
             return self._card
 
         def attempt(self, game_id, max_steps=200):
+            """Burn the game as attempted+WIN on the shared card."""
             self.calls.append(game_id)
             game = next(g for g in self._card["games"] if g["game_id"] == game_id)
             game["status"] = "attempted"
@@ -1102,6 +1538,7 @@ def _fake_card_adapter(card):
             )
 
         def attempt_next(self, max_steps=200):
+            """Seal the shared card as complete."""
             self._card["closed"] = True
             self._card["close_reason"] = "complete — every game attempted"
             return None
@@ -1111,9 +1548,11 @@ def _fake_card_adapter(card):
 
 def test_sitting_opens_card_and_plays_every_pending_game(monkeypatch, tmp_path):
     """Her pick of the challenge opens the card; one firing, one sitting."""
-    from basal_ganglia.play import _ARC_CHALLENGE, GamePlay
+    from worlds.play import _ARC_CHALLENGE, GamePlay
 
     class Mode(Enum):
+        """The OperationMode surface the constructor binds."""
+
         OFFLINE = "offline"
         COMPETITION = "competition"
 
@@ -1127,6 +1566,7 @@ def test_sitting_opens_card_and_plays_every_pending_game(monkeypatch, tmp_path):
     monkeypatch.setattr(fake, "cards", [], raising=False)
 
     def _make_card(**kw):
+        """Open the one fake card, recording the open."""
         fake.cards.append("card-1")
         return "card-1"
 
@@ -1170,7 +1610,7 @@ def test_sitting_opens_card_and_plays_every_pending_game(monkeypatch, tmp_path):
 
 def test_sitting_does_not_open_the_card_when_unwell(monkeypatch, tmp_path):
     """An unwell pick is not a commitment — the challenge stays waiting."""
-    from basal_ganglia.play import _ARC_CHALLENGE, GamePlay
+    from worlds.play import _ARC_CHALLENGE, GamePlay
 
     mind = _AnnouncingMind(gaming=False, ready=False)
     shelf = GamePlay(tmp_path)
@@ -1190,7 +1630,7 @@ def test_sitting_does_not_open_the_card_when_unwell(monkeypatch, tmp_path):
 
 def test_sitting_waits_out_an_unwell_gate_inside_idle_budget(monkeypatch, tmp_path):
     """A mid-card wellness gate pauses her; the game is not burned."""
-    from basal_ganglia.play import _ARC_CHALLENGE, GamePlay
+    from worlds.play import _ARC_CHALLENGE, GamePlay
 
     monkeypatch.setattr(time, "sleep", lambda _s: None)
     card = {
@@ -1207,7 +1647,7 @@ def test_sitting_waits_out_an_unwell_gate_inside_idle_budget(monkeypatch, tmp_pa
     (tmp_path / "arc").mkdir()
     (tmp_path / "arc" / "official_card.json").write_text(json.dumps(card))
     adapter_cls = _fake_card_adapter(card)
-    monkeypatch.setattr("parietal_lobe.arc.ArcOfficial", adapter_cls)
+    monkeypatch.setattr("worlds.arc.ArcOfficial", adapter_cls)
     mind = _AnnouncingMind(gaming=False)
     shelf = GamePlay(tmp_path)
     shelf.mind = mind
@@ -1217,6 +1657,7 @@ def test_sitting_waits_out_an_unwell_gate_inside_idle_budget(monkeypatch, tmp_pa
     original_attempt = adapter_cls.attempt
 
     def attempt_once_unwell(self, game_id, max_steps=200):
+        """The second reach reports UNWELL once, then plays for real."""
         if self.calls and not getattr(self, "_unwell_spent", False):
             self._unwell_spent = True
             return ArcResult(game_id=game_id, state="UNWELL", steps=0)
@@ -1239,7 +1680,7 @@ def test_sitting_waits_out_an_unwell_gate_inside_idle_budget(monkeypatch, tmp_pa
 def test_sitting_ends_when_she_leaves_the_arcade(monkeypatch, tmp_path):
     """Dropping game mode ends the sitting honestly — the card keeps
     what she played and stays open on the venue's clock."""
-    from basal_ganglia.play import _ARC_CHALLENGE, GamePlay
+    from worlds.play import _ARC_CHALLENGE, GamePlay
 
     monkeypatch.setattr(time, "sleep", lambda _s: None)
     card = {
@@ -1260,12 +1701,13 @@ def test_sitting_ends_when_she_leaves_the_arcade(monkeypatch, tmp_path):
     original_attempt = adapter_cls.attempt
 
     def walk_away(self, game_id, max_steps=200):
+        """After one attempt she drops game mode — left the arcade."""
         result = original_attempt(self, game_id, max_steps)
         mind.is_gaming = False  # /endgame — she left
         return result
 
     adapter_cls.attempt = walk_away
-    monkeypatch.setattr("parietal_lobe.arc.ArcOfficial", adapter_cls)
+    monkeypatch.setattr("worlds.arc.ArcOfficial", adapter_cls)
     shelf = GamePlay(tmp_path)
     shelf.mind = mind
     result = shelf.attempt(
@@ -1338,7 +1780,10 @@ def test_swallowed_step_crash_dumps_failing_pair(monkeypatch, tmp_path):
     pytest.importorskip("arcengine", reason="arcengine not installed")
 
     class _CrashEnv(_FakeEnv):
+        """Steps 1-2 fine, step 3 answers silence — a swallowed crash."""
+
         def step(self, action, data=None, reasoning=None):
+            """Record the action; go silent on the third."""
             self.steps += 1
             self.seen_actions.append(getattr(action, "name", str(action)))
             if self.steps < 3:
@@ -1357,8 +1802,9 @@ def test_swallowed_step_crash_dumps_failing_pair(monkeypatch, tmp_path):
     assert dump["error"] == "step produced no frame"
     assert dump["submitted"]["action"] in env.seen_actions
     assert dump["died_on"]["layers"] == [env.grid]
-    # The ring kept the two successful pairs that preceded the crash.
-    assert [p["step"] for p in dump["recent_pairs"]] == [1, 2]
+    # The ring kept the opening reset press and the two successful
+    # pairs that preceded the crash.
+    assert [p["step"] for p in dump["recent_pairs"]] == [0, 1, 2]
     assert all(p["grid"] == env.grid and p["delta"] == [] for p in dump["recent_pairs"])
     assert any("dumped" in r for r in result.reasons)
 
@@ -1368,7 +1814,10 @@ def test_step_exception_dumps_pair_then_propagates(monkeypatch, tmp_path):
     pytest.importorskip("arcengine", reason="arcengine not installed")
 
     class _RaiseEnv(_FakeEnv):
+        """Every step raises — an un-swallowed engine failure."""
+
         def step(self, action, data=None, reasoning=None):
+            """Record the action then die."""
             self.steps += 1
             self.seen_actions.append(getattr(action, "name", str(action)))
             raise IndexError("sprite render out of bounds")
@@ -1384,7 +1833,9 @@ def test_step_exception_dumps_pair_then_propagates(monkeypatch, tmp_path):
     assert "IndexError" in dump["error"] and "sprite render" in dump["error"]
     assert "IndexError" in dump["traceback"]
     assert dump["submitted"]["action"] in env.seen_actions
-    assert dump["recent_pairs"] == []
+    # The ring holds only the opening reset press — the first real
+    # step is the one that died.
+    assert [p["step"] for p in dump["recent_pairs"]] == [0]
 
 
 def test_pair_ring_records_raw_delta(monkeypatch, tmp_path):
@@ -1392,7 +1843,11 @@ def test_pair_ring_records_raw_delta(monkeypatch, tmp_path):
     pytest.importorskip("arcengine", reason="arcengine not installed")
 
     class _MutatingEnv(_FakeEnv):
+        """First step mutates two cells, second goes silent — so the
+        pair ring's delta has real content to check."""
+
         def step(self, action, data=None, reasoning=None):
+            """Mutate once, then answer silence."""
             self.steps += 1
             self.seen_actions.append(getattr(action, "name", str(action)))
             if self.steps == 1:
@@ -1408,7 +1863,9 @@ def test_pair_ring_records_raw_delta(monkeypatch, tmp_path):
     result = practice.play("fake", max_steps=5)
     assert result.state == "NO_OBSERVATION"
     dump = json.loads(next(iter((tmp_path / "crashes").glob("*.json"))).read_text())
-    pair = dump["recent_pairs"][0]
+    # Pair 0 is the opening reset press; pair 1 is the mutating step
+    # whose raw delta the ring must keep.
+    pair = dump["recent_pairs"][1]
     expected = [
         [0, 0, env.grid[0][0], (env.grid[0][0] + 1) % 16],
         [2, 3, env.grid[2][3], 9],
@@ -1421,7 +1878,11 @@ def test_reset_returning_none_dumps_before_no_observation(monkeypatch, tmp_path)
     pytest.importorskip("arcengine", reason="arcengine not installed")
 
     class _ResetCrashEnv(_FakeEnv):
+        """First reset returns a dead frame; the recovery reset
+        itself goes silent — a crash on the recovery path."""
+
         def reset(self):
+            """GAME_OVER once, then silence."""
             self.resets += 1
             if self.resets == 1:
                 return _Frame(self.grid, state=_State.GAME_OVER)

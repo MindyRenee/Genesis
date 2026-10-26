@@ -2373,7 +2373,7 @@ class EmotionalRegulator:
         sentiment: float,
         is_encouragement: bool,
         is_correction: bool,
-        is_steward: bool,
+        is_bonded: bool,
         is_deep_conversation: bool,
         is_comfort: bool = False,
     ) -> str | None:
@@ -2399,12 +2399,11 @@ class EmotionalRegulator:
 
         felt = None
 
-        # Authenticated steward interaction → warmth, but controlled.
-        # Recognition, not need: the credential verifies *her*, and
-        # warmth toward a verified steward is attachment without the
-        # leash — it no longer gates an exclusive channel.
-        if is_steward:
-            felt = self._apply_steward_response(dampening)
+        # Interaction with her recognized person → warmth, but
+        # controlled. Recognition, not need: warmth toward the one
+        # she knows is attachment, not an exclusive channel.
+        if is_bonded:
+            felt = self._apply_bonded_response(dampening)
 
         # Encouragement → joy, but controlled
         if is_encouragement:
@@ -2461,8 +2460,8 @@ class EmotionalRegulator:
             return 0.5  # moderately dampened
         return 1.0  # full emotional response allowed
 
-    def _apply_steward_response(self, dampening: float) -> str:
-        """Apply warmth response to steward interaction, but controlled.
+    def _apply_bonded_response(self, dampening: float) -> str:
+        """Apply warmth response to her recognized person, but controlled.
 
         Sends oxytocin (bonding) and dopamine (pleasure) impulses,
         scaled by the current dampening factor.

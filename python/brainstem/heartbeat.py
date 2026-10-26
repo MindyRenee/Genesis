@@ -416,7 +416,7 @@ class HeartbeatMixin:
                 # path.
                 if control.thermally_capped != self._thermally_throttled:
                     self._thermally_throttled = control.thermally_capped
-                    from infrastructure.cpu_speed import CpuSpeed
+                    from brainstem.cpufreq import CpuSpeed
 
                     CpuSpeed().set_effort("slow" if self._thermally_throttled else "fast")
         except (OSError, ConnectionError, ValueError) as e:
@@ -707,6 +707,15 @@ class HeartbeatMixin:
                 last_learner_phase = current_phase
                 last_learner_wave = current_wave
                 self.learner.notify_state_change()
+            # ── Wave→chemical transduction: the return edge of the
+            # loop documented above — the hypothalamus emits the
+            # impulses the measured wave state commands (up peptides
+            # track their band power, down peptides are suppressed by
+            # it). Field → waves → chemicals.
+            if current_brain_wave_state is not None:
+                from hypothalamus.transduction import transduce_waves
+
+                transduce_waves(self.client, current_brain_wave_state, core_state.chemicals)
         except (OSError, ConnectionError, ValueError) as e:
             note_swallowed(
                 "mind.heartbeat._heartbeat_advance_neuro",
@@ -789,7 +798,8 @@ class HeartbeatMixin:
 
     def _update_channel_board(self, now: float) -> None:
         """Push the live-board card to her channel on a fixed cadence."""
-        feed = getattr(self, "_public_feed", None)
+        channel = getattr(getattr(self, "world", None), "channel", None)
+        feed = channel.feed if channel is not None else None
         if feed is None or now < getattr(self, "_next_board_at", 0.0):
             return
         self._next_board_at = now + _CHANNEL_BOARD_S
@@ -1011,8 +1021,8 @@ class HeartbeatMixin:
             int(time.time() - getattr(self, "_session_started_at", time.time())),
         )
         hours, minutes = divmod(up_s // 60, 60)
-        listener = getattr(self, "_discord_listener", None)
-        ear = "off" if listener is None else ("deaf" if listener.deaf else "on")
+        channel = getattr(getattr(self, "world", None), "channel", None)
+        ear = channel.ear if channel is not None else "off"
         meta = (
             f"meta     up {hours}h{minutes:02d}m"
             f" · conv {getattr(self, '_interaction_count', 0)}"

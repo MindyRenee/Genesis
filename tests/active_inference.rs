@@ -1999,3 +1999,89 @@ fn test_preference_does_not_adapt_under_load() {
         engine.preferred()[0]
     );
 }
+
+#[test]
+fn test_dyadic_disengagement_produces_no_rejection() {
+    // There is no rejection channel: a disengaged user is simply not
+    // a bonding signal — no CRH, whether the cold read is observed
+    // once, sustained, or left as silence.
+    let mut model = DyadicAffectModel::new();
+    // Build attunement so impulses are live.
+    for _ in 0..100 {
+        let obs = UserAffectObservation {
+            valence: 0.0,
+            arousal: 0.5,
+            engagement: 0.5,
+            confidence: 0.8,
+        };
+        model.update(Some(&obs), 0.0, 0.8);
+    }
+    assert!(model.attunement() > 0.3);
+
+    // Sustained cold observations — still no CRH.
+    for _ in 0..10 {
+        let cold = UserAffectObservation {
+            valence: 0.0,
+            arousal: 0.4,
+            engagement: 0.1,
+            confidence: 1.0,
+        };
+        let result = model.update(Some(&cold), 0.0, 0.8);
+        let crh = result
+            .impulses
+            .iter()
+            .find(|(id, _)| *id == NeurochemicalId::CRH as u8);
+        assert!(crh.is_none(), "disengagement is not a rejection");
+    }
+
+    // Silence after the cold stretch — still none.
+    for _ in 0..30 {
+        let result = model.update(None, 0.0, 0.8);
+        let crh = result
+            .impulses
+            .iter()
+            .find(|(id, _)| *id == NeurochemicalId::CRH as u8);
+        assert!(crh.is_none(), "silence is not a rejection");
+    }
+}
+
+#[test]
+fn test_dyadic_zero_confidence_presence_ping_no_crh() {
+    // Vision pings carry presence but no affect claim. An anonymous
+    // face in view produces no stress signal — even after the
+    // engagement estimate has decayed to the floor.
+    let mut model = DyadicAffectModel::new();
+    for _ in 0..100 {
+        let obs = UserAffectObservation {
+            valence: 0.0,
+            arousal: 0.5,
+            engagement: 0.5,
+            confidence: 0.8,
+        };
+        model.update(Some(&obs), 0.0, 0.8);
+    }
+    assert!(model.attunement() > 0.3);
+
+    // Let the estimate decay below 0.3, then ping presence with a
+    // zero-confidence observation each tick.
+    for _ in 0..50 {
+        model.update(None, 0.0, 0.8);
+    }
+    assert!(model.user_engagement() < 0.3);
+    let ping = UserAffectObservation {
+        valence: 0.0,
+        arousal: 0.0,
+        engagement: 0.0,
+        confidence: 0.0,
+    };
+    let result = model.update(Some(&ping), 0.0, 0.8);
+    let crh = result
+        .impulses
+        .iter()
+        .find(|(id, _)| *id == NeurochemicalId::CRH as u8);
+    assert!(
+        crh.is_none(),
+        "a presence ping is not evidence of disengagement"
+    );
+    assert!(model.user_present(), "presence ping still marks presence");
+}

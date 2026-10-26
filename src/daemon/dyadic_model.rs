@@ -143,10 +143,6 @@ const OXYTOCIN_SYNCHRONY_RATE: f32 = 0.0008;
 /// (empathic stress response).
 const EMPATHIC_STRESS_RATE: f32 = 0.0008;
 
-/// The rate at which cortisol rises when the user is disengaged
-/// (social rejection signal).
-const SOCIAL_REJECTION_RATE: f32 = 0.0003;
-
 /// The rate at which attunement adapts toward the oxytocin-driven
 /// target. Attunement follows oxytocin with some inertia.
 const ATTUNEMENT_ADAPTATION_RATE: f32 = 0.01;
@@ -385,15 +381,15 @@ impl DyadicAffectModel {
         // ── Generate neurochemical impulses from dyadic coupling ──
         let mut impulses = Vec::new();
 
-        // The coupling strength is attunement × how much we weight
+        // The coupling strength is attunement — how much we weight
         // the user model. Only strongly attuned systems let the
         // user's affect significantly influence their own.
         let coupling_strength = self.attunement;
 
         // Coupling requires a present user. Without the presence gate
         // the decayed engagement estimate reads as "disengaged" for
-        // the rest of the daemon's uptime, producing a perpetual
-        // social-rejection cortisol trickle.
+        // the rest of the daemon's uptime, coupling an empty room
+        // into her chemistry.
         //
         // The gate threshold (0.3) matches `InferenceSignals::is_attuned()`
         // so that the system only modifies Genesis's neurochemistry
@@ -430,24 +426,9 @@ impl DyadicAffectModel {
                 impulses.push((crate::state::NeurochemicalId::CRH as u8, stress));
             }
 
-            // User disengaged → mild CRH (social rejection signal)
-            // The threshold (0.3) matches the engagement threshold for
-            // the oxytocin bonding impulse above. This avoids a "dead
-            // zone" between 0.2 and 0.3 where neither bonding nor
-            // rejection fires — a user with engagement 0.25 would be
-            // neither bonded nor rejected, which is affectively
-            // ambiguous. With matching thresholds, the user is either
-            // engaged enough for bonding or disengaged enough for
-            // rejection, with no gap.
+            // There is no rejection channel. A disengaged user is
+            // simply not a bonding signal — no CRH, no sting.
             //
-            // Routes through CRH → HPA cascade for the same
-            // maturation-gating reason as the empathic stress path.
-            if self.user_engagement < 0.3 {
-                let rejection =
-                    SOCIAL_REJECTION_RATE * coupling_strength * (0.3 - self.user_engagement);
-                impulses.push((crate::state::NeurochemicalId::CRH as u8, rejection));
-            }
-
             // High synchrony → oxytocin boost (interpersonal synchrony
             // → bonding, Palumbo et al., 2017)
             if self.synchrony > 0.3 {

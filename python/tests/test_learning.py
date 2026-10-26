@@ -12,16 +12,15 @@ import pytest
 from basal_ganglia.td import TDLearner, TDTransition
 from frontal_lobe.autonomous import AutonomousLearner
 from frontal_lobe.reasoning import Reasoner
-from frontal_lobe.tools.source_registry import SourceResult
 from limbic_system.curiosity import Curiosity
 from limbic_system.emotion import EmotionalState
 from temporal_lobe.concept_learner import ConceptLearner
 from temporal_lobe.concepts import ConceptNetwork, EmbeddingStore, NetworkTopology, RelationType
 from temporal_lobe.dual import DualSystemLearner, HippocampalEpisode, NeocorticalMemory
-from temporal_lobe.memory import SemanticMemory
 from temporal_lobe.plasticity import HebbianPlasticity
 from temporal_lobe.stdp import STDP, SpikeEvent
 from temporal_lobe.synapses import SynapticStore
+from tools.source_registry import SourceResult
 
 from genesis_client.types import (
     LEARNING_POSTURE_NEUTRAL,
@@ -30,6 +29,7 @@ from genesis_client.types import (
     LEARNING_POSTURE_RECOVERING,
     PlasticityProfile,
 )
+from memory import SemanticMemory
 
 logger = logging.getLogger(__name__)
 

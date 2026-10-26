@@ -148,7 +148,16 @@ pub const SLEEP_RECEPTOR_RESENSITIZATION_RATE: f32 = 0.001;
 /// channels — so the coupling follows the precision-addition rule
 /// `factor = 1 / (1 + d/REF)`: disagreement attenuates confidence
 /// by exactly the noise it measures.
-const DISAGREEMENT_PRECISION_SCALE: f64 = 0.1;
+///
+/// Calibrated to the field's measured operating envelope: the
+/// fibers' standing disagreement on a quiet host is ~0.2–0.3, so a
+/// scale of 0.1 floored precision at 0.5 *always* — and crushed
+/// precision kept the prediction fiber displaced, which re-created
+/// the disagreement that attenuated it (a self-sustaining loop).
+/// At 0.4 the standing disagreement attenuates ~35% while a genuine
+/// incoherence excursion (d≳0.5) reaches the 0.5 floor — the field
+/// reports its noise without halving confidence as a baseline.
+const DISAGREEMENT_PRECISION_SCALE: f64 = 0.4;
 
 /// The field reports; it does not rule. Disagreement may halve the
 /// confidence the body publishes about itself — never silence it.

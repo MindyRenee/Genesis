@@ -38,14 +38,14 @@ from temporal_lobe.base import Language, Thought
 
 if TYPE_CHECKING:
     from frontal_lobe.reasoning import Judge, ReasoningResult, TheoryOfMind
-    from frontal_lobe.self import SelfComposer, SelfModel
-    from frontal_lobe.tools.framework import ToolRegistry
     from parietal_lobe.situation_model import SituationModel
+    from self import SelfComposer, SelfModel
     from temporal_lobe.comprehension import Proposition
     from temporal_lobe.concepts import ConceptNetwork, RelationType
-    from temporal_lobe.memory import MemoryContext
+    from tools.framework import ToolRegistry
 
     from infrastructure.user_profile import UserProfile
+    from memory import MemoryContext
 
     from .thought_composer import ThoughtComposer
 

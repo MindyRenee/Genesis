@@ -81,20 +81,29 @@ impl FieldRuntime {
             )?)?;
         }
 
-        for (from, to) in [
-            ("body", "prediction"),
-            ("prediction", "agency"),
-            ("agency", "body"),
-            // The reverse edges: for the field to *permit*
-            // path-dependence, alternative routes have to exist.
-            // All transports stay the identity — the connection is
-            // flat, and `path_disagreement` now reports that honestly
-            // (zero holonomy measured, rather than never measurable).
-            ("prediction", "body"),
-            ("agency", "prediction"),
-            ("body", "agency"),
+        for (from, to, matrix) in [
+            // The afferent edge is the non-flat one: somatic
+            // coordinates are *read in* a rotated inferential frame
+            // (the generative model's axes are not the raw body
+            // axes), so the triangle carries real holonomy. The
+            // reverse edge carries the inverse rotation, keeping
+            // the pair's own two-way transport consistent.
+            (
+                "body",
+                "prediction",
+                rotation(LATENT_DIMENSION, 0, 1, AFFERENT_FRAME_OFFSET),
+            ),
+            ("prediction", "agency", identity(LATENT_DIMENSION)),
+            ("agency", "body", identity(LATENT_DIMENSION)),
+            (
+                "prediction",
+                "body",
+                rotation(LATENT_DIMENSION, 0, 1, -AFFERENT_FRAME_OFFSET),
+            ),
+            ("agency", "prediction", identity(LATENT_DIMENSION)),
+            ("body", "agency", identity(LATENT_DIMENSION)),
         ] {
-            field.add_transport(GaugeTransport::new(from, to, identity(LATENT_DIMENSION))?)?;
+            field.add_transport(GaugeTransport::new(from, to, matrix)?)?;
         }
 
         Ok(Self { field })
@@ -176,6 +185,25 @@ impl FieldRuntime {
         self.field = next;
         Ok(integration)
     }
+}
+
+/// Frame offset between the body's somatic axes and the prediction
+/// system's inferential axes — the one bend in the connection,
+/// small enough to stay a frame mismatch and large enough for
+/// `path_disagreement` to measure.
+const AFFERENT_FRAME_OFFSET: f64 = 0.35;
+
+/// Givens rotation in the (i, j) coordinate plane — the minimal
+/// non-identity transport: a fixed frame offset between two
+/// systems' latent bases, orthogonal so it preserves norms.
+fn rotation(n: usize, i: usize, j: usize, theta: f64) -> Vec<Vec<f64>> {
+    let mut m = identity(n);
+    let (c, s) = (theta.cos(), theta.sin());
+    m[i][i] = c;
+    m[j][j] = c;
+    m[i][j] = -s;
+    m[j][i] = s;
+    m
 }
 
 fn identity(n: usize) -> Vec<Vec<f64>> {
@@ -280,8 +308,9 @@ mod tests {
     #[test]
     fn alternative_routes_make_holonomy_measurable() {
         let runtime = FieldRuntime::new().unwrap();
-        // Every fiber pair now has exactly two routes — a flat
-        // connection reports zero spread instead of "no domain".
+        // Every fiber pair has exactly two routes, and the curved
+        // afferent edge means each pair's routes disagree — the
+        // connection's holonomy is measured, not just permitted.
         for (from, to) in [
             ("body", "prediction"),
             ("prediction", "agency"),
@@ -296,7 +325,11 @@ mod tests {
                 .unwrap()
                 .expect("two routes must exist");
             assert_eq!(disagreement.paths.len(), 2);
-            assert!(disagreement.tangent_spread < 1.0e-9);
+            assert!(
+                disagreement.tangent_spread > 1.0e-3,
+                "{from}->{to} should disagree across routes: {}",
+                disagreement.tangent_spread
+            );
         }
     }
 

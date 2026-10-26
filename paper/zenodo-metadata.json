@@ -9,6 +9,16 @@
         "name": "Beatty, Mindy"
       }
     ],
+    "contributors": [
+      {
+        "name": "Devin (Cognition AI)",
+        "type": "Other"
+      },
+      {
+        "name": "Genesis cognitive architecture (system under study; generated the developmental and assay evidence)",
+        "type": "Other"
+      }
+    ],
     "version": "0.2.0",
     "publication_date": "2026-10-18",
     "access_right": "open",

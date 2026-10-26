@@ -1,10 +1,10 @@
-"""Tests for frontal_lobe.self.man_review — her man-page review queue."""
+"""Tests for self.man_review — her man-page review queue."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from frontal_lobe.self.man_review import ManPageReview
+from self.man_review import ManPageReview
 
 TROFF_V1 = ".TH genesis 1\n.SH NAME\ngenesis - launch the mind\n"
 TROFF_V2 = ".TH genesis 1\n.SH NAME\ngenesis - launch the artificial mind\n"
@@ -132,9 +132,9 @@ def test_ingest_endogenous_learns_without_fetch_bookkeeping(
 ) -> None:
     from frontal_lobe.autonomous import AutonomousLearner
     from frontal_lobe.reasoning import Reasoner
-    from frontal_lobe.tools.source_registry import SourceResult
     from limbic_system.curiosity import Curiosity
     from temporal_lobe.concepts import ConceptNetwork
+    from tools.source_registry import SourceResult
 
     net = ConceptNetwork()
     learner = AutonomousLearner(network=net, curiosity=Curiosity(net, Reasoner(net)))
@@ -161,9 +161,9 @@ def test_ingest_endogenous_learns_without_fetch_bookkeeping(
 def test_ingest_endogenous_skips_thin_content(tmp_path: Path) -> None:
     from frontal_lobe.autonomous import AutonomousLearner
     from frontal_lobe.reasoning import Reasoner
-    from frontal_lobe.tools.source_registry import SourceResult
     from limbic_system.curiosity import Curiosity
     from temporal_lobe.concepts import ConceptNetwork
+    from tools.source_registry import SourceResult
 
     net = ConceptNetwork()
     learner = AutonomousLearner(network=net, curiosity=Curiosity(net, Reasoner(net)))

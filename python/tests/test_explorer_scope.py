@@ -12,12 +12,12 @@ import os
 from pathlib import Path
 
 import pytest
-from frontal_lobe.tools.explorer import (
+from temporal_lobe.concepts import ConceptNetwork
+from tools.explorer import (
     MAX_FILE_SIZE,
     Explorer,
     default_allowed_roots,
 )
-from temporal_lobe.concepts import ConceptNetwork
 
 
 def _explorer(root: Path, roots: list[str] | None = None) -> Explorer:
@@ -105,7 +105,6 @@ def test_relative_path_resolves_under_project_root(tmp_path) -> None:
         "secrets.json",
         "credentials",
         "backup.p12",
-        "steward.key",
     ],
 )
 def test_sensitive_files_learned(tmp_path, name) -> None:

@@ -1228,7 +1228,6 @@ def test_policy_uses_an_unbid_safe_escape_when_bids_are_fatal(
         "_bid_reembody",
         "_bid_calibrate",
         "_bid_plan",
-        "_bid_board",
         "_bid_intention",
         "_bid_probe",
         "_bid_reprobe",
@@ -1264,7 +1263,6 @@ def test_policy_uses_an_unbid_route_when_bids_are_measured_failures(
         "_bid_reembody",
         "_bid_calibrate",
         "_bid_plan",
-        "_bid_board",
         "_bid_intention",
         "_bid_probe",
         "_bid_reprobe",
@@ -1305,7 +1303,6 @@ def test_policy_waits_with_a_safe_blocked_move_when_trapped(
         "_bid_reembody",
         "_bid_calibrate",
         "_bid_plan",
-        "_bid_board",
         "_bid_intention",
         "_bid_probe",
         "_bid_reprobe",
@@ -1383,7 +1380,6 @@ def test_policy_can_wait_on_a_refused_move_beside_a_hazard(
         "_bid_reembody",
         "_bid_calibrate",
         "_bid_plan",
-        "_bid_board",
         "_bid_intention",
         "_bid_probe",
         "_bid_reprobe",
@@ -2841,6 +2837,64 @@ def test_coordinate_action_graduates_without_noop_contexts():
     assert bid is None
 
 
+def test_coordinate_action_graduates_on_a_mixed_answer_posterior():
+    """A pointer whose clicks answer some kinds is understood.
+
+    The global reach posterior gates limbs, not pointers: on a board
+    of live and dead cells a coordinate act's mixture sits mid-range
+    forever — half the kinds answering IS the settled verdict, and
+    the per-kind click ledger is where the question keeps being
+    asked (lp85: 81/100 steps re-probing an ACTION6 whose semantics
+    were settled on trial two — a babble channel that could never
+    close because it asked the aggregate a per-kind question).
+    """
+    model = _world_with_self()
+    model.learn_action_label("press", "coordinate")
+    model.action_effects["press"] = Counter({(0, 0): 40})
+    model.action_tries["press"] = 40
+    # Forty clicks, about half answered — mid-range forever.
+    model._efficacy["press"] = [20.0, 22.0]
+    assert model.action_understood("press")
+
+
+def test_pointer_reafference_is_not_a_calibration_question():
+    """A target-dependent bodily delta is not comparator evidence.
+
+    On lp85 her body is a thing pointing moves — the click lands and
+    she shifts, by a delta that is a function of where she aimed.
+    Grading that against the modal stride means every honest click
+    is a maximal prediction error, the cerebellum's EMA pins the
+    pointer miscalibrated forever, and calibrate re-bids it for the
+    whole budget (81 of 100 steps babbling a pointing that worked
+    exactly as pointing works). The comparator grades limbs against
+    fixed predictions; a pointer's body-side answer lives in the
+    click ledger, so it is never fed.
+    """
+    from cerebellum.motor import SensorimotorLayer
+
+    model = _world_with_self()
+    model.learn_action_label("press", "coordinate")
+    model.motor_comparator = SensorimotorLayer()
+    others = [(5, {(0, 0), (0, 1), (1, 0), (1, 1)}), (9, {(12, 10), (12, 11)})]
+
+    # Every press lands the body somewhere different — the deltas a
+    # real pointing produces when each trial aims at a new target.
+    for dr, dc in [(0, 1), (1, -3), (-1, 0), (1, -1), (-1, 0), (0, 1)]:
+        model.note_action("press")
+        model.observe(_scene([(_ME, {(r + dr, c + dc) for r, c in _ME_CELLS}), *others]))
+        model.observe(_scene([(_ME, set(_ME_CELLS)), *others]))
+
+    # Never fed: the pointer's body-side variation is its semantics,
+    # not staleness — so the verdict is comprehension, not error.
+    assert model.motor_comparator.error_of("press") == 0.0
+    assert model.action_understood("press")
+    # And a limb keeps the comparator's scrutiny — the guard is
+    # scoped to pointing, not reafference in general.
+    model.note_action("up")
+    model.observe(_scene([(_ME, {(r, c - 2) for r, c in _ME_CELLS}), *others]))
+    assert model.motor_comparator.error_of("up") > 0.0
+
+
 def test_inert_action_graduates_on_tries_when_contexts_cannot_diversify():
     """The refusal-diversity bar cannot gate what gates the bar.
 
@@ -3421,6 +3475,79 @@ def test_silent_trials_decay_efficacy_without_inert_verdict():
     eff = model.action_efficacy("press")
     assert eff < 0.5  # β is accumulating on the silent evidence
     assert not model.action_inert("press")  # but the verdict needs more
+
+
+def test_causal_uncertainty_shrinks_without_declaring_stochastic_actions_inert():
+    model = WorldModel()
+    assert model.action_uncertainty("press") == pytest.approx(1.0)
+    model._efficacy["press"] = [2.0, 2.0]
+    early = model.action_uncertainty("press")
+    model._efficacy["press"] = [30.0, 30.0]
+    assert 0.0 < model.action_uncertainty("press") < early < 1.0
+    assert model.action_efficacy("press") == pytest.approx(0.5)
+    assert not model.action_inert("press")
+
+
+def test_calibration_yields_after_many_ambiguous_trials():
+    from basal_ganglia.world_policy import WorldPolicy
+
+    model = _world_with_self()
+    model.action_effects["press"] = Counter({(0, 0): 58})
+    model.action_tries["press"] = 58
+    model._efficacy["press"] = [30.0, 30.0]
+    policy = WorldPolicy(model, seed=0)
+    assert not model.action_understood("press")
+    bid = policy._bid_calibrate(["up", "press"])
+    assert bid is not None and bid["action"] == "press"
+    assert 0.0 < bid["weight"] < 0.35
+
+
+def test_calibration_preserves_new_actions_and_surprising_effects():
+    from basal_ganglia.world_policy import WorldPolicy
+
+    model = _world_with_self()
+    policy = WorldPolicy(model, seed=0)
+    bid = policy._bid_calibrate(["up", "press"])
+    assert bid is not None and bid["action"] == "press"
+    assert bid["weight"] > 0.8
+    model.action_effects["press"] = Counter({(0, 1): 58})
+    model.action_tries["press"] = 58
+    model._efficacy["press"] = [30.0, 30.0]
+
+    class Comparator:
+        def miscalibrated(self, action):
+            return action == "press"
+
+    model.motor_comparator = Comparator()
+    bid = policy._bid_calibrate(["up", "press"])
+    assert bid is not None and bid["action"] == "press"
+    assert bid["weight"] > 0.8
+
+
+def test_motor_field_moves_on_from_an_unresponsive_click_target():
+    from basal_ganglia.motor_field import compose_motor_fields
+
+    scene = _scene([(4, {(2, 2)}), (7, {(10, 10)})])
+    model = WorldModel()
+    model.learn_action_label("press", "coordinate")
+    model.observe(scene)
+    field = compose_motor_fields(model, ["press"], 16, 16)
+    assert field.peak == (2, 2)
+    model.note_action("press", target=field.peak)
+    model.observe(scene)
+    field = compose_motor_fields(model, ["press"], 16, 16)
+    assert field.peak == (10, 10)
+    assert 0.0 < field.spatial[2][2] < field.spatial[10][10]
+
+
+def test_motor_field_keeps_learned_value_after_repeated_clicks():
+    from basal_ganglia.motor_field import compose_motor_fields
+
+    model = WorldModel()
+    model.observe(_scene([(4, {(2, 2)}), (7, {(10, 10)})]))
+    model.click_tries[("press", 4)] = 50
+    model.affordances[4] = Counter({OUT_WIN: 1})
+    assert compose_motor_fields(model, ["press"], 16, 16).peak == (2, 2)
 
 
 def test_silent_action_earns_inert_verdict():

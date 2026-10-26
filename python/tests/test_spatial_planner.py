@@ -20,8 +20,10 @@ import sys
 
 sys.path.insert(0, str(__file__).rsplit("/tests/", 1)[0])
 
+from frontal_lobe.reasoning import TaskCompetence
 from parietal_lobe.grid import Grid
-from parietal_lobe.spatial.agent import SpatialAgent
+from parietal_lobe.scene import perceive
+from worlds.spatial_agent import SpatialAgent
 
 # Steps are the moves a world would teach: 1=up 2=down 3=left 4=right.
 _STEPS = {1: (-1, 0), 2: (1, 0), 3: (0, -1), 4: (0, 1)}
@@ -54,7 +56,7 @@ def _step_frames(
 
 def test_learned_end_to_end_plan():
     """Avatar, strides, and walls are all earned through observe()."""
-    agent = SpatialAgent()
+    agent = SpatialAgent(task_competence=TaskCompetence(), perceive=perceive)
     g = _world()
     at = (8, 4)
     _place(g, *at, 9)
@@ -91,7 +93,7 @@ def test_learned_end_to_end_plan():
 
 
 def test_step_vectors_use_successful_moves_only():
-    agent = SpatialAgent()
+    agent = SpatialAgent(task_competence=TaskCompetence(), perceive=perceive)
     agent.avatar_color = 9
     st = agent._stat(1)
     st.moves = 5
@@ -102,7 +104,7 @@ def test_step_vectors_use_successful_moves_only():
 
 
 def test_collision_marks_destination_blocked():
-    agent = SpatialAgent()
+    agent = SpatialAgent(task_competence=TaskCompetence(), perceive=perceive)
     agent.avatar_color = 9
     st = agent._stat(4)
     st.moves = 10
@@ -128,7 +130,7 @@ def test_collision_marks_destination_blocked():
 
 
 def test_no_collision_no_blocked():
-    agent = SpatialAgent()
+    agent = SpatialAgent(task_competence=TaskCompetence(), perceive=perceive)
     agent.avatar_color = 9
     st = agent._stat(4)
     st.moves = 10
@@ -142,7 +144,7 @@ def test_no_collision_no_blocked():
 
 
 def _seeded_agent(at: tuple[int, int], g: list[list[int]]) -> SpatialAgent:
-    agent = SpatialAgent()
+    agent = SpatialAgent(task_competence=TaskCompetence(), perceive=perceive)
     agent.avatar_color = 9
     for a, (dr, dc) in _STEPS.items():
         st = agent._stat(a)

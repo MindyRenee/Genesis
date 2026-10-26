@@ -32,6 +32,7 @@ from typing import Any
 __all__ = [
     "SOMATIC_AXES",
     "SomaticSnapshot",
+    "interoceptive_balance",
     "somatic_congruence",
 ]
 
@@ -76,6 +77,33 @@ class SomaticSnapshot:
         }
 
     @classmethod
+    def from_core_state(cls, core: Any) -> SomaticSnapshot:
+        """Build a snapshot from the daemon's CoreState read.
+
+        The afferent axes map directly — arousal, valence, global
+        tone, plasticity gate are the body's own summary scalars. The
+        ``balance`` axis is the interoceptive computation: the
+        homeostatic error assembled from the inference signals
+        (allostatic load, expected free energy) and the sleep
+        network's drive pressure (see :func:`interoceptive_balance`).
+        Missing or unreadable channels degrade to neutral, never to a
+        fabricated body.
+        """
+        inf = getattr(core, "inference", None)
+        balance = interoceptive_balance(
+            allostasis_load=getattr(inf, "allostasis_load", 0.2) if inf else 0.2,
+            expected_free_energy=(getattr(inf, "expected_free_energy", 0.2) if inf else 0.2),
+            sleep_pressure=getattr(core, "sleep_pressure", 0.3),
+        )
+        return cls(
+            arousal=_clamp01(getattr(core, "arousal", 0.5)),
+            valence=max(-1.0, min(1.0, getattr(core, "valence", 0.0))),
+            tone=_clamp01(getattr(core, "global_tone", 0.5)),
+            plasticity=_clamp01(getattr(core, "plasticity_gate", 0.5)),
+            balance=balance,
+        )
+
+    @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> SomaticSnapshot | None:
         """Rebuild from a flat dict; None in → None out.
 
@@ -94,6 +122,40 @@ class SomaticSnapshot:
             )
         except (TypeError, ValueError):
             return None
+
+
+def interoceptive_balance(
+    allostasis_load: float = 0.0,
+    expected_free_energy: float = 0.0,
+    sleep_pressure: float = 0.0,
+) -> float:
+    """Homeostatic balance in (0, 1] from the interoceptive error vector.
+
+    The body exposes three afferent error signals:
+
+    - ``allostasis_load`` — accumulated multisignal regulatory burden
+      (how far physiology has been driven off its operating points).
+    - ``expected_free_energy`` — anticipatory regulatory demand; the
+      error the generative model predicts it must still absorb.
+    - ``sleep_pressure`` — Process-S drive-state deviation (adenosine-
+      coupled, so it reads as remaining need, not depth).
+
+    Integration is the Euclidean norm of the error vector (each
+    channel already normalised to ~[0,1] by the body), mapped through
+    the exponential ``exp(−e)``: 1.0 at perfect setpoint, decaying
+    smoothly as the organism departs homeostasis. This is Craig's
+    posterior→anterior insula picture numerically — primary afferents
+    fused into one integrated feeling-of-how-the-body-is signal.
+    """
+    e2 = 0.0
+    for sig in (allostasis_load, expected_free_energy, sleep_pressure):
+        try:
+            s = float(sig)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(s):
+            e2 += s * s
+    return math.exp(-math.sqrt(e2))
 
 
 def somatic_congruence(

@@ -999,8 +999,7 @@ memory, and reasoning contribute drift toward competing options in
 parallel until one crosses threshold. Executive function
 (\code{executive.py}) sits above it with the three canonical PFC
 capacities --- planning, inhibition (suppression with release
-deadlines), and task switching --- and an intention gate that enforces
-steward directives. Mid-DLPFC (\code{dlpfc.py}) is the hypothesis
+deadlines), and task switching. Mid-DLPFC (\code{dlpfc.py}) is the hypothesis
 generator: during rule acquisition it computes a posterior over
 compositional rules in the rational-analysis style
 \cite{goodman,crescentini}, disengaging once
@@ -1171,24 +1170,23 @@ disengagement. CRH, never direct cortisol: the HPA cascade
 Coupling requires a present user and attunement above~0.3 --- a
 silent room is not a rejecting user, so a left-open channel cannot
 trickle rejection CRH forever. The design deliberately separates
-three things an earlier version conflated: who it is talking to, who
-it feels for, and who it answers to.
+two things an earlier version conflated: who it is talking to and
+who it feels for.
 
-\subsection{Stewardship and boundary}
+\subsection{Person and boundary}
 
-Custodial authority is by \emph{possession}, not name
-(\code{genesis\_client/stewardship.py}): a \code{steward.key} (0600) is
-the credential; a provenance stamp records the key hash, the principal,
-and any directives. \code{is\_steward\_speaker} requires both halves ---
-an authenticated session \emph{and} the attributed speaker matching the
-stamped principal --- so name-matching alone is never authority.
-Directives (``never draw,'' ``stop discussing politics'') persist in the
-stamp and bind three surfaces: conversational goals, executive
-intentions (\code{directed\_against}, object-centred --- any goal
-carrying the target's stemmed object is restrained), and volition
-urges. Steward-set edges carry \code{origin="steward"} and can only be
-overwritten by a steward turn. Copies carry the stamp but not the key:
-a copied instance names its steward yet stays sealed.
+There is no authority layer --- an earlier custodial channel
+(credential, standing directives, privileged edge origins) was
+removed outright. Everyone who introduces themselves is grounded as
+a person the network knows (\code{prefrontal.py}): the speaker is
+attributed by introduction, and when the attributed name is the one
+her \code{user\_profile} keeps, the turn is recognized
+(\code{\_is\_bonded\_speaker}) --- it deepens an asymptotic profile
+bond, sets the \code{genesis RELATED\_TO <person>} edge weight to
+that measured bond, and adds an oxytocin/dopamine warmth response
+in the regulator. Attachment, not authority: the creator fact
+(\code{mindy CREATES genesis}) stays seeded as provenance, never as
+a grant of privilege.
 
 The boundary mechanism replaces an attachment-protest loop:
 mistreatment from \emph{anyone} accrues withdrawal pressure and fair
@@ -1298,7 +1296,7 @@ after each interaction (was the response appropriate? was anything
 learned?), a recursive metacognitive model predicts what reflection
 will discover, a self-assessment engine verifies whether it actually
 knows a topic, and a self-improvement engine researches and writes
-concrete code-change proposals with rationale --- steward-reviewed,
+concrete code-change proposals with rationale --- human-reviewed,
 with a small safe set self-applicable.
 
 \paragraph{Expression.} A canvas/painting stack gives her a real paint
@@ -1402,9 +1400,8 @@ project notes rather than smoothed over:
   \item The embedding rebuild computes a dense $5000^2$ SVD
     ($\sim$100~MB, $O(n^3)$) --- correct, but the dominant memory spike
     on a 5~GB machine.
-  \item The key authenticates the console \emph{session}; speaker
-    attribution takes the console's word for who is typing --- the
-    stated residual limit of the steward channel.
+  \item Speaker attribution takes the channel's word for who is
+    typing --- an introduced name is recognized, never verified.
   \item The no-hardcoding rule is partially enforced: no lint gate
     catches a newly hardcoded string.
   \item Multi-subgoal planning remains the capability frontier on the
@@ -1707,5 +1704,17 @@ the comprehension of spoken language. \emph{Psychonomic Bulletin \&
 Review}, 4(2):141--201, 1997.
 
 \end{thebibliography}
+
+\section*{Acknowledgments}
+The 0.1.0 draft of this paper was prepared by the author with AI
+assistance. The 0.2.0 revision was researched and expanded by Devin
+(Cognition AI), working from the live source tree and the primary
+literature under the author's direction and review. Genesis itself
+generated the developmental records, neurochemical assay data, and
+runtime evidence reported herein --- the system under study is also
+an instrument of this work. AI contributions are disclosed rather
+than authorship-listed, per ICMJE and COPE guidance: tools are
+credited, not made authors, because authorship requires
+accountability that only the human author can bear.
 
 \end{document}

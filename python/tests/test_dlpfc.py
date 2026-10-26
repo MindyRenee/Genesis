@@ -207,8 +207,8 @@ def test_canonical_order() -> None:
 
 def test_rule_agent_induce_mode_uses_posterior() -> None:
     """The worksheet agent induces the hidden rule through the DLPFC."""
-    from basal_ganglia.rule_agent import RuleAgent
     from worlds.classification import Item, RuleGame
+    from worlds.rule_agent import RuleAgent
 
     items = [
         Item(0, "alpha", ("striped", "round")),
@@ -222,7 +222,9 @@ def test_rule_agent_induce_mode_uses_posterior() -> None:
         items,
         examples=[],
     )
-    agent = RuleAgent(seed=0, inducer=DorsolateralPFC())
+    from frontal_lobe.reasoning import TaskCompetence
+
+    agent = RuleAgent(seed=0, inducer=DorsolateralPFC(), task_competence=TaskCompetence())
     res = agent.solve(world, max_steps=60)
     assert res.solved
     inducer = agent._inducer

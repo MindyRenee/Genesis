@@ -9,10 +9,10 @@ at the next move and closes the window.
 import time
 from typing import ClassVar
 
-import basal_ganglia.play as play_mod
-from basal_ganglia.play import GamePlay
-from basal_ganglia.player import GamePlayer
+import worlds.play as play_mod
 from worlds.environment import GameObservation, GameOutcome
+from worlds.play import GamePlay
+from worlds.player import GamePlayer
 
 
 class _Env:

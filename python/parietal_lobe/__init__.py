@@ -436,9 +436,9 @@ _EXPORTS: dict[str, str] = {
     "TwoViewReport": "occipital_lobe.epipolar",
     # V1 M-pathway input (dorsal stream from occipital)
     "VisualField": "occipital_lobe.v1",
-    "PhonologicalLoop": "temporal_lobe.memory.working",
-    "VisuoSpatialSketchpad": "temporal_lobe.memory.working",
-    "WorkingMemory": "temporal_lobe.memory.working",
+    "PhonologicalLoop": "memory.working",
+    "VisuoSpatialSketchpad": "memory.working",
+    "WorkingMemory": "memory.working",
     "TheoryOfMind": "frontal_lobe.reasoning.theory_of_mind",
     # Multisensory integration — the superior parietal lobule binds
     # the modalities into a unified percept
@@ -468,6 +468,20 @@ _EXPORTS: dict[str, str] = {
     "scene_facts": "parietal_lobe.grounding",
     "scene_relations_for": "parietal_lobe.grounding",
     "Transform": "parietal_lobe.transforms",
+    # Structural-form perception — scenes settle into organized
+    # structure by coupled variational flow (spectral grouping,
+    # Bayesian form discovery, lattice fitting): the dorsal-stream
+    # math for "what organizes this scene" (Kemp–Tenenbaum /
+    # Shi–Malik, not heuristic parsing)
+    "StructuralForm": "parietal_lobe.structure",
+    "LatticeFit": "parietal_lobe.structure",
+    "Violation": "parietal_lobe.structure",
+    "GroupStructure": "parietal_lobe.structure",
+    "SceneStructure": "parietal_lobe.structure",
+    "StructurePerceiver": "parietal_lobe.structure",
+    "discover_structure": "parietal_lobe.structure",
+    "affinity": "parietal_lobe.structure",
+    "fit_lattice": "parietal_lobe.structure",
     # Numerical cognition — the intraparietal sulcus handles
     # magnitude; the PFC handles symbolic manipulation. Co-claimed
     # with frontal_lobe (frontoparietal).
@@ -502,12 +516,6 @@ _EXPORTS: dict[str, str] = {
     "CorrespondenceLedger": "parietal_lobe.correspondence",
     "Claim": "parietal_lobe.correspondence",
     "TruthVerdict": "parietal_lobe.correspondence",
-    # Demonstration scenes — paired exemplar panels detected in a
-    # frame and handed to the prefrontal inductor (the parietal
-    # half of abstraction from examples: PPC holds the bound
-    # relational representations RLPFC integrates)
-    "ExemplarSession": "parietal_lobe.exemplars",
-    "ExemplarTarget": "parietal_lobe.exemplars",
     # Strip perception — wall/segment parsing of bordered panels
     # and the periodic runs inside them (the ventral scene-geometry
     # the inductor consumes; perception lives here, not in frontal)
@@ -534,8 +542,8 @@ _EXPORTS: dict[str, str] = {
     # The temporoparietal minimal self — self-location, first-person
     # perspective, and the ownership comparator that marks which
     # events are self-caused (co-claimed with limbic_system)
-    "MinimalSelf": "frontal_lobe.self.model",
-    "AgencyDetector": "frontal_lobe.self.model",
+    "MinimalSelf": "self.self_model",
+    "AgencyDetector": "self.self_model",
     # Mentalizing over the social world — Beta posteriors on the
     # external presences' responsiveness and mood (rTPJ belief
     # attribution; co-claimed with frontal_lobe's medial PFC)
@@ -544,18 +552,18 @@ _EXPORTS: dict[str, str] = {
     # The posterior default-mode hub — posterior cingulate/precuneus
     # and the angular gyrus are the parietal half of the mind-
     # wandering loop InnerLife models (co-claimed with frontal_lobe)
-    "InnerLife": "frontal_lobe.inner_life",
+    "InnerLife": "sleep.inner_life",
     # The region itself — dorsal attention + situation model
     "ParietalLobe": "parietal_lobe.parietal",
     # The task competencies the play loop drives — transform search
     # over grids, relational arrangement, piece fitting, numerosity.
     # The worlds they solve live in ``worlds`` (the P and R of the
     # MDP); these are the agent side — the parietal tissue.
-    "SpatialAgent": "parietal_lobe.spatial.agent",
+    "SpatialAgent": "worlds.spatial_agent",
     "SpatialReasoner": "parietal_lobe.spatial.solver",
-    "RelationsAgent": "parietal_lobe.relations",
-    "AssemblyAgent": "parietal_lobe.assembly",
-    "QuantitiesAgent": "parietal_lobe.quantities",
+    "RelationsAgent": "worlds.relations_agent",
+    "AssemblyAgent": "worlds.assembly_agent",
+    "QuantitiesAgent": "worlds.quantities_agent",
 }
 
 __all__ = sorted(_EXPORTS)

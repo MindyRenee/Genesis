@@ -138,9 +138,7 @@ class Judge:
         """
         stance = _ASSESSMENT_STANCE[assessment.recommendation]
         grounds = tuple(assessment.fallacies) + tuple(assessment.notes[:2])
-        evidence = len(assessment.supporting_evidence) + len(
-            assessment.disconfirming_evidence
-        )
+        evidence = len(assessment.supporting_evidence) + len(assessment.disconfirming_evidence)
         return Judgment(
             content,
             stance,

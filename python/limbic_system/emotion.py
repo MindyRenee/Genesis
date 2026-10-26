@@ -465,17 +465,21 @@ BORED_NE = 0.27
 # supports calm.
 #
 #   FIELD_INCOHERENT: disagreement above this means the major
-#     systems are telling different stories. 0.05 is half of the
-#     daemon's own DISAGREEMENT_PRECISION_SCALE (0.1 in
-#     src/daemon/tick.rs — the variance at which the body's
-#     published precision halves), so the field feels incoherence
-#     before it formally degrades confidence.
+#     systems are telling different stories. Recalibrated to the
+#     field's measured operating envelope — the body/prediction/
+#     agency fibers carry structurally different projections and
+#     stand ~0.18–0.30 apart even when healthy, so the old 0.05
+#     boundary read the ordinary operating point as chronic
+#     incoherence. 0.45 sits well above that floor: the field reads
+#     incoherence on real excursions, not its baseline tension.
 #   FIELD_CENTER_DISPLACED: consensus_norm above this means the
-#     organism's center of mass has moved well off nominal. Fibers
-#     live in a ±0.25 box (corner ≈ 0.61); 0.18 is a real
-#     displacement, not noise around the origin.
-FIELD_INCOHERENT = 0.05
-FIELD_CENTER_DISPLACED = 0.18
+#     organism's center of mass has moved well off nominal. The
+#     fibers' consensus ordinarily rides ~0.36–0.40 out of a ±0.61
+#     corner box, so the old 0.18 boundary fired at baseline. 0.55
+#     is most of the way to the corner — a real displacement, not
+#     the standing offset.
+FIELD_INCOHERENT = 0.45
+FIELD_CENTER_DISPLACED = 0.55
 
 
 @dataclass(slots=True)
@@ -684,9 +688,7 @@ def _affect_features(
         # drifted from nominal. Absent → the terms drop out, like
         # an unread wave channel.
         f["disagreement"] = _finite(getattr(field_state, "disagreement", 0.0), 0.0, 1.0)
-        f["center_displacement"] = _finite(
-            getattr(field_state, "consensus_norm", 0.0), 0.0, 1.0
-        )
+        f["center_displacement"] = _finite(getattr(field_state, "consensus_norm", 0.0), 0.0, 1.0)
     return f
 
 
@@ -863,7 +865,10 @@ _FIELD_REGIONS: dict[EmotionCategory, _Region] = {
                     ("hi", "cortisol", GUARDED_CORTISOL, 0.02),
                     ("lo", "plasticity", PLASTICITY_LOW, 0.06),
                 ),
-                ("hi", "disagreement", 0.09, 0.025),
+                # The fibers stand ~0.2–0.3 apart at the honest
+                # operating point — a real incoherence excursion is
+                # disagreement well above that floor.
+                ("hi", "disagreement", 0.5, 0.10),
             ),
             ("hi", "w_beta3", 0.15, 0.06),
         ),
@@ -909,7 +914,7 @@ _FIELD_REGIONS: dict[EmotionCategory, _Region] = {
                     ("hi", "cortisol", 0.04, 0.02),
                     ("hi", "w_beta3", 0.18, 0.06),
                 ),
-                ("hi", "disagreement", 0.08, 0.025),
+                ("hi", "disagreement", 0.5, 0.10),
             ),
         ),
         weights=(1.5, 1.5, 0.4),
@@ -1114,9 +1119,7 @@ _PHASE_CATEGORY: dict[str, EmotionCategory] = {
 }
 
 # (mode, verbosity, openness, caution, creativity|None→base)
-_PHASE_PROFILE: dict[
-    EmotionCategory, tuple[CognitiveMode, float, float, float, float | None]
-] = {
+_PHASE_PROFILE: dict[EmotionCategory, tuple[CognitiveMode, float, float, float, float | None]] = {
     EmotionCategory.SLEEPING: (CognitiveMode.DREAMLIKE, 0.3, 0.2, 0.3, 0.9),
     EmotionCategory.OVERWHELMED: (CognitiveMode.SCATTERED, 0.4, 0.3, 0.8, None),
     EmotionCategory.STRESSED: (CognitiveMode.CAUTIOUS, 0.7, 1.0, 0.7, None),
@@ -1161,9 +1164,25 @@ def membership_field(
     you want the mixture (e.g. anxious 0.6 with afraid 0.3), not the
     argmax.
     """
-    return _raw_memberships(
-        _affect_features(summary, chemicals, context, waves, field_state)
-    )
+    return _raw_memberships(_affect_features(summary, chemicals, context, waves, field_state))
+
+
+# Precedence is exercised by established states, not residual
+# membership. Every evidence term is a sigmoid, so a region's
+# membership never quite reaches zero — below the sigmoid midpoint it
+# is residual possibility, not a measured state. A masker deflates a
+# generic by its membership weighted by its establishment
+# (m·σ((m−0.5)/0.1)): a saturated state still explains away almost
+# fully, a mid-range established state keeps real precedence, and a
+# region that exists only as stacked tails cannot tax the generic
+# defaults into losing to a weak residual.
+_PRECEDENCE_EVIDENCE_CENTER = 0.5
+_PRECEDENCE_EVIDENCE_WIDTH = 0.1
+
+
+def _mask_strength(m_k: float) -> float:
+    """The masker's membership weighted by how established it is."""
+    return m_k * _sigmoid((m_k - _PRECEDENCE_EVIDENCE_CENTER) / _PRECEDENCE_EVIDENCE_WIDTH)
 
 
 def effective_memberships(
@@ -1171,15 +1190,16 @@ def effective_memberships(
 ) -> dict[EmotionCategory, float]:
     """Deflate generic regions by the evidence for the specific ones.
 
-    eff_s = m_s · Π_{k∈mask(s)} (1 − m_k) — the fuzzy form of
-    precedence: a generic region survives only where no more specific
-    measured state explains the substrate.
+    eff_s = m_s · Π_{k∈mask(s)} (1 − s_k) with s_k the masker's
+    established share — the fuzzy form of precedence: a generic region
+    survives only where no more specific measured state explains the
+    substrate.
     """
     eff: dict[EmotionCategory, float] = {}
     for cat, m_s in m.items():
         keep = 1.0
         for k in _FIELD_REGIONS[cat].masked_by:
-            keep *= 1.0 - m.get(k, 0.0)
+            keep *= 1.0 - _mask_strength(m.get(k, 0.0))
         eff[cat] = m_s * keep
     return eff
 
@@ -1226,7 +1246,7 @@ def _resolve_state(
         eff.setdefault(cat, 0.0)
     if phase_cat is not None:
         eff[phase_cat] = (
-            1.0 - eff.get(EmotionCategory.GUARDED, 0.0)
+            1.0 - _mask_strength(eff.get(EmotionCategory.GUARDED, 0.0))
             if phase_cat is EmotionCategory.FLOW
             else 1.0
         )

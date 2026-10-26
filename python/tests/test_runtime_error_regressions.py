@@ -44,7 +44,7 @@ def test_sleep_desync_reads_the_phase_field(monkeypatch) -> None:
     """The reader must use the field `PhaseInfo` actually has."""
     import inspect
 
-    from brainstem.sleep import SleepMixin
+    from sleep.sleep import SleepMixin
 
     src = inspect.getsource(SleepMixin._check_sleep_desync)
     assert "get_phase().phase" in src, "_check_sleep_desync must read PhaseInfo.phase"
@@ -85,8 +85,8 @@ def test_curiosity_generate_questions_dereferences_its_emotion() -> None:
 def test_identity_curiosity_source_actually_produces_observations() -> None:
     """The source that used to always raise must now yield something."""
     from frontal_lobe.reasoning import Reasoner
-    from frontal_lobe.self.identity import EmergentIdentity
     from limbic_system.curiosity import Curiosity
+    from self.identity import EmergentIdentity
     from temporal_lobe.concepts import ConceptNetwork, RelationType
 
     net = ConceptNetwork()
@@ -258,10 +258,11 @@ def test_sleep_desync_runs_without_raising() -> None:
         def get_phase(self) -> PhaseInfo:
             return PhaseInfo(phase=5, arousal=0.2, valence=0.0)
 
-    from brainstem.sleep import SleepMixin
+    from sleep.sleep import SleepMixin
 
     probe = SleepMixin.__new__(SleepMixin)
     probe._is_sleeping = False
+    probe._is_gaming = False
     probe._wake_time = 0.0
     probe._last_wake_attempt = 0.0
     probe.client = _Client()  # type: ignore[attr-defined]
@@ -283,7 +284,7 @@ def test_module_exists_probe_maps_real_package_paths() -> None:
     """
     import importlib.util
 
-    from frontal_lobe.self.introspection import (
+    from self.introspection import (
         _MODULE_PATH_OVERRIDES,
         Introspection,
     )
@@ -295,7 +296,7 @@ def test_module_exists_probe_maps_real_package_paths() -> None:
         assert spec is not None, f"{name} -> {mod_path} does not resolve"
 
     probe = Introspection.__new__(Introspection)
-    site = "frontal_lobe.self.introspection._module_exists"
+    site = "self.introspection._module_exists"
     before = swallow.swallow_count(site)
     # A genuinely absent module is a False answer, not a fault.
     assert probe._module_exists("definitely_not_a_real_module_xyz") is False

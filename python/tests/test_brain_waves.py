@@ -532,7 +532,7 @@ def test_curiosity_gamma_more_questions():
 
 def test_working_memory_gamma_expands_capacity():
     """Gamma state expands working memory capacity."""
-    from temporal_lobe.memory import WorkingMemory
+    from memory import WorkingMemory
 
     wm = WorkingMemory()
     summary = _make_summary(arousal=0.5, plasticity=0.5, phase=PHASE_ACTIVE)
@@ -605,8 +605,8 @@ def test_narrative_delta_suppresses_recording():
     """Delta state suppresses narrative event recording."""
     import time
 
-    from frontal_lobe.self import SelfModel
     from limbic_system.emotion import EmotionalState
+    from self import SelfModel
     from temporal_lobe.concepts import ConceptNetwork
 
     from infrastructure.narrative import Narrator
@@ -641,8 +641,8 @@ def test_narrative_delta_suppresses_recording():
 
 def test_dream_synthesis_theta_more_proposals():
     """Theta (REM) state produces more dream synthesis proposals than delta."""
+    from sleep.dream_synthesis import DreamSynthesis
     from temporal_lobe.concepts import ConceptNetwork
-    from temporal_lobe.dream_synthesis import DreamSynthesis
 
     net = ConceptNetwork()
     # Add some concepts with similar structure
@@ -703,9 +703,9 @@ def test_synaptic_downscaler_body_pressure_drives_shy():
 
 def test_voice_brain_waves_modulate_rhythm():
     """Brain wave state modulates voice rhythm."""
-    from frontal_lobe.self import PersonalityTraits
     from frontal_lobe.voice import Voice
     from limbic_system.emotion import EmotionalState
+    from self import PersonalityTraits
 
     personality = PersonalityTraits()
     voice = Voice(personality, seed=42)

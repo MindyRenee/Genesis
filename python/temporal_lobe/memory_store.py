@@ -11,8 +11,8 @@ Dependencies (passed to ``__init__``):
     - regulator: EmotionalRegulator for neurochemical responses to interactions
     - self_model: SelfModel for learning user facts and interests
     - td_learner: TDLearner for dopamine signal
-    - is_steward_speaker: callable reporting whether the current
-      attributed speaker is the authenticated steward
+    - is_bonded_speaker: callable reporting whether the current
+      attributed speaker is the person her profile names
     - last_summary_getter: callable returning last neuro summary
     - last_memory_mode_getter: callable returning current memory mode
 """
@@ -32,9 +32,10 @@ from genesis_client.swallow import note_swallowed
 
 if TYPE_CHECKING:
     from basal_ganglia.td import TDLearner
-    from frontal_lobe.self import SelfModel
     from limbic_system.emotional_regulator import EmotionalRegulator
-    from temporal_lobe.memory import MemorySystem
+    from self import SelfModel
+
+    from memory import MemorySystem
 
 __all__ = ["MemoryStore"]
 
@@ -56,7 +57,7 @@ class MemoryStore:
         regulator: EmotionalRegulator | None,
         self_model: SelfModel,
         td_learner: TDLearner,
-        is_steward_speaker: Callable[[], bool],
+        is_bonded_speaker: Callable[[], bool],
         last_summary_getter: Callable[[], Any],
         last_memory_mode_getter: Callable[[], str],
     ) -> None:
@@ -66,7 +67,7 @@ class MemoryStore:
         self._regulator = regulator
         self._self_model = self_model
         self._td_learner = td_learner
-        self._is_steward_speaker = is_steward_speaker
+        self._is_bonded_speaker = is_bonded_speaker
         self._last_summary_getter = last_summary_getter
         self._last_memory_mode_getter = last_memory_mode_getter
 
@@ -89,7 +90,7 @@ class MemoryStore:
         if self._regulator is None:
             return
 
-        is_steward = self._is_steward_speaker()
+        is_bonded = self._is_bonded_speaker()
         is_encouragement = perception.intent == Intent.ENCOURAGEMENT
         is_correction = perception.intent == Intent.CORRECTION
         is_comfort = perception.intent == Intent.COMFORT
@@ -111,7 +112,7 @@ class MemoryStore:
             sentiment=perception.sentiment,
             is_encouragement=is_encouragement,
             is_correction=is_correction,
-            is_steward=is_steward,
+            is_bonded=is_bonded,
             is_deep_conversation=is_deep,
             is_comfort=is_comfort,
         )

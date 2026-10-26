@@ -276,6 +276,7 @@ positive feedback loop.)
 Python modules that send cortisol impulses:
     - emotional_regulator.py: stress, concern, calming (negative),
       stress reduction, social comfort
+    - transduction.py: wave-driven SUPPRESSION (delta, wave_sign=-1)
 
 Python modules that read cortisol:
     - emotion.py: maps to EmotionalState (stress, valence)
@@ -319,6 +320,11 @@ class Cortisol:
     projections: tuple[str, ...] = ("bloodstream", "hippocampus", "PFC", "amygdala")
     receptors: tuple[str, ...] = ("GR", "MR")
     brain_waves: tuple[str, ...] = ("delta",)
+    # The DOWN member of the delta pair: delta-band dominance is the
+    # cortisol nadir (melatonin is the pair's UP member). A positive
+    # sign here would pump a stress hormone during slow-wave sleep —
+    # the recurring cortisol regression. -1 means the band suppresses.
+    wave_sign: float = -1.0
     circadian_modifier: str = "1.0 (NO circadian modulation — stress hormone)"
     role: str = "stress response, HPA cascade, BDNF suppression"
     hard_clamp_max: float = 0.80

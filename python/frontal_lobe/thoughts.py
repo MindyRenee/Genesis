@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from frontal_lobe.self import Insight
+from self import Insight
 
 __all__ = ["SpontaneousThought", "ThoughtChainType"]
 

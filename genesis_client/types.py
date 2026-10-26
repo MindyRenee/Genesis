@@ -733,6 +733,73 @@ def unpack_recent_episodes(data: bytes) -> list[RecentEpisode]:
     return results
 
 
+# ─── ArchivedEpisode ──────────────────────────────────────────
+#
+# From SEARCH_ARCHIVED response. Each entry is:
+# [u64 episode_id][u64 timestamp][f32 salience]
+# [u8 flags][u8 source_module][f32×4 emotional_tag]
+
+# IndexEntry flag bits (mirror of src/store/ltm.rs).
+EPISODE_FLAG_DELETED = 1 << 0
+EPISODE_FLAG_META = 1 << 1
+EPISODE_FLAG_ARCHIVED = 1 << 2
+
+
+@dataclass(frozen=True)
+class ArchivedEpisode:
+    """Metadata for one archived LTM episode — no payload text.
+
+    The release decision works on metadata alone: timestamp feeds
+    the decay terms, salience and the arousal tag feed consolidation
+    depth, flags separate real episodes from meta-memories, and
+    episode_id keys the mind's own access records. The body stays
+    on disk; only the bookkeeping crosses the wire.
+    """
+
+    episode_id: int
+    timestamp: int
+    salience: float
+    flags: int
+    source_module: int
+    emotional_tag: tuple[float, float, float, float]
+
+
+def unpack_archived_episodes(data: bytes) -> list[ArchivedEpisode]:
+    """Unpack a SEARCH_ARCHIVED response into a list of entries."""
+    if len(data) < 4:
+        return []
+    count = _U32.unpack(data[0:4])[0]
+    results: list[ArchivedEpisode] = []
+    offset = 4
+    entry_size = 8 + 8 + 4 + 1 + 1 + 16
+    for _ in range(count):
+        if offset + entry_size > len(data):
+            break
+        ep_id = _U64.unpack(data[offset : offset + 8])[0]
+        ts = _U64.unpack(data[offset + 8 : offset + 16])[0]
+        sal = _F32.unpack(data[offset + 16 : offset + 20])[0]
+        flags = data[offset + 20]
+        sm = data[offset + 21]
+        tag: tuple[float, float, float, float] = (
+            _F32.unpack(data[offset + 22 : offset + 26])[0],
+            _F32.unpack(data[offset + 26 : offset + 30])[0],
+            _F32.unpack(data[offset + 30 : offset + 34])[0],
+            _F32.unpack(data[offset + 34 : offset + 38])[0],
+        )
+        offset += entry_size
+        results.append(
+            ArchivedEpisode(
+                episode_id=ep_id,
+                timestamp=ts,
+                salience=sal,
+                flags=flags,
+                source_module=sm,
+                emotional_tag=tag,
+            )
+        )
+    return results
+
+
 # ─── CoreState (partial parse of 3480 bytes) ──────────────────
 #
 # We don't parse the full 3480-byte struct — that's too much detail
@@ -2306,9 +2373,7 @@ class FieldState:
         unwarmed field is an absent channel, not a zero reading.
         """
         try:
-            consensus = tuple(
-                float(x) for x in internals["field.consensus"].split(",")
-            )
+            consensus = tuple(float(x) for x in internals["field.consensus"].split(","))
             disagreement = float(internals["field.disagreement"])
             temperature = float(internals["field.temperature"])
             consensus_norm = float(internals["field.consensus_norm"])

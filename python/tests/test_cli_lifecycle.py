@@ -274,8 +274,19 @@ def test_graceful_teardown_says_goodbye_to_the_body(tmp_path):
     mind.stop.return_value = True
     with patch.object(genesis_cli, "_arm_exit_watchdog"):
         genesis_cli._teardown_session(
-            shutting_down, None, None, mind, None, None, str(tmp_path),
-            None, None, None, None, None, 0,
+            shutting_down,
+            None,
+            None,
+            mind,
+            None,
+            None,
+            str(tmp_path),
+            None,
+            None,
+            None,
+            None,
+            None,
+            0,
         )
     assert (tmp_path / "mind.suppress").exists()
 
@@ -286,8 +297,19 @@ def test_teardown_without_mind_writes_no_suppress(tmp_path):
     shutting_down = threading.Event()
     with patch.object(genesis_cli, "_arm_exit_watchdog"):
         genesis_cli._teardown_session(
-            shutting_down, None, None, None, None, None, str(tmp_path),
-            None, None, None, None, None, 0,
+            shutting_down,
+            None,
+            None,
+            None,
+            None,
+            None,
+            str(tmp_path),
+            None,
+            None,
+            None,
+            None,
+            None,
+            0,
         )
     assert not (tmp_path / "mind.suppress").exists()
 

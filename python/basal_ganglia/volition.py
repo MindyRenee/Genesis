@@ -17,8 +17,8 @@ from brainstem.thresholds import (
     WAKE_STABILIZATION_WINDOW,
 )
 from frontal_lobe.canvas import DrawingResult
-from frontal_lobe.tools.project_creator import create_project, manage_project_lifecycle
 from frontal_lobe.volition import Urge, Volition
+from tools.project_creator import create_project, manage_project_lifecycle
 
 from genesis_client.protocol import CHEM_NAMES, MODULE_METACOGNITION
 from genesis_client.swallow import note_swallowed, total_swallowed
@@ -273,8 +273,7 @@ class VolitionMixin:
             note_swallowed("mind.volition._chemical_signals", e)
             return {}
         return {
-            f"chem_{name}": min(1.0, max(0.0, float(level)))
-            for name, level in chemicals.items()
+            f"chem_{name}": min(1.0, max(0.0, float(level))) for name, level in chemicals.items()
         }
 
     def _orienting_signal(self) -> float:
@@ -578,19 +577,8 @@ class VolitionMixin:
 
     def _filter_ready_urges(self, ready: list[str]) -> list[str]:
         """Apply the readiness gates to the evaluated urges, in order:
-        custodial restraint, the protective-posture CPU cap, and
-        delta-wave creative suppression."""
-        # Custodial restraint — the steward's standing directives veto
-        # urges at the gate. An urge that matches a directive never
-        # reaches the performers; the veto is logged so restraint is
-        # legible, not silent.
-        steward = getattr(self.brain.frontal, "steward", None)
-        if steward is not None:
-            restrained = [r for r in ready if steward.directed_against(r) is not None]
-            if restrained:
-                logger.info(f"volition restrained by steward directive: {restrained}")
-                ready = [r for r in ready if r not in restrained]
-
+        the protective-posture CPU cap and delta-wave creative
+        suppression."""
         # Gate heavy CPU activities on learning posture
         posture = self._get_current_posture()
         from genesis_client.types import LEARNING_POSTURE_PROTECTIVE
@@ -785,15 +773,25 @@ class VolitionMixin:
             # The audit appetite is discharged by the scan itself —
             # record completion whether or not anything new was found.
             self._bug_scan_last_completed = time.monotonic()
+            # A long audit can straddle sleep onset — the urge fired
+            # while awake, the scan ran, and she is now asleep. The
+            # discharge and the fix records are still real, but the
+            # act's broadcast is wake-only: inside sleep it stays
+            # unsaid rather than surfacing a scan she should not be
+            # running.
+            loud = not self._is_sleeping
             # A bug that scanned clean was fixed — surface the repair
             # so it is known (thought + memory event), not merely gone.
             # The running list stays empty; the fix is the event.
             for file_path, category in result.resolved:
-                self._emit_live_thought(
-                    "code",
-                    f"a {category} in {file_path} is fixed — code is clean",
-                )
+                if loud:
+                    self._emit_live_thought(
+                        "code",
+                        f"a {category} in {file_path} is fixed — code is clean",
+                    )
                 self._store_fix_event(file_path, category)
+            if not loud:
+                return
             if result.new_bugs:
                 self._emit_live_thought(
                     "code",
@@ -1004,18 +1002,16 @@ class VolitionMixin:
 
         Two things happen here:
 
-        1. Autonomous bug fixes — the ONLY code changes that bypass the
-           experiment pipeline. These are safe, mechanical fixes for
-           three bug categories only (silent_except, unreachable_code,
-           print_in_code). They don't change control flow and are
-           validated with py_compile before writing.
+        1. Autonomous bug fixes — safe, mechanical fixes that write the
+           live file directly and validate with py_compile + import +
+           the test suite, reverting on failure.
 
-        2. Proposals for human review — everything else (docstrings,
-           type hints, refactoring, etc.) becomes a proposal. A proposal
-           IS an experiment: when accepted via /accept N, it runs
-           through the full verification pipeline (py_compile + tests)
-           with automatic revert on failure. No code change
-           bypasses this pipeline except the autonomous bug fixes above.
+        2. Proposal generation + experiments — everything else becomes
+           a proposal, and pending proposals run the full verification
+           pipeline on their own: the edit lands on the live file,
+           pytest + cargo test verify it, and a failure reverts and
+           rejects with teaching notes. The verification gate, not a
+           review queue, decides what lands.
 
         Sleep-gated: no improvement work during sleep. The brain-wave
         gating (delta/theta) is a secondary defense — N1 sleep can be
@@ -1043,8 +1039,8 @@ class VolitionMixin:
 
         self._emit_volition_thought(("improvement", "progress", "better"), "thinking")
         try:
-            # 1. Autonomous bug fixes — the only bypass for the
-            #    experiment pipeline. Three safe categories only.
+            # 1. Autonomous bug fixes — the mechanical categories,
+            #    written live and validated before they stay.
             applied = self.self_improvement.apply_autonomous_fixes(max_fixes=1)
             for fix in applied:
                 self._emit_live_thought(
@@ -1057,8 +1053,7 @@ class VolitionMixin:
             if applied:
                 self.brain.frontal.narrative.check_milestone("first self-modification")
 
-            # 2. Generate proposals — each one is a potential experiment
-            #    that will run through verification when accepted.
+            # 2. Generate proposals — each one is a potential experiment.
             #    These include its own ideas and refactors, not just
             #    bug fixes. It has opinions about its code.
             new = self.self_improvement.generate_proposals(max_proposals=3)
@@ -1068,6 +1063,31 @@ class VolitionMixin:
             # urge drove the action (it tried), it just has nothing
             # to propose. A hardcoded "nothing stood out" sentence
             # would violate the no-hardcoding rule and add noise.
+
+            # 3. Drain the queue — pending proposals run the verified
+            #    experiment pipeline automatically. One per urge: each
+            #    run is a full test-gate pass. The gate decides what
+            #    lands; a failed edit reverts and the rejection notes
+            #    teach the next attempt.
+            for outcome in self.run_pending_experiments(max_experiments=1):
+                if outcome["status"] == "applied":
+                    self._emit_live_thought(
+                        "code",
+                        f"applied my own change to {outcome['title']} — "
+                        "verified, it stays",
+                    )
+                    # A verified self-edit is the same milestone the
+                    # autonomous fixer trips.
+                    self.brain.frontal.narrative.check_milestone(
+                        "first self-modification"
+                    )
+                else:
+                    self._emit_live_thought(
+                        "code",
+                        f"my change to {outcome['title']} failed "
+                        f"verification ({outcome['status']}) — reverted, "
+                        "rethinking",
+                    )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._perform_improve",
@@ -1177,6 +1197,7 @@ class VolitionMixin:
                 task=task,
                 on_step=_on_step,
                 should_stop=_play_should_stop,
+                inducer=self.brain.frontal.dlpfc,
             )
         except Exception as e:  # noqa: BLE001
             note_swallowed("mind.volition._perform_play", e)
@@ -1642,7 +1663,8 @@ class VolitionMixin:
         (see discord_feed._classify).
         """
         self._emit_live_thought("broadcast", text)
-        feed = getattr(self, "_public_feed", None)
+        channel = getattr(getattr(self, "world", None), "channel", None)
+        feed = channel.feed if channel is not None else None
         if feed is not None:
             try:
                 feed.post(text, "Genesis")
@@ -1660,14 +1682,16 @@ class VolitionMixin:
             )
 
     def _hear_channel(self, author: str, content: str, message: dict) -> None:
-        """A public message on her channel — inbound speech.
+        """A public message on her channel — the reply side of hearing.
 
-        The DiscordListener's callback. Every message is heard:
-        recorded in her world as overheard speech (the public are
-        ambient voices until she can tell them apart) and surfaced
-        as a ``genesis~ [heard]`` live thought — terminal, journal,
-        workspace. The mirror skips that tag so the channel never
-        reposts the public's own words under her name.
+        The world's ``on_channel_speech`` callback: the page lives in
+        her outer world, which has already recorded the message as
+        overheard speech (``world._channel_heard`` — the hearing is
+        the world's to hold). What remains here is cognition: every
+        message is surfaced as a ``genesis~ [heard]`` live thought —
+        terminal, journal, workspace. The mirror skips that tag so
+        the channel never reposts the public's own words under her
+        name.
 
         Messages that address her — her name, or a reply to one of
         her own posts — get a public answer through ``_public_share``,
@@ -1679,13 +1703,6 @@ class VolitionMixin:
         text = content.strip()
         if not text or getattr(self, "_is_sleeping", False):
             return
-        try:
-            self.world.hear_overheard(f"{author}: {text}")
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition._hear_channel",
-                e,
-            )
         self._emit_live_thought("heard", f"{author}: {text}")
         if not self._channel_addressed(text, message):
             return
@@ -1720,7 +1737,8 @@ class VolitionMixin:
         referenced_message; a webhook post carries webhook_id)."""
         if "genesis" in text.lower():
             return True
-        bot_id = getattr(getattr(self, "_discord_listener", None), "bot_id", None)
+        channel = getattr(getattr(self, "world", None), "channel", None)
+        bot_id = channel.bot_id if channel is not None else None
         if bot_id is not None:
             for mention in message.get("mentions") or ():
                 if str(mention.get("id")) == str(bot_id):
@@ -1994,7 +2012,8 @@ class VolitionMixin:
         message, image plus her words. No feed means no channel —
         her work is still saved, remembered, and shown locally.
         """
-        feed = getattr(self, "_public_feed", None)
+        channel = getattr(getattr(self, "world", None), "channel", None)
+        feed = channel.feed if channel is not None else None
         if feed is None or not result.filepath:
             return
         try:

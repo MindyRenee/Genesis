@@ -7,7 +7,6 @@ import tempfile
 
 import numpy as np
 import pytest
-from frontal_lobe.self import PersonalityTraits
 from limbic_system.emotion import EmotionalState
 from occipital_lobe.perception import (
     IntegratedPerception,
@@ -40,6 +39,7 @@ from occipital_lobe.perception.core import (
 )
 from occipital_lobe.perception.vision import ColorInfo, _build_scene, _learn_objects
 from occipital_lobe.v1 import _build_summary
+from self import PersonalityTraits
 from temporal_lobe import (
     COCO_CLASSES,
     DetectedObject,

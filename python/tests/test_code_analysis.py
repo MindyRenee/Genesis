@@ -16,7 +16,7 @@ implementations describe the same thing.
 from __future__ import annotations
 
 import pytest
-from frontal_lobe.tools.code_analysis import analyze_python_source, impact_of, summarize
+from tools.code_analysis import analyze_python_source, impact_of, summarize
 
 
 def _symbol(analysis, name):

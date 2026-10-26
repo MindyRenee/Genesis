@@ -92,11 +92,11 @@ from .basal_ganglia import ActionBid, BasalGanglia, SelectionResult
 _EXPORTS: dict[str, str] = {
     "TDLearner": "basal_ganglia.td",
     "TDTransition": "basal_ganglia.td",
-    "HABIT_THRESHOLD": "temporal_lobe.memory.procedural",
-    "HabitBias": "temporal_lobe.memory.procedural",
-    "ProceduralMemory": "temporal_lobe.memory.procedural",
-    "Skill": "temporal_lobe.memory.procedural",
-    "SkillStrategy": "temporal_lobe.memory.procedural",
+    "HABIT_THRESHOLD": "memory.procedural",
+    "HabitBias": "memory.procedural",
+    "ProceduralMemory": "memory.procedural",
+    "Skill": "memory.procedural",
+    "SkillStrategy": "memory.procedural",
     # The action→prediction→observation→revision loop — how the
     # striatum learns what an action actually produces
     "ActionFeedback": "basal_ganglia.action_feedback",
@@ -121,26 +121,9 @@ _EXPORTS: dict[str, str] = {
     # GABA — the striatum's own inhibitory currency: direct/indirect
     # pathway gating lives here, not in a general pool
     "GABA": "basal_ganglia.gaba",
-    # Play — task selection scored by mastery and the actor-critic
-    # player that runs attempts; the environments it selects among
-    # live in ``worlds`` (the P and R of the MDP — the world, not
-    # the tissue)
-    "GameAttempt": "basal_ganglia.play",
-    "GamePlay": "basal_ganglia.play",
-    "normalize_offered": "basal_ganglia.play",
-    "COLLECTION": "basal_ganglia.play",
-    "GamePlayer": "basal_ganglia.player",
-    "PlayResult": "basal_ganglia.player",
-    "PlayStep": "basal_ganglia.player",
-    # Procedural category learning — dopamine prediction error
-    # shaping stimulus-response associations (COVIS-style)
-    "SorterAgent": "basal_ganglia.sorter_agent",
-    "PerceptualSorterAgent": "basal_ganglia.sorter_agent",
-    "RuleAgent": "basal_ganglia.rule_agent",
 }
 
 __all__ = [
-    "COLLECTION",
     "GABA",
     "HABIT_THRESHOLD",
     "ActionBid",
@@ -150,20 +133,12 @@ __all__ = [
     "BasalGanglia",
     "CausalHypothesis",
     "Discrepancy",
-    "GameAttempt",
-    "GamePlay",
-    "GamePlayer",
     "HabitBias",
     "MotorField",
-    "PerceptualSorterAgent",
-    "PlayResult",
-    "PlayStep",
     "ProceduralMemory",
-    "RuleAgent",
     "SelectionResult",
     "Skill",
     "SkillStrategy",
-    "SorterAgent",
     "TDLearner",
     "TDTransition",
     "Urge",
@@ -172,7 +147,6 @@ __all__ = [
     "WorldPolicy",
     "compose_motor_fields",
     "model_repeated_failure",
-    "normalize_offered",
 ]
 
 __getattr__ = view_getattr(_EXPORTS, __name__)

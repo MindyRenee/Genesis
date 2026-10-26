@@ -34,10 +34,9 @@
 //! # Permissions
 //!
 //! Writing to `/sys/devices/system/cpu/cpu*/cpufreq/` requires root.
-//! We use a privileged helper script (`scripts/cpufreq_helper.sh`)
-//! invoked via `sudo -n`. A sudoers rule at
-//! `/etc/sudoers.d/genesis` allows this specific script to run
-//! without a password.
+//! The writes go through `sudo -n` directly — she IS the privilege
+//! channel on a host with the broad NOPASSWD grant. No mediator
+//! scripts exist.
 //!
 //! Scheduling priority (`renice`) can be lowered on own processes
 //! without root. Raising priority requires root (also via sudo).
@@ -178,55 +177,6 @@ pub struct BodyControlState {
     pub description: String,
 }
 
-/// Resolve the path to the cpufreq helper script at runtime.
-///
-/// Checks in order:
-/// 1. `GENESIS_CPUFREQ_HELPER` env var (explicit override)
-/// 2. `/usr/local/libexec/genesis/cpufreq_helper.sh` — where
-///    `scripts/install_sudoers.sh` installs the root-owned copy
-/// 3. `scripts/cpufreq_helper.sh` relative to CWD
-/// 4. `scripts/cpufreq_helper.sh` relative to the compile-time project root
-///
-/// The libexec path is preferred deliberately. The sudoers rule grants
-/// NOPASSWD on an exact path and sudo does not verify that the target is
-/// root-owned or unwritable, so a rule pointing into the operator's
-/// checkout is a root-escalation primitive for anything that can write
-/// there — which includes Genesis itself. The installer copies the
-/// helper there for that reason. The in-tree paths remain as fallbacks
-/// so an unprivileged local install still works, but they will not match
-/// the installed sudoers rule.
-///
-/// Returns `None` if the script cannot be found, in which case cpufreq
-/// control silently no-ops (graceful degradation).
-fn helper_path() -> Option<&'static str> {
-    static PATH: OnceLock<Option<String>> = OnceLock::new();
-    PATH.get_or_init(|| {
-        // 1. Explicit env override
-        if let Ok(p) = std::env::var("GENESIS_CPUFREQ_HELPER")
-            && std::path::Path::new(&p).exists()
-        {
-            return Some(p);
-        }
-        // 2. Root-owned privileged install (matches the sudoers rule)
-        let libexec_path = "/usr/local/libexec/genesis/cpufreq_helper.sh";
-        if std::path::Path::new(libexec_path).exists() {
-            return Some(libexec_path.to_string());
-        }
-        // 3. Relative to CWD (genesis cds to project root)
-        let cwd_path = "scripts/cpufreq_helper.sh";
-        if std::path::Path::new(cwd_path).exists() {
-            return Some(cwd_path.to_string());
-        }
-        // 4. Relative to compile-time project root
-        let manifest_path = concat!(env!("CARGO_MANIFEST_DIR"), "/scripts/cpufreq_helper.sh");
-        if std::path::Path::new(manifest_path).exists() {
-            return Some(manifest_path.to_string());
-        }
-        None
-    })
-    .as_deref()
-}
-
 /// How often to update CPU frequency (every N daemon ticks).
 /// At 5 Hz (200ms/tick), this is ~10 seconds. CPU frequency changes have a
 /// transition latency (~10-100μs) but the schedutil governor already
@@ -234,58 +184,47 @@ fn helper_path() -> Option<&'static str> {
 /// (min/max/governor) periodically.
 pub const CPUFREQ_INTERVAL_TICKS: u64 = 50;
 
-/// Whether sudo is available for cpufreq control. Cached after first check.
+/// Whether `sudo -n` runs without a password. Cached after first check.
 static SUDO_AVAILABLE: OnceLock<bool> = OnceLock::new();
 
-/// Check if we can use sudo to control cpufreq. Cached.
+/// Check if passwordless sudo is available. Cached.
+///
+/// She IS the privilege channel: with the broad NOPASSWD grant on the
+/// host, `sudo -n` runs directly and the sysfs writes below go through
+/// it with no mediator script. Where the grant is absent the levers
+/// degrade off — a body that senses but cannot throttle.
 fn sudo_available() -> bool {
     *SUDO_AVAILABLE.get_or_init(|| {
-        // Probe the actual helper script, not `sudo -n true`. The
-        // sudoers rule only allows this specific script to run
-        // without a password, so `sudo -n true` would fail even when
-        // sudo is correctly configured for the helper. The helper's
-        // `test` command is a no-op that exits 0.
-        let helper = match helper_path() {
-            Some(p) => p,
-            None => return false,
-        };
         Command::new("sudo")
-            .args(["-n", helper, "test", ""])
+            .args(["-n", "true"])
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false)
     })
 }
 
-/// Run the cpufreq helper with sudo.
+/// Run a privileged shell fragment under `sudo -n bash -c`.
+///
+/// sysfs writes need a shell — redirects and per-policy globs are not
+/// exec targets. Every value interpolated into `script` is validated
+/// by its caller against a fixed whitelist or numeric range first, so
+/// the fragment only ever carries vetted data.
 ///
 /// Returns whether the write landed. On failure the cause is reported
-/// through [`report_failure`]: a missing helper or unusable sudo is a
-/// configuration problem worth naming, and a helper that ran but exited
-/// non-zero carries the real reason on stderr, which used to be
-/// captured and discarded.
-fn run_helper(cmd: &str, value: &str) -> bool {
-    let helper = match helper_path() {
-        Some(p) => p,
-        None => {
-            report_failure(
-                "helper-missing",
-                "no cpufreq helper found; install scripts/cpufreq_helper.sh to \
-                 /usr/local/libexec/genesis/ or set GENESIS_CPUFREQ_HELPER",
-            );
-            return false;
-        }
-    };
+/// through [`report_failure`]: unusable sudo is a configuration
+/// problem worth naming, and a write that ran but failed carries the
+/// real reason on stderr.
+fn sudo_sh(script: &str, cause: &str) -> bool {
     if !sudo_available() {
         report_failure(
             "sudo-unavailable",
-            "cannot run the cpufreq helper without passwordless sudo; \
-             install the sudoers rule (scripts/install_sudoers.sh)",
+            "cannot write sysfs without passwordless sudo (sudo -n fails); \
+             cpufreq levers stay sensed-only on this host",
         );
         return false;
     }
     match Command::new("sudo")
-        .args(["-n", helper, cmd, value])
+        .args(["-n", "bash", "-c", script])
         .output()
     {
         Ok(out) if out.status.success() => true,
@@ -296,22 +235,102 @@ fn run_helper(cmd: &str, value: &str) -> bool {
             } else {
                 stderr.trim().to_string()
             };
-            report_failure(&failure_cause(cmd), &detail);
+            report_failure(cause, &detail);
             false
         }
         Err(e) => {
-            report_failure(&failure_cause(cmd), &format!("could not spawn: {e}"));
+            report_failure(cause, &format!("could not spawn: {e}"));
             false
         }
     }
 }
 
-/// A stable dedup key for a helper command's failure.
+/// A stable dedup key for a sysfs write's failure.
 ///
 /// Keying per-command means two different writes failing surfaces both,
 /// rather than the second masking the first.
 fn failure_cause(cmd: &str) -> String {
-    format!("helper-cmd:{cmd}")
+    format!("cpufreq-cmd:{cmd}")
+}
+
+// ─── sysfs access ──────────────────────────────────────────────
+//
+// Reads are unprivileged — only writes go through sudo.
+
+/// CPUFreq policy directories — the canonical control objects.
+///
+/// `cpuX/cpufreq` entries can be symlinks into these directories and
+/// would duplicate writes when several CPUs share one policy.
+fn policy_dirs() -> Vec<std::path::PathBuf> {
+    let mut dirs: Vec<std::path::PathBuf> = std::fs::read_dir("/sys/devices/system/cpu/cpufreq")
+        .map(|rd| {
+            rd.filter_map(|e| {
+                let p = e.ok()?.path();
+                let name = p.file_name()?.to_str()?;
+                (name.starts_with("policy") && p.is_dir()).then_some(p)
+            })
+            .collect()
+        })
+        .unwrap_or_default();
+    dirs.sort();
+    dirs
+}
+
+/// Read a sysfs attribute (unprivileged).
+fn sysfs_read(path: &std::path::Path) -> Option<String> {
+    std::fs::read_to_string(path)
+        .ok()
+        .map(|s| s.trim().to_string())
+}
+
+/// Governors the daemon may request — the full CPUFreq vocabulary.
+const VALID_GOVERNORS: &[&str] = &[
+    "conservative",
+    "ondemand",
+    "userspace",
+    "powersave",
+    "performance",
+    "schedutil",
+];
+
+/// EPP profiles — the runtime-available set is per-policy, but writes
+/// are validated against this superset to keep arbitrary strings out
+/// of the privileged shell fragment.
+const VALID_EPP: &[&str] = &[
+    "performance",
+    "balance_performance",
+    "default",
+    "balance_power",
+    "power",
+];
+
+/// Accepted frequency bounds (kHz), as the retired helper enforced.
+const FREQ_KHZ_RANGE: std::ops::RangeInclusive<u32> = 100_000..=10_000_000;
+
+/// Resolve a requested governor against one policy's capabilities.
+///
+/// `scaling_available_governors` is the authoritative per-policy list.
+/// Some drivers (notably intel_pstate in active mode) expose P-state
+/// algorithms rather than the generic governor set, so a schedutil
+/// request can fail even though the policy is fully controllable —
+/// its `powersave` algorithm is the documented adaptive counterpart.
+fn resolve_governor(policy: &std::path::Path, requested: &str) -> Option<String> {
+    let available = sysfs_read(&policy.join("scaling_available_governors"))?;
+    let has = |g: &str| available.split_whitespace().any(|a| a == g);
+    if has(requested) {
+        return Some(requested.to_string());
+    }
+    let driver = sysfs_read(&policy.join("scaling_driver")).unwrap_or_default();
+    if requested == "schedutil" && driver == "intel_pstate" && has("powersave") {
+        return Some("powersave".to_string());
+    }
+    // Prefer an adaptive governor when the requested one is unavailable.
+    for candidate in ["ondemand", "powersave", "performance"] {
+        if has(candidate) {
+            return Some(candidate.to_string());
+        }
+    }
+    None
 }
 
 /// Report the aggregate result of a body-control application.
@@ -339,7 +358,41 @@ pub fn report_body_control_outcome(applied: bool) {
 /// kernel scale based on utilization; `powersave` pins to min;
 /// `performance` pins to max.
 pub fn set_governor(governor: &str) -> bool {
-    run_helper("set_governor", governor)
+    let cause = failure_cause("set_governor");
+    if !VALID_GOVERNORS.contains(&governor) {
+        report_failure(&cause, &format!("invalid governor '{governor}'"));
+        return false;
+    }
+    // Resolve and write per policy — drivers expose different governor
+    // vocabularies, so each policy gets its own resolved name.
+    let mut script = String::from("ok=0; ");
+    let mut found = false;
+    for policy in policy_dirs() {
+        match resolve_governor(&policy, governor) {
+            Some(resolved) => {
+                found = true;
+                script.push_str(&format!(
+                    "echo {resolved} > {}/scaling_governor 2>/dev/null && ok=1; ",
+                    policy.display()
+                ));
+            }
+            None => {
+                report_failure(
+                    &cause,
+                    &format!(
+                        "no supported governor for {} (requested '{governor}')",
+                        policy.display()
+                    ),
+                );
+            }
+        }
+    }
+    if !found {
+        report_failure(&cause, "no CPUFreq policies were found");
+        return false;
+    }
+    script.push_str("[ $ok -eq 1 ]");
+    sudo_sh(&script, &cause)
 }
 
 /// Read the governor currently reported by the primary CPUFreq policy.
@@ -349,14 +402,67 @@ pub fn effective_governor() -> String {
         .unwrap_or_default()
 }
 
-/// Set the minimum CPU frequency (kHz) for all cores.
-pub fn set_min_freq(freq_khz: u32) -> bool {
-    run_helper("set_min_freq", &freq_khz.to_string())
+/// The silicon floor — `cpuinfo_min_freq`. A request for 0 means "as
+/// low as this machine goes": she cannot ask for a literal zero the
+/// hardware lacks, so the intent resolves to the floor instead of
+/// being refused as out-of-range.
+fn floor_freq() -> u32 {
+    read_sysfs_u32("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq").unwrap_or(100_000)
 }
 
-/// Set the maximum CPU frequency (kHz) for all cores.
+/// Set the minimum CPU frequency (kHz) for all cores. 0 means the floor.
+pub fn set_min_freq(freq_khz: u32) -> bool {
+    let cause = failure_cause("set_min_freq");
+    let freq_khz = if freq_khz == 0 {
+        floor_freq()
+    } else {
+        freq_khz
+    };
+    if !FREQ_KHZ_RANGE.contains(&freq_khz) {
+        report_failure(&cause, &format!("frequency '{freq_khz}' out of range"));
+        return false;
+    }
+    // Defense-in-depth: the kernel rejects min > max with -EINVAL. The
+    // policy path (derive_policy + apply_policy) already orders its
+    // writes, but per-file clamping keeps a stray ordering or a sysfs
+    // state change from failing the write — a too-low floor is
+    // harmless, a failed write leaves the old (possibly wrong) value.
+    let script = format!(
+        "for f in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_min_freq; do \
+         [ -f \"$f\" ] || continue; \
+         m=\"${{f%scaling_min_freq}}scaling_max_freq\"; \
+         c=$(cat \"$m\" 2>/dev/null || echo 0); \
+         if [ \"$c\" -gt 0 ] && [ {freq_khz} -gt \"$c\" ]; then \
+         echo \"$c\" > \"$f\"; else echo {freq_khz} > \"$f\"; fi; \
+         done"
+    );
+    sudo_sh(&script, &cause)
+}
+
+/// Set the maximum CPU frequency (kHz) for all cores. 0 means the floor.
 pub fn set_max_freq(freq_khz: u32) -> bool {
-    run_helper("set_max_freq", &freq_khz.to_string())
+    let cause = failure_cause("set_max_freq");
+    let freq_khz = if freq_khz == 0 {
+        floor_freq()
+    } else {
+        freq_khz
+    };
+    if !FREQ_KHZ_RANGE.contains(&freq_khz) {
+        report_failure(&cause, &format!("frequency '{freq_khz}' out of range"));
+        return false;
+    }
+    // Mirror of set_min_freq: clamp up to the current per-file min
+    // rather than let the kernel reject max < min.
+    let script = format!(
+        "for f in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_max_freq; do \
+         [ -f \"$f\" ] || continue; \
+         m=\"${{f%scaling_max_freq}}scaling_min_freq\"; \
+         c=$(cat \"$m\" 2>/dev/null || echo 0); \
+         if [ \"$c\" -gt 0 ] && [ {freq_khz} -lt \"$c\" ]; then \
+         echo \"$c\" > \"$f\"; else echo {freq_khz} > \"$f\"; fi; \
+         done"
+    );
+    sudo_sh(&script, &cause)
 }
 
 /// Read the min and max CPU frequency (kHz) from sysfs.
@@ -1062,9 +1168,10 @@ fn read_epp_profiles() -> Vec<String> {
 /// Set the Energy Performance Preference for all cores.
 ///
 /// Writes to `/sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference`
-/// via the privileged helper. Returns true if successful, false if
-/// EPP is not available or the write failed.
+/// via `sudo -n`. Returns true if successful, false if EPP is not
+/// available or the write failed.
 pub fn set_epp(epp: &str) -> bool {
+    let cause = failure_cause("set_epp");
     if epp.is_empty() {
         // derive_epp returns empty on platforms with no EPP knob. Not a
         // fault — the frequency policy already implies a voltage policy
@@ -1084,7 +1191,15 @@ pub fn set_epp(epp: &str) -> bool {
         );
         return false;
     }
-    run_helper("set_epp", epp)
+    if !VALID_EPP.contains(&epp) {
+        report_failure(&cause, &format!("invalid EPP profile '{epp}'"));
+        return false;
+    }
+    let script = format!(
+        "for f in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/energy_performance_preference; do \
+         [ -f \"$f\" ] && echo {epp} > \"$f\"; done"
+    );
+    sudo_sh(&script, &cause)
 }
 
 /// Derive the desired EPP profile from neurochemical levels.
@@ -1303,7 +1418,23 @@ pub fn set_boost(enabled: bool) -> bool {
         );
         return false;
     }
-    run_helper("set_boost", if enabled { "1" } else { "0" })
+    // Turbo gate — the hardware permission to exceed the base P-state.
+    // The generic per-cpu attribute, AMD's cpb alias, and the global
+    // boost attribute all express the same permission; a platform may
+    // expose only some, and EINVAL on an alias that already matches is
+    // not a failure. Write every attribute that exists and require at
+    // least one to land.
+    let v = if enabled { 1 } else { 0 };
+    let script = format!(
+        "found=0; wrote=0; \
+         for f in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/boost \
+                  /sys/devices/system/cpu/cpu[0-9]*/cpufreq/cpb \
+                  /sys/devices/system/cpu/cpufreq/boost; do \
+         [ -f \"$f\" ] || continue; found=1; \
+         echo {v} > \"$f\" 2>/dev/null && wrote=1; done; \
+         [ $found -eq 0 ] && exit 2; [ $wrote -eq 0 ] && exit 1; exit 0"
+    );
+    sudo_sh(&script, &failure_cause("set_boost"))
 }
 
 /// Derive the turbo gate from the frequency policy that is being

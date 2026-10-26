@@ -170,9 +170,7 @@ class Volition:
         """Look up an urge by name, or None if not found."""
         return self.urges.get(name)
 
-    def _capture_readiness(
-        self, urge: Urge, trace: deque[tuple[float, float]]
-    ) -> None:
+    def _capture_readiness(self, urge: Urge, trace: deque[tuple[float, float]]) -> None:
         """Snapshot the buildup at the moment of threshold crossing.
 
         Onset is the trough of the trace since the urge's previous

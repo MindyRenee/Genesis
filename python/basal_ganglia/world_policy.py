@@ -234,8 +234,6 @@ class WorldPolicy:
                 self._bid_reembody(available),
                 self._bid_calibrate(available),
                 self._bid_plan(available),
-                self._bid_board(available),
-                self._bid_exemplar(available),
                 self._bid_intention(available),
                 self._bid_probe(available),
                 self._bid_reprobe(available),
@@ -599,6 +597,8 @@ class WorldPolicy:
         choices = [a for a in candidates if evidence[a] == least]
         pick = self._rng.choice(choices)
         weight = 0.7 + 0.3 * len(non_reset) / len(available) if non_reset else 0.15
+        if model.effect_of(pick) is not None and not model.action_miscalibrated(pick):
+            weight *= model.action_uncertainty(pick)
         return {
             "action": pick,
             "cell": self._cell_for(pick),
@@ -630,49 +630,6 @@ class WorldPolicy:
             "route": len(seq),
             "source": "planned",
             "weight": weight,
-        }
-
-    def _bid_board(self, available: list[str]) -> dict[str, Any] | None:
-        """Constraint satisfaction — the structured-scene machinery
-        holds a violation-reducing act. A solve in hand is
-        deliberate pursuit: same league as a route to goal value."""
-        cell = self._model.board_plan()
-        if cell is None:
-            return None
-        actions = [a for a in self._model.coordinate_actions if a in available]
-        if not actions:
-            return None
-        # The control that has answered most is the one to press.
-        action = max(
-            actions,
-            key=lambda a: (
-                sum(v for (act, _c), v in self._model.click_changes.items() if act == a),
-                -self._model.action_tries[a],
-            ),
-        )
-        return {
-            "action": action,
-            "cell": cell,
-            "source": "planned",
-            "weight": 0.8,
-        }
-
-    def _bid_exemplar(self, available: list[str]) -> dict[str, Any] | None:
-        """Abstraction in hand — the demonstration machinery induced
-        a rule and its writer knows the next act toward the answer.
-
-        A predicted target plus a write plan is deliberate pursuit,
-        the same league as the boards solve: above probes and
-        intentions, below a verified route to learned value.
-        """
-        action = self._model.exemplar_act(available)
-        if action is None:
-            return None
-        return {
-            "action": action,
-            "cell": None,
-            "source": "exemplar",
-            "weight": 0.7,
         }
 
     # Objective targets naming what her model has learned to want

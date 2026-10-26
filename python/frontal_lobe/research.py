@@ -7,8 +7,8 @@ keeping its claims, its evidence, and its failures together so that
 nothing is ever paid for twice — the graveyard of attempts is part
 of the state, not noise.
 
-The discipline is provenance, patterned on the steward channel: the
-writer never grants its own authority. ``record_conjecture``,
+The discipline is provenance: the writer never grants its own
+authority. ``record_conjecture``,
 ``record_reading``, and ``mark_empirical`` can only create claims
 that are conjectured, read, or empirically supported; the terminal
 verdicts "verified" and "refuted" are written only by ``verify``,

@@ -237,3 +237,33 @@ class TestVQCodebook:
         cb.fit(vectors, names, iters=5)
         # K should be clamped to 30 (number of vectors)
         assert cb.prototypes.shape[0] == 30
+
+    def test_adaptive_residual_scale_fits_the_data(self, sample_vectors):
+        """Default construction derives the int8 scale from the residuals.
+
+        A fixed 0.1 step is orders of magnitude coarser than real
+        residuals, so most of them quantized to int8 zero and the
+        reported error was the prototype residual itself. Adaptive
+        scaling maps the largest residual to the int8 edge: saturation
+        is structurally zero and the error floor follows the data.
+        """
+        vectors, names = sample_vectors
+        cb = VQCodebook(dim=8, k=3)
+        cb.fit(vectors, names, iters=20)
+
+        assert cb.residual_scale != cb.DEFAULT_RESIDUAL_SCALE
+        assert cb.residual_saturation_fraction == 0.0
+        # The fitted scale must be finer than the old fixed step for
+        # residuals this small, and the error must beat it.
+        coarse = VQCodebook(dim=8, k=3, residual_scale=0.1)
+        coarse.fit(vectors, names, iters=20)
+        assert cb.residual_scale < 0.1
+        assert cb.reconstruction_error <= coarse.reconstruction_error
+
+    def test_explicit_residual_scale_is_honored(self, sample_vectors):
+        """An explicit scale disables adaptation — the caller's
+        quantization range stays theirs across refits."""
+        vectors, names = sample_vectors
+        cb = VQCodebook(dim=8, k=3, residual_scale=0.01)
+        cb.fit(vectors, names, iters=20)
+        assert cb.residual_scale == 0.01

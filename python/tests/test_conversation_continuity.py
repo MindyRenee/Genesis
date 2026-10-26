@@ -23,13 +23,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pytest
 from frontal_lobe.generator import GenerativeLanguage
 from frontal_lobe.prefrontal import FrontalLobe
-from frontal_lobe.self import SelfModel
 from occipital_lobe.perception import perceive
+from self import SelfModel
 from temporal_lobe.concepts import ConceptNetwork, RelationType
-from temporal_lobe.memory import MemorySystem
 
 from genesis_client import GenesisClient
 from infrastructure.user_profile import UserProfile
+from memory import MemorySystem
 
 
 @pytest.fixture

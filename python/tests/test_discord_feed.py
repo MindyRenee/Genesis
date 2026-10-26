@@ -396,7 +396,7 @@ def _scripted_listener(monkeypatch, delivered: list, script: _ScriptedGet) -> Di
         lambda author, content, message: delivered.append((author, content)),
         poll_interval=0.01,
     )
-    monkeypatch.setattr(listener, "_resolve_channel", lambda url: "chan123")
+    monkeypatch.setattr(listener, "_resolve_channel", lambda url, stop=None: "chan123")
     monkeypatch.setattr(listener, "_get", script)
     return listener
 
@@ -498,6 +498,66 @@ def test_from_feed_requires_token_and_feed(monkeypatch):
     monkeypatch.setenv("GENESIS_DISCORD_BOT_TOKEN", "tok")
     assert DiscordListener.from_feed(feed, lambda *a: None) is not None
     assert DiscordListener.from_feed(None, lambda *a: None) is None
+
+
+# ---------------------------------------------------------------
+# Shutdown — teardown must not outlive the urlopen bound
+# ---------------------------------------------------------------
+
+
+def _hanging_urlopen(req, timeout=0):
+    """A request that never answers — dead resolver/down webhook."""
+    time.sleep(30)
+    return _FakeResponse()
+
+
+def test_close_binds_inflight_post_to_drain_deadline(monkeypatch):
+    """close() drains for _DRAIN_DEADLINE at most — an in-flight POST
+    expires *with* the deadline instead of parking the join for the
+    full urlopen bound on top of it."""
+    monkeypatch.setattr(discord_feed.urllib.request, "urlopen", _hanging_urlopen)
+    feed = DiscordFeed(URL, post_interval=0.0)
+    feed.post("pending line")
+    time.sleep(0.3)  # let the poster enter the hanging request
+    start = time.monotonic()
+    feed.close()
+    elapsed = time.monotonic() - start
+    # The thread must be *dead* when close() returns — the pre-fix
+    # join expired at DRAIN+2 while the wedged request ran on to 15 s.
+    assert not feed._thread.is_alive()
+    assert elapsed < discord_feed._DRAIN_DEADLINE + 2.0
+
+
+def test_close_interrupts_backoff_sleep(monkeypatch):
+    """A rate-limit backoff must not outlive close() — the poster
+    wakes on the close notify instead of sleeping out retry_after."""
+
+    def rate_limited(req, timeout=0):
+        raise urllib.error.HTTPError(URL, 429, "rl", {}, io.BytesIO(b'{"retry_after": 600}'))
+
+    monkeypatch.setattr(discord_feed.urllib.request, "urlopen", rate_limited)
+    feed = DiscordFeed(URL, post_interval=0.0)
+    feed.post("x")
+    # Wait for the first POST to fail so the poster is parked in
+    # the backoff sleep before close() lands.
+    assert _wait_for(lambda: feed._fail_streak >= 1)
+    feed.close()
+    # Without the interruptible wait the poster slept retry_after=600 s
+    # past close() — the thread must already be dead here.
+    assert not feed._thread.is_alive()
+
+
+def test_listener_stop_interrupts_inflight_get(monkeypatch):
+    """stop() cuts an in-flight poll — the ear must not hold
+    teardown for the rest of a wedged urlopen's bound."""
+    monkeypatch.setattr(discord_feed.urllib.request, "urlopen", _hanging_urlopen)
+    listener = DiscordListener("tok", "wh-url", lambda *a: None, poll_interval=0.01)
+    monkeypatch.setattr(listener, "_resolve_channel", lambda url, stop=None: "chan")
+    listener.start()
+    time.sleep(0.2)  # let the poll thread enter a hanging _get
+    start = time.monotonic()
+    listener.stop()
+    assert time.monotonic() - start < 3.0
 
 
 # ---------------------------------------------------------------

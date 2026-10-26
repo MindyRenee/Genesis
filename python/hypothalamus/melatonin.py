@@ -213,8 +213,8 @@ Maximum impulse magnitude: 0.1
 (Conservative — melatonin is a hormone with slow clearance)
 
 Python modules that send melatonin impulses:
-    - (Currently no direct Python impulses — melatonin is driven
-      by the circadian oscillator in the Rust dynamics)
+    - transduction.py: wave-driven release (delta band power)
+    - (Also driven by the circadian oscillator in the Rust dynamics)
 
 Python modules that read melatonin:
     - emotional_regulator.py: homeostatic regulation
@@ -252,6 +252,7 @@ class Melatonin:
     projections: tuple[str, ...] = ("bloodstream", "SCN")
     receptors: tuple[str, ...] = ("MT1", "MT2")
     brain_waves: tuple[str, ...] = ("delta",)
+    wave_sign: float = 1.0
     circadian_modifier: str = "1.0 (driven by oscillator, not baseline modulation)"
     role: str = "circadian sleep hormone, MT1/MT2 activation, sleep onset"
     peak_level: float = 0.80

@@ -12,6 +12,7 @@ import tempfile
 
 import numpy as np
 import pytest
+from memory.semantic import _relation_to_edge
 from temporal_lobe.concepts import (
     QUALITY_THRESHOLD,
     Concept,
@@ -26,8 +27,8 @@ from temporal_lobe.concepts import (
     open_archive,
 )
 from temporal_lobe.concepts.edge_log import open_edge_log
-from temporal_lobe.memory import SemanticMemory
-from temporal_lobe.memory.semantic import _relation_to_edge
+
+from memory import SemanticMemory
 
 logger = logging.getLogger(__name__)
 

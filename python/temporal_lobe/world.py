@@ -22,8 +22,32 @@ inner-life social drive and the ``reach_out`` volition urge. This is
 what lets it *initiate* contact, not just answer it: conversations
 can start from either side.
 
+Her **channel** is a place in this world — her page, where the
+public gathers and she posts (``worlds.channel.Channel``).
+The page lives here rather than in the mind because it *is* a part
+of the outer world: what the public says on it arrives as speech in
+the world's own stream (``_channel_heard``), and what she says onto
+it is recorded beside her other acts.
+
 The world is a model, not a policy: it records and weighs what
 happens; the mind decides what to do about it.
+
+The model is predictive, not just archival — a successor-
+representation map (Dayan 1993; Stachenfeld, Botvinick & Gershman
+2017) learned over the world's own state stream, the same math the
+hippocampal-entorhinal map applies to space, here applied to the
+social/episodic domain (Tavares et al. 2015; Schafer & Schiller
+2018 — the hippocampus maps social state space too). Each recorded
+event is a state visit and consecutive events are transitions, so
+``M = (I − γP)⁻¹`` over the observed transition matrix is the
+expected discounted occupancy of what comes next — "from here,
+what does the world do": after she speaks, does speech come back;
+after an arrival, does engagement follow; when she is active, who
+answers. Two grains, matching the two things the world holds: the
+*event-kind* map (the dynamics — the events between them) and the
+*presence* map (the people — who acts after whom, her own acts
+included). Structure is learned from the stream; content stays in
+the events themselves — the TEM structure/content split.
 """
 
 from __future__ import annotations
@@ -31,8 +55,14 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections import Counter
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+
+if TYPE_CHECKING:
+    from worlds.channel import Channel
 
 from limbic_system.sentiment import analyze_sentiment
 
@@ -88,6 +118,117 @@ _SALIENCE = {
     EventKind.ACTION: 0.4,
 }
 
+#: Successor-representation discount (Stachenfeld 2017 uses γ≈0.9+).
+#: Deep enough that "who answers when I speak" reaches past the next
+#: event; shallow enough that a quiet world's distant futures don't
+#: dominate the near-term prediction.
+_SR_GAMMA = 0.9
+
+
+class _SuccessorMap:
+    """M = (I − γP)⁻¹ over an open set of world states.
+
+    States are opaque hashable keys (event kinds, presence ids).
+    Every ``observe`` is a state visit; consecutive visits count a
+    transition — the world's stream is its trajectory. Counts
+    row-normalize to P; M's row for a state is the expected
+    discounted future occupancy of every other state from it —
+    Stachenfeld's "predictive map," the closed form over the
+    empirical transition matrix (the spatial sibling in
+    ``cognitive_map`` uses the same construction). The map is
+    rebuilt lazily and cached until the counts change.
+    """
+
+    def __init__(self) -> None:
+        self._counts: dict[Any, Counter] = {}
+        self._prev: Any = None
+        self._version = 0
+        self._cache: tuple[int, float, list[Any], np.ndarray] | None = None
+
+    def observe(self, state: Any) -> None:
+        """Record a visit to ``state`` — and the transition into it."""
+        if self._prev is not None:
+            self._counts.setdefault(self._prev, Counter())[state] += 1
+            self._version += 1
+        else:
+            self._counts.setdefault(state, Counter())
+            self._version += 1
+        self._prev = state
+
+    def evict(self, state: Any) -> None:
+        """Drop a state entirely — its row and its inbound edges."""
+        if state not in self._counts:
+            return
+        del self._counts[state]
+        for dsts in self._counts.values():
+            dsts.pop(state, None)
+        if self._prev == state:
+            self._prev = None
+        self._version += 1
+
+    def transition_matrix(self) -> tuple[list[Any], np.ndarray]:
+        """P — row-normalized transition probabilities over states."""
+        ids = sorted(self._counts, key=str)
+        index = {s: i for i, s in enumerate(ids)}
+        P = np.zeros((len(ids), len(ids)))
+        for src, dsts in self._counts.items():
+            total = sum(dsts.values())
+            if not total:
+                continue
+            for dst, n in dsts.items():
+                if dst in index:
+                    P[index[src], index[dst]] += n / total
+        return ids, P
+
+    def successor_map(self, gamma: float = _SR_GAMMA) -> tuple[list[Any], np.ndarray]:
+        """M = (I − γP)⁻¹ — expected discounted future occupancy."""
+        if self._cache is not None and self._cache[0] == self._version and self._cache[1] == gamma:
+            return self._cache[2], self._cache[3]
+        ids, P = self.transition_matrix()
+        if not ids:
+            return ids, np.zeros((0, 0))
+        n = len(ids)
+        M = np.linalg.inv(np.eye(n) - gamma * P)
+        self._cache = (self._version, gamma, ids, M)
+        return ids, M
+
+    def expect(self, state: Any, gamma: float = _SR_GAMMA) -> dict[Any, float]:
+        """The predictive row for ``state``: what follows, and how much.
+
+        Returns ``{state′: expected discounted occupancy}`` — empty
+        for a state the map has never seen (no prior to predict from).
+        """
+        ids, M = self.successor_map(gamma)
+        if state not in ids:
+            return {}
+        row = M[ids.index(state)]
+        return {s: float(row[i]) for i, s in enumerate(ids) if row[i] > 0}
+
+    def current(self) -> Any:
+        """The last visited state — where the trajectory is now."""
+        return self._prev
+
+    def to_dict(self, encode: Callable[[Any], str] = str) -> dict[str, Any]:
+        """Serialize the counted transitions through a key encoder."""
+        return {
+            "counts": {
+                encode(s): {encode(d): n for d, n in dsts.items()}
+                for s, dsts in self._counts.items()
+            },
+            "prev": encode(self._prev) if self._prev is not None else None,
+        }
+
+    def restore(self, data: dict[str, Any], decode: Callable[[str], Any] = str) -> None:
+        """Rebuild from serialized counts through a key decoder."""
+        counts: dict[Any, Counter] = {}
+        for s, dsts in (data.get("counts") or {}).items():
+            counts[decode(str(s))] = Counter({decode(str(d)): int(n) for d, n in dsts.items()})
+        prev = data.get("prev")
+        self._counts = counts
+        self._prev = decode(str(prev)) if prev is not None else None
+        self._version += 1
+        self._cache = None
+
 
 class OuterWorld:
     """The model of Genesis's external world.
@@ -111,6 +252,13 @@ class OuterWorld:
         get_user_name: Callback returning the user's name if its
             user profile has learned one. Synced lazily onto the user
             presence. Optional.
+        channel: Her page — the public channel (``Channel``) that
+            lives in this world. Optional; absent when no webhook is
+            configured.
+        on_channel_speech: Callback ``(author, text, message)`` for
+            cognition — called after the world records a heard channel
+            message, so the mind can decide whether to answer.
+            Optional; the world records public speech either way.
     """
 
     def __init__(
@@ -120,6 +268,8 @@ class OuterWorld:
         neuro_impulse: Callable[[int, float], None] | None = None,
         is_sleeping: Callable[[], bool] | None = None,
         get_user_name: Callable[[], str | None] | None = None,
+        channel: Channel | None = None,
+        on_channel_speech: Callable[[str, str, dict], None] | None = None,
     ) -> None:
         """Initialize the external world with the given wiring."""
         self._network = network
@@ -127,9 +277,26 @@ class OuterWorld:
         self._is_sleeping = is_sleeping
         self._get_user_name = get_user_name
 
+        # Her page — the place in this world where the public gathers.
+        # The world owns the hearing: the channel's inbound speech is
+        # recorded here first, then handed to cognition's callback.
+        self.channel = channel
+        self.on_channel_speech = on_channel_speech
+        if self.channel is not None:
+            self.channel.on_speech = self._channel_heard
+
         self._stream = EventStream(max_size=200)
         self._presences: dict[str, Presence] = {}
         self._lock = threading.Lock()
+
+        # The predictive maps — successor representation over the
+        # world's own stream, at the two grains the world holds:
+        # event kinds (its dynamics) and event sources (its people,
+        # "self" included — her acts are transitions in the world
+        # too). Every recorded event is a visit to its kind and to
+        # its source.
+        self._kind_map = _SuccessorMap()
+        self._presence_map = _SuccessorMap()
 
         # Listener notified for every recorded event — Mind registers
         # here to route events into cognition (workspace, memory,
@@ -238,6 +405,24 @@ class OuterWorld:
         self._impulse(CHEM_NOREPINEPHRINE, 0.01)
         self._record(event)
         return event
+
+    def _channel_heard(self, author: str, content: str, message: dict) -> None:
+        """Public speech arriving through her page — heard by the world.
+
+        The channel's ear calls this for every public message. The
+        world records it as overheard speech — the public are ambient
+        voices until it can tell them apart — then hands the utterance
+        to cognition's ``on_channel_speech``, which decides whether it
+        addressed her and whether she answers. The thalamic gate
+        applies here like everywhere else inbound: asleep, nothing
+        reaches the world or the mind.
+        """
+        text = (content or "").strip()
+        if not text or self._asleep():
+            return
+        self.hear_overheard(f"{author}: {text}")
+        if self.on_channel_speech is not None:
+            self.on_channel_speech(author, text, message)
 
     def perceive(
         self,
@@ -437,6 +622,57 @@ class OuterWorld:
             count = sum(1 for e in self._stream.recent(200) if e.inbound and e.timestamp >= cutoff)
         return count / 5.0
 
+    # ── The predictive map — what the world does next ───────────
+
+    def expected_events(self) -> dict[EventKind, float]:
+        """Expected discounted occupancy of each event kind from here.
+
+        The successor map's row for the world's current event kind —
+        "from here, what does the stream do": an arrival that usually
+        becomes engagement shows USER_SPEECH mass; a room whose speech
+        runs dry shows DEPARTURE ahead. Empty until the world has
+        seen enough to predict from.
+        """
+        with self._lock:
+            cur = self._kind_map.current()
+            return {} if cur is None else self._kind_map.expect(cur)
+
+    def expected_activity(self) -> dict[str, float]:
+        """Expected discounted activity per event source from here.
+
+        The presence map's row for whoever acted last — "who is
+        likely to act next." ``self`` is a source in this map, so
+        the row following her own act is the learned "when I'm
+        active, who answers."
+        """
+        with self._lock:
+            cur = self._presence_map.current()
+            return {} if cur is None else self._presence_map.expect(cur)
+
+    def expected_engagement(self) -> float:
+        """Expected addressed contact upcoming from the current state.
+
+        ``M[current, USER_SPEECH]`` — the map's answer to "will
+        anyone engage it soon," learned from the stream itself rather
+        than from a clock alone. Zero with no map and no history.
+        """
+        with self._lock:
+            cur = self._kind_map.current()
+            if cur is None:
+                return 0.0
+            return self._kind_map.expect(cur).get(EventKind.USER_SPEECH, 0.0)
+
+    def answer_expectation(self) -> float:
+        """Expected addressed reply after her own act — do bids land.
+
+        ``M[UTTERANCE, USER_SPEECH]``: the occupancy the map predicts
+        for addressed speech in the wake of her speaking — learned
+        from every past utterance's aftermath. The sequence-level
+        complement to a presence's responsiveness posterior.
+        """
+        with self._lock:
+            return self._kind_map.expect(EventKind.UTTERANCE).get(EventKind.USER_SPEECH, 0.0)
+
     def tick(self, now: float | None = None) -> None:
         """Advance the world — presence decay and housekeeping.
 
@@ -511,6 +747,10 @@ class OuterWorld:
             f"  social isolation: {isolation:.0%}   "
             f"activity: {self.activity_level():.1f} events/min"
         )
+        expected = self.expected_events()
+        if expected:
+            top = sorted(expected.items(), key=lambda kv: -kv[1])[:3]
+            lines.append("  expects next: " + ", ".join(f"{k.value} ({v:.2f})" for k, v in top))
         events = self._stream.recent(8)
         if events:
             lines.append("  recent:")
@@ -530,6 +770,10 @@ class OuterWorld:
                 "events": [e.to_dict() for e in self._stream.recent(50)],
                 "last_addressed_time": self._last_addressed_time,
                 "unanswered_bids": self._unanswered_bids,
+                "maps": {
+                    "kinds": self._kind_map.to_dict(lambda k: k.value),
+                    "sources": self._presence_map.to_dict(str),
+                },
             }
 
     def restore_from_dict(self, data: dict[str, Any]) -> None:
@@ -558,6 +802,7 @@ class OuterWorld:
                 events.append(event)
         last_addressed = float(data.get("last_addressed_time", time.time()))
         bids = int(data.get("unanswered_bids", 0))
+        maps = data.get("maps") or {}
         with self._lock:
             self._presences = presences
             self._stream = EventStream(max_size=200)
@@ -565,11 +810,22 @@ class OuterWorld:
                 self._stream.append(event)
             self._last_addressed_time = last_addressed
             self._unanswered_bids = max(0, bids)
+            # Learned structure persists across restarts — a map that
+            # forgot its transitions every boot would never grow up.
+            self._kind_map = _SuccessorMap()
+            self._presence_map = _SuccessorMap()
+            if isinstance(maps.get("kinds"), dict):
+                self._kind_map.restore(maps["kinds"], EventKind)
+            if isinstance(maps.get("sources"), dict):
+                self._presence_map.restore(maps["sources"], str)
 
     # ── Internals ───────────────────────────────────────────────
 
     def _record(self, event: ExternalEvent) -> None:
-        """Append the event and notify the listener (no lock held)."""
+        """Append the event, learn its transitions, notify (no lock)."""
+        with self._lock:
+            self._kind_map.observe(event.kind)
+            self._presence_map.observe(event.source)
         self._stream.append(event)
         listener = self.on_external_event
         if listener is not None:
@@ -607,6 +863,7 @@ class OuterWorld:
             return
         stale = min(candidates, key=lambda p: p.last_seen)
         del self._presences[stale.presence_id]
+        self._presence_map.evict(stale.presence_id)
 
     def _arrival_locked(self, presence: Presence, now: float) -> ExternalEvent:
         """Build an ARRIVAL event for a presence that just appeared.

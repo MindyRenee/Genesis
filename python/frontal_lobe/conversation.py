@@ -9,12 +9,12 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from frontal_lobe import CognitiveState
-from frontal_lobe.self import EmergentIdentitySource, IdentityStage
 from occipital_lobe import load_image, resize_for_vision
 from parietal_lobe.grid import Grid
 from parietal_lobe.grounding import ground_scene
 from parietal_lobe.scene import Scene
 from parietal_lobe.scene import perceive as _scene_perceive
+from self import EmergentIdentitySource, IdentityStage
 from temporal_lobe.base import Thought
 from temporal_lobe.events import EventKind
 from temporal_lobe.presence import PresenceKind
@@ -1592,7 +1592,7 @@ class ConversationMixin:
         self.brain.frontal.game_mode = True
         self.learner.pause()
         try:
-            from frontal_lobe.tools.framework import get_tools
+            from tools.framework import get_tools
 
             get_tools().net_sealed = True
         except Exception as e:  # noqa: BLE001 — sealing must never block play
@@ -1618,7 +1618,7 @@ class ConversationMixin:
         self.brain.frontal.game_mode = False
         self.learner.resume()
         try:
-            from frontal_lobe.tools.framework import get_tools
+            from tools.framework import get_tools
 
             get_tools().net_sealed = False
         except Exception as e:  # noqa: BLE001 — release is best-effort

@@ -30,7 +30,7 @@ from temporal_lobe.base import Language, Thought
 from infrastructure.text import is_blank
 
 if TYPE_CHECKING:
-    from temporal_lobe.memory import WorkingMemory
+    from memory import WorkingMemory
 
     from .thought_composer import ThoughtComposer
 

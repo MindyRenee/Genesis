@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from frontal_lobe import CognitiveState
-from frontal_lobe.self import EmergentIdentity, IdentityStage
 from limbic_system.emotion import (
     PLASTICITY_CLOSED,
     PLASTICITY_LOW,
@@ -16,6 +15,7 @@ from limbic_system.emotion import (
     EmotionalState,
     assess_emotion,
 )
+from self import EmergentIdentity, IdentityStage
 from temporal_lobe.base import Thought
 from temporal_lobe.concepts import NetworkTopology
 
@@ -453,13 +453,9 @@ class StatusMixin:
             note_swallowed("mind.status.feel.field_state", e)
         field = getattr(self.regulator, "field", None)
         if field is not None:
-            emotion = field.update(
-                summary, core_state.chemicals, context, waves, field_state
-            )
+            emotion = field.update(summary, core_state.chemicals, context, waves, field_state)
         else:
-            emotion = assess_emotion(
-                summary, core_state.chemicals, context, waves, field_state
-            )
+            emotion = assess_emotion(summary, core_state.chemicals, context, waves, field_state)
         emotion.chemicals = core_state.chemicals
         emotion.tonic_phasic = tonic_phasic
         if self.regulator.last_cause:

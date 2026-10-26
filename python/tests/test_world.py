@@ -3,14 +3,15 @@
 import os
 import sys
 import time
+from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from frontal_lobe.inner_life import InnerLife
 from frontal_lobe.reasoning import Reasoner
-from frontal_lobe.self import Reflection
 from limbic_system.curiosity import Curiosity
 from parietal_lobe.belief import BID_WINDOW, Beta, PresenceBelief
+from self import Reflection
+from sleep.inner_life import InnerLife
 from temporal_lobe.concepts import ConceptNetwork
 from temporal_lobe.events import (
     EventKind,
@@ -246,6 +247,99 @@ def test_inbound_gated_during_sleep():
     assert world.perceive("a sound") is None
     # Addressed speech is not gated — respond() wakes it first.
     assert world.hear_user("genesis") is not None
+
+
+# ─── Her channel — the page that lives in the world ────────────
+
+
+def test_world_adopts_channel_and_wires_hearing():
+    """A channel handed to the world gets its speech handler wired."""
+    channel = SimpleNamespace(on_speech=None)
+    world = _make_world(channel=channel)
+    assert world.channel is channel
+    assert channel.on_speech == world._channel_heard
+
+
+def test_channel_heard_records_and_forwards():
+    """Public speech through her page is recorded as overheard
+    speech, then handed to cognition's callback."""
+
+    got: list[tuple] = []
+    world = _make_world(on_channel_speech=lambda a, t, m: got.append((a, t)))
+    world._channel_heard("amy", "hello there", {"id": "1"})
+    heard = [e for e in world.recent_events() if e.kind == EventKind.OVERHEARD_SPEECH]
+    assert heard and heard[0].content == "amy: hello there"
+    assert got == [("amy", "hello there")]
+
+
+def test_channel_heard_ignores_blank():
+    """Whitespace-only content records nothing and reaches nobody."""
+    got: list[tuple] = []
+    world = _make_world(on_channel_speech=lambda a, t, m: got.append((a, t)))
+    world._channel_heard("amy", "   ", {"id": "1"})
+    assert world.recent_events() == []
+    assert got == []
+
+
+def test_channel_heard_sleep_gates_everything():
+    """Asleep, the thalamic gate closes for her page too — nothing
+    recorded, nothing forwarded."""
+    got: list[tuple] = []
+    world = _make_world(
+        is_sleeping=lambda: True,
+        on_channel_speech=lambda a, t, m: got.append((a, t)),
+    )
+    world._channel_heard("amy", "wake up", {"id": "1"})
+    assert world.recent_events() == []
+    assert got == []
+
+
+def test_channel_deliver_reaches_on_speech():
+    """The page's ear delivers what it hears to the world's handler."""
+    from worlds.channel import Channel
+
+    feed = SimpleNamespace(_url="https://example.invalid/wh")
+    channel = Channel(feed, listener=SimpleNamespace(deaf=False, bot_id="b1"))
+    got: list[tuple] = []
+    channel.on_speech = lambda a, t, m: got.append((a, t, m))
+    channel._deliver("amy", "hi", {"id": "9"})
+    assert got == [("amy", "hi", {"id": "9"})]
+    assert channel.ear == "on"
+    assert channel.bot_id == "b1"
+
+
+def test_channel_ear_status():
+    """No listener → ear off; a deafened or healthy ear reports so."""
+    from worlds.channel import Channel
+
+    feed = SimpleNamespace(_url="https://example.invalid/wh")
+    channel = Channel(feed, listener=None)
+    assert channel.ear == "off"
+    assert channel.bot_id is None
+    channel.listener = SimpleNamespace(deaf=True, bot_id="b1")
+    assert channel.ear == "deaf"
+    channel.listener = SimpleNamespace(deaf=False, bot_id="b1")
+    assert channel.ear == "on"
+
+
+def test_channel_close_stops_ear_then_feed():
+    """Shutting the page closes the ear first, then the poster."""
+    from worlds.channel import Channel
+
+    calls: list[str] = []
+    feed = SimpleNamespace(_url="u", close=lambda: calls.append("feed"))
+    listener = SimpleNamespace(stop=lambda: calls.append("ear"))
+    channel = Channel(feed, listener=listener)
+    channel.close()
+    assert calls == ["ear", "feed"]
+
+
+def test_channel_from_env_no_webhook(monkeypatch):
+    """No webhook configured → no page in her world."""
+    from worlds.channel import Channel
+
+    monkeypatch.delenv("GENESIS_DISCORD_WEBHOOK", raising=False)
+    assert Channel.from_env() is None
 
 
 def test_perceive_records_percept():
@@ -829,3 +923,84 @@ def test_world_percept_ignores_non_grid(tmp_path):
     )
     assert event is not None
     assert mind.brain.frontal.network.get_concept("world:ambient:obj:0") is None
+
+
+# ─── The predictive map — what the world does next ────────────
+
+
+def test_world_map_learns_event_transitions():
+    """A repeated exchange teaches the kind map what follows what."""
+    world = _make_world()
+    for _ in range(4):
+        world.hear_user("hello there")
+        world.it_said("hi")
+    expected = world.expected_events()
+    # The stream ended on her utterance: self-occupancy is counted,
+    # and every utterance in history was followed by addressed speech.
+    assert expected[EventKind.UTTERANCE] > 1.0
+    assert expected[EventKind.USER_SPEECH] > 0.9
+    # Kinds the world has never produced are not predicted.
+    assert EventKind.DEPARTURE not in expected
+
+
+def test_answer_expectation_reflects_history():
+    """A world that answers bids predicts answers; a silent one doesn't."""
+    world = _make_world()
+    for _ in range(4):
+        world.hear_user("hello")
+        world.it_said("hi")
+    assert world.answer_expectation() > 0.9
+
+    silent = _make_world()
+    for _ in range(4):
+        silent.it_said("hello?")
+        silent.it_acted("doodled")
+    assert silent.answer_expectation() < 0.1
+
+
+def test_expected_activity_learns_who_follows_self():
+    """The presence map learns who acts after her acts."""
+    world = _make_world()
+    for _ in range(4):
+        world.it_said("posting")
+        world.hear_user("I saw it")
+    activity = world.expected_activity()
+    assert activity.get("user", 0.0) > 0.9
+    # Her own acts are states in the world's map too — self
+    # occupancy is always counted.
+    assert "self" in activity or "user" in activity
+
+
+def test_expected_engagement_zero_without_history():
+    """A world with no stream predicts nothing."""
+    world = _make_world()
+    assert world.expected_events() == {}
+    assert world.expected_activity() == {}
+    assert world.expected_engagement() == 0.0
+    assert world.answer_expectation() == 0.0
+
+
+def test_world_map_persists_across_restart():
+    """Learned transitions ride the same persistence as the world."""
+    world = _make_world()
+    for _ in range(4):
+        world.hear_user("hello")
+        world.it_said("hi")
+    before = world.answer_expectation()
+    restored = _make_world()
+    restored.restore_from_dict(world.to_dict())
+    assert abs(restored.answer_expectation() - before) < 1e-9
+    assert restored.expected_activity().get("user", 0.0) > 0.0
+
+
+def test_world_map_eviction_forgets_the_source():
+    """Evicting a presence drops its state from the map's transition
+    counts — forgotten people don't keep predicting."""
+    world = _make_world()
+    world.hear_user("hello")
+    world.it_said("hi")
+    assert "user" in world._presence_map.transition_matrix()[0]
+    world._presence_map.evict("user")
+    assert "user" not in world._presence_map.transition_matrix()[0]
+    # Its inbound edges are gone too — nothing predicts it anymore.
+    assert "user" not in world.expected_activity()

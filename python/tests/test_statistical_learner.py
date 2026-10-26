@@ -7,8 +7,8 @@ slot selection and generator realization scoring.
 """
 
 import pytest
-from frontal_lobe.self import PersonalityTraits, SelfModel
 from limbic_system.emotion import EmotionalState
+from self import PersonalityTraits, SelfModel
 from temporal_lobe.statistical_learner import (
     NGramModel,
     StatisticalLanguageLearner,

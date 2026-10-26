@@ -63,7 +63,15 @@ from frontal_lobe.reasoning import (
     UserBelief,
     UserModel,
 )
-from frontal_lobe.self import (
+from limbic_system.curiosity import Curiosity
+from limbic_system.emotional_regulator import (
+    AllostaticLoadTracker,
+    AllostaticState,
+    HPAAxis,
+    HPAState,
+    _clamp01,
+)
+from self import (
     ErrorMonitor,
     Insight,
     LearningEvent,
@@ -73,14 +81,6 @@ from frontal_lobe.self import (
     SelfDirectedLearner,
     SelfImprovement,
     SelfModel,
-)
-from limbic_system.curiosity import Curiosity
-from limbic_system.emotional_regulator import (
-    AllostaticLoadTracker,
-    AllostaticState,
-    HPAAxis,
-    HPAState,
-    _clamp01,
 )
 from temporal_lobe.cognitive_map import CognitiveMap
 from temporal_lobe.concepts import (
@@ -92,7 +92,11 @@ from temporal_lobe.concepts import (
     RelationType,
     _normalize_id,
 )
-from temporal_lobe.memory import (
+from temporal_lobe.plasticity import HebbianPlasticity
+from temporal_lobe.synapses import SynapticStore
+
+from genesis_client.swallow import note_swallowed
+from memory import (
     AttractorNetwork,
     AttractorPattern,
     EmotionalMemory,
@@ -104,10 +108,6 @@ from temporal_lobe.memory import (
     SkillStrategy,
     SpacedRepetitionScheduler,
 )
-from temporal_lobe.plasticity import HebbianPlasticity
-from temporal_lobe.synapses import SynapticStore
-
-from genesis_client.swallow import note_swallowed
 
 from .growth_ledger import GrowthLedger
 from .narrative import LifeChapter, LifeEvent, Narrator
@@ -126,7 +126,7 @@ if TYPE_CHECKING:
     # Several self modules import from persistence at module level, so we
     # use TYPE_CHECKING to avoid a circular import. The actual classes
     # are imported lazily inside the functions that need them.
-    from frontal_lobe.self import (
+    from self import (
         CognitiveTrajectoryModel,
         DevelopmentalTracker,
         EmergentIdentity,
@@ -1432,7 +1432,7 @@ def restore_emergent_identity(
     Returns the experience sources, self_description, confidence, and
     coherence so the caller can wire them into the mind.
     """
-    from frontal_lobe.self import EmergentIdentitySource
+    from self import EmergentIdentitySource
 
     sources: list[EmergentIdentitySource] = []
     for s_data in data.get("sources", []):

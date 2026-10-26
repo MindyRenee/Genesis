@@ -591,10 +591,15 @@ Modules claimed by this subsystem:
         already knows (reasoning, inference, conversation) instead of
         fetching from external sources. Semantic learning, temporal.
 
-    world.py, events.py, presence.py (the former world/ package)
+    world.py, events.py, presence.py (the former
+    world/ package)
         OuterWorld — the external world as a remembered, relational
         structure: the people it knows, the events between them, and
-        its own acts recorded in the same stream. The neuroanatomical
+        its own acts recorded in the same stream. The world also
+        holds her channel — the public page where she posts and,
+        when an ear exists, hears; the page object itself is
+        environment-side (``worlds.channel``), not a mind organ. The
+        neuroanatomical
         substrate is the hippocampal–entorhinal cognitive map plus
         the superior temporal sulcus's social perception: a map of
         states and transitions learned from experience (Tolman;
@@ -647,19 +652,19 @@ from .vtc import VTCFeatureSpace as VTCFeatureSpace
 # creates cycles.
 _EXPORTS: dict[str, str] = {
     # Hippocampal system — memory formation, retrieval, consolidation
-    "AttractorNetwork": "temporal_lobe.memory.systems",
-    "EmotionalMemorySystem": "temporal_lobe.memory.systems",
-    "Fact": "temporal_lobe.memory.semantic",
-    "MemoryContext": "temporal_lobe.memory.memory",
-    "MemorySystem": "temporal_lobe.memory.memory",
-    "MemoryRecord": "temporal_lobe.memory.memory",
-    "PrimingSystem": "temporal_lobe.memory.systems",
-    "ReconsolidationModification": "temporal_lobe.memory.memory",
-    "ReviewRecord": "temporal_lobe.memory.spaced_repetition",
-    "Schema": "temporal_lobe.memory.semantic",
-    "SemanticMemory": "temporal_lobe.memory.semantic",
-    "SpacedRepetitionScheduler": "temporal_lobe.memory.spaced_repetition",
-    "SpreadingActivation": "temporal_lobe.memory.systems",
+    "AttractorNetwork": "memory.systems",
+    "EmotionalMemorySystem": "memory.systems",
+    "Fact": "memory.semantic",
+    "MemoryContext": "memory.memory",
+    "MemorySystem": "memory.memory",
+    "MemoryRecord": "memory.memory",
+    "PrimingSystem": "memory.systems",
+    "ReconsolidationModification": "memory.memory",
+    "ReviewRecord": "memory.spaced_repetition",
+    "Schema": "memory.semantic",
+    "SemanticMemory": "memory.semantic",
+    "SpacedRepetitionScheduler": "memory.spaced_repetition",
+    "SpreadingActivation": "memory.systems",
     "MotionCell": "occipital_lobe.motion",
     "MotionField": "occipital_lobe.motion",
     "MotionProcessor": "occipital_lobe.motion",
@@ -733,10 +738,10 @@ _EXPORTS: dict[str, str] = {
     # similar far-pair edge proposals, validated on waking) and the
     # sleep compression pass (VQ retraining, holographic edge
     # migration, episode summarization)
-    "DreamInsight": "temporal_lobe.dream_synthesis",
-    "DreamProposal": "temporal_lobe.dream_synthesis",
-    "DreamSynthesis": "temporal_lobe.dream_synthesis",
-    "SleepCompressor": "temporal_lobe.compression",
+    "DreamInsight": "sleep.dream_synthesis",
+    "DreamProposal": "sleep.dream_synthesis",
+    "DreamSynthesis": "sleep.dream_synthesis",
+    "SleepCompressor": "sleep.compression",
     # The concept network's machinery — consolidation, activation
     # dynamics, extraction, archival tiers, the edge log, and the
     # layer/provenance types (all part of the ATL semantic hub)
@@ -789,9 +794,9 @@ _EXPORTS: dict[str, str] = {
     "SynapticStore": "temporal_lobe.synapses",
     # Self-directed knowledge learning — deriving new network facts
     # from what it already knows (reasoning, inference, conversation)
-    "InferenceResult": "frontal_lobe.self.learning",
-    "LearningEvent": "frontal_lobe.self.learning",
-    "SelfDirectedLearner": "frontal_lobe.self.learning",
+    "InferenceResult": "self.learning",
+    "LearningEvent": "self.learning",
+    "SelfDirectedLearner": "self.learning",
     # Sleep architecture's consolidation machinery — the synaptic
     # homeostasis downscaler (SHY) and hippocampal replay (the
     # ultradian tracker is claimed by brainstem)
@@ -840,7 +845,7 @@ _EXPORTS: dict[str, str] = {
     # Sequence prediction — the hippocampal/temporal predictive-map
     # faculty the play loop drives on pattern tasks (the world it
     # predicts lives in ``worlds.sequence``)
-    "PatternAgent": "temporal_lobe.sequence_agent",
+    "PatternAgent": "worlds.sequence_agent",
 }
 
 # The five eager names stay in a literal list so static checkers

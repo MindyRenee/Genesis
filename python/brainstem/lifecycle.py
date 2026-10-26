@@ -164,7 +164,6 @@ class LifecycleMixin:
         from previous conversations.
         """
         _warm_nltk()
-        self._provision_stewardship()
         self._start_connect_and_register()
         try:
             self._start_restore_state()
@@ -188,29 +187,6 @@ class LifecycleMixin:
         self._start_autonomous_subsystems()
         self._start_engage_restored_sleep()
         self._start_background_threads()
-
-    def _provision_stewardship(self) -> None:
-        """First-boot steward provisioning — explicit, at the entry point.
-
-        ``Stewardship.load`` (run in the frontal lobe's constructor) is
-        strictly read-only: it can authenticate an existing credential
-        but never creates one. Creation happens only here — a data dir
-        with no stamp gets its instance key and provenance stamp; a
-        stamped dir (including a copy whose key it cannot read) is left
-        exactly as found, sealed. ``provision`` mutates the loaded
-        channel in place, so the frontal lobe's steward object needs
-        no re-wiring.
-        """
-        steward = getattr(self.brain.frontal, "steward", None)
-        if steward is None:
-            return
-        try:
-            if steward.provision():
-                logger.info("steward channel authenticated")
-            elif steward.stamped:
-                logger.info("steward channel sealed — stamped to a key this process does not hold")
-        except OSError as e:
-            logger.warning(f"steward provisioning failed: {e}")
 
     def _start_connect_and_register(self) -> None:
         """Connect to the daemon and register cognitive modules.
@@ -344,7 +320,7 @@ class LifecycleMixin:
         # Introspect — discover who it is by examining itself
         # This writes its identity into the concept network through
         # self-examination, not hardcoded facts
-        from frontal_lobe.self import Introspection
+        from self import Introspection
 
         _intro_t0 = time.perf_counter()
         introspector = Introspection(self.brain.frontal.network)
@@ -686,13 +662,13 @@ class LifecycleMixin:
         )
         self._presence_thread.start()
 
-        # Start the channel listener — her ear on the public feed.
+        # Start the channel's ear — her hearing on the public page.
         # None unless GENESIS_DISCORD_BOT_TOKEN is set; starting it
         # here (not in __init__) keeps construction free of the
         # channel-resolve GET.
-        listener = getattr(self, "_discord_listener", None)
-        if listener is not None:
-            listener.start()
+        channel = getattr(getattr(self, "world", None), "channel", None)
+        if channel is not None:
+            channel.start()
 
     # Presence sampling cadence — kept under the daemon's 60 s
     # observation window (PRESENCE_TIMEOUT_TICKS at 200 ms) so an
@@ -733,8 +709,9 @@ class LifecycleMixin:
         """
         if self._is_sleeping:
             return
-        from occipital_lobe.perception.retina import latest_frame
         from occipital_lobe.perception.vision import _yuyv_to_rgb
+
+        from genesis_client.retina import latest_frame
 
         frame = latest_frame(copy=True)
         if frame is None:
@@ -752,12 +729,7 @@ class LifecycleMixin:
         if not self.vision.last_persons_seen():
             return
         try:
-            self.client.update_user_affect(
-                0.0,
-                0.0,
-                0.0,
-                confidence=0.0,
-            )
+            self.client.update_user_affect(0.0, 0.0, 0.0, confidence=0.0)
         except (OSError, ConnectionError) as e:
             note_swallowed("mind.lifecycle._sample_presence", e)
 
@@ -973,10 +945,10 @@ class LifecycleMixin:
         # and journal state in the middle of the save below. A stuck
         # join is not a shutdown failure; any reply already queued
         # still gets the feed's drain window at the end.
-        listener = getattr(self, "_discord_listener", None)
-        if listener is not None:
+        channel = getattr(getattr(self, "world", None), "channel", None)
+        if channel is not None:
             try:
-                listener.stop()
+                channel.stop()
             except Exception as e:  # noqa: BLE001
                 note_swallowed("mind.lifecycle.stop.listener", e)
 
@@ -990,12 +962,11 @@ class LifecycleMixin:
         # pending posts get their flush window, then the poster
         # thread stops. Failure to reach Discord is not a shutdown
         # failure, so it does not count against clean_shutdown.
-        feed = getattr(self, "_public_feed", None)
-        if feed is not None:
+        if channel is not None:
             try:
-                feed.close()
+                channel.close()
             except Exception as e:  # noqa: BLE001
-                note_swallowed("mind.lifecycle.stop.public_feed", e)
+                note_swallowed("mind.lifecycle.stop.channel", e)
 
         # Close the cognitive journal last of all writers — it is the
         # record of everything above. Clearing the active binding stops
@@ -1316,7 +1287,7 @@ class LifecycleMixin:
 
     def _restore_saved_components(self, data) -> None:
         """Validate and commit each saved component as one transaction."""
-        from frontal_lobe.self import Reflection, SelfModel
+        from self import Reflection, SelfModel
         from temporal_lobe.concepts import ConceptNetwork
 
         # Repair reports staged by _stage_cognitive_systems; journaled

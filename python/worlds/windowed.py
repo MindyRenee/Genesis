@@ -96,18 +96,10 @@ class _Display:
     def keycode(self, keysym: int) -> int:
         return int(self.lib.XKeysymToKeycode(self.handle, keysym))
 
-    def press(self, keysym: int, hold: float = 0.05) -> None:
-        """Press a key for ``hold`` seconds.
-
-        Arcade games steer while a direction key is DOWN — a tap does
-        nothing. ``hold`` is the action's duration: how long the key
-        stays pressed before release.
-        """
+    def press(self, keysym: int) -> None:
+        """Tap a key — press and release."""
         code = self.keycode(keysym)
         _xtst().XTestFakeKeyEvent(self.handle, code, 1, 0)
-        self.lib.XFlush(self.handle)
-        if hold > 0.0:
-            time.sleep(hold)
         _xtst().XTestFakeKeyEvent(self.handle, code, 0, 0)
         self.lib.XFlush(self.handle)
 
@@ -224,7 +216,6 @@ class X11Game:
         actions: list[str] | None = None,
         cell_px: int = 12,
         frame_pause: float = 0.15,
-        key_hold: float = 0.35,
         start_keys: list[str] | None = None,
         observe: dict | None = None,
     ) -> None:
@@ -233,9 +224,6 @@ class X11Game:
         self._actions = actions or ["up", "down", "left", "right"]
         self.cell_px = cell_px
         self.frame_pause = frame_pause
-        # How long each action's key stays down — arcade games steer
-        # while the key is held, so a move IS a duration.
-        self.key_hold = key_hold
         self.start_keys = start_keys or []
 
         # What she was told to watch — the briefing made perceptual.
@@ -596,6 +584,6 @@ class X11Game:
             else:
                 return
         try:
-            self._display.press(keysym, hold=self.key_hold)
+            self._display.press(keysym)
         except (OSError, ctypes.ArgumentError) as e:
             logger.debug(f"key {action}: {e}")

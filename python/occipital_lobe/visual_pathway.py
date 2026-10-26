@@ -21,7 +21,7 @@ from .lgn import LGNOutput, LGNRelay
 from .v1 import V1Model, VisualField
 
 if TYPE_CHECKING:
-    from .retina import Retina
+    from genesis_client.retina import Retina
 
 logger = logging.getLogger(__name__)
 

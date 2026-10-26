@@ -882,16 +882,19 @@ def _opponent_channels(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndar
     parvocellular opponent image, and the blue-yellow (S−(L+M))
     koniocellular opponent image. ``rg``/``by`` are signed and centred
     near zero on a colourless image; the same transforms the LGN
-    computes upstream.
+    computes upstream — sRGB→XYZ→LMS cone excitations, von Kries
+    normalized at the D65 display white (``occipital_lobe.color``),
+    not display-primary differences.
 
     Args:
         rgb: (H, W, 3) float image already in [0, 1].
     """
-    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
-    lum = 0.299 * r + 0.587 * g + 0.114 * b
-    rg = r - g
-    by = b - 0.5 * (r + g)
-    return lum, rg, by
+    from occipital_lobe.color import cone_opponent
+
+    lum, rg, by = cone_opponent(rgb)
+    # cL+cM reads 2.0 at the adapting white; halve it for the [0,1]
+    # range downstream code was tuned against.
+    return lum / 2.0, rg, by
 
 
 # Mean |chroma| below which an opponent channel is treated as silent —

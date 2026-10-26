@@ -1,44 +1,73 @@
-"""Lexicon-based sentiment analysis with negation, intensifier, and
-diminisher handling.
+"""Affect appraisal as compositional operator algebra on valence–arousal space.
 
-This is a VADER-style (Gilbert & Hutto, 2014) sentiment analyzer — no
-external dependencies, no ML model, no network calls. It runs in
-microseconds and gives the dyadic affective model a much richer signal
-than the previous word-list heuristic.
+This is not a rule engine. An utterance's affect is computed by folding
+a sequence of *linear operators* and *affect vectors* over a
+two-dimensional affective space — the same formal family cognitive
+science uses for compositional semantics and dimensional affect:
 
-## What it handles that the old heuristic didn't
+- **Affective space** A ⊂ ℝ² = (valence v, arousal a) — Russell's
+  circumplex / dimensional affect (Russell 1980, Psych. Rev. 87;
+  Barrett & Russell 1999). Every word Genesis has learned carries an
+  affect vector φ(w) = (v, κ|v|): its learned valence plus the arousal
+  its intensity implies. The lexicon itself is *learned through
+  interaction* — nothing about word meaning is seeded.
 
-- **Negation**: "not bad" → positive, "don't like" → negative,
-  "never good" → negative. The old system scored "not bad" as negative
-  because it matched "bad".
-- **Intensifiers**: "very good" > "good", "extremely terrible" < "terrible".
-- **Diminishers**: "slightly good" < "good", "kind of bad" < "bad".
-- **Contrastive conjunctions**: "good but slow" shifts weight to "slow".
-- **Punctuation boost**: "great!!!" > "great".
-- **Capitalization boost**: "GREAT" > "great".
-- **Multi-word modifier phrases**: "kind of bad" < "bad", "sort of good" <
-  "good", "a lot better" > "better". Phrase-level modifiers are matched
-  before per-token scoring so their constituent words are not scored
-  individually (see ``MODIFIER_PHRASES``).
-- **Multi-word negation**: "doesn't work", "not very good".
+- **Composition is linear-operator action.** Grammatical modifiers are
+  not flags on a counter; they are 2×2 matrices acting on the next
+  affect vector (Smolensky 1990-style vector-space semantics — meaning
+  composes by linear operations on a state space):
 
-## Limitations (documented honestly)
+      negation    N = [[−ρ, 0], [0, 1]]   — valence reflection; arousal
+                                            survives ("not good" is
+                                            still *felt*, just inverted)
+      intensifier G = g·I,   g > 1        — isotropic dilation
+      diminisher  D = d·I,   d < 1        — isotropic contraction
 
-- No sarcasm detection ("Oh great, another bug" scores positive).
-- No context beyond the message itself.
-- No aspect-based sentiment ("the UI is great but the backend is slow"
-  is scored as a single valence, not per-aspect).
-- The lexicon is curated, not learned — it covers common English
-  sentiment words but will miss domain-specific jargon.
+  Consecutive modifiers compose by multiplication — "not very good" is
+  N·G·φ, an operator product, not a patchwork of booleans.
 
-## Reference
+- **Modifier scope is persistence-decayed, not windowed.** A pending
+  operator carries charge q ∈ [0,1]; every intervening neutral token
+  decays it q ← q·e^{−1/τ} and the operator acts only while q ≥ ½ —
+  its *half-life*. Scale modifiers (τ_mod ≈ 1/ln 2.5) discharge after a
+  single neutral token; negation (τ_neg = 4.5) survives ~3, the same
+  syntactic reach VADER hardcodes as a counter — but here it is the
+  half-life of a transient expectation, a drift term, not a rule.
 
-Gilbert, C. H. E., & Hutto, E. E. (2014). VADER: A Parsimonious Rule-based
-Model for Sentiment Analysis of Social Media Text. Proceedings of the
-8th International Conference on Weblogs and Social Media (ICWSM).
+- **Contrastive junctions flush the integrator.** "good but slow"
+  attenuates the accumulated state S ← (1−Λ)·S at the junction — a
+  leak jump, the discrete analog of an attentional reset in the
+  affect integrator — so the clause after "but" dominates the residue
+  the way post-contrastive weighting intends, without a special pass.
+
+- **Emphasis is an arousal operator.** ALL-CAPS dilates the token's
+  affect vector; repeated "!" applies a scalar gain to the terminal
+  state — emphasis lives on the arousal axis where it belongs and
+  leaks onto valence through the same compress.
+
+- **Report is a saturating compress.** The terminal valence is
+  normalized through the signed compress x/√(x²+α) (a smooth
+  odd sigmoid — the report map is compressive like every affect
+  readout). Positive/negative/neutral proportions are the valence
+  masses of the trajectory normalized against token mass.
+
+Word valences remain learned (``LEARNED_LEXICON``); the function-word
+operator table is grammar, not meaning — "not", "very", "but" are
+syntactic operators in every speaker of English, which is exactly the
+kind of seed the project allows: building blocks, not answers.
+
+References: Russell (1980); Barrett & Russell (1999); Smolensky
+(1990) tensor-product semantics; Oravecz & Tuerlinckx (2011) and
+Kuppens, Oravecz & Tuerlinckx (2010), feelings as a linear dynamical
+system.
 """
 
 from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+
+import numpy as np
 
 from infrastructure.text import words
 
@@ -94,9 +123,83 @@ def has_learned_sentiment(word: str) -> bool:
     return word.lower().strip() in LEARNED_LEXICON
 
 
-# ─── Negation words ───────────────────────────────────────────────
-# These flip the sentiment of the following sentiment-bearing word.
-# "not good" → -good, "don't like" → -like, "never great" → -great.
+# ─── Affective space ──────────────────────────────────────────────
+# A ⊂ ℝ²: component 0 is valence, component 1 is arousal. A learned
+# word's affect vector places its valence on the first axis and the
+# arousal its magnitude implies on the second — |v| is the learned
+# intensity, and arousal is intensity, not sign.
+
+_AROUSAL_GAIN = 1.0  # arousal carried by a unit of learned valence
+
+# Core affect — the organism's standing (valence, arousal), read as
+# the fold's initial condition (Russell, 2003). Appraisal is
+# state-contingent: residual drive is experienced as part of the
+# current stimulus's affect (Schachter & Singer, 1962 — arousal
+# misattribution). Driven once per turn by the body's summary;
+# (0,0) means no standing state and preserves the stimulus-only fold.
+_CORE_AFFECT: tuple[float, float] = (0.0, 0.0)
+
+
+def set_core_affect(valence: float = 0.0, arousal: float = 0.0) -> None:
+    """Set the organism's standing affective state (core affect).
+
+    ``valence`` in [-1,1], ``arousal`` in [0,1] from the body's
+    neurochemical summary. The fold starts at this point, so the same
+    stimulus appraises differently in an aroused body than a calm one
+    — the misattribution term of emotion.
+    """
+    global _CORE_AFFECT
+    try:
+        v = float(valence)
+        a = float(arousal)
+    except (TypeError, ValueError):
+        return
+    if math.isfinite(v) and math.isfinite(a):
+        _CORE_AFFECT = (max(-1.0, min(1.0, v)), max(0.0, min(1.0, a)))
+
+
+def _affect_vector(token: str) -> np.ndarray | None:
+    """The token's learned affect vector in A, or None if unknown.
+
+    φ(w) = (v_w, κ·|v_w|): valence on axis 0, intensity-as-arousal on
+    axis 1. Unknown words contribute no vector — they are mass on the
+    neutral axis, not zero-valence claims.
+    """
+    v = lookup_sentiment(token)
+    if v is None:
+        return None
+    return np.array([v, _AROUSAL_GAIN * abs(v)], dtype=float)
+
+
+# ─── Operators ────────────────────────────────────────────────────
+# Function-word grammar as linear operators on A. These are syntactic
+# constants — English grammar fixes what "not" does to a predication —
+# while every affect vector above is learned.
+
+_NEG_ATTENUATION = 0.9  # valence reflection keeps 90% of magnitude
+
+
+def _negation_operator() -> np.ndarray:
+    """Negation as valence reflection: diag(−ρ, 1) on A.
+
+    Reflects the valence axis while preserving arousal — "not great"
+    remains an aroused state, only inverted. The 0.9 attenuation is the
+    hedging residue negation leaves (litotes is rarely a clean flip).
+    """
+    return np.array([[-_NEG_ATTENUATION, 0.0], [0.0, 1.0]])
+
+
+def _dilation(gain: float) -> np.ndarray:
+    """Isotropic dilation g·I — the intensifier/diminisher operator.
+
+    g > 1 amplifies valence and arousal together; g < 1 contracts both.
+    """
+    return np.array([[gain, 0.0], [0.0, gain]])
+
+
+# ─── Function-word operator seeds ─────────────────────────────────
+# Grammar, not meaning: which words operate, and the matrix each maps
+# to. Word → operator-matrix constructor args.
 
 NEGATIONS: frozenset[str] = frozenset(
     {
@@ -129,11 +232,7 @@ NEGATIONS: frozenset[str] = frozenset(
     }
 )
 
-# ─── Intensifiers ─────────────────────────────────────────────────
-# These amplify the sentiment of the following word.
-# "very good" → good * 1.5, "extremely terrible" → terrible * 1.8.
-# Values are multipliers.
-
+# Dilation gains g > 1 for intensifier operators.
 INTENSIFIERS: dict[str, float] = {
     "very": 1.5,
     "extremely": 1.8,
@@ -158,13 +257,9 @@ INTENSIFIERS: dict[str, float] = {
     "hugely": 1.5,
 }
 
-# ─── Diminishers ──────────────────────────────────────────────────
-# These reduce the sentiment of the following word.
-# "slightly good" → good * 0.5, "kinda bad" → bad * 0.7.
-# Note: "kind" is NOT here — it's a positive sentiment word in LEXICON.
-# The multi-word phrase "kind of" is handled in MODIFIER_PHRASES below,
-# not as a single token.
-
+# Contraction gains d < 1 for diminisher operators.
+# "kind" is NOT here — it is a positive sentiment word when it stands
+# alone; the hedge is the *phrase* "kind of", in MODIFIER_PHRASES.
 DIMINISHERS: dict[str, float] = {
     "slightly": 0.5,
     "somewhat": 0.6,
@@ -183,37 +278,23 @@ DIMINISHERS: dict[str, float] = {
     "less": 0.6,
 }
 
-# ─── Multi-word modifier phrases ──────────────────────────────────
-# Some modifiers are phrases, not single words. They must be recognized
-# before per-token scoring, because their constituent words would
-# otherwise be scored or discarded incorrectly. The clearest case is
-# "kind of": "kind" is a *positive* sentiment word in LEXICON, so
-# without phrase recognition "kind of bad" gains positive weight from
-# "kind" and loses the diminisher entirely (net ~neutral), and
-# "kind of good" scores *more* positive than "good" — the hedge
-# inverts the sentiment. Similarly "sort of" loses its diminisher
-# because "of" is a non-sentiment word that resets it, and "a lot"
-# contributes no intensification at all.
-#
-# Maps a tuple of normalized words to (kind, multiplier), where kind is
-# "intensifier" or "diminisher". Longer phrases are matched first.
-MODIFIER_PHRASES: dict[tuple[str, ...], tuple[str, float]] = {
-    ("a", "great", "deal"): ("intensifier", 1.5),
-    ("kind", "of"): ("diminisher", 0.7),
-    ("sort", "of"): ("diminisher", 0.7),
-    ("a", "lot"): ("intensifier", 1.5),
-    ("a", "bit"): ("diminisher", 0.7),
-    ("a", "little"): ("diminisher", 0.7),
-    ("a", "tad"): ("diminisher", 0.5),
-    ("a", "touch"): ("diminisher", 0.6),
-    ("very", "much"): ("intensifier", 1.4),
+# Multi-word operators, matched before per-token scoring so their
+# constituents never reach the fold as independent tokens — "kind of"
+# is a contraction, not the adjective "kind" followed by "of".
+# tuple → dilation gain.
+MODIFIER_PHRASES: dict[tuple[str, ...], float] = {
+    ("a", "great", "deal"): 1.5,
+    ("kind", "of"): 0.7,
+    ("sort", "of"): 0.7,
+    ("a", "lot"): 1.5,
+    ("a", "bit"): 0.7,
+    ("a", "little"): 0.7,
+    ("a", "tad"): 0.5,
+    ("a", "touch"): 0.6,
+    ("very", "much"): 1.4,
 }
 
-# ─── Contrastive conjunctions ─────────────────────────────────────
-# "but" shifts focus to the following clause. We handle this by
-# boosting the sentiment of words that come after "but" and reducing
-# the weight of words that came before.
-
+# Contrastive junctions — attentional resets, not operators.
 CONTRASTIVES: frozenset[str] = frozenset(
     {
         "but",
@@ -228,31 +309,65 @@ CONTRASTIVES: frozenset[str] = frozenset(
     }
 )
 
-# ─── Negation window ──────────────────────────────────────────────
-# How many non-sentiment words can appear between a negation and the
-# sentiment word it flips. VADER uses 3; we match that. Without this,
-# "not the good" loses the negation at "the" and scores positive.
-
-_NEGATION_WINDOW = 3
-
-# ─── Punctuation and capitalization ───────────────────────────────
-
-_EXCLAMATION_BOOST_THRESHOLD = 3  # need this many ! to get a boost
-
-
-def _punctuation_boost(text: str) -> float:
-    """Boost sentiment magnitude based on exclamation marks."""
-    excl_count = text.count("!")
-    if excl_count >= _EXCLAMATION_BOOST_THRESHOLD:
-        return 1.0 + min(0.5, 0.1 * excl_count)
-    return 1.0
+# ─── Persistence kernels ──────────────────────────────────────────
+# A pending operator's charge decays q ← q·e^{−1/τ} per neutral token
+# and acts while q ≥ ½ (its half-life boundary). The τ's are the
+# syntactic reach of each operator class:
+#   scale modifiers — bind only the immediately following affect word
+#                     (q < ½ after one neutral token ⇒ τ < 1/ln2)
+#   negation        — persists across ~3 neutral tokens
+#                     (q ≥ ½ at d ≤ 3, q < ½ at d = 4 ⇒ τ ∈ [4.33, 5.77))
+_TAU_MODIFIER = 1.0  # charge 1 → e^{−1} ≈ 0.37 < ½ after one neutral token
+_TAU_NEGATION = 4.5  # charge 1 → e^{−3/4.5} ≈ 0.51 ≥ ½ at distance 3
+_CHARGE_BOUND = 0.5  # half-life: the operator's activation criterion
 
 
-def _capitalization_boost(word: str) -> float:
-    """Boost sentiment if the word is ALL CAPS (and has sentiment)."""
-    normalized = word.lower().replace("'", "")
-    if len(word) >= 3 and word.isupper() and lookup_sentiment(normalized) is not None:
-        return 1.5
+@dataclass
+class _PendingOp:
+    """A composed operator waiting on the next affect vector.
+
+    ``matrix`` is the accumulated operator product (later modifiers
+    left-multiply); ``charge`` decays exponentially per neutral token;
+    ``tau`` is the persistence kernel of the weakest-link operator —
+    a scale modifier inside a negation discharge dies with the
+    modifier, matching how the stack reads.
+    """
+
+    matrix: np.ndarray
+    charge: float
+    tau: float
+
+    def decay(self) -> None:
+        """One neutral token's worth of exponential charge decay."""
+        self.charge *= math.exp(-1.0 / self.tau)
+
+    @property
+    def live(self) -> bool:
+        """Whether the operator still exceeds its half-life bound."""
+        return self.charge >= _CHARGE_BOUND
+
+
+# ─── Contrastive flush ────────────────────────────────────────────
+# A contrastive junction attenuates the accumulated valence mass —
+# the integrator leaks: S ← (1−Λ)·S. Λ = 0.75 leaves a quarter of
+# the pre-junction mass, the discrete analog of an attentional reset.
+
+_CONTRASTIVE_LEAK = 0.75
+
+# ─── Emphasis operators ───────────────────────────────────────────
+# Orthographic arousal: ALL-CAPS dilates the token's own vector;
+# !!! applies a scalar gain to the terminal state.
+
+_CAPS_DILATION = 1.5
+_EXCLAMATION_BOOST_THRESHOLD = 3  # need this many ! to register an impulse
+
+
+def _exclamation_gain(text: str) -> float:
+    """Terminal arousal gain from exclamation runs — a scalar operator
+    on the whole utterance state, saturating at +50%."""
+    count = text.count("!")
+    if count >= _EXCLAMATION_BOOST_THRESHOLD:
+        return 1.0 + min(0.5, 0.1 * count)
     return 1.0
 
 
@@ -261,7 +376,7 @@ def _capitalization_boost(word: str) -> float:
 
 def _tokenize(text: str) -> list[str]:
     """Split text into word tokens, preserving original case for the
-    capitalization boost. Lowercasing happens later in ``_normalize``.
+    emphasis operator. Lowercasing happens later in ``_normalize``.
 
     Uses the canonical word boundary: Unicode letters (not just ASCII —
     "gérard" is one token, not "g"+"rard") and apostrophe variants
@@ -273,7 +388,7 @@ def _tokenize(text: str) -> list[str]:
 
 
 def _normalize(token: str) -> str:
-    """Normalize a token for lexicon/negation lookup.
+    """Normalize a token for operator/lexicon lookup.
 
     Strips apostrophes from contractions: "don't" → "dont",
     "can't" → "cant". This matches the NEGATIONS set which stores
@@ -282,436 +397,183 @@ def _normalize(token: str) -> str:
     return token.lower().replace("'", "")
 
 
-# ─── Sentiment analysis ───────────────────────────────────────────
+def _match_phrase(tokens: list[str], index: int) -> tuple[int, float] | None:
+    """Match a multi-word operator phrase at ``index``.
 
-
-def _score_sentiment_word(
-    raw_token: str,
-    token: str,
-    intensifier_mult: float,
-    diminisher_mult: float,
-    negation_active: bool,
-    negation_distance: int,
-) -> tuple[float, float, float, bool]:
-    """Score a single sentiment-bearing token with context modifiers.
-
-    Returns (score, new_intensifier_mult, new_diminisher_mult,
-    new_negation_active).
-    """
-    learned = lookup_sentiment(token)
-    base_score = learned if learned is not None else 0.0
-
-    # Apply capitalization boost
-    cap_boost = _capitalization_boost(raw_token)
-    base_score *= cap_boost
-
-    # Apply intensifier
-    if intensifier_mult > 1.0:
-        base_score *= intensifier_mult
-        intensifier_mult = 1.0  # reset
-
-    # Apply diminisher
-    if diminisher_mult < 1.0:
-        base_score *= diminisher_mult
-        diminisher_mult = 1.0  # reset
-
-    # Apply negation (flip sign) if within the negation window
-    if negation_active and negation_distance <= _NEGATION_WINDOW:
-        base_score = -base_score * 0.9  # slightly reduced
-        negation_active = False
-
-    # Clamp to [-4, 4]
-    base_score = max(-4.0, min(4.0, base_score))
-
-    return base_score, intensifier_mult, diminisher_mult, negation_active
-
-
-def _match_modifier_phrase(
-    tokens: list[str],
-    index: int,
-) -> tuple[int, str, float] | None:
-    """Match a multi-word modifier phrase starting at ``index``.
-
-    Returns ``(length, kind, multiplier)`` where ``kind`` is
-    ``"intensifier"`` or ``"diminisher"``, or ``None`` if no phrase
-    starts here. Longer phrases are tried first so "a great deal" is
-    preferred over a hypothetical two-word prefix.
+    Returns (length, gain) for the longest matching phrase, or None.
+    Phrases are matched longest-first so "a great deal" outranks any
+    two-word prefix.
     """
     for length in (3, 2):
         end = index + length
         if end > len(tokens):
             continue
         key = tuple(_normalize(t) for t in tokens[index:end])
-        entry = MODIFIER_PHRASES.get(key)
-        if entry is not None:
-            return length, entry[0], entry[1]
+        if key in MODIFIER_PHRASES:
+            return length, MODIFIER_PHRASES[key]
     return None
 
 
-def _score_sentiment_token(
-    raw_token: str,
-    token: str,
-    intensifier_mult: float,
-    diminisher_mult: float,
-    negation_active: bool,
-    negation_distance: int,
-    pending_negation: bool,
-) -> tuple[float, float, float, float, float, bool]:
-    """Score one sentiment-bearing token and return its contributions.
+# ─── The fold ─────────────────────────────────────────────────────
 
-    Returns (base_score, pos_delta, neg_delta, new_intensifier_mult,
-    new_diminisher_mult, new_negation_active). The caller appends
-    base_score to the scores and contrastive lists.
+
+def _fold(tokens: list[str]) -> tuple[list[np.ndarray], int]:
+    """Fold the token stream into the trajectory of operator-applied
+    affect contributions.
+
+    The scan is a single pass: affect vectors are pushed through the
+    pending operator product, contrastive junctions flush the
+    accumulated mass, and neutral tokens decay operator charges.
+    Returns (contributions, neutral_token_count).
     """
-    base_score, intensifier_mult, diminisher_mult, negation_active = _score_sentiment_word(
-        raw_token,
-        token,
-        intensifier_mult,
-        diminisher_mult,
-        negation_active,
-        negation_distance,
-    )
-    pos_delta = base_score if base_score > 0 else 0.0
-    neg_delta = abs(base_score) if base_score < 0 else 0.0
-    # If this word was a negation+sentiment word (e.g., "no",
-    # "never"), activate negation for the next sentiment word.
-    if pending_negation:
-        negation_active = True
-    return (
-        base_score,
-        pos_delta,
-        neg_delta,
-        intensifier_mult,
-        diminisher_mult,
-        negation_active,
-    )
-
-
-def _advance_non_sentiment(
-    intensifier_mult: float,
-    diminisher_mult: float,
-    negation_active: bool,
-    negation_distance: int,
-) -> tuple[float, float, bool, int]:
-    """Reset modifiers after a non-sentiment word.
-
-    Modifiers only affect the immediately following sentiment word,
-    per VADER. Negation persists up to ``_NEGATION_WINDOW`` words, so
-    "not the good" is correctly negated.
-    """
-    intensifier_mult = 1.0
-    diminisher_mult = 1.0
-    negation_distance += 1
-    if negation_distance > _NEGATION_WINDOW:
-        negation_active = False
-    return intensifier_mult, diminisher_mult, negation_active, negation_distance
-
-
-def _handle_negation(
-    token: str,
-) -> tuple[bool, bool, int]:
-    """Process a negation token.
-
-    Returns (is_pure_negation, pending_negation, new_negation_distance).
-    A pure negation word (not also a sentiment word) skips scoring and
-    activates negation; the caller continues the loop. A negation+
-    sentiment word (e.g., "no", "never") falls through to scoring with
-    ``pending_negation`` set, clearing any prior negation so it doesn't
-    flip this word.
-    """
-    if lookup_sentiment(token) is None:
-        # Pure negation word — skip scoring, activate negation.
-        return True, False, 0
-    # Negation word that is also a sentiment word: score it as
-    # sentiment (without self-negation), then activate negation for
-    # the following word.
-    return False, True, 0
-
-
-def _match_modifier_word(
-    token: str,
-) -> tuple[float, float] | None:
-    """If ``token`` is an intensifier or diminisher, return the new
-    ``(intensifier_mult, diminisher_mult)``; otherwise return None.
-
-    Intensifiers take precedence over diminishers if a word were both
-    (matching the original check order).
-    """
-    if token in INTENSIFIERS:
-        return INTENSIFIERS[token], 1.0
-    if token in DIMINISHERS:
-        return 1.0, DIMINISHERS[token]
-    return None
-
-
-def _score_tokens(
-    tokens: list[str],
-) -> tuple[list[float], float, float, int, list[float], list[float], bool]:
-    """Score each sentiment-bearing token with context modifiers.
-
-    Returns (scores, pos_sum, neg_sum, sentiment_count,
-             pre_contrastive_scores, post_contrastive_scores,
-             seen_contrastive).
-    """
-    scores: list[float] = []
-    pos_sum = 0.0
-    neg_sum = 0.0
-    sentiment_count = 0
-
-    # Track context: negation, intensifier, diminisher, contrastive
-    negation_active = False
-    negation_distance = 0
-    intensifier_mult = 1.0
-    diminisher_mult = 1.0
-
-    # We need to track pre-contrastive scores separately
-    pre_contrastive_scores: list[float] = []
-    post_contrastive_scores: list[float] = []
-    seen_contrastive = False
+    contributions: list[np.ndarray] = []
+    neutral = 0
+    pending: list[_PendingOp] = []
 
     i = 0
-    token_count = len(tokens)
-    while i < token_count:
-        raw_token = tokens[i]
-        token = _normalize(raw_token)
+    n = len(tokens)
+    while i < n:
+        raw = tokens[i]
+        token = _normalize(raw)
 
-        # Check for a multi-word modifier phrase ("kind of", "a lot", …).
-        # This consumes all the phrase's tokens so its constituent words
-        # are not scored individually — critical for "kind of", where
-        # "kind" is otherwise a positive sentiment word.
-        phrase = _match_modifier_phrase(tokens, i)
+        # Multi-word operator phrase first — its constituents must
+        # never reach the fold as independent tokens.
+        phrase = _match_phrase(tokens, i)
         if phrase is not None:
-            length, kind, multiplier = phrase
-            if kind == "intensifier":
-                intensifier_mult = multiplier
-            else:
-                diminisher_mult = multiplier
+            length, gain = phrase
+            pending.append(_PendingOp(_dilation(gain), 1.0, _TAU_MODIFIER))
             i += length
             continue
 
-        # Check for contrastive conjunction
+        # Contrastive junction: flush accumulated mass, discharge all
+        # pending operators — the reset is total.
         if token in CONTRASTIVES:
-            seen_contrastive = True
-            # Reset modifiers after contrastive
-            intensifier_mult, diminisher_mult = 1.0, 1.0
-            negation_active, negation_distance = False, 0
+            pending.clear()
+            for c in contributions:
+                c *= 1.0 - _CONTRASTIVE_LEAK
             i += 1
             continue
 
-        # Check for negation (affects next sentiment word)
-        pending_negation = False
+        # Negation operator: reflection matrix with the long kernel.
         if token in NEGATIONS:
-            is_pure, pending_negation, negation_distance = _handle_negation(token)
-            if is_pure:
-                # Pure negation word — skip scoring, activate negation.
-                negation_active = True
-                i += 1
-                continue
-            # Clear any prior negation so it doesn't flip this word.
-            negation_active = False
-
-        # Check for intensifier or diminisher (affects next sentiment word)
-        mod = _match_modifier_word(token)
-        if mod is not None:
-            intensifier_mult, diminisher_mult = mod
+            pending.append(_PendingOp(_negation_operator(), 1.0, _TAU_NEGATION))
             i += 1
             continue
 
-        # Check if this word has sentiment (learned first, seed fallback)
-        contrastive_bucket = post_contrastive_scores if seen_contrastive else pre_contrastive_scores
-        (
-            scored,
-            pos_delta,
-            neg_delta,
-            intensifier_mult,
-            diminisher_mult,
-            negation_active,
-            negation_distance,
-        ) = _accumulate_token(
-            raw_token,
-            token,
-            intensifier_mult,
-            diminisher_mult,
-            negation_active,
-            negation_distance,
-            pending_negation,
-            scores,
-            contrastive_bucket,
-        )
-        sentiment_count += scored
-        pos_sum += pos_delta
-        neg_sum += neg_delta
+        # Scale operators: dilation/contraction with the short kernel.
+        if token in INTENSIFIERS:
+            pending.append(_PendingOp(_dilation(INTENSIFIERS[token]), 1.0, _TAU_MODIFIER))
+            i += 1
+            continue
+        if token in DIMINISHERS:
+            pending.append(_PendingOp(_dilation(DIMINISHERS[token]), 1.0, _TAU_MODIFIER))
+            i += 1
+            continue
+
+        # Affect vector: push through the live operator product, then
+        # discharge every operator — scope binds the first affect word.
+        phi = _affect_vector(token)
+        if phi is not None:
+            live = [op for op in pending if op.live]
+            for op in live:
+                phi = op.matrix @ phi
+            pending.clear()
+            # Orthographic emphasis: ALL-CAPS dilates this token's vector.
+            if len(raw) >= 3 and raw.isupper():
+                phi = phi * _CAPS_DILATION
+            contributions.append(phi)
+        else:
+            neutral += 1
+            # Neutral mass decays every pending charge; dead operators drop.
+            for op in pending:
+                op.decay()
+            pending = [op for op in pending if op.live]
 
         i += 1
 
-    return (
-        scores,
-        pos_sum,
-        neg_sum,
-        sentiment_count,
-        pre_contrastive_scores,
-        post_contrastive_scores,
-        seen_contrastive,
-    )
+    return contributions, neutral
 
 
-def _accumulate_token(
-    raw_token: str,
-    token: str,
-    intensifier_mult: float,
-    diminisher_mult: float,
-    negation_active: bool,
-    negation_distance: int,
-    pending_negation: bool,
-    scores: list[float],
-    contrastive_bucket: list[float],
-) -> tuple[bool, float, float, float, float, bool, int]:
-    """Score one non-modifier token and update the running state.
+# ─── Report ───────────────────────────────────────────────────────
 
-    Sentiment words append their score to ``scores`` and the active
-    pre/post-contrastive bucket; non-sentiment words just decay the
-    modifier state (they only affect the immediately following
-    sentiment word, per VADER).
-
-    Returns (scored, pos_delta, neg_delta, intensifier_mult,
-    diminisher_mult, negation_active, negation_distance).
-    """
-    if lookup_sentiment(token) is not None:
-        (
-            base_score,
-            pos_delta,
-            neg_delta,
-            intensifier_mult,
-            diminisher_mult,
-            negation_active,
-        ) = _score_sentiment_token(
-            raw_token,
-            token,
-            intensifier_mult,
-            diminisher_mult,
-            negation_active,
-            negation_distance,
-            pending_negation,
-        )
-        scores.append(base_score)
-        contrastive_bucket.append(base_score)
-        return (
-            True,
-            pos_delta,
-            neg_delta,
-            intensifier_mult,
-            diminisher_mult,
-            negation_active,
-            negation_distance,
-        )
-    intensifier_mult, diminisher_mult, negation_active, negation_distance = _advance_non_sentiment(
-        intensifier_mult,
-        diminisher_mult,
-        negation_active,
-        negation_distance,
-    )
-    return (
-        False,
-        0.0,
-        0.0,
-        intensifier_mult,
-        diminisher_mult,
-        negation_active,
-        negation_distance,
-    )
-
-
-def _compute_proportions(
-    pos_sum: float,
-    neg_sum: float,
-    sentiment_count: int,
-    total_tokens: int,
-) -> tuple[float, float, float]:
-    """Compute VADER-style positive/negative/neutral proportions."""
-    neutral_count = total_tokens - sentiment_count
-    total = pos_sum + neg_sum + neutral_count
-    if total > 0:
-        positive = pos_sum / total
-        negative = neg_sum / total
-        neutral = neutral_count / total
-    else:
-        positive = 0.0
-        negative = 0.0
-        neutral = 1.0
-    neutral = max(0.0, min(1.0, neutral))
-    return positive, negative, neutral
+_COMPRESS_ALPHA = 15.0  # variance-stabilizer of the saturating compress
 
 
 def analyze_sentiment(text: str) -> dict:
-    """Analyze the sentiment of a text.
+    """Appraise the affect of a text in valence–arousal space.
+
+    The trajectory folds operator-applied affect vectors; the report
+    compresses the terminal valence and reads the valence masses.
 
     Returns a dict with:
-        - compound: float in [-1, 1] — overall sentiment
-        - positive: float in [0, 1] — proportion of positive sentiment
-        - negative: float in [0, 1] — proportion of negative sentiment
-        - neutral: float in [0, 1] — proportion of neutral sentiment
-        - sentiment_words: int — number of sentiment-bearing words found
+        - compound: float in [-1, 1] — compressed terminal valence
+        - arousal: float in [0, 1] — compressed terminal arousal
+        - positive: float in [0, 1] — positive valence mass proportion
+        - negative: float in [0, 1] — negative valence mass proportion
+        - neutral: float in [0, 1] — unaffective mass proportion
+        - sentiment_words: int — affect vectors that entered the fold
     """
     tokens = _tokenize(text)
     if not tokens:
         return {
             "compound": 0.0,
+            "arousal": 0.0,
             "positive": 0.0,
             "negative": 0.0,
             "neutral": 1.0,
             "sentiment_words": 0,
         }
 
-    (
-        scores,
-        pos_sum,
-        neg_sum,
-        sentiment_count,
-        pre_contrastive,
-        post_contrastive,
-        seen_contrastive,
-    ) = _score_tokens(tokens)
-
-    if not scores:
+    contributions, neutral_count = _fold(tokens)
+    if not contributions:
+        # No affect vectors — but the organism's standing state is
+        # still the reading: an unaffective utterance in an aroused
+        # body appraises aroused (the fold's initial condition is
+        # also the whole terminal state here).
+        v0, a0 = _CORE_AFFECT
         return {
-            "compound": 0.0,
+            "compound": v0 / math.sqrt(v0 * v0 + _COMPRESS_ALPHA),
+            "arousal": a0 / math.sqrt(a0 * a0 + _COMPRESS_ALPHA),
             "positive": 0.0,
             "negative": 0.0,
             "neutral": 1.0,
             "sentiment_words": 0,
         }
 
-    # Apply contrastive weighting: post-contrastive scores get 1.5x weight
-    if seen_contrastive and post_contrastive:
-        weighted_scores: list[float] = []
-        for s in pre_contrastive:
-            weighted_scores.append(s * 0.5)
-        for s in post_contrastive:
-            weighted_scores.append(s * 1.5)
-        scores = weighted_scores
+    # Terminal state: the fold runs from the organism's core affect —
+    # standing (v0, a0) plus the stimulus trajectory under the
+    # exclamation gain. The baseline is not gained by punctuation;
+    # it is where the trajectory begins.
+    gain = _exclamation_gain(text)
+    v0, a0 = _CORE_AFFECT
+    valence = v0 + sum(c[0] for c in contributions) * gain
+    arousal = a0 + sum(c[1] for c in contributions) * gain
 
-        # Recompute sums
-        pos_sum = sum(s for s in scores if s > 0)
-        neg_sum = sum(abs(s) for s in scores if s < 0)
-
-    # Apply punctuation boost to the final compound
-    punct_boost = _punctuation_boost(text)
-
-    # Compound score: sum of scores, normalized to [-1, 1]
-    # Using the VADER normalization: sum / sqrt(sum^2 + alpha)
-    raw_sum = sum(scores) * punct_boost
-    alpha = 15.0  # VADER's normalization constant
-    compound = raw_sum / (raw_sum * raw_sum + alpha) ** 0.5
+    # Signed saturating compress — the report map.
+    compound = valence / math.sqrt(valence * valence + _COMPRESS_ALPHA)
     compound = max(-1.0, min(1.0, compound))
+    arousal_report = arousal / math.sqrt(arousal * arousal + _COMPRESS_ALPHA)
+    arousal_report = max(0.0, min(1.0, arousal_report))
 
-    positive, negative, neutral = _compute_proportions(
-        pos_sum, neg_sum, sentiment_count, len(tokens)
-    )
+    # Valence masses: the signed projection of the trajectory onto
+    # the valence axis, normalized against neutral token mass.
+    pos_mass = sum(c[0] for c in contributions if c[0] > 0.0)
+    neg_mass = sum(-c[0] for c in contributions if c[0] < 0.0)
+    total = pos_mass + neg_mass + neutral_count
+    if total > 0:
+        positive = pos_mass / total
+        negative = neg_mass / total
+        neutral_prop = max(0.0, min(1.0, neutral_count / total))
+    else:
+        positive = 0.0
+        negative = 0.0
+        neutral_prop = 1.0
 
     return {
         "compound": compound,
+        "arousal": arousal_report,
         "positive": positive,
         "negative": negative,
-        "neutral": neutral,
-        "sentiment_words": sentiment_count,
+        "neutral": neutral_prop,
+        "sentiment_words": len(contributions),
     }

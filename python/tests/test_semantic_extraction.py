@@ -8,7 +8,7 @@ somatosensory system") that were stored as concept-network edges. The
 article must be a complete word: ``(?:(?:a|an|the)\s+)?``.
 """
 
-from temporal_lobe.memory.semantic import SemanticMemory
+from memory.semantic import SemanticMemory
 
 
 def _objects(memory: SemanticMemory, text: str, relation: str) -> list[str]:

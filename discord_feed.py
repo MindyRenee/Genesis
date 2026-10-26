@@ -1,4 +1,10 @@
-"""Discord feed — the webhook transport behind Genesis's channels.
+"""Discord feed — the webhook transport behind Genesis's channel.
+
+The channel itself — *her page*, a place in the outer world where
+the public gathers — is ``worlds.channel.Channel``, held by
+``OuterWorld``. This module is only the transport: posting out
+(``DiscordFeed``), polling in (``DiscordListener``), and the
+session-mirror plumbing (``FeedLogHandler``, ``StderrTee``).
 
 Three channels exist, each on its own webhook:
 
@@ -18,8 +24,8 @@ A webhook can only *post* — it cannot read the channel. Hearing the
 public needs a bot identity: ``DiscordListener`` (below) polls the
 channel with ``GENESIS_DISCORD_BOT_TOKEN`` when one is configured —
 that is the one inbound path, and everything it hears is attributed
-to the public, never the steward. Without the token her channel
-stays read-only by construction, exactly as before.
+to the public. Without the token her channel stays read-only by
+construction, exactly as before.
 
 Design notes:
 
@@ -92,7 +98,11 @@ _PREFIX_AUTHORS: tuple[tuple[str, str], ...] = (
 )
 
 
-def _bounded_urlopen(req: urllib.request.Request, timeout: float) -> addinfourl:
+def _bounded_urlopen(
+    req: urllib.request.Request,
+    timeout: float,
+    stop: threading.Event | None = None,
+) -> addinfourl:
     """urlopen with a wall-clock bound that also covers DNS.
 
     urllib's ``timeout`` bounds connect/read but NOT ``getaddrinfo`` —
@@ -101,6 +111,10 @@ def _bounded_urlopen(req: urllib.request.Request, timeout: float) -> addinfourl:
     teardown join). The request runs on a daemon helper thread; after
     ``timeout`` the caller abandons it and the orphan finishes whenever
     DNS returns — it is a daemon, so it can never block process exit.
+
+    ``stop`` cuts the wait short: ``box.get`` is polled in small
+    slices, so a set event abandons the request immediately instead
+    of parking the caller for the rest of ``timeout``.
     """
     box: queue.Queue[addinfourl | BaseException] = queue.Queue(maxsize=1)
 
@@ -111,12 +125,20 @@ def _bounded_urlopen(req: urllib.request.Request, timeout: float) -> addinfourl:
             box.put(e)
 
     named_thread("discord-io", _do, comm="g-disc-io").start()
-    try:
-        item = box.get(timeout=timeout)
-    except queue.Empty:
-        raise urllib.error.URLError(
-            f"request exceeded {timeout:.0f}s total bound (incl. DNS)"
-        ) from None
+    deadline = time.monotonic() + timeout
+    while True:
+        if stop is not None and stop.is_set():
+            raise urllib.error.URLError("request cancelled — shutdown")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise urllib.error.URLError(
+                f"request exceeded {timeout:.0f}s total bound (incl. DNS)"
+            ) from None
+        try:
+            item = box.get(timeout=min(remaining, 0.05))
+        except queue.Empty:
+            continue
+        break
     if isinstance(item, BaseException):
         raise item
     return item
@@ -255,6 +277,9 @@ class DiscordFeed:
         self._closing = False
         self._disabled = False
         self._fail_streak = 0
+        # Set at the drain deadline — in-flight requests poll it so a
+        # wedged urlopen expires *with* the flush grace, not after.
+        self._abandon = threading.Event()
         # A webhook may edit its own messages; the live-board view is
         # one message kept current rather than a scroll of frames.
         self._live_id: str | None = None
@@ -384,19 +409,32 @@ class DiscordFeed:
                 wait = backoff
                 if drain_deadline is not None:
                     wait = min(wait, max(0.0, drain_deadline - time.monotonic()))
-                time.sleep(wait)
+                with self._cond:
+                    # Interruptible — close()'s notify wakes the drain
+                    # now instead of sleeping out the backoff.
+                    self._cond.wait_for(lambda: self._closing or self._disabled, timeout=wait)
+            # An in-flight request must expire *with* the drain
+            # deadline, not the urlopen bound past it — otherwise a
+            # dead network turns close() into its full 15 s timeout.
+            bound = (
+                max(0.0, drain_deadline - time.monotonic()) if drain_deadline is not None else None
+            )
+            if bound is not None and bound <= 0.0:
+                return
             if kind == "text":
                 _, author, content = batch
-                ok, retry_after, permanent = self._post(content, author)
+                ok, retry_after, permanent = self._post(content, author, bound)
             elif kind == "image":
                 _, author, caption, filename, png = batch
-                ok, retry_after, permanent = self._post_image_once(caption, author, filename, png)
+                ok, retry_after, permanent = self._post_image_once(
+                    caption, author, filename, png, bound
+                )
             elif kind == "live_text":
                 _, author, text = batch
-                ok, retry_after, permanent = self._post_live_text(text, author)
+                ok, retry_after, permanent = self._post_live_text(text, author, bound)
             else:  # "live"
                 _, author, caption, png = batch
-                ok, retry_after, permanent = self._post_live(caption, author, png)
+                ok, retry_after, permanent = self._post_live(caption, author, png, bound)
             if ok:
                 backoff = 0.0
                 self._fail_streak = 0
@@ -417,14 +455,15 @@ class DiscordFeed:
                     )
                     return
                 backoff = (
-                    retry_after
+                    min(_BACKOFF_CAP, retry_after)
                     if retry_after is not None
                     else min(_BACKOFF_CAP, max(2.0, backoff * 2))
                 )
                 # Re-queue the failed batch so it isn't lost.
                 with self._cond:
                     self._queue.appendleft(batch)
-            time.sleep(0.0 if self._closing else self._post_interval)
+            with self._cond:
+                self._cond.wait_for(lambda: self._closing, timeout=self._post_interval)
 
     def _take_batch(self) -> tuple | None:
         """Pop one item, coalescing same-author text up to the limit."""
@@ -460,16 +499,26 @@ class DiscordFeed:
                 total += 1 + len(next_text)
             return ("text", author, "\n".join(parts))
 
-    def _post(self, content: str, author: str | None) -> tuple[bool, float | None, bool]:
+    def _post(
+        self,
+        content: str,
+        author: str | None,
+        bound: float | None = None,
+    ) -> tuple[bool, float | None, bool]:
         """POST content (chunked). Returns (ok, retry_after, permanent)."""
         for chunk in _chunks(content):
             chunk = _fence_if_panel(chunk)
-            ok, retry_after, permanent = self._post_once(chunk, author)
+            ok, retry_after, permanent = self._post_once(chunk, author, bound)
             if not ok:
                 return ok, retry_after, permanent
         return True, None, False
 
-    def _post_once(self, content: str, author: str | None) -> tuple[bool, float | None, bool]:
+    def _post_once(
+        self,
+        content: str,
+        author: str | None,
+        bound: float | None = None,
+    ) -> tuple[bool, float | None, bool]:
         payload: dict[str, object] = {
             "content": content,
             "allowed_mentions": {"parse": []},
@@ -487,8 +536,11 @@ class DiscordFeed:
             },
             method="POST",
         )
+        timeout = min(10.0, bound) if bound is not None else 10.0
+        if timeout <= 0.0:
+            return False, None, False
         try:
-            with _bounded_urlopen(req, timeout=10):
+            with _bounded_urlopen(req, timeout=timeout, stop=self._abandon):
                 return True, None, False
         except urllib.error.HTTPError as e:
             if e.code == 429:
@@ -508,6 +560,7 @@ class DiscordFeed:
         author: str | None,
         filename: str,
         png: bytes,
+        bound: float | None = None,
     ) -> tuple[bool, float | None, bool]:
         payload: dict[str, object] = {
             "content": caption,
@@ -517,10 +570,14 @@ class DiscordFeed:
         if author:
             payload["username"] = author
         body, content_type = _multipart(payload, filename, png)
-        return self._send(self._url, "POST", body, content_type)
+        return self._send(self._url, "POST", body, content_type, bound=bound)
 
     def _post_live(
-        self, caption: str, author: str | None, png: bytes
+        self,
+        caption: str,
+        author: str | None,
+        png: bytes,
+        bound: float | None = None,
     ) -> tuple[bool, float | None, bool]:
         """PATCH the live message if it exists, else create it (wait=true)."""
         payload: dict[str, object] = {
@@ -531,7 +588,7 @@ class DiscordFeed:
         if self._live_id:
             url = f"{self._url}/messages/{self._live_id}"
             body, content_type = _multipart(payload, "board.png", png)
-            ok, retry_after, permanent = self._send(url, "PATCH", body, content_type)
+            ok, retry_after, permanent = self._send(url, "PATCH", body, content_type, bound=bound)
             if ok or retry_after is not None or not permanent:
                 return ok, retry_after, permanent
             # Permanent failure — the message may have been deleted.
@@ -542,7 +599,7 @@ class DiscordFeed:
         body, content_type = _multipart(payload, "board.png", png)
         url = self._url + ("&" if "?" in self._url else "?") + "wait=true"
         status, retry_after, permanent, resp = self._send(
-            url, "POST", body, content_type, want_body=True
+            url, "POST", body, content_type, want_body=True, bound=bound
         )
         if status and resp:
             try:
@@ -551,7 +608,12 @@ class DiscordFeed:
                 note_swallowed("discord_feed.live_status_parse", e)
         return status, retry_after, permanent
 
-    def _post_live_text(self, text: str, author: str | None) -> tuple[bool, float | None, bool]:
+    def _post_live_text(
+        self,
+        text: str,
+        author: str | None,
+        bound: float | None = None,
+    ) -> tuple[bool, float | None, bool]:
         """PATCH the live message's content, or create it (wait=true).
 
         Plain JSON — the board carries no attachment, so no multipart
@@ -569,6 +631,7 @@ class DiscordFeed:
                 "PATCH",
                 body,
                 "application/json",
+                bound=bound,
             )
             if ok or retry_after is not None or not permanent:
                 return ok, retry_after, permanent
@@ -578,7 +641,7 @@ class DiscordFeed:
         body = json.dumps(payload).encode("utf-8")
         url = self._url + ("&" if "?" in self._url else "?") + "wait=true"
         status, retry_after, permanent, resp = self._send(
-            url, "POST", body, "application/json", want_body=True
+            url, "POST", body, "application/json", want_body=True, bound=bound
         )
         if status and resp:
             try:
@@ -594,6 +657,7 @@ class DiscordFeed:
         body: bytes,
         content_type: str,
         want_body: bool = False,
+        bound: float | None = None,
     ) -> tuple:
         """Raw request. Returns (ok, retry_after, permanent[, body])."""
         req = urllib.request.Request(
@@ -605,8 +669,11 @@ class DiscordFeed:
             },
             method=method,
         )
+        timeout = min(15.0, bound) if bound is not None else 15.0
+        if timeout <= 0.0:
+            return (False, None, False, None) if want_body else (False, None, False)
         try:
-            with _bounded_urlopen(req, timeout=15) as r:
+            with _bounded_urlopen(req, timeout=timeout, stop=self._abandon) as r:
                 resp = r.read() if want_body else None
             return (True, None, False, resp) if want_body else (True, None, False)
         except urllib.error.HTTPError as e:
@@ -629,6 +696,12 @@ class DiscordFeed:
         with self._cond:
             self._closing = True
             self._cond.notify_all()
+        # Requests still on the wire when the drain deadline hits are
+        # abandoned — without this a wedged urlopen keeps the poster
+        # (and the join below) parked past the grace it was given.
+        timer = threading.Timer(_DRAIN_DEADLINE, self._abandon.set)
+        timer.daemon = True  # a non-daemon Timer would hold the exit itself
+        timer.start()
         self._thread.join(timeout=_DRAIN_DEADLINE + 2.0)
 
 
@@ -707,7 +780,7 @@ class DiscordListener:
         return cls(token, url, on_message)
 
     @staticmethod
-    def _resolve_channel(webhook_url: str) -> str | None:
+    def _resolve_channel(webhook_url: str, stop: threading.Event | None = None) -> str | None:
         """GET the webhook object → the channel it posts to."""
         req = urllib.request.Request(
             webhook_url,
@@ -715,7 +788,7 @@ class DiscordListener:
             method="GET",
         )
         try:
-            with _bounded_urlopen(req, timeout=10) as r:
+            with _bounded_urlopen(req, timeout=10, stop=stop) as r:
                 data = json.loads(r.read())
             return data.get("channel_id") or None
         except Exception as e:  # noqa: BLE001
@@ -744,7 +817,7 @@ class DiscordListener:
             method="GET",
         )
         try:
-            with _bounded_urlopen(req, timeout=15) as r:
+            with _bounded_urlopen(req, timeout=15, stop=self._stop) as r:
                 return json.loads(r.read() or b"null"), None, False
         except urllib.error.HTTPError as e:
             if e.code == 429:
@@ -761,7 +834,7 @@ class DiscordListener:
         # channel_id. Retried on the poll interval so a Discord blip
         # at boot doesn't deafen her for the session.
         while self._channel_id is None and not self.deaf and not self._stop.is_set():
-            self._channel_id = self._resolve_channel(self._webhook_url)
+            self._channel_id = self._resolve_channel(self._webhook_url, self._stop)
             if self._channel_id is None:
                 self._stop.wait(self._poll_interval)
         if self.deaf or self._stop.is_set():

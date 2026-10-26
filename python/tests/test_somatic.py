@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from insula.somatic import SomaticSnapshot, somatic_congruence
-from temporal_lobe.memory.memory import MemoryRecord, MemorySystem
+from memory.memory import MemoryRecord, MemorySystem
 
 
 def test_congruence_identical_is_one():

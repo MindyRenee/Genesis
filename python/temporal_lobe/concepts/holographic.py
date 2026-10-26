@@ -363,9 +363,7 @@ class HolographicGraph:
         bucket = self._bucket_index(source)
         self._memory[relation][bucket] += bound
 
-    def _journal_add(
-        self, source: str, relation: str, target: str, weight: float
-    ) -> None:
+    def _journal_add(self, source: str, relation: str, target: str, weight: float) -> None:
         """Record an association in the bounded journal.
 
         Repeated bindings accumulate weight (repetition strengthens,
@@ -386,9 +384,7 @@ class HolographicGraph:
         batch, not a per-add sort.
         """
         keep = int(self.journal_cap * 0.9)
-        ranked = sorted(
-            self._journal.items(), key=lambda kv: kv[1], reverse=True
-        )
+        ranked = sorted(self._journal.items(), key=lambda kv: kv[1], reverse=True)
         self._journal = dict(ranked[:keep])
 
     def add(self, source: str, relation: str, target: str, weight: float = 1.0) -> None:
@@ -567,9 +563,7 @@ class HolographicGraph:
             else:
                 bucket = self._bucket_index(source)
                 probe = (
-                    self._addresses[source]
-                    if self._encoding >= 2
-                    else self._roles.get(relation)
+                    self._addresses[source] if self._encoding >= 2 else self._roles.get(relation)
                 )
                 if probe is not None:
                     recovered = circular_correlate(self._memory[relation][bucket], probe)
@@ -632,9 +626,7 @@ class HolographicGraph:
                 mem = self._memory[relation]
                 col = np.zeros(n, dtype=np.float32)
                 for i, cid in enumerate(concept_ids):
-                    result = circular_correlate(
-                        mem[self._bucket_index(cid)], self._addresses[cid]
-                    )
+                    result = circular_correlate(mem[self._bucket_index(cid)], self._addresses[cid])
                     col[i] = float(np.linalg.norm(result))
                 features.append(col)
         else:

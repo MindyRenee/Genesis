@@ -12,6 +12,12 @@ import tempfile
 from unittest.mock import MagicMock
 
 import pytest
+from brainstem.active_inference import (
+    ActiveInferenceReader,
+    DyadicState,
+    SelfModelState,
+    UserAffectEstimate,
+)
 from cerebellum.predictive import (
     Prediction,
     PredictionContext,
@@ -24,12 +30,6 @@ from frontal_lobe.autonomous import (
     AutonomousLearner,
 )
 from frontal_lobe.reasoning import Reasoner
-from limbic_system.active_inference import (
-    ActiveInferenceReader,
-    DyadicState,
-    SelfModelState,
-    UserAffectEstimate,
-)
 from limbic_system.curiosity import Curiosity
 from limbic_system.emotional_regulator import EmotionalRegulator
 from occipital_lobe.perception import Intent, Perception, QuestionType

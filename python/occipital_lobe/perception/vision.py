@@ -70,13 +70,13 @@ from genesis_client.protocol import (
     CHEM_NOREPINEPHRINE,
     CHEM_OXYTOCIN,
 )
+from genesis_client.retina import latest_frame
 from genesis_client.swallow import note_swallowed
 
 from ..epipolar import EpipolarProcessor, TwoViewReport
 from . import illumination, optics
 from .phototransduction import PhototransductionCascade, PhototransductionState
 from .recognition import FaceRecognizer
-from .retina import latest_frame
 
 if TYPE_CHECKING:
     from limbic_system.emotion import EmotionalState

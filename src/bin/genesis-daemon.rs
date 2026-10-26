@@ -861,13 +861,13 @@ fn main() {
         // an earlier same-cause log.
         eprintln!(
             "[genesis] WARNING: host CPU policy was NOT restored — this machine may \
-             be left at the throttled governor Genesis applied. Check that the \
-             cpufreq helper and its sudoers rule are still installed."
+             be left at the throttled governor Genesis applied. Check that \
+             passwordless sudo still works (`sudo -n true`)."
         );
     } else {
         // Nothing was ever applied, so there is nothing to restore. This
-        // is the ordinary case on a machine where the helper was never
-        // installed, and warning about a throttle we never applied
+        // is the ordinary case on a machine where the sudo grant was
+        // never installed, and warning about a throttle we never applied
         // would be a false alarm on every shutdown.
         eprintln!("[genesis] Host CPU policy unchanged — nothing was applied, nothing to restore.");
     }

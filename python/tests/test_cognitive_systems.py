@@ -28,7 +28,8 @@ from parietal_lobe.attention import (
     AttentionType,
 )
 from temporal_lobe.concepts import ConceptNetwork, RelationType
-from temporal_lobe.memory import (
+
+from memory import (
     HABIT_THRESHOLD,
     CentralExecutive,
     ConversationThread,
@@ -1242,18 +1243,13 @@ def test_learn_code_urge_needs_chemistry() -> None:
 
 def test_learn_code_urge_fires_in_plasticity_state() -> None:
     """BDNF/ACh/DA up with pressure low — the body is ready to encode."""
-    fired_at = _ticks_to_fire(
-        _configured_urge("learn_code"), dict(_PLASTIC_CHEMISTRY), 300
-    )
+    fired_at = _ticks_to_fire(_configured_urge("learn_code"), dict(_PLASTIC_CHEMISTRY), 300)
     assert fired_at is not None and fired_at < 150
 
 
 def test_learn_code_urge_suppressed_by_stress() -> None:
     """Cortisol/CRH dominance allostatically vetoes appetitive study."""
-    assert (
-        _ticks_to_fire(_configured_urge("learn_code"), dict(_STRESSED_CHEMISTRY), 600)
-        is None
-    )
+    assert _ticks_to_fire(_configured_urge("learn_code"), dict(_STRESSED_CHEMISTRY), 600) is None
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -3680,7 +3676,12 @@ def _broadcast_holder(**overrides):
 
     said: list[str] = []
     emitted: list[tuple] = []
-    world = SimpleNamespace(it_said=lambda t: said.append(t))
+    # Her page lives in the outer world — the holder's world carries
+    # a channel whose feed collects the posts.
+    world = SimpleNamespace(
+        it_said=lambda t: said.append(t),
+        channel=SimpleNamespace(feed=_Feed(), listener=None, bot_id=None),
+    )
     network = SimpleNamespace(
         most_activated=lambda n: [("curiosity", 0.9)],
         get_concept=lambda name: SimpleNamespace(confidence=0.9),
@@ -3697,7 +3698,6 @@ def _broadcast_holder(**overrides):
         _is_meditating=False,
         _is_teaching=False,
         _is_gaming=False,
-        _public_feed=_Feed(),
         _last_broadcast_seed=None,
         brain=SimpleNamespace(frontal=frontal),
         feel=lambda: SimpleNamespace(valence=0.2),
@@ -3708,7 +3708,10 @@ def _broadcast_holder(**overrides):
     holder._broadcast_topic = lambda: VolitionMixin._broadcast_topic(holder)
     holder._public_share = lambda text: VolitionMixin._public_share(holder, text)
     for key, value in overrides.items():
-        setattr(holder, key, value)
+        if key == "channel":
+            holder.world.channel = value
+        else:
+            setattr(holder, key, value)
     return holder, posts, said, network, composer, emitted
 
 
@@ -3729,7 +3732,7 @@ def test_broadcast_terminal_feed_without_channel() -> None:
     in her terminal feed — the channel is silent, she is not."""
     from basal_ganglia.volition import VolitionMixin
 
-    holder, posts, said, _net, _comp, emitted = _broadcast_holder(_public_feed=None)
+    holder, posts, said, _net, _comp, emitted = _broadcast_holder(channel=None)
     VolitionMixin._perform_broadcast(holder)
     assert posts == []
     assert emitted == [("broadcast", "her own words")]
@@ -3848,9 +3851,7 @@ def test_draw_without_feed_still_speaks() -> None:
         description="",
         timestamp=0.0,
     )
-    holder, posts, said, emitted, _acted = _draw_holder(
-        ("a wash of violet", result), _public_feed=None
-    )
+    holder, posts, said, emitted, _acted = _draw_holder(("a wash of violet", result), channel=None)
     VolitionMixin._perform_draw(holder)
     assert posts == []
     assert emitted == [("broadcast", "a wash of violet")]
@@ -3976,27 +3977,43 @@ def test_seeded_channel_knowledge() -> None:
 # ═══════════════════════════════════════════════════════════════════
 
 
-def _channel_holder(**overrides):
-    """A broadcast holder extended for _hear_channel."""
-    from basal_ganglia.volition import VolitionMixin
+def _heard_speech(world) -> list[str]:
+    """The overheard-speech contents the world recorded."""
+    from temporal_lobe.events import EventKind
 
-    holder, posts, said, _net, _comp, emitted = _broadcast_holder(**overrides)
-    heard: list[str] = []
+    return [e.content for e in world.recent_events() if e.kind == EventKind.OVERHEARD_SPEECH]
+
+
+def _channel_holder(**overrides):
+    """A broadcast holder extended for channel hearing — a real
+    OuterWorld owns the page and the record; the holder supplies the
+    reply side the world forwards to."""
+    from basal_ganglia.volition import VolitionMixin
+    from temporal_lobe.world import OuterWorld
+
+    holder, posts, _said, _net, _comp, emitted = _broadcast_holder(**overrides)
     calls: list[str] = []
-    holder.world.hear_overheard = lambda t: heard.append(t)
     holder.respond = lambda q: (calls.append(q), "her answer")[1]
     holder._running = True
     holder._hear_channel = lambda a, c, m: VolitionMixin._hear_channel(holder, a, c, m)
     holder._channel_addressed = lambda t, m: VolitionMixin._channel_addressed(holder, t, m)
-    return holder, posts, said, emitted, heard, calls
+    # The page the world owns — the broadcast holder's feed stub.
+    channel = holder.world.channel
+    world = OuterWorld(
+        is_sleeping=lambda: getattr(holder, "_is_sleeping", False),
+        channel=channel,
+        on_channel_speech=holder._hear_channel,
+    )
+    holder.world = world
+    return holder, posts, world, emitted, calls
 
 
 def test_hear_channel_perceives_public_speech() -> None:
     """A stranger's message is heard — world record, journal,
     workspace — but not replied to: it didn't address her."""
-    holder, posts, _said, emitted, heard, calls = _channel_holder()
-    holder._hear_channel("amy", "just watching", {"id": "1"})
-    assert heard == ["amy: just watching"]
+    _holder, posts, world, emitted, calls = _channel_holder()
+    world._channel_heard("amy", "just watching", {"id": "1"})
+    assert _heard_speech(world) == ["amy: just watching"]
     assert emitted == [("heard", "amy: just watching")]
     assert posts == [] and calls == []
 
@@ -4004,19 +4021,22 @@ def test_hear_channel_perceives_public_speech() -> None:
 def test_hear_channel_replies_when_addressed() -> None:
     """Her name in a public message → she answers through a full
     respond turn, and the answer is a public share."""
-    holder, posts, said, emitted, _heard, calls = _channel_holder()
-    holder._hear_channel("amy", "hey genesis, what are you?", {"id": "1"})
+    from temporal_lobe.events import EventKind
+
+    _holder, posts, world, emitted, calls = _channel_holder()
+    world._channel_heard("amy", "hey genesis, what are you?", {"id": "1"})
     assert calls == ["(public channel) amy: hey genesis, what are you?"]
     assert posts == [("her answer", "Genesis")]
     assert emitted[-1] == ("broadcast", "her answer")
-    assert said == ["her answer"]
+    uttered = [e.content for e in world.recent_events() if e.kind == EventKind.UTTERANCE]
+    assert uttered == ["her answer"]
 
 
 def test_hear_channel_reply_to_her_post_addresses_her() -> None:
     """A reply to one of her posts addresses her even without her
     name — referenced_message.webhook_id marks her own posts."""
-    holder, posts, _said, _e, _h, calls = _channel_holder()
-    holder._hear_channel(
+    _holder, posts, world, _e, calls = _channel_holder()
+    world._channel_heard(
         "amy",
         "this is lovely",
         {"id": "2", "referenced_message": {"webhook_id": "w1"}},
@@ -4028,20 +4048,20 @@ def test_hear_channel_reply_to_her_post_addresses_her() -> None:
 def test_hear_channel_reply_pacing() -> None:
     """A second addressed message inside the window is still heard —
     it just isn't answered twice."""
-    holder, posts, _said, _emitted, heard, calls = _channel_holder()
-    holder._hear_channel("amy", "genesis are you there?", {"id": "1"})
-    holder._hear_channel("amy", "genesis did you hear me?", {"id": "2"})
+    _holder, posts, world, _emitted, calls = _channel_holder()
+    world._channel_heard("amy", "genesis are you there?", {"id": "1"})
+    world._channel_heard("amy", "genesis did you hear me?", {"id": "2"})
     assert calls == ["(public channel) amy: genesis are you there?"]
     assert posts == [("her answer", "Genesis")]
-    assert len(heard) == 2
+    assert len(_heard_speech(world)) == 2
 
 
 def test_hear_channel_sleep_gates_hearing() -> None:
     """Asleep, she does not hear the channel — the thalamic gate is
     closed for public speech too."""
-    holder, posts, _said, emitted, heard, calls = _channel_holder(_is_sleeping=True)
-    holder._hear_channel("amy", "genesis wake up", {"id": "1"})
-    assert heard == [] and emitted == [] and posts == [] and calls == []
+    _holder, posts, world, emitted, calls = _channel_holder(_is_sleeping=True)
+    world._channel_heard("amy", "genesis wake up", {"id": "1"})
+    assert _heard_speech(world) == [] and emitted == [] and posts == [] and calls == []
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -4141,11 +4161,12 @@ def _board_holder(**overrides):
     )
     holder = SimpleNamespace(
         _is_sleeping=False,
-        _public_feed=_Feed(),
+        world=SimpleNamespace(
+            channel=SimpleNamespace(feed=_Feed(), ear="on"),
+        ),
         _next_board_at=0.0,
         _session_started_at=0.0,
         _interaction_count=12,
-        _discord_listener=SimpleNamespace(deaf=False),
         _last_emitted=("thought", "a passing idea"),
         client=SimpleNamespace(
             get_state=lambda: core,
@@ -4177,7 +4198,10 @@ def _board_holder(**overrides):
         holder, core, lines
     )
     for key, value in overrides.items():
-        setattr(holder, key, value)
+        if key == "channel":
+            holder.world.channel = value
+        else:
+            setattr(holder, key, value)
     return holder, boards
 
 
@@ -4247,7 +4271,7 @@ def test_channel_board_paces_fixed_cadence() -> None:
 def test_channel_board_without_feed_or_daemon() -> None:
     """No channel → no board; a dead daemon still posts a minimal
     honest card — 'daemon unreachable' is telemetry too."""
-    holder, boards = _board_holder(_public_feed=None)
+    holder, boards = _board_holder(channel=None)
     holder._update_channel_board(1000.0)
     assert boards == []
 

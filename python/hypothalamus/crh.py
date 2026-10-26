@@ -178,6 +178,7 @@ Maximum impulse magnitude: 0.1
 
 Python modules that send CRH impulses:
     - emotional_regulator.py: stress (via _raw_impulse)
+    - transduction.py: wave-driven release (beta band power)
 
 Python modules that read CRH:
     - emotional_regulator.py: homeostatic regulation
@@ -216,6 +217,7 @@ class CRH:
     )
     receptors: tuple[str, ...] = ("CRF1", "CRF2")
     brain_waves: tuple[str, ...] = ("beta",)
+    wave_sign: float = 1.0
     circadian_modifier: str = "1.0 (no circadian modulation)"
     role: str = "HPA cascade initiator, stress response, anxiety"
     metabolic_decay_rate: float = 0.005

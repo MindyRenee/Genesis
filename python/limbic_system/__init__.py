@@ -338,7 +338,7 @@ referenced by this subsystem.
         drives the questions Genesis asks itself and the topics
         the autonomous learner pursues.
 
-    (limbic_system/) active_inference.py
+    (brainstem/) active_inference.py
         ActiveInference — the self-affect/self-state reader:
         minimizing free energy over what the user's words imply
         about its own standing. Insula-style appraisal.
@@ -438,18 +438,18 @@ _EXPORTS: dict[str, str] = {
     "DamasioSelfHierarchy": "insula.damasio",
     "ProtoSelf": "insula.damasio",
     "ProtoSelfState": "insula.damasio",
-    "SelfModel": "frontal_lobe.self.model",
+    "SelfModel": "self.self_model",
     # Interoceptive self-reading — active inference over its own
     # neurochemical trajectory (insula: felt sense of the body);
     # SEEKING drive (curiosity) and dyadic user-affect modeling
-    "ActiveInferenceReader": "limbic_system.active_inference",
+    "ActiveInferenceReader": "brainstem.active_inference",
     "Curiosity": "limbic_system.curiosity",
     "CuriosityType": "limbic_system.curiosity",
-    "DyadicState": "limbic_system.active_inference",
+    "DyadicState": "brainstem.active_inference",
     "Question": "limbic_system.curiosity",
-    "SelfModelReading": "limbic_system.active_inference",
-    "SelfModelState": "limbic_system.active_inference",
-    "UserAffectEstimate": "limbic_system.active_inference",
+    "SelfModelReading": "brainstem.active_inference",
+    "SelfModelState": "brainstem.active_inference",
+    "UserAffectEstimate": "brainstem.active_inference",
     # Amygdala evaluation of language — sentiment tagging
     "analyze_sentiment": "limbic_system.sentiment",
     # The learned sentiment lexicon — valence acquired from experience
@@ -463,12 +463,12 @@ _EXPORTS: dict[str, str] = {
     # The self-model's structural components — traits, the machine
     # body-substrate, the minimal self, agency detection, values,
     # self-esteem (SelfModel itself is claimed above)
-    "AgencyDetector": "frontal_lobe.self.model",
-    "ComputationalSubstrate": "frontal_lobe.self.model",
-    "MinimalSelf": "frontal_lobe.self.model",
-    "PersonalityTraits": "frontal_lobe.self.model",
-    "SelfEsteem": "frontal_lobe.self.model",
-    "Value": "frontal_lobe.self.model",
+    "AgencyDetector": "self.self_model",
+    "ComputationalSubstrate": "self.self_model",
+    "MinimalSelf": "self.self_model",
+    "PersonalityTraits": "self.self_model",
+    "SelfEsteem": "self.self_model",
+    "Value": "self.self_model",
     # Interoceptive congruence — how well the felt body matches the
     # expressed body (somatic_marker congruence; co-claimed with
     # insula, where the interoceptive comparison is read)
@@ -478,8 +478,8 @@ _EXPORTS: dict[str, str] = {
     # memory and gates its strength (McGaugh's amygdala-hippocampal
     # interaction; co-claimed with temporal_lobe, which owns the
     # episodic store)
-    "EmotionalMemory": "temporal_lobe.memory.systems",
-    "EmotionalMemorySystem": "temporal_lobe.memory.systems",
+    "EmotionalMemory": "memory.systems",
+    "EmotionalMemorySystem": "memory.systems",
     # Reward/motivation tracking — the dopamine sense of progress
     "GrowthLedger": "infrastructure.growth_ledger",
     "GrowthMilestone": "infrastructure.growth_ledger",

@@ -36,6 +36,10 @@ paper/*.toc
 recordings/
 notebooks/correlates_*.json
 *.sublime-workspace
+# Self-experiment recovery points — pre-edit backups the verify gate
+# parks beside each file it touches. Recovery data, not source.
+*.pre_experiment
+*.pre_workspace
 My Notes
 .vscode/
 

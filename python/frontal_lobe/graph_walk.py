@@ -58,8 +58,8 @@ import random
 import re
 from typing import TYPE_CHECKING, Any
 
-from frontal_lobe.self import PersonalityTraits
 from limbic_system.emotion import EmotionalState
+from self import PersonalityTraits
 from temporal_lobe.base import Thought
 from temporal_lobe.morphology import (
     agree_verb_phrase,

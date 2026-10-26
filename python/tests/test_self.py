@@ -9,7 +9,9 @@ import logging
 
 import pytest
 from frontal_lobe import CognitiveState
-from frontal_lobe.self import (
+from limbic_system.emotion import EmotionalState
+from occipital_lobe.perception import Intent, Perception, QuestionType
+from self import (
     AnswerAssessment,
     AutobiographicalSelf,
     CapabilityProfile,
@@ -29,12 +31,11 @@ from frontal_lobe.self import (
     SelfComposer,
     SelfModel,
 )
-from limbic_system.emotion import EmotionalState
-from occipital_lobe.perception import Intent, Perception, QuestionType
 from temporal_lobe.base import Thought
 from temporal_lobe.concepts import ConceptNetwork, RelationType
-from temporal_lobe.memory import MemoryContext
 from thalamus.brain_waves import BrainWave, BrainWaveState
+
+from memory import MemoryContext
 
 logger = logging.getLogger(__name__)
 
@@ -2243,7 +2244,7 @@ def test_self_model_sees_her_own_hardware_body() -> None:
     or any of the other hardware signals. She could not know she was
     hot, or out of power, or being stalled.
     """
-    from frontal_lobe.self.model import SelfModel as SM
+    from self.self_model import SelfModel as SM
 
     body = SM().update_hardware_body(_FullBody())
 
@@ -2267,7 +2268,7 @@ def test_absent_sensor_is_distinguishable_from_measured_zero() -> None:
     reading, and a need derived from the body could be inferred from
     silence. `hardware_sensors_present` counts what actually reported.
     """
-    from frontal_lobe.self.model import SelfModel as SM
+    from self.self_model import SelfModel as SM
 
     class _PartialBody:
         cpu_temp_c = 60.0
@@ -2292,7 +2293,7 @@ def test_stale_hardware_reading_is_not_actionable() -> None:
     """A need computed from a stale body reading is a hallucinated need."""
     import time as _time
 
-    from frontal_lobe.self.model import SelfModel as SM
+    from self.self_model import SelfModel as SM
 
     model = SM()
     body = model.update_hardware_body(_FullBody())
@@ -2309,7 +2310,7 @@ def test_stale_hardware_reading_is_not_actionable() -> None:
 
 def test_non_finite_sensor_reading_is_not_a_measurement() -> None:
     """A NaN or inf from a sensor must not enter the self-model."""
-    from frontal_lobe.self.model import SelfModel as SM
+    from self.self_model import SelfModel as SM
 
     class _BrokenBody:
         cpu_temp_c = float("nan")
@@ -2331,7 +2332,7 @@ def test_hardware_staleness_constant_is_not_a_serialized_field() -> None:
     """
     import dataclasses
 
-    from frontal_lobe.self.model import ComputationalSubstrate
+    from self.self_model import ComputationalSubstrate
 
     field_names = {f.name for f in dataclasses.fields(ComputationalSubstrate)}
     assert "HARDWARE_STALE_SECONDS" not in field_names
@@ -2341,7 +2342,7 @@ def test_hardware_staleness_constant_is_not_a_serialized_field() -> None:
 def test_developmental_tracker_reconcile_is_monotonic():
     """A checkpoint showing a later stage restores the floor; the live
     state is never lowered, and re-applying is a no-op."""
-    from frontal_lobe.self.identity import DevelopmentalTracker, IdentityStage
+    from self.identity import DevelopmentalTracker, IdentityStage
 
     live = DevelopmentalTracker()
     # Live state: pointer behind, some fresh evidence of its own.
@@ -2372,16 +2373,18 @@ def test_developmental_tracker_reconcile_is_monotonic():
 
 def test_developmental_tracker_reconcile_never_lowers():
     """An earlier-stage checkpoint cannot move the pointer back."""
-    from frontal_lobe.self.identity import DevelopmentalTracker, IdentityStage
+    from self.identity import DevelopmentalTracker, IdentityStage
 
     live = DevelopmentalTracker()
     live._current_stage = IdentityStage.INDUSTRY_VS_INFERIORITY
     live._resolutions[IdentityStage.TRUST_VS_MISTRUST].resolution = 0.9
 
-    report = live.reconcile({
-        "current_stage": "TRUST_VS_MISTRUST",
-        "resolutions": {"TRUST_VS_MISTRUST": {"resolution": 0.2, "evidence": []}},
-    })
+    report = live.reconcile(
+        {
+            "current_stage": "TRUST_VS_MISTRUST",
+            "resolutions": {"TRUST_VS_MISTRUST": {"resolution": 0.2, "evidence": []}},
+        }
+    )
 
     assert live._current_stage is IdentityStage.INDUSTRY_VS_INFERIORITY
     assert live._resolutions[IdentityStage.TRUST_VS_MISTRUST].resolution == 0.9

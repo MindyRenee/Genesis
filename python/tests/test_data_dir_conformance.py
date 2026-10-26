@@ -135,8 +135,6 @@ DIR_RESOLVERS = {
 # Tools that must reach the data dir through the shared resolver —
 # a private reimplementation is how forks start.
 DELEGATORS = {
-    "scripts/arc_offer.py": "default_data_dir",
-    "scripts/arc_play_evidence.py": "default_data_dir",
     "scripts/discord_pulse.py": "default_data_dir",
     "scripts/restore_archived_dreams.py": "default_data_dir",
     "scripts/recover_pruned_concepts.py": "default_data_dir",

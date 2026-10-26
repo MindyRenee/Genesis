@@ -11,9 +11,9 @@ from frontal_lobe.reasoning.induction import (
     ExampleInductor,
     RuleStatus,
 )
-from parietal_lobe.exemplars import ExemplarSession, _Panel, _PanelWriter
 from parietal_lobe.grid import Grid
 from parietal_lobe.strips import orbit, segment
+from worlds.exemplars import ExemplarSession, _Panel, _PanelWriter
 
 
 def _g(rows: list[list[int]]) -> Grid:
@@ -239,7 +239,7 @@ def _demo_scene() -> tuple[list[list[int]], list[Grid], list[Grid]]:
 class TestExemplarSession:
     def test_scene_pairs_feed_inductor(self) -> None:
         scene, _antes, _cons = _demo_scene()
-        sess = ExemplarSession()
+        sess = ExemplarSession(ExampleInductor())
         g = _g(scene)
         sess.observe(g)
         # A demonstration must persist — one frame only accrues votes.
@@ -251,7 +251,7 @@ class TestExemplarSession:
 
     def test_expected_picks_antecedent_framed_query(self) -> None:
         scene, _antes, cons = _demo_scene()
-        sess = ExemplarSession()
+        sess = ExemplarSession(ExampleInductor())
         g = _g(scene)
         sess.observe(g)
         sess.observe(g)
@@ -267,7 +267,7 @@ class TestExemplarSession:
         assert blocks[2] == cons[2]
 
     def test_empty_scene_is_silent(self) -> None:
-        sess = ExemplarSession()
+        sess = ExemplarSession(ExampleInductor())
         sess.observe(_g([[1] * 32 for _ in range(32)]))
         assert sess.expected() is None
         assert len(sess.inductor.store.pairs) == 0
@@ -277,7 +277,7 @@ class TestExemplarSession:
         a transition artifact — and must never reach the store or
         the frame-color schema."""
         scene, _antes, _cons = _demo_scene()
-        sess = ExemplarSession()
+        sess = ExemplarSession(ExampleInductor())
         g = _g(scene)
         sess.observe(g)
         sess.observe(g)
@@ -297,15 +297,15 @@ class TestExemplarSession:
         """Second episode: borders, committed pairs, and verb skills
         ride the export; live scene state re-derives from frames."""
         scene, _antes, cons = _demo_scene()
-        sess = ExemplarSession()
+        sess = ExemplarSession(ExampleInductor())
         g = _g(scene)
         sess.observe(g)
         sess.observe(g)
         import json
 
         data = json.loads(json.dumps(sess.export_learning()))
-        restored = ExemplarSession()
-        restored.import_learning(data)
+        restored = ExemplarSession(ExampleInductor())
+        restored.import_learning(data, inductor=ExampleInductor.from_dict(data["inductor"]))
         assert restored._ante_borders == sess._ante_borders
         assert restored._cons_borders == sess._cons_borders
         assert restored._seen_pairs == sess._seen_pairs
@@ -323,14 +323,15 @@ class TestExemplarSession:
         """A pair seen once before shutdown commits on the next
         session's first sighting — votes are evidence too."""
         scene, _antes, _cons = _demo_scene()
-        sess = ExemplarSession()
+        sess = ExemplarSession(ExampleInductor())
         g = _g(scene)
         sess.observe(g)
         assert len(sess.inductor.store.pairs) == 0 and sess._pair_votes
         import json
 
-        restored = ExemplarSession()
-        restored.import_learning(json.loads(json.dumps(sess.export_learning())))
+        restored = ExemplarSession(ExampleInductor())
+        data = json.loads(json.dumps(sess.export_learning()))
+        restored.import_learning(data, inductor=ExampleInductor.from_dict(data["inductor"]))
         restored.observe(g)
         assert len(restored.inductor.store.pairs) == 3
 
@@ -567,7 +568,7 @@ class TestCompetenceBridge:
 
     def _scene_session(self, competence=None):
         scene, _antes, _cons = _demo_scene()
-        sess = ExemplarSession()
+        sess = ExemplarSession(ExampleInductor())
         sess.competence = competence
         g = _g(scene)
         sess.observe(g)
@@ -575,7 +576,7 @@ class TestCompetenceBridge:
         return sess, scene, g
 
     def test_engaged_only_with_committed_pairs(self) -> None:
-        sess = ExemplarSession()
+        sess = ExemplarSession(ExampleInductor())
         assert not sess.engaged()
         sess2, _s, _g = self._scene_session()
         assert sess2.engaged()
@@ -678,8 +679,8 @@ class TestCompetenceBridge:
         import json
 
         data = json.loads(json.dumps(sess.export_learning()))
-        restored = ExemplarSession()
-        restored.import_learning(data)
+        restored = ExemplarSession(ExampleInductor())
+        restored.import_learning(data, inductor=ExampleInductor.from_dict(data["inductor"]))
         assert restored.glyph_ids[tile.rows()] == "glyph:abc123"
 
     def test_glyph_tiles_are_committed_evidence_only(self) -> None:
@@ -706,7 +707,7 @@ class TestConceptGrounding:
 
         net = ConceptNetwork()
         scene, _antes, _cons = _demo_scene()
-        sess = ExemplarSession()
+        sess = ExemplarSession(ExampleInductor())
         sess.network = net
         g = _g(scene)
         sess.observe(g)
@@ -736,7 +737,7 @@ class TestConceptGrounding:
         net = ConceptNetwork()
         prior = net.add_concept("pair", origin="conversation")
         scene, _a, _c = _demo_scene()
-        sess = ExemplarSession()
+        sess = ExemplarSession(ExampleInductor())
         sess.network = net
         sess.observe(_g(scene))
         sess.observe(_g(scene))
@@ -748,7 +749,7 @@ class TestConceptGrounding:
         from temporal_lobe.concepts import ConceptNetwork
 
         net = ConceptNetwork()
-        sess = ExemplarSession()
+        sess = ExemplarSession(ExampleInductor())
         sess.network = net
         sess.observe(_g([[1] * 32 for _ in range(32)]))  # empty scene
         assert net.get_concept("pair") is None
@@ -781,7 +782,7 @@ class TestConceptGrounding:
 
     def test_standalone_session_keeps_plain_words(self) -> None:
         scene, _a, _c = _demo_scene()
-        sess = ExemplarSession()  # no network — words pass through
+        sess = ExemplarSession(ExampleInductor())  # no network — words pass through
         g = _g(scene)
         sess.observe(g)
         sess.observe(g)

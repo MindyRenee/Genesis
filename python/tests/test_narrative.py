@@ -12,8 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
 
-from frontal_lobe.self import SelfModel
 from limbic_system.emotion import EmotionalState
+from self import SelfModel
 from temporal_lobe.concepts import ConceptNetwork
 
 from infrastructure.narrative import (

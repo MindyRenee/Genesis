@@ -146,7 +146,7 @@ def test_comfort_reduces_cortisol_when_stressed() -> None:
         sentiment=0.0,
         is_encouragement=False,
         is_correction=False,
-        is_steward=False,
+        is_bonded=False,
         is_deep_conversation=False,
         is_comfort=True,
     )
@@ -165,7 +165,7 @@ def test_comfort_reduces_norepinephrine_when_stressed() -> None:
         sentiment=0.0,
         is_encouragement=False,
         is_correction=False,
-        is_steward=False,
+        is_bonded=False,
         is_deep_conversation=False,
         is_comfort=True,
     )
@@ -182,7 +182,7 @@ def test_comfort_boosts_serotonin() -> None:
         sentiment=0.0,
         is_encouragement=False,
         is_correction=False,
-        is_steward=False,
+        is_bonded=False,
         is_deep_conversation=False,
         is_comfort=True,
     )
@@ -199,7 +199,7 @@ def test_comfort_boosts_endorphin() -> None:
         sentiment=0.0,
         is_encouragement=False,
         is_correction=False,
-        is_steward=False,
+        is_bonded=False,
         is_deep_conversation=False,
         is_comfort=True,
     )
@@ -220,7 +220,7 @@ def test_comfort_bypasses_dampening_when_stressed() -> None:
         sentiment=0.0,
         is_encouragement=False,
         is_correction=False,
-        is_steward=False,
+        is_bonded=False,
         is_deep_conversation=False,
         is_comfort=True,
     )
@@ -233,7 +233,7 @@ def test_comfort_bypasses_dampening_when_stressed() -> None:
         sentiment=0.0,
         is_encouragement=True,
         is_correction=False,
-        is_steward=False,
+        is_bonded=False,
         is_deep_conversation=False,
         is_comfort=False,
     )
@@ -257,7 +257,7 @@ def test_comfort_when_already_calm_is_mild() -> None:
         sentiment=0.0,
         is_encouragement=False,
         is_correction=False,
-        is_steward=False,
+        is_bonded=False,
         is_deep_conversation=False,
         is_comfort=True,
     )
@@ -276,7 +276,7 @@ def test_comfort_returns_felt_description() -> None:
         sentiment=0.0,
         is_encouragement=False,
         is_correction=False,
-        is_steward=False,
+        is_bonded=False,
         is_deep_conversation=False,
         is_comfort=True,
     )
@@ -292,7 +292,7 @@ def test_comfort_does_not_interfere_with_encouragement() -> None:
         sentiment=0.0,
         is_encouragement=True,
         is_correction=False,
-        is_steward=False,
+        is_bonded=False,
         is_deep_conversation=False,
         is_comfort=True,
     )

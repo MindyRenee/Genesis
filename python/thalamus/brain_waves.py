@@ -683,9 +683,12 @@ def _windowed_gamma_plv(
     returned alongside the per-pair breakdown. ``None`` when the
     window holds too few samples — an absent channel, not a zero.
     """
-    if len(samples) < 4:
+    # Snapshot first: the oscillator appends to the same deque on
+    # its own thread — iterating the live deque races it.
+    window = list(samples)
+    if len(window) < 4:
         return None, {}
-    n = len(samples)
+    n = len(window)
     pair_idx = [
         (i, j) for i in range(len(_GAMMA_REGIONS)) for j in range(i + 1, len(_GAMMA_REGIONS))
     ]

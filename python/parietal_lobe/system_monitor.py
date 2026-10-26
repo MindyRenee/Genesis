@@ -40,7 +40,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from infrastructure.cpu_speed import CpuSpeed
+from brainstem.cpufreq import CpuSpeed
 
 logger = logging.getLogger(__name__)
 

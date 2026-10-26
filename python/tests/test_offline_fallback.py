@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from frontal_lobe.tools.source_registry import (
+from tools.source_registry import (
     SourceCache,
     SourceRegistry,
     SourceResult,

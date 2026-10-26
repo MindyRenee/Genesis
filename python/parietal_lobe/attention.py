@@ -133,6 +133,7 @@ class AttentionType(Enum):
     SUSTAINED = "sustained"  # maintain focus over time
     EXECUTIVE = "executive"  # top-down goal-directed biasing
     DIVIDED = "divided"  # splitting resources across tasks
+    CAPTURED = "captured"  # stimulus-driven ventral capture
 
 
 @dataclass(slots=True)
@@ -279,6 +280,57 @@ class AttentionSystem:
         # Amplify the attended concept in the network
         self._amplify_concept(target, intensity)
 
+        return focus
+
+    def capture(self, target: str, drive: float) -> AttentionFocus | None:
+        """Stimulus-driven attentional capture — the ventral network.
+
+        Corbetta & Shulman (2002): the dorsal frontoparietal network
+        holds top-down goals while the ventral network (TPJ + ventral
+        frontal cortex) is driven by stimulus salience and can seize
+        the spotlight when a stimulus's bottom-up drive outweighs the
+        incumbent focus. ``capture`` installs a focus only when the
+        drive exceeds what it must displace — at capacity it competes
+        against the weakest incumbent; below capacity it needs only a
+        minimal salience threshold.
+
+        Args:
+            target: The stimulus capturing attention.
+            drive: Bottom-up salience drive in [0,1] — the externally
+                computed competition signal (novelty, prediction error,
+                affective intensity, NE gain already folded in).
+
+        Returns:
+            The captured AttentionFocus, or None when the drive lost
+            the competition to the incumbent set.
+        """
+        drive = max(0.0, min(1.0, drive))
+
+        if target in self._foci:
+            focus = self._foci[target]
+            focus.intensity = max(focus.intensity, drive)
+            return focus
+
+        if len(self._foci) >= self.max_foci:
+            weakest_name = min(self._foci, key=lambda t: self._foci[t].intensity)
+            weakest = self._foci[weakest_name]
+            # Capture must beat the weakest incumbent outright.
+            if drive <= weakest.intensity:
+                return None
+            self._remove_focus(weakest_name)
+        elif drive < 0.25:
+            # Below capacity a stimulus still needs a minimal salience
+            # floor — spontaneous activity doesn't capture a spotlight.
+            return None
+
+        focus = AttentionFocus(
+            target=target,
+            intensity=drive,
+            attention_type=AttentionType.CAPTURED,
+            goal="",
+        )
+        self._foci[target] = focus
+        self._amplify_concept(target, drive)
         return focus
 
     def suppress(self, target: str) -> None:

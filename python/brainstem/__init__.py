@@ -370,7 +370,7 @@ _EXPORTS: dict[str, str] = {
     # Arousal / coming-online — start, stop, save, restore
     "LifecycleMixin": "brainstem.lifecycle",
     # The VLPO flip-flop — sleep-wake switching and consolidation drive
-    "SleepMixin": "brainstem.sleep",
+    "SleepMixin": "sleep.sleep",
     # Autonomic setpoints — warning thresholds
     "WARN_CORTISOL": "brainstem.thresholds",
     # Neuromodulator source nuclei (table in the module docstring) —
@@ -390,6 +390,20 @@ _EXPORTS: dict[str, str] = {
     "apply_field_stimulus": "brainstem.field_probe",
     "field_phase_lock": "brainstem.field_probe",
     "apply_audio_stimulus": "brainstem.field_audio",
+    # Anticipatory regulation — the mind's reader of the body's
+    # generative self-model (free energy, precision, surprise,
+    # allostatic load); the engine itself is the daemon's
+    # (co-claimed with limbic_system)
+    "ActiveInferenceReader": "brainstem.active_inference",
+    "SelfModelReading": "brainstem.active_inference",
+    "SelfModelState": "brainstem.active_inference",
+    "DyadicState": "brainstem.active_inference",
+    "UserAffectEstimate": "brainstem.active_inference",
+    # Autonomic frequency reflex — the mind's own-process priority
+    # and I/O class, the counterpart of the body's governor policy
+    "CpuSpeed": "brainstem.cpufreq",
+    "CpuSpeedState": "brainstem.cpufreq",
+    "SpeedResult": "brainstem.cpufreq",
     # The proto-self — Damasio's primordial self is rooted in the
     # brainstem's body-mapping nuclei (NTS, parabrachial, PAG,
     # reticular formation): the first map of "how the organism is"

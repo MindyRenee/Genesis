@@ -9,8 +9,8 @@ from dataclasses import dataclass
 import pytest
 from frontal_lobe.reasoning import Reasoner, ReasoningType
 from limbic_system.emotion import EmotionalState
+from sleep.dream_synthesis import DreamInsight, DreamProposal, DreamSynthesis
 from temporal_lobe.concepts import ConceptNetwork, RelationType
-from temporal_lobe.dream_synthesis import DreamInsight, DreamProposal, DreamSynthesis
 
 from genesis_client.types import NeuroSummary, RecentEpisode
 from mind import Mind
@@ -1665,10 +1665,10 @@ def test_restored_sleep_first_awake_observation_starts_grace():
 
 def _make_inner_life_for_lucid(seed: int = 42):
     """Build an InnerLife with a small network for lucid dream tests."""
-    from frontal_lobe.inner_life import InnerLife
     from frontal_lobe.reasoning import Reasoner
-    from frontal_lobe.self import Reflection
     from limbic_system.curiosity import Curiosity
+    from self import Reflection
+    from sleep.inner_life import InnerLife
     from temporal_lobe.concepts import ConceptNetwork, RelationType
 
     net = ConceptNetwork()
@@ -1810,10 +1810,10 @@ def _make_emotion() -> EmotionalState:
 
 def _make_inner_life_for_dream_composition():
     """InnerLife over a network holding a speakable/unspeakable pair."""
-    from frontal_lobe.inner_life import InnerLife
     from frontal_lobe.reasoning import Reasoner
-    from frontal_lobe.self import Reflection
     from limbic_system.curiosity import Curiosity
+    from self import Reflection
+    from sleep.inner_life import InnerLife
     from temporal_lobe.concepts import ConceptNetwork, RelationType
 
     net = ConceptNetwork()
@@ -1911,7 +1911,7 @@ def test_dream_thought_speech_never_contains_the_raw_pair():
     import time
 
     from frontal_lobe.generator import GenerativeLanguage
-    from frontal_lobe.self import PersonalityTraits, SelfModel
+    from self import PersonalityTraits, SelfModel
 
     il = _make_inner_life_for_dream_composition()
     engine = GenerativeLanguage(
@@ -1952,8 +1952,8 @@ def test_echoed_placeholder_is_suppressed_despite_grammar_decoration():
     import time
 
     from frontal_lobe.generator import GenerativeLanguage
-    from frontal_lobe.self import PersonalityTraits, SelfModel
     from frontal_lobe.thoughts import SpontaneousThought
+    from self import PersonalityTraits, SelfModel
 
     # No definition, no edges, noisy target: composition can only echo.
     net = ConceptNetwork()
@@ -2030,7 +2030,7 @@ def test_sleep_processes_close_on_stage_leave():
     interrupted sleep does not run stale physiology later."""
     from unittest.mock import MagicMock
 
-    from brainstem.sleep import SleepMixin
+    from sleep.sleep import SleepMixin
     from thalamus.brain_waves import SleepStage
 
     def _proc():

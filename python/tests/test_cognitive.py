@@ -17,13 +17,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import logging
 
 import pytest
-from frontal_lobe.self import SelfModel
 from limbic_system.emotion import (
     EmotionalState,
     EmotionCategory,
     assess_emotion,
 )
 from occipital_lobe.perception import Intent, QuestionType, perceive
+from self import SelfModel
 
 from genesis_client import NeuroSummary
 from genesis_client.protocol import PHASE_FLOW, PHASE_SLEEPING, PHASE_STRESS
@@ -505,7 +505,12 @@ def test_field_coherence_is_measured_evidence():
     """The latent field's disagreement drives the coherence channel:
     rising Fréchet variance of the body's fibers raises unsettled and
     guarded monotonically — mood-as-precision (Clark & Friston 2018):
-    internal incoherence is a felt signal, not telemetry."""
+    internal incoherence is a felt signal, not telemetry.
+
+    The fibers' standing disagreement on a quiet host is ~0.2–0.3 by
+    construction — three different signal families projected onto
+    shared latent axes, so the sweep runs from that measured floor up
+    through a genuine incoherence excursion."""
     from itertools import pairwise
 
     from limbic_system.emotion import membership_field
@@ -518,8 +523,9 @@ def test_field_coherence_is_measured_evidence():
     summary = _summary(0.5, 0.4)
     unsettled, guarded = [], []
     for k in range(6):
-        d = 0.0 + k * 0.04  # sweeps coherent → past the 0.1 scale
-        m = membership_field(summary, field_state=_Field(d))
+        d = 0.2 + k * 0.12  # sweeps the standing floor → a real excursion
+        norm = 0.3 + k * 0.08
+        m = membership_field(summary, field_state=_Field(d, norm))
         unsettled.append(m[EmotionCategory.UNSETTLED])
         guarded.append(m[EmotionCategory.GUARDED])
     assert all(a <= b + 1e-9 for a, b in pairwise(unsettled))
@@ -543,12 +549,60 @@ def test_field_state_absent_drops_coherence_terms():
     absent = membership_field(summary)
     coherent = membership_field(summary, field_state=_Field())
     incoherent = membership_field(
-        summary, field_state=type("F", (), {"disagreement": 0.15, "consensus_norm": 0.3})()
+        summary, field_state=type("F", (), {"disagreement": 0.7, "consensus_norm": 0.7})()
     )
     # An absent channel is not a zero channel.
     assert absent != coherent
     # Measured incoherence is unsettling; measured coherence is not.
     assert incoherent[EmotionCategory.UNSETTLED] > absent[EmotionCategory.UNSETTLED]
+
+
+def test_precedence_residual_floor_does_not_claim_generic():
+    """Sigmoid evidence never reads zero — a deep region carries a
+    residual tail even on a clean substrate. That tail must not claim
+    precedence: at the field's measured operating floor (standing
+    disagreement ~0.26, normal plasticity, resting cortisol, positive
+    valence) no guarded evidence is established, so the generic
+    positive default keeps the label."""
+    from limbic_system.emotion import membership_field
+
+    class _Field:
+        disagreement = 0.262
+        consensus_norm = 0.389
+
+    summary = _summary(0.47, 0.25, plasticity=0.45)
+    chemicals = {"cortisol": 0.015}
+    emo = assess_emotion(summary, chemicals, field_state=_Field())
+    assert emo.category == EmotionCategory.POSITIVE
+    m = membership_field(summary, chemicals, field_state=_Field())
+    # Guarded still *carries* residual membership — the mixture view
+    # is honest about the tail — it just cannot explain away.
+    assert 0.0 < m[EmotionCategory.GUARDED] < emo.memberships["positive"]
+
+
+def test_precedence_established_excursions_still_mask():
+    """The gate opens for real evidence: a cortisol excursion with a
+    positive surface is genuinely guarded and demotes the default —
+    the same posture the silent-stress test pins end-to-end."""
+    from limbic_system.emotion import membership_field
+
+    class _Field:
+        disagreement = 0.262
+        consensus_norm = 0.389
+
+    summary = _summary(0.47, 0.25, plasticity=0.45)
+    emo = assess_emotion(summary, {"cortisol": 0.10}, field_state=_Field())
+    assert emo.category == EmotionCategory.GUARDED
+    assert emo.intensity > 0.7
+
+    class _HotField:
+        disagreement = 0.75
+        consensus_norm = 0.7
+
+    emo2 = assess_emotion(summary, {"cortisol": 0.015}, field_state=_HotField())
+    assert emo2.category in (EmotionCategory.GUARDED, EmotionCategory.UNSETTLED)
+    m = membership_field(summary, {"cortisol": 0.015}, field_state=_HotField())
+    assert m[EmotionCategory.UNSETTLED] > 0.5
 
 
 # ─── Emotion word learning tests ──────────────────────────────

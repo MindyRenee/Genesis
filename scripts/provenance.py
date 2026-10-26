@@ -16,22 +16,17 @@ G00 — is bound into the field's deterministic noise stream seed, so the
 mark is carried in behavior, not only in text.
 
 Reading the message is public: find every ``0x4753``-tagged constant,
-sort by index, check the chain. Producing it is not: the seal in
-PROVENANCE.md is an HMAC over the assembled message keyed by the
-steward key — only the key holder can mint or verify it.
+sort by index, check the chain.
 
 Usage::
 
     python3 scripts/provenance.py            # scan, verify, print the message
-    python3 scripts/provenance.py --keyed    # additionally verify the steward seal
-    python3 scripts/provenance.py --seal     # print the seal this key would produce
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
-import hmac
 import re
 import sys
 from pathlib import Path
@@ -124,35 +119,8 @@ def verify(root: Path) -> tuple[str, list[str]]:
     return "".join(message), problems
 
 
-def steward_key() -> bytes | None:
-    import os
-
-    env = os.environ.get("GENESIS_STEWARD_KEY", "")
-    path = (
-        Path(env)
-        if env
-        else (
-            Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-            / "genesis"
-            / "steward.key"
-        )
-    )
-    try:
-        return path.read_bytes().strip()
-    except OSError:
-        return None
-
-
-def seal_for(key: bytes, message: str) -> str:
-    return hmac.new(key, message.encode(), hashlib.sha256).hexdigest()
-
-
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument(
-        "--keyed", action="store_true", help="verify the steward seal against steward.key"
-    )
-    ap.add_argument("--seal", action="store_true", help="print the seal this steward key produces")
     ap.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
     args = ap.parse_args()
 
@@ -166,16 +134,6 @@ def main() -> int:
     ok = not problems and message == EXPECTED_MESSAGE
     if message != EXPECTED_MESSAGE:
         problems.append(f"assembled message {message!r} != expected {EXPECTED_MESSAGE!r}")
-
-    if args.keyed or args.seal:
-        key = steward_key()
-        if key is None:
-            print("steward key: not found — seal cannot be produced or verified")
-        else:
-            s = seal_for(key, message)
-            print(f"seal   : {s}")
-            if args.seal:
-                return 0
 
     for p in problems:
         print(f"FAIL: {p}")

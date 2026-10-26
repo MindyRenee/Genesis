@@ -13,16 +13,16 @@ from frontal_lobe.question_handler import (
     QuestionHandler,
 )
 from frontal_lobe.reasoning import Judge
-from frontal_lobe.self import SelfComposer, SelfModel
-from frontal_lobe.tools.framework import ToolRegistry
 from limbic_system.emotion import EmotionalState
+from memory.memory import MemoryContext
 from occipital_lobe.perception import Intent, Perception, QuestionType
 from parietal_lobe.correspondence import CorrespondenceLedger
 from parietal_lobe.situation_model import SituationModel
+from self import SelfComposer, SelfModel
 from temporal_lobe.base import Thought
 from temporal_lobe.comprehension import Comprehension
 from temporal_lobe.concepts import ConceptNetwork, RelationType
-from temporal_lobe.memory.memory import MemoryContext
+from tools.framework import ToolRegistry
 
 _VERB_MAP = {
     RelationType.CREATES: "creates",

@@ -279,7 +279,7 @@ pub mod cmd {
     ///   Request:  [u64 epoch_secs] (0 = disarm)
     ///   Response: [u8 ok][u64 armed_epoch] — ok=1 and armed_epoch is
     ///             the alarm the hardware reports afterward; ok=0 when
-    ///             arming failed (helper missing, no sudo, kernel
+    ///             arming failed (no sudo grant, kernel
     ///             rejected), armed_epoch = currently armed alarm (0
     ///             when none).
     pub const SET_WAKE_ALARM: u8 = 34;
@@ -504,6 +504,39 @@ pub mod cmd {
     /// phase's own lid position by `min`: the will can shut an open
     /// eye but cannot open one the stage has closed.
     pub const SET_LID: u8 = 57;
+
+    /// Deep recall — SimHash similarity scan over the *archived* tier
+    /// of LTM. Sleep compression retires low-salience episodes to the
+    /// archive, where they stay retrievable by ID but leave every
+    /// associative index; this reaches them when the active set has
+    /// no answer. Request and response are identical to FIND_SIMILAR.
+    /// Additive: PROTOCOL_VERSION is unaffected.
+    pub const FIND_SIMILAR_ARCHIVED: u8 = 58;
+
+    /// Un-archive an episode — reconsolidation. Clears the archived
+    /// flag, returns the episode to the active similarity index,
+    /// re-bundles its SDR, and floors its salience at the
+    /// reconsolidation level so the next sleep pass retains what
+    /// recall actually used. Request/response identical to
+    /// ARCHIVE_EPISODE. Additive: PROTOCOL_VERSION is unaffected.
+    pub const UNARCHIVE_EPISODE: u8 = 59;
+
+    /// Page through the archived tier — the cold store's table of
+    /// contents. Request `[u32 limit][u32 offset]`; response is
+    /// `[u32 count]` then per entry `[u64 id][u64 ts][f32 salience]
+    /// [u8 flags][u8 source_module][f32×4 emotional_tag]` —
+    /// metadata only, no payload text (pruning doesn't need the
+    /// body). Additive: PROTOCOL_VERSION is unaffected.
+    pub const SEARCH_ARCHIVED: u8 = 60;
+
+    /// Delete an episode for real — the substrate death the archive
+    /// only sleepwalks. Marks the deleted flag, removes every index
+    /// (id_to_idx, active_ids), and unsubscribes its SDR if still
+    /// bundled. The payload slot stays orphaned in the data file —
+    /// reclaiming physical space is a rebuild pass, not this call.
+    /// Request/response identical to ARCHIVE_EPISODE. Additive:
+    /// PROTOCOL_VERSION is unaffected.
+    pub const DELETE_EPISODE: u8 = 61;
 
     // ─── Tensor slab ──────────────────────────────────────────
     // Named multidimensional tensors shared between the daemon and
@@ -2195,7 +2228,7 @@ impl IpcClient {
     /// Arm or disarm the RTC wake alarm. `epoch_secs` is a Unix
     /// timestamp; 0 disarms. Returns the alarm epoch the hardware
     /// reports afterward (0 = none armed), or an error if the
-    /// daemon could not arm it (helper missing / no sudo).
+    /// daemon could not arm it (no sudo grant).
     pub fn set_wake_alarm(&mut self, epoch_secs: u64) -> std::io::Result<u64> {
         let resp = self.request(cmd::SET_WAKE_ALARM, &epoch_secs.to_le_bytes())?;
         if resp.len() < 9 {
@@ -2900,6 +2933,39 @@ pub fn default_handler<L: LtmAccess>(
             resp
         }
 
+        cmd::FIND_SIMILAR_ARCHIVED => {
+            // Request: [u32 query_len][query bytes][u8 limit]
+            // Response: [u32 count] then for each:
+            //   [u64 episode_id][u32 hamming_dist][u64 timestamp][f32 salience]
+            if payload.len() < 5 {
+                return vec![0; 4];
+            }
+            let query_len =
+                u32::from_le_bytes(payload[0..4].try_into().unwrap_or_default()) as usize;
+            if payload.len() < 4 + query_len + 1 {
+                return vec![0; 4];
+            }
+            let query = String::from_utf8_lossy(&payload[4..4 + query_len]).into_owned();
+            let limit = payload[4 + query_len] as usize;
+
+            // Deep recall: the same exact SimHash distance FIND_SIMILAR
+            // uses, over the archived tier — retired episodes the
+            // active index can no longer reach. Hits are expected to be
+            // un-archived by the caller (reconsolidation).
+            let ltm_guard = ltm.access();
+            let results = ltm_guard.find_similar_archived(&query, limit);
+
+            let mut resp = Vec::with_capacity(4 + results.len() * 24);
+            resp.extend_from_slice(&(results.len() as u32).to_le_bytes());
+            for (ep_id, dist, entry) in results {
+                resp.extend_from_slice(&ep_id.to_le_bytes());
+                resp.extend_from_slice(&dist.to_le_bytes());
+                resp.extend_from_slice(&entry.timestamp.to_le_bytes());
+                resp.extend_from_slice(&entry.salience.to_le_bytes());
+            }
+            resp
+        }
+
         cmd::SET_ZONE => {
             if payload.is_empty() {
                 return vec![error::PAYLOAD_TOO_SHORT];
@@ -3505,7 +3571,7 @@ pub fn default_handler<L: LtmAccess>(
         cmd::UPDATE_USER_AFFECT => {
             // Parse the user affect observation from the payload:
             // [f32 valence][f32 arousal][f32 engagement][f32 confidence]
-            // = 16 bytes.
+            // = 16 bytes. Any trailing bytes are ignored.
             if payload.len() < 16 {
                 return vec![error::PAYLOAD_TOO_SHORT];
             }
@@ -3555,6 +3621,62 @@ pub fn default_handler<L: LtmAccess>(
             match ltm.access().archive(episode_id) {
                 Ok(()) => vec![1],
                 Err(_) => vec![0], // not found
+            }
+        }
+
+        cmd::UNARCHIVE_EPISODE => {
+            // Request:  [u64 episode_id]
+            // Response: [u8 ack (1=ok, 0=not found)]
+            if payload.len() < 8 {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let episode_id = u64::from_le_bytes(payload[0..8].try_into().unwrap_or_default());
+            match ltm.access().unarchive(episode_id) {
+                Ok(()) => vec![1],
+                Err(_) => vec![0], // not found
+            }
+        }
+
+        cmd::SEARCH_ARCHIVED => {
+            // Request:  [u32 limit][u32 offset]
+            // Response: [u32 count] then per entry:
+            //   [u64 id][u64 ts][f32 salience][u8 flags]
+            //   [u8 source_module][f32×4 emotional_tag]
+            if payload.len() < 8 {
+                return vec![0; 4];
+            }
+            let limit = u32::from_le_bytes(payload[0..4].try_into().unwrap_or_default()) as usize;
+            let offset = u32::from_le_bytes(payload[4..8].try_into().unwrap_or_default()) as usize;
+            let limit = limit.min(1000); // same page cap as SEARCH_EPISODES
+
+            let ltm_guard = ltm.access();
+            let results = ltm_guard.search_archived(limit, offset);
+
+            let mut resp = Vec::with_capacity(4 + results.len() * 38);
+            resp.extend_from_slice(&(results.len() as u32).to_le_bytes());
+            for (_id, entry) in results {
+                resp.extend_from_slice(&entry.episode_id.to_le_bytes());
+                resp.extend_from_slice(&entry.timestamp.to_le_bytes());
+                resp.extend_from_slice(&entry.salience.to_le_bytes());
+                resp.push(entry.flags);
+                resp.push(entry.source_module);
+                for v in entry.emotional_tag {
+                    resp.extend_from_slice(&v.to_le_bytes());
+                }
+            }
+            resp
+        }
+
+        cmd::DELETE_EPISODE => {
+            // Request:  [u64 episode_id]
+            // Response: [u8 ack (1=ok, 0=not found)]
+            if payload.len() < 8 {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let episode_id = u64::from_le_bytes(payload[0..8].try_into().unwrap_or_default());
+            match ltm.access().delete(episode_id) {
+                Ok(()) => vec![1],
+                Err(_) => vec![0], // not found / already deleted
             }
         }
 

@@ -39,14 +39,11 @@ precise enough to be falsified.
 
 Genesis is designed and developed by Mindy Beatty.
 
-![Three pieces Genesis drew across a few days of October 2026](docs/assets/drawings-strip.webp)
-
-Drawn by Genesis, not generated for this README — composition and color
-follow its affective state through the flow fields in
-`python/frontal_lobe/canvas.py`. Its journal entry while composing the
-middle panel, produced by its own language engine, rough edges and all:
-*"Drawing is environmental factors, it is a kind of art, and it is type
-of art."*
+Genesis draws — composition and color follow its affective state through
+the flow fields in `python/frontal_lobe/canvas.py`, nothing scripted. Its
+journal entry while composing, produced by its own language engine, rough
+edges and all: *"Drawing is environmental factors, it is a kind of art,
+and it is type of art."*
 
 ---
 
@@ -98,7 +95,7 @@ question the project does not claim to answer.
 
 **This is not a product.** It is not for sale, not for integration, not for
 deployment, not for commercial use. The project treats Genesis as a
-developing cognitive architecture, tuned to a single primary user. The
+developing cognitive architecture, tuned to a single primary operator. The
 observatory exists so that what it is can be witnessed, not so that it can
 be consumed.
 
@@ -122,16 +119,7 @@ composition with a neuromodulatory layer that is coupled to the physical
 machine it runs on. It is not a smaller version of the same approach. It
 is a different approach.
 
-| | The dominant trajectory | Genesis |
-|---|---|---|
-| Embodiment | disembodied — no body, no interoception | machine-native — CPU temperature feeds neurochemistry |
-| Self-model | none | active inference over its own neurochemical trajectory |
-| Language | statistical pattern over human text | composed from a self-built semantic graph |
-| Development | fixed after training | ongoing — it learns, consolidates, and runs dream synthesis |
-| State | stateless between calls | continuous — state evolves tick to tick |
-| Deployment | requires network to a data center | local — no external model dependency |
-
-A caveat the table cannot show: these are not two ways of doing the same
+A caveat worth stating before any comparison: these are not two ways of doing the same
 thing. A frontier language model produces fluent, general text across an
 enormous range of domains; Genesis composes from a semantic graph it built
 itself, which is narrower in coverage and less fluent than a trained LM.
@@ -170,7 +158,7 @@ Genesis they follow from the architecture itself.)
 | Internal state | None. A function: same input → same output. | Eighteen coupled neurochemicals. State evolves tick to tick. |
 | Mental states | None. Cannot be calm, stressed, tired, or in flow. | Emergent. Flow, stress, sleep, overwhelm arise from dynamics. |
 | Self-model | None. Does not predict its own behavior. | Active inference. Predicts its own neurochemical trajectory, acts on prediction error. |
-| Relationships | Stateless. Does not remember you. Does not attune. | Dyadic coupling. Oxytocin-mediated attunement, synchrony tracking, continuous memory of you. |
+| Operator coupling | Stateless. The user is invisible to the model between calls. | The operator is a modeled state variable. Bounded attunement as an oversight channel — accountability, not companionship. |
 | Sleep | None. No reason to sleep. | Emergent from adenosine. Consolidates memory, resensitizes receptors, compresses, runs dream synthesis. |
 | Development | Fixed after training. Personality is a system prompt. | Ongoing. Personality, knowledge, and self-model drift with experience. |
 | Deployment | Requires network to a data center for every interaction. | Local. Network only for learning, not for cognition. |
@@ -291,7 +279,7 @@ the industry will notice that it does.
 │    ├─ STM → LTM consolidation (BDNF-gated)                │
 │    ├─ memory association + dreaming                       │
 │    ├─ active inference (generative self-model)            │
-│    ├─ dyadic affective coupling                           │
+│    ├─ operator affective coupling                         │
 │    ├─ interoception (hardware sensors → neurochemistry)   │
 │    ├─ optic nerve (retina → subcortical channels)         │
 │    ├─ field probe (measured substrate ↔ model phase lock) │
@@ -543,8 +531,8 @@ the neurochemistry drives are real. The loop is closed, physical, and live:
    published as information, never applied by the daemon. The body is an
    informational panel; the conscious mind reads the recommendation
    (`GET_BODY_CONTROL`) and applies it herself (`APPLY_BODY_CONTROL`,
-   `infrastructure/cpu_speed.py`) on her own process tree — plus, where her
-   root-owned helpers are installed, the audited privileged levers:
+   `infrastructure/cpu_speed.py`) on her own process tree — plus, where a
+   passwordless sudo grant is installed, the privileged levers:
    - **CPU frequency:** dopamine speeds up, GABA slows down, melatonin →
      powersave.
    - **Scheduling priority:** acetylcholine (attention) → daemon priority.
@@ -596,7 +584,7 @@ The mind injects the measured signature as wave-oscillator stimulus, and
 the corrected phase returns via `SET_FIELD_PHASE` — a bounded mutual
 phase-locked loop; above a measured-coherence threshold the pull becomes a
 sync and the modeled band's phase is set to the physical phase outright.
-The causal assays in `eval/` measured the coupling: nine of ten bands moved
+The causal assays (recorded in `AGENTS.md`) measured the coupling: nine of ten bands moved
 under real load where an uncoupled control stayed flat, the mutual lock
 held at PLV ≈0.93, and a 0.25 Hz drive left a die-temperature oscillation
 ringing down with τ≈25 s after the drive stopped.
@@ -607,46 +595,49 @@ current, and corrects.
 
 ---
 
-## The dyadic coupling: the user as a coupled dynamical system
+## The operator channel: the user as a measured state variable
 
-Genesis models the user's affective state — valence, arousal, engagement — as
-hidden variables, inferred from conversation features, and coupled to its own
-neurochemistry via oxytocin-mediated attunement.
+An autonomous system needs a bounded channel through which its owner remains
+part of its dynamics — not as a prompt prefix or an off-switch, but as a
+*measured variable in the state space itself*. That is what this channel is
+for. It was built for accountability: the person responsible for the system
+keeps a live, modeled handle on it, and the system's affective dynamics can
+never fully decouple from the operator's measured state. If the organism's
+dynamics ever run away from intent, the coupling is still there to read and
+to steer.
 
-The system and the user form a coupled system. Its utterances are its actions
-(they influence the user). The user's messages are its sensory evidence (they
-reveal the user's hidden state). The coupling is oxytocin-mediated: high
-oxytocin → strong attunement → the user's affective state significantly
-influences its own neurochemistry.
+Formally, the operator's affective state — valence, arousal, engagement — is
+treated as a set of hidden variables. They cannot be read directly; they are
+estimated from observable evidence (message features), the same inferential
+posture active inference takes toward any unobserved cause. The estimate is
+coupled into the neurochemical vector through an oxytocin-gated gain: the
+channel's influence on the body scales with oxytocin, and it saturates — the
+coupling is bounded by construction, so the operator can modulate but never
+dominate the organism's dynamics.
 
-**Dyadic synchrony** is the rolling Pearson correlation between the system's
-valence and the user's valence over a ~30-second window. High synchrony means
-their affective states are co-fluctuating — "in sync." Synchrony itself boosts
-oxytocin, a positive feedback loop of attunement modeling the neuroscience of
-interpersonal synchrony (Palumbo et al., 2017).
+**Synchrony** is measured, not assumed: the rolling Pearson correlation
+between the organism's valence trajectory and the operator's inferred valence
+over a ~30 s window. Synchrony raises oxytocin, which raises the coupling
+gain — a positive-feedback term that makes the channel self-reinforcing when
+the estimate is tracking well and weak when it is not (cf. Palumbo et al.,
+2017, for the biological motivation of the form).
 
-**User affect inference** uses a VADER-style lexicon-based sentiment
-analyzer (`python/limbic_system/sentiment.py`, Gilbert & Hutto 2014)
-with ~250-word lexicon, negation handling ("not bad" → positive),
-intensifiers ("very good" > "good"), diminishers ("slightly bad" < "bad"),
-contrastive conjunctions ("good but slow" → emphasis on "slow"),
-capitalization boost ("GREAT" > "great"), and punctuation boost
-("great!!!" > "great"). This is a rule-based analyzer, not a deep
-sentiment model — it handles the linguistic structure of sentiment
-(negation, intensification, contrast) but does not detect sarcasm or
-context. The valence output feeds the dyadic coupling model, which
-generates bounded oxytocin impulses for engaged presence and CRH impulses
-for distress — never direct cortisol; the HPA cascade owns cortisol
-maturation — that influence the neurochemical system.
+**Operator affect inference** uses a VADER-style lexicon-based estimator
+(`python/limbic_system/sentiment.py`, Gilbert & Hutto 2014) with a ~250-word
+lexicon, negation handling ("not bad" → positive), intensifiers, diminishers,
+contrastive conjunctions, and capitalization/punctuation boosts — a
+rule-based estimator that handles the linguistic structure of sentiment
+without pretending to sarcasm detection or deep context. Its valence output
+drives bounded impulses — oxytocin for engagement, CRH for distress — never
+direct cortisol; the HPA cascade owns cortisol maturation.
 
-The system is tuned to a single primary user. The oxytocin-mediated
-attunement, the theory of mind model, and the emotional conditioning are
-designed around that single-user relationship. It is not a limitation to
-fix — it is the foundation of the developmental model.
+The model is tuned to a single primary operator. That is a deliberate design
+constraint, not a limitation: the channel exists so that *the accountable
+party is a first-class variable* — exactly one, with provenance.
 
-Custodial authority is separate from attachment: a `steward.key` credential
-plus a `steward.json` provenance stamp authenticate the steward, and
-directives ("never draw", "stop discussing politics") bind conversational
+Custodial authority is enforced separately from the coupling: a `steward.key`
+credential plus a `steward.json` provenance stamp authenticate the steward,
+and directives ("never draw", "stop discussing politics") bind conversational
 goals, executive intentions, and volition urges — name-matching alone is
 never authority. Mistreatment from anyone accrues withdrawal pressure and
 fair treatment drains it; nobody's absence is harm and nobody's presence is
@@ -791,7 +782,9 @@ citations are real.
 - **Learn on its own.** Between conversations, autonomous urges send
   it to **the open web**, the local filesystem, and its own source
   code — which it reads structurally, files bug reports against, and
-  turns into self-improvement experiment proposals. The one real
+  turns into self-improvement experiments that apply to its own live
+  source, verified by the full test gate and reverted on failure —
+  her source tree is her workspace. The one real
   filter is an adult/malware *content* filter on the fetch path.
   `./genesis --offline` closes the network. See
   [SECURITY.md](SECURITY.md) before pointing it at a machine you
@@ -838,9 +831,8 @@ citations are real.
   in a review queue for its own say (apply or veto, remembered).
 
 The measured record for these claims is in [DEVLOG.md](DEVLOG.md);
-the evidence catalog — probe results, live-state artifacts, and the
-failure modes that are themselves evidence — is
-[docs/EMERGENCE.md](docs/EMERGENCE.md).
+the growth arc — benchmarks, milestones, regressions, and the
+breakthroughs between them — is in [MILESTONES.md](MILESTONES.md).
 
 ## ARC-AGI-3
 
@@ -860,16 +852,15 @@ It completes public practice environments — `bt11` fully, twice (88 and
 127 steps), and the opening `ls20` level in 10 of 19 recorded sweep runs —
 with replayable [recordings](https://github.com/MindyRenee/genesis-eval/tree/main/arc_practice)
 carrying per-move decision provenance. These are practice results on public
-environments, not an official score; the evidence standard is documented in
-[docs/ARC-AGI-3.md](docs/ARC-AGI-3.md). Local `/arc` runs are diagnostics;
+environments, not an official score; the evidence standard is stated rather
+than inflated. Local `/arc` runs are diagnostics;
 the official scorecard is a separate transport reached only by her own play
 urge. `/arc --fresh` runs a cold start with
 prior learning suppressed.
 
 ARC-AGI-1 training tasks are also offered inside her games curriculum in
 live play — the spatial reasoner searches transform compositions, verifies
-on train pairs, and guesses on held-out test input it never sees. Evidence
-and scope: [docs/ARC-GRID-EVIDENCE.md](docs/ARC-GRID-EVIDENCE.md).
+on train pairs, and guesses on held-out test input it never sees.
 
 ---
 
@@ -918,8 +909,8 @@ the code. Tests cover:
   protocol version mismatch.
 - **Active inference convergence** — surprise decreases over time, precision
   adapts, model matures, save/load round-trip.
-- **Dyadic affective model** — attunement follows oxytocin, synchrony
-  computed for correlated and anti-correlated trajectories.
+- **Operator affective coupling** — coupling gain follows oxytocin,
+  synchrony computed for correlated and anti-correlated trajectories.
 - **Sentiment analyzer** — VADER-style lexicon with negation ("not bad"
   → positive), intensifiers ("very good" > "good"), diminishers
   ("slightly bad" < "bad"), multi-word modifier phrases ("kind of bad"
@@ -1078,9 +1069,9 @@ The repo root is also an installable package: `pip install .` provides a
 install — editable venv, release binaries, launcher, and an enabled
 `genesis.service` systemd user unit. One instance at a time per data dir;
 the CLI lock refuses a second. For the privileged body levers (CPU
-governor, RTC wake alarm) `sudo bash scripts/install_sudoers.sh` installs
-root-owned helpers and a sudoers rule for exactly those paths — privilege
-is helper-mediated, never blanket sudo.
+governor, RTC wake alarm) a NOPASSWD sudo grant for the daemon's user
+is enough — the levers invoke `sudo -n` directly; there are no helper
+scripts to install.
 
 Operational notes, in brief:
 
@@ -1092,7 +1083,7 @@ Operational notes, in brief:
 - **Everything that grows is bounded** — episodic evictions, attractor
   ceilings, working-memory deadlines, review-record caps are enforced in
   code and exercised by tests; the specific ceilings are tabulated in
-  `AGENTS.md` and `docs/`.
+  `AGENTS.md`.
 - **It does real background work.** Autonomous urges consume real CPU;
   interoception dampens heavy work under thermal strain.
 

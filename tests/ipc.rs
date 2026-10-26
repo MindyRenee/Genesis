@@ -798,6 +798,86 @@ fn test_archive_episode() {
     assert_eq!(resp[0], 0, "archiving non-existent episode should return 0");
 }
 
+#[test]
+fn test_deep_recall_and_unarchive() {
+    let mut sys = IpcTestSystem::new("deep_recall");
+    let ep_id = {
+        let mut ltm = LtmStore::open(&sys.ltm_base).expect("open ltm");
+        let tag = [0.5f32; 12];
+
+        ltm.store(
+            1000,
+            0.4,
+            tag,
+            [0.4, 0.3, 0.2, 0.5],
+            0,
+            4, // Language — a real content module, not meta
+            "the tide pulled the rowboat past the jetty",
+        )
+        .expect("store")
+    };
+    sys.start_server();
+
+    let mut client = sys.client();
+
+    // Archive the episode — it leaves every associative index.
+    let resp = client
+        .request(cmd::ARCHIVE_EPISODE, &ep_id.to_le_bytes())
+        .expect("archive");
+    assert_eq!(resp[0], 1, "archive should succeed");
+
+    // Wire helper: [u32 query_len][query bytes][u8 limit]
+    // (near-verbatim cue — a keyword-only query still surfaces the
+    // episode but lands ~25 bits out on the SimHash axis)
+    let query = b"tide pulled the rowboat past the jetty";
+    let mut payload = Vec::with_capacity(4 + query.len() + 1);
+    payload.extend_from_slice(&(query.len() as u32).to_le_bytes());
+    payload.extend_from_slice(query);
+    payload.push(10);
+
+    // The active similarity scan can no longer see it.
+    let resp = client
+        .request(cmd::FIND_SIMILAR, &payload)
+        .expect("find similar");
+    let count = u32::from_le_bytes(resp[0..4].try_into().unwrap());
+    assert_eq!(count, 0, "archived episode must leave the active index");
+
+    // …but deep recall reaches it — [u64 id][u32 dist][u64 ts][f32 sal]
+    let resp = client
+        .request(cmd::FIND_SIMILAR_ARCHIVED, &payload)
+        .expect("deep recall");
+    let count = u32::from_le_bytes(resp[0..4].try_into().unwrap());
+    assert_eq!(count, 1, "deep recall should surface the archived episode");
+    let found_id = u64::from_le_bytes(resp[4..12].try_into().unwrap());
+    assert_eq!(found_id, ep_id, "deep recall should return the episode id");
+    let dist = u32::from_le_bytes(resp[12..16].try_into().unwrap());
+    assert!(dist <= 10, "near-verbatim cue should be close, got {dist}");
+
+    // Reconsolidate — the memory earned its way back.
+    let resp = client
+        .request(cmd::UNARCHIVE_EPISODE, &ep_id.to_le_bytes())
+        .expect("unarchive");
+    assert_eq!(resp[0], 1, "unarchive should succeed");
+
+    // …and the active index sees it again.
+    let resp = client
+        .request(cmd::FIND_SIMILAR, &payload)
+        .expect("find similar after unarchive");
+    let count = u32::from_le_bytes(resp[0..4].try_into().unwrap());
+    assert_eq!(count, 1, "revived episode must re-enter the active index");
+    let found_id = u64::from_le_bytes(resp[4..12].try_into().unwrap());
+    assert_eq!(found_id, ep_id);
+
+    // Unarchiving a non-existent episode returns 0 (not an error byte).
+    let resp = client
+        .request(cmd::UNARCHIVE_EPISODE, &999_999u64.to_le_bytes())
+        .expect("unarchive non-existent");
+    assert_eq!(
+        resp[0], 0,
+        "unarchiving non-existent episode should return 0"
+    );
+}
+
 // ─── Store episode (direct LTM) ────────────────────────────────
 
 #[test]
@@ -1836,4 +1916,113 @@ fn test_set_cognitive_pid_short_payload() {
         .request(genesis::daemon::ipc::cmd::SET_COGNITIVE_PID, &[1, 2])
         .expect("request");
     assert_eq!(resp[0], genesis::daemon::ipc::error::PAYLOAD_TOO_SHORT);
+}
+
+#[test]
+fn test_search_archived_and_delete() {
+    let mut sys = IpcTestSystem::new("search_archived");
+    let (ep1, ep2) = {
+        let mut ltm = LtmStore::open(&sys.ltm_base).expect("open ltm");
+        let tag = [0.5f32; 12];
+        let e1 = ltm
+            .store(
+                1000,
+                0.6,
+                tag,
+                [0.7, 0.3, 0.2, 0.5],
+                0,
+                4,
+                "first cold memory",
+            )
+            .expect("store 1");
+        let e2 = ltm
+            .store(
+                2000,
+                0.3,
+                tag,
+                [0.2, 0.3, 0.2, 0.5],
+                0,
+                4,
+                "second cold memory",
+            )
+            .expect("store 2");
+        ltm.archive(e1).expect("archive 1");
+        ltm.archive(e2).expect("archive 2");
+        (e1, e2)
+    };
+    sys.start_server();
+
+    let mut client = sys.client();
+
+    // [u32 limit][u32 offset] → [u32 count] then per entry
+    // [u64 id][u64 ts][f32 sal][u8 flags][u8 src][f32×4 tag] = 38B.
+    let mut payload = Vec::with_capacity(8);
+    payload.extend_from_slice(&10u32.to_le_bytes());
+    payload.extend_from_slice(&0u32.to_le_bytes());
+    let resp = client
+        .request(cmd::SEARCH_ARCHIVED, &payload)
+        .expect("search archived");
+
+    let count = u32::from_le_bytes(resp[0..4].try_into().unwrap());
+    assert_eq!(count, 2, "both archived episodes enumerable");
+
+    let id1 = u64::from_le_bytes(resp[4..12].try_into().unwrap());
+    let sal1 = f32::from_le_bytes(resp[20..24].try_into().unwrap());
+    let flags1 = resp[24];
+    let src1 = resp[25];
+    assert_eq!(id1, ep1, "oldest first");
+    assert!((sal1 - 0.6).abs() < 1e-6, "salience round-trips");
+    assert_eq!(flags1 & 0b100, 0b100, "archived flag set on the wire");
+    assert_eq!(src1, 4, "source module round-trips");
+
+    let id2 = u64::from_le_bytes(resp[42..50].try_into().unwrap());
+    assert_eq!(id2, ep2, "second entry follows at 38-byte stride");
+
+    // Delete the first — substrate death.
+    let resp = client
+        .request(cmd::DELETE_EPISODE, &ep1.to_le_bytes())
+        .expect("delete");
+    assert_eq!(resp[0], 1, "delete should succeed");
+
+    // It leaves the tier and every retrieval path.
+    let resp = client
+        .request(cmd::SEARCH_ARCHIVED, &payload)
+        .expect("search archived after delete");
+    let count = u32::from_le_bytes(resp[0..4].try_into().unwrap());
+    assert_eq!(count, 1, "deleted engram leaves the cold tier");
+
+    let resp = client
+        .request(cmd::RETRIEVE_EPISODE, &ep1.to_le_bytes())
+        .expect("retrieve deleted");
+    assert_eq!(resp[0], 0, "deleted payload unreachable");
+
+    // Double-delete is a clean not-found.
+    let resp = client
+        .request(cmd::DELETE_EPISODE, &ep1.to_le_bytes())
+        .expect("double delete");
+    assert_eq!(resp[0], 0, "double delete returns 0");
+}
+
+// ─── Update user affect ────────────────────────────────────────
+
+#[test]
+fn test_update_user_affect_round_trip() {
+    let mut sys = IpcTestSystem::new("useraffect");
+    sys.start_server();
+    let mut client = sys.client();
+
+    // Drain any observation left in the shared slot.
+    let _ = genesis::daemon::dyadic_model::take_user_affect();
+
+    assert!(
+        client
+            .update_user_affect(0.2, 0.5, 0.6, 0.9)
+            .expect("update")
+    );
+    std::thread::sleep(Duration::from_millis(20));
+    let obs = genesis::daemon::dyadic_model::take_user_affect().expect("obs");
+    assert!((obs.valence - 0.2).abs() < 1e-6);
+    assert!((obs.arousal - 0.5).abs() < 1e-6);
+    assert!((obs.engagement - 0.6).abs() < 1e-6);
+    assert!((obs.confidence - 0.9).abs() < 1e-6);
 }

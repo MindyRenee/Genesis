@@ -17,8 +17,16 @@ from unittest.mock import MagicMock
 
 import pytest
 from brainstem.architecture import SleepStage
+from memory.systems import (
+    EmotionalMemorySystem,
+    PrimingSystem,
+    SpreadingActivation,
+    _emotional_similarity,
+)
 from temporal_lobe.concepts import ConceptNetwork, RelationType
-from temporal_lobe.memory import (
+
+from genesis_client.types import ArchivedEpisode, Episode, MemoryStats, SimilarEpisode
+from memory import (
     AttractorNetwork,
     MemoryContext,
     MemoryRecord,
@@ -28,14 +36,6 @@ from temporal_lobe.memory import (
     SourceTag,
     SpacedRepetitionScheduler,
 )
-from temporal_lobe.memory.systems import (
-    EmotionalMemorySystem,
-    PrimingSystem,
-    SpreadingActivation,
-    _emotional_similarity,
-)
-
-from genesis_client.types import Episode, MemoryStats, SimilarEpisode
 
 logger = logging.getLogger(__name__)
 
@@ -309,6 +309,75 @@ def test_retrieve_relevant_client_error_returns_empty() -> None:
     cast(MagicMock, engine.client).find_similar.side_effect = OSError("connection lost")
     results = engine.retrieve_relevant("test")
     assert results == []
+
+
+def _sim(episode_id: int, dist: int, salience: float = 0.5) -> SimilarEpisode:
+    """SimilarEpisode shorthand for deep-recall tests."""
+    return SimilarEpisode(
+        episode_id=episode_id,
+        hamming_distance=dist,
+        timestamp=int(time.time() * 1000),
+        salience=salience,
+    )
+
+
+def test_deep_recall_reconsolidates_surfaced_hit() -> None:
+    """An archived hit that surfaces is un-archived (reconsolidation)."""
+    engine = _make_engine()
+    client = cast(MagicMock, engine.client)
+    client.find_similar.return_value = []
+    client.find_similar_archived.return_value = [_sim(42, dist=3)]
+    results = engine.retrieve_relevant("a memory sleep compressed away")
+    assert [r.episode_id for r in results] == [42]
+    client.unarchive_episode.assert_called_once_with(42)
+
+
+def test_deep_recall_sharp_archived_outranks_faint_active() -> None:
+    """A close archived hit outranks a far active one after the merge."""
+    engine = _make_engine()
+    client = cast(MagicMock, engine.client)
+    client.find_similar.return_value = [_sim(1, dist=28)]  # beyond the gate
+    client.find_similar_archived.return_value = [_sim(9, dist=4)]
+    results = engine.retrieve_relevant("old vivid memory")
+    assert [r.episode_id for r in results] == [9, 1]
+    client.unarchive_episode.assert_called_once_with(9)
+
+
+def test_deep_recall_skipped_when_active_answer_is_strong() -> None:
+    """A full, in-range active answer keeps the archive cold."""
+    engine = _make_engine()
+    client = cast(MagicMock, engine.client)
+    client.find_similar.return_value = [_sim(i, dist=5) for i in range(5)]
+    results = engine.retrieve_relevant("well-remembered thing", limit=5)
+    assert len(results) == 5
+    client.find_similar_archived.assert_not_called()
+    client.unarchive_episode.assert_not_called()
+
+
+def test_deep_recall_failure_leaves_recall_intact() -> None:
+    """An archived scan that errors degrades to ordinary recall."""
+    engine = _make_engine()
+    client = cast(MagicMock, engine.client)
+    client.find_similar.return_value = [_sim(7, dist=6)]
+    client.find_similar_archived.side_effect = OSError("no deep tier")
+    results = engine.retrieve_relevant("partial cue")
+    assert [r.episode_id for r in results] == [7]
+    client.unarchive_episode.assert_not_called()
+
+
+def test_deep_recall_hit_dropped_by_rerank_is_not_revived() -> None:
+    """A deep hit that falls outside the limit is never reconsolidated."""
+    engine = _make_engine()
+    client = cast(MagicMock, engine.client)
+    client.find_similar.return_value = []
+    client.find_similar_archived.return_value = [
+        _sim(i, dist=d) for i, d in enumerate((3, 8, 12, 15, 18, 19))
+    ]
+    results = engine.retrieve_relevant("crowded archive", limit=3)
+    assert [r.episode_id for r in results] == [0, 1, 2]
+    revived = {c.args[0] for c in client.unarchive_episode.call_args_list}
+    assert revived == {0, 1, 2}
+    assert 3 not in revived and 4 not in revived and 5 not in revived
 
 
 def test_retrieve_episode_success() -> None:
@@ -2432,3 +2501,277 @@ def test_expanding_intervals(scheduler) -> None:
     i2 = scheduler.next_interval("tree")
     # After a second success, stability grew → longer interval
     assert i2 > i1 * 0.9  # allow small timing tolerance
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Engram release — biological active forgetting
+# ═══════════════════════════════════════════════════════════════════
+
+
+def _archived_entry(
+    episode_id: int,
+    timestamp: int,
+    salience: float = 0.5,
+    arousal: float = 0.3,
+    flags: int = 4,
+    source_module: int = 1,
+) -> ArchivedEpisode:
+    """Build an ArchivedEpisode-shaped entry for release_verdict."""
+    return ArchivedEpisode(
+        episode_id=episode_id,
+        timestamp=timestamp,
+        salience=salience,
+        flags=flags,
+        source_module=source_module,
+        emotional_tag=(arousal, 0.5, 0.3, 0.4),
+    )
+
+
+def test_engram_drive_single_use_decays_power_law() -> None:
+    """A never-reactivated trace decays as a power law of age.
+
+    With no record, salience 0, arousal 0, no cortical term, drive is
+    ln(t^-0.5) = -0.5·ln(t_days). It crosses the -2.0 release
+    threshold at t = e^4 ≈ 55 days — the CA1 spine-turnover
+    timescale the model is calibrated against.
+    """
+    engine = _make_engine()
+    now_ms = int(time.time() * 1000)
+    day_ms = 86_400_000
+
+    # Young trace: alive.
+    young = now_ms - 10 * day_ms
+    d = engine.engram_drive(
+        1,
+        encoded_ms=young,
+        salience=0.0,
+        arousal=0.0,
+        cortical_strength=0.0,
+        now_ms=now_ms,
+    )
+    assert d > MemorySystem._RELEASE_THRESHOLD
+
+    # Crossing e^4 ≈ 54.6 days: dead.
+    old = now_ms - 80 * day_ms
+    d = engine.engram_drive(
+        2,
+        encoded_ms=old,
+        salience=0.0,
+        arousal=0.0,
+        cortical_strength=0.0,
+        now_ms=now_ms,
+    )
+    assert d < MemorySystem._RELEASE_THRESHOLD
+
+
+def test_should_release_power_law_boundary() -> None:
+    """Release verdict follows the drive, not a calendar."""
+    engine = _make_engine()
+    now_ms = int(time.time() * 1000)
+    day_ms = 86_400_000
+
+    assert not engine.should_release(
+        1,
+        encoded_ms=now_ms - 20 * day_ms,
+        salience=0.0,
+        arousal=0.0,
+        cortical_strength=0.0,
+        now_ms=now_ms,
+    )
+    assert engine.should_release(
+        2,
+        encoded_ms=now_ms - 80 * day_ms,
+        salience=0.0,
+        arousal=0.0,
+        cortical_strength=0.0,
+        now_ms=now_ms,
+    )
+
+
+def test_reactivation_keeps_engram_alive() -> None:
+    """A memory she keeps recalling keeps itself alive.
+
+    Same 80-day age that dies untouched survives with retrieval
+    history: each use re-potentiates the retrieval path. The
+    reactivation terms dominate the decay of any single trace.
+    """
+    engine = _make_engine()
+    now_ms = int(time.time() * 1000)
+    day_ms = 86_400_000
+    encoded = now_ms - 80 * day_ms
+
+    rec = _make_record(
+        episode_id=7,
+        encoded_at=encoded,
+        salience=0.0,
+        access_count=8,
+        emotional_tag=[0.0] * 12,
+    )
+    rec.last_accessed = now_ms - 2 * day_ms
+    engine._records[7] = rec
+
+    assert not engine.should_release(
+        7,
+        encoded_ms=encoded,
+        salience=0.0,
+        arousal=0.0,
+        cortical_strength=0.0,
+        now_ms=now_ms,
+    )
+
+
+def test_reconsolidation_counts_as_reactivation() -> None:
+    """A recently reconsolidated memory's drive is refreshed.
+
+    Deep recall that un-archives an episode re-potentiates its
+    retrieval path — last_reconsolidated resets the last-use term
+    even when last_accessed is stale.
+    """
+    engine = _make_engine()
+    now_ms = int(time.time() * 1000)
+    day_ms = 86_400_000
+    encoded = now_ms - 90 * day_ms
+
+    rec = _make_record(
+        episode_id=9,
+        encoded_at=encoded,
+        salience=0.0,
+        access_count=1,
+        last_reconsolidated=now_ms - 3 * day_ms,
+        emotional_tag=[0.0] * 12,
+    )
+    rec.last_accessed = now_ms - 90 * day_ms
+    engine._records[9] = rec
+
+    drive = engine.engram_drive(
+        9,
+        encoded_ms=encoded,
+        salience=0.0,
+        arousal=0.0,
+        cortical_strength=0.0,
+        now_ms=now_ms,
+    )
+    # ln(2·2/(√90 + √3)) ≈ ln(4/11.2) ≈ -1.03 > -2 → alive.
+    assert drive > MemorySystem._RELEASE_THRESHOLD
+
+
+def test_salience_and_arousal_extend_lifetime() -> None:
+    """Deeper encoding = larger initial trace = longer survival.
+
+    McGaugh amygdala modulation: salience 0.9 + arousal 0.8 should
+    roughly double the bare-trace lifetime (~55d → ~200d).
+    """
+    engine = _make_engine()
+    now_ms = int(time.time() * 1000)
+    day_ms = 86_400_000
+
+    # 80 days kills a bare trace but not a deeply encoded one.
+    old = now_ms - 80 * day_ms
+    assert not engine.should_release(
+        1,
+        encoded_ms=old,
+        salience=0.9,
+        arousal=0.8,
+        cortical_strength=0.0,
+        now_ms=now_ms,
+    )
+
+
+def test_cortical_redundancy_hastens_release() -> None:
+    """Once systems-consolidated, the verbatim is redundant.
+
+    A 40-day trace that survives on its own dies sooner when the
+    content already lives in cortex — the maintenance budget for a
+    redundant copy stops being worth paying.
+    """
+    engine = _make_engine()
+    now_ms = int(time.time() * 1000)
+    day_ms = 86_400_000
+    encoded = now_ms - 100 * day_ms
+
+    alive = engine.engram_drive(
+        1,
+        encoded_ms=encoded,
+        salience=0.9,
+        arousal=0.5,
+        cortical_strength=0.0,
+        now_ms=now_ms,
+    )
+    redundant = engine.engram_drive(
+        1,
+        encoded_ms=encoded,
+        salience=0.9,
+        arousal=0.5,
+        cortical_strength=1.0,
+        now_ms=now_ms,
+    )
+    assert redundant < alive
+    assert redundant == pytest.approx(alive - MemorySystem._RELEASE_CORTICAL_W)
+
+
+def test_record_systems_strength_is_authoritative() -> None:
+    """When a record exists, its systems_strength wins over the hint."""
+    engine = _make_engine()
+    now_ms = int(time.time() * 1000)
+    day_ms = 86_400_000
+    encoded = now_ms - 40 * day_ms
+
+    rec = _make_record(
+        episode_id=5,
+        encoded_at=encoded,
+        salience=0.5,
+        systems_strength=0.9,
+        emotional_tag=[0.3] * 12,
+    )
+    rec.last_accessed = now_ms - 40 * day_ms
+    engine._records[5] = rec
+
+    # cortical_strength=0 hint is ignored — rec.systems_strength=0.9
+    # drives the redundancy term.
+    with_record = engine.engram_drive(
+        5,
+        encoded_ms=encoded,
+        salience=0.5,
+        arousal=0.3,
+        cortical_strength=0.0,
+        now_ms=now_ms,
+    )
+    without_record = engine.engram_drive(
+        6,
+        encoded_ms=encoded,
+        salience=0.5,
+        arousal=0.3,
+        cortical_strength=0.9,
+        now_ms=now_ms,
+    )
+    assert with_record == pytest.approx(without_record, abs=0.5)
+
+
+def test_release_verdict_reads_wire_entry() -> None:
+    """release_verdict unpacks an ArchivedEpisode for the model."""
+    engine = _make_engine()
+    now_ms = int(time.time() * 1000)
+    day_ms = 86_400_000
+
+    young = _archived_entry(1, now_ms - 10 * day_ms)
+    assert not engine.release_verdict(young)
+
+    old = _archived_entry(2, now_ms - 300 * day_ms)
+    assert engine.release_verdict(old)
+
+
+def test_recently_archived_never_released() -> None:
+    """Nothing young dies — the drive floor protects new traces."""
+    engine = _make_engine()
+    now_ms = int(time.time() * 1000)
+    hour_ms = 3_600_000
+    # Even at zero depth terms, a 1-hour-old trace's drive is huge
+    # (a_enc → floor → react_sum large).
+    assert not engine.should_release(
+        1,
+        encoded_ms=now_ms - hour_ms,
+        salience=0.0,
+        arousal=0.0,
+        cortical_strength=1.0,
+        now_ms=now_ms,
+    )

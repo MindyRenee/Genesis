@@ -84,6 +84,7 @@ from .protocol import (
     CHEM_GABA,
     CHEM_OXYTOCIN,
     CONSOLIDATE,
+    DELETE_EPISODE,
     DREAM,
     DROP_TENSOR,
     DT_MAX,
@@ -91,6 +92,7 @@ from .protocol import (
     DT_NOMINAL_STEP,
     EMOTIONAL_TAG_SIZE,
     FIND_SIMILAR,
+    FIND_SIMILAR_ARCHIVED,
     GET_BODY_CONTROL,
     GET_BODY_STATE,
     GET_FIELD_PROBE,
@@ -128,6 +130,7 @@ from .protocol import (
     READ_SENSORS,
     RETRIEVE_EPISODE,
     SAVE_INFERENCE,
+    SEARCH_ARCHIVED,
     SEARCH_EPISODES,
     SET_COGNITIVE_PID,
     SET_FIELD_CARRIER,
@@ -142,6 +145,7 @@ from .protocol import (
     STORE_EPISODE,
     STORE_EVENT,
     SYNC,
+    UNARCHIVE_EPISODE,
     UPDATE_MODULE_STATUS,
     UPDATE_USER_AFFECT,
     # Zone IDs (for validation)
@@ -163,6 +167,7 @@ from .tensor import (
     unpack_motor_target,
 )
 from .types import (
+    ArchivedEpisode,
     BodyControlState,
     BodyState,
     CoreState,
@@ -183,6 +188,7 @@ from .types import (
     SimilarEpisode,
     SubsystemReport,
     ZoneTransitions,
+    unpack_archived_episodes,
     unpack_recent_episodes,
     unpack_similar_results,
 )
@@ -427,6 +433,8 @@ class GenesisClient:
             LIST_TENSORS,
             RETRIEVE_EPISODE,
             FIND_SIMILAR,
+            FIND_SIMILAR_ARCHIVED,
+            SEARCH_ARCHIVED,
             SEARCH_EPISODES,
         }
     )
@@ -467,6 +475,8 @@ class GenesisClient:
             UPDATE_MODULE_STATUS,
             UPDATE_USER_AFFECT,
             ARCHIVE_EPISODE,
+            UNARCHIVE_EPISODE,
+            DELETE_EPISODE,
             STORE_EPISODE,
             ADVANCE_NEURO,
             ADVANCE_PHYSICS,
@@ -489,7 +499,9 @@ class GenesisClient:
             PING,
             RETRIEVE_EPISODE,
             FIND_SIMILAR,
+            FIND_SIMILAR_ARCHIVED,
             GET_RECENT_EPISODES,
+            SEARCH_ARCHIVED,
             SEARCH_EPISODES,
             GET_OPTIC_STATE,
             PUT_TENSOR,
@@ -517,6 +529,8 @@ class GenesisClient:
             UPDATE_MODULE_STATUS,
             UPDATE_USER_AFFECT,
             ARCHIVE_EPISODE,
+            UNARCHIVE_EPISODE,
+            DELETE_EPISODE,
             NEURO_ADJUST_BASELINE,
             ADVANCE_NEURO,
             ADVANCE_PHYSICS,
@@ -1186,8 +1200,8 @@ class GenesisClient:
 
         ``epoch_secs`` is a Unix timestamp; 0 disarms. Returns the
         alarm epoch the hardware reports afterward (0 = none armed),
-        or ``None`` if the daemon could not arm it (helper missing or
-        sudo not installed — see ``scripts/install_sudoers.sh``).
+        or ``None`` if the daemon could not arm it (no passwordless
+        sudo grant on this host).
 
         This only schedules the wake interrupt; it does NOT suspend
         the machine. Suspending stays a separate deliberate act.
@@ -1433,6 +1447,37 @@ class GenesisClient:
         resp = self._request(FIND_SIMILAR, bytes(payload), timeout=timeout)
         return unpack_similar_results(resp)
 
+    def find_similar_archived(
+        self, query: str, limit: int = 10, *, timeout: float | None = None
+    ) -> list[SimilarEpisode]:
+        """Deep recall — find similar memories in the archived tier.
+
+        Same SimHash associative matching as `find_similar`, scanned
+        over episodes the sleep compressor retired. Archived episodes
+        are out of the active index but intact on disk, so a specific
+        enough cue can still reach them. A hit is meant to be
+        reconsolidated — pass its episode_id to `unarchive_episode`
+        when the memory is actually used.
+
+        Args:
+            query: The search query.
+            limit: Maximum number of results.
+
+        Returns:
+            List of SimilarEpisode, sorted by Hamming distance
+            (most similar first).
+        """
+        query_bytes = query.encode("utf-8")
+        if not (0 <= limit <= 255):
+            raise ValueError(f"limit must be 0-255, got {limit}")
+        payload = bytearray()
+        payload.extend(_U32.pack(len(query_bytes)))
+        payload.extend(query_bytes)
+        payload.append(limit & 0xFF)
+
+        resp = self._request(FIND_SIMILAR_ARCHIVED, bytes(payload), timeout=timeout)
+        return unpack_similar_results(resp)
+
     def get_recent_episodes(
         self,
         limit: int = 20,
@@ -1487,6 +1532,93 @@ class GenesisClient:
         payload = _U64.pack(episode_id)
         resp = self._request(ARCHIVE_EPISODE, payload, timeout=timeout)
         return bool(resp and resp[0] == 1)
+
+    def unarchive_episode(self, episode_id: int, *, timeout: float | None = None) -> bool:
+        """Un-archive an episode — reconsolidation.
+
+        The mirror of `archive_episode`: when deep recall surfaces a
+        retired memory and the mind actually uses it, this returns the
+        episode to the active similarity index, re-bundles its SDR,
+        and floors its salience at the reconsolidation level so the
+        next sleep pass retains what recall used. Retrieval is what
+        earns a memory its warmth.
+
+        Args:
+            episode_id: The episode's unique ID.
+
+        Returns:
+            True if the episode was un-archived, False if not found.
+        """
+        payload = _U64.pack(episode_id)
+        resp = self._request(UNARCHIVE_EPISODE, payload, timeout=timeout)
+        return bool(resp and resp[0] == 1)
+
+    def delete_episode(self, episode_id: int, *, timeout: float | None = None) -> bool:
+        """Delete an episode from LTM — real forgetting.
+
+        The terminal tier: archived is still there, deleted is not.
+        The mind's own retention model decides which episodes earn
+        release; the daemon only executes it. Deletion removes the
+        episode from every index and retrieval path but leaves its
+        payload slot orphaned in the data file — physical space is
+        reclaimed by a file rebuild, not this call.
+
+        Args:
+            episode_id: The episode's unique ID.
+
+        Returns:
+            True if the episode was deleted, False if not found or
+            already deleted.
+        """
+        payload = _U64.pack(episode_id)
+        resp = self._request(DELETE_EPISODE, payload, timeout=timeout)
+        return bool(resp and resp[0] == 1)
+
+    def search_archived(
+        self,
+        limit: int = 1000,
+        offset: int = 0,
+        *,
+        timeout: float | None = None,
+    ) -> list[ArchivedEpisode]:
+        """Page through the archived tier — metadata only.
+
+        The cold store's table of contents: every archived episode's
+        id, timestamp, salience, flags, source module, and compact
+        emotional tag, in ascending episode-id order (oldest first).
+        Sleep compression enumerates this to decide which traces have
+        decayed past retrieval — the release decision needs the
+        bookkeeping, not the body of each memory.
+
+        Args:
+            limit: Maximum number of entries to return (capped at
+                1000 by the daemon per page; this method paginates
+                internally).
+            offset: Number of entries to skip from the start.
+
+        Returns:
+            List of ArchivedEpisode, ordered by episode ID ascending.
+        """
+        if not (0 <= limit <= 0xFFFFFFFF):
+            raise ValueError(f"limit must be 0-4294967295, got {limit}")
+        if not (0 <= offset <= 0xFFFFFFFF):
+            raise ValueError(f"offset must be 0-4294967295, got {offset}")
+        entries: list[ArchivedEpisode] = []
+        while len(entries) < limit:
+            page_offset = offset + len(entries)
+            if page_offset > 0xFFFFFFFF:
+                break
+            payload = _U32.pack(min(1000, limit - len(entries))) + _U32.pack(page_offset)
+            resp = self._request(SEARCH_ARCHIVED, payload, timeout=timeout)
+            page = unpack_archived_episodes(resp)
+            if not page:
+                break
+            if entries and page[0].episode_id <= entries[-1].episode_id:
+                raise ProtocolError("archived search returned overlapping pages")
+            entries.extend(page)
+            if len(page) < 1000:
+                break  # short page — end of the tier
+        return entries
 
     def search_episodes(
         self,

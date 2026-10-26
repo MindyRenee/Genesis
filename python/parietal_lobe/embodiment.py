@@ -139,10 +139,6 @@ _OBJECTIVE_STALE_S = 120.0
 # level boundaries always get through.
 _WORLD_VISION_PERIOD = 4
 
-# Glyph-level vision — exemplar tiles through the ventral stream.
-# A recognition only binds at this cosine floor; below it a tile
-# mints its own concept instead of stealing a maybe-wrong name.
-_GLYPH_MATCH_FLOOR = 0.55
 # New concepts taught per frame — the whole alphabet arrives at
 # once but teaching is a drip, not a batch.
 _GLYPH_TEACH_MAX = 8
@@ -302,11 +298,6 @@ class EmbodimentMixin:
         # what it remembered, for telemetry.
         self._world_recall_tick = -1
         self._world_last_recall: dict[int, float] = {}
-        # Glyph-vision bookkeeping — tiles already run through the
-        # ventral stream (teach once) and tiles it failed to name
-        # (retried only after new concepts change the bridge).
-        self._glyph_seen: set[tuple[tuple[int, ...], ...]] = set()
-        self._glyph_neg: set[tuple[tuple[int, ...], ...]] = set()
 
     def observe(
         self,
@@ -338,17 +329,6 @@ class EmbodimentMixin:
         scene = self._frame_to_scene(frame, background=background)
         if scene is None:
             return []
-        # The exemplar session speaks the shared competence protocol
-        # itself — hand it the substrate before its own tick runs
-        # inside world_model.observe. Same for the ventral-stream
-        # probe: installed once, self-guarding when vision is absent.
-        sess = self.world_model.exemplars
-        if sess.competence is None:
-            sess.competence = getattr(self.brain.frontal, "task_competence", None)
-        if sess.network is None:
-            sess.network = getattr(self.brain.frontal, "network", None)
-        if sess.inductor.glyph_probe is None:
-            sess.inductor.set_glyph_probe(self._glyph_probe)
         # The action whose outcome this frame carries — captured
         # before _resolve_world_action clears it.
         pending = self._pending_world_action
@@ -364,7 +344,6 @@ class EmbodimentMixin:
         self._map_world(scene)
         self._resolve_world_action()
         self._learn_world_hypotheses(pending, events)
-        self._bridge_exemplar(events)
         for event in events:
             self._feel_world_event(event)
             if event.salience >= _STORE_SALIENCE:
@@ -876,18 +855,11 @@ class EmbodimentMixin:
         the change measure couples to dopamine (hers to compute, not
         a delegate's report). Returns the frame's events."""
         prev_grid = self._prev_world_grid
-        errs_before = self.world_model.exemplars.writer.errors
         events = self.observe(
             frame,
             info={**info, "game": game, "level": level, **({"win": True} if advanced else {})},
             through=through,
         )
-        # A falsified motor prediction is an orienting signal — the
-        # exemplar writer counts its misses, and surprise couples to
-        # norepinephrine, not reward.
-        errs = self.world_model.exemplars.writer.errors - errs_before
-        if errs > 0:
-            self._impulse_world(CHEM_NOREPINEPHRINE, min(0.01, 0.004 * errs))
         change = self._frame_change(prev_grid)
         vision_novel = (
             self._see_game_frame(frame)
@@ -1551,184 +1523,6 @@ class EmbodimentMixin:
             logger.debug(f"world hypothesis update failed: {e}")
         self._prev_world_state = state
 
-    # ─── Exemplar → memory bridge ─────────────────────────────
-
-    def _bridge_exemplar(self, events: list[WorldEvent]) -> None:
-        """Wire the exemplar session into the mind's memory systems.
-
-        The session (parietal) owns its domain protocol — this layer
-        only supplies the handles it can't reach: episode verdicts
-        from world events, the episodic store for its milestones,
-        and the ventral stream for its tiles.
-        """
-        sess = self.world_model.exemplars
-        terminal = next((e for e in events if e.kind in ("win", "reset")), None)
-        if terminal is not None:
-            sess.end_episode(success=terminal.kind == "win")
-        for text, salience in sess.drain_milestones():
-            self._store_exemplar_event(text, salience)
-        self._see_glyphs(sess)
-
-    def _store_exemplar_event(self, text: str, salience: float) -> None:
-        """Episodic memory: what the demonstration format did becomes
-        recallable — the same channel world events already take."""
-        game = self._world_context or "the world"
-        try:
-            chem = self.client.get_state()
-            tag = [float(chem.chemicals.get(CHEM_NAMES[i], 0.0)) for i in range(EMOTIONAL_TAG_SIZE)]
-            self.client.store_event(
-                timestamp=int(time.time() * 1000),
-                event_type=0,  # Input — something she perceived
-                source_module=MODULE_SENSORY,
-                salience=salience,
-                emotional_tag=tag,
-                text=f"{game}: {text}",
-            )
-        except Exception as e:  # noqa: BLE001 — memory loss must not crash the loop
-            logger.debug(f"failed to store exemplar event: {e}")
-
-    def _see_glyphs(self, sess: Any) -> None:
-        """Teach the ventral stream the committed exemplar tiles.
-
-        Whole game frames already flow through ``_see_game_frame``;
-        this is the same channel at glyph granularity — a tile's
-        identity becomes a concept the MTL bridge can recognize
-        later, in this world or another. Only committed pair
-        evidence is taught; unverified tiles never mint concepts.
-        """
-        cortex = getattr(self, "visual_cortex", None)
-        if cortex is None or not sess.inductor.store.pairs:
-            return
-        taught = 0
-        for tile in sess.glyph_tiles():
-            key = tile.rows()
-            if key in sess.glyph_ids or key in self._glyph_seen:
-                continue
-            if taught >= _GLYPH_TEACH_MAX:
-                break
-            self._glyph_seen.add(key)
-            rgb = self._glyph_rgb(tile)
-            if rgb is None:
-                continue
-            try:
-                percept = cortex.see(rgb, learn=True)
-            except Exception as e:  # noqa: BLE001 — vision is advisory
-                note_swallowed("mind.world_step.see_glyph", e)
-                break
-            taught += 1
-            concept = getattr(percept, "concept", None)
-            conf = float(getattr(percept, "confidence", 0.0) or 0.0)
-            if concept is not None and conf >= _GLYPH_MATCH_FLOOR:
-                # The ventral stream already knows this shape — bind,
-                # don't mint a synonym.
-                sess.glyph_ids[key] = concept
-            elif self._mint_glyph(tile, rgb):
-                sess.glyph_ids[key] = self._glyph_name(tile)
-        if taught:
-            # New associations can reclassify earlier misses.
-            self._glyph_neg.clear()
-            self._ground_glyph_pairs(sess)
-
-    def _glyph_name(self, tile: Any) -> str:
-        """The shape concept's name — content-addressed: the same
-        tile in any world is the same glyph."""
-        import hashlib
-
-        digest = hashlib.sha256(repr(tile.rows()).encode()).hexdigest()[:12]
-        return f"glyph:{digest}"
-
-    def _glyph_rgb(self, tile: Any) -> Any | None:
-        """A tile crop through the palette at resolvable resolution.
-
-        The V1 patch size (8) can't resolve a 5×5 glyph — scale the
-        palette render up so at least one full patch exists (nearest
-        neighbor; the glyph's structure, not interpolated detail)."""
-        try:
-            import numpy as np
-
-            idx = np.asarray(tile.to_lists(), dtype=np.int64) & 0xF
-            side = min(tile.height, tile.width)
-            k = max(1, -(-10 // side))  # ceil(10/side)
-            rgb = np.asarray(_GAME_PALETTE, dtype=np.uint8)[idx]
-            return np.repeat(np.repeat(rgb, k, axis=0), k, axis=1)
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.world_step.glyph_rgb", e)
-            return None
-
-    def _mint_glyph(self, tile: Any, rgb: Any) -> bool:
-        """Register a new shape concept and bind the crop to it.
-
-        The concept joins the network (``IS_A glyph``) so the
-        association is semantic content, not an opaque classifier
-        entry — she can in principle say what she has seen.
-        """
-        name = self._glyph_name(tile)
-        network = getattr(self.brain.frontal, "network", None)
-        cortex = getattr(self, "visual_cortex", None)
-        if cortex is None:
-            return False
-        try:
-            if network is not None:
-                network.add_concept(
-                    name,
-                    origin="perception",
-                    properties={
-                        "kind": "glyph",
-                        "shape": f"{tile.height}x{tile.width}",
-                    },
-                )
-                network.add_edge(name, "glyph", RelationType.IS_A, origin="perception")
-            return bool(cortex.learn_from_image(rgb, name))
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.world_step.mint_glyph", e)
-            return False
-
-    def _ground_glyph_pairs(self, sess: Any) -> None:
-        """Pair relations as concept edges — "this glyph substitutes
-        to that glyph" is learned relational knowledge, grounded the
-        same way consolidated skills are."""
-        network = getattr(self.brain.frontal, "network", None)
-        if network is None:
-            return
-        try:
-            for ante, cons in sess.glyph_pairs():
-                a_name = sess.glyph_ids.get(ante.rows())
-                c_name = sess.glyph_ids.get(cons.rows())
-                if a_name and c_name and a_name != c_name:
-                    network.add_edge(a_name, c_name, RelationType.RELATED_TO, origin="perception")
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.world_step.ground_glyphs", e)
-
-    def _glyph_probe(self, tile: Any) -> str | None:
-        """The ventral stream's name for a tile — the recognition
-        assist the substitution matcher may consult. Positive
-        recognitions persist on the session; misses are ephemeral
-        (a later-taught concept could reclassify them)."""
-        sess = self.world_model.exemplars
-        key = tile.rows()
-        name = sess.glyph_ids.get(key)
-        if name:
-            return name
-        if key in self._glyph_neg:
-            return None
-        cortex = getattr(self, "visual_cortex", None)
-        if cortex is None:
-            return None
-        rgb = self._glyph_rgb(tile)
-        if rgb is None:
-            return None
-        try:
-            percept = cortex.see(rgb, learn=False)
-        except Exception:  # noqa: BLE001 — recognition is advisory
-            return None
-        name = getattr(percept, "concept", None)
-        conf = float(getattr(percept, "confidence", 0.0) or 0.0)
-        if name and conf >= _GLYPH_MATCH_FLOOR:
-            sess.glyph_ids[key] = name
-            return name
-        self._glyph_neg.add(key)
-        return None
-
     def _recall_world(self, game: str, events: list[WorldEvent]) -> None:
         """Cue-driven episodic recall — the situation summons its past.
 
@@ -1758,6 +1552,15 @@ class EmbodimentMixin:
         try:
             cue = f"{game}: {self.world_model.summary()}"
             hits = self.client.find_similar(cue, limit=_RECALL_LIMIT)
+            # Deep recall: the active index is shallow by design — a
+            # situation whose only memories were compressed away still
+            # counts. When no active hit lands inside the association
+            # gate, reach into the archived tier.
+            deep_ids: set[int] = set()
+            if not any(h.hamming_distance <= _RECALL_DIST for h in hits):
+                deep = self.client.find_similar_archived(cue, limit=_RECALL_LIMIT)
+                deep_ids = {h.episode_id for h in deep}
+                hits = [*hits, *deep]
         except Exception as e:  # noqa: BLE001 — recall is advisory
             logger.debug(f"world recall query failed: {e}")
             return
@@ -1771,6 +1574,13 @@ class EmbodimentMixin:
             except Exception:  # noqa: BLE001 — a lost memory is lost
                 continue
             fetched += 1
+            # Reconsolidation: a revived memory that actually biased
+            # the field earns its way back into the active index.
+            if hit.episode_id in deep_ids:
+                try:
+                    self.client.unarchive_episode(hit.episode_id)
+                except Exception as e:  # noqa: BLE001 — advisory, not fatal
+                    note_swallowed("mind.world_step.recall_world.unarchive", e)
             assoc = 1.0 - hit.hamming_distance / _RECALL_DIST
             for match in _RECALL_ENTITY_RE.finditer(episode.text):
                 color = int(match.group(1))

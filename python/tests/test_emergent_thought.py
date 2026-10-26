@@ -23,12 +23,12 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
-from frontal_lobe.inner_life import InnerLife
 from frontal_lobe.reasoning import Reasoner
 from frontal_lobe.reasoning.reasoner import ReasoningType
-from frontal_lobe.self import Reflection
 from limbic_system.curiosity import Curiosity
 from limbic_system.emotion import EmotionalState
+from self import Reflection
+from sleep.inner_life import InnerLife
 from temporal_lobe.concepts import ConceptNetwork, RelationType
 
 
@@ -516,7 +516,7 @@ class TestRecentTopicTracking:
 
     def test_record_thought_appends_topic(self):
         """_record_thought should append the topic to recent_thought_topics."""
-        from frontal_lobe.inner_life import SpontaneousThought
+        from sleep.inner_life import SpontaneousThought
 
         il = _make_inner_life()
         emotion = _neutral_emotion()
@@ -533,7 +533,7 @@ class TestRecentTopicTracking:
 
     def test_record_thought_uses_trigger_when_no_topic(self):
         """When metadata has no topic, the trigger should be used."""
-        from frontal_lobe.inner_life import SpontaneousThought
+        from sleep.inner_life import SpontaneousThought
 
         il = _make_inner_life()
         emotion = _neutral_emotion()
@@ -633,7 +633,7 @@ class TestInsightWriteBack:
     """
 
     def test_novel_pair_writes_edge_and_does_not_refire(self):
-        from frontal_lobe.inner_life import SpontaneousThought
+        from sleep.inner_life import SpontaneousThought
 
         net = ConceptNetwork()
         net.add_concept("alpha", confidence=0.8)
@@ -655,7 +655,7 @@ class TestInsightWriteBack:
         assert il.detect_insight(thought, net) is None
 
     def test_dream_insight_never_writes_a_canonical_edge(self):
-        from frontal_lobe.inner_life import SpontaneousThought
+        from sleep.inner_life import SpontaneousThought
 
         net = ConceptNetwork()
         net.add_concept("gamma", confidence=0.8)

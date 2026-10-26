@@ -49,20 +49,20 @@ if TYPE_CHECKING:
     from genesis_client.types import PlasticityProfile
 
 from basal_ganglia.td import TDLearner
-from frontal_lobe.tools.source_registry import SourceRegistry, SourceResult
 from limbic_system.curiosity import Curiosity
 from temporal_lobe.concepts import ConceptNetwork, is_world_concept, strip_sense_suffix
 from temporal_lobe.concepts.edge_log import WEB_SOURCES_CAP, web_origin
 from temporal_lobe.dual import DualSystemLearner
-from temporal_lobe.memory import SemanticMemory, SpacedRepetitionScheduler
 from temporal_lobe.stdp import STDP
 from temporal_lobe.synapses import SynapticStore
 from thalamus.brain_waves import BrainWave
+from tools.source_registry import SourceRegistry, SourceResult
 
 from genesis_client.protocol import CHEM_DOPAMINE
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
 from infrastructure.text import sentences as _sentences
+from memory import SemanticMemory, SpacedRepetitionScheduler
 
 __all__ = [
     "RATE_LIMIT_DELAY",
@@ -2774,8 +2774,8 @@ class AutonomousLearner:
         Runs in a background thread so it doesn't slow down text learning.
         """
         try:
-            from frontal_lobe.tools.source_registry import wikipedia_lead_image
             from occipital_lobe import decode_image_bytes, resize_for_vision
+            from tools.source_registry import wikipedia_lead_image
 
             # Fetch the article's lead image
             img_bytes = wikipedia_lead_image(article_title)
@@ -2819,7 +2819,7 @@ class AutonomousLearner:
         source records ``definition_source="web:<domain>"`` alongside
         so a squatting web definition stays attributable.
         """
-        from frontal_lobe.self.learning import _clean_definition_text
+        from self.learning import _clean_definition_text
         from temporal_lobe.concepts import _FUNCTION_WORDS
 
         for concept_name, definition in definitions.items():
@@ -3257,7 +3257,7 @@ class AutonomousLearner:
         safeguard the ``tools/`` fetch path had was dead code on this
         path. One fetch implementation, one boundary.
         """
-        from frontal_lobe.tools.web_search import fetch as _hardened_fetch
+        from tools.web_search import fetch as _hardened_fetch
 
         try:
             result = _hardened_fetch(url)
@@ -4330,6 +4330,12 @@ class AutonomousLearner:
         dopamine = self.td_learner.get_dopamine_signal()
         self._stdp.set_modulator(dopamine)
         self._stdp.apply_updates(time.monotonic() * 1000)
+        # The same dopaminergic third factor gates the Hebbian
+        # embedding plasticity — both are reward-modulated
+        # consolidation (Fremaux & Gerstner, 2016).
+        plasticity = getattr(self, "plasticity", None)
+        if plasticity is not None:
+            plasticity.set_modulator(dopamine)
         if self._on_neuro_impulse and abs(dopamine) > 1e-6:
             try:
                 self._on_neuro_impulse(CHEM_DOPAMINE, dopamine)
@@ -4376,8 +4382,17 @@ class AutonomousLearner:
                 e,
             )
 
-        # 2. Spaced repetition: review due concepts
+        # 2. Spaced repetition: review due concepts — gated by the
+        # body's consolidation weight and the emergent sleep phase
+        # (hippocampal replay is a state-dependent window, not a
+        # constant-rate scheduler).
         try:
+            summary = getattr(self, "_last_summary", None)
+            core = getattr(self, "_last_core_state", None)
+            self.spaced_repetition.set_consolidation_state(
+                consolidation_weight=(summary.consolidation_weight if summary is not None else 0.5),
+                phase=(core.phase_name if core is not None else None),
+            )
             self._review_due_concepts(limit=review_limit)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
@@ -4411,9 +4426,12 @@ class AutonomousLearner:
             if c is None:
                 continue
             # Re-activate: reinforce confidence (saturating update)
-            # and boost activation, mimicking memory reactivation.
-            c.confidence = c.confidence + (1.0 - c.confidence) * 0.05
-            c.activation = min(1.0, (c.activation or 0.0) + 0.1)
+            # and boost activation, mimicking memory reactivation —
+            # replay amplitude scales with the consolidation-state
+            # gain (SWS window strengthens replay; stress suppresses).
+            replay_gain = self.spaced_repetition.replay_gain
+            c.confidence = c.confidence + (1.0 - c.confidence) * 0.05 * replay_gain
+            c.activation = min(1.0, (c.activation or 0.0) + 0.1 * replay_gain)
             self.network._mark_active(concept)
             # Record the review as successful (it recalled it).
             # This expands the next interval via the ease factor.

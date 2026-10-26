@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import re
 
+import regex
+
 from infrastructure.text import collapse_ws
 
 from .types import ConceptCategory, ConceptModality, Edge, RelationType
 
-_WORD_RE = re.compile(r"[A-Za-z']+")
+_WORD_RE = regex.compile(r"(?:\p{L}|\p{M}|['’])+")
 _CAMEL_SPLIT_RE = re.compile(r"(?<=[a-z])(?=[A-Z])|[_:.]+")
 _CLAUSE_SPLIT_RE = re.compile(r"\s*;\s*")
 _COMPOUND_SPLIT_RE = re.compile(r"\s*,\s*(?:and\s+)?|\s+and\s+")
@@ -1037,8 +1039,8 @@ _RELATION_VERBS: frozenset[str] = frozenset(
         "characterizing",
     }
 )
-_INDEPENDENT_CLAUSE_RE = re.compile(
-    r"^(?:[A-Za-z][A-Za-z0-9_\-]*(?:\s+[A-Za-z][A-Za-z0-9_\-]*)*)\s+"
+_INDEPENDENT_CLAUSE_RE = regex.compile(
+    r"^(?:\p{L}[\w\-]*(?:\s+\p{L}[\w\-]*)*)\s+"
     r"(?:" + "|".join(re.escape(v) for v in _RELATION_VERBS) + r")\b",
     re.IGNORECASE,
 )

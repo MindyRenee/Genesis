@@ -212,8 +212,10 @@ class V4Model:
     ) -> np.ndarray:
         """Compute color statistics for each V4 pooling region.
 
-        Extracts mean RGB, saturation, and hue histogram per region.
-        This gives V4 the chromatic information that V1 lacks.
+        Coordinates are the perceptual ones V4 actually represents:
+        CIELAB mean/std (uniform lightness + opponent axes) and the
+        DKL opponent plane's hue/chroma — hue aggregated circularly,
+        never linearly.
         """
         h, w = frame.shape[:2]
         rgb = frame[..., :3].astype(np.float64) / 255.0
@@ -237,14 +239,7 @@ class V4Model:
             if region.size == 0:
                 continue
 
-            # Mean RGB (3 dims)
-            mean_rgb = region.mean(axis=(0, 1))
-            # Std RGB (3 dims)
-            std_rgb = region.std(axis=(0, 1))
-            # HSV stats (6 dims): mean hue, mean sat, mean val, std hue, std sat, std val
-            mean_hsv = self._rgb_to_hsv_stats(region)
-
-            vec = np.concatenate([mean_rgb, std_rgb, mean_hsv])
+            vec = self._perceptual_color_stats(region)
             # Pad or truncate to color_dims
             if len(vec) < self.color_dims:
                 vec = np.pad(vec, (0, self.color_dims - len(vec)))
@@ -256,45 +251,52 @@ class V4Model:
         return stats
 
     @staticmethod
-    def _rgb_to_hsv_stats(region: np.ndarray) -> np.ndarray:
-        """Compute HSV statistics for an image region."""
-        r, g, b = region[..., 0], region[..., 1], region[..., 2]
-        mx = np.maximum(np.maximum(r, g), b)
-        mn = np.minimum(np.minimum(r, g), b)
-        delta = mx - mn
+    def _perceptual_color_stats(region: np.ndarray) -> np.ndarray:
+        """Color statistics in the coordinates V4 represents.
 
-        # Value
-        v = mx
-        # Saturation
-        s = np.where(mx > 1e-8, delta / np.maximum(mx, 1e-8), 0.0)
+        CIELAB carries the uniform perceptual coordinates (L*a*b*);
+        the DKL opponent plane carries hue and chroma — hue as
+        directional statistics (the resultant vector, Mardia & Jupp),
+        never a linear mean of an angle on S¹. Twelve dimensions:
 
-        # Hue
-        hue = np.zeros_like(mx)
-        mask_r = (delta > 1e-8) & (mx == r)
-        mask_g = (delta > 1e-8) & (mx == g) & ~mask_r
-        mask_b = (delta > 1e-8) & (mx == b) & ~mask_r & ~mask_g
+        [mean L*, mean a*, mean b*, std L*, std a*, std b*,
+         cos θ̄, sin θ̄, R, chroma mean, chroma std, achromatic fraction]
+        """
+        from occipital_lobe.color import (
+            chroma,
+            circular_resultant,
+            cone_opponent,
+            hue_angle,
+            srgb_to_lab,
+        )
 
-        hue[mask_r] = 60.0 * (((g - b) / np.maximum(delta, 1e-8))[mask_r] % 6.0)
-        hue[mask_g] = 60.0 * (((b - r) / np.maximum(delta, 1e-8))[mask_g] + 2.0)
-        hue[mask_b] = 60.0 * (((r - g) / np.maximum(delta, 1e-8))[mask_b] + 4.0)
+        lab = srgb_to_lab(region).reshape(-1, 3)
+        _lum, rg, by = cone_opponent(region)
+        hues = hue_angle(rg, by).ravel()
+        chrom = chroma(rg, by).ravel()
 
-        # Hue is circular (0° ≡ 360°, both red): use the circular mean
-        # θ̄ = arg(Σ exp(iθ)) (Mardia & Jupp). A linear mean would place
-        # a red cluster split across 0°/360° at ~180° (cyan) artifactually.
-        hue_rad = np.deg2rad(hue)
-        mean_hue = float(np.angle(np.mean(np.exp(1j * hue_rad))) % (2.0 * np.pi)) / (2.0 * np.pi)
-        # Circular std: σ = √(−2 ln R), R = |Σ exp(iθ)|/n.
-        resultant = float(np.abs(np.mean(np.exp(1j * hue_rad))))
-        hue_std = float(np.sqrt(max(0.0, -2.0 * np.log(max(resultant, 1e-8)))) / (2.0 * np.pi))
+        cos_sum = float(np.cos(hues).sum())
+        sin_sum = float(np.sin(hues).sum())
+        resultant = circular_resultant(hues)
+        # Resultant direction as a unit vector — downstream learners
+        # get a wrap-free representation of mean hue.
+        norm = float(np.hypot(cos_sum, sin_sum))
+        dir_cos, dir_sin = (cos_sum / norm, sin_sum / norm) if norm > 0 else (0.0, 0.0)
 
         return np.array(
             [
-                mean_hue,
-                np.mean(s),
-                np.mean(v),
-                min(hue_std, 0.5),
-                np.std(s),
-                np.std(v),
+                lab[:, 0].mean() / 100.0,
+                lab[:, 1].mean() / 100.0,
+                lab[:, 2].mean() / 100.0,
+                lab[:, 0].std() / 100.0,
+                lab[:, 1].std() / 100.0,
+                lab[:, 2].std() / 100.0,
+                dir_cos,
+                dir_sin,
+                resultant,
+                chrom.mean(),
+                chrom.std(),
+                float((chrom < 0.02).mean()),
             ]
         )
 

@@ -20,7 +20,6 @@ import random
 import pytest
 from frontal_lobe import research as research_module
 from frontal_lobe.research import ResearchWorkbench
-from frontal_lobe.tools.framework import ToolRegistry, get_tools
 from frontal_lobe.volition import Urge
 from parietal_lobe.math.symbolic import (
     check_equality,
@@ -28,6 +27,7 @@ from parietal_lobe.math.symbolic import (
     mutate_identity,
     split_equality,
 )
+from tools.framework import ToolRegistry, get_tools
 
 from infrastructure.config import VolitionConfig
 

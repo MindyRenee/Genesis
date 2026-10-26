@@ -22,6 +22,17 @@ const EPS: f64 = 1.0e-12;
 /// fluctuation around the consensus pull, never a takeover.
 pub(crate) const TEMPERATURE_CAP: f64 = 0.5;
 
+/// The latent working box's half-width — the thermal kick samples
+/// temperature as a *fraction* of the field's operating extent.
+/// Unscaled, σ ≈ √(2·gain·T·dt) reaches ~0.45 tangent units on a
+/// hot field while the whole box spans ±0.5 — a kick that size
+/// scatters the fibers across the manifold instead of perturbing
+/// them, and the scattered fibers re-create the disagreement that
+/// keeps the temperature pinned: a thermostat stuck on. Scaling σ
+/// by the box half-width makes the kick a genuine fluctuation and
+/// lets a cooling field actually settle.
+pub(crate) const KICK_LATENT_SCALE: f64 = 0.25;
+
 /// Provenance marker — one letter of the creator lattice (see
 /// PROVENANCE.md). This one is load-bearing: it is bound into the
 /// deterministic noise stream's seed below.
@@ -933,9 +944,17 @@ impl GlobalField {
         match paths.as_slice() {
             [] => Err(FieldError::MissingTransport),
             [p] => Ok(p.matrix.clone()),
-            [first, rest @ ..] => {
-                let candidate = &first.matrix;
-                for path in rest {
+            many => {
+                // With a non-flat connection, alternative routes
+                // legitimately disagree — that disagreement *is* the
+                // holonomy. A canonical route still has to exist, so
+                // transport prefers the fewest hops (least curvature
+                // accumulated); disagreement between equally short
+                // routes is a real ambiguity and still an error.
+                let shortest = many.iter().map(|p| p.nodes.len()).min().expect("non-empty");
+                let mut best = many.iter().filter(|p| p.nodes.len() == shortest);
+                let candidate = &best.next().expect("non-empty").matrix;
+                for path in best {
                     if matrix_distance(candidate, &path.matrix)? > 1.0e-9 {
                         return Err(FieldError::TransportMismatch);
                     }
@@ -1046,7 +1065,10 @@ impl GlobalField {
         }
         let next_disagreement = disagreement / states.len() as f64;
         let gain = (self.integration_gain.max(0.0) * dt).clamp(0.0, 1.0);
-        let sigma = (2.0 * self.integration_gain.max(0.0) * self.temperature * dt).sqrt();
+        // σ = √(2·gain·T·dt) · box-half-width — the kick is a
+        // fraction-of-extent fluctuation, not a raw-unit scatter.
+        let sigma = (2.0 * self.integration_gain.max(0.0) * self.temperature * dt).sqrt()
+            * KICK_LATENT_SCALE;
         if !sigma.is_finite() {
             return Err(FieldError::NonFiniteState);
         }

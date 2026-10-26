@@ -52,6 +52,7 @@ __all__ = [
     "CHEM_SEROTONIN",
     "CHEM_VASOPRESSIN",
     "CONSOLIDATE",
+    "DELETE_EPISODE",
     "DREAM",
     "DROP_TENSOR",
     "ERROR_INTERNAL_ERROR",
@@ -63,6 +64,7 @@ __all__ = [
     "ERROR_UNKNOWN_COMMAND",
     "ERROR_VERSION_MISMATCH",
     "FIND_SIMILAR",
+    "FIND_SIMILAR_ARCHIVED",
     "GET_BODY_CONTROL",
     "GET_BODY_STATE",
     "GET_DYADIC_STATE",
@@ -126,6 +128,7 @@ __all__ = [
     "READ_SENSORS",
     "RETRIEVE_EPISODE",
     "SAVE_INFERENCE",
+    "SEARCH_ARCHIVED",
     "SEARCH_EPISODES",
     "SENSOR_AC_ADAPTER",
     "SENSOR_BATTERY",
@@ -162,6 +165,7 @@ __all__ = [
     "SUBSYSTEM_NAMES",
     "SUBSYSTEM_RETINA",
     "SYNC",
+    "UNARCHIVE_EPISODE",
     "UPDATE_MODULE_STATUS",
     "UPDATE_USER_AFFECT",
     "ZONE_ANALYSIS",
@@ -403,6 +407,35 @@ SET_COGNITIVE_PID = 56
 # not momentary — lids stay where the mind left them.
 # Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
 SET_LID = 57
+
+# Deep recall — SimHash similarity scan over the archived tier of
+# LTM. Sleep compression retires low-salience episodes to the
+# archive, where they stay retrievable by ID but leave every
+# associative index; this reaches them when the active set has no
+# answer. Request and response are identical to FIND_SIMILAR.
+# Additive: PROTOCOL_VERSION stays 3.
+FIND_SIMILAR_ARCHIVED = 58
+
+# Un-archive an episode — reconsolidation. Clears the archived flag,
+# returns the episode to the active similarity index, re-bundles its
+# SDR, and floors its salience at the reconsolidation level so the
+# next sleep pass retains what recall actually used. Request/response
+# identical to ARCHIVE_EPISODE. Additive: PROTOCOL_VERSION stays 3.
+UNARCHIVE_EPISODE = 59
+
+# Page through the archived tier — the cold store's table of
+# contents. Request [u32 limit][u32 offset]; response is [u32 count]
+# then per entry [u64 id][u64 ts][f32 salience][u8 flags]
+# [u8 source_module][f32×4 emotional_tag] — metadata only, no
+# payload text. Additive: PROTOCOL_VERSION stays 3.
+SEARCH_ARCHIVED = 60
+
+# Delete an episode for real. Marks the deleted flag and removes
+# every index; the payload slot stays orphaned in the data file —
+# reclaiming physical space is a rebuild pass, not this call.
+# Request/response identical to ARCHIVE_EPISODE. Additive:
+# PROTOCOL_VERSION stays 3.
+DELETE_EPISODE = 61
 
 # Which optional hardware sensors this machine actually has.
 # Response: [u16 mask] — a bitmask of SENSOR_* below. A set bit means

@@ -134,8 +134,8 @@ Maximum impulse magnitude: 0.05
 (Conservative — neuropeptides have narrow effective ranges)
 
 Python modules that send vasopressin impulses:
-    - (Currently no direct Python impulses — vasopressin is
-      scaffolded for future social behavior modeling)
+    - transduction.py: wave-driven release (alpha band power)
+    - (Also scaffolded for future social behavior modeling)
 
 Python modules that read vasopressin:
     - emotional_regulator.py: homeostatic regulation
@@ -171,5 +171,6 @@ class Vasopressin:
     projections: tuple[str, ...] = ("posterior pituitary", "amygdala", "septum", "autonomics")
     receptors: tuple[str, ...] = ("V1a", "V1b", "V2")
     brain_waves: tuple[str, ...] = ("alpha",)
+    wave_sign: float = 1.0
     circadian_modifier: str = "1.0 (no circadian modulation)"
     role: str = "social bonding, aggression, water retention, pair bonding"

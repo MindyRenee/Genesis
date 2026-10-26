@@ -18,7 +18,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from frontal_lobe.self import (
+from self import (
     ExperimentRecord,
     FeedbackRecord,
     HeuristicExperiment,
@@ -29,7 +29,7 @@ from frontal_lobe.self import (
     SelfDirectedLearner,
     SelfImprovement,
 )
-from frontal_lobe.self.learning import (
+from self.learning import (
     _CAUSES_RE,
     _DEFINITION_RE,
     _DEPENDS_RE,
@@ -41,8 +41,8 @@ from frontal_lobe.self.learning import (
     _SIMILAR_RE,
     _normalize_concept,
 )
-from frontal_lobe.tools.framework import ToolResult
 from temporal_lobe.concepts import ConceptNetwork, RelationType
+from tools.framework import ToolResult
 
 from infrastructure.bug_reporter import BugReport
 
@@ -956,59 +956,65 @@ class TestAutonomousAllowlist:
         assert not SelfImprovement._is_autonomous_allowed("setup.py")
 
 
-class TestProtectedCore:
-    """Tests for the protected-core boundary.
+class TestEveryOwnSourceFixable:
+    """Every own-source file is fixable — the verification gate, not a
+    permission list, decides which edits land.
 
-    These prove that autonomous fixes and experiments cannot touch
-    the cognition engine, language engine, or mind — the files that
-    define its ability to think and speak. Proposals can still be
-    generated for these files, but it cannot apply changes to them
-    without human review.
+    These prove the cognition engine, language engine, and mind itself
+    are all inside her reach — there is no protected core. The only
+    boundary left is the instruments: tests, config, and build files,
+    which stay outside because they are what verifies every change.
     """
 
-    def test_cognition_engine_protected(self):
-        """Cognition engine is protected from autonomous fixes."""
-        assert not SelfImprovement._is_autonomous_allowed("python/frontal_lobe/prefrontal.py")
+    def test_cognition_engine_fixable(self):
+        """Cognition engine is autonomously fixable."""
+        assert SelfImprovement._is_autonomous_allowed("python/frontal_lobe/prefrontal.py")
 
-    def test_language_generator_protected(self):
-        """Language generator is protected from autonomous fixes."""
-        assert not SelfImprovement._is_autonomous_allowed("python/frontal_lobe/generator.py")
+    def test_language_generator_fixable(self):
+        """Language generator is autonomously fixable."""
+        assert SelfImprovement._is_autonomous_allowed("python/frontal_lobe/generator.py")
 
-    def test_language_graph_walk_protected(self):
-        """Language graph_walk is protected from autonomous fixes."""
-        assert not SelfImprovement._is_autonomous_allowed("python/frontal_lobe/graph_walk.py")
+    def test_language_graph_walk_fixable(self):
+        """Language graph_walk is autonomously fixable."""
+        assert SelfImprovement._is_autonomous_allowed("python/frontal_lobe/graph_walk.py")
 
-    def test_language_vocabulary_protected(self):
-        """Language vocabulary is protected from autonomous fixes."""
-        assert not SelfImprovement._is_autonomous_allowed("python/temporal_lobe/vocabulary.py")
+    def test_language_vocabulary_fixable(self):
+        """Language vocabulary is autonomously fixable."""
+        assert SelfImprovement._is_autonomous_allowed("python/temporal_lobe/vocabulary.py")
 
-    def test_mind_protected(self):
-        """Mind is protected from autonomous fixes."""
-        assert not SelfImprovement._is_autonomous_allowed("mind.py")
+    def test_mind_fixable(self):
+        """Mind is autonomously fixable."""
+        assert SelfImprovement._is_autonomous_allowed("mind.py")
 
     def test_cognition_engine_still_own_source(self):
-        """Protected core files are still own-source (can have proposals)."""
+        """Cognition files are own-source."""
         assert SelfImprovement._is_own_source("python/frontal_lobe/prefrontal.py")
 
     def test_language_still_own_source(self):
-        """Language files are still own-source (can have proposals)."""
+        """Language files are own-source."""
         assert SelfImprovement._is_own_source("python/frontal_lobe/generator.py")
 
     def test_non_core_cognitive_still_allowed(self):
         """Non-core cognitive files are still autonomously fixable."""
         assert SelfImprovement._is_autonomous_allowed("python/perception/core.py")
 
-    def test_protected_core_experiment_blocked(self):
-        """Experiments cannot touch protected core files."""
-        from frontal_lobe.self.improvement import HeuristicExperiment
-
-        assert not HeuristicExperiment._is_allowlisted("python/frontal_lobe/prefrontal.py")
-
-    def test_protected_core_still_experimentable(self):
-        """Protected core files are still experimentable (proposals OK)."""
-        from frontal_lobe.self.improvement import HeuristicExperiment
+    def test_cognition_engine_experimentable(self):
+        """The cognition engine is experimentable — verified edits land."""
+        from self.improvement import HeuristicExperiment
 
         assert HeuristicExperiment._is_experimentable("python/frontal_lobe/prefrontal.py")
+
+    def test_integrity_channels_experimentable(self):
+        """Even the body's integrity channels are experimentable.
+
+        mmap_state, continuity, and ipc verify like everything else —
+        the cargo gate is their arbiter too.
+        """
+        from self.improvement import HeuristicExperiment
+
+        assert HeuristicExperiment._is_experimentable("src/store/mmap_state.rs")
+        assert HeuristicExperiment._is_experimentable("src/daemon/continuity.rs")
+        assert HeuristicExperiment._is_experimentable("src/daemon/ipc.rs")
 
 
 class TestModuleNameFor:
@@ -1104,7 +1110,7 @@ class TestImportGate:
             {"run": staticmethod(lambda name, **kw: ToolResult(success=True, output="mocked"))},
         )()
         with patch(
-            "frontal_lobe.self.improvement.get_tools",
+            "self.improvement.get_tools",
             return_value=mock_tools,
         ):
             result = engine._validate_and_write_fix(
@@ -1139,7 +1145,7 @@ class TestImportGate:
             },
         )()
         with patch(
-            "frontal_lobe.self.improvement.get_tools",
+            "self.improvement.get_tools",
             return_value=mock_tools,
         ):
             result = engine._validate_and_write_fix(

@@ -88,6 +88,17 @@ pub const MAX_PAYLOAD_SIZE: usize = 256 * 1024;
 /// limit.
 pub const MAX_COMPRESSED_SIZE: usize = 320 * 1024;
 
+/// Salience floor applied by `unarchive` — reconsolidation.
+///
+/// An episode surfaced by deep recall is lifted to at least this
+/// salience so the next sleep-compaction pass retains it: retrieval
+/// is what earns a memory its warmth. Must stay above the
+/// compressor's retention threshold (`DEFAULT_SALIENCE_THRESHOLD` =
+/// 0.6 in `temporal_lobe/compression.py`); 0.65 clears the gate
+/// without outranking genuinely high-salience memories in the
+/// retention cap.
+pub const RECONSOLIDATION_SALIENCE_FLOOR: f32 = 0.65;
+
 // ─────────────────────────────────────────────────────────────────
 //  Index entry (same layout as v1 — 64 bytes)
 // ─────────────────────────────────────────────────────────────────
@@ -1722,6 +1733,54 @@ impl LtmStore {
         scored
     }
 
+    /// SimHash similarity scan over the *archived* tier — deep recall.
+    ///
+    /// `find_similar_hash` scans only the active set; this is its mirror
+    /// for the cold store: the same exact Hamming distance over entries
+    /// the compactor retired. Archived payloads survive intact, and the
+    /// SimHash needs no bundle contribution — so a specific enough cue
+    /// can still reach a memory the active set no longer holds.
+    ///
+    /// Deep recall deliberately returns archived real episodes only:
+    /// meta-memories (association traces, dream insights) have their own
+    /// recall channels, and deleted entries are gone semantically even
+    /// where their slots remain.
+    ///
+    /// Returns up to `limit` results sorted by Hamming distance (ascending).
+    pub fn find_similar_archived(&self, query: &str, limit: usize) -> Vec<(u64, u32, &IndexEntry)> {
+        let query_hash = simhash(query);
+        let mut scored: Vec<(u64, u32, &IndexEntry)> = Vec::new();
+        for entry in &self.entries {
+            if entry.is_deleted() || entry.is_meta_memory() || !entry.is_archived() {
+                continue;
+            }
+            scored.push((entry.episode_id, entry.hash_distance(query_hash), entry));
+        }
+        scored.sort_by_key(|a| a.1);
+        scored.truncate(limit);
+        scored
+    }
+
+    /// Page through the archived tier — oldest first.
+    ///
+    /// The mirror of `search_episodes` for the cold store: entries
+    /// where `is_archived` holds, in index order (ascending episode
+    /// ID — insertion order, hence oldest first). Returns lightweight
+    /// index references, not decompressed payloads — pruning and
+    /// tier bookkeeping need the metadata, not the text.
+    ///
+    /// Includes archived meta-memories; the caller's own policy
+    /// decides which source modules are prunable.
+    pub fn search_archived(&self, limit: usize, offset: usize) -> Vec<(u64, &IndexEntry)> {
+        self.entries
+            .iter()
+            .filter(|e| e.is_archived() && !e.is_deleted())
+            .skip(offset)
+            .take(limit)
+            .map(|e| (e.episode_id, e))
+            .collect()
+    }
+
     /// Find the highest-salience episodes.
     pub fn find_most_salient(&self, limit: usize) -> Vec<(u64, &IndexEntry)> {
         let mut results: Vec<(u64, &IndexEntry)> = Vec::with_capacity(self.active_ids.len());
@@ -1883,6 +1942,87 @@ impl LtmStore {
 
         // Remove from active_ids but keep in id_to_idx.
         self.active_ids.retain(|id| *id != episode_id);
+
+        Ok(())
+    }
+
+    /// Un-archive an episode — reconsolidation.
+    ///
+    /// The mirror of `archive`: retrieval is what earns a memory its
+    /// place in the active set, so when a deep-recall cue reaches into
+    /// the cold tier and surfaces an episode, the episode comes back.
+    /// This clears the archived flag on disk, returns the ID to
+    /// `active_ids`, re-adds its SDR to the bundle superposition (the
+    /// inverse of the subtraction `archive` performs), and floors its
+    /// salience at `RECONSOLIDATION_SALIENCE_FLOOR` so the next
+    /// compaction pass retains what recall actually used. A revived
+    /// episode that is never touched again can still be re-archived by
+    /// a later sweep — forgetting stays earned in both directions.
+    pub fn unarchive(&mut self, episode_id: u64) -> Result<(), LtmError> {
+        let idx = *self
+            .id_to_idx
+            .get(&episode_id)
+            .ok_or(LtmError::EpisodeNotFound)?;
+
+        // Already active — nothing to do.
+        if !self.entries[idx].is_archived() {
+            return Ok(());
+        }
+
+        let flags = self.entries[idx].flags & !IndexEntry::ARCHIVED_FLAG;
+        let new_salience = self.entries[idx]
+            .salience
+            .max(RECONSOLIDATION_SALIENCE_FLOOR);
+        let salience_changed = (new_salience - self.entries[idx].salience).abs() > f32::EPSILON;
+
+        // flags sits at offset 60 and salience at offset 40 inside the
+        // 64-byte entry — same surgical writes `archive` uses.
+        let entry_base = 64 + idx as u64 * INDEX_ENTRY_SIZE as u64;
+        self.meta_file
+            .seek(SeekFrom::Start(entry_base + 60))
+            .map_err(LtmError::Io)?;
+        self.meta_file.write_all(&[flags]).map_err(LtmError::Io)?;
+        if salience_changed {
+            self.meta_file
+                .seek(SeekFrom::Start(entry_base + 40))
+                .map_err(LtmError::Io)?;
+            self.meta_file
+                .write_all(&new_salience.to_le_bytes())
+                .map_err(LtmError::Io)?;
+        }
+        let previous_count = self.meta_header.episode_count;
+        self.meta_header.episode_count = previous_count.saturating_add(1);
+        if let Err(error) = self.write_meta_header() {
+            self.meta_header.episode_count = previous_count;
+            return Err(error);
+        }
+        self.entries[idx].flags = flags;
+        self.entries[idx].salience = new_salience;
+
+        // Re-bundle the SDR so the bundle-store path sees the revived
+        // episode again — the inverse of `archive`'s subtraction.
+        // Meta-memories were never bundled; a failed read leaves
+        // bounded drift the startup reconciliation tolerates.
+        if !self.entries[idx].is_meta_memory() {
+            match self.retrieve(episode_id) {
+                Ok(episode) => {
+                    let code = episode_id_to_code(episode_id);
+                    let sdr = encode_episode(
+                        &episode.text,
+                        &episode.full_emotional_tag,
+                        episode.timestamp,
+                    );
+                    self.bundles.add_episode(&code, &sdr);
+                }
+                Err(e) => {
+                    eprintln!("[ltm] could not re-bundle revived episode {episode_id}: {e}")
+                }
+            }
+        }
+
+        // Back on the active list — appended like a fresh store, which
+        // is what reconsolidation semantically is.
+        self.active_ids.push(episode_id);
 
         Ok(())
     }

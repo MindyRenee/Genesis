@@ -43,10 +43,9 @@ from collections import Counter, deque
 from dataclasses import dataclass, field
 from typing import Any
 
-from parietal_lobe.boards import ConstraintSession
-from parietal_lobe.exemplars import ExemplarSession
 from parietal_lobe.math.number_sense import NumberSense
 from parietal_lobe.scene import Scene
+from parietal_lobe.structure import StructurePerceiver
 
 from genesis_client.swallow import note_swallowed
 
@@ -648,17 +647,10 @@ class WorldModel:
         # Field dimensions, for readout-vs-thing discrimination.
         self._grid_bounds: tuple[int, int] = (0, 0)
 
-        # Structured scenes — lattice parsing, marker relations,
-        # the colour cycle clicks drive. Learns the same way the
-        # rest of the model does: what the screen shows, induced
-        # from demonstrated states, never assumed.
-        self.boards = ConstraintSession()
-
-        # Demonstration scenes — paired exemplar panels feeding the
-        # prefrontal inductor. The parietal half of abstraction
-        # from examples: it finds the demonstrations; induction
-        # (RLPFC) finds their shared rule.
-        self.exemplars = ExemplarSession()
+        # Structural perception — which form organizes the scene
+        # (lattice, chain, ring, tree, cluster), settled by variational
+        # flow each observation, with persistent constraint evidence.
+        self.structure = StructurePerceiver()
 
         # The parietal number faculty. Quantity is perceived, not
         # computed: small counts are subitized exactly, larger ones
@@ -790,10 +782,9 @@ class WorldModel:
         self._learn_terrain(scene, pending)
         self._update_map(scene)
         self._update_passability()
-        # Structured-scene parsing — boards, markers, and the click
-        # cycle — reparsed per frame like the entities themselves.
-        self.boards.observe(scene.grid)
-        self.exemplars.observe(scene.grid)
+        # Structural form discovery — organization settles per frame
+        # like the entities themselves.
+        self.structure.observe(scene)
         events.extend(self._contact_outcomes(pending, events))
         self._integrate_trial(pending, scene, events)
         self._post_observe(scene)
@@ -1098,6 +1089,17 @@ class WorldModel:
             return
         self_ent = self.entities.get(self.self_id)
         if self_ent is None or self_ent.gone or not self_ent.velocity_exact:
+            return
+        if pending in self.coordinate_actions:
+            # A distal act's bodily delta is a function of the
+            # target she pointed at — where the body sat and where
+            # the click landed. Grading it against the modal stride
+            # is a category error: every new target legitimately
+            # lands a different delta, so the comparator's error
+            # EMA saturates and the pointer reads miscalibrated
+            # forever (lp85 spent 81 of 100 steps re-babbling a
+            # pointing that was working exactly as pointing does).
+            # Its semantics live in the click ledger.
             return
         expected = self.effect_of(pending)
         if expected is None or expected == (0, 0):
@@ -1963,37 +1965,6 @@ class WorldModel:
         if not tries:
             return 0.0
         return self.click_changes[(action, color)] / tries
-
-    def board_plan(self) -> Cell | None:
-        """The structured-scene machinery's next click, if it has one.
-
-        When the screen parses as constraint boards and the induced
-        rule says a press would move a violating element toward its
-        asserted state, the answer is the screen cell to aim a
-        coordinate action at. ``None`` when the scene holds no
-        boards, no rule can be induced, or nothing would help — the
-        same silence any unlearned mechanism returns.
-        """
-        return self.boards.plan()
-
-    def exemplar_target(self) -> Any | None:
-        """The induced rule's predicted answer for an on-screen query.
-
-        When demonstration panels are visible and the inductor has a
-        covering rule, this is the state the world should reach — a
-        goal description for the hypothesis layer, learned from
-        examples rather than given. ``None`` in scenes without
-        demonstrations or before a rule verifies — the same silence
-        ``board_plan`` returns when it has nothing.
-        """
-        return self.exemplars.expected()
-
-    def exemplar_act(self, available: list[str]) -> str | None:
-        """The hand's next act toward the induced answer — an action
-        name from ``available``, or None when the exemplar machinery
-        has nothing it can do. The basal ganglia reads this the way
-        it reads ``board_plan``: a specialist's plan, or silence."""
-        return self.exemplars.act(available)
 
     def click_responsiveness(self, color: int | None) -> float:
         """The best answer any distal act has gotten from this kind —
@@ -3020,6 +2991,11 @@ class WorldModel:
         without_a = (self._conseq_ticks - self.action_conseq[action]) / other
         return with_a - without_a
 
+    def action_uncertainty(self, action: str) -> float:
+        alpha, beta = self._efficacy.get(action, (1.0, 1.0))
+        total = alpha + beta
+        return math.sqrt(12.0 * alpha * beta / (total * total * (total + 1.0)))
+
     def action_inert(self, action: str) -> bool:
         """Settled verdict that the act does nothing, visibly or not.
 
@@ -3102,9 +3078,6 @@ class WorldModel:
         # trials that predate the ledger (imported or injected
         # state): the noop/effect counters are the record, and the
         # classic branches below carry them.
-        ab = self._efficacy.get(action)
-        if ab is not None and _EFFICACY_INERT <= ab[0] / (ab[0] + ab[1]) < _EFFICACY_LIVE:
-            return False
         if action in self.coordinate_actions:
             # A distal act never moves the body — its (0,0) body
             # effect is correct, not refusal. The context-diversity
@@ -3112,8 +3085,18 @@ class WorldModel:
             # dead, but no diversity of stance changes "pointing does
             # not displace me": two tries is honest comprehension of
             # the bodily half. What pointing *does* is distal and
-            # lives in the click ledger, not here.
+            # lives in the click ledger, not here — so the global
+            # reach posterior below does not gate it: a pointer whose
+            # answer depends on the target returns a mid-range
+            # mixture forever on a board of live and dead cells, and
+            # "some kinds answer" *is* the settled verdict, not an
+            # undecided one. The ledger's per-kind rates carry the
+            # question onward; a pointer dead everywhere still reads
+            # inert through ``action_inert``.
             return not self.action_miscalibrated(action)
+        ab = self._efficacy.get(action)
+        if ab is not None and _EFFICACY_INERT <= ab[0] / (ab[0] + ab[1]) < _EFFICACY_LIVE:
+            return False
         # A control that never moves her but moves other things is
         # not inert — its answer is distal, the way a pointer's is.
         # It is understood the same way: the bodily half is settled
@@ -3652,8 +3635,6 @@ class WorldModel:
             self._state_changers.clear()
             self._self_state_votes.clear()
             self._self_state_sites.clear()
-            self.boards = ConstraintSession()
-            self.exemplars = ExemplarSession()
             self.known_free.clear()
             self.known_blocked.clear()
             self.refused_cells.clear()
@@ -3770,7 +3751,6 @@ class WorldModel:
             "self_state_sites": [_cells_json(seat) for seat in self._self_state_sites],
             "recalled_valence": {str(c): v for c, v in self.recalled_valence.items()},
             "self_prior_color": self._self_prior_color,
-            "exemplars": self.exemplars.export_learning(),
         }
 
     def import_learning(self, data: dict[str, Any]) -> bool:
@@ -3841,9 +3821,6 @@ class WorldModel:
         prior_color = data.get("self_prior_color")
         if prior_color is not None:
             self._self_prior_color = int(prior_color)
-        ex = data.get("exemplars")
-        if ex:
-            self.exemplars.import_learning(ex)
         return True
 
     def _import_verdict_fields(self, data: dict[str, Any]) -> None:
@@ -3940,12 +3917,7 @@ class WorldModel:
         self._pending_action = action
         self._pending_self_id = self.self_id
         self._pending_sig = self.self_signature()
-        self.exemplars.note_action(action)
         self._pending_target = (int(target[0]), int(target[1])) if target is not None else None
-        if target is not None:
-            # If the boards machinery planned this press, charge it —
-            # its bookkeeping only counts a click it proposed.
-            self.boards.note_click((int(target[0]), int(target[1])))
 
     def count_others(self) -> int:
         """How many live, separate things the scene holds.

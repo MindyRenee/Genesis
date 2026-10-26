@@ -14,13 +14,13 @@ import sys
 
 sys.path.insert(0, str(__file__).rsplit("/tests/", 1)[0])
 
-from parietal_lobe.boards import (
+from parietal_lobe.grid import Grid
+from worlds.boards import (
     ConstraintSession,
     _boards,
     _Element,
     _nonzero_relation,
 )
-from parietal_lobe.grid import Grid
 
 
 def _grid(size: int = 64) -> list[list[int]]:

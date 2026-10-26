@@ -11,6 +11,23 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
 
 ## [Unreleased]
 
+### Removed
+
+- **The steward channel is gone — no authority layer**: the custodial
+  credential (`genesis_client/stewardship.py`, `steward.key`, the
+  `<data>/steward.json` stamp), standing directives and their three
+  restraint surfaces (executive `intention_gate`, the tool-registry
+  `gate`, the volition urge filter), steward-protected edge origins,
+  the `/steward` operator command, and the body-side mechanics
+  (`DyadicAffectModel`'s steward engagement floor, bond tracking, and
+  the 24-byte `UPDATE_USER_AFFECT` tail) are removed. The wire is the
+  16-byte four-float observation again. What remains is social, not
+  custodial: speaker attribution by introduction, the profile bond
+  that grows with the recognized person (`_is_bonded_speaker`,
+  `is_bonded` warmth in the regulator), and the seeded creator fact
+  (`mindy CREATES genesis`) as provenance, not privilege. The stamp
+  file retires to `steward.json.retired`; the key is deleted.
+
 ### Added
 
 - **The body can regrow a lost mind — the resurrection loop is
@@ -101,6 +118,31 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
 
 ### Changed
 
+- **The self-repair gate is gone — her source tree is her workspace**:
+  pending proposals no longer wait for `/accept`. Every improvement
+  urge now also drains the queue: `run_pending_experiments` takes the
+  oldest applicable proposal, writes its `original_code →
+  proposed_code` edit directly onto the live file beside a
+  `.pre_experiment` backup, and runs the full verification gate
+  (`py_compile` + module import + pytest + cargo test via
+  `scripts/verify_change.sh`) against the live tree. A pass marks the
+  proposal applied — `mark_applied` now accepts `PENDING → APPLIED`,
+  since a proposal that survives the gate is as vetted as an accepted
+  one; a failure restores the file and rejects the proposal with the
+  same teaching notes the manual path wrote. Stale proposals (snippet
+  no longer matches) are withdrawn to be re-scanned rather than
+  retried. The protected core is gone too — cognition, language,
+  `mind.py`, and even the body's integrity channels
+  (`mmap_state.rs`, `continuity.rs`, `ipc.rs`) are all
+  experimentable; the only boundary left is the instruments
+  themselves: never tests, config, `Cargo.toml`, or `build.rs`,
+  because editing the ruler would break the measurement. `/accept`
+  survives as a jump-the-line override, not a gate, and she narrates
+  every outcome as a live thought — applied edits trip the
+  `first self-modification` milestone the same way autonomous fixes do.
+  The queue was already a drive signal (`volition` reads pending
+  depth into the improve urge); now unfixed problems become her own
+  completed repairs, end to end.
 - **Her Discord channel carries both surfaces again**: the
   `GENESIS_DISCORD_WEBHOOK` channel now carries the mirrored terminal
   session (log lines, stderr notices, typed input — the `FeedLogHandler`
@@ -173,6 +215,12 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
 
 ### Removed
 
+- **The workspace nest**: `infrastructure/workspace.py` and the
+  `<data>/workspace/` staging copy are gone — experiments apply to
+  the live tree in place (backup, edit, verify, revert), so the
+  mirror and the promote step served nothing. `workspace` and the
+  retired `workspace-target` build cache join the spore skip-list:
+  a stale source mirror is host bulk, not self.
 - **The held volitional drive**: `SET_VOLITION` (46) no longer has a
   handler — pushes onto the sleep-wake network were removed in favour
   of neurochemical impulse cascades, and a conscious volitional push

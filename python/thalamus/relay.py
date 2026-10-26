@@ -23,7 +23,9 @@ projection, not a broadcast: only subscribers of that source hear it.
 
 from __future__ import annotations
 
+import math
 import threading
+import time
 from collections.abc import Callable
 
 # kind is the low 8 bits of the module's task_id. 0 means the module
@@ -35,6 +37,22 @@ KIND_RECALLED = 3  # memory surfaced a trace
 KIND_FELT = 4  # limbic state shifted
 
 _MASK = 0xFF
+
+# ─── TRN divisive gating ─────────────────────────────────────────
+# The thalamic reticular nucleus wraps the relay nuclei in inhibitory
+# collaterals: each relay cell's transmission is divided by the total
+# drive competing on neighbouring channels (lateral inhibition;
+# Sherman & Guillery 1996 — the relay is a gate, not a wire). Here the
+# contention pool is the exponential-decaying sum of other modules'
+# recent post drives, τ ≈ 2 s; the gain is the standard divisive
+# normalization g = d / (d + C + ε), and a message whose gain falls
+# under the transmission floor is vetoed — the volley never reaches
+# cortex. TRN gate failure is what under-arousal/distractibility looks
+# like; that is modelled by the drive the caller passes, not by an
+# extra switch.
+_TRN_TAU = 2.0  # s — contention decays e-folding per 2 s
+_TRN_FLOOR = 0.2  # gain below this vetoes the volley
+_TRN_EPS = 1e-6
 
 # signature: (kind, payload) -> None
 Handler = Callable[[int, object], None]
@@ -72,6 +90,10 @@ class Thalamus:
         self._seen: dict[int, int] = {}
         self._handlers: dict[int, list[Handler]] = {}
         self._salt = 1
+        # TRN contention pool: module_id → (drive, last_timestamp).
+        # Each module's recent posts add inhibitory mass against every
+        # other module's next volley.
+        self._contention: dict[int, tuple[float, float]] = {}
 
     def register(self, module_id: int, handler: Handler) -> Handler:
         """Project onto ``module_id`` — hear every message it publishes."""
@@ -100,14 +122,52 @@ class Thalamus:
 
         return self.register(module_id, _wrapper)
 
-    def post(self, module_id: int, kind: int, payload: object) -> int:
+    def _trn_gate(self, module_id: int, drive: float, now: float) -> float:
+        """Divisive normalization against the contention pool.
+
+        Decays every channel's inhibitory mass by exp(−dt/τ), then
+        returns g = d / (d + C + ε) where C is the summed decayed
+        drive of all *other* modules — TRN lateral inhibition. The
+        module's own drive is added to the pool whether or not the
+        volley is transmitted: the reticular nucleus sees the
+        attempt, not just the success.
+        """
+        pool: dict[int, float] = {}
+        for mid, (d, ts) in self._contention.items():
+            decayed = d * math.exp(-(now - ts) / _TRN_TAU)
+            if decayed > _TRN_EPS:
+                pool[mid] = decayed
+        c = sum(v for mid, v in pool.items() if mid != module_id)
+        gain = drive / (drive + c + _TRN_EPS)
+        pool[module_id] = pool.get(module_id, 0.0) + drive
+        self._contention = {mid: (v, now) for mid, v in pool.items()}
+        return gain
+
+    def post(self, module_id: int, kind: int, payload: object, drive: float = 1.0) -> int:
         """Publish a message from ``module_id``; returns its task_id.
+
+        The volley first crosses the TRN gate: its divisive
+        normalization gain must clear the transmission floor, or the
+        message is vetoed and 0 is returned (kind-0 silence — the
+        module has nothing to say). ``drive`` is the afferent
+        strength of this message — unattended chatter posts weak
+        drives and loses to competing traffic.
 
         Subscribers fire synchronously, in registration order. The
         task_id stays in the mailbox until the heartbeat writes it —
         that is how the manifest comes to show which module spoke.
         """
+        try:
+            drive = float(drive)
+        except (TypeError, ValueError):
+            drive = 1.0
+        if not math.isfinite(drive) or drive <= 0.0:
+            return 0
+
         with self._lock:
+            gain = self._trn_gate(module_id, drive, time.monotonic())
+            if gain < _TRN_FLOOR:
+                return 0
             self._salt = (self._salt + 1) & 0xFFFFFF
             task_id = pack(kind, self._salt)
             self._pending[module_id] = (task_id, payload)

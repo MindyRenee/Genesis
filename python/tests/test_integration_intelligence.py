@@ -17,7 +17,8 @@ from frontal_lobe.reasoning import Reasoner
 from frontal_lobe.thought_composer import ThoughtComposer
 from limbic_system.emotion import EmotionalState
 from temporal_lobe.concepts import ConceptNetwork, RelationType
-from temporal_lobe.memory import Turn, WorkingMemory
+
+from memory import Turn, WorkingMemory
 
 logger = logging.getLogger(__name__)
 

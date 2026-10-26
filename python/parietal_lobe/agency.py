@@ -26,8 +26,8 @@ relative path resolves against, they never deny:
 - ``data`` is the state directory — observe intentions read persisted
   state there (growth ledger, play progress, cognitive journal, body
   image).
-- ``config`` covers ``$XDG_CONFIG_HOME/genesis`` — the deployment and
-  stewardship area.
+- ``config`` covers ``$XDG_CONFIG_HOME/genesis`` — the deployment
+  area.
 - ``net`` tools (web_search, web_fetch) run only when online.
 - ``scratch`` is ``<data_dir>/experiments/`` — the sandbox where the
   loop writes its own field notes and where ``maintain`` stages
@@ -63,8 +63,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from frontal_lobe.executive import ExecutiveFunction, ExecutiveIntention
-from frontal_lobe.tools.framework import ToolRegistry, ToolResult, get_tools
 from temporal_lobe.concepts import is_world_concept, strip_sense_suffix
+from tools.framework import ToolRegistry, ToolResult, get_tools
 
 from genesis_client.protocol import CHEM_DOPAMINE
 from infrastructure.paths import code_root
@@ -141,7 +141,6 @@ _OBSERVE_FILES = (
     "growth_ledger.jsonl",
     "user_profile.json",
     "cognitive_journal.jsonl",
-    "steward.json",
     # dyadic_persons.json is deliberately absent: it was the removed
     # person-registry's file — nothing writes it now, and the live
     # dyadic bond (attunement/synchrony/user affect) persists in
@@ -155,12 +154,13 @@ _OBSERVE_FILES = (
 # machine she runs on. Fires only after the file probes habituate, so
 # it's an occasional check-in rather than a fixed heartbeat.
 _OBSERVE_CPU = "cpu"
-# The config-area probe — where her deployment and stewardship files
-# live ($XDG_CONFIG_HOME/genesis).
+# The config-area probe — where her deployment files live
+# ($XDG_CONFIG_HOME/genesis).
 _OBSERVE_CONFIG = "configdir"
 # The daemon-internals probe — GET_INTERNALS over IPC: the body's
 # process-local gears (adaptive gates, lease, tick) that no file shows.
 _OBSERVE_INTERNALS = "internals"
+
 
 @dataclass(slots=True)
 class Intention:
@@ -294,9 +294,11 @@ class ActingLoop:
         self.on_live_thought = on_live_thought
         self.executive = executive
         if config_dir is None:
-            from genesis_client.stewardship import _config_dir
+            import os
 
-            config_dir = str(_config_dir())
+            config_dir = str(
+                Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "genesis"
+            )
         self._config_root = config_dir
         self.get_internals = get_internals
         # The body's thermal-cap flag, read through whatever the host
@@ -738,8 +740,7 @@ class ActingLoop:
 
     def _observe_config(self, result: ActingResult) -> None:
         """Look at the deployment config area — where her deployment
-        and stewardship files live. The point is that the area
-        registers at all.
+        files live. The point is that the area registers at all.
         """
         listing = self._use(result, "list_dir", path=".", _scope="config")
         if listing is None or not listing.success:

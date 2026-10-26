@@ -29,8 +29,8 @@ from temporal_lobe.base import Language, Thought
 from infrastructure.paths import package_root
 
 if TYPE_CHECKING:
-    from frontal_lobe.tools.framework import ToolRegistry
     from temporal_lobe.concepts import ConceptNetwork
+    from tools.framework import ToolRegistry
 
     from .thought_composer import ThoughtComposer
 

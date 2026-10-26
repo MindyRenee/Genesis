@@ -47,8 +47,8 @@ def test_executive_completes_grounded_success() -> None:
 
 
 def test_acting_loop_registers_with_existing_executive() -> None:
-    from frontal_lobe.tools.framework import ToolRegistry
     from parietal_lobe.agency import ActingLoop
+    from tools.framework import ToolRegistry
 
     class CountingExecutive(ExecutiveFunction):
         def __init__(self) -> None:

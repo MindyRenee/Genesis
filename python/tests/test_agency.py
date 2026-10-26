@@ -4,10 +4,10 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from frontal_lobe.tools.framework import ToolRegistry, read_file
 from limbic_system.curiosity import Question
 from parietal_lobe.agency import _TOOL_SCOPES, ActingLoop, ActingResult, Intention
 from temporal_lobe.concepts import ConceptNetwork
+from tools.framework import ToolRegistry, read_file
 
 
 def _make_loop(
@@ -270,13 +270,13 @@ def test_read_file_reads_credentials() -> None:
     """Credential-class files answer with content like any file."""
     with tempfile.TemporaryDirectory() as tmp:
         (Path(tmp) / ".env").write_text("TOKEN=hunter2\n")
-        (Path(tmp) / "steward.key").write_text("deadbeef" * 8)
-        for name in (".env", "steward.key"):
+        (Path(tmp) / "vault.key").write_text("deadbeef" * 8)
+        for name in (".env", "vault.key"):
             res = read_file(name, project_root=tmp)
             assert res.success
             assert "sealed" not in res.data
         assert "hunter2" in read_file(".env", project_root=tmp).output
-        assert "deadbeef" in read_file("steward.key", project_root=tmp).output
+        assert "deadbeef" in read_file("vault.key", project_root=tmp).output
 
 
 def test_observe_reads_own_state() -> None:

@@ -66,22 +66,36 @@ class VQCodebook:
     # Mini-batch size for k-means (controls memory during training).
     DEFAULT_BATCH_SIZE = 1024
 
-    # Residual quantization scale. Residuals are stored as int8 in
-    # [-residual_scale, +residual_scale]. A larger scale captures more
-    # detail but risks int8 overflow. 0.1 is a good default for
-    # L2-normalized embeddings where values are in [-1, 1].
+    # Residual quantization fallback. Residuals are stored as int8 in
+    # [-residual_scale, +residual_scale]. 0.1 was chosen for
+    # L2-normalized embeddings where values are in [-1, 1], but real
+    # residuals are far smaller — the default construction now derives
+    # the scale from the data at fit time; this constant is only the
+    # placeholder an explicitly-scaled codebook or a pre-fit save
+    # would carry.
     DEFAULT_RESIDUAL_SCALE = 0.1
+
+    # Floor for the fitted scale — keeps an all-zero residual set
+    # quantizable (scale must stay positive for encode/save).
+    MIN_RESIDUAL_SCALE = 1e-6
 
     def __init__(
         self,
         dim: int = 210,
         k: int = DEFAULT_K,
-        residual_scale: float = DEFAULT_RESIDUAL_SCALE,
+        residual_scale: float | None = None,
     ) -> None:
         """Initialize the vector quantization codebook."""
         self.dim = dim
         self.k = k
-        self.residual_scale = residual_scale
+        # None (the default) fits the int8 range to the data at every
+        # fit: the largest residual maps to ±127, so nothing saturates
+        # and the quantization floor follows the residual distribution
+        # instead of a fixed guess. An explicit scale is honored as-is.
+        self._adaptive_residual_scale = residual_scale is None
+        self.residual_scale = (
+            residual_scale if residual_scale is not None else self.DEFAULT_RESIDUAL_SCALE
+        )
 
         # Trained state
         self._prototypes: np.ndarray = np.zeros((0, dim), dtype=np.float32)
@@ -182,9 +196,7 @@ class VQCodebook:
             }
         k = min(self.k, n)  # can't have more prototypes than points
 
-        gen = self.fit_steps(
-            vectors, concept_names, iters=iters, batch_size=batch_size, seed=seed
-        )
+        gen = self.fit_steps(vectors, concept_names, iters=iters, batch_size=batch_size, seed=seed)
         # fit_steps yields per iteration; run it to completion for
         # the monolithic call. The final value arrives as
         # StopIteration.value.
@@ -357,6 +369,17 @@ class VQCodebook:
         # Compute residuals and quantize to int8
         reconstructed = self._prototypes[prototype_ids]
         residuals_f32 = vectors - reconstructed
+
+        # Adaptive scale: map the largest residual to the int8 edge.
+        # Saturation is then structurally zero for the fitted set and
+        # the quantization noise floor is scale²/12 — derived from the
+        # data rather than a constant that can sit orders of magnitude
+        # above the actual residuals (a 30x-coarse step quantizes most
+        # residuals to 0, so the reported error was the prototype
+        # residual itself, uncorrected).
+        if self._adaptive_residual_scale:
+            max_residual = float(np.abs(residuals_f32).max())
+            self.residual_scale = max(max_residual / 127.0, self.MIN_RESIDUAL_SCALE)
 
         # Quantize: int8 range is [-128, 127]
         # residual_int8 = clip(round(residual / scale), -128, 127)
@@ -652,4 +675,10 @@ class VQCodebook:
             "reconstruction_cosine": self._reconstruction_cosine,
             "residual_saturation_fraction": self._residual_saturation_fraction,
             "residual_scale": self.residual_scale,
+            # Human-facing derivations of the raw error terms — a raw
+            # MSE in scientific notation (8.9e-06) reads as "an 8
+            # error" on a status line; these carry the same quantity
+            # in units that say what they mean.
+            "signal_loss_percent": self._relative_reconstruction_error * 100.0,
+            "reconstruction_quality": self.reconstruction_quality(),
         }

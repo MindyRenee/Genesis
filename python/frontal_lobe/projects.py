@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from frontal_lobe.tools.project_creator import archive_project as _archive_project
-from frontal_lobe.tools.project_creator import (
+from tools.project_creator import archive_project as _archive_project
+from tools.project_creator import (
     clear_project_notes,
     create_project,
     leave_project_note,
@@ -15,7 +15,7 @@ from frontal_lobe.tools.project_creator import (
     projects_with_notes,
     read_project_notes,
 )
-from frontal_lobe.tools.project_creator import restore_project as _restore_project
+from tools.project_creator import restore_project as _restore_project
 
 from genesis_client.protocol import CHEM_NAMES
 from genesis_client.swallow import note_swallowed

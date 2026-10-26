@@ -22,7 +22,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from frontal_lobe.response_styler import ResponseStyler
 from temporal_lobe.concepts import ConceptNetwork, RelationType
 from temporal_lobe.concepts.types import ConceptCategory
-from temporal_lobe.memory import WorkingMemory
+
+from memory import WorkingMemory
 
 
 def _make_styler(

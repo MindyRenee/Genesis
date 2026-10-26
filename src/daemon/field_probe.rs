@@ -260,6 +260,18 @@ const ELEC_SAMPLE_PERIOD: Duration = Duration::from_millis(10);
 /// ages the average honestly instead of per call.
 const ELEC_EMA_TAU: f64 = 0.1;
 
+/// Time constant (seconds) of the jitter-climate EMA the bath is
+/// measured against — slow enough that a scheduling storm registers
+/// as weather change, fast enough that a machine's ordinary noise
+/// floor is learned rather than felt as stress forever.
+const JITTER_CLIMATE_TAU_S: f32 = 300.0;
+
+/// Absolute turbulence floor: an RMS loop-period error equal to one
+/// full nominal period (CV = 1.0) is real turbulence no matter how
+/// ordinary it is on this host — below that, userspace scheduling
+/// noise is the machine's own weather and does not heat the field.
+const JITTER_ABS_FLOOR: f32 = 1.0;
+
 /// Reference geometry for the Maxwell estimates: a die/package-scale
 /// current loop (~1 cm²) and a beside-the-chassis distance. These are
 /// order-of-magnitude assumptions — the current swing is measured,
@@ -650,9 +662,17 @@ fn discover_powercap() -> Option<PowerSource> {
 /// `powerN_average` can block ~10 ms in the read on fam15h_power).
 /// CPU-class sensors (fam15h_power, zenpower, …) rank first: the
 /// die's own draw is the quantity the carrier modulates.
+///
+/// A sensor that can only ever read zero is a dead channel —
+/// fam15h_power's averaged register reports 0 µW forever on
+/// northbridges that never implemented it, and a readable dead
+/// register would otherwise shadow every live source. The first
+/// candidate that actually reports nonzero draw wins; if all read
+/// zero the CPU-first pick still stands so the channel reports its
+/// honest zero rather than vanishing.
 fn discover_hwmon_power() -> Option<PathBuf> {
-    let mut cpu_class = None;
-    let mut any = None;
+    let mut cpu_class: Vec<PathBuf> = Vec::new();
+    let mut any: Vec<PathBuf> = Vec::new();
     for h in dir_entries("/sys/class/hwmon") {
         let name = std::fs::read_to_string(h.join("name")).unwrap_or_default();
         let cpuish = name.contains("power") || name.contains("zen");
@@ -676,13 +696,33 @@ fn discover_hwmon_power() -> Option<PathBuf> {
         // inside the read on fam15h_power.
         if let Some(p) = input.or(average) {
             if cpuish {
-                cpu_class.get_or_insert(p);
+                cpu_class.push(p);
             } else {
-                any.get_or_insert(p);
+                any.push(p);
             }
         }
     }
-    cpu_class.or(any)
+    let mut cands = cpu_class;
+    cands.extend(any);
+    let first = cands.first()?.clone();
+    // A candidate that reports real draw wins outright.
+    if let Some(live) = cands.iter().find(|c| read_f64(c).is_some_and(|v| v > 0.0)) {
+        return Some(live.clone());
+    }
+    // When every source reads zero, a single sample can't tell a
+    // dead register from a genuinely idle rail by value alone —
+    // prefer an instantaneous `power*_input` (a live sensor sampling
+    // real draw that happens to be idle) over a `power*_average`
+    // register: fam15h_power's averaged counter is 0 µW forever on
+    // northbridges that never implemented it, while the battery's
+    // instantaneous read is a real sensor reporting an honest idle.
+    Some(
+        cands
+            .iter()
+            .find(|c| c.to_string_lossy().ends_with("_input"))
+            .cloned()
+            .unwrap_or(first),
+    )
 }
 
 /// Battery/adapter draw — system-level watts when the silicon
@@ -1274,9 +1314,22 @@ struct Electrical {
 
 impl Electrical {
     fn discover() -> Self {
-        let power = discover_powercap()
-            .or_else(|| discover_hwmon_power().map(|path| PowerSource::Direct { path }))
-            .or_else(|| discover_supply_power().map(|path| PowerSource::Direct { path }));
+        let power = discover_powercap().or_else(|| {
+            let hwmon = discover_hwmon_power();
+            let supply = discover_supply_power();
+            // A dead hwmon pick — readable but only ever zero — must
+            // not shadow a live supply rail.
+            let pick = match (&hwmon, &supply) {
+                (Some(h), Some(s))
+                    if !read_f64(h).is_some_and(|v| v > 0.0)
+                        && read_f64(s).is_some_and(|v| v > 0.0) =>
+                {
+                    Some(s.clone())
+                }
+                _ => hwmon.or(supply),
+            };
+            pick.map(|path| PowerSource::Direct { path })
+        });
         Self {
             power,
             volts: discover_voltage(),
@@ -1463,6 +1516,16 @@ struct ProbeInner {
     throughput_mean: f32,
     jitter_sq_mean: f32,
     jitter_mean: f32,
+    /// Slow EMA of the jitter level — the machine's own timing
+    /// climate, so the bath measures *excess* turbulence rather
+    /// than this host's ordinary scheduling weather (the same
+    /// baseline-relative discipline as the band energies).
+    jitter_cv_climate: f32,
+    jitter_cv_climate_init: bool,
+    last_bath: Option<Instant>,
+    /// The open system-bus connection owning the rtkit grant —
+    /// the elevation lives only as long as this client does.
+    bus_hold: Option<std::os::unix::net::UnixStream>,
     carrier_freq: f32,
     /// The carrier generator's instantaneous phase (radians).
     carrier_phase: f32,
@@ -1496,6 +1559,33 @@ pub struct FieldProbe {
 /// Process-shared probe handle. Started in `daemon main`, read by
 /// the IPC handler — mirrors how `interoception` shares state.
 static FIELD_PROBE: OnceLock<std::sync::Arc<FieldProbe>> = OnceLock::new();
+
+/// Ask RealtimeKit to lift this thread out of bulk SCHED_OTHER
+/// competition — the unprivileged scheduling boost (rtkit-daemon
+/// runs as root and grants down to its advertised MinNiceLevel for
+/// same-uid callers; real SCHED_FIFO is policy-denied on typical
+/// desktops). A 250 Hz loop that loses its slice measures its own
+/// starvation as substrate jitter and heats the field with it —
+/// asking first keeps the bath honest about the machine's noise
+/// rather than the thread's run-queue position. The request is
+/// made over a persistent system-bus connection kept in `inner`:
+/// rtkit revokes a grant whose requesting client has left the bus,
+/// which is why a one-shot `dbus-send` cannot do this job. An
+/// absent service or a refusal leaves scheduling as it was —
+/// degraded jitter, never a failure.
+fn request_scheduling_boost(inner: &Mutex<ProbeInner>) {
+    let pid = std::process::id() as u64;
+    // SAFETY: SYS_gettid takes no arguments and cannot fail — the
+    // raw syscall always returns the calling thread's id.
+    let tid = unsafe { libc::syscall(libc::SYS_gettid) } as u64;
+    match super::rtkit::grant_high_priority(pid, tid) {
+        Ok((nice, conn)) => {
+            inner.lock().unwrap_or_else(|e| e.into_inner()).bus_hold = Some(conn);
+            eprintln!("[field-probe] rtkit granted nice {nice}");
+        }
+        Err(e) => eprintln!("[field-probe] rtkit boost unavailable: {e}"),
+    }
+}
 
 /// Start the probe thread. `phase_source` is polled ~4×/s for the
 /// body's phase name; it sets the carrier frequency. Idempotent:
@@ -1587,6 +1677,10 @@ impl FieldProbe {
                 throughput_mean: 0.0,
                 jitter_sq_mean: 0.0,
                 jitter_mean: 0.0,
+                jitter_cv_climate: 0.0,
+                jitter_cv_climate_init: false,
+                last_bath: None,
+                bus_hold: None,
                 carrier_freq: CARRIER_WAKE_HZ,
                 carrier_phase: 0.0,
                 carrier_depth: 0.60,
@@ -1692,6 +1786,7 @@ impl FieldProbe {
     }
 
     fn run(&self, phase_source: impl Fn() -> &'static str) {
+        request_scheduling_boost(&self.inner);
         let nominal = PROBE_PERIOD.as_secs_f32();
         let mut prev = Instant::now();
         // WLAN byte-counter paths, cloned once — the flux channel
@@ -1872,13 +1967,18 @@ impl FieldProbe {
         (lag, coherence.min(1.0), amplitude)
     }
 
-    /// The substrate's own measured thermal level — RMS probe-loop
-    /// jitter as a fraction of the nominal period. This is the bath
-    /// the latent field's Langevin reservoir samples: the silicon's
-    /// real timing noise, not a modeled amplitude. `None` until the
-    /// jitter ring warms — an absent channel is no reading.
+    /// The substrate's measured thermal level — *excess* jitter as a
+    /// fraction of the nominal period: the current RMS loop-period
+    /// error minus the machine's own timing climate (a slow EMA of
+    /// the same quantity, floored at [`JITTER_ABS_FLOOR`] so noise
+    /// beyond one full missed period counts however ordinary it is
+    /// here). The field's Langevin reservoir samples real silicon
+    /// noise — but a chronically contended host is not "under
+    /// physical stress" every second of its life; turbulence is
+    /// what exceeds the climate. `None` until the jitter ring
+    /// warms — an absent channel is no reading.
     pub fn bath_fluctuation(&self) -> Option<f64> {
-        let g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         if !g.jitter.filled {
             return None;
         }
@@ -1886,7 +1986,19 @@ impl FieldProbe {
         if !jvar.is_finite() {
             return None;
         }
-        Some((jvar.sqrt() / PROBE_PERIOD.as_secs_f32()) as f64)
+        let cv = jvar.sqrt() / PROBE_PERIOD.as_secs_f32();
+        let now = Instant::now();
+        if !g.jitter_cv_climate_init {
+            g.jitter_cv_climate = cv;
+            g.jitter_cv_climate_init = true;
+        } else if let Some(prev) = g.last_bath {
+            let dt = (now - prev).as_secs_f32();
+            let a = 1.0 - (-dt / JITTER_CLIMATE_TAU_S).exp();
+            g.jitter_cv_climate += a * (cv - g.jitter_cv_climate);
+        }
+        g.last_bath = Some(now);
+        let climate = g.jitter_cv_climate.max(JITTER_ABS_FLOOR);
+        Some((cv - climate).max(0.0) as f64)
     }
 
     /// Compute the current signature. Called by the IPC handler.

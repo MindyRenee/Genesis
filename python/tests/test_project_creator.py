@@ -3,7 +3,8 @@
 import tempfile
 from pathlib import Path
 
-from frontal_lobe.tools.framework import (
+from temporal_lobe.concepts import ConceptNetwork
+from tools.framework import (
     ToolRegistry,
     delete_file,
     list_dir,
@@ -13,12 +14,12 @@ from frontal_lobe.tools.framework import (
     run_shell,
     write_file,
 )
-from frontal_lobe.tools.project_composer import (
+from tools.project_composer import (
     compose_main_module,
     compose_test_module,
     gather_knowledge,
 )
-from frontal_lobe.tools.project_creator import (
+from tools.project_creator import (
     MAX_PROJECT_SIZE_BYTES,
     _sanitize_name,
     archive_project,
@@ -31,7 +32,6 @@ from frontal_lobe.tools.project_creator import (
     read_project_notes,
     restore_project,
 )
-from temporal_lobe.concepts import ConceptNetwork
 
 # ─── File operation tools ────────────────────────────────────────────
 

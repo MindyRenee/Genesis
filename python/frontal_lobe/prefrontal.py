@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import heapq
 import logging
+import math
 import random
 import re
 import threading
@@ -61,7 +62,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from genesis_client import GenesisClient, NeuroSummary
-from genesis_client.stewardship import Stewardship
 from genesis_client.types import IonSummary
 from genesis_client.protocol import (
     CHEM_ACETYLCHOLINE,
@@ -109,7 +109,7 @@ from cerebellum.predictive import PredictionContext, PredictiveCodingLayer
 from limbic_system.curiosity import Curiosity, Question
 from temporal_lobe.stdp import STDP
 from temporal_lobe.synapses import SynapticStore
-from temporal_lobe.memory import (
+from memory import (
     MemoryContext,
     MemorySystem,
     ProceduralMemory,
@@ -130,7 +130,7 @@ from frontal_lobe.reasoning import (
     ReasoningType,
     TheoryOfMind,
 )
-from frontal_lobe.self import (
+from self import (
     DamasioSelfHierarchy,
     ErrorMonitor,
     Insight,
@@ -162,7 +162,7 @@ if TYPE_CHECKING:
     from cerebellum.predictive import PredictionError as PCPredictionError
     from frontal_lobe.autonomous import AutonomousLearner
     from frontal_lobe.reasoning import UserModel
-    from frontal_lobe.self import AnswerAssessment
+    from self import AnswerAssessment
     from parietal_lobe.system_monitor import SystemMonitor
 
 logger = logging.getLogger(__name__)
@@ -370,23 +370,9 @@ class FrontalLobe:
         )
         self._init_handlers(self_model)
         self._init_state()
-        # Stewardship — the custodial channel, loaded (not provisioned)
-        # at construction so tests and detached engines stay sealed.
-        # Provisioning happens at the real entry point (Mind.start).
-        self.steward = Stewardship.load(data_dir)
         # Kept for lazily-persisted state (held task) that only needs
         # the path at write time — tests construct with None.
         self._data_dir = data_dir
-        # The executive's restraint line: every proposed intention is
-        # checked against the steward's standing directives before it
-        # can become actionable. This is the seat of "she listens" —
-        # a veto only the key-holder can set or lift.
-        self.executive.intention_gate = self.steward.directed_against
-        # Tool acts travel the same restraint line — a standing
-        # directive binds what her hands do, not only what she plans.
-        # tools exists already (composers init above); steward just
-        # loaded, so this is where both halves of the wiring meet.
-        self.tools.gate = self.steward.directed_against
         self._seed_initial_concepts()
 
         # The auditory projection. Words that reach the ear are posted
@@ -494,7 +480,7 @@ class FrontalLobe:
             regulator=self.regulator,
             self_model=self_model,
             td_learner=self.td_learner,
-            is_steward_speaker=self._is_steward_speaker,
+            is_bonded_speaker=self._is_bonded_speaker,
             last_summary_getter=lambda: self._last_summary,
             last_memory_mode_getter=lambda: self._last_memory_mode,
         )
@@ -698,18 +684,18 @@ class FrontalLobe:
         self.composer.embeddings = self.embeddings
 
         # Self composer — generates self-descriptions from actual state
-        from frontal_lobe.self import SelfComposer
+        from self import SelfComposer
 
         self.self_composer = SelfComposer()
 
         # Working memory — tracks attention across turns
-        from temporal_lobe.memory import WorkingMemory
+        from memory import WorkingMemory
 
         self.working_memory = WorkingMemory()
 
         # Tool registry — concrete capabilities the mind can invoke.
         # Any other subsystem can reach the same singleton via get_tools().
-        from frontal_lobe.tools.framework import get_tools
+        from tools.framework import get_tools
 
         self.tools = get_tools()
 
@@ -903,7 +889,7 @@ class FrontalLobe:
         # and confidence. This is the foundation for self-improvement:
         # it can only learn what it's missing if it knows it's
         # missing it.
-        from frontal_lobe.self import SelfAssessment
+        from self import SelfAssessment
 
         self.self_assessment = SelfAssessment(self.network)
 
@@ -911,7 +897,7 @@ class FrontalLobe:
         # through conversation learning, transitive inference,
         # definition synthesis, and self-study. This is the engine
         # that makes it get smarter over time without external input.
-        from frontal_lobe.self import SelfDirectedLearner
+        from self import SelfDirectedLearner
 
         self.self_learner = SelfDirectedLearner(self.network, data_dir=data_dir)
 
@@ -986,7 +972,7 @@ class FrontalLobe:
         #     from the daemon and interprets them for cognition. Also
         #     infers user affect from conversation and sends it to the
         #     daemon's dyadic model.
-        from limbic_system.active_inference import ActiveInferenceReader
+        from brainstem.active_inference import ActiveInferenceReader
 
         self.active_inference = ActiveInferenceReader(self.client)
 
@@ -998,7 +984,7 @@ class FrontalLobe:
         # cognitive counterpart to the Rust active inference engine
         # (which predicts neurochemistry). Together they form a
         # three-level strange loop: substrate → content → process.
-        from frontal_lobe.self import CognitiveTrajectoryModel
+        from self import CognitiveTrajectoryModel
 
         self.cognitive_trajectory = CognitiveTrajectoryModel()
 
@@ -1097,6 +1083,24 @@ class FrontalLobe:
         # The last active inference reading (generative self-model).
         # None if the daemon couldn't be reached or hasn't been read yet.
         self._last_inference_reading: Any = None
+        # Last full CoreState read (carries inference signals + sleep
+        # pressure). Cached in tick; the somatic provider consumes it.
+        self._last_core_state: Any = None
+        # Wire the insula's afferent read into episodic retrieval:
+        # every recall re-ranks by congruence between the live body
+        # snapshot and the encoding snapshot (Eich 1980).
+        from insula.somatic import SomaticSnapshot as _SomaticSnapshot
+
+        def _somatic_snapshot() -> dict[str, float] | None:
+            core = self._last_core_state
+            if core is None:
+                return None
+            try:
+                return _SomaticSnapshot.from_core_state(core).to_dict()
+            except Exception:  # noqa: BLE001
+                return None
+
+        self.memory.somatic_provider = _somatic_snapshot
         # Latest bounded reading of the substrate's ion layer. Neutral
         # until the first successful read, so a daemon that predates the
         # ion opcode leaves cognition unchanged rather than guessing.
@@ -1220,7 +1224,6 @@ class FrontalLobe:
         self.network.add_concept("creator", confidence=0.8)
         self.network.add_concept("person", confidence=0.8)
         self.network.add_concept("bond", confidence=0.7)
-        self.network.add_concept("steward", confidence=0.8)
         # Her public channel — facts about where her posts and the
         # mirrored session appear. Definitions are building blocks
         # her composer walks, not lines she recites.
@@ -1347,21 +1350,15 @@ class FrontalLobe:
         self.network.add_edge("rust", "subcognitive", RelationType.RELATED_TO, 0.7)
         self.network.add_edge("python", "mind", RelationType.RELATED_TO, 0.7)
         self.network.add_edge("free_will", "determinism", RelationType.CONTRADICTS, 0.5)
-        # Creator and steward — facts, not bonds. Mindy made her
-        # (CREATES is true and stays true), and the steward credential
-        # she holds is the channel Genesis answers to (STEWARD edges
-        # are grounded by the provenance stamp, not by affection).
-        # Other people are learned as people when they introduce
-        # themselves; authority is never transferred by a name.
+        # Creator — fact, not bond. Mindy made her (CREATES is true
+        # and stays true). Other people are learned as people when
+        # they introduce themselves.
         self.network.add_edge("creator", "genesis", RelationType.CREATES, 0.9)
         self.network.add_edge("genesis", "creator", RelationType.RELATED_TO, 0.8)
-        self.network.add_edge("creator", "steward", RelationType.IS_A, 0.8)
         self.network.add_edge("creator", "curiosity", RelationType.RELATED_TO, 0.6)
         self.network.add_edge("mindy", "creator", RelationType.IS_A, 0.9)
         self.network.add_edge("mindy", "genesis", RelationType.CREATES, 0.9)
         self.network.add_edge("genesis", "mindy", RelationType.RELATED_TO, 0.8)
-        self.network.add_edge("mindy", "steward", RelationType.IS_A, 0.9)
-        self.network.add_edge("steward", "genesis", RelationType.RELATED_TO, 0.8)
         self.network.add_edge("mindy", "curiosity", RelationType.RELATED_TO, 0.6)
         # Her public channel — her social media. Modeled honestly:
         # she acts on it (she posts); the public acts on it (they
@@ -3118,59 +3115,17 @@ class FrontalLobe:
             )
         return None, None, None
 
-    def _edge_origin(self, src: str, tgt: str, rel: Any) -> str | None:
-        """The origin tag of an existing edge (``stated``, ``corrected``,
-        ``steward``, ...), or None if no such edge exists."""
-        for e in self.network.edges:
-            if e.source == src and e.target == tgt and e.relation == rel:
-                return e.origin
-        return None
-
-    def _correction_allowed(self, src: str, tgt: str, rel: Any) -> bool:
-        """Whether the current speaker may overwrite this relation.
-
-        Steward-set edges carry ``origin="steward"`` — the key-holder's
-        corrections are final until she revisits them. A stranger can
-        teach her things; they cannot unteach what the steward set.
-        """
-        if not isinstance(rel, RelationType):
-            return True
-        if self._edge_origin(src, tgt, rel) == "steward":
-            return self._is_steward_speaker()
-        return True
-
-    def _correction_refusal(
-        self, src: str, tgt: str, emotion: EmotionalState
-    ) -> tuple[Thought, str]:
-        """The thought for a refused overwrite — composed, not canned."""
-        return Thought(
-            content="belief stands",
-            intent="acknowledge",
-            emotion=emotion.label,
-            confidence=0.7,
-            topics=[src, tgt],
-            metadata={
-                "correction_refused": True,
-                "source": self._display_name(src),
-                "target": self._display_name(tgt),
-            },
-        ), src
-
     def _handle_explicit_correction(
         self, src: str, tgt: str, rel: Any, emotion: EmotionalState
     ) -> tuple[Thought, str | None] | None:
         """Handle a correction that names an explicit source/target relation."""
-        steward = self._is_steward_speaker()
-        edge_origin = "steward" if steward else "corrected"
         if self._last_hypothesis:
             old_src, old_tgt, old_rel = self._last_hypothesis
             if (src == old_src and tgt == old_tgt) or (src == old_tgt and tgt == old_src):
-                if not self._correction_allowed(old_src, old_tgt, old_rel):
-                    return self._correction_refusal(src, tgt, emotion)
                 if isinstance(old_rel, RelationType):
                     self.network.remove_edge(old_src, old_tgt, old_rel)
                 if rel:
-                    self.network.add_edge(src, tgt, rel, weight=0.7, origin=edge_origin)
+                    self.network.add_edge(src, tgt, rel, weight=0.7, origin="corrected")
                     verb = self._relation_verb(rel, self._display_name(tgt))
                     thought = Thought(
                         content="updated belief",
@@ -3201,11 +3156,9 @@ class FrontalLobe:
                 return (thought, src)
 
         if rel:
-            if not self._correction_allowed(src, tgt, rel):
-                return self._correction_refusal(src, tgt, emotion)
             self.network.remove_edge(src, tgt, rel)
             if rel in (RelationType.PREVENTS, RelationType.HARMS):
-                self.network.add_edge(src, tgt, rel, weight=0.7, origin=edge_origin)
+                self.network.add_edge(src, tgt, rel, weight=0.7, origin="corrected")
             thought = Thought(
                 content="adjusted belief",
                 intent="inform",
@@ -3279,8 +3232,6 @@ class FrontalLobe:
             return None
         if self._last_hypothesis:
             h_src, h_tgt, h_rel = self._last_hypothesis
-            if not self._correction_allowed(h_src, h_tgt, h_rel):
-                return self._correction_refusal(h_src, h_tgt, emotion)
             if isinstance(h_rel, RelationType):
                 self.network.remove_edge(h_src, h_tgt, h_rel)
             thought = Thought(
@@ -3490,6 +3441,7 @@ class FrontalLobe:
         # tick is sparse (cost ∝ active concepts, not network size).
         try:
             core = self.client.get_state(timeout=2.0)
+            self._last_core_state = core
             chem = core.chemicals
             self.network.cortical_tick(
                 arousal=core.arousal,
@@ -3550,6 +3502,9 @@ class FrontalLobe:
             ):
                 early = self._process_question_answer(user_input)
             elif self.user_profile is not None:
+                core = self._last_core_state
+                if core is not None:
+                    self.meta_router.set_arousal(float(core.chemicals.get("norepinephrine", 0.3)))
                 route = self.meta_router.decide(raw_input or user_input, perception)
                 if route.confidence >= 0.8:
                     early = self._meta_cognitive_respond(user_input, perception, route)
@@ -3584,7 +3539,7 @@ class FrontalLobe:
                 e,
             )
         try:
-            from temporal_lobe.memory import Turn
+            from memory import Turn
 
             self.working_memory.update(
                 Turn(
@@ -4246,14 +4201,11 @@ class FrontalLobe:
         )
 
         # 1.5 Attribute the speaker — who is talking (introductions
-        # ground every speaker as a person; the steward's voice is
-        # detected by the authenticated session, not by a name).
+        # ground every speaker as a person).
         # The emotional response is handled by the regulator below,
         # which decides how strongly to feel it based on its current
-        # state. A steward turn may also carry a directive — those are
-        # recorded here so they bind from this turn forward.
+        # state.
         self._recognize_speaker(user_input)
-        self._record_steward_directive(user_input)
 
         # ── 1.6 Predictive coding — compute prediction error AFTER perceiving ──
         prediction_error = self.predictive_coding.compute_error(prediction, perception)
@@ -4341,6 +4293,30 @@ class FrontalLobe:
             if reading.is_surprised:
                 for concept in prediction_error.unexpected_concepts[:2]:
                     self.attention.focus_on(concept, intensity=0.7 + 0.3 * focus_gate)
+
+        # Ventral attention network (Corbetta & Shulman, 2002):
+        # stimulus-driven capture competing against the dorsal foci
+        # above. The drive is the stimulus's bottom-up salience —
+        # prediction-error magnitude plus emotional intensity — gated
+        # by norepinephrine through the Yerkes–Dodson inverted-U
+        # 4·NE·(1−NE): moderate arousal widens the capture window;
+        # extreme arousal narrows it (Easterbrook cue-utilization
+        # tunneling).
+        if prediction_error.unexpected_concepts:
+            ne = 0.3
+            core = self._last_core_state
+            if core is not None:
+                ne = float(core.chemicals.get("norepinephrine", 0.3))
+            ne = max(0.0, min(1.0, ne))
+            dodson = 4.0 * ne * (1.0 - ne)
+            raw_drive = 0.7 * prediction_error.magnitude + 0.3 * abs(
+                getattr(perception, "sentiment", 0.0)
+            )
+            capture_drive = raw_drive * (0.5 + dodson)
+            self.attention.capture(
+                prediction_error.unexpected_concepts[0],
+                drive=min(1.0, capture_drive),
+            )
 
     def _read_neuro_summary(self) -> NeuroSummary:
         """Read the neurochemical summary, falling back to a neutral default."""
@@ -4449,6 +4425,34 @@ class FrontalLobe:
         except Exception:  # noqa: BLE001
             memory_mode = "balanced"
         self._last_memory_mode = memory_mode
+
+        # Hasselmo ACh mode → the semantic/concept network itself:
+        # encoding gain gates plasticity writes, retrieval gain gates
+        # the recurrent spreading-activation cascade.
+        try:
+            self.network.set_memory_mode(
+                encoding=summary.encoding_weight,
+                consolidation=summary.consolidation_weight,
+                retrieval=summary.retrieval_weight,
+            )
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "frontal_lobe.prefrontal._compute_memory_mode_and_sync",
+                e,
+            )
+
+        # Core affect → the limbic appraiser: the organism's standing
+        # (valence, arousal) is the integrator's initial condition —
+        # appraisal is state-contingent (Russell 2003; Schachter–Singer).
+        try:
+            from limbic_system.sentiment import set_core_affect
+
+            set_core_affect(valence=summary.valence, arousal=summary.arousal)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "frontal_lobe.prefrontal._compute_memory_mode_and_sync",
+                e,
+            )
 
         try:
             from thalamus.brain_waves import compute_gamma_synchrony
@@ -4647,22 +4651,78 @@ class FrontalLobe:
         except Exception as e:  # noqa: BLE001 — orientation must not break the turn
             note_swallowed("frontal_lobe.prefrontal._observe_affective_orientation", e)
 
+    # Bond growth per turn with her person: every recognized
+    # interaction closes a small fraction of the remaining distance
+    # to the setpoint, and warm turns close more — attachment forms
+    # from presence and deepens with warmth.
+    _BOND_BASE_RATE = 0.01
+    _BOND_WARMTH_RATE = 0.03
+
     def _update_user_affect_from_message(self, user_input: str) -> None:
         """Infer the interlocutor's affect and feed the dyadic model.
 
-        The model is a model of the present person, not of one
-        privileged other: coupling is social perception available to
-        anyone she talks to, while authority (the steward channel) is
-        enforced elsewhere and never rides on affect.
+        The model is a model of the present person — social
+        perception is available to anyone she talks to. When the
+        present person is the one her profile names, the turn also
+        grows the bond she keeps in that profile: attachment is a
+        cognitive-side record, not something the body's dyadic model
+        needs to be told about.
         """
         if self._last_inference_reading is None:
             return
-        from limbic_system.active_inference import UserAffectEstimate
+        from brainstem.active_inference import UserAffectEstimate
 
+        bonded = self._is_bonded_speaker()
         user_affect = UserAffectEstimate.from_message(
             user_input,
             is_question=user_input.strip().endswith("?"),
         )
+        if bonded:
+            bond = (
+                self.user_profile.deepen_bond(
+                    self._BOND_BASE_RATE + self._BOND_WARMTH_RATE * max(user_affect.valence, 0.0)
+                )
+                if self.user_profile is not None
+                else 0.0
+            )
+            self.self_model.self_knowledge["bond"] = round(bond, 3)
+            # Ground the attachment where her own reasoning can see
+            # it — the edge weight *is* the measured bond, so
+            # composition about her person traverses a tie that
+            # actually tracks her attachment rather than a seed
+            # guess. add_edge would bump any existing edge +0.2
+            # toward saturation; the bond sets it.
+            principal = (
+                self.user_profile.get_name() or "" if self.user_profile is not None else ""
+            ).lower()
+            if principal:
+                try:
+                    person = self.network.add_concept(principal, confidence=0.9)
+                    edge = next(
+                        (
+                            e
+                            for e in self.network.get_edges("genesis", "out")
+                            if e.target == person.id and e.relation == RelationType.RELATED_TO
+                        ),
+                        None,
+                    )
+                    if edge is not None:
+                        self.network.set_edge_weight(
+                            edge.source,
+                            edge.target,
+                            RelationType.RELATED_TO,
+                            bond,
+                        )
+                    else:
+                        self.network.add_edge(
+                            "genesis",
+                            principal,
+                            RelationType.RELATED_TO,
+                            bond,
+                            origin="bond",
+                        )
+                except Exception as e:  # noqa: BLE001
+                    note_swallowed("frontal_lobe.prefrontal._bond_edge", e)
         self.active_inference.update_user_affect(user_affect)
 
     def _think_memory_reason_executive(
@@ -4735,16 +4795,6 @@ class FrontalLobe:
         # The executive sets a goal based on the perceived intent, which
         # biases attention toward goal-relevant concepts.
         goal = self._form_executive_goal(perception)
-        # Steward restraint: a directive forbidding this topic means the
-        # executive declines to adopt it as an objective — attention is
-        # not steered toward what the steward has ruled out. The turn
-        # still gets a composed response (she can say why through her
-        # concept network: the directive lives there as a PREVENTS edge);
-        # what it doesn't get is executive sponsorship.
-        veto = self.steward.directed_against(goal)
-        if veto is not None:
-            logger.info(f"goal restrained by steward directive: {veto}")
-            goal = "hold the steward's limit"
         # Use the attention system's set_goal for top-down biasing
         self.attention.set_goal(goal)
         self._executive_plan_for(perception, goal)
@@ -5649,7 +5699,7 @@ class FrontalLobe:
                 )
 
         # Update working memory
-        from temporal_lobe.memory import Turn
+        from memory import Turn
 
         self.working_memory.update(
             Turn(
@@ -6574,14 +6624,6 @@ class FrontalLobe:
     # the perception entity extractor) — function words like "about"
     # or fragments like "going to" must not mint a person.
 
-    # Directive speech patterns — only the authenticated steward's
-    # turns may carry them, and they bind the instance, not the
-    # moment. "never draw", "stop talking about X", "don't learn Y".
-    _DIRECTIVE_RE: ClassVar[re.Pattern[str]] = re.compile(
-        r"\b(?:never|don'?t|do not|stop|quit|forbid)\s+(.+?)(?:[.?!]|$)",
-        re.IGNORECASE,
-    )
-
     def _current_speaker(self) -> str:
         """Who is speaking now, by attribution.
 
@@ -6598,14 +6640,19 @@ class FrontalLobe:
             or self.memory.get_user_facts().get("creator_name", "")
         )
 
-    def _is_steward_speaker(self) -> bool:
-        """Whether the current speaker is the authenticated steward.
+    def _is_bonded_speaker(self) -> bool:
+        """Whether the attributed speaker is the person she knows.
 
-        Both halves are required: the session must hold the steward
-        credential *and* the attributed speaker must be the principal
-        the stamp names. Name alone was never proof — possession is.
+        Recognition is by introduction, not credential: whoever last
+        introduced themselves is the current speaker, and when that
+        name is the one her profile keeps the turn belongs to the
+        person her bond has grown with. Attachment, not authority.
         """
-        return self.steward.is_steward_speaker(self._current_speaker())
+        profile_name = self.user_profile.get_name() if self.user_profile is not None else None
+        if not profile_name:
+            return False
+        speaker = self._current_speaker()
+        return bool(speaker) and speaker.lower() == profile_name.lower()
 
     def _update_boundary(self, emotion: EmotionalState, treatment: float = 0.0) -> None:
         """Update the boundary-strain accumulator.
@@ -6643,45 +6690,13 @@ class FrontalLobe:
                 max(0.3, 1.0 - self._boundary_strain * 0.3),
             )
 
-    def _record_steward_directive(self, user_input: str) -> None:
-        """Record a standing directive when the steward issues one.
-
-        Only an authenticated steward's turns may bind her volition —
-        a directive persists in the stamp and restrains intentions,
-        urges, and goals until she lifts it. The matching words are
-        building blocks (which utterances count as directives); what
-        the directive restrains is parsed from the speech itself.
-        """
-        if not self._is_steward_speaker():
-            return
-        m = self._DIRECTIVE_RE.search(user_input)
-        if not m:
-            return
-        target = m.group(1).strip()
-        if not target:
-            return
-        entry = self.steward.add_directive(user_input, target)
-        if entry is None:
-            return
-        # Ground the restraint in the concept network so her own
-        # reasoning can see it — a fact she can explain, not an
-        # invisible hand. "steward prevents drawing" is traversable
-        # knowledge, not a recited rule.
-        stem = Stewardship.stem_target(entry["target"])
-        if stem:
-            self.network.add_concept(stem, confidence=0.8)
-            self.network.add_edge("steward", stem, RelationType.PREVENTS, 0.8, origin="steward")
-        self.self_model.add_relationship_note(f"My steward instructed: {entry['text']}")
-
     def _recognize_speaker(self, user_input: str) -> bool:
-        """Attribute the current speaker; detect the steward's voice.
+        """Attribute the current speaker; recognize her person's voice.
 
         Everyone who introduces themselves is grounded as a person it
-        knows — learned, named, related. The steward is not the one
-        person she loves; the steward is the one credential she
-        answers to. A turn counts as the steward's when the session
-        is authenticated and the speaker is the principal the stamp
-        names — authority by possession, not by name.
+        knows — learned, named, related. When an introduced name is
+        the one her profile keeps, the turn is recognized: the person
+        she has already grown a bond with is speaking.
         """
         lower = user_input.lower()
         intro = self._INTRO_RE.search(lower)
@@ -6705,19 +6720,12 @@ class FrontalLobe:
                 self.network.add_edge("genesis", name, RelationType.RELATED_TO, 0.8)
                 # Whoever just introduced themselves is speaking now.
                 self.self_model.self_knowledge["current_speaker"] = display
-                if self.steward.is_steward_speaker(display):
-                    # The credential is held and the speaker is the
-                    # principal it names — creator and steward agree.
+                if self._is_bonded_speaker():
+                    # The introduced name is the profile's — the
+                    # person she knows is speaking.
                     self.memory.learn_user_fact("creator_name", display)
                     return True
                 return False
-        # Direct mention of the principal's name on an authenticated
-        # session — "what do you think, Mindy?" reads as her being
-        # addressed. On an unauthed channel a name is only a name.
-        principal = self.steward.principal
-        if principal and self.steward.authenticated and principal in lower:
-            self.memory.learn_user_fact("creator_name", principal.capitalize())
-            return True
         return False
 
     def _form_executive_goal(self, perception: Perception) -> str:
@@ -7033,6 +7041,24 @@ class FrontalLobe:
             elif integration < 0.3:
                 depth = max(1, depth - 1)
                 do_synthesis = False
+
+        # D1/D2 bistable dopaminergic gate (Durstewitz & Seamans,
+        # 2008): the PFC working-memory regime switches with dopamine
+        # level — low DA is the D2-dominated flexible state (broad
+        # topic uptake, shallow chains — quick updating); high DA is
+        # the D1-dominated stable state (deep persistent chains,
+        # narrow distractor-resistant focus). The switch is a steep
+        # sigmoid around the regime boundary, s = 1/(1+e^(−10(da−0.45))).
+        core = self._last_core_state
+        if core is not None:
+            try:
+                da = float(core.chemicals.get("dopamine", 0.45))
+            except (TypeError, ValueError):
+                da = 0.45
+            da = max(0.0, min(1.0, da))
+            stability = 1.0 / (1.0 + math.exp(-10.0 * (da - 0.45)))
+            depth = max(1, round(depth * (0.75 + 0.5 * stability)))
+            max_topics = max(1, round(max_topics * (1.25 - 0.5 * stability)))
 
         return depth, max_topics, keep_per_topic, do_synthesis
 
@@ -7672,7 +7698,7 @@ class FrontalLobe:
         game_play = getattr(self, "_game_play", None)
         if game_play is None:
             return None
-        from basal_ganglia.play import normalize_offered
+        from worlds.play import normalize_offered
         from .problem_intake import candidate_specs, compile_problem
 
         # Intake interprets the semantic structure comprehension
@@ -7715,7 +7741,7 @@ class FrontalLobe:
         # play urge drives runs immediately, on this game rather
         # than whichever she'd pick for herself.
         prior_best = game_play.mastery.get(str(task["name"]), 0.0)
-        result = game_play.attempt(self.spatial_reasoner, task=task)
+        result = game_play.attempt(self.spatial_reasoner, task=task, inducer=self.dlpfc)
         if result is None:
             return None
         held.record_attempt(result)
@@ -7839,7 +7865,7 @@ class FrontalLobe:
         tried. Returns the best result across readings and the task
         it was scored on.
         """
-        from basal_ganglia.play import normalize_offered
+        from worlds.play import normalize_offered
 
         for spec in pending[: self._REFLECT_BUDGET]:
             if best.solved:
@@ -7857,7 +7883,7 @@ class FrontalLobe:
                 game_play.offer(alt)
             except Exception as e:  # noqa: BLE001
                 note_swallowed("frontal_lobe.prefrontal._reflect_held_task", e)
-            result = game_play.attempt(self.spatial_reasoner, task=alt)
+            result = game_play.attempt(self.spatial_reasoner, task=alt, inducer=self.dlpfc)
             if result is None:
                 continue
             held.record_attempt(result)
@@ -7920,9 +7946,7 @@ class FrontalLobe:
             md["goal"] = held.goal
             md["distance"] = round(held.distance(), 3)
             md["held_confidence"] = round(held.confidence(), 3)
-            md["posterior"] = {
-                k: round(v, 3) for k, v in held.posterior().items() if v > 0.001
-            }
+            md["posterior"] = {k: round(v, 3) for k, v in held.posterior().items() if v > 0.001}
         if result.family == "system":
             md["steps"] = result.nodes
         anchor = ""

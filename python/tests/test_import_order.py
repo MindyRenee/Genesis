@@ -36,7 +36,7 @@ import subprocess
 import sys
 
 _ROOT = pathlib.Path(__file__).resolve().parents[1]
-SELF_INIT = _ROOT / "frontal_lobe" / "self" / "__init__.py"
+SELF_INIT = _ROOT / "self" / "__init__.py"
 
 
 def test_self_package_stays_lazy() -> None:

@@ -242,9 +242,7 @@ def recombining(worlds: Iterable[World], atoms: Iterable[str]) -> tuple[World, .
     basis = frozenset(atoms) | {a for w in ws for a in w}
     keys = sorted(basis)
     options = [tuple({w.get(k, False) for w in ws}) for k in keys]
-    return tuple(
-        dict(zip(keys, combo, strict=True)) for combo in itertools.product(*options)
-    )
+    return tuple(dict(zip(keys, combo, strict=True)) for combo in itertools.product(*options))
 
 
 def supervenes(

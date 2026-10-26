@@ -17,11 +17,11 @@ from __future__ import annotations
 import logging
 
 import pytest
-from frontal_lobe.inner_life import InnerLife
 from frontal_lobe.reasoning import Reasoner
-from frontal_lobe.self import Reflection
 from frontal_lobe.thoughts import SpontaneousThought
 from limbic_system.curiosity import Curiosity
+from self import Reflection
+from sleep.inner_life import InnerLife
 from temporal_lobe.concepts import ConceptNetwork, RelationType
 
 
@@ -98,7 +98,7 @@ def test_dream_derived_insight_reaches_the_dream_stream() -> None:
     run caught that. Asserting on the sender asserts the wrong side.
     """
     from frontal_lobe.conversation import stream_kind
-    from frontal_lobe.inner_life import _LiveEvent
+    from sleep.inner_life import _LiveEvent
 
     il = _inner_life()
     recorder = _Recorder()
@@ -122,7 +122,7 @@ def test_dream_derived_insight_reaches_the_dream_stream() -> None:
 def test_waking_derived_insight_stays_a_thought() -> None:
     """The other direction: waking insights must not be demoted."""
     from frontal_lobe.conversation import stream_kind
-    from frontal_lobe.inner_life import _LiveEvent
+    from sleep.inner_life import _LiveEvent
 
     il = _inner_life()
     recorder = _Recorder()
@@ -144,7 +144,7 @@ def test_live_event_carries_the_dream_flag() -> None:
     Its `__slots__` omitted `is_dream`, so every dream-derived event was
     indistinguishable from a waking one no matter what the sender said.
     """
-    from frontal_lobe.inner_life import _LiveEvent
+    from sleep.inner_life import _LiveEvent
 
     assert "is_dream" in _LiveEvent.__slots__, "the receiver reads is_dream off this object"
     assert _LiveEvent("x", "dream", True).is_dream is True
@@ -240,7 +240,7 @@ def test_chain_stops_when_sleep_onsets_mid_chain() -> None:
         lambda emotion, thought: 1.0
     )
 
-    import frontal_lobe.inner_life as il_mod
+    import sleep.inner_life as il_mod
 
     original_delay = il_mod.CHAIN_THOUGHT_DELAY
     il_mod.CHAIN_THOUGHT_DELAY = 0.0
@@ -322,7 +322,7 @@ def test_dream_generators_are_only_flagged_by_their_callers() -> None:
 def test_parasomnia_log_is_not_a_thought(caplog) -> None:
     """Parasomnia events are logged, never surfaced as thoughts."""
     il = _inner_life()
-    caplog.set_level(logging.WARNING, logger="frontal_lobe.inner_life")
+    caplog.set_level(logging.WARNING, logger="sleep.inner_life")
 
     recorder = _Recorder()
     il._emit = recorder  # type: ignore[method-assign,assignment]
@@ -516,7 +516,7 @@ def test_dream_chain_walks_past_its_anchor(monkeypatch) -> None:
     sport..." forever). The re-seed now drops the thought's anchor so
     the walk follows the association it just made.
     """
-    import frontal_lobe.inner_life as il_mod
+    import sleep.inner_life as il_mod
     from thalamus.brain_waves import SleepStage
 
     monkeypatch.setattr(il_mod, "CHAIN_THOUGHT_DELAY", 0.0)

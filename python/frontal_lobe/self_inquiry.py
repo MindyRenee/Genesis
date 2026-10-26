@@ -40,13 +40,13 @@ from genesis_client.swallow import note_swallowed
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from frontal_lobe.self import Reflection, SelfAssessment, SelfComposer, SelfModel
     from limbic_system.feeling_reporter import FeelingReporter
+    from self import Reflection, SelfAssessment, SelfComposer, SelfModel
     from self_learner import SelfDirectedLearner
     from temporal_lobe.concepts import ConceptNetwork, NetworkTopology
-    from temporal_lobe.memory import MemoryContext, MemorySystem
 
     from infrastructure.narrative import Narrator
+    from memory import MemoryContext, MemorySystem
 
     from .thought_composer import ThoughtComposer
 

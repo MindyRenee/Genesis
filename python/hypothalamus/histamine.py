@@ -163,6 +163,7 @@ Maximum impulse magnitude: 0.1
 
 Python modules that send histamine impulses:
     - emotional_regulator.py: wakefulness, drowsiness (negative)
+    - transduction.py: wave-driven release (beta band power)
 
 Python modules that read histamine:
     - emotion.py: maps to EmotionalState (arousal)
@@ -201,5 +202,6 @@ class Histamine:
     projections: tuple[str, ...] = ("throughout brain",)
     receptors: tuple[str, ...] = ("H1", "H2", "H3")
     brain_waves: tuple[str, ...] = ("beta",)
+    wave_sign: float = 1.0
     circadian_modifier: str = "1.0 + 0.20 * sin(2π * (phase - 0.25))"
     role: str = "wakefulness, arousal maintenance, narcolepsy modeling"

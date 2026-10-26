@@ -30,10 +30,10 @@ from brainstem.architecture import (
     SleepStage,
     SynapticDownscaler,
 )
-from frontal_lobe.inner_life import InnerLife
 from frontal_lobe.reasoning import Reasoner
-from frontal_lobe.self import Reflection, SelfModel
 from limbic_system.curiosity import Curiosity
+from self import Reflection, SelfModel
+from sleep.inner_life import InnerLife
 from temporal_lobe.concepts import ConceptNetwork, RelationType
 from thalamus.events import HypnagogicState, SleepInertia
 

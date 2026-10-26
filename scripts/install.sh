@@ -203,9 +203,8 @@ interactive session can't run at once; the CLI lock refuses the
 second.
 
 Optional — privileged body levers (CPU governor, RTC wake alarm):
-  sudo bash $REPO/scripts/install_sudoers.sh
-This installs root-owned helper copies under /usr/local/libexec/genesis
-plus a sudoers rule for them. Without it, sensing still works — only
-the actuation levers stay read-only.
+install a NOPASSWD sudo grant for this user (any sudoers.d drop-in;
+the levers invoke `sudo -n` directly). Without it, sensing still
+works — only the actuation levers stay read-only.
 EOF
 fi

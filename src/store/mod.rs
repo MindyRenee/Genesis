@@ -73,7 +73,8 @@ pub fn page_align_up(len: usize) -> usize {
 pub use ltm::{
     DEFAULT_INDEX_CAPACITY, DataHeader, EMOTIONAL_TAG_SIZE as LTM_EMOTIONAL_TAG_SIZE, Episode,
     INDEX_ENTRY_SIZE, IndexEntry, IndexHeader, LTM_DATA_MAGIC, LTM_META_MAGIC, LTM_SCHEMA_VERSION,
-    LtmError, LtmStore, MAX_PAYLOAD_SIZE, hamming_distance, simhash,
+    LtmError, LtmStore, MAX_PAYLOAD_SIZE, RECONSOLIDATION_SALIENCE_FLOOR, hamming_distance,
+    simhash,
 };
 pub use mmap_state::{MmapState, StateFileError};
 pub use ring_buffer::{

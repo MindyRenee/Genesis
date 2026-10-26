@@ -11,7 +11,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from frontal_lobe.self import Insight, PersonalityTraits, Reflection, SelfDirectedLearner, SelfModel
+from self import Insight, PersonalityTraits, Reflection, SelfDirectedLearner, SelfModel
 from temporal_lobe.concepts import ConceptNetwork, RelationType
 from temporal_lobe.synapses import SynapticStore
 
@@ -518,7 +518,7 @@ def test_semantic_memory_facts_survive_a_round_trip(tmp_path):
     edge log cannot hold these edges, so a fact learned from a
     conversation previously existed only in RAM.
     """
-    from temporal_lobe.memory.semantic import Fact, SemanticMemory
+    from memory.semantic import Fact, SemanticMemory
 
     network = ConceptNetwork()
     network.add_concept("dog", confidence=0.9)
@@ -561,7 +561,7 @@ def test_semantic_memory_facts_survive_a_round_trip(tmp_path):
 
 def test_semantic_memory_restore_tolerates_corrupt_payload():
     """A corrupt payload costs the facts, not the ability to start."""
-    from temporal_lobe.memory.semantic import SemanticMemory
+    from memory.semantic import SemanticMemory
 
     network = ConceptNetwork()
     sem = SemanticMemory(network=network)
@@ -587,7 +587,7 @@ def test_semantic_memory_does_not_restore_stale_priming():
     toward concepts that were salient then, which is not what semantic
     priming models.
     """
-    from temporal_lobe.memory.semantic import SemanticMemory
+    from memory.semantic import SemanticMemory
 
     network = ConceptNetwork()
     sem = SemanticMemory(network=network)

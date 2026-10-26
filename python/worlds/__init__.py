@@ -17,6 +17,9 @@ procedural learners that drive attempts.
   - ``windowed`` — installed desktop programs as environments:
     frames in through X11, keystrokes out through XTEST (a
     sensory-motor channel, not cognition).
+  - ``channel`` — her Discord page: a public place in the outer
+    world where she posts and, when an ear exists, hears (the
+    transports live in ``discord_feed``).
   - The family modules (``relations``, ``quantities``,
     ``assembly``, ``sequence``, ``sorter``, ``classification``)
     are the world halves of the built-in tasks — the rule-keepers

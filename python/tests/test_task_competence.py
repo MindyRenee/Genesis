@@ -6,7 +6,7 @@ from frontal_lobe.reasoning import (
     TaskCompetence,
     TaskContext,
 )
-from frontal_lobe.self import Reflection, SelfModel
+from self import Reflection, SelfModel
 from temporal_lobe.concepts import ConceptNetwork
 
 from infrastructure.narrative import Narrator

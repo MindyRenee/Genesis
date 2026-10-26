@@ -112,7 +112,7 @@ from _views import view_getattr
 _EXPORTS: dict[str, str] = {
     "SleepStage": "thalamus.brain_waves",
     "SleepCycleTracker": "brainstem.architecture",
-    "SleepMixin": "brainstem.sleep",
+    "SleepMixin": "sleep.sleep",
     # The orexin-stabilization lag — the hypothalamic peptide holds
     # the monoaminergic pole of the flip-flop, so the grogginess after
     # the wake flip decays on orexin's timescale (co-claimed with
@@ -139,6 +139,10 @@ _EXPORTS: dict[str, str] = {
     "Histamine": "hypothalamus.histamine",
     # SCN -> pineal circadian output
     "Melatonin": "hypothalamus.melatonin",
+    # The wave→chemical transducer — band powers drive the peptides
+    # that declared affinity for them (field → waves → chemicals)
+    "wave_impulses": "hypothalamus.transduction",
+    "transduce_waves": "hypothalamus.transduction",
 }
 
 __all__ = sorted(_EXPORTS)

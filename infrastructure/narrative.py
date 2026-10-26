@@ -34,8 +34,8 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 
-from frontal_lobe.self import PersonalityTraits, SelfModel
 from limbic_system.emotion import EmotionalState
+from self import PersonalityTraits, SelfModel
 from temporal_lobe.concepts import ConceptNetwork
 from thalamus.brain_waves import BrainWave, BrainWaveState
 

@@ -26,9 +26,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
+from occipital_lobe.color import cone_opponent
 
 if TYPE_CHECKING:
-    from .retina import Retina
+    from genesis_client.retina import Retina
 
 logger = logging.getLogger(__name__)
 
@@ -128,10 +129,14 @@ class LGNRelay:
         frame_f32 = frame.astype(np.float32) / 255.0
 
         # === Magnocellular pathway (M) ===
-        # Luminance only (grayscale)
-        luminance = (
-            0.299 * frame_f32[:, :, 0] + 0.587 * frame_f32[:, :, 1] + 0.114 * frame_f32[:, :, 2]
-        )
+        # Cone-space luminance L+M — the magnocellular input is the
+        # achromatic channel, so it comes from the opponent pipeline
+        # (sRGB→XYZ→LMS, von Kries at the D65 display white), not the
+        # Rec.601 luma that weighs encoded primaries.
+        luminance, rg, by = cone_opponent(frame_f32)
+        # Normalize to the [0,1] range the rest of this pathway
+        # expects: cL+cM reads 2.0 at the adapting white.
+        luminance = luminance / 2.0
 
         # Spatial downsampling (lower resolution, larger receptive fields)
         if self.m_downsample > 1:
@@ -161,15 +166,13 @@ class LGNRelay:
         self._m_prev_frame = m_raw.copy()
 
         # === Parvocellular pathway (P) ===
-        # Full RGB color with chromatic enhancement
+        # Full RGB color with chromatic enhancement.
+        # The opponent axes are the DKL cone-contrast channels computed
+        # above — L−M and S−(L+M) in von Kries-normalized cone space.
+        # Display-primary differences (R−G, B−(R+G)/2) only
+        # approximate these: pure blue is invisible in R−G but drives
+        # both L and M cones differently.
         p_color = frame_f32.copy()
-
-        # Enhance chromatic channels (red-green, blue-yellow opponency)
-        # This is a simplified opponent-color representation
-        # Red-green: R - G
-        rg = p_color[:, :, 0] - p_color[:, :, 1]
-        # Blue-yellow: B - (R + G) / 2
-        by = p_color[:, :, 2] - 0.5 * (p_color[:, :, 0] + p_color[:, :, 1])
 
         # Apply chromatic gain to color channels
         p_color[:, :, 0] += self.p_chromatic_gain * np.clip(rg, -0.5, 0.5)

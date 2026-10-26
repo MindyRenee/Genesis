@@ -373,6 +373,14 @@ class ConceptNetwork(
         # rank — the first entry is the most common sense.
         self._alias_map: dict[str, list[str]] = {}
         self._concept_ids_cache: list[str] | None = None
+        # Memory-mode gains — the body's ACh/DA/cortisol-derived
+        # encoding/consolidation/retrieval weights mapped to multipliers
+        # (Hasselmo: ACh sets the same circuitry to encode or retrieve;
+        # 1.0 = open). Driven by set_memory_mode, read by the write and
+        # spread paths.
+        self._encoding_gain = 1.0
+        self._consolidation_gain = 1.0
+        self._retrieval_gain = 1.0
         self._world_concept_ids_cache: list[str] | None = None
         self._quality_concept_ids_cache: list[str] | None = None
         # Column → set of concept IDs. Inverted index for fast column
@@ -420,6 +428,55 @@ class ConceptNetwork(
         # ``get_associations`` only — never on the hot paths
         # (spread_activation, has_neighbors).
         self._similarity_provider: Any = None
+
+    def set_memory_mode(
+        self,
+        encoding: float = 0.5,
+        consolidation: float = 0.5,
+        retrieval: float = 0.5,
+    ) -> None:
+        """Set the neuromodulatory mode of the whole network.
+
+        The body's memory weights are in [0,1] with 0.5 the neutral
+        drive (derived in Rust from dopamine + norepinephrine +
+        acetylcholine for encoding, ACh + serotonin − cortisol for
+        retrieval, cortisol + ACh for consolidation — Hasselmo's
+        ACh encode/retrieve switch is embedded in those drives). The
+        gate is the weight relative to baseline: g = w/0.5, so 0.5 →
+        1.0 (open), 1.0 → 2.0 (amplified), 0 → 0 (suppressed).
+
+        High encoding gain writes fast; high retrieval gain releases
+        the recurrent spread; suppression of either is interference
+        control, not malfunction.
+        """
+
+        def _gain(w: float) -> float:
+            try:
+                w = float(w)
+            except (TypeError, ValueError):
+                return 1.0
+            if not math.isfinite(w):
+                return 1.0
+            return max(0.0, min(2.0, w / 0.5))
+
+        self._encoding_gain = _gain(encoding)
+        self._consolidation_gain = _gain(consolidation)
+        self._retrieval_gain = _gain(retrieval)
+
+    @property
+    def encoding_gain(self) -> float:
+        """The encode-mode multiplier — afferent write drive."""
+        return self._encoding_gain
+
+    @property
+    def consolidation_gain(self) -> float:
+        """The consolidation-mode multiplier — STM→LTM promotion drive."""
+        return self._consolidation_gain
+
+    @property
+    def retrieval_gain(self) -> float:
+        """The retrieval-mode multiplier — recurrent-spread drive."""
+        return self._retrieval_gain
 
     @property
     def size(self) -> int:
@@ -1109,7 +1166,7 @@ class ConceptNetwork(
         Boosts activation, adds aliases, updates confidence and
         properties, and registers the new column.
         """
-        existing.activation = min(1.0, (existing.activation or 0.0) + 0.3)
+        existing.activation = min(1.0, (existing.activation or 0.0) + 0.3 * self._encoding_gain)
         self._mark_active(existing.id)
         if aliases:
             for a in aliases:
@@ -1213,7 +1270,12 @@ class ConceptNetwork(
         key = (src_id, tgt_id, relation)
         existing = self._edge_key_index.get(key)
         if existing is not None:
-            return self.set_edge_weight(src_id, tgt_id, relation, min(1.0, existing.weight + 0.2))
+            return self.set_edge_weight(
+                src_id,
+                tgt_id,
+                relation,
+                min(1.0, existing.weight + 0.2 * self._encoding_gain),
+            )
 
         # A live edge log never materializes derivable edges — they
         # are recomputed by the similarity provider at query time.
@@ -1222,12 +1284,13 @@ class ConceptNetwork(
         if self._edge_log is not None and is_derivable_edge(relation, origin):
             return None
 
-        # Create new edge
+        # Create new edge — the initial write is plasticity-gated:
+        # encoding gain scales the synaptic increment (ACh drive).
         edge = Edge(
             source=src_id,
             target=tgt_id,
             relation=relation,
-            weight=weight,
+            weight=min(1.0, weight * self._encoding_gain),
             origin=origin,
         )
         if self._edge_log is not None:

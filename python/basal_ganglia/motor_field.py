@@ -107,7 +107,10 @@ def compose_spatial_field(model: WorldModel, height: int, width: int) -> list[li
         # plan. Present-measured affordances still outweigh it.
         strength += _W_RECALL * model.recalled_valence_of(entity.color)
         if strength == 0.0 and not aff:
-            strength = _W_UNPROBED
+            trials = sum(
+                n for (_action, color), n in model.click_tries.items() if color == entity.color
+            )
+            strength = _W_UNPROBED / (1.0 + trials)
         for r, c in entity.cells:
             if 0 <= r < height and 0 <= c < width:
                 f[r][c] += strength

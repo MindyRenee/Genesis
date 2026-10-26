@@ -67,6 +67,11 @@ def test_save_is_atomic_no_temp_files_left():
         assert entries == ["a.npz"], entries
 
 
+# np.savez abandons its internal ZipFile when serialization fails
+# mid-write; its __del__ then raises against the already-closed temp
+# file. Harmless — the fd is closed and the tmp path unlinked — but
+# pytest reports the unraisable exception as a warning.
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 def test_failed_save_leaves_previous_file_intact(tmp_path):
     """A crash mid-write must not destroy the last good artifact.
 

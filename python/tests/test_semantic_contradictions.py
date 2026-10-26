@@ -1,4 +1,4 @@
-from temporal_lobe.memory.semantic import SemanticMemory
+from memory.semantic import SemanticMemory
 
 
 def test_explicit_contradiction_is_stored_as_semantic_fact() -> None:

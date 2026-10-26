@@ -189,6 +189,7 @@ Maximum impulse magnitude: 0.1
 
 Python modules that send orexin impulses:
     - emotional_regulator.py: drowsiness (negative), calming
+    - transduction.py: wave-driven release (beta band power)
 
 Python modules that read orexin:
     - emotion.py: maps to EmotionalState (arousal)
@@ -227,6 +228,7 @@ class Orexin:
     projections: tuple[str, ...] = ("locus coeruleus", "raphe", "TMN", "VTA", "throughout brain")
     receptors: tuple[str, ...] = ("OX1R", "OX2R")
     brain_waves: tuple[str, ...] = ("beta",)
+    wave_sign: float = 1.0
     circadian_modifier: str = "1.0 (no circadian modulation)"
     role: str = "wake stabilization, flip-flop stabilizer, narcolepsy modeling"
     narcolepsy_threshold: float = 0.10

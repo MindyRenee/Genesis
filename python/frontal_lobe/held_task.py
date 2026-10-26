@@ -338,12 +338,14 @@ class HeldTask:
         r = 1.0 if entry["solved"] else float(entry["score"])
         self.last_delta = r - self.expected_value
         self.expected_value += _VALUE_LR * self.last_delta
-        entry.update({
-            "rule": str(getattr(attempt, "rule", "") or ""),
-            "failure": str(getattr(attempt, "failure", "") or ""),
-            "total_attempts": int(getattr(attempt, "total_attempts", 0) or 0),
-            "name": str(getattr(attempt, "task", "") or self.spec.get("name", "")),
-        })
+        entry.update(
+            {
+                "rule": str(getattr(attempt, "rule", "") or ""),
+                "failure": str(getattr(attempt, "failure", "") or ""),
+                "total_attempts": int(getattr(attempt, "total_attempts", 0) or 0),
+                "name": str(getattr(attempt, "task", "") or self.spec.get("name", "")),
+            }
+        )
         self.attempts.append(entry)
         self.attempts = self.attempts[-_MAX_LEDGER:]
         name: str = entry["name"] or str(self.spec.get("name", ""))

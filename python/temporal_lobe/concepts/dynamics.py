@@ -216,6 +216,10 @@ class DynamicsMixin:
         # share proportional to the edge weight. This is the standard
         # spreading activation model (Anderson & Pirolli, 1984).
         decay = 0.5  # per-depth attenuation
+        # Hasselmo ACh gate: the recurrent cascade is suppressed while
+        # the body is in encode mode and released in retrieve mode —
+        # retrieval_gain carries the body's ACh-derived weight.
+        retrieval_gain = getattr(self, "_retrieval_gain", 1.0)
         while frontier:
             current, d = frontier.popleft()
             if d >= depth:
@@ -256,6 +260,7 @@ class DynamicsMixin:
                     category_mult,
                     hub_mult,
                     modality_mult,
+                    retrieval_gain,
                 )
 
             # NOTE: Holographic associations are NOT queried during
@@ -393,6 +398,7 @@ class DynamicsMixin:
         category_mult: float,
         hub_mult: float,
         modality_mult: float,
+        retrieval_gain: float,
     ) -> None:
         """Compute spread for one edge and update activation/frontier."""
         share = edge.weight / total_weight
@@ -406,6 +412,7 @@ class DynamicsMixin:
             * category_mult
             * hub_mult
             * modality_mult
+            * retrieval_gain
         )
 
         # Column-aware attenuation: if this edge crosses columns

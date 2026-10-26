@@ -61,6 +61,33 @@ def connected_sensors(monkeypatch):
     monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "none")
 
 
+@pytest.fixture(autouse=True)
+def reset_core_affect():
+    """Run every test with the organism's standing affect at rest.
+
+    ``sentiment._CORE_AFFECT`` is module-global body state: the
+    prefrontal turn driver writes it from the body's neurochemical
+    summary each turn, and it is the appraisal fold's initial
+    condition. A test that exercises that path leaves the residue in
+    the module global, so a later neutral probe ("the table is
+    brown") appraises the *previous* test's body instead of a resting
+    one — order-dependent sentiment reads.
+
+    The learned lexicon gets the same treatment in
+    ``learned_sentiment``; the standing state needs it autouse
+    because the tests that pollute it never touch that fixture.
+    Resetting on both sides keeps a test's own baseline honest and
+    stops the leak propagating.
+    """
+    from limbic_system.sentiment import set_core_affect
+
+    set_core_affect(0.0, 0.0)
+    try:
+        yield
+    finally:
+        set_core_affect(0.0, 0.0)
+
+
 # Genesis has no seed sentiment lexicon: sentiment is learned through
 # interaction (``sentiment.learn_sentiment``), not shipped as a table.
 # Tests of the sentiment *logic* — negation, intensifiers, dimishers,

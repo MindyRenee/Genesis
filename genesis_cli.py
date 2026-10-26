@@ -32,10 +32,10 @@ Commands (typed during conversation):
     /note-project <name> <note> — leave mentor feedback on a project
     /review-notes [name] — have it read and absorb project notes
     /read-notes <name> — show notes on a project without absorbing
-    /proposals   — see its code improvement proposals
+    /proposals   — see its code improvement proposals (they self-verify and apply)
     /clear-proposals — remove all pending proposals
     /proposal N  — see details of proposal N
-    /accept N [reason] — approve a proposal (runs verification, applies if it passes)
+    /accept N [reason] — run a proposal's verification now (pending ones self-run anyway)
     /reject N [reason] — reject a proposal with notes teaching the correct way
     /experiments — see its verified self-improvement experiments
     /growth      — see its growth narrative
@@ -99,8 +99,8 @@ from types import FrameType
 from typing import TYPE_CHECKING
 
 from brainstem.heartbeat import _AdaptiveInterval
-from brainstem.sleep import WakeOutcome
 from occipital_lobe.perception.ambient import AmbientListener, contains_wake_word, strip_wake_word
+from sleep.sleep import WakeOutcome
 from temporal_lobe import AuditoryCortex, SoundEvent
 from temporal_lobe.concepts import RelationType
 from temporal_lobe.speech import Voice, VoiceInput
@@ -115,6 +115,8 @@ from infrastructure.config import default_data_dir
 from mind import Mind
 
 if TYPE_CHECKING:
+    from worlds.channel import Channel
+
     from genesis_client import GenesisClient
 
 # Provenance marker — one letter of the creator lattice (see
@@ -1642,70 +1644,6 @@ def _cmd_growth(mind: Mind, rest: str) -> str:
     return f"\n  genesis> {mind.growth_narrative()}\n"
 
 
-def _cmd_steward(mind: Mind, rest: str) -> str:
-    """Inspect or act on the steward channel — the custodial authority.
-
-    This is operator tooling, not conversation: it reports the
-    channel's state and lifts directives, and its output is CLI text,
-    never Genesis's voice.
-
-      /steward              — status: stamped, authenticated, principal,
-                              key fingerprint, standing directives
-      /steward release N    — lift directive N (authenticated only)
-      /steward unbind       — seal this session's authority until a
-                              fresh claim or restart re-opens it
-    """
-    steward = getattr(mind.brain.frontal, "steward", None)
-    if steward is None:
-        return "\n  No steward channel on this mind.\n"
-
-    parts = rest.split(None, 1)
-    sub = parts[0].lower() if parts and parts[0] else ""
-    arg = parts[1].strip() if len(parts) > 1 else ""
-
-    if sub == "release":
-        try:
-            index = int(arg)
-        except ValueError:
-            return "\n  usage: /steward release <index>\n"
-        entry = steward.release_directive(index)
-        if entry is None:
-            return (
-                "\n  Not released — the channel is sealed "
-                "(authentication required), or no directive has that "
-                "index.\n"
-            )
-        return f"\n  Released: {entry.get('text', entry.get('target'))}\n"
-
-    if sub == "unbind":
-        steward.unbind()
-        return "\n  Steward session sealed. The stamp and directives stand.\n"
-
-    if sub:
-        return "\n  usage: /steward [release <index> | unbind]\n"
-
-    s = steward.status()
-    lines = ["", "  steward channel — custodial authority"]
-    if not s["stamped"]:
-        lines.append("    stamped:       no — unprovisioned instance")
-        lines.append("    (provisioned on first boot of the real entry point)")
-        return "\n".join(lines) + "\n"
-    lines.append("    stamped:       yes")
-    lines.append(f"    principal:     {s['principal']}")
-    lines.append(f"    key held:      {'yes' if s['key_held'] else 'no'}")
-    lines.append(f"    authenticated: {'yes' if s['authenticated'] else 'no — sealed'}")
-    fp = s["key_fingerprint"]
-    if fp:
-        lines.append(f"    fingerprint:   {fp}…")
-    if s["directives"]:
-        lines.append("    directives:")
-        for i, d in enumerate(s["directives"]):
-            lines.append(f"      [{i}] {d.get('text')}  (→ {d.get('target')})")
-    else:
-        lines.append("    directives:    none")
-    return "\n".join(lines) + "\n"
-
-
 def _cmd_growth_report(mind: Mind, rest: str) -> str:
     """Show a structured growth report across knowledge, dreams, and emotion."""
     return f"\n{mind.growth_report()}\n"
@@ -1788,7 +1726,7 @@ def _cmd_register_face(mind: Mind, rest: str) -> str:
         return f"\n  genesis> {result}\n"
 
     # Capture a frame and register
-    from occipital_lobe.perception.retina import latest_frame
+    from genesis_client.retina import latest_frame
 
     frame = latest_frame(copy=True)
     if frame is None:
@@ -2258,6 +2196,8 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
       (the official card is hers alone — she takes up the challenge
        from her own shelf when she feels ready; there is no forced run)
       /arc ls20-9607627b --fresh         — cold start: prior learning neither read nor written
+      /arc ls20-9607627b --web           — the public task page in her
+        Chrome (headless); --web --watch shows it on her own screen
       /arc --all --delay 0.5 --recover 180 — pace steps; wait up to 180s for
         her to settle at a wellness gate instead of abandoning the suite
 
@@ -2295,9 +2235,17 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
         del parts[i : i + 2]
     fresh = "--fresh" in parts
     parts = [p for p in parts if p != "--fresh"]
+    web = "--web" in parts
+    parts = [p for p in parts if p != "--web"]
+    watch = "--watch" in parts
+    parts = [p for p in parts if p != "--watch"]
+    if watch and not web:
+        return "  --watch only applies with --web (the browser goes to her screen).\n" + usage
     if not parts or steps <= 0:
         return usage
     whole_suite = "--all" in parts
+    if whole_suite and web:
+        return "  --all runs on the SDK scorecard; pick a game for --web.\n" + usage
     if any(p.startswith("--") for p in parts) and not (len(parts) == 1 and whole_suite):
         return usage
     lines = []
@@ -2315,6 +2263,8 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
         results = mind.play_arc(
             parts,
             max_steps=steps,
+            web=web,
+            watch=watch,
             fresh=fresh,
             step_delay_s=delay,
             recovery_wait_s=recover,
@@ -2444,7 +2394,7 @@ def _cmd_play(mind: Mind, rest: str) -> str:
     {"family": "quantities", "generate"/"target"+"groups"},
     {"family": "classification", "items"+"predicate"/"examples"}.
     """
-    from basal_ganglia.play import COLLECTION, normalize_offered
+    from worlds.play import COLLECTION, normalize_offered
 
     play = mind.game_play
     rest = rest.strip()
@@ -2571,7 +2521,6 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/arc": _cmd_arc,
     "/teach-questions": _cmd_teach_questions,
     "/sleep-aid": _cmd_sleep_aid,
-    "/steward": _cmd_steward,
 }
 
 
@@ -2757,10 +2706,6 @@ def _print_help() -> None:
     logger.info("    /arc <ids|--all> [--steps N] [--fresh]")
     logger.info("    /teach-questions — answer its queued questions one at a time")
     logger.info("    /sleep-aid    — emergency sleep aid for stress-induced insomnia")
-    logger.info(
-        "    /steward [release N|unbind] — custodial authority: "
-        "status, lift a directive, seal the session"
-    )
     logger.info("    /quit         — exit")
     logger.info("")
     logger.info("  When you're idle, its thoughts appear live as genesis~ lines.")
@@ -3025,9 +2970,7 @@ def _resolved_data_dir_of(pid: int) -> str | None:
     (it is not ours to claim)."""
     try:
         with open(f"/proc/{pid}/environ", "rb") as f:
-            env = dict(
-                kv.split(b"=", 1) for kv in f.read().split(b"\0") if b"=" in kv
-            )
+            env = dict(kv.split(b"=", 1) for kv in f.read().split(b"\0") if b"=" in kv)
     except OSError:
         return None
     explicit = env.get(b"GENESIS_DATA_DIR", b"").decode("utf-8", "replace").strip()
@@ -3228,7 +3171,12 @@ _SPORE_SKIP_NAMES = frozenset(
         "mind.suppress",
         # Regenerable build cache for workspace-crate verification —
         # gigabytes of compiled artifacts, never part of the self.
+        # (Retired — experiments verify on the live tree now; the name
+        # stays so a stale cache still can't travel.)
         "workspace-target",
+        # The retired workspace nest — a stale source mirror is host
+        # bulk, not self. Her source tree IS her workspace now.
+        "workspace",
     }
 )
 _SPORE_SKIP_SUFFIXES = (
@@ -4349,7 +4297,7 @@ def _run_interactive_loop(
 
             # Typed input never reaches the log — echo it to her
             # channel so the mirrored session shows both sides.
-            feed = getattr(mind, "_public_feed", None)
+            feed = mind.public_feed
             if feed is not None:
                 feed.post_user(user_input)
 
@@ -4855,12 +4803,17 @@ def main() -> int:
     shutting_down = threading.Event()
     _setup_signal_handlers(shutting_down)
 
-    # Her public channel — opened before the daemon starts so the
-    # whole session, startup notices included, reaches the mirror.
-    # Mind adopts this same feed for her broadcast posts, so mirrored
-    # lines and her posts share one paced queue.
-    feed = DiscordFeed.from_env()
-    feed_handler, real_stderr = _attach_session_mirror(feed)
+    # Her page — the public channel in her outer world — opened
+    # before the daemon starts so the whole session, startup notices
+    # included, reaches the mirror. The mind adopts this same channel
+    # for her broadcast posts, so mirrored lines and her posts share
+    # one paced queue.
+    from worlds.channel import Channel
+
+    channel = Channel.from_env()
+    feed_handler, real_stderr = _attach_session_mirror(
+        channel.feed if channel is not None else None
+    )
 
     daemon_proc: subprocess.Popen | _AdoptedDaemon | None = None
     retina_proc: subprocess.Popen | None = None
@@ -4890,7 +4843,7 @@ def main() -> int:
                     "[genesis] Offline mode — learning paused, conversation and art active.",
                     file=sys.stderr,
                 )
-            mind = Mind(daemon_socket, offline=args.offline, public_feed=feed)
+            mind = Mind(daemon_socket, offline=args.offline, channel=channel)
             try:
                 mind.start()
             except (OSError, ConnectionError) as e:
@@ -4932,7 +4885,7 @@ def main() -> int:
             dedup_voice or voice,
             feed_handler,
             real_stderr,
-            feed,
+            channel,
             exit_code,
         )
     return exit_code
@@ -4950,7 +4903,7 @@ def _teardown_session(
     voice: Voice | None,
     feed_handler: logging.Handler | None,
     real_stderr,
-    feed: DiscordFeed | None,
+    channel: Channel | None,
     exit_code: int,
 ) -> int:
     """Shut the whole organism down and return the final exit code."""
@@ -5000,15 +4953,15 @@ def _teardown_session(
         # Restart=on-failure resurrects the whole, never one half.
         exit_code = 1
     # Detach the mirror after _shutdown so teardown notices still
-    # reach the feed's drain window; a feed the mind adopted is
+    # reach the feed's drain window; a channel the mind adopted is
     # already closed by its lifecycle stop — this close covers the
     # case where the mind was never constructed.
     if feed_handler is not None:
         logging.getLogger().removeHandler(feed_handler)
     if real_stderr is not None:
         sys.stderr = real_stderr
-    if feed is not None:
-        feed.close()
+    if channel is not None:
+        channel.close()
     # From here on, every remaining step is best-effort tail work
     # plus interpreter finalization — none of which may hold the
     # process past _EXIT_WATCHDOG_S.

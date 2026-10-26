@@ -43,9 +43,13 @@ from cerebellum.cerebellum import Cerebellum
 from frontal_lobe import FrontalLobe
 from frontal_lobe.autonomous import AutonomousLearner
 from frontal_lobe.canvas import Canvas
-from frontal_lobe.inner_life import InnerLife
 from frontal_lobe.painting import Painter
-from frontal_lobe.self import (
+from limbic_system.limbic import LimbicSystem
+from occipital_lobe.occipital import OccipitalLobe
+from occipital_lobe.perception import FaceRecognizer
+from parietal_lobe.parietal import ParietalLobe
+from parietal_lobe.system_monitor import SystemMonitor
+from self import (
     DevelopmentalTracker,
     EmergentIdentity,
     EmergentIdentitySource,
@@ -53,21 +57,16 @@ from frontal_lobe.self import (
     SelfImprovement,
     SelfModel,
 )
-from frontal_lobe.tools.code_learner import CodeLearner
-from frontal_lobe.tools.explorer import Explorer, default_allowed_roots
-from limbic_system.limbic import LimbicSystem
-from occipital_lobe.occipital import OccipitalLobe
-from occipital_lobe.perception import FaceRecognizer
-from parietal_lobe.parietal import ParietalLobe
-from parietal_lobe.system_monitor import SystemMonitor
+from sleep.inner_life import InnerLife
 from temporal_lobe.base import Language
-from temporal_lobe.memory import MemorySystem
 from temporal_lobe.temporal import TemporalLobe
 from temporal_lobe.world import OuterWorld
 from thalamus.brain_waves import BrainWave, add_brain_wave_drive, add_stimulus
 from thalamus.relay import Thalamus
+from tools.code_learner import CodeLearner
+from tools.explorer import Explorer, default_allowed_roots
 
-from discord_feed import DiscordFeed, DiscordListener
+from discord_feed import DiscordFeed
 from genesis_client import GenesisClient
 from genesis_client.protocol import CHEM_ACETYLCHOLINE
 from genesis_client.swallow import note_swallowed, set_swallow_sink
@@ -77,21 +76,23 @@ from infrastructure.growth_ledger import GrowthLedger
 from infrastructure.journal import CognitiveJournal, set_active
 from infrastructure.paths import code_root
 from infrastructure.user_profile import UserProfile
+from memory import MemorySystem
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from parietal_lobe.arc import ArcEvaluation, ArcResult
+    from worlds.arc import ArcEvaluation, ArcResult
+    from worlds.channel import Channel
 from basal_ganglia.volition import VolitionMixin
 from brainstem.heartbeat import HeartbeatMixin
 from brainstem.lifecycle import LifecycleMixin
-from brainstem.sleep import SleepMixin
 from frontal_lobe.conversation import ConversationMixin
 from frontal_lobe.projects import ProjectsMixin
-from frontal_lobe.self.man_review import ManReviewMixin
-from frontal_lobe.self.proposals import ProposalsMixin
 from frontal_lobe.status import StatusMixin
 from parietal_lobe.embodiment import EmbodimentMixin
+from self.man_review import ManReviewMixin
+from self.proposals import ProposalsMixin
+from sleep.sleep import SleepMixin
 
 # Provenance marker — one letter of the creator lattice (see
 # PROVENANCE.md).
@@ -173,7 +174,7 @@ class Mind(
         seed: int | None = None,
         config: MindConfig | None = None,
         offline: bool = False,
-        public_feed: DiscordFeed | None = None,
+        channel: Channel | None = None,
     ) -> None:
         """Initialize the cognitive mind and wire all subsystems together."""
         self.socket_path = socket_path
@@ -182,11 +183,14 @@ class Mind(
         self.config = config if config is not None else MindConfig()
         self._offline = offline
         self.client = GenesisClient(socket_path)
-        # Her public channel — adopt the session feed the caller (the
-        # CLI) already opened for mirroring, or open our own. One feed
-        # per session: mirrored lines and her broadcasts share the
-        # same paced queue.
-        self._public_feed = public_feed if public_feed is not None else DiscordFeed.from_env()
+        # Her page — the public channel that lives in her outer world.
+        # Adopt the channel the caller (the CLI) already opened for
+        # mirroring, or open our own: one page per session, so
+        # mirrored lines and her broadcasts share the same paced
+        # queue. The channel itself is held by OuterWorld below.
+        from worlds.channel import Channel
+
+        channel = channel if channel is not None else Channel.from_env()
 
         # Self-model — who Genesis is
         self.self_model = SelfModel(born_at=int(time.time() * 1000))
@@ -213,7 +217,7 @@ class Mind(
         self._live_thought_listeners: list = []
 
         self._init_brain(language, seed)
-        self._init_learner_and_inner_life()
+        self._init_learner_and_inner_life(channel)
         self._init_identity()
         self._init_self_awareness_modules()
         self._init_sleep_compression()
@@ -244,6 +248,15 @@ class Mind(
         thoughts, status reports, conversational fallbacks); it does
         not own or fabricate the machinery."""
         return self.brain.frontal.language
+
+    @property
+    def public_feed(self) -> DiscordFeed | None:
+        """The posting surface of her page — owned by the outer world
+        (``self.world.channel``); exposed for the session mirror and
+        other host code that rides the same transport. None when no
+        channel is configured."""
+        channel = getattr(self.world, "channel", None)
+        return channel.feed if channel is not None else None
 
     @property
     def network(self):
@@ -367,7 +380,7 @@ class Mind(
             self.brain.frontal.self_composer, self.brain.frontal.reflection
         )
 
-    def _init_learner_and_inner_life(self) -> None:
+    def _init_learner_and_inner_life(self, channel: Channel | None) -> None:
         """Create the autonomous learner, inner life, and emotional regulator."""
         # Autonomous learner — learns from ..edu sites when idle.
         # The agency callback connects it to its train of thought:
@@ -481,17 +494,17 @@ class Mind(
             neuro_impulse=self._learner_neuro_impulse,
             is_sleeping=lambda: self._is_sleeping,
             get_user_name=self.user_profile.get_name,
+            channel=channel,
+            on_channel_speech=self._hear_channel,
         )
 
-        # The public channel's own state — the feed itself is created
-        # in __init__ (see above). None when the webhook is unset —
-        # no channel, no mirror then.
+        # The public channel's own state — the page itself lives in
+        # the outer world (``self.world.channel``); None when the
+        # webhook is unset — no channel, no mirror then. What the
+        # public says there reaches cognition through
+        # ``world._channel_heard`` → ``self._hear_channel``.
         self._last_broadcast_seed: str | None = None
         self._last_channel_reply = 0.0
-        # Her ear on the channel — exists only when a bot token is
-        # configured; the webhook alone is write-only. Started with
-        # the background threads, stopped ahead of the feed drain.
-        self._discord_listener = DiscordListener.from_feed(self._public_feed, self._hear_channel)
 
     def _init_identity(self) -> None:
         """Create emergent identity and developmental tracker."""
@@ -517,7 +530,7 @@ class Mind(
         # Game play — her game collection and play record. Like the
         # canvas, this is an ability she owns: nobody drives her
         # through it; the play urge lets her choose to play.
-        from basal_ganglia.play import GamePlay
+        from worlds.play import GamePlay
 
         self.game_play = GamePlay(self.data_dir)
         # Her body is where world games live: official-card attempts
@@ -676,7 +689,7 @@ class Mind(
         # applies, or vetoes. Drift between the versioned sources in
         # docs/man/ and the installed pages is queued now so she sees
         # it — nothing edits her manual silently.
-        from frontal_lobe.self.man_review import ManPageReview
+        from self.man_review import ManPageReview
 
         self.man_review = ManPageReview(
             data_dir=self.data_dir,
@@ -734,14 +747,12 @@ class Mind(
         self.volition = self._init_volition()
 
         # Verified self-improvement loop (workstream D) — Genesis can
-        # safely tweak its own learning heuristics. The candidate edit
-        # lands in a persistent workspace copy of the source tree
-        # (infrastructure/workspace.py), verification runs against that
-        # copy, and only a passing gate promotes it into the live tree.
+        # safely tweak its own learning heuristics. The edit lands on
+        # the live tree — her source is her workspace — verified in
+        # place and reverted on failure.
         self.heuristic_experiment = HeuristicExperiment(
             engine=self.self_improvement,
             project_root=str(self.code_learner.project_root),
-            data_dir=self.data_dir,
         )
 
         # Growth ledger (workstream E) — legible tracking of Genesis's
@@ -852,15 +863,17 @@ class Mind(
         max_steps: int = 200,
         instructions: str = "this is a video game",
         web: bool = False,
+        watch: bool = False,
         fresh: bool = False,
         step_delay_s: float = 0.0,
         recovery_wait_s: float = 120.0,
     ) -> list[ArcResult]:
         """Play ARC-AGI-3 games as herself, in game mode.
 
-        The environment is ``parietal_lobe.arc`` — or, with ``web=True``, the
-        public human task page through ``parietal_lobe.arc_web`` (real key and
-        mouse events on the live site). Either way this is the entity
+        The environment is ``worlds.arc`` — or, with ``web=True``, the
+        public human task page through ``worlds.arc_web`` (real key and
+        mouse events on the live site — ``watch=True`` shows it on
+        her own screen instead of headless). Either way this is the entity
         side of the run. Game mode wraps every game, and her readiness
         gate refuses or stops play, not the caller. Game mode is
         restored to whatever it was before the call.
@@ -870,7 +883,7 @@ class Mind(
         the result carries only what she brought as priors — and her
         banked experience is left exactly as it was.
         """
-        from parietal_lobe.arc import ArcPractice
+        from worlds.arc import ArcPractice
 
         was_gaming = self.is_gaming
         prev_fresh = getattr(self, "_fresh_world_run", False)
@@ -878,9 +891,9 @@ class Mind(
         self.enter_game_mode()
         try:
             if web:
-                from parietal_lobe.arc_web import ArcWebPractice
+                from worlds.arc_web import ArcWebPractice
 
-                web_practice = ArcWebPractice(self, instructions=instructions)
+                web_practice = ArcWebPractice(self, instructions=instructions, headless=not watch)
                 try:
                     return [web_practice.play(game, max_steps=max_steps) for game in games]
                 finally:
@@ -909,7 +922,7 @@ class Mind(
         one SDK scorecard. Diagnostics, not the official card: the
         official venue is hers to take up through play, never driven
         from here (``ArcOfficial`` refuses a forced run)."""
-        from parietal_lobe.arc import ArcPractice
+        from worlds.arc import ArcPractice
 
         was_gaming = self.is_gaming
         prev_fresh = getattr(self, "_fresh_world_run", False)

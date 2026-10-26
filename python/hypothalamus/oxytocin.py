@@ -139,6 +139,7 @@ slow clearance)
 Python modules that send oxytocin impulses:
     - emotional_regulator.py: social warmth, social bonding, comfort,
       engagement
+    - transduction.py: wave-driven release (alpha band power)
     - dyadic_model (Rust): oxytocin-mediated attunement
 
 Python modules that read oxytocin:
@@ -180,5 +181,6 @@ class Oxytocin:
     projections: tuple[str, ...] = ("posterior pituitary", "amygdala", "nucleus accumbens", "PFC")
     receptors: tuple[str, ...] = ("OXTR",)
     brain_waves: tuple[str, ...] = ("alpha",)
+    wave_sign: float = 1.0
     circadian_modifier: str = "1.0 (no circadian modulation)"
     role: str = "social bonding, trust, dyadic attunement, stress buffering"

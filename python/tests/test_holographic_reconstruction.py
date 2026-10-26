@@ -69,14 +69,8 @@ def test_rebuild_from_journal_restores_fidelity() -> None:
     # same edge volume barely saturates, which is the point of 64.
     graph = HolographicGraph(n_buckets=4, journal_cap=2000)
     concepts = [f"c{i}" for i in range(400)]
-    strong = [
-        (rng.choice(concepts), "related_to", rng.choice(concepts), 0.9)
-        for _ in range(150)
-    ]
-    weak = [
-        (rng.choice(concepts), "related_to", rng.choice(concepts), 0.3)
-        for _ in range(8000)
-    ]
+    strong = [(rng.choice(concepts), "related_to", rng.choice(concepts), 0.9) for _ in range(150)]
+    weak = [(rng.choice(concepts), "related_to", rng.choice(concepts), 0.3) for _ in range(8000)]
     for s, r, t, w in strong + weak:
         if s != t:
             graph.add(s, r, t, w)

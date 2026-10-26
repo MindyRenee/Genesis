@@ -106,7 +106,7 @@ def test_conversation_returns_with_the_mode() -> None:
 
 def test_net_seal_refuses_web_tools() -> None:
     """While sealed, web_search and web_fetch are refused outright."""
-    from frontal_lobe.tools.framework import ToolRegistry
+    from tools.framework import ToolRegistry
 
     reg = ToolRegistry()
     reg.net_sealed = True
@@ -118,7 +118,7 @@ def test_net_seal_refuses_web_tools() -> None:
 
 def test_net_seal_leaves_the_workstation_hers() -> None:
     """The seal is the net only — files, shell, and math still run."""
-    from frontal_lobe.tools.framework import ToolRegistry
+    from tools.framework import ToolRegistry
 
     reg = ToolRegistry()
     reg.net_sealed = True
@@ -128,7 +128,7 @@ def test_net_seal_leaves_the_workstation_hers() -> None:
 
 def test_net_unseal_restores_lookup() -> None:
     """Leaving game mode hands the net back."""
-    from frontal_lobe.tools.framework import ToolRegistry
+    from tools.framework import ToolRegistry
 
     reg = ToolRegistry()
     reg.net_sealed = True
@@ -300,9 +300,7 @@ def test_deep_adenosine_does_not_sleep_her_either() -> None:
     from brainstem.thresholds import WAKE_DESYNC_GRACE_SECONDS, WAKE_RESCUE_ADENOSINE
 
     with tempfile.TemporaryDirectory() as data_dir:
-        mind = _gaming_mind(
-            data_dir, adenosine=WAKE_RESCUE_ADENOSINE + 0.1, phase="nrem"
-        )
+        mind = _gaming_mind(data_dir, adenosine=WAKE_RESCUE_ADENOSINE + 0.1, phase="nrem")
         mind._wake_time = _time.time() - WAKE_DESYNC_GRACE_SECONDS - 1.0
         mind._last_wake_attempt = 0.0
 

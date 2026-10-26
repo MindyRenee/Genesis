@@ -21,7 +21,7 @@ Pipeline:
     SpatialSolution                rule + predictions
 
 Consumers:
-    - ``basal_ganglia.play.GamePlay`` — her game collection —
+    - ``worlds.play.GamePlay`` — her game collection —
       drives the reasoner through grid games.
     - The cognition engine holds a ``SpatialReasoner`` instance so
       spatial problems raised in conversation can be perceived and
@@ -41,25 +41,19 @@ from parietal_lobe.scene import (
 )
 from parietal_lobe.transforms import Example, Transform, propose
 
-from .agent import ActionStats, EpisodeResult, SpatialAgent, frame_diff, frame_to_grid
 from .solver import SpatialHypothesis, SpatialReasoner, SpatialSolution
 
 __all__ = [
-    "ActionStats",
-    "EpisodeResult",
     "Example",
     "Grid",
     "ObjectRelation",
     "PerceivedObject",
     "Scene",
-    "SpatialAgent",
     "SpatialHypothesis",
     "SpatialReasoner",
     "SpatialRelationKind",
     "SpatialSolution",
     "Transform",
-    "frame_diff",
-    "frame_to_grid",
     "ground_scene",
     "perceive",
     "propose",

@@ -1,10 +1,41 @@
-"""Metacognitive router — decides which subsystem should handle input.
+"""Metacognitive router — Bayesian model selection over speech-act templates.
 
 Before Genesis runs the full cognition pipeline, the router does a quick
 first pass over the user's input and classifies the kind of speech act.
 If it can confidently identify the route, the main pipeline can hand the
 question to a specialist (identity, user model, code, etc.) instead of
 letting the big monolithic think() produce a noisy answer.
+
+## The math
+
+Each routing template is a *generative model* of an utterance class: a
+regular grammar committing to literal token evidence and slot variables.
+Routing is Bayesian model selection over the template library:
+
+    P(template | input)  ∝  m_i · 𝟙{template_i matches input}
+
+where m_i is the template's *specificity mass* — the number of literal
+word tokens the pattern commits to. Under a uniform prior over matched
+templates, the winner is the maximum-specificity parse: the template
+that explains the most of the utterance (the MDL/MAP answer — a
+longer literal commitment that still matches is strictly stronger
+evidence than a short one). Declaration order survives only as the
+tie-breaker on equal masses, which is what priority ordering always
+approximated.
+
+Confidence is posterior odds against the strongest contender:
+
+    c = m_win / (m_win + m_runner + ε)
+
+not a constant: a single dominant parse reports ~1; two contending
+parses split the mass and the route falls below the accept gate —
+the ambiguity defers to the full pipeline instead of being resolved
+by declaration order. The factual-definition templates ("what is
+X", "tell me about X") are the *null hypothesis*: they match nearly
+every question by construction, so they never count as contenders —
+a specific parse beats them by existing, not by out-arguing them.
+Template grammars are grammar seeds (English interrogative frames);
+the selection over them is the inference.
 """
 
 from __future__ import annotations
@@ -12,6 +43,26 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from typing import ClassVar
+
+# A template's specificity mass: the count of literal word tokens its
+# pattern commits to — the evidence it must explain to match.
+_LITERAL_WORD = re.compile(r"[a-z']{2,}")
+
+# Posterior smoothing floor — the background mass every matched
+# template competes against. Small: an uncontested parse reports
+# confidence ≈ m/(m+ε) ≈ 1.
+_POSTERIOR_FLOOR = 0.25
+
+
+def _template_mass(pattern: re.Pattern) -> float:
+    """Specificity mass of a pattern: literal word tokens committed.
+
+    Regex structure (``\\b``, ``(?:``, character classes) contributes
+    nothing; only word literals of ≥2 letters count as evidence. An
+    alternation counts all its branches — an overcount that stays
+    monotonic with the constraint the pattern actually imposes.
+    """
+    return float(len(_LITERAL_WORD.findall(pattern.pattern)))
 
 
 @dataclass(slots=True)
@@ -24,7 +75,33 @@ class Route:
 
 
 class MetaCognitiveRouter:
-    """Fast, rule-based metacognitive routing for user input."""
+    """Bayesian metacognitive routing for user input."""
+
+    def __init__(self) -> None:
+        """Initialize the router at full selectivity (neutral drive)."""
+        # Yerkes–Dodson selectivity gain — norepinephrine/arousal
+        # tempers the posterior: moderate arousal sharpens route
+        # discrimination; hypo- and hyper-arousal flatten it toward
+        # chance so the fast path defers to full deliberation.
+        # g = 4·NE·(1−NE) ∈ [0,1], peaked at NE=0.5.
+        self._dodson_gain = 1.0
+
+    def set_arousal(self, norepinephrine: float) -> None:
+        """Set the LC–NE arousal drive on route selectivity.
+
+        ``norepinephrine`` is the body's effective level in ~[0,1].
+        The gain is the Yerkes–Dodson inverted-U 4·NE·(1−NE): an
+        arousal extreme (sleepy or stressed) flattens discrimination
+        toward 0.5 — under those states the fast router yields to the
+        deliberative pipeline rather than committing on a flat
+        posterior.
+        """
+        import math
+
+        if not math.isfinite(norepinephrine):
+            return
+        ne = max(0.0, min(1.0, float(norepinephrine)))
+        self._dodson_gain = 4.0 * ne * (1.0 - ne)
 
     # Maps the verb captured from "what do i <verb>" to the preference
     # category used by UserProfile.preferences.
@@ -380,67 +457,103 @@ class MetaCognitiveRouter:
         if len(set(named_entities)) >= 2 and has_reference and has_followup_question:
             return Route(route="reference_ambiguity", confidence=0.9, sub_kind="")
 
-        for route, sub_kind, pattern in self._PATTERNS:
+        # Bayesian model selection: every matched template contributes
+        # its specificity mass; the winner is the maximum-specificity
+        # parse (declaration order breaks ties). Confidence is posterior
+        # odds against the strongest *non-generic* competitor — the
+        # factual-definition catch-alls are the null hypothesis a
+        # specific parse is measured against, not contenders, so a
+        # specific match reports ~1 while genuinely contending parses
+        # split the mass and fall below the accept gate.
+        candidates: list[tuple[float, int, str, str, re.Match, bool]] = []
+        for rank, (route, sub_kind, pattern) in enumerate(self._PATTERNS):
             match = pattern.search(lower)
-            if match:
-                if route == "code" and not self._is_code_request(user_input):
-                    # Mentioning code in a statement is not a request for
-                    # the code specialist; let normal learning/responding
-                    # handle it.
-                    continue
-                if route == "comparison" and match.groups() and match.group(2):
-                    a = match.group(1).strip().strip("?").strip(".").strip("!")
-                    b = match.group(2).strip().strip("?").strip(".").strip("!")
-                    if a and b:
-                        return Route(route=route, confidence=0.9, sub_kind=f"{a}|||{b}")
-                if route == "parts" and match.groups():
-                    # For "of" patterns, group(1) is the container.
-                    # For "in/have/include" patterns, group(2) is the container.
-                    if sub_kind == "of":
-                        container = match.group(1).strip().strip("?").strip(".").strip("!")
-                    else:
-                        container = match.group(2).strip().strip("?").strip(".").strip("!")
-                    if container:
-                        return Route(route=route, confidence=0.9, sub_kind=container)
-                if route == "consumes" and match.groups() and match.group(1):
-                    target = match.group(1).strip().strip("?").strip(".").strip("!")
-                    if target:
-                        return Route(route=route, confidence=0.9, sub_kind=target)
-                # Personal preference questions: extract the topic the
-                # user is asking about (e.g., "color" from "what's your
-                # favorite color"). The sub_kind encodes both the
-                # question type and the topic as "type:topic".
-                if route == "preference" and match.groups():
-                    if sub_kind == "favorite":
-                        topic = match.group(2).strip().strip("?").strip(".").strip("!")
-                    else:
-                        topic = match.group(1).strip().strip("?").strip(".").strip("!")
-                    if topic:
-                        return Route(
-                            route=route,
-                            confidence=0.9,
-                            sub_kind=f"{sub_kind}:{topic}",
-                        )
-                    return Route(route=route, confidence=0.9, sub_kind=sub_kind)
-                if (
-                    route in ("factual", "counterfactual", "explanation", "planning")
-                    and match.groups()
-                ):
-                    target = match.group(1).strip().strip("?").strip(".").strip("!")
-                    if target:
-                        return Route(route=route, confidence=0.9, sub_kind=target)
-                # User preference questions: map the captured verb to a
-                # preference category so _route_user can extract only the
-                # relevant category instead of dumping the entire profile.
-                if route == "user" and sub_kind == "preference" and match.groups():
-                    verb = match.group(1).strip().lower()
-                    pref_category = self._PREFERENCE_VERB_MAP.get(verb, "likes")
-                    return Route(
-                        route=route, confidence=0.9, sub_kind=f"preference:{pref_category}"
-                    )
-                return Route(route=route, confidence=0.9, sub_kind=sub_kind)
-        # Fallback: use perception intent if it is already clearly one of the
-        # self-inquiry / user intents we have wired in perception.py.
+            if not match:
+                continue
+            if route == "code" and not self._is_code_request(user_input):
+                # Mentioning code in a statement is not a request for
+                # the code specialist; let normal learning/responding
+                # handle it.
+                continue
+            generic = route == "factual" and sub_kind == "definition"
+            candidates.append((_template_mass(pattern), -rank, route, sub_kind, match, generic))
+
+        if not candidates:
+            return self._intent_fallback(intent, intent_value)
+
+        mass_win, neg_rank, route, sub_kind, match, _g = max(candidates)
+        others = [c for c in candidates if c[1] != neg_rank]
+        generic_win = route == "factual" and sub_kind == "definition"
+        if generic_win:
+            # The winner is itself the null hypothesis — its competition
+            # is every other parse, generic or not.
+            competitor = max((c[0] for c in others), default=0.0)
+        else:
+            # Only non-generic parses of a *different route* compete —
+            # the definition catch-alls are the null a specific parse
+            # is measured against, and same-route templates are the
+            # same hypothesis, not contenders.
+            competitor = max((c[0] for c in others if not c[5] and c[2] != route), default=0.0)
+        confidence = mass_win / (mass_win + competitor + _POSTERIOR_FLOOR)
+        # Yerkes–Dodson tempering: arousal extremes pull the posterior
+        # toward chance (0.5) — under hypo/hyper-arousal the fast
+        # route's discrimination is unreliable and should defer.
+        confidence = 0.5 + (confidence - 0.5) * self._dodson_gain
+
+        if route == "comparison" and match.groups() and match.group(2):
+            a = match.group(1).strip().strip("?").strip(".").strip("!")
+            b = match.group(2).strip().strip("?").strip(".").strip("!")
+            if a and b:
+                return Route(route=route, confidence=confidence, sub_kind=f"{a}|||{b}")
+        if route == "parts" and match.groups():
+            # For "of" patterns, group(1) is the container.
+            # For "in/have/include" patterns, group(2) is the container.
+            if sub_kind == "of":
+                container = match.group(1).strip().strip("?").strip(".").strip("!")
+            else:
+                container = match.group(2).strip().strip("?").strip(".").strip("!")
+            if container:
+                return Route(route=route, confidence=confidence, sub_kind=container)
+        if route == "consumes" and match.groups() and match.group(1):
+            target = match.group(1).strip().strip("?").strip(".").strip("!")
+            if target:
+                return Route(route=route, confidence=confidence, sub_kind=target)
+        # Personal preference questions: extract the topic the
+        # user is asking about (e.g., "color" from "what's your
+        # favorite color"). The sub_kind encodes both the
+        # question type and the topic as "type:topic".
+        if route == "preference" and match.groups():
+            if sub_kind == "favorite":
+                topic = match.group(2).strip().strip("?").strip(".").strip("!")
+            else:
+                topic = match.group(1).strip().strip("?").strip(".").strip("!")
+            if topic:
+                return Route(
+                    route=route,
+                    confidence=confidence,
+                    sub_kind=f"{sub_kind}:{topic}",
+                )
+            return Route(route=route, confidence=confidence, sub_kind=sub_kind)
+        if route in ("factual", "counterfactual", "explanation", "planning") and match.groups():
+            target = match.group(1).strip().strip("?").strip(".").strip("!")
+            if target:
+                return Route(route=route, confidence=confidence, sub_kind=target)
+        # User preference questions: map the captured verb to a
+        # preference category so _route_user can extract only the
+        # relevant category instead of dumping the entire profile.
+        if route == "user" and sub_kind == "preference" and match.groups():
+            verb = match.group(1).strip().lower()
+            pref_category = self._PREFERENCE_VERB_MAP.get(verb, "likes")
+            return Route(route=route, confidence=confidence, sub_kind=f"preference:{pref_category}")
+        return Route(route=route, confidence=confidence, sub_kind=sub_kind)
+
+    def _intent_fallback(self, intent: object, intent_value: str) -> Route:
+        """No template matched — fall back to the perception intent.
+
+        Perception already classified the speech act coarsely; a clear
+        self-inquiry or question intent still routes, at the lower
+        confidence an ungrounded classification earns.
+        """
         if intent is not None:
             if intent_value == "self_inquiry":
                 return Route(route="identity", confidence=0.7, sub_kind="")

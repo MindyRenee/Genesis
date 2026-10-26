@@ -532,6 +532,230 @@ fn test_archive_survives_reopen() {
     cleanup(&base);
 }
 
+#[test]
+fn test_find_similar_archived() {
+    let base = temp_base("deep_recall");
+    let mut store = LtmStore::create(&base, 64).expect("create");
+
+    // source_module=4 (Language) — a real content module, not
+    // auto-flagged as meta-memory.
+    let archived_id = store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "the orchard ladder leaned against the old barn",
+        )
+        .expect("store archived");
+    let active_id = store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "a completely unrelated note about semaphore flags",
+        )
+        .expect("store active");
+    // An archived meta-memory: store_meta flags it regardless of
+    // source module; archiving it yields flags = meta|archived.
+    let meta_id = store
+        .store_meta(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "association trace orchard ladder barn",
+        )
+        .expect("store meta");
+    store.archive(meta_id).expect("archive meta");
+    let deleted_id = store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "the orchard ladder is also mentioned here",
+        )
+        .expect("store doomed");
+    store.archive(archived_id).expect("archive");
+    store.delete(deleted_id).expect("delete");
+
+    // The active scan cannot see the archived episode.
+    let active = store.find_similar_hash("orchard ladder barn", 10);
+    assert!(
+        !active.iter().any(|(id, _, _)| *id == archived_id),
+        "archived episode must stay out of the active scan"
+    );
+
+    // Deep recall reaches it — a verbatim cue is an exact SimHash
+    // match (distance 0) and ranks first.
+    let deep = store.find_similar_archived("the orchard ladder leaned against the old barn", 10);
+    assert_eq!(
+        deep[0].0, archived_id,
+        "archived episode should lead deep recall"
+    );
+    assert_eq!(deep[0].1, 0, "verbatim cue should be an exact match");
+    // A fragmentary cue still surfaces it first — SimHash distance
+    // reflects whole-text token overlap, so partial recall lands near
+    // the 20-bit association boundary rather than at zero.
+    let deep = store.find_similar_archived("orchard ladder leaned barn", 10);
+    assert_eq!(
+        deep[0].0, archived_id,
+        "fragmentary cue should still lead deep recall"
+    );
+    // The other archived mention is reachable too — deep recall
+    // returns the whole tier, ranked.
+    // Active episodes are NOT part of the archived tier...
+    assert!(
+        !deep.iter().any(|(id, _, _)| *id == active_id),
+        "active episodes do not belong to deep recall"
+    );
+    // ...nor archived meta-memories (they have their own channels)...
+    assert!(
+        !deep.iter().any(|(id, _, _)| *id == meta_id),
+        "meta-memories stay out of deep recall"
+    );
+    // ...nor deleted entries.
+    assert!(
+        !deep.iter().any(|(id, _, _)| *id == deleted_id),
+        "deleted entries are gone semantically"
+    );
+
+    drop(store);
+    cleanup(&base);
+}
+
+#[test]
+fn test_unarchive_reconsolidates() {
+    let base = temp_base("unarchive");
+    let mut store = LtmStore::create(&base, 64).expect("create");
+
+    let id = store
+        .store(
+            0,
+            0.3,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "buried treasure under the old dock",
+        )
+        .expect("store");
+    assert_eq!(store.count(), 1);
+
+    store.archive(id).expect("archive");
+    assert_eq!(store.count(), 0, "archive should drop the active count");
+    assert!(store.find_similar_hash("buried treasure", 10).is_empty());
+
+    store.unarchive(id).expect("unarchive");
+    assert_eq!(
+        store.count(),
+        1,
+        "unarchive should restore the active count"
+    );
+
+    // Back in the SimHash similarity index…
+    let results = store.find_similar_hash("buried treasure under the dock", 10);
+    assert!(
+        results.iter().any(|(eid, _, _)| *eid == id),
+        "revived episode must be searchable again"
+    );
+    // …and back in the bundle superposition — the association path
+    // sees it too.
+    let bundled = store.find_similar("buried treasure under the old dock", 10);
+    assert!(
+        bundled.iter().any(|(eid, _, _)| *eid == id),
+        "revived episode must be re-bundled"
+    );
+
+    // Reconsolidation salience floor: a weak episode that proved
+    // itself reachable is lifted above the compressor's retention
+    // threshold.
+    let ep = store.retrieve(id).expect("retrieve revived");
+    assert!(
+        (ep.salience - RECONSOLIDATION_SALIENCE_FLOOR).abs() < 1e-6,
+        "salience should floor at reconsolidation level, got {}",
+        ep.salience
+    );
+
+    // A strong memory is never dragged down to the floor.
+    let strong_id = store
+        .store(
+            0,
+            0.9,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "a vivid day at the county fair",
+        )
+        .expect("store strong");
+    store.archive(strong_id).expect("archive strong");
+    store.unarchive(strong_id).expect("unarchive strong");
+    let strong = store.retrieve(strong_id).expect("retrieve strong");
+    assert!(
+        (strong.salience - 0.9).abs() < 1e-6,
+        "floor must not lower high salience, got {}",
+        strong.salience
+    );
+
+    // Unarchiving an already-active episode is a no-op; a missing
+    // one is an error.
+    store.unarchive(id).expect("re-unarchive should be a no-op");
+    assert!(store.unarchive(999_999).is_err(), "missing id should error");
+
+    drop(store);
+    cleanup(&base);
+}
+
+#[test]
+fn test_unarchive_survives_reopen() {
+    let base = temp_base("unarchive_reopen");
+    let id = {
+        let mut store = LtmStore::create(&base, 64).expect("create");
+        let id = store
+            .store(
+                0,
+                0.4,
+                make_full_tag(),
+                make_compact_tag(),
+                0,
+                4,
+                "a memory that refuses to stay buried",
+            )
+            .expect("store");
+        store.archive(id).expect("archive");
+        store.unarchive(id).expect("unarchive");
+        id
+    };
+
+    let mut store = LtmStore::open(&base).expect("open");
+    assert_eq!(
+        store.count(),
+        1,
+        "revived episode stays active after reopen"
+    );
+    let ep = store.retrieve(id).expect("retrieve after reopen");
+    assert_eq!(ep.text, "a memory that refuses to stay buried");
+    let results = store.find_similar_hash("refuses to stay buried", 10);
+    assert!(
+        results.iter().any(|(eid, _, _)| *eid == id),
+        "revived episode stays searchable after reopen"
+    );
+
+    drop(store);
+    cleanup(&base);
+}
+
 // ─── v2: no capacity ceiling ──────────────────────────────────
 
 #[test]
@@ -1238,5 +1462,123 @@ fn test_store_meta_non_auto_module_unbundles() {
         1,
         "store_meta on a non-auto module must not leave its SDR bundled"
     );
+    cleanup(&base);
+}
+
+#[test]
+fn test_search_archived_pages_the_cold_tier() {
+    let base = temp_base("search_archived");
+    let mut store = LtmStore::create(&base, 64).expect("create");
+
+    // Three real episodes archived, one active, one deleted, one
+    // archived meta-memory.
+    let mut archived = Vec::new();
+    for i in 0..3u8 {
+        let id = store
+            .store(
+                0,
+                0.5,
+                make_full_tag(),
+                make_compact_tag(),
+                i,
+                4,
+                &format!("archived episode {i}"),
+            )
+            .expect("store");
+        store.archive(id).expect("archive");
+        archived.push(id);
+    }
+    let active = store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "still active",
+        )
+        .expect("store active");
+    let doomed = store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "deleted while active",
+        )
+        .expect("store doomed");
+    store.delete(doomed).expect("delete");
+    let meta = store
+        .store_meta(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "archived meta trace",
+        )
+        .expect("store meta");
+    store.archive(meta).expect("archive meta");
+
+    let page = store.search_archived(100, 0);
+    let ids: Vec<u64> = page.iter().map(|(id, _)| *id).collect();
+
+    // Oldest-first ascending order over the archived tier.
+    assert_eq!(ids[..3], archived[..3], "archived real episodes, in order");
+    // The archived meta-memory rides the tier (the caller's policy
+    // filters it); the active episode and the deleted one do not.
+    assert!(ids.contains(&meta), "archived meta-memory is enumerable");
+    assert!(!ids.contains(&active), "active episode excluded");
+    assert!(!ids.contains(&doomed), "deleted episode excluded");
+    assert_eq!(ids.len(), 4);
+
+    // Positional paging: skip(1) drops the oldest archived entry.
+    let page2 = store.search_archived(2, 1);
+    let ids2: Vec<u64> = page2.iter().map(|(id, _)| *id).collect();
+    assert_eq!(ids2.len(), 2);
+    assert_eq!(ids2[0], archived[1], "offset skips into the tier");
+
+    // Metadata survives the round trip.
+    let (_, entry) = page[0];
+    assert_eq!(entry.episode_id, archived[0]);
+    assert!(entry.is_archived());
+    cleanup(&base);
+}
+
+#[test]
+fn test_delete_removes_from_archived_tier() {
+    let base = temp_base("delete_archived");
+    let mut store = LtmStore::create(&base, 64).expect("create");
+
+    let id = store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "substrate death candidate",
+        )
+        .expect("store");
+    store.archive(id).expect("archive");
+
+    assert_eq!(store.search_archived(10, 0).len(), 1);
+    store.delete(id).expect("delete");
+
+    assert!(
+        store.search_archived(10, 0).is_empty(),
+        "deleted engram leaves the archived tier"
+    );
+    assert!(
+        store
+            .find_similar_archived("substrate death", 10)
+            .is_empty()
+    );
+    assert!(store.retrieve(id).is_err(), "deleted payload unreachable");
     cleanup(&base);
 }

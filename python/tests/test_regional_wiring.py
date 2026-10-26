@@ -159,6 +159,9 @@ _OWNERSHIP_PINS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     # The external-world model is the hippocampal-entorhinal map plus
     # the STS social stream — the relay is how it reaches cortex.
     ("OuterWorld", ("temporal_lobe",), ()),
+    # Her page — a place in the external world, not a mind organ:
+    # worlds.channel is environment-side, so no region may claim it.
+    ("Channel", (), REGIONS),
     ("WorldBridge", ("thalamus",), ()),
     # Mentalizing posteriors over presences — rTPJ + mPFC.
     ("PresenceBelief", ("parietal_lobe", "frontal_lobe"), ()),
@@ -200,10 +203,10 @@ _ALLOWLIST: dict[str, str] = {
     "genesis_client": "the daemon client — support layer beside the regions",
     "infrastructure": "support layer (persistence, config, journal)",
     "eval": "baseline/drift/assay harness",
-    "parietal_lobe.arc": "ARC-3 task-environment adapter, not a brain function",
-    "parietal_lobe.arc_cabinet": "X11 input surface for the ARC adapter, not a brain function",
-    "parietal_lobe.arc_web": "web task-environment adapter, not a brain function",
-    "parietal_lobe.discord_showcase": "platform adapter, not a brain function",
+    "worlds.arc": "ARC-3 task-environment adapter, not a brain function",
+    "worlds.arc_cabinet": "X11 input surface for the ARC adapter, not a brain function",
+    "worlds.arc_web": "web task-environment adapter, not a brain function",
+    "worlds.discord_showcase": "platform adapter, not a brain function",
     "frontal_lobe.krita_studio": "Krita plugin bridge — platform adapter, not a brain function",
     "commitment": "top-level support module",
     "discord_feed": "platform adapter",
@@ -215,7 +218,7 @@ _ALLOWLIST: dict[str, str] = {
     "brainstem.thresholds": "autonomic setpoints — constants owned by brainstem",
     "parietal_lobe.motion": "compatibility projection of occipitotemporal MT/V5",
     "parietal_lobe.epipolar": "compatibility projection of occipital MSTd",
-    "frontal_lobe.tools.charter": "a prose letter to the organism — no code, nothing to claim",
+    "tools.charter": "a prose letter to the organism — no code, nothing to claim",
 }
 
 _FUNCTIONAL_PACKAGES = (
