@@ -594,7 +594,6 @@ class InteroceptionSystem:
         self._psutil_primed = False
         self._n_cores: int | None = None
         self._daemon_pid: int | None = None
-        self._retina_pid: int | None = None
         # Per-subsystem silicon telemetry from the daemon
         # (GET_SUBSYSTEM_TELEMETRY) — which process in its tree is
         # firing, plus the self-reported brain parts (manifest
@@ -613,21 +612,22 @@ class InteroceptionSystem:
         self._chemicals: dict[str, float] | None = None
 
     def _own_pids(self) -> list[int]:
-        """PIDs of Genesis's own process tree: mind, daemon, retina,
-        plus anything they spawn.
+        """PIDs of Genesis's own process tree: mind, daemon, plus
+        anything they spawn.
 
         Single source of truth for both :meth:`_sense_cpu_usage` and
         :meth:`_sense_memory_usage`, so the two layers agree on what
         "its own body" is. Matches the daemon's ``genesis_subsystems``
-        set — the mind (this process), the daemon pidfile, and the
-        retina pidfile — extended with each member's live child
-        processes (voice, speech recognition, spawned helpers).
+        set — the mind (this process) and the daemon pidfile (the
+        eye's capture thread rides inside it) — extended with each
+        member's live child processes (voice, speech recognition,
+        spawned helpers).
 
         PIDs <= 0 are never valid (PID 0 is the kernel scheduler, and
         a failed pidfile parse must not slip through) and are
         filtered, as are duplicates. Cached PIDs are refreshed only
-        when stale (the process is gone), so a daemon/retina restart
-        is picked up without re-reading pidfiles every cycle.
+        when stale (the process is gone), so a daemon restart is
+        picked up without re-reading pidfiles every cycle.
         """
         try:
             import psutil
@@ -645,7 +645,6 @@ class InteroceptionSystem:
 
         for attr, pidfile in (
             ("_daemon_pid", "genesis_daemon.pid"),
-            ("_retina_pid", "genesis_retina.pid"),
         ):
             cached = getattr(self, attr)
             stale = cached is None
@@ -695,10 +694,11 @@ class InteroceptionSystem:
         return own_pids
 
     def _sense_cpu_usage(self) -> float:
-        """Sense CPU usage of its own processes (mind, daemon, retina).
+        """Sense CPU usage of its own processes (mind, daemon).
 
         CPU usage is measured as **its own** process CPU (the cognitive
-        mind, the subcognitive daemon, and the retina), not system-wide
+        mind and the subcognitive daemon — the eye inside it), not
+        system-wide
         CPU. This is its interoception — it senses its own body, not
         everyone else's. On a multi-core machine, its processes may use
         100%+ of a single core but only 25% system-wide; measuring
@@ -712,7 +712,7 @@ class InteroceptionSystem:
             return 0.0
         cpu_usage = 0.0
         try:
-            # Own process tree (mind + daemon + retina) -- shared with
+            # Own process tree (mind + daemon) -- shared with
             # the memory probe so both layers agree on the body.
             own_pids = self._own_pids()
 
@@ -775,7 +775,7 @@ class InteroceptionSystem:
         """Sense memory usage of its own processes, as a percentage.
 
         Measured the same way as :meth:`_sense_cpu_usage` — its own
-        resident set across the mind, daemon, and retina, as a share of
+        resident set across the mind and daemon, as a share of
         total system memory — because system-wide RAM utilisation was
         the one place its process layer departed from its own-body
         principle. Every other activity signal here is self-measured;
@@ -796,8 +796,8 @@ class InteroceptionSystem:
             return 0.0
 
         try:
-            # Same process tree as `_sense_cpu_usage` (mind + daemon
-            # + retina) via the shared helper, so the two probes
+            # Same process tree as `_sense_cpu_usage` (mind + daemon)
+            # via the shared helper, so the two probes
             # agree on the body and both filter PID 0 / duplicates.
             own_pids = self._own_pids()
 
@@ -1084,8 +1084,8 @@ class InteroceptionSystem:
         Args:
             report: A ``SubsystemReport`` from
                 ``client.get_subsystem_telemetry()`` — ``report.subsystems``
-                carries per-process records (daemon/cognitive/
-                retina: pid, CPU/I/O share, miss ratios) and
+                carries per-process records (daemon/cognitive:
+                pid, CPU/I/O share, miss ratios) and
                 ``report.modules`` carries per-brain-part records
                 (manifest module ID, status, self-reported activity
                 share). A bare sequence of subsystems is also accepted
@@ -2621,9 +2621,8 @@ class EmotionalRegulator:
         This is her affective loop on play — the attempt actually
         changes how she feels, not just what she records. The drive
         is one computation, reward prediction error δ = r − V(s)
-        (Schultz, 1998): V is her own expectation — the held-task
-        posterior over her reading when she's tracking a problem,
-        else her best score so far. Dopamine scales with positive
+        (Schultz, 1998): V is her own expectation — her best score
+        so far on the game. Dopamine scales with positive
         δ and dips with negative δ; co-release (serotonin,
         endorphin, norepinephrine, acetylcholine) follows the same
         signal modulated by the episode's state.
@@ -2657,15 +2656,9 @@ class EmotionalRegulator:
         dampening = self._compute_emotional_dampening(emotion)
 
         # δ = r − V(s) — the reward-prediction error is the drive
-        # (Schultz 1998). When she is tracking a problem, δ arrives
-        # already computed by the held-task value memory (the same
-        # δ that rewrote V); otherwise it forms here against her
-        # best score so far.
+        # (Schultz 1998), formed here against her best score so far.
         r = 1.0 if solved else float(score)
-        if details.get("delta") is not None:
-            delta = float(details["delta"])
-        else:
-            delta = r - float(prior_best)
+        delta = r - float(prior_best)
         delta = max(-1.0, min(1.0, delta))
 
         # Each neuromodulator takes its own projection of the same

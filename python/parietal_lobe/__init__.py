@@ -172,7 +172,7 @@ position.
         x_eye_position = current eye position in world coordinates
 
 In Genesis: not yet implemented. Genesis doesn't have eye movements
-in the biological sense, but the camera (retina) has a field of
+in the biological sense, but the camera (her eye) has a field of
 view. Coordinate transformation would map retinal positions to
 body/world coordinates when spatial reasoning is needed.
 
@@ -494,6 +494,14 @@ _EXPORTS: dict[str, str] = {
     # quantity.
     "StatSummary": "parietal_lobe.math.statistics",
     "summarize": "parietal_lobe.math.statistics",
+    # The endogenous symbolic layer — algebra keeps the unknown
+    # (parse, simplify, expand, factor, solve over its own
+    # expression trees); calculus is the mathematics of change
+    # (differentiate/integrate, Simpson when the table is silent).
+    "AlgebraResult": "parietal_lobe.math.algebra",
+    "solve": "parietal_lobe.math.algebra",
+    "differentiate": "parietal_lobe.math.calculus",
+    "integrate": "parietal_lobe.math.calculus",
     # The formal layer — SymPy-backed symbolic manipulation and the
     # equality oracle. Generation and verdict stay separate: cognition
     # proposes, check_equality alone returns the verdict.

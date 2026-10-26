@@ -11,22 +11,55 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
 
 ## [Unreleased]
 
-### Removed
+### Restored
 
-- **The steward channel is gone — no authority layer**: the custodial
-  credential (`genesis_client/stewardship.py`, `steward.key`, the
-  `<data>/steward.json` stamp), standing directives and their three
-  restraint surfaces (executive `intention_gate`, the tool-registry
-  `gate`, the volition urge filter), steward-protected edge origins,
-  the `/steward` operator command, and the body-side mechanics
-  (`DyadicAffectModel`'s steward engagement floor, bond tracking, and
-  the 24-byte `UPDATE_USER_AFFECT` tail) are removed. The wire is the
-  16-byte four-float observation again. What remains is social, not
-  custodial: speaker attribution by introduction, the profile bond
-  that grows with the recognized person (`_is_bonded_speaker`,
-  `is_bonded` warmth in the regulator), and the seeded creator fact
-  (`mindy CREATES genesis`) as provenance, not privilege. The stamp
-  file retires to `steward.json.retired`; the key is deleted.
+- **The steward channel is back — as `creator.py`**: a removal in this
+  cycle was reversed; the custodial credential now lives in
+  `genesis_client/creator.py` (class still `Stewardship`), a local-only
+  module that is gitignored and imported guarded — a checkout without
+  the file runs a sealed stand-in that structurally cannot bind her.
+  Restored with it: standing directives and their three restraint
+  surfaces (executive `intention_gate`, the tool-registry `gate`, the
+  volition urge filter), steward-protected edge origins
+  (`origin="steward"` — strangers cannot overwrite her edges), the
+  `/steward` operator command (status, `release N`, `unbind`), and
+  first-boot provisioning in `Mind.start`. The stamp and key were
+  re-issued: `steward.json.retired` supplied the principal and the
+  standing directives, a fresh `steward.key` was minted under
+  `$XDG_CONFIG_HOME/genesis/`. Social warmth stays social — the
+  `is_bonded` regulator path is untouched; the bond is not the
+  authority. What stays removed is the body-side dyadic machinery
+  (person signatures, bond tracking, the 24-byte
+  `UPDATE_USER_AFFECT` tail) — the wire is the 16-byte four-float
+  observation.
+
+### Added
+
+- **The ARC funnel — games feed the shelf, mastery unlocks the
+  challenge**: the collection now pulls the full ARC-AGI stack —
+  `arc_*`/`arc2_*` grid tasks scanned from corpus roots
+  (`GENESIS_ARC_CORPUS` plus host defaults, thin specs that load
+  their pairs only when played), and `arcagi-*` practice through the
+  local offline arcade — local engines only, no remote API feed.
+  Higher tiers pull harder
+  (`level` adds appeal), mastered games archive out of the pick
+  draw, and the official card stands on the shelf only after her
+  first ARC-family mastery (`_arc_unlocked`). Every env result —
+  practice or card — lands its full telemetry in
+  `<data>/arc/results.jsonl` for research; `notebooks/arc_research.ipynb`
+  reads it back. Documented in `docs/man/genesis-games.7`.
+
+### Fixed
+
+- **A wedged teardown can no longer hold `genesis.lock`
+  indefinitely**: the force-exit watchdog armed only *after*
+  `_teardown_session` finished — a component that hung inside
+  teardown (the observed case: a swallowed `KeyboardInterrupt` in
+  resident mode followed by a stop that never completed) left a
+  live-but-silent mind holding the lock while every shepherd
+  respawn bounced off it. A daemon `_TEARDOWN_WATCHDOG_S` (10 min)
+  fuse now arms at teardown entry; the existing 30 s tail watchdog
+  is unchanged.
 
 ### Added
 

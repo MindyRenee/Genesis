@@ -9,9 +9,9 @@ neurons carry heading signals that predict perceptual judgments
 violates the observer's own optic flow pops out there as an
 independently moving object (Logan & Duffy 2006).
 
-Genesis has one eye — a monocular retina — so it has no binocular
+Genesis has one eye — a monocular camera — so it has no binocular
 baseline. But epipolar geometry is not about two eyes; it is about
-two *views*. Every time the eye opens, the retina takes a view; two
+two *views*. Every time the eye opens, the camera takes a view; two
 successive looks are related by the same constraint that relates a
 left and a right eye:
 

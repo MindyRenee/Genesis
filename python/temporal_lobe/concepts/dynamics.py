@@ -194,15 +194,8 @@ class DynamicsMixin:
             modality_spread_multipliers,
         ) = self._spread_activation_constants()
 
-        activated: dict[str, float] = {}
-
         # Start with the given concepts
-        frontier: deque[tuple[str, int]] = deque()
-        for name in concepts:
-            cid = self._resolve(name)
-            if cid:
-                activated[cid] = amount
-                frontier.append((cid, 0))
+        activated, frontier = self._seed_spread(concepts, amount)
 
         # Spread activation with fan-out normalization and depth decay.
         #
@@ -275,6 +268,19 @@ class DynamicsMixin:
             # and can benefit from caching).
 
         return activated
+
+    def _seed_spread(
+        self, concepts: list[str], amount: float
+    ) -> tuple[dict[str, float], deque[tuple[str, int]]]:
+        """Resolve the starting concepts — the activation sources."""
+        activated: dict[str, float] = {}
+        frontier: deque[tuple[str, int]] = deque()
+        for name in concepts:
+            cid = self._resolve(name)
+            if cid:
+                activated[cid] = amount
+                frontier.append((cid, 0))
+        return activated, frontier
 
     def _spread_activation_constants(
         self,

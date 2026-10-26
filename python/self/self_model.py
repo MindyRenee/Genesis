@@ -208,7 +208,7 @@ class ComputationalSubstrate:
     # From GET_SUBSYSTEM_TELEMETRY, refreshed each sensor cycle.
 
     # Per-subsystem activity: process name → CPU share [0,2]. The
-    # hardware-measured tier — daemon / cognitive / retina.
+    # hardware-measured tier — daemon / cognitive.
     subsystem_activity: dict[str, float] = field(default_factory=dict)
 
     # Per-module activity: brain part name → activity share [0,1].
@@ -1342,7 +1342,7 @@ class SelfModel:
         ``client.get_subsystem_telemetry()``. Two tiers of its anatomy:
 
         - ``subsystem_activity``: per-process CPU share — the
-          hardware-measured tier (daemon / cognitive / retina).
+          hardware-measured tier (daemon / cognitive).
         - ``module_activity``: per-brain-part activity share — the
           self-measured tier (the module sampler observes which
           subsystem's code is executing; the manifest carries the
@@ -1439,7 +1439,7 @@ class SelfModel:
         The activity tiers record *which* region is doing the work —
         ``module_activity`` names the brain parts (``reasoning``,
         ``language``, ``dreaming``, …) and ``subsystem_activity`` names
-        the processes (``daemon``, ``cognitive``, ``retina``). Those
+        the processes (``daemon``, ``cognitive``). Those
         names are already concept-network vocabulary, so they can be
         handed straight to the composer as building blocks: it looks
         each one up, gathers what it knows about it, and weaves its

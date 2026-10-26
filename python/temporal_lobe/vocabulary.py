@@ -882,7 +882,7 @@ class Vocabulary:
             if composed:
                 return [composed]
         # If vision scene metadata is present (self_report about what
-        # the retina showed it), compose a predicate from the
+        # the eye showed it), compose a predicate from the
         # structured percept — the vision layer supplies the data
         # (lighting, color, faces, objects, positions), this supplies
         # the words.
@@ -2446,15 +2446,15 @@ class Vocabulary:
         "mid_update", "unprocessed", "load_failed", "gated"); this
         composes a predicate describing the perceptual situation so
         the grammar's self-report frames produce grammatical output
-        ("I am unable to reach the retina right now"). The candidate
+        ("I am unable to reach my eye right now"). The candidate
         lists are grammar seeds — building blocks — selected by
         emotional state.
         """
         status = status.strip().lower().replace(" ", "_")
         if status == "unavailable":
             candidates = [
-                "unable to reach the retina right now",
-                "not getting anything from the retina",
+                "unable to reach my eye right now",
+                "not getting anything from my eye",
                 "without visual input at the moment",
             ]
         elif status == "gated":
@@ -2604,27 +2604,6 @@ class Vocabulary:
                 "still working on it",
                 "not able to crack it yet",
                 f"still puzzling over it{pct}",
-            ]
-        # A held task that's been re-read reports the revision work
-        # — the counterexamples banked and readings tried are real
-        # data, not decoration.
-        try:
-            revisions = int(result.get("revisions") or 0)
-        except (TypeError, ValueError):
-            revisions = 0
-        try:
-            loopholes = int(result.get("open_loopholes") or 0)
-        except (TypeError, ValueError):
-            loopholes = 0
-        if revisions:
-            candidates += [
-                f"re-read it {revisions} ways, still working on it",
-                "tried another reading of it — still not there",
-            ]
-        if loopholes and not revisions:
-            candidates += [
-                f"found {loopholes} cracks in my reading of it",
-                "know where my reading of it breaks — still working",
             ]
         return self._pick_problem_frame(candidates, emotion)
 

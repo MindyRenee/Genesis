@@ -398,7 +398,7 @@ class GraphWalkGenerator:
             thought.metadata.get("self_fragments") or thought.metadata.get("field")
         ):
             return True
-        # Vision thoughts carry the retina's structured percept
+        # Vision thoughts carry the optic nerve's structured percept
         # (vision_scene) or a perceptual failure (vision_status) as
         # metadata — the scene IS the semantic material, composed by
         # the vocabulary's vision path. The content anchor is the bare

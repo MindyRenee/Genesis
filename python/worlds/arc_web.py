@@ -264,8 +264,8 @@ class _Browser:
         try:
             for line in self._proc.stdout or ():
                 self._stderr_lines.append(line.rstrip("\n"))
-        except Exception:  # noqa: BLE001 — pipe died with the browser
-            pass
+        except Exception as e:  # noqa: BLE001 — pipe died with the browser
+            note_swallowed("worlds.arc_web.stderr_drain", e)
 
     def _stderr_tail(self) -> str:
         """The browser's last stderr lines — for launch-failure messages."""

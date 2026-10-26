@@ -49,3 +49,8 @@ AGENTS.md
 # Stray package artifacts captured beside the checkout
 /arc_agi
 /kagglehub
+
+# The authority channel is a local module — present on her host,
+# never shipped. Callers import it guarded; without the file the
+# channel exists only as a sealed stand-in.
+genesis_client/creator.py

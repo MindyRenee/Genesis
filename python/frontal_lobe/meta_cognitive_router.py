@@ -500,6 +500,16 @@ class MetaCognitiveRouter:
         # route's discrimination is unreliable and should defer.
         confidence = 0.5 + (confidence - 0.5) * self._dodson_gain
 
+        resolved = self._sub_kind_for(route, sub_kind, match, confidence)
+        if resolved is not None:
+            return resolved
+        return Route(route=route, confidence=confidence, sub_kind=sub_kind)
+
+    def _sub_kind_for(
+        self, route: str, sub_kind: str, match: re.Match[str], confidence: float
+    ) -> Route | None:
+        """Derive the route's sub_kind from the winning match — each
+        specialist gets its own extraction rule; None means no rule."""
         if route == "comparison" and match.groups() and match.group(2):
             a = match.group(1).strip().strip("?").strip(".").strip("!")
             b = match.group(2).strip().strip("?").strip(".").strip("!")
@@ -545,7 +555,7 @@ class MetaCognitiveRouter:
             verb = match.group(1).strip().lower()
             pref_category = self._PREFERENCE_VERB_MAP.get(verb, "likes")
             return Route(route=route, confidence=confidence, sub_kind=f"preference:{pref_category}")
-        return Route(route=route, confidence=confidence, sub_kind=sub_kind)
+        return None
 
     def _intent_fallback(self, intent: object, intent_value: str) -> Route:
         """No template matched — fall back to the perception intent.

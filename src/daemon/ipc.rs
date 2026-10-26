@@ -260,8 +260,9 @@ pub mod cmd {
     /// Response: [u8 ack (1=ok, 0=failed)][u64 episode_id] (on ack=1)
     pub const STORE_EPISODE: u8 = 32;
     /// Get per-subsystem silicon telemetry — which part of the mind's
-    /// process tree is firing. Each subsystem (daemon, cognitive,
-    /// retina) reports its own CPU share, I/O share, and
+    /// process tree is firing. Each subsystem (daemon, cognitive —
+    /// the eye rides inside the daemon) reports its own CPU share,
+    /// I/O share, and
     /// microarchitectural prediction-error ratios (cache/branch
     /// misses). The cognitive mind correlates this with its task
     /// zone to feel *where* its activity lives. Response:
@@ -350,14 +351,15 @@ pub mod cmd {
     /// Which of Genesis's own processes are alive, and how many have died.
     ///
     /// A subsystem that dies used to vanish from
-    /// `GET_SUBSYSTEM_TELEMETRY` with no trace, so a crashed retina was
+    /// `GET_SUBSYSTEM_TELEMETRY` with no trace, so a crashed organ was
     /// indistinguishable from one that was never started. This reports
     /// liveness explicitly and counts losses.
     ///
     /// Response: `[u16 alive_mask][u16 deaths][u8 last_death]`
     ///
     /// Bit *n* of `alive_mask` is set while subsystem *n* is running
-    /// (0 = daemon, 1 = cognitive, 2 = retina). `deaths` counts
+    /// (0 = daemon, 1 = cognitive; 2 is retired — the eye is a thread
+    /// inside the daemon, not a process). `deaths` counts
     /// transitions from alive to not-alive since startup; a subsystem
     /// that was never running does not count. `last_death` is the
     /// subsystem index of the most recent loss, or 0xff if none.
@@ -931,10 +933,11 @@ pub struct BodyStateSummary {
 }
 
 /// Per-subsystem silicon telemetry — one process's activity signals.
-/// `subsystem` is the wire tag: 0 = daemon, 1 = cognitive, 2 = retina.
+/// `subsystem` is the wire tag: 0 = daemon, 1 = cognitive (2 is a
+/// retired tag — the eye rides inside the daemon now).
 #[derive(Clone, Debug, Default)]
 pub struct SubsystemTelemetrySummary {
-    /// Subsystem tag (0=daemon, 1=cognitive, 2=retina).
+    /// Subsystem tag (0=daemon, 1=cognitive, 2=retired).
     pub subsystem: u8,
     /// Process ID.
     pub pid: u32,

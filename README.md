@@ -281,7 +281,7 @@ the industry will notice that it does.
 │    ├─ active inference (generative self-model)            │
 │    ├─ operator affective coupling                         │
 │    ├─ interoception (hardware sensors → neurochemistry)   │
-│    ├─ optic nerve (retina → subcortical channels)         │
+│    ├─ optic nerve (camera → subcortical channels)         │
 │    ├─ field probe (measured substrate ↔ model phase lock) │
 │    ├─ structural code sense (syn AST → analysis report)   │
 │    └─ body recommendation (published; the mind applies)   │
@@ -1053,8 +1053,9 @@ python3 -c "import nltk; nltk.download('wordnet'); nltk.download('punkt_tab')"
 ./genesis
 ```
 
-`genesis` launches the daemon, the cognitive CLI, the retina (camera), and
-TTS; Ctrl-C tears everything down gracefully — a guided descent, not a
+`genesis` launches the daemon (which captures the camera itself) and
+the cognitive CLI, plus TTS; Ctrl-C tears everything down
+gracefully — a guided descent, not a
 kill. `./genesis --stop` stops a running session; `./genesis --offline`
 disables network access. With no camera or microphone it runs text-only —
 absent sensors are never reported as readings. State lives in

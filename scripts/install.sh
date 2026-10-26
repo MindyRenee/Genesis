@@ -69,12 +69,11 @@ if [ "$uninstall" -eq 1 ]; then
 fi
 
 # ── 1. Rust binaries ────────────────────────────────────────────────
-if [ ! -x "$REPO/target/release/genesis-daemon" ] || \
-   [ ! -x "$REPO/target/release/retina" ]; then
+if [ ! -x "$REPO/target/release/genesis-daemon" ]; then
     say "Building release binaries (cargo build --release)..."
     (cd "$REPO" && cargo build --release)
 fi
-for bin in genesis-daemon retina; do
+for bin in genesis-daemon; do
     [ -x "$REPO/target/release/$bin" ] || {
         say "Missing binary: $REPO/target/release/$bin — build failed?"
         exit 1

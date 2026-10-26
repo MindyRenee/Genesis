@@ -70,7 +70,10 @@ class ToolRegistry:
         """Initialize an empty tool registry and register built-in tools."""
         self._tools: dict[str, Tool] = {}
         self._register_builtins()
-        # The match seal — True while she's gaming: a competition
+        # Optional restraint hook — None in the organism: her tool
+        # acts are her own. Detached engines and tests run ungated.
+        self.gate: Callable[[str], str | None] | None = None
+        # The match seal — True while she's gaming. A competition
         # session seals the net for every caller.
         self.net_sealed = False
 
@@ -101,6 +104,17 @@ class ToolRegistry:
                 success=False,
                 error="sealed: no network while gaming — the workstation is hers, the net is not",
             )
+        if self.gate is not None:
+            # Every act is a candidate intention — the gate reads the
+            # act's own text ("run_shell rm -rf build") the way it
+            # reads a goal's object; restraint is a veto, not advice.
+            intent = " ".join([name] + [str(v) for v in kwargs.values() if isinstance(v, str)])
+            try:
+                restraint = self.gate(intent)
+            except Exception:  # noqa: BLE001 — a broken gate must not
+                restraint = None  # break the tool path
+            if restraint is not None:
+                return ToolResult(success=False, error=f"restrained: {restraint}")
         return tool.run(**kwargs)
 
 

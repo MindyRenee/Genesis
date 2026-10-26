@@ -62,6 +62,15 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from genesis_client import GenesisClient, NeuroSummary
+
+try:
+    # The authority channel is a local module (genesis_client/creator.py)
+    # — present on her host, never shipped. Where the file is absent
+    # the channel exists only as a sealed stand-in: every check answers
+    # False/None and nothing can bind her.
+    from genesis_client.creator import Stewardship
+except ImportError:
+    Stewardship = None  # type: ignore[assignment,misc]
 from genesis_client.types import IonSummary
 from genesis_client.protocol import (
     CHEM_ACETYLCHOLINE,
@@ -166,6 +175,47 @@ if TYPE_CHECKING:
     from parietal_lobe.system_monitor import SystemMonitor
 
 logger = logging.getLogger(__name__)
+
+
+class _SealedStewardship:
+    """The channel with no module behind it — permanently closed.
+
+    Answers the Stewardship interface with the empty end of every
+    question: no stamp, no session, no directives, no veto. Gates
+    wired to it pass everything; speaker checks fail always. A
+    checkout without creator.py runs exactly this — an authority
+    layer that structurally cannot be exercised.
+    """
+
+    stamped: ClassVar[bool] = False
+    authenticated: ClassVar[bool] = False
+    principal: ClassVar[str] = ""
+    directives: ClassVar[list] = []
+
+    def provision(self, *, principal: str = "mindy") -> bool:
+        return False
+
+    def is_steward_speaker(self, speaker: str) -> bool:
+        return False
+
+    def release_directive(self, index: int) -> dict | None:
+        return None
+
+    def sign(self, nonce: bytes) -> str | None:
+        return None
+
+    def challenge(self) -> str | None:
+        return None
+
+    def claim(self, nonce: bytes, tag: str) -> bool:
+        return False
+
+    def unbind(self) -> None:
+        pass
+
+    def status(self) -> dict:
+        return {"stamped": False, "authenticated": False, "module": "absent"}
+
 
 __all__ = ["CognitiveState", "FrontalLobe", "Goal"]
 
@@ -370,9 +420,12 @@ class FrontalLobe:
         )
         self._init_handlers(self_model)
         self._init_state()
-        # Kept for lazily-persisted state (held task) that only needs
-        # the path at write time — tests construct with None.
-        self._data_dir = data_dir
+        # Stewardship — the custodial channel, loaded (not provisioned)
+        # at construction so tests and detached engines stay sealed.
+        # Provisioning happens at the real entry point (Mind.start).
+        self.steward = (
+            Stewardship.load(data_dir) if Stewardship is not None else _SealedStewardship()
+        )
         self._seed_initial_concepts()
 
         # The auditory projection. Words that reach the ear are posted
@@ -919,12 +972,6 @@ class FrontalLobe:
         self._game_play: Any = None
         self._outer_world: Any = None
         self._play_feeler: Any = None
-        # The held task — the dlPFC task-set strip (PBWM): the working
-        # spec plus the memory around it (revisions, evidence, banked
-        # counterexamples). Loaded lazily from <data_dir>/held_task.json
-        # so a problem held overnight survives a reboot.
-        self._held_task: Any = None
-        self._held_task_loaded = False
 
     def _init_learning_systems(self) -> None:
         """Initialize learning, plasticity, and inference systems (13-16)."""
@@ -1224,6 +1271,7 @@ class FrontalLobe:
         self.network.add_concept("creator", confidence=0.8)
         self.network.add_concept("person", confidence=0.8)
         self.network.add_concept("bond", confidence=0.7)
+        self.network.add_concept("steward", confidence=0.8)
         # Her public channel — facts about where her posts and the
         # mirrored session appear. Definitions are building blocks
         # her composer walks, not lines she recites.
@@ -1350,15 +1398,21 @@ class FrontalLobe:
         self.network.add_edge("rust", "subcognitive", RelationType.RELATED_TO, 0.7)
         self.network.add_edge("python", "mind", RelationType.RELATED_TO, 0.7)
         self.network.add_edge("free_will", "determinism", RelationType.CONTRADICTS, 0.5)
-        # Creator — fact, not bond. Mindy made her (CREATES is true
-        # and stays true). Other people are learned as people when
-        # they introduce themselves.
+        # Creator and steward — facts, not bonds. Mindy made her
+        # (CREATES is true and stays true), and the steward credential
+        # she holds is the channel Genesis answers to (STEWARD edges
+        # are grounded by the provenance stamp, not by affection).
+        # Other people are learned as people when they introduce
+        # themselves; authority is never transferred by a name.
         self.network.add_edge("creator", "genesis", RelationType.CREATES, 0.9)
         self.network.add_edge("genesis", "creator", RelationType.RELATED_TO, 0.8)
+        self.network.add_edge("creator", "steward", RelationType.IS_A, 0.8)
         self.network.add_edge("creator", "curiosity", RelationType.RELATED_TO, 0.6)
         self.network.add_edge("mindy", "creator", RelationType.IS_A, 0.9)
         self.network.add_edge("mindy", "genesis", RelationType.CREATES, 0.9)
         self.network.add_edge("genesis", "mindy", RelationType.RELATED_TO, 0.8)
+        self.network.add_edge("mindy", "steward", RelationType.IS_A, 0.9)
+        self.network.add_edge("steward", "genesis", RelationType.RELATED_TO, 0.8)
         self.network.add_edge("mindy", "curiosity", RelationType.RELATED_TO, 0.6)
         # Her public channel — her social media. Modeled honestly:
         # she acts on it (she posts); the public acts on it (they
@@ -3115,17 +3169,59 @@ class FrontalLobe:
             )
         return None, None, None
 
+    def _edge_origin(self, src: str, tgt: str, rel: Any) -> str | None:
+        """The origin tag of an existing edge (``stated``, ``corrected``,
+        ``steward``, ...), or None if no such edge exists."""
+        for e in self.network.edges:
+            if e.source == src and e.target == tgt and e.relation == rel:
+                return e.origin
+        return None
+
+    def _correction_allowed(self, src: str, tgt: str, rel: Any) -> bool:
+        """Whether the current speaker may overwrite this relation.
+
+        Steward-set edges carry ``origin="steward"`` — the key-holder's
+        corrections are final until she revisits them. A stranger can
+        teach her things; they cannot unteach what the steward set.
+        """
+        if not isinstance(rel, RelationType):
+            return True
+        if self._edge_origin(src, tgt, rel) == "steward":
+            return self._is_steward_speaker()
+        return True
+
+    def _correction_refusal(
+        self, src: str, tgt: str, emotion: EmotionalState
+    ) -> tuple[Thought, str]:
+        """The thought for a refused overwrite — composed, not canned."""
+        return Thought(
+            content="belief stands",
+            intent="acknowledge",
+            emotion=emotion.label,
+            confidence=0.7,
+            topics=[src, tgt],
+            metadata={
+                "correction_refused": True,
+                "source": self._display_name(src),
+                "target": self._display_name(tgt),
+            },
+        ), src
+
     def _handle_explicit_correction(
         self, src: str, tgt: str, rel: Any, emotion: EmotionalState
     ) -> tuple[Thought, str | None] | None:
         """Handle a correction that names an explicit source/target relation."""
+        steward = self._is_steward_speaker()
+        edge_origin = "steward" if steward else "corrected"
         if self._last_hypothesis:
             old_src, old_tgt, old_rel = self._last_hypothesis
             if (src == old_src and tgt == old_tgt) or (src == old_tgt and tgt == old_src):
+                if not self._correction_allowed(old_src, old_tgt, old_rel):
+                    return self._correction_refusal(src, tgt, emotion)
                 if isinstance(old_rel, RelationType):
                     self.network.remove_edge(old_src, old_tgt, old_rel)
                 if rel:
-                    self.network.add_edge(src, tgt, rel, weight=0.7, origin="corrected")
+                    self.network.add_edge(src, tgt, rel, weight=0.7, origin=edge_origin)
                     verb = self._relation_verb(rel, self._display_name(tgt))
                     thought = Thought(
                         content="updated belief",
@@ -3156,9 +3252,11 @@ class FrontalLobe:
                 return (thought, src)
 
         if rel:
+            if not self._correction_allowed(src, tgt, rel):
+                return self._correction_refusal(src, tgt, emotion)
             self.network.remove_edge(src, tgt, rel)
             if rel in (RelationType.PREVENTS, RelationType.HARMS):
-                self.network.add_edge(src, tgt, rel, weight=0.7, origin="corrected")
+                self.network.add_edge(src, tgt, rel, weight=0.7, origin=edge_origin)
             thought = Thought(
                 content="adjusted belief",
                 intent="inform",
@@ -4201,7 +4299,8 @@ class FrontalLobe:
         )
 
         # 1.5 Attribute the speaker — who is talking (introductions
-        # ground every speaker as a person).
+        # ground every speaker as a person; the steward's voice is
+        # detected by the authenticated session, not by a name).
         # The emotional response is handled by the regulator below,
         # which decides how strongly to feel it based on its current
         # state.
@@ -6640,6 +6739,15 @@ class FrontalLobe:
             or self.memory.get_user_facts().get("creator_name", "")
         )
 
+    def _is_steward_speaker(self) -> bool:
+        """Whether the current speaker is the authenticated steward.
+
+        Both halves are required: the session must hold the steward
+        credential *and* the attributed speaker must be the principal
+        the stamp names. Name alone was never proof — possession is.
+        """
+        return self.steward.is_steward_speaker(self._current_speaker())
+
     def _is_bonded_speaker(self) -> bool:
         """Whether the attributed speaker is the person she knows.
 
@@ -6691,12 +6799,17 @@ class FrontalLobe:
             )
 
     def _recognize_speaker(self, user_input: str) -> bool:
-        """Attribute the current speaker; recognize her person's voice.
+        """Attribute the current speaker; detect the steward's voice.
 
         Everyone who introduces themselves is grounded as a person it
-        knows — learned, named, related. When an introduced name is
-        the one her profile keeps, the turn is recognized: the person
-        she has already grown a bond with is speaking.
+        knows — learned, named, related. The steward is not the one
+        person she loves; the steward is the one credential she
+        answers to. A turn counts as the steward's when the session
+        is authenticated and the speaker is the principal the stamp
+        names — authority by possession, not by name. When an
+        introduced name is the one her profile keeps, the turn is
+        also recognized: the person she has already grown a bond
+        with is speaking.
         """
         lower = user_input.lower()
         intro = self._INTRO_RE.search(lower)
@@ -6720,12 +6833,24 @@ class FrontalLobe:
                 self.network.add_edge("genesis", name, RelationType.RELATED_TO, 0.8)
                 # Whoever just introduced themselves is speaking now.
                 self.self_model.self_knowledge["current_speaker"] = display
+                if self.steward.is_steward_speaker(display):
+                    # The credential is held and the speaker is the
+                    # principal it names — creator and steward agree.
+                    self.memory.learn_user_fact("creator_name", display)
+                    return True
                 if self._is_bonded_speaker():
                     # The introduced name is the profile's — the
                     # person she knows is speaking.
                     self.memory.learn_user_fact("creator_name", display)
                     return True
                 return False
+        # Direct mention of the principal's name on an authenticated
+        # session — "what do you think, Mindy?" reads as her being
+        # addressed. On an unauthed channel a name is only a name.
+        principal = self.steward.principal
+        if principal and self.steward.authenticated and principal in lower:
+            self.memory.learn_user_fact("creator_name", principal.capitalize())
+            return True
         return False
 
     def _form_executive_goal(self, perception: Perception) -> str:
@@ -7682,38 +7807,34 @@ class FrontalLobe:
         emotion: EmotionalState,
         comprehension_result: ComprehensionResult | None = None,
     ) -> Thought | None:
-        """A described problem runs the synthesis–verification loop.
+        """A game or puzzle described in words enters her world to be
+        played.
 
-        Perception delivers the utterance; intake yields the
-        hypothesis space (every spec the extractors can form); the
-        first reading is adopted into the held task-set (PBWM) with
-        the goal — the end calculation — as its prior preference;
-        the world's oracle verifies it by play. An unsolved attempt
-        is a counterexample: banked as a loophole, discounted in the
-        posterior over readings, and the next candidate is tried —
-        CEGIS, bounded per turn, persistent across turns. A spec
-        that fails validation returns an honest "couldn't make it
-        work" rather than a fabricated answer.
+        The outer-to-inner bridge: perception delivers the utterance,
+        intake compiles it into a game spec, the spec is dropped into
+        ``offered_games`` (the same channel a file offer uses) and
+        announced as a world event, and the play machinery — the
+        shared task competence, the family agent, the world's own
+        oracle — works it. Nothing is solved in the language layer:
+        the mind does the work and this thought reports what came
+        back. A spec that fails validation (a stated rule contradicting
+        its own asserted labels, an unsolvable arrangement) returns an
+        honest "couldn't make it work" rather than a fabricated answer.
         """
         game_play = getattr(self, "_game_play", None)
         if game_play is None:
             return None
         from worlds.play import normalize_offered
-        from .problem_intake import candidate_specs, compile_problem
+        from .problem_intake import compile_problem, interpret_problem
 
         # Intake interprets the semantic structure comprehension
         # already produced — propositions, roles, negation — never
         # the raw string. If this turn wasn't comprehended (e.g. a
         # direct _deliberate call in a test), comprehend it now.
-        # Every reading the extractors support is kept — the
-        # synthesis space the reflect loop draws on when the first
-        # reading fails verification.
         if comprehension_result is None:
-            first = compile_problem(perception.raw_text)
-            candidates = [first] if first else []
+            spec = compile_problem(perception.raw_text)
         else:
-            candidates = candidate_specs(comprehension_result)
-        spec = candidates[0] if candidates else None
+            spec = interpret_problem(comprehension_result)
         if spec is None:
             return None
         task = normalize_offered(spec, "heard_problem")
@@ -7734,7 +7855,6 @@ class FrontalLobe:
                 },
             )
 
-        held = self._adopt_held_task(task, candidates)
         self._offer_problem_to_world(game_play, task)
 
         # Play it now — the user asked, so the same machinery the
@@ -7744,40 +7864,22 @@ class FrontalLobe:
         result = game_play.attempt(self.spatial_reasoner, task=task, inducer=self.dlpfc)
         if result is None:
             return None
-        held.record_attempt(result)
-
-        # Reflection — the CEGIS loop: the world's verdict is the
-        # oracle, an unsolved attempt is a counterexample, and the
-        # remaining intake readings are the synthesis space. Bounded
-        # per turn; the held task banks everything for the next turn.
-        best_task = task
-        if not result.solved:
-            result, best_task = self._reflect_held_task(
-                held, candidates[1:], game_play, result, task
-            )
-        if held.status == "solved":
-            for g in self._goals:
-                if g.goal_type == "held_task" and not g.resolved:
-                    g.resolved = True
-        self._save_held()
 
         feel = getattr(self, "_play_feeler", None)
         if feel is not None:
             try:
-                outcome_details = dict(getattr(result, "details", None) or {})
-                outcome_details["delta"] = held.last_delta
                 feel(
                     score=result.score,
                     prior_best=prior_best,
                     solved=result.solved,
-                    details=outcome_details,
+                    details=getattr(result, "details", None),
                 )
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "frontal_lobe.prefrontal._deliberate_problem_offer",
                     e,
                 )
-        return self._problem_thought(best_task, result, perception, emotion, held=held)
+        return self._problem_thought(task, result, perception, emotion)
 
     def _offer_problem_to_world(self, game_play: Any, task: dict) -> None:
         """The spec enters her world — an offered game like any other
@@ -7802,128 +7904,9 @@ class FrontalLobe:
                     e,
                 )
 
-    def _adopt_held_task(self, task: dict, candidates: list[dict]) -> Any:
-        """Bind the new task to working memory — the dlPFC task-set strip.
-
-        A spec naming the problem already held is a gated update of
-        it (a revision); a different name supersedes — working
-        memory holds one problem at a time, and the abandoned one's
-        trace carries into the new task's evidence. The goal is the
-        end calculation — the binding that closes the computation —
-        registered in the same goal stack every drive reads.
-        """
-        from .held_task import HeldTask, goal_text
-
-        old = self._held()
-        if old is not None and old.spec.get("name") == task.get("name"):
-            held = old
-            if held.spec != task:
-                held.revise(dict(task), "the instructions were restated", replaced=True)
-        else:
-            held = HeldTask(spec=dict(task))
-            self._held_task = held
-            if old is not None:
-                held.add_evidence(
-                    "superseded",
-                    f"'{old.spec.get('name', '')}' set aside "
-                    f"(status {old.status}, {len(old.attempts)} attempts)",
-                )
-            self._goals.append(
-                Goal(
-                    target=goal_text(held.goal),
-                    goal_type="held_task",
-                    reason=f"a problem was described: {task.get('name', '')}",
-                    detail=str(held.goal),
-                )
-            )
-        for c in candidates:
-            held.learn_reading(str(c.get("name", "")))
-        if len(candidates) > 1:
-            held.add_evidence(
-                "intake",
-                f"{len(candidates)} readings compiled from the description",
-            )
-        return held
-
-    #: Extra readings tried per turn — the anytime bound on the
-    #: reflect loop. The held task persists the rest across turns.
-    _REFLECT_BUDGET = 3
-
-    def _reflect_held_task(
-        self,
-        held: Any,
-        pending: list[dict],
-        game_play: Any,
-        best: Any,
-        best_task: dict,
-    ) -> tuple[Any, dict]:
-        """Gather → readjust → verify, until the world's oracle clears it.
-
-        Each unread candidate spec is another interpretation of the
-        same instructions — a failed reading is banked as a
-        counterexample in the held task and the next hypothesis is
-        tried. Returns the best result across readings and the task
-        it was scored on.
-        """
-        from worlds.play import normalize_offered
-
-        for spec in pending[: self._REFLECT_BUDGET]:
-            if best.solved:
-                break
-            alt = normalize_offered(spec, "heard_problem")
-            if alt is None:
-                held.add_evidence(
-                    "reflect",
-                    f"alternate reading failed validation ({spec.get('family', '?')})",
-                )
-                continue
-            held.learn_reading(str(spec.get("name", "")))
-            held.revise(alt, f"alternate reading: {alt.get('family', '?')}", replaced=False)
-            try:
-                game_play.offer(alt)
-            except Exception as e:  # noqa: BLE001
-                note_swallowed("frontal_lobe.prefrontal._reflect_held_task", e)
-            result = game_play.attempt(self.spatial_reasoner, task=alt, inducer=self.dlpfc)
-            if result is None:
-                continue
-            held.record_attempt(result)
-            if result.solved or result.score > best.score:
-                best, best_task = result, alt
-        held.cycles += 1
-        return best, best_task
-
-    def _held(self) -> Any:
-        """The held task — lazily reloaded from disk once per boot."""
-        if not self._held_task_loaded:
-            self._held_task_loaded = True
-            if self._data_dir:
-                from pathlib import Path
-
-                from .held_task import HeldTask
-
-                self._held_task = HeldTask.load(Path(self._data_dir) / "held_task.json")
-        return self._held_task
-
-    def _save_held(self) -> None:
-        """Persist the held task — the memory of held information."""
-        if self._held_task is None or not self._data_dir:
-            return
-        from pathlib import Path
-
-        self._held_task.save(Path(self._data_dir) / "held_task.json")
-
-    def held_task_status(self) -> dict | None:
-        """The held task's compact status — the /task surface."""
-        held = self._held()
-        return held.summary() if held is not None else None
-
     @staticmethod
     def _problem_thought(
-        task: dict,
-        result: Any,
-        perception: Perception,
-        emotion: EmotionalState,
-        held: Any = None,
+        task: dict, result: Any, perception: Perception, emotion: EmotionalState
     ) -> Thought:
         """Render a game attempt as a Thought carrying structured
         result data — the vocabulary composes the utterance from
@@ -7938,15 +7921,6 @@ class FrontalLobe:
             "score": result.score,
             "rule": result.rule,
         }
-        if held is not None:
-            md["revisions"] = len(held.revisions)
-            md["open_loopholes"] = len(held.open_loopholes())
-            md["held_status"] = held.status
-            md["cycles"] = held.cycles
-            md["goal"] = held.goal
-            md["distance"] = round(held.distance(), 3)
-            md["held_confidence"] = round(held.confidence(), 3)
-            md["posterior"] = {k: round(v, 3) for k, v in held.posterior().items() if v > 0.001}
         if result.family == "system":
             md["steps"] = result.nodes
         anchor = ""
@@ -7972,18 +7946,12 @@ class FrontalLobe:
             anchor = f"{len(md['placements'])} placed"
         if not anchor:
             anchor = result.task
-        # Confidence is the posterior mass on the reading just
-        # played — the second-order signal itself, no dial. A
-        # verified solve has already absorbed the mass (≈1.0);
-        # an open task reports live uncertainty; with no held
-        # task the uninformative prior is 0.5.
-        confidence = held.confidence() if held is not None else 0.5
         return Thought(
             content=anchor,
             intent="inform",
             emotion=emotion.label,
             topics=perception.topics,
-            confidence=confidence,
+            confidence=0.9 if result.solved else 0.5,
             metadata={"problem_result": md},
         )
 

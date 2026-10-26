@@ -5,7 +5,7 @@ ANATOMY AND FUNCTION
 ════════════════════════════════════════════════════════════════════════
 
 The occipital subsystem is the primary visual processing center of the
-brain. It receives input from the retina (via the LGN) and contains
+brain. It receives input from the eye (via the optic nerve and LGN) and contains
 the earliest stages of the cortical visual hierarchy. In Genesis, the
 occipital subsystem implements the full ventral ("what") stream pipeline,
 from raw pixels to concept recognition.
@@ -17,7 +17,7 @@ bidirectional flow is the core computational principle.
 
 Pipeline:
 
-    retina frame (H x W x 3, uint8)
+    nerve frame (H x W x 3, uint8)
         |
         v
     [V1] Primary visual cortex (Brodmann area 17)
@@ -348,13 +348,13 @@ MODULE ORGANIZATION
 
 Top-level modules referenced by this subsystem:
 
-    (perception/) retina.py
-        Retina — zero-copy access to the Rust retina shared-memory
-        camera feed. This is the eye: the retina captures photons
-        (camera frames) and passes them to the LGN for processing.
-        Anatomically the retina is not part of the occipital subsystem
-        (it's in the eye), but functionally it's the input to the
-        visual pathway.
+    (genesis_client/) optic_nerve.py
+        OpticNerve — zero-copy access to the body's optic-nerve
+        shared-memory frame feed. The nerve carries what the eye
+        captured — the daemon owns the camera itself — and hands it
+        to the LGN for processing. Anatomically the nerve is not part
+        of the occipital subsystem (it's the afferent path), but
+        functionally it's the input to the visual pathway.
 
     (perception/) lgn.py
         LGN (Lateral Geniculate Nucleus) — thalamic visual relay with
@@ -365,7 +365,8 @@ Top-level modules referenced by this subsystem:
         organization of the primate LGN.
 
     (perception/) vision.py
-        Vision — the bridge between the raw camera feed (retina.py)
+        Vision — the bridge between the raw camera feed (the body's
+        optic nerve)
         and Genesis's cognitive experience. Produces rich, human-like
         scene descriptions combining color, objects, faces, lighting,
         and spatial layout. This is the visual association cortex —
@@ -392,7 +393,7 @@ from __future__ import annotations
 from _views import view_getattr
 
 from .image_utils import decode_image_bytes, load_image, resize_for_vision
-from .lgn import LGNOutput, LGNRelay, lgn_from_retina
+from .lgn import LGNOutput, LGNRelay, lgn_from_nerve
 from .v1 import V1Model, VisualContour, VisualFeature, VisualField
 from .v4 import V4Model
 from .visual_cortex import VisualCortex, VisualPercept
@@ -412,7 +413,7 @@ __all__ = [
     "VisualPercept",
     "create_visual_pathway",
     "decode_image_bytes",
-    "lgn_from_retina",
+    "lgn_from_nerve",
     "load_image",
     "resize_for_vision",
 ]
@@ -426,7 +427,7 @@ __all__ = [
 # re-exports the language and memory packages, which sit upstream in
 # the import graph — an eager import here would close a cycle.
 #
-# The retina (the eye's sensor sheet) and the visual association
+# The optic nerve (the afferent frame wire) and the visual association
 # cortex (unified scene perception) are lazily re-exported for the
 # same reason: ``perception.vision`` imports V1 from this package,
 # so eagerly importing it here creates a cycle. PEP 562 resolution
@@ -444,7 +445,7 @@ _EXPORTS: dict[str, str] = {
     "EpipolarProcessor": "occipital_lobe.epipolar",
     "TwoViewReport": "occipital_lobe.epipolar",
     "MemoryBridge": "temporal_lobe.mtl_bridge",
-    "Retina": "genesis_client.retina",
+    "OpticNerve": "genesis_client.optic_nerve",
     "TrainingExample": "temporal_lobe.mtl_bridge",
     "VTCFeatureSpace": "temporal_lobe.vtc",
     "Vision": "occipital_lobe.perception.vision",
@@ -466,7 +467,7 @@ _EXPORTS: dict[str, str] = {
     "retinal_irradiance": "occipital_lobe.perception.optics",
     # The illuminant/reflectance split — retinex E/ρ decomposition,
     # von Kries chromatic adaptation, light direction, shadow
-    # candidates. The LGN/retina computation cortex inherits.
+    # candidates. The retinal/LGN computation cortex inherits.
     "Illumination": "occipital_lobe.perception.illumination",
     # The cone transduction cascade — photoreceptor biochemistry
     # behind the afferent signal.
@@ -478,7 +479,7 @@ _EXPORTS: dict[str, str] = {
     # LGN — thalamic visual relay with M/P/K pathway separation
     "LGNOutput": "occipital_lobe.lgn",
     "LGNRelay": "occipital_lobe.lgn",
-    "lgn_from_retina": "occipital_lobe.lgn",
+    "lgn_from_nerve": "occipital_lobe.lgn",
     # Cone opponency — retinal/LGN color math (sRGB→LMS, opponent
     # channels, CIE Lab) feeding the M/P/K separation
     "srgb_to_linear": "occipital_lobe.color",
@@ -491,7 +492,7 @@ _EXPORTS: dict[str, str] = {
     "xyz_to_lab": "occipital_lobe.color",
     # V4 — mid-level visual cortex (chromatic, shape processing)
     "V4Model": "occipital_lobe.v4",
-    # Visual pathway orchestrator — retina → LGN → V1 → dorsal/ventral streams
+    # Visual pathway orchestrator — nerve → LGN → V1 → dorsal/ventral streams
     "VisualPathway": "occipital_lobe.visual_pathway",
     "VisualPathwayOutput": "occipital_lobe.visual_pathway",
     "create_visual_pathway": "occipital_lobe.visual_pathway",
@@ -511,12 +512,12 @@ __all__ = [
     "MotionProcessor",
     "MotionRegion",
     "OccipitalLobe",
+    "OpticNerve",
     "OpticalResult",
     "PGOWave",
     "PhototransductionCascade",
     "PhototransductionParams",
     "PhototransductionState",
-    "Retina",
     "TrainingExample",
     "TwoViewReport",
     "V1Model",
@@ -537,7 +538,7 @@ __all__ = [
     "defocus_sigma",
     "hue_angle",
     "irradiance_gain",
-    "lgn_from_retina",
+    "lgn_from_nerve",
     "load_image",
     "resize_for_vision",
     "retinal_irradiance",

@@ -223,6 +223,7 @@ const WORK_SLICE_ITERS: u32 = 4096;
 /// Carrier frequencies keyed by body phase. The body's own rhythm,
 /// written into real work — not a claim about what the rhythm means.
 const CARRIER_WAKE_HZ: f32 = 10.0;
+const CARRIER_DROWSY_HZ: f32 = 5.5;
 const CARRIER_REM_HZ: f32 = 5.5;
 const CARRIER_NREM_HZ: f32 = 2.25;
 
@@ -1692,12 +1693,15 @@ impl FieldProbe {
     }
 
     /// Carrier frequency for the body's phase name. Wake ≈ alpha,
-    /// REM ≈ theta, NREM ≈ delta — the body's actual state carried
-    /// on real work. Unknown/absent phase → wake rate.
+    /// drowsy/REM ≈ theta, NREM ≈ delta — the body's actual state
+    /// carried on real work. Drowsy is the N1 descent: alpha drops
+    /// out and theta dominates the resting mind (same band REM
+    /// rides). Unknown/absent phase → wake rate.
     fn carrier_for_phase(phase: &str) -> f32 {
         match phase {
             "nrem" => CARRIER_NREM_HZ,
             "rem" => CARRIER_REM_HZ,
+            "drowsy" => CARRIER_DROWSY_HZ,
             _ => CARRIER_WAKE_HZ,
         }
     }
@@ -2307,6 +2311,7 @@ mod tests {
     fn carrier_maps_phase() {
         assert_eq!(FieldProbe::carrier_for_phase("nrem"), CARRIER_NREM_HZ);
         assert_eq!(FieldProbe::carrier_for_phase("rem"), CARRIER_REM_HZ);
+        assert_eq!(FieldProbe::carrier_for_phase("drowsy"), CARRIER_DROWSY_HZ);
         assert_eq!(FieldProbe::carrier_for_phase("active"), CARRIER_WAKE_HZ);
     }
 

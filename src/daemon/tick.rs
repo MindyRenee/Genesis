@@ -354,7 +354,7 @@ impl TickLoop {
             zone_tally: Default::default(),
             phase_tally: Default::default(),
             intention_manager: IntentionManager::new(4),
-            interoceptor: Interoceptor::new_with_data_dir(data_dir),
+            interoceptor: Interoceptor::new(),
             last_body_state: super::interoception::BodyState::neutral(),
             inference_engine,
             dyadic_model: DyadicAffectModel::new(),

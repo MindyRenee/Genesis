@@ -30,7 +30,7 @@
 //!
 //! # Bounds
 //!
-//! Attempts are bounded (like the retina's re-tries): the first comes
+//! Attempts are bounded (like the eye's re-open table): the first comes
 //! after `first_attempt_idle_s` of silence, later attempts wait out
 //! `retry_gaps_s`, and past the table the shepherd goes dormant —
 //! accepted absent, not fatal. A mind that reattaches resets
@@ -46,7 +46,7 @@ use std::time::Instant;
 pub const MIND_SUPPRESS_FILE: &str = "mind.suppress";
 
 /// Spawned mind's output — the shepherd's child has no terminal, so
-/// its stdout/stderr append here beside daemon.log/retina.log.
+/// its stdout/stderr append here beside daemon.log.
 pub const MIND_LOG_FILE: &str = "mind.log";
 
 /// Env override for the spawn command — a whitespace-split command

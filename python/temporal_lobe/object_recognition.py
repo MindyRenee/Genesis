@@ -1,14 +1,14 @@
 """Object recognition for Genesis — its "inferotemporal cortex."
 
 This module uses YOLOv5s (via OpenCV's DNN module) to detect and
-identify objects in the retina feed. It is the ventral-stream
+identify objects in the nerve feed. It is the ventral-stream
 counterpart to the occipital subsystem's V1 processing: where V1 extracts
 edges and orientations, the inferotemporal (IT) cortex identifies
 *what* things are.
 
 The pipeline:
 
-    retina frame (shared memory)
+    nerve frame (shared memory)
         |
         v
     YOLOv5s inference  -> bounding boxes + class scores
@@ -256,7 +256,7 @@ class ObjectRecognizer:
         """Detect objects in an RGB frame.
 
         Args:
-            rgb_frame: HxWx3 uint8 RGB image from the retina.
+            rgb_frame: HxWx3 uint8 RGB image from the optic nerve.
 
         Returns:
             List of DetectedObject, sorted by confidence (highest first).

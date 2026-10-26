@@ -1,13 +1,14 @@
-"""Vision for Genesis — interprets the retina's shared-memory camera feed.
+"""Vision for Genesis — interprets the optic nerve's shared-memory feed.
 
-This module is the bridge between the raw camera feed (retina.py) and
+This module is the bridge between the raw camera feed (the body's
+optic nerve, read through ``genesis_client.optic_nerve``) and
 Genesis's cognitive experience. It produces a structured scene percept
 — color, objects, faces, lighting, and spatial layout as data — that
 the language engine composes its report from.
 
 The pipeline:
 
-    retina frame (shared memory)
+    nerve frame (shared memory)
         |
         v
     thalamic relay gate     -> the body's GET_OPTIC_STATE relay_gain;
@@ -64,13 +65,13 @@ from occipital_lobe.v1 import name_color
 from temporal_lobe import DetectedObject, ObjectRecognizer
 from temporal_lobe.concepts import RelationType
 
+from genesis_client.optic_nerve import latest_frame
 from genesis_client.protocol import (
     CHEM_ACETYLCHOLINE,
     CHEM_DOPAMINE,
     CHEM_NOREPINEPHRINE,
     CHEM_OXYTOCIN,
 )
-from genesis_client.retina import latest_frame
 from genesis_client.swallow import note_swallowed
 
 from ..epipolar import EpipolarProcessor, TwoViewReport
@@ -217,7 +218,7 @@ class VisionScene:
 
 
 class Vision:
-    """Look through the retina and produce a structured scene percept.
+    """Look through the optic nerve and produce a structured scene percept.
 
     Uses the V1Model (V1 sparse-coding model) to extract structured
     visual percepts -- edges, orientations, contours, and gamma power --
@@ -299,14 +300,14 @@ class Vision:
         self._on_sight = callback
 
     def is_available(self) -> bool:
-        """Return whether a live retina feed can be read."""
+        """Return whether a live optic-nerve feed can be read."""
         if self._available is None:
             try:
                 img = latest_frame(copy=True)
                 self._available = img is not None and img.size > 0
             except (OSError, FileNotFoundError) as e:
-                # No frame on disk — no camera, or the retina is not
-                # running. That is the documented text-only degradation,
+                # No frame on disk — no camera, or the body's eye is
+                # dark. That is the documented text-only degradation,
                 # so it must not be tallied beside genuine faults.
                 logger.debug("no vision frame available: %s", e)
                 self._available = False
@@ -399,14 +400,14 @@ class Vision:
     def recognize_faces_in(self, rgb) -> tuple[list[str], int]:
         """Public face recognition for a frame from any source.
 
-        The retina path runs this as part of `see`, but a frame read
-        from an image file never passed through it — so looking at a
-        photograph detected objects and features while never detecting
-        a face in it. That made face recognition reachable only via a
-        live camera, and left her unable to recognise anyone on a
-        machine without one.
+        The optic-nerve path runs this as part of `see`, but a frame
+        read from an image file never passed through it — so looking
+        at a photograph detected objects and features while never
+        detecting a face in it. That made face recognition reachable
+        only via a live camera, and left her unable to recognise
+        anyone on a machine without one.
 
-        Returns ``(names, unknown_count)``, exactly as the retina path
+        Returns ``(names, unknown_count)``, exactly as the nerve path
         consumes it, and records the names so
         :meth:`last_faces_seen` reports them.
         """
@@ -506,10 +507,10 @@ class Vision:
         emotion: EmotionalState | None = None,
         network=None,
     ) -> VisionScene:
-        """Look through the retina and return the structured scene.
+        """Look through the optic nerve and return the structured scene.
 
         This runs the full visual pipeline:
-        1. Capture a frame from the retina (shared memory)
+        1. Capture a frame from the nerve (shared memory)
         2. Convert to RGB if needed
         3. Analyze color, lighting, and spatial layout
         4. Detect and identify objects (IT cortex)
@@ -533,7 +534,7 @@ class Vision:
             if frame is None:
                 return VisionScene(status="mid_update")
 
-            # Convert to RGB. The retina reader returns (H, W, 3) for
+            # Convert to RGB. The nerve reader returns (H, W, 3) for
             # RGB3/BGR3, (H, W, 2) packed YUYV pairs for YUYV, and the
             # raw 1-D buffer for any other fourcc — the last is not a
             # scene, so refuse it cleanly rather than misparse it.

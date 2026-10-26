@@ -1017,7 +1017,7 @@ class TestBuildScene:
         )
         assert content, "vocabulary should compose a status predicate"
         assert "vision" not in content, content
-        assert "retina" in content or "visual" in content, content
+        assert "eye" in content or "visual" in content, content
 
 
 # ─── _learn_objects ────────────────────────────────────────────────────

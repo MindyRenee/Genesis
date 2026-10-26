@@ -319,7 +319,7 @@ def test_only_one_inbound_listener() -> None:
     inbound listener (Unix or TCP, any layer) would be a second door
     into the body and must never appear. Outbound sockets (the local
     IP probe, websocket clients) are fine — they cannot accept a
-    connection. The retina's shared memory is afferent data, not an
+    connection. The optic nerve's shared memory is afferent data, not an
     entrance: no command can travel it, and the gate on it arrives
     through the socket.
     """

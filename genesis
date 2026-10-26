@@ -2,7 +2,8 @@
 # Run Genesis — start and stop everything from one script.
 #
 # This is the only supported way to start and stop Genesis.
-# Starting launches the daemon, cognitive CLI, retina, and TTS.
+# Starting launches the daemon (which captures the eye itself) and
+# the cognitive CLI with TTS.
 # Ctrl-C in the running terminal tears them all down.
 #
 # Usage: ./genesis            (wake Genesis)
@@ -63,10 +64,10 @@ fi
 DATA_DIR="$(readlink -m "${GENESIS_DATA_DIR:-$HOME/.local/share/genesis}")"
 
 # ─── PID-file helpers ────────────────────────────────────────────────
-# The CLI writes PID files for itself, the daemon, and the retina to
-# the data dir. We use these to kill exact processes instead of broad
-# pkill patterns that could match unrelated user processes (e.g.
-# "aplay", "piper", "retina" run by other applications).
+# The CLI writes PID files for itself and the daemon to the data dir.
+# We use these to kill exact processes instead of broad pkill patterns
+# that could match unrelated user processes (e.g. "aplay", "piper"
+# run by other applications).
 
 # Read a PID from a PID file. Returns 0 and echoes the PID if the file
 # exists and the PID is alive; returns 1 otherwise.
@@ -97,16 +98,6 @@ _matches_pid() {
             ;;
         genesis_daemon.pid)
             [ "${args[0]##*/}" = genesis-daemon ] || return 1
-            ;;
-        genesis_retina.pid)
-            [ "${args[0]##*/}" = retina ] || return 1
-            # Primary identity: stdout redirected to this instance's
-            # retina.log. Log rotation renames the file, so the fd may
-            # point at a rotated/deleted inode — fall back to the
-            # --data-dir argument match below in that case.
-            if [[ "$(readlink "/proc/$pid/fd/1" 2>/dev/null)" == "$DATA_DIR/retina.log"* ]]; then
-                return 0
-            fi
             ;;
         *) return 1 ;;
     esac
@@ -152,9 +143,8 @@ _matches_pid() {
 }
 
 # Echo every matching PID — the pidfile's first (it is the freshest
-# identity), then any further /proc matches. Plural matters: retina
-# holds no lock, so a second matching process must be found rather than
-# silently surviving a --stop.
+# identity), then any further /proc matches. Plural matters: a stale
+# duplicate must be found rather than silently surviving a --stop.
 _find_pids() {
     local pidfile="$1" entry pid
     _read_pid "$pidfile" 2>/dev/null
@@ -202,7 +192,6 @@ _kill_pidfile() {
 _stop_all() {
     local cli_pidfile="$DATA_DIR/genesis_cli.pid"
     local daemon_pidfile="$DATA_DIR/genesis_daemon.pid"
-    local retina_pidfile="$DATA_DIR/genesis_retina.pid"
 
     # 0. Tell the body's mind-shepherd this absence is authored —
     #    an orphaned daemon past the CLI's death must not regrow a
@@ -212,23 +201,21 @@ _stop_all() {
     # 1. Stop the cognitive CLI first (it owns the daemon lifecycle).
     #    Validate PID files and fall back to exact /proc arguments.
     #    Each step has its own 120s grace period; a failure returns
-    #    immediately so daemon/retina may be left running — retry
+    #    immediately so the daemon may be left running — retry
     #    ./genesis --stop after the CLI finishes saving state.
     _kill_pidfile "$cli_pidfile" INT || { echo "  CLI shutdown pending; retry --stop once it exits." >&2; return 1; }
 
     # 2. The helper waits for the CLI to finish before proceeding.
 
-    # 3. Gracefully stop orphaned children only after the CLI exits.
-    #    Keep their PID files on failure so shutdown can be retried.
-    #    Never interrupt an in-progress cognitive state save.
+    # 3. Gracefully stop the orphaned daemon only after the CLI exits.
+    #    Keep its PID file on failure so shutdown can be retried.
+    #    Never interrupt an in-progress cognitive state save. The eye
+    #    goes down with the body — it is a thread inside the daemon.
     _kill_pidfile "$daemon_pidfile" TERM || { echo "  Daemon shutdown pending; state preserved, retry --stop." >&2; return 1; }
-    _kill_pidfile "$retina_pidfile" TERM || { echo "  Retina shutdown pending; retry --stop." >&2; return 1; }
 
     # Fallback discovery is handled by _find_pids using /proc arguments.
     # Exact data-directory matching avoids regex metacharacters and
     # whitespace confusing unrelated processes with this instance.
-    # Retina is identified by its executable and per-instance log,
-    # not by a project-wide process-name pattern.
     # Voice subprocess cleanup remains the cognitive CLI's responsibility.
 
     # 4. Leave lock inodes intact; the owning processes clean their sockets.
@@ -239,10 +226,8 @@ _stop_all() {
 _is_running() {
     local cli_pidfile="$DATA_DIR/genesis_cli.pid"
     local daemon_pidfile="$DATA_DIR/genesis_daemon.pid"
-    local retina_pidfile="$DATA_DIR/genesis_retina.pid"
     [ -n "$(_find_pids "$cli_pidfile")" ] && return 0
     [ -n "$(_find_pids "$daemon_pidfile")" ] && return 0
-    [ -n "$(_find_pids "$retina_pidfile")" ] && return 0
     return 1
 }
 
@@ -299,8 +284,8 @@ else
 fi
 
 # Refuse to start if a Genesis mind is already running for this data dir.
-# Only the CLI blocks a new start: a surviving daemon/retina with no CLI
-# is the body outliving its last mind — the CLI adopts it rather than
+# Only the CLI blocks a new start: a surviving daemon with no CLI is
+# the body outliving its last mind — the CLI adopts it rather than
 # being refused, so mind and body are never deliberately kept apart.
 # A CLI mid-teardown still matches here and refuses, which is correct:
 # a new start must never interrupt a state save.
@@ -308,9 +293,6 @@ if [ -n "$(_find_pids "$DATA_DIR/genesis_cli.pid")" ]; then
     echo "  Genesis is already running. Stop it with: ./genesis --stop"
     exit 1
 fi
-
-# Existing retina processes for this instance are checked above.
-# Do not signal camera processes belonging to another data directory.
 
 # EXIT trap — report unfinished shutdown without interrupting state saves.
 # The CLI owns child cleanup. If startup loses a singleton-lock race,
@@ -347,7 +329,7 @@ export GENESIS_WAKE=1
 
 # Start Genesis — voice and ambient listening always on.
 # Ctrl-C in this terminal sends SIGINT to the foreground CLI, which
-# shuts down the daemon and retina before exiting; the EXIT trap
+# shuts down the daemon before exiting; the EXIT trap
 # reports any processes still needing a graceful shutdown.
 #
 # OFFLINE_ARG was parsed from the command line above (--offline for

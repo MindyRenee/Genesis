@@ -1338,7 +1338,7 @@ class StatusMixin:
             # profile for introspection.
             "user_profile_summary": self.user_profile.summarize(),
             "user_interaction_count": self.user_profile.interaction_count,
-            # Vision — whether the retina is attached and what it
+            # Vision — whether the optic nerve is attached and what it
             # last saw. Exposes last_faces_seen() and last_objects_seen()
             # for introspection so its visual state is visible alongside
             # its cognitive state.

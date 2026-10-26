@@ -337,7 +337,7 @@ class EmbodimentMixin:
         # the model inside observe(); every policy commitment made
         # against that vanished episode is stale with it. Cached plans,
         # retrial entities, perseveration, and re-embodiment counts all
-        # name the old world, not the one now on the retina.
+        # name the old world, not the one now in view.
         if any(event.kind in {"reset", "win"} for event in events):
             self._world_policy.reset()
         events.extend(self._recognize_scene_change(scene))
@@ -1357,7 +1357,7 @@ class EmbodimentMixin:
         if frame is None:
             return self.vision.perceive_scene(network=self.brain.frontal.network)
         # A 2-D integer frame (game pixels) is already a grid —
-        # no retina quantization needed.
+        # no sensor quantization needed.
         try:
             import numpy as np
 

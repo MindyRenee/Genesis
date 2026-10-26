@@ -1388,7 +1388,9 @@ class BodyState:
 #   [f32 cache_miss_rate][f32 branch_miss_rate]
 #
 # Subsystem tags: 0 = daemon (subcognitive), 1 = cognitive mind,
-# 2 = retina.
+# 2 = retired (the eye was once a standalone retina process; its
+# capture is a daemon thread now — nothing is tagged 2 anymore, but
+# old telemetry still decodes by name).
 
 LOBE_NAMES = {0: "daemon", 1: "cognitive", 2: "retina"}
 
@@ -1551,7 +1553,7 @@ class SubsystemReport:
     """Combined GET_SUBSYSTEM_TELEMETRY response.
 
     ``subsystems`` are hardware-measured per-process records (daemon /
-    cognitive / retina); ``modules`` are the self-reported brain
+    cognitive); ``modules`` are the self-reported brain
     parts from the runtime manifest. The module section is empty
     when talking to a daemon that predates it or before the mind
     has registered its modules.
@@ -1723,7 +1725,7 @@ class ZoneTransitions:
 # Response: [u16 alive_mask][u16 deaths][u8 last_death]
 #
 # A subsystem that died used to vanish from the telemetry with no
-# trace, so a crashed retina was indistinguishable from one that was
+# trace, so a crashed organ was indistinguishable from one that was
 # never started. This reports liveness explicitly and counts losses.
 
 
@@ -2235,7 +2237,7 @@ class FieldProbeSignature:
 @dataclass(frozen=True, slots=True)
 class OpticState:
     """The optic nerve's subcortical channel state — the body's own
-    read of the retinal segment (GET_OPTIC_STATE).
+    read of its nerve segment (GET_OPTIC_STATE).
 
     Not pixels: the optic nerve's non-image-forming branches pooled
     into the signals the SCN, superior colliculus, and thalamic relay

@@ -1,12 +1,13 @@
-//! Optic nerve — the retinal afferent's subcortical branches into the body.
+//! Optic nerve — the whole retinal afferent path, held inside the body.
 //!
-//! The `retina` capture process writes raw frames into the POSIX
-//! shared-memory segment `/genesis_retina` — that segment is the optic
-//! nerve. Anatomically the nerve does not reach cortex directly: its
-//! ~10⁶ ganglion-cell axons fan out to roughly forty subcortical
-//! targets, and only the thalamocortical radiation carries what the
-//! thalamus relays onward. The subcortical recipients matter as much
-//! as the relay:
+//! The nerve's retinal end is the body's own limb: the daemon opens
+//! the camera itself and writes raw frames into the POSIX
+//! shared-memory segment `/genesis_optic_nerve` — that segment is
+//! the optic nerve. Anatomically the nerve does not reach cortex
+//! directly: its ~10⁶ ganglion-cell axons fan out to roughly forty
+//! subcortical targets, and only the thalamocortical radiation
+//! carries what the thalamus relays onward. The subcortical
+//! recipients matter as much as the relay:
 //!
 //! - **Suprachiasmatic nucleus (SCN)** — retinal illuminance via the
 //!   retinohypothalamic tract, carried almost exclusively by
@@ -47,29 +48,43 @@
 //! a flash can still wake), half-mast drowsy, open awake. Sleep
 //! miosis and the ciliary's release to rest ride the same closure.
 //!
-//! What is deliberately NOT here: no pixels leave this module. The
-//! frame scan computes a handful of scalar channel signals (the same
-//! thing the RHT, tectal, and pretectal fibres carry — there is no
-//! image on those axons either). Image-forming content stays on the
-//! shared-memory bus for the mind's V1, gated by `relay_gain`.
+//! What is deliberately NOT here: semantics. Everything in this
+//! module is machine math — bytes, atomics, pooled scalar channels
+//! (the same thing the RHT, tectal, and pretectal fibres carry —
+//! there is no image on those axons either). Image-forming content
+//! stays on the shared-memory bus for the mind's V1, gated by
+//! `relay_gain`, and the meaning of the pixels lives entirely in the
+//! mind — the words side.
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::ffi::CString;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::thread::{self, JoinHandle};
+use std::time::{Duration, Instant};
+
+use v4l::Device;
+use v4l::buffer::Type;
+use v4l::format::FourCC;
+use v4l::io::mmap::Stream as MmapStream;
+use v4l::io::traits::CaptureStream;
+use v4l::video::Capture;
 
 use crate::state::sanitize::finite_clamp;
 use crate::state::zones::MentalPhase;
 
-/// POSIX name of the retinal segment — the same constant the `retina`
-/// binary writes and the Python mind reads (`src/bin/retina.rs`,
-/// `occipital_lobe/perception/retina.py`).
-pub const SHM_NAME: &str = "/genesis_retina";
+/// POSIX name of the optic-nerve segment — the same constant the
+/// capture limb writes and the Python mind reads
+/// (`genesis_client/optic_nerve.py`).
+pub const SHM_NAME: &str = "/genesis_optic_nerve";
 
-/// Header layout written by the retina process:
+/// Header layout written by the capture limb:
 /// `[u64 seqlock][u32 width][u32 height][4B fourcc][u32 size][u32 stride]`.
 const HEADER_SIZE: usize = 28;
 
 /// A frame is "live" while the last consumed frame is younger than
-/// this. Past it the feed is stale (camera stalled, retina dead) and
-/// the circadian input falls back to the photoperiod.
+/// this. Past it the feed is stale (camera stalled, the capture limb
+/// dead or still retrying) and the circadian input falls back to the
+/// photoperiod.
 const FRESH_WINDOW_MS: u64 = 5_000;
 
 /// Pixels sampled per frame read. The subcortical channels carry
@@ -181,11 +196,11 @@ const ACCOM_TAU_FAR_S: f32 = 0.7;
 pub struct OpticNerve {
     /// Segment name — a parameter so tests can use private segments.
     shm_name: String,
-    /// The open shared-memory attachment; `None` until the retina
-    /// process creates the segment, re-tried every sample.
+    /// The open shared-memory attachment; `None` until the capture
+    /// limb creates the segment, re-tried every sample.
     shm: Option<shared_memory::Shmem>,
     /// Last consumed seqlock value — a frame is consumed once, so an
-    /// unchanged counter means the retina has not written since.
+    /// unchanged counter means the limb has not written since.
     last_seq: u64,
     /// `current_ms` of the last consumed frame (0 = never).
     last_fresh_ms: u64,
@@ -245,8 +260,9 @@ pub struct OpticNerve {
 
 // SAFETY: `OpticNerve` holds a `shared_memory::Shmem`, which is !Send
 // only because `MapData` stores the mapping's `*mut u8`. The pointer
-// names a process-wide POSIX shared-memory mapping owned by the retina
-// process (this attachment is never the owner and never unlinks), and
+// names a process-wide POSIX shared-memory mapping owned by the
+// capture limb (this attachment is never the owner and never
+// unlinks), and
 // every access through it here is a read bounded by the segment length.
 // Moving the handle between threads moves no ownership of the mapping
 // and enables no aliased mutation, so Send is sound.
@@ -364,8 +380,8 @@ impl OpticNerve {
     /// stalled segments are the no-eye condition — the afference just
     /// reports no fresh input, it is never a fault.
     pub fn sample(&mut self, now_ms: u64) {
-        // A stale feed can mean the mapping is a corpse: the retina
-        // unlinks the segment on exit, and a reincarnated retina
+        // A stale feed can mean the mapping is a corpse: a dead limb
+        // unlinks the segment on its way out, and the next life
         // creates a *new* object under the same name — this handle
         // still points at the dead one, whose counter is frozen
         // forever. Once frames have been seen, a feed that stays
@@ -381,8 +397,9 @@ impl OpticNerve {
         if self.shm.is_none() {
             match shared_memory::ShmemConf::new().os_id(&self.shm_name).open() {
                 Ok(s) => {
-                    // The retina owns the segment's lifetime; we are
-                    // a recipient, so unlinking is never ours to do.
+                    // The capture limb owns the segment's lifetime;
+                    // we are a recipient, so unlinking is never ours
+                    // to do.
                     self.shm = Some(s);
                 }
                 Err(_) => return,
@@ -392,7 +409,7 @@ impl OpticNerve {
         let base = shm.as_ptr();
 
         // Seqlock read, same protocol as the Python reader and the
-        // retina writer: even counter = complete frame, odd = write in
+        // capture-limb writer: even counter = complete frame, odd = write in
         // progress, changed across the read = torn. The pixel pooling
         // runs inside the bracket too — stats accumulate into locals
         // and only commit after the second counter read verifies.
@@ -766,21 +783,397 @@ impl Default for OpticNerve {
     }
 }
 
+// ─── The retinal end — the body's own capture limb ────────────────
+//
+// The eye is part of the body now. This limb does everything the old
+// standalone `retina` process did — V4L2 open, format negotiation,
+// the 28-byte header, seqlock frame writes — as a thread the daemon
+// owns instead of a process the mind babysat. It is pure machine
+// math: bytes onto the bus, no semantics — the meaning of the pixels
+// belongs to the mind, the words side.
+//
+// Retry lives here too: an absent or dying camera is re-opened on
+// the same bounded table the mind's rebirth watcher kept for the
+// process, then accepted absent — sight is a degradation, never a
+// fault. The daemon is never at risk: every failure in the limb is
+// logging, a count, and a backoff, never a panic.
+
+/// Bounded re-open table: after each un-lived life the limb waits
+/// this long before the next attempt — the same widening sequence
+/// the process-level rebirth used.
+const EYE_BACKOFF_S: [u64; 5] = [2, 5, 15, 30, 60];
+
+/// A life at least this long counts the eye as having lived — the
+/// attempt count refunds, the same stability rule the watcher kept.
+const EYE_STABLE_S: f64 = 60.0;
+
+/// Consecutive dequeue errors that declare the device lost; at the
+/// 500 ms error sleep this is ~15 s of a truly dead camera before
+/// the limb counts it a life ended and re-opens.
+const EYE_ERR_LIMIT: u32 = 30;
+
+/// The eye's handle: a stop flag, the segment's POSIX name for
+/// unlinking, and the capture thread. `stop()` flags the limb out
+/// and takes the name back; a thread still blocked in the driver's
+/// dequeue is reaped by the daemon's own exit — the same bound the
+/// process tree had.
+pub struct OpticCapture {
+    stop: Arc<AtomicBool>,
+    shm_name: String,
+    _limb: JoinHandle<()>,
+}
+
+impl OpticCapture {
+    /// Open the eye on its own thread. Never fails into the caller —
+    /// a missing camera just means the limb goes dark after its
+    /// bounded retries and the nerve reports no eye.
+    pub fn start() -> Self {
+        Self::with_segment(SHM_NAME)
+    }
+
+    /// Same, on a named segment (tests use private names).
+    pub fn with_segment(shm_name: &str) -> Self {
+        let stop = Arc::new(AtomicBool::new(false));
+        let shm_name = shm_name.to_string();
+        let limb = {
+            let stop = stop.clone();
+            let name = shm_name.clone();
+            thread::Builder::new()
+                .name("genesis-eye".to_string())
+                .spawn(move || capture_limb(&name, &stop))
+                .expect("spawn optic capture limb")
+        };
+        Self {
+            stop,
+            shm_name,
+            _limb: limb,
+        }
+    }
+
+    /// Close the eye: flag the limb out and unlink the segment's
+    /// name. Readers already holding the mapping keep it until they
+    /// detach; the name is gone, so nothing new attaches to a dead
+    /// eye — and a stillborn life (segment never created) unlinks
+    /// harmlessly, ENOENT.
+    pub fn stop(&self) {
+        self.stop.store(true, Ordering::Relaxed);
+        if let Ok(name) = CString::new(self.shm_name.as_str()) {
+            // SAFETY: `name` is a valid NUL-terminated CString;
+            // shm_unlink of a missing name returns ENOENT, ignored.
+            unsafe {
+                let _ = libc::shm_unlink(name.as_ptr());
+            }
+        }
+    }
+}
+
+impl Drop for OpticCapture {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
+/// The limb's whole existence: a life, a count, a pause, another
+/// life. Every death lands here once — the same accounting the
+/// mind's rebirth watcher kept for the standalone process, now held
+/// where the loss actually happens. Bounded: after the table's
+/// worth of un-lived lives the eye is accepted absent and the limb
+/// rests — the organism goes on without sight.
+fn capture_limb(shm_name: &str, stop: &AtomicBool) {
+    let camera_path = std::env::var("GENESIS_CAMERA").unwrap_or_else(|_| "/dev/video0".to_string());
+    let camera_index = camera_path
+        .strip_prefix("/dev/video")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    let mut deaths = 0usize;
+    while !stop.load(Ordering::Relaxed) {
+        if deaths >= EYE_BACKOFF_S.len() {
+            eprintln!(
+                "[genesis] the eye will not re-open — accepted absent; \
+                 the body goes on without sight"
+            );
+            return;
+        }
+        let lived = eye_life(shm_name, camera_index, &camera_path, stop);
+        if stop.load(Ordering::Relaxed) {
+            return;
+        }
+        if lived >= EYE_STABLE_S {
+            // A life past the stability window refunds the count —
+            // only sustained failure spends the table.
+            deaths = 0;
+            continue;
+        }
+        let slot = deaths.min(EYE_BACKOFF_S.len() - 1);
+        deaths += 1;
+        for _ in 0..EYE_BACKOFF_S[slot] * 10 {
+            if stop.load(Ordering::Relaxed) {
+                return;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+    }
+}
+
+/// One life of the eye: device open → format negotiate → segment
+/// create → frame loop, until the hardware fails or `stop` lands.
+/// Returns the seconds the eye stayed open — `EYE_STABLE_S` is the
+/// refund threshold. Every failure inside is quiet logging, never a
+/// panic: this thread dying must never cost the body.
+fn eye_life(shm_name: &str, camera_index: usize, camera_path: &str, stop: &AtomicBool) -> f64 {
+    let born = Instant::now();
+
+    // Open the V4L2 capture device. EBUSY is transient — a previous
+    // owner can still be releasing the device — so it gets a short
+    // retry window before the life is declared stillborn.
+    let mut dev = None;
+    for _ in 0..10 {
+        match Device::new(camera_index) {
+            Ok(d) => {
+                dev = Some(d);
+                break;
+            }
+            Err(e) if e.raw_os_error() == Some(libc::EBUSY) => {
+                if stop.load(Ordering::Relaxed) {
+                    return 0.0;
+                }
+                thread::sleep(Duration::from_millis(200));
+            }
+            Err(e) => {
+                eprintln!("[genesis] eye: cannot open {camera_path}: {e}");
+                return born.elapsed().as_secs_f64();
+            }
+        }
+    }
+    let Some(dev) = dev else {
+        eprintln!("[genesis] eye: cannot open {camera_path}: device stayed busy");
+        return born.elapsed().as_secs_f64();
+    };
+
+    // Request an uncompressed RGB24 format. Fall back to YUYV if
+    // RGB3 is not available.
+    let mut fmt = match dev.format() {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("[genesis] eye: cannot read current format: {e}");
+            return born.elapsed().as_secs_f64();
+        }
+    };
+    fmt.width = 640;
+    fmt.height = 480;
+
+    // Try RGB24 first, then the camera's native uncompressed
+    // fallback. A driver rejects an unsupported fourcc with EINVAL —
+    // move on to the next candidate — and answers EBUSY while a
+    // previous handle still owns the device, which gets the same
+    // brief retry window as open.
+    let mut negotiated = None;
+    'fourcc: for cand in [b"RGB3", b"YUYV"] {
+        fmt.fourcc = FourCC::new(cand);
+        for _ in 0..10 {
+            match dev.set_format(&fmt) {
+                Ok(f) if f.fourcc == FourCC::new(cand) => {
+                    negotiated = Some(f);
+                    break 'fourcc;
+                }
+                // Driver accepted the request but negotiated a
+                // different fourcc — try the next candidate.
+                Ok(_) => continue 'fourcc,
+                Err(e) if e.raw_os_error() == Some(libc::EBUSY) => {
+                    if stop.load(Ordering::Relaxed) {
+                        return born.elapsed().as_secs_f64();
+                    }
+                    thread::sleep(Duration::from_millis(200));
+                }
+                Err(_) => continue 'fourcc,
+            }
+        }
+    }
+    let Some(fmt) = negotiated else {
+        eprintln!("[genesis] eye: no usable format on {camera_path}");
+        return born.elapsed().as_secs_f64();
+    };
+
+    eprintln!(
+        "[genesis] eye: {}x{} fourcc={:?} size={} stride={}",
+        fmt.width,
+        fmt.height,
+        fmt.fourcc.str().unwrap_or("????"),
+        fmt.size,
+        fmt.stride
+    );
+
+    // Create a memory-mapped, zero-copy V4L2 stream.
+    let mut stream = match MmapStream::with_buffers(&dev, Type::VideoCapture, 4) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[genesis] eye: cannot create mmap stream: {e}");
+            return born.elapsed().as_secs_f64();
+        }
+    };
+
+    // Drop any stale segment so the create below succeeds. One life,
+    // one segment — the handle stays the owner, so its drop unlinks
+    // the name and the next life starts fresh.
+    if let Ok(cname) = CString::new(shm_name) {
+        // SAFETY: `cname` is a valid NUL-terminated CString; ENOENT
+        // is expected and discarded.
+        unsafe {
+            let _ = libc::shm_unlink(cname.as_ptr());
+        }
+    }
+    let shm_size = HEADER_SIZE + fmt.size as usize;
+    let shmem = match shared_memory::ShmemConf::new()
+        .os_id(shm_name)
+        .size(shm_size)
+        .create()
+    {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[genesis] eye: cannot create shared memory {shm_name}: {e}");
+            return born.elapsed().as_secs_f64();
+        }
+    };
+
+    {
+        let base = shmem.as_ptr();
+        // SAFETY: `base` is a valid pointer to the shared memory
+        // region of `shm_size` bytes obtained from `Shmem`, which
+        // guarantees the mapping is valid and writable. The header
+        // fields (offsets 0–27) and the writes below are all within
+        // bounds. `write_volatile` prevents the stores from being
+        // optimized away — another process reads this memory
+        // concurrently.
+        unsafe {
+            // Initialize the header once.
+            // The frame counter is an AtomicU64 using a seqlock:
+            // even = frame complete, odd = write in progress.
+            let counter = &*(base as *const AtomicU64);
+            counter.store(0, Ordering::Relaxed);
+            core::ptr::write_volatile(base.add(8) as *mut u32, fmt.width);
+            core::ptr::write_volatile(base.add(12) as *mut u32, fmt.height);
+            core::ptr::copy_nonoverlapping(fmt.fourcc.repr.as_ptr(), base.add(16), 4);
+            core::ptr::write_volatile(base.add(20) as *mut u32, fmt.size);
+            core::ptr::write_volatile(base.add(24) as *mut u32, fmt.stride);
+        }
+    }
+
+    eprintln!("[genesis] eye: optic nerve {shm_name} live, {shm_size} bytes");
+
+    let mut errors = 0u32;
+    loop {
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
+        let base = shmem.as_ptr();
+
+        let (buf, meta) = match stream.next() {
+            Ok(frame) => {
+                errors = 0;
+                frame
+            }
+            Err(e) => {
+                if stop.load(Ordering::Relaxed) {
+                    break;
+                }
+                // EINTR is transient (any signal can interrupt the
+                // dequeue); retry without logging or delay.
+                if e.raw_os_error() == Some(libc::EINTR) {
+                    continue;
+                }
+                errors += 1;
+                eprintln!("[genesis] eye: capture error: {e}");
+                if errors >= EYE_ERR_LIMIT {
+                    eprintln!("[genesis] eye: device declared lost — re-opening");
+                    break;
+                }
+                // Back off to avoid a tight error spin that floods
+                // the log and burns CPU when the camera is
+                // disconnected. The error is typically persistent
+                // (device gone), so we sleep before retrying.
+                thread::sleep(Duration::from_millis(500));
+                continue;
+            }
+        };
+
+        // Use bytesused from the V4L2 buffer metadata instead of
+        // buf.len(). The buffer is a full mmap'd arena and may be
+        // larger than the actual frame data (e.g., page-aligned
+        // padding). bytesused tells us exactly how many bytes the
+        // driver filled, which is what we need to copy. Without this,
+        // padded frames would be silently dropped when buf.len()
+        // exceeds fmt.size even though the actual frame fits.
+        let frame_size = meta.bytesused as usize;
+        if frame_size == 0 {
+            // Driver reported zero bytes — skip this frame
+            continue;
+        }
+        if frame_size > fmt.size as usize {
+            eprintln!(
+                "[genesis] eye: frame size {frame_size} exceeds expected {}",
+                fmt.size
+            );
+            continue;
+        }
+
+        // SAFETY: `base` is a valid pointer to the shared memory
+        // region obtained from `Shmem`, mapped with `shm_size` bytes.
+        // The frame counter at offset 0 is an `AtomicU64` initialized
+        // once during setup and only accessed via atomic operations.
+        // The frame data copy (`base.add(HEADER_SIZE)`) stays within
+        // bounds because `frame_size` was checked against `fmt.size`
+        // above, and `shm_size = HEADER_SIZE + fmt.size`. The seqlock
+        // protocol ensures readers see consistent data.
+        unsafe {
+            let counter = &*(base as *const AtomicU64);
+
+            // Seqlock write protocol:
+            // 1. Increment counter to odd → signals "write in progress"
+            //    Any reader seeing an odd counter will retry.
+            // 2. Copy the frame data.
+            // 3. Increment counter to even → signals "frame complete"
+            //    The Release ordering ensures the frame copy is visible
+            //    before the even counter is observed by the reader.
+            let seq = counter.load(Ordering::Relaxed);
+            counter.store(seq.wrapping_add(1), Ordering::Relaxed);
+            std::sync::atomic::fence(Ordering::SeqCst);
+
+            // Copy the raw frame into the shared buffer after the header.
+            core::ptr::copy_nonoverlapping(buf.as_ptr(), base.add(HEADER_SIZE), frame_size);
+
+            // Publish the completed frame.
+            counter.store(seq.wrapping_add(2), Ordering::Release);
+        }
+
+        // Frame-rate throttling — cap at ~30 FPS to avoid burning CPU
+        // when the camera delivers frames faster than the consumer
+        // (the cognitive mind) needs them. The cognitive mind samples
+        // at its own rate via the seqlock, so extra frames are wasted
+        // work. 33ms ≈ 30 FPS.
+        thread::sleep(Duration::from_millis(33));
+    }
+
+    // The owner `shmem` drops here — unlink frees the name for the
+    // next life. Readers already mapped keep the corpse until they
+    // detach and re-open by name.
+    born.elapsed().as_secs_f64()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// Build a private retinal segment carrying `payload` bytes after a
+    /// Build a private nerve segment carrying `payload` bytes after a
     /// valid header, then hand back the segment (kept alive by the
     /// caller so the mapping persists) and its name.
-    fn fake_retina(
+    fn fake_nerve(
         tag: &str,
         width: u32,
         height: u32,
         fourcc: &[u8; 4],
         frame: &[u8],
     ) -> (shared_memory::Shmem, String) {
-        let name = format!("/genesis_retina_test_{}_{}", std::process::id(), tag);
+        let name = format!("/genesis_optic_nerve_test_{}_{}", std::process::id(), tag);
         let stride = width * 3;
         let size = (stride * height) as usize;
         let shmem = shared_memory::ShmemConf::new()
@@ -806,7 +1199,7 @@ mod tests {
 
     #[test]
     fn absent_segment_is_no_fault_and_no_eye() {
-        let mut optic = OpticNerve::with_name("/genesis_retina_test_absent_nope");
+        let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_absent_nope");
         optic.sample(1000);
         let s = optic.state(1000);
         assert!(!s.eye_present && !s.frames_fresh && s.frame_age_ms == -1);
@@ -817,7 +1210,7 @@ mod tests {
     fn rgb_frame_feeds_the_channels() {
         // 64x48 RGB3, mid-blue — melanopsin-weighted should read high.
         let frame = [30u8, 40u8, 200u8].repeat(64 * 48);
-        let (seg, name) = fake_retina("rgb", 64, 48, b"RGB3", &frame);
+        let (seg, name) = fake_nerve("rgb", 64, 48, b"RGB3", &frame);
         let mut optic = OpticNerve::with_name(&name);
         optic.sample(10_000);
         let s = optic.state(10_000);
@@ -839,7 +1232,7 @@ mod tests {
 
     #[test]
     fn a_changed_frame_is_motion_and_orienting() {
-        let (seg, name) = fake_retina("motion", 64, 48, b"RGB3", &[0u8].repeat(64 * 48 * 3));
+        let (seg, name) = fake_nerve("motion", 64, 48, b"RGB3", &[0u8].repeat(64 * 48 * 3));
         let mut optic = OpticNerve::with_name(&name);
         optic.sample(1_000);
         // Rewrite the payload bright and bump the seqlock.
@@ -859,7 +1252,7 @@ mod tests {
 
     #[test]
     fn gate_follows_the_sleep_stage_and_cortical_feedback() {
-        let mut optic = OpticNerve::with_name("/genesis_retina_test_gate_nope");
+        let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_gate_nope");
         optic.set_cortical_gain(0.5);
         optic.update_gate(MentalPhase::Active);
         assert!(optic.state(0).relay_gain > 0.7);
@@ -885,7 +1278,7 @@ mod tests {
 
     #[test]
     fn alert_only_fires_below_the_wake_threshold() {
-        let mut optic = OpticNerve::with_name("/genesis_retina_test_alert_nope");
+        let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_alert_nope");
         optic.orienting = 0.5;
         assert_eq!(
             optic.alert_lc(crate::state::sleep_network::SLEEP_THRESHOLD + 1.0),
@@ -896,7 +1289,7 @@ mod tests {
 
     #[test]
     fn pupil_constricts_to_light_and_dilates_to_dark() {
-        let mut optic = OpticNerve::with_name("/genesis_retina_test_pupil_nope");
+        let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_pupil_nope");
         // First call only seeds the clock — the resting diameter holds.
         optic.update_pupil(1_000, 0.3);
         assert_eq!(optic.state(1_000).pupil_mm, PUPIL_REST_MM);
@@ -919,7 +1312,7 @@ mod tests {
 
     #[test]
     fn pupil_dilates_with_norepinephrine() {
-        let mut optic = OpticNerve::with_name("/genesis_retina_test_pupil_ne_nope");
+        let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_pupil_ne_nope");
         optic.illuminance = 0.5;
         optic.update_pupil(1_000, 0.0);
         for t in 1..=20 {
@@ -943,8 +1336,8 @@ mod tests {
         // Both nerves start at rest; one steps toward a bright target,
         // the other toward darkness. Same elapsed step: the
         // parasympathetic arc covers more of its travel.
-        let mut constricting = OpticNerve::with_name("/genesis_retina_test_pc_nope");
-        let mut dilating = OpticNerve::with_name("/genesis_retina_test_pd_nope");
+        let mut constricting = OpticNerve::with_name("/genesis_optic_nerve_test_pc_nope");
+        let mut dilating = OpticNerve::with_name("/genesis_optic_nerve_test_pd_nope");
         constricting.illuminance = 1.0;
         dilating.illuminance = 0.0;
         constricting.update_pupil(1_000, 0.0);
@@ -965,7 +1358,7 @@ mod tests {
 
     #[test]
     fn wire_is_fifty_eight_bytes_and_carries_the_ocular_state() {
-        let mut optic = OpticNerve::with_name("/genesis_retina_test_wire_nope");
+        let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_wire_nope");
         optic.pupil_mm = 5.25;
         optic.accommodation_dpt = 2.5;
         optic.update_gate(MentalPhase::Drowsy);
@@ -981,7 +1374,7 @@ mod tests {
 
     #[test]
     fn focus_distance_maps_to_dioptres() {
-        let mut optic = OpticNerve::with_name("/genesis_retina_test_accom_nope");
+        let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_accom_nope");
         optic.set_focus_m(1.0);
         assert_eq!(optic.accom_target_dpt, 1.0);
         optic.set_focus_m(0.5);
@@ -1000,7 +1393,7 @@ mod tests {
 
     #[test]
     fn accommodation_slews_toward_the_requested_power() {
-        let mut optic = OpticNerve::with_name("/genesis_retina_test_slew_nope");
+        let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_slew_nope");
         // First call seeds the clock at the tonic rest position.
         optic.update_accommodation(1_000);
         assert_eq!(optic.state(1_000).accommodation_dpt, ACCOM_REST_DPT);
@@ -1024,8 +1417,8 @@ mod tests {
 
     #[test]
     fn accommodation_releases_faster_than_it_pulls_in() {
-        let mut near = OpticNerve::with_name("/genesis_retina_test_an_nope");
-        let mut far = OpticNerve::with_name("/genesis_retina_test_af_nope");
+        let mut near = OpticNerve::with_name("/genesis_optic_nerve_test_an_nope");
+        let mut far = OpticNerve::with_name("/genesis_optic_nerve_test_af_nope");
         // Equal distances from target: near starts at rest (1 D) and
         // pulls toward 3 D; far starts at 5 D and releases toward 3 D.
         near.accom_target_dpt = 3.0;
@@ -1047,7 +1440,7 @@ mod tests {
     fn closed_lids_dim_the_oscillator_but_do_not_black_it_out() {
         // A bright blue frame — the melanopic channel reads high.
         let frame = [30u8, 40u8, 200u8].repeat(64 * 48);
-        let (seg, name) = fake_retina("lids", 64, 48, b"RGB3", &frame);
+        let (seg, name) = fake_nerve("lids", 64, 48, b"RGB3", &frame);
         let mut optic = OpticNerve::with_name(&name);
         optic.sample(10_000);
         optic.update_gate(MentalPhase::Active);
@@ -1070,7 +1463,7 @@ mod tests {
 
     #[test]
     fn a_flash_through_closed_lids_still_reaches_the_colliculus() {
-        let mut optic = OpticNerve::with_name("/genesis_retina_test_lidalert_nope");
+        let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_lidalert_nope");
         optic.orienting = 0.5;
         optic.update_gate(MentalPhase::Active);
         let awake = optic.alert_lc(1.0);
@@ -1084,7 +1477,7 @@ mod tests {
     fn sleep_pulls_the_pupil_to_miosis_not_dilation() {
         // Dark room, no NE — an awake pupil dark-adapts toward 8 mm;
         // the sleeping pupil constricts despite the same darkness.
-        let mut optic = OpticNerve::with_name("/genesis_retina_test_miosis_nope");
+        let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_miosis_nope");
         optic.illuminance = 0.0;
         optic.update_gate(MentalPhase::Active);
         optic.update_pupil(1_000, 0.0);
@@ -1107,7 +1500,7 @@ mod tests {
 
     #[test]
     fn accommodation_relaxes_to_rest_in_sleep() {
-        let mut optic = OpticNerve::with_name("/genesis_retina_test_accomsleep_nope");
+        let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_accomsleep_nope");
         optic.update_gate(MentalPhase::Active);
         optic.update_accommodation(1_000);
         // Awake: a 25 cm near point pulls the lens to ~4 D.
@@ -1131,7 +1524,7 @@ mod tests {
 
     #[test]
     fn the_will_shuts_but_never_opens_the_lid() {
-        let mut optic = OpticNerve::with_name("/genesis_retina_test_willlid_nope");
+        let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_willlid_nope");
         optic.update_gate(MentalPhase::Active);
         // Awake, unrequested: the phase's lid is open.
         assert!((optic.lid() - 1.0).abs() < 1e-6);
@@ -1162,7 +1555,7 @@ mod tests {
         // lid — a bright room through held-shut lids feeds the SCN
         // weakly, like sleep.
         let frame = [30u8, 40u8, 200u8].repeat(64 * 48);
-        let (seg, name) = fake_retina("willlux", 64, 48, b"RGB3", &frame);
+        let (seg, name) = fake_nerve("willlux", 64, 48, b"RGB3", &frame);
         let mut optic = OpticNerve::with_name(&name);
         optic.sample(10_000);
         optic.update_gate(MentalPhase::Active);

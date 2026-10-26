@@ -494,7 +494,7 @@ class OuterWorld:
         """Record its acting on the world — looking, drawing, learning.
 
         ``description`` is a short semantic summary ("looked through
-        the retina"); ``detail`` carries the full report.
+        the eye"); ``detail`` carries the full report.
         """
         event = ExternalEvent(
             kind=EventKind.ACTION,

@@ -993,7 +993,7 @@ class GenerativeLanguage(Language):
             # from the summary, not by reciting the page verbatim.
             "web_summary": thought.metadata.get("web_summary"),
             "web_source": thought.metadata.get("web_source"),
-            # Vision scene metadata — the retina feed's structured
+            # Vision scene metadata — the optic nerve feed's structured
             # percept (lighting, color, faces, objects, positions).
             # The vocabulary composes its report from the data; the
             # vision module itself never writes its words.

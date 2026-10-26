@@ -122,8 +122,7 @@ class ProposalsMixin:
             if not self.self_improvement._proposal_can_apply(proposal):
                 self.self_improvement.withdraw_proposal(
                     proposal.id,
-                    "stale — the snippet no longer matches the file, "
-                    "re-scan and re-propose",
+                    "stale — the snippet no longer matches the file, re-scan and re-propose",
                 )
                 continue
             result = self._run_proposal_experiment(proposal)
@@ -162,9 +161,7 @@ class ProposalsMixin:
             notes += "hit an unexpected error. Check the logs and try "
             notes += "a different approach."
             self.self_improvement.reject_proposal(proposal.id, notes)
-            logger.warning(
-                f"heuristic experiment for proposal #{proposal.id} failed: {e}"
-            )
+            logger.warning(f"heuristic experiment for proposal #{proposal.id} failed: {e}")
             return {"status": "error", "reason": str(e), "notes": notes, "error": True}
 
         if record.status == "applied":

@@ -1,13 +1,20 @@
-"""Retina — zero-copy access to the Rust retina shared-memory camera feed.
+"""Optic nerve — the mind's end of the afferent path.
 
-This module attaches to the POSIX shared memory segment ``/genesis_retina``
-created by the Rust ``retina`` binary and wraps the live frame directly into a
-NumPy array without any serialization, JSON, or socket round-trips.
+The body's optic nerve (``src/daemon/optic_nerve.rs`` — the daemon owns
+the camera now, a capture thread inside the body rather than a separate
+process) writes raw frames into the POSIX shared-memory segment
+``/genesis_optic_nerve``. This module attaches to that segment and wraps
+the live frame directly into a NumPy array without any serialization,
+JSON, or socket round-trips.
 
 The frame counter uses a seqlock protocol: the writer increments it to an
 odd value before writing the frame, then to an even value when the write
 is complete. The reader retries if it sees an odd counter or if the
 counter changes between the two reads surrounding the frame copy.
+
+This is the afferent wire only — it delivers pixels. What the pixels
+*mean* lives in the visual cortex (``occipital_lobe/perception/vision.py``),
+which is the words side.
 """
 
 from __future__ import annotations
@@ -17,10 +24,10 @@ from multiprocessing import resource_tracker, shared_memory
 
 import numpy as np
 
-NAME = "genesis_retina"
+NAME = "genesis_optic_nerve"
 HEADER = 28
 
-# Layout, same as src/bin/retina.rs:
+# Layout, same as src/daemon/optic_nerve.rs:
 #   u64 counter (seqlock: even = frame complete, odd = write in progress)
 #   u32 width
 #   u32 height
@@ -32,11 +39,11 @@ _HEADER_FMT = "<QII4sII"
 _MAX_RETRIES = 64
 
 
-class Retina:
-    """Attach to the live retina shared memory and expose frames as numpy arrays."""
+class OpticNerve:
+    """Attach to the live optic-nerve segment and expose frames as numpy arrays."""
 
     def __init__(self, name: str = NAME) -> None:
-        """Attach to the named retina shared-memory segment without creating it."""
+        """Attach to the named optic-nerve shared-memory segment without creating it."""
         self._shmem = shared_memory.SharedMemory(name=name, create=False)
         # Prevent the multiprocessing resource tracker from unlinking the
         # persistent shared memory when this Python process exits. The
@@ -89,7 +96,7 @@ class Retina:
 
         The array is a zero-copy view of the shared memory unless ``copy=True``.
         The shape always matches the exact byte allocation advertised by the
-        Rust retina header.
+        nerve's header.
         """
         assert self._buf is not None
         offset = HEADER
@@ -157,23 +164,24 @@ def latest_frame(copy: bool = True) -> np.ndarray | None:
 
     Always returns a copy. The ``copy`` parameter is accepted for
     backward compatibility but a zero-copy view is unsafe in this
-    one-shot helper: the ``Retina`` object is local and goes out of
+    one-shot helper: the ``OpticNerve`` object is local and goes out of
     scope when the function returns, which unmaps the shared memory
     backing the view and leaves the caller with a dangling pointer
     (use-after-unmap). Callers that need a zero-copy view should
-    construct a ``Retina`` directly and keep it alive for the
+    construct an ``OpticNerve`` directly and keep it alive for the
     lifetime of the view.
 
     Returns ``None`` if no consistent frame could be read (e.g. the
     writer is producing frames faster than we can read them).
     """
     try:
-        r = Retina()
+        nerve = OpticNerve()
     except FileNotFoundError:
-        # No retina segment — the camera process is not running. That
-        # is the documented text-only degradation: no frame, not a fault.
+        # No nerve segment — the body's eye is dark (camera absent or
+        # the capture limb between re-open attempts). That is the
+        # documented text-only degradation: no frame, not a fault.
         return None
     try:
-        return r.latest(copy=True)
+        return nerve.latest(copy=True)
     finally:
-        r.close()
+        nerve.close()

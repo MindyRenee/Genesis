@@ -2365,10 +2365,18 @@ class SelfImprovement:
         args = self._extract_docstring_args(node)
         docstring = self._format_docstring(body_indent, summary, args)
 
-        # Show the full signature in the original/proposed code
+        # Show the full signature in the original/proposed code. The
+        # first body line rides along: that seat is where a docstring
+        # would live, so once one exists the snippet stops matching and
+        # the proposal reads stale instead of inserting a duplicate.
         sig_lines = [lines[i].rstrip("\n") for i in range(node.lineno - 1, sig_end_line)]
-        original = "\n".join(sig_lines)
-        proposed = original + "\n" + docstring
+        seat = (
+            [lines[node.body[0].lineno - 1].rstrip("\n")]
+            if node.body and node.body[0].lineno <= len(lines)
+            else []
+        )
+        original = "\n".join(sig_lines + seat)
+        proposed = "\n".join([*sig_lines, docstring, *seat])
 
         return Proposal(
             id=0,
@@ -2941,6 +2949,42 @@ class HeuristicExperiment:
         self.project_root = project_root
         self._verify_script = os.path.join(project_root, "scripts", "verify_change.sh")
         self._rust_attempts: deque[float] = deque()
+        self._reconcile_interrupted()
+
+    def _reconcile_interrupted(self) -> None:
+        """Restore files left edited by an experiment that died mid-verify.
+
+        An experiment parks the pre-edit content in ``<file>.pre_experiment``
+        and sets an ``<file>.in_flight`` marker for the live-edit window.
+        A crash or shutdown between the write and the gate's verdict leaves
+        the marker behind with the edit still in the tree; without
+        reconciliation the orphaned edit becomes the next experiment's
+        baseline, and each interrupted attempt ratchets the tree further
+        from clean. A marker with no readable backup can only be flagged —
+        nothing else knows what the file looked like.
+        """
+        root = Path(self.project_root)
+        if not root.is_dir():
+            return
+        for marker in root.rglob("*.in_flight"):
+            live = marker.with_suffix("")
+            backup = live.with_suffix(live.suffix + ".pre_experiment")
+            try:
+                original = backup.read_text(encoding="utf-8")
+            except OSError:
+                logger.warning(
+                    f"In-flight experiment marker without readable backup: {live} — left as-is"
+                )
+                marker.unlink(missing_ok=True)
+                continue
+            try:
+                live.write_text(original, encoding="utf-8")
+                logger.warning(
+                    f"Restored {live} from {backup.name} — experiment interrupted mid-verify"
+                )
+            except OSError as e:
+                logger.error(f"Could not restore interrupted experiment file {live}: {e}")
+            marker.unlink(missing_ok=True)
 
     def run_experiment(
         self,
@@ -3141,6 +3185,24 @@ class HeuristicExperiment:
                 )
             offset = resolved
 
+        # A "missing docstring" proposal carries a signature-only
+        # snippet, so it keeps matching after the function gains a
+        # docstring by another route — inserting a second docstring
+        # literal ahead of the real one. When the proposed text appends
+        # a docstring where the file already opens one, the finding no
+        # longer holds; refuse rather than duplicate.
+        if proposed_code.startswith(original_code):
+            inserted = proposed_code[len(original_code) :].lstrip()
+            if inserted.startswith(('"""', "'''")):
+                following = source[offset + len(original_code) :].lstrip()
+                if following.startswith(('"""', "'''")):
+                    return ExperimentRecord(
+                        file_path=file_path,
+                        description=description,
+                        status="reverted",
+                        reason=("stale proposal — the target already carries a docstring"),
+                    )
+
         modified_source = source[:offset] + proposed_code + source[offset + len(original_code) :]
         if modified_source == source:
             return ExperimentRecord(
@@ -3173,12 +3235,19 @@ class HeuristicExperiment:
         """
         live_file = Path(self.project_root) / file_path
         backup = live_file.with_suffix(live_file.suffix + ".pre_experiment")
+        # The marker witnesses the live-edit window: written after the
+        # backup, removed on every verdict path below. Surviving past a
+        # crash means the tree holds an unverified edit — the next boot's
+        # reconcile restores the backup.
+        marker = live_file.with_suffix(live_file.suffix + ".in_flight")
         try:
             backup.write_text(source, encoding="utf-8")
+            marker.write_text(description, encoding="utf-8")
             live_file.write_text(modified_source, encoding="utf-8")
         except OSError as e:
             # The live file may be partially written — restore it.
             self._revert(live_file, source)
+            marker.unlink(missing_ok=True)
             return ExperimentRecord(
                 file_path=file_path,
                 description=description,
@@ -3186,55 +3255,58 @@ class HeuristicExperiment:
                 reason=f"could not write live file: {e}",
             )
 
-        is_rust = file_path.endswith(".rs")
-        if not is_rust:
-            # Verify: py_compile first (fast fail). Rust has no
-            # single-file syntax gate at this layer — the cargo suite
-            # below is its fast-fail.
-            compile_result = get_tools().run(
-                "compile_python",
-                path=str(live_file),
-                project_root=self.project_root,
-            )
-            if not compile_result.success:
+        try:
+            is_rust = file_path.endswith(".rs")
+            if not is_rust:
+                # Verify: py_compile first (fast fail). Rust has no
+                # single-file syntax gate at this layer — the cargo suite
+                # below is its fast-fail.
+                compile_result = get_tools().run(
+                    "compile_python",
+                    path=str(live_file),
+                    project_root=self.project_root,
+                )
+                if not compile_result.success:
+                    self._revert(live_file, source)
+                    record = ExperimentRecord(
+                        file_path=file_path,
+                        description=description,
+                        status="reverted",
+                        reason=f"py_compile failed: {compile_result.error}",
+                    )
+                    self.engine.record_experiment(record)
+                    return record
+
+            # Verify: the full gate against the live tree — py_compile all,
+            # module imports, pytest, and cargo test. The live crate builds
+            # into its own target/ cache, so a Rust experiment costs an
+            # incremental build rather than a cold one.
+            if not self._run_verify_script(
+                python_dir=os.path.join(self.project_root, "python"),
+                rust_dir=self.project_root,
+                timeout=self._RUST_VERIFY_TIMEOUT_S if is_rust else self._VERIFY_TIMEOUT_S,
+            ):
                 self._revert(live_file, source)
                 record = ExperimentRecord(
                     file_path=file_path,
                     description=description,
                     status="reverted",
-                    reason=f"py_compile failed: {compile_result.error}",
+                    reason="verification gate failed (tests failed)",
                 )
                 self.engine.record_experiment(record)
                 return record
 
-        # Verify: the full gate against the live tree — py_compile all,
-        # module imports, pytest, and cargo test. The live crate builds
-        # into its own target/ cache, so a Rust experiment costs an
-        # incremental build rather than a cold one.
-        if not self._run_verify_script(
-            python_dir=os.path.join(self.project_root, "python"),
-            rust_dir=self.project_root,
-            timeout=self._RUST_VERIFY_TIMEOUT_S if is_rust else self._VERIFY_TIMEOUT_S,
-        ):
-            self._revert(live_file, source)
             record = ExperimentRecord(
                 file_path=file_path,
                 description=description,
-                status="reverted",
-                reason="verification gate failed (tests failed)",
+                status="applied",
+                reason="all verification checks passed",
             )
             self.engine.record_experiment(record)
+            logger.info(f"Heuristic experiment applied: {description} in {file_path}")
             return record
-
-        record = ExperimentRecord(
-            file_path=file_path,
-            description=description,
-            status="applied",
-            reason="all verification checks passed",
-        )
-        self.engine.record_experiment(record)
-        logger.info(f"Heuristic experiment applied: {description} in {file_path}")
-        return record
+        finally:
+            marker.unlink(missing_ok=True)
 
     def _run_verify_script(
         self,

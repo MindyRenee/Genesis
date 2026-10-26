@@ -126,15 +126,20 @@ def test_net_seal_leaves_the_workstation_hers() -> None:
     assert reg.run("run_shell", command="echo hi", timeout=5).success
 
 
-def test_net_unseal_restores_lookup() -> None:
+def test_net_unseal_restores_lookup(monkeypatch) -> None:
     """Leaving game mode hands the net back."""
+    import tools.web_search
     from tools.framework import ToolRegistry
 
     reg = ToolRegistry()
     reg.net_sealed = True
     reg.net_sealed = False
-    # web_search may still fail for want of a backend — but not with
-    # the seal's refusal text.
+    # The seal is what the test asserts — not the backend. A unit
+    # test must not spawn her real browser (a live Chrome on her
+    # production profile) or reach the network, so the search
+    # function is stubbed; an empty answer exercises the same
+    # post-seal path.
+    monkeypatch.setattr(tools.web_search, "search", lambda q, limit=5: [])
     result = reg.run("web_search", query="x")
     assert "sealed" not in (result.error or "")
 
@@ -174,8 +179,8 @@ class _LookProbe:
 
 
 def test_look_urge_vetoed_while_gaming() -> None:
-    """While she plays, the retina is not her visual channel — the
-    game feed is. A crossed look urge wanders no gaze."""
+    """While she plays, the camera's nerve feed is not her visual
+    channel — the game feed is. A crossed look urge wanders no gaze."""
     from basal_ganglia.volition import VolitionMixin
 
     probe = _LookProbe(gaming=True)

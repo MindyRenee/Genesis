@@ -79,14 +79,16 @@ def test_shutdown_reports_failure_when_child_cannot_be_killed(tmp_path):
     daemon.kill.assert_called_once()
 
 
-def test_shutdown_waits_for_slow_retina_within_grace_window():
-    retina = Mock()
-    retina.poll.return_value = None
-    retina.wait.side_effect = [subprocess.TimeoutExpired("retina", 3), 0]
-    retina.returncode = 0
-    assert genesis_cli._shutdown(None, Mock(), None, retina)
-    retina.terminate.assert_called_once()
-    assert retina.wait.call_count == 2
+def test_shutdown_escalates_bounded_for_slow_child():
+    """A child that answers SIGTERM late still stops inside the grace
+    window — escalation is bounded, never instant."""
+    daemon = Mock()
+    daemon.poll.return_value = None
+    daemon.wait.side_effect = [subprocess.TimeoutExpired("daemon", 5), 0]
+    daemon.returncode = 0
+    assert genesis_cli._shutdown(None, Mock(), daemon)
+    daemon.terminate.assert_called_once()
+    assert daemon.wait.call_count == 2
 
 
 def test_shutdown_reports_failed_daemon_exit():
@@ -228,7 +230,6 @@ _find_pids() {
     case "$1" in
         *cli.pid) echo 100 ;;
         *daemon.pid) echo 200 ;;
-        *retina.pid) echo 300 ;;
     esac
 }
 _matches_pid() { return 1; }
@@ -238,7 +239,7 @@ _stop_all
         tmp_path,
     )
     assert result.returncode == 0
-    assert result.stdout.splitlines() == ["-INT 100", "-TERM 200", "-TERM 300"]
+    assert result.stdout.splitlines() == ["-INT 100", "-TERM 200"]
 
 
 def test_shell_stop_writes_mind_suppress(tmp_path):
@@ -279,7 +280,6 @@ def test_graceful_teardown_says_goodbye_to_the_body(tmp_path):
             None,
             mind,
             None,
-            None,
             str(tmp_path),
             None,
             None,
@@ -298,7 +298,6 @@ def test_teardown_without_mind_writes_no_suppress(tmp_path):
     with patch.object(genesis_cli, "_arm_exit_watchdog"):
         genesis_cli._teardown_session(
             shutting_down,
-            None,
             None,
             None,
             None,
@@ -375,7 +374,6 @@ def test_interactive_failure_still_shuts_down(tmp_path):
             ),
             _acquire_cli_lock=Mock(return_value=1),
             _start_daemon_process=Mock(),
-            _start_retina_process=Mock(),
             Mind=Mock(),
             _wire_voice=Mock(return_value=(Mock(), Mock())),
             _setup_ambient_listener=Mock(),
@@ -436,7 +434,6 @@ def test_startup_failure_still_shuts_down(tmp_path, failing_step):
             ),
             _acquire_cli_lock=Mock(return_value=1),
             _start_daemon_process=Mock(),
-            _start_retina_process=Mock(),
             Mind=Mock(return_value=mind),
             _shutdown=cleanup,
             # See test_interactive_failure_still_shuts_down — the exit
@@ -789,22 +786,6 @@ def test_daemon_fault_needs_sustained_probe_failure(tmp_path):
     rebirth._next_probe_at = 0.0
     assert not rebirth._daemon_faulted()
     assert rebirth._fault_strikes == 0
-
-
-def test_rebirth_respawns_retina_until_it_accepts_the_eye_absent(tmp_path):
-    """A dead retina is reincarnated, but a crash-looping eye is
-    accepted absent — sight is a degradation, never a fatal one."""
-    rebirth = _make_rebirth(tmp_path)
-    dead = Mock()
-    dead.poll.return_value = 1
-    newborn = Mock()
-    newborn.poll.return_value = 1  # reincarnated but dies at once
-    rebirth.set_children(retina=dead)
-    with patch.object(genesis_cli, "_start_retina_process", return_value=newborn) as start:
-        for _ in range(genesis_cli._RETINA_REBIRTH_MAX + 2):
-            rebirth._check_retina()
-    assert start.call_count == genesis_cli._RETINA_REBIRTH_MAX
-    assert rebirth._retina_gave_up
 
 
 # ─── Spore — the self survives the host ──────────────────────────────

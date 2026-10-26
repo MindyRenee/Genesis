@@ -128,7 +128,7 @@ fn sigmoid(x: f64, max: f64, beta: f64, alpha: f64) -> f64 {
 
 /// Subcortical retinal afference for one integration step — the optic
 /// nerve's non-image-forming branches, measured by the body from the
-/// retina's shared-memory frames (`daemon::optic_nerve`).
+/// nerve's shared-memory frames (`daemon::optic_nerve`).
 ///
 /// Two projections matter to this network:
 ///

@@ -1005,15 +1005,25 @@ class ConversationMixin:
         presence arrival in its world, not just a line in a report.
         Person keys, not just names: an unrecognized face marks its
         anonymous "face:N" identity — a familiar stranger is someone.
+
+        A look that finds someone is also the co-presence the body's
+        dyadic model measures: the zero-confidence observation updates
+        *who is here* without writing anything about how they feel —
+        presence is measured, affect stays earned. It posts on the
+        look itself, so co-presence accrues whenever she happens to
+        see a person — driven by gaze, not by a sampling timer.
         """
         try:
-            for key in self.vision.last_persons_seen():
+            persons = self.vision.last_persons_seen()
+            for key in persons:
                 # Named faces arrive as their name; anonymous ones
                 # already carry their "face:N" presence id.
                 pid = key if key.startswith("face:") else f"face:{key}"
                 self.world.mark_presence(
                     pid, PresenceKind.FACE, name=key if not key.startswith("face:") else None
                 )
+            if persons:
+                self.client.update_user_affect(0.0, 0.0, 0.0, confidence=0.0)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.conversation._note_faces_seen",
@@ -1243,7 +1253,7 @@ class ConversationMixin:
         self._resume_inner_life()
 
     def see(self) -> str:
-        """Look through the retina, store the observation, and report it.
+        """Look through the optic nerve, store the observation, and report it.
 
         ``vision.see`` returns the scene as structured percept data;
         the language engine composes its report from it — nothing here
@@ -1278,7 +1288,7 @@ class ConversationMixin:
                 )
             report = self.language.render(thought, emotion)
             try:
-                self.world.it_acted("looked through the retina", detail=report[:200])
+                self.world.it_acted("looked through the eye", detail=report[:200])
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.conversation.see",
@@ -1328,7 +1338,7 @@ class ConversationMixin:
 
             frame = resize_for_vision(frame, max_dim=320)
 
-            # Face recognition (FFA) on the image itself. The retina
+            # Face recognition (FFA) on the image itself. The live-eye
             # path does this inside `vision.see`, so without it here an
             # image was processed for objects, colour and features but
             # never for a face — leaving her unable to recognise anyone

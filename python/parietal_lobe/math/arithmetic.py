@@ -3,8 +3,8 @@
 Exact symbolic arithmetic is the cortical layer on top of the
 approximate number system: where the ANS estimates, this computes.
 Implemented as a recursive-descent evaluator over a token stream —
-no ``eval()``, no Python expression execution, only numbers and the
-operators defined here.
+no ``eval()``, no host-language expression execution, only numbers
+and the operators defined here.
 
 Two input dialects:
 
@@ -27,7 +27,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class CalcResult:
-    """The outcome of a calculation."""
+    """The outcome of a calculation — expression text, value, the
+    ok flag, and the failure wording when ok is false."""
 
     expression: str  # normalized expression text ("7 + 5")
     value: float | int | None
@@ -35,7 +36,9 @@ class CalcResult:
     error: str = ""
 
 
-# ── Number words ─────────────────────────────────────────────────
+# ── Number words
+# The vocabulary of magnitude: units, tens, and scales — every word
+# the faculty can hear as a quantity.
 
 _UNITS = {
     "zero": 0,
@@ -59,6 +62,7 @@ _UNITS = {
     "eighteen": 18,
     "nineteen": 19,
 }
+
 _TENS = {
     "twenty": 20,
     "thirty": 30,
@@ -69,7 +73,12 @@ _TENS = {
     "eighty": 80,
     "ninety": 90,
 }
-_SCALES = {"hundred": 100, "thousand": 1000, "million": 1_000_000}
+
+_SCALES = {
+    "hundred": 100,
+    "thousand": 1000,
+    "million": 1_000_000,
+}
 
 _OPERATOR_WORDS = {
     "plus": "+",
@@ -91,9 +100,19 @@ _OPERATOR_WORDS = {
     "power": "**",
     "pow": "**",
 }
-_POSTFIX_WORDS = {"squared": "** 2", "cubed": "** 3", "square": "** 2", "cube": "** 3"}
+
+_POSTFIX_WORDS = {
+    "squared": "** 2",
+    "cubed": "** 3",
+    "square": "** 2",
+    "cube": "** 3",
+}
 
 _NUMBER_WORDS = set(_UNITS) | set(_TENS) | set(_SCALES) | {"a", "an"}
+
+# The scan grammar — numbers first, the two multi-char operators
+# ahead of single-char symbols, parens, words, punctuation. Anything
+# that matches none of these is passed over without a sound.
 _TOKEN_RE = re.compile(
     r"""
     \d+\.\d+|\d+          # numbers
@@ -106,13 +125,26 @@ _TOKEN_RE = re.compile(
 )
 
 
+def _scan(text: str) -> list[str]:
+    """Split raw text into candidate tokens, lowercasing words —
+    the classes the regex grammar names, passed over in source order.
+    """
+    return [m.group(0).lower() for m in _TOKEN_RE.finditer(text)]
+
+
+def _is_number_word(word: str) -> bool:
+    """Whether a word can begin a spoken quantity."""
+    return word in _NUMBER_WORDS or word in ("point", "half")
+
+
 def _words_to_number(words: list[str]) -> tuple[float | None, int]:
     """Parse a run of number words into a value.
 
     Returns (value, words_consumed). Handles units, tens, and scales:
     ``seven`` → 7, ``twenty three`` → 23, ``two hundred`` → 200,
     ``a thousand`` → 1000, ``three point five`` → 3.5,
-    ``half`` → 0.5.
+    ``half`` → 0.5. A word that begins none of these stops the run
+    unconsumed, and a run that consumed nothing reports no value.
     """
     total = 0.0
     current = 0.0
@@ -163,9 +195,11 @@ def tokenize(text: str) -> list[str]:
 
     Word numbers are folded into numeric tokens; operator words into
     symbols. Anything that isn't math is skipped, so callers can pass
-    whole questions ("what is 7 plus 5?") directly.
+    whole questions ("what is 7 plus 5?") directly. The fold happens
+    in one left-to-right pass over the scanned candidates, longest
+    number-word run first.
     """
-    raw = [m.group(0).lower() for m in _TOKEN_RE.finditer(text)]
+    raw = _scan(text)
     tokens: list[str] = []
     i = 0
     while i < len(raw):
@@ -229,7 +263,7 @@ def tokenize(text: str) -> list[str]:
             i += 1
             continue
         # Number words — consume the longest run
-        if tok in _NUMBER_WORDS or tok in ("point", "half"):
+        if _is_number_word(tok):
             value, consumed = _words_to_number(raw[i:])
             if consumed and value is not None:
                 tokens.append(str(int(value) if float(value).is_integer() else value))
@@ -240,7 +274,20 @@ def tokenize(text: str) -> list[str]:
     return tokens
 
 
-# ── Recursive-descent evaluator ──────────────────────────────────
+# ── Recursive-descent evaluator
+# The grammar in code: expression over term over factor over unary
+# over atom — precedence by call depth, exponentiation right-
+# associative, division guards spoken where they are enforced.
+#
+#     expr    ::=  term   ( ( "+" | "-" )              term   )*
+#     term    ::=  factor ( ( "*" | "/" | "//" | "%" ) factor )*
+#     factor  ::=  unary  ( "**" factor )?
+#     unary   ::=  ( "-" | "+" | "sqrt" ) unary  |  atom
+#     atom    ::=  NUMBER  |  "(" expr ")"
+#
+# Each production is one method below, and each method docstring
+# says the level aloud — descent order is the order of operations,
+# so the parse tree is the precedence table drawn as calls.
 
 _BINOPS = {
     "+": operator.add,
@@ -251,11 +298,13 @@ _BINOPS = {
     "%": operator.mod,
     "**": operator.pow,
 }
+
 _MAX_POW_ABS = 10_000  # guard absurd exponent sizes
 
 
 class _Parser:
-    """Recursive-descent parser for the arithmetic token stream."""
+    """Recursive-descent parser for the arithmetic token stream —
+    one method per grammar level, descent order is precedence."""
 
     def __init__(self, tokens: list[str]) -> None:
         """Initialize the parser at the first token."""
@@ -345,7 +394,12 @@ class _Parser:
 
 
 def normalize(tokens: list[str]) -> str:
-    """Render the token stream back as a clean expression string."""
+    """Render the token stream back as a clean expression string.
+
+    Power reads as ``^`` and the internal sqrt marker reads as
+    ``sqrt``, parentheses hug their contents — the surface form her
+    journal and replies quote when she answers aloud.
+    """
     text = " ".join("^" if t == "**" else "sqrt" if t == "__sqrt__" else t for t in tokens)
     return text.replace("( ", "(").replace(" )", ")").replace("sqrt (", "sqrt(")
 

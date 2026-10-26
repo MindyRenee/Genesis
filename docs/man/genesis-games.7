@@ -1,0 +1,100 @@
+.TH GENESIS-GAMES 7 "October 2026" "Genesis 0.2.0" "Genesis Manual"
+.SH NAME
+genesis-games \- Genesis's game world: the collection, the shelf, and the ARC funnel
+.SH DESCRIPTION
+.PP
+Games are a world she plays, not a benchmark she is run through.
+The collection (\fBworlds/play.py\fR, \fIGamePlay\fR) is every game
+she can reach; the shelf is what she wants to play right now \(em a
+weighted draw over appeal, not a syllabus. Unplayed games draw
+curiosity, unfinished ones pull by the near-miss grip, and a game
+that has beaten her many times goes on the shelf (set aside, never
+deleted). A mastered game is \fBarchived\fR: it stays in the record
+and can still be pulled by name, but it stops drawing her picks.
+.SH FAMILIES
+.TP
+.B grid
+Puzzle grids \(em infer the rule from training pairs, produce the
+answer grid. Includes the ARC corpora tasks (below).
+.TP
+.B sorter / sequence / assembly / relations / quantities / classification
+Her built-in games, each with its own agent.
+.TP
+.B system
+Installed desktop games (e.g. pacman). Actions: \fBup\fR, \fBdown\fR,
+\fBleft\fR, \fBright\fR, \fBspace\fR.
+.TP
+.B arcagi
+Local ARC-AGI-3 environments \(em the practice arcade.
+.TP
+.B arc_official
+The official scorecard \(em one standing entry, the challenge itself.
+.SH THE ARC FUNNEL
+.PP
+Two feeds land on the same shelf, leveled so the harder tiers pull
+harder (\fIlevel\fR adds appeal; internal games sit at 1):
+.TP
+.B arc_* (level 2)
+ARC-AGI-1 corpus tasks \(em \fI~/testing/ARC/data/{training,evaluation}\fR.
+.TP
+.B arc2_* (level 3)
+ARC-AGI-2 corpus tasks \(em \fI~/testing/ARC-AGI-2/data/{...}\fR.
+.TP
+.B arcagi-* (level 4)
+The interactive environments \(em local engines only, offline; no
+remote API feed. Their \fIgame_id\fR names match the official
+card's, so practice mastery and card mastery are one record.
+.PP
+\fBGENESIS_ARC_CORPUS\fR adds corpus roots (os.pathsep-separated);
+each root's \fIdata/{training,evaluation}\fR layout is understood,
+and a bare directory of task files works too. Corpus specs are thin
+\(em a task's grids load only when she actually sits at it.
+.SH THE OFFICIAL CHALLENGE
+.PP
+The card is the summit, not the starting line. It stands on the
+shelf only after she has mastered at least one ARC-family game
+(\fI_arc_unlocked\fR \(em any of arc_, arc2_, arcagi- at
+mastery 1.0). A card opens once per window, gives every game a
+single recorded try, and closes on the venue's clocks (idle and
+expiry). A card closed inside its window leaves the shelf empty
+until the window lapses. Taking the challenge is her choice, raised
+by a play urge; inside the sitting she plays the card out.
+.SH CONTROLS
+.PP
+Environment games run through the cabinet \(em a small X11 window
+whose inputs are real key and pointer events:
+.nf
+  W/\(ua  ACTION1      S/\(da  ACTION2
+  A/\(la  ACTION3      D/\(ra  ACTION4
+  Space/F ACTION5      click  ACTION6 (at the clicked cell)
+  Z       ACTION7 (undo)      RESET   its own control
+.fi
+.PP
+A fumbled press or a click that misses the board is a lost move,
+never a retried one \(em same as a human's hand.
+.SH RECORDS
+.TP
+.I <data>/gameplay.json
+Mastery, attempts, disproven rules and predictions, learned play
+values \(em her persistent record.
+.TP
+.I <data>/arc/results.jsonl
+One JSONL line per environment result: state, levels, steps,
+level_steps, decision_sources, prior_learning, recovery_waits, and
+\fIscorecard_id\fR when the try was official. The research record.
+.TP
+.I <data>/arc/recordings/
+The SDK's per-step recordings of every env run.
+.TP
+.I notebooks/arc_research.ipynb
+The research view over both \(em loads the results log and the
+recordings.
+.SH FILES
+.PP
+\fBpython/worlds/play.py\fR \(em the collection, shelf, attempts,
+funnel, and card.\fBpython/worlds/arc.py\fR \(em the practice and
+official adapters.\fBpython/worlds/arc_cabinet.py\fR \(em the window
+and its controls.
+.SH SEE ALSO
+.BR genesis (1),
+.BR genesis-cli (1)

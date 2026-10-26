@@ -354,7 +354,7 @@ GET_INTERNALS = 51
 # SCN light drive it currently feeds the circadian oscillator, and
 # the thalamic relay gate the mind must honour (it approaches 0 in
 # NREM — sensory transmission is blocked at the thalamus, so a look
-# during sleep is a blind look). This is the same /genesis_retina
+# during sleep is a blind look). This is the same /genesis_optic_nerve
 # segment the mind reads frames from — the daemon consumes the
 # nerve's non-image-forming branches, the mind the relayed image.
 # Response: [u8 ack] then 46 bytes —
@@ -460,7 +460,8 @@ GET_ZONE_TRANSITIONS = 37
 # Which of Genesis's own processes are alive, and how many have died.
 # Response: [u16 alive_mask][u16 deaths][u8 last_death]
 # Bit n of alive_mask is set while subsystem n runs (0=daemon,
-# 1=cognitive, 2=retina). A subsystem that was never running does not
+# 1=cognitive, 2=retired — the eye is a thread inside the daemon now).
+# A subsystem that was never running does not
 # count as a death. last_death is 0xff when nothing has been lost.
 # A subsystem that dies used to vanish from the telemetry with no
 # trace; this makes the loss countable.
@@ -488,6 +489,9 @@ GET_MOTOR_TARGET = 45
 
 SUBSYSTEM_DAEMON = 0
 SUBSYSTEM_COGNITIVE = 1
+# Retired wire tag — the eye was once a standalone retina process;
+# its capture is a thread inside the daemon now, so nothing is ever
+# tagged 2 anymore. Kept so old telemetry still decodes by name.
 SUBSYSTEM_RETINA = 2
 
 SUBSYSTEM_NAMES: dict[int, str] = {

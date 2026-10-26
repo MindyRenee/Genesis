@@ -1504,8 +1504,9 @@ fn test_get_body_state() {
 #[test]
 fn test_get_lobe_telemetry() {
     // Per-lobe telemetry round-trips: the daemon publishes one
-    // record per process in its tree (daemon/cognitive/retina),
-    // each carrying its CPU/I/O share and miss ratios.
+    // record per process in its tree (daemon/cognitive — the eye's
+    // tag 2 is retired but still decodes on the wire), each
+    // carrying its CPU/I/O share and miss ratios.
     use genesis::daemon::interoception::{
         Subsystem, SubsystemTelemetry, publish_subsystem_telemetry,
     };
@@ -1574,7 +1575,7 @@ fn test_get_lobe_telemetry() {
     assert!((subsystems[1].branch_miss_rate - 0.03).abs() < 0.001);
     assert_eq!(
         subsystems[2].subsystem, 2,
-        "third subsystem should be retina (2)"
+        "third subsystem should be the retired eye tag (2)"
     );
     assert!((subsystems[2].io - 0.3).abs() < 0.001);
 

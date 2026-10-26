@@ -1,6 +1,6 @@
 """Occipital subsystem — primary visual cortex (V1) for Genesis.
 
-This module turns the raw camera feed from the retina into structured visual
+This module turns the raw camera feed from the optic nerve into structured visual
 percepts. It implements the classical sparse-coding account of V1 inference
 (Olshausen & Field, 1996 — orientation-selective simple-cell features) with
 recurrent horizontal connections captured by a learned interaction matrix M
@@ -9,7 +9,7 @@ algorithm (Rozell et al., 2008).
 
 The architecture:
 
-    retina frame
+    nerve frame
         │
         ▼
     [opponent split]   → luminance (lum) + red-green (L−M) + blue-yellow
@@ -381,7 +381,7 @@ class V1Model:
         """Run one glance through V1 and return a structured visual field.
 
         Args:
-            frame: an H×W or H×W×C uint8 image from the retina.
+            frame: an H×W or H×W×C uint8 image from the optic nerve.
             learn: if True, update the interaction matrix M from this view.
 
         Returns:
@@ -391,7 +391,7 @@ class V1Model:
 
         gray = _to_grayscale(frame)
         if gray.size == 0:
-            return VisualField(summary="The retina gave me nothing to look at.")
+            return VisualField(summary="The eye gave me nothing to look at.")
 
         # Sample patches on a regular grid. Overlap is allowed to avoid
         # aliasing; the sparse code is inferred independently per patch.

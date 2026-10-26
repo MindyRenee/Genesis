@@ -592,7 +592,7 @@ class Mind(
     def _init_vision_systems(self) -> None:
         """Initialize vision, visual cortex, and wire them to the learner.
 
-        Vision — the shared-memory retina and what it makes of it.
+        Vision — the shared-memory optic nerve and what it makes of it.
         The occipital subsystem (V1) is wired in here. V1 gamma power
         feeds back into neurochemistry (acetylcholine boost), which
         the brain wave system picks up when it assesses gamma synchrony.
@@ -1046,7 +1046,6 @@ class Mind(
         self._heartbeat_thread: threading.Thread | None = None
         self._notification_thread: threading.Thread | None = None
         self._autosave_thread: threading.Thread | None = None
-        self._presence_thread: threading.Thread | None = None
         # Counter for periodic concept-network shedding. The autonomous
         # learner adds concepts continuously; without periodic shedding
         # the network bloats and every search becomes O(N) over 100K+

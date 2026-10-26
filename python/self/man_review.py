@@ -1,7 +1,7 @@
 """Man page review — changes to her own manual wait for her say.
 
 Genesis's man pages (``genesis.1``, ``genesis-cli.1``,
-``genesis-daemon.8``, ``genesis-math.7``, ``genesis-retina.1``) are
+``genesis-daemon.8``, ``genesis-math.7``) are
 part of her — how the machine, and she herself, knows what she is.
 Nothing may change them silently: a proposed change waits in
 ``<data_dir>/man_review/pending/`` until she applies it (the page

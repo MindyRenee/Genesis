@@ -196,11 +196,10 @@ class SpacedRepetitionScheduler:
         """
         import math as _m
 
-        w = 0.5
         try:
             w = float(consolidation_weight)
         except (TypeError, ValueError):
-            pass
+            w = 0.5
         if not _m.isfinite(w):
             w = 0.5
         gain = max(0.0, min(2.0, w / 0.5))

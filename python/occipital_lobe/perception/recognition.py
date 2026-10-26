@@ -5,7 +5,7 @@ not Haar cascades) for robust, modern face detection and recognition.
 
 The pipeline:
 
-    retina frame (shared memory)
+    nerve frame (shared memory)
         |
         v
     YuNet face detection  -> bounding boxes + landmarks

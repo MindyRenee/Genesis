@@ -1377,6 +1377,10 @@ def test_own_pids_filters_zero_and_dead(tmp_path) -> None:
     sock.write_text("")
     io = InteroceptionSystem(socket_path=str(sock))
     (tmp_path / "genesis_daemon.pid").write_text("0")
+    # A stale retina pidfile from before the eye moved inside the
+    # daemon is ignored — the nerve's capture thread is not a
+    # process to tag, and a live PID in a dead file must not leak
+    # into the tree either.
     (tmp_path / "genesis_retina.pid").write_text(str(os.getpid()))
     pids = io._own_pids()
     assert 0 not in pids
@@ -1384,7 +1388,6 @@ def test_own_pids_filters_zero_and_dead(tmp_path) -> None:
 
     (tmp_path / "genesis_daemon.pid").write_text("99999999")
     io._daemon_pid = None
-    io._retina_pid = None
     pids = io._own_pids()
     assert 99999999 not in pids
 

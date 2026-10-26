@@ -1275,7 +1275,7 @@ fn test_tick_loop_starts_with_empty_tallies() {
 #[test]
 fn test_process_health_tracks_liveness() {
     // A subsystem that died used to vanish from the telemetry with no
-    // trace, so a crashed retina looked exactly like one that was never
+    // trace, so a crashed process looked exactly like one that was never
     // started. Liveness is now explicit and losses are counted.
     use genesis::daemon::interoception::{ProcessHealth, Subsystem, read_process_health};
 
@@ -1286,7 +1286,7 @@ fn test_process_health_tracks_liveness() {
     );
 
     let lost = ProcessHealth {
-        alive_mask: 0b0011, // daemon + cognitive, retina gone
+        alive_mask: 0b0011, // daemon + cognitive; bit 2 (retired eye) clear
         deaths: 1,
         last_death: 2,
     };

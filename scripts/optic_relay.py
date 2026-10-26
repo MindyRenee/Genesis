@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
-"""Retinal relay — a second afferent path into /genesis_retina.
+"""Optic relay — a second afferent path into /genesis_optic_nerve.
 
-The canonical `retina` binary negotiates raw formats (RGB3/YUYV) on a
-V4L2 device it owns. When that device is unavailable — held by another
-capture process, or offering only compressed formats — this relay feeds
-the same shared-memory segment from an alternative source:
+The body's own capture limb (``src/daemon/optic_nerve.rs``) negotiates
+raw formats (RGB3/YUYV) on a V4L2 device it owns. When that device is
+unavailable — held by another capture process, or offering only
+compressed formats — this relay feeds the same shared-memory segment
+from an alternative source:
 
   - a local V4L2 device that only speaks MJPEG, or
   - an HTTP MJPEG stream (e.g. a surveillance daemon's localhost feed)
 
 ffmpeg decodes to packed RGB24 frames; the relay writes them into the
-/genesis_retina segment using the same 28-byte header + seqlock protocol
-the Rust retina publishes (`src/bin/retina.rs`), so the optic nerve and
+/genesis_optic_nerve segment using the same 28-byte header + seqlock
+protocol the capture limb publishes, so the body's subcortical read and
 the mind's optics layer see an ordinary eye.
 
 Usage:
-    retina_relay.py [source] [shm_name]
+    optic_relay.py [source] [shm_name]
 
   source defaults to /dev/video2. Sources ending in :// are treated as
   HTTP MJPEG streams; ``x11:WxH+X+Y`` captures a region of the X11
@@ -23,9 +24,9 @@ Usage:
   cropped to WxH (the screen as an eye — the ARC cabinet uses this);
   anything else is a V4L2 device.
 
-  shm_name defaults to genesis_retina; pass a different name to publish
-  a second eye (e.g. genesis_arc_retina for the screen that plays ARC)
-  without displacing the physical camera's segment.
+  shm_name defaults to genesis_optic_nerve; pass a different name to
+  publish a second eye (e.g. genesis_arc_nerve for the screen that
+  plays ARC) without displacing the physical camera's segment.
 """
 
 import mmap
@@ -46,7 +47,7 @@ SEG_SIZE = HEADER_SIZE + FRAME_SIZE
 
 HEADER_FMT = "<QII4sII"  # seq, width, height, fourcc, size, stride
 
-# ffmpeg's rgb24 writes R,G,B bytes in memory. The retina header uses
+# ffmpeg's rgb24 writes R,G,B bytes in memory. The nerve header uses
 # V4L2 fourcc names, which are word-order: bytes already in R,G,B
 # order are BGR3, and RGB3 would mean B,G,R bytes (the reader flips
 # those). Tag honestly or every downstream channel is swapped.
@@ -161,18 +162,18 @@ def _out() -> list[str]:
 
 
 def main() -> int:
-    """Own the retina segment and pump frames until stopped.
+    """Own the nerve segment and pump frames until stopped.
 
     Parses ``source`` and ``shm_name`` from argv, creates the POSIX
-    shared memory with the Rust retina's header layout, and loops:
+    shared memory with the capture limb's header layout, and loops:
     read one RGB24 frame from ffmpeg's stdout, seqlock-write it.
     """
     source = sys.argv[1] if len(sys.argv) > 1 else "/dev/video2"
-    shm_name = sys.argv[2] if len(sys.argv) > 2 else "genesis_retina"
+    shm_name = sys.argv[2] if len(sys.argv) > 2 else "genesis_optic_nerve"
     shm_path = f"/dev/shm/{shm_name}"
 
-    # Own the segment like the Rust retina does: drop any stale object,
-    # create fresh, keep it alive for readers while we run.
+    # Own the segment like the capture limb does: drop any stale
+    # object, create fresh, keep it alive for readers while we run.
     Path(shm_path).unlink(missing_ok=True)
     fd = os.open(shm_path, os.O_CREAT | os.O_RDWR, 0o600)
     os.ftruncate(fd, SEG_SIZE)
@@ -199,13 +200,13 @@ def main() -> int:
     signal.signal(signal.SIGINT, _stop)
     signal.signal(signal.SIGTERM, _stop)
 
-    print(f"retina-relay: {source} -> {shm_path} ({WIDTH}x{HEIGHT} rgb24)")
+    print(f"optic-relay: {source} -> {shm_path} ({WIDTH}x{HEIGHT} rgb24)")
     seq = 0
     while True:
         frame = proc.stdout.read(FRAME_SIZE)
         if len(frame) < FRAME_SIZE:
             if proc.poll() is not None:
-                print("retina-relay: source ended, exiting", file=sys.stderr)
+                print("optic-relay: source ended, exiting", file=sys.stderr)
                 _stop()
             time.sleep(0.05)
             continue

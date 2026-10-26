@@ -15,7 +15,7 @@ It organizes retinal signals into three parallel processing streams:
   Projects to V1 layers 2/3.
 
 This module implements the LGN as a preprocessing layer that separates the
-retina frame into these three parallel streams, each with appropriate spatial
+nerve frame into these three parallel streams, each with appropriate spatial
 and temporal filtering to match the biological properties of each pathway.
 """
 
@@ -29,7 +29,7 @@ import numpy as np
 from occipital_lobe.color import cone_opponent
 
 if TYPE_CHECKING:
-    from genesis_client.retina import Retina
+    from genesis_client.optic_nerve import OpticNerve
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +71,10 @@ class LGNRelay:
     biological organization of the primate LGN.
 
     Usage:
-        retina = Retina()
+        nerve = OpticNerve()
         lgn = LGNRelay()
         while True:
-            frame = retina.latest(copy=True)
+            frame = nerve.latest(copy=True)
             if frame is not None:
                 output = lgn.process(frame)
                 # output.m_luminance -> V1 M-pathway (dorsal stream)
@@ -110,7 +110,7 @@ class LGNRelay:
         """Process a retinal frame through the LGN relay.
 
         Args:
-            frame: RGB image from retina, shape (H, W, 3), dtype uint8
+            frame: RGB image from the optic nerve, shape (H, W, 3), dtype uint8
 
         Returns:
             LGNOutput with three parallel pathway streams
@@ -219,18 +219,18 @@ class LGNRelay:
 _SHARED_RELAY: LGNRelay | None = None
 
 
-def lgn_from_retina(retina: Retina, lgn: LGNRelay | None = None) -> LGNOutput | None:
-    """Convenience function: read from retina and process through LGN.
+def lgn_from_nerve(nerve: OpticNerve, lgn: LGNRelay | None = None) -> LGNOutput | None:
+    """Convenience function: read from the optic nerve and process through LGN.
 
     Args:
-        retina: Retina instance to read from
+        nerve: OpticNerve instance to read from
         lgn: Relay to use; when omitted a process-shared instance keeps
             the M pathway's temporal state between calls.
 
     Returns:
         LGNOutput if a frame was available, None otherwise
     """
-    frame = retina.latest(copy=True)
+    frame = nerve.latest(copy=True)
     if frame is None:
         return None
 

@@ -157,16 +157,16 @@ class VolitionConfig:
             ),
             # Look urge — she feels like seeing. Was a metronome
             # (threshold 0, fired on cooldown); now the drive is
-            # chemical: LC-NE is the orienting/vigilance signal,
-            # basal-forebrain ACh is the attentional-sampling gain,
+            # chemical: LC-NE is the orienting/vigilance signal —
+            # the phasic burst a salient visual transient deposits
+            # onto the pool IS the superior colliculus pull — basal-
+            # forebrain ACh is the attentional-sampling gain, and
             # orexin and histamine are the wake tone that keeps an
-            # eye worth opening, and a measured salient transient on
-            # the optic nerve pulls the gaze (the SC channel). Sleep
-            # pressure (adenosine, melatonin) weighs the lid with
-            # negative weight — drowsy chemistry dissolves the urge
-            # upstream of the hard gates in _perform_look. The
-            # cooldown survives as a maximum rate, no longer the
-            # mechanism.
+            # eye worth opening. Sleep pressure (adenosine,
+            # melatonin) weighs the lid with negative weight —
+            # drowsy chemistry dissolves the urge upstream of the
+            # hard gates in _perform_look. The cooldown survives as
+            # a maximum rate, no longer the mechanism.
             UrgeConfig(
                 name="look",
                 threshold=0.55,
@@ -174,12 +174,11 @@ class VolitionConfig:
                 decay=0.0008,
                 cooldown=30.0,  # fastest she looks, not how often
                 stimuli={
-                    "chem_norepinephrine": 0.008,
+                    "chem_norepinephrine": 0.016,
                     "chem_acetylcholine": 0.006,
                     "chem_orexin": 0.005,
                     "chem_histamine": 0.004,
                     "curiosity": 0.005,
-                    "visual_transient": 0.02,
                     "chem_adenosine": -0.010,
                     "chem_melatonin": -0.006,
                 },

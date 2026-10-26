@@ -1118,10 +1118,11 @@ def test_safeguard_urge_dynamics() -> None:
 # The look and learn_code workers are not scheduled: each is an urge
 # whose accumulator is fed by her measured chemistry. ``chem_*``
 # channels arrive verbatim from the body's CoreState levels (clamped
-# [0, 1]); ``visual_transient`` is the optic nerve's salient
-# transient. Look carries a faint ambient growth (a live eye
-# wanders); learn_code has none — desire needs an object, and its
-# object is the plasticity state itself.
+# [0, 1]); a salient visual transient reaches her through the phasic
+# LC→NE pulse the body deposits — chemistry, not an optic-state read.
+# Look carries a faint ambient growth (a live eye wanders); learn_code
+# has none — desire needs an object, and its object is the plasticity
+# state itself.
 
 
 def _configured_urge(name: str):
@@ -1146,7 +1147,6 @@ _WAKE_CHEMISTRY = {
     "chem_orexin": 0.6,
     "chem_histamine": 0.5,
     "curiosity": 0.4,
-    "visual_transient": 0.0,
     "chem_adenosine": 0.15,
     "chem_melatonin": 0.1,
 }
@@ -1157,7 +1157,6 @@ _SLEEPY_CHEMISTRY = {
     "chem_orexin": 0.2,
     "chem_histamine": 0.15,
     "curiosity": 0.2,
-    "visual_transient": 0.0,
     "chem_adenosine": 0.7,
     "chem_melatonin": 0.5,
 }
@@ -1199,7 +1198,7 @@ def test_look_urge_is_a_drive_not_a_metronome() -> None:
     assert cfg.threshold > 0.0
     assert cfg.stimuli["chem_adenosine"] < 0.0
     assert cfg.stimuli["chem_melatonin"] < 0.0
-    assert "visual_transient" in cfg.stimuli
+    assert cfg.stimuli["chem_norepinephrine"] > 0.0
 
 
 def test_look_urge_fires_under_wake_chemistry() -> None:
@@ -1219,9 +1218,9 @@ def test_look_urge_never_fires_on_a_dead_channel() -> None:
 
 
 def test_look_urge_orienting_transient_pulls_faster() -> None:
-    """A salient transient on the optic nerve hastens the look."""
+    """A salient transient — felt as an NE pulse — hastens the look."""
     without = _ticks_to_fire(_configured_urge("look"), dict(_WAKE_CHEMISTRY), 300)
-    pulled = dict(_WAKE_CHEMISTRY, visual_transient=0.6)
+    pulled = dict(_WAKE_CHEMISTRY, chem_norepinephrine=0.9)
     with_it = _ticks_to_fire(_configured_urge("look"), pulled, 300)
     assert without is not None and with_it is not None
     assert with_it < without

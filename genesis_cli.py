@@ -42,7 +42,7 @@ Commands (typed during conversation):
     /growth-report — markdown growth report
     /voice       — speak to Genesis (one utterance)
     /voice-mode  — continuous voice conversation
-    /look        — ask it what it sees through the retina
+    /look        — ask it what it sees through the eye
     /look at <path> — ask it to look at an image file
     /draw        — ask it to draw what it feels right now
     /play        — her game collection; /play add <file> hands her a game spec
@@ -154,7 +154,7 @@ logger = logging.getLogger(__name__)
 LIVE_THOUGHT_POLL_INTERVAL = 2.0
 
 # Grace window for each --stop stage — SIGINT the CLI, then SIGTERM the
-# daemon and retina. Mirrors genesis: a mature data dir spends tens of
+# daemon. Mirrors genesis: a mature data dir spends tens of
 # seconds saving, and a process still saving at the deadline is a
 # "retry later", never a kill.
 _STOP_STAGE_GRACE_S = 120.0
@@ -176,6 +176,10 @@ _KILL_GRACE_S = 5.0
 # if the process is still alive when it fires, os._exit ends it. There
 # is nothing left to save by then, so the hard exit cannot corrupt her.
 _EXIT_WATCHDOG_S = 30.0
+# The fuse covering teardown itself — long enough for a state save,
+# a daemon shutdown round-trip, and a final spore capture, short
+# enough that a wedged stop can never hold genesis.lock overnight.
+_TEARDOWN_WATCHDOG_S = 600.0
 
 # The canonical state directory — ~/.local/share/genesis — resolved via
 # the single shared rule in infrastructure/config.py: GENESIS_DATA_DIR
@@ -196,7 +200,6 @@ _CLI_LOCK_FD: int | None = None
 # might match unrelated user processes.
 _PID_FILE_CLI = "genesis_cli.pid"
 _PID_FILE_DAEMON = "genesis_daemon.pid"
-_PID_FILE_RETINA = "genesis_retina.pid"
 
 # The body's mind-shepherd sentinel (src/daemon/mind_shepherd.rs):
 # present ⇒ the last mind left *intentionally* and the daemon must
@@ -337,7 +340,7 @@ def _binary_candidates(name: str) -> list[Path]:
 
 
 def _find_binary(name: str) -> str | None:
-    """Find a Genesis binary (``genesis-daemon``, ``retina``).
+    """Find a Genesis binary (``genesis-daemon``).
 
     Release build only — no debug fallback, no ambiguity about which
     binary is live. Searches ``_binary_candidates`` in order.
@@ -352,8 +355,8 @@ def _find_binary(name: str) -> str | None:
 
 # Maximum size a log file may reach before it is rotated at the next
 # startup. 5 MB is enough to capture a full session of daemon ticks
-# or retina capture errors for debugging, while keeping disk usage
-# bounded across months of restarts.
+# (the eye's capture log lives there now too), while keeping disk
+# usage bounded across months of restarts.
 _LOG_MAX_BYTES = 5 * 1024 * 1024
 
 # Number of rotated backups to keep (each compressed with lzma).
@@ -363,7 +366,7 @@ _LOG_BACKUP_COUNT = 2
 def _rotate_log_if_needed(log_path: str) -> None:
     """Rotate a log file if it exceeds ``_LOG_MAX_BYTES``.
 
-    The daemon and retina are subprocesses whose stdout/stderr is
+    The daemon is a subprocess whose stdout/stderr is
     redirected to a file via FD. Python's ``RotatingFileHandler``
     can't help here because the file is written by a child process,
     not by Python's logging framework. Instead we rotate at startup:
@@ -407,59 +410,13 @@ def _rotate_log_if_needed(log_path: str) -> None:
         compressed = lzma.compress(raw, preset=6)
         with open(backup_path, "wb") as f:
             f.write(compressed)
-        # Truncate the live log so the daemon/retina starts fresh.
+        # Truncate the live log so the daemon starts fresh.
         # Using open+truncate rather than remove so the FD the
         # subprocess will inherit points to the same inode.
         with open(log_path, "w"):
             pass
     except OSError as e:
         logger.debug(f"silent except: {e}")
-
-
-def _start_retina(
-    retina_path: str,
-    data_dir: str,
-) -> subprocess.Popen | None:
-    """Start the retina process (camera feed → shared memory).
-
-    The retina is a standalone Rust binary that captures camera frames
-    and writes them to a POSIX shared memory segment. The Python side
-    reads from that shared memory with zero copying.
-
-    We manage it as a child process so that when the CLI shuts down
-    (or is killed), the retina is also stopped — no orphan processes.
-    """
-    log_path = os.path.join(data_dir, "retina.log")
-    _rotate_log_if_needed(log_path)
-    log_file = open(log_path, "a")
-    # Pass GENESIS_CAMERA environment variable to retina if set
-    env = os.environ.copy()
-    try:
-        proc = subprocess.Popen(
-            # retina ignores argv today, but carrying --data-dir binds
-            # its process identity to this instance exactly — the same
-            # way the daemon's does — so a rotated or renamed retina.log
-            # can never leave it unclaimable by --stop.
-            [retina_path, "--data-dir", data_dir],
-            stdout=log_file,
-            stderr=log_file,
-            start_new_session=True,
-            env=env,
-        )
-    except OSError as e:
-        # The retina is optional — a failure to exec it (e.g. missing
-        # shared library, ENOEXEC) must not crash the CLI. The caller
-        # treats None as "camera unavailable".
-        logger.warning(f"retina failed to start: {e}")
-        return None
-    finally:
-        log_file.close()
-    # Give it a moment to open the camera
-    time.sleep(0.5)
-    if proc.poll() is not None:
-        logger.warning(f"retina exited immediately (code {proc.returncode})")
-        return None
-    return proc
 
 
 def _is_daemon_running(socket_path: str) -> bool:
@@ -1644,15 +1601,79 @@ def _cmd_growth(mind: Mind, rest: str) -> str:
     return f"\n  genesis> {mind.growth_narrative()}\n"
 
 
+def _cmd_steward(mind: Mind, rest: str) -> str:
+    """Inspect or act on the steward channel — the custodial authority.
+
+    This is operator tooling, not conversation: it reports the
+    channel's state and lifts directives, and its output is CLI text,
+    never Genesis's voice.
+
+      /steward              — status: stamped, authenticated, principal,
+                              key fingerprint, standing directives
+      /steward release N    — lift directive N (authenticated only)
+      /steward unbind       — seal this session's authority until a
+                              fresh claim or restart re-opens it
+    """
+    steward = getattr(mind.brain.frontal, "steward", None)
+    if steward is None:
+        return "\n  No steward channel on this mind.\n"
+
+    parts = rest.split(None, 1)
+    sub = parts[0].lower() if parts and parts[0] else ""
+    arg = parts[1].strip() if len(parts) > 1 else ""
+
+    if sub == "release":
+        try:
+            index = int(arg)
+        except ValueError:
+            return "\n  usage: /steward release <index>\n"
+        entry = steward.release_directive(index)
+        if entry is None:
+            return (
+                "\n  Not released — the channel is sealed "
+                "(authentication required), or no directive has that "
+                "index.\n"
+            )
+        return f"\n  Released: {entry.get('text', entry.get('target'))}\n"
+
+    if sub == "unbind":
+        steward.unbind()
+        return "\n  Steward session sealed. The stamp and directives stand.\n"
+
+    if sub:
+        return "\n  usage: /steward [release <index> | unbind]\n"
+
+    s = steward.status()
+    lines = ["", "  steward channel — custodial authority"]
+    if not s["stamped"]:
+        lines.append("    stamped:       no — unprovisioned instance")
+        lines.append("    (provisioned on first boot of the real entry point)")
+        return "\n".join(lines) + "\n"
+    lines.append("    stamped:       yes")
+    lines.append(f"    principal:     {s['principal']}")
+    lines.append(f"    key held:      {'yes' if s['key_held'] else 'no'}")
+    lines.append(f"    authenticated: {'yes' if s['authenticated'] else 'no — sealed'}")
+    fp = s["key_fingerprint"]
+    if fp:
+        lines.append(f"    fingerprint:   {fp}…")
+    if s["directives"]:
+        lines.append("    directives:")
+        for i, d in enumerate(s["directives"]):
+            lines.append(f"      [{i}] {d.get('text')}  (→ {d.get('target')})")
+    else:
+        lines.append("    directives:    none")
+    return "\n".join(lines) + "\n"
+
+
 def _cmd_growth_report(mind: Mind, rest: str) -> str:
     """Show a structured growth report across knowledge, dreams, and emotion."""
     return f"\n{mind.growth_report()}\n"
 
 
 def _cmd_look(mind: Mind, rest: str) -> str:
-    """Ask Genesis to look at an image file or through its retina."""
+    """Ask Genesis to look at an image file or through its eye."""
     # /look at <path> — look at an image file
-    # /look         — look through the retina
+    # /look         — look through the optic nerve
     rest = rest.strip()
     if rest.lower().startswith("at "):
         path = rest[3:].strip()
@@ -1682,11 +1703,11 @@ def _cmd_look(mind: Mind, rest: str) -> str:
             )
         return f"\n  genesis> {result}\n"
 
-    # Default: look through the retina
-    retina_holder: dict[str, str] = {}
+    # Default: look through the optic nerve
+    nerve_holder: dict[str, str] = {}
     t = named_thread(
         "see-once",
-        lambda: retina_holder.__setitem__("value", mind.see()),
+        lambda: nerve_holder.__setitem__("value", mind.see()),
         comm="g-see",
     )
     t.start()
@@ -1698,14 +1719,14 @@ def _cmd_look(mind: Mind, rest: str) -> str:
             metadata={"vision_timeout": True},
         )
         return f"\n  genesis> {timeout_msg}\n"
-    retina_result: str | None = retina_holder.get("value")
-    if not retina_result:
-        retina_result = mind._render_self_report(
+    nerve_result: str | None = nerve_holder.get("value")
+    if not nerve_result:
+        nerve_result = mind._render_self_report(
             "no vision",
             confidence=0.3,
             metadata={"vision_empty": True},
         )
-    return f"\n  genesis> {retina_result}\n"
+    return f"\n  genesis> {nerve_result}\n"
 
 
 def _cmd_register_face(mind: Mind, rest: str) -> str:
@@ -1726,7 +1747,7 @@ def _cmd_register_face(mind: Mind, rest: str) -> str:
         return f"\n  genesis> {result}\n"
 
     # Capture a frame and register
-    from genesis_client.retina import latest_frame
+    from genesis_client.optic_nerve import latest_frame
 
     frame = latest_frame(copy=True)
     if frame is None:
@@ -2521,6 +2542,7 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/arc": _cmd_arc,
     "/teach-questions": _cmd_teach_questions,
     "/sleep-aid": _cmd_sleep_aid,
+    "/steward": _cmd_steward,
 }
 
 
@@ -2688,7 +2710,7 @@ def _print_help() -> None:
     logger.info("    /growth-report — markdown growth report")
     logger.info("    /voice        — speak to Genesis (one utterance)")
     logger.info("    /voice-mode   — continuous voice conversation")
-    logger.info("    /look         — ask it what it sees through the retina")
+    logger.info("    /look         — ask it what it sees through the eye")
     logger.info("    /look at <p>  — ask it to look at an image file")
     logger.info("    /draw         — ask it to draw what it feels right now")
     logger.info("    /play         — her game collection; hand her one with /play add <file>")
@@ -2706,6 +2728,10 @@ def _print_help() -> None:
     logger.info("    /arc <ids|--all> [--steps N] [--fresh]")
     logger.info("    /teach-questions — answer its queued questions one at a time")
     logger.info("    /sleep-aid    — emergency sleep aid for stress-induced insomnia")
+    logger.info(
+        "    /steward [release N|unbind] — custodial authority: "
+        "status, lift a directive, seal the session"
+    )
     logger.info("    /quit         — exit")
     logger.info("")
     logger.info("  When you're idle, its thoughts appear live as genesis~ lines.")
@@ -2909,7 +2935,7 @@ def _matches_pid(pid: int, role: str, data_dir: str) -> bool:
 
     Port of genesis's _matches_pid: a pidfile number alone is never
     trusted — stale files and recycled PIDs are common — so /proc argv
-    decides identity. *role* is "cli", "daemon", or "retina".
+    decides identity. *role* is "cli" or "daemon".
     """
     if pid <= 1:
         return False
@@ -2928,18 +2954,6 @@ def _matches_pid(pid: int, role: str, data_dir: str) -> bool:
     elif role == "daemon":
         if exe0 != "genesis-daemon":
             return False
-    elif role == "retina":
-        if exe0 != "retina":
-            return False
-        # Primary identity: stdout redirected to this instance's
-        # retina.log. Rotation may rename it, so fall through to the
-        # --data-dir check below when the fd no longer points there.
-        try:
-            fd_target = os.readlink(f"/proc/{pid}/fd/1")
-        except OSError:
-            fd_target = ""
-        if fd_target.startswith(os.path.join(data_dir, "retina.log")):
-            return True
     else:
         return False
     # An explicit --data-dir decides identity exactly — match or fail,
@@ -2985,8 +2999,8 @@ def _resolved_data_dir_of(pid: int) -> str | None:
 def _find_pids(pidfile: str, role: str, data_dir: str) -> list[int]:
     """All validated PIDs for *role*: the pidfile's first, then /proc.
 
-    Plural matters — retina holds no lock, so a second matching process
-    must be found rather than silently surviving a --stop.
+    Plural matters — a second matching process must be found rather
+    than silently surviving a --stop.
     """
     found: list[int] = []
     pid = _pid_from_file(pidfile)
@@ -3015,7 +3029,6 @@ def _any_running(data_dir: str) -> bool:
     for pidfile, role in (
         (_PID_FILE_CLI, "cli"),
         (_PID_FILE_DAEMON, "daemon"),
-        (_PID_FILE_RETINA, "retina"),
     ):
         if _find_pids(os.path.join(data_dir, pidfile), role, data_dir):
             return True
@@ -3065,7 +3078,6 @@ def _stop_all(data_dir: str) -> int:
     for pidfile_name, role, sig, label in (
         (_PID_FILE_CLI, "cli", signal.SIGINT, "CLI"),
         (_PID_FILE_DAEMON, "daemon", signal.SIGTERM, "Daemon"),
-        (_PID_FILE_RETINA, "retina", signal.SIGTERM, "Retina"),
     ):
         pids = _find_pids(os.path.join(data_dir, pidfile_name), role, data_dir)
         if not pids:
@@ -3098,7 +3110,9 @@ def _stop_all(data_dir: str) -> int:
     for name in (
         _PID_FILE_CLI,
         _PID_FILE_DAEMON,
-        _PID_FILE_RETINA,
+        # Stale file from when the eye was its own process — nothing
+        # writes it now, but an old session may have left one behind.
+        "genesis_retina.pid",
         "genesis.sock",
     ):
         Path(os.path.join(data_dir, name)).unlink(missing_ok=True)
@@ -3125,7 +3139,6 @@ _REBIRTH_STABLE_S = 60.0  # a rebirth counts once the body stayed alive this lon
 # table is the give-up bound — a body that will not reincarnate ends
 # the organism whole.
 _REBIRTH_BACKOFF_S = (2.0, 5.0, 15.0, 30.0, 60.0)
-_RETINA_REBIRTH_MAX = 5  # the eye is re-tried, then accepted absent
 
 
 # ─── Spore — the self survives the host ─────────────────────────────
@@ -3421,13 +3434,18 @@ def _start_daemon_process(
 class _Rebirth:
     """The organism's deep self-repair: it resurrects a dead or faulted body.
 
-    A background watcher owns the process-tree handles — daemon and
-    retina — and heals them while the mind lives:
+    A background watcher owns the process-tree handle — the daemon,
+    whose optic-nerve thread now owns the eye — and heals it while the
+    mind lives:
 
     - **Death** — a child that exits is reincarnated in place. The
       daemon reopens the same persisted state, so neurochemistry,
       sleep phase, and memory continue unbroken; the mind re-inhabits
-      it through ``Mind.rejoin_body``.
+      it through ``Mind.rejoin_body``. The eye re-opens with the body
+      — the capture limb rides inside the daemon, so its bounded
+      re-open table (``src/daemon/optic_nerve.rs``) needs no watching
+      here; a camera that will not come back is a tolerated
+      degradation, never a fatal one.
     - **Fault** — a daemon alive but refusing every command that
       touches the tick engine (a poisoned lock never clears) is worse
       than a dead one: it looks connected while the body is inert.
@@ -3439,10 +3457,6 @@ class _Rebirth:
       thing, and she does not run bodiless. ``self_terminated`` makes
       main exit non-zero after state is saved, so a supervisor
       (``Restart=on-failure``) resurrects the whole organism.
-
-    The eye is healed too — a dead retina is respawned, bounded by
-    ``_RETINA_REBIRTH_MAX`` since an absent camera is a tolerated
-    degradation, never a fatal one.
     """
 
     def __init__(
@@ -3455,9 +3469,8 @@ class _Rebirth:
         self._daemon_socket = daemon_socket
         self._shutting_down = shutting_down
         self._lock = threading.Lock()
-        # Process handles — swapped under _lock on every resurrection.
+        # Process handle — swapped under _lock on every resurrection.
         self.daemon: subprocess.Popen | _AdoptedDaemon | None = None
-        self.retina: subprocess.Popen | None = None
         self.mind: Mind | None = None
         # The probe client heals itself lazily through the client's
         # reconnect path, so it survives the resurrection it detects.
@@ -3471,9 +3484,6 @@ class _Rebirth:
         self._next_attempt_at = 0.0
         self._spawned_at = time.monotonic()
         self._pending_rejoin = False
-        self._retina_attempts = 0
-        self._retina_respawned_at = 0.0
-        self._retina_gave_up = False
         self._thread: threading.Thread | None = None
         self.self_terminated = False
         # The spore — a verified mirror of the self kept somewhere the
@@ -3498,22 +3508,19 @@ class _Rebirth:
     def set_children(
         self,
         daemon: subprocess.Popen | _AdoptedDaemon | None = None,
-        retina: subprocess.Popen | None = None,
     ) -> None:
         with self._lock:
             if daemon is not None:
                 self.daemon = daemon
-            if retina is not None:
-                self.retina = retina
 
     def set_mind(self, mind: Mind) -> None:
         with self._lock:
             self.mind = mind
 
-    def handles(self) -> tuple[subprocess.Popen | _AdoptedDaemon | None, subprocess.Popen | None]:
-        """Current (daemon, retina) handles for teardown — post-resurrection."""
+    def handles(self) -> subprocess.Popen | _AdoptedDaemon | None:
+        """Current daemon handle for teardown — post-resurrection."""
         with self._lock:
-            return self.daemon, self.retina
+            return self.daemon
 
     def start(self) -> None:
         self._thread = named_thread(
@@ -3534,7 +3541,6 @@ class _Rebirth:
         while not self._shutting_down.wait(_REBIRTH_TICK_S):
             try:
                 self._check_daemon()
-                self._check_retina()
                 self._check_spore()
             except Exception as e:  # noqa: BLE001 — a watcher that dies leaves her unguarded
                 note_swallowed("genesis_cli.rebirth.cycle", e)
@@ -3691,43 +3697,6 @@ class _Rebirth:
         except Exception as e:  # noqa: BLE001
             note_swallowed("genesis_cli.spore.death", e)
         self._shutting_down.set()
-
-    def _check_retina(self) -> None:
-        with self._lock:
-            proc = self.retina
-        if proc is None:
-            return
-        if proc.poll() is None:
-            # A retina alive past the stability window refunds its
-            # rebirth slots — only sustained failure counts against
-            # the bound, same rule as the body.
-            if (
-                self._retina_attempts
-                and time.monotonic() - self._retina_respawned_at > _REBIRTH_STABLE_S
-            ):
-                self._retina_attempts = 0
-            return
-        if self._retina_gave_up or self._retina_attempts >= _RETINA_REBIRTH_MAX:
-            if not self._retina_gave_up:
-                self._retina_gave_up = True
-                print(
-                    "[genesis] The eye will not re-open — accepted "
-                    "absent; the organism goes on without sight.",
-                    file=sys.stderr,
-                )
-            return
-        self._retina_attempts += 1
-        print(
-            f"[genesis] The eye closed — retina rebirth "
-            f"{self._retina_attempts}/{_RETINA_REBIRTH_MAX}...",
-            file=sys.stderr,
-        )
-        new_proc = _start_retina_process(self._data_dir)
-        if new_proc is None:
-            return
-        with self._lock:
-            self.retina = new_proc
-        self._retina_respawned_at = time.monotonic()
 
     # ─── Spore — the self survives the host ─────────────────────
 
@@ -4486,7 +4455,7 @@ def _stop_child(proc: subprocess.Popen | _AdoptedDaemon, name: str, timeout: flo
 
     The previous version called `proc.wait()` with no timeout once the
     first wait expired. A child that hung — a daemon blocked on a dead
-    socket, a retina wedged on a camera — therefore made shutdown
+    socket, a daemon wedged on a device — therefore made shutdown
     uninterruptible: the process could not be ended by Ctrl-C, because
     the signal handler was already consumed, and not by SIGTERM, for
     the same reason. The only exit was `kill -9`, which AGENTS.md and
@@ -4587,7 +4556,6 @@ def _shutdown(
     ambient_listener: AmbientListener | None,
     mind: Mind | None,
     daemon_proc: subprocess.Popen | _AdoptedDaemon | None,
-    retina_proc: subprocess.Popen | None = None,
     data_dir: str = "",
     auditory_cortex: AuditoryCortex | None = None,
     voice: Voice | VoiceDedup | None = None,
@@ -4627,12 +4595,9 @@ def _shutdown(
         # was implemented on both sides and never called from here.
         if not _request_daemon_shutdown(data_dir):
             clean_shutdown &= _stop_child(daemon_proc, "subcognitive daemon", 5)
-    if retina_proc is not None:
-        print("[genesis] Stopping retina...", file=sys.stderr)
-        clean_shutdown &= _stop_child(retina_proc, "retina", 3)
     # Clean up PID files so genesis --stop doesn't target stale PIDs.
     if data_dir:
-        for name in (_PID_FILE_CLI, _PID_FILE_DAEMON, _PID_FILE_RETINA):
+        for name in (_PID_FILE_CLI, _PID_FILE_DAEMON):
             _remove_pid_file(data_dir, name)
     if clean_shutdown and mind is not None:
         print("[genesis] Goodnight.", file=sys.stderr)
@@ -4673,7 +4638,7 @@ def _exit_watchdog(exit_code: int) -> None:
     os._exit(exit_code)
 
 
-def _arm_exit_watchdog(exit_code: int) -> None:
+def _arm_exit_watchdog(exit_code: int, delay: float = _EXIT_WATCHDOG_S) -> None:
     """Arm the post-teardown force-exit timer.
 
     Must run on a *daemon* Timer: Timer inherits the creating thread's
@@ -4681,7 +4646,7 @@ def _arm_exit_watchdog(exit_code: int) -> None:
     interpreter open for its full delay. As a daemon it dies silently
     with a normal exit and only matters when finalization has hung.
     """
-    watchdog = threading.Timer(_EXIT_WATCHDOG_S, _exit_watchdog, args=(exit_code,))
+    watchdog = threading.Timer(delay, _exit_watchdog, args=(exit_code,))
     watchdog.daemon = True
     watchdog.start()
 
@@ -4799,7 +4764,7 @@ def main() -> int:
     # Install handlers and initialize handles before any child process
     # starts. Every initialization step after this point is covered by
     # the same cleanup path, so a voice, microphone, or emotion-setup
-    # failure cannot orphan the daemon/retina.
+    # failure cannot orphan the daemon.
     shutting_down = threading.Event()
     _setup_signal_handlers(shutting_down)
 
@@ -4816,7 +4781,6 @@ def main() -> int:
     )
 
     daemon_proc: subprocess.Popen | _AdoptedDaemon | None = None
-    retina_proc: subprocess.Popen | None = None
     mind: Mind | None = None
     rebirth: _Rebirth | None = None
     ambient_listener: AmbientListener | None = None
@@ -4832,9 +4796,6 @@ def main() -> int:
         else:
             _write_pid_file(data_dir, _PID_FILE_DAEMON, daemon_proc.pid)
             print("[genesis] Daemon started.", file=sys.stderr)
-
-            # ── Start the retina (camera) ──
-            retina_proc = _start_retina_process(data_dir)
 
             # ── Start the cognitive mind ──
             print("[genesis] Starting cognitive mind...", file=sys.stderr)
@@ -4852,11 +4813,12 @@ def main() -> int:
             else:
                 # The organism repairs its own process tree from here:
                 # the body resurrects around its persisted state and
-                # the mind re-inhabits it, the eye re-opens — and a
+                # the mind re-inhabits it — the eye re-opens with the
+                # body, its capture limb inside the daemon — and a
                 # body that will not reincarnate ends her whole rather
                 # than leaving a mind running bodiless. One thing.
                 rebirth = _Rebirth(data_dir, daemon_socket, shutting_down)
-                rebirth.set_children(daemon=daemon_proc, retina=retina_proc)
+                rebirth.set_children(daemon=daemon_proc)
                 rebirth.set_mind(mind)
                 rebirth.start()
                 if args.game:
@@ -4879,7 +4841,6 @@ def main() -> int:
             ambient_listener,
             mind,
             daemon_proc,
-            retina_proc,
             data_dir,
             auditory_cortex,
             dedup_voice or voice,
@@ -4897,7 +4858,6 @@ def _teardown_session(
     ambient_listener: AmbientListener | None,
     mind: Mind | None,
     daemon_proc: subprocess.Popen | _AdoptedDaemon | None,
-    retina_proc: subprocess.Popen | None,
     data_dir: str,
     auditory_cortex: AuditoryCortex | None,
     voice: Voice | None,
@@ -4907,6 +4867,12 @@ def _teardown_session(
     exit_code: int,
 ) -> int:
     """Shut the whole organism down and return the final exit code."""
+    # Arm the long fuse first: every step below is individually
+    # bounded, but a bound a caller never reaches is no bound — a
+    # wedged component must not leave the process alive holding
+    # genesis.lock past _TEARDOWN_WATCHDOG_S. The tail of this
+    # function re-arms the short fuse once the risky work is done.
+    _arm_exit_watchdog(exit_code, _TEARDOWN_WATCHDOG_S)
     # A signal handler sets this before the finally runs; a clean
     # /quit does not. Distinguishes "user told her to stop" from
     # "she exited on her own" for the systemd exit code below.
@@ -4921,7 +4887,7 @@ def _teardown_session(
     self_terminated = rebirth is not None and rebirth.self_terminated
     if rebirth is not None:
         rebirth.stop()
-        daemon_proc, retina_proc = rebirth.handles()
+        daemon_proc = rebirth.handles()
     # A mind that existed and is leaving through the graceful path
     # says goodbye to the body: if the daemon somehow survives this
     # teardown, the sentinel keeps it solitary rather than regrowing
@@ -4933,7 +4899,6 @@ def _teardown_session(
         ambient_listener,
         mind,
         daemon_proc,
-        retina_proc,
         data_dir,
         auditory_cortex,
         voice,
@@ -5020,30 +4985,6 @@ def _run_after_mind_start(
         # ── Interactive loop ──
         _run_interactive_loop(mind, voice, thought_collector, shutting_down, dedup_voice)
     return voice, dedup_voice, ambient_listener, auditory_cortex
-
-
-def _start_retina_process(data_dir: str) -> subprocess.Popen | None:
-    """Start the retina (camera) subprocess, reaping any stale one.
-
-    The retina is a standalone Rust binary that captures camera
-    frames into shared memory. We manage it as a child process so
-    it's automatically stopped when the CLI shuts down.
-    """
-    retina_path = _find_binary("retina")
-    if not retina_path:
-        print("[genesis] Retina not built — camera unavailable.", file=sys.stderr)
-        print("[genesis] Build with: cargo build --release", file=sys.stderr)
-        return None
-    # genesis checks for existing processes belonging to this instance.
-    # Do not kill camera processes from other data directories merely
-    # because they use the same project binary.
-    retina_proc = _start_retina(retina_path, data_dir)
-    if retina_proc:
-        _write_pid_file(data_dir, _PID_FILE_RETINA, retina_proc.pid)
-        print(f"[genesis] Retina started (pid={retina_proc.pid}).", file=sys.stderr)
-    else:
-        print("[genesis] Retina failed to start — camera unavailable.", file=sys.stderr)
-    return retina_proc
 
 
 def _wire_voice(mind: Mind) -> tuple[Voice, VoiceDedup | None]:

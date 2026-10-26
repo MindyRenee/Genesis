@@ -1,11 +1,11 @@
-"""Visual pathway orchestrator — retina → LGN → V1 → dorsal/ventral streams.
+"""Visual pathway orchestrator — optic nerve → LGN → V1 → dorsal/ventral streams.
 
 This module orchestrates the full biological visual pathway:
-    retina → LGN (M/P/K separation) → V1 (parallel M/P processing) →
+    optic nerve → LGN (M/P/K separation) → V1 (parallel M/P processing) →
         dorsal stream (M → parietal lobe for motion/spatial)
         ventral stream (P → temporal lobe for object/face recognition)
 
-This replaces the direct retina → V1 connection with the biologically
+This replaces the direct nerve → V1 connection with the biologically
 accurate thalamic relay and parallel pathway architecture.
 """
 
@@ -21,7 +21,7 @@ from .lgn import LGNOutput, LGNRelay
 from .v1 import V1Model, VisualField
 
 if TYPE_CHECKING:
-    from genesis_client.retina import Retina
+    from genesis_client.optic_nerve import OpticNerve
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +52,12 @@ class VisualPathwayOutput:
 class VisualPathway:
     """Full biological visual pathway orchestrator.
 
-    Coordinates retina → LGN → V1(M/P) → dorsal/ventral streams.
+    Coordinates optic nerve → LGN → V1(M/P) → dorsal/ventral streams.
 
     Usage:
-        retina = Retina()
+        nerve = OpticNerve()
         pathway = VisualPathway()
-        output = pathway.process_from_retina(retina)
+        output = pathway.process_from_nerve(nerve)
         # output.dorsal_field → parietal lobe (motion/spatial)
         # output.ventral_field → temporal lobe (object/face)
     """
@@ -77,11 +77,11 @@ class VisualPathway:
         self.v1 = v1 if v1 is not None else V1Model()
         self._frame_counter = 0
 
-    def process_from_retina(self, retina: Retina) -> VisualPathwayOutput:
-        """Process a frame from retina through the full pathway.
+    def process_from_nerve(self, nerve: OpticNerve) -> VisualPathwayOutput:
+        """Process a frame from the optic nerve through the full pathway.
 
         Args:
-            retina: Retina instance to read from
+            nerve: OpticNerve instance to read from
 
         Returns:
             VisualPathwayOutput with dorsal and ventral stream outputs
@@ -90,8 +90,8 @@ class VisualPathway:
 
         t0 = time.time()
 
-        # Step 1: Read from retina
-        frame = retina.latest(copy=True)
+        # Step 1: Read from the nerve
+        frame = nerve.latest(copy=True)
         if frame is None:
             return VisualPathwayOutput()
 

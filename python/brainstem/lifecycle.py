@@ -164,6 +164,7 @@ class LifecycleMixin:
         from previous conversations.
         """
         _warm_nltk()
+        self._provision_stewardship()
         self._start_connect_and_register()
         try:
             self._start_restore_state()
@@ -187,6 +188,29 @@ class LifecycleMixin:
         self._start_autonomous_subsystems()
         self._start_engage_restored_sleep()
         self._start_background_threads()
+
+    def _provision_stewardship(self) -> None:
+        """First-boot steward provisioning — explicit, at the entry point.
+
+        ``Stewardship.load`` (run in the frontal lobe's constructor) is
+        strictly read-only: it can authenticate an existing credential
+        but never creates one. Creation happens only here — a data dir
+        with no stamp gets its instance key and provenance stamp; a
+        stamped dir (including a copy whose key it cannot read) is left
+        exactly as found, sealed. ``provision`` mutates the loaded
+        channel in place, so the frontal lobe's steward object needs
+        no re-wiring.
+        """
+        steward = getattr(self.brain.frontal, "steward", None)
+        if steward is None:
+            return
+        try:
+            if steward.provision():
+                logger.info("steward channel authenticated")
+            elif steward.stamped:
+                logger.info("steward channel sealed — stamped to a key this process does not hold")
+        except OSError as e:
+            logger.warning(f"steward provisioning failed: {e}")
 
     def _start_connect_and_register(self) -> None:
         """Connect to the daemon and register cognitive modules.
@@ -648,20 +672,6 @@ class LifecycleMixin:
         )
         self._autosave_thread.start()
 
-        # Start the presence heartbeat — periodically samples the retina
-        # for faces and reports measured co-presence to the daemon's
-        # dyadic model. Presence accrues only while an observation is
-        # fresh (60s window); without sampling, co-presence only ever
-        # registered during active conversation — a caretaker who sits
-        # nearby all day measured about an hour of presence, and the
-        # affective signature that familiarity grows from starved.
-        self._presence_thread: threading.Thread | None = named_thread(
-            "presence-heartbeat",
-            self._presence_loop,
-            comm="g-presence",
-        )
-        self._presence_thread.start()
-
         # Start the channel's ear — her hearing on the public page.
         # None unless GENESIS_DISCORD_BOT_TOKEN is set; starting it
         # here (not in __init__) keeps construction free of the
@@ -669,69 +679,6 @@ class LifecycleMixin:
         channel = getattr(getattr(self, "world", None), "channel", None)
         if channel is not None:
             channel.start()
-
-    # Presence sampling cadence — kept under the daemon's 60 s
-    # observation window (PRESENCE_TIMEOUT_TICKS at 200 ms) so an
-    # observed person accrues co-presence continuously.
-    _PRESENCE_INTERVAL_S = 45.0
-
-    def _presence_loop(self) -> None:
-        """Background thread that reports measured co-presence.
-
-        Each cycle reads the latest retina frame and runs face
-        detection only — no V1 coding, no object recognition, no
-        cognition — then sends a zero-confidence user-affect
-        observation. The zero confidence makes the daemon's EMA weight
-        zero, so the observation updates *who is here* without writing
-        anything about how they feel: presence is measured, affect
-        stays earned.
-        """
-        while self._running:
-            waited = 0.0
-            while waited < self._PRESENCE_INTERVAL_S and self._running:
-                time.sleep(1.0)
-                waited += 1.0
-            if not self._running:
-                break
-            try:
-                self._sample_presence()
-            except Exception as e:  # noqa: BLE001
-                note_swallowed("mind.lifecycle._presence_loop", e)
-
-    def _sample_presence(self) -> None:
-        """Sample who is visibly present and report it to the dyad.
-
-        Presence is pooled — the dyadic model tracks one dyad, whoever
-        is there. Faces still get recognized so the vision layer keeps
-        its own person memory; only the co-presence signal reaches the
-        body. While asleep she does not perceive, so sampling is
-        skipped and co-presence stops accruing.
-        """
-        if self._is_sleeping:
-            return
-        from occipital_lobe.perception.vision import _yuyv_to_rgb
-
-        from genesis_client.retina import latest_frame
-
-        frame = latest_frame(copy=True)
-        if frame is None:
-            return
-        try:
-            rgb = frame if frame.ndim == 3 and frame.shape[2] == 3 else _yuyv_to_rgb(frame)
-            self.vision.recognize_faces_in(rgb)
-        except (FileNotFoundError, OSError):
-            # Absent retina segment or missing DNN model files are
-            # the no-vision degradation — sampling just does nothing.
-            return
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.lifecycle._sample_presence", e)
-            return
-        if not self.vision.last_persons_seen():
-            return
-        try:
-            self.client.update_user_affect(0.0, 0.0, 0.0, confidence=0.0)
-        except (OSError, ConnectionError) as e:
-            note_swallowed("mind.lifecycle._sample_presence", e)
 
     def _autosave_loop(self) -> None:
         """Background thread that periodically saves cognitive state.
@@ -1015,7 +962,6 @@ class LifecycleMixin:
             (self._heartbeat_thread, "heartbeat", 5.0),
             (self._autosave_thread, "autosave", 60.0),
             (self._notification_thread, "notifications", 5.0),
-            (self._presence_thread, "presence-heartbeat", 5.0),
         ):
             clean &= self._join_shutdown_thread(thread, name, timeout=timeout)
         return clean

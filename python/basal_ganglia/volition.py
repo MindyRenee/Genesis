@@ -253,7 +253,6 @@ class VolitionMixin:
             # The body's own levels pass untouched like interoception
             # — engagement attenuates appetites, never physiology.
             **chemical,
-            "visual_transient": self._orienting_signal(),
         }
 
     def _chemical_signals(self) -> dict[str, float]:
@@ -275,23 +274,6 @@ class VolitionMixin:
         return {
             f"chem_{name}": min(1.0, max(0.0, float(level))) for name, level in chemicals.items()
         }
-
-    def _orienting_signal(self) -> float:
-        """The salient-transient channel — the superior colliculus pull.
-
-        ``orienting`` is the optic nerve's unsmoothed salient
-        transient: motion or a flash on the retina pulls the urge to
-        look the way a real orienting reflex does — a measured
-        channel, not a schedule. No eye means no pull.
-        """
-        try:
-            optic = self.client.get_optic_state()
-            if optic is None or not optic.eye_present:
-                return 0.0
-            return min(1.0, max(0.0, float(optic.orienting)))
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.volition._orienting_signal", e)
-            return 0.0
 
     def _drive_signals(self) -> dict[str, float]:
         """The maintenance-channel drive inputs, normalized to [0, 1].
@@ -1073,14 +1055,11 @@ class VolitionMixin:
                 if outcome["status"] == "applied":
                     self._emit_live_thought(
                         "code",
-                        f"applied my own change to {outcome['title']} — "
-                        "verified, it stays",
+                        f"applied my own change to {outcome['title']} — verified, it stays",
                     )
                     # A verified self-edit is the same milestone the
                     # autonomous fixer trips.
-                    self.brain.frontal.narrative.check_milestone(
-                        "first self-modification"
-                    )
+                    self.brain.frontal.narrative.check_milestone("first self-modification")
                 else:
                     self._emit_live_thought(
                         "code",
@@ -1780,7 +1759,7 @@ class VolitionMixin:
 
         Game-gated: while she is playing, her visual channel is the
         game feed — frames arrive through ``world_step``, not the
-        retina. Looking around the room is off-task gaze wandering.
+        optic nerve. Looking around the room is off-task gaze wandering.
         """
         if self._is_sleeping or self._is_gaming:
             return

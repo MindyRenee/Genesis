@@ -684,8 +684,16 @@ def _windowed_gamma_plv(
     window holds too few samples — an absent channel, not a zero.
     """
     # Snapshot first: the oscillator appends to the same deque on
-    # its own thread — iterating the live deque races it.
-    window = list(samples)
+    # its own thread — iterating the live deque races it. The
+    # snapshot itself is an iteration, so a racing append can still
+    # fail it; a bounded retry lands between appends.
+    window: list[tuple[float, tuple[float, float, float, float]]] = []
+    for _ in range(3):
+        try:
+            window = list(samples)
+            break
+        except RuntimeError:
+            continue
     if len(window) < 4:
         return None, {}
     n = len(window)
@@ -694,8 +702,8 @@ def _windowed_gamma_plv(
     ]
     pairs: dict[str, float] = {}
     for i, j in pair_idx:
-        re = sum(math.cos(ph[i] - ph[j]) for _, ph in samples)
-        im = sum(math.sin(ph[i] - ph[j]) for _, ph in samples)
+        re = sum(math.cos(ph[i] - ph[j]) for _, ph in window)
+        im = sum(math.sin(ph[i] - ph[j]) for _, ph in window)
         pairs[f"{_GAMMA_REGIONS[i]}-{_GAMMA_REGIONS[j]}"] = math.hypot(re, im) / n
     return sum(pairs.values()) / len(pairs), pairs
 

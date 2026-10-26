@@ -144,7 +144,7 @@ def test_ingest_endogenous_learns_without_fetch_bookkeeping(
         content=(
             "genesis launches the organism. The daemon is the body. "
             "The daemon owns neurochemistry and the core state. "
-            "The mind is cognition. The retina is the eye. "
+            "The mind is cognition. The optic nerve is the eye. "
             "The mind reads core state through the socket."
         ),
         source_name="man_pages",

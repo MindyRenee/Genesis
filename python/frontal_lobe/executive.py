@@ -283,6 +283,13 @@ class ExecutiveFunction:
         # Learned success rate per action kind, so arbitration is biased
         # by observed outcomes rather than declared confidence alone.
         self._kind_reliability: dict[str, tuple[int, int]] = {}
+        # Optional restraint hook. Given a proposed objective it
+        # returns a reason it must not proceed, or None. A declined
+        # objective is recorded (it stays legible) but never
+        # actionable: it cannot win arbitration, and refreshing it
+        # cannot revive it. Nothing wires this in the organism — her
+        # intentions are her own.
+        self.intention_gate: Callable[[str], str | None] | None = None
 
     # ─── Planning ─────────────────────────────────────────────────
 
@@ -414,7 +421,19 @@ class ExecutiveFunction:
         key = objective.strip().lower()
         if not key:
             raise ValueError("objective must not be empty")
+        # The restraint line runs before any lookup: a directive set
+        # after an intention exists must still restrain it, and a
+        # gate hit forces the record non-actionable whether it's new
+        # or already known.
+        restraint: str | None = None
+        if self.intention_gate is not None:
+            restraint = self.intention_gate(objective)
+            if restraint is not None:
+                actionable = False
+                reason = reason or f"restrained: {restraint}"
         current = self._intentions.get(key)
+        if current is not None and restraint is not None:
+            current.actionable = False
         if current is not None:
             # A terminal objective stays terminal: a repeated signal
             # does not resurrect it. Without this, a source that stays

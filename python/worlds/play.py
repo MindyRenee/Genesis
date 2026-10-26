@@ -267,6 +267,34 @@ _ARC_OFFICIAL_CARD = "official_card.json"
 _ARC_OFFICIAL_ENVS = "environment_files"
 _ARC_CHALLENGE = "arc-official-challenge"
 
+# The ARC funnel — the corpora she climbs toward the official
+# challenge. Two feeds land on the same shelf:
+#
+#   arc_*/arc2_*   grid puzzles from the ARC-AGI-1/2 task corpora,
+#                  scanned from configured directories.
+#   arcagi-*       the ARC-AGI-3 environments installed locally —
+#                  the offline arcade, unlimited practice.
+#
+# Corpus roots: ``GENESIS_ARC_CORPUS`` adds os.pathsep-separated
+# directories; each root's ``data/{training,evaluation}`` layout is
+# understood, and a bare directory of task files works too. The
+# corpora live outside the repo — wherever on the host they were
+# fetched. The two defaults cover this host's layout.
+_ARC_CORPUS_ENV = "GENESIS_ARC_CORPUS"
+_ARC_CORPUS_DIRS = (
+    ("~/testing/ARC/data", "arc", 2),
+    ("~/testing/ARC-AGI-2/data", "arc2", 3),
+)
+_ARC_PRACTICE_FAMILY = "arcagi"
+# Every env attempt's full telemetry lands here — one JSONL line per
+# result, the research record the notebooks read.
+_ARC_RESULTS_LOG = "results.jsonl"
+
+# The ladder's difficulty pull: higher tiers draw harder than easy
+# shelves — the funnel leans into the frontier, not the solved end.
+# Internal games/offered tasks sit at level 1 by default.
+_ARC_LEVEL_PULL = 0.3
+
 # What she was *told* about specific system games — the briefing a
 # person gives a new player: what the game is, the point of it, and
 # where the important things live on screen. This is instruction,
@@ -949,6 +977,8 @@ class GamePlay:
     # The card-window key the stakes brief was last announced for —
     # she hears what the challenge is once per window, not every firing.
     _arc_briefed: str | None = None
+    # Corpus spec cache — task files don't move inside a session.
+    _corpus_specs: list[dict] | None = None
 
     def __post_init__(self) -> None:
         self._progress_path = Path(self.data_dir) / _PROGRESS_FILE
@@ -1092,6 +1122,95 @@ class GamePlay:
             del self._offered_cache[stale]
         return out
 
+    def _arc_corpus_games(self) -> list[dict]:
+        """The ARC-AGI-1/2 task corpora — grid puzzles, lazily bound.
+
+        Scanning yields one thin spec per ``*.json`` task file; the
+        pairs themselves load only if she actually sits at the task
+        (``_corpus`` is resolved in ``attempt``). Corpus roots come
+        from ``GENESIS_ARC_CORPUS`` plus the host defaults — corpora
+        live outside the repo, wherever they were fetched. Prefixes
+        namespace the sets: ``arc_*`` ARC-1, ``arc2_*`` ARC-2, and
+        env-added roots join ARC-2's tier — newer corpora are the
+        harder end. The spec list is cached: task files don't move.
+        """
+        if self._corpus_specs is not None:
+            return self._corpus_specs
+        roots: list[tuple[str, str, int]] = [
+            (os.path.expanduser(d), prefix, level) for d, prefix, level in _ARC_CORPUS_DIRS
+        ]
+        for extra in os.environ.get(_ARC_CORPUS_ENV, "").split(os.pathsep):
+            extra = extra.strip()
+            if extra:
+                roots.append((os.path.expanduser(extra), "arc2", 3))
+        out: list[dict] = []
+        # Names already covered elsewhere — an offered copy of a task
+        # (her first ARC games arrived that way) keeps its entry; the
+        # corpus spec for the same id would only double the shelf.
+        seen: set[str] = {str(t["name"]) for t in COLLECTION}
+        seen |= {str(t["name"]) for t in self.offered_games()}
+        for root, prefix, level in roots:
+            dirs = [
+                sub for sub in (Path(root) / "training", Path(root) / "evaluation") if sub.is_dir()
+            ] or ([Path(root)] if Path(root).is_dir() else [])
+            for directory in dirs:
+                try:
+                    files = sorted(directory.glob("*.json"))
+                except OSError:
+                    continue
+                for f in files:
+                    name = f"{prefix}_{f.stem}"
+                    if name in seen:
+                        continue
+                    seen.add(name)
+                    out.append(
+                        {
+                            "name": name,
+                            "family": "grid",
+                            "hint": (
+                                f"An {prefix.upper()}-corpus puzzle — "
+                                "infer the rule, produce the grid."
+                            ),
+                            "level": level,
+                            "_corpus": str(f),
+                        }
+                    )
+        self._corpus_specs = out
+        return out
+
+    def _arc_practice_games(self) -> list[dict]:
+        """The local ARC-AGI-3 environments — her practice arcade.
+
+        Every game installed under ``<data>/arc/environment_files``
+        is playable through the offline arcade: same engines the card
+        uses, no venue clock, unlimited reps. The name matches the
+        card's game_id so card mastery and practice mastery are the
+        same record.
+        """
+        out: list[dict] = []
+        env_dir = Path(self.data_dir) / "arc" / _ARC_OFFICIAL_ENVS
+        try:
+            games = sorted(d for d in env_dir.iterdir() if d.is_dir())
+        except OSError:
+            return out
+        for d in games:
+            try:
+                versions = sorted(v.name for v in d.iterdir() if (v / "metadata.json").is_file())
+            except OSError:
+                versions = []
+            for ver in versions:
+                game_id = f"{d.name}-{ver}"
+                out.append(
+                    {
+                        "name": f"arcagi-{game_id}",
+                        "family": _ARC_PRACTICE_FAMILY,
+                        "game_id": game_id,
+                        "hint": "A local ARC-AGI-3 environment — a video game to win.",
+                        "level": 4,
+                    }
+                )
+        return out
+
     def collection(self) -> list[dict]:
         """Every game she can play — her collection, always there.
 
@@ -1103,6 +1222,8 @@ class GamePlay:
         return [
             *self.offered_games(),
             *self._arc_official_games(),
+            *self._arc_corpus_games(),
+            *self._arc_practice_games(),
             *COLLECTION,
             *self._system_games(),
         ]
@@ -1123,6 +1244,8 @@ class GamePlay:
         challenge then is what opens the card.
         """
         if not os.getenv("ARC_API_KEY", "").strip():
+            return None
+        if not self._arc_unlocked():
             return None
         arc_dir = Path(self.data_dir) / "arc"
         try:
@@ -1178,6 +1301,18 @@ class GamePlay:
             "live": False,
             "idle_pressure": 0.0,
         }
+
+    def _arc_unlocked(self) -> bool:
+        """Whether she's earned the official challenge — one ARC win.
+
+        The card is the summit, not the starting line: it stands on
+        the shelf only after she's mastered at least one ARC-family
+        game — any grid puzzle or environment. Mastery is the
+        credential; until then the challenge stays off the shelf and
+        the funnel (corpora, practice arcade) is the climb.
+        """
+        prefixes = ("arc_", "arc2_", "arcagi-")
+        return any(m >= 1.0 for n, m in self.mastery.items() if n.startswith(prefixes))
 
     def _arc_official_games(self) -> list[dict]:
         """The official ARC-AGI-3 challenge — one entry, when offered."""
@@ -1284,6 +1419,9 @@ class GamePlay:
             appeal += 0.5  # never played — novelty
         elif attempts >= _SHELVE_AFTER:
             appeal *= 0.15  # shelved — it stopped being fun
+        # The difficulty ladder: higher-tier games pull harder, so
+        # the ARC funnel leans toward the frontier.
+        appeal += _ARC_LEVEL_PULL * (float(game.get("level", 1)) - 1.0)
         return appeal
 
     def system_ready(self) -> bool:
@@ -1309,6 +1447,17 @@ class GamePlay:
         games = self.collection()
         if not allow_system:
             games = [g for g in games if g.get("family") != "system"]
+        # Mastered games are archived — they stay in the collection
+        # record and can still be pulled by name, but they stop
+        # drawing her picks; the shelf is for unfinished work. The
+        # official challenge is exempt: its standing is the venue's,
+        # not a mastery score.
+        games = [
+            g
+            for g in games
+            if g.get("family") == _ARC_OFFICIAL_FAMILY
+            or self.mastery.get(str(g["name"]), 0.0) < 1.0
+        ]
         if not games:
             return None
         chooser = rng or random
@@ -1362,6 +1511,29 @@ class GamePlay:
             return self._attempt_system(task, on_step=on_step, should_stop=should_stop)
         if family == _ARC_OFFICIAL_FAMILY:
             return self._attempt_arc(task)
+        if family == _ARC_PRACTICE_FAMILY:
+            return self._attempt_arc_env(task)
+
+        # Corpus tasks carry their file, not their pairs — the grids
+        # load only now that she's actually sitting at this one.
+        if "_corpus" in task:
+            try:
+                raw = json.loads(Path(task["_corpus"]).read_text())
+            except (OSError, json.JSONDecodeError):
+                return None
+            pairs = []
+            for section in ("train", "test"):
+                parsed = _pairs(
+                    [
+                        [p.get("input"), p.get("output")]
+                        for p in raw.get(section, [])
+                        if isinstance(p, dict)
+                    ]
+                )
+                if not parsed:
+                    return None
+                pairs.append(parsed)
+            task = {**task, "train": pairs[0], "test": pairs[1]}
 
         name = str(task["name"])
         tests = [i for i, _ in task["test"]]
@@ -1419,6 +1591,56 @@ class GamePlay:
             nodes=sol.nodes_explored,
             total_attempts=self.attempts[name],
             failure=failure,
+        )
+
+    def _attempt_arc_env(self, task: dict) -> GameAttempt | None:
+        """One go at an ARC-AGI-3 environment — the practice floor.
+
+        Same embodied loop the official sitting uses, minus the card:
+        local engines offline, no venue clock, no one-try rule —
+        practice reps are how she earns the challenge. The result
+        books under the game's own id and lands in the research log.
+        """
+        mind = getattr(self, "mind", None)
+        if mind is None:
+            return None
+        try:
+            from worlds.arc import ArcPractice
+        except ImportError:
+            return None
+        arc_dir = Path(self.data_dir) / "arc"
+        adapter = ArcPractice(
+            mind,
+            environments_dir=arc_dir / _ARC_OFFICIAL_ENVS,
+            recordings_dir=arc_dir / "recordings",
+            instructions="this is a video game",
+            step_delay_s=1.0,
+        )
+        try:
+            result = adapter.play(str(task["game_id"]))
+        except Exception as e:  # noqa: BLE001 — a world that faults isn't a turn
+            note_swallowed("worlds.play.arc_env", e)
+            return None
+        self._record_arc_result(result)
+        name = str(task["name"])
+        return GameAttempt(
+            task=name,
+            hint=str(task["hint"]),
+            score=self.mastery.get(name, 0.0),
+            best=self.mastery.get(name, 0.0),
+            solved=result.won,
+            mastered=result.won,
+            rule="environment play",
+            nodes=result.steps,
+            total_attempts=self.attempts.get(name, 0),
+            failure="" if result.won else "; ".join(result.reasons[:3]),
+            family=str(task.get("family", "")),
+            details={
+                "game_id": result.game_id,
+                "state": result.state,
+                "levels_completed": result.levels_completed,
+                "win_levels": result.win_levels,
+            },
         )
 
     def _attempt_arc(self, task: dict) -> GameAttempt | None:
@@ -1579,12 +1801,40 @@ class GamePlay:
         return random.choices(pending, weights=weights, k=1)[0]
 
     def _record_arc_result(self, result: Any) -> None:
-        """Book a card attempt under the game's own name — one try, kept."""
+        """Book an env attempt under the game's own name — one try, kept.
+
+        The full telemetry also lands in ``<data>/arc/results.jsonl``
+        — the research record the notebooks read. Local reps and card
+        tries share the same log; the card's ``scorecard_id`` marks
+        which lines were official.
+        """
         name = f"arcagi-{result.game_id}"
         score = result.levels_completed / result.win_levels if result.win_levels else 0.0
         self.attempts[name] = self.attempts.get(name, 0) + 1
         self.mastery[name] = max(self.mastery.get(name, 0.0), score)
         self._save()
+        try:
+            line = {
+                "at": time.time(),
+                "game_id": result.game_id,
+                "state": result.state,
+                "levels_completed": result.levels_completed,
+                "win_levels": result.win_levels,
+                "steps": result.steps,
+                "resets": result.resets,
+                "score": result.score,
+                "scorecard_id": result.scorecard_id,
+                "level_steps": list(result.level_steps),
+                "prior_learning": result.prior_learning,
+                "decision_sources": dict(result.decision_sources),
+                "recovery_waits": result.recovery_waits,
+            }
+            log_path = Path(self.data_dir) / "arc" / _ARC_RESULTS_LOG
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            with log_path.open("a") as f:
+                f.write(json.dumps(line) + "\n")
+        except (OSError, TypeError, ValueError) as e:
+            note_swallowed("worlds.play.arc_results_log", e)
 
     def _record_miss(self, name: str, sol: Any, reasoner: SpatialReasoner) -> str:
         """Learn from the miss: rules that verified on the training

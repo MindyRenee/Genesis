@@ -1125,7 +1125,7 @@ class GenesisClient:
         """Get which of Genesis's own processes are alive, and death count.
 
         A subsystem that dies used to disappear from
-        ``get_subsystem_telemetry`` with no record, so a crashed retina
+        ``get_subsystem_telemetry`` with no record, so a crashed organ
         looked exactly like one that was never started — the reader saw
         a shorter list and could not tell why.
 
@@ -1181,7 +1181,8 @@ class GenesisClient:
         Returns a :class:`SubsystemReport` with two granularities:
 
         - ``subsystems``: one :class:`SubsystemTelemetry` per process in its
-          process tree (daemon, cognitive, retina) — hardware-measured
+          process tree (daemon, cognitive — the eye rides inside the
+          daemon) — hardware-measured
           CPU/I/O share plus microarchitectural prediction-error
           ratios (cache/branch misses).
         - ``modules``: one :class:`ModuleTelemetry` per non-Stopped
