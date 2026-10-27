@@ -1262,7 +1262,9 @@ class StatusMixin:
         status = {
             "running": self._running,
             "interactions": self._interaction_count,
-            "phase": summary.phase_name,
+            # N1 is hypnagogia — the transitional state, not "nrem"
+            # sleep; the displayed phase names the state she is in.
+            "phase": "hypnagogic" if self.is_hypnagogic else summary.phase_name,
             "emotion": emotion.label,
             "arousal": summary.arousal,
             "valence": summary.valence,
