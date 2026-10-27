@@ -248,6 +248,10 @@ _EXPORTS: dict[str, str] = {
     # The inter-region relay itself — cortico-cortical messages ride
     # the module manifest the way drivers ride TC relay cells
     "Thalamus": "thalamus.relay",
+    # One cognitive turn — the relay paces the cortico-thalamic loop:
+    # it calls each region's stage in order (also re-exported by
+    # frontal_lobe, which owns the stages it calls)
+    "Turn": "thalamus.turn",
 }
 
 __all__ = sorted(_EXPORTS)

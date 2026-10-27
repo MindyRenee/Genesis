@@ -6,6 +6,11 @@ already own those functions. This module is the handoff — each stage
 names the region that performs it and calls that region's method on
 the engine. Adding a stage means adding a region call here, not
 growing another method on the engine.
+
+It lives in the thalamus because that is what the code does: the
+relay paces the cortico-thalamic loop — one iteration of the loop is
+one turn. The engine supplies the regional methods; this module only
+orders them.
 """
 
 from __future__ import annotations

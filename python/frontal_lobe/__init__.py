@@ -901,9 +901,9 @@ _EXPORTS: dict[str, str] = {
     "ToolRegistry": "tools.framework",
     "ToolResult": "tools.framework",
     "get_tools": "tools.framework",
-    # One cognitive turn — the handoff between regions. Frontal
-    # owns the sequence because it owns executive control of it.
-    "Turn": "frontal_lobe.turn",
+    # One cognitive turn — the handoff between regions. The relay
+    # paces the cortico-thalamic loop; it lives in thalamus.
+    "Turn": "thalamus.turn",
     # Cognitive access broadcast — PFC is the primary broadcaster;
     # the relay is the physical relay (also re-exported by thalamus)
     "GlobalWorkspace": "frontal_lobe.global_workspace",
