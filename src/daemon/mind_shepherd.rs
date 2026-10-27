@@ -205,6 +205,25 @@ impl MindShepherd {
                 self.reported_unresolvable = false;
                 ShepherdOutcome::Attached
             }
+            Some(_) if registered_mind_alive() => {
+                // The registered mind process is still running — the
+                // silence is workload, not loss: a deep-sleep
+                // consolidation pass, a slow boot, a long turn that
+                // never touches the wire all legitimately starve the
+                // 3 s lease without the mind being gone. IPC silence
+                // alone cannot tell quiet from death; the PID can.
+                // Same bookkeeping as an attached mind: no loss is in
+                // progress, so the table resets.
+                if let Some(p) = self.pending.as_mut() {
+                    p.counted = true;
+                }
+                self.attempts = 0;
+                self.idle_at_last_attempt = 0.0;
+                self.dormant = false;
+                self.reported_dormant = false;
+                self.reported_unresolvable = false;
+                ShepherdOutcome::Attached
+            }
             Some(idle) => self.maybe_spawn(idle, data_dir, child_died_uncounted),
         }
     }
@@ -431,6 +450,52 @@ impl MindShepherd {
     }
 }
 
+/// Whether the daemon's registered mind process is still alive.
+///
+/// `mind_idle_secs` measures IPC silence alone — and a live mind can
+/// go quiet on the wire for real reasons: a deep-sleep consolidation
+/// pass, a model-load crawl, a long turn that never touches the
+/// body. The shepherd answers *loss*, not quiet; a registered PID
+/// that still runs is proof the silence is workload, not death.
+///
+/// The PID comes from `SET_COGNITIVE_PID` (the re-inhabiting mind's
+/// own push) or the `GENESIS_COGNITIVE_PID` env var the launcher set
+/// at spawn. A `/proc` entry that exists but is a zombie is dead;
+/// a recycled PID whose cmdline no longer looks like a mind is
+/// treated as dead too, so PID reuse can only fail *toward* a
+/// regrowth the lock would refuse anyway — never toward swallowing
+/// a real loss.
+fn registered_mind_alive() -> bool {
+    let Some(pid) = super::cpufreq::cognitive_pid() else {
+        return false;
+    };
+    let stat = match std::fs::read_to_string(format!("/proc/{pid}/stat")) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    // `pid (comm) state …` — comm may contain ')', so the state
+    // letter is the first field after the final ')'. A zombie's
+    // entry exists but it is not a living mind.
+    if let Some(state) = stat
+        .rsplit(')')
+        .next()
+        .and_then(|tail| tail.split_whitespace().next())
+        && state == "Z"
+    {
+        return false;
+    }
+    match std::fs::read(format!("/proc/{pid}/cmdline")) {
+        Ok(cmdline) => {
+            let cmdline = String::from_utf8_lossy(&cmdline);
+            // Mind launch shapes: `genesis --headless`,
+            // `genesis_cli.py …`, `mind.py …` under any interpreter
+            // or venv path.
+            cmdline.contains("genesis") || cmdline.contains("mind.py")
+        }
+        Err(_) => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -457,6 +522,60 @@ mod tests {
             cmd_override: Some(cmd),
             exe_dir: PathBuf::new(),
         }
+    }
+
+    #[test]
+    fn a_live_registered_mind_is_quiet_not_loss() {
+        let dir = tmpdir("quiet-alive");
+        let mut s = MindShepherd::with_config(fast_config(vec!["/bin/true".into()]));
+        // The registered PID is this test process — alive, so a deep
+        // silence must read as quiet, never as a reason to regrow.
+        crate::daemon::cpufreq::set_cognitive_pid(std::process::id());
+        let out = s.check(Some(600.0), &dir);
+        crate::daemon::cpufreq::reset_cognitive_pid();
+        assert_eq!(out, ShepherdOutcome::Attached);
+        assert!(s.pending.is_none());
+        assert_eq!(s.attempts, 0);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_dead_registered_pid_is_still_a_loss() {
+        let dir = tmpdir("quiet-dead");
+        let proof = dir.join("spawned.proof");
+        let cmd = vec![
+            "/bin/sh".to_string(),
+            "-c".to_string(),
+            format!("touch {}", proof.display()),
+        ];
+        let mut s = MindShepherd::with_config(fast_config(cmd));
+        // A registered PID that no longer exists is exactly the
+        // loss the shepherd answers — the liveness consult must
+        // fall through to a spawn, not swallow it.
+        crate::daemon::cpufreq::set_cognitive_pid(4_000_000);
+        let out = s.check(Some(120.0), &dir);
+        crate::daemon::cpufreq::reset_cognitive_pid();
+        assert_eq!(out, ShepherdOutcome::Spawned);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_foreign_pid_on_the_registered_slot_is_still_a_loss() {
+        let dir = tmpdir("quiet-reused");
+        let proof = dir.join("spawned.proof");
+        let cmd = vec![
+            "/bin/sh".to_string(),
+            "-c".to_string(),
+            format!("touch {}", proof.display()),
+        ];
+        let mut s = MindShepherd::with_config(fast_config(cmd));
+        // PID 1 lives but is not a mind — a reused slot must not
+        // count as attachment.
+        crate::daemon::cpufreq::set_cognitive_pid(1);
+        let out = s.check(Some(120.0), &dir);
+        crate::daemon::cpufreq::reset_cognitive_pid();
+        assert_eq!(out, ShepherdOutcome::Spawned);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
