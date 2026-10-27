@@ -89,7 +89,12 @@ COUPLING: HOW OREXIN AFFECTS OTHERS (matrix column 15)
     OX  -> GABA:  -0.05  (weak volume transmission.)
     OX  -> GLU:  +0.05  (weak volume transmission.)
     OX  -> HIST:  +0.05  (orexin excites histamine — wake-stabilization circuit.)
-    OX  -> ADN:  -0.05  (wake promotion — orexin mildly inhibits adenosine.)
+    OX  -> ADN:  0.00   (no direct coupling — adenosine is a metabolic
+                        byproduct of neural activity; orexin-driven
+                        arousal *builds* it, it does not suppress it.
+                        Orexin counteracts adenosine's *effect* at the
+                        receiving arousal neurons — the flip-flop fight
+                        is downstream, not on the metabolite.)
     OX  -> EPI:  +0.05  (sympathetic activation.)
     OX  -> MEL:  -0.05  (melatonin pushes the sleep-wake switch toward sleep (reciprocal: OX
                         suppresses MEL).)

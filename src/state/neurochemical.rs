@@ -1513,11 +1513,16 @@ pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
     // Adenosine's interactions with arousal systems are handled by the
     // sleep pressure mechanism (level accumulation/clearance), NOT by the coupling
     // matrix. Only GABA (promotes sleep) and cortisol (stress-related
-    // adenosine release) have direct coupling. Orexin mildly inhibits
-    // adenosine (wake promotion).
+    // adenosine release) have direct coupling.
+    // OX→ADN (0.00): orexin does not suppress adenosine. Adenosine is a
+    //   metabolic byproduct of neural activity — orexin-driven arousal
+    //   *builds* it (orexin neuron loss blunts the wake-time adenosine
+    //   rise; Murillo-Rodriguez et al., Eur J Neurosci 2008). Orexin
+    //   counteracts adenosine's *effect* at the receiving neurons — the
+    //   flip-flop fight is downstream, not on the metabolite itself.
     [
         0.00, 0.00, 0.00, 0.00, 0.10, 0.00, 0.10, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
-        -0.10, 0.00, 0.00,
+        0.00, 0.00, 0.00,
     ],
     // BDNF → how others affect BDNF
     // SRT→BDNF (+0.10): the antidepressant mechanism — serotonin is a
