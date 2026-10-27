@@ -530,6 +530,26 @@ class AgencyDetector:
         matched = self._matches(intended, actual_outcome)
         self._records.append((intended, actual_outcome, matched))
 
+    def record_evaluated_outcome(
+        self,
+        action: str,
+        intended_outcome: str,
+        actual_outcome: str,
+        matched: bool,
+    ) -> None:
+        """Record an outcome the caller already compared.
+
+        ``record_outcome`` re-derives the match by word overlap, but a
+        caller holding both the prediction and the observation can
+        judge the match itself — the embodied loop compares predicted
+        vs observed velocity, which string similarity cannot see. The
+        pending intention is still popped so an unmatched action does
+        not linger; the caller's ``intended_outcome`` is the fallback
+        when no intention was recorded.
+        """
+        intended = self._pending.pop(action, intended_outcome)
+        self._records.append((intended, actual_outcome, bool(matched)))
+
     def _matches(self, intended: str, actual: str) -> bool:
         """Check if an intended outcome matches the actual outcome.
 
@@ -1627,4 +1647,26 @@ class SelfModel:
             actual_outcome: What actually happened.
         """
         self.agency_detector.record_outcome(action, actual_outcome)
+        self.agency_score = self.agency_detector.sense_of_agency()
+
+    def record_evaluated_outcome(
+        self,
+        action: str,
+        intended_outcome: str,
+        actual_outcome: str,
+        matched: bool,
+    ) -> None:
+        """Record an outcome the caller evaluated directly.
+
+        The embodied loop in ``parietal_lobe.embodiment`` compares a
+        predicted bodily consequence against the observed velocity and
+        supplies the verdict itself — ``record_outcome``'s word-overlap
+        comparison cannot see that judgment.
+        """
+        self.agency_detector.record_evaluated_outcome(
+            action,
+            intended_outcome,
+            actual_outcome,
+            matched,
+        )
         self.agency_score = self.agency_detector.sense_of_agency()
