@@ -113,12 +113,10 @@ def test_save_errors_propagate_rather_than_being_swallowed(tmp_path):
         unwritable.chmod(0o700)
 
 
-def test_legacy_pickled_file_still_loads(tmp_path):
-    """A pre-existing object-dtype file must remain readable.
+def test_legacy_pickled_file_requires_explicit_opt_in(tmp_path):
+    """A pre-existing object-dtype file cannot execute during normal startup.
 
-    The fallback exists so this change does not invalidate every
-    existing state directory. It warns once; the window closes when
-    every installation has been rewritten.
+    A trusted offline migration can still read it with explicit opt-in.
     """
     path = str(tmp_path / "legacy.npz")
     np.savez(
@@ -132,5 +130,7 @@ def test_legacy_pickled_file_still_loads(tmp_path):
     with pytest.raises(ValueError):
         with np.load(path, allow_pickle=False) as probe:
             _ = probe["names"]
-    data = load_npz(path)
+    with pytest.raises(ValueError, match="migrate a trusted legacy file offline"):
+        load_npz(path)
+    data = load_npz(path, allow_legacy_pickle=True)
     assert [str(n) for n in data["names"]] == ["dog", "water"]

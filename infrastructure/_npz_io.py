@@ -18,11 +18,9 @@ execution for anyone who can write the file, and it was never needed:
 NumPy's native ``<U`` dtype stores the same strings as plain UTF-8.
 
 The legacy problem: files written before this change contain pickled
-object arrays, so ``allow_pickle=False`` cannot open them. Rather than
-either breaking every existing state directory or leaving the RCE
-vector open, :func:`load_npz` tries the safe path first and falls back
-to the legacy one, logging a warning so the window is visible. Once
-every installation has been rewritten, the fallback can go.
+object arrays, so ``allow_pickle=False`` cannot open them. Loading
+these files requires an explicit opt-in for an offline migration from
+a trusted source. Normal startup never executes stored pickles.
 """
 
 from __future__ import annotations
@@ -73,6 +71,9 @@ def save_npz(path: str | os.PathLike[str], **arrays: Any) -> None:
     swallowing it (as these sites previously did, at DEBUG) is how a
     silently-truncated artifact goes unnoticed for months.
     """
+    for name, value in arrays.items():
+        if np.asarray(value).dtype.hasobject:
+            raise TypeError(f"{name} contains objects that require pickle")
     path = os.fspath(path)
     directory = os.path.dirname(os.path.abspath(path)) or "."
     os.makedirs(directory, exist_ok=True)
@@ -95,13 +96,13 @@ def save_npz(path: str | os.PathLike[str], **arrays: Any) -> None:
         raise
 
 
-def load_npz(path: str | os.PathLike[str]) -> dict[str, Any]:
-    """Load a ``.npz``, preferring the pickle-free path.
+def load_npz(
+    path: str | os.PathLike[str], *, allow_legacy_pickle: bool = False
+) -> dict[str, Any]:
+    """Load a ``.npz`` without executing pickles by default.
 
-    Falls back to ``allow_pickle=True`` for files written before
-    :func:`save_npz` existed, and warns once when it does. That
-    fallback is the only remaining pickle surface in the project and
-    should be removable once every state directory has been rewritten.
+    Explicit opt-in is only for offline migration of trusted legacy
+    files. The normal runtime never enables it.
     """
     global legacy_pickle_warned
     path = os.fspath(path)
@@ -109,14 +110,18 @@ def load_npz(path: str | os.PathLike[str]) -> dict[str, Any]:
         with np.load(path, allow_pickle=False) as data:
             return {k: data[k] for k in data.files}
     except ValueError as e:
+        if not allow_legacy_pickle:
+            raise ValueError(
+                f"Cannot load {path} without pickle; migrate a trusted legacy file offline"
+            ) from e
         # numpy raises ValueError when a pickled object array is
         # present and allow_pickle is False.
         if not legacy_pickle_warned:
             legacy_pickle_warned = True
             logger.warning(
                 "loading %s required pickle (legacy format written before "
-                "atomic npz persistence). It will be rewritten in the "
-                "native format on the next save. Source: %s",
+                "atomic npz persistence); convert the trusted file offline "
+                "and use the pickle-free copy. Source: %s",
                 os.path.basename(path),
                 e,
             )

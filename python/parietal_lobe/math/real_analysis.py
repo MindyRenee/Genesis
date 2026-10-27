@@ -69,8 +69,8 @@ def delta_game(f: Callable[[float], float], a: float, limit: float,
     neighborhood means x = a itself is never tested: a limit
     ignores what the function does at the point.
     """
-    if epsilon <= 0 or delta <= 0:
-        return None
+    if epsilon <= 0 or delta <= 0 or probes <= 0:
+        raise ValueError("epsilon, delta and probes must be positive")
     for i in range(probes):
         off = delta * (i + 1) / probes
         for x in (a - off, a + off):
@@ -132,8 +132,15 @@ def numeric_limit(f: Callable[[float], float], a: float) -> AnalysisResult:
 def bisection(f: Callable[[float], float], lo: float, hi: float,
               tol: float = 1e-12) -> float | None:
     """A root inside a sign change — the interval halved to tol."""
+    if tol <= 0 or lo >= hi:
+        return None
     flo = f(lo)
-    if flo * f(hi) > 0:
+    fhi = f(hi)
+    if flo == 0:
+        return lo
+    if fhi == 0:
+        return hi
+    if not math.isfinite(flo) or not math.isfinite(fhi) or flo * fhi > 0:
         return None
     for _ in range(200):
         mid = (lo + hi) / 2
@@ -150,7 +157,9 @@ def bisection(f: Callable[[float], float], lo: float, hi: float,
 def riemann_sum(f: Callable[[float], float], lo: float, hi: float,
                 n: int = 1000) -> float:
     """Left-endpoint Riemann sum — area as accumulation."""
-    if n < 1 or lo >= hi:
+    if n < 1:
+        raise ValueError("n must be positive")
+    if lo == hi:
         return 0.0
     dx = (hi - lo) / n
     return sum(f(lo + i * dx) for i in range(n)) * dx
@@ -159,6 +168,8 @@ def riemann_sum(f: Callable[[float], float], lo: float, hi: float,
 def simpson(f: Callable[[float], float], lo: float, hi: float,
             n: int = 1000) -> float:
     """Simpson's rule — parabolic quadrature, n forced even."""
+    if n < 1:
+        raise ValueError("n must be positive")
     if n % 2:
         n += 1
     dx = (hi - lo) / n

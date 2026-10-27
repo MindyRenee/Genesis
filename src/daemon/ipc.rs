@@ -1603,12 +1603,22 @@ impl IpcServer {
             .owns_socket
             .store(true, std::sync::atomic::Ordering::Release);
         eprintln!("[ipc] listening on {}", server.socket_path.display());
-        let mut client_threads = Vec::new();
+        let mut client_threads: Vec<std::thread::JoinHandle<()>> = Vec::new();
 
         while !server
             .shutdown_flag
             .load(std::sync::atomic::Ordering::Relaxed)
         {
+            let mut i = 0;
+            while i < client_threads.len() {
+                if client_threads[i].is_finished() {
+                    if let Err(e) = client_threads.swap_remove(i).join() {
+                        eprintln!("[ipc] client thread panicked: {e:?}");
+                    }
+                } else {
+                    i += 1;
+                }
+            }
             let stream = match listener.accept() {
                 Ok((s, _)) => s,
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -1691,6 +1701,12 @@ impl IpcServer {
         L: LtmAccess,
         F: Fn(&MmapState, &RingBuffer, &mut L, u8, &[u8]) -> Vec<u8>,
     {
+        if stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+            .is_err()
+        {
+            return;
+        }
         // ── Handshake ───────────────────────────────────────────
         let (cmd, payload) = match read_message(&mut stream) {
             Ok(msg) => msg,

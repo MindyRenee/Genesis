@@ -1249,9 +1249,17 @@ class LifecycleMixin:
         )
 
         staged_network = None
+        dictionary_concepts: list[dict[str, Any]] = []
         if "concept_network" in data:
             staged_network = ConceptNetwork()
-            restore_network(staged_network, data["concept_network"])
+            dictionary_concepts = [
+                concept
+                for concept in data["concept_network"].get("concepts", [])
+                if concept.get("origin") == "dictionary"
+            ]
+            restore_network(
+                staged_network, data["concept_network"], prune_dictionary=bool(dictionary_concepts)
+            )
 
         pending: list[tuple[Any, Any]] = []
         scalar_updates: list[tuple[Any, str, Any]] = []
@@ -1286,6 +1294,33 @@ class LifecycleMixin:
         # objects. Commit only after validation succeeds so a malformed
         # later component cannot leave earlier live systems mutated.
         if staged_network is not None:
+            if dictionary_concepts:
+                from temporal_lobe.concepts import _normalize_id
+
+                archive = self.brain.frontal.network._archive
+                if archive is None:
+                    raise RuntimeError("cannot prune dictionary concepts without an archive")
+                existing = archive.get_all_ids()
+                items = [
+                    (_normalize_id(concept["id"]), concept, set(concept.get("aliases", [])))
+                    for concept in dictionary_concepts
+                    if _normalize_id(concept["id"]) not in existing
+                ]
+                if items and archive.archive_concepts_batch(items) != len(items):
+                    raise RuntimeError("dictionary concept archival failed")
+                dictionary_ids = {_normalize_id(concept["id"]) for concept in dictionary_concepts}
+                edges = [
+                    {
+                        **edge,
+                        "source": _normalize_id(edge["source"]),
+                        "target": _normalize_id(edge["target"]),
+                    }
+                    for edge in data["concept_network"].get("edges", [])
+                    if _normalize_id(edge["source"]) in dictionary_ids
+                    or _normalize_id(edge["target"]) in dictionary_ids
+                ]
+                if edges and archive.archive_edges_batch(edges, overwrite=False) != len(edges):
+                    raise RuntimeError("dictionary edge archival failed")
             self.brain.frontal.network.replace_contents(staged_network)
         for target, staged in pending:
             vars(target).update(vars(staged))

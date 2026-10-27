@@ -39,8 +39,14 @@ impl Topology {
     /// open. On a finite family these are decidable, not
     /// approximate.
     pub fn is_topology(&self) -> bool {
+        if self.points > 64 {
+            return false;
+        }
         let full = self.universe();
-        if !self.opens.contains(&0) || !self.opens.contains(&full) {
+        if !self.opens.contains(&0)
+            || !self.opens.contains(&full)
+            || self.opens.iter().any(|&open| open & !full != 0)
+        {
             return false;
         }
         // Finite unions: closure under union is implied by pairwise
@@ -96,8 +102,9 @@ impl Topology {
             changed = false;
             let snapshot: Vec<Subset> = opens.clone();
             for &a in basis.iter().chain(&snapshot) {
+                let a = a & full;
                 for &b in &snapshot {
-                    for &c in &[a, a | b] {
+                    for &c in &[a, a | b, a & b] {
                         if !opens.contains(&c) {
                             opens.push(c);
                             changed = true;
@@ -162,6 +169,9 @@ impl Topology {
 
     /// Neighborhoods of a point: the opens containing it.
     pub fn neighborhoods(&self, point: usize) -> Vec<Subset> {
+        if point >= self.points || point >= 64 {
+            return Vec::new();
+        }
         let bit = 1u64 << point;
         self.opens
             .iter()

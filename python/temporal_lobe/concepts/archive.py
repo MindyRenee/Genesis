@@ -124,7 +124,9 @@ class ConceptArchive:
                         )
         return len(items)
 
-    def archive_edges_batch(self, edge_dicts: list[dict[str, Any]]) -> int:
+    def archive_edges_batch(
+        self, edge_dicts: list[dict[str, Any]], *, overwrite: bool = True
+    ) -> int:
         """Archive edges (source, target, relation, weight, created_at,
         origin). Idempotent — INSERT OR REPLACE on the natural key."""
         with self._lock:
@@ -133,7 +135,8 @@ class ConceptArchive:
             with self._conn:
                 for e in edge_dicts:
                     self._conn.execute(
-                        "INSERT OR REPLACE INTO edges "
+                        ("INSERT OR REPLACE" if overwrite else "INSERT OR IGNORE")
+                        + " INTO edges "
                         "(source, target, relation, weight, created_at, origin) "
                         "VALUES (?, ?, ?, ?, ?, ?)",
                         (

@@ -40,8 +40,10 @@ FiniteSpace = frozenset[frozenset[int]]
 def is_topology(n: int, opens: FiniteSpace) -> bool:
     """The three axioms: ∅ and X open; unions open; finite
     intersections open."""
+    if n < 0:
+        return False
     universe = frozenset(range(n))
-    if frozenset() not in opens or universe not in opens:
+    if frozenset() not in opens or universe not in opens or any(not o <= universe for o in opens):
         return False
     for a, b in itertools.combinations_with_replacement(list(opens), 2):
         if (a | b) not in opens or (a & b) not in opens:

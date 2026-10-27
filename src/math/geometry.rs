@@ -32,7 +32,8 @@ pub fn segments_cross(a: Point, b: Point, c: Point, d: Point) -> bool {
     let o2 = orient(a, b, d);
     let o3 = orient(c, d, a);
     let o4 = orient(c, d, b);
-    (o1 > 0.0) != (o2 > 0.0) && (o3 > 0.0) != (o4 > 0.0)
+    ((o1 > 0.0 && o2 < 0.0) || (o1 < 0.0 && o2 > 0.0))
+        && ((o3 > 0.0 && o4 < 0.0) || (o3 < 0.0 && o4 > 0.0))
 }
 
 /// Signed double area of a polygon — the shoelace sum.

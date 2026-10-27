@@ -657,7 +657,9 @@ def _merge_duplicate_sense_suffixes(
     return cleaned, id_remap
 
 
-def restore_network(network: ConceptNetwork, data: dict[str, Any]) -> None:
+def restore_network(
+    network: ConceptNetwork, data: dict[str, Any], *, prune_dictionary: bool = False
+) -> None:
     """Restore concept network from saved data.
 
     Concept IDs and edge references are normalized using
@@ -668,7 +670,8 @@ def restore_network(network: ConceptNetwork, data: dict[str, Any]) -> None:
     concepts = data.get("concepts", [])
     edges = data.get("edges", [])
 
-    concepts = _prune_dictionary_concepts(concepts)
+    if prune_dictionary:
+        concepts = _prune_dictionary_concepts(concepts)
     concepts, id_remap = _merge_duplicate_sense_suffixes(concepts)
 
     _restore_concepts(network, concepts, id_remap)
