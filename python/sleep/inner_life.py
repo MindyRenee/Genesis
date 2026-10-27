@@ -1475,6 +1475,11 @@ class InnerLife:
                 self._run_dream_synthesis(summary)
                 self._synthesis_done_this_rem = True
         else:
+            # Out of REM — the next REM period gets its own synthesis
+            # pass ("once per REM period", not once per sleep). The
+            # flag also resets on wake, but a night has several REM
+            # periods and each is a distinct synthesis window.
+            self._synthesis_done_this_rem = False
             # Sharp wave-ripples during NREM/SWS — drive memory replay.
             # SWRs are most prominent in N3 (slow-wave sleep).
             swr = self._generate_sharp_wave_ripple()
