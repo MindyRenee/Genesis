@@ -322,6 +322,12 @@ class GenerativeLanguage(Language):
         # Track generation history for variation
         self._recent_outputs: deque[str] = deque(maxlen=20)
 
+        # Brain-wave state is injected by the prefrontal cortex each
+        # cycle (prefrontal.py sets this attribute directly). Initialize
+        # it so generate()/vary() work before the first injection —
+        # standalone engines and tests render without it.
+        self.current_brain_waves = None
+
     def clear_recent_outputs(self) -> None:
         """Clear the recent output history so generation varies again.
 

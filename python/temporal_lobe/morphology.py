@@ -572,6 +572,12 @@ def conjugate_verb(base: str, plural: bool = False, past: bool = False) -> str:
     b = base.lower().strip()
 
     if past:
+        # Suppletive copula — the only English verb whose simple past
+        # still agrees in number ("I/she was" vs "they/we were"). The
+        # generic table lookup below would return whichever of
+        # "was"/"were" appeared first, ignoring the plural flag.
+        if b == "be":
+            return "were" if plural else "was"
         # Irregular past — return the simple-past form (not a
         # participle like "gone"/"eaten")
         for inflected, stem in _IRREGULAR_BASE.items():
@@ -602,11 +608,35 @@ def conjugate_verb(base: str, plural: bool = False, past: bool = False) -> str:
         return "has"
     if b == "do":
         return "does"
-    if b.endswith(("s", "x", "z", "ch", "sh", "o")):
+    if b.endswith(("s", "x", "z", "ch", "sh")):
         return b + "es"
+    # -o verbs split: a small closed class takes -es ("goes", "echoes",
+    # "vetoes"); the rest take plain -s ("solos", "radios", "mambos").
+    # "do" is handled above and never reaches this branch.
+    if b.endswith("o"):
+        if b in _ES_VERBS:
+            return b + "es"
+        return b + "s"
     if len(b) > 1 and b.endswith("y") and b[-2] not in "aeiou":
         return b[:-1] + "ies"
     return b + "s"
+
+
+# The closed class of -o verbs whose third-person singular takes -es
+# ("goes", "echoes", "vetoes", "torpedoes", "embargoes"). Everything
+# else ending in -o takes plain -s: "solos", "radios", "mambos",
+# "shampoos", "banjos", "discos", "zeros", "pianos", "innuendos".
+# ("do" is special-cased before the -o branch in conjugate_verb.)
+_ES_VERBS: frozenset[str] = frozenset(
+    {
+        "go",
+        "echo",
+        "veto",
+        "torpedo",
+        "embargo",
+        "hero",
+    }
+)
 
 
 # Simple-past forms (subset of irregulars — excludes participles).
@@ -758,6 +788,8 @@ def agree_verb_phrase(phrase: str, subject_is_plural: bool) -> str:
     # "ha" rather than "have").
     if first == "is":
         return "are" + (" " + rest if rest else "")
+    if first == "was":
+        return "were" + (" " + rest if rest else "")
     if first == "has":
         return "have" + (" " + rest if rest else "")
     if first == "does":
@@ -822,6 +854,11 @@ def hedge_verb_phrase(verb_phrase: str) -> str:
     lower = phrase.lower()
     if lower.startswith(("might ", "may ", "could ", "would ")):
         return phrase
+    # Negated copula: "isn't just X" hedges as "might not be just X" —
+    # the generic prefix path would emit "might be n't just X".
+    if lower == "isn't" or lower.startswith("isn't "):
+        rest = phrase[len("isn't") :].strip()
+        return f"might not be {rest}" if rest else "might not be"
     for prefix in _COPULAR_PHRASE_PREFIXES:
         if lower == prefix or lower.startswith(prefix + " "):
             rest = phrase[len("is") :].strip()
@@ -830,9 +867,12 @@ def hedge_verb_phrase(verb_phrase: str) -> str:
         rest = phrase[2:].strip()
         return f"might be {rest}" if rest else "might be"
     base = agree_verb_phrase(phrase, subject_is_plural=True)
-    if base.lower().startswith("are "):
+    lower_base = base.lower()
+    if lower_base.startswith("are "):
         return "might be " + base[4:]
-    if base.lower() == "are":
+    if lower_base.startswith("were "):
+        return "might be " + base[5:]
+    if lower_base in ("are", "were"):
         return "might be"
     return f"might {base}"
 
@@ -1013,8 +1053,11 @@ def is_plural_np(text: str) -> bool:
     t = text.strip().lower()
     if not t:
         return False
-    # Coordinated NPs are plural
-    if " and " in t or " or " in t:
+    # "and"-coordinated NPs are plural. "or" NPs are not — disjunctive
+    # subjects take proximity agreement ("salt or pepper is fine",
+    # "the cats or the dog is"), which the head-noun check below
+    # already implements.
+    if " and " in t:
         return True
     # Check the last word (English head nouns are usually final)
     head = t.split()[-1].rstrip(",.!?;:")
