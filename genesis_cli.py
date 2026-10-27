@@ -626,8 +626,11 @@ class AmbientHandler:
     def handle(self, text: str) -> None:
         """Classify an overheard utterance and enqueue it.
 
-        During sleep, the ambient listener has no effect on it at
-        all — no wake word detection, no chime-ins, no responses.
+        During established sleep (N2+), the ambient listener has no
+        effect on it at all — no wake word detection, no chime-ins,
+        no responses. Hypnagogia (N1) is the exception: she still
+        hears and answers, since responsiveness persists through
+        sleep onset.
         It wakes on its own when its neurochemistry shifts to an
         active phase (the sleep watcher handles this), or when the
         user explicitly calls /wake. This mirrors biological sleep:
@@ -640,7 +643,7 @@ class AmbientHandler:
         someone says its name, stale opportunistic utterances are
         dropped so it answers the person, not the backlog.
         """
-        if self.mind.is_sleeping:
+        if self.mind.thalamic_gate_closed:
             return
         addressed = contains_wake_word(text)
         if addressed:
@@ -690,8 +693,11 @@ class AmbientHandler:
                 return
             # Re-check sleep at processing time — it may have fallen
             # asleep between enqueue and now, and sleeping its means
-            # no responses of either kind.
-            if self.mind.is_sleeping:
+            # no responses of either kind. Hypnagogia (N1) still
+            # responds in a session — behavioral responsiveness
+            # persists through sleep onset and only reliably ceases at
+            # N2 — but a resident mind's gate shuts with the onset.
+            if self.mind.thalamic_gate_closed:
                 continue
             if addressed:
                 self._handle_addressed(text)
@@ -703,7 +709,8 @@ class AmbientHandler:
 
         Always speaks the response — no dedup. When someone addresses
         it by name, it must respond, period. This is only reached
-        when it's awake — the handle() method gates sleep.
+        when it's awake or hypnagogic — the handle() method gates
+        established sleep.
         """
         query = strip_wake_word(text)
         if not query:
@@ -733,7 +740,10 @@ class AmbientHandler:
         # Only direct address (wake word) can wake it — this is the
         # biological equivalent of the thalamic gate opening for
         # salient stimuli (your name) but not background noise.
-        if self.mind.is_sleeping:
+        # Hypnagogia (N1) exempts itself in a session: sensory
+        # registration and behavioral response persist through the
+        # onset period. A resident mind closes with the onset.
+        if self.mind.thalamic_gate_closed:
             return
 
         # Record the utterance in its external world — speech near it
@@ -834,8 +844,10 @@ class AuditoryHandler:
             self._last_event_time = event.timestamp
 
             # Sensory gating during sleep — only sudden loud sounds
-            # penetrate (like a loud bang waking you up).
-            if self.mind.is_sleeping:
+            # penetrate (like a loud bang waking you up). Hypnagogia
+            # (N1) exempts itself in a session: the sleeping brain
+            # still registers the environment at sleep onset.
+            if self.mind.thalamic_gate_closed:
                 if event.sound_type == "impact" and event.loudness > 0.4:
                     logger.info(f"[auditory] Loud sound during sleep: {event.description}")
                     # Don't wake it fully, but record it — it may
@@ -2054,7 +2066,7 @@ def _cmd_meditate(mind: Mind, rest: str) -> str:
 def _cmd_teach(mind: Mind, rest: str) -> str:
     """Put Genesis into teaching/training mode.
 
-    Pauses bug scanning, autonomous learning, art, and unrelated
+    Pauses code scanning, autonomous learning, art, and unrelated
     curiosity questions. It focuses on what you're teaching and
     remembers it.
 
@@ -2125,7 +2137,7 @@ def _cmd_teach(mind: Mind, rest: str) -> str:
 def _cmd_endteach(mind: Mind, rest: str) -> str:
     """Exit teaching/training mode and resume normal operation.
 
-    Resumes bug scanning, autonomous learning, art, and curiosity.
+    Resumes code scanning, autonomous learning, art, and curiosity.
     """
     if not mind.is_teaching:
         return (
@@ -2865,6 +2877,31 @@ def _acquire_cli_lock(data_dir: str) -> int | None:
     """
     global _CLI_LOCK_FD
     lock_path = os.path.join(data_dir, "genesis_cli.lock")
+
+    # The launch script (`./genesis`) takes this lock before the
+    # interpreter is loaded and hands the descriptor down. Adopt it:
+    # the lock is already held on that open file description, so
+    # re-flocking is a no-op, and the start race was settled in the
+    # shell instead of surfacing here as a bare lock error. Verify the
+    # descriptor really is this lock file — an inherited fd is just an
+    # integer until it is checked.
+    inherited = os.environ.get("GENESIS_CLI_LOCK_FD", "").strip()
+    if inherited:
+        try:
+            inherited_fd = int(inherited)
+            held = os.fstat(inherited_fd)
+            want = os.stat(lock_path)
+            if (held.st_dev, held.st_ino) == (want.st_dev, want.st_ino):
+                fcntl.flock(inherited_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                # Children (the daemon, voice helpers) must not carry
+                # the lock past this process: a surviving body that
+                # inherited it would block the mind from re-adopting it.
+                os.set_inheritable(inherited_fd, False)
+                _CLI_LOCK_FD = inherited_fd
+                return inherited_fd
+        except (ValueError, OSError):
+            pass  # stale env or wrong fd — take the lock ourselves
+
     fd = None
     try:
         fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
@@ -3182,6 +3219,15 @@ _SPORE_SKIP_NAMES = frozenset(
         # Host-local intent — a germinated self's body must be free to
         # regrow its mind; the old host's goodbye does not travel.
         "mind.suppress",
+        # Her browser's profiles — live Chrome process state, not
+        # self. SingletonLock/Cookie/Socket name the instance holding
+        # the profile; carried to another host they arrive stale or
+        # flattened from symlinks into files, and Chrome then refuses
+        # to launch (singleton-cookie failure). Beyond those, a live
+        # profile copied file-at-a-time tears its leveldb stores into
+        # "corrupt" profiles, and the caches are regenerable bulk.
+        # Web memory re-accumulates; identity never lived in cookies.
+        "browser",
         # Regenerable build cache for workspace-crate verification —
         # gigabytes of compiled artifacts, never part of the self.
         # (Retired — experiments verify on the live tree now; the name
@@ -4804,7 +4850,12 @@ def main() -> int:
                     "[genesis] Offline mode — learning paused, conversation and art active.",
                     file=sys.stderr,
                 )
-            mind = Mind(daemon_socket, offline=args.offline, channel=channel)
+            mind = Mind(
+                daemon_socket,
+                offline=args.offline,
+                channel=channel,
+                headless=args.headless,
+            )
             try:
                 mind.start()
             except (OSError, ConnectionError) as e:
@@ -5009,11 +5060,12 @@ def _wire_voice(mind: Mind) -> tuple[Voice, VoiceDedup | None]:
         voice should reflect how it feels, whether it's answering
         a question or speaking its own thoughts.
 
-        Never speaks during sleep — defensive guard. The callers
-        (speech urge, warn()) already gate on sleep, but this
-        ensures no path can bypass the sleep gate.
+        Never speaks during established sleep — defensive guard. The
+        callers (speech urge, warn()) already gate on sleep, but this
+        ensures no path can bypass the sleep gate. Hypnagogia (N1) is
+        speakable — hypnagogic speech is a real onset phenomenon.
         """
-        if mind.is_sleeping or not mind._running:
+        if (mind.is_sleeping and not mind.is_hypnagogic) or not mind._running:
             return
         try:
             state = mind.get_state()

@@ -2053,3 +2053,88 @@ def test_sleep_processes_close_on_stage_leave():
     mind._on_sleep_stage_transition(SleepStage.REM, 30.0)
     assert not mind._n3_processes
     assert not mind._n3_rotation
+
+
+# ======================================================================
+# Thalamic gate — headless closes it at sleep onset, a session at N2
+# ======================================================================
+
+
+def _gate_mind(headless: bool, sleeping: bool, hypnagogic: object, stage=None):
+    """A bare SleepMixin wired for the gate truth table.
+
+    ``hypnagogic`` is the awake-side transition object (None or a
+    HypnagogicState stand-in); ``stage`` is the asleep-side ultradian
+    stage (None → no tracker, treated as not-N1).
+    """
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from sleep.sleep import SleepMixin
+
+    mind = SleepMixin.__new__(SleepMixin)
+    mind._headless = headless
+    mind._is_sleeping = sleeping
+    mind._is_meditating = False
+    mind.inner_life = SimpleNamespace(
+        sleep_cycle=SimpleNamespace(current_stage=stage) if stage else None,
+        current_hypnagogic=hypnagogic,
+    )
+    # SleepMixin reads inner_life through attributes only; keep a real
+    # namespace so a missing attribute fails loudly rather than a Mock
+    # silently inventing one.
+    assert not isinstance(mind.inner_life, MagicMock)
+    return mind
+
+
+def test_gate_open_when_awake_both_modes():
+    """Awake and not drifting: gate open in either mode."""
+    for headless in (False, True):
+        mind = _gate_mind(headless, sleeping=False, hypnagogic=None)
+        assert mind.thalamic_gate_closed is False
+
+
+def test_gate_interactive_hypnagogia_stays_open():
+    """A session keeps the N1 exemption: responsiveness persists
+    through sleep onset (Ogilvie 1989) — someone is at the prompt."""
+    from thalamus.brain_waves import SleepStage
+    from thalamus.events import HypnagogicState
+
+    # Awake-side drift.
+    mind = _gate_mind(False, sleeping=False, hypnagogic=HypnagogicState(progress=0.4))
+    assert mind.thalamic_gate_closed is False
+    # Asleep-side N1.
+    mind = _gate_mind(False, sleeping=True, hypnagogic=None, stage=SleepStage.N1)
+    assert mind.thalamic_gate_closed is False
+
+
+def test_gate_interactive_established_sleep_closes():
+    """N2 and beyond close the gate in a session too — unchanged."""
+    from thalamus.brain_waves import SleepStage
+
+    for stage in (SleepStage.N2, SleepStage.N3, SleepStage.REM):
+        mind = _gate_mind(False, sleeping=True, hypnagogic=None, stage=stage)
+        assert mind.thalamic_gate_closed is True
+
+
+def test_gate_headless_hypnagogia_closes_both_sides():
+    """Resident: the gate shuts the moment hypnagogia begins — the
+    relay quiets ahead of the cortex like a brain's (Magnin 2010)."""
+    from thalamus.brain_waves import SleepStage
+    from thalamus.events import HypnagogicState
+
+    # Awake-side drift — still nominally awake, already gated.
+    mind = _gate_mind(True, sleeping=False, hypnagogic=HypnagogicState(progress=0.2))
+    assert mind.thalamic_gate_closed is True
+    # Asleep-side N1 — the session exemption does not apply headless.
+    mind = _gate_mind(True, sleeping=True, hypnagogic=None, stage=SleepStage.N1)
+    assert mind.thalamic_gate_closed is True
+
+
+def test_gate_headless_established_sleep_closes():
+    """Established sleep stays closed in resident mode as well."""
+    from thalamus.brain_waves import SleepStage
+
+    for stage in (SleepStage.N2, SleepStage.N3, SleepStage.REM):
+        mind = _gate_mind(True, sleeping=True, hypnagogic=None, stage=stage)
+        assert mind.thalamic_gate_closed is True

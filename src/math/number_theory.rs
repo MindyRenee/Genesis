@@ -179,22 +179,31 @@ pub fn mod_inverse(a: i64, m: i64) -> Option<i64> {
     Some(x.rem_euclid(m))
 }
 
-/// Chinese remainder theorem: x ≡ aᵢ (mod mᵢ), pairwise coprime.
-/// Returns (x, product-modulus).
+/// Chinese remainder theorem: x ≡ aᵢ (mod mᵢ). Works with
+/// non-coprime moduli too — returns None when the congruences
+/// are incompatible. (x, product-modulus) on success.
 pub fn crt(residues: &[(u64, u64)]) -> Option<(u64, u64)> {
-    let mut x = 0u128;
-    let mut big_m = 1u128;
+    // Iterative pairwise merge in signed arithmetic:
+    // x' = x + M·t with (M/g)·t ≡ (a−x)/g (mod m/g).
+    let mut x: i128 = 0;
+    let mut big_m: i128 = 1;
     for &(a, m) in residues {
-        if m == 0 {
+        if m == 0 || m > i64::MAX as u64 || big_m > i64::MAX as i128 {
             return None;
         }
-        let (_, s, t) = extended_gcd(big_m as i64, m as i64);
-        if (a as i128 - x) % (gcd(big_m as u64, m) as i128) != 0 {
+        let (g, s, _t) = extended_gcd(big_m as i64, m as i64);
+        let (g, a, m) = (g as i128, (a % m) as i128, m as i128);
+        if (a - x) % g != 0 {
             return None; // incompatible congruences
         }
-        let lcm = big_m / gcd(big_m as u64, m) as u128 * m as u128;
-        x = ((x * m as u128 * t as i128 + a as u128 * big_m * s as i128) % lcm + lcm) % lcm;
-        big_m = lcm;
+        let m_g = m / g;
+        let modulus = big_m.checked_mul(m_g)?;
+        if modulus > u64::MAX as i128 {
+            return None;
+        }
+        let t = (((a - x) / g) * s as i128).rem_euclid(m_g);
+        x = (x + big_m * t).rem_euclid(modulus);
+        big_m = modulus;
     }
     Some((x as u64, big_m as u64))
 }
@@ -219,8 +228,8 @@ pub fn legendre(a: u64, p: u64) -> i64 {
         return 0;
     }
     match mod_pow(a, (p - 1) / 2, p) {
-        r if r == 0 => 0,
-        r if r == 1 => 1,
+        0 => 0,
+        1 => 1,
         _ => -1,
     }
 }

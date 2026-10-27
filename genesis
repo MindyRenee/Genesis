@@ -262,6 +262,28 @@ fi
 
 mkdir -p "$DATA_DIR" || exit 1
 
+# ─── Singleton lock ──────────────────────────────────────────────────
+# The CLI's singleton lock is taken here, by the shell, before the
+# interpreter is loaded, and handed down on fd 9. The pidfile check
+# below is advisory — a process writes its PID file only after it has
+# started, so two near-simultaneous launches both pass it and one then
+# loses the race inside Python with a bare lock error. flock is the
+# actual gate: it is atomic, and it is the same file the CLI would
+# otherwise open itself, so an instance started another way (the
+# installed `genesis` console script) is seen too. Holding the fd
+# across the launch keeps the lock for exactly as long as this
+# organism lives — the daemon is spawned with close_fds, so it cannot
+# inherit the lock and keep a dead mind's claim alive.
+if command -v flock >/dev/null 2>&1; then
+    CLI_LOCK="$DATA_DIR/genesis_cli.lock"
+    exec 9>>"$CLI_LOCK" || { echo "  Cannot open $CLI_LOCK" >&2; exit 1; }
+    if ! flock -n 9; then
+        echo "  Genesis is already running. Stop it with: ./genesis --stop"
+        exit 1
+    fi
+    export GENESIS_CLI_LOCK_FD=9
+fi
+
 # Guard against two checkouts sharing one mind. The data dir records
 # which project tree created it; a different tree reusing it would
 # corrupt both developmental records. Warn loudly — do not refuse,
@@ -283,20 +305,18 @@ else
     echo "$PWD" > "$MARKER"
 fi
 
-# Refuse to start if a Genesis mind is already running for this data dir.
-# Only the CLI blocks a new start: a surviving daemon with no CLI is
-# the body outliving its last mind — the CLI adopts it rather than
-# being refused, so mind and body are never deliberately kept apart.
-# A CLI mid-teardown still matches here and refuses, which is correct:
-# a new start must never interrupt a state save.
+# Advisory check on top of the flock above: it names the instance in
+# the message and covers a CLI started without the launcher. The flock
+# is what makes it race-free.
 if [ -n "$(_find_pids "$DATA_DIR/genesis_cli.pid")" ]; then
     echo "  Genesis is already running. Stop it with: ./genesis --stop"
     exit 1
 fi
 
 # EXIT trap — report unfinished shutdown without interrupting state saves.
-# The CLI owns child cleanup. If startup loses a singleton-lock race,
-# this shell must not stop the winning instance or unlink its locks.
+# The CLI owns child cleanup. The singleton lock is this shell's fd 9:
+# it is released when the shell exits, so a failed launch cannot leave
+# the next start refused, and it is never unlinked.
 _atexit() {
     # Use validated process identities when checking for remaining work.
     if _is_running; then

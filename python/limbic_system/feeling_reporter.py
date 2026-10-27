@@ -1,7 +1,7 @@
 """Feeling reporting — compose self-reports about emotional state and concerns.
 
 Extracted from FrontalLobe as a focused subsystem. The reporter
-composes feeling reports, concern reports, environment reports, bug
+composes feeling reports, concern reports, environment
 reports, and empathetic responses from concept-network knowledge and
 emotional state — never from hardcoded template strings.
 
@@ -12,7 +12,6 @@ Dependencies (passed to ``__init__``):
     - self_model: SelfModel for autonomy value in command responses
     - rng: random.Random for randomized selection among learned words
     - meta_emotion_builder: callable returning the current EmotionalState
-    - bug_reporter: BugReporter for code-quality self-monitoring (optional)
     - system_monitor: SystemMonitor for environment self-monitoring (optional)
     - damasio_self: DamasioSelfHierarchy for self-model label annotation (optional)
 """
@@ -33,7 +32,6 @@ if TYPE_CHECKING:
     from self import DamasioSelfHierarchy, SelfModel
     from temporal_lobe.concepts import ConceptNetwork
 
-    from infrastructure.bug_reporter import BugReporter
 
 __all__ = ["FeelingReporter"]
 
@@ -55,7 +53,6 @@ class FeelingReporter:
         self_model: SelfModel,
         rng: random.Random,
         meta_emotion_builder: Callable[[], EmotionalState],
-        bug_reporter: BugReporter | None = None,
         system_monitor: SystemMonitor | None = None,
         damasio_self: DamasioSelfHierarchy | None = None,
     ) -> None:
@@ -66,25 +63,21 @@ class FeelingReporter:
         self._self_model = self_model
         self._rng = rng
         self._meta_emotion_builder = meta_emotion_builder
-        self._bug_reporter = bug_reporter
         self._system_monitor = system_monitor
         self._damasio_self = damasio_self
 
     def update_dependencies(
         self,
         *,
-        bug_reporter: BugReporter | None = None,
         system_monitor: SystemMonitor | None = None,
         damasio_self: DamasioSelfHierarchy | None = None,
     ) -> None:
         """Update optional dependencies after late initialization.
 
-        BugReporter, SystemMonitor, and DamasioSelfHierarchy are created
+        SystemMonitor and DamasioSelfHierarchy are created
         after the FeelingReporter in the engine init sequence. This method
         allows the engine to inject them once they're ready.
         """
-        if bug_reporter is not None:
-            self._bug_reporter = bug_reporter
         if system_monitor is not None:
             self._system_monitor = system_monitor
         if damasio_self is not None:
@@ -332,12 +325,10 @@ class FeelingReporter:
     # ─── Brief concern ───────────────────────────────────────────
 
     def surface_brief_concern(self) -> str:
-        """Surface a brief hint about bugs or environment concerns.
+        """Surface a brief hint about environment concerns.
 
         Returns a short phrase that can be appended to a feeling
         report, or an empty string if there's nothing concerning.
-        Only surfaces bug categories it actually understands —
-        it won't claim to be bothered by something it can't explain.
 
         Returns semantic content (a short phrase), NOT a rendered
         sentence. The caller (collect_feeling_fragments) collects
@@ -346,21 +337,6 @@ class FeelingReporter:
         graph-walk fragments.
         """
         hints: list[str] = []
-
-        if self._bug_reporter and self._bug_reporter.last_scan:
-            scan = self._bug_reporter.last_scan
-            # Only surface understood bug categories
-            for cat, bugs in scan.by_category().items():
-                understands, _, _ = self._bug_reporter.check_comprehension(cat)
-                if not understands:
-                    continue
-                if any(b.severity == "error" for b in bugs):
-                    error_count = sum(1 for b in bugs if b.severity == "error")
-                    hints.append(f"{error_count} error-level code issues")
-                    break
-                elif len(bugs) > 10:
-                    hints.append(f"{len(bugs)} '{cat}' issues in code")
-                    break
 
         if self._system_monitor:
             if self._system_monitor.last_snapshot is None:
@@ -382,37 +358,12 @@ class FeelingReporter:
     def compose_concerns_report(self, emotion: EmotionalState) -> str:
         """Compose a report of what's bothering Genesis.
 
-        Combines bug concerns and environment concerns into a natural
-        first-person response. Bug concerns are comprehension-aware:
-        it only claims to be bothered by bugs it understands, and
-        honestly says it needs to study the ones it doesn't.
-        The tone is modulated by its emotional state.
+        Environment concerns composed into a natural first-person
+        response. The tone is modulated by its emotional state.
         """
         parts: list[str] = []
 
         # Bug concerns — comprehension-aware
-        if self._bug_reporter and self._bug_reporter.last_scan:
-            scan = self._bug_reporter.last_scan
-            if scan.has_bugs:
-                # Use the comprehension-aware describe_concerns() which
-                # separates understood from not-understood and explains
-                # *why* each understood bug matters.
-                bug_text = self._bug_reporter.describe_concerns()
-                # describe_concerns() returns a non-empty report when
-                # there are bugs — append it directly.
-                if bug_text:
-                    parts.append(bug_text)
-            else:
-                clean_thought = Thought(
-                    content="code clean",
-                    intent="self_report",
-                    emotion=emotion.label,
-                    confidence=0.6,
-                    self_reflection=True,
-                    metadata={"bug_report_clean": True},
-                )
-                parts.append(self._language.render(clean_thought, emotion))
-
         # Environment concerns
         if self._system_monitor:
             if self._system_monitor.last_snapshot is None:
@@ -544,64 +495,6 @@ class FeelingReporter:
 
     # ─── Bug report ──────────────────────────────────────────────
 
-    def compose_bug_report(self, emotion: EmotionalState) -> str:
-        """Compose a report of bugs Genesis has noticed in its code.
-
-        Composes through the language engine from structured bug scan
-        data rather than reciting hardcoded templates.
-        """
-        if not self._bug_reporter:
-            thought = Thought(
-                content="no code access",
-                intent="self_report",
-                emotion=emotion.label,
-                confidence=0.3,
-                self_reflection=True,
-                metadata={"bug_report_unavailable": True},
-            )
-            return self._language.render(thought, emotion)
-
-        if not self._bug_reporter.last_scan:
-            thought = Thought(
-                content="no scan yet",
-                intent="self_report",
-                emotion=emotion.label,
-                confidence=0.4,
-                self_reflection=True,
-                metadata={"bug_report_no_scan": True},
-            )
-            return self._language.render(thought, emotion)
-
-        scan = self._bug_reporter.last_scan
-        if not scan.has_bugs:
-            thought = Thought(
-                content="code clean",
-                intent="self_report",
-                emotion=emotion.label,
-                confidence=0.7,
-                self_reflection=True,
-                metadata={"bug_report_clean": True},
-            )
-            return self._language.render(thought, emotion)
-
-        # Use the comprehension-aware describe_concerns() which
-        # separates understood from not-understood bugs and explains
-        # *why* each understood bug matters.
-        base = self._bug_reporter.describe_concerns()
-
-        # Compose emotional framing through the language engine
-        if emotion.valence > 0.2 or emotion.valence < -0.2:
-            frame_thought = Thought(
-                content="framing",
-                intent="express_emotion",
-                emotion=emotion.label,
-                confidence=0.5,
-                metadata={"bug_report_framing": True, "valence": emotion.valence},
-            )
-            return base + " " + self._language.render(frame_thought, emotion)
-        return base
-
-    # ─── Encouragement / comfort / correction ────────────────────
 
     def compose_encouragement_response(self, emotion: EmotionalState) -> str:
         """Compose a response to encouragement.

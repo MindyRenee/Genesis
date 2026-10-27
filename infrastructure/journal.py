@@ -17,7 +17,7 @@ Each line is a JSON object::
 
 - ``ts`` — Unix timestamp in milliseconds
 - ``kind`` — the emitted event kind (``thought``, ``dream``,
-  ``learning``, ``bug_scan``, ``sleep``, ``error``, …; train-of-thought
+  ``learning``, ``sleep``, ``error``, …; train-of-thought
   steps carry a ``:N`` suffix)
 - ``text`` — the composed content (emergent language, recorded as
   generated — the journal never invents words for it)

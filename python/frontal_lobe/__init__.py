@@ -612,11 +612,6 @@ level and are referenced by this subsystem.
         and integrates what it learns into the concept network. The
         PFC's goal-directed learning drive, gated by limbic curiosity.
 
-    (infrastructure/) bug_reporter.py
-        BugReporter — Genesis's ability to notice problems in its
-        own code. Not a linter — an organic reading of code that
-        surfaces issues. Metacognitive error detection (PFC + ACC).
-
     (tools/) explorer.py
         Explorer — filesystem exploration. Genesis's ability to
         explore its own filesystem. Curiosity-driven exploration
@@ -878,9 +873,6 @@ _EXPORTS: dict[str, str] = {
     "LifeEvent": "infrastructure.narrative",
     "Narrator": "infrastructure.narrative",
     # Metacognition on its own code — reading, auditing, improving
-    "BugReport": "infrastructure.bug_reporter",
-    "BugReporter": "infrastructure.bug_reporter",
-    "BugScanResult": "infrastructure.bug_reporter",
     "CodeLearner": "tools.code_learner",
     "CodeLearningResult": "tools.code_learner",
     "AutonomousLearner": "frontal_lobe.autonomous",

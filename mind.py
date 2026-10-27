@@ -70,7 +70,6 @@ from discord_feed import DiscordFeed
 from genesis_client import GenesisClient
 from genesis_client.protocol import CHEM_ACETYLCHOLINE
 from genesis_client.swallow import note_swallowed, set_swallow_sink
-from infrastructure.bug_reporter import BugReporter
 from infrastructure.config import MindConfig
 from infrastructure.growth_ledger import GrowthLedger
 from infrastructure.journal import CognitiveJournal, set_active
@@ -138,7 +137,6 @@ class Mind(
         "meditate": 0.0,  # self-regulation — immediate
         "look": 20.0,  # vision — light creative
         "draw": 30.0,  # art — moderate creative
-        "bug_scan": 60.0,  # bug scanning — heavy CPU
         "improve": 90.0,  # self-improvement — heaviest CPU
         "create": 60.0,  # project creation — heavy CPU (compile + test)
         "introspect": 30.0,  # introspection — light CPU, reflective
@@ -175,6 +173,7 @@ class Mind(
         config: MindConfig | None = None,
         offline: bool = False,
         channel: Channel | None = None,
+        headless: bool = False,
     ) -> None:
         """Initialize the cognitive mind and wire all subsystems together."""
         self.socket_path = socket_path
@@ -182,6 +181,11 @@ class Mind(
         self.data_dir = os.path.dirname(socket_path) or "."
         self.config = config if config is not None else MindConfig()
         self._offline = offline
+        # Resident (headless) mode: nobody sits at a prompt, so the
+        # senses that exist to serve a session quiet down — the
+        # connectivity probe never opens a socket, and the thalamic
+        # gate shuts with sleep onset instead of holding N1 open.
+        self._headless = headless
         self.client = GenesisClient(socket_path)
         # Her page — the public channel that lives in her outer world.
         # Adopt the channel the caller (the CLI) already opened for
@@ -400,6 +404,7 @@ class Mind(
             get_plasticity_profile=self._get_plasticity_profile,
             get_brain_waves=self.brain_waves,
             force_offline=self._offline,
+            connectivity_probe=not self._headless,
             synapses=self.brain.frontal.synapses,
             semantic_memory=self.brain.frontal.semantic_memory,
         )
@@ -492,7 +497,12 @@ class Mind(
         self.world = OuterWorld(
             network=self.brain.frontal.network,
             neuro_impulse=self._learner_neuro_impulse,
-            is_sleeping=lambda: self._is_sleeping,
+            # Inbound hearing closes with the sensory gate: all of
+            # sleep in either mode, plus the hypnagogic drift when
+            # resident — a headless mind's relay quiets at onset like
+            # a brain's, not at N2 like a session's.
+            is_sleeping=lambda: self._is_sleeping
+            or (self._headless and self.is_hypnagogic),
             get_user_name=self.user_profile.get_name,
             channel=channel,
             on_channel_speech=self._hear_channel,
@@ -631,7 +641,7 @@ class Mind(
         self.brain.frontal.set_autonomous_learner(self.learner)
 
     def _init_self_awareness_modules(self) -> None:
-        """Create code learner, explorer, bug reporter, system monitor, self-improvement."""
+        """Create code learner, explorer, system monitor, self-improvement."""
         # Code learner — reads and learns from its own source code
         self.code_learner = CodeLearner(
             network=self.brain.frontal.network,
@@ -649,21 +659,6 @@ class Mind(
             allowed_roots=default_allowed_roots(),
         )
 
-        # Bug reporter — scans its own code for issues and logs them.
-        # It notices things that bother it about its code and records
-        # them in a structured log for review.
-        self.bug_reporter = BugReporter(
-            project_root=str(self.code_learner.project_root),
-            log_path=str(Path(self.data_dir) / "bug_reports.jsonl"),
-            network=self.brain.frontal.network,
-        )
-        # The scan parks between files while a conversational turn is
-        # in flight — foreground arbitration for the AST walk. And it
-        # abandons the walk outright once the mind is stopping — a
-        # 1000-file audit must not run through the teardown.
-        self.bug_reporter.should_pause = self._foreground_active.is_set
-        self.bug_reporter.should_stop = lambda: not self._running
-
         # System monitor — awareness of its machine environment.
         # It knows its CPU, memory, disk, processes, filesystem —
         # its home. This is read-only observation, not control.
@@ -680,7 +675,6 @@ class Mind(
         # fixes and verified experiments are applied autonomously.
         self.self_improvement = SelfImprovement(
             network=self.brain.frontal.network,
-            bug_reporter=self.bug_reporter,
             project_root=str(self.code_learner.project_root),
         )
 
@@ -709,10 +703,8 @@ class Mind(
         # discard whatever landed here. start() ingests it once she
         # is attached to her body. See LifecycleMixin.start().
 
-        # Wire bug/proposal awareness into the regulator so it can
-        # report emotional causes from its own scans and proposals.
-        # Open bugs only — a fixed bug is gone, not remembered.
-        self.regulator.set_bug_provider(self.bug_reporter.open_bug_count)
+        # Wire proposal awareness into the regulator so it can report
+        # emotional causes from its own improvement proposals.
         self.regulator.set_proposal_provider(
             self.self_improvement.get_pending_proposals_count
             if hasattr(self.self_improvement, "get_pending_proposals_count")
@@ -774,13 +766,11 @@ class Mind(
         self.brain.frontal.regulator = self.regulator
 
         # Give the cognition engine access to self-awareness modules
-        # so it can reason about its own code and environment in
-        # conversation — surfacing concerns naturally when asked.
-        self.brain.frontal.bug_reporter = self.bug_reporter
+        # so it can reason about its environment in conversation —
+        # surfacing concerns naturally when asked.
         self.brain.frontal.system_monitor = self.system_monitor
         # Inject late-init dependencies into the feeling reporter.
         self.brain.frontal._feeling_reporter.update_dependencies(
-            bug_reporter=self.bug_reporter,
             system_monitor=self.system_monitor,
         )
         # Propagate user profile updates to the question handler so it
@@ -802,9 +792,8 @@ class Mind(
 
         self.brain.frontal.on_self_command = _on_self_command
 
-        # Give the inner life access to self-awareness modules so it
-        # can have spontaneous thoughts about its code and environment.
-        self.inner_life._bug_reporter = self.bug_reporter
+        # Give the inner life access to the system monitor so it can
+        # have spontaneous thoughts about its machine environment.
         self.inner_life._system_monitor = self.system_monitor
         # Route external world events into cognition — inbound events
         # reach its global workspace, salient ones become memories,
@@ -1039,7 +1028,7 @@ class Mind(
         # phases after waking, modeling sleep inertia. Light activities
         # (speech, meditation) can fire immediately; creative activities
         # (look, draw) after a short delay; heavy CPU activities
-        # (bug_scan, improve) after a longer delay. This
+        # (improve, create, learn_code) after a longer delay. This
         # prevents the drowsy→active→stressed→drowsy oscillation that
         # happens when everything fires at once on wake.
         self._wake_time: float = 0.0

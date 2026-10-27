@@ -11,7 +11,6 @@ thalamus, cerebellum, basal_ganglia).
     journal.py               Append-only record of inner life.
     narrative.py             The self-story over time.
     notifications.py         Subcognitive -> cognitive notification queue.
-    bug_reporter.py          Noticing problems in its own code.
     growth_ledger.py         Legible tracking of development.
     user_profile.py          What Genesis knows about the human.
     vq_codebook.py           Compression of the concept embedding space.

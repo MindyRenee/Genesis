@@ -312,3 +312,49 @@ def test_decision_sources_and_prior_learning_reported():
     result = _practice(mind, frames).play("fake", max_steps=5)
     assert result.decision_sources == {"plan": 1}
     assert result.prior_learning == "loaded"
+
+
+def test_stale_singletons_cleared_but_live_lock_kept(tmp_path):
+    """Flattened or dead-owner singleton files are dropped before
+    launch; a lock naming a live local pid is left for adoption."""
+    import os
+    import socket
+
+    from worlds.arc_web import _clear_stale_singletons
+
+    profile = tmp_path / "web"
+    profile.mkdir()
+    # The germinated shape: symlinks flattened into plain files.
+    for name in (
+        "SingletonLock",
+        "SingletonCookie",
+        "SingletonSocket",
+        "DevToolsActivePort",
+    ):
+        (profile / name).write_text("stale")
+    _clear_stale_singletons(profile)
+    for name in (
+        "SingletonLock",
+        "SingletonCookie",
+        "SingletonSocket",
+        "DevToolsActivePort",
+    ):
+        assert not (profile / name).exists(), name
+
+    # A lock pointing at a dead pid — same clean sweep.
+    os.symlink("999999-oldhost", profile / "SingletonLock")
+    (profile / "SingletonCookie").write_text("x")
+    _clear_stale_singletons(profile)
+    assert not (profile / "SingletonLock").exists()
+    assert not (profile / "SingletonCookie").exists()
+
+    # A live owner keeps every marker — the launch adopts it.
+    os.symlink(
+        f"{os.getpid()}-{socket.gethostname()}", profile / "SingletonLock"
+    )
+    (profile / "DevToolsActivePort").write_text("12345\n")
+    _clear_stale_singletons(profile)
+    # lexists: the lock is a symlink whose target is a pid string,
+    # never a path — exists() would follow it into nothing.
+    assert os.path.lexists(profile / "SingletonLock")
+    assert (profile / "DevToolsActivePort").read_text() == "12345\n"

@@ -17,6 +17,37 @@ Five layers, matching the anatomy of the intraparietal sulcus:
                         the named means, dispersion, and moments.
                         The population picture.
 
+And the higher faculties — one file per domain, each mirrored by a
+pure-machine twin under ``src/math/`` in the body:
+
+    trig.py             — the circle's vocabulary: angles, ratios,
+                          triangles.
+    linear_algebra.py   — spaces and maps: matrices, determinants,
+                          systems.
+    abstract_algebra.py — structure itself: permutations, cycles,
+                          orbits, groups. The cube's home.
+    real_analysis.py    — limits made honest: the epsilon-delta
+                          game, graphs as (x, y) points.
+    complex_analysis.py — the plane of numbers: polar form, roots
+                          of unity, De Moivre.
+    number_theory.py    — the integers' inner life: primes,
+                          factors, congruences.
+    topology.py         — shape without distance: opens, closure,
+                          the Euler characteristic.
+    geometry.py         — shape with distance: areas, hulls,
+                          point-in-polygon.
+    discrete.py         — relations, sets, graphs — the decidable
+                          finite.
+    combinatorics.py    — counting without listing: choose,
+                          arrange, derange.
+
+And the three pillars mathematical thinking stands on:
+
+    axioms.py           — the ladder of laws: closure through
+                          abelian group, each rung witnessed.
+    proof.py            — valid inference: truth tables, entailment,
+                          the named rules.
+
 ``symbolic.py`` sits beside them as the oracle — the sympy-backed
 checker ``frontal_lobe/research.py`` verifies claims against. The
 faculty here is endogenous: it manipulates structure itself, and
@@ -29,6 +60,15 @@ from __future__ import annotations
 
 import re
 
+from .abstract_algebra import (
+    GroupResult,
+    compose_text,
+    looks_like_group,
+    order_text,
+)
+from .abstract_algebra import (
+    describe_text as group_describe_text,
+)
 from .algebra import (
     AlgebraResult,
     expand_text,
@@ -39,6 +79,7 @@ from .algebra import (
     solve,
 )
 from .arithmetic import CalcResult, evaluate
+from .axioms import AxiomResult, classify_text, looks_like_axioms
 from .calculus import (
     derivative_at_text,
     derivative_text,
@@ -46,21 +87,127 @@ from .calculus import (
     integral_text,
     taylor,
 )
+from .combinatorics import (
+    CountResult,
+    arrange_text,
+    choose_text,
+    derange_text,
+    looks_like_counting,
+)
+from .complex_analysis import (
+    ComplexResult,
+    looks_like_complex,
+    power_text,
+    roots_text,
+    roots_unity_text,
+)
+from .complex_analysis import (
+    describe_text as complex_describe_text,
+)
+from .discrete import (
+    DiscreteResult,
+    connected_text,
+    looks_like_discrete,
+    relation_text,
+)
+from .geometry import (
+    GeoResult,
+    area_text,
+    distance_text,
+    hull_text,
+    inside_text,
+    looks_like_geometry,
+)
+from .linear_algebra import (
+    LinearResult,
+    determinant_text,
+    looks_like_linear_algebra,
+    matmul_text,
+    rank_text,
+)
+from .linear_algebra import (
+    solve_text as solve_system_text,
+)
 from .number_sense import MagnitudeJudgment, NumberSense
+from .number_theory import (
+    NumberResult,
+    crt_text,
+    gcd_text,
+    looks_like_number_theory,
+    prime_text,
+    solve_congruence_text,
+)
+from .number_theory import (
+    factor_text as factor_number_text,
+)
+from .proof import (
+    ProofResult,
+    entail_text,
+    looks_like_proof,
+    satisfiable_text,
+    tautology_text,
+)
+from .real_analysis import (
+    AnalysisResult,
+    limit_text,
+    looks_like_analysis,
+    plot_text,
+)
+from .real_analysis import (
+    integral_text as numeric_integral_text,
+)
 from .statistics import MEAN_KINDS, StatSummary, mean, summarize
+from .topology import (
+    TopoResult,
+    describe_space_text,
+    euler_surface,
+    looks_like_topology,
+)
+from .trig import (
+    TrigResult,
+    convert_text,
+    looks_like_trig,
+    ratio_text,
+    triangle_text,
+)
 
 __all__ = [
     "MEAN_KINDS",
     "AlgebraResult",
+    "AnalysisResult",
+    "AxiomResult",
     "CalcResult",
+    "ComplexResult",
+    "CountResult",
+    "DiscreteResult",
+    "GeoResult",
+    "GroupResult",
+    "LinearResult",
     "MagnitudeJudgment",
+    "NumberResult",
     "NumberSense",
     "ParietalMath",
+    "ProofResult",
     "StatSummary",
+    "TopoResult",
+    "TrigResult",
+    "euler_surface",
     "looks_like_algebra",
+    "looks_like_analysis",
+    "looks_like_axioms",
     "looks_like_calculus",
+    "looks_like_complex",
+    "looks_like_counting",
+    "looks_like_discrete",
+    "looks_like_geometry",
+    "looks_like_group",
+    "looks_like_linear_algebra",
     "looks_like_math",
+    "looks_like_number_theory",
+    "looks_like_proof",
     "looks_like_statistics",
+    "looks_like_topology",
+    "looks_like_trig",
     "mean",
     "summarize",
 ]
@@ -268,3 +415,225 @@ class ParietalMath:
             return AlgebraResult("taylor", text, render(out), True)
         except (ValueError, TypeError, OverflowError, ZeroDivisionError) as e:
             return AlgebraResult("taylor", text, "", False, str(e))
+
+    # ── Trigonometry — the circle's vocabulary ──────────────────
+
+    def looks_like_trig(self, text: str) -> bool:
+        """Whether the text asks about angles, ratios, or triangles."""
+        return looks_like_trig(text)
+
+    def trig_ratio(self, func: str, angle_text: str) -> TrigResult:
+        """A ratio at an angle — exact names for the famous angles."""
+        return ratio_text(func, _extract(angle_text))
+
+    def convert_angle(self, text: str, to: str) -> TrigResult:
+        """Degrees to radians or back."""
+        return convert_text(_extract(text), to)
+
+    def triangle(self, sides: list[float]) -> TrigResult:
+        """Solve a triangle from three sides."""
+        return triangle_text(sides)
+
+    # ── Linear algebra — spaces and maps ─────────────────────────
+
+    def looks_like_linear_algebra(self, text: str) -> bool:
+        """Whether the text asks a matrix question."""
+        return looks_like_linear_algebra(text)
+
+    def determinant(self, text: str) -> LinearResult:
+        """The determinant of a bracketed matrix — exact."""
+        return determinant_text(text)
+
+    def matrix_rank(self, text: str) -> LinearResult:
+        """The rank of a bracketed matrix."""
+        return rank_text(text)
+
+    def matmul(self, a_text: str, b_text: str) -> LinearResult:
+        """The product of two bracketed matrices."""
+        return matmul_text(a_text, b_text)
+
+    def solve_system(self, a_text: str, b_text: str) -> LinearResult:
+        """Solve Ax = b — exact fractions."""
+        return solve_system_text(a_text, b_text)
+
+    # ── Abstract algebra — structure itself ─────────────────────
+
+    def looks_like_group(self, text: str) -> bool:
+        """Whether the text asks about permutations or groups."""
+        return looks_like_group(text)
+
+    def permutation_order(self, text: str) -> GroupResult:
+        """The order of a cycle-notation permutation."""
+        return order_text(text)
+
+    def permutation_compose(self, left: str, right: str) -> GroupResult:
+        """Compose two permutations, left then right."""
+        return compose_text(left, right)
+
+    def permutation_describe(self, text: str) -> GroupResult:
+        """Cycles, order, parity — the move's portrait."""
+        return group_describe_text(text)
+
+    # ── Real analysis — limits made honest ──────────────────────
+
+    def looks_like_analysis(self, text: str) -> bool:
+        """Whether the text asks about limits or convergence."""
+        return looks_like_analysis(text)
+
+    def limit(self, text: str, at: float) -> AnalysisResult:
+        """The limit of an expression as x approaches a point."""
+        return limit_text(_extract(text), at)
+
+    def plot(self, text: str, lo: float, hi: float, n: int = 128) -> AnalysisResult:
+        """The graph of an expression — its (x, y) points."""
+        return plot_text(_extract(text), lo, hi, n)
+
+    def numeric_integral(self, text: str, lo: float, hi: float) -> AnalysisResult:
+        """The definite integral by Simpson's quadrature."""
+        return numeric_integral_text(_extract(text), lo, hi)
+
+    # ── Complex analysis — the plane of numbers ─────────────────
+
+    def looks_like_complex(self, text: str) -> bool:
+        """Whether the text asks about complex numbers."""
+        return looks_like_complex(text)
+
+    def complex_describe(self, text: str) -> ComplexResult:
+        """Magnitude, argument, polar form — the number's portrait."""
+        return complex_describe_text(text)
+
+    def complex_power(self, text: str, n: int) -> ComplexResult:
+        """A complex number raised to an integer power."""
+        return power_text(text, n)
+
+    def roots_of_unity(self, n: int) -> ComplexResult:
+        """All n nth roots of unity."""
+        return roots_unity_text(n)
+
+    def complex_roots(self, text: str, n: int) -> ComplexResult:
+        """All n nth roots of a complex number."""
+        return roots_text(text, n)
+
+    # ── Number theory — the integers' inner life ────────────────
+
+    def looks_like_number_theory(self, text: str) -> bool:
+        """Whether the text asks about primes, factors, congruences."""
+        return looks_like_number_theory(text)
+
+    def is_prime(self, n: int) -> NumberResult:
+        """Primality with the factorization when composite."""
+        return prime_text(n)
+
+    def factor_number(self, n: int) -> NumberResult:
+        """Prime factorization, with its check."""
+        return factor_number_text(n)
+
+    def gcd(self, a: int, b: int) -> NumberResult:
+        """The greatest common divisor, with the Bezout witness."""
+        return gcd_text(a, b)
+
+    def solve_congruence(self, a: int, b: int, m: int) -> NumberResult:
+        """Solve ax ≡ b (mod m)."""
+        return solve_congruence_text(a, b, m)
+
+    def chinese_remainder(self, pairs: list[tuple[int, int]]) -> NumberResult:
+        """CRT over (residue, modulus) pairs."""
+        return crt_text(pairs)
+
+    # ── Topology — shape without distance ───────────────────────
+
+    def looks_like_topology(self, text: str) -> bool:
+        """Whether the text asks about opens, surfaces, connectedness."""
+        return looks_like_topology(text)
+
+    def euler_characteristic(self, v: int, e: int, f: int) -> TopoResult:
+        """V − E + F — the count that knows the surface."""
+        return euler_surface(v, e, f)
+
+    def is_topology(self, n: int, opens: list[list[int]]) -> TopoResult:
+        """Whether a collection of subsets is a topology on n points."""
+        return describe_space_text(n, opens)
+
+    # ── Geometry — shape with distance ──────────────────────────
+
+    def looks_like_geometry(self, text: str) -> bool:
+        """Whether the text asks about points, areas, hulls."""
+        return looks_like_geometry(text)
+
+    def distance(self, text: str) -> GeoResult:
+        """Distance between two "(x, y)" points."""
+        return distance_text(text)
+
+    def polygon_area(self, text: str) -> GeoResult:
+        """Area of a point list — the shoelace."""
+        return area_text(text)
+
+    def convex_hull(self, text: str) -> GeoResult:
+        """The convex hull of a point list."""
+        return hull_text(text)
+
+    def point_inside(self, point_text: str, poly_text: str) -> GeoResult:
+        """Whether a point lies inside a polygon — ray casting."""
+        return inside_text(point_text, poly_text)
+
+    # ── Discrete — relations, sets, graphs ──────────────────────
+
+    def looks_like_discrete(self, text: str) -> bool:
+        """Whether the text asks about relations, sets, or graphs."""
+        return looks_like_discrete(text)
+
+    def relation_properties(self, text: str, universe_text: str | None = None) -> DiscreteResult:
+        """Which relation properties hold — reflexive through
+        transitive, with the equivalence/order verdict."""
+        return relation_text(text, universe_text)
+
+    def graph_connected(self, text: str) -> DiscreteResult:
+        """Whether an edge list is one connected component."""
+        return connected_text(text)
+
+    # ── Combinatorics — counting without listing ────────────────
+
+    def looks_like_counting(self, text: str) -> bool:
+        """Whether the text asks a counting question."""
+        return looks_like_counting(text)
+
+    def choose(self, n: int, k: int) -> CountResult:
+        """C(n,k) — subsets, not orders."""
+        return choose_text(n, k)
+
+    def arrange(self, n: int, k: int | None = None) -> CountResult:
+        """Orders: n! or P(n,k) — the multiplication rule."""
+        return arrange_text(n, k)
+
+    def derangements(self, n: int) -> CountResult:
+        """!n — permutations leaving nothing home."""
+        return derange_text(n)
+
+    # ── Axioms — the ladder of laws ─────────────────────────────
+
+    def looks_like_axioms(self, text: str) -> bool:
+        """Whether the text asks about algebraic structure."""
+        return looks_like_axioms(text)
+
+    def classify_structure(self, table: list[list[int]]) -> AxiomResult:
+        """Which rung a Cayley table reaches, with the axiom it
+        fails and the witness."""
+        return classify_text(table)
+
+    # ── Proof — valid inference ─────────────────────────────────
+
+    def looks_like_proof(self, text: str) -> bool:
+        """Whether the text asks about proof or validity."""
+        return looks_like_proof(text)
+
+    def is_tautology(self, prop: tuple, words: str = "") -> ProofResult:
+        """Whether a proposition tree is true under every world."""
+        return tautology_text(prop, words)
+
+    def is_satisfiable(self, prop: tuple, words: str = "") -> ProofResult:
+        """Whether some world makes a proposition true — with one."""
+        return satisfiable_text(prop, words)
+
+    def entails(self, premises: list[tuple], goal: tuple) -> ProofResult:
+        """Whether premises force a goal — or the countermodel."""
+        return entail_text(premises, goal)

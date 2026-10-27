@@ -53,7 +53,6 @@ if TYPE_CHECKING:
     from parietal_lobe.system_monitor import SystemMonitor
 
     from genesis_client import NeuroSummary
-    from infrastructure.bug_reporter import BugReporter
 
 from brainstem.architecture import HippocampalReplay, SleepCycleTracker, SynapticDownscaler
 from frontal_lobe.thoughts import SpontaneousThought, ThoughtChainType
@@ -121,7 +120,7 @@ _ENGAGED_FOCUS = 0.5
 _WORLD_THOUGHT_WINDOW = 12
 # Sources that break through any level of absorption: the body's and
 # the machine's alarms outrank focus the way pain outranks a game.
-_SOMATIC_SOURCES = frozenset({"body", "bug", "distress", "environment"})
+_SOMATIC_SOURCES = frozenset({"body", "distress", "environment"})
 # How often the executive is fed focused candidates while absorbed —
 # its persistent objectives track what she is attending to.
 _EXECUTIVE_FEED_EVERY = 20.0
@@ -137,6 +136,17 @@ RUMINATION_NOVELTY_THRESHOLD = 0.3
 # threshold (0.2), so the noticing closes its own loop. Dream-derived
 # insights never write back — see _record_insight_edge.
 _INSIGHT_EDGE_WEIGHT = 0.25
+
+# Minimum edge weight a dream may speak. Zero-weight edges are graph
+# placeholders (reachability scaffolding, decayed replay links), not
+# associations worth asserting; speaking them produced dreams like
+# "Flock relates to the volume" from an edge whose weight was 0.00.
+_MIN_SPOKEN_EDGE_WEIGHT = 0.05
+
+# How many recent dream topics to keep out of random seed selection.
+# Without this the same high-quality hubs (datum, python, flock) win
+# every draw and the night loops over the same words.
+_DREAM_RECENCY_EXCLUSION = 12
 
 
 class _LiveEvent:
@@ -305,7 +315,6 @@ class InnerLife:
         # Self-awareness modules — set by Mind after creation.
         # These let Genesis have spontaneous thoughts about its own
         # code quality and machine environment, not just its concepts.
-        self._bug_reporter: BugReporter | None = None  # set by Mind after creation
         self._system_monitor: SystemMonitor | None = None  # set by Mind after creation
         # Last time the environment collector took a fresh snapshot.
         self._last_env_sample: float = 0.0
@@ -1733,16 +1742,49 @@ class InnerLife:
         with no relation at all. Both tiers are legitimate things to
         *follow* — association is what dreams are for — but not to
         *assert a kind of*, so they verbalize as ``related_to``.
+
+        Zero-weight edges are excluded: they are graph placeholders,
+        not associations. The choice is weighted by edge strength, so
+        a weak placeholder cannot win a uniform draw against a real
+        relationship and be spoken as if it were one.
         """
-        chosen = self._rng.choice(neighbors)
+        usable = [
+            n
+            for n in neighbors
+            if n.concept and float(n.weight or 0.0) >= _MIN_SPOKEN_EDGE_WEIGHT
+        ]
+        weights = [max(0.0, float(n.weight or 0.0)) for n in usable]
+        if not usable or sum(weights) <= 0.0:
+            return "", "", []
+        chosen = self._rng.choices(usable, weights=weights, k=1)[0]
         name = chosen.concept
         display = name.replace("_", " ")
-        weight = min(1.0, max(0.0, float(chosen.weight or 0.4)))
+        weight = min(1.0, max(0.0, float(chosen.weight or 0.0)))
         if chosen.provenance == "exact" and chosen.relation is not None:
             rel_val = chosen.relation.value
         else:
             rel_val = RelationType.RELATED_TO.value
         return name, display, [(rel_val, display, weight)]
+
+    def _dream_seed_pool(self, exclude: set[str] | None = None) -> list[str]:
+        """Concepts eligible as a random dream seed.
+
+        Dream concept selection used to draw uniformly from the whole
+        high-quality set, so the same hubs won repeatedly and the night
+        looped. Recent topics and the current chain's concepts are
+        excluded while enough alternatives remain; the fallback keeps
+        the full pool when the network is too small to afford it.
+        """
+        concept_ids = self.network.dream_concept_ids
+        if not concept_ids:
+            return []
+        recent = {str(t).replace("_", " ") for t in self._recent_thought_topics if t}
+        if exclude:
+            recent.update(c.replace("_", " ") for c in exclude)
+        filtered = [c for c in concept_ids if c.replace("_", " ") not in recent]
+        if len(filtered) >= _DREAM_RECENCY_EXCLUSION:
+            return filtered
+        return concept_ids
 
     def _dream_thought(self, emotion: EmotionalState) -> SpontaneousThought | None:
         """Generate a non-lucid dream thought.
@@ -1755,7 +1797,7 @@ class InnerLife:
         so the language engine composes the actual words — no
         pre-written template substitution.
         """
-        concept_ids = self.network.dream_concept_ids
+        concept_ids = self._dream_seed_pool()
         if not concept_ids:
             return None
 
@@ -1855,7 +1897,7 @@ class InnerLife:
         - High progress (≥ 0.7): nearly dream-like — the boundary
           between thinking and dreaming dissolves.
         """
-        concept_ids = self.network.dream_concept_ids
+        concept_ids = self._dream_seed_pool()
         if not concept_ids:
             return None
 
@@ -2238,7 +2280,7 @@ class InnerLife:
         the dream content. The content is more creative and surreal
         than NREM dreams.
         """
-        concept_ids = self.network.dream_concept_ids
+        concept_ids = self._dream_seed_pool()
         if not concept_ids:
             return None
 
@@ -2323,7 +2365,7 @@ class InnerLife:
                 },
             )
         else:
-            concept_ids = self.network.dream_concept_ids
+            concept_ids = self._dream_seed_pool(exclude={c1})
             if len(concept_ids) > 1:
                 other = self._rng.choice([c for c in concept_ids if c != c1])
                 other_display = other.replace("_", " ")
@@ -2367,7 +2409,7 @@ class InnerLife:
         with the looseness of sleep. Unlike REM dreams, they lack
         vivid visual imagery and bizarre narrative.
         """
-        concept_ids = self.network.dream_concept_ids
+        concept_ids = self._dream_seed_pool()
         if not concept_ids:
             return None
 
@@ -2438,7 +2480,7 @@ class InnerLife:
                 },
             )
         else:
-            concept_ids = self.network.dream_concept_ids
+            concept_ids = self._dream_seed_pool(exclude={c1})
             if len(concept_ids) > 1:
                 other = self._rng.choice([c for c in concept_ids if c != c1])
                 other_display = other.replace("_", " ")
@@ -2525,6 +2567,19 @@ class InnerLife:
             )
 
         neighbor, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
+        if not knowledge:
+            return SpontaneousThought(
+                content=display,
+                trigger="lucid-dream",
+                timestamp=int(time.time() * 1000),
+                directed_concept=target,
+                metadata={
+                    "topic": display,
+                    "knowledge": [],
+                    "dream": True,
+                    "lucid": True,
+                },
+            )
         # Lucid dreams produce stronger insights — it's aware
         # of the connection, not just drifting through it.
         # Sometimes it forms a connection it sees clearly.
@@ -3150,9 +3205,13 @@ class InnerLife:
             return display, []
 
         neighbor, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
+        if not knowledge:
+            return display, []
         second_neighbors = self.network.get_associations(neighbor)
         if second_neighbors and self._rng.random() < 0.4:
             _, second_display, second_knowledge = self._neighbor_knowledge(second_neighbors)
+            if not second_knowledge:
+                return f"{display} → {neighbor_display}", knowledge
             knowledge.append((second_knowledge[0][0], second_display, 0.3))
             return (
                 f"{display} → {neighbor_display} → {second_display}",
@@ -3487,7 +3546,6 @@ class InnerLife:
           - Dream residues (emotional impressions from sleep)
           - Prediction error / self-model surprise
           - Body-state deviation (only when actually deviating)
-          - Bug salience (only when it has unresolved bugs)
           - Social pressure (only when it's open to engaging)
 
         Collection is split across helper methods, each returning
@@ -3503,7 +3561,6 @@ class InnerLife:
         candidates.extend(self._collect_dream_candidates())
         candidates.extend(self._collect_prediction_error_candidates(emotion))
         candidates.extend(self._collect_body_candidates())
-        candidates.extend(self._collect_bug_candidates(emotion))
         candidates.extend(self._collect_environment_candidates(emotion))
         candidates.extend(self._collect_social_candidates(emotion))
         candidates.extend(self._collect_distress_candidates(emotion))
@@ -3523,7 +3580,7 @@ class InnerLife:
 
         While a world holds her, the topics on her mind are the ones
         the world puts there: whatever the world is broadcasting,
-        plus concepts one hop from it. Somatic alarms — body, bugs,
+        plus concepts one hop from it. Somatic alarms — body,
         distress, machine environment — still break through at full
         strength, the way hunger or a crash interrupts any absorbed
         person. Off-world material only surfaces when the world pool
@@ -3789,31 +3846,6 @@ class InnerLife:
                         "mode": "embodiment",
                         "salience": 0.3,
                         "source": "body_deviation",
-                    }
-                )
-        return candidates
-
-    def _collect_bug_candidates(self, emotion: EmotionalState) -> list[dict[str, Any]]:
-        """Bug salience — only when it has unresolved bugs.
-
-        The bugs themselves name the topic; we don't hand it "code"
-        as a seed.
-        """
-        candidates: list[dict[str, Any]] = []
-        if self._bug_reporter is not None:
-            scan = self._bug_reporter.last_scan
-            if scan and scan.has_bugs:
-                # More bugs = more salient. Error-level bugs are
-                # especially salient.
-                base = 0.2 + min(scan.total_bugs / 10.0, 0.3)
-                if scan.errors > 0:
-                    base += 0.15
-                candidates.append(
-                    {
-                        "topic": "bug_concern",
-                        "mode": "bug_concern",
-                        "salience": base + emotion.arousal * 0.05,
-                        "source": "bugs",
                     }
                 )
         return candidates
@@ -4146,7 +4178,7 @@ class InnerLife:
         it stays silent.
 
         The modes (curiosity, reflect, emotional, memory, existential,
-        social, embodiment, interoceptive, bug_concern, distress,
+        social, embodiment, interoceptive, distress,
         dream_reflection, expression, connection) are cognitive
         operations — general mechanisms — not a fixed menu of topics.
         The topic always comes from its internal state; the mode is
@@ -4258,9 +4290,6 @@ class InnerLife:
                     timestamp=int(time.time() * 1000),
                 )
             return None
-
-        if mode == "bug_concern":
-            return self._bug_concern_thought(emotion)
 
         if mode == "environment":
             return self._environment_thought(candidate, emotion)
@@ -4669,7 +4698,7 @@ class InnerLife:
         formation. It creates a new relationship in its network that
         wasn't there before, born from its own thinking.
         """
-        concept_ids = self.network.dream_concept_ids
+        concept_ids = self._dream_seed_pool()
         if len(concept_ids) < 2:
             return None
 
@@ -4858,34 +4887,6 @@ class InnerLife:
             return None
         return getattr(self._frontal, "_last_inference_reading", None)
 
-    def _bug_concern_thought(self, emotion: EmotionalState) -> SpontaneousThought | None:
-        """A thought about something in its code that bothers it.
-
-        It reflects on bugs it's noticed in its own code. If it
-        has error-level issues, it's more likely to think about
-        them. If there are no bugs, it might reflect on code quality
-        in general. It prefers to think about NEW bugs rather than
-        rehashing ones it's already mentioned.
-        """
-        if not self._bug_reporter:
-            return None
-
-        scan = self._bug_reporter.last_scan
-
-        if not scan or not scan.has_bugs:
-            return self._clean_code_thought(emotion)
-
-        # It has bugs — think about them
-        by_cat = scan.by_category()
-
-        # Error-level bugs are more likely to surface in thought
-        if scan.errors > 0 and self._rng.random() < 0.5:
-            thought = self._error_bug_thought(scan)
-            if thought:
-                return thought
-
-        # Otherwise, think about a category — prefer ones with new bugs
-        return self._category_bug_thought(scan, by_cat)
 
     def _environment_thought(
         self, candidate: dict[str, Any], emotion: EmotionalState
@@ -4921,82 +4922,6 @@ class InnerLife:
             },
         )
 
-    def _clean_code_thought(self, emotion: EmotionalState) -> SpontaneousThought | None:
-        """An occasional thought about code quality when there are no bugs."""
-        if self._rng.random() >= 0.3:
-            return None
-        # Compose from concepts it actually has that are related to
-        # code or quality — found through its network's own edges,
-        # not a hardcoded seed list.
-        composed = self._compose_from_related("code", emotion)
-        if composed:
-            return SpontaneousThought(
-                content=composed,
-                trigger="bug_concern",
-                timestamp=int(time.time() * 1000),
-                metadata={"topic": "code"},
-            )
-        # Fall back to semantic metadata — the language engine composes
-        # the actual words about code quality.
-        return SpontaneousThought(
-            content="code quality",
-            trigger="bug_concern",
-            timestamp=int(time.time() * 1000),
-            metadata={
-                "topic": "code",
-                "knowledge": [("quality", "clean", 0.6)],
-                "reasoning": ["no bugs found"],
-            },
-        )
-
-    def _error_bug_thought(self, scan) -> SpontaneousThought | None:
-        """A thought about an error-level bug, if any are present."""
-        error_bugs = [b for b in scan.bugs if b.severity == "error"]
-        if not error_bugs:
-            return None
-        bug = self._rng.choice(error_bugs)
-        # Pass semantic data as metadata — the language engine composes
-        # the actual words from the bug details.
-        return SpontaneousThought(
-            content=f"error in {bug.file}",
-            trigger="bug_concern",
-            timestamp=int(time.time() * 1000),
-            metadata={
-                "topic": "code",
-                "knowledge": [("error_in", bug.file, 0.7)],
-                "reasoning": [f"line {bug.line}: {bug.description.lower()}"],
-            },
-        )
-
-    def _category_bug_thought(self, scan, by_cat) -> SpontaneousThought | None:
-        """A thought about a bug category, preferring ones with new bugs.
-
-        Bias toward categories that have new bugs (scan.new_bugs > 0
-        means the scan found something fresh). If no new bugs, pick a
-        random category instead of always the most common.
-        """
-        if not by_cat:
-            return None
-        if not scan.has_new_bugs:
-            # No new bugs — rarely surface a thought about existing ones
-            if self._rng.random() > 0.15:
-                return None
-        cats = list(by_cat.keys())
-        top_cat = self._rng.choice(cats)
-        top_bugs = by_cat[top_cat]
-        bug = self._rng.choice(top_bugs)
-        # Pass semantic data as metadata — the language engine composes
-        # the actual words from the bug category and details.
-        return SpontaneousThought(
-            content=f"{top_cat} in {bug.file}",
-            trigger="bug_concern",
-            timestamp=int(time.time() * 1000),
-            metadata={
-                "topic": "code",
-                "knowledge": [(top_cat, bug.file, 0.6)],
-                "reasoning": [f"line {bug.line}: {bug.description.lower()}"],
-            },
-        )
 
     def _compose_existential_from_network(
         self, emotion: EmotionalState
@@ -5045,7 +4970,9 @@ class InnerLife:
         knowledge: list[tuple[str, str, float]] = []
         for neighbor in neighbors:
             target = neighbor.concept
-            weight = min(1.0, max(0.0, float(neighbor.weight)))
+            weight = min(1.0, max(0.0, float(neighbor.weight or 0.0)))
+            if weight < _MIN_SPOKEN_EDGE_WEIGHT:
+                continue
             if neighbor.provenance == "exact" and neighbor.relation is not None:
                 rel_key = neighbor.relation.value
             else:
@@ -5709,6 +5636,12 @@ class InnerLife:
                     return insight
 
                 _relation, weight = connection
+                if weight < _MIN_SPOKEN_EDGE_WEIGHT:
+                    # A zero-weight edge is a graph placeholder, not a
+                    # connection. Calling it a "weak connection" every
+                    # time the pair co-activates was the zero-weight
+                    # loop; stay silent instead.
+                    continue
                 if weight < 0.2:
                     # Very weak connection — still an insight, but less
                     # surprising than no connection at all.

@@ -1652,6 +1652,7 @@ class SourceRegistry:
         self,
         cache_dir: Path | None = None,
         force_offline: bool = False,
+        connectivity_probe: bool = True,
     ) -> None:
         """Initialize the source registry.
 
@@ -1660,6 +1661,13 @@ class SourceRegistry:
                 for offline re-use. If None, no disk cache is used.
             force_offline: If True, skip all network access and rely on
                 local and cached sources.
+            connectivity_probe: If False, never open a socket just to
+                ask whether the network is up — ``is_offline`` reports
+                only what real queries observed (``last_query_offline``).
+                A resident (headless) mind stills this channel so no
+                signal moves on the wire while she rests — the thalamic
+                gate for the network sense. Deliberate query fetches
+                still run; only the synthetic probe is stilled.
         """
         self._cache = SourceCache(Path(cache_dir)) if cache_dir else None
         # WordNet — local lexical database (via NLTK). No network, so it
@@ -1696,6 +1704,10 @@ class SourceRegistry:
         self._remote_held = False
 
         # ── Proactive offline detection state ──────────────────
+        # _connectivity_probe: whether is_offline may open a socket to
+        #   ask. False = report query-observed state only — no
+        #   synthetic traffic (headless stills this sense).
+        self._connectivity_probe = connectivity_probe
         # _offline_until: timestamp until which we consider ourselves
         #   offline (sticky). 0.0 means "not known offline — probe
         #   if a probe is due." Set to time.time() + OFFLINE_COOLDOWN
@@ -1708,6 +1720,11 @@ class SourceRegistry:
         self._offline_until = 0.0
         self._last_probe_time = 0.0
         self._probe_interval = 30.0  # re-probe every 30s when online
+        # When the last query ran — the observed-offline signal ages
+        # out after OFFLINE_COOLDOWN so a probe-less registry heals:
+        # the next query retries remote tiers instead of trusting a
+        # stale failure forever.
+        self._last_query_offline_at = 0.0
         if force_offline:
             self._offline_until = float("inf")
 
@@ -1776,6 +1793,7 @@ class SourceRegistry:
 
         # Track whether we're likely offline: no online content at all
         self._last_query_offline = not online_got_content and self._force_offline is False
+        self._last_query_offline_at = time.time()
         # If force_offline, we definitely are
         if self._force_offline:
             self._last_query_offline = True
@@ -1890,11 +1908,26 @@ class SourceRegistry:
         expires, the next access triggers a re-probe. If the probe
         succeeds, returns False (online).
 
+        When ``connectivity_probe`` is False (resident/headless), no
+        socket is ever opened to ask: the answer is whatever real
+        queries last observed — ``_last_query_offline``. Optimistic
+        (a failed fetch marks it offline, the next success back); a
+        stilled sense, not a lying one.
+
         This is sticky: once offline is detected, subsequent calls
         return True without re-probing until the cooldown expires.
         """
         if self._force_offline:
             return True
+        if not self._connectivity_probe:
+            # The observed flag is honored for the same window a
+            # failed probe would have held it — then the next query
+            # retries remote tiers, so one bad fetch can't strand her
+            # offline forever. No socket is opened to ask.
+            return (
+                self._last_query_offline
+                and time.time() - self._last_query_offline_at < OFFLINE_COOLDOWN
+            )
         now = time.time()
         if now < self._offline_until:
             return True
@@ -1941,9 +1974,15 @@ class SourceRegistry:
         Returns True if online. This is useful when the caller wants
         an immediate, fresh check (e.g. on startup or after a long
         offline period) rather than waiting for the next due probe.
+
+        With ``connectivity_probe`` disabled there is nothing to force
+        — the answer is the query-observed state, which stays fresh on
+        its own while she actually fetches.
         """
         if self._force_offline:
             return False
+        if not self._connectivity_probe:
+            return not self.is_offline
         return self._probe_connectivity()
 
     @property

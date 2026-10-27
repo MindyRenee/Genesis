@@ -96,41 +96,11 @@ class VolitionConfig:
     # Normalization denominator for the speech queue size.
     speech_queue_size_normalization: float = 5.0
 
-    # Seconds after which an unaudited codebase counts as fully
-    # "overdue" for the bug_scan urge's recency stimulus — the faint
-    # hygiene floor beneath the felt drive. The audit appetite
-    # is discharged by scanning itself; open-bug count does not drive
-    # it. Recency never fires a scan on its own (its weight sits below
-    # decay) — it only stretches how long felt wrongness lingers.
-    bug_scan_recency_seconds: float = 14400.0
-
     # Default set of urges. Order matters: earlier registrations are not
     # treated specially by ``Volition``; this list just defines
     # the built-in urges.
     urges: tuple[UrgeConfig, ...] = field(
         default_factory=lambda: (
-            UrgeConfig(
-                name="bug_scan",
-                threshold=0.65,
-                # No unconditional growth: the audit urge forms only
-                # while she feels something wrong — fresh swallowed
-                # failures, a hot error signal, sustained caution —
-                # and fades when she feels clean. scan_recency sits
-                # below decay: it can never push the urge up on its
-                # own, it only slows how fast felt unease fades when
-                # she is overdue — the longer since she checked
-                # herself, the longer the wrongness lingers.
-                growth=0.0,
-                decay=0.0005,
-                cooldown=180.0,
-                # Open-bug count must NOT drive re-scanning — a scan
-                # discovers issues but does not resolve them, so a
-                # count-driven urge can never discharge and re-fires
-                # on every cooldown. The open-work state drives the
-                # improve urge instead, which is the behavior that
-                # actually discharges it (autonomous mechanical fixes).
-                stimuli={"self_discomfort": 0.02, "scan_recency": 0.0004},
-            ),
             UrgeConfig(
                 name="improve",
                 threshold=0.70,
@@ -138,7 +108,6 @@ class VolitionConfig:
                 decay=0.0003,
                 cooldown=600.0,
                 stimuli={
-                    "bug_count": 0.02,
                     "pending_proposals": 0.04,
                     "idle_seconds": 0.01,
                 },

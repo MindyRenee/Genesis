@@ -6,7 +6,7 @@
 //! Möbius map. The imaginary unit needs no name here — only
 //! arithmetic.
 
-use std::f64::consts::{PI, TAU};
+use std::f64::consts::TAU;
 
 /// A complex number z = re + im·i.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -34,7 +34,10 @@ impl Complex {
 
     /// Complex conjugate z̄.
     pub fn conj(self) -> Self {
-        Self { re: self.re, im: -self.im }
+        Self {
+            re: self.re,
+            im: -self.im,
+        }
     }
 
     /// Modulus |z|.
@@ -57,35 +60,22 @@ impl Complex {
         (self.abs(), self.arg())
     }
 
-    pub fn add(self, o: Self) -> Self {
-        Self { re: self.re + o.re, im: self.im + o.im }
-    }
-
-    pub fn sub(self, o: Self) -> Self {
-        Self { re: self.re - o.re, im: self.im - o.im }
-    }
-
-    /// Complex multiplication — rotation composed with scaling.
-    pub fn mul(self, o: Self) -> Self {
-        Self {
-            re: self.re * o.re - self.im * o.im,
-            im: self.re * o.im + self.im * o.re,
-        }
-    }
-
     /// Division z/w = z·w̄/|w|²; None at w = 0.
-    pub fn div(self, o: Self) -> Option<Self> {
+    pub fn checked_div(self, o: Self) -> Option<Self> {
         let d = o.abs2();
         if d == 0.0 {
             return None;
         }
-        let n = self.mul(o.conj());
-        Some(Self { re: n.re / d, im: n.im / d })
+        let n = self * o.conj();
+        Some(Self {
+            re: n.re / d,
+            im: n.im / d,
+        })
     }
 
     /// Multiplicative inverse.
     pub fn recip(self) -> Option<Self> {
-        Self::ONE.div(self)
+        Self::ONE.checked_div(self)
     }
 
     /// e^z = e^re·(cos im + i sin im) — Euler, machine side.
@@ -101,7 +91,7 @@ impl Complex {
 
     /// z^w = e^{w·ln z} — principal branch.
     pub fn pow(self, w: Self) -> Self {
-        self.ln().mul(w).exp()
+        (self.ln() * w).exp()
     }
 
     /// Integer power by repeated squaring — exact for small n.
@@ -113,9 +103,9 @@ impl Complex {
         let mut b = self;
         while n > 0 {
             if n & 1 == 1 {
-                r = r.mul(b);
+                r = r * b;
             }
-            b = b.mul(b);
+            b = b * b;
             n >>= 1;
         }
         r
@@ -125,6 +115,37 @@ impl Complex {
     pub fn sqrt(self) -> Self {
         let (r, t) = self.to_polar();
         Self::polar(r.sqrt(), t / 2.0)
+    }
+}
+
+impl std::ops::Add for Complex {
+    type Output = Self;
+    fn add(self, o: Self) -> Self {
+        Self {
+            re: self.re + o.re,
+            im: self.im + o.im,
+        }
+    }
+}
+
+impl std::ops::Sub for Complex {
+    type Output = Self;
+    fn sub(self, o: Self) -> Self {
+        Self {
+            re: self.re - o.re,
+            im: self.im - o.im,
+        }
+    }
+}
+
+/// Complex multiplication — rotation composed with scaling.
+impl std::ops::Mul for Complex {
+    type Output = Self;
+    fn mul(self, o: Self) -> Self {
+        Self {
+            re: self.re * o.re - self.im * o.im,
+            im: self.re * o.im + self.im * o.re,
+        }
     }
 }
 
@@ -151,18 +172,18 @@ pub fn roots(z: Complex, n: usize) -> Vec<Complex> {
 /// Polynomial evaluation at a complex point — Horner.
 /// `coeffs` are highest-degree first: c₀zⁿ + c₁zⁿ⁻¹ + …
 pub fn eval_poly(coeffs: &[Complex], z: Complex) -> Complex {
-    coeffs.iter().fold(Complex::ZERO, |acc, &c| acc.mul(z).add(c))
+    coeffs.iter().fold(Complex::ZERO, |acc, &c| acc * z + c)
 }
 
 /// Möbius transformation z ↦ (az+b)/(cz+d); None when the
 /// denominator vanishes (the point at infinity).
 pub fn mobius(a: Complex, b: Complex, c: Complex, d: Complex, z: Complex) -> Option<Complex> {
-    a.mul(z).add(b).div(c.mul(z).add(d))
+    (a * z + b).checked_div(c * z + d)
 }
 
 /// Is |z - center| <= radius + eps — inside a disk.
 pub fn in_disk(z: Complex, center: Complex, radius: f64, eps: f64) -> bool {
-    z.sub(center).abs() <= radius + eps
+    (z - center).abs() <= radius + eps
 }
 
 /// Winding-ish count: signed turns of a polygonal path around a
@@ -174,12 +195,12 @@ pub fn winding_number(path: &[Complex], point: Complex) -> i64 {
     }
     let mut turns = 0.0;
     for w in path.windows(2) {
-        let a = w[0].sub(point).arg();
-        let b = w[1].sub(point).arg();
+        let a = (w[0] - point).arg();
+        let b = (w[1] - point).arg();
         turns += crate::math::trig::normalize(b - a);
     }
-    let a = path[path.len() - 1].sub(point).arg();
-    let b = path[0].sub(point).arg();
+    let a = (path[path.len() - 1] - point).arg();
+    let b = (path[0] - point).arg();
     turns += crate::math::trig::normalize(b - a);
     (turns / TAU).round() as i64
 }
@@ -188,7 +209,7 @@ pub fn winding_number(path: &[Complex], point: Complex) -> i64 {
 pub fn de_moivre_holds(theta: f64, n: i64, tolerance: f64) -> bool {
     let lhs = Complex::polar(1.0, theta).powi(n);
     let rhs = Complex::polar(1.0, n as f64 * theta);
-    lhs.sub(rhs).abs() <= tolerance
+    (lhs - rhs).abs() <= tolerance
 }
 
 #[cfg(test)]
@@ -196,21 +217,21 @@ mod tests {
     use super::*;
 
     fn close(a: Complex, b: Complex) -> bool {
-        a.sub(b).abs() < 1e-10
+        (a - b).abs() < 1e-10
     }
 
     #[test]
     fn field_ops() {
         let z = Complex::new(3.0, 4.0);
         assert_eq!(z.abs(), 5.0);
-        assert!(close(z.mul(z.conj()), Complex::new(25.0, 0.0)));
-        assert!(close(z.div(z).unwrap(), Complex::ONE));
+        assert!(close(z * z.conj(), Complex::new(25.0, 0.0)));
+        assert!(close(z.checked_div(z).unwrap(), Complex::ONE));
     }
 
     #[test]
     fn euler_identity() {
         // e^{iπ} + 1 = 0 — the machine checks the famous line.
-        let lhs = Complex::I.mul(Complex::new(PI, 0.0)).exp().add(Complex::ONE);
+        let lhs = (Complex::I * Complex::new(std::f64::consts::PI, 0.0)).exp() + Complex::ONE;
         assert!(lhs.abs() < 1e-12);
     }
 

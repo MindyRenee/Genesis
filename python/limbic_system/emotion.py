@@ -172,9 +172,7 @@ class CauseCategory(Enum):
     INTEROCEPTION_STRESS = "interoception_stress"
     INTEROCEPTION_ENVIRONMENT = "interoception_environment"
     INTEROCEPTION_REST = "interoception_rest"
-    COGNITIVE_LOAD_BUGS = "cognitive_load_bugs"
     COGNITIVE_LOAD_PROPOSALS = "cognitive_load_proposals"
-    COGNITIVE_LOAD_BUGS_AND_PROPOSALS = "cognitive_load_bugs_and_proposals"
     INTEROCEPTION_REGULATION = "interoception_regulation"
     # Signal-resolved causes (paired with the contextual categories)
     FEAR_ACUTE = "fear_acute"  # phasic catecholamine surge — acute threat

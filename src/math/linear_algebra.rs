@@ -109,8 +109,8 @@ impl Matrix {
         let mut sign = 1.0;
         let mut row = 0;
         for col in 0..self.cols {
-            let Some(pivot) = (row..self.rows)
-                .max_by(|&a, &b| m.at(a, col).abs().partial_cmp(&m.at(b, col).abs()).unwrap())
+            let Some(pivot) =
+                (row..self.rows).max_by(|&a, &b| m.at(a, col).abs().total_cmp(&m.at(b, col).abs()))
             else {
                 break;
             };
@@ -118,10 +118,9 @@ impl Matrix {
                 continue;
             }
             if pivot != row {
-                m.data.swap(
-                    pivot * self.cols..pivot * self.cols + self.cols,
-                    row * self.cols..row * self.cols + self.cols,
-                );
+                for c in 0..self.cols {
+                    m.data.swap(pivot * self.cols + c, row * self.cols + c);
+                }
                 sign = -sign;
             }
             let pv = m.at(row, col);
@@ -178,12 +177,17 @@ impl Matrix {
             aug[r * (n + 1) + n] = b[r];
         }
         for col in 0..n {
-            let pivot = (col..n)
-                .max_by(|&a, &c| aug[a * (n + 1) + col].abs().total_cmp(&aug[c * (n + 1) + col].abs()))?;
+            let pivot = (col..n).max_by(|&a, &c| {
+                aug[a * (n + 1) + col]
+                    .abs()
+                    .total_cmp(&aug[c * (n + 1) + col].abs())
+            })?;
             if aug[pivot * (n + 1) + col].abs() < 1e-12 {
                 return None;
             }
-            aug.swap(pivot * (n + 1)..pivot * (n + 1) + n + 1, col * (n + 1)..col * (n + 1) + n + 1);
+            for c in 0..=n {
+                aug.swap(pivot * (n + 1) + c, col * (n + 1) + c);
+            }
             let pv = aug[col * (n + 1) + col];
             for r in (col + 1)..n {
                 let f = aug[r * (n + 1) + col] / pv;

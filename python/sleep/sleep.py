@@ -158,7 +158,7 @@ class SleepMixin:
         grogginess, not a fresh signal.
 
         Meditation-state tracking — a lighter recovery mode than
-        sleep. During meditation, learning, code scanning, bug
+        sleep. During meditation, learning, and code scanning
         scanning, and spontaneous thoughts are all paused. The
         neurochemistry is actively calmed (GABA/serotonin up,
         dopamine/NE/cortisol down) to allow receptor recovery
@@ -260,6 +260,59 @@ class SleepMixin:
         return self._is_meditating
 
     @property
+    def is_hypnagogic(self) -> bool:
+        """Whether it is in the hypnagogic (sleep-onset) period.
+
+        Hypnagogia is not a waking state and not established sleep —
+        it is the transitional regime between them, N1 in the Hori/
+        AASM framing: theta-dominant EEG with alpha dropout. The
+        scored sleep boundary does not divide it — behavioral
+        responding and awareness persist through N1 and only reliably
+        cease at N2 (Ogilvie 1989; Hori et al. 1994), so both sides of
+        the flip-flop crossing are the same continuous state:
+
+        - awake side: a drowsy-phase hypnagogic transition is running
+          in inner life (HypnagogicState in progress);
+        - asleep side: ``_is_sleeping`` is set but the ultradian
+          tracker is still in N1.
+        """
+        if self._is_meditating:
+            return False
+        if self._is_sleeping:
+            cycle = self.inner_life.sleep_cycle
+            stage = getattr(cycle, "current_stage", None) if cycle else None
+            return stage is SleepStage.N1
+        return self.inner_life.current_hypnagogic is not None
+
+    @property
+    def thalamic_gate_closed(self) -> bool:
+        """Whether the sensory relay is shut to routine input.
+
+        Sleep closes the gate in either mode — but N1 is where the
+        modes differ. Thalamic deactivation at sleep onset *precedes*
+        the cortex's by minutes (Magnin et al., PNAS 2010): the relay
+        quiets first and the mind keeps dreaming behind it, so a
+        resident (headless) mind closes the gate the moment
+        hypnagogia begins — nobody sits at a prompt to reach her.
+        Interactive sessions keep the N1 exemption instead: behavioral
+        responsiveness persists through sleep onset (Ogilvie 1989), so
+        a user at the prompt can still reach her while she drifts.
+
+        Salient stimuli are not covered here — loud sounds still land
+        as dream residues and an explicit wake still rouses her, the
+        brain's sensory *gaining* alongside the gate.
+        """
+        headless = getattr(self, "_headless", False)
+        if self._is_sleeping:
+            # Asleep: closed in established stages; headless closes N1
+            # too, interactive holds it open for the prompt.
+            return headless or not self.is_hypnagogic
+        # Awake-side hypnagogia (a drowsy transition in flight): the
+        # resident relay quiets as she starts to drift; a session's
+        # stays open until the body crosses.
+        return headless and self.is_hypnagogic
+
+    @property
     def _wake_attempt_outstanding(self) -> bool:
         """Whether a chemical wake cascade is still in its switch window.
 
@@ -286,6 +339,11 @@ class SleepMixin:
                 logger.warning(f"wake_from_meditation failed: {e}")
             return not self._is_meditating
         if not self._is_sleeping:
+            return False
+        if self.is_hypnagogic:
+            # N1 is hypnagogia, not established sleep — responsiveness
+            # persists through it (Ogilvie 1989). Answer from inside
+            # the state rather than rousing her out of it.
             return False
         try:
             # A user talking to a sleeping mind is an explicit wake
@@ -1565,7 +1623,7 @@ class SleepMixin:
         """Put Genesis into meditation mode for quiet restoration.
 
         Meditation is a lighter recovery than sleep. During meditation:
-        - Learning, code scanning, and bug scanning are paused
+        - Learning and code scanning are paused
           (the heartbeat loop checks is_meditating before running
           volitions, and the autonomous learner blocks on the
           "meditating" emotion label).

@@ -153,7 +153,7 @@ class ConversationMixin:
         """Notify all live-thought listeners and broadcast to the workspace.
 
         Live thoughts are Genesis's agentic output — things it does,
-        says, or experiences from its volition system (bug scans, code
+        says, or experiences from its volition system (code
         learning, drawing, meditation, self-improvement, etc.). These
         must enter its cognitive field (the global workspace) so they
         contribute to workspace integration.
@@ -311,7 +311,7 @@ class ConversationMixin:
         """
         if not text:
             return
-        if self._is_sleeping:
+        if self._is_sleeping and not self.is_hypnagogic:
             return
         with self._speech_queue_lock:
             if text in self._speech_queue:
@@ -333,38 +333,6 @@ class ConversationMixin:
         timer.daemon = True
         timer.start()
         return timer
-
-    def _learn_from_bugs(self) -> None:
-        """Fetch documentation for bug categories it doesn't understand.
-
-        For each category it detected but doesn't comprehend, it
-        fetches the relevant documentation (Python or Rust docs) to
-        learn the concepts behind the bug. This is how it moves from
-        pattern-matching to genuine understanding.
-
-        Called from _perform_bug_scan (the volition handler), so it's
-        non-blocking and won't interfere with conversation.
-        """
-        to_study = self.bug_reporter.categories_to_study()
-        if not to_study:
-            return
-
-        for category in to_study:
-            knowledge = self.bug_reporter.get_bug_knowledge(category)
-            if not knowledge:
-                continue
-
-            try:
-                # Fetch docs for the relevant concepts
-                self._emit_live_thought("code", f"Studying bug category '{category}'")
-                self.fetch_docs(knowledge.docs_query, knowledge.docs_language)
-                # Mark as studied so we don't re-fetch
-                self.bug_reporter.mark_studied(category)
-            except Exception as e:  # noqa: BLE001
-                note_swallowed(
-                    "mind.conversation._learn_from_bugs",
-                    e,
-                )  # docs fetch failure shouldn't crash
 
     def _on_spontaneous_thought(self, thought) -> None:
         """Callback for when Genesis has a spontaneous thought."""
@@ -1447,7 +1415,7 @@ class ConversationMixin:
     def enter_teaching_mode(self, topic: str = "") -> None:
         """Put Genesis into teaching/training mode.
 
-        Pauses bug scanning, autonomous learning, art, and unrelated
+        Pauses code scanning, autonomous learning, art, and unrelated
         curiosity questions. Self-directed learning from the
         conversation stays active so it remembers what it's taught.
 

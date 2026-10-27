@@ -12,12 +12,14 @@
 //! numbers; these modules return numbers.
 
 pub mod abstract_algebra;
+pub mod axioms;
 pub mod combinatorics;
 pub mod complex_analysis;
 pub mod discrete;
 pub mod geometry;
 pub mod linear_algebra;
 pub mod number_theory;
+pub mod proof;
 pub mod real_analysis;
 pub mod topology;
 pub mod trig;

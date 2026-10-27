@@ -114,7 +114,7 @@ REGIONS: tuple[Region, ...] = (
     Region(
         name="infrastructure",
         package="infrastructure",
-        modules=("data_dir", "store::mmap_state"),
+        modules=("data_dir", "store::mmap_state", "math"),
         projections=(),
         fiber="body",
     ),

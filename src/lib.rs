@@ -38,6 +38,7 @@ pub mod cognition;
 pub mod daemon;
 pub mod data_dir;
 pub mod field;
+pub mod math;
 pub mod state;
 pub mod store;
 

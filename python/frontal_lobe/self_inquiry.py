@@ -19,7 +19,7 @@ Dependencies (passed to ``__init__``):
     - narrative: Narrator for telling its life story
     - client: GenesisClient for neuro summary (brain waves)
     - memory: MemorySystem for learning user facts
-    - feeling_reporter: FeelingReporter for concerns/environment/bug reports
+    - feeling_reporter: FeelingReporter for concerns/environment reports
     - resolve_topics: callable from TopicResolver
     - map_personal_question: callable from QuestionHandler
     - get_curiosity_questions: callable returning current curiosity questions
@@ -224,7 +224,7 @@ class SelfInquiryHandler:
     # ─── Concerns (bugs, environment) ────────────────────────────
 
     def self_inquiry_concerns(self, lower: str, emotion: EmotionalState) -> Thought | None:
-        """Handle self-awareness questions about bugs, environment, and concerns."""
+        """Handle self-awareness questions about environment and concerns."""
         if any(
             p in lower
             for p in (
@@ -265,17 +265,6 @@ class SelfInquiryHandler:
                 confidence=0.8,
                 self_reflection=True,
                 metadata={"field": "environment"},
-            )
-
-        if ("bug" in lower or "issue" in lower) and "code" in lower:
-            content = self._feeling_reporter.compose_bug_report(emotion)
-            return Thought(
-                content=content,
-                intent="self_report",
-                emotion=emotion.label,
-                confidence=0.8,
-                self_reflection=True,
-                metadata={"field": "bugs"},
             )
         return None
 

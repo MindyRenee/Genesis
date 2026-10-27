@@ -124,6 +124,7 @@ def test_sigterm_interrupts_blocking_input():
 
 def test_failed_cli_lock_closes_descriptor(tmp_path):
     with (
+        patch.dict(os.environ, {"GENESIS_CLI_LOCK_FD": ""}),
         patch.object(genesis_cli.os, "open", return_value=123),
         patch.object(genesis_cli.fcntl, "flock", side_effect=BlockingIOError),
         patch.object(genesis_cli.os, "close") as close,
@@ -132,6 +133,52 @@ def test_failed_cli_lock_closes_descriptor(tmp_path):
         assert genesis_cli._acquire_cli_lock(str(tmp_path)) is None
         close.assert_called_once_with(123)
         assert genesis_cli._CLI_LOCK_FD is None
+
+
+def test_cli_lock_adopts_inherited_descriptor(tmp_path):
+    """The launch script takes the lock and hands down fd 9; the CLI
+    must adopt it instead of trying to lock the file a second time."""
+    import fcntl
+
+    lock_path = tmp_path / "genesis_cli.lock"
+    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    try:
+        with (
+            patch.dict(os.environ, {"GENESIS_CLI_LOCK_FD": str(fd)}),
+            patch.object(genesis_cli, "_CLI_LOCK_FD", None),
+        ):
+            got = genesis_cli._acquire_cli_lock(str(tmp_path))
+            assert got == fd
+            assert genesis_cli._CLI_LOCK_FD == fd
+            # The daemon must not inherit the lock: a surviving body
+            # holding it would block the mind from re-adopting it.
+            assert os.get_inheritable(fd) is False
+    finally:
+        os.close(fd)
+
+
+def test_cli_lock_ignores_foreign_inherited_descriptor(tmp_path):
+    """An inherited fd that is not the lock file is not a lock."""
+    import fcntl
+
+    other = tmp_path / "not-the-lock"
+    fd = os.open(other, os.O_RDWR | os.O_CREAT, 0o644)
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    acquired = None
+    try:
+        with (
+            patch.dict(os.environ, {"GENESIS_CLI_LOCK_FD": str(fd)}),
+            patch.object(genesis_cli, "_CLI_LOCK_FD", None),
+        ):
+            acquired = genesis_cli._acquire_cli_lock(str(tmp_path))
+            assert acquired is not None
+            assert acquired != fd
+    finally:
+        os.close(fd)
+        if acquired is not None:
+            os.close(acquired)
+        genesis_cli._CLI_LOCK_FD = None
 
 
 def test_failed_restore_cannot_be_saved_during_shutdown():
@@ -849,6 +896,11 @@ def test_spore_mirrors_the_self_and_skips_the_runtime(tmp_path):
     (data / "core_state.corrupt.999").write_bytes(b"torn")
     (data / "models").mkdir()
     (data / "models" / "detector.onnx").write_bytes(b"weights")
+    # Her browser's profile is live Chrome process state — the
+    # singleton markers and torn leveldb must never travel.
+    (data / "browser" / "web").mkdir(parents=True)
+    (data / "browser" / "web" / "SingletonCookie").write_text("c")
+    (data / "browser" / "web" / "Cookies").write_bytes(b"jars")
     assert rebirth.write_spore()
     assert (spore / "cognitive_state.json").read_text() == "{}"
     assert (spore / "ltm_store.dat").read_bytes() == b"episodes"
@@ -860,6 +912,7 @@ def test_spore_mirrors_the_self_and_skips_the_runtime(tmp_path):
         ".project_root",
         "core_state.corrupt.999",
         "models",
+        "browser",
     ):
         assert not (spore / name).exists(), name
 

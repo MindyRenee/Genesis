@@ -715,6 +715,7 @@ class AutonomousLearner:
         get_plasticity_profile=None,
         get_brain_waves=None,
         force_offline: bool = False,
+        connectivity_probe: bool = True,
         synapses: SynapticStore | None = None,
         semantic_memory: SemanticMemory | None = None,
     ) -> None:
@@ -723,6 +724,7 @@ class AutonomousLearner:
         self.curiosity = curiosity
         self._data_dir = data_dir
         self._force_offline = force_offline
+        self._connectivity_probe = connectivity_probe
         self._init_callbacks(
             on_neuro_impulse,
             on_store_memory,
@@ -928,6 +930,7 @@ class AutonomousLearner:
         self._sources = SourceRegistry(
             cache_dir=cache_dir,
             force_offline=self._force_offline,
+            connectivity_probe=self._connectivity_probe,
         )
 
     def _init_queues(self) -> None:

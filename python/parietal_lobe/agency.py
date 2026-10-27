@@ -1,7 +1,7 @@
 """Agency — open-ended tool use driven by volition, not fixed scripts.
 
 Every other urge fires a single fixed action: learn fetches a source,
-bug_scan runs the scanner, draw paints. The ``act`` urge is different —
+draw paints. The ``act`` urge is different —
 when it crosses threshold, the ActingLoop forms an *intention* from
 current cognitive state (a curiosity question, an agency topic from
 its train of thought, a place it hasn't looked, a measurement it
@@ -149,7 +149,6 @@ _OBSERVE_FILES = (
     # core_state's inference signals instead. The file is preserved
     # on disk as dyadic_persons.json.retired — history, not state.
     "face_clusters.json",
-    "bug_reports.jsonl",
     "core_state.bin",
 )
 # The body probe — proprioception extends past the data dir to the

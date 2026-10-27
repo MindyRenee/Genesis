@@ -133,8 +133,6 @@ if TYPE_CHECKING:
         EmergentIdentitySource,
     )
 
-    from .bug_reporter import BugReporter
-
 
 def _snapshot[T](src: Callable[[], Iterable[T]] | Iterable[T], attempts: int = 8) -> list[T]:
     """Materialize a collection that other threads may be mutating.
@@ -190,7 +188,6 @@ def save_state(
     growth_ledger: GrowthLedger | None = None,
     plasticity: HebbianPlasticity | None = None,
     developmental_tracker: DevelopmentalTracker | None = None,
-    bug_reporter: BugReporter | None = None,
     sleep_state: dict[str, Any] | None = None,
     memory_records: dict[str, Any] | None = None,
     cognitive_trajectory: CognitiveTrajectoryModel | None = None,
@@ -255,7 +252,6 @@ def save_state(
         growth_ledger=growth_ledger,
         plasticity=plasticity,
         developmental_tracker=developmental_tracker,
-        bug_reporter=bug_reporter,
         sleep_state=sleep_state,
         memory_records=memory_records,
         cognitive_trajectory=cognitive_trajectory,
@@ -418,7 +414,6 @@ def _add_optional_state(
     growth_ledger: GrowthLedger | None = None,
     plasticity: HebbianPlasticity | None = None,
     developmental_tracker: DevelopmentalTracker | None = None,
-    bug_reporter: BugReporter | None = None,
     sleep_state: dict[str, Any] | None = None,
     memory_records: dict[str, Any] | None = None,
     cognitive_trajectory: CognitiveTrajectoryModel | None = None,
@@ -437,7 +432,7 @@ def _add_optional_state(
     memory, attractor, error monitor, emergent identity (+ sources),
     HPA axis, allostatic load, self-directed/autonomous learners,
     self-improvement, growth ledger, plasticity, developmental
-    tracker, bug reporter, cognitive trajectory, dream synthesis,
+    tracker, cognitive trajectory, dream synthesis,
     inner life, executive intentions.
     """
     if predictive_coding is not None:
@@ -482,8 +477,6 @@ def _add_optional_state(
         state["plasticity"] = plasticity.save_state()
     if developmental_tracker is not None:
         state["developmental_tracker"] = developmental_tracker.to_dict()
-    if bug_reporter is not None:
-        state["bug_reporter"] = bug_reporter.to_dict()
     if sleep_state is not None:
         state["sleep_state"] = sleep_state
     if memory_records is not None:

@@ -36,7 +36,7 @@ sibling modules and are wired in ``__init__``:
   explanatory/planning/goal/mission answers
 - ``code_tools`` — code tool dispatch and code-discussion composition
 - ``concept_learner`` — word labeling and activation spreading
-- ``feeling_reporter`` — feeling/concern/environment/bug/empathetic reports
+- ``feeling_reporter`` — feeling/concern/environment/empathetic reports
 - ``memory_store`` — conversation and cognitive event persistence
 - ``question_handler`` — question routing and answering
 - ``response_styler`` — metacognitive tone adjustment
@@ -163,7 +163,6 @@ from temporal_lobe.topic_resolver import TopicResolver
 if TYPE_CHECKING:
     from cerebellum.cerebellum import Cerebellum
     from limbic_system.emotional_regulator import EmotionalRegulator
-    from infrastructure.bug_reporter import BugReporter
     from parietal_lobe.parietal import ParietalLobe
     from temporal_lobe.comprehension import ComprehensionResult
     from temporal_lobe.temporal import TemporalLobe
@@ -404,7 +403,7 @@ class FrontalLobe:
         self._init_cognitive_systems(data_dir)
         # Feeling reporter — created after cognitive systems are
         # initialized since it needs the ThoughtComposer and _rng.
-        # Optional deps (bug_reporter, system_monitor, damasio_self)
+        # Optional deps (system_monitor, damasio_self)
         # are injected after late init via update_dependencies().
         self._feeling_reporter = FeelingReporter(
             network=self.network,
@@ -603,7 +602,6 @@ class FrontalLobe:
         # These give Genesis awareness of its own code quality and
         # machine environment. They're optional (None by default) so
         # the cognition engine works standalone in tests.
-        self.bug_reporter: BugReporter | None = None  # set by Mind after creation
         self.system_monitor: SystemMonitor | None = None  # set by Mind after creation
 
         # Gap-to-learning callback — set by Mind after creation.
@@ -1790,9 +1788,7 @@ class FrontalLobe:
             CauseCategory.INTEROCEPTION_MEMORY.value: _S,
             CauseCategory.INTEROCEPTION_LATENCY.value: _S,
             CauseCategory.INTEROCEPTION_STRESS.value: _S,
-            CauseCategory.COGNITIVE_LOAD_BUGS.value: _S,
             CauseCategory.COGNITIVE_LOAD_PROPOSALS.value: _O,
-            CauseCategory.COGNITIVE_LOAD_BUGS_AND_PROPOSALS.value: _O,
             CauseCategory.INTEROCEPTION_REGULATION.value: _S,
         }
         for cause in CauseCategory:
@@ -8934,18 +8930,6 @@ class FrontalLobe:
                 devs = self.system_monitor.describe_deviations()
                 if devs:
                     parts.append(f"System deviations: {devs[:80]}")
-            except Exception as e:  # noqa: BLE001
-                note_swallowed(
-                    "frontal_lobe.prefrontal._introspect_learning_systems",
-                    e,
-                )
-        # Bug reporter — it knows what bugs it's tracking. This is
-        # part of its self-awareness about its own issues.
-        if self.bug_reporter is not None:
-            try:
-                open_bugs = self.bug_reporter.open_bug_count()
-                if open_bugs:
-                    parts.append(f"Open bugs: {open_bugs}")
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "frontal_lobe.prefrontal._introspect_learning_systems",

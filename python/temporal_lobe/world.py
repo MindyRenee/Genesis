@@ -246,9 +246,11 @@ class OuterWorld:
         neuro_impulse: ``(chem_id, amount)`` callback into the
             daemon's neurochemistry (typically
             ``Mind._learner_neuro_impulse``). Optional.
-        is_sleeping: Predicate — True while it sleeps. Inbound
-            perception is gated during sleep (the thalamic gate):
-            overheard speech and percepts are not recorded then.
+        is_sleeping: Predicate — True while the thalamic gate is
+            closed. Inbound perception is gated then: overheard
+            speech and percepts are not recorded. The predicate is
+            the gate, not strictly the sleep flag — a resident mind
+            closes it at hypnagogic onset too.
         get_user_name: Callback returning the user's name if its
             user profile has learned one. Synced lazily onto the user
             presence. Optional.

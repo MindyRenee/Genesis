@@ -767,6 +767,58 @@ class TestQuestionComposerScaffoldFilter:
                 )
 
 
+class TestZeroWeightDreamNoise:
+    """Zero-weight edges are graph placeholders, not spoken associations."""
+
+    def test_zero_weight_neighbor_is_never_spoken(self):
+        net = ConceptNetwork()
+        net.add_concept("alpha", confidence=0.9)
+        net.add_concept("beta", confidence=0.9)
+        net.add_concept("gamma", confidence=0.9)
+        net.add_edge("alpha", "beta", RelationType.RELATED_TO, 0.8)
+        net.add_edge("alpha", "gamma", RelationType.RELATED_TO, 0.0)
+        il = _make_inner_life(net, seed=7)
+
+        for _ in range(50):
+            name, _display, knowledge = il._neighbor_knowledge(
+                net.get_associations("alpha")
+            )
+            assert name == "beta", f"zero-weight neighbor was spoken: {name}"
+            assert knowledge and knowledge[0][2] >= 0.05
+
+    def test_zero_weight_edge_is_not_a_weak_insight(self):
+        from sleep.inner_life import SpontaneousThought
+
+        net = ConceptNetwork()
+        net.add_concept("alpha", confidence=0.9)
+        net.add_concept("beta", confidence=0.9)
+        net.add_edge("alpha", "beta", RelationType.RELATED_TO, 0.0)
+        il = _make_inner_life(net)
+        thought = SpontaneousThought(
+            content="alpha meets beta",
+            trigger="dream",
+            timestamp=0,
+            is_dream=True,
+        )
+        assert il.detect_insight(thought, net) is None
+
+    def test_dream_seed_pool_skips_recent_topics(self):
+        net = ConceptNetwork()
+        words = [
+            "apple", "banana", "cherry", "grape", "lemon", "mango", "melon",
+            "olive", "peach", "pear", "plum", "berry", "fig", "kiwi", "lime",
+            "nut", "date", "corn", "bean", "rice",
+        ]
+        for word in words:
+            net.add_concept(word, confidence=0.9)
+        il = _make_inner_life(net, seed=11)
+        il._recent_thought_topics.append("apple")
+
+        pool = il._dream_seed_pool()
+        assert "apple" not in pool
+        assert len(pool) >= 12
+
+
 def test_start_refuses_second_worker_while_predecessor_alive(monkeypatch) -> None:
     """start() finding the predecessor still alive after its join must
     not spawn a second thought generator — clearing _stop_event and

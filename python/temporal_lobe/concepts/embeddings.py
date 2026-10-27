@@ -66,6 +66,8 @@ import numpy as np
 from genesis_client.swallow import note_swallowed
 from infrastructure._npz_io import load_npz, save_npz, str_array
 
+from .classify import _normalize_id
+
 logger = logging.getLogger(__name__)
 
 # Ceiling on the ad-hoc per-concept vector cache. Each entry is one
@@ -661,6 +663,17 @@ class EmbeddingStore:
         1. TF-IDF: matching words in concept definitions
         2. GloVe (if available): word vector average for distributional match
 
+        Names and aliases are resolved exactly, through the concept
+        index, in addition to the vector search. A bag-of-words vector
+        cannot represent a word that appears in no other concept's text
+        — the TF-IDF vocabulary is selected by document frequency — so
+        concepts like "datum", "entry", "belief" and "intention" had an
+        all-zero flat block and were invisible to this method no matter
+        how exactly the caller named them. Identity is a lookup, not a
+        cosine: the name index already holds it for working memory and
+        for the archive, with no collision noise and no extra
+        dimensions.
+
         Example: "the tall plant in my yard" → [("tree", 0.82),
         ("plant", 0.75), ("garden", 0.68), ...]
 
@@ -677,13 +690,88 @@ class EmbeddingStore:
         if self._concept_matrix is None:
             return []
 
+        exact = self._exact_name_matches(text, exclude)
         vec = self._compute_text_vector(text)
         if vec is None:
-            return []
+            return exact[:k]
 
-        return self._search_concept_matrix(
+        results = self._search_concept_matrix(
             vec, k, threshold, exclude=exclude, query_has_spectral=False
         )
+        return self._merge_exact_matches(results, exact, k)
+
+    def _exact_name_matches(
+        self,
+        text: str,
+        exclude: str | None = None,
+    ) -> list[tuple[str, float]]:
+        """Concepts named verbatim in *text*, by canonical name.
+
+        Scans unigrams and short n-grams so multi-word concept names
+        ("entry point", "to genesis") resolve as well as single words.
+        Archived concepts are matched without being recalled.
+
+        Only canonical names count, not aliases. The alias index is
+        broad — code learning attaches short aliases like "cognitive"
+        to whole module concepts — and matching those would return
+        unrelated code symbols at full similarity for an ordinary
+        sentence. Canonical names are what a caller means by "name".
+        """
+        words = [w.strip(".,;:!?()\"'`").lower() for w in text.split()]
+        words = [w for w in words if w]
+        if not words:
+            return []
+
+        phrases: set[str] = set()
+        max_n = min(3, len(words))
+        # A one-word query is a name, not prose: a concept called "other"
+        # must resolve when the caller types exactly "other", even
+        # though the word is a stopword inside a sentence.
+        single = len(words) == 1
+        for n in range(1, max_n + 1):
+            for i in range(len(words) - n + 1):
+                phrase = " ".join(words[i : i + n])
+                if n == 1 and not single and (phrase in self._STOPWORDS or len(phrase) < 3):
+                    continue
+                phrases.add(_normalize_id(phrase))
+
+        concepts = getattr(self.network, "_concepts", {})
+        archive = getattr(self.network, "_archive", None)
+        found: list[tuple[str, float]] = []
+        for phrase in phrases:
+            if phrase == exclude:
+                continue
+            if phrase in concepts:
+                found.append((phrase, 1.0))
+                continue
+            if archive is not None:
+                try:
+                    if archive.has_concept(phrase):
+                        found.append((phrase, 1.0))
+                except (sqlite3.Error, RuntimeError) as e:
+                    note_swallowed(
+                        "temporal_lobe.concepts.embeddings._exact_name_matches",
+                        e,
+                    )
+        return found
+
+    @staticmethod
+    def _merge_exact_matches(
+        results: list[tuple[str, float]],
+        exact: list[tuple[str, float]],
+        k: int,
+    ) -> list[tuple[str, float]]:
+        """Merge exact name hits into vector results, best score wins.
+
+        Exact hits are inserted first so that at an equal score — a
+        one-hot vector match is also 1.0 — the concept the caller
+        actually named ranks above the coincidence.
+        """
+        best: dict[str, float] = {}
+        for name, score in (*exact, *results):
+            if score > best.get(name, float("-inf")):
+                best[name] = score
+        return sorted(best.items(), key=lambda item: -item[1])[:k]
 
     def find_similar_to_vector(
         self,
@@ -1108,7 +1196,11 @@ class EmbeddingStore:
         indexed by a fixed word list and can be copied directly.
 
         For backwards compatibility, files saved without vocabulary
-        metadata fall back to positional copying (the old behavior).
+        metadata are *not* restored: without the word mapping there is
+        no way to prove the saved columns mean what the current columns
+        mean, and a positional copy could smear one concept's learned
+        weights onto unrelated words. The curated block is rebuilt from
+        the current corpus, so discarding is safe.
 
         Args:
             data_dir: Directory to load from. Defaults to the store's
@@ -1156,7 +1248,16 @@ class EmbeddingStore:
 
         # Build saved→current TF-IDF column mapping
         tfidf_col_map: dict[int, int] = {}  # saved_col → current_col
-        if saved_tfidf_vocab and self._tfidf_vocab and saved_tfidf_dim > 0:
+        if not saved_tfidf_vocab:
+            # Without vocabulary metadata the columns cannot be
+            # re-aligned by word. Positional copying is only safe when
+            # the saved layout is known to match, and a file with no
+            # metadata does not prove that.
+            logger.info(
+                "Discarding saved experiential vectors: no vocabulary metadata",
+            )
+            return False
+        if self._tfidf_vocab and saved_tfidf_dim > 0:
             for word, saved_col in saved_tfidf_vocab.items():
                 current_col = self._tfidf_vocab.get(word)
                 if current_col is not None:

@@ -1544,7 +1544,6 @@ class EmotionalRegulator:
         self._neuro_impulse = neuro_impulse
         self._get_state = get_state
         self.config = config if config is not None else EmotionalConfig()
-        self._get_open_bugs: Callable[[], int] | None = None
         self._get_pending_proposals: Callable[[], int] | None = None
         self._proposal_triage: Callable[[], list[int]] | None = None
         # Throttle callbacks — when she detects sustained CPU stress
@@ -1711,10 +1710,6 @@ class EmotionalRegulator:
             self._thread.join(timeout=5)
         logger.info("Emotional regulator stopped")
 
-    def set_bug_provider(self, get_open_bugs: Callable[[], int]) -> None:
-        """Provide a callback that returns the current open bug count."""
-        self._get_open_bugs = get_open_bugs
-
     def set_proposal_provider(self, get_pending_proposals: Callable[[], int]) -> None:
         """Provide a callback that returns the current pending proposal count."""
         self._get_pending_proposals = get_pending_proposals
@@ -1724,7 +1719,7 @@ class EmotionalRegulator:
 
         Pending proposals otherwise wait on human review forever — a
         cognitive obligation with no relief. Triage withdraws the ones
-        that no longer deserve review (stale, dead file, orphaned bug)
+        that no longer deserve review (stale, dead file)
         and returns their ids, so the queue is a cost she can actually
         reduce, not just label.
         """
@@ -2299,16 +2294,7 @@ class EmotionalRegulator:
             self._impulse(CHEM_ENDOCANNABINOID, 0.02)
 
     def _regulate_cognitive_load(self, actions: list[str]) -> None:
-        """Check open bugs and pending self-improvement proposals."""
-        if self._get_open_bugs:
-            try:
-                bug_count = self._get_open_bugs()
-            except Exception as e:  # noqa: BLE001
-                logger.warning(f"get open bugs failed: {e}")
-                bug_count = 0
-        else:
-            bug_count = 0
-
+        """Check pending self-improvement proposals."""
         if self._get_pending_proposals:
             try:
                 proposal_count = self._get_pending_proposals()
@@ -2335,11 +2321,7 @@ class EmotionalRegulator:
                     "longer deserved review — the queue is hers to clear"
                 )
 
-        if bug_count > 0 and proposal_count > 0:
-            self._last_cause = "cognitive_load_bugs_and_proposals"
-        elif bug_count > 0:
-            self._last_cause = "cognitive_load_bugs"
-        elif proposal_count > 0:
+        if proposal_count > 0:
             self._last_cause = "cognitive_load_proposals"
 
     def _record_regulation(

@@ -100,12 +100,12 @@ def test_journal_rotates_at_size_cap(tmp_path):
 
 def test_journal_record_error(tmp_path):
     journal = CognitiveJournal(tmp_path)
-    journal.record_error("volition.bug_scan", ValueError("boom"))
+    journal.record_error("volition.improve", ValueError("boom"))
     journal.close()
 
     (event,) = _read_events(tmp_path / JOURNAL_FILENAME)
     assert event["kind"] == "error"
-    assert event["site"] == "volition.bug_scan"
+    assert event["site"] == "volition.improve"
     assert "boom" in event["text"]
 
 

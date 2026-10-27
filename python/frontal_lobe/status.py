@@ -877,19 +877,6 @@ class StatusMixin:
             note_swallowed("mind.status._current_somatic_dict", e)
             return None
 
-    def bug_report(self) -> str:
-        """Return a description of bugs Genesis has noticed in its code."""
-        return self.bug_reporter.describe_concerns()
-
-    def recent_bugs(self, n: int = 10) -> list:
-        """Return recent bug reports from the log."""
-        return self.bug_reporter.recent_bugs(n)
-
-    def scan_for_bugs(self) -> str:
-        """Run a bug scan now and return the results."""
-        result = self.bug_reporter.scan(max_files=50)
-        return result.summary()
-
     def environment_status(self) -> str:
         """Return a description of Genesis's machine environment."""
         self.system_monitor.snapshot()

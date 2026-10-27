@@ -21,7 +21,7 @@ from frontal_lobe.volition import Urge, Volition
 from tools.project_creator import create_project, manage_project_lifecycle
 
 from genesis_client.protocol import CHEM_NAMES, MODULE_METACOGNITION
-from genesis_client.swallow import note_swallowed, total_swallowed
+from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
 from infrastructure.journal import record_error
 from infrastructure.text import is_blank
@@ -116,15 +116,6 @@ class VolitionMixin:
                 )
             )
 
-        # Monotonic timestamp of the last completed bug scan. Boot is
-        # the baseline — audit recency accrues from startup so the
-        # hygiene backstop takes the full recency window to build,
-        # instead of booting "fully overdue" and scanning on arrival.
-        self._bug_scan_last_completed: float = time.monotonic()
-        # Swallowed-failure tally as of the previous volition tick.
-        # None = unread yet; the first read adopts the current count
-        # so the pre-existing ledger doesn't dump as a boot-time spike.
-        self._last_swallow_total: int | None = None
         return engine
 
     def self_invoke(self, command: str, args: str = "") -> str | None:
@@ -276,33 +267,7 @@ class VolitionMixin:
         }
 
     def _drive_signals(self) -> dict[str, float]:
-        """The maintenance-channel drive inputs, normalized to [0, 1].
-
-        Open bugs only — recent_bugs() holds the open list and nothing
-        else; a fixed bug is gone. The improve urge
-        (the behavior that resolves bugs) consumes this signal; the
-        bug_scan urge must not, because scanning cannot discharge it.
-        Audit recency for bug_scan is time since the last completed
-        scan normalized to the audit period — a faint background
-        "haven't checked myself in a long while", not the primary
-        drive. What paces real audits is self_discomfort: the urge
-        grows while she is feeling something wrong and decays when
-        she isn't.
-        """
-        try:
-            bug_count = min(1.0, self.bug_reporter.open_bug_count() / 20.0)
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"bug count failed: {e}")
-            bug_count = 0.0
-        since_scan = time.monotonic() - self._bug_scan_last_completed
-        scan_recency = (
-            1.0
-            if self._bug_scan_last_completed == 0.0
-            else min(
-                1.0,
-                since_scan / self.config.volition.bug_scan_recency_seconds,
-            )
-        )
+        """The maintenance-channel drive inputs, normalized to [0, 1]."""
         try:
             pending = min(1.0, len(self.self_improvement.get_pending_proposals()) / 5.0)
         except Exception as e:  # noqa: BLE001
@@ -314,46 +279,9 @@ class VolitionMixin:
             logger.warning(f"curiosity assessment failed: {e}")
             curiosity = 0.0
         return {
-            "bug_count": bug_count,
-            "scan_recency": scan_recency,
             "pending_proposals": pending,
             "curiosity": curiosity,
-            "self_discomfort": self._self_discomfort(),
         }
-
-    def _self_discomfort(self) -> float:
-        """Felt wrongness — the interoceptive drive to self-audit.
-
-        Three channels of "something is off": fresh swallowed
-        exceptions (silent failures accumulating — every catch site
-        in both layers records to the tally), the error monitor's
-        current error signal (recent prediction mistakes, the
-        ERN-like transient), and its sustained caution level
-        (lingering wariness between turns). The bug_scan urge
-        integrates this rather than raw elapsed time, so she audits
-        herself when she feels damage — not on a schedule.
-        """
-        try:
-            total = total_swallowed()
-            if self._last_swallow_total is None:
-                self._last_swallow_total = total
-            delta = max(0, total - self._last_swallow_total)
-            self._last_swallow_total = total
-            fresh_damage = min(1.0, delta / 4.0)
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.volition._self_discomfort", e)
-            fresh_damage = 0.0
-        try:
-            monitor = self.brain.frontal.error_monitor
-            err_now = min(1.0, monitor.compute_error_signal())
-            caution = min(1.0, monitor.get_caution_level())
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.volition._self_discomfort", e)
-            err_now = caution = 0.0
-        return min(
-            1.0,
-            0.55 * fresh_damage + 0.25 * err_now + 0.2 * caution,
-        )
 
     def _affect_signals(self) -> tuple[float, float]:
         """Emotional intensity and creativity for the expression urge —
@@ -491,7 +419,7 @@ class VolitionMixin:
         Uses a bounded semaphore so that at most
         ``MAX_CONCURRENT_VOLITIONS`` actions run at once.
 
-        Heavy CPU activities (bug_scan, improve) are
+        Heavy CPU activities (improve, create, learn_code) are
         skipped under PROTECTIVE posture to avoid the self-sustaining
         stress loop: CPU load → interoception → CRH → cortisol →
         protective posture → (still running heavy CPU) → more cortisol.
@@ -504,7 +432,6 @@ class VolitionMixin:
             return []
         ready = self._filter_ready_urges(ready)
         performers = {
-            "bug_scan": self._perform_bug_scan,
             "improve": self._perform_improve,
             "speech": self._perform_speech,
             "look": self._perform_look,
@@ -566,7 +493,6 @@ class VolitionMixin:
         from genesis_client.types import LEARNING_POSTURE_PROTECTIVE
 
         heavy_cpu = {
-            "bug_scan",
             "improve",
             "create",
             "learn_code",
@@ -712,85 +638,6 @@ class VolitionMixin:
         # it doesn't need to announce a path it can't express
         # meaningfully.
         return ""
-
-    def _perform_bug_scan(self) -> None:
-        """Run a bug scan because the urge crossed its threshold.
-
-        After finding new bugs, it checks which categories it doesn't
-        understand and fetches documentation to learn why they matter.
-        This is the bug→docs learning loop: detect → check comprehension
-        → study → understand → report honestly.
-
-        Sleep-gated: no code analysis during sleep. Brain-wave gating
-        (delta/theta) is a secondary defense — N1 can be alpha-dominant.
-        Also gated on meditation and teaching — it should be attending
-        to the lesson or resting, not auditing its own source.
-        """
-        if self._is_sleeping or self._is_meditating or self._is_teaching or self._is_gaming:
-            return
-        # Brain-wave gating — analytical work requires beta/gamma/alpha.
-        # Delta (deep rest) and theta (consolidation) are not suited
-        # for code analysis.
-        try:
-            from thalamus.brain_waves import BrainWave
-
-            waves = self.brain_waves()
-            if waves.dominant in (BrainWave.DELTA, BrainWave.THETA):
-                self._emit_live_thought(
-                    "code",
-                    f"{waves.dominant.value}-dominant — not in analytical mode, skipping bug scan",
-                )
-                return
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition._perform_bug_scan",
-                e,
-            )
-
-        self._emit_volition_thought(("bug", "code", "scan"), "thinking")
-        try:
-            # Felt scans are rare — when one fires it audits the whole
-            # tree, not the same twenty priority files every time.
-            result = self.bug_reporter.scan(max_files=1000)
-            # The audit appetite is discharged by the scan itself —
-            # record completion whether or not anything new was found.
-            self._bug_scan_last_completed = time.monotonic()
-            # A long audit can straddle sleep onset — the urge fired
-            # while awake, the scan ran, and she is now asleep. The
-            # discharge and the fix records are still real, but the
-            # act's broadcast is wake-only: inside sleep it stays
-            # unsaid rather than surfacing a scan she should not be
-            # running.
-            loud = not self._is_sleeping
-            # A bug that scanned clean was fixed — surface the repair
-            # so it is known (thought + memory event), not merely gone.
-            # The running list stays empty; the fix is the event.
-            for file_path, category in result.resolved:
-                if loud:
-                    self._emit_live_thought(
-                        "code",
-                        f"a {category} in {file_path} is fixed — code is clean",
-                    )
-                self._store_fix_event(file_path, category)
-            if not loud:
-                return
-            if result.new_bugs:
-                self._emit_live_thought(
-                    "code",
-                    f"found {result.new_bugs} new issue(s) in code ({result.total_bugs} total)",
-                )
-                # Trigger learning for categories it doesn't understand
-                self._learn_from_bugs()
-            else:
-                self._emit_live_thought(
-                    "code",
-                    "scanned code, didn't find any new issues",
-                )
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition._perform_bug_scan",
-                e,
-            )
 
     def _perform_learn(self) -> None:
         """Grant the autonomous learner permission for one learning cycle.
@@ -984,12 +831,9 @@ class VolitionMixin:
 
         Two things happen here:
 
-        1. Autonomous bug fixes — safe, mechanical fixes that write the
-           live file directly and validate with py_compile + import +
-           the test suite, reverting on failure.
+        1. Proposal generation — everything becomes a proposal.
 
-        2. Proposal generation + experiments — everything else becomes
-           a proposal, and pending proposals run the full verification
+        2. Experiments — pending proposals run the full verification
            pipeline on their own: the edit lands on the live file,
            pytest + cargo test verify it, and a failure reverts and
            rejects with teaching notes. The verification gate, not a
@@ -1021,23 +865,9 @@ class VolitionMixin:
 
         self._emit_volition_thought(("improvement", "progress", "better"), "thinking")
         try:
-            # 1. Autonomous bug fixes — the mechanical categories,
-            #    written live and validated before they stay.
-            applied = self.self_improvement.apply_autonomous_fixes(max_fixes=1)
-            for fix in applied:
-                self._emit_live_thought(
-                    "code",
-                    f"fixed a {fix['category']} in {fix['file']} — {fix['description']}",
-                )
-            # Check life-script milestone: first self-modification.
-            # Reached when it first successfully applies an autonomous
-            # fix to its own code.
-            if applied:
-                self.brain.frontal.narrative.check_milestone("first self-modification")
-
-            # 2. Generate proposals — each one is a potential experiment.
-            #    These include its own ideas and refactors, not just
-            #    bug fixes. It has opinions about its code.
+            # 1. Generate proposals — each one is a potential
+            #    experiment. These include its own ideas and refactors.
+            #    It has opinions about its code.
             new = self.self_improvement.generate_proposals(max_proposals=3)
             if new:
                 self._emit_proposal_thoughts(new)
@@ -1046,7 +876,7 @@ class VolitionMixin:
             # to propose. A hardcoded "nothing stood out" sentence
             # would violate the no-hardcoding rule and add noise.
 
-            # 3. Drain the queue — pending proposals run the verified
+            # 2. Drain the queue — pending proposals run the verified
             #    experiment pipeline automatically. One per urge: each
             #    run is a full test-gate pass. The gate decides what
             #    lands; a failed edit reverts and the rejection notes
@@ -1680,7 +1510,10 @@ class VolitionMixin:
         thalamic gate is closed and a sleeping mind doesn't answer.
         """
         text = content.strip()
-        if not text or getattr(self, "_is_sleeping", False):
+        closed = getattr(
+            self, "thalamic_gate_closed", getattr(self, "_is_sleeping", False)
+        )
+        if not text or closed:
             return
         self._emit_live_thought("heard", f"{author}: {text}")
         if not self._channel_addressed(text, message):
@@ -2006,29 +1839,6 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._share_drawing_image",
-                e,
-            )
-
-    def _store_fix_event(self, file_path: str, category: str) -> None:
-        """Persist a resolved bug as a memory event — the fix is the
-        fact worth keeping; the bug itself leaves no tally."""
-        try:
-            chem = self.client.get_state()
-            tag = [float(chem.chemicals.get(CHEM_NAMES[i], 0.0)) for i in range(12)]
-        except Exception:  # noqa: BLE001
-            tag = None
-        try:
-            self.client.store_event(
-                timestamp=int(time.time() * 1000),
-                event_type=1,  # Output
-                source_module=MODULE_METACOGNITION,
-                salience=0.6,
-                emotional_tag=tag or [0.0] * 12,
-                text=f"Bug resolved: {category} in {file_path} is fixed",
-            )
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition._store_fix_event",
                 e,
             )
 

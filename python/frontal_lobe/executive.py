@@ -654,7 +654,6 @@ class ExecutiveFunction:
             "social": "learn",
             "connection": "learn",
             # Code-directed signals have a real inspect actuator.
-            "bug_concern": "inspect",
             "improvement": "inspect",
             # Internal/body pressure remains an executive advisory
             # objective until a matching regulator actuator exists.

@@ -79,9 +79,7 @@ pub fn triangle_angles(a: f64, b: f64, c: f64) -> Option<(f64, f64, f64)> {
 
 /// Heron's area from three side lengths.
 pub fn area_heron(a: f64, b: f64, c: f64) -> Option<f64> {
-    if triangle_angles(a, b, c).is_none() {
-        return None;
-    }
+    triangle_angles(a, b, c)?;
     let s = (a + b + c) / 2.0;
     Some((s * (s - a) * (s - b) * (s - c)).sqrt())
 }

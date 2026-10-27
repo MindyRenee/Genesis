@@ -488,6 +488,25 @@ class TestTfIdfVocabularyAlignment:
         assert "tfidf_indices" in data
         assert "tfidf_dim" in data
 
+    def test_file_without_vocabulary_metadata_is_discarded(
+        self, small_network: ConceptNetwork, tmp_path: Path
+    ) -> None:
+        """A saved flat block whose columns cannot be re-aligned by word
+        must not be copied by position into the current layout."""
+        store = EmbeddingStore(small_network, data_dir=str(tmp_path))
+        store._ensure_loaded()
+        store.save_experiential()
+
+        path = tmp_path / "concept_vectors.npz"
+        data = dict(np.load(path, allow_pickle=False))
+        data["tfidf_words"] = np.array([], dtype=np.str_)
+        data["tfidf_indices"] = np.array([], dtype=np.int32)
+        np.savez(path, **data)
+
+        reloaded = EmbeddingStore(small_network, data_dir=str(tmp_path))
+        reloaded._ensure_loaded()
+        assert reloaded.load_experiential() is False
+
 
 class TestColdLayer:
     """Test that archived (dormant) concepts get cold-layer vectors.
@@ -661,3 +680,106 @@ class TestColdLayer:
             if vec is not None:
                 widths.add(vec.shape[0])
         assert widths in (set(), {store.dimensionality})
+
+
+class TestExactNameMatching:
+    """Names and aliases resolve exactly, even with no shared vocabulary.
+
+    Regression test for a reachability defect: the TF-IDF vocabulary is
+    selected by document frequency, so a concept whose name appears in
+    no other concept's text — "datum", "entry", "belief", "intention" —
+    has an all-zero flat vector. Text search is a bag-of-words cosine,
+    so those concepts were invisible however exactly the caller named
+    them, and the archive's cold layer skipped them entirely (about
+    four fifths of dormant memory).
+
+    Identity is a lookup, not a cosine. The name index already holds
+    every name and alias, for working memory and for the archive, with
+    no collision noise.
+    """
+
+    def _unique_name_network(self) -> ConceptNetwork:
+        """Concepts that share no vocabulary at all."""
+        net = ConceptNetwork()
+        for name, defn in [
+            ("datum", "a single piece of information"),
+            ("entry", "an item recorded in a list"),
+            ("belief", "a conviction held without proof"),
+            ("desire", "a want for something to happen"),
+            ("intention", "a plan to act in a certain way"),
+        ]:
+            net.add_concept(name, confidence=0.9, origin="test")
+            concept = net.get_concept(name)
+            if concept:
+                concept.properties["definition"] = defn
+        return net
+
+    def test_exact_name_surfaces_unique_named_concept(self, tmp_path: Path) -> None:
+        net = self._unique_name_network()
+        store = EmbeddingStore(net, data_dir=str(tmp_path))
+        for name in ("datum", "entry", "belief", "desire", "intention"):
+            results = store.find_similar_to_text(name, k=3, threshold=0.3)
+            assert results and results[0][0] == name, (name, results)
+
+    def test_stopword_named_concept_resolves(self, tmp_path: Path) -> None:
+        """A concept *is* its name — even a name that is a stopword."""
+        net = ConceptNetwork()
+        net.add_concept("other", confidence=0.9, origin="test")
+        net.add_concept("tree", confidence=0.9, origin="test")
+        store = EmbeddingStore(net, data_dir=str(tmp_path))
+        results = store.find_similar_to_text("other", k=3, threshold=0.3)
+        assert results and results[0][0] == "other"
+
+    def test_exact_name_surfaces_archived_concept(self, tmp_path: Path) -> None:
+        """An archived concept with no hot-vocabulary overlap is still
+        findable by name, without being recalled."""
+        from temporal_lobe.concepts.archive import open_archive
+
+        net = ConceptNetwork()
+        net.add_concept("tree", confidence=0.9, origin="test")
+        archive = open_archive(tmp_path / "archive")
+        archive.archive_concept(
+            "datum",
+            {
+                "id": "datum",
+                "aliases": [],
+                "activation": 0.0,
+                "confidence": 0.8,
+                "origin": "learned",
+                "columns": [],
+                "created_at": 0,
+                "review_count": 0,
+                "last_reviewed": 0,
+                "properties": {"definition": "a single piece of information"},
+                "category": "unknown",
+                "is_animacy_detected": False,
+                "modality": "unknown",
+                "is_semantic_hub": False,
+            },
+            set(),
+        )
+        net.attach_archive(archive)
+
+        store = EmbeddingStore(net, data_dir=str(tmp_path))
+        results = store.find_similar_to_text("datum", k=10, threshold=0.0)
+        assert "datum" in [name for name, _ in results]
+        # The lookup must not pull the concept back into working memory.
+        assert "datum" not in net._concepts
+        archive.close()
+
+    def test_exact_name_does_not_pollute_unrelated_query(self, tmp_path: Path) -> None:
+        """Exact matching adds the named concept, not every concept."""
+        net = self._unique_name_network()
+        store = EmbeddingStore(net, data_dir=str(tmp_path))
+        results = store.find_similar_to_text("the tall plant", k=10, threshold=0.0)
+        names = [name for name, _ in results]
+        for absent in ("datum", "entry", "belief", "desire", "intention"):
+            assert absent not in names
+
+    def test_exact_name_merges_with_vector_results(self, tmp_path: Path) -> None:
+        """A concept found by both paths appears once, with the better score."""
+        net = self._unique_name_network()
+        store = EmbeddingStore(net, data_dir=str(tmp_path))
+        results = store.find_similar_to_text("belief conviction proof", k=10, threshold=0.0)
+        names = [name for name, _ in results]
+        assert names.count("belief") == 1

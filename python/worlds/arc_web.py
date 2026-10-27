@@ -163,7 +163,56 @@ def _browser_profile(purpose: str) -> str:
 
     path = default_data_dir() / "browser" / purpose
     path.mkdir(parents=True, exist_ok=True)
+    _clear_stale_singletons(path)
     return str(path)
+
+
+def _pid_alive(pid: int) -> bool:
+    """Whether *pid* names a live process on this host."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return pid > 0
+
+
+def _clear_stale_singletons(profile: os.PathLike[str] | str) -> None:
+    """Drop Chrome's singleton markers when no live browser owns them.
+
+    ``SingletonLock``/``SingletonCookie``/``SingletonSocket`` — plus
+    the ``DevToolsActivePort`` hint — are process state, not profile
+    data: they name the instance holding the profile and nothing
+    more. An unclean mind death leaves them pointing at a dead pid,
+    and a profile that traveled (spore, germinate, a copied data
+    dir) can arrive with the symlinks flattened into plain files —
+    which Chrome refuses to overwrite, aborting launch with a
+    singleton-cookie failure. Chrome heals a stale *lock* itself but
+    not the rest. Safe to remove only when nothing owns them, so the
+    lock's ``pid-hostname`` target is checked first: a live owner
+    keeps its markers and the launch adopts it instead.
+    """
+    import socket
+
+    lock = os.path.join(profile, "SingletonLock")
+    try:
+        target = os.readlink(lock)  # "PID-HOSTNAME"
+        pid_s, _, host = target.partition("-")
+        if host == socket.gethostname() and _pid_alive(int(pid_s)):
+            return  # a live browser owns this profile — adopt, don't touch
+    except (OSError, ValueError):
+        pass  # absent, unreadable, or flattened — none name a live owner
+    for name in (
+        "SingletonLock",
+        "SingletonCookie",
+        "SingletonSocket",
+        "DevToolsActivePort",
+    ):
+        try:
+            os.unlink(os.path.join(profile, name))
+        except OSError:
+            pass
 
 
 class _Browser:

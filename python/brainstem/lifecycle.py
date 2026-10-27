@@ -626,7 +626,7 @@ class LifecycleMixin:
     def _start_background_threads(self) -> None:
         """Start heartbeat, notification, and autosave threads.
 
-        The code-learning, bug-scan, and self-improvement threads were
+        The code-learning and self-improvement threads were
         replaced by the volition engine, which drives these actions
         from internal urges rather than fixed schedules. The thread
         objects have been removed; the loop methods remain as volition
@@ -1534,7 +1534,6 @@ class LifecycleMixin:
                 self._developmental_tracker,
                 lambda t, p: t.restore_from_dict(p),
             ),
-            ("bug_reporter", self.bug_reporter, lambda t, p: t.restore_from_dict(p)),
             ("plasticity", self.brain.frontal.plasticity, lambda t, p: t.load_state(p)),
             (
                 "cognitive_trajectory",
@@ -1698,7 +1697,6 @@ class LifecycleMixin:
                 growth_ledger=self.growth_ledger,
                 plasticity=self.brain.frontal.plasticity,
                 developmental_tracker=self._developmental_tracker,
-                bug_reporter=self.bug_reporter,
                 sleep_state=sleep_state,
                 memory_records=self.memory.serialize_records(),
                 cognitive_trajectory=self.brain.frontal.cognitive_trajectory,

@@ -45,7 +45,8 @@ impl Permutation {
         for w in cycle.windows(2) {
             p.image[w[0]] = w[1];
         }
-        p.image[*cycle.last().unwrap()] = cycle[0];
+        let &last = cycle.last()?;
+        p.image[last] = cycle[0];
         Some(p)
     }
 
@@ -186,7 +187,11 @@ pub fn zn_add_table(n: u64) -> Option<Vec<Vec<u64>>> {
     if n == 0 || n > 512 {
         return None;
     }
-    Some((0..n).map(|a| (0..n).map(|b| (a + b) % n).collect()).collect())
+    Some(
+        (0..n)
+            .map(|a| (0..n).map(|b| (a + b) % n).collect())
+            .collect(),
+    )
 }
 
 /// Is the map φ: ℤₙ → ℤₘ (given as images φ(k)) a homomorphism?
@@ -218,7 +223,7 @@ mod tests {
         let p = Permutation::new(vec![1, 2, 0, 4, 3]).unwrap();
         assert_eq!(p.order(), 6);
         assert_eq!(p.cycles().len(), 2);
-        assert_eq!(p.sign(), 1); // 3-cycle(+1)·transposition(-1) → even
+        assert_eq!(p.sign(), -1); // 3-cycle(2 trans)·transposition(1) → odd
     }
 
     #[test]
