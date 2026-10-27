@@ -611,11 +611,20 @@ class ArcWebPractice:
         """
         deadline = time.time() + timeout
         while time.time() < deadline:
-            bodies = self._browser.bodies
-            if len(bodies) > marker:
-                obs = self._latest_frame()
-                if obs is not None:
-                    return obs
+            # Only bodies landed after the marker count are candidates —
+            # the frame she needs is the reply to the move just sent,
+            # which lands at an index past every body already seen.
+            # A fresh body that bears no frame (an error reply, a
+            # different /api/cmd response) is not an observation, and
+            # an older frame-bearing body re-returned would be a
+            # replay — neither satisfies the wait.
+            new = [
+                b
+                for b in list(self._browser.bodies.values())[marker:]
+                if isinstance(b, dict) and "frame" in b
+            ]
+            if new:
+                return new[-1]
             time.sleep(0.1)
         return None
 

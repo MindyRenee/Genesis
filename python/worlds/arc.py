@@ -1331,7 +1331,7 @@ class ArcOfficial(ArcPractice):
         if now >= card["expires_at"]:
             self._seal(card, "expired — window closed")
             return None
-        if now - card["last_action_at"] >= self.IDLE_LIMIT_S:
+        if now - card.get("last_action_at", card["opened_at"]) >= self.IDLE_LIMIT_S:
             self._seal(card, "idle — the venue closed it")
             return None
         game = next((g for g in card["games"] if g["status"] == "pending"), None)
@@ -1356,7 +1356,7 @@ class ArcOfficial(ArcPractice):
         if now >= card["expires_at"]:
             self._seal(card, "expired — window closed")
             return None
-        if now - card["last_action_at"] >= self.IDLE_LIMIT_S:
+        if now - card.get("last_action_at", card["opened_at"]) >= self.IDLE_LIMIT_S:
             self._seal(card, "idle — the venue closed it")
             return None
         game = next(
