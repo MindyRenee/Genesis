@@ -982,6 +982,7 @@ fn read_bt_link_rssi(hci: &str) -> Option<f32> {
             .split("RSSI return value:")
             .nth(1)
             .and_then(|s| s.trim().parse::<f32>().ok())
+            .filter(|v| *v != 0.0)
         {
             sum += v;
             n += 1;
