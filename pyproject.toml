@@ -80,6 +80,7 @@ py-modules = [
     "genesis_cli",
     "mind",
     "setup_embeddings",
+    "turn",
 ]
 
 [tool.setuptools.packages.find]

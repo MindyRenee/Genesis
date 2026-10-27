@@ -901,9 +901,9 @@ _EXPORTS: dict[str, str] = {
     "ToolRegistry": "tools.framework",
     "ToolResult": "tools.framework",
     "get_tools": "tools.framework",
-    # One cognitive turn — the handoff between regions. The relay
-    # paces the cortico-thalamic loop; it lives in thalamus.
-    "Turn": "thalamus.turn",
+    # One cognitive turn — the handoff between regions. It lives at
+    # the root of the Python tree: the mind's level, not a region's.
+    "Turn": "turn",
     # Cognitive access broadcast — PFC is the primary broadcaster;
     # the relay is the physical relay (also re-exported by thalamus)
     "GlobalWorkspace": "frontal_lobe.global_workspace",

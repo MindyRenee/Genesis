@@ -7,10 +7,12 @@ names the region that performs it and calls that region's method on
 the engine. Adding a stage means adding a region call here, not
 growing another method on the engine.
 
-It lives in the thalamus because that is what the code does: the
-relay paces the cortico-thalamic loop — one iteration of the loop is
-one turn. The engine supplies the regional methods; this module only
-orders them.
+It lives at the repository root beside ``mind.py`` and
+``commitment.py`` — the level of the whole organism, not inside
+any region and not inside the composition entry (the regions can't
+import ``mind.py`` without a cycle): the organism is the mind, and
+one pass of input through its regions is orchestration of the
+whole, not a part of it.
 """
 
 from __future__ import annotations

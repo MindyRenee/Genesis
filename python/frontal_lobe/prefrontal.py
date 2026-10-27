@@ -3730,11 +3730,11 @@ class FrontalLobe:
         Returns (response_text, cognitive_state).
 
         The turn itself is a handoff between regions
-        (``thalamus.turn.Turn`` — the relay paces the cortico-thalamic
-        loop; this engine owns the stages it calls, not their order).
-        This method is the entry the mind calls.
+        (``turn.Turn`` — a mind-level sequencer at the root of the
+        Python tree; this engine owns the stages it calls, not
+        their order). This method is the entry the mind calls.
         """
-        from thalamus.turn import Turn
+        from turn import Turn
 
         with self._think_mutex:
             return Turn(self, user_input).run()
