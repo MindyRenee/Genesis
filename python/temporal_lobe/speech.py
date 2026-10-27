@@ -692,7 +692,7 @@ class VoiceInput:
 
         chunks: list[bytes] = []
         silence_count = 0
-        speech_started = True
+        speech_started = False
         import time as _time
 
         def callback(indata: Any, frames: int, time_info: object, status: object) -> None:
@@ -714,11 +714,23 @@ class VoiceInput:
             return s
 
         stream = call_on_named_thread("mic-io", _open_vosk_stream, comm="g-mic-io")
+        consumed = 0
         try:
             start = _time.time()
             while True:
                 _time.sleep(0.05)
                 elapsed = _time.time() - start
+
+                # Feed newly captured chunks to the recognizer so
+                # PartialResult reflects what has actually been heard —
+                # it only advances when AcceptWaveform is called.
+                # AcceptWaveform returning True means Vosk detected an
+                # utterance boundary on its own, which counts as speech.
+                while consumed < len(chunks):
+                    if recognizer.AcceptWaveform(chunks[consumed]):
+                        speech_started = True
+                        silence_count = 0
+                    consumed += 1
 
                 # Check Vosk partial results for speech detection
                 partial = json.loads(recognizer.PartialResult())

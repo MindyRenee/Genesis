@@ -31,6 +31,7 @@ from infrastructure.text import is_blank
 from infrastructure.text import sentences as _sentences
 
 from .morphology import (
+    _ES_VERBS,
     agree_verb_phrase,
     conjugate_verb,
     copula,
@@ -4697,25 +4698,65 @@ class Vocabulary:
         return "does"
 
     @staticmethod
-    def _base_form(verb_phrase: str) -> str:
+    def _deconjugate_head(first: str) -> str:
+        """Return the base form of a verb phrase's head word.
+
+        Verb phrases arrive in mixed forms: learned relation verbs are
+        stored inflected for 3sg ("causes", "leads to") while composer
+        fallbacks are base form ("produce", "cause"). Lexicon lookup
+        resolves irregulars and learned verbs; for ordinary inflected
+        words not in a lexicon (``_VERB_BASES`` is empty by design —
+        knowledge is learned), fall back to morphological stripping so
+        "causes" → "cause" rather than passing through unchanged.
+        """
+        base = is_verb_form(first)
+        if base is not None:
+            return base
+        f = first.lower().rstrip(",.!?;:")
+        # 3sg inflection rules, mirroring deconjugate_verb. "ies" → "y"
+        # ("tries" → "try"), but a one-letter stem means the base ends
+        # in -ie ("lies" → "lie", not "ly"). Sibilant endings strip
+        # "es" ("watches" → "watch"); other -es words strip just "s"
+        # ("analyzes" → "analyze", "causes" → "cause"). Bases ending in
+        # -us/-is are mostly nouns, and their 3sg is -uses/-ises, so a
+        # bare -s after u/i is not an inflection ("focus" stays).
+        if f.endswith("ies") and len(f) > 3:
+            stem = f[:-3]
+            return stem + "y" if len(stem) > 1 else f[:-1]
+        if f.endswith("oes"):
+            # -o verbs take -es only in a closed class ("goes",
+            # "echoes" → "go", "echo"); -oe verbs take -s
+            # ("shoes" → "shoe", not "sho").
+            if f[:-2] in _ES_VERBS:
+                return f[:-2]
+            return f[:-1]
+        if f.endswith(("shes", "ches", "sses", "xes")):
+            return f[:-2]
+        if f.endswith("s") and not f.endswith(("ss", "us", "is")):
+            return f[:-1]
+        return first
+
+    @classmethod
+    def _base_form(cls, verb_phrase: str) -> str:
         """Deconjugate the first word of a verb phrase to base form.
 
         "gives rise to" → "give rise to" — for do-support questions
         where the main verb is uninflected.
         """
         first, *rest = verb_phrase.split()
-        base = is_verb_form(first) or first
-        return " ".join([base, *rest])
+        return " ".join([cls._deconjugate_head(first), *rest])
 
-    @staticmethod
-    def _third_sg(verb_phrase: str) -> str:
+    @classmethod
+    def _third_sg(cls, verb_phrase: str) -> str:
         """Conjugate the first word of a verb phrase to 3sg.
 
         "give rise to" → "gives rise to" — for wh-subject questions
-        ("what gives rise to X") where the gap is nominative.
+        ("what gives rise to X") where the gap is nominative. The head
+        is deconjugated first so an already-inflected seed verb
+        ("causes") doesn't become "causeses".
         """
         first, *rest = verb_phrase.split()
-        return " ".join([conjugate_verb(first), *rest])
+        return " ".join([conjugate_verb(cls._deconjugate_head(first)), *rest])
 
     def _wh_question(
         self,
