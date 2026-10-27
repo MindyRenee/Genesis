@@ -269,9 +269,10 @@ class SpacedRepetitionScheduler:
         caller can hold the set at exactly `MAX_RECORDS` after the
         insert rather than overshooting by one.
 
-        Drops the records closest to full retention — the ones the
-        scheduler would not have picked soonest, so eviction costs the
-        least. Returns the number evicted.
+        Drops the records furthest from full retention — the most
+        forgotten ones, so eviction discards records whose trace was
+        already effectively gone and costs the least. Returns the
+        number evicted.
         """
         overflow = len(self._records) + reserve - self.MAX_RECORDS
         if overflow <= 0:

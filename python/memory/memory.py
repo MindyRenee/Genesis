@@ -1323,7 +1323,13 @@ class MemorySystem:
             return results
         completed = SimilarEpisode(
             episode_id=eid,
-            hamming_distance=0,
+            # A confident completion claims the match it made — the
+            # re-rank passes below score salience - distance/64, so 0
+            # keeps it first. A suggestive (over-capacity) match is
+            # not a measured similarity at all: scoring it 0 would
+            # let a possibly-spurious attractor outrank real semantic
+            # hits in the re-rank and defeat the tail placement.
+            hamming_distance=64 if suggestive else 0,
             timestamp=ep.timestamp,
             salience=ep.salience,
         )
@@ -1331,7 +1337,9 @@ class MemorySystem:
             results.append(completed)
         else:
             results.insert(0, completed)
-        self._surface_attractor_associations(eid, results, _t_retrieve, _t_fetch)
+        self._surface_attractor_associations(
+            eid, results, _t_retrieve, _t_fetch, suggestive=suggestive
+        )
         return results[:limit]
 
     def _attractor_retrieve(self, query: str) -> tuple[Any, float]:
@@ -1378,10 +1386,19 @@ class MemorySystem:
         results: list[SimilarEpisode],
         _t_retrieve: float,
         _t_fetch: float,
+        *,
+        suggestive: bool = False,
     ) -> None:
         """CA3 auto-association: surface episodes similar to the
         completed pattern — related memories the hippocampal CA3
-        region co-activates when one is recalled."""
+        region co-activates when one is recalled.
+
+        Associated episodes were never measured against the query,
+        so they do not claim a direct-match distance. They carry the
+        deep-recall gate distance — the edge of association range —
+        which ranks them below direct hits and above far noise. When
+        the anchor itself is suggestive (over-capacity attractor),
+        its associations are doubly indirect and stay weakest."""
         import time as _attractor_time
 
         _t0 = _attractor_time.perf_counter()
@@ -1405,7 +1422,9 @@ class MemorySystem:
                 results.append(
                     SimilarEpisode(
                         episode_id=sid_eid,
-                        hamming_distance=0,
+                        hamming_distance=(
+                            64 if suggestive else self._DEEP_RECALL_DISTANCE_GATE
+                        ),
                         timestamp=sep.timestamp,
                         salience=sep.salience,
                     )
