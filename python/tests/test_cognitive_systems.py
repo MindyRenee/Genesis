@@ -4117,4 +4117,38 @@ def test_channel_board_without_feed_or_daemon() -> None:
     holder._update_channel_board(1000.0)
     assert len(boards) == 1
     assert "daemon unreachable" in boards[0]
-    assert "up " in boards[0]
+
+
+def test_channel_board_fits_a_phone() -> None:
+    """Every board line stays under the mobile code-block width —
+    wide rows reflow to continuation lines, never scroll sideways."""
+    from brainstem.heartbeat import _BOARD_WIDTH
+
+    holder, boards = _board_holder()
+    holder._update_channel_board(1000.0)
+    text = boards[0]
+    body = [ln for ln in text.splitlines() if not ln.startswith("```")]
+    assert body, "board rendered no rows"
+    assert all(len(ln) <= _BOARD_WIDTH for ln in body), (
+        f"rows over {_BOARD_WIDTH} chars: {[ln for ln in body if len(ln) > _BOARD_WIDTH]}"
+    )
+
+
+def test_channel_board_small_wave_isnt_reported_zero() -> None:
+    """A measured 0.004 is not 0.00 — sub-0.005 wave power keeps a
+    third decimal so a real reading isn't displayed as a lie of zero."""
+    from types import SimpleNamespace
+
+    from thalamus.brain_waves import BrainWave
+
+    holder, boards = _board_holder()
+    holder.brain_waves = lambda c: SimpleNamespace(
+        powers={BrainWave.GAMMA: 0.0042},
+        dominant=BrainWave.GAMMA,
+    )
+    holder._update_channel_board(1000.0)
+    text = boards[0]
+    assert "γ 0.004" in text
+    # A two-decimal rendering would read "γ 0.00" followed by a
+    # line end or another reading — the token alone, whole.
+    assert "γ 0.00\n" not in text and "γ 0.00 " not in text

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import textwrap
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -61,6 +62,53 @@ _BOARD_WAVE_HZ = {
     "epsilon": "100-200",
     "infraslow": "0.1-0.5",
 }
+
+# The board's line budget. Discord renders a code block in a
+# horizontally-scrolling box — on a phone that's ~38-40 monospace
+# columns, so every board line is packed under 36 chars. A wide row
+# becomes indented continuation lines under the same label column;
+# readings are never clipped, only reflowed.
+_BOARD_WIDTH = 36
+# Width of the label column every board row shares ("waves    ").
+_BOARD_LABEL = 9
+
+
+def _board_pack(label: str, bits: list[str]) -> list[str]:
+    """Pack one labeled row of readings into ≤_BOARD_WIDTH lines.
+
+    `bits` are self-contained readings ("δ 0.09", "F 0.412") joined
+    by single spaces; the first line carries the label, continuations
+    indent under the value column. A single bit wider than the value
+    column still gets its own line — the row goes long rather than
+    break a reading in half.
+    """
+    prefix = f"{label:<{_BOARD_LABEL}}"
+    indent = " " * _BOARD_LABEL
+    lines = []
+    cur = prefix
+    for bit in bits:
+        at_col_start = cur == prefix or cur == indent
+        cand = cur + bit if at_col_start else cur + " " + bit
+        if not at_col_start and len(cand) > _BOARD_WIDTH:
+            lines.append(cur)
+            cur = indent + bit
+        else:
+            cur = cand
+    lines.append(cur)
+    return lines
+
+
+def _board_power(v: float) -> str:
+    """Wave power for the board — honest at the small end.
+
+    A measured 0.004 is not 0.00: when two decimals would round a
+    real reading to the lie "0.00" the board gives it a third. A
+    band that is genuinely ~zero still prints "0.00" — the digits
+    tell absent-tiny from absent.
+    """
+    if 0.0 < v < 0.005:
+        return f"{v:.3f}"
+    return f"{v:.2f}"
 
 
 class _AdaptiveInterval:
@@ -846,37 +894,49 @@ class HeartbeatMixin:
             logger.debug(f"feel() failed on board line: {e}")
         try:
             waves = self.brain_waves(core)
-            strip = " ".join(
-                f"{glyph} {waves.powers[w]:.2f}"
+            bits = [
+                f"{glyph} {_board_power(waves.powers[w])}"
                 for name, glyph in _BOARD_WAVES
                 for w in waves.powers
                 if w.value == name
-            )
-            if strip:
+            ]
+            if bits:
+                lines.extend(_board_pack("waves", bits))
                 dominant = getattr(waves, "dominant", None)
                 if dominant is not None:
                     hz = _BOARD_WAVE_HZ.get(dominant.value, "?")
-                    strip += f" · {dominant.value} {hz} Hz"
-                lines.append(f"waves    {strip}")
+                    lines.append(f"dom      {dominant.value} {hz} Hz")
         except Exception as e:  # noqa: BLE001
             logger.debug(f"brain_waves failed on board line: {e}")
-        lines.append(
-            f"affect   v {core.valence:+.2f} · a {core.arousal:.2f} · tone {core.global_tone:.2f}"
+        lines.extend(
+            _board_pack(
+                "affect",
+                [
+                    f"v {core.valence:+.2f}",
+                    f"a {core.arousal:.2f}",
+                    f"tone {core.global_tone:.2f}",
+                ],
+            )
         )
         inf = core.inference
         if inf is not None:
-            lines.append(
-                f"infer    F {inf.free_energy:.3f}"
-                f" · prec {inf.precision:.2f}"
-                f" · surp {inf.surprise_ema:.3f}"
-                f" · allo {inf.allostasis_load:.2f}"
-                f" · model {inf.model_maturity:.2f}"
+            lines.extend(
+                _board_pack(
+                    "infer",
+                    [
+                        f"F {inf.free_energy:.3f}",
+                        f"prec {inf.precision:.2f}",
+                        f"surp {inf.surprise_ema:.3f}",
+                        f"allo {inf.allostasis_load:.2f}",
+                        f"model {inf.model_maturity:.2f}",
+                    ],
+                )
             )
             lines.append(f"tick     {inf.inference_tick_count:,}")
         chem = core.chemicals or {}
-        bits = " ".join(f"{short} {chem[name]:.2f}" for short, name in _BOARD_CHEMS if name in chem)
+        bits = [f"{short} {chem[name]:.2f}" for short, name in _BOARD_CHEMS if name in chem]
         if bits:
-            lines.append(f"chem     {bits}")
+            lines.extend(_board_pack("chem", bits))
         # stm must come from the live ring — MemoryStats reports
         # RingBuffer::count(); the CoreState memory-pointers field
         # at offset 2584 is a dead mirror that nothing writes.
@@ -884,7 +944,7 @@ class HeartbeatMixin:
             stm_live = self.client.get_memory_stats().stm_count
         except Exception:  # noqa: BLE001
             stm_live = core.stm_count
-        lines.append(f"mem      stm {stm_live} · ltm {core.ltm_episode_count:,}")
+        lines.extend(_board_pack("mem", [f"stm {stm_live}", f"ltm {core.ltm_episode_count:,}"]))
 
     def _board_field_lines(self, lines: list[str]) -> None:
         """Rows for the substrate's measured physical life.
@@ -902,15 +962,15 @@ class HeartbeatMixin:
         if probe is None:
             lines.append("field    probe off")
             return
-        field_bits = (
-            f"carrier {probe.carrier_freq:.1f} Hz"
-            f" · thru {probe.throughput_mean:,.0f} it/s"
-            f" · jit {probe.jitter_cv:.2f}"
-            f" · irq {probe.irq_rate:,.0f}/s"
-        )
+        field_bits = [
+            f"carrier {probe.carrier_freq:.1f} Hz",
+            f"thru {probe.throughput_mean:,.0f} it/s",
+            f"jit {probe.jitter_cv:.2f}",
+            f"irq {probe.irq_rate:,.0f}/s",
+        ]
         if probe.carrier_coherence is not None:
-            field_bits += f" · coh {probe.carrier_coherence:.2f}"
-        lines.append(f"field    {field_bits}")
+            field_bits.append(f"coh {probe.carrier_coherence:.2f}")
+        lines.extend(_board_pack("field", field_bits))
         elec_bits = []
         if probe.power_watts is not None:
             elec_bits.append(f"pwr {probe.power_watts:.1f} W")
@@ -921,7 +981,7 @@ class HeartbeatMixin:
         if probe.power_coherence is not None:
             elec_bits.append(f"pcoh {probe.power_coherence:.2f}")
         if elec_bits:
-            lines.append(f"elec     {' · '.join(elec_bits)}")
+            lines.extend(_board_pack("elec", elec_bits))
         # The radio sense — the room's RF environment: WLAN
         # field strength + traffic flux, Bluetooth HCI event
         # flux. None-gated like everything else — absent radios
@@ -947,7 +1007,7 @@ class HeartbeatMixin:
         if probe.rf_tx_mbps is not None:
             rf_bits.append(f"{probe.rf_tx_mbps:.0f} Mbps")
         if rf_bits:
-            lines.append(f"rf       {' · '.join(rf_bits)}")
+            lines.extend(_board_pack("rf", rf_bits))
 
     def _board_cell_line(self, lines: list[str]) -> None:
         """The cell's modeled electrochemical state — the ion model's
@@ -956,12 +1016,17 @@ class HeartbeatMixin:
         it, is on the elec line above."""
         try:
             ions = self.client.get_ion_summary()
-            lines.append(
-                f"cell     Vm {ions.membrane_potential_mv:+.1f} mV"
-                f" · I {ions.net_membrane_current:.2f}"
-                f" · exc {ions.excitability:.2f}"
-                f" · grad {ions.gradient_integrity:.2f}"
-                f" · atp {ions.atp_availability:.2f}"
+            lines.extend(
+                _board_pack(
+                    "cell",
+                    [
+                        f"Vm {ions.membrane_potential_mv:+.1f} mV",
+                        f"I {ions.net_membrane_current:.2f}",
+                        f"exc {ions.excitability:.2f}",
+                        f"grad {ions.gradient_integrity:.2f}",
+                        f"atp {ions.atp_availability:.2f}",
+                    ],
+                )
             )
         except Exception as e:  # noqa: BLE001
             logger.debug(f"ion summary failed on board line: {e}")
@@ -982,25 +1047,30 @@ class HeartbeatMixin:
             done_n = sum(1 for t in threads if t.status == "resolved")
             ver = sum(1 for t in threads for c in t.claims if c.provenance == "verified")
             ref = sum(1 for t in threads for c in t.claims if c.provenance == "refuted")
-            proof = f"proof    {open_n} open · {done_n} resolved · {ver} verified · {ref} refuted"
+            proof_bits = [
+                f"{open_n} open",
+                f"{done_n} resolved",
+                f"{ver} verified",
+                f"{ref} refuted",
+            ]
             # The ledger's digest anchors the tallies to the file —
             # anyone holding workbench.json can recompute it and
             # confirm the board isn't showing rewritten history.
             digest = getattr(bench, "digest", lambda: "")()
             if digest:
-                proof += f" · #{digest}"
-            lines.append(proof)
+                proof_bits.append(f"#{digest}")
+            lines.extend(_board_pack("proof", proof_bits))
         # Growth she can be measured by — concept tally, edge tally,
         # and the plasticity gate that throttles learning.
         try:
             net = self.network
-            grow = f"grow     {net.size} concepts · {net.edge_count} edges"
+            grow_bits = [f"{net.size} concepts", f"{net.edge_count} edges"]
             archive = getattr(net, "archive_size", 0)
             if archive:
-                grow += f" · {archive} archived"
+                grow_bits.append(f"{archive} archived")
             if core is not None:
-                grow += f" · plast {core.plasticity_gate:.2f}"
-            lines.append(grow)
+                grow_bits.append(f"plast {core.plasticity_gate:.2f}")
+            lines.extend(_board_pack("grow", grow_bits))
         except Exception as e:  # noqa: BLE001
             logger.debug(f"growth row failed on board line: {e}")
         # The cause — which drives are pulling at her right now.
@@ -1011,9 +1081,9 @@ class HeartbeatMixin:
                 key=lambda kv: kv[1],
                 reverse=True,
             )
-            top = " · ".join(f"{name} {value:.2f}" for name, value in urges[:3] if value > 0.01)
+            top = [f"{name} {value:.2f}" for name, value in urges[:3] if value > 0.01]
             if top:
-                lines.append(f"drive    {top}")
+                lines.extend(_board_pack("drive", top))
         except Exception as e:  # noqa: BLE001
             logger.debug(f"drive row failed on board line: {e}")
         up_s = max(
@@ -1023,25 +1093,41 @@ class HeartbeatMixin:
         hours, minutes = divmod(up_s // 60, 60)
         channel = getattr(getattr(self, "world", None), "channel", None)
         ear = channel.ear if channel is not None else "off"
-        meta = (
-            f"meta     up {hours}h{minutes:02d}m"
-            f" · conv {getattr(self, '_interaction_count', 0)}"
-            f" · ear {ear}"
-        )
+        meta_bits = [
+            f"up {hours}h{minutes:02d}m",
+            f"conv {getattr(self, '_interaction_count', 0)}",
+            f"ear {ear}",
+        ]
         if core is not None:
             # Freshness and continuity proofs: the raw 5 Hz body
             # counter must climb between refreshes, the snapshot age
             # must stay ~0 (a replayed card can't hold it), and the
             # instance id proves the same process keeps answering.
             age_ms = max(0.0, time.time() * 1000 - core.last_updated)
-            meta += f" · hb {core.heartbeat:,} · age {age_ms / 1000:.1f}s · id {core.instance_id}"
-        lines.append(meta)
+            meta_bits += [
+                f"hb {core.heartbeat:,}",
+                f"age {age_ms / 1000:.1f}s",
+                f"id {core.instance_id}",
+            ]
+        lines.extend(_board_pack("meta", meta_bits))
         last = getattr(self, "_last_emitted", None)
         if last:
             kind, text = last
             clean = " ".join(str(text).split()).replace("`", "'")[:140]
             if clean:
-                lines.append(f"last     [{kind}] {clean}")
+                # The one free-text row: wrap it into the board's
+                # column, capped at three lines — a thought that
+                # outgrows the card ends with an ellipsis rather
+                # than a scroll.
+                chunks = textwrap.wrap(
+                    f"[{kind}] {clean}",
+                    width=_BOARD_WIDTH - _BOARD_LABEL,
+                )
+                if len(chunks) > 3:
+                    chunks = chunks[:3]
+                    chunks[-1] = chunks[-1][:-1] + "…"
+                lines.append(f"{'last':<{_BOARD_LABEL}}{chunks[0]}")
+                lines.extend(" " * _BOARD_LABEL + c for c in chunks[1:])
 
     def _heartbeat_sensors(
         self,
