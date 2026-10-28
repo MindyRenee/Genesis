@@ -1207,6 +1207,37 @@ class LifecycleMixin:
                 mod_counts,
             )
 
+        # Rehydrate the learned sentiment lexicon from the restored
+        # network. ``connect_word_to_valence`` persists polarity as the
+        # concept's ``valence_state`` property (plus an EXPRESSES edge
+        # to the ``_cat:valence`` hub) and magnitude as
+        # ``valence_score``, but ``LEARNED_LEXICON`` — the only source
+        # ``analyze_sentiment`` consults — is volatile. Without this
+        # every boot read all user affect as zero until the words were
+        # re-taught. Older saves carry only the polarity; those fall
+        # back to the ±2.0 the teaching path writes.
+        try:
+            from limbic_system.sentiment import learn_sentiment
+
+            restored = 0
+            for state, fallback in (("positive", 2.0), ("negative", -2.0)):
+                for concept in network.find_concepts_by_property(
+                    "valence_state", state, limit=10_000
+                ):
+                    try:
+                        score = float(concept.properties.get("valence_score", fallback))
+                    except (TypeError, ValueError):
+                        score = fallback
+                    learn_sentiment(concept.id, score)
+                    restored += 1
+            if restored:
+                logger.info("Rehydrated %d learned sentiment scores", restored)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.lifecycle._load_saved_state",
+                e,
+            )
+
     def _restore_saved_components(self, data) -> None:
         """Validate and commit each saved component as one transaction."""
         from self import Reflection, SelfModel

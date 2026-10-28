@@ -81,6 +81,108 @@ def test_mind_lifecycle_learner_persistence():
         assert stats3["conversation_facts"] > stats2["conversation_facts"]
 
 
+def test_learned_sentiment_survives_restart(tmp_path):
+    """Taught word valence must repopulate the volatile lexicon on load.
+
+    ``connect_word_to_valence`` persists polarity in the concept graph
+    (``valence_state`` property + ``_cat:valence`` hub edge), but
+    ``LEARNED_LEXICON`` — the only table ``analyze_sentiment`` reads —
+    is process-local. Without rehydration every boot zeroed her affect
+    vocabulary and all user sentiment read as neutral.
+    """
+    from limbic_system.sentiment import (
+        LEARNED_LEXICON,
+        analyze_sentiment,
+        lookup_sentiment,
+    )
+
+    data_dir = tmp_path
+    socket_path = os.path.join(data_dir, "genesis.sock")
+
+    mind1 = Mind(socket_path)
+    learner = mind1.brain.frontal._concept_learner
+    learner.connect_word_to_valence("zephyr", "positive", 2.0)
+    learner.connect_word_to_valence("mire", "negative", -2.0)
+    # A conditioned (non-anchor) score must restore its own magnitude,
+    # not the ±2.0 teaching default.
+    learner.condition_word_valence("murmur", 0.8)
+    murmur_score = lookup_sentiment("murmur")
+    assert murmur_score is not None and 0.0 < murmur_score < 2.0
+    assert lookup_sentiment("zephyr") == 2.0
+    mind1._save_state()
+
+    # Simulate the restart: the volatile lexicon dies with the process.
+    LEARNED_LEXICON.clear()
+    try:
+        assert lookup_sentiment("zephyr") is None
+
+        mind2 = Mind(socket_path)
+        mind2._load_saved_state()
+
+        # The persisted graph repopulates it — taught score, both poles.
+        assert lookup_sentiment("zephyr") == 2.0
+        assert lookup_sentiment("mire") == -2.0
+        assert lookup_sentiment("murmur") == pytest.approx(murmur_score)
+        assert analyze_sentiment("zephyr") != 0.0
+
+        # Unknown words stay unknown — no phantom sentiment.
+        assert lookup_sentiment("quixotic") is None
+
+        # Idempotent: a second load must not double-count or drift.
+        mind2._load_saved_state()
+        assert lookup_sentiment("zephyr") == 2.0
+    finally:
+        LEARNED_LEXICON.clear()
+
+
+def test_evaluative_conditioning_acquires_word_sentiment(tmp_path):
+    """Words co-occurring with felt valence acquire its polarity.
+
+    Evaluative conditioning: resting-tone valence teaches nothing,
+    salient valence nudges content words (never function words), and
+    repeated opposite pairings can flip a word's polarity — moving its
+    EXPRESSES edge to the other hub so both don't claim it.
+    """
+    from limbic_system.emotion import EmotionalState
+    from limbic_system.sentiment import LEARNED_LEXICON, lookup_sentiment
+    from temporal_lobe.concepts import RelationType
+
+    learner = Mind(str(tmp_path / "genesis.sock")).brain.frontal._concept_learner
+
+    def _emotion(valence: float) -> EmotionalState:
+        return EmotionalState(label="neutral", cognitive_style="steady", valence=valence)
+
+    try:
+        # Resting-tone valence is not an unconditioned stimulus.
+        learner.learn_word_from_labeling("the zephyr returned", _emotion(0.3))
+        assert lookup_sentiment("zephyr") is None
+
+        # Salient valence conditions the content words of the message.
+        for _ in range(4):
+            learner.learn_word_from_labeling("the zephyr returned to you", _emotion(0.8))
+        score = lookup_sentiment("zephyr")
+        assert score is not None and score > 0
+        # Function words never acquire sentiment.
+        assert lookup_sentiment("the") is None
+        assert lookup_sentiment("you") is None
+        assert lookup_sentiment("returned") is not None
+
+        # Sustained opposite pairing flips the polarity.
+        for _ in range(20):
+            learner.learn_word_from_labeling("zephyr again", _emotion(-0.9))
+        assert lookup_sentiment("zephyr") < 0
+        concept = learner._network.get_concept("zephyr")
+        assert concept.properties["valence_state"] == "negative"
+        assert concept.properties["valence_score"] < 0
+        # The positive hub released it; the negative hub holds it.
+        pos = learner._network.get_exact_neighbors("_cat:valence:positive", RelationType.EXPRESSES)
+        assert "zephyr" not in {n[0] for n in pos}
+        neg = learner._network.get_exact_neighbors("_cat:valence:negative", RelationType.EXPRESSES)
+        assert "zephyr" in {n[0] for n in neg}
+    finally:
+        LEARNED_LEXICON.clear()
+
+
 def test_failed_late_restore_does_not_commit_network(tmp_path):
     """A malformed later component must not partially publish a save."""
     import gzip

@@ -123,6 +123,42 @@ _LABELING_SKIP_WORDS = {
     "through",
 }
 
+# Evaluative conditioning (De Houwer 2007): a neutral stimulus
+# repeatedly paired with an affective state acquires that state's
+# polarity. Below the gate, felt valence is resting tone — not an
+# unconditioned stimulus — and conditions nothing.
+_EC_VALENCE_GATE = 0.5
+# Per-pairing nudge at unit valence; kept small so connotation builds
+# over several encounters rather than one loud moment.
+_EC_GAIN = 0.4
+
+# Fragments left when "don't"/"isn't" split on the apostrophe —
+# not words, never learnable.
+_EC_SKIP_FRAGMENTS = frozenset(
+    {
+        "don",
+        "didn",
+        "doesn",
+        "isn",
+        "aren",
+        "wasn",
+        "weren",
+        "won",
+        "wouldn",
+        "couldn",
+        "shouldn",
+        "mustn",
+        "haven",
+        "hasn",
+        "hadn",
+        "ain",
+        "ll",
+        "ve",
+        "re",
+        "em",
+    }
+)
+
 
 class ConceptLearner:
     """Learn words from social labeling and spread concept activation.
@@ -199,6 +235,55 @@ class ConceptLearner:
         self._try_learn_valence(lower, skip_words)
         # Verb acquisition — explicit teaching registers the base form.
         self._try_learn_verb(lower, skip_words)
+        # Evaluative conditioning — the implicit half of sentiment
+        # acquisition. Explicit frames above are rare; most human word
+        # connotation is absorbed from co-occurrence with felt state.
+        self._condition_words_on_valence(lower, emotion.valence)
+
+    def _condition_words_on_valence(self, text: str, valence: float) -> int:
+        """Let heard words absorb the valence felt when they arrive.
+
+        Evaluative conditioning (De Houwer 2007): content words in the
+        utterance are conditioned stimuli, her live felt valence is the
+        unconditioned stimulus. Below ``_EC_VALENCE_GATE`` the state is
+        resting tone and conditions nothing — otherwise every message
+        would drift its words toward her mildly positive baseline.
+        Function words and contraction fragments never learn.
+        """
+        if abs(valence) < _EC_VALENCE_GATE:
+            return 0
+        from temporal_lobe.concepts.classify import _FUNCTION_WORDS
+
+        words = {
+            w
+            for w in re.findall(r"[a-z]+", text)
+            if len(w) >= 3
+            and w not in _LABELING_SKIP_WORDS
+            and w not in _FUNCTION_WORDS
+            and w not in _EC_SKIP_FRAGMENTS
+        }
+        for word in words:
+            self.condition_word_valence(word, valence)
+        return len(words)
+
+    def condition_word_valence(self, word: str, felt_valence: float) -> float:
+        """Nudge a word's sentiment score by a felt valence.
+
+        Satiation-scaled: scores near the ±4 clamp resist further
+        drift, so explicitly taught anchors (±2.0) move slowly under
+        conditioning while novel words respond quickly to a few
+        pairings. Returns the new score.
+        """
+        from limbic_system.sentiment import lookup_sentiment
+
+        w = word.lower().strip()
+        if not w:
+            return 0.0
+        current = lookup_sentiment(w) or 0.0
+        new = current + felt_valence * _EC_GAIN * (1.0 - abs(current) / 4.0)
+        polarity = "positive" if new >= 0 else "negative"
+        self.connect_word_to_valence(w, polarity, new)
+        return new
 
     def _try_learn_valence(self, lower: str, skip_words: set[str]) -> bool:
         """Learn a word's polarity from a taught frame."""
@@ -304,11 +389,21 @@ class ConceptLearner:
             logger.warning("valence_learn: failed to create '%s'", w)
             return
         concept.properties["valence_state"] = valence_state
+        # Magnitude persists alongside polarity so a restart restores
+        # the learned score, not just the teaching-path default ±2.0.
+        concept.properties["valence_score"] = score
 
         hub_id = f"_cat:valence:{valence_state}"
         if self._network.get_concept(hub_id) is None:
             self._network.add_concept(hub_id, confidence=0.8, origin="structural")
         existing = self._network.get_exact_neighbors(w, RelationType.EXPRESSES)
+        # Conditioning can push a score across zero and flip polarity;
+        # retract the stale hub edge so both hubs don't claim the word.
+        stale_hub = (
+            "_cat:valence:negative" if valence_state == "positive" else "_cat:valence:positive"
+        )
+        if any(n[0] == stale_hub for n in existing):
+            self._network.remove_edge(w, stale_hub, RelationType.EXPRESSES)
         if not any(n[0] == hub_id for n in existing):
             self._network.add_edge(
                 w,
