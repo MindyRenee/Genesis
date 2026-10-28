@@ -788,9 +788,12 @@ const _: () = {
     assert!(offset_of!(FoldMargins, _pad) == 33);
 };
 
-/// Compact neurochemical summary (32 bytes) — sent in response to
+/// Compact neurochemical summary (40 bytes) — sent in response to
 /// GetNeuroSummary. This is what the Python side reads to know how
-/// Genesis feels without transferring the full state.
+/// Genesis feels without transferring the full state. The trailing
+/// dopamine fields were appended in v2 of this packet: older daemons
+/// send the 32-byte prefix, and both decoders accept either length —
+/// a missing tail reads as zero dopamine tonic/phasic.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 
@@ -813,11 +816,19 @@ pub struct NeuroSummary {
     pub phase: u8,
     /// Alignment padding.
     pub _pad: [u8; 3],
+    /// Tonic dopamine — the slow background level. Reports the
+    /// integrated reward environment (vigor; Niv et al., 2007) as
+    /// distinct from the burst transient below.
+    pub dopamine_tonic: f32,
+    /// Phasic dopamine — the fast burst transient of reward
+    /// prediction error, decaying on the ~1.5 s scale. The
+    /// synaptic tag-and-capture gate reads this directly.
+    pub dopamine_phasic: f32,
 }
 
 const _: () = {
     use core::mem::offset_of;
-    assert!(core::mem::size_of::<NeuroSummary>() == 32);
+    assert!(core::mem::size_of::<NeuroSummary>() == 40);
     assert!(offset_of!(NeuroSummary, arousal) == 0);
     assert!(offset_of!(NeuroSummary, valence) == 4);
     assert!(offset_of!(NeuroSummary, global_tone) == 8);
@@ -826,6 +837,8 @@ const _: () = {
     assert!(offset_of!(NeuroSummary, consolidation_weight) == 20);
     assert!(offset_of!(NeuroSummary, retrieval_weight) == 24);
     assert!(offset_of!(NeuroSummary, phase) == 28);
+    assert!(offset_of!(NeuroSummary, dopamine_tonic) == 32);
+    assert!(offset_of!(NeuroSummary, dopamine_phasic) == 36);
 };
 
 /// Memory statistics (24 bytes).
@@ -2077,21 +2090,25 @@ impl IpcClient {
 
     pub fn get_neuro_summary(&mut self) -> std::io::Result<NeuroSummary> {
         let resp = self.request(cmd::GET_NEURO_SUMMARY, &[])?;
-        if resp.len() < core::mem::size_of::<NeuroSummary>() {
+        // v1 packets are the 32-byte prefix (no dopamine tail); v2
+        // adds 8 bytes. Accept either — a short tail zero-fills.
+        const PREFIX_LEN: usize = 32;
+        if resp.len() < PREFIX_LEN {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "neuro summary response too short",
             ));
         }
+        let copy_len = resp.len().min(core::mem::size_of::<NeuroSummary>());
         let mut summary = NeuroSummary::default();
-        // SAFETY: `resp.len()` was checked ≥ size_of::<NeuroSummary>().
+        // SAFETY: `resp` holds at least `copy_len` bytes.
         // `summary` is a stack value. Non-overlapping heap→stack copy.
         // NeuroSummary is #[repr(C)] with no padding.
         unsafe {
             std::ptr::copy_nonoverlapping(
                 resp.as_ptr(),
                 &mut summary as *mut NeuroSummary as *mut u8,
-                core::mem::size_of::<NeuroSummary>(),
+                copy_len,
             );
         }
         Ok(summary)
@@ -2980,6 +2997,18 @@ pub fn default_handler<L: LtmAccess>(
                         ),
                         phase: state.zones.emergent_phase,
                         _pad: [0; 3],
+                        dopamine_tonic: crate::state::sanitize::finite_clamp(
+                            state.neurochemicals.chemicals[NeurochemicalId::Dopamine as usize]
+                                .tonic_level,
+                            0.0,
+                            1.0,
+                        ),
+                        dopamine_phasic: crate::state::sanitize::finite_clamp(
+                            state.neurochemicals.chemicals[NeurochemicalId::Dopamine as usize]
+                                .phasic_level,
+                            0.0,
+                            1.0,
+                        ),
                     };
                     // SAFETY: `summary` is a valid stack-owned value.
                     // Slice covers exactly size_of::<NeuroSummary>() bytes.

@@ -125,7 +125,8 @@ impl Drop for IpcTestSystem {
 
 #[test]
 fn test_neuro_summary_size() {
-    assert_eq!(core::mem::size_of::<NeuroSummary>(), 32);
+    // v2 packet: 32-byte v1 prefix + dopamine tonic/phasic tail.
+    assert_eq!(core::mem::size_of::<NeuroSummary>(), 40);
 }
 
 #[test]

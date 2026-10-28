@@ -3393,13 +3393,19 @@ class FrontalLobe:
         # windows never close and memories stay permanently modifiable.
         self.memory.tick_reconsolidation(dt=dt)
         # Synaptic tags (Frey & Morris): tags set at encoding decay on
-        # the ~hour scale; while the body's effective dopamine is in a
-        # phasic burst, tagged traces capture protein from the shared
-        # pool and commit to late-LTP. The body decides what survives.
+        # the ~hour scale; while the body's dopamine is in a phasic
+        # burst, tagged traces capture protein from the shared pool
+        # and commit to late-LTP. The body decides what survives. The
+        # gate reads the daemon's raw phasic level when the packet
+        # carries it, falling back to the effective level — a burst
+        # elevates both.
         try:
             core = self._last_core_state
-            da = float(core.chemicals.get("dopamine", 0.35)) if core is not None else 0.35
-            self.memory.tick_tags(dt=dt, dopamine=da)
+            effective = float(core.chemicals.get("dopamine", 0.35)) if core is not None else 0.35
+            summary = self._last_summary
+            phasic = summary.dopamine_phasic if summary is not None else None
+            da_gate = max(phasic or 0.0, effective)
+            self.memory.tick_tags(dt=dt, dopamine=da_gate)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.prefrontal.tick",
@@ -4994,10 +5000,15 @@ class FrontalLobe:
             self.decision_engine.set_exploration(
                 float(core.chemicals.get("norepinephrine", 0.3)) if core is not None else None
             )
-            # Tonic dopamine = average reward rate ρ̄ (Niv et al.,
-            # 2007): rich recent reward lowers the release bar —
-            # the system acts with vigor rather than hesitating.
-            self.decision_engine.set_vigor(self.td_learner.average_reward_rate())
+            # Tonic dopamine = the integrated reward environment —
+            # the opportunity cost of time (Niv et al., 2007). Prefer
+            # the daemon's own tonic level; the learner's running
+            # reward rate is the fallback when the packet lacks it.
+            summary = self._last_summary
+            tonic = summary.dopamine_tonic if summary is not None else None
+            self.decision_engine.set_vigor(
+                tonic if tonic is not None else self.td_learner.average_reward_rate()
+            )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.prefrontal._apply_decision_engine",

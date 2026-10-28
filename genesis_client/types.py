@@ -70,7 +70,7 @@ LEARNING_POSTURE_PROTECTIVE = "protective"
 LEARNING_POSTURE_RECOVERING = "recovering"
 LEARNING_POSTURE_NEUTRAL = "neutral"
 
-# ─── NeuroSummary (32 bytes) ──────────────────────────────────
+# ─── NeuroSummary (40 bytes; v1 = 32-byte prefix) ─────────────
 #
 # offset  field                  type
 # ------  -----                  ----
@@ -83,6 +83,8 @@ LEARNING_POSTURE_NEUTRAL = "neutral"
 #  24     retrieval_weight       f32
 #  28     phase                  u8
 #  29     _pad                   [u8;3]
+#  32     dopamine_tonic         f32   (v2 only — absent on 32-byte packets)
+#  36     dopamine_phasic        f32   (v2 only — absent on 32-byte packets)
 
 
 @dataclass(frozen=True)
@@ -188,7 +190,14 @@ class FoldMargins:
 
 @dataclass(frozen=True)
 class NeuroSummary:
-    """Compact neurochemical summary — how Genesis feels right now."""
+    """Compact neurochemical summary — how Genesis feels right now.
+
+    ``dopamine_tonic``/``dopamine_phasic`` are the daemon's own
+    tonic/phasic decomposition of dopamine (vigor / RPE-burst
+    channels). They arrive only on the extended 40-byte packet —
+    on a 32-byte (v1) response both are ``None``, and consumers
+    should fall back to the effective ``chemicals["dopamine"]``.
+    """
 
     arousal: float
     valence: float
@@ -198,6 +207,8 @@ class NeuroSummary:
     consolidation_weight: float
     retrieval_weight: float
     phase: int
+    dopamine_tonic: float | None = None
+    dopamine_phasic: float | None = None
 
     @property
     def phase_name(self) -> str:
@@ -206,7 +217,11 @@ class NeuroSummary:
 
     @classmethod
     def unpack(cls, data: bytes) -> NeuroSummary:
-        """Unpack a 32-byte NeuroSummary from the daemon's binary response."""
+        """Unpack a NeuroSummary from the daemon's binary response.
+
+        v1 packets are 32 bytes; v2 appends the dopamine tonic/phasic
+        pair for 40 bytes total. Either is accepted.
+        """
         if len(data) < 32:
             raise ValueError(f"NeuroSummary needs 32 bytes, got {len(data)}")
         return cls(
@@ -218,6 +233,8 @@ class NeuroSummary:
             consolidation_weight=_F32.unpack(data[20:24])[0],
             retrieval_weight=_F32.unpack(data[24:28])[0],
             phase=data[28],
+            dopamine_tonic=_F32.unpack(data[32:36])[0] if len(data) >= 40 else None,
+            dopamine_phasic=_F32.unpack(data[36:40])[0] if len(data) >= 40 else None,
         )
 
 

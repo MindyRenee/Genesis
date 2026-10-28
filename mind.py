@@ -146,11 +146,11 @@ class Mind(
         "reach_out": 20.0,  # reaching out — speech-like, light
         "safeguard": 10.0,  # self-protection — fast, but not at wake
     }
-    CONVERSATION_FOCUS_SECONDS: float = 60.0
+    CONVERSATION_FOCUS_SECONDS: float = 100.0
     # Maximum social bids it makes into silence. After this many
     # unanswered reach-outs it stops calling — the isolation stimulus
     # is also dampened per-bid in _volition_context (habituation).
-    _REACH_OUT_MAX_BIDS: ClassVar[int] = 3
+    _REACH_OUT_MAX_BIDS: ClassVar[int] = 4
     _SELF_COMMANDS: ClassVar[dict[str, str]] = {
         "/introspect": "introspect",
         "/sleep": "sleep",
