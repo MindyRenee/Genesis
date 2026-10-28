@@ -135,6 +135,7 @@ from .protocol import (
     SEARCH_EPISODES,
     SET_COGNITIVE_PID,
     SET_FIELD_CARRIER,
+    SET_FIELD_PULSE,
     SET_FOCUS,
     SET_LID,
     SET_OPTIC_GAIN,
@@ -902,6 +903,33 @@ class GenesisClient:
         payload = _F32.pack(depth) + _F32.pack(freq)
         try:
             resp = self._request(SET_FIELD_CARRIER, payload, timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return False
+        return bool(resp) and resp[0] == 1
+
+    def set_field_pulse(
+        self,
+        base: float,
+        mod_freq: float,
+        mod_depth: float,
+        *,
+        timeout: float | None = None,
+    ) -> bool:
+        """Arm the parasympathetic pulse — a slow wave riding carrier depth.
+
+        While armed, the probe breathes carrier depth as
+        ``base + mod_depth·sin(2π·mod_freq·t)``, integrated on the
+        body's own clock — the RSA analog: the vagal signature is the
+        pulse's slow wax and wane, never a pinned tempo. Carrier rate
+        stays the phase's own either way; ``mod_freq <= 0`` disarms
+        and depth returns to the static set-point.
+
+        Returns ``False`` when the probe isn't running or the daemon
+        predates the command — an absent channel, never silent.
+        """
+        payload = _F32.pack(base) + _F32.pack(mod_freq) + _F32.pack(mod_depth)
+        try:
+            resp = self._request(SET_FIELD_PULSE, payload, timeout=timeout)
         except (ConnectionError, OSError, ProtocolError):
             return False
         return bool(resp) and resp[0] == 1

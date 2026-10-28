@@ -581,6 +581,17 @@ pub mod cmd {
     /// PROTOCOL_VERSION is unaffected.
     pub const GET_FOLD_MARGINS: u8 = 62;
 
+    /// Arm or disarm the parasympathetic pulse — a slow autonomic
+    /// wave riding the carrier's modulation *depth* (contractility,
+    /// not rate; the RSA analog — the vagal signature is the pulse's
+    /// slow wax and wane, never a pinned tempo). Request:
+    /// `[f32 base][f32 mod_freq_hz][f32 mod_depth]`; `mod_freq <= 0`
+    /// disarms and depth returns to the static set-point. When armed
+    /// the probe integrates the envelope on its own clock — the wave
+    /// runs on the body's time whether or not the mind ticks.
+    /// Reply: [u8 ack]. Additive: PROTOCOL_VERSION unaffected.
+    pub const SET_FIELD_PULSE: u8 = 63;
+
     // ─── Tensor slab ──────────────────────────────────────────
     // Named multidimensional tensors shared between the daemon and
     // the cognitive mind — world frames, salience fields, embeddings,
@@ -3660,6 +3671,25 @@ pub fn default_handler<L: LtmAccess>(
             match super::field_probe::shared() {
                 Some(probe) => {
                     probe.set_carrier(depth, freq);
+                    vec![1u8]
+                }
+                None => vec![error::READ_FAILED],
+            }
+        }
+
+        cmd::SET_FIELD_PULSE => {
+            // The parasympathetic envelope — a slow wave riding
+            // carrier depth, integrated on the probe's own clock.
+            // mod_freq <= 0 disarms.
+            if payload.len() < 12 {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let base = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
+            let mod_freq = f32::from_le_bytes(payload[4..8].try_into().unwrap_or_default());
+            let mod_depth = f32::from_le_bytes(payload[8..12].try_into().unwrap_or_default());
+            match super::field_probe::shared() {
+                Some(probe) => {
+                    probe.set_pulse(base, mod_freq, mod_depth);
                     vec![1u8]
                 }
                 None => vec![error::READ_FAILED],

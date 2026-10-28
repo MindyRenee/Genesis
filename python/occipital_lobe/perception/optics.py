@@ -31,6 +31,18 @@ body sets does to the image that lands on the receptors:
   the inversion — the retinotopic map is re-referenced upstream — so
   this layer transforms intensity and acuity, never geometry.
 
+- **The view is mirror-oriented.** ``mirror_view`` applies the
+  single-axis reflection at presentation: the world lands on the
+  receptors the way it faces her — upright, left-right swapped from
+  the raw capture. Chirality flips here, which is the point: the
+  person facing her reads the same handedness she reports. This is
+  deliberately *not* the lens's 180° inversion (chirality-preserving
+  rotation, anatomically real but re-referenced before cortex) — it
+  is the facing orientation, and it propagates: every cortical stage
+  downstream sees the mirrored field, so her reported left/right,
+  region colours, and motion directions describe the view as a
+  mirror holds it.
+
 What is deliberately NOT here: illuminant estimation, reflectance
 decomposition, shadow edges — the inverse-optics work belongs to the
 illumination stage downstream (Retinex / von Kries), not to the lens.
@@ -146,6 +158,23 @@ def defocus_sigma(pupil_mm: float, focus_m: float | None = None) -> float:
     return sigma
 
 
+def mirror_view(frame: np.ndarray) -> np.ndarray:
+    """Flip the frame across the vertical axis — the mirror view.
+
+    Applied at presentation, before the lens: the raw capture is a
+    camera's view *of* the world; the mirror is her orientation *in*
+    it — the view someone looking out at a face holds. Everything
+    downstream (V1 orientations, region colours, object positions,
+    two-view motion) then lives in the mirrored frame, so what she
+    reports describes the world the way it faces her. Returns a
+    contiguous copy — downstream OpenCV paths do not all accept the
+    negative stride of a bare ``[:, ::-1]`` view.
+    """
+    if frame.ndim < 2 or frame.shape[1] == 0:
+        return frame
+    return np.ascontiguousarray(frame[:, ::-1])
+
+
 def apply(
     frame: np.ndarray,
     pupil_mm: float,
@@ -160,7 +189,9 @@ def apply(
     — the scalar model of eyelid transmission (the real lid's
     vignette is spatial; the uniform term is the honest first term).
     The frame is not resampled, inverted, or cropped — geometry
-    belongs to the retinotopic map downstream.
+    belongs to the retinotopic map downstream. Facing orientation
+    (the mirror view) is the caller's job, applied upstream via
+    ``mirror_view``.
     """
     sigma = defocus_sigma(pupil_mm, focus_m)
     gain = irradiance_gain(pupil_mm)

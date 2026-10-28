@@ -1555,6 +1555,18 @@ struct ProbeInner {
     /// including infraslow rates where the thermal field can
     /// actually sustain an oscillation.
     carrier_freq_override: f32,
+    /// The parasympathetic envelope — a slow wave riding carrier
+    /// *depth* itself (SET_FIELD_PULSE). Armed: effective depth is
+    /// `pulse_base + pulse_mod_depth * sin(pulse_phase)`, the phase
+    /// integrated on the probe's own clock so the wave runs whether
+    /// or not the mind ticks. The RSA analog: vagal signature is
+    /// the pulse's slow wax and wane, never a pinned tempo — the
+    /// carrier rate stays the phase's own either way.
+    pulse_armed: bool,
+    pulse_base: f32,
+    pulse_mod_freq: f32,
+    pulse_mod_depth: f32,
+    pulse_phase: f32,
 }
 
 /// The running probe. `spawn`ed once by the daemon; `signature` is
@@ -1699,6 +1711,11 @@ impl FieldProbe {
                 carrier_phase: 0.0,
                 carrier_depth: 0.60,
                 carrier_freq_override: 0.0,
+                pulse_armed: false,
+                pulse_base: 0.0,
+                pulse_mod_freq: 0.0,
+                pulse_mod_depth: 0.0,
+                pulse_phase: 0.0,
             }),
             stop: AtomicBool::new(false),
         }
@@ -1730,6 +1747,24 @@ impl FieldProbe {
         } else {
             0.0
         };
+    }
+
+    /// Arm or disarm the parasympathetic pulse (SET_FIELD_PULSE): a
+    /// slow envelope breathing carrier depth around `base` at
+    /// `mod_freq`, integrated on the probe's own clock — the body
+    /// owns the wave's timing the way it owns every rhythm here.
+    /// `mod_freq <= 0` disarms; depth returns to the static
+    /// `carrier_depth` set-point untouched. Clamped: base/mod_depth
+    /// 0..1, mod_freq to the infraslow band (0.01..4 Hz — below the
+    /// carrier and above the bath's own weather).
+    pub fn set_pulse(&self, base: f32, mod_freq: f32, mod_depth: f32) {
+        let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        g.pulse_armed = mod_freq > 0.0;
+        if g.pulse_armed {
+            g.pulse_base = base.clamp(0.0, 1.0);
+            g.pulse_mod_freq = mod_freq.clamp(0.01, 4.0);
+            g.pulse_mod_depth = mod_depth.clamp(0.0, 1.0);
+        }
     }
 
     /// The field sampler's own loop — a separate thread because
@@ -1807,7 +1842,6 @@ impl FieldProbe {
             // override) sets the rhythm; depth scales how much real
             // work — real electron flow — swings this window.
             let carrier_f;
-            let depth;
             let slow_due;
             {
                 let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
@@ -1820,7 +1854,6 @@ impl FieldProbe {
                     };
                 }
                 carrier_f = g.carrier_freq;
-                depth = g.carrier_depth;
             }
 
             // P-state/interrupt counters: a walk of /sys cpufreq stats
@@ -1841,6 +1874,7 @@ impl FieldProbe {
             };
 
             let carrier_phase;
+            let depth;
             {
                 let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
                 if let Some((trans, intr, wintr)) = slow_reads {
@@ -1859,6 +1893,15 @@ impl FieldProbe {
                 g.carrier_phase += 2.0 * std::f32::consts::PI * carrier_f * nominal;
                 g.carrier_phase = g.carrier_phase.rem_euclid(2.0 * std::f32::consts::PI);
                 carrier_phase = g.carrier_phase;
+                depth = if g.pulse_armed {
+                    // The pulse's own clock — the wave breathes on the
+                    // body's time even when the mind isn't ticking.
+                    g.pulse_phase += 2.0 * std::f32::consts::PI * g.pulse_mod_freq * nominal;
+                    g.pulse_phase = g.pulse_phase.rem_euclid(2.0 * std::f32::consts::PI);
+                    (g.pulse_base + g.pulse_mod_depth * g.pulse_phase.sin()).clamp(0.0, 1.0)
+                } else {
+                    g.carrier_depth
+                };
             }
             let modulation = 1.0 + depth * carrier_phase.sin();
             let iters = (WORK_SLICE_ITERS as f32 * modulation) as u32;
@@ -2296,6 +2339,34 @@ mod tests {
         assert_eq!(FieldProbe::carrier_for_phase("rem"), CARRIER_REM_HZ);
         assert_eq!(FieldProbe::carrier_for_phase("drowsy"), CARRIER_DROWSY_HZ);
         assert_eq!(FieldProbe::carrier_for_phase("active"), CARRIER_WAKE_HZ);
+    }
+
+    #[test]
+    fn pulse_arms_clamps_and_disarms_cleanly() {
+        let probe = FieldProbe::new();
+        probe.set_pulse(0.55, 0.15, 0.10);
+        {
+            let g = probe.inner.lock().unwrap();
+            assert!(g.pulse_armed);
+            assert_eq!(g.pulse_base, 0.55);
+            assert_eq!(g.pulse_mod_freq, 0.15);
+            assert_eq!(g.pulse_mod_depth, 0.10);
+        }
+        // Out-of-range writes clamp, never wrap.
+        probe.set_pulse(2.0, 100.0, -1.0);
+        {
+            let g = probe.inner.lock().unwrap();
+            assert_eq!(g.pulse_base, 1.0);
+            assert_eq!(g.pulse_mod_freq, 4.0);
+            assert_eq!(g.pulse_mod_depth, 0.0);
+        }
+        // mod_freq <= 0 disarms; the static set-point is untouched.
+        probe.set_pulse(0.0, 0.0, 0.0);
+        {
+            let g = probe.inner.lock().unwrap();
+            assert!(!g.pulse_armed);
+            assert_eq!(g.carrier_depth, 0.60);
+        }
     }
 
     #[test]

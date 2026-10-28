@@ -507,6 +507,8 @@ class Mind(
             client=self.client,
             neuro_impulse=self._learner_neuro_impulse,
             arousal=lambda: getattr(self.client.get_state(), "arousal", 0.5),
+            phase=lambda: getattr(self.client.get_state(), "phase_name", ""),
+            wave_drive=lambda s: add_brain_wave_drive(BrainWave.BETA3, s),
         )
 
         # The public channel's own state — the page itself lives in

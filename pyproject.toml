@@ -107,7 +107,12 @@ testpaths = ["python/tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-q"
+# Block the system astropy plugin family that autoloads on this
+# host — pytest_astropy pulls in astropy → erfa, which is compiled
+# against NumPy 1.x and crashes the session under NumPy 2. None of
+# them serve this suite; `-p no:` on an absent plugin is harmless
+# on hosts that lack them.
+addopts = "-q -p no:pytest_astropy -p no:pytest_astropy_header -p no:pytest_arraydiff -p no:pytest_doctestplus -p no:pytest_filter_subpackage -p no:pytest_remotedata"
 filterwarnings = [
     "error::DeprecationWarning",
     "error::PendingDeprecationWarning",

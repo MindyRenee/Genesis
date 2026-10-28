@@ -157,6 +157,69 @@ class TestDefocus:
             assert result.frame.mean() == pytest.approx(200.0, abs=1.5)
 
 
+class TestMirrorView:
+    def test_columns_flip_left_right(self) -> None:
+        """The mirror is a single-axis reflection — upright, the
+        handedness of the facing view."""
+        frame = np.zeros((48, 64, 3), dtype=np.uint8)
+        frame[:, :16] = 200  # bright block on the capture's left
+        out = optics.mirror_view(frame)
+        assert out[:, 48:].mean() == pytest.approx(200.0)  # now on her right
+        assert out[:, :32].mean() == pytest.approx(0.0)
+        # Rows untouched — the mirror is not the lens's 180° inversion.
+        assert np.array_equal(out, frame[:, ::-1])
+
+    def test_output_is_contiguous_for_cv2(self) -> None:
+        frame = np.zeros((48, 64, 3), dtype=np.uint8)
+        out = optics.mirror_view(frame)
+        assert out.flags["C_CONTIGUOUS"]
+
+    def test_degenerate_frame_passes_through(self) -> None:
+        flat = np.zeros((64,), dtype=np.uint8)
+        assert optics.mirror_view(flat) is flat
+
+    def test_mirror_reaches_the_cortical_stages(self, monkeypatch) -> None:
+        """The flip propagates: every downstream stage sees the
+        mirrored field, so her report describes the facing view."""
+        import occipital_lobe.perception.vision as vision_mod
+        from occipital_lobe.perception.vision import Vision
+
+        lens_input: list[np.ndarray] = []
+        orig_apply = optics.apply
+
+        def _spy_apply(f, d, fm=None, lid=1.0):
+            lens_input.append(f)
+            return orig_apply(f, d, fm, lid)
+
+        v1_input: list[np.ndarray] = []
+
+        def _spy_v1(self, rgb):
+            v1_input.append(rgb)
+            return None
+
+        monkeypatch.setattr(optics, "apply", _spy_apply)
+        monkeypatch.setattr(Vision, "_run_v1_sparse_coding", _spy_v1)
+        monkeypatch.setattr(Vision, "_two_view_geometry", lambda self, rgb: None)
+        monkeypatch.setattr(Vision, "_get_object_recognizer", lambda self: None)
+        monkeypatch.setattr(Vision, "_get_face_recognizer", lambda self: None)
+
+        frame = np.zeros((48, 64, 3), dtype=np.uint8)
+        frame[:, :16] = 200
+        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True: frame)
+
+        vis = Vision()
+        vis._available = True
+        vis.see(client=_OpticClient(_optic(4.5)))
+
+        # The lens receives exactly the mirrored capture.
+        assert len(lens_input) == 1
+        assert np.array_equal(lens_input[0], frame[:, ::-1])
+        # And the bright block is on the field's right at V1 —
+        # illumination may rescale but cannot un-mirror the scene.
+        assert len(v1_input) == 1
+        assert v1_input[0][:, 48:].mean() > v1_input[0][:, :16].mean()
+
+
 class TestSeeIntegration:
     def _vision_with_stub_stages(self, monkeypatch):
         """A Vision whose cortical stages are stubbed — the test
@@ -226,7 +289,9 @@ class TestSeeIntegration:
         assert scene.focus_m is None
         assert applied[0].defocus_sigma == 0.0
         assert applied[0].irradiance_gain == 1.0
-        assert applied[0].frame is frame
+        # The optics stage is an identity on the mirrored view the
+        # lens received — mirror lives upstream of apply.
+        assert np.array_equal(applied[0].frame, frame[:, ::-1])
 
     def test_see_carries_the_focus_onto_the_scene(self, monkeypatch) -> None:
         """The body's accommodation lands on the scene as a distance —

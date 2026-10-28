@@ -603,6 +603,16 @@ class Vision:
     ) -> VisionScene:
         """The cortical pipeline on one captured frame: optics,
         illumination, recognition, packaging, integration."""
+        # ── Mirror orientation — the world as it faces her ─────
+        # Single-axis reflection at presentation: the raw capture is
+        # the camera's view of the world; this is her orientation in
+        # it — the person looking back at her reads the same
+        # handedness she reports. Not the lens inversion (180°,
+        # chirality-preserving) — the facing view. Everything
+        # downstream lives in the mirrored frame, so regions,
+        # directions and motion describe the view a mirror holds.
+        rgb = optics.mirror_view(rgb)
+
         # ── Eye optics — the aperture the body set ─────────────
         # The pupil the body integrated (light reflex + LC tone)
         # decides what reaches the receptors: retinal irradiance

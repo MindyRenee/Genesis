@@ -151,6 +151,7 @@ __all__ = [
     "SET_COGNITIVE_PID",
     "SET_FIELD_CARRIER",
     "SET_FIELD_PHASE",
+    "SET_FIELD_PULSE",
     "SET_FOCUS",
     "SET_LID",
     "SET_OPTIC_GAIN",
@@ -443,6 +444,17 @@ DELETE_EPISODE = 61
 # opcode and a standalone 40-byte response; no existing layout
 # moves, so PROTOCOL_VERSION is unaffected.
 GET_FOLD_MARGINS = 62
+
+# Arm or disarm the parasympathetic pulse — a slow autonomic wave
+# riding the carrier's modulation depth (contractility, not rate;
+# the RSA analog — the vagal signature is the pulse's slow wax and
+# wane, never a pinned tempo). Request:
+# [f32 base][f32 mod_freq_hz][f32 mod_depth]; mod_freq <= 0 disarms
+# and depth returns to the static set-point. When armed the probe
+# integrates the envelope on its own clock — the wave runs on the
+# body's time whether or not the mind ticks.
+# Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
+SET_FIELD_PULSE = 63
 
 # Which optional hardware sensors this machine actually has.
 # Response: [u16 mask] — a bitmask of SENSOR_* below. A set bit means

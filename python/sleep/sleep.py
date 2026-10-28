@@ -1654,6 +1654,13 @@ class SleepMixin:
         self._learner_neuro_impulse(CHEM_NOREPINEPHRINE, -0.05)
         self._learner_neuro_impulse(CHEM_CORTISOL, -0.05)
 
+        # The body takes up the slow pulse for the sit — the RSA
+        # analog of a settling breath, armed once and run on the
+        # body's own clock while the cardiac center holds the
+        # boundary watch. Absent probe → arm fails, the keep stays
+        # disarmed, meditation proceeds without it.
+        self.heart.arm_hypnagogic()
+
     def emit_meditation_impulses(self) -> None:
         """Emit a round of calming impulses during meditation.
 
@@ -1725,6 +1732,9 @@ class SleepMixin:
         """
         if not self._is_meditating:
             return
+        # The pulse releases first — the keep belongs to the sit and
+        # must not outlive it, teardown path included.
+        self.heart.disarm_hypnagogic()
         # Teardown has begun — the zone write and the resumes below
         # belong to threads already joined. The flag still clears so
         # the saved state does not record a phantom meditation.

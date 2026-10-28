@@ -177,8 +177,7 @@ class ProjectsMixin:
             try:
                 chem = self.client.get_state()
                 tag = [
-                    float(chem.chemicals.get(CHEM_NAMES[i], 0.0))
-                    for i in range(EMOTIONAL_TAG_SIZE)
+                    float(chem.chemicals.get(CHEM_NAMES[i], 0.0)) for i in range(EMOTIONAL_TAG_SIZE)
                 ]
                 self.memory.store_memory(
                     text=f"Mentor notes on project '{pname}': {notes[:500]}",

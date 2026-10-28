@@ -1483,9 +1483,7 @@ class MemorySystem:
         # (0.6) because it reflects the emotional context of the
         # retrieval, not just the ambient mood.
         if current is not None and query_emotion is not None:
-            target = [
-                0.4 * c + 0.6 * q for c, q in zip(current, query_emotion, strict=False)
-            ]
+            target = [0.4 * c + 0.6 * q for c, q in zip(current, query_emotion, strict=False)]
         elif query_emotion is not None:
             target = query_emotion
         else:
