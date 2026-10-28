@@ -177,32 +177,29 @@
 //! # Allostatic load
 //!
 //! Allostatic load is the cumulative regulatory burden, integrated
-//! over time under a hysteresis band:
+//! over time around a measured resting baseline:
 //!
 //! ```text
-//! burden = mean of the two middle values of
-//!          [expected_fe, surprise, 1 - precision, homeostatic deviation]
+//! burden  = mediator elevation (2*cortisol + epi + 0.5*norepinephrine,
+//!           each normalised over its resting level)
+//!         * context amplifier (bounded, from expected-fe and surprise EMAs)
 //!
-//! if burden > ACCUMULATE_THRESHOLD:
-//!     allostasis_load += ACCUMULATION_RATE * (burden - threshold) * dt_scale
-//! elif burden < RECOVER_THRESHOLD:
-//!     allostasis_load -= RECOVERY_RATE * dt_scale
-//! else:
-//!     allostasis_load -= RECOVERY_RATE * 0.25 * dt_scale
+//! if burden > rest + deadband:  load += RATE * (burden - rest - deadband) * dt_scale
+//! elif burden < rest - deadband: load -= RECOVERY * depth * dt_scale
+//! else:                         load unchanged (neutral variation)
 //! ```
 //!
-//! The burden is deliberately **multisignal**: it is the mean of the
-//! two middle values of the four, so one isolated spike cannot
-//! manufacture load while elevation across several dimensions can.
-//! The third branch — slow recovery inside the band — is what keeps
-//! already-accumulated load from becoming permanent under sustained
-//! mild stress. Omitting it makes the band a hard freeze, which is
-//! the allostatic trap this mechanism exists to model (McEwen, 1998).
+//! Per McEwen the mediators *are* cortisol, epinephrine and
+//! norepinephrine; anticipated demand (expected free energy) and
+//! unexpectedness (surprise) are circumstances that drive the axis,
+//! not mediators in their own right, so they enter only through a
+//! bounded multiplicative amplifier — context can never manufacture
+//! burden from nothing. `rest` is the system's own measured resting
+//! burden (a slow tracker, `rest_baseline`), and the dead-band keeps
+//! ordinary physiological variation from integrating without bound.
 //!
-//! Expected free energy is one input to that median, not the driver:
-//! it is the *anticipatory* demand signal, and load is the accumulated
-//! wear. Sustained load upregulates the cortisol baseline, modeling
-//! the chronic stress → HPA axis sensitization pathway (McEwen &
+//! Sustained load upregulates the cortisol baseline, modeling the
+//! chronic stress → HPA axis sensitization pathway (McEwen &
 //! Stellar, 1993).
 //!
 //! This engine's load is the **substrate-scoped** view. The cognitive
@@ -1616,6 +1613,22 @@ impl ActiveInferenceEngine {
         // BDNF and suppressed under cortisol; forgetting is not a
         // separate mechanism imposed from outside, it is the same gate.
         let forget = MODEL_FORGETTING * self.precision;
+        // Forgetting is a regularizer inside the weight update — the
+        // forgetting-factor literature applies it per iteration — so
+        // it scales with the size of the step this update takes, not
+        // with wall-clock time. `effective_lr` grows as dt_scale up to
+        // a 10x cap (`MODEL_LEARNING_RATE * 10.0` above), meaning one
+        // cycle takes at most ten nominal steps of learning; decay
+        // applies (1 - forget) for that many nominal steps. Letting it
+        // compound by raw elapsed time instead would let a single long
+        // tick pull weights toward the prior far harder than the
+        // capped update could ever restore — the model would go
+        // amnesiac after every stall. (Elapsed-time drift already
+        // enters the belief state through the dt-scaled process
+        // noise in the predict step; the weights are not where that
+        // signal belongs.) At dt_scale = 1 this is identically (1 -
+        // forget), the historical flat step.
+        let retention = (1.0 - forget).powf(dt_scale.min(10.0));
         let pre_power: f32 = pre.iter().map(|v| v * v).sum();
         let action_power: f32 = action.iter().map(|v| v * v).sum();
         // Floor the normaliser so a near-zero input yields a bounded
@@ -1647,14 +1660,14 @@ impl ActiveInferenceEngine {
                 // regularisation toward the prior, the same principle
                 // as weight decay in a Bayesian sense.
                 let prior = if i == j { 1.0 } else { 0.0 };
-                row[j] = prior + (row[j] - prior) * (1.0 - forget);
+                row[j] = prior + (row[j] - prior) * retention;
                 row[j] += update * pre_val / pre_norm;
                 // Clamp to prevent runaway weights (NaN-safe)
                 row[j] = crate::state::sanitize::finite_clamp(row[j], -2.0, 2.0);
             }
             // The bias has no prior to shrink to — it is already the
             // zero-predicting default — so it decays toward zero.
-            self.bias[i] *= 1.0 - forget;
+            self.bias[i] *= retention;
             self.bias[i] += update * 0.1 / pre_norm;
             self.bias[i] = crate::state::sanitize::finite_clamp(self.bias[i], -0.5, 0.5);
         }
@@ -1667,7 +1680,11 @@ impl ActiveInferenceEngine {
         for (i, row) in self.action_matrix.iter_mut().enumerate() {
             let update = effective_lr * result.errors[i];
             for (j, &act_val) in action.iter().enumerate() {
-                row[j] *= 1.0 - MODEL_FORGETTING;
+                // B's prior is the zero matrix ("actions do nothing by
+                // default"), so shrinkage toward zero IS decay toward
+                // the prior — the same update as A with prior = 0, and
+                // the same precision-gated, time-scaled retention.
+                row[j] *= retention;
                 row[j] += update * act_val / action_norm;
                 row[j] = crate::state::sanitize::finite_clamp(row[j], -1.0, 1.0);
             }
@@ -1727,13 +1744,28 @@ impl ActiveInferenceEngine {
         );
         if self.precision > precision_target {
             // Overconfident for the observed error variance — lose
-            // confidence quickly.
+            // confidence quickly. The step is capped at the target so
+            // the slew lands on it instead of overshooting: an
+            // uncapped step carries precision past a target that sits
+            // just under the 1.0 ceiling, which then re-triggers this
+            // branch every time the cap is touched — a period-4
+            // sawtooth parked at the ceiling rather than a settled
+            // confidence.
             let step = (PRECISION_DECAY_RATE * dt_scale).min(0.1);
-            self.precision = crate::state::sanitize::finite_clamp(self.precision - step, 0.1, 1.0);
+            self.precision = crate::state::sanitize::finite_clamp(
+                (self.precision - step).max(precision_target),
+                0.1,
+                1.0,
+            );
         } else if self.precision < precision_target {
-            // Underconfident — regain confidence slowly.
+            // Underconfident — regain confidence slowly, landing on
+            // the target rather than stepping past it.
             let step = (PRECISION_RECOVERY_RATE * dt_scale).min(0.1);
-            self.precision = crate::state::sanitize::finite_clamp(self.precision + step, 0.1, 1.0);
+            self.precision = crate::state::sanitize::finite_clamp(
+                (self.precision + step).min(precision_target),
+                0.1,
+                1.0,
+            );
         }
         result.precision = self.precision;
 
@@ -1863,14 +1895,26 @@ impl ActiveInferenceEngine {
         //
         // This is the uncertainty tracking that makes the variational
         // posterior a real posterior, not a static-gain filter.
+        //
+        // The process noise is scaled by dt_scale for time-invariance:
+        // for a diffusion process the discrete Kalman Q grows linearly
+        // with elapsed time, so a 10 s tick (dt_scale = 100) accumulates
+        // a hundred times the drift variance of a nominal 0.1 s tick.
+        // A constant Q per cycle left the filter as confident after a
+        // long gap as after a normal tick — over-trusting a stale
+        // prediction exactly when the belief should widen. (dt_scale
+        // was computed above from the sanitized dt.)
         for (i, transition_row) in prediction_transition.iter().enumerate() {
             let propagated_var = transition_row
                 .iter()
                 .zip(self.belief_var.iter())
                 .map(|(weight, variance)| weight * weight * variance)
                 .sum::<f32>();
-            self.prior_var[i] =
-                crate::state::sanitize::finite_clamp(propagated_var + PROCESS_NOISE, 1e-8, 1.0);
+            self.prior_var[i] = crate::state::sanitize::finite_clamp(
+                propagated_var + PROCESS_NOISE * dt_scale,
+                1e-8,
+                1.0,
+            );
         }
 
         // Kalman update (per dimension, diagonal)
@@ -2228,7 +2272,7 @@ impl ActiveInferenceEngine {
         // system is stressed, a corrective policy wins. This is
         // continuous active inference, not just emergency intervention.
         let inferred_state = self.belief_mean;
-        let selected = self._select_policy(&inferred_state, target, result);
+        let selected = self._select_policy(&inferred_state, target, result, dt_scale);
         result.selected_policy = selected.policy.name;
         result.selected_policy_efe = selected.efe;
 
@@ -2362,14 +2406,19 @@ impl ActiveInferenceEngine {
         self.last_action = action;
     }
 
-    fn predicted_variances(&self) -> [f32; DIM] {
+    /// Predicted prior variances for the next cycle's horizon.
+    ///
+    /// Mirrors the predict step in `cycle()`: the process noise is
+    /// scaled by dt_scale because the next observation's interval is
+    /// best estimated by the interval just measured.
+    fn predicted_variances(&self, dt_scale: f32) -> [f32; DIM] {
         std::array::from_fn(|i| {
             let propagated = self.transition_matrix[i]
                 .iter()
                 .zip(self.belief_var.iter())
                 .map(|(weight, variance)| weight * weight * variance)
                 .sum::<f32>();
-            crate::state::sanitize::finite_clamp(propagated + PROCESS_NOISE, 1e-8, 1.0)
+            crate::state::sanitize::finite_clamp(propagated + PROCESS_NOISE * dt_scale, 1e-8, 1.0)
         })
     }
 
@@ -2385,12 +2434,12 @@ impl ActiveInferenceEngine {
     /// in the published EFE decomposition but cannot arbitrate
     /// between policies. See the scoring loop for why the previous
     /// novelty-based substitute was removed.
-    fn expected_information_gain(&self) -> f32 {
+    fn expected_information_gain(&self, dt_scale: f32) -> f32 {
         let observation_variance = (MIN_OBS_NOISE
             + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE))
             / self.ach_sensory_gain;
         let gain = self
-            .predicted_variances()
+            .predicted_variances(dt_scale)
             .iter()
             .map(|variance| 0.5 * (variance / observation_variance).ln_1p())
             .sum::<f32>();
@@ -2415,6 +2464,7 @@ impl ActiveInferenceEngine {
         current: &[f32; DIM],
         target: &[f32; DIM],
         _result: &InferenceResult,
+        dt_scale: f32,
     ) -> PolicyEvaluation {
         // The homeostatic target is the set of baseline levels passed
         // in from the neurochemical state. Policies are scored on how
@@ -2476,7 +2526,7 @@ impl ActiveInferenceEngine {
             let observation_variance = (MIN_OBS_NOISE
                 + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE))
                 / self.ach_sensory_gain;
-            let future_variances = self.predicted_variances();
+            let future_variances = self.predicted_variances(dt_scale);
             let mut preference_cost = 0.0f32;
             for i in 0..DIM {
                 let diff = predicted_after[i] - target[i];
@@ -2515,7 +2565,7 @@ impl ActiveInferenceEngine {
             // The live exploration mechanism is the precision-weighted
             // softmax temperature below: low precision samples,
             // high precision exploits.
-            let epistemic_value = self.expected_information_gain();
+            let epistemic_value = self.expected_information_gain(dt_scale);
 
             // EFE = expected negative log preference - expected information gain.
             // Lower EFE is better; epistemic value is subtracted
@@ -3341,15 +3391,18 @@ impl ActiveInferenceEngine {
     /// already moved by the time the assertion runs. This recomputes
     /// just the variance step so the identity can be checked exactly.
     #[cfg(test)]
-    pub(crate) fn test_recompute_prior_var(&mut self) {
+    pub(crate) fn test_recompute_prior_var(&mut self, dt_scale: f32) {
         for i in 0..DIM {
             let propagated_var = self.transition_matrix[i]
                 .iter()
                 .zip(self.belief_var.iter())
                 .map(|(weight, variance)| weight * weight * variance)
                 .sum::<f32>();
-            self.prior_var[i] =
-                crate::state::sanitize::finite_clamp(propagated_var + PROCESS_NOISE, 1e-8, 1.0);
+            self.prior_var[i] = crate::state::sanitize::finite_clamp(
+                propagated_var + PROCESS_NOISE * dt_scale,
+                1e-8,
+                1.0,
+            );
         }
     }
 
@@ -3599,7 +3652,7 @@ mod tests {
         // Recompute the variance step directly. A full cycle would
         // first apply weight decay to the diagonal, so the value read
         // back would no longer be the one that was set.
-        engine.test_recompute_prior_var();
+        engine.test_recompute_prior_var(1.0);
 
         // prior_var[0] = 0.5^2 * 0.02 + 0.01 = 0.015
         let expected = 0.5f32 * 0.5 * 0.02 + PROCESS_NOISE;
@@ -3635,8 +3688,8 @@ mod tests {
         // it from a full cycle: the cycle applies weight decay to the
         // diagonal first, so a value read afterwards is not the one
         // that was set.
-        engine_damping.test_recompute_prior_var();
-        engine_amplifying.test_recompute_prior_var();
+        engine_damping.test_recompute_prior_var(1.0);
+        engine_amplifying.test_recompute_prior_var(1.0);
 
         let damping_prior = engine_damping.test_prior_var(0);
         let amplifying_prior = engine_amplifying.test_prior_var(0);
@@ -3708,7 +3761,7 @@ mod tests {
         engine.test_set_belief_var(0, 0.02);
 
         // Variance propagates on A^2, so the sign is irrelevant.
-        engine.test_recompute_prior_var();
+        engine.test_recompute_prior_var(1.0);
 
         // prior_var[0] = (-0.5)^2 * 0.02 + 0.01 = 0.015
         let expected = 0.5f32 * 0.5 * 0.02 + PROCESS_NOISE;
@@ -3718,6 +3771,108 @@ mod tests {
             "negative A[i][i] should use A^2: expected {}, got {}",
             expected,
             actual
+        );
+    }
+
+    #[test]
+    fn test_process_noise_accumulates_with_elapsed_time() {
+        // Process noise is variance accumulated per unit of elapsed
+        // time (discrete Kalman Q ∝ Δt), not a per-cycle constant: a
+        // 1.0 s tick (dt_scale = 10) must widen the prior ten times as
+        // much as a nominal 0.1 s tick. prediction_transition is
+        // snapshotted before the model update, so the predict step
+        // reads exactly the matrix set here; with pre = post = 0 the
+        // prediction error is identically zero, so nothing else moves.
+        let mut engine = ActiveInferenceEngine::new();
+        let zeros = [0.0f32; DIM];
+        engine.cycle(&zeros, &zeros, 0.1, &zeros);
+
+        engine.test_set_transition_diagonal(0, 0.5);
+        engine.test_set_belief_var(0, 0.02);
+        engine.cycle(&zeros, &zeros, 0.1, &zeros);
+        let nominal = engine.test_prior_var(0);
+
+        engine.test_set_transition_diagonal(0, 0.5);
+        engine.test_set_belief_var(0, 0.02);
+        engine.cycle(&zeros, &zeros, 1.0, &zeros);
+        let wide = engine.test_prior_var(0);
+
+        let propagated = 0.5f32 * 0.5 * 0.02;
+        assert!(
+            (nominal - (propagated + PROCESS_NOISE)).abs() < 1e-6,
+            "nominal tick: expected {}, got {}",
+            propagated + PROCESS_NOISE,
+            nominal
+        );
+        assert!(
+            (wide - (propagated + PROCESS_NOISE * 10.0)).abs() < 1e-6,
+            "10x tick: expected {}, got {}",
+            propagated + PROCESS_NOISE * 10.0,
+            wide
+        );
+    }
+
+    #[test]
+    fn test_forgetting_scales_with_update_step_size() {
+        // Forgetting is a per-update regularizer: retention is
+        // (1 - forget) raised to the number of nominal steps the
+        // update takes, so a longer tick relaxes an unsupported weight
+        // further toward its prior — up to the same 10x cap that
+        // bounds effective_lr. With pre = 0 the delta-rule update term
+        // is identically zero for every j (update * pre[j] / pre_norm
+        // = 0), so the matrix moves by decay alone.
+        let mut short = ActiveInferenceEngine::new();
+        let mut long = ActiveInferenceEngine::new();
+        let zeros = [0.0f32; DIM];
+        for engine in [&mut short, &mut long] {
+            engine.cycle(&zeros, &zeros, 0.1, &zeros);
+            // Below the identity prior of 1.0, so decay pulls it up.
+            engine.test_set_transition_diagonal(0, 0.5);
+        }
+        short.cycle(&zeros, &zeros, 0.1, &zeros); // dt_scale = 1
+        long.cycle(&zeros, &zeros, 1.0, &zeros); // dt_scale = 10
+
+        let a_short = short.test_transition(0, 0);
+        let a_long = long.test_transition(0, 0);
+        assert!(
+            a_short < 1.0 && a_long <= 1.0,
+            "both should sit at or below the prior: short={}, long={}",
+            a_short,
+            a_long
+        );
+        assert!(
+            a_long > a_short,
+            "longer tick should relax further toward the prior: short={}, long={}",
+            a_short,
+            a_long
+        );
+    }
+
+    #[test]
+    fn test_forgetting_saturates_at_the_learning_step_cap() {
+        // The learning step is capped at ten nominal steps per cycle,
+        // so the regularizer must saturate there too: a 10 s tick and
+        // a 1 s tick are both "ten nominal steps", not 100 vs 10. If
+        // decay compounded by raw elapsed time instead, a long gap
+        // would erase the model far faster than one update can ever
+        // rebuild it.
+        let mut capped = ActiveInferenceEngine::new();
+        let mut beyond = ActiveInferenceEngine::new();
+        let zeros = [0.0f32; DIM];
+        for engine in [&mut capped, &mut beyond] {
+            engine.cycle(&zeros, &zeros, 0.1, &zeros);
+            engine.test_set_transition_diagonal(0, 0.5);
+        }
+        capped.cycle(&zeros, &zeros, 1.0, &zeros); // dt_scale = 10
+        beyond.cycle(&zeros, &zeros, 10.0, &zeros); // dt_scale = 100
+
+        let a_capped = capped.test_transition(0, 0);
+        let a_beyond = beyond.test_transition(0, 0);
+        assert!(
+            (a_beyond - a_capped).abs() < 1e-6,
+            "decay must saturate at the learning cap: dt_scale=10 gives {}, dt_scale=100 gives {}",
+            a_capped,
+            a_beyond
         );
     }
 
@@ -4106,15 +4261,24 @@ mod tests {
             stressed
         );
 
-        // Recovery: sustained accuracy restores confidence.
-        for _ in 0..200 {
+        // Recovery: sustained accuracy restores confidence, and the
+        // confidence then *holds* — sampling a single tick here is
+        // meaningless if precision sawtooths at its ceiling, so the
+        // whole tail must sit above the threshold.
+        let mut min_tail = 1.0f32;
+        let mut recovered = 0.0f32;
+        for t in 0..200 {
             engine.cycle(&rest, &rest, 1.0, &rest);
+            if t >= 150 {
+                min_tail = min_tail.min(engine.test_precision());
+            }
+            recovered = engine.test_precision();
         }
-        let recovered = engine.test_precision();
         assert!(
-            recovered > 0.95,
-            "precision should recover with sustained accuracy: {}",
-            recovered
+            recovered > 0.95 && min_tail > 0.95,
+            "precision should recover and hold with sustained accuracy: recovered={}, tail_min={}",
+            recovered,
+            min_tail
         );
     }
 
@@ -4176,7 +4340,7 @@ mod tests {
         // uncertainty has not yet been resolved, but a future observation
         // is informative: its gain includes next-step process noise.
         let engine = ActiveInferenceEngine::new();
-        let ig = engine.expected_information_gain();
+        let ig = engine.expected_information_gain(1.0);
         assert!(
             ig.is_finite() && ig >= 0.0,
             "IG must be finite nonnegative: {}",
