@@ -412,6 +412,12 @@ class MemorySystem:
     # Effective dopamine level that opens the capture gate — resting
     # tonic (~0.35) must not commit anything; phasic bursts do.
     _CAPTURE_DA_THRESHOLD: float = 0.5
+    # Noradrenaline opens the same gate: β-adrenergic activation in
+    # the amygdala converts early→late LTP without a dopaminergic
+    # event (Hu et al., 2007; Roozendaal & McGaugh, 2011 — the
+    # flashbulb pathway: emotional arousal commits memory with no
+    # reward prediction error). Baseline NE ~0.30; bursts exceed 0.55.
+    _CAPTURE_NE_THRESHOLD: float = 0.55
     # Fraction of an open tag converted to late-LTP per capture pass
     # (bounded by the protein pool — synthesis is rate-limited).
     _CAPTURE_GAIN: float = 0.5
@@ -2308,8 +2314,8 @@ class MemorySystem:
             if rec.reconsolidation_window > 0:
                 rec.reconsolidation_window = max(0.0, rec.reconsolidation_window - dt)
 
-    def tick_tags(self, dt: float, dopamine: float = 0.0) -> int:
-        """Advance synaptic tags and run dopamine-gated capture.
+    def tick_tags(self, dt: float, dopamine: float = 0.0, norepinephrine: float = 0.0) -> int:
+        """Advance synaptic tags and run modulator-gated capture.
 
         Two coupled processes (Frey & Morris, 1997; Clopath et al.,
         2008; Redondo & Morris, 2011):
@@ -2319,24 +2325,32 @@ class MemorySystem:
            closes on the ~hour scale. A tag that decays uncaptured
            leaves the trace to normal forgetting.
         2. **Capture**: while the effective dopamine level is above
-           ``_CAPTURE_DA_THRESHOLD`` (a phasic event, not tonic),
-           every open tag draws from the shared protein pool and
-           converts a fraction of itself to ``late_strength`` —
-           the committed late-LTP floor. The pool is finite, so a
-           strong dopaminergic event rescues *all* memories tagged
-           in the window but cannot commit the whole world:
-           salient (strongly tagged) traces win the pool first.
+           ``_CAPTURE_DA_THRESHOLD`` (a phasic event, not tonic) —
+           or noradrenaline is above ``_CAPTURE_NE_THRESHOLD`` (the
+           β-adrenergic amygdala path: emotional arousal commits
+           with no reward event) — every open tag draws from the
+           shared protein pool and converts a fraction of itself to
+           ``late_strength``, the committed late-LTP floor. The pool
+           is finite, so a strong modulatory event rescues *all*
+           memories tagged in the window but cannot commit the whole
+           world: salient (strongly tagged) traces win the pool
+           first.
 
         Args:
             dt: Elapsed time in seconds.
             dopamine: The body's current effective dopamine level
                 [0, 1]. Below the capture threshold only decay runs.
+            norepinephrine: The body's effective noradrenaline level
+                [0, 1] — the emotional-arousal co-gate.
 
         Returns:
             Number of tags that captured protein this call.
         """
         decay = math.exp(-max(0.0, dt) / self._TAG_TAU_S)
-        capturing = dopamine >= self._CAPTURE_DA_THRESHOLD and self._protein_pool > 0.0
+        gate_open = (
+            dopamine >= self._CAPTURE_DA_THRESHOLD or norepinephrine >= self._CAPTURE_NE_THRESHOLD
+        )
+        capturing = gate_open and self._protein_pool > 0.0
         captured = 0
         for rec in list(self._records.values()):
             if rec.tag_strength <= 0.0:

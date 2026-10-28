@@ -3402,10 +3402,11 @@ class FrontalLobe:
         try:
             core = self._last_core_state
             effective = float(core.chemicals.get("dopamine", 0.35)) if core is not None else 0.35
+            ne_gate = float(core.chemicals.get("norepinephrine", 0.3)) if core is not None else 0.3
             summary = self._last_summary
             phasic = summary.dopamine_phasic if summary is not None else None
             da_gate = max(phasic or 0.0, effective)
-            self.memory.tick_tags(dt=dt, dopamine=da_gate)
+            self.memory.tick_tags(dt=dt, dopamine=da_gate, norepinephrine=ne_gate)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.prefrontal.tick",
@@ -4607,11 +4608,7 @@ class FrontalLobe:
         # Also infer the user's affective state from this message and
         # send it to the daemon's dyadic model, closing the loop.
         try:
-            ach = (
-                float(chemicals.get("acetylcholine", 0.35))
-                if chemicals is not None
-                else None
-            )
+            ach = float(chemicals.get("acetylcholine", 0.35)) if chemicals is not None else None
         except Exception:  # noqa: BLE001
             ach = None
         self._last_inference_reading = self.active_inference.read(acetylcholine=ach)
