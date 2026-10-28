@@ -162,7 +162,6 @@ _OWNERSHIP_PINS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     # Her page — a place in the external world, not a mind organ:
     # worlds.channel is environment-side, so no region may claim it.
     ("Channel", (), REGIONS),
-    ("WorldBridge", ("thalamus",), ()),
     # Mentalizing posteriors over presences — rTPJ + mPFC.
     ("PresenceBelief", ("parietal_lobe", "frontal_lobe"), ()),
     # The minimal self and agency comparator are TPJ work; the
@@ -203,14 +202,9 @@ _ALLOWLIST: dict[str, str] = {
     "genesis_client": "the daemon client — support layer beside the regions",
     "infrastructure": "support layer (persistence, config, journal)",
     "eval": "baseline/drift/assay harness",
-    "worlds.arc": "ARC-3 task-environment adapter, not a brain function",
-    "worlds.arc_cabinet": "X11 input surface for the ARC adapter, not a brain function",
-    "worlds.arc_web": "web task-environment adapter, not a brain function",
-    "worlds.discord_showcase": "platform adapter, not a brain function",
     "frontal_lobe.krita_studio": "Krita plugin bridge — platform adapter, not a brain function",
     "commitment": "top-level support module",
     "discord_feed": "platform adapter",
-    "play": "ARC engine smoke script, not a brain function",
     "setup_embeddings": "one-off embedding setup script",
     "_views": "the view machinery itself",
     # Constant tables — no class/function to carry __module__, but the
@@ -219,6 +213,21 @@ _ALLOWLIST: dict[str, str] = {
     "parietal_lobe.motion": "compatibility projection of occipitotemporal MT/V5",
     "parietal_lobe.epipolar": "compatibility projection of occipital MSTd",
     "tools.charter": "a prose letter to the organism — no code, nothing to claim",
+    "_wake": "operator scratch probe — not a brain function",
+    # Parietal math leaf modules — internal library tissue used through
+    # the claimed front-ends (arithmetic/algebra/calculus/symbolic).
+    "parietal_lobe.math.abstract_algebra": "math leaf — parietal library tissue",
+    "parietal_lobe.math.axioms": "math leaf — parietal library tissue",
+    "parietal_lobe.math.combinatorics": "math leaf — parietal library tissue",
+    "parietal_lobe.math.complex_analysis": "math leaf — parietal library tissue",
+    "parietal_lobe.math.discrete": "math leaf — parietal library tissue",
+    "parietal_lobe.math.geometry": "math leaf — parietal library tissue",
+    "parietal_lobe.math.linear_algebra": "math leaf — parietal library tissue",
+    "parietal_lobe.math.number_theory": "math leaf — parietal library tissue",
+    "parietal_lobe.math.proof": "math leaf — parietal library tissue",
+    "parietal_lobe.math.real_analysis": "math leaf — parietal library tissue",
+    "parietal_lobe.math.topology": "math leaf — parietal library tissue",
+    "parietal_lobe.math.trig": "math leaf — parietal library tissue",
 }
 
 _FUNCTIONAL_PACKAGES = (

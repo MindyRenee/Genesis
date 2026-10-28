@@ -82,6 +82,7 @@ from .protocol import (
     CHEM_CORTISOL,
     CHEM_DOPAMINE,
     CHEM_GABA,
+    CHEM_NAMES,
     CHEM_OXYTOCIN,
     CONSOLIDATE,
     DELETE_EPISODE,
@@ -122,7 +123,6 @@ from .protocol import (
     MODULE_STATUS_ERROR,
     MODULE_STATUS_IDLE,
     MODULE_STATUS_RUNNING,
-    NEURO_ADJUST_BASELINE,
     NEURO_IMPULSE,
     PING,
     PROTOCOL_VERSION,
@@ -134,7 +134,6 @@ from .protocol import (
     SEARCH_EPISODES,
     SET_COGNITIVE_PID,
     SET_FIELD_CARRIER,
-    SET_FIELD_PHASE,
     SET_FOCUS,
     SET_LID,
     SET_OPTIC_GAIN,
@@ -468,7 +467,6 @@ class GenesisClient:
         {
             STORE_EVENT,
             NEURO_IMPULSE,
-            NEURO_ADJUST_BASELINE,
             SET_ZONE,
             SYNC,
             SHUTDOWN,
@@ -531,7 +529,6 @@ class GenesisClient:
             ARCHIVE_EPISODE,
             UNARCHIVE_EPISODE,
             DELETE_EPISODE,
-            NEURO_ADJUST_BASELINE,
             ADVANCE_NEURO,
             ADVANCE_PHYSICS,
             CONSOLIDATE,
@@ -861,24 +858,6 @@ class GenesisClient:
             if sep and key:
                 out[key] = value
         return out
-
-    def set_field_phase(self, phase: float, *, timeout: float | None = None) -> bool:
-        """Push the mind's modeled carrier-band phase into the probe.
-
-        The physics-follows-model leg of the mutual phase lock: the
-        probe extrapolates the pushed phase at its carrier rate and
-        pulls the generator's phase toward it each tick. A target not
-        refreshed within 5 s is dropped — a dead mind can't steer
-        the body's rhythm.
-
-        Returns ``False`` when the probe isn't running or the daemon
-        predates the command — an absent channel, never silent.
-        """
-        try:
-            resp = self._request(SET_FIELD_PHASE, _F32.pack(phase), timeout=timeout)
-        except (ConnectionError, OSError, ProtocolError):
-            return False
-        return bool(resp) and resp[0] == 1
 
     def set_field_carrier(
         self, depth: float, freq: float = 0.0, *, timeout: float | None = None
@@ -1282,14 +1261,36 @@ class GenesisClient:
         resp = self._request(GET_MEMORY_STATS, timeout=timeout)
         return MemoryStats.unpack(resp)
 
+    def live_emotional_tag(self) -> list[float] | None:
+        """The body's current effective neurochemical levels, in tag order.
+
+        The emotional tag is defined as the ``EMOTIONAL_TAG_SIZE``
+        effective levels — the daemon stamps them from its own live
+        state on every store, so callers only need this for their own
+        records (or against a legacy daemon that stores the wire tag
+        verbatim).
+
+        Returns:
+            The 12 effective levels in canonical chemical order, or
+            None if the state cannot be read.
+        """
+        try:
+            chemicals = self.get_state().chemicals
+        except Exception:  # noqa: BLE001 — best-effort snapshot
+            return None
+        return [
+            float(chemicals.get(CHEM_NAMES.get(i, ""), 0.0) or 0.0)
+            for i in range(EMOTIONAL_TAG_SIZE)
+        ]
+
     def store_event(
         self,
         timestamp: int,
         event_type: int,
         source_module: int,
         salience: float,
-        emotional_tag: list[float],
-        text: str,
+        emotional_tag: list[float] | None = None,
+        text: str = "",
         *,
         timeout: float | None = None,
     ) -> bool:
@@ -1300,12 +1301,19 @@ class GenesisClient:
             event_type: Event type ID (0=UserInput, 1=Output, etc.)
             source_module: Module ID that produced this event.
             salience: Importance score [0.0, 1.0].
-            emotional_tag: EMOTIONAL_TAG_SIZE effective neurochemical levels.
+            emotional_tag: Advisory — the field is defined as the
+                EMOTIONAL_TAG_SIZE effective neurochemical levels, and
+                the daemon always stamps them from its own live state
+                on store. Pass None (the default) to send the all-zero
+                "unspecified" encoding; a legacy daemon without stamping
+                would store the sent value verbatim.
             text: Event description (max 188 bytes).
 
         Returns:
             True if the event was stored successfully.
         """
+        if emotional_tag is None:
+            emotional_tag = [0.0] * EMOTIONAL_TAG_SIZE
         if len(emotional_tag) != EMOTIONAL_TAG_SIZE:
             raise ValueError(
                 f"emotional_tag must have {EMOTIONAL_TAG_SIZE} elements, got {len(emotional_tag)}"
@@ -1341,11 +1349,11 @@ class GenesisClient:
         event_type: int,
         source_module: int,
         salience: float,
-        emotional_tag: list[float],
-        text: str,
+        emotional_tag: list[float] | None = None,
+        text: str = "",
         *,
         timeout: float | None = None,
-    ) -> int | None:
+    ) -> tuple[int | None, list[float] | None]:
         """Store an episode directly in long-term memory, bypassing STM.
 
         Used by the cognitive mind for deliberate memory stores
@@ -1360,15 +1368,22 @@ class GenesisClient:
             event_type: Event type ID (0=UserInput, 1=Output, etc.)
             source_module: Module ID that produced this event.
             salience: Importance score [0.0, 1.0].
-            emotional_tag: EMOTIONAL_TAG_SIZE effective neurochemical levels.
+            emotional_tag: Advisory — see :meth:`store_event`. The
+                daemon stamps the tag from its own live effective
+                levels; pass None when the caller has no tag.
             text: Event description (max 65535 bytes — the wire protocol's
             u16 text_len limit). The LTM store itself can handle up to
             256 KB per episode; the bottleneck is the u16 length field.
 
         Returns:
-            The real LTM episode ID on success, or None if the store
-            failed.
+            ``(episode_id, stamped_tag)`` — the real LTM episode ID and
+            the tag the daemon actually stored (its live effective
+            levels). Both are None on failure; ``stamped_tag`` is also
+            None when the daemon predates the stamped-tag response tail
+            — in that case the stored tag is whatever was sent.
         """
+        if emotional_tag is None:
+            emotional_tag = [0.0] * EMOTIONAL_TAG_SIZE
         if len(emotional_tag) != EMOTIONAL_TAG_SIZE:
             raise ValueError(
                 f"emotional_tag must have {EMOTIONAL_TAG_SIZE} elements, got {len(emotional_tag)}"
@@ -1399,8 +1414,13 @@ class GenesisClient:
 
         resp = self._request(STORE_EPISODE, bytes(payload), timeout=timeout)
         if len(resp) >= 9 and resp[0] == 1:
-            return _U64.unpack(resp[1:9])[0]
-        return None
+            stamped = (
+                [_F32.unpack(resp[9 + i * 4 : 13 + i * 4])[0] for i in range(EMOTIONAL_TAG_SIZE)]
+                if len(resp) >= 9 + EMOTIONAL_TAG_SIZE * 4
+                else None
+            )
+            return _U64.unpack(resp[1:9])[0], stamped
+        return None, None
 
     def retrieve_episode(self, episode_id: int, *, timeout: float | None = None) -> Episode:
         """Retrieve a full episode from long-term memory by ID.
@@ -1722,32 +1742,6 @@ class GenesisClient:
         resp = self._request(SET_POLICY_AUTHORITY, bytes(payload), timeout=timeout)
         return bool(resp) and resp[0] == 1
 
-    def neuro_adjust_baseline(
-        self, chem: int, delta: float, *, timeout: float | None = None
-    ) -> bool:
-        """Adjust a neurochemical's baseline (set-point) directly.
-
-        Unlike neuro_impulse, which only affects the current level and
-        decays back to baseline, this permanently shifts the baseline.
-        Used by the startup wake cascade to clear residual adenosine
-        sleep pressure from a previous session.
-
-        Args:
-            chem: Neurochemical ID (0=Dopamine, 1=Serotonin, etc.)
-            delta: Change to apply to the baseline (positive raises,
-                  negative lowers). Baseline is clamped to [0.05, 0.95].
-
-        Returns:
-            True if the baseline was adjusted successfully.
-        """
-        if not (0 <= chem <= 17):
-            raise ValueError(f"chem must be 0-17 (18 chemicals), got {chem}")
-        payload = bytearray()
-        payload.append(chem & 0xFF)
-        payload.extend(_F32.pack(delta))
-        resp = self._request(NEURO_ADJUST_BASELINE, bytes(payload), timeout=timeout)
-        return bool(resp) and resp[0] == 1
-
     def sync(self, *, timeout: float | None = None) -> bool:
         """Request the daemon to sync all stores to disk.
 
@@ -2000,11 +1994,10 @@ class GenesisClient:
         """Store an observation event with the current timestamp.
 
         Convenience wrapper around store_event that fills in the
-        timestamp and event type automatically.
+        timestamp and event type automatically. The daemon stamps the
+        emotional tag from its live chemistry; pass a tag only when a
+        legacy daemon needs the wire value.
         """
-        if emotional_tag is None:
-            # Neutral emotional tag
-            emotional_tag = [0.5] * 12
         return self.store_event(
             timestamp=int(time.time() * 1000),
             event_type=3,  # EventType::Observation (see ring_buffer.rs)

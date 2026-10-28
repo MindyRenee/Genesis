@@ -5,8 +5,8 @@
 //! `python/` opens to brain regions because the mind is organized
 //! anatomically; `src/` presents the body's anatomy the same way.
 //! The implementation lives in `daemon`, `state`, `store`,
-//! `cognition`, and `field`; the region modules (`brainstem`,
-//! `thalamus`, `neurochemical`, `memory`, `limbic_system`,
+//! `cognition`, and `field`; the region modules (`basal_forebrain`,
+//! `brainstem`, `thalamus`, `neurochemical`, `memory`, `limbic_system`,
 //! `basal_ganglia`, `self_`, `sleep`, `tools`, `infrastructure`)
 //! re-export those modules under the structure they implement, so
 //! the crate reads the same way the mind does: click `src/` and the
@@ -15,6 +15,7 @@
 // ─── The body, by region ─────────────────────────────────────────
 // Anatomical view of the implementation below — re-exports only,
 // no code moves. See each region's mod.rs for what lives there.
+pub mod basal_forebrain;
 pub mod basal_ganglia;
 pub mod brainstem;
 pub mod infrastructure;

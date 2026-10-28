@@ -1,7 +1,7 @@
 """Research workbench — long-horizon mathematical inquiry, persisted.
 
-``problem_intake`` compiles a heard sentence into a task spec that
-lives for minutes. This is the same act at research scale: a thread
+A heard sentence compiles into a task spec that lives for minutes.
+This is the same act at research scale: a thread
 is an open problem that persists across sessions and sleep cycles,
 keeping its claims, its evidence, and its failures together so that
 nothing is ever paid for twice — the graveyard of attempts is part

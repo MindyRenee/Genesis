@@ -87,6 +87,34 @@ def test_rebuild_from_journal_restores_fidelity() -> None:
     assert after >= 0.7, f"journaled recall degraded after rebuild: {after:.3f}"
 
 
+def test_rebuild_drops_unjournaled_relations_before_save(tmp_path) -> None:
+    """``clear()`` must drop ``_memory`` keys alongside ``_roles``.
+
+    The two dicts share one relation keyspace — ``_get_role`` is the
+    only writer and always creates both. ``clear()`` used to zero the
+    ``_memory`` rows but keep their keys while ``_roles`` went to
+    ``{}``; a rebuild whose journal no longer held a relation then
+    left the key in ``_memory`` only, and ``save()`` raised
+    ``KeyError`` on ``_roles[r]`` (seen in production as
+    ``KeyError(np.str_('harms'))`` and ``KeyError(np.str_('creates'))``
+    — npz-loaded keys surface as ``np.str_``).
+    """
+    path = str(tmp_path / "hg.npz")
+    graph = HolographicGraph(dim=128, n_buckets=4)
+    graph.add("stress", "harms", "memory", weight=0.8)
+    graph.add("dog", "related_to", "cat", weight=0.9)
+
+    # The journal loses every 'harms' entry (cap eviction); memory
+    # still carries the relation key until the rebuild clears it.
+    graph._journal = {k: v for k, v in graph._journal.items() if k[1] != "harms"}
+    graph.rebuild_from_journal()
+
+    assert "harms" not in graph._roles
+    assert "harms" not in graph._memory  # pre-fix kept a zeroed row here
+    graph.save(path)  # KeyError: 'harms' before the fix
+    assert graph.query("stress", "harms") == []
+
+
 def test_rebuild_from_journal_empty_is_noop() -> None:
     graph = HolographicGraph(dim=128, n_buckets=4)
     assert graph.rebuild_from_journal() == 0

@@ -25,8 +25,7 @@
 //! it before the mind leaves, and the next CLI start clears it. A
 //! mind that dies *without* saying goodbye — crash, SIGKILL, host
 //! fault — is a loss and is regrown; a mind that said goodbye is left
-//! absent. The sentinel is host-local intent and stays out of the
-//! spore mirror.
+//! absent. The sentinel is host-local intent and travels nowhere.
 //!
 //! # Bounds
 //!

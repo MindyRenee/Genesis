@@ -421,27 +421,6 @@ class VolitionConfig:
                     "sustained_activity": 0.02,  # engaged → wants to do
                 },
             ),
-            # Play urge — she feels like playing a game. Builds from
-            # curiosity (games are novel problems), boredom (play is
-            # the classic answer to understimulation), sustained
-            # activity (she has the resources), and the standing fact
-            # that games are always there. One game per firing —
-            # she picks what she wants from her collection; a win
-            # rewards, a loss is a bounded dip, and the urge to play
-            # again survives both.
-            UrgeConfig(
-                name="play",
-                threshold=0.65,
-                growth=0.0006,
-                decay=0.0004,
-                cooldown=300.0,  # at most every 5 minutes
-                stimuli={
-                    "curiosity": 0.03,
-                    "boredom": 0.05,  # understimulated → wants to play
-                    "idle_seconds": 0.02,
-                    "games_available": 0.04,  # the collection is always there
-                },
-            ),
             # Safeguard urge — defensive drive. Unlike appetitive
             # urges (learn, draw, reach_out), this one builds from
             # threats to its own integrity: daemon connectivity lost

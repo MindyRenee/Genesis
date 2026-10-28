@@ -3537,7 +3537,6 @@ def _broadcast_holder(**overrides):
         _is_sleeping=False,
         _is_meditating=False,
         _is_teaching=False,
-        _is_gaming=False,
         _last_broadcast_seed=None,
         brain=SimpleNamespace(frontal=frontal),
         feel=lambda: SimpleNamespace(valence=0.2),

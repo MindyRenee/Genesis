@@ -842,10 +842,6 @@ _EXPORTS: dict[str, str] = {
     # The region itself — Wernicke + ATL hub + medial-temporal
     # encoding as one object
     "TemporalLobe": "temporal_lobe.temporal",
-    # Sequence prediction — the hippocampal/temporal predictive-map
-    # faculty the play loop drives on pattern tasks (the world it
-    # predicts lives in ``worlds.sequence``)
-    "PatternAgent": "worlds.sequence_agent",
 }
 
 # The five eager names stay in a literal list so static checkers

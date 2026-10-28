@@ -203,25 +203,11 @@ class VolitionMixin:
         chemical = self._chemical_signals()
         concept_growth = self._concept_growth()
         social_isolation = self._social_isolation()
-        boredom, games_available = self._play_signals(idle, emotional_intensity, concept_growth)
-
-        # Conscious world focus — an ignited world broadcast or a
-        # pinned engaged world means an outer world is holding her
-        # attention (she is *in* a game, a percept just fired). This
-        # is focus expressed as state: engagement attenuates the
-        # appetitive drives — boredom, idle time, off-task curiosity,
-        # audit appetite, social pressure, expression — the way
-        # absorption does, so the urges simply never cross their
-        # thresholds rather than being switched off upstream. The
-        # interoceptive, wave, and threat signals pass untouched:
-        # an absorbed person still has a body, and defensive needs
-        # always out-compete a game.
-        free = 1.0 - self.world_engagement()
+        boredom = self._boredom_signal(idle, emotional_intensity, concept_growth)
 
         appetitive = {
             **drives,
             "boredom": boredom,
-            "games_available": games_available,
             "idle_seconds": min(
                 1.0,
                 idle / self.config.volition.idle_normalization_seconds,
@@ -237,12 +223,10 @@ class VolitionMixin:
             "open_problems": self._open_problem_signal(),
         }
         return {
-            **{k: v * free for k, v in appetitive.items()},
+            **appetitive,
             **interoceptive,
             **wave_data,
             **threat_data,
-            # The body's own levels pass untouched like interoception
-            # — engagement attenuates appetites, never physiology.
             **chemical,
         }
 
@@ -384,34 +368,27 @@ class VolitionMixin:
             note_swallowed("mind.volition._open_problem_signal", e)
             return 0.0
 
-    def _play_signals(
+    def _boredom_signal(
         self,
         idle: float,
         emotional_intensity: float,
         concept_growth: float,
-    ) -> tuple[float, float]:
-        """Boredom and games_available. Boredom is genuine
-        understimulation — awake, idle, unengaged, nothing new arriving
-        — the classic precondition for wanting to play.
-        ``games_available`` is the standing fact of her collection:
-        games are always there if she wants them, so the option itself
-        exerts a small pull."""
+    ) -> float:
+        """Boredom is genuine understimulation — awake, idle,
+        unengaged, nothing new arriving — the classic precondition
+        for wanting to do something."""
         try:
             idle_norm = min(
                 1.0,
                 idle / self.config.volition.idle_normalization_seconds,
             )
-            boredom = idle_norm * (1.0 - emotional_intensity) * (1.0 - min(1.0, concept_growth))
-            return (
-                boredom,
-                1.0 if self.game_play.has_games() else 0.0,
-            )
+            return idle_norm * (1.0 - emotional_intensity) * (1.0 - min(1.0, concept_growth))
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._volition_context",
                 e,
             )
-            return 0.0, 0.0
+            return 0.0
 
     def _act_on_volition(self, ready: list[str]) -> list[str]:
         """Run each ready urge action in its own background thread.
@@ -444,7 +421,6 @@ class VolitionMixin:
             "learn": self._perform_learn,
             "learn_code": self._perform_learn_code,
             "act": self._perform_act,
-            "play": self._perform_play,
             "reach_out": self._perform_reach_out,
             "broadcast": self._perform_broadcast,
             "research": self._perform_research,
@@ -655,7 +631,7 @@ class VolitionMixin:
         Urgent topics (from conversation gaps) bypass this gate
         entirely — those are conversation-driven, not autonomous.
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching or self._is_gaming:
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
             return
         self._emit_volition_thought(
             ("learning", "curiosity", "understanding"),
@@ -675,7 +651,7 @@ class VolitionMixin:
         Each firing is one bounded bout, not a bulk import — the urge
         must rebuild between study sessions.
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching or self._is_gaming:
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -715,7 +691,7 @@ class VolitionMixin:
         Sleep-gated like every voluntary act; delta/theta gating is
         the secondary defense (tool use is engagement, not rest).
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching or self._is_gaming:
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -763,7 +739,7 @@ class VolitionMixin:
         Sleep-gated like every voluntary act; delta/theta gating is
         the secondary defense (proof work is engagement, not rest).
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching or self._is_gaming:
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -844,7 +820,7 @@ class VolitionMixin:
         alpha-dominant, so brain waves alone don't reliably detect all
         sleep stages. The ``_is_sleeping`` flag is the authority.
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching or self._is_gaming:
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -905,7 +881,7 @@ class VolitionMixin:
 
     def _perform_speech(self) -> None:
         """Speak a queued utterance because the urge crossed its threshold."""
-        if self._is_sleeping or self._is_gaming:
+        if self._is_sleeping:
             return  # in game mode she thinks — speech waits
         with self._speech_queue_lock:
             if not self._speech_queue:
@@ -930,331 +906,6 @@ class VolitionMixin:
                 "mind.volition._perform_speech",
                 e,
             )
-
-    def _perform_play(self) -> None:
-        """Play a game because the play urge crossed its threshold.
-
-        She picks what she wants from her collection — appeal weights
-        the choice, never a syllabus. One game per firing; mastery
-        persists across sessions. The outcome becomes a live thought
-        and a stored event — and is *felt* through the regulator:
-        dopamine on a win, a bounded dip on a loss. Playing for the
-        feel of it is the point.
-        """
-        if self._is_meditating or self._is_sleeping or self._is_teaching or self._is_gaming:
-            return
-        self._emit_volition_thought(
-            ("play", "game", "fun", "strategy"),
-            "playing",
-        )
-        # She can't choose what she doesn't know: when the official
-        # challenge is on her shelf she hears what it is — the games,
-        # the clock, the stakes — once per card window, before the
-        # pick that could take it.
-        try:
-            brief = self.game_play.arc_brief_due()
-            if brief:
-                self.world_announce(brief, topics=["arc", "official", "challenge"])
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.volition._perform_play", e)
-        # Pick the game up front so the regulator can tell genuine
-        # progress (a new personal best) from a miss. Windowed games
-        # hold the user's screen and keyboard — they're only on the
-        # shelf once the desktop gap has lapsed; while it runs she
-        # reaches for an internal game instead.
-        try:
-            task = self.game_play.pick(allow_system=self.game_play.system_ready())
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.volition._perform_play", e)
-            task = None
-        if task is None:
-            return
-        game = str(task["name"])
-        prior_best = self.game_play.mastery.get(game, 0.0)
-
-        # Sitting down to play — the settling-in moment: attention on
-        # the game (acetylcholine + beta2 drive, the engagement
-        # signature of focused play), and she tells herself what it
-        # is and what the point of it is, if anyone told her.
-        vocab = getattr(getattr(self.brain.frontal, "language", None), "vocabulary", None)
-        emotion = self.feel()
-
-        def _say(moment: dict) -> None:
-            self._play_say(vocab, emotion, moment)
-
-        stats, _on_step = self._play_couplings(game, task, _say)
-
-        # The interrupt: the user showing up (or rest beginning, or
-        # volition being suppressed — she puts the game down when the
-        # world needs her) ends the episode at the next move.
-        interaction_mark = self._last_interaction_time
-
-        def _play_should_stop() -> bool:
-            return bool(
-                self._is_sleeping
-                or self._is_meditating
-                or self._is_teaching
-                or self._is_gaming
-                or self._suppress_volition
-                or self._foreground_active.is_set()
-                or self._last_interaction_time > interaction_mark
-            )
-
-        try:
-            result = self.game_play.attempt(
-                self.brain.frontal.spatial_reasoner,
-                task=task,
-                on_step=_on_step,
-                should_stop=_play_should_stop,
-                inducer=self.brain.frontal.dlpfc,
-            )
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.volition._perform_play", e)
-            return
-        if result is None:
-            return
-        self._record_play_outcome(result, game, prior_best, stats, _say)
-
-    def _play_say(self, vocab: Any, emotion: Any, moment: dict) -> None:
-        """Her inner voice on a play moment — words composed by
-        her own language system from the event, never recited."""
-        if vocab is None:
-            return
-        try:
-            text = vocab._compose_play_moment(moment, emotion)
-        except Exception:  # noqa: BLE001 — a voice hiccup is not a crash
-            return
-        if not text:
-            return
-        inner = getattr(self.brain.frontal, "inner_life", None)
-        if inner is not None:
-            try:
-                noted = inner.note_thought(
-                    text,
-                    trigger="play",
-                    intent="play",
-                    metadata={
-                        "topic": moment.get("game", ""),
-                        "moment": moment.get("kind", ""),
-                    },
-                )
-                if noted is not None:
-                    return
-            except Exception as e:  # noqa: BLE001
-                note_swallowed("basal_ganglia.volition.play_moment", e)
-        self._emit_live_thought("play", text)
-
-    def _play_couplings(self, game: str, task: dict, say: Any) -> tuple[dict, Any]:
-        """The live couplings — what a body does while playing.
-
-        Every signal is a bounded impulse into the chemistry the body
-        integrates; the feeling that comes of it is hers, computed
-        by the substrate, never declared here.
-
-        - TD error → phasic dopamine (Schultz 1998; Koepp 1998:
-          striatal dopamine during real play). The game's own
-          reward teaches her mid-game, not just at the end.
-        - Threat rising → norepinephrine + acetylcholine
-          (orienting — the post-encounter vigilance of the
-          predatory-imminence continuum, Fanselow; Mobbs 2007).
-        - Circa-strike (threat >= 0.7) → the adrenaline moment:
-          a sharper NE burst and beta2 drive.
-        - Escape → relief IS reward (averted-punishment RPE —
-          Leknes 2011; omission-of-threat dopamine scales with
-          how bad it almost was): dopamine + endorphin.
-        - Death → dopamine dip + NE spike + a trace of cortisol
-          (HPA is slow chemistry; it only earns a trickle when
-          losses keep coming — a single death is a sting, not
-          a stressor).
-
-        Returns ``(stats, on_step)`` — the per-episode counters and
-        the step callback, or ``None`` when the coupling imports
-        are unavailable.
-        """
-        stats = {
-            "deaths": 0,
-            "escapes": 0,
-            "scored": 0,
-            "peak_threat": 0.0,
-            "dry": 0,
-            "voiced": 0,
-        }
-        try:
-            from thalamus.brain_waves import BrainWave, add_brain_wave_drive
-
-            from genesis_client.protocol import CHEM_ACETYLCHOLINE
-
-            add_brain_wave_drive(BrainWave.BETA2, 0.15)
-            self._learner_neuro_impulse(CHEM_ACETYLCHOLINE, 0.004)
-            say(
-                {
-                    "kind": "start",
-                    "game": game,
-                    "goal": task.get("goal", ""),
-                }
-            )
-
-            def _step_coupled(st: Any) -> None:
-                self._play_step_coupled(st, stats, game, say)
-
-            return stats, _step_coupled
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.volition._perform_play", e)
-            return stats, None
-
-    def _play_step_coupled(self, st: Any, stats: dict, game: str, say: Any) -> None:
-        """One coupled play step — TD error, threat, and events each
-        push a bounded impulse into the substrate. Only reachable after
-        the coupling imports in ``_play_couplings`` have succeeded."""
-        from thalamus.brain_waves import BrainWave, add_brain_wave_drive
-
-        from genesis_client.protocol import (
-            CHEM_ACETYLCHOLINE,
-            CHEM_CORTISOL,
-            CHEM_DOPAMINE,
-            CHEM_ENDORPHIN,
-            CHEM_NOREPINEPHRINE,
-        )
-
-        impulse = max(-0.006, min(0.006, st.td_error * 0.04))
-        if abs(impulse) >= 0.001:
-            self._learner_neuro_impulse(CHEM_DOPAMINE, impulse)
-            add_brain_wave_drive(
-                BrainWave.GAMMA if impulse > 0 else BrainWave.BETA2, min(0.25, abs(impulse) * 40)
-            )
-
-        threat = st.threat
-        stats["peak_threat"] = max(stats["peak_threat"], threat)
-        if threat >= 0.7:
-            self._learner_neuro_impulse(CHEM_NOREPINEPHRINE, 0.006)
-            add_brain_wave_drive(BrainWave.BETA2, 0.3)
-            if stats["voiced"] < 8:
-                stats["voiced"] += 1
-                say({"kind": "danger", "game": game})
-        elif threat > stats["peak_threat"] - 0.15:
-            self._learner_neuro_impulse(CHEM_NOREPINEPHRINE, 0.002 * threat)
-            self._learner_neuro_impulse(CHEM_ACETYLCHOLINE, 0.001 * threat)
-
-        if "escaped" in st.events:
-            stats["escapes"] += 1
-            # Relief scales with how bad it almost was.
-            relief = 0.003 + 0.006 * stats["peak_threat"]
-            self._learner_neuro_impulse(CHEM_DOPAMINE, relief)
-            self._learner_neuro_impulse(CHEM_ENDORPHIN, relief * 0.7)
-            stats["peak_threat"] = 0.0
-            if stats["voiced"] < 8:
-                stats["voiced"] += 1
-                say({"kind": "close", "game": game})
-
-        if "death" in st.events:
-            stats["deaths"] += 1
-            self._learner_neuro_impulse(CHEM_DOPAMINE, -0.008)
-            self._learner_neuro_impulse(CHEM_NOREPINEPHRINE, 0.008)
-            self._learner_neuro_impulse(CHEM_CORTISOL, 0.001 * stats["deaths"])
-            if stats["voiced"] < 8:
-                stats["voiced"] += 1
-                say({"kind": "death", "game": game})
-
-        if "scored" in st.events:
-            stats["scored"] += 1
-            stats["dry"] = 0
-            if stats["voiced"] < 8:
-                stats["voiced"] += 1
-                say(
-                    {
-                        "kind": "scored" if stats["scored"] > 1 else "discovery",
-                        "game": game,
-                    }
-                )
-        else:
-            stats["dry"] += 1
-            if stats["dry"] == 25 and stats["voiced"] < 8:
-                stats["voiced"] += 1
-                say({"kind": "stuck", "game": game})
-
-        for ev in ("won", "over"):
-            if ev in st.events and stats["voiced"] < 9:
-                stats["voiced"] += 1
-                say({"kind": ev, "game": game})
-
-    def _record_play_outcome(
-        self,
-        result: Any,
-        game: str,
-        prior_best: float,
-        stats: dict,
-        say: Any,
-    ) -> None:
-        """Feel, broadcast, store, and articulate the play result."""
-        # Feel the outcome — a real neurochemical response through
-        # her emotional regulator: reward on a win, partial reward on
-        # progress, a bounded prediction-error dip on a loss. An
-        # interrupted run skips this — the user arriving isn't a
-        # loss, and coupling it to a dip would teach that.
-        interrupted = result.failure == "interrupted"
-        felt = None
-        if interrupted:
-            say({"kind": "stopped", "game": game})
-        else:
-            try:
-                felt = self.regulator.respond_to_play(
-                    self.feel(),
-                    score=result.score,
-                    prior_best=prior_best,
-                    solved=result.solved,
-                    details={
-                        "deaths": result.details.get("deaths", 0),
-                        "escapes": stats["escapes"],
-                        "scored": stats["scored"],
-                    },
-                )
-            except Exception as e:  # noqa: BLE001
-                note_swallowed("mind.volition._perform_play", e)
-
-        # Surface the raw outcome — telemetry, not speech. Broadcast
-        # into the workspace so the result is something she
-        # cognitively registers, not just a stored event.
-        self._emit_live_thought(
-            "play",
-            f"{result.task} [{result.family}] score={result.score:.2f} "
-            f"best={result.best:.2f} rule={result.rule} "
-            f"nodes={result.nodes} attempts={result.total_attempts}"
-            + (f" felt={felt}" if felt else "")
-            + (f" why={result.failure}" if result.failure else ""),
-        )
-
-        # Ground the outcome as a memory event — salience scales with
-        # how close she came, so near-misses matter more than misses.
-        try:
-            chemicals = self.client.get_state().chemicals
-            tag = [float(chemicals.get(CHEM_NAMES[i], 0.0)) for i in range(12)]
-            if result.mastered:
-                tag[0] = min(1.0, tag[0] + 0.2)  # dopamine reward
-            self.client.store_event(
-                timestamp=int(time.time() * 1000),
-                event_type=1,  # Output
-                source_module=MODULE_METACOGNITION,
-                salience=0.4 + 0.5 * result.score,
-                emotional_tag=tag,
-                text=(
-                    f"play:{result.task} score={result.score:.2f} "
-                    f"rule={result.rule} attempts={result.total_attempts}"
-                    + (f" felt={felt}" if felt else "")
-                    + (f" why={result.failure}" if result.failure else "")
-                ),
-            )
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.volition._perform_play", e)
-
-        # Let her articulate it through her own understanding — the
-        # rule she found (or the game concept) — not a report string.
-        seeds = ["play", "game"]
-        if felt:
-            seeds.append(felt)
-        if result.rule != "none":
-            rule_ns = "spatial" if result.family == "grid" else result.family
-            seeds.insert(0, f"{rule_ns}:rule:{result.rule}")
-        self._emit_volition_thought(tuple(seeds), "playing")
 
     def _perform_safeguard(self) -> None:
         """Protect its own integrity because the urge crossed threshold.
@@ -1317,7 +968,7 @@ class VolitionMixin:
         _REACH_OUT_MAX_BIDS it stops calling into silence entirely —
         a person who reaches out and is never answered stops knocking.
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching or self._is_gaming:
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
             return
         if self.world.unanswered_bids >= self._REACH_OUT_MAX_BIDS:
             return
@@ -1432,7 +1083,7 @@ class VolitionMixin:
         an outbound act on the world, the public counterpart to the
         utterances _perform_speech lands at a listener.
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching or self._is_gaming:
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
             return
         seed = self._broadcast_topic()
         if seed is None:
@@ -1590,11 +1241,8 @@ class VolitionMixin:
         Brain-wave gating (delta) is a secondary defense — N1/N2 can
         be alpha/theta-dominant.
 
-        Game-gated: while she is playing, her visual channel is the
-        game feed — frames arrive through ``world_step``, not the
-        optic nerve. Looking around the room is off-task gaze wandering.
         """
-        if self._is_sleeping or self._is_gaming:
+        if self._is_sleeping:
             return
         if not self.vision.is_available():
             return
@@ -1639,7 +1287,7 @@ class VolitionMixin:
         The meditation itself runs in a background thread (via
         _self_meditate) so the heartbeat loop isn't blocked.
         """
-        if self._is_meditating or self._is_sleeping or self._is_teaching or self._is_gaming:
+        if self._is_meditating or self._is_sleeping or self._is_teaching:
             return
         self._emit_volition_thought(("meditation", "rest", "calm"), "thought")
         self._self_meditate()
@@ -1684,7 +1332,7 @@ class VolitionMixin:
         words, not her work. ``desc`` may be empty while ``result``
         is not None.
         """
-        if self._is_meditating or self._is_sleeping or self._is_teaching or self._is_gaming:
+        if self._is_meditating or self._is_sleeping or self._is_teaching:
             return None, None
 
         try:
@@ -1766,7 +1414,7 @@ class VolitionMixin:
         articulate still posts, silently — the art is hers whether
         or not she has words for it.
         """
-        if self._is_meditating or self._is_sleeping or self._is_teaching or self._is_gaming:
+        if self._is_meditating or self._is_sleeping or self._is_teaching:
             return
         self._emit_volition_thought(("drawing", "art", "expression", "creativity"), "creating")
         desc, result = self._draw_result()
@@ -1916,7 +1564,7 @@ class VolitionMixin:
         knows about the topic. The project is sandboxed to
         ``<data_dir>/projects/`` and verified with compile + test.
         """
-        if self._is_meditating or self._is_sleeping or self._is_teaching or self._is_gaming:
+        if self._is_meditating or self._is_sleeping or self._is_teaching:
             return
 
         # Brain-wave gating — creative code work needs beta/gamma/alpha.
@@ -2158,7 +1806,7 @@ class VolitionMixin:
         (deep rest, not reflective mode). Theta is allowed —
         consolidation-mode reflection is still introspective.
         """
-        if self._is_meditating or self._is_sleeping or self._is_teaching or self._is_gaming:
+        if self._is_meditating or self._is_sleeping or self._is_teaching:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -2190,7 +1838,7 @@ class VolitionMixin:
         network cannot cross, the wake-desync check reconciles the
         attempt rather than leaving a sleeping mind on an awake body.
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching or self._is_gaming:
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
             return
         # Wake stabilization backstop: within the post-wake window,
         # re-sleeping at moderate pressure is the flip-flop failing to
@@ -2224,7 +1872,7 @@ class VolitionMixin:
         direction. The mission is composed from its own understanding,
         not from a template.
         """
-        if self._is_meditating or self._is_sleeping or self._is_teaching or self._is_gaming:
+        if self._is_meditating or self._is_sleeping or self._is_teaching:
             return
 
         # Compose a mission from its concept network — pick something

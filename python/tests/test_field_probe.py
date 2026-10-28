@@ -105,14 +105,9 @@ def test_slow_channels_map_to_alert_bands() -> None:
 class _FakeClient:
     def __init__(self, sig):
         self._sig = sig
-        self.pushed: list[float] = []
 
     def get_field_probe(self):
         return self._sig
-
-    def set_field_phase(self, phase: float) -> bool:
-        self.pushed.append(phase)
-        return True
 
 
 class _FailingClient:
@@ -238,7 +233,8 @@ def test_carrier_band_mapping() -> None:
 
 def test_phase_lock_syncs_when_coherent(_no_audio) -> None:
     """Full measured coherence → the modeled band's phase *is* the
-    physical phase (the continuous weight reaches 1), pushed back."""
+    physical phase (the continuous weight reaches 1). The lock runs
+    one way only — physics → model; nothing is pushed back."""
     from brainstem import field_probe
     from thalamus import brain_waves
 
@@ -253,8 +249,6 @@ def test_phase_lock_syncs_when_coherent(_no_audio) -> None:
         field_probe.apply_field_stimulus(client)
         # Weight 1: model alpha phase becomes the physical phase.
         assert brain_waves.wave_phase_of(BrainWave.ALPHA) == pytest.approx(0.8, abs=1e-9)
-        # The physical phase is pushed back — physics follows model.
-        assert client.pushed == [pytest.approx(0.8)]
     finally:
         brain_waves.reset_oscillator()
 
@@ -276,7 +270,6 @@ def test_phase_lock_pull_is_coherence_weighted(_no_audio) -> None:
         # Model alpha at 0; err = 0.8; gain = 0.25 + 0.75·0.1 = 0.325
         # → pull = 0.325·0.8 = 0.26.
         assert brain_waves.wave_phase_of(BrainWave.ALPHA) == pytest.approx(0.26, abs=1e-9)
-        assert client.pushed == [pytest.approx(0.26)]
     finally:
         brain_waves.reset_oscillator()
 

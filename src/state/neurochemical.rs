@@ -67,6 +67,7 @@
 //! "flow mode" — flow emerges when dopamine, ACh, and NE are high while
 //! cortisol is low.
 
+use super::basal_forebrain;
 use super::zones::MentalPhase;
 
 /// Number of tracked neurochemicals.
@@ -2961,6 +2962,20 @@ impl NeurochemicalVector {
             );
         }
 
+        // Basal forebrain: when the sleep-wake network is not driving
+        // ACh, the region's cholinergic set-point is the homeostatic
+        // baseline shaped by its own two modulators — A1 occupancy on
+        // the wake-active population (the somnogenic signal acting at
+        // its site) and the expected-uncertainty drive. When the
+        // network IS driving, this entry is never read: ACh relaxes
+        // toward `basal_forebrain::release_target` below instead.
+        let ach_idx = NeurochemicalId::Acetylcholine as usize;
+        circadian_baselines[ach_idx] = basal_forebrain::wake_setpoint(
+            circadian_baselines[ach_idx],
+            self.chemicals[NeurochemicalId::Adenosine as usize].level,
+            params.expected_uncertainty,
+        );
+
         // Recompute derived fields so the coupling snapshot reflects the
         // *current* chemical state, not the previous tick's cache. Between
         // ticks, apply_impulse / apply_impulse_capped (from IPC, active
@@ -3744,9 +3759,10 @@ impl NeurochemicalVector {
                 );
             };
             let (lc, vlpo, rem) = (net.lc, net.vlpo, net.rem);
+            let adn_raw = self.chemicals[adn_idx].level;
             relax(
                 &mut self.chemicals[NeurochemicalId::Acetylcholine as usize],
-                ACH_BASE + ACH_FROM_LC * lc + ACH_FROM_REM * rem,
+                basal_forebrain::release_target(lc, rem, adn_raw, params.expected_uncertainty),
             );
             relax(
                 &mut self.chemicals[NeurochemicalId::Serotonin as usize],
@@ -4532,11 +4548,9 @@ pub struct NetworkLevels {
 /// REM) and to the release data they are meant to reproduce; the fit and its
 /// tolerances are in tests/network_calibration.rs.
 ///
-/// Acetylcholine rises with LC (wake) and REM-on: it is high in waking and
-/// REM and lowest in NREM (Vazquez & Baghdoyan 2001).
-pub const ACH_BASE: f32 = 0.2895;
-pub const ACH_FROM_LC: f32 = 0.3017;
-pub const ACH_FROM_REM: f32 = 0.4512;
+/// Acetylcholine's map is the basal forebrain's own output equation —
+/// `state::basal_forebrain::release_target` composes it with the region's
+/// A1/uncertainty modulators and holds the coefficients.
 /// Serotonin (dorsal raphe) tracks LC, is reduced in NREM, and is near silent
 /// in REM (Monti & Jantos 2008; Sakai & Crochet 2001).
 pub const SRT_BASE: f32 = 0.1904;
@@ -4759,6 +4773,16 @@ pub struct NeuroTickParams {
     /// sleep-wake network owns. 0.0 = darkness or no eye: nothing
     /// suppressed.
     pub light_lux: f32,
+    /// Expected uncertainty α in [0, 1] — the signal cortical
+    /// acetylcholine reports (Yu & Dayan, Neuron 2005): the body's
+    /// estimate of how unreliable its own predictions are. The daemon
+    /// fills it from the inference engine's tracked precision via
+    /// `state::basal_forebrain::expected_uncertainty`; the basal
+    /// forebrain's release equation scales its wake component with it.
+    /// At [`basal_forebrain::UNCERTAINTY_REFERENCE`] the drive is
+    /// exactly neutral — the standalone default, since with no
+    /// inference running there is no measured uncertainty to report.
+    pub expected_uncertainty: f32,
 }
 
 impl NeuroTickParams {
@@ -4789,6 +4813,7 @@ impl NeuroTickParams {
         receptor_resensitization_rate: 0.0, // set by daemon during sleep
         network_levels: None,               // set per sub-step from the sleep-wake network
         light_lux: 0.0,                     // set by daemon from the optic nerve each advance
+        expected_uncertainty: basal_forebrain::UNCERTAINTY_REFERENCE, // neutral with no inference
     };
 
     /// Compressed-time parameters for testing and fast iteration.

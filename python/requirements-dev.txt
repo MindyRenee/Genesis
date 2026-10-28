@@ -15,8 +15,7 @@ mypy==2.3.1
 vulture==2.14
 
 # Optional-at-runtime deps kept in dev/CI so their code paths and
-# tests run (symbolic.py degrades gracefully when sympy is absent;
-# ARC tests importorskip arcengine).
+# tests run (symbolic.py degrades gracefully when sympy is absent).
 sympy==1.12
 # mpmath>=1.4 deprecated names sympy 1.12 still calls
 # (ctx_mp.bitcount, mpnumeric); keep it below the break.

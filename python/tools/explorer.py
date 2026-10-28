@@ -300,7 +300,7 @@ class Explorer:
                     event_type=3,  # Observation
                     source_module=6,  # Sensory
                     salience=0.4,
-                    emotional_tag=[0.5] * 12,
+                    emotional_tag=None,
                     text=(
                         f"Explored {result.files_explored} files in {path or 'project root'}: "
                         f"+{result.concepts_added} concepts"

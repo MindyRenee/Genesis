@@ -272,7 +272,9 @@ __all__ = ["CHEM_ADENOSINE", "Adenosine"]
 class Adenosine:
     """Adenosine — sleep pressure; ATP metabolism byproduct.
 
-    All values synchronized with src/state/neurochemical.rs.
+    All values synchronized with src/state/neurochemical.rs and
+    src/state/basal_forebrain.rs (the A1 site-of-action mechanism —
+    math on the Rust side, words here).
     """
 
     index: int = CHEM_ADENOSINE

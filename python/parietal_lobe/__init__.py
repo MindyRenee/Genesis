@@ -389,8 +389,7 @@ Top-level modules newly claimed by this subsystem:
         carrying the milk"), updated every turn by comprehension
         propositions and consulted before semantic memory or external
         lookup. Event comprehension is parietal-temporal; the model
-        of where things are right now is parietal (the world_model's
-        discourse sibling).
+        of where things are right now is parietal.
 
     (this package) grid.py, scene.py, grounding.py, delta.py,
                   transforms.py
@@ -534,19 +533,13 @@ _EXPORTS: dict[str, str] = {
     "orbit": "parietal_lobe.strips",
     "join_run": "parietal_lobe.strips",
     "join": "parietal_lobe.strips",
-    # Relational reasoning (IPS) and the egocentric world model
+    # Relational reasoning (IPS)
     "AbstractReasoner": "parietal_lobe.abstract_reasoning",
     "RelationalComplexity": "parietal_lobe.abstract_reasoning",
     "RelationalSchema": "parietal_lobe.abstract_reasoning",
     "RelationalSystem": "parietal_lobe.abstract_reasoning",
     "SchemaAtom": "parietal_lobe.abstract_reasoning",
     "SpatialImagery": "parietal_lobe.spatial_imagery",
-    "WorldModel": "parietal_lobe.world_model",
-    "WorldEntity": "parietal_lobe.world_model",
-    "WorldEvent": "parietal_lobe.world_model",
-    "SimState": "parietal_lobe.world_model",
-    # Sensorimotor body loop — observe/act (body schema is parietal)
-    "EmbodimentMixin": "parietal_lobe.embodiment",
     # The temporoparietal minimal self — self-location, first-person
     # perspective, and the ownership comparator that marks which
     # events are self-caused (co-claimed with limbic_system)
@@ -563,15 +556,7 @@ _EXPORTS: dict[str, str] = {
     "InnerLife": "sleep.inner_life",
     # The region itself — dorsal attention + situation model
     "ParietalLobe": "parietal_lobe.parietal",
-    # The task competencies the play loop drives — transform search
-    # over grids, relational arrangement, piece fitting, numerosity.
-    # The worlds they solve live in ``worlds`` (the P and R of the
-    # MDP); these are the agent side — the parietal tissue.
-    "SpatialAgent": "worlds.spatial_agent",
     "SpatialReasoner": "parietal_lobe.spatial.solver",
-    "RelationsAgent": "worlds.relations_agent",
-    "AssemblyAgent": "worlds.assembly_agent",
-    "QuantitiesAgent": "worlds.quantities_agent",
 }
 
 __all__ = sorted(_EXPORTS)

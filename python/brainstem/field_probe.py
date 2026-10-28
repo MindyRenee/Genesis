@@ -120,12 +120,13 @@ _SHUDDER_JITTER_CV = 1.5
 # continuous pinning, not an evoked reset.
 _SHUDDER_REARM = 0.8 * _SHUDDER_JITTER_CV
 
-# Mutual phase lock — the entrainment leg. The measured substrate
-# response phase is demodulated against the daemon's own carrier
-# phase track; the modeled carrier band's phase is pulled toward it
-# (physics → model), and the corrected phase is pushed back to the
-# daemon's generator (model → physics). Two oscillators pulling on
-# each other — one dynamical system.
+# Phase lock — the entrainment leg. The measured substrate response
+# phase is demodulated against the daemon's own carrier phase track,
+# and the modeled carrier band's phase is pulled toward it —
+# physics → model, the only direction the lock runs. The reverse leg
+# (pushing the model's phase into the physical generator) was retired
+# with SET_FIELD_PHASE: modeled state does not assert onto a physical
+# quantity.
 _PLL_GAIN = 0.25  # pull floor — the soft-PLL rate at zero coherence
 _CARRIER_BAND_TOL = 1.0  # Hz — carrier→band mapping tolerance
 # RF envelope entrainment (v6) — the flux phasors let a measured
@@ -179,15 +180,15 @@ def _carrier_band(freq: float) -> BrainWave | None:
     return best
 
 
-def _apply_phase_lock(sig: FieldProbeSignature, client: GenesisClient) -> None:
+def _apply_phase_lock(sig: FieldProbeSignature) -> None:
     """Pull the modeled carrier band toward the measured physical
-    phase, then push the corrected phase back to the generator.
+    phase — physics → model, the only direction the lock runs.
 
     The substrate's measured response phase is the generator phase
     minus the response lag; the model's band phase is pulled toward
-    it — and the corrected phase returns through SET_FIELD_PHASE so
-    the physical rhythm chases the model in turn. Both directions
-    pull; the lock is mutual.
+    it. The model's phase is never pushed back into the generator —
+    modeled state does not assert onto a physical quantity (the
+    ``SET_FIELD_PHASE`` push channel is retired).
 
     The measured coherence is the pull's weight outright: at full
     trust the band's phase becomes the physical phase — the first
@@ -211,10 +212,6 @@ def _apply_phase_lock(sig: FieldProbeSignature, client: GenesisClient) -> None:
     gain = _PLL_GAIN + (1.0 - _PLL_GAIN) * coherence
     perturb_wave_phase(band, gain * err)
     _phase_errs.append(err)
-    try:
-        client.set_field_phase(wave_phase_of(band))
-    except Exception as e:  # noqa: BLE001 — absent channel, any cause
-        logger.debug("field phase push failed: %s", e)
 
 
 def field_phase_lock() -> dict[str, float]:
@@ -430,7 +427,7 @@ def apply_field_stimulus(client: GenesisClient) -> bool:
         for band, level in levels.items():
             hold_stimulus(band, level)
         _apply_evoked_resets(sig)
-        _apply_phase_lock(sig, client)
+        _apply_phase_lock(sig)
         _apply_rf_entrainment(sig)
         applied = True
 

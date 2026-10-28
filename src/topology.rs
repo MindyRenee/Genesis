@@ -37,6 +37,22 @@ pub struct Region {
 /// listed here; the body's table ends at its own edge.
 pub const REGIONS: &[Region] = &[
     Region {
+        name: "basal_forebrain",
+        package: "basal_forebrain",
+        modules: &[
+            "state::basal_forebrain",
+            "state::neurochemical",
+            "state::sleep_network",
+            "state::memory",
+        ],
+        // Cholinergic output feeds cortical inference (the
+        // sensory-precision edge) and hippocampal encoding; the
+        // region is the A1 site of action for the sleep-pressure
+        // signal it feeds back into the switch.
+        projections: &["memory", "sleep"],
+        fiber: "prediction",
+    },
+    Region {
         name: "basal_ganglia",
         package: "basal_ganglia",
         modules: &["cognition::intention"],

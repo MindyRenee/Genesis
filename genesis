@@ -193,11 +193,6 @@ _stop_all() {
     local cli_pidfile="$DATA_DIR/genesis_cli.pid"
     local daemon_pidfile="$DATA_DIR/genesis_daemon.pid"
 
-    # 0. Tell the body's mind-shepherd this absence is authored —
-    #    an orphaned daemon past the CLI's death must not regrow a
-    #    mind the operator is putting down (src/daemon/mind_shepherd.rs).
-    printf 'stopped %s\n' "$(date +%s%3N)" > "$DATA_DIR/mind.suppress" 2>/dev/null || true
-
     # 1. Stop the cognitive CLI first (it owns the daemon lifecycle).
     #    Validate PID files and fall back to exact /proc arguments.
     #    Each step has its own 120s grace period; a failure returns

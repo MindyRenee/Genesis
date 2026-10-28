@@ -74,10 +74,10 @@ from genesis_client.protocol import (
 )
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
-from genesis_client.types import CoreState, NeuroSummary
+from genesis_client.types import CoreState
 from infrastructure.config import EmotionalConfig, default_data_dir
 
-from .emotion import CauseCategory, EmotionalState, EmotionField, assess_emotion
+from .emotion import CauseCategory, EmotionalState, EmotionField
 
 logger = logging.getLogger(__name__)
 
@@ -2589,107 +2589,6 @@ class EmotionalRegulator:
         self._impulse(CHEM_DOPAMINE, novelty)
         self._impulse(CHEM_ACETYLCHOLINE, novelty * 0.7)
         return "curious"
-
-    def respond_to_play(
-        self,
-        emotion: EmotionalState,
-        score: float,
-        prior_best: float,
-        solved: bool,
-        details: dict | None = None,
-    ) -> str | None:
-        """Consciously respond to the outcome of playing a game.
-
-        This is her affective loop on play — the attempt actually
-        changes how she feels, not just what she records. The drive
-        is one computation, reward prediction error δ = r − V(s)
-        (Schultz, 1998): V is her own expectation — her best score
-        so far on the game. Dopamine scales with positive
-        δ and dips with negative δ; co-release (serotonin,
-        endorphin, norepinephrine, acetylcholine) follows the same
-        signal modulated by the episode's state.
-
-        ``details`` carries the episode's texture — deaths, narrow
-        escapes, scores — because *how* a game went changes what
-        the outcome feels like:
-
-        - **Won after danger** (escapes on record): exhilarated —
-          victory that survived threat is the strongest kind; the
-          relief already registered, the win adds serotonin and a
-          bigger endorphin glow.
-        - **Won clean**: satisfied — the RPE burst, satisfaction,
-          the "got it" glow, and acetylcholine to encode the
-          winning strategy while it's live.
-        - **Improved but didn't win**: encouraged — progress keeps
-          her engaged.
-        - **Repeated deaths / stalls**: frustrated — blocked goal
-          is the textbook frustration trigger; a deeper dopamine
-          dip plus more norepinephrine. Bounded — still enough
-          sting to matter, not enough to sour the collection.
-        - **Missed or stalled**: determined — the smaller honest
-          dip plus arousal to want another run.
-
-        Returns a description of what she felt, or None if she chose
-        not to react.
-        """
-        details = details or {}
-        deaths = int(details.get("deaths", 0) or 0)
-        escapes = int(details.get("escapes", 0) or 0)
-        dampening = self._compute_emotional_dampening(emotion)
-
-        # δ = r − V(s) — the reward-prediction error is the drive
-        # (Schultz 1998), formed here against her best score so far.
-        r = 1.0 if solved else float(score)
-        delta = r - float(prior_best)
-        delta = max(-1.0, min(1.0, delta))
-
-        # Each neuromodulator takes its own projection of the same
-        # episode. Dopamine carries the signed error itself —
-        # predicted reward barely moves it, surprise bursts, a
-        # miss dips by how wrong she was. Norepinephrine tracks
-        # |δ| plus accumulated blockage — arousal and the sting.
-        # Serotonin tracks attainment r, not error — satisfaction
-        # exists even when the win was expected. Endorphin is
-        # relief, which requires threat survived. Acetylcholine
-        # tracks |δ| — encode most what was least predicted.
-        self._impulse(CHEM_DOPAMINE, 0.030 * dampening * delta)
-        self._impulse(
-            CHEM_NOREPINEPHRINE,
-            0.012 * dampening * (abs(delta) + 0.5 * min(deaths, 4) / 4.0),
-        )
-        self._impulse(CHEM_SEROTONIN, 0.018 * dampening * r)
-        self._impulse(
-            CHEM_ENDORPHIN,
-            0.014 * dampening * r * (1.0 if escapes else 0.5),
-        )
-        self._impulse(CHEM_ACETYLCHOLINE, 0.012 * dampening * abs(delta))
-
-        # What she felt is what her chemistry now is: re-read the
-        # body after the impulses landed and let the emotion
-        # assessment name the state — the label emerges from the
-        # neurochemistry, not from which outcome occurred.
-        state = self._get_state() if self._get_state else None
-        if state is None:
-            return None
-        try:
-            summary = NeuroSummary(
-                arousal=float(state.arousal),
-                valence=float(state.valence),
-                global_tone=float(state.global_tone),
-                plasticity_gate=float(state.plasticity_gate),
-                encoding_weight=float(state.encoding_weight),
-                consolidation_weight=float(state.consolidation_weight),
-                retrieval_weight=float(state.retrieval_weight),
-                phase=int(getattr(state, "emergent_phase", 0) or 0),
-            )
-            felt = assess_emotion(summary, state.chemicals).label
-        except (AttributeError, TypeError, ValueError) as e:
-            note_swallowed(
-                "limbic_system.emotional_regulator.respond_to_play",
-                e,
-            )
-            return None
-        return felt or None
 
     def _impulse(self, chem: int, amount: float) -> None:
         """Send a regulatory neurochemical impulse, tolerating failures.

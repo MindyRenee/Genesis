@@ -47,7 +47,7 @@ from typing import TYPE_CHECKING
 from genesis_client.swallow import note_swallowed
 
 if TYPE_CHECKING:
-    from worlds.arc_web import _Browser
+    from tools.browser import _Browser
 
 logger = logging.getLogger(__name__)
 
@@ -540,8 +540,8 @@ def _get_ssl_context() -> ssl.SSLContext:
 # ─── Headless browser (the Chrome path) ────────────────────────────
 #
 # One lazy headless Chrome shared by search and fetch, driven over
-# the DevTools protocol by the same ``_Browser`` the ARC web games
-# use. A single tab means navigation must be serialized — the lock
+# the DevTools protocol by ``tools.browser._Browser``. A single tab
+# means navigation must be serialized — the lock
 # wraps each navigate → settle → extract cycle so concurrent callers
 # (curiosity worker, conversation) cannot interleave page loads.
 # The ``"web"`` profile under her data dir is persistent — cookies,
@@ -566,7 +566,7 @@ def _get_browser():
     if _browser_failed:
         return None
     try:
-        from worlds.arc_web import _Browser
+        from tools.browser import _Browser
 
         _browser = _Browser(headless=True, purpose="web")
         atexit.register(_close_browser)

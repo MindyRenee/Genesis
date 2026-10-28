@@ -164,7 +164,6 @@ class LifecycleMixin:
         from previous conversations.
         """
         _warm_nltk()
-        self._provision_stewardship()
         self._start_connect_and_register()
         try:
             self._start_restore_state()
@@ -188,29 +187,6 @@ class LifecycleMixin:
         self._start_autonomous_subsystems()
         self._start_engage_restored_sleep()
         self._start_background_threads()
-
-    def _provision_stewardship(self) -> None:
-        """First-boot steward provisioning — explicit, at the entry point.
-
-        ``Stewardship.load`` (run in the frontal lobe's constructor) is
-        strictly read-only: it can authenticate an existing credential
-        but never creates one. Creation happens only here — a data dir
-        with no stamp gets its instance key and provenance stamp; a
-        stamped dir (including a copy whose key it cannot read) is left
-        exactly as found, sealed. ``provision`` mutates the loaded
-        channel in place, so the frontal lobe's steward object needs
-        no re-wiring.
-        """
-        steward = getattr(self.brain.frontal, "steward", None)
-        if steward is None:
-            return
-        try:
-            if steward.provision():
-                logger.info("steward channel authenticated")
-            elif steward.stamped:
-                logger.info("steward channel sealed — stamped to a key this process does not hold")
-        except OSError as e:
-            logger.warning(f"steward provisioning failed: {e}")
 
     def _start_connect_and_register(self) -> None:
         """Connect to the daemon and register cognitive modules.

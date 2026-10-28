@@ -367,44 +367,23 @@ fn test_neuro_impulse() {
 // ─── Neuro adjust baseline ────────────────────────────────────
 
 #[test]
-fn test_neuro_adjust_baseline() {
-    let mut sys = IpcTestSystem::new("adjust_baseline");
+fn test_neuro_adjust_baseline_is_retired() {
+    let mut sys = IpcTestSystem::new("adjust_baseline_retired");
     sys.start_server();
 
     let mut client = sys.client();
 
-    // Get the raw adenosine baseline before adjustment by reading state
-    let state_before = client.get_state().expect("state before");
-    let adn_idx = NeurochemicalId::Adenosine as usize;
-    let baseline_before = state_before.neurochemicals.chemicals[adn_idx].baseline;
-
-    // Adjust the adenosine baseline downward by 0.05 (small enough to
-    // not hit the 0.05 floor from the default ~0.20 baseline)
+    // Opcode 23 is retired: direct baseline edits bypassed the body's
+    // own dynamics. The wire number stays pinned (never reused) and
+    // every request returns UNKNOWN_COMMAND.
     let delta: f32 = -0.05;
     let delta_bytes = delta.to_le_bytes();
     let mut msg = vec![NeurochemicalId::Adenosine as u8];
     msg.extend_from_slice(&delta_bytes);
     let resp = client
         .request(cmd::NEURO_ADJUST_BASELINE, &msg)
-        .expect("adjust baseline");
-    assert_eq!(resp, vec![1], "adjust baseline should return ack=1");
-
-    // Verify the baseline was actually lowered
-    let state_after = client.get_state().expect("state after");
-    let baseline_after = state_after.neurochemicals.chemicals[adn_idx].baseline;
-    assert!(
-        baseline_after < baseline_before,
-        "baseline should decrease after negative adjust: was {}, now {}",
-        baseline_before,
-        baseline_after
-    );
-    assert!(
-        (baseline_after - (baseline_before + delta)).abs() < 0.01,
-        "baseline should be ~{} lower: expected ~{}, got {}",
-        delta,
-        baseline_before + delta,
-        baseline_after
-    );
+        .expect("retired opcode is still routable");
+    assert_eq!(resp, vec![genesis::daemon::ipc::error::UNKNOWN_COMMAND]);
 }
 
 // ─── Get memory stats ─────────────────────────────────────────
@@ -959,6 +938,88 @@ fn test_store_episode_bypasses_stm() {
         "STM should be empty (store_episode bypasses STM)"
     );
     assert!(ltm_count > 0, "LTM should have the episode");
+}
+
+#[test]
+fn test_store_stamps_live_chemistry() {
+    // The emotional tag is defined as the body's effective
+    // neurochemical levels — the daemon stamps it from live state on
+    // every store, so a caller-supplied tag is advisory and must not
+    // end up in the stored memory.
+    let mut sys = IpcTestSystem::new("store_stamp");
+    sys.start_server();
+
+    // Plant distinctive effective levels in the live state through a
+    // second mmap handle — the values the daemon must stamp.
+    let expected: [f32; 12] = [
+        0.11, 0.22, 0.33, 0.44, 0.55, 0.66, 0.77, 0.88, 0.12, 0.34, 0.56, 0.78,
+    ];
+    let state_handle = MmapState::open(&sys.state_path).expect("open state");
+    state_handle
+        .modify(2000, |s| {
+            s.neurochemicals.effective_levels[..12].copy_from_slice(&expected);
+        })
+        .expect("write levels");
+
+    let mut client = sys.client();
+
+    // Build one wire-layout store payload with a bogus client tag.
+    let text = b"tag stamp test";
+    let mut payload = Vec::new();
+    payload.extend_from_slice(&1000u64.to_le_bytes());
+    payload.push(0u8); // event_type
+    payload.push(4u8); // source_module
+    payload.extend_from_slice(&0.8f32.to_le_bytes());
+    for v in [0.9f32; 12] {
+        payload.extend_from_slice(&v.to_le_bytes());
+    }
+    payload.extend_from_slice(&(text.len() as u16).to_le_bytes());
+    payload.extend_from_slice(text);
+
+    // STORE_EVENT: response is ack + the stamped tag.
+    let resp = client
+        .request(cmd::STORE_EVENT, &payload)
+        .expect("store_event");
+    assert_eq!(
+        resp.len(),
+        1 + 48,
+        "STORE_EVENT must return ack + stamped tag"
+    );
+    assert_eq!(resp[0], 1);
+    for (i, &e) in expected.iter().enumerate() {
+        let got = f32::from_le_bytes(resp[1 + i * 4..][..4].try_into().unwrap());
+        assert_eq!(
+            got, e,
+            "stamped tag[{i}] must be the live level, not the client's 0.9"
+        );
+    }
+
+    // STORE_EPISODE: ack + id + stamped tag tail.
+    let resp = client
+        .request(cmd::STORE_EPISODE, &payload)
+        .expect("store_episode");
+    assert!(resp.len() >= 9 && resp[0] == 1);
+    let ep_id = u64::from_le_bytes(resp[1..9].try_into().unwrap());
+    assert!(
+        resp.len() >= 9 + 48,
+        "STORE_EPISODE must return the stamped tag"
+    );
+    for (i, &e) in expected.iter().enumerate() {
+        let got = f32::from_le_bytes(resp[9 + i * 4..][..4].try_into().unwrap());
+        assert_eq!(got, e);
+    }
+
+    // The stored LTM record's full tag carries the stamped levels.
+    // RETRIEVE layout: [u8][u64 id][u64 ts][f32 sal][u64 assoc]
+    // [f32×4 compact][f32×12 full] → full tag at offset 45.
+    let r = client
+        .request(cmd::RETRIEVE_EPISODE, &ep_id.to_le_bytes())
+        .expect("retrieve");
+    assert_eq!(r[0], 1);
+    for (i, &e) in expected.iter().enumerate() {
+        let got = f32::from_le_bytes(r[45 + i * 4..][..4].try_into().unwrap());
+        assert_eq!(got, e, "stored episode tag[{i}] must be the live level");
+    }
 }
 
 #[test]

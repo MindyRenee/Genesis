@@ -249,8 +249,6 @@ class MemoryStore:
         crashes on memory-storage problems.
         """
         try:
-            if emotional_tag is None:
-                emotional_tag = [0.5] * 12
             self._client.store_event(
                 timestamp=int(time.time() * 1000),
                 event_type=event_type,

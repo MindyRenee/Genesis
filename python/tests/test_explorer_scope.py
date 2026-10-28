@@ -315,13 +315,13 @@ def test_read_file_missing_and_dir(tmp_path) -> None:
     assert ex.read_file(str(tmp_path)) is None
 
 
-# ── ARC task files ───────────────────────────────────────────────────
+# ── grid task files ──────────────────────────────────────────────────
 
 
-def test_arc_task_json_readable(tmp_path) -> None:
-    """An ARC-style task JSON outside the project root is learnable."""
+def test_task_json_readable(tmp_path) -> None:
+    """A grid-task JSON outside the project root is learnable."""
     task = _write(
-        tmp_path / "ARC" / "data" / "training" / "0a938d79.json",
+        tmp_path / "tasks" / "data" / "training" / "0a938d79.json",
         '{"train": [{"input": [[0, 0, 2]], "output": [[2, 0, 0]]}],'
         ' "test": [{"input": [[1, 1, 0]]}]}',
     )

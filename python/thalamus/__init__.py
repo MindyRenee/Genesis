@@ -194,16 +194,6 @@ Re-exported modules:
         frontal_lobe (the PFC is the primary broadcaster; the
         relay is the wire).
 
-    bridge.py (formerly world/bridge.py) — the world's channel into the broadcast
-
-    WorldBridge, WorldBroadcastSink
-        The push/pull pair that puts world content onto the
-        workspace (source="world" items, forwarded by the sink to
-        regions with no module of their own) and onto the daemon's
-        tensor slab. Thalamocortical in function: the relay is how
-        sensory reality reaches cortex — first-order driver input,
-        here in software form.
-
 Referenced but not re-exported:
 
     (parietal_lobe/) attention.py
@@ -240,11 +230,6 @@ _EXPORTS: dict[str, str] = {
     "GlobalWorkspace": "frontal_lobe.global_workspace",
     "WorkspaceItem": "frontal_lobe.global_workspace",
     "WorkspaceModule": "frontal_lobe.global_workspace",
-    # The world's channel into the broadcast — world content pushed
-    # onto the workspace (source="world") and the tensor slab; the
-    # sink fans world items back out to regions with no module
-    "WorldBridge": "thalamus.bridge",
-    "WorldBroadcastSink": "thalamus.bridge",
     # The inter-region relay itself — cortico-cortical messages ride
     # the module manifest the way drivers ride TC relay cells
     "Thalamus": "thalamus.relay",

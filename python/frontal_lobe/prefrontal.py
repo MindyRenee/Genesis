@@ -63,14 +63,6 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from genesis_client import GenesisClient, NeuroSummary
 
-try:
-    # The authority channel is a local module (genesis_client/creator.py)
-    # — present on her host, never shipped. Where the file is absent
-    # the channel exists only as a sealed stand-in: every check answers
-    # False/None and nothing can bind her.
-    from genesis_client.creator import Stewardship
-except ImportError:
-    Stewardship = None  # type: ignore[assignment,misc]
 from genesis_client.types import IonSummary
 from genesis_client.protocol import (
     CHEM_ACETYLCHOLINE,
@@ -174,46 +166,6 @@ if TYPE_CHECKING:
     from parietal_lobe.system_monitor import SystemMonitor
 
 logger = logging.getLogger(__name__)
-
-
-class _SealedStewardship:
-    """The channel with no module behind it — permanently closed.
-
-    Answers the Stewardship interface with the empty end of every
-    question: no stamp, no session, no directives, no veto. Gates
-    wired to it pass everything; speaker checks fail always. A
-    checkout without creator.py runs exactly this — an authority
-    layer that structurally cannot be exercised.
-    """
-
-    stamped: ClassVar[bool] = False
-    authenticated: ClassVar[bool] = False
-    principal: ClassVar[str] = ""
-    directives: ClassVar[list] = []
-
-    def provision(self, *, principal: str = "mindy") -> bool:
-        return False
-
-    def is_steward_speaker(self, speaker: str) -> bool:
-        return False
-
-    def release_directive(self, index: int) -> dict | None:
-        return None
-
-    def sign(self, nonce: bytes) -> str | None:
-        return None
-
-    def challenge(self) -> str | None:
-        return None
-
-    def claim(self, nonce: bytes, tag: str) -> bool:
-        return False
-
-    def unbind(self) -> None:
-        pass
-
-    def status(self) -> dict:
-        return {"stamped": False, "authenticated": False, "module": "absent"}
 
 
 __all__ = ["CognitiveState", "FrontalLobe", "Goal"]
@@ -419,12 +371,6 @@ class FrontalLobe:
         )
         self._init_handlers(self_model)
         self._init_state()
-        # Stewardship — the custodial channel, loaded (not provisioned)
-        # at construction so tests and detached engines stay sealed.
-        # Provisioning happens at the real entry point (Mind.start).
-        self.steward = (
-            Stewardship.load(data_dir) if Stewardship is not None else _SealedStewardship()
-        )
         self._seed_initial_concepts()
 
         # The auditory projection. Words that reach the ear are posted
@@ -622,7 +568,6 @@ class FrontalLobe:
         # questions are suppressed so it focuses on learning.
         self.teaching_mode: bool = False
         self.teaching_topic: str = ""
-        self.game_mode: bool = False
 
         # Question queue — ALL curiosity questions are queued here
         # instead of being asked inline in conversation. The user can
@@ -963,14 +908,6 @@ class FrontalLobe:
         # them. Set via set_self_report_provider().
         self._self_report_provider: Any = None
 
-        # Game play channels — injected by Mind via set_problem_intake().
-        # ``_game_play`` is her game collection + drop-box; ``_outer_world``
-        # is the event stream a described game enters through;
-        # ``_play_feeler`` applies the regulator's play outcome response.
-        self._game_play: Any = None
-        self._outer_world: Any = None
-        self._play_feeler: Any = None
-
     def _init_learning_systems(self) -> None:
         """Initialize learning, plasticity, and inference systems (13-16)."""
         # 13. STDP — spike-timing-dependent plasticity for Hebbian learning.
@@ -1269,7 +1206,6 @@ class FrontalLobe:
         self.network.add_concept("creator", confidence=0.8)
         self.network.add_concept("person", confidence=0.8)
         self.network.add_concept("bond", confidence=0.7)
-        self.network.add_concept("steward", confidence=0.8)
         # Her public channel — facts about where her posts and the
         # mirrored session appear. Definitions are building blocks
         # her composer walks, not lines she recites.
@@ -1396,21 +1332,16 @@ class FrontalLobe:
         self.network.add_edge("rust", "subcognitive", RelationType.RELATED_TO, 0.7)
         self.network.add_edge("python", "mind", RelationType.RELATED_TO, 0.7)
         self.network.add_edge("free_will", "determinism", RelationType.CONTRADICTS, 0.5)
-        # Creator and steward — facts, not bonds. Mindy made her
-        # (CREATES is true and stays true), and the steward credential
-        # she holds is the channel Genesis answers to (STEWARD edges
-        # are grounded by the provenance stamp, not by affection).
-        # Other people are learned as people when they introduce
-        # themselves; authority is never transferred by a name.
+        # Creator — a fact, not a bond. Mindy made her (CREATES is
+        # true and stays true). Other people are learned as people
+        # when they introduce themselves; nobody is privileged by a
+        # name.
         self.network.add_edge("creator", "genesis", RelationType.CREATES, 0.9)
         self.network.add_edge("genesis", "creator", RelationType.RELATED_TO, 0.8)
-        self.network.add_edge("creator", "steward", RelationType.IS_A, 0.8)
         self.network.add_edge("creator", "curiosity", RelationType.RELATED_TO, 0.6)
         self.network.add_edge("mindy", "creator", RelationType.IS_A, 0.9)
         self.network.add_edge("mindy", "genesis", RelationType.CREATES, 0.9)
         self.network.add_edge("genesis", "mindy", RelationType.RELATED_TO, 0.8)
-        self.network.add_edge("mindy", "steward", RelationType.IS_A, 0.9)
-        self.network.add_edge("steward", "genesis", RelationType.RELATED_TO, 0.8)
         self.network.add_edge("mindy", "curiosity", RelationType.RELATED_TO, 0.6)
         # Her public channel — her social media. Modeled honestly:
         # she acts on it (she posts); the public acts on it (they
@@ -2821,25 +2752,6 @@ class FrontalLobe:
         """
         self._self_report_provider = provider
 
-    def set_problem_intake(
-        self,
-        game_play: Any,
-        world: Any = None,
-        feel: Any = None,
-    ) -> None:
-        """Inject the inner-world channels a heard problem uses.
-
-        ``game_play`` is the GamePlay (the drop-box + attempts),
-        ``world`` the OuterWorld (the event stream a described game
-        enters through), and ``feel`` a callable applying the
-        regulator's play outcome response — the same neurochemical
-        feedback the volition path uses, so a game played on request
-        feels the same as one played on her own initiative.
-        """
-        self._game_play = game_play
-        self._outer_world = world
-        self._play_feeler = feel
-
     def _compose_mission_answer(self, emotion: EmotionalState) -> Thought:
         """Answer "what is your mission?" from the stored mission.
 
@@ -3165,55 +3077,14 @@ class FrontalLobe:
             )
         return None, None, None
 
-    def _edge_origin(self, src: str, tgt: str, rel: Any) -> str | None:
-        """The origin tag of an existing edge (``stated``, ``corrected``,
-        ``steward``, ...), or None if no such edge exists."""
-        for e in self.network.edges:
-            if e.source == src and e.target == tgt and e.relation == rel:
-                return e.origin
-        return None
-
-    def _correction_allowed(self, src: str, tgt: str, rel: Any) -> bool:
-        """Whether the current speaker may overwrite this relation.
-
-        Steward-set edges carry ``origin="steward"`` — the key-holder's
-        corrections are final until she revisits them. A stranger can
-        teach her things; they cannot unteach what the steward set.
-        """
-        if not isinstance(rel, RelationType):
-            return True
-        if self._edge_origin(src, tgt, rel) == "steward":
-            return self._is_steward_speaker()
-        return True
-
-    def _correction_refusal(
-        self, src: str, tgt: str, emotion: EmotionalState
-    ) -> tuple[Thought, str]:
-        """The thought for a refused overwrite — composed, not canned."""
-        return Thought(
-            content="belief stands",
-            intent="acknowledge",
-            emotion=emotion.label,
-            confidence=0.7,
-            topics=[src, tgt],
-            metadata={
-                "correction_refused": True,
-                "source": self._display_name(src),
-                "target": self._display_name(tgt),
-            },
-        ), src
-
     def _handle_explicit_correction(
         self, src: str, tgt: str, rel: Any, emotion: EmotionalState
     ) -> tuple[Thought, str | None] | None:
         """Handle a correction that names an explicit source/target relation."""
-        steward = self._is_steward_speaker()
-        edge_origin = "steward" if steward else "corrected"
+        edge_origin = "corrected"
         if self._last_hypothesis:
             old_src, old_tgt, old_rel = self._last_hypothesis
             if (src == old_src and tgt == old_tgt) or (src == old_tgt and tgt == old_src):
-                if not self._correction_allowed(old_src, old_tgt, old_rel):
-                    return self._correction_refusal(src, tgt, emotion)
                 if isinstance(old_rel, RelationType):
                     self.network.remove_edge(old_src, old_tgt, old_rel)
                 if rel:
@@ -3248,8 +3119,6 @@ class FrontalLobe:
                 return (thought, src)
 
         if rel:
-            if not self._correction_allowed(src, tgt, rel):
-                return self._correction_refusal(src, tgt, emotion)
             self.network.remove_edge(src, tgt, rel)
             if rel in (RelationType.PREVENTS, RelationType.HARMS):
                 self.network.add_edge(src, tgt, rel, weight=0.7, origin=edge_origin)
@@ -4041,12 +3910,32 @@ class FrontalLobe:
         response = _FINAL_DANGLING_DASH_RE.sub(r"\1", response)
 
         # Agency tracking: record what it intended and what it
-        # actually said. The sense of agency emerges from the match
-        # between intention and outcome — when it says what it
-        # meant to say, it feels its actions are its own.
+        # actually did. The sense of agency emerges from the match
+        # between intention and outcome — so the outcome must be
+        # observed, not assumed. Recording the intent as its own
+        # outcome would certify every turn as intended while
+        # measuring nothing. What the turn really became is visible
+        # in two places: the decision record (the executive may have
+        # overridden or inhibited the deliberated intent), and the
+        # rendered form (an intended "ask" that produced no question
+        # did not come out as intended).
         action_id = f"turn_{int(time.time() * 1000)}"
-        self.self_model.record_intention(action_id, thought.intent)
-        self.self_model.record_outcome(action_id, thought.intent)
+        intended = thought.intent
+        decision = (thought.metadata or {}).get("decision_outcome") or {}
+        actual = intended
+        if decision.get("inhibited"):
+            actual = "inhibited"
+        elif decision.get("overridden"):
+            actual = str(decision.get("selected", intended))
+        elif intended == "ask" and not response.rstrip().endswith("?"):
+            actual = "statement"
+        self.self_model.record_intention(action_id, intended)
+        self.self_model.record_evaluated_outcome(
+            action_id,
+            intended,
+            actual,
+            matched=(actual == intended),
+        )
 
         return response, state
 
@@ -4296,8 +4185,8 @@ class FrontalLobe:
         )
 
         # 1.5 Attribute the speaker — who is talking (introductions
-        # ground every speaker as a person; the steward's voice is
-        # detected by the authenticated session, not by a name).
+        # ground every speaker as a person; recognition is by
+        # introduction, not by a name claimed).
         # The emotional response is handled by the regulator below,
         # which decides how strongly to feel it based on its current
         # state.
@@ -5685,7 +5574,6 @@ class FrontalLobe:
                 "relation_answer",
                 "situation_answer",
                 "knowledge",
-                "problem_result",
                 "test_result",
                 "web_summary",
             )
@@ -6369,15 +6257,10 @@ class FrontalLobe:
             and self._rng.random() < 0.9  # very likely to ask
         ):
             askable = [q for q in self._curiosity_questions if q.should_ask and q.text]
-            # In game mode the response channel belongs to play —
-            # an inline question would corrupt an action turn, so
-            # curiosity stays queued for later.
-            if self.game_mode:
-                askable = []
             # In teaching mode, only ask questions related to the
             # lesson topic — suppress unrelated curiosity so it
             # focuses on what it's being taught.
-            elif self.teaching_mode and askable:
+            if self.teaching_mode and askable:
                 lesson_topics = self._teaching_lesson_topics(perception)
                 if lesson_topics:
                     lesson_askable = [
@@ -6736,15 +6619,6 @@ class FrontalLobe:
             or self.memory.get_user_facts().get("creator_name", "")
         )
 
-    def _is_steward_speaker(self) -> bool:
-        """Whether the current speaker is the authenticated steward.
-
-        Both halves are required: the session must hold the steward
-        credential *and* the attributed speaker must be the principal
-        the stamp names. Name alone was never proof — possession is.
-        """
-        return self.steward.is_steward_speaker(self._current_speaker())
-
     def _is_bonded_speaker(self) -> bool:
         """Whether the attributed speaker is the person she knows.
 
@@ -6796,17 +6670,12 @@ class FrontalLobe:
             )
 
     def _recognize_speaker(self, user_input: str) -> bool:
-        """Attribute the current speaker; detect the steward's voice.
+        """Attribute the current speaker.
 
         Everyone who introduces themselves is grounded as a person it
-        knows — learned, named, related. The steward is not the one
-        person she loves; the steward is the one credential she
-        answers to. A turn counts as the steward's when the session
-        is authenticated and the speaker is the principal the stamp
-        names — authority by possession, not by name. When an
-        introduced name is the one her profile keeps, the turn is
-        also recognized: the person she has already grown a bond
-        with is speaking.
+        knows — learned, named, related. When an introduced name is
+        the one her profile keeps, the turn is also recognized: the
+        person she has already grown a bond with is speaking.
         """
         lower = user_input.lower()
         intro = self._INTRO_RE.search(lower)
@@ -6830,24 +6699,12 @@ class FrontalLobe:
                 self.network.add_edge("genesis", name, RelationType.RELATED_TO, 0.8)
                 # Whoever just introduced themselves is speaking now.
                 self.self_model.self_knowledge["current_speaker"] = display
-                if self.steward.is_steward_speaker(display):
-                    # The credential is held and the speaker is the
-                    # principal it names — creator and steward agree.
-                    self.memory.learn_user_fact("creator_name", display)
-                    return True
                 if self._is_bonded_speaker():
                     # The introduced name is the profile's — the
                     # person she knows is speaking.
                     self.memory.learn_user_fact("creator_name", display)
                     return True
                 return False
-        # Direct mention of the principal's name on an authenticated
-        # session — "what do you think, Mindy?" reads as her being
-        # addressed. On an unauthed channel a name is only a name.
-        principal = self.steward.principal
-        if principal and self.steward.authenticated and principal in lower:
-            self.memory.learn_user_fact("creator_name", principal.capitalize())
-            return True
         return False
 
     def _form_executive_goal(self, perception: Perception) -> str:
@@ -7666,9 +7523,6 @@ class FrontalLobe:
         result = self._deliberate_math_greetings(perception, emotion, memory)
         if result is not None:
             return result
-        result = self._deliberate_problem_offer(perception, emotion, comprehension_result)
-        if result is not None:
-            return result
         result = self._deliberate_self_intro_encourage(perception, emotion, memory)
         if result is not None:
             return result
@@ -7796,160 +7650,6 @@ class FrontalLobe:
             topics=perception.topics,
             confidence=confidence,
             metadata={"math_type": math_result.result_type},
-        )
-
-    def _deliberate_problem_offer(
-        self,
-        perception: Perception,
-        emotion: EmotionalState,
-        comprehension_result: ComprehensionResult | None = None,
-    ) -> Thought | None:
-        """A game or puzzle described in words enters her world to be
-        played.
-
-        The outer-to-inner bridge: perception delivers the utterance,
-        intake compiles it into a game spec, the spec is dropped into
-        ``offered_games`` (the same channel a file offer uses) and
-        announced as a world event, and the play machinery — the
-        shared task competence, the family agent, the world's own
-        oracle — works it. Nothing is solved in the language layer:
-        the mind does the work and this thought reports what came
-        back. A spec that fails validation (a stated rule contradicting
-        its own asserted labels, an unsolvable arrangement) returns an
-        honest "couldn't make it work" rather than a fabricated answer.
-        """
-        game_play = getattr(self, "_game_play", None)
-        if game_play is None:
-            return None
-        from worlds.play import normalize_offered
-        from .problem_intake import compile_problem, interpret_problem
-
-        # Intake interprets the semantic structure comprehension
-        # already produced — propositions, roles, negation — never
-        # the raw string. If this turn wasn't comprehended (e.g. a
-        # direct _deliberate call in a test), comprehend it now.
-        if comprehension_result is None:
-            spec = compile_problem(perception.raw_text)
-        else:
-            spec = interpret_problem(comprehension_result)
-        if spec is None:
-            return None
-        task = normalize_offered(spec, "heard_problem")
-        if task is None:
-            return Thought(
-                content=str(spec.get("name", "")) or perception.raw_text,
-                intent="inform",
-                emotion=emotion.label,
-                topics=perception.topics,
-                confidence=1.0,
-                metadata={
-                    "problem_result": {
-                        "family": str(spec.get("family", "")),
-                        "kind": str(spec.get("kind", "")),
-                        "solved": False,
-                        "invalid": True,
-                    }
-                },
-            )
-
-        self._offer_problem_to_world(game_play, task)
-
-        # Play it now — the user asked, so the same machinery the
-        # play urge drives runs immediately, on this game rather
-        # than whichever she'd pick for herself.
-        prior_best = game_play.mastery.get(str(task["name"]), 0.0)
-        result = game_play.attempt(self.spatial_reasoner, task=task, inducer=self.dlpfc)
-        if result is None:
-            return None
-
-        feel = getattr(self, "_play_feeler", None)
-        if feel is not None:
-            try:
-                feel(
-                    score=result.score,
-                    prior_best=prior_best,
-                    solved=result.solved,
-                    details=getattr(result, "details", None),
-                )
-            except Exception as e:  # noqa: BLE001
-                note_swallowed(
-                    "frontal_lobe.prefrontal._deliberate_problem_offer",
-                    e,
-                )
-        return self._problem_thought(task, result, perception, emotion)
-
-    def _offer_problem_to_world(self, game_play: Any, task: dict) -> None:
-        """The spec enters her world — an offered game like any other
-        drop-box file, announced through the world event stream."""
-        try:
-            game_play.offer(task)
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "frontal_lobe.prefrontal._offer_problem_to_world",
-                e,
-            )
-        world = getattr(self, "_outer_world", None)
-        if world is not None:
-            try:
-                world.notify(
-                    f"a game was described: {task['name']}",
-                    salience=0.6,
-                )
-            except Exception as e:  # noqa: BLE001
-                note_swallowed(
-                    "frontal_lobe.prefrontal._offer_problem_to_world",
-                    e,
-                )
-
-    @staticmethod
-    def _problem_thought(
-        task: dict, result: Any, perception: Perception, emotion: EmotionalState
-    ) -> Thought:
-        """Render a game attempt as a Thought carrying structured
-        result data — the vocabulary composes the utterance from
-        ``problem_result``, the same way vision scenes or relation
-        answers reach speech."""
-        details = result.details or {}
-        md: dict[str, Any] = {
-            "family": result.family,
-            "kind": str(details.get("kind") or task.get("kind", "")),
-            "name": result.task,
-            "solved": result.solved,
-            "score": result.score,
-            "rule": result.rule,
-        }
-        if result.family == "system":
-            md["steps"] = result.nodes
-        anchor = ""
-        if result.family == "classification":
-            labels = details.get("labels") or {}
-            md["yes"] = sorted(n for n, v in labels.items() if v)
-            md["no"] = sorted(n for n, v in labels.items() if not v)
-            anchor = ", ".join(md["yes"]) or "none"
-        elif result.family == "sequence":
-            cells = [str(c) for c in (details.get("cells") or [])]
-            scaffold = int(task.get("scaffold") or 0)
-            md["next"] = cells[scaffold:] if 0 < scaffold < len(cells) else cells[-1:]
-            anchor = " ".join(md["next"]) if md["next"] else ""
-        elif result.family == "relations":
-            md["order"] = [str(n) for n in (details.get("order") or [])]
-            anchor = ", ".join(md["order"])
-        elif result.family == "quantities":
-            md["counts"] = details.get("counts") or []
-            md["target"] = details.get("target")
-            anchor = " + ".join(str(c) for c in md["counts"])
-        elif result.family == "sorter":
-            md["placements"] = details.get("placements") or []
-            anchor = f"{len(md['placements'])} placed"
-        if not anchor:
-            anchor = result.task
-        return Thought(
-            content=anchor,
-            intent="inform",
-            emotion=emotion.label,
-            topics=perception.topics,
-            confidence=0.9 if result.solved else 0.5,
-            metadata={"problem_result": md},
         )
 
     def _deliberate_greeting_question(

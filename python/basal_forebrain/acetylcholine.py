@@ -245,7 +245,9 @@ __all__ = ["CHEM_ACETYLCHOLINE", "Acetylcholine"]
 class Acetylcholine:
     """Acetylcholine — attention, focus, cortical arousal, memory encoding.
 
-    All values synchronized with src/state/neurochemical.rs.
+    All values synchronized with src/state/neurochemical.rs and
+    src/state/basal_forebrain.rs (the region's release equation, A1
+    inhibition, and uncertainty drive — math on the Rust side, words here).
     """
 
     index: int = CHEM_ACETYLCHOLINE

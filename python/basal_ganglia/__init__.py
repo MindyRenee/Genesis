@@ -105,12 +105,6 @@ _EXPORTS: dict[str, str] = {
     "CausalHypothesis": "basal_ganglia.action_feedback",
     "Discrepancy": "basal_ganglia.action_feedback",
     "model_repeated_failure": "basal_ganglia.action_feedback",
-    # Action policy over the world model (striatal selection)
-    "WorldPolicy": "basal_ganglia.world_policy",
-    # The same decision as a distributed field — where to act laid
-    # over the world grid, published to the daemon's tensor slab
-    "MotorField": "basal_ganglia.motor_field",
-    "compose_motor_fields": "basal_ganglia.motor_field",
     # Urge arbitration — the striatal selection loop over drives
     "VolitionMixin": "basal_ganglia.volition",
     # The urge accumulator the selection loop gates — a leaky integrator
@@ -134,7 +128,6 @@ __all__ = [
     "CausalHypothesis",
     "Discrepancy",
     "HabitBias",
-    "MotorField",
     "ProceduralMemory",
     "SelectionResult",
     "Skill",
@@ -144,8 +137,6 @@ __all__ = [
     "Urge",
     "Volition",
     "VolitionMixin",
-    "WorldPolicy",
-    "compose_motor_fields",
     "model_repeated_failure",
 ]
 

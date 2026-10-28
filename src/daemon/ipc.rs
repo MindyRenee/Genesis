@@ -118,6 +118,31 @@ fn snapshot_state(mmap: &MmapState) -> Option<GenesisCoreState> {
     mmap.read_consistent_locked().ok()
 }
 
+/// The emotional tag is defined as the `EMOTIONAL_TAG_SIZE` effective
+/// neurochemical levels at encode time — a quantity only the body
+/// knows. The daemon therefore stamps it from live state on every
+/// store rather than trusting the wire field: a memory must carry
+/// the chemistry it was actually encoded under, since that is what
+/// consolidation, mood-congruent retrieval, and the episode SDR all
+/// key on. The client-supplied tag survives only as the fallback for
+/// the case where the state snapshot cannot be read at all.
+fn live_emotional_tag(mmap: &MmapState, client_tag: [f32; 12]) -> [f32; 12] {
+    match snapshot_state(mmap) {
+        Some(state) => {
+            let mut tag = [0.0f32; 12];
+            for (i, v) in tag.iter_mut().enumerate() {
+                *v = crate::state::sanitize::finite_clamp(
+                    state.neurochemicals.effective_levels[i],
+                    0.0,
+                    1.0,
+                );
+            }
+            tag
+        }
+        None => client_tag,
+    }
+}
+
 /// Maximum total payload length we will accept in a single message.
 /// The largest legitimate request is `StoreEvent` carrying up to
 /// `MAX_PAYLOAD_SIZE` (256 KiB) of text plus its fixed header. 1 MiB
@@ -133,6 +158,10 @@ pub mod cmd {
     /// Request the compact neurochemical summary (`NeuroSummary`).
     pub const GET_NEURO_SUMMARY: u8 = 2;
     /// Store a pre-cognitive event into short-term memory.
+    /// The wire emotional_tag is advisory: the daemon always stamps
+    /// the tag from its own live effective levels (see STORE_EPISODE's
+    /// doc comment). Send all-zeros when the caller has no tag.
+    /// Response: [u8 ack][f32×12 stamped_tag].
     pub const STORE_EVENT: u8 = 3;
     /// Retrieve a single episode by ID.
     pub const RETRIEVE_EPISODE: u8 = 4;
@@ -193,14 +222,11 @@ pub mod cmd {
     /// [u32 limit][u32 offset]. Response: same format as
     /// GET_RECENT_EPISODES.
     pub const SEARCH_EPISODES: u8 = 22;
-    /// Adjust a neurochemical's baseline (set-point) directly. Unlike
-    /// NeuroImpulse, which only affects the current level and decays
-    /// back to baseline, this permanently shifts the baseline. Used by
-    /// the startup wake cascade to clear residual adenosine sleep
-    /// pressure from a previous session — biologically justified as
-    /// the glymphatic system having already cleared adenosine during
-    /// the offline period (restart = sleep already happened).
-    /// Request: [u8 chem_id][f32 delta]. Response: u8 ack (1=ok).
+    /// Retired — never reuse this wire number. Direct baseline edits
+    /// let a caller permanently move a homeostatic set-point, bypassing
+    /// the body's own dynamics; the only sanctioned chemistry channel
+    /// is NEURO_IMPULSE's bounded, decaying impulses.
+    #[allow(dead_code)]
     pub const NEURO_ADJUST_BASELINE: u8 = 23;
 
     // ─── Reactive commands (mind-driven, not tick-driven) ───────
@@ -257,7 +283,12 @@ pub mod cmd {
     /// Request:  [u64 timestamp][u8 event_type][u8 source_module]
     ///           [f32 salience][f32×12 emotional_tag]
     ///           [u16 text_len][text bytes]
+    /// The wire emotional_tag is advisory: the daemon always stamps
+    /// the tag from its own live effective levels (it is defined as
+    /// the body's chemistry at encode time, which only the body can
+    /// know). Send all-zeros when the caller has no tag of its own.
     /// Response: [u8 ack (1=ok, 0=failed)][u64 episode_id] (on ack=1)
+    ///           [f32×12 stamped_tag] (on ack=1)
     pub const STORE_EPISODE: u8 = 32;
     /// Get per-subsystem silicon telemetry — which part of the mind's
     /// process tree is firing. Each subsystem (daemon, cognitive —
@@ -414,13 +445,13 @@ pub mod cmd {
     /// a healthy zero.
     pub const GET_FIELD_PROBE: u8 = 47;
 
-    /// Push the mind's modeled carrier-band phase into the probe's
-    /// generator — the physics-follows-model leg of the mutual phase
-    /// lock. Request: [f32 phase_rad]. The probe extrapolates it at
-    /// the carrier rate and pulls its generator phase toward it each
-    /// tick (bounded first-order pull); a target not refreshed within
-    /// 5 s is dropped so a dead mind can't steer the body's rhythm.
-    /// Reply: [u8 ack]. Additive: PROTOCOL_VERSION unaffected.
+    /// Retired — never reuse this wire number. The mind's modeled
+    /// carrier-band phase is no longer pushed into the probe's
+    /// generator: modeled state does not assert onto a physical
+    /// quantity. The phase lock is one-directional — the signature's
+    /// measured response phase pulls the model's band phase
+    /// (physics → model); nothing runs back.
+    #[allow(dead_code)]
     pub const SET_FIELD_PHASE: u8 = 48;
 
     /// Set the carrier's real-work modulation — the write side of the
@@ -2655,12 +2686,13 @@ impl IpcClient {
 /// The default request handler. This is what the daemon uses to
 /// process IPC requests.
 ///
-/// **Response convention**: Ack commands (STORE_EVENT, SET_ZONE,
-/// NEURO_IMPULSE, SYNC, SHUTDOWN, UPDATE_MODULE_STATUS,
-/// UPDATE_USER_AFFECT, PING) return `vec![1]` on success. On error
-/// they return `vec![error::XXX]` where `error::XXX >= 0x80`, so the
-/// client can distinguish success (`1`) from error (`>= 0x80`) by
-/// checking the high bit of the first response byte.
+/// **Response convention**: Ack commands (SET_ZONE, NEURO_IMPULSE,
+/// SYNC, SHUTDOWN, UPDATE_MODULE_STATUS, UPDATE_USER_AFFECT, PING)
+/// return `vec![1]` on success; STORE_EVENT and STORE_EPISODE append
+/// the daemon-stamped emotional tag (see `live_emotional_tag`). On
+/// error they return `vec![error::XXX]` where `error::XXX >= 0x80`,
+/// so the client can distinguish success (`1`) from error (`>= 0x80`)
+/// by checking the high bit of the first response byte.
 ///
 /// Data commands (GET_STATE, GET_NEURO_SUMMARY, etc.) return raw
 /// struct bytes on success, or `vec![error::READ_FAILED]` if the
@@ -2866,6 +2898,9 @@ pub fn default_handler<L: LtmAccess>(
             let text_len = text_len.min(payload.len() - 64);
             let text = String::from_utf8_lossy(&payload[64..64 + text_len]).into_owned();
 
+            // Stamp the body's live chemistry — see live_emotional_tag.
+            let emotional_tag = live_emotional_tag(mmap, emotional_tag);
+
             // Store in STM
             let entry = crate::store::RingBufferEntry::new(
                 timestamp,
@@ -2876,7 +2911,15 @@ pub fn default_handler<L: LtmAccess>(
                 &text,
             );
             stm.push(entry);
-            vec![1] // ack
+            // Ack + the stamped tag (12×f32) so the caller's own
+            // records can carry exactly what was stored. Pre-tail
+            // clients only check resp[0] and ignore the rest.
+            let mut resp = Vec::with_capacity(1 + 48);
+            resp.push(1);
+            for v in emotional_tag {
+                resp.extend_from_slice(&v.to_le_bytes());
+            }
+            resp
         }
 
         cmd::RETRIEVE_EPISODE => {
@@ -3485,22 +3528,6 @@ pub fn default_handler<L: LtmAccess>(
             }
         }
 
-        cmd::SET_FIELD_PHASE => {
-            // The mind pushes its modeled carrier-band phase; the
-            // probe's generator chases it — physics follows model.
-            if payload.len() < 4 {
-                return vec![error::PAYLOAD_TOO_SHORT];
-            }
-            let phase = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
-            match super::field_probe::shared() {
-                Some(probe) => {
-                    probe.set_phase_target(phase);
-                    vec![1u8]
-                }
-                None => vec![error::READ_FAILED],
-            }
-        }
-
         cmd::SET_FIELD_CARRIER => {
             // Carrier write control — depth and frequency override.
             if payload.len() < 8 {
@@ -3735,7 +3762,10 @@ pub fn default_handler<L: LtmAccess>(
             let text_len = text_len.min(payload.len() - 64);
             let text = String::from_utf8_lossy(&payload[64..64 + text_len]).into_owned();
 
-            // Expand the 12-element wire tag into the full LTM tag and
+            // Stamp the body's live chemistry — see live_emotional_tag.
+            let emotional_tag = live_emotional_tag(mmap, emotional_tag);
+
+            // Expand the 12-element stamped tag into the full LTM tag and
             // compute the compact tag, using the same helpers as the
             // consolidation engine so LTM payloads are identical
             // regardless of which path stored them.
@@ -3752,9 +3782,16 @@ pub fn default_handler<L: LtmAccess>(
                 &text,
             ) {
                 Ok(episode_id) => {
-                    let mut resp = Vec::with_capacity(9);
+                    // Ack + episode_id + the stamped tag (12×f32) so
+                    // the caller's MemoryRecord carries exactly what
+                    // was stored. Pre-tail clients read only the
+                    // first 9 bytes.
+                    let mut resp = Vec::with_capacity(9 + 48);
                     resp.push(1); // ack
                     resp.extend_from_slice(&episode_id.to_le_bytes());
+                    for v in emotional_tag {
+                        resp.extend_from_slice(&v.to_le_bytes());
+                    }
                     resp
                 }
                 Err(e) => {
@@ -3814,38 +3851,6 @@ pub fn default_handler<L: LtmAccess>(
                 Err(e) => {
                     eprintln!("[ipc] SET_POLICY_AUTHORITY modify failed: {e}");
                     vec![error::INTERNAL_ERROR, 0, 0, 0, 0]
-                }
-            }
-        }
-
-        cmd::NEURO_ADJUST_BASELINE => {
-            // Request:  [u8 chem_id][f32 delta]
-            // Response: [u8 ack (1=ok)]
-            if payload.len() < 5 {
-                return vec![error::PAYLOAD_TOO_SHORT];
-            }
-            let chem_id = payload[0];
-            let raw_delta = f32::from_le_bytes(payload[1..5].try_into().unwrap_or_default());
-            // Validate chem_id — same as NEURO_IMPULSE.
-            if chem_id >= 18 {
-                return vec![error::INVALID_VALUE];
-            }
-            // Reject NaN/inf — same safety as NeuroImpulse.
-            let delta = crate::state::sanitize::finite_or(raw_delta, 0.0);
-            let chem_id_enum = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
-            let now = crate::daemon::current_ms();
-            match mmap.modify(now, |state| {
-                if let Some(chem) = state.neurochemicals.get_mut(chem_id_enum) {
-                    chem.baseline =
-                        crate::state::sanitize::finite_clamp(chem.baseline + delta, 0.05, 0.95);
-                }
-                state.neurochemicals.recompute_derived();
-                state.sync_neurochemistry_to_state();
-            }) {
-                Ok(()) => vec![1],
-                Err(e) => {
-                    eprintln!("[ipc] NEURO_ADJUST_BASELINE modify failed: {e}");
-                    vec![error::INTERNAL_ERROR]
                 }
             }
         }

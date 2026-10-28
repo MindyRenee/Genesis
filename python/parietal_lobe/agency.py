@@ -26,8 +26,8 @@ relative path resolves against, they never deny:
 - ``data`` is the state directory — observe intentions read persisted
   state there (growth ledger, play progress, cognitive journal, body
   image).
-- ``config`` covers ``$XDG_CONFIG_HOME/genesis`` — the deployment and
-  stewardship area.
+- ``config`` covers ``$XDG_CONFIG_HOME/genesis`` — the deployment
+  area.
 - ``net`` tools (web_search, web_fetch) run only when online.
 - ``scratch`` is ``<data_dir>/experiments/`` — the sandbox where the
   loop writes its own field notes and where ``maintain`` stages
@@ -142,7 +142,6 @@ _OBSERVE_FILES = (
     "growth_ledger.jsonl",
     "user_profile.json",
     "cognitive_journal.jsonl",
-    "steward.json",
     # dyadic_persons.json is deliberately absent: it was the removed
     # person-registry's file — nothing writes it now, and the live
     # dyadic bond (attunement/synchrony/user affect) persists in
@@ -155,8 +154,8 @@ _OBSERVE_FILES = (
 # machine she runs on. Fires only after the file probes habituate, so
 # it's an occasional check-in rather than a fixed heartbeat.
 _OBSERVE_CPU = "cpu"
-# The config-area probe — where her deployment and stewardship files
-# live ($XDG_CONFIG_HOME/genesis).
+# The config-area probe — where her deployment files live
+# ($XDG_CONFIG_HOME/genesis).
 _OBSERVE_CONFIG = "configdir"
 # The daemon-internals probe — GET_INTERNALS over IPC: the body's
 # process-local gears (adaptive gates, lease, tick) that no file shows.

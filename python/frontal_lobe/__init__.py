@@ -995,10 +995,6 @@ _EXPORTS: dict[str, str] = {
     # Glutamate — the cortex-wide excitatory drive; the cortical
     # regions share it, and the executive is where it is claimed.
     "Glutamate": "frontal_lobe.glutamate",
-    # Problem intake — a game heard in conversation compiles to a
-    # spec (prefrontal comprehension→action handoff)
-    "compile_problem": "frontal_lobe.problem_intake",
-    "interpret_problem": "frontal_lobe.problem_intake",
     # Open-ended agency — intentions formed from cognitive state,
     # planned and executed through the tool layer (PFC agency)
     "ActingLoop": "parietal_lobe.agency",
@@ -1027,8 +1023,6 @@ _EXPORTS: dict[str, str] = {
     "WordNetSource": "tools.source_registry",
     # Broca's voice — identity-expressive production style
     "Voice": "frontal_lobe.voice",
-    # Route planning over the world model (PFC deliberation)
-    "WorldPlanner": "frontal_lobe.world_planner",
     # Speech-act control — the conversational turn (Broca's loop)
     "ConversationMixin": "frontal_lobe.conversation",
     # Metacognitive self-report — status queries and reports

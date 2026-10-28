@@ -262,7 +262,6 @@ def test_sleep_desync_runs_without_raising() -> None:
 
     probe = SleepMixin.__new__(SleepMixin)
     probe._is_sleeping = False
-    probe._is_gaming = False
     probe._wake_time = 0.0
     probe._last_wake_attempt = 0.0
     probe.client = _Client()  # type: ignore[attr-defined]

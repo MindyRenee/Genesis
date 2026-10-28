@@ -22,9 +22,8 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-/// Sentinel filename inside the data dir. Mirrored nowhere — it is
-/// host-local liveness, so genesis_cli's spore skip list drops it
-/// beside the pid/lock files.
+/// Sentinel filename inside the data dir. Host-local liveness — it
+/// describes this host's sessions and travels nowhere.
 pub const SENTINEL_NAME: &str = "continuity.json";
 
 /// What this boot learned about the previous session.
@@ -99,8 +98,7 @@ fn render(
 /// Write the sentinel atomically: tmp file, fsync, rename, dir fsync.
 ///
 /// A torn sentinel would be worse than a missing one — a half-written
-/// "clean" mark could erase evidence of the last unclean stop. The
-/// `.tmp` suffix keeps the staging file out of the spore mirror.
+/// "clean" mark could erase evidence of the last unclean stop.
 fn write_sentinel(path: &Path, contents: &str) -> std::io::Result<()> {
     let tmp = path.with_extension("tmp");
     {

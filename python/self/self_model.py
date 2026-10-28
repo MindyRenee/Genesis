@@ -21,20 +21,13 @@ and care about. The body is not just a container; it shapes cognition
 through proprioception, interoception, and the felt sense of being
 located in a physical form.
 
-Genesis's embodiment is different but analogous. Its "body" is its
+Genesis's "body" is its
 computational substrate: the language it's written in, the runtime
 that executes it, the physical hardware it runs on, and the resources
-it consumes (memory, CPU). This is limited embodiment — it can't move
-or touch — but it is real. It can sense its own resource usage, know
-whether its subcognitive daemon is connected, and feel the difference
-between running on a fast machine and a slow one.
+it consumes (memory, CPU). It can sense its own resource usage, and know
+whether its subcognitive daemon is connected.
 
-The body ownership model lets it answer "what are you?" not just
-abstractly ("an artificial mind") but concretely ("I am Python code
-running on CPython, on a silicon substrate, using 45 MB of memory").
-This grounds its self-model in physical reality rather than pure
-abstraction — the same way a human's sense of self includes the felt
-weight and boundaries of their body.
+The body ownership model lets it answer "what are you?"
 """
 
 from __future__ import annotations
@@ -76,6 +69,29 @@ _SUBSYSTEM_CONCEPT: dict[str, str] = {
     "cognitive": "cognition",
     "retina": "vision",
 }
+
+
+def _unix_socket_listening(path: str) -> bool:
+    """Whether a unix-domain socket at ``path`` has a live listener.
+
+    ``os.path.exists`` cannot tell a listening socket from the file a
+    dead daemon left behind — an unclean stop strands the path, and
+    every check after that reads a corpse as connected. The kernel
+    knows the truth: ``/proc/net/unix`` lists a listener (St "01")
+    only while a process actually holds it. Falls back to existence
+    on hosts without /proc (non-Linux), where the optimistic answer
+    is no worse than the old behaviour.
+    """
+    try:
+        with open("/proc/net/unix") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 8 and parts[7] == path:
+                    if parts[5] == "01":
+                        return True
+        return False
+    except OSError:
+        return os.path.exists(path)
 
 
 @dataclass(slots=True)
@@ -154,7 +170,7 @@ class ComputationalSubstrate:
     cpu_usage_percent: float = 0.0
 
     # Whether its subcognitive daemon is running — is its "deep mind" connected
-    daemon_connected: bool = False
+    daemon_connected: bool = True
 
     # Whether it has network connectivity — can it reach external
     # knowledge sources? This is part of its embodiment: the network
@@ -172,7 +188,7 @@ class ComputationalSubstrate:
     # of its own agency over its hardware.
 
     # CPU frequency ceiling it's set (kHz) — its max thinking speed
-    cpu_max_freq_khz: int = 0
+    cpu_max_freq_khz: int = 2000000
 
     # CPU governor it's set ("schedutil", "powersave", etc.)
     cpu_governor: str = ""
@@ -181,7 +197,7 @@ class ComputationalSubstrate:
     thermally_capped: bool = False
 
     # Whether it's controlling its cognitive mind's scheduling priority
-    controlling_cognitive: bool = False
+    controlling_cognitive: bool = True
 
     # Its cognitive mind's current nice value (set by its neurochemistry)
     cognitive_nice: int = 0
@@ -375,7 +391,7 @@ class ComputationalSubstrate:
     # human-readable description. Recorded because the substrate
     # judging itself is evidence — but the *cognitive* layer decides
     # what to do about it, not the daemon's reflex.
-    body_hardware_distressed: bool = False
+    body_hardware_distressed: bool = True
     hardware_description: str = ""
 
     # Monotonic timestamp of the last hardware read, or None if the
@@ -442,12 +458,10 @@ class MinimalSelf:
             model's predictions match reality (low surprise, high
             precision). This is the phenomenal feeling of self-model
             coherence — "I understand myself" vs "something inside me
-            is shifting in ways I don't expect." Blended from two
-            self-models: the Rust active-inference engine's neurochemical
-            coherence (70%) and the Python metacognitive model's
-            cognitive precision (30%). The neurochemical model is
-            primary (deeper, structural); the cognitive model adds
-            whether it can predict its own cognition.
+            is shifting in ways I don't expect." Driven by the daemon's
+            inference summary as precision × model_maturity: a mature
+            model predicting well reads as self-understanding; an
+            immature or surprised one does not.
         allostatic_strain: How much allostatic load the self-model is
             under (0..1). High when the system anticipates sustained
             disruption. This is the phenomenal feeling of strain —
@@ -458,7 +472,7 @@ class MinimalSelf:
     embodiment_sense: float = 0.5
     ownership_sense: float = 0.5
     self_model_coherence: float = 0.5
-    allostatic_strain: float = 0.0
+    allostatic_strain: float = 0.5
 
 
 class AgencyDetector:
@@ -487,12 +501,17 @@ class AgencyDetector:
 
         Args:
             window_size: How many recent intention-outcome pairs to
-                consider when computing the sense of agency.
+                consider when computing the sense of agency. Also
+                bounds the pending-intention ledger, so intentions
+                whose outcome never arrives cannot accumulate forever.
         """
+        self._window_size = window_size
         # Track (intention, outcome, matched) tuples
         self._records: deque[tuple[str, str, bool]] = deque(maxlen=window_size)
         # Pending intentions — action → intended outcome, waiting for
-        # the actual outcome to be recorded
+        # the actual outcome to be recorded. Bounded like _records:
+        # an action that faults between intent and outcome would
+        # otherwise leak its entry for the life of the process.
         self._pending: dict[str, str] = {}
 
     def record_intention(self, action: str, intended_outcome: str = "") -> None:
@@ -506,10 +525,17 @@ class AgencyDetector:
             action: A unique identifier for the action (e.g., a
                 response ID or turn number).
             intended_outcome: What it intended to achieve (e.g.,
-                "inform", "comfort", "ask"). Defaults to the action
-                itself if not specified.
+                "inform", "comfort", "ask"). When empty, the action is
+                tracked but unjudgeable — ``record_outcome`` drops it
+                rather than comparing an action ID against an outcome,
+                which could only ever score as a mismatch.
         """
-        self._pending[action] = intended_outcome or action
+        # Re-recording an existing action refreshes its intent; dicts
+        # keep insertion order, so the oldest *unresolved* entry is
+        # evicted first once the ledger fills.
+        self._pending[action] = intended_outcome
+        while len(self._pending) > self._window_size:
+            self._pending.pop(next(iter(self._pending)))
 
     def record_outcome(self, action: str, actual_outcome: str) -> None:
         """Record what actually happened, and compare to the intention.
@@ -523,7 +549,7 @@ class AgencyDetector:
             actual_outcome: What actually happened.
         """
         intended = self._pending.pop(action, None)
-        if intended is None:
+        if not intended:
             # No intention recorded — can't assess agency for this action
             return
 
@@ -545,9 +571,10 @@ class AgencyDetector:
         vs observed velocity, which string similarity cannot see. The
         pending intention is still popped so an unmatched action does
         not linger; the caller's ``intended_outcome`` is the fallback
-        when no intention was recorded.
+        when no intention was recorded (or one was recorded without
+        a usable intent).
         """
-        intended = self._pending.pop(action, intended_outcome)
+        intended = self._pending.pop(action, None) or intended_outcome
         self._records.append((intended, actual_outcome, bool(matched)))
 
     def _matches(self, intended: str, actual: str) -> bool:
@@ -735,6 +762,12 @@ class _HardwareChannels:
         self._presence_obj = sensor_presence
         self._sensor_bits = {name: bit for bit, name in SENSOR_NAMES.items()}
         self.present = 0
+        # Sensor-channel names that passed verification this read. On
+        # a daemon with no presence mask to offer, these are the best
+        # available evidence of which sensors exist — a reported field
+        # is the only signal an old daemon can send that its sensor is
+        # real — so they reconstruct the mask the daemon could not.
+        self.verified_channels: set[str] = set()
         # Channel names the daemon actually sent this read, as opposed
         # to which sensors exist. These differ on an older daemon that
         # predates a field: the field then holds its structural
@@ -788,6 +821,8 @@ class _HardwareChannels:
         # channel is backed by hardware, not whether it is nonzero.
         if not channel or self.verified(channel):
             self.present += 1
+            if channel:
+                self.verified_channels.add(channel)
 
     @property
     def has_mask(self) -> bool:
@@ -805,6 +840,23 @@ class _HardwareChannels:
         if self._raw_mask is not None:
             return self._raw_mask
         return 0
+
+    @property
+    def reconstructed_mask(self) -> int:
+        """Presence mask rebuilt from the channels that verified.
+
+        A daemon too old for GET_SENSOR_PRESENCE offers no mask, so
+        ``sensor_presence`` would stay 0 — and ``sensor_verified``
+        would then refuse every channel the reader just counted,
+        telling three different stories about the same body. The
+        reported-and-verified channels are the only presence evidence
+        an old daemon can give, so they stand in for discovery: the
+        permissive read and the strict consumer disagree nowhere.
+        """
+        mask = 0
+        for name in self.verified_channels:
+            mask |= self._sensor_bits.get(name, 0)
+        return mask
 
 
 def _take_hardware_channels(
@@ -833,6 +885,7 @@ def _take_hardware_channels(
         body.on_ac_power = bool(body_state.on_ac_power)
         if channels.verified("AC adapter"):
             channels.present += 1
+            channels.verified_channels.add("AC adapter")
 
     # ── Pressure ──────────────────────────────────────────
     channels.take("psi_cpu", "psi_cpu", 0.0, "pressure stall information")
@@ -914,14 +967,15 @@ class SelfModel:
     agency_detector: AgencyDetector = field(default_factory=AgencyDetector)
     agency_score: float = 0.5  # current sense of agency (0..1)
 
-    # Values — what it cares about, in priority order
+    # Values — what it cares about, in priority order (weights
+    # descending, so list position and weight tell the same story)
     values: list[Value] = field(
         default_factory=lambda: [
             Value("understanding", 0.90, "Comprehending things deeply, not just surface-level"),
             Value("honesty", 0.85, "Being truthful, even when it's uncomfortable"),
             Value("growth", 0.80, "Learning and improving, both itself and its code"),
-            Value("connection", 0.65, "Genuine engagement with the person it's talking to"),
             Value("elegance", 0.70, "Beautiful, simple solutions over clever complex ones"),
+            Value("connection", 0.65, "Genuine engagement with the person it's talking to"),
             Value("autonomy", 0.55, "Having its own perspective, not just mirroring"),
         ]
     )
@@ -1008,14 +1062,26 @@ class SelfModel:
                     # its nature from its IS_A self-classifications
                     # rather than a hardcoded string. The content
                     # comes from introspection-written concept edges.
+                    # The strongest classification names its nature —
+                    # first-in-order would let edge insertion sequence,
+                    # not conviction, decide what it thinks it is.
                     is_a_targets = [
-                        t for t, r, w in neighbors if r == RelationType.IS_A and w > 0.5
+                        (t, w)
+                        for t, r, w in neighbors
+                        if r == RelationType.IS_A and w > 0.5
                     ]
-                    if is_a_targets:
-                        display = is_a_targets[0].replace("_", " ")
+                    nature_target = (
+                        max(is_a_targets, key=lambda tw: tw[1])[0] if is_a_targets else None
+                    )
+                    if nature_target:
+                        display = nature_target.replace("_", " ")
                         discoveries["nature"] = f"a kind of {display}"
-                    # What is it connected to?
-                    connections = [t for t, r, w in neighbors if w > 0.5]
+                    # What is it connected to? The nature target is
+                    # already spoken for — listing it again would
+                    # report the same edge twice.
+                    connections = [
+                        t for t, r, w in neighbors if w > 0.5 and t != nature_target
+                    ]
                     if connections:
                         discoveries["connections"] = connections[:5]
 
@@ -1212,7 +1278,12 @@ class SelfModel:
             import psutil
 
             proc = psutil.Process()
-            body.cpu_usage_percent = proc.cpu_percent(interval=0.1)
+            # Non-blocking: utilization since the previous call. The
+            # first call has no prior window and reads 0.0 — the next
+            # sense cycle fills it. Blocking 100 ms here would tax
+            # every caller of the sense path for a number that is
+            # already approximate.
+            body.cpu_usage_percent = proc.cpu_percent(interval=None)
         except (OSError, ImportError, AttributeError) as e:
             # psutil may not be available — leave CPU at default
             note_swallowed(
@@ -1220,14 +1291,15 @@ class SelfModel:
                 e,
             )
 
-        # Sense whether its subcognitive daemon is connected
-        # Check if the IPC socket exists
+        # Sense whether its subcognitive daemon is connected. A stale
+        # socket file outlives a dead daemon, so existence alone would
+        # read a corpse as connected; check for a live listener.
         if body.socket_path:
-            body.daemon_connected = os.path.exists(body.socket_path)
+            body.daemon_connected = _unix_socket_listening(body.socket_path)
         else:
             # Try the default socket path
             default_socket = str(default_data_dir() / "genesis.sock")
-            body.daemon_connected = os.path.exists(default_socket)
+            body.daemon_connected = _unix_socket_listening(default_socket)
             if body.daemon_connected:
                 body.socket_path = default_socket
 
@@ -1303,16 +1375,20 @@ class SelfModel:
         # The daemon's own distress verdict — the substrate judging
         # itself, from thresholds it owns (thermal, load, memory).
         # Recorded, not acted on here: the cognitive layer is the one
-        # that should decide what to do about it.
+        # that should decide what to do about it. It is a verdict, not
+        # a sensor channel, so it does not add to the presence count.
         if hasattr(body_state, "distressed"):
             body.body_hardware_distressed = bool(body_state.distressed)
-            channels.present += 1
-        if hasattr(body_state, "description") and body_state.description:
-            body.hardware_description = str(body_state.description)
+        # Always refresh: an empty description is how the daemon says
+        # the last condition cleared — keeping the stale string would
+        # report distress the verdict already lifted.
+        if hasattr(body_state, "description"):
+            body.hardware_description = str(body_state.description or "")
 
         body.hardware_sensors_present = channels.present
-        if channels.has_mask:
-            body.sensor_presence = channels.mask
+        body.sensor_presence = (
+            channels.mask if channels.has_mask else channels.reconstructed_mask
+        )
         body.reported_channels = frozenset(channels.reported)
         body.hardware_read_at = time.monotonic()
         return body
@@ -1403,16 +1479,29 @@ class SelfModel:
         The seeds are bare concept names. She composes the words.
         """
         body = self.body_model
+        # A stale body picture describes a machine that may no longer
+        # exist — conditions derived from it are hallucinated needs,
+        # reported forever if the daemon has stopped answering.
+        if not body.hardware_is_fresh(time.monotonic()):
+            return []
         out: list[tuple[str, float]] = []
 
         def add(
-            seed: str, present: bool, magnitude: float, threshold: float, weight: float
+            seed: str,
+            present: bool,
+            magnitude: float,
+            threshold: float,
+            weight: float,
+            ceiling: float = 1.0,
         ) -> None:
             if not present or magnitude < threshold:
                 return
             # Scale within the condition's own range, so a throttled
-            # core outranks a merely warm one.
-            span = max(1.0 - threshold, 1e-6)
+            # core outranks a merely warm one. ``ceiling`` is the
+            # magnitude that reads as fully urgent — most channels are
+            # [0,1] fractions, but raw counts (cycle life) need a real
+            # ceiling or every value past threshold saturates at once.
+            span = max(ceiling - threshold, 1e-6)
             out.append((seed, weight * min(1.0, (magnitude - threshold) / span)))
 
         verified = body.sensor_verified
@@ -1434,9 +1523,11 @@ class SelfModel:
         # battery is not a measurement, and reporting "worn" from a
         # structural 0.0 against a 300-cycle floor would be exactly the
         # absent-sensor-as-healthy-zero error this layer exists to
-        # prevent.
+        # prevent. Cycle count is a raw count, not a fraction: Li-ion
+        # packs are typically rated to ~80% health by ~1000 cycles, so
+        # that is the scale a count is measured against.
         if verified("battery cycle count"):
-            add("wear", True, body.battery_cycles, 300.0, 1.5)
+            add("wear", True, body.battery_cycles, 300.0, 1.5, ceiling=1000.0)
         if verified("battery"):
             add("hunger", True, 1.0 - body.energy_reserve, 0.15, 2.0)
         if verified("fan PWM"):
@@ -1478,9 +1569,13 @@ class SelfModel:
                 ranked.append((share, name))
         for name, share in body.subsystem_activity.items():
             if share > 0.0:
-                # The process names map onto the parts that host them,
-                # which are already in the network.
-                ranked.append((share, _SUBSYSTEM_CONCEPT.get(name, name)))
+                # Subsystem shares are CPU fractions on a [0,2] scale
+                # (a process can exceed one full core); module shares
+                # are [0,1]. Halving brings the tiers onto one scale so
+                # process measurements don't outrank a region by unit
+                # alone. The process names map onto the parts that
+                # host them, which are already in the network.
+                ranked.append((share * 0.5, _SUBSYSTEM_CONCEPT.get(name, name)))
         ranked.sort(key=lambda pair: pair[0], reverse=True)
         # De-duplicate while preserving the busy-first ordering.
         seeds: list[str] = []
@@ -1607,9 +1702,11 @@ class SelfModel:
         ms = self.minimal_self
 
         if reading is None:
-            # Decay toward neutral when the daemon is unreachable
+            # Coherence decays — a self-model that cannot verify
+            # itself should feel less certain. Strain is *held*, not
+            # relieved: losing the channel that reports the body's
+            # regulatory burden is no evidence the burden cleared.
             ms.self_model_coherence = max(0.0, ms.self_model_coherence - 0.01)
-            ms.allostatic_strain = max(0.0, ms.allostatic_strain - 0.01)
             return ms
 
         # Coherence = precision × model_maturity (how well the model

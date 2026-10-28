@@ -50,6 +50,7 @@
 //!   a zero resting baseline (leaky integrators), produced only by the
 //!   maturation-gated CRH → ACTH → cortisol cascade.
 
+pub mod basal_forebrain;
 pub mod core_state;
 pub mod header;
 pub mod inference;

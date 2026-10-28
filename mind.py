@@ -36,7 +36,7 @@ import time
 from collections import deque
 from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from brainstem.brainstem import Brainstem
 from cerebellum.cerebellum import Cerebellum
@@ -80,7 +80,6 @@ from memory import MemorySystem
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from worlds.arc import ArcEvaluation, ArcResult
     from worlds.channel import Channel
 from basal_ganglia.volition import VolitionMixin
 from brainstem.heartbeat import HeartbeatMixin
@@ -88,7 +87,6 @@ from brainstem.lifecycle import LifecycleMixin
 from frontal_lobe.conversation import ConversationMixin
 from frontal_lobe.projects import ProjectsMixin
 from frontal_lobe.status import StatusMixin
-from parietal_lobe.embodiment import EmbodimentMixin
 from self.man_review import ManReviewMixin
 from self.proposals import ProposalsMixin
 from sleep.sleep import SleepMixin
@@ -110,7 +108,6 @@ class Mind(
     ManReviewMixin,
     StatusMixin,
     ConversationMixin,
-    EmbodimentMixin,
 ):
     """Genesis's cognitive mind.
 
@@ -227,18 +224,6 @@ class Mind(
         self._init_sleep_compression()
         self._wire_modules()
         self._init_runtime_state()
-        # The environment-facing loop: world model + policy + the
-        # bridge that pushes world state to the workspace and the
-        # daemon's tensor slab. Runs last — it reaches into the
-        # frontal workspace and the occipital vision system.
-        self._init_embodiment(seed=seed)
-        # The cerebellum's sensorimotor comparator takes its seat in
-        # the embodied loop: the world model keeps the physics, the
-        # cerebellum grades each act's predicted reafference against
-        # the frame's answer — error becomes orienting chemistry and
-        # the action's calibration estimate, which is how a stale
-        # move gets re-babbled instead of trusted.
-        self.world_model.motor_comparator = self.brain.cerebellum.sensorimotor
 
     @property
     def regulator(self):
@@ -431,7 +416,7 @@ class Mind(
             is_mind_sleeping=lambda: self._is_sleeping,
             frontal=self.brain.frontal,
             is_nap_mode=lambda: self._nap_mode,
-            engagement=self.world_engagement,
+            engagement=lambda: 0.0,
         )
 
         # Wire the emotional memory callback: when a high-emotion
@@ -537,35 +522,6 @@ class Mind(
         # Mind. No age, no regime: plasticity stays available for life.
         self.memory.somatic_provider = self._current_somatic_dict
 
-        # Game play — her game collection and play record. Like the
-        # canvas, this is an ability she owns: nobody drives her
-        # through it; the play urge lets her choose to play.
-        from worlds.play import GamePlay
-
-        self.game_play = GamePlay(self.data_dir)
-        # Her body is where world games live: official-card attempts
-        # need world_step, readiness, and game mode — attached the
-        # same way cortex is below.
-        self.game_play.mind = self
-
-        # Problem intake — a game described in conversation (the
-        # outer world) compiles to a spec, lands in the drop-box,
-        # registers as a world event, and is played by the same
-        # machinery the urge drives. The feeler is the regulator's
-        # play response, so a game played on request feels like one
-        # she chose herself.
-        self.brain.frontal.set_problem_intake(
-            self.game_play,
-            self.world,
-            lambda score, prior_best, solved, details=None: self.regulator.respond_to_play(
-                self.feel(),
-                score=score,
-                prior_best=prior_best,
-                solved=solved,
-                details=details,
-            ),
-        )
-
     def _on_v1_gamma(self, gamma_power: float) -> None:
         """Handle V1 gamma power updates from the occipital subsystem.
 
@@ -634,8 +590,6 @@ class Mind(
         # Wire the visual cortex to the learner so it can learn from
         # images encountered during Wikipedia article learning.
         self.learner.visual_cortex = self.visual_cortex
-        # Perceptual games (a sorter she must look at) use the cortex.
-        self.game_play.cortex = self.visual_cortex
         # Wire the autonomous learner to the cognition engine so
         # _get_recent_learning() can access Wikipedia/GitHub topics.
         self.brain.frontal.set_autonomous_learner(self.learner)
@@ -846,89 +800,6 @@ class Mind(
             error_type=type(exc).__name__,
         )
 
-    def play_arc(
-        self,
-        games: list[str],
-        max_steps: int = 200,
-        instructions: str = "this is a video game",
-        web: bool = False,
-        watch: bool = False,
-        fresh: bool = False,
-        step_delay_s: float = 0.0,
-        recovery_wait_s: float = 120.0,
-    ) -> list[ArcResult]:
-        """Play ARC-AGI-3 games as herself, in game mode.
-
-        The environment is ``worlds.arc`` — or, with ``web=True``, the
-        public human task page through ``worlds.arc_web`` (real key and
-        mouse events on the live site — ``watch=True`` shows it on
-        her own screen instead of headless). Either way this is the entity
-        side of the run. Game mode wraps every game, and her readiness
-        gate refuses or stops play, not the caller. Game mode is
-        restored to whatever it was before the call.
-
-        ``fresh=True`` is the cold-start measurement: persisted world
-        learning is neither read nor written for the run's span, so
-        the result carries only what she brought as priors — and her
-        banked experience is left exactly as it was.
-        """
-        from worlds.arc import ArcPractice
-
-        was_gaming = self.is_gaming
-        prev_fresh = getattr(self, "_fresh_world_run", False)
-        self._fresh_world_run = fresh
-        self.enter_game_mode()
-        try:
-            if web:
-                from worlds.arc_web import ArcWebPractice
-
-                web_practice = ArcWebPractice(self, instructions=instructions, headless=not watch)
-                try:
-                    return [web_practice.play(game, max_steps=max_steps) for game in games]
-                finally:
-                    web_practice.close()
-            practice = ArcPractice(
-                self,
-                instructions=instructions,
-                step_delay_s=step_delay_s,
-                recovery_wait_s=recovery_wait_s,
-            )
-            return [practice.play(game, max_steps=max_steps) for game in games]
-        finally:
-            if not was_gaming:
-                self.exit_game_mode()
-            self._fresh_world_run = prev_fresh
-
-    def evaluate_arc(
-        self,
-        *,
-        max_steps: int = 200,
-        fresh: bool = False,
-        step_delay_s: float = 0.0,
-        recovery_wait_s: float = 120.0,
-    ) -> ArcEvaluation:
-        """The local practice suite — every discovered environment on
-        one SDK scorecard. Diagnostics, not the official card: the
-        official venue is hers to take up through play, never driven
-        from here (``ArcOfficial`` refuses a forced run)."""
-        from worlds.arc import ArcPractice
-
-        was_gaming = self.is_gaming
-        prev_fresh = getattr(self, "_fresh_world_run", False)
-        self._fresh_world_run = fresh
-        self.enter_game_mode()
-        try:
-            adapter = ArcPractice(
-                self,
-                step_delay_s=step_delay_s,
-                recovery_wait_s=recovery_wait_s,
-            )
-            return adapter.play_all(max_steps=max_steps)
-        finally:
-            if not was_gaming:
-                self.exit_game_mode()
-            self._fresh_world_run = prev_fresh
-
     def _init_runtime_state(self) -> None:
         """Initialize runtime flags, thread handles, and live-thought listeners."""
         self._running = False
@@ -939,12 +810,6 @@ class Mind(
         self._shutdown_save_ok: bool | None = None
         self._interaction_count = 0
         self._last_interaction_time = time.time()
-        # Game mode's play session — created lazily by game_turn on
-        # the first FRAME line. Must exist as None before then: the
-        # lazy check reads the attribute, so a missing one raised
-        # AttributeError into the turn's catch and every FRAME came
-        # back empty.
-        self._game_session: Any = None
         self._think_worker_lock = threading.Lock()
         self._active_think_worker: threading.Thread | None = None
         # Per-module activity accounting — seconds of observed

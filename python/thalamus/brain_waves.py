@@ -51,23 +51,24 @@ following associations are this model's control conventions:
 
 # How Genesis's brain waves work
 
-Genesis's brain waves are produced by a bank of **Stuart–Landau
-oscillators** (``BrainWaveOscillator``) — the normal form of a Hopf
-bifurcation, which is the canonical generative model for rhythmic
-population activity in whole-brain dynamics (Deco et al.; the
-Virtual Brain / Jirsa lineage) — not a classifier. Each band is a
-real oscillation with persistent quadrature state:
+Genesis's brain waves are produced by a bank of **driven phasor
+oscillators** (``BrainWaveOscillator``) — not a classifier. Each
+band is a real oscillation with persistent quadrature state, and its
+reported power is *measured*: the band emits its real-axis trace and
+a Goertzel meter — the same band math the body's field probe ran
+over the substrate before the two swapped places — reads the wave's
+band energy off the emitted signal, never off state.
 
 - **Waveform**: each band carries a complex state ``z`` rotating at
   the band's characteristic frequency (delta ~2.25 Hz, theta ~5.5 Hz,
   alpha ~10 Hz, sigma ~14 Hz, low beta ~13.5 Hz, mid beta ~17.5 Hz,
   high beta ~25 Hz, gamma ~50 Hz, epsilon ~150 Hz). ``Re(z)`` is a
-  genuine synthesized trace — the wave exists, it does not just
-  precess on paper.
-- **Amplitude** is the limit-cycle radius |z|. Neurochemical targets
-  set the *radius the cycle converges to*, with the band's time
-  constant as its radial growth/ring-down rate — so a state change
-  is an oscillation swelling or dying away, not a scalar relaxing.
+  genuine synthesized trace — emitted into the metering ring at
+  512 Hz, it is the signal the band meter integrates.
+- **Amplitude** is the radius |z|. Neurochemical targets set the
+  radius the envelope relaxes toward, with the band's time constant
+  as its first-order growth/ring-down rate — so a state change is an
+  oscillation swelling or dying away.
 - **Phase** is *measured* from the state (``arg z``), not advanced by
   a stopwatch. Under the stochastic drive it diffuses and wanders the
   way real rhythm phase does — a kick (``perturb_phase``) is a real
@@ -83,7 +84,7 @@ real oscillation with persistent quadrature state:
   coupling, the canonical mechanism for cross-scale neural
   coordination; Canolty & Knight, 2010).
 - **Top-down drive** from cognition, action, and perception enlarges
-  specific limit cycles above their neurochemical radii. Attention →
+  specific envelopes above their neurochemical radii. Attention →
   gamma, memory retrieval → theta, motor planning → mid beta, V1
   visual input → gamma. This is bidirectional coupling: the oscillator
   gates cognition, and cognition drives the oscillator.
@@ -151,6 +152,7 @@ from __future__ import annotations
 
 import math
 import random
+import threading
 import time
 from collections import deque
 from collections.abc import MutableMapping
@@ -443,6 +445,36 @@ class SleepStageSignature:
 # e.g. alpha at 10 Hz over 0.2 s = 2.0 exactly, or 5.5 Hz over 0.2 s =
 # 1.1) sits 0.1 turns or more away, so it is never snapped.
 _TURN_SNAP_EPS = 1e-9
+
+
+def _band_power(samples: deque[float] | list[float], fs: float, freq: float) -> float:
+    """Goertzel power of ``samples`` at ``freq`` — the field probe's
+    band meter, carried into the mind.
+
+    Second-order recurrence over the emitted trace:
+    ``s₀ = x + coeff·s₁ − s₂`` with ``coeff = 2·cos(2πk/n)`` at the
+    exact bin nearest ``freq``; power ``= (s₁² + s₂² − coeff·s₁·s₂)
+    / n²``. The wave's reported band energy is *measured* off the
+    emitted trace — the same arithmetic the body applies to the
+    substrate's real signals — not read from oscillator state.
+
+    Bands above the metering rate's Nyquist bound return 0 — an
+    absent channel, not a reading of zero.
+    """
+    n = len(samples)
+    if n < 4:
+        return 0.0
+    k = max(1, round(n * freq / fs))
+    if k >= n / 2:
+        return 0.0  # above Nyquist — absent channel
+    w = 2.0 * math.pi * k / n
+    coeff = 2.0 * math.cos(w)
+    s1 = s2 = 0.0
+    for x in samples:
+        s0 = x + coeff * s1 - s2
+        s2 = s1
+        s1 = s0
+    return (s1 * s1 + s2 * s2 - coeff * s1 * s2) / (n * n)
 
 
 # ─── Theta-gamma cross-frequency coupling ──────────────────────
@@ -1062,16 +1094,20 @@ def meditative_coherence(state: BrainWaveState) -> float:
     return max(0.0, min(1.0, calm / total))
 
 
-# ─── Coupled Stuart–Landau oscillator bank ──────────────────────
+# ─── Coupled driven-phasor oscillator bank ──────────────────────
 #
-# The oscillator bank is the dynamical core. Each band is one
-# Stuart–Landau oscillator — the normal form of a supercritical Hopf
-# bifurcation, ż = (λ(1 − |z|²/A²) + iω)z + noise — with persistent
-# quadrature state (the oscillation is real state, not a phase
-# counter plus a smoothed scalar). Cross-frequency coupling emerges
+# The oscillator bank is the dynamical core. Each band is one driven
+# phasor — ż = iωz + noise with the envelope relaxing toward a
+# drive-prescribed radius — with persistent quadrature state (the
+# oscillation is real state, not a phase counter plus a smoothed
+# scalar). The Stuart–Landau normal form this bank once ran moved
+# into the body: the field probe's channels now resonate with the
+# substrate on that math, while the mind's reported band power is
+# *measured* — Goertzel over each band's emitted trace, the meter
+# the body gave up in exchange. Cross-frequency coupling emerges
 # from actual phase-amplitude interaction: the slow band's measured
-# phase modulates the fast band's limit-cycle radius. Top-down drive
-# from cognition, action, and perception enlarges specific cycles
+# phase modulates the fast band's driven radius. Top-down drive
+# from cognition, action, and perception enlarges specific envelopes
 # above their neurochemical radii — bidirectional coupling.
 
 
@@ -1148,54 +1184,51 @@ class _AmplitudeView(MutableMapping):
 
 
 class BrainWaveOscillator:
-    """Bank of Stuart–Landau oscillators — one per brain wave band.
+    """Bank of driven phasor oscillators — one per brain wave band.
 
-    Each band integrates the Hopf-bifurcation normal form
+    Each band integrates a driven phasor
 
-        ż = (λ(1 − |z|²/A²) + iω)·z + σ·(ξ_x + i·ξ_y)dt^{1/2}
+        ż = iω·z + σ·(ξ_x + i·ξ_y)dt^{1/2},   r → a at rate 1 − e^{−h/τ}
 
-    over the interval between assess() calls:
+    over the interval between assess() calls, and emits its real-axis
+    trace into a metering ring: reported band power is *measured*
+    (Goertzel over the emitted trace — the band math the body ran
+    before the two layers swapped), never read off state:
 
     - **Oscillation**: ``z = x + iy`` rotates at ω = 2πf_band. The
       wave is a real dynamical state — ``Re(z)`` is the band's
       synthesized trace — so a kick or a target change produces a
       genuine transient: overshoot, ring-down, phase slip.
-    - **Amplitude** is the limit-cycle radius |z|. The neurochemical
-      target is the *radius A* the cycle converges to, with
-      λ = 1/(2τ_band) setting the radial rate — slow bands ring long
-      (delta τ=8s), fast bands re-seat quickly (gamma τ=0.5s). The
-      same per-band τ as the old first-order model, now a ring-down
-      time of a real oscillation.
+    - **Amplitude** is the driven radius |z|. The neurochemical
+      target is the *radius a* the envelope relaxes toward, with
+      τ_band setting the first-order approach — slow bands ring long
+      (delta τ=8s), fast bands re-seat quickly (gamma τ=0.5s).
     - **Phase** is measured — ``arg z`` — so it precesses at the band
       frequency and diffuses under the noise drive, instead of being
       a fixed-rate integrator. Phase perturbations rotate z itself.
     - **Stochastic drive**: σ ∝ A (+ a small spontaneous floor) makes
-      the envelope wander ~η·A around the cycle — the fluctuating
+      the envelope wander ~η·A around its radius — the fluctuating
       band power real recordings show, rather than a clamped
-      setpoint. In the Hopf taxonomy each band sits supercritical
-      (μ > 0) with noise: a noisy limit cycle (Deco et al., 2017;
-      Pérez-Cervera et al., 2021).
+      setpoint (Deco et al., 2017; Pérez-Cervera et al., 2021).
     - **Cross-frequency coupling** emerges from phase-amplitude
       interaction: the slow band's measured phase modulates the fast
-      band's radius. When theta is at its peak, gamma's cycle gets a
-      boost; when theta is at its trough, gamma is suppressed. This
+      band's radius. When theta is at its peak, gamma's envelope gets
+      a boost; when theta is at its trough, gamma is suppressed. This
       is the canonical PAC mechanism acting on real power.
     - **Top-down drive** from cognition/action/perception enlarges
-      specific cycles above their neurochemical radii. Attention →
+      specific envelopes above their neurochemical radii. Attention →
       gamma, memory retrieval → theta, motor activity → mid beta.
       The drive decays exponentially (τ=2s), so it must be
       sustained by ongoing activity.
 
-    The propagation is exact for any step size by operator
-    splitting: rotation and the radial logistic map commute
-    (rotation preserves |z|; the radial map preserves arg z), each
-    has a closed form, and the noise kick's variance is ∝ step, so a
-    subdivided interval and a single step land on the same
-    deterministic trajectory up to the same noise statistics. This
-    produces genuine oscillatory state (frequency, phase, amplitude)
-    from which
-    band powers, cross-frequency coupling, and cognitive gating
-    parameters are derived.
+    Rotation is closed-form for any step size and the noise kick's
+    variance is ∝ step, so a subdivided interval and a single step
+    land on the same deterministic trajectory up to the same noise
+    statistics; only the amplitude-coupled PAC sampling resolves
+    finer with sub-steps. This produces genuine oscillatory state
+    (frequency, phase, amplitude) from which
+    measured band powers, cross-frequency coupling, and cognitive
+    gating parameters are derived.
     """
 
     # Characteristic frequencies (Hz) — center of each band
@@ -1213,9 +1246,10 @@ class BrainWaveOscillator:
     }
 
     # Radial time constants (seconds) — the envelope's ring-down /
-    # spin-up scale, setting the Stuart–Landau growth rate
-    # λ = 1/(2τ). Slow bands carry their rhythm long (delta τ=8s);
-    # fast bands re-seat quickly (gamma τ=0.5s).
+    # spin-up scale: the first-order approach r → a advances
+    # 1 − e^{−h/τ} of the remaining gap per step. Slow bands carry
+    # their rhythm long (delta τ=8s); fast bands re-seat quickly
+    # (gamma τ=0.5s).
     _TAU: ClassVar[dict[BrainWave, float]] = {
         BrainWave.INFRASLOW: 12.0,
         BrainWave.DELTA: 8.0,
@@ -1234,7 +1268,7 @@ class BrainWaveOscillator:
 
     # ── Stochastic drive ──────────────────────────────────────────
     # Fractional envelope wandering: the radius fluctuates with
-    # stationary std ≈ _TEXTURE·A around the limit cycle. 0.10 gives
+    # stationary std ≈ _TEXTURE·A around the driven radius. 0.10 gives
     # the visibly bursty texture of real band power without letting
     # noise re-rank the distribution — the dominance ordering the
     # rest of the mind reads is a target-level property, not a
@@ -1245,9 +1279,9 @@ class BrainWaveOscillator:
     # dead silence), so its phase diffuses slowly rather than
     # freezing at its last angle.
     _NOISE_FLOOR: ClassVar[float] = 0.02
-    # Limit-cycle radius floor: the logistic radial map divides by
-    # A², so the capacity is floored far below anything a target
-    # would legitimately request.
+    # Driven-radius floor: the radial approach reads a target radius,
+    # floored far below anything a target would legitimately request
+    # so a zero target still leaves noise somewhere to live.
     _A_FLOOR: ClassVar[float] = 1e-3
 
     # ── Integration resolution ────────────────────────────────────
@@ -1308,6 +1342,19 @@ class BrainWaveOscillator:
     # Rolling window the PLV is computed over — ~50 gamma cycles.
     _PLV_WINDOW_S: ClassVar[float] = 1.0
 
+    # ── Trace metering ────────────────────────────────────────────
+    # Each band emits its real-axis oscillation into an analysis ring
+    # at this fixed metering rate; reported band power is measured
+    # off the emitted wave by Goertzel (the body's field math), not
+    # read from state. 384 Hz keeps epsilon (150 Hz) inside Nyquist
+    # where the body's own ~250 Hz probe cannot follow it, and the
+    # 1536-sample window is four seconds — bin width 0.25 Hz, so
+    # every band center (all multiples of 0.25 Hz) lands exactly on
+    # a bin: k = 4f for all ten bands, no off-bin rolloff at all.
+    _TRACE_FS: ClassVar[float] = 384.0
+    _TRACE_DT: ClassVar[float] = 1.0 / 384.0
+    _TRACE_LEN: ClassVar[int] = 1536
+
     def __init__(
         self,
         rng: random.Random | None = None,
@@ -1331,6 +1378,21 @@ class BrainWaveOscillator:
         self._z: dict[BrainWave, complex] = {band: complex(0.2, 0.0) for band in BrainWave}
         self._phase_view = _PhaseView(self._z)
         self._amplitude_view = _AmplitudeView(self._z)
+        # The emitted real-axis trace per band — what the Goertzel
+        # meter measures. Filled by _emit_trace at _TRACE_FS; the
+        # fractional remainder carries forward so emission rate never
+        # drifts with sub-step cadence.
+        self._trace: dict[BrainWave, deque[float]] = {
+            band: deque(maxlen=self._TRACE_LEN) for band in BrainWave
+        }
+        self._trace_debt: dict[BrainWave, float] = dict.fromkeys(BrainWave, 0.0)
+        # The oscillator is a singleton state machine shared by the
+        # heartbeat and any reader thread (mind.brain_waves() calls
+        # assess too) — a read that iterates the trace while a
+        # concurrent assess emits into it is a hard fault, not a
+        # stale value. One re-entrant lock serializes the advance and
+        # the mutators that feed it.
+        self._lock = threading.RLock()
         self._rng = rng if rng is not None else random.Random()
         self._texture = max(0.0, texture)
         self._top_down: dict[BrainWave, float] = dict.fromkeys(BrainWave, 0.0)
@@ -1381,7 +1443,8 @@ class BrainWaveOscillator:
                 or negative (inhibition). Typical range [-0.5, 0.5].
             decay: Per-tick decay factor (0-1). Higher = slower decay.
         """
-        self._stimulus[band] = self._stimulus[band] * decay + strength
+        with self._lock:
+            self._stimulus[band] = self._stimulus[band] * decay + strength
 
     def hold_stimulus(self, band: BrainWave, level: float) -> None:
         """Set the standing stimulus level for a continuous channel.
@@ -1405,7 +1468,8 @@ class BrainWaveOscillator:
         pulse channel — so re-reporting replaces only the standing
         level and never erases a pulse still ringing on the band.
         """
-        self._held[band] = max(-0.5, min(0.5, level))
+        with self._lock:
+            self._held[band] = max(-0.5, min(0.5, level))
 
     def add_top_down_drive(self, band: BrainWave, strength: float) -> None:
         """Add top-down drive to a band.
@@ -1423,7 +1487,8 @@ class BrainWaveOscillator:
             band: The band to drive.
             strength: Drive strength (0-1, added to band target).
         """
-        self._top_down[band] = min(1.0, self._top_down[band] + max(0.0, strength))
+        with self._lock:
+            self._top_down[band] = min(1.0, self._top_down[band] + max(0.0, strength))
 
     def perturb_phase(self, band: BrainWave, delta: float) -> None:
         """Nudge a band's instantaneous phase by ``delta`` radians.
@@ -1437,7 +1502,8 @@ class BrainWaveOscillator:
         own cycle. A positive delta advances the band, negative
         retards it.
         """
-        self._z[band] *= complex(math.cos(delta), math.sin(delta))
+        with self._lock:
+            self._z[band] *= complex(math.cos(delta), math.sin(delta))
 
     def reset_phase(self, band: BrainWave, phase: float = 0.0) -> None:
         """Snap a band's phase to ``phase`` (radians).
@@ -1448,8 +1514,9 @@ class BrainWaveOscillator:
         is repositioned at the given phase of its cycle. Use for
         transients large enough to dominate the band's own precession.
         """
-        r = abs(self._z[band])
-        self._z[band] = complex(r * math.cos(phase), r * math.sin(phase))
+        with self._lock:
+            r = abs(self._z[band])
+            self._z[band] = complex(r * math.cos(phase), r * math.sin(phase))
 
     @property
     def _phase(self) -> _PhaseView:
@@ -1503,6 +1570,14 @@ class BrainWaveOscillator:
         targets modulated by both inner (neurochemical) and outer
         (stimulus) inputs.
         """
+        with self._lock:
+            return self._assess_locked(summary, sleep_stage)
+
+    def _assess_locked(
+        self,
+        summary: NeuroSummary,
+        sleep_stage: SleepStage | None,
+    ) -> BrainWaveState:
         # Compute targets from neurochemistry (same classification
         # logic as before — these are the neurochemically-driven
         # equilibrium amplitudes)
@@ -1615,6 +1690,17 @@ class BrainWaveOscillator:
             # ticks — otherwise a regime change lands suspiciously
             # noise-free.
             self._z[band] = self._kick(band, z, dt, target)
+            # The snap re-seats the wave's radius for its whole
+            # record too: the ring is the meter's memory of *this*
+            # oscillation, so its older samples rescale by the same
+            # real-positive factor — phase content untouched —
+            # or the meter keeps reporting the regime the snap ended.
+            ring = self._trace[band]
+            if r > 0.0 and len(ring) > 0:
+                ratio = abs(self._z[band]) / r
+                for i in range(len(ring)):
+                    ring[i] *= ratio
+            self._emit_trace(band, dt)
         decay = math.exp(-dt / self._DRIVE_TAU)
         for band in BrainWave:
             self._top_down[band] *= decay
@@ -1691,31 +1777,61 @@ class BrainWaveOscillator:
         """Advance every band's oscillation by dt without retargeting.
 
         Retained as the stable name for phase advancement; delegates to
-        the closed-form rotation.
+        the closed-form rotation, then emits the interval's trace so
+        the meter's record covers the span.
         """
         self._advance_phase_exact(dt)
+        for band in BrainWave:
+            self._emit_trace(band, dt)
+
+    def _emit_trace(self, band: BrainWave, h: float) -> None:
+        """Emit the band's shaped trace into the metering ring.
+
+        The wave the Goertzel meter reads: the end phasor gives the
+        interval's amplitude (|z|) and end phase (arg z − ωh at the
+        start), and each emitted sample is ``r · carrier(φ)`` — the
+        band's physiological waveform, not a bare sinusoid. The
+        carrier is :func:`_wave_phase_value`, the same table the PAC
+        modulator uses, so REM theta emits its sawtooth and the
+        meter honestly reads only the fundamental (~2/π of a sine
+        at equal amplitude) while the recorded wave carries the
+        shape's morphology and harmonics. Emission debt accumulates
+        fractionally so the sample count stays proportional to
+        elapsed time at any sub-step cadence.
+        """
+        self._trace_debt[band] += h * self._TRACE_FS
+        m = int(self._trace_debt[band])
+        self._trace_debt[band] -= m
+        if m <= 0:
+            return
+        freq = self._FREQS[band]
+        z = self._z[band]
+        r = abs(z)
+        phase = math.atan2(z.imag, z.real) - 2.0 * math.pi * freq * h
+        step = 2.0 * math.pi * freq * self._TRACE_DT
+        two_pi = 2.0 * math.pi
+        phase_name = self._last_phase_name or ""
+        ring = self._trace[band]
+        for _ in range(m):
+            ring.append(r * _wave_phase_value(band, phase % two_pi, phase_name))
+            phase += step
 
     def _propagate(self, band: BrainWave, h: float, radius: float) -> None:
-        """One exact operator-split step of a band's Stuart–Landau state.
+        """One step of a band's driven phasor state.
 
-        The three pieces commute pairwise (rotation preserves |z|, the
-        radial map preserves arg z, the kick is additive), so the order
-        is immaterial and each is exact at any h:
-
-        1. **Rotation** — z ← z·e^{iωh} in closed form. The angle is
-           reduced to its fractional turn first and a within-noise
-           integral-cycle residue snapped to zero (see
-           :meth:`_advance_phase_exact` for why).
-        2. **Radial** — u = |z|² follows the logistic map exactly:
-           u' = A²u / (u + (A² − u)e^{−2λh}), λ = 1/(2τ). Fixed points
-           at u = 0 (unstable — noise kicks escape it) and u = A²
-           (the limit cycle the drive prescribes).
-        3. **Noise** — z ← z + σ√h·(g₁ + ig₂), with
-           σ = √2·η·(A + floor)/√τ chosen so the radial OU process
-           reaches stationary std ≈ η·A: the envelope wanders that
-           fraction about its cycle regardless of the assess cadence
-           (kick variance sums ∝ dt, so cadence splits are equal in
-           distribution).
+        Rotation is closed form — z ← z·e^{iωh}, the angle reduced to
+        its fractional turn first and a within-noise integral-cycle
+        residue snapped to zero (see :meth:`_advance_phase_exact`).
+        The envelope relaxes exponentially toward the driven radius —
+        r ← r + (a − r)·(1 − e^{−h/τ}), a plain first-order approach:
+        the limit-cycle map moved to the body's substrate resonator.
+        The kick is additive — z ← z + σ√h·(g₁ + ig₂), with
+        σ = √2·η·(A + floor)/√τ chosen so the radial OU process
+        reaches stationary std ≈ η·A: the envelope wanders that
+        fraction about its radius regardless of the assess cadence
+        (kick variance sums ∝ dt, so cadence splits are equal in
+        distribution). At the end of the step the band emits its
+        real-axis trace — the signal the Goertzel meter reads.
         """
         z = self._z[band]
         if h > 0.0:
@@ -1726,27 +1842,34 @@ class BrainWaveOscillator:
             ang = 2.0 * math.pi * frac
             z *= complex(math.cos(ang), math.sin(ang))
 
-            # Radial logistic step toward the limit-cycle radius.
+            # Radial relaxation toward the driven radius — first-order
+            # exponential approach on the same per-band τ the
+            # limit-cycle map used.
             a = max(radius, self._A_FLOOR)
             u = z.real * z.real + z.imag * z.imag
             if u > 0.0:
-                e = math.exp(-h / self._TAU[band])
-                a2 = a * a
-                u = (a2 * u) / (u + (a2 - u) * e)
-                z *= math.sqrt(u) / math.hypot(z.real, z.imag)
+                r = math.sqrt(u)
+                z *= (r + (a - r) * (1.0 - math.exp(-h / self._TAU[band]))) / r
 
             # Stochastic drive — variance ∝ h, so cadence-invariant.
             z = self._kick(band, z, h, a)
 
-        self._z[band] = z
+            # Seat the end state before the trace reads it — the
+            # meter must see the wave this step produced, not the
+            # one it replaced.
+            self._z[band] = z
+            self._emit_trace(band, h)
+
+        else:
+            self._z[band] = z
 
     def _kick(self, band: BrainWave, z: complex, h: float, radius: float) -> complex:
         """One stochastic kick: z + σ√h·(g₁ + ig₂).
 
         σ = √2·η·(A + floor)/√τ is chosen so the radial Ornstein–
         Uhlenbeck process reaches stationary std ≈ η·A — the envelope
-        wanders that fraction about its limit cycle regardless of the
-        assess cadence (kick variance sums ∝ elapsed time, so any
+        wanders that fraction about its driven radius regardless of
+        the assess cadence (kick variance sums ∝ elapsed time, so any
         subdivision of an interval is equal in distribution). Used by
         both the driven propagator and the transition snap — a regime
         change should arrive already textured, not noise-free.
@@ -1849,9 +1972,9 @@ class BrainWaveOscillator:
     ) -> None:
         """Advance the oscillator bank over dt seconds in sub-steps.
 
-        Each sub-step propagates every band's Stuart–Landau state
-        (rotation + logistic radial step + noise kick) toward its
-        PAC-modulated limit-cycle radius, and decays the top-down
+        Each sub-step propagates every band's phasor state
+        (rotation + exponential radial approach + noise kick) toward
+        its PAC-modulated driven radius, and decays the top-down
         drive and stimulus registers.
 
         Sub-stepping exists for the *coupled* terms, not integrator
@@ -1861,7 +1984,7 @@ class BrainWaveOscillator:
         (``exp(-(h1+h2)/τ) == exp(-h1/τ)·exp(-h2/τ)``). What fine steps
         resolve is the amplitude-coupled PAC strength (the geometric
         mean of the bands' envelopes, read at each step's start) —
-        measured residual ~1e-4 at the 0.1 s resolution.
+        measured residual ~2e-4 at the 0.1 s resolution.
 
         Args:
             dt: Total interval in seconds. Assumed non-negative.
@@ -2002,9 +2125,40 @@ class BrainWaveOscillator:
         description: str,
         summary: NeuroSummary,
     ) -> BrainWaveState:
-        """Build BrainWaveState from current oscillator amplitudes."""
-        # Normalize amplitudes to sum to 1.0 (powers)
-        powers = dict(self._amplitude)
+        """Build BrainWaveState from the measured band powers."""
+        # Band power is *measured*: Goertzel over each band's emitted
+        # real-axis trace — the field probe's own meter moved into the
+        # mind — not read from oscillator amplitude. The meter reports
+        # the single-bin amplitude estimate (2√P = A for an on-bin
+        # tone), the same scale "powers" has always carried and every
+        # downstream threshold is tuned to. A band's meter reports only
+        # once the ring's bin nearest its center actually resolves it —
+        # |k·fs/n − f| ≤ f/8 — a meter that would measure a theta wave
+        # at an alpha bin should not report at all; until the span is
+        # honest the state amplitude stands in. Fast bands resolve
+        # early, slow bands need their span: infraslow only at the full
+        # four seconds.
+        powers = {}
+        for band in BrainWave:
+            ring = self._trace[band]
+            n = len(ring)
+            freq = self._FREQS[band]
+            if n >= 4:
+                k = max(1, round(n * freq / self._TRACE_FS))
+                resolves = abs(k * self._TRACE_FS / n - freq) <= freq / 8.0
+            else:
+                resolves = False
+            if resolves:
+                # Single-bin amplitude estimate: for x = A·cos, the
+                # Goertzel bin has |X| = nA/2, so 2√(|X|²/n²) = A.
+                # Powers stay amplitude-proportional — the same scale
+                # the field has always reported and every downstream
+                # threshold is tuned to.
+                powers[band] = 2.0 * math.sqrt(
+                    _band_power(ring, self._TRACE_FS, freq)
+                )
+            else:
+                powers[band] = self._amplitude[band]
         total = sum(powers.values())
         if total > 0:
             for band in powers:
@@ -2220,10 +2374,10 @@ def assess_brain_waves(
     ``brainstem.field_probe``). With no client the oscillator runs on
     its modeled inputs alone — identical to the old call shape.
 
-    The oscillator propagates each band's Stuart–Landau state —
-    rotating, converging toward the neurochemically-driven cycle
-    radius, wandering under its noise drive — then returns the
-    measured state. The mapping from neurochemistry to limit-cycle
+    The oscillator propagates each band's phasor state —
+    rotating, relaxing toward the neurochemically-driven radius,
+    wandering under its noise drive — then returns the measured
+    state. The mapping from neurochemistry to driven
     radii is grounded in neuroscience:
     - Alertness is the primary driver (low→delta/theta, high→beta/gamma)
     - Plasticity gates whether high alertness produces gamma (integration)

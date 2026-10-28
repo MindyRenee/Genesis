@@ -1124,6 +1124,16 @@ pub struct ActiveInferenceEngine {
     /// Predicted marginal variance: propagated posterior uncertainty
     /// plus process noise. It changes with the model and belief variance.
     prior_var: [f32; DIM],
+    /// Cholinergic gain on the sensory channel — the basal forebrain's
+    /// efferent edge. Acetylcholine optimizes the precision of
+    /// bottom-up prediction errors by gain on the units reporting them
+    /// (supragranular pyramidal cells: Feldman & Friston, 2010; Moran
+    /// et al., J. Neurosci. 2013 — cholinesterase inhibition shifted
+    /// sensory PE responses through exactly this gain). Set each cycle
+    /// from the observed effective ACh level; the precision-weighted
+    /// observation variance is divided by it. Per-tick and recomputed,
+    /// so it is never serialized.
+    ach_sensory_gain: f32,
     /// The last bounded regulatory demand proxy [0, 1]. Stored so
     /// that signals() can report it without recomputing.
     last_free_energy: f32,
@@ -1188,6 +1198,7 @@ impl ActiveInferenceEngine {
             belief_mean: [0.5; DIM],
             belief_var: [PROCESS_NOISE; DIM],
             prior_var: [PROCESS_NOISE; DIM],
+            ach_sensory_gain: 1.0,
             last_free_energy: 0.0,
             preferred: genetic_preference_seed(),
             preference_precision: PREFERENCE_PRECISION_INIT,
@@ -1436,6 +1447,15 @@ impl ActiveInferenceEngine {
         // computation. This confines the damage to one tick.
         self.sanitize_internal_state();
 
+        // Basal forebrain: cholinergic gain on the sensory channel.
+        // The observed effective ACh level sets how strongly
+        // bottom-up prediction errors weigh against the model's
+        // predictions this cycle — elevated ACh raises the precision
+        // of the observation channel (lower effective obs_var).
+        self.ach_sensory_gain = crate::state::basal_forebrain::sensory_precision_gain(
+            post[NeurochemicalId::Acetylcholine as usize],
+        );
+
         // Step 1: Predict the next state from the pre-tick state,
         // conditioned on the action (impulses) applied in the previous
         // cycle. This is the action-conditioned generative prediction:
@@ -1475,8 +1495,9 @@ impl ActiveInferenceEngine {
             // mark as initialized.
             self.initialized = true;
             self.belief_mean = post;
-            let observation_variance =
-                MIN_OBS_NOISE + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE);
+            let observation_variance = (MIN_OBS_NOISE
+                + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE))
+                / self.ach_sensory_gain;
             self.belief_var = [observation_variance; DIM];
             self.tick_count = 1;
             self._update_maturity();
@@ -1768,8 +1789,12 @@ impl ActiveInferenceEngine {
 
         // Observation noise: precision-weighted. High precision →
         // low obs_var → trust observations. Low precision → high
-        // obs_var → distrust observations.
-        let obs_var = MIN_OBS_NOISE + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE);
+        // obs_var → distrust observations. The cholinergic gain is the
+        // basal forebrain's division of this channel's variance —
+        // elevated ACh is elevated sensory precision.
+        let obs_var = (MIN_OBS_NOISE
+            + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE))
+            / self.ach_sensory_gain;
 
         // ── Kalman predict step ──
         //
@@ -2362,8 +2387,9 @@ impl ActiveInferenceEngine {
     /// between policies. See the scoring loop for why the previous
     /// novelty-based substitute was removed.
     fn expected_information_gain(&self) -> f32 {
-        let observation_variance =
-            MIN_OBS_NOISE + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE);
+        let observation_variance = (MIN_OBS_NOISE
+            + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE))
+            / self.ach_sensory_gain;
         let gain = self
             .predicted_variances()
             .iter()
@@ -2448,8 +2474,9 @@ impl ActiveInferenceEngine {
             // (Koudahl et al., 2021). Exploration is therefore handled
             // separately by the policy sampler.
             let preference_precision = self.preference_precision.max(1e-3);
-            let observation_variance =
-                MIN_OBS_NOISE + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE);
+            let observation_variance = (MIN_OBS_NOISE
+                + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE))
+                / self.ach_sensory_gain;
             let future_variances = self.predicted_variances();
             let mut preference_cost = 0.0f32;
             for i in 0..DIM {

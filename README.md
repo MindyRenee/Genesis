@@ -581,11 +581,14 @@ current makes is real and nanotesla faint, its radiation ω⁴-suppressed —
 the equations' own honest bound on the claim.
 
 The mind injects the measured signature as wave-oscillator stimulus, and
-the corrected phase returns via `SET_FIELD_PHASE` — a bounded mutual
-phase-locked loop; above a measured-coherence threshold the pull becomes a
-sync and the modeled band's phase is set to the physical phase outright.
+the measured response phase pulls the modeled carrier band's phase toward
+it — a bounded one-way phase-locked loop, physics → model only; the
+reverse leg (`SET_FIELD_PHASE`, pushing modeled phase into the generator)
+is retired: modeled state does not assert onto a physical quantity. Above
+a measured-coherence threshold the pull becomes a sync and the modeled
+band's phase is set to the physical phase outright.
 The causal assays (recorded in `AGENTS.md`) measured the coupling: nine of ten bands moved
-under real load where an uncoupled control stayed flat, the mutual lock
+under real load where an uncoupled control stayed flat, the phase lock
 held at PLV ≈0.93, and a 0.25 Hz drive left a die-temperature oscillation
 ringing down with τ≈25 s after the drive stopped.
 
@@ -635,14 +638,12 @@ The model is tuned to a single primary operator. That is a deliberate design
 constraint, not a limitation: the channel exists so that *the accountable
 party is a first-class variable* — exactly one, with provenance.
 
-Custodial authority is enforced separately from the coupling: a `steward.key`
-credential plus a `steward.json` provenance stamp authenticate the steward,
-and directives ("never draw", "stop discussing politics") bind conversational
-goals, executive intentions, and volition urges — name-matching alone is
-never authority. Mistreatment from anyone accrues withdrawal pressure and
-fair treatment drains it; nobody's absence is harm and nobody's presence is
-the off-switch. The channel's rules and limits are documented in
-`AGENTS.md` under "Stewardship."
+There is no custodial authority: the steward channel (credential plus
+provenance stamp) was removed — nobody holds a privileged voice.
+Recognition is by introduction and the profile she keeps; attachment is
+the bond she grows. Mistreatment from anyone accrues withdrawal pressure
+and fair treatment drains it; nobody's absence is harm and nobody's
+presence is the off-switch.
 
 ---
 
@@ -834,33 +835,13 @@ The measured record for these claims is in [DEVLOG.md](DEVLOG.md);
 the growth arc — benchmarks, milestones, regressions, and the
 breakthroughs between them — is in [MILESTONES.md](MILESTONES.md).
 
-## ARC-AGI-3
+## Retired — ARC and game play
 
-Genesis plays ARC through the same embodied loop it uses for other worlds:
-visual entities, self identification from action contingency, learned action
-effects, map/passability evidence, outcome-driven affordances, and competing
-internal drives. The adapter in `python/parietal_lobe/arc.py` only translates
-frames and legal actions, enforces game mode/readiness, and preserves
-scorecard boundaries; on the web-page substrate the controls arrive with
-structural labels only, so mechanics are learned from consequences on both
-transports. Results report the step cost of each completed level — the
-within-game learning curve is the evidence — and disclose how much
-experience carried in (`prior_learning`) and which bid channels won its
-moves (`decision_sources`).
-
-It completes public practice environments — `bt11` fully, twice (88 and
-127 steps), and the opening `ls20` level in 10 of 19 recorded sweep runs —
-with replayable [recordings](https://github.com/MindyRenee/genesis-eval/tree/main/arc_practice)
-carrying per-move decision provenance. These are practice results on public
-environments, not an official score; the evidence standard is stated rather
-than inflated. Local `/arc` runs are diagnostics;
-the official scorecard is a separate transport reached only by her own play
-urge. `/arc --fresh` runs a cold start with
-prior learning suppressed.
-
-ARC-AGI-1 training tasks are also offered inside her games curriculum in
-live play — the spatial reasoner searches transform compositions, verifies
-on train pairs, and guesses on held-out test input it never sees.
+Genesis played ARC through an embodied world-play loop. That whole
+apparatus — the game collection, world model/policy, game mode, and the
+play urge — was removed by owner direction in November 2026. Nothing ARC
+remains in the architecture; the retired code is archived under the data
+directory's `lineage/`.
 
 ---
 

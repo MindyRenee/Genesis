@@ -514,7 +514,7 @@ def test_sensors_present_counts_real_hardware_not_fields() -> None:
     model_full.update_hardware_body(_body_state(), full)
     full_count = model_full.body_model.hardware_sensors_present
 
-    assert full_count == 30, "all sensors present should count every channel"
+    assert full_count == 29, "all sensors present should count every channel"
     assert desktop_count < full_count, (
         "a machine with no battery, fan or RAPL domains must report fewer "
         "verified channels than one with everything"
@@ -540,7 +540,7 @@ def test_sensors_present_without_mask_keeps_legacy_behaviour() -> None:
     """
     model = SelfModel()
     model.update_hardware_body(_body_state(), None)
-    assert model.body_model.hardware_sensors_present == 30
+    assert model.body_model.hardware_sensors_present == 29
 
 
 # ─── zone / phase transition telemetry ────────────────────────
@@ -760,6 +760,24 @@ def test_body_condition_seeds_are_bare_names() -> None:
         assert " " not in seed
         assert not seed.endswith((".", "!", "?"))
         assert urgency > 0.0
+
+
+def test_body_condition_seeds_go_silent_on_stale_body() -> None:
+    """A stale body picture reports no conditions.
+
+    The regression this pins: conditions were emitted from whatever
+    the last read held, forever. If the daemon died while throttled,
+    she reported throttling for the rest of her life — a hallucinated
+    need, which is exactly what the freshness stamp exists to prevent.
+    """
+    import time as _time
+
+    model = SelfModel()
+    model.update_hardware_body(_loaded_body(), SensorPresence(mask=0x1FFFF))
+    assert model.body_condition_seeds(), "fresh readings should report conditions"
+
+    model.body_model.hardware_read_at = _time.monotonic() - 999.0
+    assert model.body_condition_seeds() == []
 
 
 # ─── process health (GET_PROCESS_HEALTH) ──────────────────────

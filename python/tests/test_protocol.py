@@ -246,8 +246,8 @@ def test_command_ids():
     assert GET_ION_SUMMARY == 40
     assert GET_SENSOR_PRESENCE == 36
     # The field probe is additive and continues past SET_VOLITION;
-    # the phase-lock push is its additive sibling, as is the
-    # carrier write control used by the ring-down experiment.
+    # opcode 48 is retired (pinned, never reused) and the carrier
+    # write control used by the ring-down experiment stays live.
     assert GET_FIELD_PROBE == 47
     assert SET_FIELD_PHASE == 48
     assert SET_FIELD_CARRIER == 49
@@ -1196,6 +1196,30 @@ def test_set_volition_is_retired_opcode_46() -> None:
     assert protocol.SET_VOLITION == 46
     assert "SET_VOLITION" in protocol.__all__
     assert not hasattr(protocol, "set_volition")
+
+
+def test_neuro_adjust_baseline_is_retired_opcode_23() -> None:
+    """The NEURO_ADJUST_BASELINE wire number is retired — direct baseline
+    edits bypassed the body's own dynamics; NEURO_IMPULSE's bounded,
+    decaying impulses are the only sanctioned chemistry channel — but
+    the constant is kept pinned at 23 so the number is never reused."""
+    from genesis_client import protocol
+
+    assert protocol.NEURO_ADJUST_BASELINE == 23
+    assert "NEURO_ADJUST_BASELINE" in protocol.__all__
+    assert not hasattr(protocol, "neuro_adjust_baseline")
+
+
+def test_set_field_phase_is_retired_opcode_48() -> None:
+    """The SET_FIELD_PHASE wire number is retired — modeled band phase is
+    no longer pushed into the probe's physical generator; the phase lock
+    runs physics → model only — but the constant is kept pinned at 48
+    so the number is never reused."""
+    from genesis_client import protocol
+
+    assert protocol.SET_FIELD_PHASE == 48
+    assert "SET_FIELD_PHASE" in protocol.__all__
+    assert not hasattr(protocol, "set_field_phase")
 
 
 def test_get_internals_is_opcode_51_and_decodes_lines() -> None:

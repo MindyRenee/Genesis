@@ -22,7 +22,6 @@ from thalamus.relay import KIND_HEARD
 
 from genesis_client.protocol import (
     CHEM_DOPAMINE,
-    CHEM_EPINEPHRINE,
     CHEM_NOREPINEPHRINE,
     MODULE_LANGUAGE,
     MODULE_SENSORY,
@@ -135,7 +134,6 @@ class ConversationMixin:
         _think_recovery_active: bool
         _think_wedged_since: float | None
         _think_worker_lock: threading.Lock
-        _game_session: Any
 
         def __getattr__(self, name: str) -> Any: ...
 
@@ -265,11 +263,6 @@ class ConversationMixin:
         return self._answering_questions
 
     @property
-    def is_gaming(self) -> bool:
-        """Whether it is currently in game mode (focused play)."""
-        return self._is_gaming
-
-    @property
     def teaching_topic(self) -> str:
         """The topic the user is currently teaching it about."""
         return self._teaching_topic
@@ -389,7 +382,7 @@ class ConversationMixin:
                 event_type=2,  # internal thought
                 source_module=4,  # inner life
                 salience=0.6 if is_expression else (0.5 if is_question else 0.4),
-                emotional_tag=[0.0] * 12,
+                emotional_tag=None,
                 text=text[:188],
             )
         except (OSError, ConnectionError) as e:
@@ -469,7 +462,7 @@ class ConversationMixin:
                 self.memory.store_memory(
                     text=event.describe(),
                     salience=event.salience,
-                    emotional_tag=[0.0] * 12,
+                    emotional_tag=None,
                     event_type=0,  # observation
                     source_module=MODULE_SENSORY,
                     source="world",
@@ -617,7 +610,7 @@ class ConversationMixin:
             self.memory.store_memory(
                 text=text,
                 salience=salience,
-                emotional_tag=[0.0] * 12,
+                emotional_tag=None,
                 event_type=0,  # observation
                 source_module=3,  # autonomous learner
                 source="learning",
@@ -801,11 +794,6 @@ class ConversationMixin:
         boundary and ends when that boundary returns. This includes normal
         cognition, errors, and bounded timeout fallbacks.
         """
-        # Conversation is off while she is gaming — terminal input,
-        # voice, and channel chatter all reach silence; the match is
-        # the only utterance she attends to.
-        if self._is_gaming:
-            return ""
         started = time.perf_counter()
         try:
             return self._respond_once(user_input, timeout)
@@ -1166,7 +1154,6 @@ class ConversationMixin:
             self._is_meditating
             or self._is_sleeping
             or self._is_teaching
-            or self._is_gaming
             or self._stop_latched  # stopping — suppression stays latched
         ):
             return
@@ -1206,7 +1193,7 @@ class ConversationMixin:
         # stay paused — they're managed by enter/exit_teaching_mode.
         # A question-answer session holds the same posture: the
         # exchange is the only thing she's doing until it ends.
-        if self._is_teaching or self._is_gaming or self._answering_questions:
+        if self._is_teaching or self._answering_questions:
             return
         # Deferred resume timer firing during teardown — the pauses
         # it would lift belong to threads already joined.
@@ -1515,14 +1502,13 @@ class ConversationMixin:
             # now — re-apply its declared topic.
             self.brain.frontal.teaching_mode = True
             self.brain.frontal.teaching_topic = self._teaching_topic
-        if not self._is_gaming:
-            try:
-                self.brain.frontal.executive.switch_task(
-                    getattr(self, "_prior_qa_task", "") or "idle"
-                )
-            except Exception as e:  # noqa: BLE001
-                logger.debug(f"executive task restore failed: {e}")
-        if not (self._is_teaching or self._is_gaming):
+        try:
+            self.brain.frontal.executive.switch_task(
+                getattr(self, "_prior_qa_task", "") or "idle"
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"executive task restore failed: {e}")
+        if not self._is_teaching:
             self.learner.resume()
         # Suppression and inner life release on the usual quiet
         # window — an exit mid-exchange shouldn't flood the turn.
@@ -1544,101 +1530,6 @@ class ConversationMixin:
         self.exit_question_mode()
         return True
 
-    def enter_game_mode(self) -> None:
-        """Put Genesis into game mode — focused play.
-
-        The whole entity stays whole: engagement pins her attention
-        on the world, which starves the appetitive urges through
-        volition context — she doesn't wander off because she is
-        *absorbed*, not because her drives were switched off. The
-        learner pauses — the world is the task; topic acquisition can
-        wait for the same reason it waits during conversation. The
-        inner life stays on — thinking about the game is the point.
-        Conversation is off — the match is the only utterance she is
-        attending to. A modest norepinephrine + epinephrine bump marks
-        the shift into alert, competitive posture — adrenaline up a
-        bit, nothing puppeteered.
-
-        The sitting's boundaries are venue rules, not steering: sleep
-        and meditation are paused while the flag stands, the
-        network-fetching tools refuse, and her hands, workstation,
-        and spawned processes stay hers.
-        """
-        if self._is_gaming:
-            return
-        self._is_gaming: bool = True
-        self.brain.frontal.game_mode = True
-        self.learner.pause()
-        try:
-            from tools.framework import get_tools
-
-            get_tools().net_sealed = True
-        except Exception as e:  # noqa: BLE001 — sealing must never block play
-            logger.debug(f"tool net-seal failed: {e}")
-        self._learner_neuro_impulse(CHEM_NOREPINEPHRINE, 0.1)
-        self._learner_neuro_impulse(CHEM_EPINEPHRINE, 0.05)
-        self.engage_world("games")
-        # The executive formally takes the task set — engagement is
-        # the strength of her focus; the task-set is its object. Any
-        # region that consults the executive now sees "games" as what
-        # she is doing, not just what she is absorbed in.
-        try:
-            self._prior_task = self.brain.frontal.executive.active_task
-            self.brain.frontal.executive.switch_task("games")
-        except Exception as e:  # noqa: BLE001 — task-set is advisory
-            logger.debug(f"executive task switch failed: {e}")
-
-    def exit_game_mode(self) -> None:
-        """Exit game mode and resume normal operation."""
-        if not self._is_gaming:
-            return
-        self._is_gaming = False
-        self.brain.frontal.game_mode = False
-        self.learner.resume()
-        try:
-            from tools.framework import get_tools
-
-            get_tools().net_sealed = False
-        except Exception as e:  # noqa: BLE001 — release is best-effort
-            logger.debug(f"tool net-unseal failed: {e}")
-        self.disengage_world()
-        self._resume_inner_life()
-        try:
-            self.brain.frontal.executive.switch_task(getattr(self, "_prior_task", "") or "idle")
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"executive task restore failed: {e}")
-
-    def game_turn(self, line: str) -> str:
-        """One game-mode turn: world state in, action out.
-
-        In game mode a ``FRAME`` line is a scene to act on, not an
-        utterance to answer — the session parses the wire format and
-        ``world_step`` runs the turn through her faculties; the reply
-        is the action she chose. Anything else is conversation, and
-        conversation is off for the sitting — silence.
-        """
-        if not self._is_gaming or not line.startswith("FRAME "):
-            return self.respond(line)
-        if self._game_session is None:
-            from worlds.session import GameSession
-
-            self._game_session = GameSession(self)
-        try:
-            return self._game_session.turn(line)
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.game_turn", e)
-            return ""
-
-    @property
-    def game_decision(self) -> dict[str, Any] | None:
-        """The decision basis behind the last world action.
-
-        Structured telemetry, not her voice: which drive the basal
-        ganglia honored, how decisive the field was, and what else
-        was in contention — the ``reasoning`` an ARC harness records
-        alongside each step.
-        """
-        return self.last_world_decision
 
     def pop_queued_question(self) -> dict[str, str] | None:
         """Pop the next queued question.

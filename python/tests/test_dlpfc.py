@@ -200,33 +200,3 @@ def test_canonical_order() -> None:
         (("a", True), ("b", True)),
     )
     assert a == b and hash(a) == hash(b)
-
-
-# ── Game integration ─────────────────────────────────────────
-
-
-def test_rule_agent_induce_mode_uses_posterior() -> None:
-    """The worksheet agent induces the hidden rule through the DLPFC."""
-    from worlds.classification import Item, RuleGame
-    from worlds.rule_agent import RuleAgent
-
-    items = [
-        Item(0, "alpha", ("striped", "round")),
-        Item(1, "beta", ("striped",)),
-        Item(2, "gamma", ("round",)),
-        Item(3, "delta", ()),
-    ]
-    # Hidden rule the agent never sees: striped ∧ round.
-    world = RuleGame(
-        {"op": "all_of", "of": ["striped", "round"]},
-        items,
-        examples=[],
-    )
-    from frontal_lobe.reasoning import TaskCompetence
-
-    agent = RuleAgent(seed=0, inducer=DorsolateralPFC(), task_competence=TaskCompetence())
-    res = agent.solve(world, max_steps=60)
-    assert res.solved
-    inducer = agent._inducer
-    assert inducer is not None
-    assert inducer.induce().map_rule is not None

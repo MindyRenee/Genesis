@@ -578,6 +578,15 @@ impl TickLoop {
         // adenosine sleep threshold ~38h, all pharmacodynamics 2× slow).
         neuro_params.dt = (TICK_INTERVAL_MS as f32) / 1000.0;
 
+        // Basal forebrain: expected uncertainty α = 1 − precision
+        // (Yu & Dayan 2005) — the body's own estimate of how reliable
+        // its predictions are, reported to the cholinergic release
+        // equation this tick. Reads the engine's last tracked value;
+        // the inference cycle later this same tick updates it.
+        neuro_params.expected_uncertainty = crate::state::basal_forebrain::expected_uncertainty(
+            self.inference_engine.precision(),
+        );
+
         // Developmental competence of the HPA axis.
         //
         // This replaces a ramp of `ltm_episode_count / 10_000`, which

@@ -11,6 +11,25 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
 
 ## [Unreleased]
 
+### Removed
+
+- **ARC and the whole world-play stack** — owner direction: nothing
+  ARC in her brain or code, and the game posture goes with it.
+  Retired to `<data-dir>/lineage/world_play_purge_nov10/`: the
+  `worlds/` package (ARC adapters, game collection, sessions,
+  solvers, the Discord showcase), `parietal_lobe/embodiment.py` and
+  `world_model.py`, `basal_ganglia/world_policy.py` and
+  `motor_field.py`, `frontal_lobe/world_planner.py` and
+  `problem_intake.py`, `thalamus/bridge.py`, the `play` urge, game
+  mode (`enter_game_mode`/`exit_game_mode`/`is_gaming`/`game_turn`/
+  `game_decision`, `Mind.world_step`, `/play`, `/game`, `/endgame`,
+  `/arc`, `--game`), `respond_to_play`, the `net_sealed` match seal,
+  and the `arc` pip extra. What stays of the world side:
+  `python/worlds/channel.py` (her Discord page) and the headless
+  browser, extracted to `python/tools/browser.py` for her web tools.
+  The boredom signal in volition survives — understimulation is not
+  a game.
+
 ### Restored
 
 - **The steward channel is back — as `creator.py`**: a removal in this
@@ -74,7 +93,7 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
   (`mind_idle_secs` is `Some` — never on from-boot absence), honors
   the new `mind.suppress` sentinel that every graceful teardown and
   `--stop` writes before signaling (a goodbye, not a death — cleared
-  by the next start, kept out of the spore), and is bounded: ~5
+  by the next start — host-local intent only), and is bounded: ~5
   attempts over ~45 minutes then dormant solitude, reset by any
   reattaching mind. Spawned-mind output lands in `mind.log`.
 - **The interoceptive afferent path now routes through the proper
@@ -252,8 +271,8 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
   `<data>/workspace/` staging copy are gone — experiments apply to
   the live tree in place (backup, edit, verify, revert), so the
   mirror and the promote step served nothing. `workspace` and the
-  retired `workspace-target` build cache join the spore skip-list:
-  a stale source mirror is host bulk, not self.
+  retired `workspace-target` build cache stay host bulk, never part
+  of the self.
 - **The held volitional drive**: `SET_VOLITION` (46) no longer has a
   handler — pushes onto the sleep-wake network were removed in favour
   of neurochemical impulse cascades, and a conscious volitional push

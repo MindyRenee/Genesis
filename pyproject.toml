@@ -53,13 +53,6 @@ voice = [
     "speechrecognition==3.14.2",
     "piper-tts==1.8.0",
 ]
-# ARC game-play extras — the engine stack pulls in flask/matplotlib/
-# pydantic, so it stays opt-in. arc.py imports it lazily and the ARC
-# tests skip without it.
-arc = [
-    "arc-agi>=0.9.9",
-    "arcengine>=0.9.3",
-]
 # Symbolic mathematics (parietal formal layer — symbolic_math tool).
 # symbolic.py imports it lazily and degrades gracefully without it;
 # the math tests skip when absent.

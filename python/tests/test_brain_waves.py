@@ -6,6 +6,7 @@ import math
 import sys
 import time
 
+import pytest
 from thalamus.brain_waves import (
     BrainWave,
     BrainWaveState,
@@ -30,6 +31,20 @@ from genesis_client.protocol import (
 from genesis_client.types import NeuroSummary
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_oscillator():
+    """Every test meters a fresh field.
+
+    Reported band powers are *measured* — Goertzel over each band's
+    emitted trace — so they carry up to ~4 s of emitted history.
+    Without a reset, a test's spectrum leaks into the next test's
+    reading.
+    """
+    from thalamus.brain_waves import reset_oscillator
+
+    reset_oscillator()
 
 
 def _make_summary(
@@ -1005,7 +1020,12 @@ def test_stimulus_modulates_amplitude():
     gamma_before = state_before.powers[BrainWave.GAMMA]
 
     add_stimulus(BrainWave.GAMMA, 0.3)
-    state_after = assess_brain_waves(summary)
+    # Powers are metered over the emitted trace — a real band meter
+    # needs the window to fill with post-stimulus wave, so let the
+    # field run (same pattern as test_stimulus_decays).
+    for _ in range(10):
+        time.sleep(0.05)
+        state_after = assess_brain_waves(summary)
     gamma_after = state_after.powers[BrainWave.GAMMA]
 
     assert gamma_after > gamma_before, (
@@ -1065,7 +1085,12 @@ def test_negative_stimulus_suppresses_band():
     alpha_before = assess_brain_waves(summary).powers[BrainWave.ALPHA]
 
     add_stimulus(BrainWave.ALPHA, -0.3)
-    alpha_after = assess_brain_waves(summary).powers[BrainWave.ALPHA]
+    # The meter needs post-stimulus wave in its window before the
+    # suppression shows — let the field run.
+    for _ in range(10):
+        time.sleep(0.05)
+        state = assess_brain_waves(summary)
+    alpha_after = state.powers[BrainWave.ALPHA]
 
     assert alpha_after < alpha_before, (
         f"inhibitory stimulus should suppress alpha: {alpha_before} → {alpha_after}"

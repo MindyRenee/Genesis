@@ -1010,11 +1010,6 @@ class GenerativeLanguage(Language):
             # report of *that* instead of leaving a raw status word
             # in the slot.
             "vision_status": thought.metadata.get("vision_status"),
-            # Played-game result — the play layer's structured
-            # outcome (family, solved, score, answer payload). The
-            # vocabulary composes the report from the data; the play
-            # layer never writes its own words.
-            "problem_result": thought.metadata.get("problem_result"),
         }
 
     def _structure_pool(

@@ -21,8 +21,6 @@ Pipeline:
     SpatialSolution                rule + predictions
 
 Consumers:
-    - ``worlds.play.GamePlay`` — her game collection —
-      drives the reasoner through grid games.
     - The cognition engine holds a ``SpatialReasoner`` instance so
       spatial problems raised in conversation can be perceived and
       reasoned about, not just talked past.

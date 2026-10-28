@@ -371,6 +371,230 @@ pub fn clock_minutes(now_ms: u64) -> f64 {
     crate::store::mmap_state::local_seconds_of_day(now_ms) as f64 / 60.0
 }
 
+// ─── Bistable geometry: the fold margins ────────────────────────────
+//
+// The LC–VLPO switch is a cusp. Mutual inhibition gives the fast
+// subsystem two stable fixed points separated by a saddle, and the
+// homeostat h — through `beta_vlpo = K1 + K2·h` — moves the system
+// along the cusp's control axis: as h rises the VLPO activation
+// threshold falls until the wake attractor merges with the saddle and
+// annihilates (the upper fold = sleep onset); as h falls during sleep
+// the sleep attractor annihilates the same way (the lower fold = the
+// wake-up edge). Between the folds the system is bistable, and that
+// band is where the sleep-onset flicker lives.
+//
+// The reduction is exact for the (f_lc, f_vlpo) subsystem at frozen
+// inputs: VLPO's input depends on LC only through c_ne = tanh(f_lc/γ),
+// so the VLPO equilibrium is a closed function of f_lc and every
+// fixed point of the 2D subsystem is a root of the scalar map
+//   g(f) = LC∞(I_LC(f_vlpo*(f))) − f.
+// Stability carries over too — the 2D Jacobian is a monotone feedback
+// loop whose determinant changes sign exactly where g's slope does.
+// f_r and f_scn are held at their current values: they are inputs to
+// the switch (ACh and circadian drives), not participants in the fold
+// — the standard quasi-static reduction for a fast-slow system. The
+// reported folds are therefore the folds of the reduced switch at the
+// current operating point, computed per query rather than per tick.
+
+/// Lower bound of the homeostat sweep used to locate the folds. h is
+/// physiologically bounded to `[H_MIN, H_MAX]` at runtime, but the
+/// fold can sit outside that band — the margin is still meaningful,
+/// it just means the current regime is monostable on one side.
+const FOLD_H_LO: f64 = -400.0;
+/// Upper bound of the homeostat sweep.
+const FOLD_H_HI: f64 = 1200.0;
+/// Coarse grid for the fold scan; transitions are refined by
+/// bisection afterwards, so this only needs to bracket them.
+const FOLD_H_STEP: f64 = 1.0;
+/// Grid resolution of the fixed-point scan over f_lc ∈ [0, MAX_LC].
+const FOLD_F_STEP: f64 = 0.02;
+/// Bisection iterations refining each bracketed root and fold.
+const FOLD_BISECT_ITERS: usize = 40;
+
+/// The scalar fixed-point map of the reduced (LC, VLPO) subsystem:
+/// `g(f) = LC∞(I_LC(f_vlpo*(f))) − f` with the homeostat substituted
+/// for the state's own `x[4]` and the REM/circadian drives frozen at
+/// the state's current values. A root of `g` is a fixed point of the
+/// switch; where `g`'s slope at the root is negative the fixed point
+/// is a stable branch.
+fn switch_map(f_lc: f64, h: f64, x: &State, hpa: f64, oxin: f64, htm: f64) -> f64 {
+    let c_ne = (f_lc / GAMMA_NE).tanh();
+    let c_scn = (x[3] / GAMMA_SCN).tanh();
+    let c_ach = (x[2] / GAMMA_ACH_R).tanh();
+    let beta_vlpo = K2 * h + K1;
+    let vlpo_input = -GNE_VLPO * c_ne - GSCN_VLPO * c_scn;
+    let f_vlpo = sigmoid(vlpo_input, MAX_VLPO, beta_vlpo, ALPHA_VLPO);
+    let c_gaba = (f_vlpo / GAMMA_GABA).tanh();
+    let lc_input = GACH_LC * c_ach + GSCN_LC * c_scn - GGABA_LC * c_gaba
+        + GCORT_LC * hpa
+        + GOXIN_LC * (oxin - OXIN_REST)
+        + GHTM_LC * (htm - HTM_REST);
+    sigmoid(lc_input, MAX_LC, BETA_LC, ALPHA_LC) - f_lc
+}
+
+/// Every fixed point of the reduced switch at homeostat `h`, in
+/// ascending order — the roots of [`switch_map`], located by sign
+/// change on a grid and refined by bisection. One low root is the
+/// sleep branch, one high root is the wake branch, three roots are
+/// both branches plus the saddle between them.
+fn switch_fixed_points(h: f64, x: &State, hpa: f64, oxin: f64, htm: f64) -> Vec<f64> {
+    let mut roots = Vec::new();
+    let mut f_prev = 0.0;
+    let mut g_prev = switch_map(0.0, h, x, hpa, oxin, htm);
+    let n = (MAX_LC / FOLD_F_STEP).ceil() as usize;
+    for i in 1..=n {
+        let f = (i as f64 * FOLD_F_STEP).min(MAX_LC);
+        let g = switch_map(f, h, x, hpa, oxin, htm);
+        if g_prev.is_finite() && g.is_finite() && g_prev * g < 0.0 {
+            let (mut lo, mut hi, mut glo) = (f_prev, f, g_prev);
+            for _ in 0..FOLD_BISECT_ITERS {
+                let mid = 0.5 * (lo + hi);
+                let gmid = switch_map(mid, h, x, hpa, oxin, htm);
+                if !gmid.is_finite() {
+                    break;
+                }
+                if glo * gmid <= 0.0 {
+                    hi = mid;
+                } else {
+                    lo = mid;
+                    glo = gmid;
+                }
+            }
+            roots.push(0.5 * (lo + hi));
+        }
+        f_prev = f;
+        g_prev = g;
+    }
+    roots
+}
+
+/// The number of fixed points of the reduced switch at homeostat `h`.
+///
+/// This is the honest bistability detector: the folds are where the
+/// root count changes, not where a root crosses the behavioral
+/// [`SLEEP_THRESHOLD`]. The 4 Hz line divides *scored* wake from
+/// scored sleep; the saddle-node is where a branch annihilates —
+/// the two are different lines, and a weakened wake attractor can
+/// sit below 4 Hz while it still exists dynamically. In the cusp
+/// geometry the count runs 1 → 3 → 1 as h sweeps upward: birth of
+/// the saddle + sleep pair is the lower fold, death of the saddle +
+/// wake pair is the upper fold. Three roots means the low and high
+/// branches coexist — bistable.
+fn switch_root_count(h: f64, x: &State, hpa: f64, oxin: f64, htm: f64) -> usize {
+    switch_fixed_points(h, x, hpa, oxin, htm).len()
+}
+
+/// The smallest h in `lo..hi` at which `pred` first holds, assuming it
+/// holds monotonically (false below the fold, true above). Returns
+/// `lo` when the predicate already holds there (the boundary is below
+/// the bracket), `f64::NAN` when it never holds inside the window.
+fn fold_edge(lo: f64, mut hi: f64, pred: &mut dyn FnMut(f64) -> bool) -> f64 {
+    if pred(lo) {
+        return lo;
+    }
+    if !pred(hi) {
+        return f64::NAN;
+    }
+    let mut lo = lo;
+    for _ in 0..FOLD_BISECT_ITERS {
+        let mid = 0.5 * (lo + hi);
+        if pred(mid) {
+            hi = mid;
+        } else {
+            lo = mid;
+        }
+    }
+    hi
+}
+
+/// The bistable geometry of the LC–VLPO switch at the current
+/// operating point: the homeostat values where the sleep and wake
+/// attractors annihilate, and where `h` sits relative to them.
+///
+/// `hpa`/`oxin`/`htm` are the same alerting inputs the tick loop
+/// feeds [`deriv_with_afference`]: the cortisol stress fraction and
+/// the effective orexin/histamine levels. The collicular transient is
+/// excluded — the margin is a property of the slow state, not of a
+/// momentary sensory pulse.
+#[derive(Clone, Copy, Debug)]
+pub struct FoldMargins {
+    /// The homeostat now (`x[4]`).
+    pub h: f64,
+    /// Lower fold: below this h the sleep branch ceases to exist —
+    /// the wake-up edge. `f64::NAN` when no fold exists in the sweep
+    /// window (the sleep branch never annihilates in range).
+    pub h_sleep_fold: f64,
+    /// Upper fold: above this h the wake branch ceases to exist — the
+    /// fall-asleep edge. `f64::NAN` when no fold exists in the sweep
+    /// window.
+    pub h_wake_fold: f64,
+    /// `(h − h_sleep_fold)/(h_wake_fold − h_sleep_fold)` — 0 at the
+    /// wake-up edge, 1 at the fall-asleep edge, inside (0, 1) in the
+    /// bistable band. Values outside [0, 1] are meaningful: >1 is
+    /// forced-sleep territory, <0 forced-wake. `f64::NAN` when either
+    /// fold is unbounded.
+    pub position: f64,
+    /// Whether the switch currently has both stable branches — i.e.
+    /// `h` lies inside the bistable band where noise-driven flicker
+    /// between wake-like and sleep-like microstates can occur.
+    pub bistable: bool,
+}
+
+/// Compute the switch's fold margins at `x` with alerting inputs
+/// `hpa`/`oxin`/`htm` (see [`FoldMargins`]).
+pub fn fold_margins(x: &State, hpa: f64, oxin: f64, htm: f64) -> FoldMargins {
+    let h = x[4];
+    let bistable = switch_root_count(h, x, hpa, oxin, htm) >= 3;
+
+    // One upward sweep brackets both transitions. The cusp's count
+    // sequence is monotone in h — 1 → 3 at the lower fold (the saddle
+    // + sleep pair is born), 3 → 1 at the upper fold (the saddle +
+    // wake pair dies) — so the first ≥3 cell brackets the lower fold
+    // and the first <3 cell after it brackets the upper.
+    let mut sleep_bracket: Option<(f64, f64)> = None;
+    let mut wake_bracket: Option<(f64, f64)> = None;
+    let mut in_band = switch_root_count(FOLD_H_LO, x, hpa, oxin, htm) >= 3;
+    let mut t = FOLD_H_LO + FOLD_H_STEP;
+    while t <= FOLD_H_HI && wake_bracket.is_none() {
+        let n = switch_root_count(t, x, hpa, oxin, htm);
+        if !in_band && n >= 3 {
+            sleep_bracket = Some((t - FOLD_H_STEP, t));
+            in_band = true;
+        } else if in_band && n < 3 {
+            wake_bracket = Some((t - FOLD_H_STEP, t));
+        }
+        t += FOLD_H_STEP;
+    }
+
+    let h_sleep_fold = match sleep_bracket {
+        Some((lo, hi)) => fold_edge(lo, hi, &mut |hh| {
+            switch_root_count(hh, x, hpa, oxin, htm) >= 3
+        }),
+        // The band extends below the sweep window (or does not exist).
+        None => f64::NAN,
+    };
+    let h_wake_fold = match wake_bracket {
+        Some((lo, hi)) => fold_edge(lo, hi, &mut |hh| {
+            switch_root_count(hh, x, hpa, oxin, htm) < 3
+        }),
+        // The band extends above the sweep window.
+        None => f64::NAN,
+    };
+
+    let position = if h_sleep_fold.is_finite() && h_wake_fold.is_finite() {
+        (h - h_sleep_fold) / (h_wake_fold - h_sleep_fold)
+    } else {
+        f64::NAN
+    };
+    FoldMargins {
+        h,
+        h_sleep_fold,
+        h_wake_fold,
+        position,
+        bistable,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -663,16 +887,21 @@ mod tests {
     /// measured on the network's own trajectory over days 8–10.
     #[test]
     fn acetylcholine_target_orders_the_states_as_the_data_do() {
-        use crate::state::neurochemical::{ACH_BASE, ACH_FROM_LC, ACH_FROM_REM};
+        use crate::state::basal_forebrain::{UNCERTAINTY_REFERENCE, release_target};
         use crate::state::zones::MentalPhase;
         let samples = simulate(14400.0, 1.0);
         let mut sums = [(0.0f64, 0usize); 3];
         for (_, x) in samples.iter().filter(|(t, _)| *t >= DAY_7) {
             let stage = stage(x, MentalPhase::Active);
             let net = levels(x);
-            let target = f64::from(ACH_BASE)
-                + f64::from(ACH_FROM_LC) * f64::from(net.lc)
-                + f64::from(ACH_FROM_REM) * f64::from(net.rem);
+            // Resting adenosine and reference uncertainty: the release
+            // equation then reduces to the calibrated linear map.
+            let target = f64::from(release_target(
+                net.lc,
+                net.rem,
+                0.20,
+                UNCERTAINTY_REFERENCE,
+            ));
             let i = match stage {
                 MentalPhase::REM => 0,
                 MentalPhase::NREM => 2,
@@ -871,5 +1100,96 @@ mod tests {
                 advance_with_afference(t, &x, 0.5, VisualAfference::NONE, 0.0, OXIN_REST, HTM_REST);
             assert_eq!(a, b, "hpa=0 must equal no input, t={t}");
         }
+    }
+
+    /// The switch must actually be a cusp: at resting chemistry the
+    /// root count runs 1 → 3 → 1 as h sweeps up, giving two ordered
+    /// folds with a bistable band between them.
+    #[test]
+    fn fold_margins_finds_the_hysteresis_band() {
+        let x = INITIAL;
+        let m = fold_margins(&x, 0.0, OXIN_REST, HTM_REST);
+        assert!(
+            m.h_sleep_fold.is_finite() && m.h_wake_fold.is_finite(),
+            "folds must exist at resting chemistry: {m:?}"
+        );
+        assert!(
+            m.h_sleep_fold < m.h_wake_fold,
+            "wake-up edge below fall-asleep edge: {m:?}"
+        );
+        // The band must lie inside the homeostat's physiological range —
+        // hysteresis straddling the reachable h band is what makes onset
+        // sharp rather than a ramp.
+        assert!(
+            m.h_sleep_fold < H_MAX && m.h_wake_fold > H_MIN,
+            "band must overlap reachable h: {m:?}"
+        );
+    }
+
+    /// The position coordinate is the hysteresis-loop coordinate:
+    /// inside the band it reads (0, 1), past the wake fold it exceeds
+    /// 1 (forced sleep), below the sleep fold it is negative (forced
+    /// wake) — and the bistable flag agrees with the root count.
+    #[test]
+    fn fold_position_tracks_the_band() {
+        let mut x = INITIAL;
+        let m0 = fold_margins(&x, 0.0, OXIN_REST, HTM_REST);
+        assert!(m0.h_sleep_fold.is_finite() && m0.h_wake_fold.is_finite());
+
+        // Mid-band: synthetic h halfway between the folds — three
+        // roots, position strictly inside (0, 1).
+        x[4] = 0.5 * (m0.h_sleep_fold + m0.h_wake_fold);
+        let mid = fold_margins(&x, 0.0, OXIN_REST, HTM_REST);
+        assert!(mid.bistable, "mid-band must be bistable: {mid:?}");
+        assert!(
+            mid.position > 0.0 && mid.position < 1.0,
+            "position in band: {}",
+            mid.position
+        );
+
+        // Forced-sleep side: h beyond the wake fold — monostable,
+        // position past 1.
+        x[4] = m0.h_wake_fold + 50.0;
+        let high = fold_margins(&x, 0.0, OXIN_REST, HTM_REST);
+        assert!(!high.bistable, "past the fold is monostable: {high:?}");
+        assert!(high.position > 1.0, "forced-sleep position: {}", high.position);
+
+        // Forced-wake side: h below the sleep fold.
+        x[4] = m0.h_sleep_fold - 50.0;
+        let low = fold_margins(&x, 0.0, OXIN_REST, HTM_REST);
+        assert!(!low.bistable, "below the fold is monostable: {low:?}");
+        assert!(low.position < 0.0, "forced-wake position: {}", low.position);
+    }
+
+    /// The folds move with the alerting inputs: a saturated cortisol
+    /// push strengthens the wake side, so the fall-asleep edge must
+    /// sit at a *higher* h — stress makes onset harder to reach, the
+    /// fragmented-sleep signature.
+    #[test]
+    fn stress_pushes_the_fold_out() {
+        let x = INITIAL;
+        let calm = fold_margins(&x, 0.0, OXIN_REST, HTM_REST);
+        let stressed = fold_margins(&x, 1.0, OXIN_REST, HTM_REST);
+        assert!(
+            stressed.h_wake_fold > calm.h_wake_fold,
+            "stress must postpone the wake fold: {} vs {}",
+            stressed.h_wake_fold,
+            calm.h_wake_fold
+        );
+    }
+
+    /// And the narcolepsy mirror: losing the orexin stabilizer shrinks
+    /// the wake side's hold — the band shifts toward sleep.
+    #[test]
+    fn orexin_loss_pulls_the_fold_in() {
+        let x = INITIAL;
+        let stable = fold_margins(&x, 0.0, OXIN_REST, HTM_REST);
+        let depleted = fold_margins(&x, 0.0, 0.0, HTM_REST);
+        assert!(
+            depleted.h_wake_fold < stable.h_wake_fold,
+            "lost stabilizer must hasten the fold: {} vs {}",
+            depleted.h_wake_fold,
+            stable.h_wake_fold
+        );
     }
 }

@@ -533,7 +533,11 @@ class MemorySystem:
         Args:
             text: The memory text content.
             salience: Memory salience [0..1].
-            emotional_tag: 12-chemical emotional snapshot.
+            emotional_tag: Advisory 12-chemical snapshot — the daemon
+                stamps the tag from its own live effective levels on
+                store, and the returned stamped tag is what the
+                MemoryRecord carries. Pass None when there is no
+                caller-side tag.
             event_type: Event type code for the daemon.
             source_module: Source module ID for the daemon.
             source: Source monitoring tag — where this memory came
@@ -563,16 +567,15 @@ class MemorySystem:
         elif memory_mode == "retrieval":
             salience = max(0.0, salience * 0.8)
 
-        if emotional_tag is None:
-            emotional_tag = [0.5] * 12
         # Clamp salience and emotional_tag to [0,1] with NaN/Inf
         # replaced by neutral defaults, matching the Rust IPC's
         # finite_clamp. This ensures the Python-side MemoryRecord,
         # the Rust-side LTM store, and the wired subsystems all
         # agree on the same values.
         salience = _finite_clamp(salience, 0.0, 1.0, default=0.5)
-        emotional_tag = [_finite_clamp(v, 0.0, 1.0, default=0.5) for v in emotional_tag]
-        eid = self.client.store_episode(
+        if emotional_tag is not None:
+            emotional_tag = [_finite_clamp(v, 0.0, 1.0, default=0.5) for v in emotional_tag]
+        eid, stamped_tag = self.client.store_episode(
             timestamp=int(time.time() * 1000),
             event_type=event_type,
             source_module=source_module,
@@ -582,6 +585,15 @@ class MemorySystem:
         )
         if eid is None:
             return False
+        if stamped_tag is not None:
+            # The daemon stamped the tag from its live effective
+            # levels — the record carries exactly what was stored.
+            emotional_tag = stamped_tag
+        elif emotional_tag is None:
+            # Legacy daemon without the stamped-tag tail: the wire
+            # carried all-zeros, so a live fetch is the closest
+            # record of the body's chemistry at encode time.
+            emotional_tag = self.client.live_emotional_tag() or [0.0] * 12
         if somatic is None and self.somatic_provider is not None:
             try:
                 somatic = self.somatic_provider()

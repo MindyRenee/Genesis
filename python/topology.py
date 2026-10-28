@@ -41,6 +41,18 @@ class Region:
 # beyond the body's edge is listed separately below.
 REGIONS: tuple[Region, ...] = (
     Region(
+        name="basal_forebrain",
+        package="basal_forebrain",
+        modules=(
+            "state::basal_forebrain",
+            "state::neurochemical",
+            "state::sleep_network",
+            "state::memory",
+        ),
+        projections=("memory", "sleep"),
+        fiber="prediction",
+    ),
+    Region(
         name="basal_ganglia",
         package="basal_ganglia",
         modules=("cognition::intention",),
@@ -131,7 +143,6 @@ REGIONS: tuple[Region, ...] = (
 # body's table never names (it ends at its own edge). Kept apart
 # from REGIONS: the join table must match the body's row for row.
 MIND_ONLY: tuple[str, ...] = (
-    "basal_forebrain",
     "cerebellum",
     "frontal_lobe",
     "hypothalamus",
@@ -177,10 +188,15 @@ class RegionWiring:
         return self.package_live and not self.missing_modules
 
 
-def _module_path(module: str, src: Path) -> Path:
-    """``daemon::tick`` -> ``src/daemon/tick.rs``; ``data_dir`` -> ``src/data_dir.rs``."""
+def _module_paths(module: str, src: Path) -> tuple[Path, Path]:
+    """``daemon::tick`` -> ``src/daemon/tick.rs`` and ``src/daemon/tick/mod.rs``.
+
+    Rust resolves ``mod name`` from either layout — a flat file or a
+    directory module — so the declared name is satisfied by both.
+    """
     parts = module.split("::")
-    return src.joinpath(*parts).with_suffix(".rs")
+    stem = src.joinpath(*parts)
+    return stem.with_suffix(".rs"), stem / "mod.rs"
 
 
 def connect(root: Path | None = None) -> tuple[RegionWiring, ...]:
@@ -198,7 +214,11 @@ def connect(root: Path | None = None) -> tuple[RegionWiring, ...]:
     wiring = []
     for r in REGIONS:
         package_live = importlib.util.find_spec(r.package) is not None if r.package else True
-        missing = tuple(m for m in r.modules if not _module_path(m, src).is_file())
+        missing = tuple(
+            m
+            for m in r.modules
+            if not any(path.is_file() for path in _module_paths(m, src))
+        )
         wiring.append(RegionWiring(r, package_live, missing))
     return tuple(wiring)
 

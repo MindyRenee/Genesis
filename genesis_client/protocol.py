@@ -213,7 +213,7 @@ GET_ION_SUMMARY = 40
 # daemon reads ``[f32; 12]`` (see ``STORE_EPISODE`` in src/daemon/ipc.rs)
 # and passes the values through positionally, so sender and receiver
 # must agree on the width or the tag is silently truncated.
-EMOTIONAL_TAG_SIZE = 12
+EMOTIONAL_TAG_SIZE = 18
 
 # ─── Command IDs ──────────────────────────────────────────────
 

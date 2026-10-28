@@ -1594,7 +1594,7 @@ class CodeLearner:
                 event_type=3,  # Observation
                 source_module=6,  # Sensory (code reading is sensory input)
                 salience=0.6,
-                emotional_tag=[0.5] * 12,
+                emotional_tag=None,
                 text=f"Analyzed {filepath}: {functions} functions, {classes} classes",
             )
         except Exception as exc:  # noqa: BLE001

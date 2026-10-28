@@ -21,12 +21,12 @@ Usage:
   source defaults to /dev/video2. Sources ending in :// are treated as
   HTTP MJPEG streams; ``x11:WxH+X+Y`` captures a region of the X11
   display and ``x11win:ID:WxH`` captures a window's own pixels by id,
-  cropped to WxH (the screen as an eye — the ARC cabinet uses this);
-  anything else is a V4L2 device.
+  cropped to WxH (the screen as an eye); anything else is a V4L2
+  device.
 
   shm_name defaults to genesis_optic_nerve; pass a different name to
-  publish a second eye (e.g. genesis_arc_nerve for the screen that
-  plays ARC) without displacing the physical camera's segment.
+  publish a second eye (e.g. a screen-capture nerve) without
+  displacing the physical camera's segment.
 """
 
 import mmap

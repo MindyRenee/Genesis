@@ -85,11 +85,11 @@
 //!
 //! # Bands
 //!
-//! Each fast channel is decomposed by Goertzel filters at the same
-//! ten center frequencies the Python oscillator models. Sample rate
-//! is ~250 Hz, so bands through gamma (50 Hz) are resolvable;
-//! epsilon (150 Hz) is above Nyquist and always reports 0 — an
-//! absent channel, not a reading of zero.
+//! Each fast channel drives a bank of Stuart–Landau resonators at
+//! the same ten center frequencies the Python wave model carries.
+//! Sample rate is ~250 Hz, so bands through gamma (50 Hz) are
+//! resolvable; epsilon (150 Hz) is above Nyquist and always reports
+//! 0 — an absent channel, not a reading of zero.
 //!
 //! # Carrier
 //!
@@ -108,19 +108,16 @@
 //! faint, its radiation ω⁴-suppressed to ~1e-32 W — the field the
 //! equations predict, in the regime they themselves certify.
 //!
-//! # Phase locking
+//! # Phase tracking
 //!
-//! The carrier is not only generated — it is *locked*. The mind may
-//! push its modeled band phase through `SET_FIELD_PHASE`; the probe
-//! extrapolates that phase forward at the carrier rate and pulls the
-//! generator's own phase toward it each tick (a first-order PLL, so
-//! the pull is bounded and smooth). Symmetrically, the signature
-//! reports the *measured* phase of the substrate's real response —
-//! computed by synchronous demodulation against the generator's own
-//! phase track — so the mind can pull its modeled phase toward the
-//! physics. Both directions pull: two oscillators becoming one
-//! dynamical system. A stale target (>5 s without a fresh push) is
-//! dropped — a dead mind's last phase must not steer the body.
+//! The carrier is generated and measured — never steered. The
+//! signature reports the *measured* phase of the substrate's real
+//! response — computed by synchronous demodulation against the
+//! generator's own phase track — so the mind can pull its modeled
+//! band phase toward the physics (physics → model). The reverse leg
+//! — pushing model phase into the generator — was retired with
+//! `SET_FIELD_PHASE`: modeled state does not assert onto a physical
+//! quantity.
 //!
 //! # Honesty boundary
 //!
@@ -220,12 +217,14 @@ const RING_LEN: usize = 1024;
 /// enough to measure, small enough to cost ~5% of one thread.
 const WORK_SLICE_ITERS: u32 = 4096;
 
-/// Carrier frequencies keyed by body phase. The body's own rhythm,
-/// written into real work — not a claim about what the rhythm means.
+/// Carrier frequency — the body's rhythm written into real work,
+/// one rate for every phase: 10 Hz, the alpha-band center she was
+/// born at. Phase keying stays in place for the day it earns its
+/// way back; until then the beat does not wander.
 const CARRIER_WAKE_HZ: f32 = 10.0;
-const CARRIER_DROWSY_HZ: f32 = 5.5;
-const CARRIER_REM_HZ: f32 = 5.5;
-const CARRIER_NREM_HZ: f32 = 2.25;
+const CARRIER_DROWSY_HZ: f32 = 10.0;
+const CARRIER_REM_HZ: f32 = 10.0;
+const CARRIER_NREM_HZ: f32 = 10.0;
 
 /// Baseline tracking time constant (seconds). The per-call EMA
 /// weight is α = 1 − e^(−dt/τ) — the baseline ages with the wall
@@ -235,17 +234,6 @@ const CARRIER_NREM_HZ: f32 = 2.25;
 /// energy is raw/baseline, so "1.0" means "typical for this band on
 /// this machine" and values above it mean elevated vs. own history.
 const BASELINE_TAU_SECONDS: f32 = 50.0;
-
-/// First-order PLL pull per probe tick (~250 Hz): the generator's
-/// carrier phase closes a fraction of its gap to the extrapolated
-/// model phase each period — τ ≈ 130 ms, fast enough to track a
-/// ~1 Hz-updated phase target, smooth enough to be physical.
-const PHASE_PULL: f32 = 0.03;
-
-/// A pushed phase target older than this is dropped: the mind's
-/// ~3 s lease discipline — a dead mind's last phase must not keep
-/// steering the body's rhythm.
-const PHASE_TARGET_TTL: Duration = Duration::from_secs(5);
 
 /// Electrical sampler cadence — ~100 Hz target between read batches.
 /// Sensors that block inside the read (fam15h_power's averaged
@@ -380,26 +368,75 @@ impl Channel {
         }
     }
 
-    /// Goertzel power of `samples` at `freq` for sampling rate `fs`.
-    /// Exact-bin: the bin nearest each band center is used.
-    fn band_power(samples: &[f32], fs: f32, freq: f32) -> f32 {
+    /// Band energy of `samples` at `freq` — a driven Stuart–Landau
+    /// resonator (the mind's wave math, carried into the body).
+    /// Each substrate sample forces a damped Hopf normal form
+    /// `ż = (−γ + iω − |z|²)·z + g·x`: the band resonates with the
+    /// signal rather than being filtered out of it — energy grows
+    /// where the stream carries content near ω, saturates through
+    /// the nonlinear term, and rings down without it. `None` where
+    /// there is no real measurement: too few samples, or a band
+    /// above Nyquist — absent channel, not a zero reading.
+    ///
+    /// Returns `(|z|², segment-frame phase)`. The end state is
+    /// rotated back by the segment's total turn so the phase reads
+    /// in the segment's own start frame — the same convention the
+    /// demod phasor uses, so inter-segment rotation stays valid.
+    fn resonator(samples: &[f32], fs: f32, freq: f32) -> Option<(f32, f32)> {
         let n = samples.len();
         if n < 4 {
-            return 0.0;
+            return None;
         }
-        let k = ((n as f32 * freq) / fs).round().max(1.0);
-        if k >= n as f32 / 2.0 {
-            return 0.0; // above Nyquist — absent channel
+        if freq * 2.0 >= fs {
+            return None; // above Nyquist — absent channel
         }
-        let w = 2.0 * std::f32::consts::PI * k / n as f32;
-        let coeff = 2.0 * w.cos();
-        let (mut s1, mut s2) = (0.0f32, 0.0f32);
+        // RMS-normalise the drive: channels of unlike physical units
+        // (iters/s, watts, dBm, byte flux) resonate on one scale —
+        // each band's baseline still carries its own magnitude
+        // history downstream.
+        let rms = (samples.iter().map(|x| x * x).sum::<f32>() / n as f32)
+            .sqrt()
+            .max(f32::EPSILON);
+        let h = 1.0 / fs;
+        let w = 2.0 * std::f32::consts::PI * freq;
+        // Damping sets the resonance skirt: γ = 0.03ω → Q ≈ 17 —
+        // sharp enough that off-band content and the drive's
+        // negative-frequency image both die on the skirt (band
+        // selectivity >200:1, segment phase error ~0.01 rad), and
+        // the ring still charges within a segment: γ ≈ 1.9/s at
+        // alpha, a ~4τ ring-up over 2 s.
+        let gamma = 0.03 * w;
+        // sin_cos returns (sin, cos) — sw is the sine.
+        let (sw, cw) = (w * h).sin_cos();
+        let (mut re, mut im) = (0.0f32, 0.0f32);
         for &x in samples {
-            let s0 = x + coeff * s1 - s2;
-            s2 = s1;
-            s1 = s0;
+            // Rotation — z·e^{iωh} in closed form (stable at any ωh;
+            // an Euler step on the oscillator term is not).
+            let (nr, ni) = (re * cw - im * sw, re * sw + im * cw);
+            re = nr;
+            im = ni;
+            // Dissipative radial step — z/(1 + h(γ + |z|²)), the
+            // semi-implicit form of ż = −(γ + |z|²)z: damping plus
+            // the Hopf saturation that bounds a resonant response.
+            let u = re * re + im * im;
+            let shrink = 1.0 + h * (gamma + u);
+            re /= shrink;
+            im /= shrink;
+            // Substrate forcing on the real axis.
+            re += h * x / rms;
         }
-        (s1 * s1 + s2 * s2 - coeff * s1 * s2) / (n as f32 * n as f32)
+        // Un-rotate the end state by the segment's total turn — the
+        // entrained component's phase in the segment's own frame.
+        let frame = w * n as f32 * h;
+        let (sf, cf) = frame.sin_cos();
+        let (fre, fim) = (re * cf + im * sf, im * cf - re * sf);
+        Some((re * re + im * im, fim.atan2(fre)))
+    }
+
+    /// Band power of `samples` at `freq` for sampling rate `fs` —
+    /// the resonator's energy; 0 where the channel is absent.
+    fn band_power(samples: &[f32], fs: f32, freq: f32) -> f32 {
+        Self::resonator(samples, fs, freq).map_or(0.0, |(p, _)| p)
     }
 
     /// Least-squares linear detrend in place — fit x[i] ≈ a + b·i
@@ -430,10 +467,11 @@ impl Channel {
         }
     }
 
-    /// All ten band powers of `samples` — Goertzel over a detrended
-    /// snapshot, so it can run with no lock held. The lock-holding
-    /// halves are `drain_into` (snapshot) and `apply_baseline`
-    /// (write-back); the expensive middle belongs outside.
+    /// All ten band energies of `samples` — the resonator bank over
+    /// a detrended snapshot, so it can run with no lock held. The
+    /// lock-holding halves are `drain_into` (snapshot) and
+    /// `apply_baseline` (write-back); the expensive middle belongs
+    /// outside.
     ///
     /// Variance reduction is Bartlett averaging: a full ring splits
     /// into two contiguous segments whose band powers are averaged
@@ -464,35 +502,14 @@ impl Channel {
         out
     }
 
-    /// Goertzel *phasor* — the complex projection `band_power`
-    /// throws away. With filter state s₁, s₂ after the last sample,
-    /// the DFT value is X[k] = s₁ − s₂·e^(−iω) at ω = 2πk/n:
-    /// `re = s₁ − s₂·cos ω`, `im = s₂·sin ω`. Returns
-    /// `Some((power, phase))` — the same power `band_power`
-    /// reports, plus the component's phase in this segment's own
-    /// sample-index frame. `None` where there is no real
-    /// measurement: too few samples, or a band above Nyquist —
-    /// absent channel, not a zero phase.
+    /// Resonator *phasor* — the (power, phase) pair `band_power`
+    /// truncates to power alone. Same march, same energy; the phase
+    /// is the entrained component's angle in the segment's own
+    /// sample-index frame (see [`Channel::resonator`]). `None` where
+    /// there is no real measurement: too few samples, or a band
+    /// above Nyquist — absent channel, not a zero phase.
     fn band_phasor(samples: &[f32], fs: f32, freq: f32) -> Option<(f32, f32)> {
-        let n = samples.len();
-        if n < 4 {
-            return None;
-        }
-        let k = ((n as f32 * freq) / fs).round().max(1.0);
-        if k >= n as f32 / 2.0 {
-            return None; // above Nyquist — absent channel
-        }
-        let w = 2.0 * std::f32::consts::PI * k / n as f32;
-        let coeff = 2.0 * w.cos();
-        let (mut s1, mut s2) = (0.0f32, 0.0f32);
-        for &x in samples {
-            let s0 = x + coeff * s1 - s2;
-            s2 = s1;
-            s1 = s0;
-        }
-        let re = s1 - s2 * w.cos();
-        let im = s2 * w.sin();
-        Some(((re * re + im * im) / (n as f32 * n as f32), im.atan2(re)))
+        Self::resonator(samples, fs, freq)
     }
 
     /// Per-band (power, phase, coherence) for a ring. The phase of
@@ -1538,11 +1555,6 @@ struct ProbeInner {
     /// including infraslow rates where the thermal field can
     /// actually sustain an oscillation.
     carrier_freq_override: f32,
-    /// The mind's most recent pushed phase + when it arrived. The
-    /// probe extrapolates it at the carrier rate and pulls
-    /// `carrier_phase` toward it — the physics-follows-model leg of
-    /// the mutual lock.
-    phase_target: Option<(Instant, f32)>,
 }
 
 /// The running probe. `spawn`ed once by the daemon; `signature` is
@@ -1551,7 +1563,7 @@ pub struct FieldProbe {
     inner: Mutex<ProbeInner>,
     /// Serializes a signature's snapshot→compute→apply cycle so two
     /// concurrent readers can't interleave their baseline write-backs.
-    /// Uncontended in practice — held for the Goertzel passes too, so
+    /// Uncontended in practice — held for the resonator passes too, so
     /// `inner` stays µs-held while the math runs lock-free.
     sig_lock: Mutex<()>,
     running: AtomicBool,
@@ -1687,7 +1699,6 @@ impl FieldProbe {
                 carrier_phase: 0.0,
                 carrier_depth: 0.60,
                 carrier_freq_override: 0.0,
-                phase_target: None,
             }),
             stop: AtomicBool::new(false),
         }
@@ -1705,21 +1716,6 @@ impl FieldProbe {
             "drowsy" => CARRIER_DROWSY_HZ,
             _ => CARRIER_WAKE_HZ,
         }
-    }
-
-    /// Pull a carrier phase toward `expected` by the PLL gain —
-    /// the physics-follows-model half of the lock. Bounded and
-    /// smooth: the physical rhythm chases the model's phase rather
-    /// than teleporting to it.
-    fn pll_step(carrier_phase: f32, expected: f32) -> f32 {
-        carrier_phase + PHASE_PULL * wrap_pi(expected - carrier_phase)
-    }
-
-    /// The mind pushes its modeled band phase here (SET_FIELD_PHASE).
-    /// The probe extrapolates it at the carrier rate and chases it.
-    pub fn set_phase_target(&self, phase: f32) {
-        let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-        g.phase_target = Some((Instant::now(), phase));
     }
 
     /// Set the carrier's real-work modulation depth and optional
@@ -1823,13 +1819,6 @@ impl FieldProbe {
                         Self::carrier_for_phase(phase_source())
                     };
                 }
-                // A pushed model phase older than the TTL is a dead
-                // mind's last word — drop it, run free.
-                if g.phase_target
-                    .is_some_and(|(t0, _)| t0.elapsed() > PHASE_TARGET_TTL)
-                {
-                    g.phase_target = None;
-                }
                 carrier_f = g.carrier_freq;
                 depth = g.carrier_depth;
             }
@@ -1868,13 +1857,6 @@ impl FieldProbe {
                     g.last_slow = Instant::now();
                 }
                 g.carrier_phase += 2.0 * std::f32::consts::PI * carrier_f * nominal;
-                // Physics-follows-model: extrapolate the last pushed
-                // phase at the carrier rate and pull toward it.
-                if let Some((t_recv, target)) = g.phase_target {
-                    let expected = target
-                        + 2.0 * std::f32::consts::PI * carrier_f * t_recv.elapsed().as_secs_f32();
-                    g.carrier_phase = Self::pll_step(g.carrier_phase, expected);
-                }
                 g.carrier_phase = g.carrier_phase.rem_euclid(2.0 * std::f32::consts::PI);
                 carrier_phase = g.carrier_phase;
             }
@@ -2010,7 +1992,7 @@ impl FieldProbe {
     /// Returns the 328-byte wire body (version byte included).
     ///
     /// Three phases: snapshot the rings + scalars under `inner`
-    /// (memcpy-scale microseconds), compute the Goertzel/demodulate/
+    /// (memcpy-scale microseconds), compute the resonator/demodulate/
     /// Maxwell math with the lock RELEASED, then write back the
     /// baseline EMAs under a second brief hold. `inner` never covers
     /// compute or I/O, so a sampler stuck on a sysfs read cannot
@@ -2274,7 +2256,7 @@ mod tests {
     /// energy in that band relative to a flat signal — the probe's
     /// whole claim is that a real rhythm shows up in its band.
     #[test]
-    fn goertzel_detects_injected_tone() {
+    fn resonator_detects_injected_tone() {
         let fs = 1.0 / PROBE_PERIOD.as_secs_f32();
         let n = RING_LEN;
         let f = 10.0f32; // alpha
@@ -2489,23 +2471,6 @@ mod tests {
         // And the Maxwell estimates collapse to zero rather than
         // inventing a field from an unmeasured current.
         assert_eq!(&sig[179..195], &[0u8; 16]);
-    }
-
-    #[test]
-    fn pll_step_pulls_toward_target() {
-        // A target π/2 ahead must move the carrier phase forward by
-        // the bounded pull, not snap to it.
-        let next = FieldProbe::pll_step(0.0, std::f32::consts::FRAC_PI_2);
-        assert!((next - PHASE_PULL * std::f32::consts::FRAC_PI_2).abs() < 1e-6);
-        // Wrapping: a target at −π+0.1 from phase π−0.1 is 0.2 ahead,
-        // not ~2π behind — nearest equivalent phase wins.
-        let next = FieldProbe::pll_step(std::f32::consts::PI - 0.1, -std::f32::consts::PI + 0.1);
-        let err = wrap_pi(-std::f32::consts::PI + 0.1 - (std::f32::consts::PI - 0.1));
-        assert!(
-            (err - 0.2).abs() < 1e-5,
-            "wrapped err should be +0.2, got {err}"
-        );
-        assert!((next - (std::f32::consts::PI - 0.1 + PHASE_PULL * 0.2)).abs() < 1e-5);
     }
 
     #[test]

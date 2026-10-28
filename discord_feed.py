@@ -15,8 +15,6 @@ Three channels exist, each on its own webhook:
   ``broadcast`` urge fires (see ``basal_ganglia.volition``). Her
   ``genesis~ [broadcast]`` echo is excluded from the mirror so a
   broadcast lands on the channel once, untagged.
-- ``GENESIS_DISCORD_ARC_WEBHOOK`` — an opt-in spectator feed the ARC
-  showcase narrates practice runs to.
 - ``GENESIS_DISCORD_PULSE_WEBHOOK`` — an opt-in ops telemetry feed
   driven by ``scripts/discord_pulse.py``.
 

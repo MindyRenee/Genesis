@@ -24,12 +24,6 @@ from infrastructure.text import is_blank
 # The registry is stateless (pure functions), so a single instance is fine.
 _GLOBAL_TOOLS: ToolRegistry | None = None
 
-# The competition seal — the tools that reach off the machine. Game
-# mode is a sealed match: her hands, workstation, and spawned
-# processes stay hers; the network does not. Mind toggles
-# ``net_sealed`` on enter/exit game mode.
-_NET_TOOLS = frozenset({"web_search", "web_fetch"})
-
 
 def get_tools() -> ToolRegistry:
     """Return the shared tool registry."""
@@ -73,9 +67,6 @@ class ToolRegistry:
         # Optional restraint hook — None in the organism: her tool
         # acts are her own. Detached engines and tests run ungated.
         self.gate: Callable[[str], str | None] | None = None
-        # The match seal — True while she's gaming. A competition
-        # session seals the net for every caller.
-        self.net_sealed = False
 
     def _register_builtins(self) -> None:
         """Register the built-in tools that ship with Genesis."""
@@ -99,11 +90,6 @@ class ToolRegistry:
         tool = self._tools.get(name)
         if tool is None:
             return ToolResult(success=False, error=f"Unknown tool: {name}")
-        if self.net_sealed and name in _NET_TOOLS:
-            return ToolResult(
-                success=False,
-                error="sealed: no network while gaming — the workstation is hers, the net is not",
-            )
         if self.gate is not None:
             # Every act is a candidate intention — the gate reads the
             # act's own text ("run_shell rm -rf build") the way it

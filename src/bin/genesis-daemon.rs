@@ -19,12 +19,11 @@
 //! 3. Runs the autonomous fallback in the main thread: while the
 //!    mind's lease is fresh it does staleness detection only; past
 //!    the lease it drives neurochemistry, consolidation, dreaming,
-//!    and sensing itself (never body-control application). The same
-//!    loop runs the mind shepherd (`daemon::mind_shepherd`): a mind
-//!    that attached and was then lost is regrown — the body spawns
-//!    the organism's own entry point and the new mind adopts this
-//!    surviving body — while `mind.suppress` (a graceful goodbye)
-//!    and from-boot absence are left alone
+//!    and sensing itself (never body-control application). A lost
+//!    mind is not regrown — the body keeps living and waits; the
+//!    organism's outside hand (the CLI under its supervisor)
+//!    resurrects cognition, and the new mind adopts this surviving
+//!    body over the socket it still holds
 //! 4. On shutdown (SIGINT/SIGTERM or IPC shutdown command), syncs
 //!    everything to disk and exits cleanly
 //!
@@ -561,15 +560,6 @@ fn main() {
     // transaction plus a possible LTM trace.
     let mut zone_gate = AdaptiveGate::new(5_000, 2_000, 30_000);
     let mut model_save_gate = AdaptiveGate::new(60_000, 20_000, 300_000);
-    // The closed loop's other half: the mind's _Rebirth reincarnates
-    // a dead body around its persisted state; this is the body's own
-    // reach back — a mind that attached and was then lost is regrown
-    // by spawning the organism's entry point (it adopts this very
-    // body through the socket). Absence is legal, goodbye is
-    // respected, and attempts are bounded into dormant solitude —
-    // see daemon/mind_shepherd.rs.
-    let mut shepherd_gate = AdaptiveGate::new(15_000, 5_000, 60_000);
-    let mut shepherd = genesis::daemon::mind_shepherd::MindShepherd::new();
     let mut last_model_save_ticks = 0u32;
     // The fallback's own axle is adaptive too: deep NREM idles at
     // ~1 Hz, REM at 2 Hz, and anything else holds the 5 Hz reference
@@ -604,7 +594,6 @@ fn main() {
                 ("body", body_gate.snapshot()),
                 ("zone", zone_gate.snapshot()),
                 ("model_save", model_save_gate.snapshot()),
-                ("mind_shepherd", shepherd_gate.snapshot()),
             ]);
             snap.axle_ms = axle_ms;
             snap.last_model_save_ticks = last_model_save_ticks;
@@ -622,25 +611,6 @@ fn main() {
                         staleness_gate.relax();
                     } else {
                         staleness_gate.demand();
-                    }
-                }
-                Err(e) => {
-                    lock_refusal("tick_loop", e);
-                }
-            }
-        }
-
-        // The mind shepherd runs on either side of the lease: fresh
-        // lease resets it (a returned mind clears the table), expired
-        // lease may fire a spawn. Placed before the `continue` below
-        // so a driving mind is still observed.
-        if shepherd_gate.due(now_ms) {
-            match tick_loop.try_lock() {
-                Ok(tl) => {
-                    use genesis::daemon::mind_shepherd::ShepherdOutcome as SO;
-                    match shepherd.check(tl.mind_idle_secs(), &config.data_dir) {
-                        SO::Spawned | SO::PendingAlive | SO::Waiting => shepherd_gate.demand(),
-                        _ => shepherd_gate.relax(),
                     }
                 }
                 Err(e) => {

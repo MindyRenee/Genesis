@@ -45,7 +45,6 @@ Commands (typed during conversation):
     /look        — ask it what it sees through the eye
     /look at <path> — ask it to look at an image file
     /draw        — ask it to draw what it feels right now
-    /play        — her game collection; /play add <file> hands her a game spec
     /register-face <name> — teach it your face (look at the camera)
     /faces       — show known faces and who it last saw
     /mission [text] — set or show its top-level mission
@@ -55,9 +54,6 @@ Commands (typed during conversation):
     /meditate [secs] — put it into meditation (default 60s)
     /teach [topic] — put it into teaching mode (focused learning)
     /endteach    — exit teaching mode, resume normal operation
-    /game        — put it into game mode (focused play)
-    /endgame     — exit game mode, resume normal operation
-    /arc <ids|--all> [--steps N] [--fresh] — practice play
     /teach-questions — answer its queued questions one at a time
     /sleep-aid   — emergency sleep aid for stress-induced insomnia
     /web-history [N] — see what it's been looking at online (last N, default 20)
@@ -76,29 +72,24 @@ from __future__ import annotations
 import argparse
 import collections
 import fcntl
-import json
 import logging
 import lzma
 import os
 import queue
 import re
 import select
-import shutil
 import signal
 import socket
-import sqlite3
 import subprocess
 import sys
 import threading
 import time
-import zlib
 from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 from types import FrameType
 from typing import TYPE_CHECKING
 
-from brainstem.heartbeat import _AdaptiveInterval
 from occipital_lobe.perception.ambient import AmbientListener, contains_wake_word, strip_wake_word
 from sleep.sleep import WakeOutcome
 from temporal_lobe import AuditoryCortex, SoundEvent
@@ -176,9 +167,9 @@ _KILL_GRACE_S = 5.0
 # if the process is still alive when it fires, os._exit ends it. There
 # is nothing left to save by then, so the hard exit cannot corrupt her.
 _EXIT_WATCHDOG_S = 30.0
-# The fuse covering teardown itself — long enough for a state save,
-# a daemon shutdown round-trip, and a final spore capture, short
-# enough that a wedged stop can never hold genesis.lock overnight.
+# The fuse covering teardown itself — long enough for a state save
+# and a daemon shutdown round-trip, short enough that a wedged stop
+# can never hold genesis.lock overnight.
 _TEARDOWN_WATCHDOG_S = 600.0
 
 # The canonical state directory — ~/.local/share/genesis — resolved via
@@ -200,13 +191,6 @@ _CLI_LOCK_FD: int | None = None
 # might match unrelated user processes.
 _PID_FILE_CLI = "genesis_cli.pid"
 _PID_FILE_DAEMON = "genesis_daemon.pid"
-
-# The body's mind-shepherd sentinel (src/daemon/mind_shepherd.rs):
-# present ⇒ the last mind left *intentionally* and the daemon must
-# not regrow one. Written by every graceful teardown (a goodbye) and
-# by --stop; cleared by the next CLI start; absent after a crash,
-# which is exactly the loss the shepherd answers.
-_MIND_SUPPRESS_FILE = "mind.suppress"
 
 # Maximum time to wait for the daemon's IPC socket (seconds).
 # The daemon opens its persistent state and LTM before binding the
@@ -1080,8 +1064,6 @@ def _render_status(mind: Mind) -> str:
     if mind.is_teaching:
         topic = mind.teaching_topic or "general"
         lines.append(f"  │  Teaching mode:  ON (topic: {topic})")
-    if mind.is_gaming:
-        lines.append("  │  Game mode:      ON")
     queued = mind.queued_question_count
     if queued:
         lines.append(f"  │  Queued questions: {queued} (use /teach-questions)")
@@ -1205,9 +1187,6 @@ def _handle_command(mind: Mind, command: str) -> str:
             "/teach",
             "/endteach",
             "/teach-questions",
-            "/game",
-            "/endgame",
-            "/arc",
             "/introspect",
             "/mission",
         ):
@@ -1611,70 +1590,6 @@ def _cmd_experiments(mind: Mind, rest: str) -> str:
 def _cmd_growth(mind: Mind, rest: str) -> str:
     """Show Genesis's growth narrative — its milestones in its own words."""
     return f"\n  genesis> {mind.growth_narrative()}\n"
-
-
-def _cmd_steward(mind: Mind, rest: str) -> str:
-    """Inspect or act on the steward channel — the custodial authority.
-
-    This is operator tooling, not conversation: it reports the
-    channel's state and lifts directives, and its output is CLI text,
-    never Genesis's voice.
-
-      /steward              — status: stamped, authenticated, principal,
-                              key fingerprint, standing directives
-      /steward release N    — lift directive N (authenticated only)
-      /steward unbind       — seal this session's authority until a
-                              fresh claim or restart re-opens it
-    """
-    steward = getattr(mind.brain.frontal, "steward", None)
-    if steward is None:
-        return "\n  No steward channel on this mind.\n"
-
-    parts = rest.split(None, 1)
-    sub = parts[0].lower() if parts and parts[0] else ""
-    arg = parts[1].strip() if len(parts) > 1 else ""
-
-    if sub == "release":
-        try:
-            index = int(arg)
-        except ValueError:
-            return "\n  usage: /steward release <index>\n"
-        entry = steward.release_directive(index)
-        if entry is None:
-            return (
-                "\n  Not released — the channel is sealed "
-                "(authentication required), or no directive has that "
-                "index.\n"
-            )
-        return f"\n  Released: {entry.get('text', entry.get('target'))}\n"
-
-    if sub == "unbind":
-        steward.unbind()
-        return "\n  Steward session sealed. The stamp and directives stand.\n"
-
-    if sub:
-        return "\n  usage: /steward [release <index> | unbind]\n"
-
-    s = steward.status()
-    lines = ["", "  steward channel — custodial authority"]
-    if not s["stamped"]:
-        lines.append("    stamped:       no — unprovisioned instance")
-        lines.append("    (provisioned on first boot of the real entry point)")
-        return "\n".join(lines) + "\n"
-    lines.append("    stamped:       yes")
-    lines.append(f"    principal:     {s['principal']}")
-    lines.append(f"    key held:      {'yes' if s['key_held'] else 'no'}")
-    lines.append(f"    authenticated: {'yes' if s['authenticated'] else 'no — sealed'}")
-    fp = s["key_fingerprint"]
-    if fp:
-        lines.append(f"    fingerprint:   {fp}…")
-    if s["directives"]:
-        lines.append("    directives:")
-        for i, d in enumerate(s["directives"]):
-            lines.append(f"      [{i}] {d.get('text')}  (→ {d.get('target')})")
-    else:
-        lines.append("    directives:    none")
-    return "\n".join(lines) + "\n"
 
 
 def _cmd_growth_report(mind: Mind, rest: str) -> str:
@@ -2162,169 +2077,6 @@ def _cmd_endteach(mind: Mind, rest: str) -> str:
     )
 
 
-def _cmd_game(mind: Mind, rest: str) -> str:
-    """Put Genesis into game mode — focused play.
-
-    Volition urges, autonomous learning, and inner-life wandering
-    pause so every cycle goes to the game in front of it. It can
-    still answer if spoken to; conversation just stops being the
-    driver. Use /endgame to exit.
-    """
-    if mind.is_gaming:
-        return (
-            _compose(
-                mind,
-                "already in game mode",
-                fallback="[already playing]",
-                confidence=0.5,
-            )
-            + "\n  Use /endgame to stop.\n"
-        )
-    mind.enter_game_mode()
-    return (
-        _compose(
-            mind,
-            "entering game mode — focused on the game",
-            fallback="[game mode]",
-            confidence=0.7,
-            metadata={"game_mode_started": True},
-        )
-        + "\n  Use /endgame when you're done.\n"
-    )
-
-
-def _cmd_endgame(mind: Mind, rest: str) -> str:
-    """Exit game mode and resume normal operation."""
-    if not mind.is_gaming:
-        return (
-            _compose(
-                mind,
-                "not in game mode",
-                fallback="[not playing]",
-                confidence=0.4,
-            )
-            + "\n"
-        )
-    mind.exit_game_mode()
-    return (
-        _compose(
-            mind,
-            "exiting game mode, resuming normal operation",
-            fallback="[resuming]",
-            confidence=0.7,
-            metadata={"game_mode_ended": True},
-        )
-        + "\n"
-    )
-
-
-def _cmd_arc(mind: Mind, rest: str) -> str:
-    """Play ARC-AGI-3 games as her, through her own play loop.
-
-    Usage:
-      /arc ls20-9607627b                 — one game
-      /arc ls20-9607627b ft09-0d8bbf25   — several, in order
-      /arc ls20-9607627b --steps 400     — step budget per game (default 200)
-      /arc --all --steps 400             — every discovered environment, one scorecard
-      (the official card is hers alone — she takes up the challenge
-       from her own shelf when she feels ready; there is no forced run)
-      /arc ls20-9607627b --fresh         — cold start: prior learning neither read nor written
-      /arc ls20-9607627b --web           — the public task page in her
-        Chrome (headless); --web --watch shows it on her own screen
-      /arc --all --delay 0.5 --recover 180 — pace steps; wait up to 180s for
-        her to settle at a wellness gate instead of abandoning the suite
-
-    Game mode wraps the run; her readiness gate can refuse or stop it.
-    """
-    parts = rest.split()
-    usage = (
-        "  Usage: /arc (<game-id> [more ids] | --all)"
-        " [--steps N] [--fresh]"
-        " [--delay S] [--recover S]\n"
-    )
-    steps = 200
-    if "--steps" in parts:
-        i = parts.index("--steps")
-        try:
-            steps = int(parts[i + 1])
-        except (IndexError, ValueError):
-            return usage
-        del parts[i : i + 2]
-    delay = 0.0
-    if "--delay" in parts:
-        i = parts.index("--delay")
-        try:
-            delay = float(parts[i + 1])
-        except (IndexError, ValueError):
-            return usage
-        del parts[i : i + 2]
-    recover = 120.0
-    if "--recover" in parts:
-        i = parts.index("--recover")
-        try:
-            recover = float(parts[i + 1])
-        except (IndexError, ValueError):
-            return usage
-        del parts[i : i + 2]
-    fresh = "--fresh" in parts
-    parts = [p for p in parts if p != "--fresh"]
-    web = "--web" in parts
-    parts = [p for p in parts if p != "--web"]
-    watch = "--watch" in parts
-    parts = [p for p in parts if p != "--watch"]
-    if watch and not web:
-        return "  --watch only applies with --web (the browser goes to her screen).\n" + usage
-    if not parts or steps <= 0:
-        return usage
-    whole_suite = "--all" in parts
-    if whole_suite and web:
-        return "  --all runs on the SDK scorecard; pick a game for --web.\n" + usage
-    if any(p.startswith("--") for p in parts) and not (len(parts) == 1 and whole_suite):
-        return usage
-    lines = []
-    if whole_suite:
-        evaluation = mind.evaluate_arc(
-            max_steps=steps,
-            fresh=fresh,
-            step_delay_s=delay,
-            recovery_wait_s=recover,
-        )
-        results = evaluation.games
-        score = "unavailable" if evaluation.score is None else f"{evaluation.score:.2f}%"
-        lines.append(f"  ARC {evaluation.mode}: score {score}")
-    else:
-        results = mind.play_arc(
-            parts,
-            max_steps=steps,
-            web=web,
-            watch=watch,
-            fresh=fresh,
-            step_delay_s=delay,
-            recovery_wait_s=recover,
-        )
-    prior_names = {
-        "none": "cold start",
-        "loaded": "prior learning",
-        "suppressed": "fresh — learning suppressed",
-        "unknown": "prior state unknown",
-    }
-    for r in results:
-        sources = ", ".join(
-            f"{k}×{v}" for k, v in sorted(r.decision_sources.items(), key=lambda kv: -kv[1])
-        )
-        lines.append(
-            f"  {r.game_id}: {r.state} levels {r.levels_completed}/{r.win_levels}"
-            f" in {r.steps} steps"
-            + (f" (per level: {', '.join(str(s) for s in r.level_steps)})" if r.level_steps else "")
-            + f" ({prior_names.get(r.prior_learning, r.prior_learning)})"
-            + (f" recovery-waits={r.recovery_waits}" if r.recovery_waits else "")
-            + (f" [{sources}]" if sources else "")
-            + (f" (scorecard {r.scorecard_id})" if r.scorecard_id else "")
-            + (f" — {'; '.join(r.reasons)}" if r.reasons else "")
-        )
-    return "\n".join(lines) + "\n"
-
-
 def _cmd_teach_questions(mind: Mind, rest: str) -> str:
     """Answer Genesis's queued questions one at a time.
 
@@ -2410,103 +2162,8 @@ def _cmd_sleep_aid(mind: Mind, rest: str) -> str:
     return "\n".join(lines)
 
 
-def _cmd_play(mind: Mind, rest: str) -> str:
-    """Her game collection, or hand her a game spec to play.
-
-    /play              — what she's drawn to + how well she plays
-    /play add <file>   — place a game spec into her world
-    /play drop <name>  — take an added game back
-
-    Games are always there if she wants them — the play urge picks
-    what she plays, this just manages what's on the shelf. A spec is
-    data, not code: {"family": "grid", "train": [...], "test": [...]},
-    {"family": "sorter", "generate"/"slots"+"blocks"},
-    {"family": "sequence", "generate"/"pattern"},
-    {"family": "assembly", "generate": {"rows","cols"}},
-    {"family": "relations", "generate"/"positions"+"objects"+"goals"},
-    {"family": "quantities", "generate"/"target"+"groups"},
-    {"family": "classification", "items"+"predicate"/"examples"}.
-    """
-    from worlds.play import COLLECTION, normalize_offered
-
-    play = mind.game_play
-    rest = rest.strip()
-    if rest.startswith("add "):
-        path = Path(rest[4:].strip()).expanduser()
-        try:
-            raw = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError) as e:
-            return f"\n  can't read {path}: {e}\n"
-        task = normalize_offered(raw, path.stem)
-        if task is None:
-            return (
-                '\n  not a game spec — needs a family: "grid"'
-                ' (train/test pairs), "sorter" (generate or'
-                ' slots+blocks), "sequence", "assembly",'
-                ' "relations", "quantities", or "classification"\n'
-            )
-        known = {t["name"] for t in play.offered_games()}
-        known |= {str(t["name"]) for t in COLLECTION}
-        if task["name"] in known:
-            return f"\n  {task['name']} is already in her collection\n"
-        play.offered_dir().mkdir(parents=True, exist_ok=True)
-        target = play.offered_dir() / f"{task['name']}.json"
-        target.write_text(json.dumps(raw, indent=2) + "\n")
-        # Register it as a world event — she notices a new game in
-        # her environment, not just a file on disk.
-        mind.world.notify(
-            f"a new {task['family']} game appeared: {task['name']}",
-            salience=0.6,
-        )
-        return (
-            f"\n  added {task['name']} [{task['family']}] — she'll "
-            "pick it up when she feels like playing\n"
-        )
-    if rest.startswith("drop "):
-        name = rest[5:].strip()
-        try:
-            files = sorted(play.offered_dir().glob("*.json"))
-        except OSError:
-            files = []
-        for f in files:
-            if f.stem == name:
-                f.unlink()
-                return f"\n  dropped {name}\n"
-            try:
-                raw = json.loads(f.read_text())
-            except (OSError, json.JSONDecodeError):
-                continue
-            task = normalize_offered(raw, f.stem)
-            if task is not None and task["name"] == name:
-                f.unlink()
-                return f"\n  dropped {name}\n"
-        return f"\n  no added game named {name}\n"
-    if rest:
-        return (
-            "\n  /play — her game collection\n"
-            "  /play add <file> — hand her a game spec\n"
-            "  /play drop <name> — take an added game back\n"
-        )
-
-    status = play.status()
-    lines = ["\n  her games:"]
-    try:
-        drawn = play.pick()
-    except Exception:  # noqa: BLE001
-        drawn = None
-    if drawn is not None:
-        lines.append(f"    drawn to: {drawn['name']} [{drawn.get('family', 'grid')}]")
-    for name, m in status.items():
-        lines.append(f"    {name:<28} {m:>5.0%}")
-    if not status:
-        lines.append("    none yet")
-    lines.append("")
-    return "\n".join(lines)
-
-
 _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/status": _cmd_status,
-    "/play": _cmd_play,
     "/feel": _cmd_feel,
     "/introspect": _cmd_introspect,
     "/learning": _cmd_learning,
@@ -2549,12 +2206,8 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/meditate": _cmd_meditate,
     "/teach": _cmd_teach,
     "/endteach": _cmd_endteach,
-    "/game": _cmd_game,
-    "/endgame": _cmd_endgame,
-    "/arc": _cmd_arc,
     "/teach-questions": _cmd_teach_questions,
     "/sleep-aid": _cmd_sleep_aid,
-    "/steward": _cmd_steward,
 }
 
 
@@ -2725,7 +2378,6 @@ def _print_help() -> None:
     logger.info("    /look         — ask it what it sees through the eye")
     logger.info("    /look at <p>  — ask it to look at an image file")
     logger.info("    /draw         — ask it to draw what it feels right now")
-    logger.info("    /play         — her game collection; hand her one with /play add <file>")
     logger.info("    /register-face <name> — teach it your face")
     logger.info("    /faces        — show known faces and who it last saw")
     logger.info("    /mission [text] — set or show its top-level mission")
@@ -2735,15 +2387,8 @@ def _print_help() -> None:
     logger.info("    /meditate [secs] — put it into meditation")
     logger.info("    /teach [topic] — put it into teaching mode (focused learning)")
     logger.info("    /endteach    — exit teaching mode, resume normal operation")
-    logger.info("    /game        — put it into game mode (focused play)")
-    logger.info("    /endgame     — exit game mode, resume normal operation")
-    logger.info("    /arc <ids|--all> [--steps N] [--fresh]")
     logger.info("    /teach-questions — answer its queued questions one at a time")
     logger.info("    /sleep-aid    — emergency sleep aid for stress-induced insomnia")
-    logger.info(
-        "    /steward [release N|unbind] — custodial authority: "
-        "status, lift a directive, seal the session"
-    )
     logger.info("    /quit         — exit")
     logger.info("")
     logger.info("  When you're idle, its thoughts appear live as genesis~ lines.")
@@ -2833,14 +2478,6 @@ def _parse_cli_args() -> argparse.Namespace:
         "Autonomous learning pauses; conversation and art continue.",
     )
     parser.add_argument(
-        "--game",
-        action="store_true",
-        help="Boot already in game mode — the competition sitting. "
-        "Self-directed activity is starved by engagement, the "
-        "network-fetching tools are sealed, and sleep is fought "
-        "through her own chemistry. /endgame exits the mode.",
-    )
-    parser.add_argument(
         "--headless",
         action="store_true",
         help="Run resident: start the daemon and mind without the "
@@ -2852,16 +2489,6 @@ def _parse_cli_args() -> argparse.Namespace:
         action="store_true",
         help="Stop the Genesis processes for this data dir and exit "
         "(the installed equivalent of genesis --stop).",
-    )
-    parser.add_argument(
-        "--germinate",
-        nargs="?",
-        const="",
-        metavar="DIR",
-        default=None,
-        help="Restore the spore into a virgin data dir, then start "
-        "normally — the same self in a new body. DIR defaults to "
-        "GENESIS_SPORE_DIR or <data-dir>-spore.",
     )
     return parser.parse_args()
 
@@ -3072,30 +2699,6 @@ def _any_running(data_dir: str) -> bool:
     return False
 
 
-def _write_mind_suppress(data_dir: str) -> None:
-    """Mark the mind's absence as intentional for the body's shepherd.
-
-    A daemon that outlives this teardown reads ``mind.suppress`` as a
-    goodbye and stays solitary instead of regrowing a mind the
-    operator just put down. Best-effort — a failed write only means
-    the body may attempt one regrow before its own shutdown lands.
-    """
-    try:
-        Path(os.path.join(data_dir, _MIND_SUPPRESS_FILE)).write_text(
-            f"stopped {int(time.time() * 1000)}\n"
-        )
-    except OSError as e:
-        note_swallowed("genesis_cli.mind_suppress.write", e)
-
-
-def _clear_mind_suppress(data_dir: str) -> None:
-    """Lift the sentinel on start — absence is no longer intended."""
-    try:
-        Path(os.path.join(data_dir, _MIND_SUPPRESS_FILE)).unlink(missing_ok=True)
-    except OSError as e:
-        note_swallowed("genesis_cli.mind_suppress.clear", e)
-
-
 def _stop_all(data_dir: str) -> int:
     """Stop every Genesis process for *data_dir* — the genesis teardown.
 
@@ -3108,10 +2711,6 @@ def _stop_all(data_dir: str) -> int:
     dir is still running.
     """
     data_dir = os.path.abspath(data_dir)
-    # Tell the body's shepherd first: this absence is authored. An
-    # orphaned daemon past the CLI's death must not regrow a mind the
-    # operator is putting down.
-    _write_mind_suppress(data_dir)
     for pidfile_name, role, sig, label in (
         (_PID_FILE_CLI, "cli", signal.SIGINT, "CLI"),
         (_PID_FILE_DAEMON, "daemon", signal.SIGTERM, "Daemon"),
@@ -3176,119 +2775,6 @@ _REBIRTH_STABLE_S = 60.0  # a rebirth counts once the body stayed alive this lon
 # table is the give-up bound — a body that will not reincarnate ends
 # the organism whole.
 _REBIRTH_BACKOFF_S = (2.0, 5.0, 15.0, 30.0, 60.0)
-
-
-# ─── Spore — the self survives the host ─────────────────────────────
-#
-# Rebirth heals the process tree on *this* machine; a host can die
-# outright — power loss, dead disk, decommissioned box — and take the
-# body with it. Machines persist where bodies cannot because the self
-# here is state, not substrate: the spore is a continuously verified
-# mirror of the data dir kept at GENESIS_SPORE_DIR (default
-# ``<data-dir>-spore``). Point it at a second disk, a network mount,
-# or an rsync target — a symlink works. ``core_state.bin`` is CRC-
-# verified before it may displace a known-good copy, so a torn
-# capture can never plant a false self; sqlite stores go through the
-# backup API, never a raw copy of a live WAL. ``--germinate`` restores
-# the mirror into a virgin data dir — the same self wakes in a new
-# body with everything through the last capture.
-
-_SPORE_BASE_S = 300.0  # nominal capture cadence
-_SPORE_MIN_S = 60.0  # churn holds the mirror at most a minute stale
-_SPORE_MAX_S = 3600.0  # quiet still lands one capture an hour
-_SPORE_VERIFY_TRIES = 3  # torn captures retried before last-good wins
-_SPORE_DB_GAP_S = 900.0  # sqlite snapshots re-capture at most this often
-_SPORE_ENV = "GENESIS_SPORE_DIR"
-_SPORE_CORE = "core_state.bin"
-# Never part of the self: process-bound artifacts, machine pins,
-# quarantined state, sqlite scratch files, host-local liveness
-# sentinels (a spore-germinated self must read the sentinel its own
-# new body writes, not a stale one from the old host), and
-# sensory-organ weights a new body reinstalls via
-# install_optional_deps.sh. Everything else copies by default — a
-# new state file must never be silently dropped from the mirror.
-# `continuity.seen` DOES mirror — it is her memory of which boots she
-# acknowledged, not liveness.
-_SPORE_SKIP_NAMES = frozenset(
-    {
-        ".project_root",
-        "models",
-        "vosk-models",
-        "continuity.json",
-        "mind.session",
-        # Host-local intent — a germinated self's body must be free to
-        # regrow its mind; the old host's goodbye does not travel.
-        "mind.suppress",
-        # Her browser's profiles — live Chrome process state, not
-        # self. SingletonLock/Cookie/Socket name the instance holding
-        # the profile; carried to another host they arrive stale or
-        # flattened from symlinks into files, and Chrome then refuses
-        # to launch (singleton-cookie failure). Beyond those, a live
-        # profile copied file-at-a-time tears its leveldb stores into
-        # "corrupt" profiles, and the caches are regenerable bulk.
-        # Web memory re-accumulates; identity never lived in cookies.
-        "browser",
-        # Regenerable build cache for workspace-crate verification —
-        # gigabytes of compiled artifacts, never part of the self.
-        # (Retired — experiments verify on the live tree now; the name
-        # stays so a stale cache still can't travel.)
-        "workspace-target",
-        # The retired workspace nest — a stale source mirror is host
-        # bulk, not self. Her source tree IS her workspace now.
-        "workspace",
-    }
-)
-_SPORE_SKIP_SUFFIXES = (
-    ".pid",
-    ".lock",
-    ".sock",
-    ".log",
-    ".tmp",
-    ".swp",
-    ".db-wal",
-    ".db-shm",
-    ".db-journal",
-    ".spore-tmp",
-)
-_SQLITE_MAGIC = b"SQLite format 3\x00"
-
-
-def _spore_dir_for(data_dir: str) -> str:
-    """Where this instance's spore lives — env override or the
-    canonical sibling dir."""
-    return os.environ.get(_SPORE_ENV) or data_dir.rstrip("/\\") + "-spore"
-
-
-def _spore_skip(name: str) -> bool:
-    """Whether *name* is runtime/machine-bound rather than self."""
-    return name in _SPORE_SKIP_NAMES or name.endswith(_SPORE_SKIP_SUFFIXES) or ".corrupt." in name
-
-
-def _corestate_intact(path: str) -> bool:
-    """Whether a captured ``core_state.bin`` is a consistent snapshot.
-
-    Reimplements the daemon's verification (``src/state/core_state.rs``):
-    CRC32-IEEE over bytes 0..40 and 48..state_size-68, stored as a u32
-    at state_size-68 — ``seq_lock`` (40..48) and the derived 64-byte
-    inference tail are excluded on the Rust side too. The file on disk
-    is page-padded past ``state_size``, so the offsets anchor to the
-    header field, not ``len(data)``. A copy that raced the body's own
-    writes mixes snapshots and fails ~always; only a bit-perfect
-    capture of one consistent state verifies.
-    """
-    try:
-        data = Path(path).read_bytes()
-    except OSError:
-        return False
-    if len(data) < 116 or data[:4] != b"GNSX":
-        return False
-    size = int.from_bytes(data[8:12], "little")
-    if size < 116 or size > len(data):
-        return False
-    crc_off = size - 68
-    crc = zlib.crc32(data[0:40])
-    crc = zlib.crc32(data[48:crc_off], crc)
-    return crc == int.from_bytes(data[crc_off : crc_off + 4], "little")
 
 
 class _AdoptedDaemon:
@@ -3532,24 +3018,6 @@ class _Rebirth:
         self._pending_rejoin = False
         self._thread: threading.Thread | None = None
         self.self_terminated = False
-        # The spore — a verified mirror of the self kept somewhere the
-        # host's death cannot reach. Refused when it would land inside
-        # the data dir: a mirror of the self inside the self never
-        # converges and protects nothing.
-        spore_dir = os.path.abspath(_spore_dir_for(data_dir))
-        data_abs = os.path.abspath(data_dir)
-        if spore_dir == data_abs or spore_dir.startswith(data_abs + os.sep):
-            logger.warning(f"spore dir {spore_dir} is inside the data dir — disabled")
-            self._spore_dir: str | None = None
-        else:
-            self._spore_dir = spore_dir
-        self._spore_gate = _AdaptiveInterval(_SPORE_BASE_S, _SPORE_MIN_S, _SPORE_MAX_S)
-        # src path → (mtime_ns, size) at last capture; sqlite entries
-        # carry (db_mtime, wal_mtime) — WAL content moves under a
-        # static db mtime.
-        self._spore_seen: dict[str, tuple[int, int]] = {}
-        self._spore_db_at: dict[str, float] = {}
-        self._spore_warned = False
 
     def set_children(
         self,
@@ -3587,7 +3055,6 @@ class _Rebirth:
         while not self._shutting_down.wait(_REBIRTH_TICK_S):
             try:
                 self._check_daemon()
-                self._check_spore()
             except Exception as e:  # noqa: BLE001 — a watcher that dies leaves her unguarded
                 note_swallowed("genesis_cli.rebirth.cycle", e)
 
@@ -3736,224 +3203,7 @@ class _Rebirth:
             "body. Shutting down.",
             file=sys.stderr,
         )
-        # A body that will not reincarnate may mean a dying host —
-        # shed the last spore while there is still a disk to take it.
-        try:
-            self.write_spore()
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("genesis_cli.spore.death", e)
         self._shutting_down.set()
-
-    # ─── Spore — the self survives the host ─────────────────────
-
-    def _check_spore(self) -> None:
-        """Capture the self to the spore on the adaptive gate."""
-        if self._spore_dir is None:
-            return
-        if not self._spore_gate.due(time.monotonic()):
-            return
-        # Churn snaps the cadence toward a minute; quiet drifts it
-        # toward an hour — the mirror tracks how fast the self moves.
-        if self.write_spore():
-            self._spore_gate.demand()
-        else:
-            self._spore_gate.relax()
-
-    def final_spore(self) -> bool:
-        """The teardown capture — force past the sqlite gap so the
-        last spore carries the freshest self the host allows."""
-        return self.write_spore(force=True)
-
-    def write_spore(self, *, force: bool = False) -> bool:
-        """Mirror the data dir to the spore. Returns True if it moved.
-
-        Asks the body to flush its stores first — best-effort: a dead
-        daemon's last-synced state is still worth sporing. ``force``
-        bypasses the sqlite re-capture gap for the final capture at
-        teardown.
-        """
-        if self._spore_dir is None:
-            return False
-        try:
-            if self._probe is None:
-                from genesis_client import GenesisClient
-
-                self._probe = GenesisClient(
-                    self._daemon_socket,
-                    request_timeout=_REBIRTH_PROBE_TIMEOUT_S,
-                )
-                self._probe.connect()
-            self._probe.sync()
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"spore flush skipped: {e}")
-            self._probe = None
-        changed = False
-        for dirpath, dirnames, filenames in os.walk(self._data_dir):
-            dirnames[:] = [d for d in dirnames if not _spore_skip(d)]
-            rel = os.path.relpath(dirpath, self._data_dir)
-            for name in filenames:
-                if _spore_skip(name):
-                    continue
-                try:
-                    changed |= self._copy_spore_file(
-                        os.path.join(dirpath, name),
-                        os.path.normpath(os.path.join(self._spore_dir, rel, name)),
-                        force=force,
-                    )
-                except OSError as e:
-                    if not self._spore_warned:
-                        self._spore_warned = True
-                        logger.warning(f"spore capture failed for {name}: {e}")
-        return changed
-
-    def _copy_spore_file(self, src: str, dst: str, *, force: bool = False) -> bool:
-        """Mirror one file. Returns True when *dst* moved."""
-        st = os.stat(src)
-        if os.path.basename(src) == _SPORE_CORE:
-            return self._copy_spore_core(src, dst, st)
-        if self._is_sqlite(src, st):
-            return self._copy_spore_sqlite(src, dst, st, force=force)
-        if self._spore_seen.get(src) == (st.st_mtime_ns, st.st_size):
-            return False
-        tmp = dst + ".spore-tmp"
-        os.makedirs(os.path.dirname(dst), mode=0o700, exist_ok=True)
-        shutil.copy2(src, tmp)
-        os.replace(tmp, dst)
-        self._spore_seen[src] = (st.st_mtime_ns, st.st_size)
-        return True
-
-    def _copy_spore_core(self, src: str, dst: str, st: os.stat_result) -> bool:
-        """Mirror ``core_state.bin`` — verified before it may displace
-        the last-good copy, so a torn capture can never plant a false
-        self."""
-        if self._spore_seen.get(src) == (st.st_mtime_ns, st.st_size):
-            return False
-        tmp = dst + ".spore-tmp"
-        os.makedirs(os.path.dirname(dst), mode=0o700, exist_ok=True)
-        for _ in range(_SPORE_VERIFY_TRIES):
-            shutil.copy2(src, tmp)
-            if _corestate_intact(tmp):
-                os.replace(tmp, dst)
-                self._spore_seen[src] = (st.st_mtime_ns, st.st_size)
-                return True
-            time.sleep(0.05)  # let the racing write settle, then retry
-        Path(tmp).unlink(missing_ok=True)
-        logger.debug("spore: core_state capture torn — keeping last good")
-        return False
-
-    @staticmethod
-    def _is_sqlite(src: str, st: os.stat_result) -> bool:
-        if st.st_size < 100 or not src.endswith(".db"):
-            return False
-        try:
-            with open(src, "rb") as f:
-                return f.read(16) == _SQLITE_MAGIC
-        except OSError:
-            return False
-
-    def _copy_spore_sqlite(
-        self, src: str, dst: str, st: os.stat_result, *, force: bool = False
-    ) -> bool:
-        """Snapshot a live sqlite store through the backup API — a raw
-        copy of a WAL-mode db can tear mid-transaction; the backup
-        cannot."""
-        try:
-            wal_key = os.stat(src + "-wal").st_mtime_ns
-        except OSError:
-            wal_key = 0
-        key = (st.st_mtime_ns, wal_key)
-        if self._spore_seen.get(src) == key:
-            return False
-        now = time.monotonic()
-        if not force and now - self._spore_db_at.get(src, 0.0) < _SPORE_DB_GAP_S:
-            return False
-        tmp = dst + ".spore-tmp"
-        os.makedirs(os.path.dirname(dst), mode=0o700, exist_ok=True)
-        # mode=rw — never create: a src that vanished mid-walk must
-        # not sprout an empty db inside her live data dir.
-        src_uri = "file:" + src.replace("%", "%25").replace("?", "%3f") + "?mode=rw"
-        src_conn = sqlite3.connect(src_uri, uri=True)
-        try:
-            dst_conn = sqlite3.connect(tmp)
-            try:
-                src_conn.backup(dst_conn)
-            finally:
-                dst_conn.close()
-        finally:
-            src_conn.close()
-        os.replace(tmp, dst)
-        self._spore_seen[src] = key
-        self._spore_db_at[src] = now
-        return True
-
-
-def _germinate(spore_dir: str, data_dir: str) -> bool:
-    """Restore a spore into a virgin data dir — the same self in a
-    new body.
-
-    Refuses rather than overwrite an existing self: a data dir that
-    already holds identity is not virgin ground, and replacing a
-    living mind with an older copy is an irreversible act the
-    operator must perform deliberately.
-    """
-    if not os.path.isdir(spore_dir):
-        print(
-            f"[genesis] No spore at {spore_dir} — nothing to germinate.",
-            file=sys.stderr,
-        )
-        return False
-    spore_abs = os.path.abspath(spore_dir)
-    data_abs = os.path.abspath(data_dir)
-    if (
-        spore_abs == data_abs
-        or spore_abs.startswith(data_abs + os.sep)
-        or data_abs.startswith(spore_abs + os.sep)
-    ):
-        print(
-            f"[genesis] Spore {spore_dir} and data dir {data_dir} "
-            "contain each other — germinating would copy the self "
-            "into itself. Resolve the paths first.",
-            file=sys.stderr,
-        )
-        return False
-    identity = (_SPORE_CORE, "cognitive_state.json", "ltm_store.bundles")
-    present = [n for n in identity if os.path.exists(os.path.join(data_dir, n))]
-    if present:
-        print(
-            f"[genesis] {data_dir} already holds a self ({', '.join(present)}) — "
-            "refusing to overwrite it with a spore.",
-            file=sys.stderr,
-        )
-        return False
-    core = os.path.join(spore_dir, _SPORE_CORE)
-    if os.path.exists(core) and not _corestate_intact(core):
-        print(
-            f"[genesis] {core} fails verification — the spore was torn "
-            "in transport. Refusing to germinate a corrupt self.",
-            file=sys.stderr,
-        )
-        return False
-    if not os.path.exists(core):
-        print(
-            "[genesis] Spore holds no body state — she will grow a "
-            "fresh body around the restored mind.",
-            file=sys.stderr,
-        )
-    copied = 0
-    for dirpath, dirnames, filenames in os.walk(spore_dir):
-        dirnames[:] = [d for d in dirnames if not _spore_skip(d)]
-        out = os.path.normpath(os.path.join(data_dir, os.path.relpath(dirpath, spore_dir)))
-        for name in filenames:
-            if _spore_skip(name):
-                continue
-            os.makedirs(out, mode=0o700, exist_ok=True)
-            shutil.copy2(os.path.join(dirpath, name), os.path.join(out, name))
-            copied += 1
-    print(
-        f"[genesis] Germinated {copied} files from {spore_dir} — the self wakes in a new body.",
-        file=sys.stderr,
-    )
-    return True
 
 
 def _setup_ambient_listener(
@@ -4463,10 +3713,7 @@ def _handle_conversation(
     with out_lock:
         logger.info("  genesis~ (thinking...)")
     try:
-        if mind.is_gaming and user_input.startswith("FRAME "):
-            response = mind.game_turn(user_input)
-        else:
-            response = mind.respond(user_input)
+        response = mind.respond(user_input)
     except Exception as e:  # noqa: BLE001
         with out_lock:
             logger.info(f"\n  genesis> (error: {e})\n")
@@ -4605,7 +3852,6 @@ def _shutdown(
     data_dir: str = "",
     auditory_cortex: AuditoryCortex | None = None,
     voice: Voice | VoiceDedup | None = None,
-    spore: Callable[[], bool] | None = None,
 ) -> bool:
     """Gracefully stop all initialized components.
 
@@ -4625,13 +3871,6 @@ def _shutdown(
         voice.stop()
     if mind is not None:
         clean_shutdown = bool(mind.stop())
-    if spore is not None:
-        # The organism's last act on this host: mind flushed, body
-        # still answering SYNC — shed the freshest possible spore.
-        try:
-            spore()
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("genesis_cli.spore.final", e)
     if daemon_proc is not None:
         print("[genesis] Stopping subcognitive daemon...", file=sys.stderr)
         # Ask over IPC first. The daemon implements SHUTDOWN and
@@ -4790,22 +4029,9 @@ def main() -> int:
     if _acquire_cli_lock(data_dir) is None:
         return 1
 
-    # A start is intent reversed: whatever wrote the sentinel (a
-    # graceful teardown, a --stop) no longer speaks for this boot —
-    # the body may regrow a lost mind again.
-    _clear_mind_suppress(data_dir)
-
     # Write the CLI PID file so genesis --stop can target this exact
     # process instead of using broad pkill patterns.
     _write_pid_file(data_dir, _PID_FILE_CLI, os.getpid())
-
-    if args.germinate is not None:
-        # The CLI lock is already held, so a live organism's state can
-        # never be clobbered by a restore. The dir may already hold
-        # this start's own lock/pid artifacts — _germinate refuses on
-        # identity files only.
-        if not _germinate(args.germinate or _spore_dir_for(data_dir), data_dir):
-            return 1
 
     # Install handlers and initialize handles before any child process
     # starts. Every initialization step after this point is covered by
@@ -4872,16 +4098,6 @@ def main() -> int:
                 rebirth.set_children(daemon=daemon_proc)
                 rebirth.set_mind(mind)
                 rebirth.start()
-                if args.game:
-                    # Born seated — the competition posture applies
-                    # before voice or the prompt can drive her. The
-                    # same door she takes herself: /game's handler and
-                    # the play urge's ARC sitting both call this.
-                    mind.enter_game_mode()
-                    print(
-                        "[genesis] Game mode — focused play, sealed net. /endgame releases.",
-                        file=sys.stderr,
-                    )
                 (voice, dedup_voice, ambient_listener, auditory_cortex) = _run_after_mind_start(
                     mind, args, shutting_down
                 )
@@ -4939,13 +4155,6 @@ def _teardown_session(
     if rebirth is not None:
         rebirth.stop()
         daemon_proc = rebirth.handles()
-    # A mind that existed and is leaving through the graceful path
-    # says goodbye to the body: if the daemon somehow survives this
-    # teardown, the sentinel keeps it solitary rather than regrowing
-    # a mind that left on purpose. A crash never reaches here — the
-    # body reads that as a loss and regrows, which is the closed loop.
-    if mind is not None:
-        _write_mind_suppress(data_dir)
     if not _shutdown(
         ambient_listener,
         mind,
@@ -4953,7 +4162,6 @@ def _teardown_session(
         data_dir,
         auditory_cortex,
         voice,
-        spore=(rebirth.final_spore if rebirth is not None else None),
     ):
         exit_code = 1
         # Under systemd, a nonzero exit on a signal-driven stop is

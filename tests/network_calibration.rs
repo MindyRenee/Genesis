@@ -36,9 +36,17 @@ const REM: NetworkLevels = NetworkLevels {
 };
 
 /// Steady-state levels of (ACh, serotonin, NE, GABA) under fixed network input.
+///
+/// Adenosine accumulation is pinned off: the microdialysis targets were
+/// measured in rested animals, and under a wake-stage input Process S
+/// never stops accumulating — the A1 mechanism in
+/// `state::basal_forebrain` would correctly sag the cholinergic level as
+/// pressure builds, but that is the mechanism working, not miscalibration.
+/// The suppression itself is asserted separately below.
 fn equilibrium(net: NetworkLevels) -> [f32; 4] {
     let params = NeuroTickParams {
         maturation_level: 1.0,
+        adenosine_accumulation_rate: 0.0,
         network_levels: Some(net),
         ..Default::default()
     };
@@ -53,6 +61,43 @@ fn equilibrium(net: NetworkLevels) -> [f32; 4] {
         NeurochemicalId::GABA,
     ]
     .map(|id| v.get(id).unwrap().level)
+}
+
+/// The basal forebrain's A1 mechanism: under a fixed wake input the
+/// cholinergic level falls as adenosine occupancy rises — the
+/// somnogenic signal silencing the region's own arousal output.
+#[test]
+fn a1_occupancy_sags_wake_acetylcholine() {
+    use genesis::state::basal_forebrain::{
+        UNCERTAINTY_REFERENCE, a1_suppression, release_target,
+    };
+    // Pure equation first: the wake steady state under deep pressure
+    // must sit below the rested 0.58 while the sleep stages don't move.
+    let wake_pressed = release_target(0.963, 0.0, 0.9, UNCERTAINTY_REFERENCE);
+    assert!(
+        wake_pressed < 0.50,
+        "wake ACh under adenosine 0.9: {wake_pressed}"
+    );
+    assert!(a1_suppression(0.9) > 0.4);
+    // And in the integrated dynamics: pin adenosine high under a wake
+    // network and the measured level must sag well below 0.58.
+    let params = NeuroTickParams {
+        maturation_level: 1.0,
+        adenosine_accumulation_rate: 0.0,
+        network_levels: Some(NetworkLevels {
+            lc: 0.963,
+            vlpo: 0.021,
+            rem: 0.0,
+        }),
+        ..Default::default()
+    };
+    let mut v = NeurochemicalVector::new(1);
+    v.get_mut(NeurochemicalId::Adenosine).unwrap().level = 0.9;
+    for _ in 0..300_000u32 {
+        v.tick_with_params(&params);
+    }
+    let ach = v.get(NeurochemicalId::Acetylcholine).unwrap().level;
+    assert!(ach < 0.50, "integrated wake ACh under pressure: {ach}");
 }
 
 #[test]

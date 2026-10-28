@@ -223,8 +223,6 @@ class SleepMixin:
         self._last_concept_count = 0
         self._is_teaching = False
         self._teaching_topic: str = ""
-        self._is_gaming: bool = False
-        self._game_session: Any = None
         # A /teach-questions session — she asked, the user is
         # answering. While it holds, background stays paused and
         # curiosity is scoped to the exchange, the way teaching mode
@@ -746,12 +744,6 @@ class SleepMixin:
         body's own network crossing under genuine pressure, which the
         desync check joins.
         """
-        # Sleep is paused for the whole sitting — none of the
-        # waking-side machinery (desync join, drowsiness signaling,
-        # idle gates) runs while she is gaming. The body keeps its
-        # own physics; her mind does not sleep.
-        if self._is_gaming:
-            return
         # Checked on this path because it already holds a state
         # snapshot, so comparing the two layers' sleep states
         # costs no extra IPC call. A joined desync puts the mind to
@@ -883,11 +875,6 @@ class SleepMixin:
         # Teardown has begun — a new sleep transition now would write
         # a stale is_sleeping into the final save.
         if self._stop_latched:
-            return
-        # The sitting holds her awake: sleep is a venue rule of game
-        # mode, not a chemistry fight — no onset path exists while
-        # she plays.
-        if self._is_gaming:
             return
         self._is_sleeping = True
         self._user_initiated_sleep = user_initiated
@@ -1467,10 +1454,6 @@ class SleepMixin:
         """
         if self._is_sleeping:
             return False
-        # Sleep is paused in game mode — the join itself is one of
-        # the onset paths the sitting refuses.
-        if self._is_gaming:
-            return False
         try:
             # `PhaseInfo` carries `phase` (an int code). It has no
             # `emergent_phase` — that field belongs to `CoreState`, a
@@ -1642,9 +1625,6 @@ class SleepMixin:
             return
         # Teardown has begun — no new meditation zone write.
         if self._stop_latched:
-            return
-        # Meditation is paused for the sitting like sleep is.
-        if self._is_gaming:
             return
         self._is_meditating = True
         self._meditation_start_time = time.time()

@@ -221,9 +221,10 @@ def test_exponential_relaxation_is_exact_under_subdivision():
     assert s5 == pytest.approx(s1, rel=1e-15)
     assert math.exp(-0.5 / 2.0) == pytest.approx(math.exp(-0.1 / 2.0) ** 5, rel=1e-15)
 
-    # Convergence toward a constant limit-cycle radius: the radial
-    # logistic map composes exactly for any split, and equals its
-    # closed form u(t) = u0·A²/(A²·e^{-t/τ} + u0·(1−e^{-t/τ})).
+    # Convergence toward a constant driven radius: the first-order
+    # exponential approach is the exact flow of dr/dt = (a−r)/τ, so it
+    # composes exactly for any split and equals its closed form
+    # r(t) = a + (r0 − a)·e^{−t/τ}.
     def run_relax(n: int) -> float:
         o = BrainWaveOscillator()
         o._phase = dict.fromkeys(BrainWave, 0.0)
@@ -235,10 +236,9 @@ def test_exponential_relaxation_is_exact_under_subdivision():
             o._relax_once(0.5 / n, targets)
         return o._amplitude[band]
 
-    u0 = 0.1 * 0.1
-    a2 = targets[band] * targets[band]
-    e = math.exp(-0.5 / tau)
-    analytic = math.sqrt(u0 * a2 / (a2 * e + u0 * (1.0 - e)))
+    r0 = 0.1
+    a = targets[band]
+    analytic = a + (r0 - a) * math.exp(-0.5 / tau)
     assert run_relax(1) == pytest.approx(analytic, rel=1e-12)
     assert run_relax(5) == pytest.approx(analytic, rel=1e-12)
     assert run_relax(20) == pytest.approx(analytic, rel=1e-12)
@@ -290,10 +290,10 @@ _FAST_BANDS = (
 # Measured convergence of the frame-rate independence test against the
 # 0.1 s reference, over 2 s: the PAC modulator is applied as its exact
 # interval mean (not a start-of-step sample), so the residual is only
-# the amplitude-coupling factor — n=20 -> 1e-4, n=50 -> 2e-5, n=100 ->
-# 7e-6 vs the n=2000 limit. See
-# test_fast_band_pac_has_a_bounded_aliasing_floor.
-_FRAME_RATE_TOL = 2e-4
+# the amplitude-coupling factor — measured on the exponential radial
+# map as n=20 -> ~2.2e-4 vs the n=2000 limit (was ~1e-4 under the
+# logistic map). See test_fast_band_pac_has_a_bounded_aliasing_floor.
+_FRAME_RATE_TOL = 3e-4
 
 
 @pytest.mark.parametrize("steps", [20, 50, 100, 500])
@@ -301,7 +301,7 @@ def test_frame_rate_independence(steps: int):
     """Wave time is the same regardless of how often assess() runs.
 
     Phase is exact by construction. Amplitudes agree to the measured
-    coupling floor (~1e-4 at the 0.1 s resolution) — what's left after
+    coupling floor (~2e-4 at the 0.1 s resolution) — what's left after
     the exact interval-mean modulation, not a fudge factor.
 
     The splits start at 20 (= 2 s / _MAX_SUBSTEP, the resolution the
@@ -389,7 +389,7 @@ def test_fast_band_pac_has_a_bounded_aliasing_floor():
 
     The modulator is applied as its exact interval mean, so what
     remains between resolutions is the amplitude-coupling factor —
-    ~1e-4 at the production 0.1 s resolution. This pins that the
+    ~2e-4 at the production 0.1 s resolution. This pins that the
     residual stays bounded well inside the modulation depth instead
     of growing: it is coupling error, not time lost.
     """

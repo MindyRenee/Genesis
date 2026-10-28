@@ -682,12 +682,16 @@ class HolographicGraph:
         candidates against the address map, so leaving it behind means
         a cleared graph still enumerates concepts it no longer has any
         association for.
+
+        `_memory` must drop its keys with `_roles`, not keep zeroed
+        rows: the two dicts share one relation keyspace, populated
+        only by `_get_role`. Keeping a memory row whose role was
+        dropped left `save()` indexing `_roles[r]` for a relation
+        `_roles` no longer had — and a later `_get_role` re-register
+        would then zero the row, destroying bindings the journal had
+        already evicted but memory still held as a ghost.
         """
-        for relation in self._memory:
-            self._memory[relation] = np.zeros(
-                (self.n_buckets, self.dim),
-                dtype=np.float32,
-            )
+        self._memory = {}
         self._addresses = {}
         self._roles = {}
         self._registered_concepts = set()

@@ -59,9 +59,10 @@ def _make_mock_client(ltm_count: int = 0) -> MagicMock:
     def _store_episode(**kwargs):
         """Return a unique incrementing episode ID on each call."""
         _episode_id_counter[0] += 1
-        return _episode_id_counter[0]
+        return _episode_id_counter[0], None
 
     client.store_episode.side_effect = _store_episode
+    client.live_emotional_tag.return_value = [0.5] * 12
     client.find_similar.return_value = []
     client.retrieve_episode.return_value = None
     return client
@@ -265,7 +266,7 @@ def test_store_memory_real_id_not_ltm_count() -> None:
     # (ltm_count + 1) by default, but we override it to return 200.
     client = _make_mock_client(ltm_count=50)
     client.store_episode.side_effect = None
-    client.store_episode.return_value = 200
+    client.store_episode.return_value = (200, None)
     engine = MemorySystem(client=client)
     ok = engine.store_memory("post-archive memory", salience=0.5)
     assert ok is True
@@ -1206,7 +1207,8 @@ def _make_mock_client_recons(ltm_count: int = 1) -> MagicMock:
     )
     client.store_event.return_value = True
     # store_episode returns the real LTM episode ID (ltm_count + 1).
-    client.store_episode.return_value = ltm_count + 1
+    client.store_episode.return_value = (ltm_count + 1, None)
+    client.live_emotional_tag.return_value = [0.5] * 12
     client.find_similar.return_value = []
     return client
 
