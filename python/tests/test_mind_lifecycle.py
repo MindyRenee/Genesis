@@ -5,10 +5,12 @@ import os
 import sys
 import tempfile
 import time
+from pathlib import Path
 
 import pytest
 from temporal_lobe.concepts import RelationType
 
+from infrastructure.user_profile import UserProfile
 from mind import Mind
 
 logger = logging.getLogger(__name__)
@@ -1078,3 +1080,71 @@ def test_drain_shutdown_workers_names_pending_volition(tmp_path, caplog):
         assert not mind._drain_shutdown_workers()
 
     assert "stuck-probe" in caplog.text
+
+
+def test_introduction_claims_empty_profile_name(tmp_path):
+    """An empty profile name slot is claimed by the first introduction.
+
+    _recognize_speaker grounds an introduced name in self_knowledge and
+    the concept network but never persisted it: a profile with an empty
+    name slot (hand-edited or foreign file — the default is always
+    "Mindy") kept returning "" to get_name(), so the bonded-speaker
+    check could never latch. The first introduction now claims the
+    slot; a later one cannot retitle it.
+    """
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    # The profile defaults to her caregiver's name; an empty slot is
+    # the edge case (hand-edited or foreign profile file) where the
+    # bonded-speaker check could never latch.
+    mind.user_profile.name = ""
+
+    # Not bonded on the first claim — the profile was empty when
+    # _is_bonded_speaker ran — but the name must be claimed.
+    assert not mind.brain.frontal._recognize_speaker("hello, my name is zephyr")
+    assert mind.user_profile.get_name() == "Zephyr"
+    # Persisted to the file, not just the in-memory slot.
+    reloaded = UserProfile(data_path=Path(mind.data_dir) / "user_profile.json")
+    reloaded.load()
+    assert reloaded.get_name() == "Zephyr"
+
+    # A later introduction cannot overwrite the bonded name.
+    mind.brain.frontal._recognize_speaker("my name is mallory")
+    assert mind.user_profile.get_name() == "Zephyr"
+
+
+def test_feel_about_me_reports_bond_not_mood(tmp_path):
+    """'How do you feel about me' must report the measured attachment.
+
+    The generic 'how do you feel' branch answers her global state —
+    'neutral' at rest — and silently drops the 'about me' object.
+    Feelings toward a person are the standing bond instead: the same
+    self_knowledge value written by deepen_bond each bonded turn.
+    """
+    from types import SimpleNamespace
+
+    from limbic_system.emotion import EmotionalState
+
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    handler = mind.brain.frontal._self_inquiry_handler
+    emotion = EmotionalState(label="neutral", cognitive_style="steady", valence=0.0)
+    sk = mind.self_model.self_knowledge
+
+    # The bonded person asking — bond is theirs.
+    sk["current_speaker"] = "Mindy"
+    sk["user_name"] = "Mindy"
+    sk["bond"] = 0.92
+    thought = handler.self_inquiry_feelings_identity(
+        "how do you feel about me?", SimpleNamespace(raw_text=""), emotion
+    )
+    assert thought.metadata["field"] == "affect_toward_user"
+    assert thought.metadata["bond"] == 0.92
+    assert ("pred", "feel close to Mindy") in thought.metadata["self_fragments"]
+
+    # A stranger asking must not inherit the caregiver's number.
+    sk["current_speaker"] = "Mallory"
+    thought = handler.self_inquiry_feelings_identity(
+        "how do you feel about me?", SimpleNamespace(raw_text=""), emotion
+    )
+    assert thought.metadata["field"] == "affect_toward_user"
+    assert thought.metadata["bond"] == 0.0
+    assert ("comp", "still learning about Mallory") in thought.metadata["self_fragments"]

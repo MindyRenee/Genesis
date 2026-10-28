@@ -462,6 +462,7 @@ class FrontalLobe:
             resolve_topics=self._resolve_topics,
             map_personal_question=self._question_handler._map_personal_question,
             get_curiosity_questions=self.get_curiosity_questions,
+            user_profile=self.user_profile,
         )
         # Code tool handler — extracted subsystem for code tools.
         self._code_tool_handler = CodeToolHandler(
@@ -6816,6 +6817,13 @@ class FrontalLobe:
                     # person she knows is speaking.
                     self.memory.learn_user_fact("creator_name", display)
                     return True
+                if self.user_profile is not None and not self.user_profile.get_name():
+                    # No bonded name yet — the first introduction
+                    # claims the slot her attachment grows around.
+                    # A populated profile name is never overwritten
+                    # by a later introduction: a stranger cannot
+                    # retitle her bond.
+                    self.user_profile.set_name(display)
                 return False
         return False
 

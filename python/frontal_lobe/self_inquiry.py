@@ -111,6 +111,7 @@ class SelfInquiryHandler:
         resolve_topics: Callable[[list[str], str], list[str]],
         map_personal_question: Callable[[str], list[str]],
         get_curiosity_questions: Callable[[], list[Any]],
+        user_profile: Any = None,
     ) -> None:
         """Wire the self-inquiry handler to its concept network and self-model."""
         self._network = network
@@ -129,6 +130,7 @@ class SelfInquiryHandler:
         self._resolve_topics = resolve_topics
         self._map_personal_question = map_personal_question
         self._get_curiosity_questions = get_curiosity_questions
+        self._user_profile = user_profile
 
     # ─── Main self-inquiry router ────────────────────────────────
 
@@ -481,6 +483,31 @@ class SelfInquiryHandler:
         if existential is not None:
             return existential
 
+        # Feelings *toward* the person asking are a standing
+        # disposition — the measured bond — not her global mood.
+        # Route them before the generic "how do you feel" report,
+        # which would answer the object-less question and read
+        # "neutral" at rest while the attachment goes unspoken.
+        if any(
+            p in lower
+            for p in (
+                "feel about me",
+                "feel towards me",
+                "feel toward me",
+                "feel for me",
+                "feel about us",
+                "feelings about me",
+                "like me",
+                "love me",
+                "care about me",
+                "care for me",
+                "hate me",
+                "think of me",
+                "think about me",
+            )
+        ):
+            return self.self_inquiry_affect_toward_user(emotion)
+
         if "feel" in lower or "how are" in lower:
             summary = self._client.get_neuro_summary()
             from thalamus.brain_waves import assess_brain_waves
@@ -823,6 +850,62 @@ class SelfInquiryHandler:
             self_reflection=True,
             confidence=0.8,
             metadata={"field": "user", "self_fragments": fragments},
+        )
+
+    def self_inquiry_affect_toward_user(self, emotion: EmotionalState) -> Thought:
+        """Handle 'how do you feel about me' — report disposition
+        toward the present person, not her global mood.
+
+        Feelings toward a specific person are the measured
+        attachment: ``self_knowledge["bond"]`` is written from
+        ``user_profile.deepen_bond`` on every bonded turn, and it
+        only belongs to the person the profile names — a stranger's
+        presence must not inherit the caregiver's number. For anyone
+        else the honest report is the relationship record so far.
+        """
+        person = (
+            self._self_model.self_knowledge.get("current_speaker", "")
+            or self._self_model.self_knowledge.get("user_name", "")
+        )
+        profile_name = (
+            self._user_profile.get_name() if self._user_profile is not None else ""
+        )
+        bonded = (
+            bool(person)
+            and bool(profile_name)
+            and person.lower() == profile_name.lower()
+        )
+        bond = (
+            float(self._self_model.self_knowledge.get("bond", 0.0) or 0.0)
+            if bonded
+            else 0.0
+        )
+
+        fragments: list[tuple[str, str]] = []
+        if person and bond >= 0.6:
+            fragments.append(("pred", f"feel close to {person}"))
+        elif person and bonded:
+            fragments.append(("comp", f"getting to know {person}"))
+        elif person:
+            fragments.append(("comp", f"still learning about {person}"))
+        else:
+            fragments.append(("pred", "am still learning who you are"))
+
+        notes = list(self._self_model.relationship_notes)
+        if notes:
+            fragments.extend(("clause", n) for n in notes[-2:])
+
+        return Thought(
+            content="how I feel about you",
+            intent="self_report",
+            emotion=emotion.label,
+            self_reflection=True,
+            confidence=0.8,
+            metadata={
+                "field": "affect_toward_user",
+                "self_fragments": fragments,
+                "bond": round(bond, 3),
+            },
         )
 
     def self_inquiry_creator(self, emotion: EmotionalState) -> Thought:
