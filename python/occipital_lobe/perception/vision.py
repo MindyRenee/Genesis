@@ -96,6 +96,13 @@ _THALAMIC_BLOCK = 0.15
 # attending vision, it is not a standing bias.
 _OPTIC_ENGAGEMENT_HALF_LIFE_S = 20.0
 
+# An unchanged scene re-encodes to episodic memory only while something
+# in it still holds attention — a face (0.8), a dominant object, a vivid
+# field. Below this an identical glance writes no duplicate episode:
+# the hippocampus stores what is new or what is attended; a static
+# mundane view is neither.
+_REENCODE_SALIENCE = 0.7
+
 
 @dataclass
 class VisionScene:
@@ -641,6 +648,13 @@ class Vision:
             optics.retinal_irradiance(color_info.brightness, pupil_mm)
         )
 
+        # ── Snapshot the last look's signatures ────────────────
+        # The IT/FFA stages refresh their seen-trackers as a side
+        # effect of running; the change detector integrates against
+        # what those trackers held before this look overwrote them.
+        prev_objects = self._last_objects
+        prev_faces = self._last_faces
+
         # ── Object recognition (IT cortex) ─────────────────────
         objects, object_colors = self._recognize_objects(rgb)
 
@@ -676,6 +690,8 @@ class Vision:
             color_info,
             objects,
             face_names,
+            prev_objects,
+            prev_faces,
             field,
             network,
             client,
@@ -691,6 +707,8 @@ class Vision:
         color_info,
         objects: list,
         face_names: list[str],
+        prev_objects: list[str],
+        prev_faces: list[str],
         field,
         network,
         client,
@@ -700,8 +718,12 @@ class Vision:
         """Wire the built scene into memory, chemistry, and brain waves.
 
         Runs change detection, salience, concept-network learning,
-        neurochemical modulation, and the V1 gamma feed. Mutates the
-        scene (salience) and the frame-to-frame change trackers.
+        neurochemical modulation, episodic encoding, and the V1 gamma
+        feed. ``prev_objects``/``prev_faces`` are the prior look's
+        signatures — the recognizers already refreshed ``_last_*`` —
+        so the change detector compares against the snapshots, never
+        a list a recognizer just overwrote. Mutates the scene
+        (salience) and the frame-to-frame change trackers.
         """
         # ── Change detection ───────────────────────────────────
         # A moved view is a changed view — the orienting signal cares
@@ -709,7 +731,8 @@ class Vision:
         changed = (
             self._last_color != color_info.dominant_color
             or self._last_light != color_info.light_level
-            or self._last_objects != [o.name for o in objects]
+            or prev_objects != [o.name for o in objects]
+            or prev_faces != face_names
             or (two_view is not None and two_view.moved)
         )
         self._last_color = color_info.dominant_color
@@ -765,19 +788,37 @@ class Vision:
             self._optic_engagement_at = time.monotonic()
 
         # ── Modulate neurochemistry ────────────────────────────
-        if client is not None and emotion is not None:
-            self._modulate_vision_chemistry(
-                client,
-                color_info,
-                mean_saturation,
-                salience,
-                changed,
-                field,
-                objects,
-                face_names,
-                emotion,
-                scene,
-            )
+        # Scene-driven impulses need only the body's socket — the
+        # EmotionalState is not consulted by any of them. A failed
+        # impulse (body mid-restart) must not cost the scene.
+        if client is not None:
+            try:
+                self._modulate_vision_chemistry(
+                    client,
+                    color_info,
+                    mean_saturation,
+                    salience,
+                    changed,
+                    field,
+                    objects,
+                    face_names,
+                )
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "occipital_lobe.perception.vision._integrate_scene",
+                    e,
+                )
+
+        # ── Wire into episodic memory ──────────────────────────
+        # Encoding does not wait on a limbic reading: the daemon
+        # stamps the event's neurochemical tag from its own live
+        # chemistry on store, so a look taken without an
+        # EmotionalState still becomes a memory. What does not
+        # encode is an unchanged scene holding nothing that draws
+        # attention — an identical mundane glance is not a new
+        # episode, and duplicating it would only crowd the ring.
+        if client is not None and (changed or salience >= _REENCODE_SALIENCE):
+            _store_vision_event(client, emotion, scene.memory_text(), salience)
 
         # ── Feed V1 gamma to brain waves ───────────────────────
         if field is not None and self._on_gamma is not None and field.gamma_power > 0:
@@ -851,8 +892,6 @@ class Vision:
         field,
         objects: list,
         face_names: list[str],
-        emotion,
-        scene: VisionScene,
     ) -> None:
         """Send neurochemical impulses based on the visual scene."""
         gamma_val = field.gamma_power if field is not None else 0.0
@@ -882,7 +921,6 @@ class Vision:
                     "occipital_lobe.perception.vision._modulate_vision_chemistry",
                     e,
                 )
-        _store_vision_event(client, emotion, scene.memory_text(), salience)
 
 
 def _yuyv_to_rgb(yuyv: np.ndarray) -> np.ndarray:
@@ -1492,16 +1530,20 @@ def _modulate_chemistry(
         client.neuro_impulse(CHEM_DOPAMINE, 0.03 * gamma)
 
 
-def _store_vision_event(client, emotion: EmotionalState, desc: str, salience: float) -> None:
+def _store_vision_event(
+    client,
+    emotion: EmotionalState | None,
+    desc: str,
+    salience: float,
+) -> None:
     """Persist the visual observation in short-term memory with an emotional tag."""
-    tag = _emotional_tag(emotion)
     try:
         client.store_event(
             timestamp=int(time.time() * 1000),
             event_type=0,  # observation
             source_module=6,  # sensory module
             salience=salience,
-            emotional_tag=tag,
+            emotional_tag=_emotional_tag(emotion),
             text=desc,
         )
     except Exception as e:  # noqa: BLE001
@@ -1511,8 +1553,17 @@ def _store_vision_event(client, emotion: EmotionalState, desc: str, salience: fl
         )
 
 
-def _emotional_tag(emotion: EmotionalState) -> list[float]:
-    """Build a neurochemical tag from an EmotionalState."""
+def _emotional_tag(emotion: EmotionalState | None) -> list[float] | None:
+    """Build a neurochemical tag from an EmotionalState.
+
+    Advisory only — the daemon stamps the stored tag from its own
+    live chemistry on receipt. ``None`` (a look taken without an
+    emotional reading) sends the all-zero "unspecified" encoding and
+    still encodes: the tag modulates the trace, it is not a license
+    to write it.
+    """
+    if emotion is None:
+        return None
     tag = [0.5] * EMOTIONAL_TAG_SIZE
     # Dopamine (0)
     tag[0] = max(0.0, min(1.0, 0.5 + emotion.valence * 0.3))

@@ -6,10 +6,13 @@ image — retinal irradiance scaling and depth-of-field blur — before
 anything cortical sees the frame.
 """
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 from occipital_lobe.perception import optics
 
+from genesis_client.protocol import CHEM_NOREPINEPHRINE
 from genesis_client.types import OpticState
 
 
@@ -40,9 +43,19 @@ def _optic(
 class _OpticClient:
     def __init__(self, optic: OpticState | None) -> None:
         self._optic = optic
+        self.stored: list[dict] = []
+        self.impulses: list[tuple[int, float]] = []
 
     def get_optic_state(self) -> OpticState | None:
         return self._optic
+
+    def store_event(self, **kwargs) -> bool:
+        self.stored.append(kwargs)
+        return True
+
+    def neuro_impulse(self, chem: int, amount: float) -> bool:
+        self.impulses.append((chem, amount))
+        return True
 
 
 class TestIrradianceGain:
@@ -322,3 +335,106 @@ class TestSeeIntegration:
         # region analyser's own scale — the scene reads darker than
         # the same room through open lids.
         assert scene.brightness < 200.0 / 255.0 * 0.75
+
+
+class TestVisualEncoding:
+    """The eye's wire into episodic memory — what a look stores in
+    the body's short-term ring."""
+
+    def _vision_with_stub_stages(self, monkeypatch, frames):
+        """A Vision with stubbed cortical stages; ``frames`` is a
+        queue served in order so successive looks can differ."""
+        import occipital_lobe.perception.vision as vision_mod
+        from occipital_lobe.perception.vision import Vision
+
+        queue = list(frames)
+        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True: queue.pop(0))
+        monkeypatch.setattr(Vision, "_run_v1_sparse_coding", lambda self, rgb: None)
+        monkeypatch.setattr(Vision, "_two_view_geometry", lambda self, rgb: None)
+        monkeypatch.setattr(Vision, "_get_object_recognizer", lambda self: None)
+        monkeypatch.setattr(Vision, "_get_face_recognizer", lambda self: None)
+        vis = Vision()
+        vis._available = True
+        return vis, vision_mod
+
+    def test_a_look_without_an_emotion_still_encodes(self, monkeypatch) -> None:
+        """The tag is the body's live stamp — a look with no
+        EmotionalState still becomes a memory, sent unspecified."""
+        vis, _ = self._vision_with_stub_stages(
+            monkeypatch, [np.full((48, 64, 3), 200, dtype=np.uint8)]
+        )
+        client = _OpticClient(_optic(4.5))
+        scene = vis.see(client=client)
+        assert scene.status == "ok"
+        assert len(client.stored) == 1
+        assert client.stored[0]["emotional_tag"] is None
+
+    def test_an_emotional_reading_rides_as_the_advisory_tag(self, monkeypatch) -> None:
+        emotion = SimpleNamespace(valence=0.5, alertness=0.7, label="calm", plasticity=0.6)
+        vis, _ = self._vision_with_stub_stages(
+            monkeypatch, [np.full((48, 64, 3), 200, dtype=np.uint8)]
+        )
+        client = _OpticClient(_optic(4.5))
+        vis.see(client=client, emotion=emotion)
+        assert len(client.stored) == 1
+        tag = client.stored[0]["emotional_tag"]
+        assert tag[2] == pytest.approx(0.7)  # norepinephrine ← alertness
+        assert tag[6] == pytest.approx(0.2)  # calm: cortisol stays low
+        assert tag[11] == pytest.approx(0.6)  # BDNF ← plasticity
+
+    def test_an_unchanged_mundane_scene_writes_once(self, monkeypatch) -> None:
+        """The same blank wall twice is one episode, not two."""
+        vis, _ = self._vision_with_stub_stages(
+            monkeypatch, [np.full((48, 64, 3), 200, dtype=np.uint8)] * 2
+        )
+        client = _OpticClient(_optic(4.5))
+        vis.see(client=client)
+        vis.see(client=client)
+        assert len(client.stored) == 1
+
+    def test_a_changed_scene_encodes_again(self, monkeypatch) -> None:
+        vis, _ = self._vision_with_stub_stages(
+            monkeypatch,
+            [
+                np.full((48, 64, 3), 200, dtype=np.uint8),
+                np.full((48, 64, 3), 30, dtype=np.uint8),
+            ],
+        )
+        client = _OpticClient(_optic(4.5))
+        vis.see(client=client)
+        vis.see(client=client)
+        assert len(client.stored) == 2
+
+    def test_an_attended_scene_reencodes_even_unchanged(self, monkeypatch) -> None:
+        """A vivid field holds attention: seeing it twice writes
+        twice — rehearsal, not duplication."""
+        frame = np.zeros((48, 64, 3), dtype=np.uint8)
+        frame[:, :, 0] = 255  # full red — saturation and brightness max
+        vis, _ = self._vision_with_stub_stages(monkeypatch, [frame, frame])
+        client = _OpticClient(_optic(4.5))
+        vis.see(client=client)
+        vis.see(client=client)
+        assert len(client.stored) == 2
+
+    def test_an_object_appearing_is_a_scene_change(self, monkeypatch) -> None:
+        """Regression: the recognizer refreshes ``_last_objects`` as
+        it runs — the detector must compare against the pre-look
+        snapshot, never the list it just overwrote."""
+        from occipital_lobe.perception.vision import Vision
+
+        cup = SimpleNamespace(name="cup", area_ratio=0.3, position_description="center")
+        seen = [[], [cup]]
+        frame = np.full((48, 64, 3), 200, dtype=np.uint8)
+        vis, _ = self._vision_with_stub_stages(monkeypatch, [frame, frame])
+        monkeypatch.setattr(
+            Vision,
+            "_recognize_objects",
+            lambda self, rgb: (seen.pop(0), {}),
+        )
+        client = _OpticClient(_optic(4.5))
+        vis.see(client=client)
+        vis.see(client=client)
+        # Two changed looks: the first-ever, then the cup arriving.
+        assert len(client.stored) == 2
+        norepinephrine = sum(1 for chem, _ in client.impulses if chem == CHEM_NOREPINEPHRINE)
+        assert norepinephrine == 2

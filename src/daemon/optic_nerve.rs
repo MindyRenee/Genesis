@@ -812,6 +812,21 @@ const EYE_STABLE_S: f64 = 60.0;
 /// the limb counts it a life ended and re-opens.
 const EYE_ERR_LIMIT: u32 = 30;
 
+/// The socket the eye opens absent a `GENESIS_CAMERA` override —
+/// and the fallback when an exhausted override names another
+/// device: a working eye beats the preferred dead one.
+const DEFAULT_CAMERA_PATH: &str = "/dev/video0";
+
+/// The sockets the limb will try, preferred first: the configured
+/// device, then the default when the override names another.
+fn camera_candidates(configured: &str) -> Vec<String> {
+    let mut candidates = vec![configured.to_string()];
+    if configured != DEFAULT_CAMERA_PATH {
+        candidates.push(DEFAULT_CAMERA_PATH.to_string());
+    }
+    candidates
+}
+
 /// The eye's handle: a stop flag, the segment's POSIX name for
 /// unlinking, and the capture thread. `stop()` flags the limb out
 /// and takes the name back; a thread still blocked in the driver's
@@ -880,39 +895,51 @@ impl Drop for OpticCapture {
 /// worth of un-lived lives the eye is accepted absent and the limb
 /// rests — the organism goes on without sight.
 fn capture_limb(shm_name: &str, stop: &AtomicBool) {
-    let camera_path = std::env::var("GENESIS_CAMERA").unwrap_or_else(|_| "/dev/video0".to_string());
-    let camera_index = camera_path
-        .strip_prefix("/dev/video")
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(0);
-    let mut deaths = 0usize;
-    while !stop.load(Ordering::Relaxed) {
-        if deaths >= EYE_BACKOFF_S.len() {
+    let configured =
+        std::env::var("GENESIS_CAMERA").unwrap_or_else(|_| DEFAULT_CAMERA_PATH.to_string());
+    for (i, camera_path) in camera_candidates(&configured).iter().enumerate() {
+        if i > 0 {
             eprintln!(
-                "[genesis] the eye will not re-open — accepted absent; \
-                 the body goes on without sight"
+                "[genesis] eye: {configured} exhausted its retries — \
+                 falling back to {camera_path}"
             );
-            return;
         }
-        let lived = eye_life(shm_name, camera_index, &camera_path, stop);
-        if stop.load(Ordering::Relaxed) {
-            return;
-        }
-        if lived >= EYE_STABLE_S {
-            // A life past the stability window refunds the count —
-            // only sustained failure spends the table.
-            deaths = 0;
-            continue;
-        }
-        let slot = deaths.min(EYE_BACKOFF_S.len() - 1);
-        deaths += 1;
-        for _ in 0..EYE_BACKOFF_S[slot] * 10 {
+        let camera_index = camera_path
+            .strip_prefix("/dev/video")
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0);
+        let mut deaths = 0usize;
+        while !stop.load(Ordering::Relaxed) {
+            if deaths >= EYE_BACKOFF_S.len() {
+                break;
+            }
+            let lived = eye_life(shm_name, camera_index, camera_path, stop);
             if stop.load(Ordering::Relaxed) {
                 return;
             }
-            thread::sleep(Duration::from_millis(100));
+            if lived >= EYE_STABLE_S {
+                // A life past the stability window refunds the count —
+                // only sustained failure spends the table.
+                deaths = 0;
+                continue;
+            }
+            let slot = deaths.min(EYE_BACKOFF_S.len() - 1);
+            deaths += 1;
+            for _ in 0..EYE_BACKOFF_S[slot] * 10 {
+                if stop.load(Ordering::Relaxed) {
+                    return;
+                }
+                thread::sleep(Duration::from_millis(100));
+            }
+        }
+        if stop.load(Ordering::Relaxed) {
+            return;
         }
     }
+    eprintln!(
+        "[genesis] the eye will not re-open — accepted absent; \
+         the body goes on without sight"
+    );
 }
 
 /// One life of the eye: device open → format negotiate → segment
@@ -1568,5 +1595,16 @@ mod tests {
             "a voluntary close attenuates the RHT drive: {shut} vs {open}"
         );
         drop(seg);
+    }
+
+    #[test]
+    fn the_default_socket_is_the_only_candidate_unless_overridden() {
+        // No override — one candidate, the default itself.
+        assert_eq!(camera_candidates("/dev/video0"), vec!["/dev/video0"]);
+        // An override leads, the default follows as fallback.
+        assert_eq!(
+            camera_candidates("/dev/video2"),
+            vec!["/dev/video2", "/dev/video0"]
+        );
     }
 }
