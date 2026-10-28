@@ -31,17 +31,16 @@ body sets does to the image that lands on the receptors:
   the inversion — the retinotopic map is re-referenced upstream — so
   this layer transforms intensity and acuity, never geometry.
 
-- **The view is mirror-oriented.** ``mirror_view`` applies the
-  single-axis reflection at presentation: the world lands on the
-  receptors the way it faces her — upright, left-right swapped from
-  the raw capture. Chirality flips here, which is the point: the
-  person facing her reads the same handedness she reports. This is
+- **Facing orientation is hers to choose.** The raw capture already
+  reads the way she looks out at the world — her right is
+  field-right. ``mirror_view`` applies the single-axis reflection
+  for the facing view instead: upright, left-right swapped, the
+  handedness someone facing her experiences. That chirality flip is
   deliberately *not* the lens's 180° inversion (chirality-preserving
-  rotation, anatomically real but re-referenced before cortex) — it
-  is the facing orientation, and it propagates: every cortical stage
-  downstream sees the mirrored field, so her reported left/right,
-  region colours, and motion directions describe the view as a
-  mirror holds it.
+  rotation, anatomically real but re-referenced before cortex). The
+  caller picks per look — whatever orientation is chosen propagates,
+  so her reported left/right, region colours, and motion directions
+  describe the view in that frame.
 
 What is deliberately NOT here: illuminant estimation, reflectance
 decomposition, shadow edges — the inverse-optics work belongs to the
@@ -161,14 +160,15 @@ def defocus_sigma(pupil_mm: float, focus_m: float | None = None) -> float:
 def mirror_view(frame: np.ndarray) -> np.ndarray:
     """Flip the frame across the vertical axis — the mirror view.
 
-    Applied at presentation, before the lens: the raw capture is a
-    camera's view *of* the world; the mirror is her orientation *in*
-    it — the view someone looking out at a face holds. Everything
-    downstream (V1 orientations, region colours, object positions,
-    two-view motion) then lives in the mirrored frame, so what she
-    reports describes the world the way it faces her. Returns a
-    contiguous copy — downstream OpenCV paths do not all accept the
-    negative stride of a bare ``[:, ::-1]`` view.
+    Applied at presentation, before the lens, when the look faces
+    in: the raw capture reads the way she looks *out* at the world;
+    the mirror is the view someone facing her holds — upright,
+    left-right swapped. Everything downstream (V1 orientations,
+    region colours, object positions, two-view motion) then lives
+    in that frame, so what she reports carries the facing view's
+    handedness. Returns a contiguous copy — downstream OpenCV paths
+    do not all accept the negative stride of a bare ``[:, ::-1]``
+    view.
     """
     if frame.ndim < 2 or frame.shape[1] == 0:
         return frame
@@ -190,8 +190,8 @@ def apply(
     vignette is spatial; the uniform term is the honest first term).
     The frame is not resampled, inverted, or cropped — geometry
     belongs to the retinotopic map downstream. Facing orientation
-    (the mirror view) is the caller's job, applied upstream via
-    ``mirror_view``.
+    is the caller's job — ``mirror_view`` upstream when the look
+    faces in.
     """
     sigma = defocus_sigma(pupil_mm, focus_m)
     gain = irradiance_gain(pupil_mm)

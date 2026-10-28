@@ -255,6 +255,13 @@ class Vision:
         # dictionary construction cost if there's no camera.
         self._occipital: V1Model | None = occipital
         self._on_gamma: Callable[[float], None] | None = None
+        # Facing orientation — which handedness her reports carry.
+        # False (default): looking out — the raw capture reads the
+        # way she faces the world: light on her right is field-right.
+        # True: the mirror view — a single-axis reflection, the
+        # handedness of someone facing her, so a raised right hand
+        # reads "right" the way that person experiences it.
+        self.mirror: bool = False
         # Sight callback — fired on every analyzed look with the
         # visual drive (salience × relay gain). The brain wave system
         # uses it for alpha blocking (the Berger effect): retinal
@@ -514,6 +521,7 @@ class Vision:
         client=None,
         emotion: EmotionalState | None = None,
         network=None,
+        mirror: bool | None = None,
     ) -> VisionScene:
         """Look through the optic nerve and return the structured scene.
 
@@ -526,6 +534,10 @@ class Vision:
         6. Run V1 sparse coding as a sublayer (edges, gamma)
         7. Package the percept as a VisionScene
         8. Wire into memory, concept network, neurochemistry, brain waves
+
+        ``mirror`` selects the facing orientation for this look —
+        ``None`` (default) follows ``self.mirror``; ``False`` looks
+        out at the world, ``True`` takes the facing (mirror) view.
 
         The return value is structured percept data, not a sentence —
         the caller hands ``scene.as_metadata()`` to the language engine,
@@ -554,7 +566,15 @@ class Vision:
                 return VisionScene(status="unprocessed", relay_gate=relay_gate)
 
             return self._analyze_frame(
-                rgb, pupil_mm, focus_m, lid, relay_gate, client, emotion, network
+                rgb,
+                pupil_mm,
+                focus_m,
+                lid,
+                relay_gate,
+                client,
+                emotion,
+                network,
+                self.mirror if mirror is None else mirror,
             )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
@@ -607,18 +627,21 @@ class Vision:
         client,
         emotion: EmotionalState | None,
         network,
+        mirror: bool,
     ) -> VisionScene:
         """The cortical pipeline on one captured frame: optics,
         illumination, recognition, packaging, integration."""
-        # ── Mirror orientation — the world as it faces her ─────
-        # Single-axis reflection at presentation: the raw capture is
-        # the camera's view of the world; this is her orientation in
-        # it — the person looking back at her reads the same
-        # handedness she reports. Not the lens inversion (180°,
-        # chirality-preserving) — the facing view. Everything
-        # downstream lives in the mirrored frame, so regions,
-        # directions and motion describe the view a mirror holds.
-        rgb = optics.mirror_view(rgb)
+        # ── Facing orientation — out at the world, or in as a
+        # mirror ─────────────────────────────────────────────────
+        # Looking out (default): the capture already reads the way
+        # she faces the world — her right is field-right. The mirror
+        # view is a single-axis reflection (not the lens's 180°
+        # inversion) — the handedness of someone facing her, so her
+        # report reads the way they experience the scene. Whatever
+        # orientation this look takes holds for everything
+        # downstream: regions, directions and motion share it.
+        if mirror:
+            rgb = optics.mirror_view(rgb)
 
         # ── Eye optics — the aperture the body set ─────────────
         # The pupil the body integrated (light reflex + LC tone)
@@ -659,7 +682,16 @@ class Vision:
         objects, object_colors = self._recognize_objects(rgb)
 
         # ── Face recognition (FFA) ─────────────────────────────
-        face_names, n_unknown_faces = self._recognize_faces(rgb)
+        # Identity is handedness-independent, but the detector and
+        # SFace embeddings are trained on standard photographs —
+        # the looking-out frame is the canonical view. Registration
+        # and matching always run on it so a mirrored look can't
+        # flip who she knows; only her *report* carries the facing
+        # orientation. (Un-mirroring the adapted frame is exact:
+        # von Kries gain is per-pixel and the illuminant map
+        # mirrors with its input.)
+        faces_rgb = optics.mirror_view(rgb) if mirror else rgb
+        face_names, n_unknown_faces = self._recognize_faces(faces_rgb)
 
         # ── V1 sparse coding (sublayer: edges, gamma) ──────────
         field = self._run_v1_sparse_coding(rgb)

@@ -192,8 +192,9 @@ class TestMirrorView:
         assert optics.mirror_view(flat) is flat
 
     def test_mirror_reaches_the_cortical_stages(self, monkeypatch) -> None:
-        """The flip propagates: every downstream stage sees the
-        mirrored field, so her report describes the facing view."""
+        """On a facing (mirror) look the flip propagates: every
+        downstream stage sees the mirrored field, so her report
+        describes the view a mirror holds."""
         import occipital_lobe.perception.vision as vision_mod
         from occipital_lobe.perception.vision import Vision
 
@@ -222,7 +223,7 @@ class TestMirrorView:
 
         vis = Vision()
         vis._available = True
-        vis.see(client=_OpticClient(_optic(4.5)))
+        vis.see(client=_OpticClient(_optic(4.5)), mirror=True)
 
         # The lens receives exactly the mirrored capture.
         assert len(lens_input) == 1
@@ -231,6 +232,37 @@ class TestMirrorView:
         # illumination may rescale but cannot un-mirror the scene.
         assert len(v1_input) == 1
         assert v1_input[0][:, 48:].mean() > v1_input[0][:, :16].mean()
+
+    def test_facial_recognition_stays_on_the_canonical_view(self, monkeypatch) -> None:
+        """A mirrored look changes what she *reports*, not who she
+        knows: FFA always sees the looking-out frame, so stored
+        embeddings and matches keep the photos' handedness."""
+        import occipital_lobe.perception.vision as vision_mod
+        from occipital_lobe.perception.vision import Vision
+
+        ffa_input: list[np.ndarray] = []
+
+        def _spy_faces(self, rgb):
+            ffa_input.append(rgb)
+            return [], 0
+
+        monkeypatch.setattr(Vision, "_recognize_faces", _spy_faces)
+        monkeypatch.setattr(Vision, "_run_v1_sparse_coding", lambda self, rgb: None)
+        monkeypatch.setattr(Vision, "_two_view_geometry", lambda self, rgb: None)
+        monkeypatch.setattr(Vision, "_get_object_recognizer", lambda self: None)
+
+        frame = np.zeros((48, 64, 3), dtype=np.uint8)
+        frame[:, :16] = 200  # bright on the capture's left
+        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True: frame)
+
+        vis = Vision()
+        vis._available = True
+        vis.see(client=_OpticClient(_optic(4.5)), mirror=True)
+
+        # FFA's input is canonical — the bright block stays on the
+        # left even though everything else saw the mirrored field.
+        assert len(ffa_input) == 1
+        assert ffa_input[0][:, :16].mean() > ffa_input[0][:, 48:].mean()
 
 
 class TestSeeIntegration:
@@ -302,9 +334,9 @@ class TestSeeIntegration:
         assert scene.focus_m is None
         assert applied[0].defocus_sigma == 0.0
         assert applied[0].irradiance_gain == 1.0
-        # The optics stage is an identity on the mirrored view the
-        # lens received — mirror lives upstream of apply.
-        assert np.array_equal(applied[0].frame, frame[:, ::-1])
+        # The optics stage is an identity on the looking-out frame —
+        # the default look faces the world, unflipped.
+        assert np.array_equal(applied[0].frame, frame)
 
     def test_see_carries_the_focus_onto_the_scene(self, monkeypatch) -> None:
         """The body's accommodation lands on the scene as a distance —
