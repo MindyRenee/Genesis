@@ -49,6 +49,7 @@ each competing option, and the winner actually determines the action.
 from __future__ import annotations
 
 import logging
+import random
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -233,6 +234,11 @@ class DecisionOutcome:
 class DecisionMaker:
     """Selects among candidate actions based on multiple criteria.
 
+    Class-level constants for the neuromodulatory exploration gate
+    (see ``set_exploration``): ``NE_BASELINE`` is the daemon's tonic
+    NE resting level, ``EXPLORATION_GAIN`` converts excess tonic NE
+    into Gaussian noise variance on the disinhibition scores.
+
     Given a context (perception intent, reasoning results, goals,
     uncertainty), the engine:
 
@@ -263,6 +269,13 @@ class DecisionMaker:
             ...
     """
 
+    # Neuromodulatory exploration gate (Doya, 2002). NE_BASELINE is
+    # the daemon's tonic NE resting level; EXPLORATION_GAIN converts
+    # excess tonic NE into Gaussian noise variance on the
+    # disinhibition scores.
+    NE_BASELINE: float = 0.30
+    EXPLORATION_GAIN: float = 0.5
+
     def __init__(
         self,
         network: ConceptNetwork,
@@ -288,6 +301,15 @@ class DecisionMaker:
         self.td_learner = td_learner
         self.value_weights = value_weights or dict(_DEFAULT_VALUE_WEIGHTS)
         self.resource_state = resource_state or ResourceState()
+        # Norepinephrine level — Doya (2002) assigns NE control of the
+        # inverse temperature β of action selection; Aston-Jones &
+        # Cohen (2005) identify tonic LC-NE with the explore mode.
+        # None = unwired → deterministic selection (baseline).
+        self._norepinephrine: float | None = None
+        # Vigor — tonic dopamine as the average reward rate ρ̄ (Niv et
+        # al., 2007): rich recent reward lowers the release bar. Fed
+        # from TDLearner.average_reward_rate().
+        self._vigor: float = 0.0
         # Computational basal-ganglia selector. It receives the evaluated
         # candidate saliences; it does not generate candidate actions.
         self.action_selector = BasalGanglia(hyperdirect_gain=0.3)
@@ -319,6 +341,34 @@ class DecisionMaker:
     def update_resource_state(self, state: ResourceState | None) -> None:
         """Update the latest embodied constraint snapshot."""
         self.resource_state = state or ResourceState()
+
+    def set_exploration(self, norepinephrine: float | None) -> None:
+        """Set the body's tonic norepinephrine level for exploration.
+
+        NE controls the randomness of action selection (Doya, 2002):
+        elevated tonic LC-NE is the exploration mode — it widens the
+        search over candidate actions instead of always committing to
+        the argmax disinhibition (Aston-Jones & Cohen, 2005). At or
+        below the daemon's tonic baseline the noise variance is zero
+        and selection is exactly the deterministic competition.
+
+        Args:
+            norepinephrine: Effective NE level in [0, 1], or None to
+                return to deterministic selection.
+        """
+        self._norepinephrine = norepinephrine
+
+    def set_vigor(self, level: float | None) -> None:
+        """Set the tonic-dopamine vigor signal for action selection.
+
+        Niv et al. (2007) identify tonic DA with the average reward
+        rate ρ̄ — the opportunity cost of time. High vigor lowers the
+        basal-ganglia release threshold (the system acts readily);
+        low vigor raises it (the system withholds). Fed from
+        ``TDLearner.average_reward_rate()``. ``None`` resets to no
+        vigor modulation.
+        """
+        self._vigor = 0.0 if level is None else max(0.0, min(1.0, level))
 
     # ─── Public API ───────────────────────────────────────────────
 
@@ -484,6 +534,7 @@ class DecisionMaker:
         bg_result = self.action_selector.select(
             [ActionBid(action=c.action_type.value, salience=c.composite_score) for c in selectable],
             dopamine_rpe=dopamine_rpe,
+            vigor=self._vigor,
         )
         by_action = {c.action_type.value: c for c in selectable}
 
@@ -491,7 +542,26 @@ class DecisionMaker:
             c.bg_disinhibition = bg_result.disinhibition.get(c.action_type.value, 0.0)
             c.bg_conflict = bg_result.conflict
 
-        if bg_result.selected is None:
+        # NE-driven exploration (Doya, 2002; Aston-Jones & Cohen,
+        # 2005): tonic NE above baseline injects temperature into the
+        # competition — disinhibition scores are perturbed by Gaussian
+        # noise of variance σ = gain·(NE − baseline), so elevated NE
+        # occasionally elects a near-tied loser (exploration) while
+        # resting NE leaves the argmax untouched (exploitation).
+        selected_name = bg_result.selected
+        if selected_name is not None and self._norepinephrine is not None:
+            sigma = self.EXPLORATION_GAIN * max(
+                0.0, min(1.0, self._norepinephrine) - self.NE_BASELINE
+            )
+            if sigma > 0.0:
+                selected_name = max(
+                    bg_result.disinhibition,
+                    key=lambda a: bg_result.disinhibition[a] + random.gauss(0.0, sigma),
+                )
+                if bg_result.disinhibition.get(selected_name, 0.0) < bg_result.effective_threshold:
+                    selected_name = None
+
+        if selected_name is None:
             return (
                 next(
                     (c for c in candidates if c.action_type == ActionType.WITHHOLD),
@@ -500,7 +570,7 @@ class DecisionMaker:
                 True,
                 bg_result.conflict,
             )
-        return by_action[bg_result.selected], False, bg_result.conflict
+        return by_action[selected_name], False, bg_result.conflict
 
     @staticmethod
     def _uncertainty_switch(

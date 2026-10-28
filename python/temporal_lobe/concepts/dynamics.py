@@ -488,6 +488,46 @@ class DynamicsMixin:
             decay_factor = 1.0 - effective_rate
             concept.activation *= decay_factor
 
+    def context_reset(self, strength: float = 0.5) -> None:
+        """Attenuate the persistent activation field — a context reset.
+
+        Yu & Dayan (2005): phasic noradrenaline reports *unexpected*
+        uncertainty — a prediction error too large to explain by the
+        current context's known unreliability. The appropriate
+        response is to reset the context model: the lingering
+        activation field that biases processing toward the old
+        interpretation is attenuated so incoming evidence can form a
+        new context.
+
+        This is a soft reset — activation is scaled by
+        ``(1 - strength)``, not zeroed. NE phasic signals doubt about
+        the current frame, not amnesia for the content: concepts that
+        were genuinely strong retain proportional activation and can
+        re-enter the new context through the normal spread path.
+
+        Args:
+            strength: Attenuation fraction in [0, 1]. 0 = no-op,
+                1 = full collapse of the field.
+        """
+        if not self._concepts or strength <= 0.0:
+            return
+        keep = 1.0 - min(1.0, strength)
+        if self._active_ids is None:
+            self._active_ids = {
+                cid for cid, c in list(self._concepts.items()) if (c.activation or 0.0) > 0.0
+            }
+        for cid in list(self._active_ids):
+            concept = self._concepts.get(cid)
+            if concept is None:
+                self._active_ids.discard(cid)
+                continue
+            a = (concept.activation or 0.0) * keep
+            if a < ACTIVATION_NOISE_FLOOR:
+                concept.activation = 0.0
+                self._active_ids.discard(cid)
+            else:
+                concept.activation = a
+
     def cortical_tick(
         self,
         arousal: float = 0.5,

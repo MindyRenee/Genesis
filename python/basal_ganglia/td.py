@@ -108,6 +108,31 @@ Positive RPE → dopamine burst; negative RPE → dopamine dip. This
 integrates with the existing dopamine impulse system in the
 autonomous learner.
 
+# Neuromodulatory meta-parameters (Doya, 2002)
+
+The ascending neuromodulators are not just signals — they are the
+*meta-parameters* of the learning machine (Doya, 2002,
+"Metalearning and neuromodulation", Neural Networks 15:495):
+
+    dopamine       -> the TD error δ        (this module)
+    serotonin      -> the discount factor γ (temporal horizon)
+    noradrenaline  -> inverse temperature β (exploration; see
+                     DecisionMaker.set_exploration)
+    acetylcholine  -> the learning rate α   (memory update speed)
+
+``set_modulators`` lets the body supply the current effective
+serotonin and acetylcholine levels each turn; the learner then runs
+on *effective* parameters rather than constants:
+
+    γ_eff = clip(γ + 0.35·(5HT − 0.40), 0.05, 0.99)
+    α_eff = α · (0.6 + 1.2·ACh)
+
+Serotonin raising γ is the patience mechanism — Miyazaki et al.
+showed dorsal raphe 5-HT firing ramps while an animal waits for a
+delayed reward, and Doya assigns it control of the discount factor.
+Acetylcholine raising α is Hasselmo's encoding mode — high ACh
+biases the system toward writing new memory.
+
 References:
     - Schultz (1997): Dopamine neurons and their role in reward
       mechanisms. Current Opinion in Neurobiology, 7, 191-197.
@@ -119,6 +144,11 @@ References:
       (2nd ed.). MIT Press, Ch. 12 (Eligibility Traces).
     - Pan et al. (2005): Reward-predicting stimuli enhance dopamine
       release in the VTA. Nature, 437, 1066-1070.
+    - Doya (2002): Metalearning and neuromodulation. Neural Networks,
+      15, 495-506.
+    - Miyazaki et al. (2011): Activation of dorsal raphe serotonin
+      neurons underlies waiting for delayed rewards. J. Neurosci.,
+      31, 469-479.
     - Morris (2006): Elements of a neurobiological theory of
       hippocampal function. Hippocampus, 16(11), 917-926.
     - Redondo & Morris (2011): Making memories last: the synaptic
@@ -192,6 +222,18 @@ class TDLearner:
     DEFAULT_DOPAMINE_SCALE: float = 0.05
     _TRACE_PRUNE_THRESHOLD: float = 1e-10
 
+    # Neuromodulatory meta-parameters (Doya, 2002). Levels are the
+    # body's effective concentrations in [0, 1]; baselines match the
+    # daemon's tonic resting values (src/state/neurochemical.rs).
+    SEROTONIN_BASELINE: float = 0.40
+    SEROTONIN_DISCOUNT_GAIN: float = 0.35
+    ACH_LR_OFFSET: float = 0.6
+    ACH_LR_GAIN: float = 1.2
+    DISCOUNT_MIN: float = 0.05
+    DISCOUNT_MAX: float = 0.99
+    # EMA rate for the average-reward (tonic DA / vigor) estimate.
+    VIGOR_EMA_RATE: float = 0.05
+
     def __init__(
         self,
         network: ConceptNetwork,
@@ -230,6 +272,20 @@ class TDLearner:
         self._history: list[TDTransition] = []
         self._max_history: int = 500
 
+        # Neuromodulator levels for the meta-parameters (Doya, 2002).
+        # None means "unwired" — the learner runs on its configured
+        # baselines exactly as before.
+        self._serotonin: float | None = None
+        self._acetylcholine: float | None = None
+
+        # Tonic dopamine proxy: the running average reward rate ρ̄.
+        # Niv et al. (2007) identify tonic DA with the opportunity
+        # cost of time — the average reward per unit time — which
+        # drives response vigor. The DecisionMaker reads this to
+        # lower its action-selection threshold when recent rewards
+        # have been rich.
+        self._avg_reward: float = 0.0
+
         # The most recent RPE — the current dopamine signal.
         self._last_rpe: float = 0.0
 
@@ -239,6 +295,58 @@ class TDLearner:
         self.total_negative_rpe = 0
 
     # ─── Public API ─────────────────────────────────────────────
+
+    def set_modulators(
+        self,
+        *,
+        serotonin: float | None = None,
+        acetylcholine: float | None = None,
+    ) -> None:
+        """Set the body's current neuromodulator levels for the
+        meta-parameters (Doya, 2002).
+
+        Serotonin modulates the effective discount factor — higher
+        5-HT lengthens the temporal horizon (patience). Acetylcholine
+        modulates the effective learning rate — higher ACh speeds
+        memory update (Hasselmo's encoding mode). Passing ``None``
+        leaves the learner on its configured baselines.
+        """
+        self._serotonin = serotonin
+        self._acetylcholine = acetylcholine
+
+    def effective_discount(self) -> float:
+        """The modulated discount factor γ_eff.
+
+        γ_eff = clip(γ + gain·(5HT − baseline), MIN, MAX). With no
+        serotonin level wired, returns the configured ``discount``.
+        """
+        if self._serotonin is None:
+            return self.discount
+        srt = max(0.0, min(1.0, self._serotonin))
+        return max(
+            self.DISCOUNT_MIN,
+            min(
+                self.DISCOUNT_MAX,
+                self.discount + self.SEROTONIN_DISCOUNT_GAIN * (srt - self.SEROTONIN_BASELINE),
+            ),
+        )
+
+    def effective_learning_rate(self) -> float:
+        """The modulated learning rate α_eff.
+
+        α_eff = α·(offset + gain·ACh), centered near the body's ACh
+        baseline so a resting level leaves the rate near α. With no
+        acetylcholine level wired, returns ``learning_rate``.
+        """
+        if self._acetylcholine is None:
+            return self.learning_rate
+        ach = max(0.0, min(1.0, self._acetylcholine))
+        return self.learning_rate * (self.ACH_LR_OFFSET + self.ACH_LR_GAIN * ach)
+
+    def average_reward_rate(self) -> float:
+        """The running average reward rate ρ̄ — the tonic dopamine
+        proxy of Niv et al. (2007), driving response vigor."""
+        return self._avg_reward
 
     def predict_value(self, state: list[str], action: str | None = None) -> float:
         """Predict the value of a state.
@@ -327,13 +435,24 @@ class TDLearner:
         Returns:
             The reward prediction error δ (the dopamine signal).
         """
+        # Effective meta-parameters (Doya, 2002): serotonin sets the
+        # temporal horizon γ_eff; acetylcholine sets the update speed
+        # α_eff. Both fall back to the configured constants when no
+        # modulator levels are wired.
+        gamma = self.effective_discount()
+        alpha = self.effective_learning_rate()
+
         v_s = self.predict_value(state, action=action)
         v_sp = self.predict_value(next_state, action=next_action)
-        rpe = reward + self.discount * v_sp - v_s
+        rpe = reward + gamma * v_sp - v_s
+
+        # Track the average reward rate — the tonic dopamine signal
+        # in Niv et al. (2007)'s vigor model.
+        self._avg_reward += self.VIGOR_EMA_RATE * (reward - self._avg_reward)
 
         # ── Eligibility trace update (backward view) ──────────────
         # 1. Decay all existing traces by γλ.
-        decay = self.discount * self.lam
+        decay = gamma * self.lam
         if decay > 0.0 and self._traces:
             prune = self._TRACE_PRUNE_THRESHOLD
             for cid in list(self._traces):
@@ -359,7 +478,7 @@ class TDLearner:
         #    non-zero traces → semi-gradient TD(0) for the value function.
         #    With λ > 0, previously-visited concepts also get credit.
         if self._traces:
-            alpha_delta = self.learning_rate * rpe
+            alpha_delta = alpha * rpe
             for trace_key, trace in self._traces.items():
                 if isinstance(trace_key, tuple):
                     concept_id, trace_action = trace_key

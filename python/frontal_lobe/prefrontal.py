@@ -314,6 +314,17 @@ class FrontalLobe:
     and deliberates about what to say.
     """
 
+    # Phasic-NE unexpected-uncertainty detector (Yu & Dayan, 2005):
+    # |TD error| tracked as an EMA with variance; an outlier beyond
+    # _RPE_RESET_K standard deviations after the warmup means the
+    # context model itself is wrong, so the activation field is
+    # attenuated by _CONTEXT_RESET_STRENGTH (a soft reset — doubt
+    # about the frame, not amnesia for the content).
+    _RPE_EMA_RATE: float = 0.1
+    _RPE_MIN_SAMPLES: int = 20
+    _RPE_RESET_K: float = 3.0
+    _CONTEXT_RESET_STRENGTH: float = 0.5
+
     def __init__(
         self,
         client: GenesisClient,
@@ -710,6 +721,13 @@ class FrontalLobe:
         # the threshold (easier cognitive access); low synchrony
         # raises it (information stays noncognitive).
         self._last_gamma_synchrony: float = 0.5
+
+        # Unexpected-uncertainty detector state (Yu & Dayan, 2005):
+        # running mean/variance of |TD error| — an outlier triggers
+        # the phasic-NE context reset.
+        self._rpe_abs_mean: float = 0.0
+        self._rpe_abs_var: float = 0.0
+        self._rpe_samples: int = 0
 
     def _init_reasoning_subsystems(self) -> None:
         """Instantiate the goal-directed reasoning, critical-thinking,
@@ -3374,6 +3392,19 @@ class FrontalLobe:
         # state for a limited time, then reconsolidate. Without this,
         # windows never close and memories stay permanently modifiable.
         self.memory.tick_reconsolidation(dt=dt)
+        # Synaptic tags (Frey & Morris): tags set at encoding decay on
+        # the ~hour scale; while the body's effective dopamine is in a
+        # phasic burst, tagged traces capture protein from the shared
+        # pool and commit to late-LTP. The body decides what survives.
+        try:
+            core = self._last_core_state
+            da = float(core.chemicals.get("dopamine", 0.35)) if core is not None else 0.35
+            self.memory.tick_tags(dt=dt, dopamine=da)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "frontal_lobe.prefrontal.tick",
+                e,
+            )
         # Minimal self update — the pre-reflective "I" is updated from
         # current neurochemistry. Arousal maps to present-moment
         # awareness (acetylcholine-driven). Without this, the minimal
@@ -4564,7 +4595,12 @@ class FrontalLobe:
         # load, dyadic coupling) from the daemon and interpret them.
         # Also infer the user's affective state from this message and
         # send it to the daemon's dyadic model, closing the loop.
-        self._last_inference_reading = self.active_inference.read()
+        try:
+            core = self._last_core_state
+            ach = float(core.chemicals.get("acetylcholine", 0.35)) if core is not None else None
+        except Exception:  # noqa: BLE001
+            ach = None
+        self._last_inference_reading = self.active_inference.read(acetylcholine=ach)
         self._update_user_affect_from_message(user_input)
 
         # Boundary — mistreatment from whoever is speaking accrues as
@@ -4949,6 +4985,24 @@ class FrontalLobe:
                 energy_reserve=body.energy_reserve,
             )
         )
+
+        # Norepinephrine sets the exploration temperature of action
+        # selection (Doya, 2002; Aston-Jones & Cohen, 2005) — elevated
+        # tonic LC-NE widens the search over candidate actions.
+        try:
+            core = self._last_core_state
+            self.decision_engine.set_exploration(
+                float(core.chemicals.get("norepinephrine", 0.3)) if core is not None else None
+            )
+            # Tonic dopamine = average reward rate ρ̄ (Niv et al.,
+            # 2007): rich recent reward lowers the release bar —
+            # the system acts with vigor rather than hesitating.
+            self.decision_engine.set_vigor(self.td_learner.average_reward_rate())
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "frontal_lobe.prefrontal._apply_decision_engine",
+                e,
+            )
 
         # Make the decision.
         outcome = self.decision_engine.decide(
@@ -6483,6 +6537,21 @@ class FrontalLobe:
                 self.spaced_repetition.record_review(topic, success=True)
 
         # ── 15. TD learning — reward prediction error ──
+        # The learner's meta-parameters follow the body's
+        # neuromodulators (Doya, 2002): serotonin sets the temporal
+        # horizon γ_eff, acetylcholine sets the update speed α_eff.
+        try:
+            core = self._last_core_state
+            if core is not None:
+                self.td_learner.set_modulators(
+                    serotonin=float(core.chemicals.get("serotonin", 0.4)),
+                    acetylcholine=float(core.chemicals.get("acetylcholine", 0.35)),
+                )
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "frontal_lobe.prefrontal._think_stdp_spaced_td",
+                e,
+            )
         # The "state" is the set of active concepts (perception topics).
         # The "reward" is how well the interaction went (confidence +
         # emotional valence). The "next state" is the thought's topics.
@@ -6499,6 +6568,33 @@ class FrontalLobe:
             next_state=thought.topics or perception.topics,
             action=thought.intent,
         )
+        # Phasic-NE unexpected-uncertainty channel (Yu & Dayan, 2005):
+        # a prediction error too large for the current context's known
+        # unreliability means the context model itself is wrong — the
+        # running activation field is attenuated so the next input
+        # forms a new frame instead of being assimilated into the old.
+        try:
+            abs_rpe = abs(td_rpe)
+            self._rpe_abs_mean += self._RPE_EMA_RATE * (abs_rpe - self._rpe_abs_mean)
+            sq = (abs_rpe - self._rpe_abs_mean) ** 2
+            self._rpe_abs_var += self._RPE_EMA_RATE * (sq - self._rpe_abs_var)
+            self._rpe_samples += 1
+            if (
+                self._rpe_samples >= self._RPE_MIN_SAMPLES
+                and abs_rpe > self._rpe_abs_mean + self._RPE_RESET_K * math.sqrt(self._rpe_abs_var)
+            ):
+                self.network.context_reset(strength=self._CONTEXT_RESET_STRENGTH)
+                # The reset itself is a regime change — the baseline
+                # should re-learn from the new context, not keep the
+                # outlier that revealed the old one was broken.
+                self._rpe_samples = 0
+                self._rpe_abs_mean = abs_rpe
+                self._rpe_abs_var = 0.0
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "frontal_lobe.prefrontal._think_stdp_spaced_td",
+                e,
+            )
         # ACC feedback monitoring (Holroyd & Coles, 2002): a negative
         # δ is an outcome worse than expected — the FRN. The dopamine
         # dip below routes the same signal to the neurochemical layer.
@@ -6506,7 +6602,7 @@ class FrontalLobe:
             td_rpe,
             context="interaction reward",
         )
-        # Apply dopamine signal from TD learning
+        # Apply dopamine signal from TD learning.
         dopamine_signal = self.td_learner.get_dopamine_signal()
         if emotion.plasticity > 0.3:
             self.stdp.set_modulator(dopamine_signal)

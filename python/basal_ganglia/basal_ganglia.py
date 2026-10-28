@@ -120,12 +120,21 @@ class BasalGanglia:
         self.base_threshold = base_threshold
         self.max_drive = max_drive
 
+    # Vigor (Niv et al., 2007): tonic dopamine reports the average
+    # reward rate — the opportunity cost of time — so a rich reward
+    # history lowers the release bar for action. VIGOR_GAIN converts
+    # the caller's normalized vigor into threshold relief, floored so
+    # the brake can never be fully abolished.
+    VIGOR_GAIN: float = 0.2
+    MIN_EFFECTIVE_THRESHOLD: float = 0.02
+
     def select(
         self,
         bids: list[ActionBid] | tuple[ActionBid, ...],
         *,
         dopamine_rpe: float = 0.0,
         conflict: float | None = None,
+        vigor: float = 0.0,
     ) -> SelectionResult:
         """Run one selection computation."""
         if not bids:
@@ -143,6 +152,9 @@ class BasalGanglia:
             )
         if not math.isfinite(dopamine_rpe):
             raise ValueError("dopamine_rpe must be finite")
+        if not math.isfinite(vigor):
+            raise ValueError("vigor must be finite")
+        vigor = _clip(vigor, 0.0, 1.0)
 
         salience: dict[str, float] = {}
         for bid in bids:
@@ -168,8 +180,14 @@ class BasalGanglia:
         # Conflict raises the release bar: near-tied bids are exactly the
         # case where the model should hesitate, so the threshold carries
         # the brake. The disinhibition sum below deliberately omits it to
-        # avoid charging the winner twice for one conflict.
-        effective_threshold = self.base_threshold + hyperdirect_brake
+        # avoid charging the winner twice for one conflict. Vigor pulls
+        # the other way (Niv et al., 2007): tonic DA — the average reward
+        # rate — is the opportunity cost of time, so a rich reward
+        # history lowers the bar and the system acts more readily.
+        effective_threshold = max(
+            self.MIN_EFFECTIVE_THRESHOLD,
+            self.base_threshold + hyperdirect_brake - self.VIGOR_GAIN * vigor,
+        )
 
         output_inhibition, disinhibition = self._inhibition_maps(
             salience, d1_drive, stn_control, hyperdirect_brake

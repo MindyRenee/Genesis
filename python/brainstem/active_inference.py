@@ -305,13 +305,27 @@ class ActiveInferenceReader:
     just interprets it.
     """
 
+    # ACh expected-uncertainty constants (Yu & Dayan, 2005): the
+    # effective precision of the top-down model is discounted by
+    # ACh above the daemon's tonic baseline.
+    _ACH_BASELINE: float = 0.35
+    _ACH_UNCERTAINTY_GAIN: float = 0.6
+
     def __init__(self, client: GenesisClient) -> None:
         """Wire the reader to the daemon client for inference signal reads."""
         self.client = client
         self._last_reading: SelfModelReading | None = None
 
-    def read(self) -> SelfModelReading | None:
+    def read(self, acetylcholine: float | None = None) -> SelfModelReading | None:
         """Read the current inference signals and interpret them.
+
+        Args:
+            acetylcholine: The body's effective ACh level [0, 1].
+                Yu & Dayan (2005) assign ACh the *expected* uncertainty
+                signal — high ACh means the top-down model is known to
+                be unreliable, so prior precision is discounted before
+                it becomes self-confidence. ``None`` leaves the raw
+                precision unmodulated.
 
         Returns None if the daemon can't be reached (offline mode).
         The caller should handle None gracefully — the cognitive mind
@@ -327,13 +341,14 @@ class ActiveInferenceReader:
             )
             return None
 
-        reading = self._interpret(signals)
+        reading = self._interpret(signals, acetylcholine)
         self._last_reading = reading
         return reading
 
     def _interpret(
         self,
         signals: InferenceSummary,
+        acetylcholine: float | None = None,
     ) -> SelfModelReading:
         """Interpret raw inference signals into a cognitive reading."""
 
@@ -367,7 +382,24 @@ class ActiveInferenceReader:
         # its predictions, so Genesis should trust its own state.
         # Modulated by model maturity — an immature model shouldn't
         # inspire high confidence even if precision is temporarily high.
-        self_confidence = signals.precision * signals.model_maturity
+        #
+        # Acetylcholine discounts the precision of the top-down model
+        # itself (Yu & Dayan, 2005): ACh reports *expected*
+        # uncertainty — when it is high the system should trust
+        # bottom-up evidence over its own prior, so effective
+        # precision falls. Below the resting baseline the prior is
+        # correspondingly *more* trustworthy.
+        precision = signals.precision
+        if acetylcholine is not None:
+            ach = max(0.0, min(1.0, acetylcholine))
+            precision = max(
+                0.0,
+                min(
+                    1.0,
+                    precision * (1.0 - self._ACH_UNCERTAINTY_GAIN * (ach - self._ACH_BASELINE)),
+                ),
+            )
+        self_confidence = precision * signals.model_maturity
 
         # ── Social presence ──
         # Attunement → social presence. High attunement = Genesis is

@@ -196,6 +196,16 @@ class MemoryRecord:
             before somatic tagging. Powers state-dependent
             retrieval: recall favours memories encoded in a similar
             bodily state (Eich 1980; Bower 1981).
+        tag_strength: Synaptic tag [0..1] (Frey & Morris, 1997). Set
+            at encoding proportional to induction strength, reset on
+            reconsolidation, decays over ~hours. While the tag is
+            open, a phasic dopamine/NE event can *capture* plasticity-
+            related proteins and convert the trace to late-LTP.
+        late_strength: Committed late-LTP component [0..1] — the
+            protein-synthesis-dependent part of the trace. Acts as a
+            floor on retention: the committed fraction survives
+            Ebbinghaus decay (late-LTP is the persistence the tag
+            buys).
     """
 
     episode_id: int
@@ -214,6 +224,8 @@ class MemoryRecord:
     reconsolidation_count: int = 0
     source_tag: SourceTag | None = None
     somatic: dict[str, float] | None = None
+    tag_strength: float = 0.0
+    late_strength: float = 0.0
 
 
 # ─── Reconsolidation modification ────────────────────────────────────
@@ -384,6 +396,31 @@ class MemorySystem:
     _HIPPOCAMPAL_DECAY: float = 0.15
     # Synaptic consolidation boost applied immediately after encoding.
     _SYNAPTIC_BOOST: float = 0.4
+    # ── Synaptic tag and capture (Frey & Morris, 1997) ──────────
+    # Early-LTP sets a tag at the potentiated synapse; the tag alone
+    # decays within ~1–3 h. Late-LTP requires plasticity-related
+    # proteins (PRPs), whose synthesis is gated by dopamine (D1/D5)
+    # and noradrenaline arriving within the tag window. Tagged
+    # synapses *capture* from a shared, finite protein pool — so a
+    # strong dopaminergic event commits every memory tagged in the
+    # window (behavioral tagging; Redondo & Morris, 2011), while
+    # untagged traces fade with early-LTP.
+    # Tag lifetime ~1 h (scaled down like the reconsolidation window).
+    _TAG_TAU_S: float = 3600.0
+    # Below this tag strength the tag is treated as closed.
+    _TAG_EPSILON: float = 1e-3
+    # Effective dopamine level that opens the capture gate — resting
+    # tonic (~0.35) must not commit anything; phasic bursts do.
+    _CAPTURE_DA_THRESHOLD: float = 0.5
+    # Fraction of an open tag converted to late-LTP per capture pass
+    # (bounded by the protein pool — synthesis is rate-limited).
+    _CAPTURE_GAIN: float = 0.5
+    # Shared plasticity-related protein pool: capacity and the amount
+    # regenerated per N3 consolidation pass (scaled by the sleep
+    # intensity drive). Sleep resynthesizes PRPs — this is a real
+    # reason consolidation needs sleep, not a batch schedule.
+    _PROTEIN_POOL_CAP: float = 1.0
+    _PROTEIN_REGEN_N3: float = 0.5
 
     def __init__(
         self,
@@ -416,6 +453,10 @@ class MemorySystem:
         self.systems_consolidation_count: int = 0
         self.sleep_consolidation_count: int = 0
         self.facts_replayed_count: int = 0
+        self.tag_capture_count: int = 0
+        # Shared plasticity-related protein pool (tag-and-capture):
+        # depleted by capture events, resynthesized during SWS.
+        self._protein_pool: float = self._PROTEIN_POOL_CAP
 
         # Optional callback: called with replayed episode text so the
         # semantic memory / concept network can extract relationships.
@@ -651,6 +692,10 @@ class MemorySystem:
                 confidence=max(0.0, min(1.0, source_confidence)),
             ),
             somatic=dict(somatic) if isinstance(somatic, dict) else None,
+            # Encoding sets the synaptic tag proportional to induction
+            # strength (Frey & Morris): a weakly-encoded trace tags
+            # weakly and needs a bigger dopaminergic event to persist.
+            tag_strength=clean_salience,
         )
         self._records[eid] = record
 
@@ -1669,6 +1714,14 @@ class MemorySystem:
         if sleep_stage == SleepStage.N3:
             # SWS: replay recent memories + systems consolidation.
             processed = self._consolidate_n3(recent_cutoff, strength_scale)
+            # Slow-wave sleep resynthesizes plasticity-related
+            # proteins — the pool that tag-and-capture draws from is
+            # finite and regenerates offline, which is why a strong
+            # day of learning literally needs the night.
+            self._protein_pool = min(
+                self._PROTEIN_POOL_CAP,
+                self._protein_pool + self._PROTEIN_REGEN_N3 * strength_scale,
+            )
         elif sleep_stage == SleepStage.N2:
             # N2: sleep spindles drive hippocampal→neocortical transfer.
             # The bulk of memory transfer happens in N2.
@@ -2156,6 +2209,10 @@ class MemorySystem:
         # while making the function idempotent.
         target = max(0.0, decayed - total_interference) * retrieval_mult * adaptive_mult
         rec.retention = min(rec.retention, target)
+        # Late-LTP floor (Frey & Morris): the committed, protein-
+        # synthesis-dependent component survives Ebbinghaus decay —
+        # capture during the tag window is what makes a trace last.
+        rec.retention = max(rec.retention, rec.late_strength)
 
         # ── Mark forgotten if below threshold ────────────────
         if rec.retention < self.config.forgetting_threshold:
@@ -2227,6 +2284,10 @@ class MemorySystem:
                     ),
                 )
 
+        # Reconsolidation re-destabilizes the synapse — the re-stored
+        # trace carries a fresh tag, so a dopaminergic event inside
+        # the new window can re-commit it at the modified strength.
+        rec.tag_strength = max(rec.tag_strength, rec.salience)
         # Close the reconsolidation window (memory is re-stored).
         rec.reconsolidation_window = 0.0
         rec.last_reconsolidated = int(time.time() * 1000)
@@ -2246,6 +2307,55 @@ class MemorySystem:
         for rec in list(self._records.values()):
             if rec.reconsolidation_window > 0:
                 rec.reconsolidation_window = max(0.0, rec.reconsolidation_window - dt)
+
+    def tick_tags(self, dt: float, dopamine: float = 0.0) -> int:
+        """Advance synaptic tags and run dopamine-gated capture.
+
+        Two coupled processes (Frey & Morris, 1997; Clopath et al.,
+        2008; Redondo & Morris, 2011):
+
+        1. **Tag decay**: every open synaptic tag decays
+           ``tag *= exp(-dt / _TAG_TAU_S)`` — the early-LTP window
+           closes on the ~hour scale. A tag that decays uncaptured
+           leaves the trace to normal forgetting.
+        2. **Capture**: while the effective dopamine level is above
+           ``_CAPTURE_DA_THRESHOLD`` (a phasic event, not tonic),
+           every open tag draws from the shared protein pool and
+           converts a fraction of itself to ``late_strength`` —
+           the committed late-LTP floor. The pool is finite, so a
+           strong dopaminergic event rescues *all* memories tagged
+           in the window but cannot commit the whole world:
+           salient (strongly tagged) traces win the pool first.
+
+        Args:
+            dt: Elapsed time in seconds.
+            dopamine: The body's current effective dopamine level
+                [0, 1]. Below the capture threshold only decay runs.
+
+        Returns:
+            Number of tags that captured protein this call.
+        """
+        decay = math.exp(-max(0.0, dt) / self._TAG_TAU_S)
+        capturing = dopamine >= self._CAPTURE_DA_THRESHOLD and self._protein_pool > 0.0
+        captured = 0
+        for rec in list(self._records.values()):
+            if rec.tag_strength <= 0.0:
+                continue
+            rec.tag_strength *= decay
+            if rec.tag_strength < self._TAG_EPSILON:
+                rec.tag_strength = 0.0
+                continue
+            if capturing:
+                want = rec.tag_strength * self._CAPTURE_GAIN
+                take = min(want, self._protein_pool)
+                if take <= 0.0:
+                    break  # pool exhausted — stronger tags captured first
+                rec.tag_strength -= take
+                rec.late_strength = min(1.0, rec.late_strength + take)
+                self._protein_pool -= take
+                captured += 1
+        self.tag_capture_count += captured
+        return captured
 
     # ═══════════════════════════════════════════════════════════════
     #  Source monitoring (Johnson et al., 1993)
@@ -2454,9 +2564,13 @@ class MemorySystem:
                     "source_modality": rec.source_tag.modality if rec.source_tag else "text",
                     "source_confidence": rec.source_tag.confidence if rec.source_tag else 0.8,
                     "somatic": dict(rec.somatic) if rec.somatic else None,
+                    "tag_strength": rec.tag_strength,
+                    "late_strength": rec.late_strength,
                 }
                 for rec in _snapshot(self._records.values)
             ],
+            "protein_pool": self._protein_pool,
+            "tag_capture_count": self.tag_capture_count,
             "forgotten_count": self.forgotten_count,
             "reconsolidation_count": self.reconsolidation_count,
             "synaptic_consolidation_count": self.synaptic_consolidation_count,
@@ -2507,8 +2621,18 @@ class MemorySystem:
                     if isinstance(entry.get("somatic"), dict)
                     else None
                 ),
+                tag_strength=float(entry.get("tag_strength", 0.0)),
+                late_strength=float(entry.get("late_strength", 0.0)),
             )
             self._records[eid] = rec
+        self._protein_pool = max(
+            0.0,
+            min(
+                self._PROTEIN_POOL_CAP,
+                float(data.get("protein_pool", self._PROTEIN_POOL_CAP)),
+            ),
+        )
+        self.tag_capture_count = int(data.get("tag_capture_count", 0))
         self.forgotten_count = int(data.get("forgotten_count", 0))
         self.reconsolidation_count = int(data.get("reconsolidation_count", 0))
         self.synaptic_consolidation_count = int(data.get("synaptic_consolidation_count", 0))
