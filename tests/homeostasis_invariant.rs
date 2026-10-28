@@ -35,18 +35,34 @@ use genesis::state::neurochemical::{NeuroTickParams, NeurochemicalId};
 
 /// Chemicals with no circadian baseline modifier. These must return to
 /// their genetic default when coupling is disabled.
-const UNMODULATED: [NeurochemicalId; 6] = [
+const UNMODULATED: [NeurochemicalId; 5] = [
     NeurochemicalId::GABA,
     NeurochemicalId::Glutamate,
-    NeurochemicalId::Acetylcholine,
     NeurochemicalId::Norepinephrine,
     NeurochemicalId::Orexin,
     NeurochemicalId::Endorphin,
 ];
 
-/// Chemicals whose equilibrium is legitimately circadian-modulated.
-/// Tracked for reporting, excluded from the assertion.
-const MODULATED: [NeurochemicalId; 2] = [NeurochemicalId::Dopamine, NeurochemicalId::Histamine];
+/// Chemicals whose equilibrium is legitimately offset from the genetic
+/// default. Tracked for reporting, excluded from the assertion.
+///
+/// Dopamine and histamine carry a circadian baseline modifier
+/// (`circadian_baseline_modifier`), so their equilibrium is offset by
+/// the circadian phase. Acetylcholine's homeostatic set-point is shaped
+/// by `basal_forebrain::wake_setpoint`: A1 occupancy on the
+/// wake-active population suppresses the cholinergic target in
+/// proportion to extracellular adenosine — the somnogenic signal acting
+/// at its site. Over this run's ~3.9 simulated hours of wakefulness,
+/// Process S accumulates and the set-point sags well below the genetic
+/// default. Asserting ACh returns to the raw default would be asserting
+/// that accumulated sleep pressure does not suppress the cholinergic
+/// set-point — the same category error as asserting the circadian
+/// rhythm does not exist.
+const MODULATED: [NeurochemicalId; 3] = [
+    NeurochemicalId::Dopamine,
+    NeurochemicalId::Histamine,
+    NeurochemicalId::Acetylcholine,
+];
 
 const TICKS: u32 = 14_000;
 const TOLERANCE: f32 = 0.01;

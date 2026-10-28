@@ -1599,35 +1599,67 @@ fn test_kalman_predict_step_propagates_variance() {
 
 #[test]
 fn test_posterior_variance_shrinks_under_predictability() {
-    // Under sustained predictability, the posterior variance shrinks
-    // (the model becomes confident in its estimates) and precision
-    // rises. Both drive the free energy toward a low steady state.
-    // We verify that the free energy decreases under sustained
-    // predictability — a property that holds because the posterior
-    // variance (now functional) contributes to the expected-uncertainty
-    // term and shrinks over time.
+    // Under sustained predictability, the Kalman posterior variance
+    // (belief_var) contracts — the model becomes confident in its
+    // estimates — and precision rises.
+    //
+    // Free energy does NOT carry a separate decaying uncertainty
+    // term: with the exact Kalman posterior, the posterior-variance
+    // contribution to the expected NLL is canceled identically by
+    // the covariance terms in the Gaussian KL, so VFE equals the
+    // predictive-density floor the moment prediction error vanishes
+    // (F = surprise + KL[q||p*], and KL = 0 when q is the true
+    // posterior). A perfectly predicted state therefore sits at
+    // fe = 0 immediately, for any variance. The meaningful
+    // assertions are the variance contraction itself and the fall
+    // of free energy from an elevated, unpredictable regime.
     let mut engine = ActiveInferenceEngine::new();
     let state = [0.5f32; NEUROCHEMICAL_COUNT];
 
-    let mut fe_20 = 0.0f32;
+    // Phase 1: unpredictable input — alternating levels defeat the
+    // linear transition model, so prediction error persists and free
+    // energy stays elevated.
+    let mut fe_unpredictable = 0.0f32;
     for i in 0..200 {
-        let result = engine.cycle(&state, &state, 0.1, &state);
+        let v = if i % 2 == 0 { 0.8 } else { 0.2 };
+        let varied = [v; NEUROCHEMICAL_COUNT];
+        fe_unpredictable = engine.cycle(&varied, &varied, 0.1, &state).free_energy;
+    }
+    assert!(
+        fe_unpredictable > 0.1,
+        "free energy should be elevated under unpredictable input: {}",
+        fe_unpredictable
+    );
+
+    // Phase 2: sustained predictability — the posterior variance
+    // contracts monotonically and free energy falls to its floor.
+    let mut var_20 = 0.0f32;
+    for i in 0..200 {
+        engine.cycle(&state, &state, 0.1, &state);
         if i == 19 {
-            fe_20 = result.free_energy;
+            var_20 = engine.posterior_variance_mean();
         }
     }
-    let fe_200 = engine.signals().free_energy;
-
+    let var_200 = engine.posterior_variance_mean();
     assert!(
-        fe_200 < fe_20,
-        "free energy should decrease under sustained predictability as \
-         the posterior variance shrinks: after 20 ticks={}, after 200={}",
-        fe_20,
-        fe_200
+        var_200 < var_20,
+        "posterior variance should shrink under sustained \
+         predictability: after 20 ticks={}, after 200={}",
+        var_20,
+        var_200
     );
+
     // The steady-state free energy should be low — the model has
     // learned the state and both precision and belief_var have
     // converged to confident values.
+    let fe_200 = engine.signals().free_energy;
+    assert!(
+        fe_200 < fe_unpredictable,
+        "free energy should decrease under sustained predictability: \
+         unpredictable={}, settled={}",
+        fe_unpredictable,
+        fe_200
+    );
     assert!(
         fe_200 < 0.1,
         "free energy should be low after sustained predictability: {}",
@@ -1637,18 +1669,16 @@ fn test_posterior_variance_shrinks_under_predictability() {
 
 #[test]
 fn test_posterior_variance_elevated_after_surprise() {
-    // After a surprising observation, the posterior variance (belief_var)
-    // should be elevated — the observation was far from the prediction,
-    // so the Kalman update moved the belief significantly, and the
-    // posterior variance reflects the residual uncertainty. This
-    // elevated belief_var should contribute to the free energy through
-    // the expected-uncertainty term, keeping the free energy above zero
-    // even as the surprise EMA decays.
+    // After a surprising observation, the belief mean lags the new
+    // state — the Kalman gain is less than one, so the posterior
+    // chases the observation over several cycles. While the residual
+    // (post − belief_mean) remains nonzero, the VFE stays above the
+    // predictive-density floor and the free-energy signal stays
+    // positive even as the surprise EMA decays.
     //
     // We verify that after a surprise followed by a brief predictable
-    // period (where surprise_ema decays but belief_var remains
-    // elevated), the free energy is still positive — reflecting the
-    // posterior variance contribution.
+    // period (where surprise_ema decays but the belief is still
+    // converging), the free energy is still positive.
     let mut engine = ActiveInferenceEngine::new();
     let state = [0.5f32; NEUROCHEMICAL_COUNT];
 
@@ -1668,13 +1698,13 @@ fn test_posterior_variance_elevated_after_surprise() {
     }
 
     let signals = engine.signals();
-    // The free energy should still be positive, reflecting the
-    // elevated posterior variance (the model is uncertain about its
-    // estimates even though recent predictions have been accurate).
+    // The free energy should still be positive — the belief mean is
+    // still converging toward 0.9, so the residual prediction error
+    // keeps the VFE above its floor.
     assert!(
         signals.free_energy > 0.0,
-        "free energy should reflect elevated posterior variance after \
-         surprise: free_energy={}",
+        "free energy should stay positive while the posterior mean is \
+         still converging after surprise: free_energy={}",
         signals.free_energy
     );
 }

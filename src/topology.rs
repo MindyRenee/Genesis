@@ -230,12 +230,19 @@ mod tests {
     #[test]
     fn declared_modules_exist() {
         // The map must point at real files: a renamed or removed
-        // module leaves the spine referencing a phantom.
+        // module leaves the spine referencing a phantom. Rust resolves
+        // a module as either `<path>.rs` or `<path>/mod.rs` — both
+        // layouts exist in this crate, so accept either.
         let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
         for r in REGIONS {
             for m in r.modules {
-                let path = src.join(m.replace("::", "/")).with_extension("rs");
-                assert!(path.is_file(), "{} declares missing module {}", r.name, m);
+                let path = src.join(m.replace("::", "/"));
+                assert!(
+                    path.with_extension("rs").is_file() || path.join("mod.rs").is_file(),
+                    "{} declares missing module {}",
+                    r.name,
+                    m
+                );
             }
         }
     }

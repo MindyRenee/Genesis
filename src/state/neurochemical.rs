@@ -273,10 +273,16 @@ pub const CORTISOL_METABOLIC_RATE: f32 = 1.75e-4;
 
 /// First-order metabolic leak for CRH, per second.
 ///
-/// CRH is a hypothalamic releasing hormone with a plasma half-life of
-/// only a few minutes; 0.005/s is a ~2.3 min half-life, so a stress
-/// signal clears once its cause is gone.
-pub const CRH_METABOLIC_RATE: f32 = 0.005;
+/// Measured plasma CRH clearance is biexponential: human CRH
+/// disappears with t½ ≈ 30.5 min (J Endocrinol 1992, 133:487), and
+/// ovine CRH in humans with fast/slow components of ~11.6 and ~73 min
+/// (JCEM 1984, 58:192; components ~6 and ~55 min in JCEM 1982). The
+/// modeled variable is the hypothalamic stress-drive signal — the
+/// hypophyseal-portal CRH pulse rather than a peripheral plasma
+/// measurement — so the fast component is used: 1.9e-3/s is a ~6 min
+/// half-life, long enough for the signal to outlast a brief impulse
+/// and short enough to clear once its cause is gone.
+pub const CRH_METABOLIC_RATE: f32 = 1.9e-3;
 
 // ─── Circulating endocrine pools ─────────────────────────────
 //
@@ -362,9 +368,14 @@ pub const MELATONIN_SECRETION_RATE: f32 = 0.80 * MELATONIN_METABOLIC_RATE;
 /// secretion drive itself, distinct from the slower phase-shift
 /// (entrainment) channel the sleep-wake network already owns.
 /// Ordinary room light suppresses substantially: Zeitzer et al.
-/// (2000) fit a steep dose–response over ~10–10,000 lux with ~50%
-/// suppression in the low hundreds of lux at hour-scale exposures.
-pub const MELATONIN_LIGHT_EC50_LUX: f32 = 200.0;
+/// (2000) showed the human response is far more sensitive than once
+/// assumed, and later dose–response work puts the group ED50 for
+/// ~1 h exposures near ~25 melanopic-EDI lux — well inside ordinary
+/// room light (Brown et al., PLoS Biol 2022; Gooley et al., JCEM
+/// 2011 measured ~90% suppression under ~200 lux room light).
+/// EC50 = 30 photopic lux approximates the melanopic ED50 for
+/// typical indoor spectra.
+pub const MELATONIN_LIGHT_EC50_LUX: f32 = 30.0;
 
 /// Hill slope of the light-suppression dose response.
 pub const MELATONIN_LIGHT_HILL: f32 = 1.5;
@@ -647,15 +658,45 @@ pub const HPA_BASAL_DRIVE: f32 = 0.05;
 ///
 /// High cortisol suppresses ACTH release from the anterior pituitary,
 /// which in turn reduces cortisol synthesis. This is the primary
-/// negative feedback loop of the HPA axis. The previous gain (0.005)
-/// was too weak to balance the CRH→ACTH→cortisol cascade, allowing
-/// cortisol to remain elevated indefinitely. The stronger gain (0.02)
-/// ensures that sustained high cortisol suppresses its own production
-/// on the same timescale as the ACTH response.
+/// negative feedback loop of the HPA axis — in vivo it sets on ~4 min
+/// after the cortisol rise begins and is rate-sensitive (Posner et
+/// al., Horm Res Paediatr 2024), abstracted here as an instantaneous
+/// level drain.
+///
+/// The gain is dimensionless and applied against
+/// [`ACTH_APPROACH_RATE`]: the drain is `cort_eff × gain × rate × dt`,
+/// so the ACTH equilibrium is `acth* = target − gain·cort_eff`
+/// regardless of how fast the pituitary approach runs. Writing the
+/// drain as an absolute per-tick rate instead made it 12× stronger
+/// than the approach once the approach was slowed to the measured
+/// ~60 s onset scale, and a modest cortisol elevation crushed ACTH
+/// to zero.
 ///
 /// (Herman et al., 2016 — HPA axis negative feedback; de Kloet et al.,
 /// 1998 — corticosteroid receptor-mediated feedback)
-pub const HPA_CORTISOL_FEEDBACK_RATE: f32 = 0.02;
+pub const HPA_CORTISOL_FEEDBACK_GAIN: f32 = 1.0;
+
+/// ACTH first-order approach rate toward its CRH-driven target, per
+/// second.
+///
+/// Plasma ACTH becomes measurable ~1–5 min after a stressor and the
+/// cortisol response lags further behind it (detectable ~10 min,
+/// peaking ~20–30 min; Dickerson & Kemeny, 2004). A time constant of
+/// ~60 s (rate 0.017/s) puts the pituitary response on the measured
+/// onset scale rather than the previous τ ≈ 5 s, which collapsed the
+/// ACTH lag to a few integration steps. The ACTH→cortisol and
+/// cortisol-feedback arms provide the rest of the axis's delay.
+pub const ACTH_APPROACH_RATE: f32 = 0.017;
+
+/// Phasic-burst decay time constant (seconds).
+///
+/// FSCV-measured phasic dopamine transients peak in <0.5 s and decay
+/// with τ ≈ 1.4–1.7 s in vivo (VTA τ 1.4 s; LC noradrenaline τ 1.7 s —
+/// Courtney & Ford, J Neurosci 2014, 34:7645). τ = 1.5 s keeps the
+/// burst on the measured extrasynaptic timescale — the previous
+/// 0.80/step retention gave τ ≈ 0.45 s, clearing transients ~3×
+/// faster than the transporter-bound decay.
+pub const PHASIC_DECAY_TAU_SECS: f32 = 1.5;
 
 /// Autoreceptor self-inhibition threshold.
 ///
@@ -717,15 +758,18 @@ pub const AUTORECEPTOR_GAIN: f32 = 200.0;
 ///    deviation due to burnout), turnover slowly restores receptor
 ///    function.
 ///
-///    Each factor's turnover is proportional to its adaptation rate
-///    (1.0×, 0.2×, 0.05× for sensitivity, desensitization,
-///    internalization respectively). This ensures that:
-///    - In normal overstimulation: desens/intern stay near 1.0 (their
-///      slow turnover is overwhelmed by downregulation), keeping
-///      health high and sensitivity at its floor.
-///    - In extreme burnout: desens/intern recover slowly enough that
-///      health stays low, allowing sensitivity turnover to overcome
-///      the weak (health-scaled) downregulation.
+///    Each factor's turnover is proportional to its adaptation rate,
+///    ordered by the biological cascade (5.0×, 1.0×, 0.2× for
+///    desensitization, internalization, sensitivity respectively —
+///    dephosphorylation is fast, membrane recycling intermediate,
+///    receptor synthesis slow). This ensures that:
+///    - In normal overstimulation: desensitization carries the acute
+///      adaptation on the measured minutes timescale, and recovers
+///      quickly once the drive drops.
+///    - In extreme burnout: health-scaled downregulation weakens as
+///      effective deviation collapses, letting turnover restore
+///      function; under sustained strong drive the factors correctly
+///      stay downregulated (chronic agonist → chronic tolerance).
 ///
 /// These mechanisms are always active — no thresholds, no recovery
 /// zones, no limit cycles. The system smoothly transitions between
@@ -870,13 +914,15 @@ impl NeurochemicalId {
     ///   ~200 nM extracellular. Always active. The GLU/GABA balance
     ///   is the primary E/I axis.
     /// - **BDNF** (0.45): Constitutively expressed neurotrophin,
-    ///   ~10 ng/mL in serum. Supports plasticity at a moderate tonic
+    ///   ~20–30 ng/mL in serum. Supports plasticity at a moderate tonic
     ///   level.
-    /// - **Serotonin** (0.40): Tonic 5-HT is ~10 nM but is a potent
-    ///   modulator. Oscillates with ~10 min periods (FSCAV data).
-    ///   Regulates mood, sleep, and BDNF expression.
+    /// - **Serotonin** (0.40): Tonic extracellular 5-HT is low
+    ///   nanomolar (~0.7–3 nM in NAcc/DRN microdialysis; FSCAV tonic
+    ///   estimates run higher) but is a potent modulator. Oscillates
+    ///   with ~10 min periods (FSCAV data). Regulates mood, sleep,
+    ///   and BDNF expression.
     /// - **Dopamine** (0.35): Tonic DA is very low (~0.06 nM in PFC,
-    ///   ~5 nM in VTA) but phasic bursts are large. The baseline
+    ///   ~5–20 nM in striatum) but phasic bursts are large. The baseline
     ///   reflects tonic firing rate, not concentration. Spontaneous
     ///   impulses at ~0.01/sec (Mohebi et al., 2019).
     /// - **Acetylcholine** (0.35): Tonic ACh ~1 nM in PFC. Sets
@@ -913,7 +959,7 @@ impl NeurochemicalId {
             Self::Glutamate => 0.60,       // ~2 µM — main excitatory, highest
             Self::GABA => 0.50,            // ~200 nM — main inhibitory
             Self::BDNF => 0.45,            // constitutive neurotrophin
-            Self::Serotonin => 0.40,       // ~10 nM — modulatory, oscillating
+            Self::Serotonin => 0.40,       // ~1–3 nM tonic — modulatory, oscillating
             Self::Dopamine => 0.35,        // ~0.06 nM tonic — low but potent
             Self::Acetylcholine => 0.35,   // ~1 nM — cortical activation
             Self::Norepinephrine => 0.30,  // ~0.13 nM — arousal
@@ -1409,14 +1455,24 @@ pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
     //   interneuron → DA disinhibition). The documented strong positive
     //   coupling for DA, appropriate for runner's high.
     // GABA→DA (-0.10): GABAergic inhibition of VTA DA neurons.
-    // ADN→DA (0.00): adenosine's effect on dopamine is handled by the
-    //   sleep pressure mechanism (level accumulation/clearance), not direct coupling.
+    // ADN→DA (-0.10): the striatal A2A–D2 receptor heteromer —
+    //   adenosine A2A activation lowers the affinity and intrinsic
+    //   efficacy of dopamine at D2 receptors (the interaction caffeine
+    //   blocks; Ferré et al., PNAS 2015). A receptor-efficacy
+    //   antagonism abstracted as a weak level coupling — distinct from
+    //   the metabolic sleep-pressure pathway, which acts on arousal
+    //   nuclei and stays out of this matrix.
     // MEL→DA (-0.10): sleep suppression of dopaminergic arousal.
-    // CORT→DA (0.00): cortisol does not directly promote dopamine.
+    // CORT→DA (+0.10): glucocorticoids potentiate dopaminergic
+    //   signaling — intra-PFC corticosterone increases DA efflux and
+    //   local GR blockade blunts the stress-evoked rise (Butts et al.,
+    //   2011); corticosterone slows NAc DA clearance via uptake2/OCT3
+    //   (Graf et al., 2013); systemic corticosterone elevates NAc DA
+    //   (Piazza et al., PNAS 1996).
     // All other couplings weak (0.10) — volume transmission.
     [
-        0.00, -0.10, 0.10, 0.10, -0.10, 0.10, 0.00, 0.10, 0.10, 0.10, 0.00, 0.10, 0.10, 0.00, 0.00,
-        0.10, 0.00, -0.10,
+        0.00, -0.10, 0.10, 0.10, -0.10, 0.10, 0.10, 0.10, 0.10, 0.10, -0.10, 0.10, 0.10, 0.00,
+        0.00, 0.10, 0.00, -0.10,
     ],
     // SRT →  how others affect serotonin
     // BDNF→SRT (+0.10): the antidepressant positive feedback — SSRIs
@@ -1475,11 +1531,14 @@ pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
     // ALL positive couplings removed. Cortisol is produced ONLY by the
     // HPA cascade (CRH→ACTH→CORT), which is maturation-gated (SHRP).
     // The coupling matrix only has suppressive feedback — the signals
-    // that tell cortisol to stop (serotonin, GABA, oxytocin, endorphin,
-    // BDNF, ECB). This prevents the death spiral where normal arousal
+    // that tell cortisol to stop (GABA, oxytocin, endorphin, BDNF,
+    // ECB). This prevents the death spiral where normal arousal
     // drives cortisol through the coupling matrix, bypassing the HPA gate.
+    // SRT→CORT (0.00): serotonin is not a cortisol brake — 5-HT
+    //   *activates* the HPA axis (5-HT2C depolarizes PVN CRH neurons;
+    //   see the CRH row). The previous -0.10 had the sign backwards.
     [
-        0.00, -0.10, 0.00, 0.00, -0.15, 0.00, 0.00, -0.10, -0.10, 0.00, 0.00, -0.10, -0.10, 0.00,
+        0.00, 0.00, 0.00, 0.00, -0.15, 0.00, 0.00, -0.10, -0.10, 0.00, 0.00, -0.10, -0.10, 0.00,
         0.00, 0.00, 0.00, 0.00,
     ],
     // OXY →  how others affect oxytocin
@@ -1511,18 +1570,16 @@ pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
         0.00, 0.10, 0.00, -0.10,
     ],
     // ADN →  how others affect adenosine
-    // Adenosine's interactions with arousal systems are handled by the
-    // sleep pressure mechanism (level accumulation/clearance), NOT by the coupling
-    // matrix. Only GABA (promotes sleep) and cortisol (stress-related
-    // adenosine release) have direct coupling.
-    // OX→ADN (0.00): orexin does not suppress adenosine. Adenosine is a
-    //   metabolic byproduct of neural activity — orexin-driven arousal
-    //   *builds* it (orexin neuron loss blunts the wake-time adenosine
-    //   rise; Murillo-Rodriguez et al., Eur J Neurosci 2008). Orexin
-    //   counteracts adenosine's *effect* at the receiving neurons — the
-    //   flip-flop fight is downstream, not on the metabolite itself.
+    // ALL couplings zero: adenosine's level is owned by the dedicated
+    // sleep-pressure mechanism (saturating Process-S accumulation
+    // during wakefulness, glymphatic clearance during sleep), which the
+    // generic update skips unconditionally. Activity→adenosine drive is
+    // already carried by the arousal-scaled accumulation rate — direct
+    // level coupling has no restoring force to balance it and
+    // integrated unboundedly to the 1.0 clamp under sustained wake,
+    // sagging basal-forebrain ACh through the A1 mechanism.
     [
-        0.00, 0.00, 0.00, 0.00, 0.10, 0.00, 0.10, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+        0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
         0.00, 0.00, 0.00,
     ],
     // BDNF → how others affect BDNF
@@ -1553,27 +1610,43 @@ pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
         0.00, 0.10, 0.00,
     ],
     // CRH → how others affect CRH
-    // ALL positive couplings removed. CRH is produced only by the stress
-    // detection mechanism (emotional regulator) and the HPA cascade.
-    // Only suppressive feedback: GABA, cortisol (negative feedback),
-    // oxytocin, ECB.
+    // Positive couplings removed except the one documented excitatory
+    // input: SRT→CRH (+0.10). Serotonin depolarizes PVN CRH neurons
+    // via 5-HT2C — ~half of CRH neurons coexpress the receptor, and
+    // 5-HT2C knockout blunts 5-HT-evoked CRH/corticosterone release
+    // (Heisler et al., J Neurosci 2007); 5-HT1A/2A agonists raise
+    // corticosterone, as do SSRIs acutely. Deviation-gated, so only
+    // elevated serotonergic drive engages it. Otherwise CRH is
+    // produced by the stress detection mechanism (emotional
+    // regulator), with suppressive feedback from GABA, cortisol
+    // (negative feedback), oxytocin, and ECB.
     [
-        0.00, 0.00, 0.00, 0.00, -0.10, 0.00, -0.10, -0.10, 0.00, 0.00, 0.00, 0.00, -0.10, 0.00,
+        0.00, 0.10, 0.00, 0.00, -0.10, 0.00, -0.10, -0.10, 0.00, 0.00, 0.00, 0.00, -0.10, 0.00,
         0.00, 0.00, 0.00, 0.00,
     ],
     // OX (orexin) → how others affect orexin
     // GABA→OX (-0.10): VLPO sleep-promoting neurons inhibit orexin.
-    // ADN→OX (-0.10): sleep pressure inhibits orexin (the sleep switch).
-    // Arousal mutual excitation (NE, HIST) kept weak (0.10).
-    // DA→OX (0.00): dopamine does not directly promote orexin — the
-    //   DA→OX→DA positive feedback loop caused runaway overstimulation.
-    //   Orexin is driven by metabolic state, not reward.
-    // SRT→OX (-0.10): serotonin promotes sleep onset.
+    // ADN→OX (-0.10): adenosine inhibits orexin neurons via A1 (the
+    //   sleep switch; Liu & Gao 2007).
+    // The catecholamines all directly HYPERPOLARIZE orexin neurons via
+    //   α2-adrenoceptors (NA, DA, and adrenaline alike — Li & van den
+    //   Pol, J Neurosci 2005; Yamanaka et al., J Neurophysiol 2006):
+    //   NE→OX (-0.10), DA→OX (-0.10), EPI→OX (-0.10). The arousal
+    //   loop is therefore negative feedback — orexin excites LC/TMN/
+    //   raphe (see their rows), and the catecholamines released
+    //   feed back to inhibit the orexin neurons. The previous
+    //   +0.10 "mutual excitation" had the sign backwards; a
+    //   reciprocal +/+ loop would also be unstable.
+    // HIST→OX (0.00): TMN histamine has no measurable effect on
+    //   orexin neurons (SLEEP 2019, zsy183) — orexin excites the
+    //   TMN (OX2R), not the reverse.
+    // SRT→OX (-0.10): serotonin inhibits orexin neurons via 5-HT1A
+    //   (Muraki et al., 2004) — promotes sleep onset.
     // MEL→OX (-0.10): melatonin pushes the sleep-wake switch toward sleep.
     // ECB→OX (-0.10): stress reduction.
     [
-        0.00, -0.10, 0.10, 0.10, -0.10, 0.10, 0.00, 0.00, 0.00, 0.10, -0.10, 0.00, -0.10, 0.10,
-        0.00, 0.00, 0.10, -0.10,
+        -0.10, -0.10, -0.10, 0.10, -0.10, 0.10, 0.00, 0.00, 0.00, 0.00, -0.10, 0.00, -0.10, 0.10,
+        0.00, 0.00, -0.10, -0.10,
     ],
     // EPI (epinephrine) → how others affect epinephrine
     // ACh→EPI (+0.10): preganglionic cholinergic stimulation of adrenal
@@ -1588,9 +1661,15 @@ pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
     ],
     // MEL (melatonin) → how others affect melatonin
     // Melatonin is primarily driven by the circadian oscillator (SCN).
-    // Wake-promoting signals suppress melatonin: NE, cortisol, orexin.
+    // Wake-promoting signals suppress melatonin: cortisol, orexin.
+    // NE→MEL (0.00): at the pinealocyte the sign is the OPPOSITE of
+    //   the old entry — nocturnal sympathetic NE release is the
+    //   obligate drive for melatonin synthesis (SCG β1/α1 → cAMP →
+    //   AANAT; Klein, Ann NY Acad Sci 2007). The model's NE scalar is
+    //   locus-coeruleus arousal NE, a different pool, and the SCN
+    //   envelope already encodes the real drive, so no coupling.
     [
-        0.00, 0.00, -0.10, 0.00, 0.00, 0.00, -0.10, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+        0.00, 0.00, 0.00, 0.00, 0.00, 0.00, -0.10, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
         -0.10, 0.00, 0.00,
     ],
 ];
@@ -3097,33 +3176,20 @@ impl NeurochemicalVector {
             // to run on a ~4.2 h time constant (chi_s, Daan, Beersma
             // & Borbély 1984).
             //
-            // Fix: skip the main loop entirely for adenosine during
-            // sleep. The glymphatic clearance mechanism (below)
-            // directly reduces the level exponentially, giving the
-            // correct hours-timescale sleep duration.
+            // And with the homeostatic force disabled there is no
+            // restoring force at all — any persistent positive coupling
+            // input integrates into the level unboundedly during wake
+            // (velocity is never pulled back), so a small tonic push
+            // random-walks adenosine to the 1.0 clamp over ~an hour of
+            // wake and the A1 mechanism then sags basal-forebrain ACh
+            // even with accumulation pinned off. The dedicated
+            // mechanism owns the level in every state, so skip the
+            // generic update unconditionally; coupling inputs to
+            // adenosine are retired with it (arousal-scaled Process S
+            // already carries the activity→adenosine drive).
             let is_adenosine = i == NeurochemicalId::Adenosine as usize;
             let is_glutamate = i == NeurochemicalId::Glutamate as usize;
-            let current_phase = MentalPhase::from_u8(self.emergent_phase);
-            // The sleep-wake network is the body's authority on sleep
-            // state: when its LC firing is below the source's 4 Hz
-            // sleep-onset threshold, sleep-mode handling applies even
-            // if the mind's zone still reads awake. `emergent_phase`
-            // cannot be relied on here — it is recomputed every tick by
-            // `recompute_derived` and the waking-phase classifier it
-            // runs never produces NREM/REM (the network injects those
-            // stages only at the end of the tick, via
-            // `apply_network_phase`). The zone is not consulted here:
-            // glymphatic clearance is a sleep-state mechanism, and the
-            // body's sleep state is the network plus its stamped phase —
-            // never the mind's declaration.
-            let is_sleeping = current_phase == MentalPhase::NREM
-                || current_phase == MentalPhase::REM
-                || network_asleep;
-            if is_adenosine && is_sleeping {
-                // Zero residual velocity from the last wakeful tick
-                // so it doesn't push the level back up on the next
-                // wakeful tick. The glymphatic clearance mechanism
-                // below manages the level directly.
+            if is_adenosine {
                 self.chemicals[i].velocity = 0.0;
                 continue;
             }
@@ -3171,15 +3237,6 @@ impl NeurochemicalVector {
                 // level += velocity*dt), making the actual level change
                 // proportional to dt² instead of dt — far weaker than the
                 // documented per-second rate.
-                0.0
-            } else if is_adenosine {
-                // Adenosine's level is managed by its dedicated
-                // sleep-pressure mechanism: saturating exponential
-                // accumulation during wakefulness, glymphatic
-                // clearance during sleep. The homeostatic force
-                // would fight both — preventing accumulation during
-                // wakefulness (receptor burnout trap) and crashing
-                // the level during sleep (see the continue above).
                 0.0
             } else if hormone_clearance.is_some() {
                 // Circulating hormones bypass the generic update
@@ -3365,7 +3422,9 @@ impl NeurochemicalVector {
             }
             coupling_force *= coupling_scale;
 
-            // Stochastic fluctuation (Ornstein-Uhlenbeck noise).
+            // Stochastic fluctuation (diffusion forcing on the spring —
+            // the mean-reverting part of the Ornstein-Uhlenbeck-like
+            // behavior is supplied by the homeostatic restoring force).
             //
             // The brain is never static — spontaneous neural activity
             // constantly perturbs neurotransmitter levels. This noise
@@ -3381,13 +3440,22 @@ impl NeurochemicalVector {
             //
             // Seeded by (noise_seed, chemical_index) via a simple
             // hash — deterministic given the same seed sequence.
+            //
+            // The kick scales with √dt, not dt: for a stochastic
+            // forcing term the increment variance must be proportional
+            // to the step (Euler–Maruyama), so the injected diffusion is
+            // time-step invariant. A linear-dt term makes noise power
+            // shrink quadratically under sub-stepping — the fluctuation
+            // amplitude then depends on the caller's cadence, which is
+            // the same class of defect the exponential decays here are
+            // written to avoid.
             let noise = if params.noise_amplitude > 0.0 && params.noise_seed > 0 {
                 let hash = neuro_noise_hash(params.noise_seed, i as u64);
                 let r01 = (hash as f32) / (u32::MAX as f32); // [0, 1)
                 let r11 = r01 * 2.0 - 1.0; // [-1, 1)
                 let deviation = (self.chemicals[i].level - homeostatic_baseline).abs();
                 let proximity = (1.0 - deviation * 2.0).max(0.0); // 1 near baseline, 0 far
-                params.noise_amplitude * r11 * proximity * dt
+                params.noise_amplitude * r11 * proximity * dt.sqrt()
             } else {
                 0.0
             };
@@ -3426,7 +3494,10 @@ impl NeurochemicalVector {
                 };
                 let restore = metabolic_rate * (homeostatic_baseline - self.chemicals[i].level);
                 let coupled = coupling_force * HORMONE_COUPLING_GAIN;
-                self.chemicals[i].level += (restore + drive + noise) * dt;
+                // The noise is a level diffusion kick (√dt-scaled), not
+                // another rate term — adding it inside the rate would
+                // shrink it to dt^1.5 and make it invisible.
+                self.chemicals[i].level += (restore + drive) * dt + noise;
                 if coupled < 0.0 {
                     // Suppression of a circulating pool acts as enhanced
                     // clearance — inhibited secretion cannot pull hormone
@@ -3514,12 +3585,13 @@ impl NeurochemicalVector {
             // plus the nonlinear `CORTISOL_CLEARANCE_RATE` in the HPA
             // cascade section below.
             //
-            // CRH is a hypothalamic releasing hormone with a plasma
-            // half-life of only a few minutes; it keeps the fast leak
-            // (0.005/s ≈ 2.3 min) here so a stress signal does not
-            // persist after its cause is gone. Applied directly to level
-            // (not through velocity) as `exp(-rate * dt)` for
-            // time-invariance and stability at large dt values.
+            // CRH is a hypothalamic releasing hormone; it keeps a fast
+            // metabolic leak here (1.9e-3/s ≈ 6 min, the measured fast
+            // plasma component — see the constant's doc) so a stress
+            // signal does not persist after its cause is gone. Applied
+            // directly to level (not through velocity) as
+            // `exp(-rate * dt)` for time-invariance and stability at
+            // large dt values.
             if is_stress_hormone {
                 self.chemicals[i].level *= (-CRH_METABOLIC_RATE * dt).exp();
             }
@@ -3850,10 +3922,11 @@ impl NeurochemicalVector {
         // ACTH approaches a target set by CRH effective level, scaled
         // by maturation. When immature, ACTH can't rise even if CRH
         // is elevated — the pituitary is unresponsive.
-        // Use exponential approach for time-invariance: rate 0.2/sec
-        // → time constant ~5 seconds. The previous `* 0.02 * dt_scale`
-        // was a per-tick rate scaled by dt_scale, which is only
-        // correct at the reference tick rate.
+        // Use exponential approach for time-invariance at
+        // ACTH_APPROACH_RATE (0.017/s → time constant ~60 s, the
+        // measured pituitary onset scale). The previous `* 0.02 *
+        // dt_scale` was a per-tick rate scaled by dt_scale, which is
+        // only correct at the reference tick rate.
         //
         // Pituitary responsivity is modulated by two circulating
         // peptides, both acting on the corticotroph rather than on
@@ -3884,7 +3957,12 @@ impl NeurochemicalVector {
         let acth_target = (crh_eff * 0.8 + HPA_BASAL_DRIVE * self.hpa_circadian_factor())
             * maturation
             * pituitary_gain;
-        let acth_alpha = 1.0 - (-0.2 * dt).exp();
+        // Exponential approach for time-invariance at the measured
+        // pituitary onset scale (ACTH_APPROACH_RATE, τ ≈ 60 s — ACTH is
+        // measurable ~1–5 min after a stressor; Dickerson & Kemeny 2004).
+        // The previous 0.2 s⁻¹ rate gave τ ≈ 5 s, compressing the real
+        // pituitary lag to a handful of integration steps.
+        let acth_alpha = 1.0 - (-ACTH_APPROACH_RATE * dt).exp();
         self.acth_level += (acth_target - self.acth_level) * acth_alpha;
         self.acth_level = crate::state::sanitize::finite_clamp(self.acth_level, 0.0, 1.0);
 
@@ -3920,15 +3998,14 @@ impl NeurochemicalVector {
         let cort_excess = (self.chemicals[cort_idx].level - cort_baseline).max(0.0);
 
         // Step 3: Cortisol negative feedback to ACTH
-        // High cortisol suppresses ACTH (long-loop negative feedback).
-        // The HPA_CORTISOL_FEEDBACK_RATE (0.02) is 4× stronger than
-        // the previous value (0.005), closing the negative feedback
-        // loop on the same timescale as the ACTH response. This is
-        // the primary brake on runaway cortisol.
-        // `dt_scale` is correct here: this is a direct level update
-        // (not a velocity force), so `rate * dt_scale = rate * dt / DT`
-        // is time-invariant.
-        self.acth_level -= cort_eff * HPA_CORTISOL_FEEDBACK_RATE * dt_scale;
+        // High cortisol suppresses ACTH (long-loop negative feedback) —
+        // the primary brake on runaway cortisol. The drain is written
+        // against ACTH_APPROACH_RATE so the feedback/feed-forward
+        // balance (acth* = target − gain·cort_eff) is invariant to the
+        // pituitary's speed: as an absolute per-tick rate it became
+        // ~12× stronger than the approach once the approach was slowed
+        // to the measured onset scale.
+        self.acth_level -= cort_eff * HPA_CORTISOL_FEEDBACK_GAIN * ACTH_APPROACH_RATE * dt;
         self.acth_level = crate::state::sanitize::finite_clamp(self.acth_level, 0.0, 1.0);
 
         // Step 3b: Cortisol negative feedback to CRH
@@ -3988,10 +4065,11 @@ impl NeurochemicalVector {
         // anxiolytic), phasic activates 5-HT2A (low-affinity,
         // excitatory).
         for chem in &mut self.chemicals {
-            // Phasic decay: fast exponential decay (seconds timescale).
-            // At the 10 Hz integration step with 0.80 decay, phasic halves in
-            // ~3 steps (~0.3 seconds), reaching near-zero in ~10 steps (~1 s).
-            chem.phasic_level *= 0.80f32.powf(dt_scale);
+            // Phasic decay: exponential at the measured extrasynaptic
+            // timescale (PHASIC_DECAY_TAU_SECS = 1.5 s — FSCV phasic
+            // transients decay with τ ≈ 1.4–1.7 s; Courtney & Ford
+            // 2014). Halves in ~1 s, reaching near-zero in ~5 s.
+            chem.phasic_level *= (-dt / PHASIC_DECAY_TAU_SECS).exp();
             chem.phasic_level = crate::state::sanitize::finite_clamp(chem.phasic_level, 0.0, 1.0);
 
             // Tonic approach: slowly tracks the current level.
@@ -4061,24 +4139,31 @@ impl NeurochemicalVector {
                 params.ne_max,
             );
 
-        // Receptor adaptation: split into two mechanisms.
+        // Receptor adaptation: split into three mechanisms ordered by
+        // the biological cascade — the response to sustained agonist is
         //
-        // 1. Desensitization (fast, phosphorylation-based, reversible in
-        //    minutes): responds quickly to high levels. The
-        //    desensitization_factor decreases when level > baseline and
-        //    recovers toward 1.0 when level ≤ baseline.
+        //   desensitization (seconds–minutes)
+        //     → internalization (minutes–hours)
+        //       → density downregulation (hours–days)
         //
-        // 2. Internalization (slow, membrane removal, reversible in hours):
-        //    responds to sustained high levels. The internalization_factor
-        //    decreases slowly when level > baseline and recovers very
-        //    slowly toward 1.0 when level ≤ baseline.
+        // 1. Desensitization (fastest, phosphorylation-based, reversible
+        //    in minutes): responds first to high levels. β2AR loses ~80%
+        //    of adenylyl-cyclase coupling within ~30 min of full agonist
+        //    and phosphorylates 11–13× within 1 min (January et al.,
+        //    JBC 1997). The desensitization_factor decreases when
+        //    level > baseline and recovers when level ≤ baseline.
         //
-        // Additionally, receptor_sensitivity itself adapts (the original
-        // mechanism, representing total receptor count changes over
-        // days/weeks). Asymmetric rates: downregulation is fast,
-        // upregulation is 3x slower.
+        // 2. Internalization (intermediate, membrane removal, reversible
+        //    in tens of minutes to hours): endocytosis follows
+        //    phosphorylation — ~55% of β2AR is internalized at 30 min.
         //
-        // 3. Sleep receptor resensitization: during sleep, all three
+        // 3. receptor_sensitivity (slowest, receptor density/expression,
+        //    days): the original mechanism. Chronic exposure changes
+        //    receptor number long after functional desensitization has
+        //    run. Asymmetric rates: downregulation is ~3x faster than
+        //    upregulation (supersensitivity develops slowly).
+        //
+        // 4. Sleep receptor resensitization: during sleep, all three
         //    receptor mechanisms (sensitivity, desensitization,
         //    internalization) recover toward 1.0 UNCONDITIONALLY —
         //    not gated on level-baseline deviation. This is the
@@ -4136,25 +4221,33 @@ impl NeurochemicalVector {
             // effective deviation due to burnout), turnover slowly
             // restores receptor function.
             //
-            // Each factor's turnover is proportional to its adaptation
-            // rate (1.0×, 0.2×, 0.05× for sensitivity, desensitization,
-            // internalization respectively). This ensures that:
-            // - In normal overstimulation: desens/intern stay near 1.0
-            //   (their slow turnover is overwhelmed by downregulation),
-            //   keeping health high and sensitivity at its floor.
-            // - In extreme burnout: desens/intern recover slowly enough
-            //   that health stays low, allowing sensitivity turnover
-            //   to overcome the weak (health-scaled) downregulation.
-            let sens_turnover = RECEPTOR_TURNOVER_RATE * dt_scale;
-            let desens_turnover = RECEPTOR_TURNOVER_RATE * 0.2 * dt_scale;
-            let intern_turnover = RECEPTOR_TURNOVER_RATE * 0.05 * dt_scale;
+            // Each factor's passive recovery (turnover) is ordered the
+            // same way as its adaptation rate, matching the biological
+            // recovery cascade: dephosphorylation/resensitization is fast
+            // (desens 5× → τ ~3 min), membrane recycling intermediate
+            // (intern 1× → τ ~17 min), receptor synthesis/replacement
+            // slowest (sens 0.2× → τ ~80 min, the compressed days-scale
+            // term). Because downregulation is health-scaled, it weakens
+            // as receptors burn out, and turnover then restores function:
+            // - In normal overstimulation: desensitization carries the
+            //   acute adaptation and recovers quickly once the drive
+            //   drops — matching measured β2AR resensitization.
+            // - In extreme burnout: effective deviation → 0, downregulation
+            //   stalls, and turnover pulls every factor back toward 1.0.
+            //   Under sustained strong drive the factors correctly stay
+            //   downregulated — chronic agonist produces chronic tolerance.
+            let sens_turnover = RECEPTOR_TURNOVER_RATE * 0.2 * dt_scale;
+            let desens_turnover = RECEPTOR_TURNOVER_RATE * 5.0 * dt_scale;
+            let intern_turnover = RECEPTOR_TURNOVER_RATE * dt_scale;
 
-            // Receptor sensitivity adaptation (slow, days/weeks)
+            // Receptor sensitivity adaptation — the slowest of the three
+            // mechanisms: receptor density/expression changes over hours
+            // to days, long after functional desensitization has run.
             {
                 let rate = if deviation > 0.0 {
-                    chem_adapt_rate // downregulation: fast
+                    chem_adapt_rate * 0.2 // downregulation: slowest
                 } else {
-                    chem_adapt_rate * 0.3 // upregulation: 3x slower
+                    chem_adapt_rate * 0.06 // upregulation: ~3x slower still
                 };
                 // Use effective deviation for downregulation, raw
                 // deviation for upregulation (upregulation should
@@ -4171,8 +4264,8 @@ impl NeurochemicalVector {
                 chem.receptor_sensitivity +=
                     (1.0 - chem.receptor_sensitivity) * sleep_resens * dt_scale;
             }
-            // Receptor turnover (background recovery, proportional to
-            // sensitivity's fast adaptation rate)
+            // Receptor turnover (background recovery — synthesis is the
+            // slowest replacement pathway)
             chem.receptor_sensitivity += (1.0 - chem.receptor_sensitivity) * sens_turnover;
             // Floor at 0.5: maximum receptor density decrease is ~50%,
             // the worst physiological case reported in the literature.
@@ -4197,11 +4290,12 @@ impl NeurochemicalVector {
             chem.receptor_sensitivity =
                 crate::state::sanitize::finite_clamp(chem.receptor_sensitivity, 0.5, 2.0);
 
-            // Desensitization (fast, minutes): responds to current deviation.
-            // Rate is much slower than receptor sensitivity — desensitization
-            // operates on a minutes timescale, not seconds.
-            // Use effective deviation for downregulation.
-            let desens_rate = chem_adapt_rate * 0.2;
+            // Desensitization (fastest, minutes): responds first to current
+            // deviation — phosphorylation/arrestin uncoupling is the
+            // earliest adaptation mechanism (β2AR phosphorylation rises
+            // 11–13× within 1 min of agonist exposure; January et al.,
+            // JBC 1997). Use effective deviation for downregulation.
+            let desens_rate = chem_adapt_rate * 5.0;
             {
                 let adapt_deviation = if deviation > 0.0 {
                     effective_deviation
@@ -4221,8 +4315,8 @@ impl NeurochemicalVector {
                 chem.desensitization_factor +=
                     (1.0 - chem.desensitization_factor) * sleep_resens * dt_scale;
             }
-            // Receptor turnover (background recovery, proportional to
-            // desensitization's moderate adaptation rate)
+            // Receptor turnover (background recovery — dephosphorylation/
+            // resensitization is the fastest replacement pathway)
             chem.desensitization_factor += (1.0 - chem.desensitization_factor) * desens_turnover;
             // Floor at 0.2: maximum functional desensitization is ~80%,
             // per the literature on chronic agonist exposure:
@@ -4240,11 +4334,12 @@ impl NeurochemicalVector {
             chem.desensitization_factor =
                 crate::state::sanitize::finite_clamp(chem.desensitization_factor, 0.2, 1.0);
 
-            // Internalization (slow, hours): responds to sustained high levels.
-            // Much slower than desensitization — membrane protein recycling
-            // operates on an hours timescale.
-            // Use effective deviation for downregulation.
-            let intern_rate = chem_adapt_rate * 0.05;
+            // Internalization (intermediate, tens of minutes–hours):
+            // endocytosis follows desensitization but precedes density
+            // change — ~55% of β2AR is internalized within 30 min of
+            // agonist exposure (January et al., JBC 1997; DAMGO/MOR
+            // 50–58%). Use effective deviation for downregulation.
+            let intern_rate = chem_adapt_rate;
             {
                 let adapt_deviation = if deviation > 0.0 {
                     effective_deviation
@@ -4264,8 +4359,8 @@ impl NeurochemicalVector {
                 chem.internalization_factor +=
                     (1.0 - chem.internalization_factor) * sleep_resens * dt_scale;
             }
-            // Receptor turnover (background recovery, proportional to
-            // internalization's slow adaptation rate)
+            // Receptor turnover (background recovery — membrane recycling
+            // is intermediate)
             chem.internalization_factor += (1.0 - chem.internalization_factor) * intern_turnover;
             // Floor at 0.45: maximum internalization is ~55%, per
             // the literature on agonist-induced receptor endocytosis:
@@ -4721,16 +4816,21 @@ pub struct NeuroTickParams {
     /// spontaneous impulses at ~0.01/sec (Mohebi et al., 2019), and
     /// DA/ACh co-fluctuate at ~2 Hz (Howe et al., 2023).
     ///
-    /// This parameter controls the amplitude of Ornstein-Uhlenbeck
-    /// noise added to each chemical's velocity per tick. The noise
-    /// is seeded by `noise_seed` (which the daemon increments each
-    /// tick) so it's deterministic given the same seed sequence.
+    /// This parameter controls the amplitude of the stochastic forcing
+    /// added to each chemical's velocity per tick (a level kick for the
+    /// circulating hormone pools). The kick scales with √dt — the
+    /// Euler–Maruyama diffusion convention — so the injected variance
+    /// is per second, time-step invariant. The noise is seeded by
+    /// `noise_seed` (which the daemon increments each tick) so it's
+    /// deterministic given the same seed sequence.
     ///
     /// At 0.0: the system is deterministic (use for tests).
-    /// At 0.002: visible fluctuations of ±0.01–0.02 around baseline,
-    ///   keeping all chemicals gently oscillating. This matches the
-    ///   observed variability in tonic neurotransmitter levels and
-    ///   prevents the system from settling to a static fixed point.
+    /// At 0.0006: visible fluctuations around baseline, keeping all
+    ///   chemicals gently oscillating — the same effective amplitude at
+    ///   the 10 Hz reference step as the previous dt-scaled 0.002.
+    ///   This matches the observed variability in tonic
+    ///   neurotransmitter levels and prevents the system from settling
+    ///   to a static fixed point.
     ///
     /// The noise is scaled per-chemical: chemicals far from baseline
     /// get less noise (the homeostatic force dominates), while
@@ -4808,7 +4908,7 @@ impl NeuroTickParams {
         ecb_activity_coupling: 0.01,        // activity-dependent eCB synthesis
         metaplasticity_rate: 0.000005,      // hours-timescale coupling adaptation
         maturation_level: 0.0,              // newborn — HPA dormant, set by daemon
-        noise_amplitude: 0.002,             // gentle stochastic fluctuations
+        noise_amplitude: 0.0006,            // gentle stochastic fluctuations (√dt-scaled)
         noise_seed: 0,                      // daemon increments each tick
         receptor_resensitization_rate: 0.0, // set by daemon during sleep
         network_levels: None,               // set per sub-step from the sleep-wake network

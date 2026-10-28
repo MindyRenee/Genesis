@@ -218,13 +218,21 @@ fn test_crh_impulse_routes_through_cascade() {
         ..NeuroTickParams::DEFAULT
     };
 
-    // Phase 1: Apply CRH impulse and verify cortisol rises
+    // Phase 1: Apply CRH impulse and verify cortisol rises. The cascade
+    // is delayed on the endocrine timescale — pituitary ACTH responds
+    // over ~1 min and plasma cortisol peaks ~20-30 min after the
+    // stimulus (then clears with a ~66 min half-life) — so the peak
+    // lands well after the impulse tick and must be tracked rather than
+    // sampled at a fixed time.
     neuro.apply_impulse_capped(NeurochemicalId::CRH, 0.3, 0);
-    for _ in 0..500 {
+    let mut cortisol_peak = 0.0f32;
+    for _ in 0..3000 {
         neuro.tick_with_params(&params);
+        let c = neuro.chemicals[NeurochemicalId::Cortisol as usize].level;
+        if c > cortisol_peak {
+            cortisol_peak = c;
+        }
     }
-
-    let cortisol_peak = neuro.chemicals[NeurochemicalId::Cortisol as usize].level;
     assert!(
         cortisol_peak > 0.01,
         "Cortisol should rise after CRH impulse, got {cortisol_peak}"
@@ -232,7 +240,7 @@ fn test_crh_impulse_routes_through_cascade() {
 
     // Phase 2: Stop CRH impulse and verify cortisol decays
     // (negative feedback + clearance)
-    for _ in 0..2000 {
+    for _ in 0..20_000 {
         neuro.tick_with_params(&params);
     }
 

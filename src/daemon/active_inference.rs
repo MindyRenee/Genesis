@@ -2806,6 +2806,16 @@ impl ActiveInferenceEngine {
         self.model_maturity
     }
 
+    /// Mean posterior variance across the belief dimensions.
+    ///
+    /// This is the diagonal of the variational posterior q(s) — the
+    /// Kalman filter's estimate uncertainty. It contracts under
+    /// sustained predictability and grows under sustained surprise
+    /// (via the precision-weighted observation noise).
+    pub fn posterior_variance_mean(&self) -> f32 {
+        self.belief_var.iter().sum::<f32>() / DIM as f32
+    }
+
     /// Get the tick count.
     pub fn tick_count(&self) -> u32 {
         self.tick_count

@@ -477,14 +477,16 @@ fn test_coupling_matrix_known_interactions() {
         "endorphins should promote dopamine"
     );
 
-    // Adenosine's interactions with arousal systems are handled by the
-    // sleep pressure mechanism (level accumulation/clearance), not the
-    // coupling matrix. The coupling matrix value for adenosine's effect
-    // on dopamine is 0.0 — this is by design, not an error.
-    // See the adenosine sleep pressure mechanism in tick().
+    // Adenosine inhibits dopamine: the striatal A2A–D2 receptor
+    // heteromer — A2A activation lowers dopamine's affinity and
+    // intrinsic efficacy at D2 receptors (the interaction caffeine
+    // blocks; Ferré et al., PNAS 2015). A receptor-efficacy antagonism
+    // abstracted as a weak level coupling — distinct from the metabolic
+    // sleep-pressure pathway (level accumulation/clearance), which acts
+    // on arousal nuclei and stays out of this matrix.
     assert_eq!(
-        DEFAULT_COUPLING_MATRIX[0][10], 0.0,
-        "adenosine's effect on dopamine is handled by sleep pressure, not coupling"
+        DEFAULT_COUPLING_MATRIX[0][10], -0.1,
+        "adenosine should inhibit dopamine (A2A–D2 receptor antagonism)"
     );
 }
 
@@ -2089,16 +2091,33 @@ fn test_receptor_burnout_recovery_through_sleep() {
         state.write_end();
     }
 
-    // Check that dopamine receptors have downregulated
-    let da_sens = state
-        .neurochemicals
-        .get(NeurochemicalId::Dopamine)
-        .unwrap()
-        .receptor_sensitivity;
+    // Check that dopamine receptors have downregulated. Burnout is the
+    // composite signaling health — sensitivity × desensitization ×
+    // internalization. The three mechanisms run at the biological
+    // cascade speeds (desensitization minutes → internalization tens of
+    // minutes → density days), so functional desensitization carries
+    // the acute loss while density downregulation is the slowest,
+    // self-limiting term: sustained agonist leaves a measured-scale
+    // density reduction (D2 chronic stimulant abuse 10-25%, β2AR
+    // chronic albuterol 22-42%), not the floor.
+    let (da_sens, da_desens, da_intern) = {
+        let da = state.neurochemicals.get(NeurochemicalId::Dopamine).unwrap();
+        (
+            da.receptor_sensitivity,
+            da.desensitization_factor,
+            da.internalization_factor,
+        )
+    };
+    let da_health = da_sens * da_desens * da_intern;
     assert!(
-        da_sens <= 0.5,
-        "dopamine sensitivity should have downregulated to floor (0.5) from sustained overstimulation: got {}",
-        da_sens
+        da_desens < 0.6,
+        "dopamine desensitization should have engaged under sustained overstimulation: got {}",
+        da_desens
+    );
+    assert!(
+        da_health < 0.40,
+        "dopamine signaling health should collapse under sustained overstimulation: got {}",
+        da_health
     );
 
     // Check adenosine has accumulated
@@ -2315,12 +2334,22 @@ fn test_receptor_resensitization_zero_during_wake() {
         .unwrap()
         .desensitization_factor;
 
-    // Without sleep resensitization, desensitization should NOT have
-    // recovered significantly (it may even have gotten worse)
+    // Without sleep resensitization, desensitization should NOT recover
+    // significantly — it must stay well below full function under
+    // sustained drive. A small bounded drift upward is expected: the
+    // functional-desensitization turnover (dephosphorylation, the
+    // fastest recovery pathway) balances a downregulation that weakens
+    // as internalization collapses the effective deviation, settling
+    // near ~0.45 — far from the 1.0 that sleep resensitization restores.
     assert!(
-        da_desens_after <= da_desens_before + 0.05,
+        da_desens_after <= da_desens_before + 0.15,
         "dopamine desensitization should NOT recover without sleep resensitization: was {}, now {}",
         da_desens_before,
+        da_desens_after
+    );
+    assert!(
+        da_desens_after < 0.7,
+        "dopamine desensitization should stay engaged under sustained drive: got {}",
         da_desens_after
     );
 }
