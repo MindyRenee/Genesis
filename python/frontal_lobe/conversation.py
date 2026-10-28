@@ -1503,9 +1503,7 @@ class ConversationMixin:
             self.brain.frontal.teaching_mode = True
             self.brain.frontal.teaching_topic = self._teaching_topic
         try:
-            self.brain.frontal.executive.switch_task(
-                getattr(self, "_prior_qa_task", "") or "idle"
-            )
+            self.brain.frontal.executive.switch_task(getattr(self, "_prior_qa_task", "") or "idle")
         except Exception as e:  # noqa: BLE001
             logger.debug(f"executive task restore failed: {e}")
         if not self._is_teaching:
@@ -1529,7 +1527,6 @@ class ConversationMixin:
             return False
         self.exit_question_mode()
         return True
-
 
     def pop_queued_question(self) -> dict[str, str] | None:
         """Pop the next queued question.

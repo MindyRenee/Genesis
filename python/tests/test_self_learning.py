@@ -525,7 +525,6 @@ def bar(y):
 class TestProposalGeneration:
     """Tests for the proposal generation logic."""
 
-
     def test_missing_docstring_detection(self):
         """Test missing docstring detection."""
         content = """def foo(path):
@@ -749,10 +748,6 @@ class TestEveryOwnSourceFixable:
         assert HeuristicExperiment._is_experimentable("src/store/mmap_state.rs")
         assert HeuristicExperiment._is_experimentable("src/daemon/continuity.rs")
         assert HeuristicExperiment._is_experimentable("src/daemon/ipc.rs")
-
-
-
-
 
 
 def _make_learner() -> SelfDirectedLearner:
@@ -2303,7 +2298,6 @@ class TestProposalFixCorrectness:
     private or echo-only functions.
     """
 
-
     def test_resolve_occurrence_picks_hinted_site(self):
         """The hint selects which occurrence of a duplicate snippet
         the experiment edits."""
@@ -2595,12 +2589,6 @@ if __name__ == "__main__":
     sys.exit(0 if success else 1)
 
 
-
-
-
-
-
-
 def _pending_proposal(tmp_path, **overrides):
     """A minimal PENDING proposal whose target file exists on disk."""
     target = tmp_path / "target.py"
@@ -2649,8 +2637,6 @@ def test_triage_withdraws_proposals_for_dead_files(tmp_path):
     assert withdrawn == [dead.id]
     assert "no longer exists" in dead.feedback
     assert alive.status == ProposalStatus.PENDING
-
-
 
 
 def test_triage_caps_withdrawals_per_call(tmp_path):

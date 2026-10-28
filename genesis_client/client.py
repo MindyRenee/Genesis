@@ -97,6 +97,7 @@ from .protocol import (
     GET_BODY_CONTROL,
     GET_BODY_STATE,
     GET_FIELD_PROBE,
+    GET_FOLD_MARGINS,
     GET_INFERENCE_SUMMARY,
     GET_INTERNALS,
     GET_ION_SUMMARY,
@@ -173,6 +174,7 @@ from .types import (
     Episode,
     FieldProbeSignature,
     FieldState,
+    FoldMargins,
     InferenceSummary,
     IonSummary,
     MemoryStats,
@@ -419,6 +421,7 @@ class GenesisClient:
             GET_BODY_CONTROL,
             GET_PLASTICITY_PROFILE,
             GET_FIELD_PROBE,
+            GET_FOLD_MARGINS,
             GET_INTERNALS,
             GET_ION_SUMMARY,
             GET_MOTOR_TARGET,
@@ -781,6 +784,28 @@ class GenesisClient:
         """
         resp = self._request(GET_ION_SUMMARY, timeout=timeout)
         return IonSummary.unpack(resp)
+
+    def get_fold_margins(self, *, timeout: float | None = None) -> FoldMargins | None:
+        """Get the LC–VLPO switch's saddle-node margins (40 bytes).
+
+        The bifurcation geometry of the body's sleep switch at the
+        current operating point: the homeostat h, the two fold edges
+        of the hysteresis band, h's normalized position between them
+        (0 = wake-up edge, 1 = fall-asleep edge), and whether the
+        switch is currently bistable — the regime where noise can hop
+        the barrier and microstates flicker.
+
+        Derived state owned by the daemon — a pure observation with no
+        request payload. Returns ``None`` when the daemon predates the
+        command: an absent channel is no reading, never a neutral one.
+        """
+        try:
+            resp = self._request(GET_FOLD_MARGINS, timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return None
+        if not resp or resp[0] >= 0x80:
+            return None
+        return FoldMargins.unpack(resp)
 
     def get_field_probe(self, *, timeout: float | None = None) -> FieldProbeSignature | None:
         """Get the body's real substrate signature (v6: 408 B; older: 328/308/195/114/102).

@@ -68,9 +68,7 @@ fn equilibrium(net: NetworkLevels) -> [f32; 4] {
 /// somnogenic signal silencing the region's own arousal output.
 #[test]
 fn a1_occupancy_sags_wake_acetylcholine() {
-    use genesis::state::basal_forebrain::{
-        UNCERTAINTY_REFERENCE, a1_suppression, release_target,
-    };
+    use genesis::state::basal_forebrain::{UNCERTAINTY_REFERENCE, a1_suppression, release_target};
     // Pure equation first: the wake steady state under deep pressure
     // must sit below the rested 0.58 while the sleep stages don't move.
     let wake_pressed = release_target(0.963, 0.0, 0.9, UNCERTAINTY_REFERENCE);

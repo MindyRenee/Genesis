@@ -69,6 +69,7 @@ __all__ = [
     "GET_BODY_STATE",
     "GET_DYADIC_STATE",
     "GET_FIELD_PROBE",
+    "GET_FOLD_MARGINS",
     "GET_INFERENCE_SUMMARY",
     "GET_INTERNALS",
     "GET_ION_SUMMARY",
@@ -436,6 +437,12 @@ SEARCH_ARCHIVED = 60
 # Request/response identical to ARCHIVE_EPISODE. Additive:
 # PROTOCOL_VERSION stays 3.
 DELETE_EPISODE = 61
+
+# The LC–VLPO switch's saddle-node margins — the bistable geometry
+# the homeostat sweeps through at sleep onset. Additive: a new
+# opcode and a standalone 40-byte response; no existing layout
+# moves, so PROTOCOL_VERSION is unaffected.
+GET_FOLD_MARGINS = 62
 
 # Which optional hardware sensors this machine actually has.
 # Response: [u16 mask] — a bitmask of SENSOR_* below. A set bit means

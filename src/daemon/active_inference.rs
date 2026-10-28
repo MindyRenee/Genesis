@@ -1792,8 +1792,7 @@ impl ActiveInferenceEngine {
         // obs_var → distrust observations. The cholinergic gain is the
         // basal forebrain's division of this channel's variance —
         // elevated ACh is elevated sensory precision.
-        let obs_var = (MIN_OBS_NOISE
-            + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE))
+        let obs_var = (MIN_OBS_NOISE + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE))
             / self.ach_sensory_gain;
 
         // ── Kalman predict step ──

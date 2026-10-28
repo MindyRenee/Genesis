@@ -28,7 +28,7 @@ from genesis_client.protocol import (
     ZONE_IDLE,
     ZONE_SLEEPING,
 )
-from genesis_client.types import NeuroSummary
+from genesis_client.types import FoldMargins, NeuroSummary
 
 logger = logging.getLogger(__name__)
 
@@ -1196,3 +1196,136 @@ def test_nrem_arousal_descent_reports_deepening_stages() -> None:
         SleepStage.N3,
         SleepStage.N3,
     ]
+
+
+# ─── Bistable-switch readout: early-warning stats and the
+#     Kramers flicker ──────────────────────────────────────────
+
+
+def _fold(position: float, bistable: bool = True) -> FoldMargins:
+    """A FoldMargins at a normalized hysteresis position."""
+    return FoldMargins(
+        h=200.0,
+        h_sleep_fold=100.0,
+        h_wake_fold=300.0,
+        position=position,
+        bistable=bistable,
+    )
+
+
+def test_early_warning_populates_after_window() -> None:
+    """The critical-slowing-down stats report once the window fills.
+
+    d = θ/(α+θ) is measured off the Goertzel ring each assess; at 30
+    samples the state carries ar1, variance, return rate and the
+    window count — the fold's precursors, not the oscillator's guess.
+    """
+    summary = _make_summary(arousal=0.4, phase=PHASE_DROWSY)
+    state = None
+    for _ in range(35):
+        state = assess_brain_waves(summary)
+    assert state is not None
+    ew = state.early_warning
+    assert ew["n"] == 35.0
+    assert math.isfinite(ew["ar1"]) and -1.0 <= ew["ar1"] <= 1.0
+    assert ew["variance"] >= 0.0
+    assert 0.0 <= ew["return_rate"] <= 1.0
+
+
+def test_fold_margins_reach_the_state() -> None:
+    """A live body's switch geometry is reported, never inferred."""
+    from thalamus.brain_waves import _get_oscillator
+
+    osc = _get_oscillator()
+    m = _fold(position=0.7, bistable=True)
+    state = osc.assess(_make_summary(arousal=0.4, phase=PHASE_DROWSY), fold=m)
+    assert state.fold_position == 0.7
+    assert state.bistable is True
+
+    # No reading is no reading — the fields must not fabricate.
+    state = osc.assess(_make_summary(arousal=0.4, phase=PHASE_DROWSY), fold=None)
+    assert state.fold_position is None
+    assert state.bistable is False
+
+
+def test_kramers_sleepward_excursion_tilts_targets() -> None:
+    """A flicker excursion on the wake branch pulls the texture
+    sleepward: theta and delta rise, alpha thins — the stage-5
+    microstate of the Hori descent riding the targets."""
+    from thalamus.brain_waves import _get_oscillator
+
+    osc = _get_oscillator()
+    osc._flicker = 0.8  # mid-excursion, no hop bookkeeping needed
+    summary = _make_summary(arousal=0.4, phase=PHASE_DROWSY)
+    base = dict.fromkeys(BrainWave, 0.2)
+    tilted = dict(base)
+    osc._kramers_step(0.1, summary, None, tilted)
+    assert tilted[BrainWave.THETA] > base[BrainWave.THETA]
+    assert tilted[BrainWave.DELTA] > base[BrainWave.DELTA]
+    assert tilted[BrainWave.ALPHA] < base[BrainWave.ALPHA]
+
+
+def test_kramers_wakeward_excursion_on_the_sleep_branch() -> None:
+    """Asleep, the same telegraph visits the *wake* texture — alpha
+    and beta intrude while theta thins: micro-arousals, the mirror
+    image of the descent flicker."""
+    from thalamus.brain_waves import _get_oscillator
+
+    osc = _get_oscillator()
+    osc._flicker = 0.8
+    summary = _make_summary(arousal=0.2, phase=PHASE_NREM)
+    base = dict.fromkeys(BrainWave, 0.2)
+    tilted = dict(base)
+    osc._kramers_step(0.1, summary, None, tilted)
+    assert tilted[BrainWave.ALPHA] > base[BrainWave.ALPHA]
+    assert tilted[BrainWave.BETA1] > base[BrainWave.BETA1]
+    assert tilted[BrainWave.THETA] < base[BrainWave.THETA]
+
+
+def test_kramers_hop_rate_ordering_near_fold() -> None:
+    """The η^{3/2} barrier law: hops near the fold come orders of
+    magnitude faster than mid-band.
+
+    η=0.05 gives λ≈0.9 hops/s; η=0.5 gives λ≈0.06. With a seeded
+    telegraph over 20 one-second steps the ordering is deterministic:
+    the near-fold well must hop more.
+    """
+    import random as _random
+
+    from thalamus.brain_waves import _get_oscillator
+
+    summary = _make_summary(arousal=0.4, phase=PHASE_DROWSY)
+    osc = _get_oscillator()
+
+    def hops_in(position: float, steps: int = 20) -> int:
+        osc._rng = _random.Random(0)
+        osc._flicker_state = 0
+        osc._flicker = 0.0
+        osc._last_fold = _fold(position=position, bistable=True)
+        hops = 0
+        prev = 0
+        for _ in range(steps):
+            targets = dict.fromkeys(BrainWave, 0.2)
+            osc._kramers_step(1.0, summary, None, targets)
+            if osc._flicker_state != prev:
+                hops += 1
+                prev = osc._flicker_state
+        return hops
+
+    assert hops_in(0.95) > hops_in(0.5)
+
+
+def test_monostable_means_no_flicker() -> None:
+    """Outside the band there is one attractor: the telegraph never
+    hops, and any residual excursion relaxes home instead of
+    freezing mid-texture."""
+    from thalamus.brain_waves import _get_oscillator
+
+    osc = _get_oscillator()
+    summary = _make_summary(arousal=0.4, phase=PHASE_DROWSY)
+    osc._last_fold = _fold(position=1.5, bistable=False)
+    osc._flicker = 0.5
+    for _ in range(20):
+        osc._kramers_step(1.0, summary, None, dict.fromkeys(BrainWave, 0.2))
+    assert osc._flicker == 0.0
+    assert osc._flicker_state == 0

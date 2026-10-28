@@ -643,9 +643,7 @@ class InteroceptionSystem:
         if me > 0:
             own_pids.append(me)
 
-        for attr, pidfile in (
-            ("_daemon_pid", "genesis_daemon.pid"),
-        ):
+        for attr, pidfile in (("_daemon_pid", "genesis_daemon.pid"),):
             cached = getattr(self, attr)
             stale = cached is None
             if not stale:

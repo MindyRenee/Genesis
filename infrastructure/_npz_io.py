@@ -96,9 +96,7 @@ def save_npz(path: str | os.PathLike[str], **arrays: Any) -> None:
         raise
 
 
-def load_npz(
-    path: str | os.PathLike[str], *, allow_legacy_pickle: bool = False
-) -> dict[str, Any]:
+def load_npz(path: str | os.PathLike[str], *, allow_legacy_pickle: bool = False) -> dict[str, Any]:
     """Load a ``.npz`` without executing pickles by default.
 
     Explicit opt-in is only for offline migration of trusted legacy

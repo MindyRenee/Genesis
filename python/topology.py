@@ -215,9 +215,7 @@ def connect(root: Path | None = None) -> tuple[RegionWiring, ...]:
     for r in REGIONS:
         package_live = importlib.util.find_spec(r.package) is not None if r.package else True
         missing = tuple(
-            m
-            for m in r.modules
-            if not any(path.is_file() for path in _module_paths(m, src))
+            m for m in r.modules if not any(path.is_file() for path in _module_paths(m, src))
         )
         wiring.append(RegionWiring(r, package_live, missing))
     return tuple(wiring)

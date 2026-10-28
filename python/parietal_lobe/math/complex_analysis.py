@@ -121,46 +121,40 @@ def describe_text(text: str) -> ComplexResult:
     argument."""
     z = parse_complex(text)
     if z is None:
-        return ComplexResult("describe", text, "", False,
-                             "could not read a complex number")
+        return ComplexResult("describe", text, "", False, "could not read a complex number")
     r, th = polar(z)
     deg = math.degrees(th)
-    out = (f"{_fmt(z)}: |z| = {r:.6g}, arg z = {th:.6g} rad "
-           f"({deg:.4g}°), polar {r:.6g}·cis({th:.6g})")
-    return ComplexResult("describe", text, out, True,
-                         data={"value": z, "r": r, "theta": th})
+    out = (
+        f"{_fmt(z)}: |z| = {r:.6g}, arg z = {th:.6g} rad ({deg:.4g}°), polar {r:.6g}·cis({th:.6g})"
+    )
+    return ComplexResult("describe", text, out, True, data={"value": z, "r": r, "theta": th})
 
 
 def power_text(text: str, n: int) -> ComplexResult:
-    """"(1+i)^8" — De Moivre: scale modulus, multiply angle."""
+    """ "(1+i)^8" — De Moivre: scale modulus, multiply angle."""
     z = parse_complex(text)
     if z is None:
-        return ComplexResult("power", text, "", False,
-                             "could not read a complex number")
-    out = z ** n
-    return ComplexResult("power", f"{text}^{n}", _fmt(out), True,
-                         data={"value": out})
+        return ComplexResult("power", text, "", False, "could not read a complex number")
+    out = z**n
+    return ComplexResult("power", f"{text}^{n}", _fmt(out), True, data={"value": out})
 
 
 def roots_unity_text(n: int) -> ComplexResult:
-    """"the 5th roots of unity" — all of them, in rectangular."""
+    """ "the 5th roots of unity" — all of them, in rectangular."""
     if n < 1:
         return ComplexResult("roots", str(n), "", False, "n must be positive")
     roots = nth_roots(n)
     out = ", ".join(_fmt(z) for z in roots)
-    return ComplexResult("roots", f"{n}th roots of unity", out, True,
-                         data={"roots": roots})
+    return ComplexResult("roots", f"{n}th roots of unity", out, True, data={"roots": roots})
 
 
 def roots_text(text: str, n: int) -> ComplexResult:
-    """"the cube roots of -8" — all n roots, none forgotten."""
+    """ "the cube roots of -8" — all n roots, none forgotten."""
     z = parse_complex(text)
     if z is None:
-        return ComplexResult("roots", text, "", False,
-                             "could not read a complex number")
+        return ComplexResult("roots", text, "", False, "could not read a complex number")
     if n < 1:
         return ComplexResult("roots", text, "", False, "n must be positive")
     roots = roots_of(z, n)
     out = ", ".join(_fmt(w) for w in roots)
-    return ComplexResult("roots", f"{n}th roots of {text}", out, True,
-                         data={"roots": roots})
+    return ComplexResult("roots", f"{n}th roots of {text}", out, True, data={"roots": roots})

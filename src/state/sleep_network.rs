@@ -896,12 +896,7 @@ mod tests {
             let net = levels(x);
             // Resting adenosine and reference uncertainty: the release
             // equation then reduces to the calibrated linear map.
-            let target = f64::from(release_target(
-                net.lc,
-                net.rem,
-                0.20,
-                UNCERTAINTY_REFERENCE,
-            ));
+            let target = f64::from(release_target(net.lc, net.rem, 0.20, UNCERTAINTY_REFERENCE));
             let i = match stage {
                 MentalPhase::REM => 0,
                 MentalPhase::NREM => 2,
@@ -1152,7 +1147,11 @@ mod tests {
         x[4] = m0.h_wake_fold + 50.0;
         let high = fold_margins(&x, 0.0, OXIN_REST, HTM_REST);
         assert!(!high.bistable, "past the fold is monostable: {high:?}");
-        assert!(high.position > 1.0, "forced-sleep position: {}", high.position);
+        assert!(
+            high.position > 1.0,
+            "forced-sleep position: {}",
+            high.position
+        );
 
         // Forced-wake side: h below the sleep fold.
         x[4] = m0.h_sleep_fold - 50.0;

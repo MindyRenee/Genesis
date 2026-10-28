@@ -116,6 +116,7 @@ def _fmt_factor(fs: list[int]) -> str:
     if not fs:
         return "1"
     from collections import Counter
+
     parts = [f"{p}^{k}" if k > 1 else str(p) for p, k in sorted(Counter(fs).items())]
     return " · ".join(parts)
 
@@ -135,20 +136,22 @@ def looks_like_number_theory(text: str) -> bool:
 
 
 def prime_text(n: int) -> NumberResult:
-    """"is 91 prime" -> no — 7 · 13."""
+    """ "is 91 prime" -> no — 7 · 13."""
     if n < 2:
-        return NumberResult("prime", str(n), f"{n} is not prime", True,
-                            data={"prime": False})
+        return NumberResult("prime", str(n), f"{n} is not prime", True, data={"prime": False})
     if is_prime(n):
-        return NumberResult("prime", str(n), f"{n} is prime", True,
-                            data={"prime": True})
-    return NumberResult("prime", str(n),
-                        f"{n} is not prime — {_fmt_factor(factor(n))}",
-                        True, data={"prime": False, "factors": factor(n)})
+        return NumberResult("prime", str(n), f"{n} is prime", True, data={"prime": True})
+    return NumberResult(
+        "prime",
+        str(n),
+        f"{n} is not prime — {_fmt_factor(factor(n))}",
+        True,
+        data={"prime": False, "factors": factor(n)},
+    )
 
 
 def factor_text(n: int) -> NumberResult:
-    """"factor 360" -> 2^3 · 3^2 · 5 = 360 — the check included."""
+    """ "factor 360" -> 2^3 · 3^2 · 5 = 360 — the check included."""
     if n == 0:
         return NumberResult("factor", str(n), "0 has no factorization", True)
     fs = factor(n)
@@ -161,41 +164,49 @@ def factor_text(n: int) -> NumberResult:
 
 
 def gcd_text(a: int, b: int) -> NumberResult:
-    """"gcd of 48 and 36" -> 12, with the Bezout witness."""
+    """ "gcd of 48 and 36" -> 12, with the Bezout witness."""
     g, x, y = egcd(a, b)
-    return NumberResult("gcd", f"{a}, {b}",
-                        f"gcd = {g}   ({a}·{x} + {b}·{y} = {a*x+b*y})",
-                        True, data={"gcd": g, "x": x, "y": y})
+    return NumberResult(
+        "gcd",
+        f"{a}, {b}",
+        f"gcd = {g}   ({a}·{x} + {b}·{y} = {a * x + b * y})",
+        True,
+        data={"gcd": g, "x": x, "y": y},
+    )
 
 
 def solve_congruence_text(a: int, b: int, m: int) -> NumberResult:
-    """"solve 3x ≡ 1 (mod 7)" -> x ≡ 5 — the modular inverse."""
+    """ "solve 3x ≡ 1 (mod 7)" -> x ≡ 5 — the modular inverse."""
     if m <= 0:
-        return NumberResult("congruence", f"{a}x ≡ {b} (mod {m})", "", False,
-                            "modulus must be positive")
+        return NumberResult(
+            "congruence", f"{a}x ≡ {b} (mod {m})", "", False, "modulus must be positive"
+        )
     a, b = a % m, b % m
     g = math.gcd(a, m)
     if b % g:
-        return NumberResult("congruence", f"{a}x ≡ {b} (mod {m})",
-                            "no solution — gcd does not divide the right side",
-                            True, data={"solutions": []})
+        return NumberResult(
+            "congruence",
+            f"{a}x ≡ {b} (mod {m})",
+            "no solution — gcd does not divide the right side",
+            True,
+            data={"solutions": []},
+        )
     inv = mod_inverse(a // g, m // g)
     assert inv is not None
     x0 = (inv * (b // g)) % (m // g)
     sols = [(x0 + k * (m // g)) % m for k in range(g)]
     out = " or ".join(f"x ≡ {s} (mod {m})" for s in sols)
-    return NumberResult("congruence", f"{a}x ≡ {b} (mod {m})", out, True,
-                        data={"solutions": sols})
+    return NumberResult("congruence", f"{a}x ≡ {b} (mod {m})", out, True, data={"solutions": sols})
 
 
 def crt_text(pairs: list[tuple[int, int]]) -> NumberResult:
-    """"x ≡ 2 (mod 3), x ≡ 3 (mod 5), x ≡ 2 (mod 7)" -> 23."""
+    """ "x ≡ 2 (mod 3), x ≡ 3 (mod 5), x ≡ 2 (mod 7)" -> 23."""
     if not pairs or any(modulus <= 0 for _, modulus in pairs):
         return NumberResult("crt", str(pairs), "", False, "moduli must be positive")
     x = crt(pairs)
     if x is None:
-        return NumberResult("crt", str(pairs), "inconsistent congruences",
-                            True, data={"solution": None})
+        return NumberResult(
+            "crt", str(pairs), "inconsistent congruences", True, data={"solution": None}
+        )
     m = math.lcm(*(p[1] for p in pairs))
-    return NumberResult("crt", str(pairs), f"x ≡ {x} (mod {m})", True,
-                        data={"solution": x})
+    return NumberResult("crt", str(pairs), f"x ≡ {x} (mod {m})", True, data={"solution": x})

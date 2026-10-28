@@ -26,6 +26,7 @@ from genesis_client.protocol import (
     CHEM_SEROTONIN,
     DT_NOMINAL_STEP,
     GET_FIELD_PROBE,
+    GET_FOLD_MARGINS,
     GET_ION_SUMMARY,
     GET_NEURO_SUMMARY,
     GET_OPTIC_STATE,
@@ -257,6 +258,10 @@ def test_command_ids():
     assert GET_OPTIC_STATE == 52
     assert SET_OPTIC_GAIN == 53
     assert SET_FOCUS == 54
+    # The fold-margins read is additive past DELETE_EPISODE — the
+    # highest core command id — and must not collide with the
+    # notification range (100+) or the tensor slab (41–45).
+    assert GET_FOLD_MARGINS == 62
     # The voluntary lid is additive past SET_COGNITIVE_PID.
     assert SET_LID == 57
 
@@ -1185,6 +1190,36 @@ def test_ion_summary_unpack_matches_wire_layout():
 
     with pytest.raises(ValueError, match="108 bytes"):
         IonSummary.unpack(raw[:107])
+
+
+def test_fold_margins_unpack_matches_wire_layout():
+    """FoldMargins decodes the daemon's fixed 40-byte block.
+
+    The daemon serializes four little-endian f64 — homeostat, the two
+    fold edges, the normalized position — then a u8 bistable flag and
+    7 padding bytes. The order is pinned so a field reorder on either
+    side surfaces as a test failure rather than a silently-swapped
+    edge.
+    """
+    import struct
+
+    from genesis_client.types import FoldMargins
+
+    raw = struct.pack("<4d", 214.0, 100.0, 300.0, 0.379) + bytes([1]) + bytes(7)
+    m = FoldMargins.unpack(raw)
+
+    assert len(raw) == 40
+    assert m.h == 214.0
+    assert m.h_sleep_fold == 100.0
+    assert m.h_wake_fold == 300.0
+    assert m.position == 0.379
+    assert m.bistable is True
+
+    raw_mono = struct.pack("<4d", 50.0, 100.0, 300.0, -0.25) + bytes([0]) + bytes(7)
+    assert FoldMargins.unpack(raw_mono).bistable is False
+
+    with pytest.raises(ValueError, match="40 bytes"):
+        FoldMargins.unpack(raw[:39])
 
 
 def test_set_volition_is_retired_opcode_46() -> None:

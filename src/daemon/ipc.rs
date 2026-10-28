@@ -571,6 +571,16 @@ pub mod cmd {
     /// PROTOCOL_VERSION is unaffected.
     pub const DELETE_EPISODE: u8 = 61;
 
+    /// The LC–VLPO switch's saddle-node margins at the current
+    /// operating point — the bistable geometry the homeostat sweeps
+    /// through at sleep onset. Request: empty. Response:
+    /// `FoldMargins` (40 bytes) — the current homeostat h, the two
+    /// fold edges in h-space, h's normalized position between them,
+    /// and the bistable flag. Pure observation: the body owns the
+    /// switch; the mind reads where in the cusp it sits. Additive:
+    /// PROTOCOL_VERSION is unaffected.
+    pub const GET_FOLD_MARGINS: u8 = 62;
+
     // ─── Tensor slab ──────────────────────────────────────────
     // Named multidimensional tensors shared between the daemon and
     // the cognitive mind — world frames, salience fields, embeddings,
@@ -722,6 +732,49 @@ const _: () = {
     assert!(offset_of!(IonSummary, gradient_integrity) == 96);
     assert!(offset_of!(IonSummary, energy_load) == 100);
     assert!(offset_of!(IonSummary, net_membrane_current) == 104);
+};
+
+/// The LC–VLPO switch's bistable geometry (40 bytes), sent in
+/// response to [`cmd::GET_FOLD_MARGINS`].
+///
+/// The homeostat `h` is the control parameter of the mutual-
+/// inhibition switch; the two fold edges are the saddle-node points
+/// where the sleep and wake attractors each cease to exist. Between
+/// them three fixed points coexist — both stable branches plus the
+/// saddle — and noise can hop the barrier: the hypnagogic flicker
+/// regime. An `NaN` edge means the fold lay outside the body's sweep
+/// window at query time; `position` is `NaN` whenever either edge is.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct FoldMargins {
+    /// Current homeostatic sleep drive — the control parameter.
+    pub h: f64,
+    /// Lower saddle-node: below it the sleep attractor ceases to
+    /// exist — the wake-up edge of the hysteresis band.
+    pub h_sleep_fold: f64,
+    /// Upper saddle-node: above it the wake attractor ceases to
+    /// exist — the fall-asleep edge of the hysteresis band.
+    pub h_wake_fold: f64,
+    /// `h` normalized into the band: 0 = the wake-up edge,
+    /// 1 = the fall-asleep edge, outside that range forced-
+    /// wake/forced-sleep respectively.
+    pub position: f64,
+    /// Nonzero when three fixed points coexist — both stable
+    /// branches present, flicker possible.
+    pub bistable: u8,
+    /// Reserved — pads the block to a multiple of eight bytes.
+    pub _pad: [u8; 7],
+}
+
+const _: () = {
+    use core::mem::offset_of;
+    assert!(core::mem::size_of::<FoldMargins>() == 40);
+    assert!(offset_of!(FoldMargins, h) == 0);
+    assert!(offset_of!(FoldMargins, h_sleep_fold) == 8);
+    assert!(offset_of!(FoldMargins, h_wake_fold) == 16);
+    assert!(offset_of!(FoldMargins, position) == 24);
+    assert!(offset_of!(FoldMargins, bistable) == 32);
+    assert!(offset_of!(FoldMargins, _pad) == 33);
 };
 
 /// Compact neurochemical summary (32 bytes) — sent in response to
@@ -1988,6 +2041,29 @@ impl IpcClient {
         Ok(summary)
     }
 
+    /// Get the LC–VLPO switch's fold margins (40 bytes).
+    pub fn get_fold_margins(&mut self) -> std::io::Result<FoldMargins> {
+        let resp = self.request(cmd::GET_FOLD_MARGINS, &[])?;
+        if resp.len() < core::mem::size_of::<FoldMargins>() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "fold margins response too short",
+            ));
+        }
+        let mut margins = FoldMargins::default();
+        // SAFETY: `resp.len()` was checked >= size_of::<FoldMargins>().
+        // `margins` is a stack value. Non-overlapping heap->stack copy.
+        // FoldMargins is #[repr(C)] with explicit padding.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                resp.as_ptr(),
+                &mut margins as *mut FoldMargins as *mut u8,
+                core::mem::size_of::<FoldMargins>(),
+            );
+        }
+        Ok(margins)
+    }
+
     pub fn get_neuro_summary(&mut self) -> std::io::Result<NeuroSummary> {
         let resp = self.request(cmd::GET_NEURO_SUMMARY, &[])?;
         if resp.len() < core::mem::size_of::<NeuroSummary>() {
@@ -2798,6 +2874,52 @@ pub fn default_handler<L: LtmAccess>(
                 }
                 None => {
                     eprintln!("[ipc] GET_ION_SUMMARY: state snapshot failed");
+                    vec![error::READ_FAILED]
+                }
+            }
+        }
+        cmd::GET_FOLD_MARGINS => {
+            // Derived state, computed at query time from the same
+            // operating point the tick advances: the live homeostat
+            // in `sleep_network[4]` plus the humoral alerting inputs
+            // the LC wake side sees — cortisol above its basal floor,
+            // and the orexin/histamine stabilizer pair at effective
+            // (receptor-weighted) levels, read exactly as
+            // `advance_physics` reads them.
+            let snapshot = snapshot_state(mmap);
+            match snapshot {
+                Some(state) => {
+                    let hpa = f64::from(crate::state::neurochemical::cortisol_stress_fraction(
+                        state.neurochemicals.chemicals[NeurochemicalId::Cortisol as usize].level,
+                    ));
+                    let oxin = f64::from(state.neurochemicals.effective(NeurochemicalId::Orexin));
+                    let htm = f64::from(state.neurochemicals.effective(NeurochemicalId::Histamine));
+                    let m = crate::state::sleep_network::fold_margins(
+                        &state.sleep_network,
+                        hpa,
+                        oxin,
+                        htm,
+                    );
+                    let summary = FoldMargins {
+                        h: m.h,
+                        h_sleep_fold: m.h_sleep_fold,
+                        h_wake_fold: m.h_wake_fold,
+                        position: m.position,
+                        bistable: u8::from(m.bistable),
+                        _pad: [0; 7],
+                    };
+                    // SAFETY: `summary` is a valid stack-owned
+                    // value; the slice covers exactly its 40 bytes.
+                    let bytes = unsafe {
+                        std::slice::from_raw_parts(
+                            &summary as *const FoldMargins as *const u8,
+                            core::mem::size_of::<FoldMargins>(),
+                        )
+                    };
+                    bytes.to_vec()
+                }
+                None => {
+                    eprintln!("[ipc] GET_FOLD_MARGINS: state snapshot failed");
                     vec![error::READ_FAILED]
                 }
             }

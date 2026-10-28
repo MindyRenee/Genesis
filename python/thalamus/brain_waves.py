@@ -166,7 +166,10 @@ from genesis_client.protocol import (
     PHASE_ACTIVE,
     PHASE_ALERT,
     PHASE_DROWSY,
+    PHASE_NREM,
+    PHASE_REM,
 )
+from genesis_client.types import FoldMargins
 
 __all__ = [
     "N1_THETA_ALERTNESS",
@@ -288,6 +291,32 @@ class BrainWaveState:
     regional_gamma_phases: dict[str, float] = field(default_factory=dict)
     gamma_plv: float | None = None
     gamma_plv_pairs: dict[str, float] = field(default_factory=dict)
+
+    # Bifurcation geometry of the body's LC–VLPO switch, when a live
+    # daemon reports it — the body's own numbers, never the
+    # oscillator's inference. ``fold_position`` is the homeostat's
+    # coordinate in the hysteresis band (0 = wake-up edge,
+    # 1 = fall-asleep edge, may be NaN when a fold lay outside the
+    # body's sweep); ``bistable`` means both attractors exist and
+    # noise can hop between them.
+    fold_position: float | None = None
+    bistable: bool = False
+
+    # Critical-slowing-down early-warning stats, measured on the
+    # alpha-dropout index d = θ/(α+θ) off the Goertzel ring — the
+    # fluctuating observable whose memory carries the fold's
+    # precursor: lag-1 autocorrelation (``ar1``, the robust
+    # indicator), fluctuation ``variance``, the implied
+    # ``return_rate`` 1−a₁, and ``n`` samples in the window. Empty
+    # until the window fills.
+    early_warning: dict[str, float] = field(default_factory=dict)
+
+    # Kramers flicker level [0,1] — the smoothed telegraph state
+    # driven by the measured distance to the fold. >0 means the wave
+    # texture is being pulled toward the *other* attractor's regime:
+    # sleepward on the wake branch (theta up, alpha down — Hori
+    # stage-5 dips), wakeward on the sleep branch (micro-arousals).
+    flicker: float = 0.0
 
     def describe(self) -> str:
         """First-person description of the current brain wave state."""
@@ -1355,6 +1384,27 @@ class BrainWaveOscillator:
     _TRACE_DT: ClassVar[float] = 1.0 / 384.0
     _TRACE_LEN: ClassVar[int] = 1536
 
+    # ── Bistable-switch readout ─────────────────────────────────
+    # Early-warning window on the alpha-dropout index: at the mind's
+    # ~1 Hz heartbeat 240 samples is ~4 min — the horizon over which
+    # the Nature Neuroscience 2025 fold result measured the
+    # autocorrelation rise preceding scored sleep.
+    _EWS_LEN: ClassVar[int] = 240
+    # Minimum window before the statistics are worth reporting.
+    _EWS_MIN: ClassVar[int] = 30
+    # Kramers telegraph: hop rate λ = ν₀·exp(−K·η^{3/2}) with η the
+    # normalized distance to the fold the current well dies at.
+    # ΔV ∝ η^{3/2} is the saddle-node barrier's universal scaling
+    # (Dykman et al.); K calibrates the barrier scale the body's
+    # normalized position lacks. ν₀=1 Hz, K=8: η→0 hops a few times
+    # per second (the Hori flicker — transient microstates at the
+    # scale of seconds), η≈0.5 dwells tens of seconds, η≈0.7 minutes.
+    _KRAMERS_NU0: ClassVar[float] = 1.0
+    _KRAMERS_K: ClassVar[float] = 8.0
+    # Texture blend time — the excursion eases in/out rather than
+    # stepping, matching the seconds-long microstate envelopes.
+    _FLICKER_TAU: ClassVar[float] = 0.7
+
     def __init__(
         self,
         rng: random.Random | None = None,
@@ -1426,6 +1476,16 @@ class BrainWaveOscillator:
         )
         self._regional_gamma_hist: deque[tuple[float, tuple[float, float, float, float]]] = deque()
         self._regional_gamma_t: float = 0.0
+        # Bistable-switch readout: the alpha-dropout index series the
+        # early-warning stats are computed on, the body's last
+        # reported fold geometry, and the Kramers telegraph state —
+        # which attractor's texture is being visited (0 = home,
+        # 1 = the other well) and its exp-smoothed level.
+        self._ews_obs: deque[float] = deque(maxlen=self._EWS_LEN)
+        self._early_warning: dict[str, float] = {}
+        self._last_fold: FoldMargins | None = None
+        self._flicker_state: int = 0
+        self._flicker: float = 0.0
 
     def add_stimulus(self, band: BrainWave, strength: float, decay: float = 0.95) -> None:
         """Apply continuous stimulus to a band.
@@ -1550,6 +1610,7 @@ class BrainWaveOscillator:
         self,
         summary: NeuroSummary,
         sleep_stage: SleepStage | None = None,
+        fold: FoldMargins | None = None,
     ) -> BrainWaveState:
         """Advance the oscillator and return the current state.
 
@@ -1565,18 +1626,23 @@ class BrainWaveOscillator:
                 tracker, when sleeping. This overrides the arousal-
                 derived stage — see :func:`_sleep_phase_powers` for
                 why arousal cannot supply it.
+            fold: The body's measured LC–VLPO switch margins, when a
+                live daemon supplies them. Drives the Kramers
+                telegraph while the switch is bistable. ``None`` runs
+                the oscillator on modeled inputs alone.
 
         The oscillator is dynamic: amplitudes flow continuously toward
         targets modulated by both inner (neurochemical) and outer
         (stimulus) inputs.
         """
         with self._lock:
-            return self._assess_locked(summary, sleep_stage)
+            return self._assess_locked(summary, sleep_stage, fold)
 
     def _assess_locked(
         self,
         summary: NeuroSummary,
         sleep_stage: SleepStage | None,
+        fold: FoldMargins | None,
     ) -> BrainWaveState:
         # Compute targets from neurochemistry (same classification
         # logic as before — these are the neurochemically-driven
@@ -1606,6 +1672,15 @@ class BrainWaveOscillator:
         )
         self._last_sleep_stage = sleep_stage
         dt = self._tick_dt()
+
+        # Kramers flicker — barrier hopping between the two attractor
+        # textures while the body's switch is bistable, at a rate set
+        # by the measured distance to the fold. It rides the targets
+        # below, sub-regime — the flicker is texture *within* the
+        # state, not a state change, so it does not feed the snap
+        # detector above.
+        self._last_fold = fold
+        self._kramers_step(dt, summary, sleep_stage, targets)
 
         if should_snap:
             self._snap_to_targets(dt, targets)
@@ -1661,6 +1736,102 @@ class BrainWaveOscillator:
             dt = 0.1  # default 100ms
         self._last_time = now
         return dt
+
+    def _kramers_step(
+        self,
+        dt: float,
+        summary: NeuroSummary,
+        sleep_stage: SleepStage | None,
+        targets: dict[BrainWave, float],
+    ) -> None:
+        """Advance the two-state Kramers telegraph and tilt the band
+        targets by the smoothed flicker level.
+
+        While the body's LC–VLPO switch is bistable, the same noise
+        that diffuses the envelopes can hop the system between its
+        two attractors. The hop rate is Kramers':
+
+            λ = ν₀·exp(−K·η^{3/2})
+
+        with η the distance to the fold the current well dies at —
+        ``1−position`` on the wake branch, ``position`` on the sleep
+        branch — and η^{3/2} the saddle-node barrier's universal
+        scaling. The telegraph state visits the *other* attractor's
+        texture: on the wake branch the excursions are sleepward
+        (theta up, alpha down — the stage-5 microstate of the Hori
+        descent); on the sleep branch they are wakeward (alpha/beta
+        intrude, theta thins — micro-arousals). The smoothed level
+        tilts the targets, blending over ``_FLICKER_TAU`` rather
+        than stepping.
+        """
+        asleep = sleep_stage is not None or summary.phase in (PHASE_NREM, PHASE_REM)
+        fold = self._last_fold
+        if fold is None or not fold.bistable or not math.isfinite(fold.position):
+            # Monostable (or no reading): one attractor — the flicker
+            # relaxes home rather than freezing mid-excursion.
+            self._flicker += -self._flicker * (1.0 - math.exp(-dt / self._FLICKER_TAU))
+            if self._flicker < 0.01:
+                self._flicker_state = 0
+                self._flicker = 0.0
+        else:
+            eta = fold.position if asleep else 1.0 - fold.position
+            eta = min(1.0, max(0.0, eta))
+            lam = self._KRAMERS_NU0 * math.exp(-self._KRAMERS_K * eta**1.5)
+            if self._rng.random() < lam * dt:
+                self._flicker_state ^= 1
+            self._flicker += (float(self._flicker_state) - self._flicker) * (
+                1.0 - math.exp(-dt / self._FLICKER_TAU)
+            )
+
+        f = self._flicker
+        if f <= 0.0:
+            return
+        if asleep:
+            # Wakeward excursion: alpha and beta intrude, theta thins.
+            targets[BrainWave.ALPHA] *= 1.0 + 0.5 * f
+            targets[BrainWave.BETA1] *= 1.0 + 0.4 * f
+            targets[BrainWave.THETA] *= max(0.0, 1.0 - 0.5 * f)
+        else:
+            # Sleepward excursion: alpha drops out, theta and delta
+            # rise — the descent texture arriving early.
+            targets[BrainWave.ALPHA] *= max(0.0, 1.0 - 0.55 * f)
+            targets[BrainWave.THETA] *= 1.0 + 0.8 * f
+            targets[BrainWave.DELTA] *= 1.0 + 0.3 * f
+
+    def _update_early_warning(self, powers: dict[BrainWave, float]) -> None:
+        """Feed the alpha-dropout index into the early-warning series.
+
+        The observable is d = θ/(α+θ) *measured off the Goertzel
+        ring* — the axis the Hori descent runs on (alpha dropout →
+        theta) and the carrier the microstate flicker rides. Its
+        fluctuation statistics are the critical-slowing-down markers
+        of the body's switch nearing a fold: lag-1 autocorrelation
+        rises as the restoring eigenvalue → 0 (the robust precursor —
+        Dakos et al. 2011 show variance can even *fall* near some
+        transitions while AR(1) does not), variance is the companion
+        statistic, and 1−a₁ is the implied return rate per assess.
+        """
+        denom = powers[BrainWave.ALPHA] + powers[BrainWave.THETA]
+        if denom <= 0.0:
+            return
+        self._ews_obs.append(powers[BrainWave.THETA] / denom)
+        n = len(self._ews_obs)
+        if n < self._EWS_MIN:
+            return
+        xs = list(self._ews_obs)
+        mu = sum(xs) / n
+        var = sum((v - mu) ** 2 for v in xs) / n
+        ar1 = (
+            sum((xs[i] - mu) * (xs[i - 1] - mu) for i in range(1, n)) / (var * n)
+            if var > 0.0
+            else 0.0
+        )
+        self._early_warning = {
+            "ar1": ar1,
+            "variance": var,
+            "return_rate": max(0.0, 1.0 - ar1),
+            "n": float(n),
+        }
 
     def _snap_to_targets(self, dt: float, targets: dict[BrainWave, float]) -> None:
         """Re-seat each oscillator's envelope at the new regime's radius
@@ -2154,9 +2325,7 @@ class BrainWaveOscillator:
                 # Powers stay amplitude-proportional — the same scale
                 # the field has always reported and every downstream
                 # threshold is tuned to.
-                powers[band] = 2.0 * math.sqrt(
-                    _band_power(ring, self._TRACE_FS, freq)
-                )
+                powers[band] = 2.0 * math.sqrt(_band_power(ring, self._TRACE_FS, freq))
             else:
                 powers[band] = self._amplitude[band]
         total = sum(powers.values())
@@ -2168,6 +2337,11 @@ class BrainWaveOscillator:
         sorted_waves = sorted(powers.items(), key=lambda x: x[1], reverse=True)
         dominant = sorted_waves[0][0]
         secondary = sorted_waves[1][0]
+
+        # The descent index feeds the early-warning series — measured
+        # powers off the ring, not oscillator state, so the marker is
+        # the same thing a meter on her waveform would report.
+        self._update_early_warning(powers)
 
         # Derive cognitive gating parameters
         plasticity = summary.plasticity_gate
@@ -2192,6 +2366,10 @@ class BrainWaveOscillator:
             regional_gamma_phases=dict(self._regional_gamma_phase),
             gamma_plv=gamma_plv,
             gamma_plv_pairs=gamma_plv_pairs,
+            fold_position=(self._last_fold.position if self._last_fold is not None else None),
+            bistable=self._last_fold.bistable if self._last_fold is not None else False,
+            early_warning=dict(self._early_warning),
+            flicker=self._flicker,
         )
         # Cross-frequency coupling from actual phase state
         state.cross_frequency = self._compute_cross_frequency(powers, consolidation_w, encoding_w)
@@ -2360,6 +2538,7 @@ def assess_brain_waves(
     summary: NeuroSummary,
     sleep_stage: SleepStage | None = None,
     client: Any | None = None,
+    fold: FoldMargins | None = None,
 ) -> BrainWaveState:
     """Derive brain wave state from the coupled oscillator.
 
@@ -2371,8 +2550,12 @@ def assess_brain_waves(
     the body's *real* measured substrate dynamics — is applied as
     stimulus before the assess step, so the wave state carries actual
     physics, not only neurochemical targets (see
-    ``brainstem.field_probe``). With no client the oscillator runs on
-    its modeled inputs alone — identical to the old call shape.
+    ``brainstem.field_probe``), and the LC–VLPO switch's measured
+    fold margins feed the Kramers telegraph. ``fold`` may be passed
+    directly instead — the explicit value wins over the client
+    fetch, which is how callback-driven callers (InnerLife) reach
+    the same channel without holding a client. With neither the
+    oscillator runs on its modeled inputs alone.
 
     The oscillator propagates each band's phasor state —
     rotating, relaxing toward the neurochemically-driven radius,
@@ -2396,7 +2579,9 @@ def assess_brain_waves(
         from brainstem.field_probe import apply_field_stimulus
 
         apply_field_stimulus(client)
-    return _get_oscillator().assess(summary, sleep_stage)
+        if fold is None:
+            fold = client.get_fold_margins()
+    return _get_oscillator().assess(summary, sleep_stage, fold)
 
 
 def _drowsy_phase_powers(

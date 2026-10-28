@@ -1886,6 +1886,38 @@ fn test_get_ion_summary() {
     assert!(ions.gradient_integrity > 0.9);
 }
 
+/// The switch's bifurcation geometry crosses the wire as a fixed
+/// 40-byte block. This pins the width a client depends on, and the
+/// invariant that makes the read meaningful: the hysteresis band is
+/// ordered — the wake-up fold sits strictly below the fall-asleep
+/// fold — so `position` is a real coordinate, not a ratio of noise.
+#[test]
+fn test_get_fold_margins() {
+    let mut sys = IpcTestSystem::new("foldmargins");
+    sys.start_server();
+
+    let mut client = sys.client();
+    let m = client.get_fold_margins().expect("get_fold_margins");
+
+    assert_eq!(
+        core::mem::size_of::<genesis::daemon::ipc::FoldMargins>(),
+        40
+    );
+    assert!(m.h.is_finite(), "the homeostat is live state, not NaN");
+    // At the resting operating point both folds exist inside the
+    // body's sweep — the switch is genuinely bistable somewhere.
+    assert!(
+        m.h_sleep_fold.is_finite() && m.h_wake_fold.is_finite(),
+        "folds inside the sweep: {:?}",
+        m
+    );
+    assert!(
+        m.h_sleep_fold < m.h_wake_fold,
+        "wake-up edge below fall-asleep edge: {:?}",
+        m
+    );
+}
+
 // ─── Code analysis — the daemon's structural sense ────────────
 
 #[test]

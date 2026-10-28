@@ -135,8 +135,7 @@ class ConceptArchive:
             with self._conn:
                 for e in edge_dicts:
                     self._conn.execute(
-                        ("INSERT OR REPLACE" if overwrite else "INSERT OR IGNORE")
-                        + " INTO edges "
+                        ("INSERT OR REPLACE" if overwrite else "INSERT OR IGNORE") + " INTO edges "
                         "(source, target, relation, weight, created_at, origin) "
                         "VALUES (?, ?, ?, ?, ?, ?)",
                         (

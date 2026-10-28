@@ -154,14 +154,14 @@ def looks_like_axioms(text: str) -> bool:
 
 
 def classify_text(table: list[list[int]]) -> AxiomResult:
-    """"what is this structure" over a Cayley table — the rung it
+    """ "what is this structure" over a Cayley table — the rung it
     reaches and the axiom it fails, witnessed."""
     if not table or any(len(r) != len(table) for r in table):
-        return AxiomResult("classify", str(table), "", False,
-                           "the table must be square")
+        return AxiomResult("classify", str(table), "", False, "the table must be square")
     if not check_closed(table)[0]:
-        return AxiomResult("classify", str(table), "", False,
-                           "table entries must be elements of the carrier")
+        return AxiomResult(
+            "classify", str(table), "", False, "table entries must be elements of the carrier"
+        )
     info = classify(table)
     out = info["structure"]
     if "witness" in info:

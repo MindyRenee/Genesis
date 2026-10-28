@@ -815,7 +815,6 @@ class SelfImprovement:
             return False
         return True
 
-
     def get_feedback_stats(self) -> dict[str, dict[str, Any]]:
         """Get statistics about proposal feedback by category.
 
@@ -834,7 +833,6 @@ class SelfImprovement:
         return stats
 
     # ─── Proposal generation from bug reports ───────────────────
-
 
     def _propose_from_code_analysis(self, max_proposals: int) -> list[Proposal]:
         """Generate proposals by scanning code for improvement patterns.

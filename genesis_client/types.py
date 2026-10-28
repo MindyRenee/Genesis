@@ -36,6 +36,7 @@ __all__ = [
     "BodyState",
     "CoreState",
     "Episode",
+    "FoldMargins",
     "InferenceSummary",
     "IonSummary",
     "MemoryStats",
@@ -143,6 +144,45 @@ class IonSummary:
             gradient_integrity=values[24],
             energy_load=values[25],
             net_membrane_current=values[26],
+        )
+
+
+@dataclass(frozen=True)
+class FoldMargins:
+    """The LC–VLPO switch's saddle-node margins (40 bytes).
+
+    The body's homeostat ``h`` is the control parameter of the
+    mutual-inhibition sleep switch. The two fold edges are the
+    saddle-node points where each attractor ceases to exist:
+    ``h_sleep_fold`` is the wake-up edge (below it the sleep branch
+    dies), ``h_wake_fold`` the fall-asleep edge (above it the wake
+    branch dies). ``position`` normalizes ``h`` into the hysteresis
+    band — 0 is the wake-up edge, 1 the fall-asleep edge, outside
+    that range is forced-wake/forced-sleep monostability. Edges
+    report NaN when they lay outside the body's sweep window, and
+    ``position`` is NaN whenever either edge is. ``bistable`` means
+    three fixed points coexist — noise can hop the barrier; that is
+    the hypnagogic flicker regime.
+    """
+
+    h: float
+    h_sleep_fold: float
+    h_wake_fold: float
+    position: float
+    bistable: bool
+
+    @classmethod
+    def unpack(cls, data: bytes) -> FoldMargins:
+        """Unpack a 40-byte FoldMargins from the daemon's response."""
+        if len(data) < 40:
+            raise ValueError(f"FoldMargins needs 40 bytes, got {len(data)}")
+        h, h_sleep_fold, h_wake_fold, position = struct.unpack_from("<4d", data, 0)
+        return cls(
+            h=h,
+            h_sleep_fold=h_sleep_fold,
+            h_wake_fold=h_wake_fold,
+            position=position,
+            bistable=data[32] != 0,
         )
 
 

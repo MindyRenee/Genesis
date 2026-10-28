@@ -1434,9 +1434,7 @@ class MemorySystem:
                 results.append(
                     SimilarEpisode(
                         episode_id=sid_eid,
-                        hamming_distance=(
-                            64 if suggestive else self._DEEP_RECALL_DISTANCE_GATE
-                        ),
+                        hamming_distance=(64 if suggestive else self._DEEP_RECALL_DISTANCE_GATE),
                         timestamp=sep.timestamp,
                         salience=sep.salience,
                     )

@@ -229,6 +229,7 @@ class InnerLife:
         frontal=None,
         is_nap_mode=None,
         engagement=None,
+        get_fold_margins=None,
         seed: int | None = None,
     ) -> None:
         """Initialize the inner life with its cognitive engines and callbacks.
@@ -266,6 +267,12 @@ class InnerLife:
                 an engaged world, [0, 1]. While it is high the thought
                 pool dwells on the world she is in — focus as salience,
                 not amputation. Optional; absent means unfocused.
+            get_fold_margins: Callback returning the body's LC–VLPO
+                switch margins (the daemon's FoldMargins, or None when
+                the channel is absent). Feeds the sleep-side Kramers
+                telegraph — the micro-arousal flicker — wherever the
+                inner life reads its waves. Optional; absent means the
+                oscillator runs on modeled inputs.
             seed: Optional RNG seed for deterministic thought sequences.
         """
         self.network = network
@@ -292,6 +299,12 @@ class InnerLife:
         # lucid dreaming probability). If None, dreaming features
         # fall back to the emotional state alone.
         self._get_neuro_summary = get_neuro_summary
+        # Optional callback returning the body's LC–VLPO switch
+        # margins — the sleep-side channel that lets the Kramers
+        # telegraph flicker toward wake (micro-arousals) while the
+        # switch is bistable. If None, the waves run on modeled
+        # inputs alone.
+        self._get_fold_margins = get_fold_margins
         # Optional callback returning world engagement, [0, 1] —
         # the focus signal: while a world holds her, off-topic
         # candidates fade rather than compete at full strength.
@@ -1532,7 +1545,12 @@ class InnerLife:
                 try:
                     from thalamus.brain_waves import assess_brain_waves
 
-                    waves = assess_brain_waves(summary)
+                    fold = (
+                        self._get_fold_margins()
+                        if self._get_fold_margins is not None
+                        else None
+                    )
+                    waves = assess_brain_waves(summary, fold=fold)
                 except Exception as e:  # noqa: BLE001
                     note_swallowed(
                         "sleep.inner_life._run_dream_synthesis",
@@ -1754,9 +1772,7 @@ class InnerLife:
         relationship and be spoken as if it were one.
         """
         usable = [
-            n
-            for n in neighbors
-            if n.concept and float(n.weight or 0.0) >= _MIN_SPOKEN_EDGE_WEIGHT
+            n for n in neighbors if n.concept and float(n.weight or 0.0) >= _MIN_SPOKEN_EDGE_WEIGHT
         ]
         weights = [max(0.0, float(n.weight or 0.0)) for n in usable]
         if not usable or sum(weights) <= 0.0:
@@ -4892,7 +4908,6 @@ class InnerLife:
             return None
         return getattr(self._frontal, "_last_inference_reading", None)
 
-
     def _environment_thought(
         self, candidate: dict[str, Any], emotion: EmotionalState
     ) -> SpontaneousThought | None:
@@ -4926,7 +4941,6 @@ class InnerLife:
                 "reasoning": [detail] if detail else [],
             },
         )
-
 
     def _compose_existential_from_network(
         self, emotion: EmotionalState

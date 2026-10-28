@@ -495,7 +495,6 @@ class FeelingReporter:
 
     # ─── Bug report ──────────────────────────────────────────────
 
-
     def compose_encouragement_response(self, emotion: EmotionalState) -> str:
         """Compose a response to encouragement.
 

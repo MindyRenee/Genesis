@@ -123,7 +123,6 @@ def _clear_stale_singletons(profile: os.PathLike[str] | str) -> None:
             pass
 
 
-
 class _Browser:
     """A browser tab driven over CDP, callable from any thread.
 
@@ -470,5 +469,3 @@ class _Browser:
                 self._proc.kill()
         except Exception as e:  # noqa: BLE001
             note_swallowed("tools.browser.proc_terminate", e)
-
-

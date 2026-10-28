@@ -48,16 +48,16 @@ def distance(a: Point, b: Point) -> float:
 def polygon_area(pts: list[Point]) -> float:
     """The shoelace — half the sum of cross products of edges."""
     n = len(pts)
-    s = sum(pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1]
-            for i in range(n))
+    s = sum(pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1] for i in range(n))
     return abs(s) / 2
 
 
 def signed_area(pts: list[Point]) -> float:
     """Signed shoelace — positive means counterclockwise winding."""
     n = len(pts)
-    return sum(pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1]
-               for i in range(n)) / 2
+    return (
+        sum(pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1] for i in range(n)) / 2
+    )
 
 
 def point_in_polygon(p: Point, pts: list[Point]) -> bool:
@@ -81,8 +81,10 @@ def convex_hull(pts: list[Point]) -> list[Point]:
     pts = sorted(set(pts))
     if len(pts) <= 2:
         return pts
+
     def cross(o: Point, a: Point, b: Point) -> float:
         return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
     lower: list[Point] = []
     for p in pts:
         while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
@@ -111,48 +113,60 @@ def looks_like_geometry(text: str) -> bool:
 
 
 def distance_text(text: str) -> GeoResult:
-    """"distance between (0,0) and (3,4)" -> 5."""
+    """ "distance between (0,0) and (3,4)" -> 5."""
     pts = parse_points(text)
     if len(pts) < 2:
         return GeoResult("distance", text, "", False, "need two points")
     d = distance(pts[0], pts[1])
     dx, dy = pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]
-    return GeoResult("distance", text,
-                     f"{d:.6g}   (√({dx:g}² + {dy:g}²) = √{dx*dx+dy*dy:g})",
-                     True, data={"distance": d})
+    return GeoResult(
+        "distance",
+        text,
+        f"{d:.6g}   (√({dx:g}² + {dy:g}²) = √{dx * dx + dy * dy:g})",
+        True,
+        data={"distance": d},
+    )
 
 
 def area_text(text: str) -> GeoResult:
-    """"area of (0,0) (4,0) (0,3)" -> 6 — the shoelace's answer."""
+    """ "area of (0,0) (4,0) (0,3)" -> 6 — the shoelace's answer."""
     pts = parse_points(text)
     if len(pts) < 3:
         return GeoResult("area", text, "", False, "need at least three points")
     a = polygon_area(pts)
     wind = "counterclockwise" if signed_area(pts) > 0 else "clockwise"
-    return GeoResult("area", text, f"{a:.6g}   (wound {wind})",
-                     True, data={"area": a})
+    return GeoResult("area", text, f"{a:.6g}   (wound {wind})", True, data={"area": a})
 
 
 def hull_text(text: str) -> GeoResult:
-    """"convex hull of ..." -> the vertices that hold the shape."""
+    """ "convex hull of ..." -> the vertices that hold the shape."""
     pts = parse_points(text)
     if len(pts) < 3:
         return GeoResult("hull", text, "", False, "need at least three points")
     hull = convex_hull(pts)
     out = " ".join(f"({x:g}, {y:g})" for x, y in hull)
-    return GeoResult("hull", text,
-                     f"{len(hull)} vertices: {out}", True,
-                     data={"hull": hull, "area": polygon_area(hull)})
+    return GeoResult(
+        "hull",
+        text,
+        f"{len(hull)} vertices: {out}",
+        True,
+        data={"hull": hull, "area": polygon_area(hull)},
+    )
 
 
 def inside_text(point_text: str, poly_text: str) -> GeoResult:
-    """"is (1,1) inside (0,0) (4,0) (0,4)" -> yes."""
+    """ "is (1,1) inside (0,0) (4,0) (0,4)" -> yes."""
     p = parse_points(point_text)
     poly = parse_points(poly_text)
     if not p or len(poly) < 3:
-        return GeoResult("inside", f"{point_text} in {poly_text}", "", False,
-                         "need a point and a polygon")
+        return GeoResult(
+            "inside", f"{point_text} in {poly_text}", "", False, "need a point and a polygon"
+        )
     inside = point_in_polygon(p[0], poly)
-    return GeoResult("inside", f"{point_text} in {poly_text}",
-                     f"{p[0]} is {'inside' if inside else 'outside'} the polygon",
-                     True, data={"inside": inside})
+    return GeoResult(
+        "inside",
+        f"{point_text} in {poly_text}",
+        f"{p[0]} is {'inside' if inside else 'outside'} the polygon",
+        True,
+        data={"inside": inside},
+    )

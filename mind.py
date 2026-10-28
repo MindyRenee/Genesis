@@ -412,6 +412,7 @@ class Mind(
             self_model=self.self_model,
             learner=self.learner,
             get_neuro_summary=self.client.get_neuro_summary,
+            get_fold_margins=self.client.get_fold_margins,
             question_composer=self.brain.frontal.question_composer,
             is_mind_sleeping=lambda: self._is_sleeping,
             frontal=self.brain.frontal,
@@ -486,8 +487,7 @@ class Mind(
             # sleep in either mode, plus the hypnagogic drift when
             # resident — a headless mind's relay quiets at onset like
             # a brain's, not at N2 like a session's.
-            is_sleeping=lambda: self._is_sleeping
-            or (self._headless and self.is_hypnagogic),
+            is_sleeping=lambda: self._is_sleeping or (self._headless and self.is_hypnagogic),
             get_user_name=self.user_profile.get_name,
             channel=channel,
             on_channel_speech=self._hear_channel,

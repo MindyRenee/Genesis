@@ -126,43 +126,56 @@ def looks_like_proof(text: str) -> bool:
 
 
 def tautology_text(p: Prop, words: str = "") -> ProofResult:
-    """"is P → P a tautology" -> yes — true under all assignments."""
+    """ "is P → P a tautology" -> yes — true under all assignments."""
     ok = tautology(p)
     label = words or render(p)
     verdict = "a tautology — true under every assignment" if ok else "not a tautology"
     return ProofResult(
-        "tautology", label,
-        f"{render(p)} is {verdict}",
-        True, data={"tautology": ok})
+        "tautology", label, f"{render(p)} is {verdict}", True, data={"tautology": ok}
+    )
 
 
 def satisfiable_text(p: Prop, words: str = "") -> ProofResult:
-    """"can P ∧ ¬Q hold" -> the assignment that does it, or none."""
+    """ "can P ∧ ¬Q hold" -> the assignment that does it, or none."""
     env = satisfiable(p)
     label = words or render(p)
     if env is None:
-        return ProofResult("satisfiable", label,
-                           f"{render(p)} is unsatisfiable — "
-                           "a contradiction in every world",
-                           True, data={"satisfiable": False})
+        return ProofResult(
+            "satisfiable",
+            label,
+            f"{render(p)} is unsatisfiable — a contradiction in every world",
+            True,
+            data={"satisfiable": False},
+        )
     out = ", ".join(f"{k}={'T' if v else 'F'}" for k, v in sorted(env.items()))
-    return ProofResult("satisfiable", label,
-                       f"satisfiable — e.g. {out}", True,
-                       data={"satisfiable": True, "witness": env})
+    return ProofResult(
+        "satisfiable",
+        label,
+        f"satisfiable — e.g. {out}",
+        True,
+        data={"satisfiable": True, "witness": env},
+    )
 
 
 def entail_text(premises: list[Prop], goal: Prop) -> ProofResult:
-    """"do these premises force the goal" — a semantic check:
+    """ "do these premises force the goal" — a semantic check:
     in every world where all premises hold, does the goal hold?"""
     names = sorted(set().union(*(atoms(p) for p in premises)) | atoms(goal))
     for bits in itertools.product((False, True), repeat=len(names)):
         env = dict(zip(names, bits, strict=True))
         if all(evaluate(p, env) for p in premises) and not evaluate(goal, env):
             out = ", ".join(f"{k}={'T' if v else 'F'}" for k, v in sorted(env.items()))
-            return ProofResult("entail", f"premises ⊢ {render(goal)}",
-                               f"no — a countermodel: {out}", True,
-                               data={"entails": False, "countermodel": env})
-    return ProofResult("entail", f"premises ⊢ {render(goal)}",
-                       "yes — the goal holds in every world "
-                       "where the premises do", True,
-                       data={"entails": True})
+            return ProofResult(
+                "entail",
+                f"premises ⊢ {render(goal)}",
+                f"no — a countermodel: {out}",
+                True,
+                data={"entails": False, "countermodel": env},
+            )
+    return ProofResult(
+        "entail",
+        f"premises ⊢ {render(goal)}",
+        "yes — the goal holds in every world where the premises do",
+        True,
+        data={"entails": True},
+    )

@@ -112,7 +112,8 @@ def ratio_text(func: str, angle_text: str) -> TrigResult:
             return TrigResult(func, angle_text, "", False, str(e))
         frac = _pi_fraction(radians)
         text_out = (
-            f"pi/{frac[1]}" if isinstance(frac, tuple)
+            f"pi/{frac[1]}"
+            if isinstance(frac, tuple)
             else (f"{frac}·pi" if isinstance(frac, int) and frac != 0 else f"{radians:.6g}")
         )
         if isinstance(frac, tuple) and frac[0] != 1:
@@ -120,7 +121,7 @@ def ratio_text(func: str, angle_text: str) -> TrigResult:
         return TrigResult(func, angle_text, text_out, True, data={"radians": radians})
     ratio = {"sin": math.sin, "cos": math.cos, "tan": math.tan}.get(name)
     if ratio is None:
-            return TrigResult(func, angle_text, "", False, f"unknown ratio '{func}'")
+        return TrigResult(func, angle_text, "", False, f"unknown ratio '{func}'")
     val = ratio(angle)
     frac = _pi_fraction(angle)
     key = frac if isinstance(frac, int) else (frac if frac else None)
@@ -151,13 +152,15 @@ def triangle_text(sides: list[float]) -> TrigResult:
         return TrigResult("triangle", str(sides), "", False, "three sides, please")
     a, b, c = sorted(sides)
     if a <= 0 or a + b <= c:
-        return TrigResult("triangle", str(sides), "", False,
-                          "those sides cannot close into a triangle")
+        return TrigResult(
+            "triangle", str(sides), "", False, "those sides cannot close into a triangle"
+        )
+
     def ang(adj1: float, adj2: float, opp: float) -> float:
         return math.degrees(math.acos((adj1**2 + adj2**2 - opp**2) / (2 * adj1 * adj2)))
+
     angles = (ang(a, b, c), ang(a, c, b), ang(b, c, a))
     s = (a + b + c) / 2
     area = math.sqrt(s * (s - a) * (s - b) * (s - c))
     out = f"angles {angles[0]:.4g}°, {angles[1]:.4g}°, {angles[2]:.4g}°; area {area:.6g}"
-    return TrigResult("triangle", str(sides), out, True,
-                      data={"angles": angles, "area": area})
+    return TrigResult("triangle", str(sides), out, True, data={"angles": angles, "area": area})

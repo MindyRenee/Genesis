@@ -183,32 +183,36 @@ def looks_like_group(text: str) -> bool:
 
 
 def order_text(text: str) -> GroupResult:
-    """"order of (1 2 3)(4 5)" -> 6 — lcm(3, 2)."""
+    """ "order of (1 2 3)(4 5)" -> 6 — lcm(3, 2)."""
     p = parse_perm(text)
     if p is None:
         return GroupResult("order", text, "", False, "could not read the permutation")
     o = order_of(p)
     cyc = "·".join(str(len(c)) for c in cycles_of(p))
     return GroupResult(
-        "order", text,
+        "order",
+        text,
         f"{o} — cycles of length {cyc}, the orbit closes after {o} repetitions",
-        True, data={"order": o},
+        True,
+        data={"order": o},
     )
 
 
 def compose_text(left: str, right: str) -> GroupResult:
-    """"compose (0 1 2) with (1 2)" — left then right."""
+    """ "compose (0 1 2) with (1 2)" — left then right."""
     p, q = parse_perm(left), parse_perm(right)
     if p is None or q is None:
-        return GroupResult("compose", f"{left} then {right}", "", False,
-                           "could not read a permutation")
+        return GroupResult(
+            "compose", f"{left} then {right}", "", False, "could not read a permutation"
+        )
     n = max(len(p), len(q))
     p += list(range(len(p), n))
     q += list(range(len(q), n))
     out = compose(p, q)
     assert out is not None
-    return GroupResult("compose", f"{left} then {right}", render_cycles(out), True,
-                       data={"image": out})
+    return GroupResult(
+        "compose", f"{left} then {right}", render_cycles(out), True, data={"image": out}
+    )
 
 
 def describe_text(text: str) -> GroupResult:
@@ -221,7 +225,10 @@ def describe_text(text: str) -> GroupResult:
     o = order_of(p)
     sgn = "even" if sign_of(p) == 1 else "odd"
     fixed = sum(1 for c in cyc if len(c) == 1)
-    out = (f"{render_cycles(p)}: {len([c for c in cyc if len(c)>1])} moving cycles, "
-           f"order {o}, {sgn} parity, {fixed} fixed point{'s' if fixed != 1 else ''}")
-    return GroupResult("describe", text, out, True,
-                       data={"cycles": cyc, "order": o, "sign": sign_of(p)})
+    out = (
+        f"{render_cycles(p)}: {len([c for c in cyc if len(c) > 1])} moving cycles, "
+        f"order {o}, {sgn} parity, {fixed} fixed point{'s' if fixed != 1 else ''}"
+    )
+    return GroupResult(
+        "describe", text, out, True, data={"cycles": cyc, "order": o, "sign": sign_of(p)}
+    )

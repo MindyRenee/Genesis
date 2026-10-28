@@ -1161,9 +1161,7 @@ class VolitionMixin:
         thalamic gate is closed and a sleeping mind doesn't answer.
         """
         text = content.strip()
-        closed = getattr(
-            self, "thalamic_gate_closed", getattr(self, "_is_sleeping", False)
-        )
+        closed = getattr(self, "thalamic_gate_closed", getattr(self, "_is_sleeping", False))
         if not text or closed:
             return
         self._emit_live_thought("heard", f"{author}: {text}")

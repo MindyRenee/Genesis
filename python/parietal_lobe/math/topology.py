@@ -73,13 +73,21 @@ def euler_characteristic(faces: list[int]) -> int:
 
 
 def euler_surface(v: int, e: int, f: int) -> TopoResult:
-    """"V-E+F for 8, 12, 6" -> 2 — a sphere's signature."""
+    """ "V-E+F for 8, 12, 6" -> 2 — a sphere's signature."""
     chi = v - e + f
-    name = {2: "sphere-like (χ=2)", 0: "torus-like (χ=0)",
-            -2: "two-holed (χ=−2)", 1: "disk-like (χ=1)"}.get(chi, f"χ={chi}")
-    return TopoResult("euler", f"V={v}, E={e}, F={f}",
-                      f"χ = {v} − {e} + {f} = {chi} — {name}",
-                      True, data={"chi": chi})
+    name = {
+        2: "sphere-like (χ=2)",
+        0: "torus-like (χ=0)",
+        -2: "two-holed (χ=−2)",
+        1: "disk-like (χ=1)",
+    }.get(chi, f"χ={chi}")
+    return TopoResult(
+        "euler",
+        f"V={v}, E={e}, F={f}",
+        f"χ = {v} − {e} + {f} = {chi} — {name}",
+        True,
+        data={"chi": chi},
+    )
 
 
 _TOPO_WORD = re.compile(
@@ -101,9 +109,9 @@ def describe_space_text(n: int, opens: list[list[int]]) -> TopoResult:
     """Is this collection of subsets a topology on n points?"""
     fs = frozenset(frozenset(o) for o in opens)
     ok = is_topology(n, fs)
-    out = (f"{len(fs)} opens on {n} points — "
-           + ("a topology: ∅, X, unions, and intersections all hold"
-              if ok else
-              "not a topology — an axiom fails"))
-    return TopoResult("topology", str(opens), out, True,
-                      data={"is_topology": ok})
+    out = f"{len(fs)} opens on {n} points — " + (
+        "a topology: ∅, X, unions, and intersections all hold"
+        if ok
+        else "not a topology — an axiom fails"
+    )
+    return TopoResult("topology", str(opens), out, True, data={"is_topology": ok})

@@ -106,41 +106,53 @@ def looks_like_counting(text: str) -> bool:
 
 
 def choose_text(n: int, k: int) -> CountResult:
-    """"choose 3 from 10" -> 120 — the binomial coefficient."""
+    """ "choose 3 from 10" -> 120 — the binomial coefficient."""
     c = choose(n, k)
     if c is None:
-        return CountResult("choose", f"C({n},{k})", "", False,
-                           "k must satisfy 0 ≤ k ≤ n")
-    return CountResult("choose", f"C({n},{k})",
-                       f"{c} — the binomial coefficient: "
-                       f"{n}!/({k}!·{n-k}!), subsets not orders",
-                       True, data={"count": c})
+        return CountResult("choose", f"C({n},{k})", "", False, "k must satisfy 0 ≤ k ≤ n")
+    return CountResult(
+        "choose",
+        f"C({n},{k})",
+        f"{c} — the binomial coefficient: {n}!/({k}!·{n - k}!), subsets not orders",
+        True,
+        data={"count": c},
+    )
 
 
 def arrange_text(n: int, k: int | None = None) -> CountResult:
-    """"arrange 5" -> 5! = 120; "arrange 3 of 10" -> P(10,3)."""
+    """ "arrange 5" -> 5! = 120; "arrange 3 of 10" -> P(10,3)."""
     if k is None or k == n:
         if n < 0:
             return CountResult("arrange", str(n), "", False, "n must be ≥ 0")
         c = math.factorial(n)
-        return CountResult("arrange", f"{n}!",
-                           f"{c} — {n}! orders for {n} distinct things",
-                           True, data={"count": c})
+        return CountResult(
+            "arrange",
+            f"{n}!",
+            f"{c} — {n}! orders for {n} distinct things",
+            True,
+            data={"count": c},
+        )
     count = permute(n, k)
     if count is None:
-        return CountResult("arrange", f"P({n},{k})", "", False,
-                           "k must satisfy 0 ≤ k ≤ n")
-    return CountResult("arrange", f"P({n},{k})",
-                       f"{count} — ordered arrangements: "
-                       f"{n}!/{n-k}!, orders not subsets",
-                       True, data={"count": count})
+        return CountResult("arrange", f"P({n},{k})", "", False, "k must satisfy 0 ≤ k ≤ n")
+    return CountResult(
+        "arrange",
+        f"P({n},{k})",
+        f"{count} — ordered arrangements: {n}!/{n - k}!, orders not subsets",
+        True,
+        data={"count": count},
+    )
 
 
 def derange_text(n: int) -> CountResult:
-    """"derangements of 5" -> 44 — nothing stays home."""
+    """ "derangements of 5" -> 44 — nothing stays home."""
     if n < 0:
         return CountResult("derange", str(n), "", False, "n must be ≥ 0")
     c = derangements(n)
-    return CountResult("derange", f"!{n}",
-                       f"{c} — permutations of {n} with no fixed point",
-                       True, data={"count": c})
+    return CountResult(
+        "derange",
+        f"!{n}",
+        f"{c} — permutations of {n} with no fixed point",
+        True,
+        data={"count": c},
+    )

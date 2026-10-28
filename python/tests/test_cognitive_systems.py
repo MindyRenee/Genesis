@@ -1257,8 +1257,6 @@ def test_learn_code_urge_suppressed_by_stress() -> None:
 # resolves bugs) and discharges only when bugs are fixed.
 
 
-
-
 def test_gw_registered_modules_property() -> None:
     """registered_modules property returns a copy of the module list."""
     gw = GlobalWorkspace()

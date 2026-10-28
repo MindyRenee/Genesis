@@ -583,9 +583,8 @@ impl TickLoop {
         // its predictions are, reported to the cholinergic release
         // equation this tick. Reads the engine's last tracked value;
         // the inference cycle later this same tick updates it.
-        neuro_params.expected_uncertainty = crate::state::basal_forebrain::expected_uncertainty(
-            self.inference_engine.precision(),
-        );
+        neuro_params.expected_uncertainty =
+            crate::state::basal_forebrain::expected_uncertainty(self.inference_engine.precision());
 
         // Developmental competence of the HPA axis.
         //

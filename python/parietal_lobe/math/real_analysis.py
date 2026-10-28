@@ -43,13 +43,16 @@ class AnalysisResult:
 def fn_of(text: str) -> Callable[[float], float]:
     """Compile expression text to a callable on the variable."""
     expr = parse(text)
+
     def f(x: float) -> float:
         return evaluate(expr, {"x": x})
+
     return f
 
 
-def plot(text_or_fn: str | Callable[[float], float],
-         lo: float, hi: float, n: int = 128) -> list[tuple[float, float]]:
+def plot(
+    text_or_fn: str | Callable[[float], float], lo: float, hi: float, n: int = 128
+) -> list[tuple[float, float]]:
     """A function's graph as its (x, y) points — n evenly spaced
     samples over [lo, hi]."""
     f = fn_of(text_or_fn) if isinstance(text_or_fn, str) else text_or_fn
@@ -59,8 +62,14 @@ def plot(text_or_fn: str | Callable[[float], float],
     return [(lo + i * step, f(lo + i * step)) for i in range(n)]
 
 
-def delta_game(f: Callable[[float], float], a: float, limit: float,
-               delta: float, epsilon: float, probes: int = 64) -> float | None:
+def delta_game(
+    f: Callable[[float], float],
+    a: float,
+    limit: float,
+    delta: float,
+    epsilon: float,
+    probes: int = 64,
+) -> float | None:
     """The epsilon-delta game, played honestly.
 
     Every x with ``0 < |x - a| < delta`` is probed; return the
@@ -85,8 +94,9 @@ def delta_game(f: Callable[[float], float], a: float, limit: float,
     return None
 
 
-def verify_limit(f: Callable[[float], float], a: float,
-                 claimed: float, epsilon: float) -> AnalysisResult:
+def verify_limit(
+    f: Callable[[float], float], a: float, claimed: float, epsilon: float
+) -> AnalysisResult:
     """Answer the challenger: find a delta for this epsilon by
     halving until the game is won, or report undecided."""
     if not math.isfinite(epsilon) or epsilon <= 0:
@@ -98,18 +108,21 @@ def verify_limit(f: Callable[[float], float], a: float,
         w = delta_game(f, a, claimed, delta, epsilon)
         if w is None:
             return AnalysisResult(
-                "limit", f"x→{a}", f"verified: δ = {delta:.3g} answers ε = {epsilon:g}",
-                True, data={"delta": delta, "epsilon": epsilon})
+                "limit",
+                f"x→{a}",
+                f"verified: δ = {delta:.3g} answers ε = {epsilon:g}",
+                True,
+                data={"delta": delta, "epsilon": epsilon},
+            )
         delta = min(delta / 2, abs(w - a) * 0.9)
-    return AnalysisResult("limit", f"x→{a}", "undecided — no delta found",
-                          False, error="undecided")
+    return AnalysisResult("limit", f"x→{a}", "undecided — no delta found", False, error="undecided")
 
 
 def numeric_limit(f: Callable[[float], float], a: float) -> AnalysisResult:
     """Approach a from both sides — the answer the function gives."""
     left = right = None
     for k in range(1, 40):
-        h = 0.5 ** k
+        h = 0.5**k
         try:
             left = f(a - h)
             right = f(a + h)
@@ -120,17 +133,21 @@ def numeric_limit(f: Callable[[float], float], a: float) -> AnalysisResult:
             left = right = None
     if left is not None and right is not None and abs(left - right) < 1e-7:
         value = (left + right) / 2
-        return AnalysisResult("limit", f"x→{a}", f"{value:.8g}", True,
-                              data={"value": value})
+        return AnalysisResult("limit", f"x→{a}", f"{value:.8g}", True, data={"value": value})
     if left is not None and right is not None:
-        return AnalysisResult("limit", f"x→{a}",
-                              f"left {left:.6g} ≠ right {right:.6g} — the limit does not exist",
-                              False, error="sides disagree")
+        return AnalysisResult(
+            "limit",
+            f"x→{a}",
+            f"left {left:.6g} ≠ right {right:.6g} — the limit does not exist",
+            False,
+            error="sides disagree",
+        )
     return AnalysisResult("limit", f"x→{a}", "undecided", False, error="undecided")
 
 
-def bisection(f: Callable[[float], float], lo: float, hi: float,
-              tol: float = 1e-12) -> float | None:
+def bisection(
+    f: Callable[[float], float], lo: float, hi: float, tol: float = 1e-12
+) -> float | None:
     """A root inside a sign change — the interval halved to tol."""
     if tol <= 0 or lo >= hi:
         return None
@@ -154,8 +171,7 @@ def bisection(f: Callable[[float], float], lo: float, hi: float,
     return (lo + hi) / 2
 
 
-def riemann_sum(f: Callable[[float], float], lo: float, hi: float,
-                n: int = 1000) -> float:
+def riemann_sum(f: Callable[[float], float], lo: float, hi: float, n: int = 1000) -> float:
     """Left-endpoint Riemann sum — area as accumulation."""
     if n < 1:
         raise ValueError("n must be positive")
@@ -165,8 +181,7 @@ def riemann_sum(f: Callable[[float], float], lo: float, hi: float,
     return sum(f(lo + i * dx) for i in range(n)) * dx
 
 
-def simpson(f: Callable[[float], float], lo: float, hi: float,
-            n: int = 1000) -> float:
+def simpson(f: Callable[[float], float], lo: float, hi: float, n: int = 1000) -> float:
     """Simpson's rule — parabolic quadrature, n forced even."""
     if n < 1:
         raise ValueError("n must be positive")
@@ -194,7 +209,7 @@ def looks_like_analysis(text: str) -> bool:
 
 
 def limit_text(text: str, at: float) -> AnalysisResult:
-    """"limit of sin(x)/x at 0" — numeric approach first, then
+    """ "limit of sin(x)/x at 0" — numeric approach first, then
     the delta game verifying what was found."""
     try:
         f = fn_of(text)
@@ -209,13 +224,13 @@ def plot_text(text: str, lo: float, hi: float, n: int = 128) -> AnalysisResult:
         pts = plot(text, lo, hi, n)
     except ParseError as e:
         return AnalysisResult("plot", text, "", False, str(e))
-    return AnalysisResult("plot", text,
-                          f"{len(pts)} points on [{lo:g}, {hi:g}]",
-                          True, data={"points": pts})
+    return AnalysisResult(
+        "plot", text, f"{len(pts)} points on [{lo:g}, {hi:g}]", True, data={"points": pts}
+    )
 
 
 def integral_text(text: str, lo: float, hi: float) -> AnalysisResult:
-    """"integral of x^2 from 0 to 1" — Simpson's quadrature."""
+    """ "integral of x^2 from 0 to 1" — Simpson's quadrature."""
     try:
         f = fn_of(text)
     except ParseError as e:

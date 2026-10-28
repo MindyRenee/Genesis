@@ -780,9 +780,7 @@ class TestZeroWeightDreamNoise:
         il = _make_inner_life(net, seed=7)
 
         for _ in range(50):
-            name, _display, knowledge = il._neighbor_knowledge(
-                net.get_associations("alpha")
-            )
+            name, _display, knowledge = il._neighbor_knowledge(net.get_associations("alpha"))
             assert name == "beta", f"zero-weight neighbor was spoken: {name}"
             assert knowledge and knowledge[0][2] >= 0.05
 
@@ -805,9 +803,26 @@ class TestZeroWeightDreamNoise:
     def test_dream_seed_pool_skips_recent_topics(self):
         net = ConceptNetwork()
         words = [
-            "apple", "banana", "cherry", "grape", "lemon", "mango", "melon",
-            "olive", "peach", "pear", "plum", "berry", "fig", "kiwi", "lime",
-            "nut", "date", "corn", "bean", "rice",
+            "apple",
+            "banana",
+            "cherry",
+            "grape",
+            "lemon",
+            "mango",
+            "melon",
+            "olive",
+            "peach",
+            "pear",
+            "plum",
+            "berry",
+            "fig",
+            "kiwi",
+            "lime",
+            "nut",
+            "date",
+            "corn",
+            "bean",
+            "rice",
         ]
         for word in words:
             net.add_concept(word, confidence=0.9)

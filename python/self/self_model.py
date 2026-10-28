@@ -1066,9 +1066,7 @@ class SelfModel:
                     # first-in-order would let edge insertion sequence,
                     # not conviction, decide what it thinks it is.
                     is_a_targets = [
-                        (t, w)
-                        for t, r, w in neighbors
-                        if r == RelationType.IS_A and w > 0.5
+                        (t, w) for t, r, w in neighbors if r == RelationType.IS_A and w > 0.5
                     ]
                     nature_target = (
                         max(is_a_targets, key=lambda tw: tw[1])[0] if is_a_targets else None
@@ -1079,9 +1077,7 @@ class SelfModel:
                     # What is it connected to? The nature target is
                     # already spoken for — listing it again would
                     # report the same edge twice.
-                    connections = [
-                        t for t, r, w in neighbors if w > 0.5 and t != nature_target
-                    ]
+                    connections = [t for t, r, w in neighbors if w > 0.5 and t != nature_target]
                     if connections:
                         discoveries["connections"] = connections[:5]
 
@@ -1386,9 +1382,7 @@ class SelfModel:
             body.hardware_description = str(body_state.description or "")
 
         body.hardware_sensors_present = channels.present
-        body.sensor_presence = (
-            channels.mask if channels.has_mask else channels.reconstructed_mask
-        )
+        body.sensor_presence = channels.mask if channels.has_mask else channels.reconstructed_mask
         body.reported_channels = frozenset(channels.reported)
         body.hardware_read_at = time.monotonic()
         return body

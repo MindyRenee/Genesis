@@ -90,8 +90,7 @@ def matmul(a: Matrix, b: Matrix) -> Matrix | None:
     if len(a[0]) != len(b):
         return None
     return [
-        [sum((a[i][k] * b[k][j] for k in range(len(b))), Fraction(0))
-         for j in range(len(b[0]))]
+        [sum((a[i][k] * b[k][j] for k in range(len(b))), Fraction(0)) for j in range(len(b[0]))]
         for i in range(len(a))
     ]
 
@@ -150,7 +149,7 @@ def looks_like_linear_algebra(text: str) -> bool:
 
 
 def determinant_text(text: str) -> LinearResult:
-    """"determinant of [[1,2],[3,4]]" -> -2."""
+    """ "determinant of [[1,2],[3,4]]" -> -2."""
     try:
         m = parse_matrix(text)
         d = determinant(m)
@@ -162,7 +161,7 @@ def determinant_text(text: str) -> LinearResult:
 
 
 def rank_text(text: str) -> LinearResult:
-    """"rank of [[1,2],[2,4]]" -> 1."""
+    """ "rank of [[1,2],[2,4]]" -> 1."""
     try:
         m = parse_matrix(text)
     except ValueError as e:
@@ -171,20 +170,21 @@ def rank_text(text: str) -> LinearResult:
 
 
 def matmul_text(a_text: str, b_text: str) -> LinearResult:
-    """"[[1,0],[0,1]] times [[1,2],[3,4]]" — the product."""
+    """ "[[1,0],[0,1]] times [[1,2],[3,4]]" — the product."""
     try:
         a, b = parse_matrix(a_text), parse_matrix(b_text)
     except ValueError as e:
         return LinearResult("matmul", f"{a_text} * {b_text}", "", False, str(e))
     out = matmul(a, b)
     if out is None:
-        return LinearResult("matmul", f"{a_text} * {b_text}", "", False,
-                            "inner dimensions must agree")
+        return LinearResult(
+            "matmul", f"{a_text} * {b_text}", "", False, "inner dimensions must agree"
+        )
     return LinearResult("matmul", f"{a_text} * {b_text}", render_matrix(out), True)
 
 
 def solve_text(a_text: str, b_text: str) -> LinearResult:
-    """"solve [[2,1],[1,-1]] x = [5, 1]" -> x = (2, 1)."""
+    """ "solve [[2,1],[1,-1]] x = [5, 1]" -> x = (2, 1)."""
     try:
         a = parse_matrix(a_text)
         lit = ast.literal_eval(b_text.strip())
@@ -193,7 +193,8 @@ def solve_text(a_text: str, b_text: str) -> LinearResult:
         return LinearResult("solve", f"{a_text} x = {b_text}", "", False, str(e))
     x = solve(a, b)
     if x is None:
-        return LinearResult("solve", f"{a_text} x = {b_text}", "", False,
-                            "the system has no unique solution")
+        return LinearResult(
+            "solve", f"{a_text} x = {b_text}", "", False, "the system has no unique solution"
+        )
     out = "(" + ", ".join(_fmt(v) for v in x) + ")"
     return LinearResult("solve", f"{a_text} x = {b_text}", f"x = {out}", True)
