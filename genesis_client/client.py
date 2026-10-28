@@ -803,7 +803,7 @@ class GenesisClient:
             resp = self._request(GET_FOLD_MARGINS, timeout=timeout)
         except (ConnectionError, OSError, ProtocolError):
             return None
-        if not resp or resp[0] >= 0x80:
+        if len(resp) < 40:
             return None
         return FoldMargins.unpack(resp)
 
