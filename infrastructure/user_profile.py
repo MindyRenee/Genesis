@@ -1,4 +1,4 @@
-"""User profile — what Genesis knows about the human.
+"""User profile — what Genesis knows about Mindy.
 
 This is a dedicated, persistent model of the user, distinct from the
 concept network. It tracks identity, preferences, goals, emotional
@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import time
 from collections import deque
@@ -42,7 +43,9 @@ _BOND_WARM_START_MAX_TURNS = 300
 class UserProfile:
     """A structured, persistent model of the human user."""
 
-    name: str | None = None
+    # The profile models exactly one person — her — so the name is
+    # known from the start; ``set_name`` can still change it.
+    name: str = "Mindy"
     preferences: dict[str, list[str]] = field(default_factory=dict)
     facts: dict[str, str] = field(default_factory=dict)
     goals: list[str] = field(default_factory=list)
@@ -73,11 +76,14 @@ class UserProfile:
 
     def set_name(self, name: str) -> None:
         """Record the user's name and persist immediately."""
-        self.name = name.strip()
+        stripped = name.strip()
+        if not stripped:
+            return
+        self.name = stripped
         self.save()
 
-    def get_name(self) -> str | None:
-        """Return the user's name, if known."""
+    def get_name(self) -> str:
+        """Return the user's name."""
         return self.name
 
     def add_preference(self, category: str, value: str) -> None:
@@ -133,6 +139,8 @@ class UserProfile:
 
     def record_emotion(self, label: str, valence: float) -> None:
         """Append a snapshot of the user's emotional state."""
+        if not math.isfinite(valence):
+            return
         self.emotional_history.append((time.time(), label, valence))
         # Keep only the last 100 entries to avoid unbounded growth.
         if len(self.emotional_history) > 100:
@@ -153,8 +161,14 @@ class UserProfile:
         fraction of the distance closed this turn; warm turns pass
         a larger rate than flat ones.
         """
-        rate = max(0.0, min(1.0, rate))
-        bond = self.bond + (_BOND_ASYMPTOTE - self.bond) * rate
+        if not math.isfinite(rate):
+            rate = 0.0
+        else:
+            rate = max(0.0, min(1.0, rate))
+        # A NaN bond must not collapse to fusion through the clamp —
+        # a corrupted attachment reads as the stranger, not the pin.
+        current = self.bond if math.isfinite(self.bond) else 0.0
+        bond = current + (_BOND_ASYMPTOTE - current) * rate
         self.bond = max(0.0, min(1.0, bond))
         return self.bond
 
@@ -213,15 +227,61 @@ class UserProfile:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> UserProfile:
-        """Restore a profile from a plain dictionary."""
+        """Restore a profile from a plain dictionary.
+
+        Every field is coerced to its declared type — a hand-edited
+        or foreign JSON that stores a list where a dict belongs must
+        not load "successfully" and then crash the next add_* call.
+        """
+        preferences = data.get("preferences")
+        facts = data.get("facts")
+        goals = data.get("goals")
+        topics = data.get("recent_topics")
+        history = data.get("emotional_history")
+        interactions = data.get("interaction_count", 0)
+        parsed_history: list[tuple[float, str, float]] = []
+        if isinstance(history, list):
+            for entry in history:
+                if isinstance(entry, (list, tuple)) and len(entry) == 3:
+                    try:
+                        parsed_history.append(
+                            (float(entry[0]), str(entry[1]), float(entry[2]))
+                        )
+                    except (TypeError, ValueError):
+                        continue
         profile = cls(
-            name=data.get("name"),
-            preferences=data.get("preferences", {}),
-            facts=data.get("facts", {}),
-            goals=data.get("goals", []),
-            recent_topics=deque(data.get("recent_topics", []), maxlen=50),
-            emotional_history=data.get("emotional_history", []),
-            interaction_count=data.get("interaction_count", 0),
+            # The profile models her — a missing, null, or wrong-typed
+            # name falls back to the default, not to anonymity.
+            name=(
+                data["name"].strip()
+                if isinstance(data.get("name"), str) and data["name"].strip()
+                else "Mindy"
+            ),
+            preferences=(
+                {
+                    k: [v for v in vals if isinstance(v, str)]
+                    for k, vals in preferences.items()
+                    if isinstance(k, str) and isinstance(vals, list)
+                }
+                if isinstance(preferences, dict)
+                else {}
+            ),
+            facts=(
+                {k: v for k, v in facts.items() if isinstance(k, str) and isinstance(v, str)}
+                if isinstance(facts, dict)
+                else {}
+            ),
+            goals=[g for g in goals if isinstance(g, str)] if isinstance(goals, list) else [],
+            recent_topics=deque(
+                ([t for t in topics if isinstance(t, str)] if isinstance(topics, list) else []),
+                maxlen=50,
+            ),
+            emotional_history=parsed_history,
+            interaction_count=(
+                int(interactions)
+                if isinstance(interactions, (int, float)) and math.isfinite(interactions)
+                else 0
+            ),
             bond=cls._initial_bond(data),
         )
         return profile
@@ -240,9 +300,20 @@ class UserProfile:
         growing from real turns.
         """
         if "bond" in data:
-            return float(data["bond"] or 0.0)
-        turns = int(data.get("interaction_count", 0) or 0)
-        credited = min(turns, _BOND_WARM_START_MAX_TURNS)
+            try:
+                bond = float(data["bond"])
+            except (TypeError, ValueError):
+                return 0.0
+            # A corrupt field must not fuse or erase the attachment —
+            # non-finite reads as the honest stranger, out-of-range
+            # clamps to the declared [0, 1].
+            if not math.isfinite(bond):
+                return 0.0
+            return max(0.0, min(1.0, bond))
+        turns = data.get("interaction_count", 0)
+        if not isinstance(turns, (int, float)) or not math.isfinite(turns):
+            turns = 0
+        credited = min(int(turns), _BOND_WARM_START_MAX_TURNS)
         return 1.0 - (1.0 - _BOND_WARM_START_RATE) ** credited
 
     def save(self) -> bool:
