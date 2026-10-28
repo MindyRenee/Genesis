@@ -4579,8 +4579,13 @@ class FrontalLobe:
         # coherent snapshot of the turn.
         self._refresh_ion_context()
         emotion = assess_emotion(summary)
+        try:
+            core = self._last_core_state
+            chemicals = core.chemicals if core is not None else None
+        except Exception:  # noqa: BLE001
+            chemicals = None
         brain_waves = self._modulate_brain_waves_by_ions(
-            assess_brain_waves(summary, client=self.client)
+            assess_brain_waves(summary, client=self.client, chemicals=chemicals)
         )
 
         # Expose the current brain wave state to the language engine
@@ -4602,8 +4607,11 @@ class FrontalLobe:
         # Also infer the user's affective state from this message and
         # send it to the daemon's dyadic model, closing the loop.
         try:
-            core = self._last_core_state
-            ach = float(core.chemicals.get("acetylcholine", 0.35)) if core is not None else None
+            ach = (
+                float(chemicals.get("acetylcholine", 0.35))
+                if chemicals is not None
+                else None
+            )
         except Exception:  # noqa: BLE001
             ach = None
         self._last_inference_reading = self.active_inference.read(acetylcholine=ach)

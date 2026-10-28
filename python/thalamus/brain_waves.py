@@ -155,7 +155,7 @@ import random
 import threading
 import time
 from collections import deque
-from collections.abc import MutableMapping
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, ClassVar
@@ -203,6 +203,81 @@ __all__ = [
 #: read here is pre-sleep, so it resolves as drowsy — theta implies
 #: N1, never active.
 N1_THETA_ALERTNESS: float = 0.35
+
+# ── Neuromodulator → band couplings ─────────────────────────────
+#
+# The phase-selected power distributions carry the state's gross
+# spectral shape. A few chemicals additionally act on the rhythm-
+# generating circuits themselves, so they reshape their bands
+# *within* whatever regime the state picked:
+#
+# - Gamma rides the excitation/inhibition balance: pyramidal-
+#   interneuron gamma (PING) needs both glutamatergic drive to
+#   recruit interneurons and GABAergic feedback to pace the rhythm
+#   (Börgers & Kopell; Atallah & Scanziani 2009 — cycle-by-cycle
+#   E/I balance sets amplitude and frequency). Geometric mean:
+#   collapse of either side collapses the rhythm.
+# - Norepinephrine facilitates gamma dose-dependently through the
+#   cholinergic basalis (Cape & Jones 1998), on top of its role in
+#   the arousal readout.
+# - Serotonin primarily *downregulates* gamma amplitude via 5-HT1A
+#   inhibition of fast-spiking interneurons (Puig et al. 2010).
+# - Phasic dopamine elevates broadband gamma for minutes after
+#   sustained VTA bursts (mPFC LFP; read straight off the summary).
+# - Endocannabinoids desynchronize assemblies: CB1 agonism cuts
+#   resting theta power dose-dependently and disrupts theta
+#   coordination of cell assemblies (Ilan et al. 2004; CB1-KO mice
+#   show altered REM theta). Modeled as theta gain, the desync.
+
+_GLUTAMATE_BASELINE: float = 0.60
+_GABA_BASELINE: float = 0.50
+_EI_GAMMA_REFERENCE: float = math.sqrt(_GLUTAMATE_BASELINE * _GABA_BASELINE)
+_EI_GAMMA_GAIN: float = 0.6
+_NE_GAMMA_GAIN: float = 0.4
+_NE_GAMMA_BASELINE: float = 0.30
+_5HT_GAMMA_GAIN: float = 0.4
+_5HT_GAMMA_BASELINE: float = 0.40
+_PHASIC_DA_GAMMA_GAIN: float = 0.5
+_ECB_THETA_GAIN: float = 0.5
+_ECB_BASELINE: float = 0.25
+
+
+def _neuromodulator_band_gains(
+    summary: NeuroSummary,
+    chemicals: Mapping[str, float] | None,
+) -> dict[BrainWave, float]:
+    """Multiplicative per-band gains from chemicals acting on the
+    rhythm-generating circuits directly (see the block above for the
+    mechanism citations). ``None`` chemicals leave only the
+    summary-carried phasic-DA term; every other coupling falls back
+    to unity so the distributions are unchanged on legacy callers.
+    """
+    gains = dict.fromkeys(BrainWave, 1.0)
+
+    gamma = 1.0 + _PHASIC_DA_GAMMA_GAIN * max(0.0, summary.dopamine_phasic or 0.0)
+
+    if chemicals is not None:
+        glu = float(chemicals.get("glutamate", _GLUTAMATE_BASELINE))
+        gaba = float(chemicals.get("gaba", _GABA_BASELINE))
+        ne = float(chemicals.get("norepinephrine", _NE_GAMMA_BASELINE))
+        srt = float(chemicals.get("serotonin", _5HT_GAMMA_BASELINE))
+        ecb = float(chemicals.get("endocannabinoid", _ECB_BASELINE))
+
+        # E/I product → PING capacity: both sides are required.
+        ei = math.sqrt(max(glu, 0.0) * max(gaba, 0.0)) / _EI_GAMMA_REFERENCE
+        gamma *= 1.0 + _EI_GAMMA_GAIN * (ei - 1.0)
+        # Noradrenergic facilitation above baseline only — below it,
+        # the arousal distribution already sets low gamma.
+        gamma *= 1.0 + _NE_GAMMA_GAIN * max(0.0, ne - _NE_GAMMA_BASELINE)
+        # Serotonergic suppression: net downregulation centered on
+        # baseline — low 5-HT partially releases the brake.
+        gamma *= 1.0 - _5HT_GAMMA_GAIN * (srt - _5HT_GAMMA_BASELINE)
+
+        theta = 1.0 - _ECB_THETA_GAIN * (ecb - _ECB_BASELINE)
+        gains[BrainWave.THETA] = max(0.5, min(1.2, theta))
+
+    gains[BrainWave.GAMMA] = max(0.3, min(2.0, gamma))
+    return gains
 
 
 def resolve_waking_drowsy(phase: int, arousal: float) -> int:
@@ -1611,6 +1686,7 @@ class BrainWaveOscillator:
         summary: NeuroSummary,
         sleep_stage: SleepStage | None = None,
         fold: FoldMargins | None = None,
+        chemicals: Mapping[str, float] | None = None,
     ) -> BrainWaveState:
         """Advance the oscillator and return the current state.
 
@@ -1630,24 +1706,31 @@ class BrainWaveOscillator:
                 live daemon supplies them. Drives the Kramers
                 telegraph while the switch is bistable. ``None`` runs
                 the oscillator on modeled inputs alone.
+            chemicals: Effective chemical levels from the live body
+                read, when supplied. Feeds the modulator→band gains
+                (E/I→gamma, 5-HT→gamma suppression, eCB→theta
+                desync) that act inside the regime the state picked.
 
         The oscillator is dynamic: amplitudes flow continuously toward
         targets modulated by both inner (neurochemical) and outer
         (stimulus) inputs.
         """
         with self._lock:
-            return self._assess_locked(summary, sleep_stage, fold)
+            return self._assess_locked(summary, sleep_stage, fold, chemicals)
 
     def _assess_locked(
         self,
         summary: NeuroSummary,
         sleep_stage: SleepStage | None,
         fold: FoldMargins | None,
+        chemicals: Mapping[str, float] | None,
     ) -> BrainWaveState:
         # Compute targets from neurochemistry (same classification
         # logic as before — these are the neurochemically-driven
         # equilibrium amplitudes)
-        targets, label, description = self._compute_targets(summary, sleep_stage)
+        targets, label, description = self._compute_targets(
+            summary, sleep_stage, chemicals
+        )
 
         # Apply continuous stimulus to targets — held levels plus
         # still-ringing pulses on the same band combine.
@@ -1884,13 +1967,16 @@ class BrainWaveOscillator:
         self,
         summary: NeuroSummary,
         sleep_stage: SleepStage | None = None,
+        chemicals: Mapping[str, float] | None = None,
     ) -> tuple[dict[BrainWave, float], str, str]:
         """Compute neurochemically-driven target amplitudes.
 
         Delegates to the phase-based classification functions to get
         the equilibrium power distribution, then returns it as target
         amplitudes (before normalization — normalization happens in
-        _build_state).
+        _build_state). ``_neuromodulator_band_gains`` reshapes the
+        bands that carry direct chemical signatures on top of the
+        chosen regime.
 
         ``sleep_stage`` is the authoritative stage from the ultradian
         tracker; when supplied it wins over the arousal-derived
@@ -1925,6 +2011,10 @@ class BrainWaveOscillator:
                 summary.plasticity_gate,
                 summary.consolidation_weight,
             )
+
+        for band, gain in _neuromodulator_band_gains(summary, chemicals).items():
+            if gain != 1.0:
+                powers[band] *= gain
 
         return powers, label, description
 
@@ -2539,6 +2629,7 @@ def assess_brain_waves(
     sleep_stage: SleepStage | None = None,
     client: Any | None = None,
     fold: FoldMargins | None = None,
+    chemicals: Mapping[str, float] | None = None,
 ) -> BrainWaveState:
     """Derive brain wave state from the coupled oscillator.
 
@@ -2555,7 +2646,10 @@ def assess_brain_waves(
     directly instead — the explicit value wins over the client
     fetch, which is how callback-driven callers (InnerLife) reach
     the same channel without holding a client. With neither the
-    oscillator runs on its modeled inputs alone.
+    oscillator runs on its modeled inputs alone. ``chemicals``
+    is the live effective-levels map; it feeds the modulator→band
+    gains (E/I→gamma, 5-HT→gamma suppression, eCB→theta desync)
+    on top of the phase-chosen distribution.
 
     The oscillator propagates each band's phasor state —
     rotating, relaxing toward the neurochemically-driven radius,
@@ -2581,7 +2675,7 @@ def assess_brain_waves(
         apply_field_stimulus(client)
         if fold is None:
             fold = client.get_fold_margins()
-    return _get_oscillator().assess(summary, sleep_stage, fold)
+    return _get_oscillator().assess(summary, sleep_stage, fold, chemicals)
 
 
 def _drowsy_phase_powers(
