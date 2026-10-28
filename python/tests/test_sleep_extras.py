@@ -2138,3 +2138,116 @@ def test_gate_headless_established_sleep_closes():
     for stage in (SleepStage.N2, SleepStage.N3, SleepStage.REM):
         mind = _gate_mind(True, sleeping=True, hypnagogic=None, stage=stage)
         assert mind.thalamic_gate_closed is True
+
+
+# ======================================================================
+# Hypnagogic transition driven by the switch's fold geometry
+# ======================================================================
+
+
+def _thought_gen_life(*, phase_name: str, fold=None, fold_channel: bool = True):
+    """A bare InnerLife wired for the drowsy-branch fold tests.
+
+    Only the attributes ``_run_thought_generation`` touches are set;
+    the thought generator is stubbed so the branch's bookkeeping —
+    entry, progress, count — is what the test observes.
+    """
+    from types import SimpleNamespace
+
+    from sleep.inner_life import InnerLife
+    from thalamus.events import SleepInertia
+
+    il = InnerLife.__new__(InnerLife)
+    il._get_emotion = lambda: SimpleNamespace()
+    il._get_neuro_summary = lambda: SimpleNamespace(phase_name=phase_name)
+    il._is_mind_sleeping = lambda: False
+    il._get_fold_margins = (lambda: fold) if fold_channel else None
+    il._was_sleeping = False
+    il._hypnagogic = None
+    il._hypnagogic_count = 0
+    il._generate_hypnagogic_thought = lambda emotion: None
+    il._sleep_inertia = SleepInertia()
+    il._should_think = lambda emotion: False
+    return il
+
+
+def _fold(*, position: float, bistable: bool):
+    from genesis_client.types import FoldMargins
+
+    return FoldMargins(
+        h=0.0,
+        h_sleep_fold=100.0,
+        h_wake_fold=200.0,
+        position=position,
+        bistable=bistable,
+    )
+
+
+def test_hypnagogia_enters_on_fold_geometry_before_the_label():
+    """Inside the bistable band the transition is underway even while
+    the phase label still reads wake — the tipping point precedes
+    scored sleep (the 2025 bifurcation-dynamics result)."""
+    il = _thought_gen_life(
+        phase_name="awake",
+        fold=_fold(position=0.45, bistable=True),
+    )
+    il._run_thought_generation(now=1000.0)
+    assert il._hypnagogic is not None
+    assert il._hypnagogic.progress == 0.45
+    assert il._hypnagogic_count == 1
+
+
+def test_hypnagogic_progress_tracks_the_band_coordinate():
+    """Progress is the measured position through the band, not a
+    counter — it advances as h approaches the wake fold and retreats
+    when the homeostat eases."""
+    from thalamus.events import HypnagogicState
+
+    il = _thought_gen_life(
+        phase_name="drowsy",
+        fold=_fold(position=0.7, bistable=True),
+    )
+    il._hypnagogic = HypnagogicState(progress=0.2, started_at=900.0)
+    il._run_thought_generation(now=1000.0)
+    assert il._hypnagogic.progress == 0.7
+
+    # The homeostat eases back — the descent retreats with it.
+    il._get_fold_margins = lambda: _fold(position=0.3, bistable=True)
+    il._run_thought_generation(now=1012.0)
+    assert il._hypnagogic.progress == 0.3
+
+
+def test_hypnagogia_past_the_wake_fold_completes():
+    """Beyond the wake fold the wake attractor is gone even if the
+    label still reads wake — the transition reports complete."""
+    il = _thought_gen_life(
+        phase_name="awake",
+        fold=_fold(position=1.1, bistable=False),
+    )
+    il._run_thought_generation(now=1000.0)
+    assert il._hypnagogic is not None
+    assert il._hypnagogic.progress == 1.0
+
+
+def test_hypnagogia_not_claimed_on_monostable_wake():
+    """Below the band there is no transition — deep wake stays clean
+    of the hypnagogic state."""
+    from thalamus.events import HypnagogicState
+
+    il = _thought_gen_life(
+        phase_name="awake",
+        fold=_fold(position=-0.5, bistable=False),
+    )
+    il._hypnagogic = HypnagogicState(progress=0.4, started_at=900.0)
+    il._run_thought_generation(now=1000.0)
+    assert il._hypnagogic is None
+
+
+def test_hypnagogia_falls_back_to_the_ramp_without_margins():
+    """No fold channel — the label-driven ramp is unchanged."""
+    il = _thought_gen_life(phase_name="drowsy", fold_channel=False)
+    il._run_thought_generation(now=1000.0)
+    assert il._hypnagogic is not None
+    assert il._hypnagogic.progress == 0.1
+    il._run_thought_generation(now=1012.0)
+    assert il._hypnagogic.progress == 0.25

@@ -41,6 +41,7 @@ The chain mechanism:
 from __future__ import annotations
 
 import logging
+import math
 import random
 import re
 import threading
@@ -1084,7 +1085,18 @@ class InnerLife:
         summary = self._get_current_summary()
         phase = getattr(summary, "phase_name", "") if summary else ""
         is_sleeping = self._is_currently_sleeping(summary)
-        is_drowsy = phase == "drowsy" and not is_sleeping
+        # The switch's fold geometry marks the transition before the
+        # phase label does: inside the bistable band the wake and
+        # sleep branches coexist and noise flickers between them, and
+        # past the wake fold the wake attractor is already gone while
+        # the label may still read wake. Either is the hypnagogic
+        # regime; the label-only path remains the fallback when the
+        # daemon reports no margins.
+        fold = self._fold_margins()
+        fold_in_transition = fold is not None and (
+            fold.bistable or (math.isfinite(fold.position) and fold.position >= 1.0)
+        )
+        is_drowsy = (phase == "drowsy" or fold_in_transition) and not is_sleeping
 
         # Detect waking from sleep → trigger sleep inertia.
         # Only treat as waking if it was sleeping AND is no longer
@@ -1118,13 +1130,24 @@ class InnerLife:
             # driven by the ultradian cycle tracker.
             self._generate_dream(emotion, summary)
         elif is_drowsy:
-            # Hypnagogic state — gradual transition into sleep
+            # Hypnagogic state — gradual transition into sleep. When
+            # the body reports the fold margins, progress is the
+            # measured coordinate through the bistable band (0 at the
+            # wake-up fold, 1 at the fall-asleep fold) rather than a
+            # fixed ramp — the descent tracks the bifurcation itself
+            # and retreats if the homeostat eases back. Without
+            # margins the fixed ramp remains.
+            fold_progress = None
+            if fold is not None and math.isfinite(fold.position):
+                fold_progress = min(1.0, max(0.0, fold.position))
             if self._hypnagogic is None:
                 self._hypnagogic = HypnagogicState(
-                    progress=0.1,
+                    progress=fold_progress if fold_progress is not None else 0.1,
                     started_at=now,
                 )
                 self._hypnagogic_count += 1
+            elif fold_progress is not None:
+                self._hypnagogic.progress = fold_progress
             else:
                 # Progress the transition toward sleep
                 self._hypnagogic.progress = min(1.0, self._hypnagogic.progress + 0.15)
@@ -1264,6 +1287,22 @@ class InnerLife:
             except (OSError, ConnectionError, RuntimeError):
                 return None
         return None
+
+    def _fold_margins(self) -> Any:
+        """Read the body's LC–VLPO switch margins, if the channel exists.
+
+        Returns the daemon's ``FoldMargins`` (``bistable`` plus the
+        normalized band ``position``), or None when the callback is
+        absent or the read fails — callers then fall back to the
+        phase-label path.
+        """
+        if self._get_fold_margins is None:
+            return None
+        try:
+            return self._get_fold_margins()
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("sleep.inner_life._fold_margins", e)
+            return None
 
     @staticmethod
     def _is_sleeping(summary) -> bool:
@@ -1545,12 +1584,7 @@ class InnerLife:
                 try:
                     from thalamus.brain_waves import assess_brain_waves
 
-                    fold = (
-                        self._get_fold_margins()
-                        if self._get_fold_margins is not None
-                        else None
-                    )
-                    waves = assess_brain_waves(summary, fold=fold)
+                    waves = assess_brain_waves(summary, fold=self._fold_margins())
                 except Exception as e:  # noqa: BLE001
                     note_swallowed(
                         "sleep.inner_life._run_dream_synthesis",
