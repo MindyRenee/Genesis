@@ -47,7 +47,19 @@ _SCALAR_BANDS: dict[str, tuple[float, float]] = {
 
 # Coarse sanity tolerances vs genetic defaults (no baseline file).
 _SANITY_TOL = 0.12
-_SANITY_CIRCADIAN_TOL = {"melatonin": 0.45, "dopamine": 0.12, "serotonin": 0.10, "histamine": 0.12}
+_SANITY_CIRCADIAN_TOL = {
+    "melatonin": 0.45,
+    "dopamine": 0.12,
+    "serotonin": 0.10,
+    "histamine": 0.12,
+    # Acetylcholine isn't circadian — it's Process-S-sensitive. The
+    # basal forebrain's A1 suppression sags the cholinergic setpoint
+    # as sleep pressure builds over a long unstimulated settle
+    # (state::basal_forebrain), which is the designed physiology, not
+    # a broken substrate. A ~0.14 sag over ~17 min of simulated waking
+    # must not read as failure.
+    "acetylcholine": 0.22,
+}
 _SANITY_ZERO_CAP = 0.25  # cortisol/CRH rest near zero; above this is stress, not rest
 
 
