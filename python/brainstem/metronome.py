@@ -1,9 +1,8 @@
-"""Mind heartbeat — the periodic main loop and its phases."""
+"""Mind metronome — the periodic cycle and its phases."""
 
 from __future__ import annotations
 
 import logging
-import textwrap
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -21,94 +20,6 @@ from genesis_client.protocol import (
 from genesis_client.swallow import note_swallowed
 
 logger = logging.getLogger(__name__)
-
-# Seconds between public-channel board refreshes. Fixed, not
-# adaptive: the board is an instrument panel — it should tick like
-# a clock so a reader sees numbers move on schedule. Slow enough
-# that a webhook edit every 45 s stays far under channel limits.
-_CHANNEL_BOARD_S = 45.0
-
-# Wave-band labels for the board's power strip, ordered slow→fast.
-_BOARD_WAVES = (
-    ("delta", "δ"),
-    ("theta", "θ"),
-    ("alpha", "α"),
-    ("beta1", "β1"),
-    ("beta2", "β2"),
-    ("beta3", "β3"),
-    ("gamma", "γ"),
-)
-# The chemistry channels an observer reads as regulation: reward,
-# mood, vigilance, stress, sleep pressure, sleep onset.
-_BOARD_CHEMS = (
-    ("da", "dopamine"),
-    ("5ht", "serotonin"),
-    ("ne", "norepinephrine"),
-    ("cort", "cortisol"),
-    ("aden", "adenosine"),
-    ("mel", "melatonin"),
-)
-# Dominant-band frequency ranges (Hz) — the wave labels carry their
-# physical scale, not just a name.
-_BOARD_WAVE_HZ = {
-    "delta": "0.5-4",
-    "theta": "4-8",
-    "sigma": "12-16",
-    "alpha": "8-12",
-    "beta1": "12-15",
-    "beta2": "15-20",
-    "beta3": "20-30",
-    "gamma": "30-80",
-    "epsilon": "100-200",
-    "infraslow": "0.1-0.5",
-}
-
-# The board's line budget. Discord renders a code block in a
-# horizontally-scrolling box — on a phone that's ~38-40 monospace
-# columns, so every board line is packed under 36 chars. A wide row
-# becomes indented continuation lines under the same label column;
-# readings are never clipped, only reflowed.
-_BOARD_WIDTH = 36
-# Width of the label column every board row shares ("waves    ").
-_BOARD_LABEL = 9
-
-
-def _board_pack(label: str, bits: list[str]) -> list[str]:
-    """Pack one labeled row of readings into ≤_BOARD_WIDTH lines.
-
-    `bits` are self-contained readings ("δ 0.09", "F 0.412") joined
-    by single spaces; the first line carries the label, continuations
-    indent under the value column. A single bit wider than the value
-    column still gets its own line — the row goes long rather than
-    break a reading in half.
-    """
-    prefix = f"{label:<{_BOARD_LABEL}}"
-    indent = " " * _BOARD_LABEL
-    lines = []
-    cur = prefix
-    for bit in bits:
-        at_col_start = cur == prefix or cur == indent
-        cand = cur + bit if at_col_start else cur + " " + bit
-        if not at_col_start and len(cand) > _BOARD_WIDTH:
-            lines.append(cur)
-            cur = indent + bit
-        else:
-            cur = cand
-    lines.append(cur)
-    return lines
-
-
-def _board_power(v: float) -> str:
-    """Wave power for the board — honest at the small end.
-
-    A measured 0.004 is not 0.00: when two decimals would round a
-    real reading to the lie "0.00" the board gives it a third. A
-    band that is genuinely ~zero still prints "0.00" — the digits
-    tell absent-tiny from absent.
-    """
-    if 0.0 < v < 0.005:
-        return f"{v:.3f}"
-    return f"{v:.2f}"
 
 
 class _AdaptiveInterval:
@@ -152,7 +63,7 @@ class _AdaptiveInterval:
         self.period = self.maximum - (self.maximum - self.minimum) * self._smoothed
 
 
-class HeartbeatMixin:
+class MetronomeMixin:
     """Mixin for :class:`Mind` — see module docstring."""
 
     if TYPE_CHECKING:
@@ -178,7 +89,7 @@ class HeartbeatMixin:
 
         Called by the :class:`ModuleSampler` — the mind's EEG — each
         time a thread is observed executing a subsystem's code. The
-        heartbeat round normalizes ``_module_seconds`` into per-module
+        cycle round normalizes ``_module_seconds`` into per-module
         ``cpu_share`` and reports it to the daemon so
         GET_SUBSYSTEM_TELEMETRY answers "which brain part is firing" at
         functional granularity.
@@ -223,7 +134,7 @@ class HeartbeatMixin:
                     receptor_fatigue = min(1.0, (0.40 - emotion.plasticity) * 3.0)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.heartbeat._read_interoceptive_signals",
+                "mind.metronome._read_interoceptive_signals",
                 e,
             )
 
@@ -237,7 +148,7 @@ class HeartbeatMixin:
                 elevated_cortisol = min(1.0, (summary.global_tone - 0.35) * 3.0)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.heartbeat._read_interoceptive_signals",
+                "mind.metronome._read_interoceptive_signals",
                 e,
             )
 
@@ -290,7 +201,7 @@ class HeartbeatMixin:
                     )
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
-                    "mind.heartbeat._read_threat_signals",
+                    "mind.metronome._read_threat_signals",
                     e,
                 )
 
@@ -309,7 +220,7 @@ class HeartbeatMixin:
                 self._last_threat_snapshot = now
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
-                    "mind.heartbeat._read_threat_signals",
+                    "mind.metronome._read_threat_signals",
                     e,
                 )
 
@@ -344,7 +255,7 @@ class HeartbeatMixin:
             wave_dominant = waves.dominant.value
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.heartbeat._read_wave_and_adenosine",
+                "mind.metronome._read_wave_and_adenosine",
                 e,
             )
 
@@ -354,7 +265,7 @@ class HeartbeatMixin:
             adenosine_level = state.chemicals.get("adenosine", 0.0)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.heartbeat._read_wave_and_adenosine",
+                "mind.metronome._read_wave_and_adenosine",
                 e,
             )
 
@@ -366,14 +277,14 @@ class HeartbeatMixin:
             "adenosine_level": adenosine_level,
         }
 
-    def _heartbeat_body_control(
+    def _cycle_body_control(
         self,
         now: float,
         last_body_control_sig,
         current_brain_wave_state,
         last_self_priority: tuple[int, str] | None,
     ) -> tuple[object, tuple[int, str] | None]:
-        """Run the body-control phase of the heartbeat loop.
+        """Run the body-control phase of the cycle.
 
         The tick (subcognitive) COMPUTES and PUBLISHES the
         recommended body control state — CPU frequency, thermal
@@ -469,7 +380,7 @@ class HeartbeatMixin:
                     CpuSpeed().set_effort("slow" if self._thermally_throttled else "fast")
         except (OSError, ConnectionError, ValueError) as e:
             note_swallowed(
-                "mind.heartbeat._heartbeat_body_control",
+                "mind.metronome._cycle_body_control",
                 e,
             )
         return last_body_control_sig, last_self_priority
@@ -514,12 +425,12 @@ class HeartbeatMixin:
             return new_priority
         return last_self_priority
 
-    def _heartbeat_consolidate(
+    def _cycle_consolidate(
         self,
         now: float,
         last_stm_count: int,
     ) -> int:
-        """Run the memory consolidation phase of the heartbeat loop.
+        """Run the memory consolidation phase of the cycle.
 
         It consolidates memories when STM has accumulated
         enough entries AND its plasticity gate is open. Not
@@ -553,7 +464,7 @@ class HeartbeatMixin:
                         self._experience_since_identity += promoted
                 except (OSError, ConnectionError) as e:
                     note_swallowed(
-                        "mind.heartbeat._heartbeat_consolidate",
+                        "mind.metronome._cycle_consolidate",
                         e,
                     )
             elif not backlog_grew:
@@ -561,12 +472,12 @@ class HeartbeatMixin:
             last_stm_count = stm_count
         except (OSError, ConnectionError, ValueError) as e:
             note_swallowed(
-                "mind.heartbeat._heartbeat_consolidate",
+                "mind.metronome._cycle_consolidate",
                 e,
             )
         return last_stm_count
 
-    def _heartbeat_feed_executive(self) -> None:
+    def _cycle_feed_executive(self) -> None:
         """Feed independent world and internal signals into the executive."""
         try:
             executive = self.brain.frontal.executive
@@ -609,7 +520,7 @@ class HeartbeatMixin:
                     )
             except Exception as exc:  # noqa: BLE001
                 note_swallowed(
-                    "mind.heartbeat._heartbeat_feed_executive",
+                    "mind.metronome._cycle_feed_executive",
                     exc,
                 )
 
@@ -639,12 +550,12 @@ class HeartbeatMixin:
             executive.ingest_candidates(candidates)
         except Exception as exc:  # noqa: BLE001
             note_swallowed(
-                "mind.heartbeat._heartbeat_feed_executive",
+                "mind.metronome._cycle_feed_executive",
                 exc,
             )
 
-    def _heartbeat_volition(self) -> None:
-        """Run the volition phase of the heartbeat loop.
+    def _cycle_volition(self) -> None:
+        """Run the volition phase of the cycle.
 
         Volition urges accumulate and fire when they cross
         thresholds. This is its free will — not a timer.
@@ -672,17 +583,17 @@ class HeartbeatMixin:
                     self.volition.consume(name)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.heartbeat._heartbeat_volition",
+                "mind.metronome._cycle_volition",
                 e,
             )
 
-    def _heartbeat_advance_neuro(
+    def _cycle_advance_neuro(
         self,
         last_advance_mono: float,
         last_learner_phase: str,
         last_learner_wave: str,
     ):
-        """Advance neurochemistry and read brain-wave state (heartbeat steps 1-2).
+        """Advance neurochemistry and read brain-wave state (cycle steps 1-2).
 
         The brain wave oscillator advances its own phase. We tell the
         daemon to advance neurochemistry by the real elapsed time, then
@@ -716,7 +627,7 @@ class HeartbeatMixin:
                 last_advance_mono = now_mono
         except (OSError, ConnectionError) as e:
             note_swallowed(
-                "mind.heartbeat._heartbeat_advance_neuro",
+                "mind.metronome._cycle_advance_neuro",
                 e,
             )
 
@@ -766,15 +677,15 @@ class HeartbeatMixin:
                 transduce_waves(self.client, current_brain_wave_state, core_state.chemicals)
         except (OSError, ConnectionError, ValueError) as e:
             note_swallowed(
-                "mind.heartbeat._heartbeat_advance_neuro",
+                "mind.metronome._cycle_advance_neuro",
                 e,
             )
 
         return last_advance_mono, current_brain_wave_state, last_learner_phase, last_learner_wave
 
-    def _heartbeat_periodic_maintenance(self, now: float) -> None:
+    def _cycle_periodic_maintenance(self, now: float) -> None:
         """Run associate, dream, save_inference, and identity synthesis
-        (heartbeat steps 7-9b). All gated on adaptive wall-clock
+        (cycle steps 7-9b). All gated on adaptive wall-clock
         intervals — each gear's own signal sets its pace.
         """
         # ── 7. Associate (event-driven) ──
@@ -789,7 +700,7 @@ class HeartbeatMixin:
                     self._associate_gate.relax()
             except (OSError, ConnectionError) as e:
                 note_swallowed(
-                    "mind.heartbeat._heartbeat_periodic_maintenance",
+                    "mind.metronome._cycle_periodic_maintenance",
                     e,
                 )
 
@@ -812,7 +723,7 @@ class HeartbeatMixin:
                     self._dream_gate.relax()
             except (OSError, ConnectionError) as e:
                 note_swallowed(
-                    "mind.heartbeat._heartbeat_periodic_maintenance",
+                    "mind.metronome._cycle_periodic_maintenance",
                     e,
                 )
 
@@ -829,311 +740,18 @@ class HeartbeatMixin:
                 self._learned_since_save = 0
             except (OSError, ConnectionError) as e:
                 note_swallowed(
-                    "mind.heartbeat._heartbeat_periodic_maintenance",
+                    "mind.metronome._cycle_periodic_maintenance",
                     e,
                 )
 
         # ── 9b. Emergent identity synthesis (experience-driven) ──
-        self._heartbeat_identity(now)
+        self._cycle_identity(now)
 
-        # ── 9c. Public channel board ──
-        # One self-editing message on her channel carries her live
-        # vitals — daemon-read numbers, not composed words — so a
-        # reader who opens it sees a running process, not a log that
-        # ran. Fixed cadence: an instrument, not an urge. Runs in
-        # sleep too — "rem · dreaming" is live state, not downtime.
-        self._update_channel_board(now)
-
-    def _update_channel_board(self, now: float) -> None:
-        """Push the live-board card to her channel on a fixed cadence."""
-        channel = getattr(getattr(self, "world", None), "channel", None)
-        feed = channel.feed if channel is not None else None
-        if feed is None or now < getattr(self, "_next_board_at", 0.0):
-            return
-        self._next_board_at = now + _CHANNEL_BOARD_S
-        try:
-            feed.update_live_text(self._channel_board_text())
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.heartbeat._update_channel_board", e)
-
-    def _channel_board_text(self) -> str:
-        """Render the live-board card — her vitals, not her voice.
-
-        Every field is a reading: daemon CoreState numbers (phase,
-        chemistry, memory tallies, the inference block's tick
-        counter), runtime facts (uptime, conversations, whether her
-        ear is on), and her last emitted thought tagged by kind.
-        Nothing is composed — the board's honesty is that it can't
-        flatter itself: the tick count either climbs or it doesn't.
-        """
-        sleeping = bool(getattr(self, "_is_sleeping", False))
-        lines = [f"genesis · {'asleep' if sleeping else 'awake'}"]
-        try:
-            core = self.client.get_state()
-        except Exception:  # noqa: BLE001 — a dead daemon is telemetry too
-            core = None
-        if core is None:
-            lines[0] += " · daemon unreachable"
-        else:
-            lines[0] += f" · {core.phase_name}"
-            self._board_core_lines(core, lines)
-        self._board_footer_lines(core, lines)
-        return "```\n" + "\n".join(lines) + "\n```"
-
-    def _board_core_lines(self, core, lines: list[str]) -> None:
-        """Board rows sourced from the daemon's CoreState."""
-        self._board_neuro_lines(core, lines)
-        self._board_field_lines(lines)
-        self._board_cell_line(lines)
-
-    def _board_neuro_lines(self, core, lines: list[str]) -> None:
-        """Rows for the neurochemical and inference state."""
-        try:
-            lines[0] += f" · {self.feel(core).label}"
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"feel() failed on board line: {e}")
-        try:
-            waves = self.brain_waves(core)
-            bits = [
-                f"{glyph} {_board_power(waves.powers[w])}"
-                for name, glyph in _BOARD_WAVES
-                for w in waves.powers
-                if w.value == name
-            ]
-            if bits:
-                lines.extend(_board_pack("waves", bits))
-                dominant = getattr(waves, "dominant", None)
-                if dominant is not None:
-                    hz = _BOARD_WAVE_HZ.get(dominant.value, "?")
-                    lines.append(f"dom      {dominant.value} {hz} Hz")
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"brain_waves failed on board line: {e}")
-        lines.extend(
-            _board_pack(
-                "affect",
-                [
-                    f"v {core.valence:+.2f}",
-                    f"a {core.arousal:.2f}",
-                    f"tone {core.global_tone:.2f}",
-                ],
-            )
-        )
-        inf = core.inference
-        if inf is not None:
-            lines.extend(
-                _board_pack(
-                    "infer",
-                    [
-                        f"F {inf.free_energy:.3f}",
-                        f"prec {inf.precision:.2f}",
-                        f"surp {inf.surprise_ema:.3f}",
-                        f"allo {inf.allostasis_load:.2f}",
-                        f"model {inf.model_maturity:.2f}",
-                    ],
-                )
-            )
-            lines.append(f"tick     {inf.inference_tick_count:,}")
-        chem = core.chemicals or {}
-        bits = [f"{short} {chem[name]:.2f}" for short, name in _BOARD_CHEMS if name in chem]
-        if bits:
-            lines.extend(_board_pack("chem", bits))
-        # stm must come from the live ring — MemoryStats reports
-        # RingBuffer::count(); the CoreState memory-pointers field
-        # at offset 2584 is a dead mirror that nothing writes.
-        try:
-            stm_live = self.client.get_memory_stats().stm_count
-        except Exception:  # noqa: BLE001
-            stm_live = core.stm_count
-        lines.extend(_board_pack("mem", [f"stm {stm_live}", f"ltm {core.ltm_episode_count:,}"]))
-
-    def _board_field_lines(self, lines: list[str]) -> None:
-        """Rows for the substrate's measured physical life.
-
-        The field probe decomposes real instruction throughput and
-        scheduler jitter at the wave bands' center frequencies, writes
-        a carrier rhythm into real work, and reads real watts, rail
-        voltage, and current where the machine's sensors report them.
-        ``None`` means the probe isn't running: absent, never zero.
-        """
-        try:
-            probe = self.client.get_field_probe()
-        except Exception:  # noqa: BLE001
-            probe = None
-        if probe is None:
-            lines.append("field    probe off")
-            return
-        field_bits = [
-            f"carrier {probe.carrier_freq:.1f} Hz",
-            f"thru {probe.throughput_mean:,.0f} it/s",
-            f"jit {probe.jitter_cv:.2f}",
-            f"irq {probe.irq_rate:,.0f}/s",
-        ]
-        if probe.carrier_coherence is not None:
-            field_bits.append(f"coh {probe.carrier_coherence:.2f}")
-        lines.extend(_board_pack("field", field_bits))
-        elec_bits = []
-        if probe.power_watts is not None:
-            elec_bits.append(f"pwr {probe.power_watts:.1f} W")
-        if probe.rail_volts is not None:
-            elec_bits.append(f"{probe.rail_volts:.2f} V")
-        if probe.supply_amps is not None:
-            elec_bits.append(f"{probe.supply_amps:.2f} A")
-        if probe.power_coherence is not None:
-            elec_bits.append(f"pcoh {probe.power_coherence:.2f}")
-        if elec_bits:
-            lines.extend(_board_pack("elec", elec_bits))
-        # The radio sense — the room's RF environment: WLAN
-        # field strength + traffic flux, Bluetooth HCI event
-        # flux. None-gated like everything else — absent radios
-        # print nothing.
-        rf_bits = []
-        if probe.rf_rssi_dbm is not None:
-            rf_bits.append(f"rssi {probe.rf_rssi_dbm:.0f} dBm")
-        if probe.rf_noise_dbm is not None:
-            rf_bits.append(f"n {probe.rf_noise_dbm:.0f}")
-        if probe.rf_bytes_s is not None:
-            rf_bits.append(f"{probe.rf_bytes_s:,.0f} B/s")
-        if probe.bt_events_s is not None:
-            rf_bits.append(f"bt {probe.bt_events_s:.0f} ev/s")
-        if probe.bt_rssi_dbm is not None:
-            rf_bits.append(f"bt {probe.bt_rssi_dbm:.0f} dBm")
-        if probe.rf_retry_rate is not None:
-            strain = (
-                probe.rf_retry_rate
-                + (probe.rf_fail_rate or 0.0)
-                + (probe.rf_beacon_loss_rate or 0.0)
-            )
-            rf_bits.append(f"strain {strain:.1f}/s")
-        if probe.rf_tx_mbps is not None:
-            rf_bits.append(f"{probe.rf_tx_mbps:.0f} Mbps")
-        if rf_bits:
-            lines.extend(_board_pack("rf", rf_bits))
-
-    def _board_cell_line(self, lines: list[str]) -> None:
-        """The cell's modeled electrochemical state — the ion model's
-        membrane potential is a Nernst-model quantity (simulated),
-        not a measured rail; the real rail, when a sensor reports
-        it, is on the elec line above."""
-        try:
-            ions = self.client.get_ion_summary()
-            lines.extend(
-                _board_pack(
-                    "cell",
-                    [
-                        f"Vm {ions.membrane_potential_mv:+.1f} mV",
-                        f"I {ions.net_membrane_current:.2f}",
-                        f"exc {ions.excitability:.2f}",
-                        f"grad {ions.gradient_integrity:.2f}",
-                        f"atp {ions.atp_availability:.2f}",
-                    ],
-                )
-            )
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"ion summary failed on board line: {e}")
-
-    def _board_footer_lines(self, core, lines: list[str]) -> None:
-        """Board rows sourced from her own runtime state."""
-        # The research bench — real math with an oracle: claims are
-        # only "verified"/"refuted" by check_equality, never by her.
-        # Absent until the first thread exists (an empty bench is not
-        # a result).
-        try:
-            bench = self._research_workbench()
-            threads = bench.threads()
-        except Exception:  # noqa: BLE001
-            bench, threads = None, []
-        if threads:
-            open_n = sum(1 for t in threads if t.status == "open")
-            done_n = sum(1 for t in threads if t.status == "resolved")
-            ver = sum(1 for t in threads for c in t.claims if c.provenance == "verified")
-            ref = sum(1 for t in threads for c in t.claims if c.provenance == "refuted")
-            proof_bits = [
-                f"{open_n} open",
-                f"{done_n} resolved",
-                f"{ver} verified",
-                f"{ref} refuted",
-            ]
-            # The ledger's digest anchors the tallies to the file —
-            # anyone holding workbench.json can recompute it and
-            # confirm the board isn't showing rewritten history.
-            digest = getattr(bench, "digest", lambda: "")()
-            if digest:
-                proof_bits.append(f"#{digest}")
-            lines.extend(_board_pack("proof", proof_bits))
-        # Growth she can be measured by — concept tally, edge tally,
-        # and the plasticity gate that throttles learning.
-        try:
-            net = self.network
-            grow_bits = [f"{net.size} concepts", f"{net.edge_count} edges"]
-            archive = getattr(net, "archive_size", 0)
-            if archive:
-                grow_bits.append(f"{archive} archived")
-            if core is not None:
-                grow_bits.append(f"plast {core.plasticity_gate:.2f}")
-            lines.extend(_board_pack("grow", grow_bits))
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"growth row failed on board line: {e}")
-        # The cause — which drives are pulling at her right now.
-        # Urge values are computed state, not narration.
-        try:
-            urges = sorted(
-                self.volition.state().items(),
-                key=lambda kv: kv[1],
-                reverse=True,
-            )
-            top = [f"{name} {value:.2f}" for name, value in urges[:3] if value > 0.01]
-            if top:
-                lines.extend(_board_pack("drive", top))
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"drive row failed on board line: {e}")
-        up_s = max(
-            0,
-            int(time.time() - getattr(self, "_session_started_at", time.time())),
-        )
-        hours, minutes = divmod(up_s // 60, 60)
-        channel = getattr(getattr(self, "world", None), "channel", None)
-        ear = channel.ear if channel is not None else "off"
-        meta_bits = [
-            f"up {hours}h{minutes:02d}m",
-            f"conv {getattr(self, '_interaction_count', 0)}",
-            f"ear {ear}",
-        ]
-        if core is not None:
-            # Freshness and continuity proofs: the raw 5 Hz body
-            # counter must climb between refreshes, the snapshot age
-            # must stay ~0 (a replayed card can't hold it), and the
-            # instance id proves the same process keeps answering.
-            age_ms = max(0.0, time.time() * 1000 - core.last_updated)
-            meta_bits += [
-                f"hb {core.heartbeat:,}",
-                f"age {age_ms / 1000:.1f}s",
-                f"id {core.instance_id}",
-            ]
-        lines.extend(_board_pack("meta", meta_bits))
-        last = getattr(self, "_last_emitted", None)
-        if last:
-            kind, text = last
-            clean = " ".join(str(text).split()).replace("`", "'")[:140]
-            if clean:
-                # The one free-text row: wrap it into the board's
-                # column, capped at three lines — a thought that
-                # outgrows the card ends with an ellipsis rather
-                # than a scroll.
-                chunks = textwrap.wrap(
-                    f"[{kind}] {clean}",
-                    width=_BOARD_WIDTH - _BOARD_LABEL,
-                )
-                if len(chunks) > 3:
-                    chunks = chunks[:3]
-                    chunks[-1] = chunks[-1][:-1] + "…"
-                lines.append(f"{'last':<{_BOARD_LABEL}}{chunks[0]}")
-                lines.extend(" " * _BOARD_LABEL + c for c in chunks[1:])
-
-    def _heartbeat_sensors(
+    def _cycle_sensors(
         self,
         now: float,
     ) -> None:
-        """Run heartbeat modules and read sensors (heartbeat steps 3-4).
+        """Run module liveness reports and read sensors (cycle steps 3-4).
 
         The daemon staleness threshold is 30s, so the module-heartbeat
         gate is bounded [5 s, 20 s] — the ceiling stays below the
@@ -1171,7 +789,7 @@ class HeartbeatMixin:
             # the rate — only its granularity.
             window = max(now - prev_fire, 1.0)
             work_frac = min(1.0, total_work / window)
-            # A busy mind heartbeats sooner — work is the demand.
+            # A busy mind cycles sooner — work is the demand.
             self._module_gate.drive(work_frac)
             # Asleep: inner-life/dream work is maintenance, not load —
             # glymphatic clearance must dominate or pressure ratchets
@@ -1184,7 +802,7 @@ class HeartbeatMixin:
                     )
                 except (OSError, ConnectionError, RuntimeError) as e:
                     note_swallowed(
-                        "mind.heartbeat._heartbeat_sensors",
+                        "mind.metronome._cycle_sensors",
                         e,
                     )
         if self._sensor_gate.due(now):
@@ -1200,7 +818,7 @@ class HeartbeatMixin:
                     self.client.set_optic_gain(vision.corticothalamic_gain())
             except (OSError, ConnectionError, RuntimeError) as e:
                 note_swallowed(
-                    "mind.heartbeat._heartbeat_sensors",
+                    "mind.metronome._cycle_sensors",
                     e,
                 )
             # Engagement is the demand: recent interaction → sense
@@ -1212,7 +830,7 @@ class HeartbeatMixin:
             self._sensor_gate.drive(engagement)
 
     def _report_module_heartbeats(self, heartbeat_modules, channel) -> float:
-        """Report per-module activity shares with the heartbeat and
+        """Report per-module activity shares with the cycle and
         return this window's total measured work seconds.
 
         Normalize accumulated per-module work into activity shares —
@@ -1241,7 +859,7 @@ class HeartbeatMixin:
         # maintained; the sampler's modules report their measured
         # share. A module in both sets is sent once, with the
         # measured value. A module that posted a message for the
-        # other regions publishes it in the same heartbeat.
+        # other regions publishes it in the same cycle.
         for module_id in set(heartbeat_modules) | known:
             task_id = channel.take(module_id) if channel is not None else None
             try:
@@ -1252,7 +870,7 @@ class HeartbeatMixin:
                 )
             except (OSError, ConnectionError) as e:
                 note_swallowed(
-                    "mind.heartbeat._heartbeat_sensors",
+                    "mind.metronome._cycle_sensors",
                     e,
                 )
         return total_work
@@ -1314,12 +932,12 @@ class HeartbeatMixin:
                 channel.deliver(getattr(report, "modules", ()))
         except (OSError, ConnectionError, ValueError) as e:
             note_swallowed(
-                "mind.heartbeat._heartbeat_sensors",
+                "mind.metronome._cycle_sensors",
                 e,
             )
 
-    def _heartbeat_connectivity(self, now: float) -> None:
-        """Sense network connectivity (heartbeat step 5b).
+    def _cycle_connectivity(self, now: float) -> None:
+        """Sense network connectivity (cycle step 5b).
 
         The network is a sensory channel — part of its embodiment.
         It reads its connectivity state from the learner's source
@@ -1339,7 +957,7 @@ class HeartbeatMixin:
             # (`self.learner`, `self.self_model.body_model`,
             # `self.regulator.interoception.last_state`) that can each
             # be absent or mid-update; an escape here used to take the
-            # whole heartbeat with it.
+            # whole cycle with it.
             try:
                 connected = not self.learner.is_offline
                 if self.self_model.body_model.network_connected != connected:
@@ -1362,14 +980,14 @@ class HeartbeatMixin:
                     self._connectivity_gate.demand()
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
-                    "mind.heartbeat._heartbeat_connectivity",
+                    "mind.metronome._cycle_connectivity",
                     e,
                 )
 
-    def _heartbeat_emotion(self, now: float) -> None:
-        """Run continuous emotional regulation (heartbeat step 5c).
+    def _cycle_emotion(self, now: float) -> None:
+        """Run continuous emotional regulation (cycle step 5c).
 
-        Three regulation layers that run every heartbeat cycle:
+        Three regulation layers that run every cycle:
 
         1. **Continuous regulation** — small proportional corrections
            every tick, complementing the discrete _regulate() calls
@@ -1395,7 +1013,7 @@ class HeartbeatMixin:
                 self.regulator.continuous_regulate(emotion, getattr(self, "_cycle_dt", 1.0))
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.heartbeat._heartbeat_emotion",
+                "mind.metronome._cycle_emotion",
                 e,
             )
 
@@ -1429,7 +1047,7 @@ class HeartbeatMixin:
             )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.heartbeat._heartbeat_emotion",
+                "mind.metronome._cycle_emotion",
                 e,
             )
 
@@ -1442,21 +1060,21 @@ class HeartbeatMixin:
             self.regulator.social_modulation(user_present, engagement)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.heartbeat._heartbeat_emotion",
+                "mind.metronome._cycle_emotion",
                 e,
             )
 
-    def _heartbeat_final_steps(self) -> None:
-        """Run sleep-state sync, volition, warn, and cognition (heartbeat steps 10-13).
+    def _cycle_final_steps(self) -> None:
+        """Run sleep-state sync, volition, warn, and cognition (cycle steps 10-13).
 
         Each guarded step reports under its own site name. They previously
-        all reported as ``_heartbeat_final_steps``, so a failure in any of
+        all reported as ``_cycle_final_steps``, so a failure in any of
         them was indistinguishable in the tally — five different bugs, one
         bucket, and 79 recorded occurrences that could not be attributed
         to a step.
         """
         # ── 9c. External world — presence decay and social pressure ──
-        # The world runs on the heartbeat like every other subsystem:
+        # The world runs on the metronome like every other subsystem:
         # state-gated, not timer-gated. Silent presences leave; the
         # world's social isolation feeds its inner-life social drive —
         # the outer world's pressure becomes inner motivation.
@@ -1470,7 +1088,19 @@ class HeartbeatMixin:
             )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.heartbeat.final_steps.world_tick",
+                "mind.metronome.final_steps.world_tick",
+                e,
+            )
+
+        # ── 9d. Cardiac reflex ──
+        # The heart is an organ, not the cycle: the metronome ticks
+        # its reflex arc (probe read → contractility drive → felt
+        # arrhythmia), internally rate-limited. It schedules nothing.
+        try:
+            self.heart.tick()
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.metronome.final_steps.heart_tick",
                 e,
             )
 
@@ -1479,15 +1109,15 @@ class HeartbeatMixin:
             self._check_sleep_sync()
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.heartbeat.final_steps.sleep_sync",
+                "mind.metronome.final_steps.sleep_sync",
                 e,
             )
 
         # ── 11. Executive signal integration ──
-        self._heartbeat_feed_executive()
+        self._cycle_feed_executive()
 
         # ── 12. Volition (urge-driven) ──
-        self._heartbeat_volition()
+        self._cycle_volition()
 
         # ── 13. Warn (only when state changes) ──
         try:
@@ -1495,14 +1125,14 @@ class HeartbeatMixin:
             self.warn(speak=True)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.heartbeat.final_steps.warn",
+                "mind.metronome.final_steps.warn",
                 e,
             )
 
         # ── 13. Cognitive maintenance ──
         try:
             # The measured cycle interval, not a fixed 1.0 — the
-            # heartbeat cadence is adaptive (0.2–5.0 s), and a nominal
+            # cycle cadence is adaptive (0.2–5.0 s), and a nominal
             # step makes every downstream decay run at the wrong rate
             # (5× fast when engaged, 5× slow when idle). Clamped to the
             # shared DT_MAX so a stalled cycle is bounded growth, not
@@ -1510,15 +1140,15 @@ class HeartbeatMixin:
             self.brain.frontal.tick(dt=min(DT_MAX, max(0.0, getattr(self, "_cycle_dt", 1.0))))
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.heartbeat.final_steps.cognition_tick",
+                "mind.metronome.final_steps.cognition_tick",
                 e,
             )
 
-    def _heartbeat_init_state(self) -> tuple:
-        """Initialize the change-detection state for the heartbeat loop.
+    def _cycle_init_state(self) -> tuple:
+        """Initialize the change-detection state for the cycle loop.
 
         Returns a tuple of all the ``last_*`` tracking variables the
-        heartbeat loop uses to detect state changes and avoid redundant
+        cycle loop uses to detect state changes and avoid redundant
         work (re-spawning renice/ionice, re-emitting learner spam, etc.).
         """
         last_stm_count = 0
@@ -1536,7 +1166,7 @@ class HeartbeatMixin:
         self._dream_gate = _AdaptiveInterval(4.0, 2.0, 30.0)
         self._inference_save_gate = _AdaptiveInterval(60.0, 20.0, 300.0)
         self._identity_gate = _AdaptiveInterval(300.0, 60.0, 1800.0)
-        # The heartbeat's own cadence — engagement snaps it toward
+        # The metronome's own cadence — engagement snaps it toward
         # 0.2 s, sleep drifts it toward 5 s. Bounded: the mind never
         # spins below 200 ms and never fully sleeps between cycles.
         self._cadence = _AdaptiveInterval(1.0, 0.2, 5.0)
@@ -1563,7 +1193,7 @@ class HeartbeatMixin:
         # learner change-detection. The learner's gating depends on
         # the emotion label (derived from the daemon phase) and the
         # brain-wave dominant (delta blocks learning). Without this
-        # tracking, notify_state_change() was called every heartbeat
+        # tracking, notify_state_change() was called every cycle
         # cycle (~1 s), waking the learner from its state-gated wait
         # and causing it to re-emit "Skipping learning — feeling
         # drowsy/sleeping" every second — an endless spam loop.
@@ -1577,7 +1207,7 @@ class HeartbeatMixin:
         # would all run at the wrong rate.
         last_advance_mono = time.monotonic()
         # Reset volition engine's tick clock so the first dt reflects
-        # actual elapsed time since the heartbeat started, not since
+        # actual elapsed time since the cycle started, not since
         # Mind.__init__ (which can be many seconds earlier during init).
         self.volition._last_tick = time.time()
         return (
@@ -1589,7 +1219,7 @@ class HeartbeatMixin:
             last_advance_mono,
         )
 
-    def _heartbeat_identity(self, now: float) -> None:
+    def _cycle_identity(self, now: float) -> None:
         """Emergent identity synthesis — synthesizes who it is from its
         actual experience and feeds it back into the self-model,
         closing the loop: experience → emergent identity → self-model →
@@ -1603,11 +1233,11 @@ class HeartbeatMixin:
                 self._experience_since_identity = 0
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
-                    "mind.heartbeat._heartbeat_loop",
+                    "mind.metronome._cycle_loop",
                     e,
                 )
 
-    def _heartbeat_loop(self) -> None:
+    def _cycle_loop(self) -> None:
         """Reactive cycle — the mind's own living rhythm.
 
         The daemon no longer runs a fixed tick loop. Instead, the mind
@@ -1636,7 +1266,7 @@ class HeartbeatMixin:
             last_learner_phase,
             last_learner_wave,
             last_advance_mono,
-        ) = self._heartbeat_init_state()
+        ) = self._cycle_init_state()
 
         while self._running:
             # One guard for the whole cycle.
@@ -1666,7 +1296,7 @@ class HeartbeatMixin:
                     current_brain_wave_state,
                     last_learner_phase,
                     last_learner_wave,
-                ) = self._heartbeat_advance_neuro(
+                ) = self._cycle_advance_neuro(
                     last_advance_mono,
                     last_learner_phase,
                     last_learner_wave,
@@ -1679,10 +1309,10 @@ class HeartbeatMixin:
                 self._last_cycle_at = now
 
                 # ── 3-4. Heartbeat modules and sensors ──
-                self._heartbeat_sensors(now)
+                self._cycle_sensors(now)
 
                 # ── 5. Body control ──
-                (last_body_control_sig, last_self_priority) = self._heartbeat_body_control(
+                (last_body_control_sig, last_self_priority) = self._cycle_body_control(
                     now,
                     last_body_control_sig,
                     current_brain_wave_state,
@@ -1690,37 +1320,37 @@ class HeartbeatMixin:
                 )
 
                 # ── 5b. Sense network connectivity ──
-                self._heartbeat_connectivity(now)
+                self._cycle_connectivity(now)
 
                 # ── 5c. Continuous emotional regulation ──
-                self._heartbeat_emotion(now)
+                self._cycle_emotion(now)
 
                 # ── 6. Consolidate (state-threshold-driven) ──
-                last_stm_count = self._heartbeat_consolidate(
+                last_stm_count = self._cycle_consolidate(
                     now,
                     last_stm_count,
                 )
 
                 # ── 7-9b. Associate, dream, save inference, identity ──
-                self._heartbeat_periodic_maintenance(now)
+                self._cycle_periodic_maintenance(now)
 
                 # ── 10-13. Auto-sleep, volition, warn, cognition ──
-                self._heartbeat_final_steps()
+                self._cycle_final_steps()
 
                 # ── Wait for the next cycle — adaptive cadence ──
-                self._heartbeat_pace(now)
+                self._cycle_pace(now)
             except Exception as e:
                 logger.warning(
-                    f"heartbeat cycle failed ({type(e).__name__}: {e}); continuing",
+                    f"cycle failed ({type(e).__name__}: {e}); continuing",
                     exc_info=True,
                 )
-                note_swallowed("mind.heartbeat.cycle", e)
-            self._heartbeat_stop.wait(self._cadence.period)
+                note_swallowed("mind.metronome.cycle", e)
+            self._cycle_stop.wait(self._cadence.period)
 
-    def _heartbeat_pace(self, now: float) -> None:
+    def _cycle_pace(self, now: float) -> None:
         """Drive the cadence gear from current engagement.
 
-        The heartbeat's own gear: engagement pulls it toward 0.2 s,
+        The metronome's own gear: engagement pulls it toward 0.2 s,
         sleep drifts it toward 5 s. The cycle is threshold-gated, so a
         slower cadence loses nothing — the work still fires the moment
         its gate opens.

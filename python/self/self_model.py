@@ -401,7 +401,7 @@ class ComputationalSubstrate:
     hardware_read_at: float | None = None
 
     # How long a hardware reading stays fresh enough to reason from.
-    # The heartbeat refreshes sensors every 5 s; this tolerates several
+    # The metronome refreshes sensors every 5 s; this tolerates several
     # missed polls before the picture is declared stale. Matches the
     # interoception body's BODY_STATE_TIMEOUT.
     #
@@ -1329,7 +1329,7 @@ class SelfModel:
         that the kernel was stalling its tasks waiting on memory.
 
         This is the single ingestion point for the hardware body. It
-        takes the ``BodyState`` the heartbeat has *already* fetched —
+        takes the ``BodyState`` the metronome has *already* fetched —
         no extra IPC round-trip — and records:
 
         - every channel the daemon reports, on its native scale

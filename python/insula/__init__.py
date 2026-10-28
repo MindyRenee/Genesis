@@ -15,7 +15,7 @@ insula represents the body's current state; the anterior insula
 integrates that state with salience and emotion and is the hub of the
 salience network with the anterior cingulate.
 
-The sensing machinery is in the brainstem (the autonomic heartbeat that
+The sensing machinery is in the brainstem (the metronome that
 samples the body) and in the limbic system (the interoceptive layer that
 turns samples into stress). This region is the anatomical place where
 those signals become a felt state; it co-claims that machinery rather
@@ -68,7 +68,7 @@ Interoceptive sensing and the felt state (co-claimed with
 interoception system and the composed internal state.
 
 Autonomic sampling (co-claimed with ``brainstem``, which owns the
-heartbeat loop): the heartbeat mixin that samples the body each cycle.
+metronome loop): the metronome mixin that samples the body each cycle.
 
 The interoceptive body map (co-claimed with ``self``, where the
 proto-self is defined): Damasio's proto-self, the insula-based map of
@@ -88,7 +88,7 @@ _EXPORTS: dict[str, str] = {
     "SystemMonitor": "parietal_lobe.system_monitor",
     "SystemSnapshot": "parietal_lobe.system_monitor",
     # The autonomic sampling loop that reads the body each cycle
-    "HeartbeatMixin": "brainstem.heartbeat",
+    "MetronomeMixin": "brainstem.metronome",
     # The body map the self is built on
     "ProtoSelf": "insula.damasio",
     "ProtoSelfState": "insula.damasio",

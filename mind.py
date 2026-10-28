@@ -60,11 +60,12 @@ from self import (
 from sleep.inner_life import InnerLife
 from temporal_lobe.base import Language
 from temporal_lobe.temporal import TemporalLobe
-from temporal_lobe.world import OuterWorld
 from thalamus.brain_waves import BrainWave, add_brain_wave_drive, add_stimulus
 from thalamus.relay import Thalamus
 from tools.code_learner import CodeLearner
 from tools.explorer import Explorer, default_allowed_roots
+from worlds.board import ChannelBoard
+from worlds.world import OuterWorld
 
 from discord_feed import DiscordFeed
 from genesis_client import GenesisClient
@@ -82,8 +83,9 @@ if TYPE_CHECKING:
 
     from worlds.channel import Channel
 from basal_ganglia.volition import VolitionMixin
-from brainstem.heartbeat import HeartbeatMixin
+from brainstem.heart import Heart
 from brainstem.lifecycle import LifecycleMixin
+from brainstem.metronome import MetronomeMixin
 from frontal_lobe.conversation import ConversationMixin
 from frontal_lobe.projects import ProjectsMixin
 from frontal_lobe.status import StatusMixin
@@ -100,7 +102,7 @@ logger = logging.getLogger(__name__)
 
 class Mind(
     LifecycleMixin,
-    HeartbeatMixin,
+    MetronomeMixin,
     VolitionMixin,
     SleepMixin,
     ProjectsMixin,
@@ -492,6 +494,20 @@ class Mind(
             channel=channel,
             on_channel_speech=self._hear_channel,
         )
+        # The page's instrument card — the world owns it (a view of
+        # her vitals, posted to her page); the metronome only ticks
+        # the world, never composes for it.
+        self.world.board = ChannelBoard(self)
+
+        # The cardiac control center — the medullary organ that reads
+        # the body's carrier pulse (daemon field probe), drives
+        # contractility with demand, and feels arrhythmia. The heart
+        # muscle itself is the daemon's carrier; this is its center.
+        self.heart = Heart(
+            client=self.client,
+            neuro_impulse=self._learner_neuro_impulse,
+            arousal=lambda: getattr(self.client.get_state(), "arousal", 0.5),
+        )
 
         # The public channel's own state — the page itself lives in
         # the outer world (``self.world.channel``); None when the
@@ -806,7 +822,7 @@ class Mind(
         # Interruptible wait for the heartbeat's adaptive cadence: the
         # loop sleeps up to 5 s when idle, which meets the 5 s shutdown
         # join budget. stop() sets this so the loop wakes immediately.
-        self._heartbeat_stop = threading.Event()
+        self._cycle_stop = threading.Event()
         self._shutdown_save_ok: bool | None = None
         self._interaction_count = 0
         self._last_interaction_time = time.time()
@@ -816,7 +832,7 @@ class Mind(
         # execution per manifest module since the last heartbeat
         # round. The ModuleSampler (the mind's EEG) credits modules
         # whenever a thread is caught executing their code;
-        # _heartbeat_sensors normalizes the totals into cpu_share and
+        # _cycle_sensors normalizes the totals into cpu_share and
         # reports them to the daemon (GET_SUBSYSTEM_TELEMETRY's module
         # section). Guarded by a lock: the sampler and heartbeat
         # threads both touch it.
@@ -897,7 +913,7 @@ class Mind(
         # prevents the drowsy→active→stressed→drowsy oscillation that
         # happens when everything fires at once on wake.
         self._wake_time: float = 0.0
-        self._heartbeat_thread: threading.Thread | None = None
+        self._cycle_thread: threading.Thread | None = None
         self._notification_thread: threading.Thread | None = None
         self._autosave_thread: threading.Thread | None = None
         # Counter for periodic concept-network shedding. The autonomous

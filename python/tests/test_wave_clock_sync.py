@@ -522,7 +522,7 @@ def test_assess_does_not_truncate_a_slow_heartbeat(monkeypatch):
 def test_assess_matches_chemistry_dt_over_a_slow_cycle(monkeypatch):
     """Wave time must equal the dt the daemon would have been given.
 
-    The daemon clamps ADVANCE_NEURO's dt to DT_MAX; heartbeat.py passes
+    The daemon clamps ADVANCE_NEURO's dt to DT_MAX; metronome.py passes
     the raw elapsed interval. Whatever chemistry is told, the wave step
     must span the same interval — that equality is the invariant the
     two-clock coupling depends on.

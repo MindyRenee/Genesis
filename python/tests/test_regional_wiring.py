@@ -134,10 +134,14 @@ _OWNERSHIP_PINS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     ("Serotonin", ("brainstem",), ()),
     # Aggregate ACh includes basal-forebrain and pontine projections.
     ("Acetylcholine", ("basal_forebrain", "brainstem"), ()),
-    # Interoception is insular; the heartbeat that samples the body is
+    # Interoception is insular; the metronome that samples the body is
     # brainstem; both are claimed by each.
     ("InteroceptionSystem", ("insula", "limbic_system"), ()),
-    ("HeartbeatMixin", ("insula", "brainstem"), ()),
+    ("MetronomeMixin", ("insula", "brainstem"), ()),
+    # The cardiac control center is medullary — the heart muscle
+    # itself is the daemon's carrier, its center is brainstem.
+    ("Heart", ("brainstem",), ()),
+    ("CardiacState", ("brainstem",), ()),
     # The urge accumulator is gated by the striatum and held by frontal.
     ("Urge", ("basal_ganglia", "frontal_lobe"), ()),
     # Social perception is superior temporal.
@@ -162,6 +166,9 @@ _OWNERSHIP_PINS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     # Her page — a place in the external world, not a mind organ:
     # worlds.channel is environment-side, so no region may claim it.
     ("Channel", (), REGIONS),
+    # The board is a view on that page — environment-side like the
+    # channel it renders for, claimable by no region.
+    ("ChannelBoard", (), REGIONS),
     # Mentalizing posteriors over presences — rTPJ + mPFC.
     ("PresenceBelief", ("parietal_lobe", "frontal_lobe"), ()),
     # The minimal self and agency comparator are TPJ work; the

@@ -364,9 +364,14 @@ _EXPORTS: dict[str, str] = {
     # afferents: threat → CeA low road, source-level monoamine
     # modulation, all magnitudes self-set from live levels
     "InteroceptiveRelay": "brainstem.interoceptive_relay",
-    # The autonomic rhythm itself — the periodic loop that samples
-    # the body and publishes module activity to the manifest
-    "HeartbeatMixin": "brainstem.heartbeat",
+    # The metronome — the periodic loop that samples the body and
+    # publishes module activity to the manifest. A scheduler, not an
+    # organ: the ticker is not her heart.
+    "MetronomeMixin": "brainstem.metronome",
+    # The medullary cardiac center — reads the body's carrier pulse,
+    # drives contractility, feels arrhythmia
+    "Heart": "brainstem.heart",
+    "CardiacState": "brainstem.heart",
     # Arousal / coming-online — start, stop, save, restore
     "LifecycleMixin": "brainstem.lifecycle",
     # The VLPO flip-flop — sleep-wake switching and consolidation drive

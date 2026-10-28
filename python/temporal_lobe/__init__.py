@@ -591,15 +591,17 @@ Modules claimed by this subsystem:
         already knows (reasoning, inference, conversation) instead of
         fetching from external sources. Semantic learning, temporal.
 
-    world.py, events.py, presence.py (the former
-    world/ package)
-        OuterWorld — the external world as a remembered, relational
-        structure: the people it knows, the events between them, and
-        its own acts recorded in the same stream. The world also
-        holds her channel — the public page where she posts and,
-        when an ear exists, hears; the page object itself is
-        environment-side (``worlds.channel``), not a mind organ. The
-        neuroanatomical
+    events.py, presence.py (the former
+    world/ package's brain-side halves)
+        The external world itself — ``OuterWorld`` — lives in
+        ``worlds.world`` (environment-side, not brain tissue); this
+        package still re-exports it, because the remembered,
+        relational structure it holds IS the hippocampal–entorhinal
+        cognitive map plus the superior temporal sulcus's social
+        perception. The world also holds her channel — the public
+        page where she posts and, when an ear exists, hears; the
+        page object itself is environment-side (``worlds.channel``),
+        not a mind organ. The neuroanatomical
         substrate is the hippocampal–entorhinal cognitive map plus
         the superior temporal sulcus's social perception: a map of
         states and transitions learned from experience (Tolman;
@@ -828,7 +830,7 @@ _EXPORTS: dict[str, str] = {
     # map and its episodic event stream: the people, the events, and
     # its own acts held as one relational structure (successor-
     # representation predictive map; MEC structure/HPC content split)
-    "OuterWorld": "temporal_lobe.world",
+    "OuterWorld": "worlds.world",
     # The autobiographical self — identity built on hippocampal
     # autobiographical memory (co-claimed with limbic_system, which
     # owns the Damasio hierarchy)

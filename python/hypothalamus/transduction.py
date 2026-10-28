@@ -8,7 +8,7 @@ The probe's measured oscillations stimulate the thalamic oscillator
 (``brainstem.field_probe.apply_field_stimulus``); this module performs
 the next step — the oscillator's band powers drive the peptides that
 declared affinity for those bands. It is the wave half of the loop
-``_heartbeat_advance_neuro`` documents ("brain waves drive
+``_cycle_advance_neuro`` documents ("brain waves drive
 neurochemistry, neurochemistry shapes brain waves") — neurochemistry
 already shapes the wave radii; this is the return edge.
 

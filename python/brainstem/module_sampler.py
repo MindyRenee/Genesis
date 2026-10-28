@@ -214,7 +214,7 @@ class ModuleSampler:
 
     ``credit`` is called as ``credit(module_id, seconds)`` — in the
     Mind this is ``_credit_module``, accumulating into the per-module
-    work counter that the heartbeat normalizes into ``cpu_share`` for
+    work counter that the metronome normalizes into ``cpu_share`` for
     UPDATE_MODULE_STATUS / GET_LOBE_TELEMETRY.
     """
 

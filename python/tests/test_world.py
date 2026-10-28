@@ -25,7 +25,7 @@ from temporal_lobe.presence import (
     Presence,
     PresenceKind,
 )
-from temporal_lobe.world import OuterWorld
+from worlds.world import OuterWorld
 
 from genesis_client.protocol import CHEM_OXYTOCIN
 

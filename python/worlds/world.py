@@ -65,15 +65,14 @@ if TYPE_CHECKING:
     from worlds.channel import Channel
 
 from limbic_system.sentiment import analyze_sentiment
+from temporal_lobe.events import EventKind, EventStream, ExternalEvent, ground_topics
+from temporal_lobe.presence import Presence, PresenceKind
 
 from genesis_client.protocol import (
     CHEM_DOPAMINE,
     CHEM_NOREPINEPHRINE,
     CHEM_OXYTOCIN,
 )
-
-from .events import EventKind, EventStream, ExternalEvent, ground_topics
-from .presence import Presence, PresenceKind
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +95,7 @@ ISOLATION_PERIOD = 1800.0
 #: talking) still counts socially, just less than engagement.
 _COMPANY_FACTOR = 0.7
 
-#: How often tick() runs its decay logic when called every heartbeat.
+#: How often tick() runs its decay logic when called every metronome pass.
 _TICK_INTERVAL = 5.0
 
 #: Bound on known presences. Every arrival creates one; without a cap,
@@ -236,7 +235,7 @@ class OuterWorld:
     Owns the event stream and the presence model, computes social
     isolation, and applies the world's neurochemical coupling through
     the ``neuro_impulse`` callback. Owns no thread — ``tick()`` is
-    driven by the mind's heartbeat, matching the codebase's
+    driven by the mind's metronome, matching the codebase's
     state-gated (not timer-gated) philosophy.
 
     Args:
@@ -286,6 +285,10 @@ class OuterWorld:
         self.on_channel_speech = on_channel_speech
         if self.channel is not None:
             self.channel.on_speech = self._channel_heard
+        # Her instrument card — a ``ChannelBoard`` the mind attaches
+        # after construction (it reads the whole mind, which does not
+        # exist yet here). None until then.
+        self.board = None
 
         self._stream = EventStream(max_size=200)
         self._presences: dict[str, Presence] = {}
@@ -678,7 +681,7 @@ class OuterWorld:
     def tick(self, now: float | None = None) -> None:
         """Advance the world — presence decay and housekeeping.
 
-        Driven by the mind's heartbeat; internally rate-limited to
+        Driven by the mind's metronome; internally rate-limited to
         every ``_TICK_INTERVAL`` seconds. A presence silent past its
         timeout leaves the world — a DEPARTURE event is recorded.
         """
@@ -710,6 +713,8 @@ class OuterWorld:
                     )
         for event in departures:
             self._record(event)
+        if self.board is not None:
+            self.board.update(ts)
 
     # ── Status and persistence ──────────────────────────────────
 

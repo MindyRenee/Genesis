@@ -345,7 +345,7 @@ class LifecycleMixin:
         # Start emotional self-regulation — it controls its state
         self.regulator.start()
         # Registration claimed `Starting`; the subsystems are now live,
-        # so the modules are genuinely working. The heartbeat takes over
+        # so the modules are genuinely working. The metronome takes over
         # the status from here, reporting `Running` with measured load
         # or `Idle` with none.
         self._mark_modules_running()
@@ -600,7 +600,7 @@ class LifecycleMixin:
         )
 
     def _start_background_threads(self) -> None:
-        """Start heartbeat, notification, and autosave threads.
+        """Start metronome, notification, and autosave threads.
 
         The code-learning and self-improvement threads were
         replaced by the volition engine, which drives these actions
@@ -608,19 +608,19 @@ class LifecycleMixin:
         objects have been removed; the loop methods remain as volition
         action handlers.
         """
-        # Start the module heartbeat thread — periodically refreshes
-        # the cognitive modules' heartbeat timestamps in the manifest
-        # so the daemon knows they're alive.
-        self._heartbeat_thread: threading.Thread | None = named_thread(
-            "module-heartbeat",
-            self._heartbeat_loop,
-            comm="g-heartbeat",
+        # Start the metronome thread — the periodic mind cycle, which
+        # among its phases refreshes the cognitive modules' heartbeat
+        # timestamps in the manifest so the daemon knows they're alive.
+        self._cycle_thread: threading.Thread | None = named_thread(
+            "mind-cycle",
+            self._cycle_loop,
+            comm="g-cycle",
         )
-        self._heartbeat_thread.start()
+        self._cycle_thread.start()
 
         # Start the module sampler — the mind's EEG. It observes which
         # subsystem's code is executing on each thread and credits that
-        # manifest module; the heartbeat round reports the shares to
+        # manifest module; the metronome round reports the shares to
         # the daemon as per-module cpu_share.
         self._module_sampler.start()
 
@@ -847,10 +847,10 @@ class LifecycleMixin:
             return True
 
         self._running = False
-        # Wake the heartbeat if it is inside its adaptive cadence sleep
+        # Wake the metronome if it is inside its adaptive cadence sleep
         # — the idle period reaches 5 s, which meets the 5 s join
         # budget; the wait is interruptible for exactly this reason.
-        self._heartbeat_stop.set()
+        self._cycle_stop.set()
         self._suppress_volition = True
         # Latched once — deferred resume timers consult this, not
         # _running, so an unstarted mind's resume paths still work.
@@ -916,15 +916,15 @@ class LifecycleMixin:
         return clean_shutdown
 
     def _join_service_threads(self) -> bool:
-        """Join the heartbeat, autosave, and notification threads.
+        """Join the metronome, autosave, and notification threads.
 
-        The heartbeat goes BEFORE saving state: it calls
+        The metronome goes BEFORE saving state: it calls
         _check_sleep_sync() every second, which can wake it to sync
         when the body's phase has already left sleep. Without joining
-        the heartbeat first, there is a race — the heartbeat wakes it
+        the metronome first, there is a race — the metronome wakes it
         between /quit and _save_state(), so the saved state says
         is_sleeping=False even though it was asleep when the user
-        quit. Joining the heartbeat ensures its sleep state at the
+        quit. Joining the metronome ensures its sleep state at the
         moment of /quit is what gets saved. Join without a timeout: a timed-out writer would still
         be alive when the archive is closed below. The autosave join
         prevents an in-flight autosave racing the shutdown save.
@@ -935,7 +935,7 @@ class LifecycleMixin:
         # hardware, far past the default 5 s join, and the save is real
         # work worth finishing rather than a stuck thread.
         for thread, name, timeout in (
-            (self._heartbeat_thread, "heartbeat", 5.0),
+            (self._cycle_thread, "metronome", 5.0),
             (self._autosave_thread, "autosave", 60.0),
             (self._notification_thread, "notifications", 5.0),
         ):

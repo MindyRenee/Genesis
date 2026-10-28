@@ -5288,7 +5288,7 @@ class InnerLife:
     def feed_social_drive(self, amount: float) -> None:
         """Add external social pressure to the social drive.
 
-        Called by the outer world (via the mind's heartbeat): time
+        Called by the outer world (via the mind's metronome): time
         without anyone engaging it is pressure the world exerts on
         the inner world — it becomes motivation to reach out. The
         drive is bounded like the internally-accumulated one; firing

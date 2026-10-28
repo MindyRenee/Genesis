@@ -692,7 +692,7 @@ class SleepMixin:
         transitions into and out of sleep are hers — a self-sleep urge
         self-invoking ``/sleep``, a user command, or the body's own
         sleep-wake network crossing under genuine pressure. What this
-        heartbeat pass does is *sync* and *signal*: when the daemon's
+        metronome pass does is *sync* and *signal*: when the daemon's
         phase says the body has crossed into NREM/REM while the mind
         still flags awake, the mind joins (``_check_sleep_desync``);
         when the phase says the body has genuinely woken while the
@@ -1459,7 +1459,7 @@ class SleepMixin:
             # `emergent_phase` — that field belongs to `CoreState`, a
             # different object. Reading it raised AttributeError, which
             # this handler does not catch, so the desync check escaped to
-            # the heartbeat and has been dead since it was written: the
+            # the metronome and has been dead since it was written: the
             # "mind awake, daemon asleep" fault it exists to record was
             # silently never detected.
             phase = self.client.get_phase().phase
@@ -1607,7 +1607,7 @@ class SleepMixin:
 
         Meditation is a lighter recovery than sleep. During meditation:
         - Learning and code scanning are paused
-          (the heartbeat loop checks is_meditating before running
+          (the metronome loop checks is_meditating before running
           volitions, and the autonomous learner blocks on the
           "meditating" emotion label).
         - Spontaneous thoughts are paused (inner_life is paused).

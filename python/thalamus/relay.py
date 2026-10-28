@@ -3,8 +3,8 @@
 This software bus abstracts both direct cortical and transthalamic
 communication; it is not a model of mandatory thalamic routing for
 all neural signals. A region posts a message onto its
-own module entry in the runtime manifest — the ``task_id`` field the
-heartbeat already writes and ``GET_SUBSYSTEM_TELEMETRY`` already
+own module entry in the runtime manifest — the ``task_id`` field the metronome already
+writes and ``GET_SUBSYSTEM_TELEMETRY`` already
 returns — and the channel delivers the payload to whichever regions
 projected onto that module.
 
@@ -77,7 +77,7 @@ class Thalamus:
 
     ``post`` records the message a module publishes, fires the local
     axons (subscribers run synchronously on the caller's thread), and
-    leaves the task_id for the next heartbeat to write into the
+    leaves the task_id for the next metronome pass to write into the
     manifest. ``deliver`` is the other direction: it is called with
     the module section of a telemetry report and hands any message
     this process did *not* post itself — one that arrived over the
@@ -154,7 +154,7 @@ class Thalamus:
         drives and loses to competing traffic.
 
         Subscribers fire synchronously, in registration order. The
-        task_id stays in the mailbox until the heartbeat writes it —
+        task_id stays in the mailbox until the metronome writes it —
         that is how the manifest comes to show which module spoke.
         """
         try:
@@ -180,10 +180,10 @@ class Thalamus:
         return task_id
 
     def take(self, module_id: int) -> int | None:
-        """Return the task_id a heartbeat should publish, if any.
+        """Return the task_id a metronome pass should publish, if any.
 
         The payload stays until a newer post replaces it: a reader
-        sampling the manifest between heartbeat and telemetry still
+        sampling the manifest between metronome passes and telemetry still
         resolves the message.
         """
         with self._lock:

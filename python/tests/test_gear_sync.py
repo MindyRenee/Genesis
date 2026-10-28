@@ -38,9 +38,9 @@ from genesis_client.protocol import DT_MAX, DT_MIN
 # constant being changed. `test_constants_match_source` below greps the
 # sources to prove these still agree with them.
 BODY_TICK_MS = 200  # src/daemon/tick.rs: TICK_INTERVAL_MS
-MIND_HEARTBEAT_S = 1.0  # heartbeat.py: _cadence base period (adaptive)
-MIND_HEARTBEAT_MIN_S = 0.2  # heartbeat.py: _cadence minimum (engaged)
-MIND_HEARTBEAT_MAX_S = 5.0  # heartbeat.py: _cadence maximum (idle/asleep)
+MIND_HEARTBEAT_S = 1.0  # metronome.py: _cadence base period (adaptive)
+MIND_HEARTBEAT_MIN_S = 0.2  # metronome.py: _cadence minimum (engaged)
+MIND_HEARTBEAT_MAX_S = 5.0  # metronome.py: _cadence maximum (idle/asleep)
 AUTONOMOUS_INTERVAL_MS = 200  # tick.rs: AUTONOMOUS_INTERVAL_MS
 
 BODY_HZ = 1000.0 / BODY_TICK_MS
@@ -165,12 +165,12 @@ def test_constants_match_source() -> None:
     assert m, "AUTONOMOUS_INTERVAL_MS not found in tick.rs"
     assert int(m.group(1)) == AUTONOMOUS_INTERVAL_MS
 
-    heartbeat = (root / "python" / "brainstem" / "heartbeat.py").read_text(encoding="utf-8")
+    heartbeat = (root / "python" / "brainstem" / "metronome.py").read_text(encoding="utf-8")
     m = re.search(
         r"_cadence = _AdaptiveInterval\(([\d.]+),\s*([\d.]+),\s*([\d.]+)\)",
         heartbeat,
     )
-    assert m, "_cadence _AdaptiveInterval not found in heartbeat.py"
+    assert m, "_cadence _AdaptiveInterval not found in metronome.py"
     base, lo, hi = (float(g) for g in m.groups())
     assert base == MIND_HEARTBEAT_S, (
         "the mind's heartbeat base cadence changed; update MIND_HEARTBEAT_S"

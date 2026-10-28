@@ -88,7 +88,7 @@ def test_mind_file_attribution():
     assert _module_of_filename(_p("mind.py")) == MODULE_METACOGNITION
     assert _module_of_filename(_p("brainstem", "sleep.py")) == MODULE_DREAMING
     assert _module_of_filename(_p("basal_ganglia", "volition.py")) == (MODULE_INTENTION)
-    assert _module_of_filename(_p("brainstem", "heartbeat.py")) == MODULE_EMOTION
+    assert _module_of_filename(_p("brainstem", "metronome.py")) == MODULE_EMOTION
 
 
 def test_top_level_files():

@@ -3826,7 +3826,7 @@ def _channel_holder(**overrides):
     OuterWorld owns the page and the record; the holder supplies the
     reply side the world forwards to."""
     from basal_ganglia.volition import VolitionMixin
-    from temporal_lobe.world import OuterWorld
+    from worlds.world import OuterWorld
 
     holder, posts, _said, _net, _comp, emitted = _broadcast_holder(**overrides)
     calls: list[str] = []
@@ -3902,16 +3902,16 @@ def test_hear_channel_sleep_gates_hearing() -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Channel board — her vitals on the live message (heartbeat step 9c)
+# Channel board — her vitals on the live message (the world's tick)
 # ═══════════════════════════════════════════════════════════════════
 
 
 def _board_holder(**overrides):
-    """A minimal stand-in for the heartbeat's channel-board step."""
+    """A minimal stand-in for the world's channel board."""
     from types import SimpleNamespace
 
-    from brainstem.heartbeat import HeartbeatMixin
     from thalamus.brain_waves import BrainWave
+    from worlds.board import ChannelBoard
 
     boards: list[str] = []
 
@@ -4021,19 +4021,14 @@ def _board_holder(**overrides):
             state=lambda: {"research": 0.62, "draw": 0.41, "broadcast": 0.18},
         ),
     )
-    holder._update_channel_board = lambda now: HeartbeatMixin._update_channel_board(holder, now)
-    holder._channel_board_text = lambda: HeartbeatMixin._channel_board_text(holder)
-    holder._board_core_lines = lambda core, lines: HeartbeatMixin._board_core_lines(
-        holder, core, lines
-    )
-    holder._board_neuro_lines = lambda core, lines: HeartbeatMixin._board_neuro_lines(
-        holder, core, lines
-    )
-    holder._board_field_lines = lambda lines: HeartbeatMixin._board_field_lines(holder, lines)
-    holder._board_cell_line = lambda lines: HeartbeatMixin._board_cell_line(holder, lines)
-    holder._board_footer_lines = lambda core, lines: HeartbeatMixin._board_footer_lines(
-        holder, core, lines
-    )
+    board = ChannelBoard(holder)
+    holder._update_channel_board = board.update
+    holder._channel_board_text = board.board_text
+    holder._board_core_lines = board._core_lines
+    holder._board_neuro_lines = board._neuro_lines
+    holder._board_field_lines = board._field_lines
+    holder._board_cell_line = board._cell_line
+    holder._board_footer_lines = board._footer_lines
     for key, value in overrides.items():
         if key == "channel":
             holder.world.channel = value
@@ -4095,7 +4090,7 @@ def test_channel_board_degrades_without_channels() -> None:
 def test_channel_board_paces_fixed_cadence() -> None:
     """The board is a clock, not an urge — inside the window it
     doesn't repost; after it, it does."""
-    from brainstem.heartbeat import _CHANNEL_BOARD_S
+    from worlds.board import _CHANNEL_BOARD_S
 
     holder, boards = _board_holder()
     holder._update_channel_board(1000.0)
@@ -4122,7 +4117,7 @@ def test_channel_board_without_feed_or_daemon() -> None:
 def test_channel_board_fits_a_phone() -> None:
     """Every board line stays under the mobile code-block width —
     wide rows reflow to continuation lines, never scroll sideways."""
-    from brainstem.heartbeat import _BOARD_WIDTH
+    from worlds.board import _BOARD_WIDTH
 
     holder, boards = _board_holder()
     holder._update_channel_board(1000.0)
