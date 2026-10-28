@@ -83,6 +83,19 @@ VOSK_MODEL_DIR = vosk_model_dir()
 _MAX_TTS_CHUNK_CHARS = 150
 
 
+def _thermal_strain(temp_c: float | None) -> float:
+    """Fever intensity [0, 1] for the voice.
+
+    The same ramp the daemon's heat-stress impulse uses
+    (src/daemon/interoception.rs): 0 at 65°C, saturating at 85°C.
+    ``None`` (no thermal reading) is 0 — an absent sensor is never a
+    fever, matching the body's own presence discipline.
+    """
+    if temp_c is None:
+        return 0.0
+    return max(0.0, min(1.0, (temp_c - 65.0) / 20.0))
+
+
 def _chunk_text_for_tts(text: str) -> list[str]:
     """Split text into sentence-sized chunks for TTS.
 
@@ -178,9 +191,9 @@ class Voice:
         # queued instead of cutting off the current speech. This prevents
         # her words from being truncated mid-sentence when multiple
         # thoughts or responses arrive in quick succession.
-        self._speech_queue: collections.deque[tuple[str, float, float, float, float]] = (
-            collections.deque(maxlen=3)
-        )
+        self._speech_queue: collections.deque[
+            tuple[str, float, float, float, float, float | None]
+        ] = collections.deque(maxlen=3)
         self._queue_lock = threading.Lock()
 
     def _check_piper(self) -> bool:
@@ -219,6 +232,7 @@ class Voice:
         valence: float = 0.0,
         caution: float = 0.0,
         creativity: float = 0.0,
+        temp_c: float | None = None,
     ) -> None:
         """Speak text aloud.
 
@@ -231,6 +245,9 @@ class Voice:
             valence: -1 to 1, affects pitch (positive = higher).
             caution: 0-1, slows speech slightly (careful delivery).
             creativity: 0-1, adds slight pitch variation.
+            temp_c: body temperature in °C (None = no thermal voice).
+                A fever slows and unsteadies her speech over the same
+                65–85°C ramp the body calls warm→critical.
         """
         if is_blank(text):
             return
@@ -243,19 +260,23 @@ class Voice:
         # timeout in _speak_piper scales with chunk length.
         chunks = _chunk_text_for_tts(text)
         if len(chunks) <= 1:
-            self._speak_single(text, blocking, alertness, valence, caution, creativity)
+            self._speak_single(text, blocking, alertness, valence, caution, creativity, temp_c)
             return
         # Speak each chunk sequentially. Non-blocking mode queues
         # the remaining chunks so they play in order without cutting
         # off the current speech.
         for i, chunk in enumerate(chunks):
             if i == 0:
-                self._speak_single(chunk, blocking, alertness, valence, caution, creativity)
+                self._speak_single(
+                    chunk, blocking, alertness, valence, caution, creativity, temp_c
+                )
             else:
                 with self._queue_lock:
                     max_q = self._speech_queue.maxlen or 3
                     if len(self._speech_queue) < max_q:
-                        self._speech_queue.append((chunk, alertness, valence, caution, creativity))
+                        self._speech_queue.append(
+                            (chunk, alertness, valence, caution, creativity, temp_c)
+                        )
 
     def _speak_single(
         self,
@@ -265,6 +286,7 @@ class Voice:
         valence: float,
         caution: float,
         creativity: float,
+        temp_c: float | None,
     ) -> None:
         """Speak a single chunk of text (internal helper)."""
 
@@ -277,7 +299,9 @@ class Voice:
             with self._queue_lock:
                 max_q = self._speech_queue.maxlen or 3
                 if len(self._speech_queue) < max_q:
-                    self._speech_queue.append((text, alertness, valence, caution, creativity))
+                    self._speech_queue.append(
+                        (text, alertness, valence, caution, creativity, temp_c)
+                    )
             return
 
         self.stop()
@@ -288,11 +312,16 @@ class Voice:
         # previous 1.45. Higher alertness → faster speech; higher caution
         # → slower speech.
         rate_factor = 1.25 + (alertness - 0.5) * 0.4 - caution * 0.15
+        # A fever makes speech slower and effortful — same 65–85°C ramp
+        # the daemon's heat-stress impulse uses
+        # (src/daemon/interoception.rs).
+        heat = _thermal_strain(temp_c)
+        rate_factor -= heat * 0.35
         rate_factor = max(0.9, min(1.8, rate_factor))
 
         try:
             if self._piper_available and self._model:
-                self._speak_piper(text, blocking, rate_factor)
+                self._speak_piper(text, blocking, rate_factor, heat)
             elif self._espeak_available:
                 self._speak_espeak(text, blocking, rate_factor)
         finally:
@@ -338,16 +367,19 @@ class Voice:
         with self._queue_lock:
             if not self._speech_queue:
                 return
-            text, alertness, _valence, caution, _creativity = self._speech_queue.popleft()
+            text, alertness, _valence, caution, _creativity, temp_c = (
+                self._speech_queue.popleft()
+            )
         # Play the queued utterance. We call the internal playback
         # directly (not speak()) to avoid re-checking is_speaking,
         # which would re-queue and never play.
         self._start_speaking()
-        rate_factor = 1.25 + (alertness - 0.5) * 0.4 - caution * 0.15
+        heat = _thermal_strain(temp_c)
+        rate_factor = 1.25 + (alertness - 0.5) * 0.4 - caution * 0.15 - heat * 0.35
         rate_factor = max(0.9, min(1.8, rate_factor))
         try:
             if self._piper_available and self._model:
-                self._speak_piper(text, False, rate_factor)
+                self._speak_piper(text, False, rate_factor, heat)
             elif self._espeak_available:
                 self._speak_espeak(text, False, rate_factor)
         except Exception as e:  # noqa: BLE001
@@ -374,7 +406,9 @@ class Voice:
                 return True
         return time.time() - self._last_spoke_time < self._speech_tail
 
-    def _speak_piper(self, text: str, blocking: bool, rate_factor: float = 1.0) -> None:
+    def _speak_piper(
+        self, text: str, blocking: bool, rate_factor: float = 1.0, heat: float = 0.0
+    ) -> None:
         """Speak using Piper neural TTS."""
         try:
             # Piper reads text from stdin and writes raw audio to stdout.
@@ -390,6 +424,17 @@ class Voice:
                 "--length-scale",
                 str(length_scale),
             ]
+            if heat > 0.0:
+                # Fever voice: duration-noise scales with heat (unsteady
+                # rhythm — the phoneme-identical noise of --noise-scale
+                # would read as slurred, not strained) and the pause
+                # between sentences lengthens (labored breath pacing).
+                cmd += [
+                    "--noise-w-scale",
+                    str(0.8 + 0.5 * heat),
+                    "--sentence-silence",
+                    str(0.2 + 0.5 * heat),
+                ]
             # Set LD_LIBRARY_PATH so piper finds its shared libs
             env = os.environ.copy()
             env["LD_LIBRARY_PATH"] = str(_VOICES_DIR) + ":" + env.get("LD_LIBRARY_PATH", "")

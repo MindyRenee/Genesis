@@ -249,7 +249,7 @@ class VoiceDedup:
         self,
         text: str,
         blocking: bool = False,
-        **kwargs: float,
+        **kwargs: float | None,
     ) -> None:
         """Speak with dedup. Skips if too similar to recent speech."""
         if not text.strip():
@@ -783,6 +783,7 @@ class AmbientHandler:
                     valence=emo.valence,
                     caution=emo.caution,
                     creativity=emo.creativity,
+                    temp_c=_voice_temp_c(self.mind),
                     blocking=False,
                 )
             else:
@@ -2287,6 +2288,17 @@ def _handle_voice_mode(
             return
 
 
+def _voice_temp_c(mind: Mind) -> float | None:
+    """Body temperature for the fever-voice channel.
+
+    Reads the self-model's body model — the daemon's measured
+    cpu_temp_c, refreshed each body-control cycle. ``None`` when the
+    channel isn't populated (no reading is never a fever).
+    """
+    body = getattr(getattr(mind, "self_model", None), "body_model", None)
+    return getattr(body, "cpu_temp_c", None)
+
+
 def _speak_response(voice: Voice, mind: Mind, response: str) -> None:
     """Speak the response aloud if voice is enabled."""
     if not voice.is_available():
@@ -2301,6 +2313,7 @@ def _speak_response(voice: Voice, mind: Mind, response: str) -> None:
                 valence=emo.valence,
                 caution=emo.caution,
                 creativity=emo.creativity,
+                temp_c=_voice_temp_c(mind),
                 blocking=False,
             )
         else:
@@ -3360,6 +3373,7 @@ def _speak_thought(
                     valence=emo.valence,
                     caution=emo.caution,
                     creativity=emo.creativity,
+                    temp_c=_voice_temp_c(mind),
                     blocking=False,
                 )
             else:
@@ -3369,6 +3383,7 @@ def _speak_thought(
                     valence=emo.valence,
                     caution=emo.caution,
                     creativity=emo.creativity,
+                    temp_c=_voice_temp_c(mind),
                     blocking=False,
                 )
         else:
@@ -4285,6 +4300,7 @@ def _wire_voice(mind: Mind) -> tuple[Voice, VoiceDedup | None]:
                     valence=emo.valence,
                     caution=emo.caution,
                     creativity=emo.creativity,
+                    temp_c=_voice_temp_c(mind),
                     blocking=False,
                 )
             else:
