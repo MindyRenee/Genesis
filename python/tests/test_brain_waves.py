@@ -1036,21 +1036,34 @@ def test_stimulus_modulates_amplitude():
 
 def test_stimulus_decays():
     """Stimulus decays over time without re-application."""
-    from thalamus.brain_waves import add_stimulus, reset_oscillator
+    from thalamus.brain_waves import _get_oscillator, add_stimulus, reset_oscillator
 
     reset_oscillator()
     summary = _make_summary(arousal=0.5, phase=PHASE_ACTIVE)
+    osc = _get_oscillator()
 
+    # Powers are Goertzel-metered over 4 s of emitted trace, and the
+    # stimulus rings down at τ≈5 s — a power reading taken right
+    # after the pulse still meters pre-stimulus wave, so the fill
+    # transient can outrun the decay. Step the oscillator's own
+    # clock instead of racing wall-clock sleeps: one dt-exact step
+    # fills the window with stimulated wave.
     add_stimulus(BrainWave.GAMMA, 0.3)
+    assess_brain_waves(summary)  # establishes _last_time
+    osc._last_time -= 4.0
     state1 = assess_brain_waves(summary)
     gamma1 = state1.powers[BrainWave.GAMMA]
 
-    for _ in range(20):
-        time.sleep(0.05)  # 50ms per tick
-        state2 = assess_brain_waves(summary)
+    # Another 4 s: the pulse rings down (~45% per step) while the
+    # window refills with progressively weaker wave.
+    osc._last_time -= 4.0
+    state2 = assess_brain_waves(summary)
     gamma2 = state2.powers[BrainWave.GAMMA]
 
     assert gamma2 < gamma1, f"stimulus should decay: {gamma1} → {gamma2}"
+    assert osc._stimulus[BrainWave.GAMMA] < 0.1, (
+        f"register must ring down: {osc._stimulus[BrainWave.GAMMA]}"
+    )
     reset_oscillator()
 
 
