@@ -28,6 +28,7 @@ from limbic_system.emotion import EmotionalState
 from occipital_lobe.perception import Perception
 
 from genesis_client import GenesisClient
+from genesis_client.protocol import EMOTIONAL_TAG_SIZE
 from genesis_client.swallow import note_swallowed
 
 if TYPE_CHECKING:
@@ -203,11 +204,11 @@ class MemoryStore:
         emotion: EmotionalState,
         perception: Perception,
     ) -> list[float]:
-        """Build a 12-element emotional tag for memory storage.
+        """Build an emotional tag for memory storage.
 
         Captures the neurochemical state at the time of the interaction.
         """
-        tag = [0.5] * 12
+        tag = [0.5] * EMOTIONAL_TAG_SIZE
 
         # Dopamine (0) — from valence
         tag[0] = max(0.0, min(1.0, 0.5 + emotion.valence * 0.3))

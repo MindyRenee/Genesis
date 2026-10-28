@@ -8379,7 +8379,7 @@ class FrontalLobe:
         emotion: EmotionalState,
         perception: Perception,
     ) -> list[float]:
-        """Build a 12-element emotional tag for memory storage.
+        """Build an emotional tag for memory storage.
 
         Delegates to the MemoryStore subsystem.
         """

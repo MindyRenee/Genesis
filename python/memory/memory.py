@@ -46,6 +46,7 @@ import numpy as np
 from thalamus.brain_waves import SleepStage
 
 from genesis_client import GenesisClient
+from genesis_client.protocol import EMOTIONAL_TAG_SIZE
 from genesis_client.swallow import note_swallowed
 from genesis_client.types import Episode, SimilarEpisode
 from infrastructure.config import MemoryConfig
@@ -163,7 +164,7 @@ class MemoryRecord:
         episode_id: The LTM episode ID (matches the Rust store).
         salience: Memory salience [0..1] — may be modified by
             reconsolidation.
-        emotional_tag: 12-chemical emotional snapshot (mutable —
+        emotional_tag: EMOTIONAL_TAG_SIZE-chemical emotional snapshot (mutable —
             reconsolidation can re-tag).
         encoded_at: When the memory was encoded (ms).
         last_accessed: When the memory was last recalled (ms).
@@ -199,7 +200,7 @@ class MemoryRecord:
 
     episode_id: int
     salience: float = 0.5
-    emotional_tag: list[float] = field(default_factory=lambda: [0.5] * 12)
+    emotional_tag: list[float] = field(default_factory=lambda: [0.5] * EMOTIONAL_TAG_SIZE)
     encoded_at: int = 0
     last_accessed: int = 0
     access_count: int = 0
@@ -433,7 +434,7 @@ class MemorySystem:
         # - ``network``: the shared concept network, used by priming
         #   and spreading activation to propagate to neighbours.
         # - ``get_emotion``: callback returning the current emotional
-        #   state (an EmotionalState or a 12-chemical vector), used
+        #   state (an EmotionalState or a chemical vector), used
         #   for emotional tagging and mood-congruent retrieval.
         self._network = network
         self._get_emotion = get_emotion
@@ -533,7 +534,7 @@ class MemorySystem:
         Args:
             text: The memory text content.
             salience: Memory salience [0..1].
-            emotional_tag: Advisory 12-chemical snapshot — the daemon
+            emotional_tag: Advisory chemical snapshot — the daemon
                 stamps the tag from its own live effective levels on
                 store, and the returned stamped tag is what the
                 MemoryRecord carries. Pass None when there is no
@@ -593,7 +594,7 @@ class MemorySystem:
             # Legacy daemon without the stamped-tag tail: the wire
             # carried all-zeros, so a live fetch is the closest
             # record of the body's chemistry at encode time.
-            emotional_tag = self.client.live_emotional_tag() or [0.0] * 12
+            emotional_tag = self.client.live_emotional_tag() or [0.0] * EMOTIONAL_TAG_SIZE
         if somatic is None and self.somatic_provider is not None:
             try:
                 somatic = self.somatic_provider()
@@ -875,7 +876,8 @@ class MemorySystem:
         if em_weights:
             total = sum(w for _, w in em_weights)
             if total > 0:
-                return [sum(tag[i] * w for tag, w in em_weights) / total for i in range(12)]
+                n = min(len(tag) for tag, _ in em_weights)
+                return [sum(tag[i] * w for tag, w in em_weights) / total for i in range(n)]
         return None
 
     def retrieve_episode(
@@ -1150,12 +1152,12 @@ class MemorySystem:
     # ═══════════════════════════════════════════════════════════════
 
     def _current_emotion_vector(self) -> list[float] | None:
-        """Return the current emotional state as a 12-chemical vector.
+        """Return the current emotional state as an emotional tag vector.
 
         Uses the ``get_emotion`` callback supplied at construction.
         The callback may return either an :class:`EmotionalState`
-        (whose ``chemicals`` dict is mapped to the 12-chemical order,
-        defaulting to 0.5 for missing chemicals) or a raw 12-element
+        (whose ``chemicals`` dict is mapped to the canonical chemical order,
+        defaulting to 0.5 for missing chemicals) or a raw vector
         list. Returns ``None`` if no callback is wired.
         """
         if self._get_emotion is None:
@@ -1169,12 +1171,12 @@ class MemorySystem:
             return None
         if isinstance(state, list):
             return list(state)
-        # EmotionalState — build a 12-vector from the chemicals dict.
+        # EmotionalState — build a tag vector from the chemicals dict.
         from genesis_client.protocol import CHEM_NAMES
 
-        vector = [0.5] * 12
+        vector = [0.5] * EMOTIONAL_TAG_SIZE
         chemicals = getattr(state, "chemicals", {}) or {}
-        for idx in range(12):
+        for idx in range(EMOTIONAL_TAG_SIZE):
             name = CHEM_NAMES.get(idx)
             if name is not None and name in chemicals:
                 vector[idx] = float(chemicals[name])
@@ -1463,7 +1465,7 @@ class MemorySystem:
         (lower is better); an emotional-congruence bonus is added on
         top.
 
-        If ``query_emotion`` is provided (a 12-chemical emotional tag
+        If ``query_emotion`` is provided (an emotional tag
         derived from the query's emotional memory associations), it is
         blended with the current mood to form the target emotional
         state for congruence scoring. This biases retrieval toward
@@ -1481,7 +1483,9 @@ class MemorySystem:
         # (0.6) because it reflects the emotional context of the
         # retrieval, not just the ambient mood.
         if current is not None and query_emotion is not None:
-            target = [0.4 * current[i] + 0.6 * query_emotion[i] for i in range(12)]
+            target = [
+                0.4 * c + 0.6 * q for c, q in zip(current, query_emotion, strict=False)
+            ]
         elif query_emotion is not None:
             target = query_emotion
         else:
@@ -1828,7 +1832,7 @@ class MemorySystem:
         processed = 0
         replayed = 0
         # Emotional memories are identified by high emotional
-        # variance in the 12-chemical tag.
+        # variance in the tag.
         for rec in list(self._records.values()):
             if rec.forgotten:
                 continue
@@ -2487,7 +2491,7 @@ class MemorySystem:
             rec = MemoryRecord(
                 episode_id=eid,
                 salience=float(entry.get("salience", 0.5)),
-                emotional_tag=list(entry.get("emotional_tag", [0.5] * 12)),
+                emotional_tag=list(entry.get("emotional_tag", [0.5] * EMOTIONAL_TAG_SIZE)),
                 encoded_at=int(entry.get("encoded_at", 0)),
                 last_accessed=int(entry.get("last_accessed", 0)),
                 access_count=int(entry.get("access_count", 0)),
@@ -2516,7 +2520,7 @@ class MemorySystem:
 
 
 def _emotional_intensity(tag: list[float]) -> float:
-    """Compute emotional intensity from a 12-chemical tag.
+    """Compute emotional intensity from an emotional tag.
 
     High variance and high arousal chemicals (cortisol, noradrenaline,
     dopamine) indicate an emotionally intense memory.

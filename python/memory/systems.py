@@ -26,6 +26,8 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from genesis_client.protocol import EMOTIONAL_TAG_SIZE
+
 if TYPE_CHECKING:  # pragma: no cover — import only for type checkers
     from temporal_lobe.concepts import ConceptNetwork
 
@@ -68,7 +70,7 @@ class EmotionalMemory:
 
     Attributes:
         stimulus: The neutral stimulus that acquired emotional salience.
-        emotional_tag: 12-dimensional emotional snapshot at encoding
+        emotional_tag: EMOTIONAL_TAG_SIZE-dimensional emotional snapshot at encoding
             (mirrors the neurochemical vector used by the daemon).
         association_strength: Strength of the stimulus→emotion link
             [0..1]. Built up during conditioning, reduced during
@@ -84,7 +86,7 @@ class EmotionalMemory:
     """
 
     stimulus: str
-    emotional_tag: list[float] = field(default_factory=lambda: [0.5] * 12)
+    emotional_tag: list[float] = field(default_factory=lambda: [0.5] * EMOTIONAL_TAG_SIZE)
     association_strength: float = 0.5
     extinction_level: float = 0.0
     is_extinct: bool = False
@@ -138,7 +140,7 @@ class EmotionalMemorySystem:
             neutral_stimulus: The stimulus to be conditioned.
             negative_emotion_strength: Strength of the negative emotion
                 [0..1]. Higher values produce stronger associations.
-            emotional_tag: Optional 12-chemical emotional snapshot. If
+            emotional_tag: Optional EMOTIONAL_TAG_SIZE-chemical emotional snapshot. If
                 omitted, a default negative-biased tag is used.
 
         Returns:
@@ -148,7 +150,7 @@ class EmotionalMemorySystem:
             # Default negative-biased tag: high cortisol, low serotonin.
             # Neurochemical indices match the Rust canonical ordering:
             # 0=Dopamine, 1=Serotonin, 6=Cortisol.
-            emotional_tag = [0.5] * 12
+            emotional_tag = [0.5] * EMOTIONAL_TAG_SIZE
             emotional_tag[6] = max(0.8, emotional_tag[6])  # cortisol
             emotional_tag[1] = min(0.2, emotional_tag[1])  # serotonin
 
@@ -227,7 +229,7 @@ class EmotionalMemorySystem:
 
         Args:
             stimulus: The stimulus to look up.
-            current_emotion: Optional 12-chemical current emotional
+            current_emotion: Optional EMOTIONAL_TAG_SIZE-chemical current emotional
                 snapshot. If provided and it matches the memory's tag,
                 retrieval priority is boosted.
 
@@ -263,7 +265,7 @@ class EmotionalMemorySystem:
 
 
 def _emotional_similarity(a: list[float], b: list[float]) -> float:
-    """Cosine similarity between two 12-chemical emotional vectors."""
+    """Cosine similarity between two emotional tag vectors."""
     n = min(len(a), len(b))
     if n == 0:
         return 0.0

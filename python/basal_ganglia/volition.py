@@ -20,7 +20,7 @@ from frontal_lobe.canvas import DrawingResult
 from frontal_lobe.volition import Urge, Volition
 from tools.project_creator import create_project, manage_project_lifecycle
 
-from genesis_client.protocol import CHEM_NAMES, MODULE_METACOGNITION
+from genesis_client.protocol import CHEM_NAMES, EMOTIONAL_TAG_SIZE, MODULE_METACOGNITION
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
 from infrastructure.journal import record_error
@@ -1374,7 +1374,7 @@ class VolitionMixin:
     def _store_drawing_event(self, result: DrawingResult) -> None:
         """Store a drawing as an STM event for later reflection.
 
-        The STM tag is the 12 v2 effective levels in NeurochemicalId
+        The STM tag is the effective levels in NeurochemicalId
         order — how she was feeling while she made it. That is memory
         context, not a control signal: the drawing itself was hers.
         """
@@ -1383,7 +1383,7 @@ class VolitionMixin:
         except Exception:  # noqa: BLE001
             chem = {}
         try:
-            tag = [float(chem.get(CHEM_NAMES[i], 0.0)) for i in range(12)]
+            tag = [float(chem.get(CHEM_NAMES[i], 0.0)) for i in range(EMOTIONAL_TAG_SIZE)]
             self.client.store_event(
                 timestamp=int(time.time() * 1000),
                 event_type=1,  # Output
@@ -1497,7 +1497,7 @@ class VolitionMixin:
         """
         try:
             chem = self.client.get_state()
-            tag = [float(chem.chemicals.get(CHEM_NAMES[i], 0.0)) for i in range(12)]
+            tag = [float(chem.chemicals.get(CHEM_NAMES[i], 0.0)) for i in range(EMOTIONAL_TAG_SIZE)]
             summary = (
                 f"Created project '{result.name}' "
                 f"({result.files_created} files, "

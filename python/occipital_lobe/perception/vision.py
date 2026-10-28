@@ -71,6 +71,7 @@ from genesis_client.protocol import (
     CHEM_DOPAMINE,
     CHEM_NOREPINEPHRINE,
     CHEM_OXYTOCIN,
+    EMOTIONAL_TAG_SIZE,
 )
 from genesis_client.swallow import note_swallowed
 
@@ -1501,8 +1502,8 @@ def _store_vision_event(client, emotion: EmotionalState, desc: str, salience: fl
 
 
 def _emotional_tag(emotion: EmotionalState) -> list[float]:
-    """Build a 12-element neurochemical tag from an EmotionalState."""
-    tag = [0.5] * 12
+    """Build a neurochemical tag from an EmotionalState."""
+    tag = [0.5] * EMOTIONAL_TAG_SIZE
     # Dopamine (0)
     tag[0] = max(0.0, min(1.0, 0.5 + emotion.valence * 0.3))
     # Serotonin (1)

@@ -17,7 +17,7 @@ from tools.project_creator import (
 )
 from tools.project_creator import restore_project as _restore_project
 
-from genesis_client.protocol import CHEM_NAMES
+from genesis_client.protocol import CHEM_NAMES, EMOTIONAL_TAG_SIZE
 from genesis_client.swallow import note_swallowed
 
 logger = logging.getLogger(__name__)
@@ -176,7 +176,10 @@ class ProjectsMixin:
             # significant learning event, not a transient one.
             try:
                 chem = self.client.get_state()
-                tag = [float(chem.chemicals.get(CHEM_NAMES[i], 0.0)) for i in range(12)]
+                tag = [
+                    float(chem.chemicals.get(CHEM_NAMES[i], 0.0))
+                    for i in range(EMOTIONAL_TAG_SIZE)
+                ]
                 self.memory.store_memory(
                     text=f"Mentor notes on project '{pname}': {notes[:500]}",
                     salience=0.9,
