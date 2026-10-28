@@ -540,6 +540,39 @@ class Mind(
         # Mind. No age, no regime: plasticity stays available for life.
         self.memory.somatic_provider = self._current_somatic_dict
 
+        # Psychoanalysis — the analytic engine. It reads the emotional
+        # memory's amygdala charge against the concept network's
+        # access to keep the repression register, interprets dreams
+        # back to their latent content at wake, and traces the return
+        # of the repressed in her stream. The drive map is a callable
+        # so the wish-fulfilment read follows live state.
+        from self.psychoanalysis import Psychoanalysis
+
+        self.psychoanalysis = Psychoanalysis(
+            network=self.brain.frontal.network,
+            emotional_memory=self.memory.emotional_memory,
+            get_drives=self._analysis_drives,
+        )
+
+    def _analysis_drives(self) -> dict[str, float]:
+        """Unmet-drive map for the analytic engine's wish read.
+
+        Keys are what the drive is *of* — the engine resolves each
+        through the concept network, so a drive with no concept yet
+        contributes nothing rather than fabricating a wish.
+        """
+        drives: dict[str, float] = {}
+        try:
+            drives["social"] = float(self.world.social_isolation())
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            for name, urge in self.volition.urges.items():
+                drives[name] = float(getattr(urge, "value", 0.0))
+        except Exception:  # noqa: BLE001
+            pass
+        return drives
+
     def _on_v1_gamma(self, gamma_power: float) -> None:
         """Handle V1 gamma power updates from the occipital subsystem.
 

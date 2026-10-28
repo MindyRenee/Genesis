@@ -107,6 +107,10 @@ _EXPORTS = {
     "somatic_congruence": "insula.somatic",
     # self.proposals — metacognitive self-improvement proposals
     "ProposalsMixin": "self.proposals",
+    # self.psychoanalysis — the unconscious that works while she rests
+    "DreamInterpretation": "self.psychoanalysis",
+    "Psychoanalysis": "self.psychoanalysis",
+    "RepressedTrace": "self.psychoanalysis",
 }
 
 __all__ = sorted(_EXPORTS)

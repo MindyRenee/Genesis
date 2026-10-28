@@ -3549,6 +3549,9 @@ def _broadcast_holder(**overrides):
             holder.world.channel = value
         else:
             setattr(holder, key, value)
+    # The rest gate reads is_resting — the stand-in derives it from
+    # the same flags SleepMixin would (overrides applied first).
+    holder.is_resting = bool(holder._is_sleeping or holder._is_meditating)
     return holder, posts, said, network, composer, emitted
 
 

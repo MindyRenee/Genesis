@@ -28,6 +28,7 @@ from genesis_client.protocol import (
 )
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
+from infrastructure.journal import record_event
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -304,7 +305,10 @@ class ConversationMixin:
         """
         if not text:
             return
-        if self._is_sleeping and not self.is_hypnagogic:
+        # Rest queuing rule — meditation banks nothing at all; sleep
+        # banks nothing except through N1/hypnagogia, where she still
+        # answers from inside the state without being roused.
+        if self._is_meditating or (self._is_sleeping and not self.is_hypnagogic):
             return
         with self._speech_queue_lock:
             if text in self._speech_queue:
@@ -398,6 +402,24 @@ class ConversationMixin:
             thought.content[:100],
             weight=0.2,
         )
+
+        # The return of the repressed — a registered complex surfacing
+        # in the stream is a slip; the analytic engine counts it and
+        # relieves a little of the pressure it surfaced under.
+        psychoanalysis = getattr(self, "psychoanalysis", None)
+        if psychoanalysis is not None:
+            try:
+                slipped = psychoanalysis.note_surfaced(getattr(thought, "topics", None) or ())
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.conversation._on_spontaneous_thought", e)
+            else:
+                if slipped:
+                    record_event(
+                        "return_of_repressed",
+                        "Registered complexes surfaced in the stream",
+                        slipped=slipped,
+                        stream=kind,
+                    )
 
     def _on_world_event(self, event: ExternalEvent) -> None:
         """Route an external world event into its cognition.
@@ -1074,7 +1096,7 @@ class ConversationMixin:
         because conversation-time self-invocation is a different trigger
         (social context) than autonomous volition (idle accumulation).
         """
-        if self._is_sleeping or self._is_meditating:
+        if self.is_resting:
             return
         # Cooldown — don't self-invoke from conversation more than
         # once per 60 seconds, even if multiple turns happen rapidly.
@@ -1166,7 +1188,9 @@ class ConversationMixin:
                 # /teach-questions.
                 self.exit_question_mode()
                 return
-            self._suppress_volition = False
+            # Volition stays held through the hypnagogic descent —
+            # the falling edge releases it along with the learners.
+            self._suppress_volition = self.is_hypnagogic
             self.inner_life.resume()
         else:
             self._defer(
@@ -1198,6 +1222,15 @@ class ConversationMixin:
         # Deferred resume timer firing during teardown — the pauses
         # it would lift belong to threads already joined.
         if self._stop_latched:
+            return
+        if self.is_hypnagogic:
+            # Mid-descent — the rest hold stands: the learners and
+            # volition stay paused until the descent resolves (into
+            # sleep, or back to waking where the falling edge routes
+            # through this same method). Inner life resumes — it owns
+            # the descent itself.
+            self._suppress_volition = True
+            self.inner_life.resume()
             return
         self.learner.resume()
         self.brain.frontal.self_learner.resume()

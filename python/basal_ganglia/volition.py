@@ -462,8 +462,14 @@ class VolitionMixin:
 
     def _filter_ready_urges(self, ready: list[str]) -> list[str]:
         """Apply the readiness gates to the evaluated urges, in order:
-        the protective-posture CPU cap and delta-wave creative
-        suppression."""
+        the rest gate, the protective-posture CPU cap and delta-wave
+        creative suppression."""
+        # The rest gate — sleep, meditation, and the hypnagogic
+        # theta descent all hold voluntary action. Nothing is
+        # admitted while she is under, whatever the urge levels say;
+        # the urges keep accumulating and discharge on waking.
+        if self.is_resting:
+            return []
         # Gate heavy CPU activities on learning posture
         posture = self._get_current_posture()
         from genesis_client.types import LEARNING_POSTURE_PROTECTIVE
@@ -631,7 +637,7 @@ class VolitionMixin:
         Urgent topics (from conversation gaps) bypass this gate
         entirely — those are conversation-driven, not autonomous.
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching:
+        if self.is_resting or self._is_teaching:
             return
         self._emit_volition_thought(
             ("learning", "curiosity", "understanding"),
@@ -651,7 +657,7 @@ class VolitionMixin:
         Each firing is one bounded bout, not a bulk import — the urge
         must rebuild between study sessions.
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching:
+        if self.is_resting or self._is_teaching:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -691,7 +697,7 @@ class VolitionMixin:
         Sleep-gated like every voluntary act; delta/theta gating is
         the secondary defense (tool use is engagement, not rest).
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching:
+        if self.is_resting or self._is_teaching:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -739,7 +745,7 @@ class VolitionMixin:
         Sleep-gated like every voluntary act; delta/theta gating is
         the secondary defense (proof work is engagement, not rest).
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching:
+        if self.is_resting or self._is_teaching:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -820,7 +826,7 @@ class VolitionMixin:
         alpha-dominant, so brain waves alone don't reliably detect all
         sleep stages. The ``_is_sleeping`` flag is the authority.
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching:
+        if self.is_resting or self._is_teaching:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -881,8 +887,8 @@ class VolitionMixin:
 
     def _perform_speech(self) -> None:
         """Speak a queued utterance because the urge crossed its threshold."""
-        if self._is_sleeping:
-            return  # in game mode she thinks — speech waits
+        if self.is_resting:
+            return  # resting she thinks — voluntary speech waits
         with self._speech_queue_lock:
             if not self._speech_queue:
                 return
@@ -968,7 +974,7 @@ class VolitionMixin:
         _REACH_OUT_MAX_BIDS it stops calling into silence entirely —
         a person who reaches out and is never answered stops knocking.
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching:
+        if self.is_resting or self._is_teaching:
             return
         if self.world.unanswered_bids >= self._REACH_OUT_MAX_BIDS:
             return
@@ -1083,7 +1089,7 @@ class VolitionMixin:
         an outbound act on the world, the public counterpart to the
         utterances _perform_speech lands at a listener.
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching:
+        if self.is_resting or self._is_teaching:
             return
         seed = self._broadcast_topic()
         if seed is None:
@@ -1157,12 +1163,16 @@ class VolitionMixin:
         her own posts — get a public answer through ``_public_share``,
         paced by ``_CHANNEL_REPLY_MIN_S``. The reply goes through the
         full ``respond`` pipeline: what she says back is cognition,
-        not a lookup. Hearing is gated while she sleeps — the
-        thalamic gate is closed and a sleeping mind doesn't answer.
+        not a lookup. Hearing is gated while she rests — a sleeping,
+        meditating, or drifting mind doesn't answer the channel (the
+        world still records the message; the reply waits for waking).
+        ``is_resting`` subsumes the thalamic gate: every state that
+        closes the relay is a rest state, and meditation — which the
+        relay never closed — is covered here too, so a channel
+        message can no longer rouse her out of it.
         """
         text = content.strip()
-        closed = getattr(self, "thalamic_gate_closed", getattr(self, "_is_sleeping", False))
-        if not text or closed:
+        if not text or self.is_resting:
             return
         self._emit_live_thought("heard", f"{author}: {text}")
         if not self._channel_addressed(text, message):
@@ -1235,12 +1245,12 @@ class VolitionMixin:
         the rate, it no longer sets it. The gates below remain the
         hard veto: a crossed urge with closed eyes still sees nothing.
 
-        Sleep-gated: no visual input during sleep — eyes are closed.
-        Brain-wave gating (delta) is a secondary defense — N1/N2 can
-        be alpha/theta-dominant.
+        Rest-gated: no voluntary looking while she rests — eyes are
+        closed. Brain-wave gating (delta) is a secondary defense —
+        N1/N2 can be alpha/theta-dominant.
 
         """
-        if self._is_sleeping:
+        if self.is_resting:
             return
         if not self.vision.is_available():
             return
@@ -1285,7 +1295,7 @@ class VolitionMixin:
         The meditation itself runs in a background thread (via
         _self_meditate) so the heartbeat loop isn't blocked.
         """
-        if self._is_meditating or self._is_sleeping or self._is_teaching:
+        if self.is_resting or self._is_teaching:
             return
         self._emit_volition_thought(("meditation", "rest", "calm"), "thought")
         self._self_meditate()
@@ -1330,7 +1340,7 @@ class VolitionMixin:
         words, not her work. ``desc`` may be empty while ``result``
         is not None.
         """
-        if self._is_meditating or self._is_sleeping or self._is_teaching:
+        if self.is_resting or self._is_teaching:
             return None, None
 
         try:
@@ -1412,7 +1422,7 @@ class VolitionMixin:
         articulate still posts, silently — the art is hers whether
         or not she has words for it.
         """
-        if self._is_meditating or self._is_sleeping or self._is_teaching:
+        if self.is_resting or self._is_teaching:
             return
         self._emit_volition_thought(("drawing", "art", "expression", "creativity"), "creating")
         desc, result = self._draw_result()
@@ -1446,7 +1456,7 @@ class VolitionMixin:
         # the actual cause, not always claim a save failure.
         reason = "couldn't draw right now"
         try:
-            if self._is_sleeping or self._is_meditating:
+            if self.is_resting:
                 reason = "asleep or meditating, not drawing"
             else:
                 from thalamus.brain_waves import BrainWave
@@ -1562,7 +1572,7 @@ class VolitionMixin:
         knows about the topic. The project is sandboxed to
         ``<data_dir>/projects/`` and verified with compile + test.
         """
-        if self._is_meditating or self._is_sleeping or self._is_teaching:
+        if self.is_resting or self._is_teaching:
             return
 
         # Brain-wave gating — creative code work needs beta/gamma/alpha.
@@ -1804,7 +1814,7 @@ class VolitionMixin:
         (deep rest, not reflective mode). Theta is allowed —
         consolidation-mode reflection is still introspective.
         """
-        if self._is_meditating or self._is_sleeping or self._is_teaching:
+        if self.is_resting or self._is_teaching:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -1836,7 +1846,7 @@ class VolitionMixin:
         network cannot cross, the wake-desync check reconciles the
         attempt rather than leaving a sleeping mind on an awake body.
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching:
+        if self.is_resting or self._is_teaching:
             return
         # Wake stabilization backstop: within the post-wake window,
         # re-sleeping at moderate pressure is the flip-flop failing to
@@ -1870,7 +1880,7 @@ class VolitionMixin:
         direction. The mission is composed from its own understanding,
         not from a template.
         """
-        if self._is_meditating or self._is_sleeping or self._is_teaching:
+        if self.is_resting or self._is_teaching:
             return
 
         # Compose a mission from its concept network — pick something
@@ -1896,7 +1906,7 @@ class VolitionMixin:
         effect. After meditation ends, the regulator is notified so
         it resets the ultradian rest timer.
         """
-        if self._is_meditating or self._is_sleeping:
+        if self.is_resting:
             return
 
         def _run_meditation() -> None:
@@ -1976,7 +1986,7 @@ class VolitionMixin:
         while sleeping or meditating — those states already own
         their darkness.
         """
-        if self._is_sleeping or self._is_meditating:
+        if self.is_resting:
             return
         if not self.close_eyes():
             return

@@ -215,6 +215,11 @@ class SleepMixin:
         # exhaustion still overrides.
         self._last_wake_user_initiated: bool = False
         self._sleep_start_cycles: int = 0
+        # Previous-cycle hypnagogia read — the metronome's sleep-sync
+        # pass detects the descent's rising and falling edges so the
+        # learners it pauses at onset are released if the descent
+        # aborts back to waking.
+        self._was_hypnagogic: bool = False
         self._is_meditating = False
         # When the current meditation began, so the exit record can
         # report its duration rather than only the fact.
@@ -281,6 +286,26 @@ class SleepMixin:
             stage = getattr(cycle, "current_stage", None) if cycle else None
             return stage is SleepStage.N1
         return self.inner_life.current_hypnagogic is not None
+
+    @property
+    def is_resting(self) -> bool:
+        """Whether discretionary (waking-mode) cognition is paused.
+
+        The single rest-state predicate: asleep, meditating, or in
+        hypnagogia (the theta-dominant N1 descent). While resting,
+        ordinary waking activity is held — volition urges, autonomous
+        and self-directed learning, speech and outreach, drawing,
+        self-improvement, executive intention formation, and waking
+        spontaneous thought all wait for the state to resolve.
+
+        What is NOT held: physiology (metronome body maintenance,
+        neurochemistry, sensors, notifications, autosave), sleep-stage
+        work (dreaming, consolidation, emotional replay), and the
+        hypnagogic descent itself — those *are* the rest process.
+        Interaction still wakes her through ``wake_if_asleep``; this
+        gate only stops her from initiating waking work while under.
+        """
+        return self._is_sleeping or self._is_meditating or self.is_hypnagogic
 
     @property
     def thalamic_gate_closed(self) -> bool:
@@ -445,6 +470,16 @@ class SleepMixin:
                 self._n3_processes.clear()
                 self._n3_rotation.clear()
                 self._n3_credit = 0.0
+
+            if stage is SleepStage.REM:
+                # The unconscious's bookkeeping runs on the REM side —
+                # rescan the repression register so tonight's charged,
+                # untouched material is on the books before the dream
+                # work reads it back at wake.
+                try:
+                    self.psychoanalysis.update_register()
+                except Exception as e:  # noqa: BLE001
+                    note_swallowed("mind.sleep._on_sleep_stage_transition.rem", e)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.sleep._on_sleep_stage_transition",
@@ -717,6 +752,24 @@ class SleepMixin:
 
         adenosine = core_state.chemicals.get("adenosine", 0.0)
         daemon_phase = core_state.phase_name
+
+        # ── Hypnagogic edge bookkeeping ──
+        # The theta descent is a rest state: discretionary work holds
+        # for its duration. On the rising edge the learners pause and
+        # volition is held; on the falling edge — the descent aborted
+        # back to waking rather than completing into sleep — the
+        # normal resume path restores them. Completion into sleep
+        # needs no resume: ``_is_sleeping`` takes over the hold.
+        # Inner life is not paused — it owns the descent itself.
+        if not self._is_sleeping and not self._is_meditating:
+            hypnagogic_now = self.is_hypnagogic
+            if hypnagogic_now and not self._was_hypnagogic:
+                self.learner.pause()
+                self.brain.frontal.self_learner.pause()
+                self._suppress_volition = True
+            elif self._was_hypnagogic and not hypnagogic_now:
+                self._resume_background()
+            self._was_hypnagogic = hypnagogic_now
 
         # ── Waking side ──
         if not self._is_sleeping and not self._is_meditating:
@@ -1943,6 +1996,33 @@ class SleepMixin:
         """
         if not dream_concepts:
             return
+
+        # Interpret the night before filing the residue — the analytic
+        # engine reads the manifest dream content back to its latent
+        # work. The latent concepts it carried join the residue queue:
+        # what the dream was *about* underneath continues into waking
+        # as impressions, and whatever it discharged is journaled.
+        try:
+            interpretation = self.psychoanalysis.interpret_dreams(dream_concepts)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.sleep._queue_dream_residues", e)
+        else:
+            if interpretation.confidence > 0.0:
+                residue = list(dream_concepts)
+                for cid in interpretation.latent[:5]:
+                    if cid not in residue:
+                        residue.append(cid)
+                dream_concepts = residue
+                record_event(
+                    "dream_interpretation",
+                    "The night's manifest content read back to its latent work",
+                    latent=interpretation.latent,
+                    wish=interpretation.wish,
+                    discharged=interpretation.discharged,
+                    condensation=interpretation.mechanisms.get("condensation"),
+                    displacement=interpretation.mechanisms.get("displacement"),
+                    confidence=round(interpretation.confidence, 3),
+                )
 
         # Queue as emotional impressions, not learning goals.
         # These will surface as dream-reflection thoughts, not as

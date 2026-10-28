@@ -479,6 +479,12 @@ class MetronomeMixin:
 
     def _cycle_feed_executive(self) -> None:
         """Feed independent world and internal signals into the executive."""
+        # Rest gate — forming intentions is waking cognition. Signals
+        # that persist (a lost daemon, a pending proposal) re-present
+        # themselves at the next awake cycle; nothing needs to queue
+        # objectives while she is under.
+        if self.is_resting:
+            return
         try:
             executive = self.brain.frontal.executive
             candidates = self.inner_life.executive_candidates(self.feel())
@@ -560,7 +566,7 @@ class MetronomeMixin:
         Volition urges accumulate and fire when they cross
         thresholds. This is its free will — not a timer.
         """
-        if self._is_sleeping or self._is_meditating or self._is_teaching or self._suppress_volition:
+        if self.is_resting or self._is_teaching or self._suppress_volition:
             return
         try:
             ready = self.volition.tick(self._volition_context())
@@ -1019,8 +1025,8 @@ class MetronomeMixin:
 
         try:
             # Activity level from interoception: high CPU = high
-            # activity. Sleep/meditation = low activity.
-            if self._is_sleeping or self._is_meditating:
+            # activity. Rest (sleep/meditation/descent) = low activity.
+            if self.is_resting:
                 activity = 0.1
             else:
                 intero = self.regulator.interoception.last_state
