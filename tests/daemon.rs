@@ -325,7 +325,7 @@ fn test_association_finds_similar_memories() {
             make_emotional_tag(),
             [0.4, 0.3, 0.2, 0.5],
             0,
-            0,
+            4,
             "Great Salt Lake water levels are declining",
         )
         .expect("store");
@@ -336,7 +336,7 @@ fn test_association_finds_similar_memories() {
             make_emotional_tag(),
             [0.4, 0.3, 0.2, 0.5],
             0,
-            0,
+            4,
             "Data centers consume water for cooling",
         )
         .expect("store");
@@ -347,7 +347,7 @@ fn test_association_finds_similar_memories() {
             make_emotional_tag(),
             [0.4, 0.3, 0.2, 0.5],
             0,
-            0,
+            4,
             "Great Salt Lake conservation needs attention",
         )
         .expect("store");
@@ -378,7 +378,7 @@ fn test_association_creates_meta_memories() {
             make_emotional_tag(),
             [0.4, 0.3, 0.2, 0.5],
             0,
-            0,
+            4,
             "Great Salt Lake water crisis",
         )
         .expect("store");
@@ -389,7 +389,7 @@ fn test_association_creates_meta_memories() {
             make_emotional_tag(),
             [0.4, 0.3, 0.2, 0.5],
             0,
-            0,
+            4,
             "Great Salt Lake drying up",
         )
         .expect("store");
@@ -418,7 +418,7 @@ fn test_dreaming_runs_with_memories() {
                 make_emotional_tag(),
                 [0.4, 0.3, 0.2, 0.5],
                 0,
-                0,
+                4,
                 &format!("Memory episode number {i} about various topics"),
             )
             .expect("store");
@@ -452,7 +452,7 @@ fn test_dream_insight_embeds_episode_text() {
             make_emotional_tag(),
             [0.4, 0.3, 0.2, 0.5],
             0,
-            0,
+            4,
             "Learning about quantum entanglement physics",
         )
         .expect("store");
@@ -463,7 +463,7 @@ fn test_dream_insight_embeds_episode_text() {
             make_emotional_tag(),
             [0.4, 0.3, 0.2, 0.5],
             0,
-            0,
+            4,
             "Learning about classical mechanics motion",
         )
         .expect("store");
@@ -476,7 +476,7 @@ fn test_dream_insight_embeds_episode_text() {
                 make_emotional_tag(),
                 [0.4, 0.3, 0.2, 0.5],
                 0,
-                0,
+                4,
                 &format!("Physics topic number {i} about energy and momentum"),
             )
             .expect("store");
@@ -532,7 +532,7 @@ fn test_association_embeds_episode_text() {
             make_emotional_tag(),
             [0.4, 0.3, 0.2, 0.5],
             0,
-            0,
+            4,
             "Great Salt Lake water crisis",
         )
         .expect("store");
@@ -543,7 +543,7 @@ fn test_association_embeds_episode_text() {
             make_emotional_tag(),
             [0.4, 0.3, 0.2, 0.5],
             0,
-            0,
+            4,
             "Great Salt Lake drying up",
         )
         .expect("store");
@@ -592,6 +592,143 @@ fn test_association_embeds_episode_text() {
             parts[2]
         );
     }
+}
+
+#[test]
+fn test_association_floor_rejects_near_duplicates() {
+    let mut sys = TestSystem::new("assoc_floor", 16, 64);
+
+    // The flood mechanism: identical texts SimHash to the same
+    // fingerprint (distance 0), and each pass used to bridge every
+    // one of them to up to 20 others. The distance floor makes
+    // near-duplicates connectionless — bridging identical memories
+    // is duplicate detection, not association.
+    let a = sys
+        .ltm
+        .store(
+            0,
+            0.5,
+            make_emotional_tag(),
+            [0.4, 0.3, 0.2, 0.5],
+            0,
+            4,
+            "Resistance is rising",
+        )
+        .expect("store");
+    let b = sys
+        .ltm
+        .store(
+            0,
+            0.5,
+            make_emotional_tag(),
+            [0.4, 0.3, 0.2, 0.5],
+            0,
+            4,
+            "Resistance is rising",
+        )
+        .expect("store");
+
+    let result = AssociationEngine::associate(&mut sys.ltm, &[a, b], 5000);
+    assert_eq!(
+        result.new_associations, 0,
+        "identical texts must not bridge — distance 0 is below the floor"
+    );
+    assert_eq!(sys.ltm.count(), 2, "no meta-memories should be stored");
+}
+
+#[test]
+fn test_association_dedup_spans_whole_store() {
+    let mut sys = TestSystem::new("assoc_dedup", 16, 64);
+
+    let a = sys
+        .ltm
+        .store(
+            0,
+            0.5,
+            make_emotional_tag(),
+            [0.4, 0.3, 0.2, 0.5],
+            0,
+            4,
+            "Great Salt Lake water crisis",
+        )
+        .expect("store");
+    let b = sys
+        .ltm
+        .store(
+            0,
+            0.5,
+            make_emotional_tag(),
+            [0.4, 0.3, 0.2, 0.5],
+            0,
+            4,
+            "Great Salt Lake drying up",
+        )
+        .expect("store");
+
+    let first = AssociationEngine::associate(&mut sys.ltm, &[a, b], 5000);
+    assert_eq!(first.new_associations, 1, "the pair bridges exactly once");
+    assert_eq!(first.duplicates, 1, "reverse direction dedups in-pass");
+
+    // Every later pass — same pair, either direction, arbitrarily far
+    // from the bridge in the index — must find the existing bridge.
+    // The old check scanned only the last ~200 episodes, which the
+    // flood's own write rate outran.
+    let second = AssociationEngine::associate(&mut sys.ltm, &[a, b], 6000);
+    assert_eq!(second.new_associations, 0);
+    assert_eq!(second.duplicates, 2);
+    let third = AssociationEngine::associate(&mut sys.ltm, &[b, a], 7000);
+    assert_eq!(
+        third.new_associations, 0,
+        "normalized pair dedups in both directions"
+    );
+}
+
+#[test]
+fn test_find_associations_ignores_meta_memories() {
+    let mut sys = TestSystem::new("assoc_meta_skip", 16, 64);
+
+    let a = sys
+        .ltm
+        .store(
+            0,
+            0.5,
+            make_emotional_tag(),
+            [0.4, 0.3, 0.2, 0.5],
+            0,
+            4,
+            "Great Salt Lake water crisis",
+        )
+        .expect("store");
+    let b = sys
+        .ltm
+        .store(
+            0,
+            0.5,
+            make_emotional_tag(),
+            [0.4, 0.3, 0.2, 0.5],
+            0,
+            4,
+            "Great Salt Lake drying up",
+        )
+        .expect("store");
+
+    AssociationEngine::associate(&mut sys.ltm, &[a, b], 5000);
+    assert_eq!(sys.ltm.count(), 3, "2 real episodes + 1 bridge");
+
+    // Querying with the bridge's own hash must never surface another
+    // meta-memory — bookkeeping cannot anchor or source associations.
+    // That exclusion is what stops bridge-to-bridge chaining.
+    let bridge_slot = 2usize;
+    let bridge_hash = sys
+        .ltm
+        .index_entry_ref(bridge_slot)
+        .expect("bridge slot")
+        .association_hash;
+    let assocs = AssociationEngine::find_associations(&sys.ltm, bridge_hash, 10);
+    assert!(
+        assocs.iter().all(|(id, _)| !sys.ltm.is_meta_episode(*id)),
+        "meta-memories must never appear as association candidates"
+    );
 }
 
 // ─── Tick loop ────────────────────────────────────────────────

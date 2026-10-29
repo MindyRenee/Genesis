@@ -1582,3 +1582,134 @@ fn test_delete_removes_from_archived_tier() {
     assert!(store.retrieve(id).is_err(), "deleted payload unreachable");
     cleanup(&base);
 }
+
+// ─── Empty payload rejection ──────────────────────────────────
+
+#[test]
+fn test_store_rejects_empty_text() {
+    let base = temp_base("empty_text");
+    let mut store = LtmStore::create(&base, 64).expect("create");
+
+    // Empty and whitespace-only texts are noise, not memories — an
+    // empty text's SimHash degenerates to 0, which made every empty
+    // episode "associated" with every other at distance 0. That was
+    // the seed of the bridge flood.
+    assert!(matches!(
+        store.store(0, 0.5, make_full_tag(), make_compact_tag(), 0, 4, ""),
+        Err(LtmError::EmptyPayload)
+    ));
+    assert!(matches!(
+        store.store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "   \t\n  "
+        ),
+        Err(LtmError::EmptyPayload)
+    ));
+
+    // A rejected store burns no episode ID and adds nothing.
+    assert_eq!(store.count(), 0);
+    assert!(store.active_episode_ids().is_empty());
+
+    // A real episode still stores fine.
+    let id = store
+        .store(0, 0.5, make_full_tag(), make_compact_tag(), 0, 4, "real")
+        .expect("non-empty stores");
+    assert_eq!(store.count(), 1);
+    assert_eq!(store.retrieve(id).expect("retrieve").text, "real");
+
+    drop(store);
+    cleanup(&base);
+}
+
+// ─── Bulk archive ─────────────────────────────────────────────
+
+#[test]
+fn test_archive_many() {
+    let base = temp_base("archive_many");
+    let mut store = LtmStore::create(&base, 64).expect("create");
+
+    let mut ids = Vec::new();
+    for i in 0..5u64 {
+        ids.push(
+            store
+                .store(
+                    i,
+                    0.5,
+                    make_full_tag(),
+                    make_compact_tag(),
+                    0,
+                    0,
+                    &format!("episode {i}"),
+                )
+                .expect("store"),
+        );
+    }
+    assert_eq!(store.count(), 5);
+
+    // Batch archive — unknown, duplicate, and re-archived IDs skipped.
+    let n = store
+        .archive_many(&[ids[0], ids[2], ids[4], 999_999, ids[2]])
+        .expect("archive_many");
+    assert_eq!(n, 3);
+    assert_eq!(store.count(), 2);
+
+    // Archived payloads remain retrievable by ID — lineage, not
+    // amputation.
+    assert_eq!(store.retrieve(ids[0]).expect("archived").text, "episode 0");
+    assert_eq!(store.retrieve(ids[4]).expect("archived").text, "episode 4");
+    assert_eq!(store.retrieve(ids[1]).expect("live").text, "episode 1");
+
+    // Re-archiving is a no-op.
+    assert_eq!(store.archive_many(&[ids[0]]).expect("no-op"), 0);
+    assert_eq!(store.count(), 2);
+
+    drop(store);
+    cleanup(&base);
+}
+
+// ─── Meta-memory dedup index ──────────────────────────────────
+
+#[test]
+fn test_meta_hash_known_survives_reopen() {
+    let base = temp_base("meta_hash");
+    let mut store = LtmStore::create(&base, 64).expect("create");
+
+    let text = "[association] episode 1 \u{2194} episode 2 (distance: 9)\ta\tb";
+    let fingerprint = simhash(text);
+    assert!(!store.meta_hash_known(fingerprint));
+
+    let id = store
+        .store_meta(0, 0.5, make_full_tag(), make_compact_tag(), 2, 0, text)
+        .expect("store_meta");
+    assert!(store.meta_hash_known(fingerprint));
+    assert!(store.is_meta_episode(id));
+
+    // A real episode is not meta.
+    let real = store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "real memory",
+        )
+        .expect("store");
+    assert!(!store.is_meta_episode(real));
+
+    drop(store);
+
+    // The dedup index is rebuilt from active meta entries on open —
+    // dedup survives restarts.
+    let reopened = LtmStore::open(&base).expect("open");
+    assert!(reopened.meta_hash_known(fingerprint));
+
+    drop(reopened);
+    cleanup(&base);
+}

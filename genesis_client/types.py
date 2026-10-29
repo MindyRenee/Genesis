@@ -2405,8 +2405,10 @@ class FieldState:
     Parsed from the daemon's ``GET_INTERNALS`` map (``field.*``
     keys). The body runs this field itself (src/field/): the fibers
     — body, prediction, agency — each project their measured state
-    into a shared 6-D latent space on a Poincaré ball, and the
-    integration pulls them toward their Fréchet barycenter.
+    into a shared 6-D latent space on a stereographic sphere
+    (positive curvature; they live inside the hemisphere cap around
+    the pole), and the integration pulls them toward their Fréchet
+    barycenter.
 
     ``consensus`` is that barycenter — the "where the organism sits"
     coordinate. ``disagreement`` is the Fréchet variance about it —
@@ -2415,7 +2417,7 @@ class FieldState:
     state — disagreement plus the physical bath (the silicon's own
     measured timing fluctuation), cooling at its own rate.
     ``consensus_norm`` is ‖consensus‖ — how far the center has
-    drifted from nominal (the ball's origin).
+    drifted from nominal (the sphere's pole).
     """
 
     consensus: tuple[float, ...]

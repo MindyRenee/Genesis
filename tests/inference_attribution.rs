@@ -16,16 +16,18 @@
 //!
 //! | chemical | genetic | chemistry only | + inference | daemon rest |
 //! |---|---|---|---|---|
-//! | dopamine    | 0.350 | 0.288 | 0.238 | ~0.25 |
-//! | serotonin   | 0.400 | 0.398 | 0.304 | 0.304 |
-//! | GABA        | 0.500 | 0.471 | 0.337 | 0.337 |
-//! | glutamate   | 0.600 | 0.553 | 0.356 | 0.356 |
+//! | dopamine    | 0.350 | 0.298 | 0.298 | ~0.25 |
+//! | serotonin   | 0.400 | 0.365 | 0.365 | 0.304 |
+//! | GABA        | 0.500 | 0.396 | 0.396 | 0.337 |
+//! | glutamate   | 0.600 | 0.591 | 0.591 | 0.356 |
 //!
-//! Without the inference layer the chemistry sits essentially on its
-//! defaults (worst deviation 0.047). With it, four chemicals are pushed
-//! 0.05-0.20 further down. So the depression is not a property of the
-//! neurochemical dynamics or of the coupling matrix — it comes from the
-//! cognitive layer's feedback into the substrate.
+//! Without the inference layer the chemistry sits below its defaults
+//! by designed amounts — acetylcholine sags ~0.12 through the basal
+//! forebrain's A1 suppression as Process S builds (`eval/drift.py`
+//! gives it a 0.22 state-sensitive band), GABA sags ~0.10 at the
+//! coupling web's equilibrium — while the +inference column tracks
+//! the chemistry-only column almost exactly at rest (the engine is
+//! ~99.9% no-op when nothing needs correcting).
 //!
 //! The inference layer acts selectively rather than globally: it drives
 //! dopamine, serotonin, GABA and glutamate substantially, while
@@ -206,6 +208,25 @@ fn attribute_resting_offset_to_active_inference() {
     // inference layer's influence: a strong influence that is
     // homeostatically correct is fine, and asserting a minimum
     // magnitude would only re-encode the bug.
+    //
+    // Tolerances are per-chemical: two designed resting sags postdate
+    // the original fixed 0.10/0.12 bands —
+    // - Acetylcholine: the basal forebrain's A1 suppression sags the
+    //   cholinergic setpoint as Process S builds over this ~4 h
+    //   unstimulated settle (state::basal_forebrain) — the same
+    //   mechanism that earned a state-sensitive 0.22 band in
+    //   eval/drift.py.
+    // - GABA: the coupling web's equilibrium — ECB→GABA braking vs
+    //   ADN→GABA promotion — settles ~0.10 below default over a long
+    //   wake. 0.15 clears the sag while still catching the
+    //   E/I-collapse class of bug (glutamate −0.23) this test guards.
+    let chem_tol = |id: NeurochemicalId| -> f32 {
+        match id {
+            NeurochemicalId::Acetylcholine => 0.22,
+            NeurochemicalId::GABA => 0.15,
+            _ => 0.10,
+        }
+    };
     for ((id, chem), (_, inf)) in chemistry_only.iter().zip(with_inference.iter()) {
         assert!(
             chem.is_finite() && inf.is_finite(),
@@ -215,8 +236,9 @@ fn attribute_resting_offset_to_active_inference() {
             inf
         );
         let g = id.default_baseline();
+        let tol = chem_tol(*id);
         assert!(
-            (chem - g).abs() < 0.10,
+            (chem - g).abs() < tol,
             "{:?} without inference should sit near its genetic default \
              ({:.3}), but was {:.3} — the chemistry alone is not at baseline",
             id,
@@ -224,7 +246,7 @@ fn attribute_resting_offset_to_active_inference() {
             chem
         );
         assert!(
-            (inf - g).abs() < 0.12,
+            (inf - g).abs() < tol + 0.02,
             "{:?} rested at {:.3}, {:.3} from its genetic default ({:.3}). \
              The excitation/inhibition loop should settle near balance, \
              not collapse excitation — see the module docs.",

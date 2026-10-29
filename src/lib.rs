@@ -45,7 +45,7 @@ pub mod store;
 
 pub use data_dir::data_dir;
 pub use field::{
-    BraidTrajectory, FieldError, GaugeTransport, GlobalField, PoincareBall, SubsystemLayer,
+    BraidTrajectory, FieldError, GaugeTransport, GlobalField, StereographicSphere, SubsystemLayer,
     SystemEngine, SystemFiber, Vector,
 };
 pub use state::GenesisCoreState;

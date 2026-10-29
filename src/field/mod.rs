@@ -4,6 +4,13 @@
 //! system's latent field. Geometry is separated from semantics: a manifold
 //! is a container and metric, while layers own represented state and dynamics.
 //!
+//! The latent manifold is the κ-stereographic sphere — the constant
+//! *positive* curvature counterpart of the Poincaré ball (Bachmann et al.
+//! 2020): the sphere of curvature κ projected stereographically onto the
+//! chart, with the north pole at the origin. The field operates inside
+//! the hemisphere cap ‖x‖ < 1/√κ, a geodesically convex region whose
+//! center is the pole — the organism's nominal home.
+//!
 //! The implementation is dependency-free and deterministic. It does not
 //! assume that a fixed number of fibers is correct.
 
@@ -90,12 +97,28 @@ fn sub(a: &[f64], b: &[f64]) -> Vector {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct PoincareBall {
+pub struct StereographicSphere {
     dimension: usize,
     curvature: f64,
 }
 
-impl PoincareBall {
+impl StereographicSphere {
+    /// The κ-stereographic sphere: the sphere of constant *positive*
+    /// curvature κ, charted by stereographic projection. The origin
+    /// of the chart is the image of the north pole — the
+    /// distinguished center of the model. The point at infinity is
+    /// the south pole, the one point the chart cannot represent.
+    ///
+    /// `contains`/`project` enforce the field's operating region —
+    /// the hemisphere cap around the pole, ‖x‖ < 1/√κ (the
+    /// stereographic image of the equator). The cap is geodesically
+    /// convex: minimizing geodesics between cap points stay in the
+    /// cap, and any set of cap points has a unique Fréchet mean
+    /// inside it (Buss & Fillmore 2001). The geometric primitives
+    /// (`mobius_add`, `log_*`, `exp_*`, `geodesic`) accept any valid
+    /// chart point — finite and right dimension — and return honest
+    /// sphere points, which may legitimately lie outside the cap;
+    /// the state boundaries re-project.
     pub fn new(dimension: usize, c: f64) -> Result<Self, FieldError> {
         if dimension == 0 || !c.is_finite() || c <= 0.0 {
             return Err(FieldError::InvalidGeometry);
@@ -111,14 +134,24 @@ impl PoincareBall {
     pub fn curvature(&self) -> f64 {
         self.curvature
     }
+    /// The chart radius of the equator — the rim of the operating
+    /// cap. Points at exactly this radius sit on the equator;
+    /// beyond it lies the southern hemisphere, out to the
+    /// unrepresentable south pole at infinity.
     fn scaled_radius(&self) -> f64 {
         1.0 / self.curvature.sqrt()
     }
+    /// Whether x is inside the operating cap — the open hemisphere
+    /// around the pole where the field works.
     pub fn contains(&self, x: &[f64]) -> bool {
         x.len() == self.dimension
             && x.iter().all(|v| v.is_finite())
             && norm(x) < self.scaled_radius()
     }
+    /// Retract x into the cap along its ray. This is the containment
+    /// policy, not a geometric projection of the manifold: outside-
+    /// cap coordinates are valid sphere points, but the field keeps
+    /// its states inside the hemisphere.
     pub fn project(&self, x: &[f64]) -> Result<Vector, FieldError> {
         if x.len() != self.dimension {
             return Err(FieldError::DimensionMismatch);
@@ -148,29 +181,43 @@ impl PoincareBall {
         }
         Ok(projected)
     }
+    /// Geodesic distance on the sphere. In stereographic
+    /// coordinates, with û = √κ·x the unit-sphere chart, the lifted
+    /// chord gives
+    ///
+    ///   tan(d·√κ/2) = √κ‖x − y‖
+    ///                 / √(1 + 2κ⟨x,y⟩ + κ²‖x‖²‖y‖²)
+    ///
+    /// so d = (2/√κ)·atan2(√κ‖x−y‖, √(1+2κ⟨x,y⟩+κ²‖x‖²‖y‖²)). The
+    /// denominator factors as (1+κ⟨x,y⟩)² + κ²(‖x‖²‖y‖² − ⟨x,y⟩²) —
+    /// nonnegative by Cauchy–Schwarz, vanishing only for antipodal
+    /// pairs, where atan2 correctly returns the maximal distance
+    /// π/√κ instead of dividing by zero.
     pub fn distance(&self, x: &[f64], y: &[f64]) -> Result<f64, FieldError> {
         self.validate_point(x)?;
         self.validate_point(y)?;
         let sqrt_c = self.curvature.sqrt();
-        let ux = scaled(x, sqrt_c);
-        let uy = scaled(y, sqrt_c);
-        let nx = dot(&ux, &ux);
-        let ny = dot(&uy, &uy);
-        let dxy = norm(&sub(&ux, &uy));
-        if !nx.is_finite() || !ny.is_finite() || !dxy.is_finite() {
+        let c = self.curvature;
+        let nx = dot(x, x);
+        let ny = dot(y, y);
+        let xy = dot(x, y);
+        let dxy = norm(&sub(x, y));
+        if !(nx.is_finite() && ny.is_finite() && xy.is_finite() && dxy.is_finite()) {
             return Err(FieldError::NonFiniteState);
         }
-        let denom = (1.0 - nx).max(EPS) * (1.0 - ny).max(EPS);
-        let arg = 1.0 + 2.0 * dxy * dxy / denom;
-        if !arg.is_finite() {
-            return Err(FieldError::NonFiniteState);
-        }
-        let distance = arg.max(1.0).acosh() / sqrt_c;
+        let opposite = (1.0 + 2.0 * c * xy + c * c * nx * ny).max(0.0).sqrt();
+        let distance = 2.0 * (sqrt_c * dxy).atan2(opposite) / sqrt_c;
         if !distance.is_finite() {
             return Err(FieldError::NonFiniteState);
         }
         Ok(distance)
     }
+    /// The tangent at the pole (the chart's origin) pointing along
+    /// the geodesic to x, distance-normalized: ‖v‖ = d(0, x). A
+    /// point at chart radius r sits at geodesic distance
+    /// (2/√κ)·atan(√κ·r) from the pole — unlike the ball's atanh
+    /// this needs no clamp: atan is finite for every representable
+    /// point, tending to π/(2√κ) as r → ∞ (the south pole).
     pub fn log_origin(&self, x: &[f64]) -> Result<Vector, FieldError> {
         self.validate_point(x)?;
         let r = norm(x);
@@ -185,8 +232,7 @@ impl PoincareBall {
         if !scaled_r.is_finite() || scaled_r <= 0.0 {
             return Err(FieldError::NonFiniteState);
         }
-        let atanh_arg = scaled_r.min(1.0 - f64::EPSILON);
-        let z = atanh_arg.atanh() * 2.0 / scaled_r;
+        let z = scaled_r.atan() * 2.0 / scaled_r;
         if !z.is_finite() || z <= 0.0 {
             return Err(FieldError::NonFiniteState);
         }
@@ -196,6 +242,12 @@ impl PoincareBall {
         }
         Ok(tangent)
     }
+    /// Step from the pole along direction v for ‖v‖ units of
+    /// geodesic distance: the image is the direction of v at chart
+    /// radius (1/√κ)·tan(√κ·‖v‖/2). tan is honest about the sphere
+    /// being compact: ‖v‖ = π/√κ lands at the unrepresentable south
+    /// pole (rejected as non-finite), and beyond it the map wraps
+    /// around — the sphere closes on itself.
     pub fn exp_origin(&self, v: &[f64]) -> Result<Vector, FieldError> {
         if v.len() != self.dimension {
             return Err(FieldError::DimensionMismatch);
@@ -212,28 +264,34 @@ impl PoincareBall {
         }
         let sqrt_c = self.curvature.sqrt();
         let scaled_r = sqrt_c * r;
-        let z = if scaled_r.is_finite() {
-            (scaled_r / 2.0).tanh() / scaled_r
-        } else {
-            (1.0 / sqrt_c) / r
-        };
-        if !z.is_finite() || z <= 0.0 {
+        if !scaled_r.is_finite() {
             return Err(FieldError::NonFiniteState);
         }
-        self.project(&scaled(v, z))
+        let z = (scaled_r / 2.0).tan() / scaled_r;
+        if !z.is_finite() {
+            return Err(FieldError::NonFiniteState);
+        }
+        let out = scaled(v, z);
+        if out.iter().any(|x| !x.is_finite()) {
+            return Err(FieldError::NonFiniteState);
+        }
+        Ok(out)
     }
     /// Möbius addition — the gyrovector operation that plays the
-    /// role of vector addition on the ball (Ungar; curvature c > 0,
-    /// ball radius 1/√c):
+    /// role of vector addition on the stereographic sphere (Ungar;
+    /// κ > 0, equator image at radius 1/√κ):
     ///
-    ///   x ⊕_c y = [(1 + 2c⟨x,y⟩ + c‖y‖²)x + (1 − c‖x‖²)y]
-    ///             / (1 + 2c⟨x,y⟩ + c²‖x‖²‖y‖²)
+    ///   x ⊕_κ y = [(1 − 2κ⟨x,y⟩ − κ‖y‖²)x + (1 + κ‖x‖²)y]
+    ///             / (1 − 2κ⟨x,y⟩ + κ²‖x‖²‖y‖²)
     ///
-    /// Non-commutative and non-associative, but closed in the ball
-    /// and left-cancellative: (−x) ⊕_c (x ⊕_c y) = y — the identity
-    /// that makes the general log/exp pair below true inverses.
-    /// Adding a fixed element is a hyperbolic translation: it moves
-    /// every point the same geodesic distance.
+    /// Non-commutative and non-associative, but left-cancellative:
+    /// (−x) ⊕_κ (x ⊕_κ y) = y — the identity that makes the general
+    /// log/exp pair below true inverses. Adding a fixed element is a
+    /// spherical translation — a rotation of the sphere, so it moves
+    /// every point the same geodesic distance. The denominator can
+    /// only vanish when y is the antipode of −x (the sum would be
+    /// the unrepresentable south pole); inside the cap it is bounded
+    /// away from zero by (1 − κ‖x‖‖y‖)².
     pub fn mobius_add(&self, x: &[f64], y: &[f64]) -> Result<Vector, FieldError> {
         self.validate_point(x)?;
         self.validate_point(y)?;
@@ -244,22 +302,23 @@ impl PoincareBall {
         if !(nx.is_finite() && ny.is_finite() && xy.is_finite()) {
             return Err(FieldError::NonFiniteState);
         }
-        let x_num = 1.0 + 2.0 * c * xy + c * ny;
-        let y_num = 1.0 - c * nx;
-        // The denominator is ≥ (1 − c‖x‖‖y‖)² > 0 inside the open
-        // ball — it can never vanish here, only underflow/overflow.
-        let denom = 1.0 + 2.0 * c * xy + c * c * nx * ny;
-        if !(x_num.is_finite() && y_num.is_finite() && denom.is_finite() && denom > 0.0) {
+        let x_num = 1.0 - 2.0 * c * xy - c * ny;
+        let y_num = 1.0 + c * nx;
+        let denom = 1.0 - 2.0 * c * xy + c * c * nx * ny;
+        if !(x_num.is_finite() && y_num.is_finite() && denom.is_finite() && denom > EPS) {
             return Err(FieldError::NonFiniteState);
         }
         let mut out = vec![0.0; self.dimension];
         for ((dst, &xi), &yi) in out.iter_mut().zip(x).zip(y) {
             *dst = (x_num * xi + y_num * yi) / denom;
         }
-        self.project(&out)
+        if out.iter().any(|v| !v.is_finite()) {
+            return Err(FieldError::NonFiniteState);
+        }
+        Ok(out)
     }
-    /// Möbius subtraction: (−x) ⊕_c y — the displacement from x to
-    /// y expressed as a ball point. A hyperbolic translation of y
+    /// Möbius subtraction: (−x) ⊕_κ y — the displacement from x to
+    /// y expressed as a chart point. A spherical translation of y
     /// back toward the origin: d(0, −x ⊕ y) = d(x, y).
     fn mobius_sub(&self, x: &[f64], y: &[f64]) -> Result<Vector, FieldError> {
         self.mobius_add(&scaled(x, -1.0), y)
@@ -268,22 +327,23 @@ impl PoincareBall {
     /// at x that points along the geodesic toward y, with the same
     /// distance-normalized convention as `log_origin` (‖v‖ = the
     /// geodesic distance the vector travels). Because x ↦ (−x) ⊕ x
-    /// is a hyperbolic translation to the origin, this is just
+    /// is a spherical translation to the origin, this is just
     /// `log_origin` of the Möbius displacement.
     pub fn log_at(&self, x: &[f64], y: &[f64]) -> Result<Vector, FieldError> {
         self.log_origin(&self.mobius_sub(x, y)?)
     }
     /// Exponential map at an arbitrary basepoint: step from x along
     /// the geodesic in direction v for ‖v‖ units of geodesic
-    /// distance — `x ⊕_c exp_origin(v)`. Inverse of `log_at` by
+    /// distance — `x ⊕_κ exp_origin(v)`. Inverse of `log_at` by
     /// left-cancellation.
     pub fn exp_at(&self, x: &[f64], v: &[f64]) -> Result<Vector, FieldError> {
         self.validate_point(x)?;
         self.mobius_add(x, &self.exp_origin(v)?)
     }
-    /// The geodesic from x toward y at fraction t of the hyperbolic
+    /// The geodesic from x toward y at fraction t of the spherical
     /// distance: d(x, γ(t)) = t·d(x,y) exactly. γ(0) = x, γ(1) = y;
-    /// t outside [0,1] extrapolates along the same geodesic.
+    /// t outside [0,1] continues along the same great circle — the
+    /// geodesic wraps around the sphere.
     pub fn geodesic(&self, x: &[f64], y: &[f64], t: f64) -> Result<Vector, FieldError> {
         if !t.is_finite() {
             return Err(FieldError::NonFiniteState);
@@ -298,26 +358,35 @@ impl PoincareBall {
     pub fn point_reflection(&self, x: &[f64], through: &[f64]) -> Result<Vector, FieldError> {
         self.geodesic(x, through, 2.0)
     }
-    /// The point diametrically opposite x through the ball's center —
-    /// the origin case of `point_reflection`. In the ball model the
-    /// geodesic through the origin is the Euclidean diameter, so the
-    /// antipode is exactly −x: d(x, −x) = 2·d(0, x), an involution
-    /// whose only fixed point is the origin.
+    /// The true spherical antipode — the point maximally distant
+    /// from x at d = π/√κ. Under stereographic projection the
+    /// antipode map is inversion in the equator circle composed with
+    /// negation: −x/(κ‖x‖²). It lands outside the cap (in the
+    /// southern hemisphere), the genuine "far side." The pole's own
+    /// antipode is the unrepresentable south pole at infinity — an
+    /// error, not a clamp.
     pub fn antipode(&self, x: &[f64]) -> Result<Vector, FieldError> {
         self.validate_point(x)?;
-        Ok(scaled(x, -1.0))
+        let r2 = dot(x, x);
+        if !r2.is_finite() || r2 <= EPS {
+            return Err(FieldError::NonFiniteState);
+        }
+        Ok(scaled(x, -1.0 / (self.curvature * r2)))
     }
+    /// A valid chart point: right dimension, finite. Any such point
+    /// names a sphere point in the stereographic chart — cap
+    /// membership (`contains`) is a separate, stricter question.
     fn validate_point(&self, x: &[f64]) -> Result<(), FieldError> {
-        if self.contains(x) {
-            Ok(())
-        } else {
+        if x.len() != self.dimension || x.iter().any(|v| !v.is_finite()) {
             Err(FieldError::InvalidPoint)
+        } else {
+            Ok(())
         }
     }
-    /// The tangent-space mean at the origin — the Euclidean average
+    /// The tangent-space mean at the pole — the Euclidean average
     /// of the lifted log coordinates, mapped back. Exact for a
     /// single point and the right seed for `frechet_mean`; away
-    /// from the origin it is only the barycenter's first
+    /// from the pole it is only the barycenter's first
     /// approximation, since the log map distorts with distance.
     fn tangent_barycenter(&self, points: &[Vector]) -> Result<Vector, FieldError> {
         let tangents = points
@@ -352,14 +421,15 @@ impl PoincareBall {
     }
     /// The Fréchet mean: the point minimizing Σᵢ d²(m, xᵢ) — the
     /// true center of mass on the manifold, where the tangent-space
-    /// mean is only its origin approximation. Computed by Karcher
+    /// mean is only its polar approximation. Computed by Karcher
     /// iteration: `m ← exp_m(meanᵢ log_m(xᵢ))`, steepest descent on
-    /// ½Σd² (whose Riemannian gradient is −Σ log_m(xᵢ)). The ball
-    /// is a Hadamard manifold — complete, simply connected,
-    /// nonpositive curvature — so the minimizer exists, is unique,
-    /// and the unit-step iteration converges to it. Seeded at the
-    /// tangent barycenter, which is already the exact answer at the
-    /// origin, so near-origin sets converge in one or two steps.
+    /// ½Σd² (whose Riemannian gradient is −Σ log_m(xᵢ)). Positive
+    /// curvature changes the guarantee, not the method: on the
+    /// sphere the mean is unique whenever the points lie in an open
+    /// hemisphere (Buss & Fillmore 2001) — exactly the cap the field
+    /// operates in — and ½d² stays strictly convex while every
+    /// pairwise distance stays under π/(2√κ). Seeded at the tangent
+    /// barycenter, which is already the exact answer at the pole.
     pub fn frechet_mean(&self, points: &[Vector]) -> Result<Vector, FieldError> {
         if points.is_empty() {
             return Err(FieldError::EmptyState);
@@ -410,8 +480,8 @@ impl SubsystemLayer {
     /// Euler update by `dt·gain·derivative` on this layer alone.
     /// The layer is geometry-agnostic — the caller owns the
     /// manifold: `SystemFiber::evolve` re-projects the result into
-    /// the ball. Crate-private so no other path can strand a layer
-    /// outside the manifold.
+    /// the cap. Crate-private so no other path can strand a layer
+    /// outside the operating region.
     pub(crate) fn evolve(&mut self, derivative: &[f64], dt: f64) -> Result<(), FieldError> {
         if derivative.len() != self.state.len() {
             return Err(FieldError::DimensionMismatch);
@@ -441,14 +511,14 @@ impl SubsystemLayer {
 pub struct SystemFiber {
     pub id: String,
     pub engine_clock: f64,
-    pub manifold: PoincareBall,
+    pub manifold: StereographicSphere,
     pub layers: Vec<SubsystemLayer>,
     pub engine: SystemEngine,
 }
 impl SystemFiber {
     pub fn new(
         id: impl Into<String>,
-        manifold: PoincareBall,
+        manifold: StereographicSphere,
         layers: Vec<SubsystemLayer>,
     ) -> Result<Self, FieldError> {
         if layers.iter().any(|l| l.state.len() != manifold.dimension()) {
@@ -477,7 +547,7 @@ impl SystemFiber {
     }
     pub fn with_engine(
         id: impl Into<String>,
-        manifold: PoincareBall,
+        manifold: StereographicSphere,
         layers: Vec<SubsystemLayer>,
         engine: SystemEngine,
     ) -> Result<Self, FieldError> {
@@ -653,8 +723,8 @@ impl GaugeTransport {
     }
     pub fn apply_on_manifold(
         &self,
-        source: &PoincareBall,
-        target: &PoincareBall,
+        source: &StereographicSphere,
+        target: &StereographicSphere,
         x: &[f64],
     ) -> Result<Vector, FieldError> {
         if source.dimension() != target.dimension()
@@ -745,7 +815,7 @@ pub struct PathDisagreement {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct GlobalField {
-    pub manifold: PoincareBall,
+    pub manifold: StereographicSphere,
     pub fibers: Vec<SystemFiber>,
     pub transports: Vec<GaugeTransport>,
     pub integration_gain: f64,
@@ -763,7 +833,7 @@ pub struct GlobalField {
     pub rng_state: u64,
 }
 impl GlobalField {
-    pub fn new(manifold: PoincareBall) -> Self {
+    pub fn new(manifold: StereographicSphere) -> Self {
         Self {
             manifold,
             fibers: Vec::new(),
@@ -844,10 +914,11 @@ impl GlobalField {
         Ok(self.transports.remove(index))
     }
     /// The diametric opposite of the field's current localization —
-    /// the antipode of the fresh consensus. Same distance from the
-    /// origin, on the far side: where the subsystems would sit if
-    /// they collectively opposed what they now agree on. `None`
-    /// when there is no consensus to oppose (empty field).
+    /// the spherical antipode of the fresh consensus: the point on
+    /// the far side of the sphere, at the maximal distance π/√κ,
+    /// where the subsystems would sit if they collectively opposed
+    /// what they now agree on. `None` when there is no consensus to
+    /// oppose (empty field).
     pub fn anticonsensus(&self) -> Result<Option<Vector>, FieldError> {
         match self.consensus()? {
             Some(c) => Ok(Some(self.manifold.antipode(&c)?)),
@@ -1112,7 +1183,7 @@ impl GlobalField {
                         *v += sigma * gaussian(&mut rng);
                     }
                 }
-                let next = manifold.exp_origin(&updated)?;
+                let next = manifold.project(&manifold.exp_origin(&updated)?)?;
                 states_for_fiber.push(next);
             }
             next_states.push((i, states_for_fiber));
@@ -1306,7 +1377,7 @@ mod distance_integrity_tests {
 
     #[test]
     fn distance_rejects_nonfinite_intermediate_result() {
-        let manifold = PoincareBall::new(1, 1.0).unwrap();
+        let manifold = StereographicSphere::new(1, 1.0).unwrap();
         let x = vec![0.0];
         let y = vec![0.999_999_999_999];
         let distance = manifold.distance(&x, &y).unwrap();
@@ -1320,7 +1391,7 @@ mod clock_integrity_tests {
 
     #[test]
     fn step_rejects_invalid_existing_clock() {
-        let manifold = PoincareBall::new(1, 1.0).unwrap();
+        let manifold = StereographicSphere::new(1, 1.0).unwrap();
         let mut fiber =
             SystemFiber::new("x", manifold, vec![SubsystemLayer::new("layer", vec![0.0])]).unwrap();
         fiber.engine_clock = f64::NAN;
@@ -1329,7 +1400,7 @@ mod clock_integrity_tests {
 
     #[test]
     fn evolve_rejects_negative_existing_clock() {
-        let manifold = PoincareBall::new(1, 1.0).unwrap();
+        let manifold = StereographicSphere::new(1, 1.0).unwrap();
         let mut fiber =
             SystemFiber::new("x", manifold, vec![SubsystemLayer::new("layer", vec![0.0])]).unwrap();
         fiber.engine_clock = -1.0;
@@ -1451,7 +1522,7 @@ impl std::error::Error for FieldError {}
 mod tests {
     #[test]
     fn failed_step_does_not_partially_commit_layer_state_or_clock() {
-        let manifold = PoincareBall::new(1, 1.0).unwrap();
+        let manifold = StereographicSphere::new(1, 1.0).unwrap();
         let mut fiber =
             SystemFiber::new("x", manifold, vec![SubsystemLayer::new("a", vec![0.25])]).unwrap();
         fiber.engine.biases[0][0] = f64::MAX;
@@ -1464,7 +1535,7 @@ mod tests {
 
     #[test]
     fn distance_invariants_hold() {
-        let m = PoincareBall::new(3, 1.0).unwrap();
+        let m = StereographicSphere::new(3, 1.0).unwrap();
         let x = vec![0.1, -0.2, 0.05];
         let y = vec![-0.15, 0.1, 0.2];
         assert!(m.distance(&x, &x).unwrap().abs() < 1.0e-12);
@@ -1474,7 +1545,7 @@ mod tests {
 
     #[test]
     fn distance_is_consistent_with_origin_log() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
+        let m = StereographicSphere::new(2, 1.0).unwrap();
         let x = vec![0.2, -0.3];
         let d = m.distance(&[0.0, 0.0], &x).unwrap();
         let tangent = m.log_origin(&x).unwrap();
@@ -1483,7 +1554,7 @@ mod tests {
 
     #[test]
     fn exp_and_log_reject_nonfinite_inputs_with_state_error() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
+        let m = StereographicSphere::new(2, 1.0).unwrap();
         assert_eq!(
             m.exp_origin(&[f64::NAN, 0.0]),
             Err(FieldError::NonFiniteState)
@@ -1496,7 +1567,7 @@ mod tests {
 
     #[test]
     fn exp_log_round_trip() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
+        let m = StereographicSphere::new(2, 1.0).unwrap();
         let x = vec![0.2, -0.3];
         let tangent = m.log_origin(&x).unwrap();
         let recovered = m.exp_origin(&tangent).unwrap();
@@ -1507,7 +1578,7 @@ mod tests {
 
     #[test]
     fn exp_log_round_trip_near_boundary() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
+        let m = StereographicSphere::new(2, 1.0).unwrap();
         let x = vec![0.999_999, 0.0];
         let tangent = m.log_origin(&x).unwrap();
         let recovered = m.exp_origin(&tangent).unwrap();
@@ -1517,14 +1588,14 @@ mod tests {
 
     #[test]
     fn project_rejects_finite_coordinates_whose_norm_overflows() {
-        let m = PoincareBall::new(4, 1.0).unwrap();
+        let m = StereographicSphere::new(4, 1.0).unwrap();
         let x = vec![f64::MAX; 4];
         assert_eq!(m.project(&x), Err(FieldError::NonFiniteState));
     }
 
     #[test]
     fn geometry_norm_handles_large_finite_coordinates() {
-        let m = PoincareBall::new(2, 1.0e-300).unwrap();
+        let m = StereographicSphere::new(2, 1.0e-300).unwrap();
         let p = vec![1.0e149, 1.0e149];
         assert!(m.contains(&p));
         let v = m.log_origin(&p).unwrap();
@@ -1533,7 +1604,7 @@ mod tests {
 
     #[test]
     fn distance_handles_large_coordinates_without_overflow() {
-        let m = PoincareBall::new(2, 1.0e-300).unwrap();
+        let m = StereographicSphere::new(2, 1.0e-300).unwrap();
         let x = vec![1.0e149, 0.0];
         let y = vec![-1.0e149, 0.0];
         let d = m.distance(&x, &y).unwrap();
@@ -1542,17 +1613,20 @@ mod tests {
     }
 
     #[test]
-    fn exp_log_round_trip_extreme_tangent_is_finite() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
+    fn exp_origin_extreme_tangent_lands_on_a_finite_point() {
+        // The sphere is compact: a tangent of 10³⁰⁸ wraps the
+        // geodesic around it ~10³⁰⁸ times and lands at an honest,
+        // arbitrary chart point — finite, but with no reason to sit
+        // inside the operating cap.
+        let m = StereographicSphere::new(2, 1.0).unwrap();
         let v = vec![1.0e308, 0.0];
         let x = m.exp_origin(&v).unwrap();
         assert!(x.iter().all(|value| value.is_finite()));
-        assert!(m.contains(&x));
     }
 
     #[test]
     fn barycenter_handles_cancelling_extreme_tangents() {
-        let m = PoincareBall::new(2, 1.0e-300).unwrap();
+        let m = StereographicSphere::new(2, 1.0e-300).unwrap();
         let a = vec![1.0e149, 0.0];
         let b = vec![-1.0e149, 0.0];
         let center = m.frechet_mean(&[a, b]).unwrap();
@@ -1565,7 +1639,7 @@ mod tests {
         // The defining property, not a Euclidean proxy: at the
         // Fréchet mean, Σᵢ log_m(xᵢ) = 0 — the Riemannian gradient
         // of ½Σd² vanishes.
-        let m = PoincareBall::new(2, 1.0).unwrap();
+        let m = StereographicSphere::new(2, 1.0).unwrap();
         let pts = vec![
             vec![0.4, 0.2],
             vec![-0.3, 0.5],
@@ -1600,7 +1674,7 @@ mod tests {
 
     #[test]
     fn empty_fiber_has_no_aggregate_system_state() {
-        let m = PoincareBall::new(1, 1.0).unwrap();
+        let m = StereographicSphere::new(1, 1.0).unwrap();
         let fiber = SystemFiber::new("empty", m, Vec::new()).unwrap();
         assert_eq!(fiber.state(), Err(FieldError::EmptyState));
     }
@@ -1624,16 +1698,16 @@ mod tests {
 
     #[test]
     fn fiber_step_rejects_mutated_invalid_engine() {
-        let m = PoincareBall::new(1, 1.0).unwrap();
+        let m = StereographicSphere::new(1, 1.0).unwrap();
         let mut fiber =
             SystemFiber::new("x", m, vec![SubsystemLayer::new("a", vec![0.0])]).unwrap();
-        fiber.engine.damping = vec![-1.0];
+        fiber.engine.damping = vec![f64::NAN];
         assert_eq!(fiber.step(0.1), Err(FieldError::InvalidDynamics));
     }
 
     #[test]
     fn fiber_rejects_nonfinite_layer_state() {
-        let m = PoincareBall::new(1, 1.0).unwrap();
+        let m = StereographicSphere::new(1, 1.0).unwrap();
         let layer = SubsystemLayer {
             id: "a".into(),
             state: vec![f64::NAN],
@@ -1647,7 +1721,7 @@ mod tests {
 
     #[test]
     fn fiber_rejects_duplicate_layer_ids() {
-        let m = PoincareBall::new(1, 1.0).unwrap();
+        let m = StereographicSphere::new(1, 1.0).unwrap();
         let layers = vec![
             SubsystemLayer::new("a", vec![0.0]),
             SubsystemLayer::new("a", vec![0.0]),
@@ -1660,7 +1734,7 @@ mod tests {
 
     #[test]
     fn fiber_rejects_nonfinite_layer_gain() {
-        let m = PoincareBall::new(1, 1.0).unwrap();
+        let m = StereographicSphere::new(1, 1.0).unwrap();
         let layer = SubsystemLayer {
             id: "a".into(),
             state: vec![0.0],
@@ -1677,7 +1751,7 @@ mod tests {
         // `evolve` must respect the engine's time scale the same way
         // `step` does: a fiber at 2× moves the layer by dt·2·gain·dx
         // and advances its clock by the scaled interval.
-        let m = PoincareBall::new(1, 1.0).unwrap();
+        let m = StereographicSphere::new(1, 1.0).unwrap();
         let mut engine = SystemEngine::zero(1, 1);
         engine.time_scale = 2.0;
         let mut fiber =
@@ -1689,11 +1763,11 @@ mod tests {
     }
 
     #[test]
-    fn evolve_projects_departed_state_back_into_the_ball() {
-        // A derivative that pushes a layer outside the ball must
+    fn evolve_projects_departed_state_back_into_the_cap() {
+        // A derivative that pushes a layer outside the cap must
         // come back through the manifold: the layer state stays a
-        // valid ball point, not a raw Euler overshoot.
-        let m = PoincareBall::new(1, 1.0).unwrap();
+        // valid cap point, not a raw Euler overshoot.
+        let m = StereographicSphere::new(1, 1.0).unwrap();
         let mut fiber =
             SystemFiber::new("x", m, vec![SubsystemLayer::new("a", vec![0.9])]).unwrap();
         fiber.evolve(&[vec![1.0]], 0.5).unwrap();
@@ -1702,7 +1776,7 @@ mod tests {
 
     #[test]
     fn mobius_addition_identity_inverse_and_left_cancellation() {
-        let m = PoincareBall::new(3, 1.0).unwrap();
+        let m = StereographicSphere::new(3, 1.0).unwrap();
         let x = vec![0.2, -0.1, 0.3];
         let y = vec![-0.15, 0.25, -0.1];
         let zero = vec![0.0; 3];
@@ -1724,7 +1798,7 @@ mod tests {
 
     #[test]
     fn log_exp_at_arbitrary_basepoint_round_trips() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
+        let m = StereographicSphere::new(2, 1.0).unwrap();
         let x = vec![0.3, -0.2];
         let y = vec![-0.1, 0.4];
         let v = m.log_at(&x, &y).unwrap();
@@ -1739,7 +1813,7 @@ mod tests {
 
     #[test]
     fn geodesic_fraction_matches_distance_fraction() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
+        let m = StereographicSphere::new(2, 1.0).unwrap();
         let x = vec![0.2, -0.3];
         let y = vec![-0.4, 0.1];
         let full = m.distance(&x, &y).unwrap();
@@ -1757,7 +1831,7 @@ mod tests {
     #[test]
     fn disagreement_heats_the_field_and_fluctuation_is_deterministic() {
         fn build() -> GlobalField {
-            let manifold = PoincareBall::new(1, 1.0).unwrap();
+            let manifold = StereographicSphere::new(1, 1.0).unwrap();
             let mut field = GlobalField::new(manifold);
             field.cooling_rate = 0.0; // isolate the heating term
             field
@@ -1813,7 +1887,7 @@ mod tests {
         // the temperature. The bath floors the field the same way
         // tension does — the machine's own heat is a real source,
         // not modeled weather.
-        let manifold = PoincareBall::new(1, 1.0).unwrap();
+        let manifold = StereographicSphere::new(1, 1.0).unwrap();
         let mut field = GlobalField::new(manifold);
         field.cooling_rate = 0.0;
         for id in ["a", "b"] {
@@ -1846,24 +1920,39 @@ mod tests {
     }
 
     #[test]
-    fn antipode_is_an_involution_that_doubles_the_origin_distance() {
-        let m = PoincareBall::new(3, 1.0).unwrap();
+    fn antipode_is_the_maximally_distant_involution() {
+        let m = StereographicSphere::new(3, 1.0).unwrap();
         let x = vec![0.2, -0.1, 0.3];
-        let neg = m.antipode(&x).unwrap();
-        assert_eq!(neg, scaled(&x, -1.0));
-        // Through the center: d(x, −x) = 2·d(0, x).
-        let origin = vec![0.0; 3];
-        assert!(
-            (m.distance(&x, &neg).unwrap() - 2.0 * m.distance(&x, &origin).unwrap()).abs() < 1.0e-9
-        );
-        // The map is its own inverse, fixing only the origin.
-        assert_eq!(m.antipode(&neg).unwrap(), x);
-        assert_eq!(m.antipode(&origin).unwrap(), origin);
+        // Inversion in the equator circle, negated: −x/(κ‖x‖²) —
+        // the far hemisphere, the genuine "other side."
+        let r2 = dot(&x, &x);
+        let expected = scaled(&x, -1.0 / r2);
+        let anti = m.antipode(&x).unwrap();
+        for (a, b) in anti.iter().zip(expected.iter()) {
+            assert!((a - b).abs() < 1.0e-12);
+        }
+        // Antipodal points saturate the sphere's diameter:
+        // d(x, antipode(x)) = π/√κ. The denominator of the distance
+        // quotient is exactly zero here; in floating point it
+        // survives as ~1e-16, so the measured distance is π to
+        // within double precision, not to machine epsilon.
+        assert!((m.distance(&x, &anti).unwrap() - std::f64::consts::PI).abs() < 1.0e-6);
+        // The antipode lives outside the operating cap — the
+        // southern hemisphere — and is still a valid chart point.
+        assert!(!m.contains(&anti));
+        // The map is its own inverse.
+        let back = m.antipode(&anti).unwrap();
+        for (a, b) in back.iter().zip(x.iter()) {
+            assert!((a - b).abs() < 1.0e-9);
+        }
+        // The pole's antipode is the unrepresentable south pole —
+        // an error, not a silent clamp.
+        assert_eq!(m.antipode(&[0.0; 3]), Err(FieldError::NonFiniteState));
     }
 
     #[test]
     fn point_reflection_places_the_center_at_the_geodesic_midpoint() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
+        let m = StereographicSphere::new(2, 1.0).unwrap();
         let x = vec![0.2, -0.3];
         let c = vec![-0.1, 0.15];
         let image = m.point_reflection(&x, &c).unwrap();
@@ -1876,17 +1965,19 @@ mod tests {
         for (a, b) in x.iter().zip(back.iter()) {
             assert!((a - b).abs() < 1.0e-9);
         }
-        // The origin case is the antipode — up to the rounding the
-        // geodesic path accumulates over the direct negation.
+        // Reflection through the pole is the polar mirror −x: the
+        // great circle through x and the pole continues past it and
+        // lands at the same polar angle on the opposite ray. That
+        // is NOT the spherical antipode — it stays inside the cap.
         let origin = vec![0.0; 2];
         let reflected = m.point_reflection(&x, &origin).unwrap();
-        for (a, b) in m.antipode(&x).unwrap().iter().zip(reflected.iter()) {
+        for (a, b) in scaled(&x, -1.0).iter().zip(reflected.iter()) {
             assert!((a - b).abs() < 1.0e-9);
         }
     }
 
     fn two_fiber_field() -> GlobalField {
-        let manifold = PoincareBall::new(1, 1.0).unwrap();
+        let manifold = StereographicSphere::new(1, 1.0).unwrap();
         let mut field = GlobalField::new(manifold);
         field.cooling_rate = 0.0;
         field
@@ -1953,10 +2044,19 @@ mod tests {
         field.synchronize(0.1, 0.0).unwrap();
         let consensus = field.consensus().unwrap().unwrap();
         let anti = field.anticonsensus().unwrap().unwrap();
-        assert_eq!(anti, scaled(&consensus, -1.0));
+        // The true spherical antipode: −c/(κ‖c‖²), at the maximal
+        // distance π/√κ on the far side of the sphere.
+        let c_norm = norm(&consensus);
+        assert_eq!(anti, scaled(&consensus, -1.0 / (c_norm * c_norm)));
+        // Singular-point tolerance, as in the antipode test above:
+        // the measured distance is π to within double precision.
+        assert!(
+            (field.manifold.distance(&consensus, &anti).unwrap() - std::f64::consts::PI).abs()
+                < 1.0e-6
+        );
         // Nothing agreed → nothing to oppose: an empty field has
         // neither a consensus nor an anticonsensus.
-        let empty = GlobalField::new(PoincareBall::new(1, 1.0).unwrap());
+        let empty = GlobalField::new(StereographicSphere::new(1, 1.0).unwrap());
         assert_eq!(empty.anticonsensus().unwrap(), None);
     }
 
@@ -1996,7 +2096,7 @@ mod global_step_tests {
 
     #[test]
     fn global_step_evolves_fibers_then_synchronizes() {
-        let manifold = PoincareBall::new(1, 1.0).unwrap();
+        let manifold = StereographicSphere::new(1, 1.0).unwrap();
         let first = SystemFiber::new(
             "first",
             manifold.clone(),
@@ -2030,7 +2130,7 @@ mod global_step_tests {
 
     #[test]
     fn global_step_is_transactional_across_fibers() {
-        let manifold = PoincareBall::new(1, 1.0).unwrap();
+        let manifold = StereographicSphere::new(1, 1.0).unwrap();
         let first = SystemFiber::new(
             "first",
             manifold.clone(),

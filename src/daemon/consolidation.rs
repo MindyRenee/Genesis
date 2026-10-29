@@ -153,6 +153,18 @@ impl ConsolidationEngine {
 
             // Store in LTM
             let text = entry.text();
+
+            // An episode with no text is noise, not a memory — its
+            // SimHash degenerates to 0 and it "associates" with every
+            // other empty episode at distance 0. Mark it consolidated
+            // so the empty slot isn't retried every pass until the
+            // ring overwrites it.
+            if text.trim().is_empty() {
+                stm.mark_consolidated_if_match(slot, entry.timestamp);
+                result.skipped += 1;
+                continue;
+            }
+
             let timestamp = entry.timestamp;
             let salience = entry.salience;
             let event_type = entry.event_type;

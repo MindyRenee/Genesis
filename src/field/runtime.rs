@@ -10,7 +10,7 @@ use crate::state::MentalPhase;
 use crate::state::neurochemical::NeurochemicalId;
 
 use super::{
-    FieldError, GaugeTransport, GlobalField, PoincareBall, SubsystemLayer, SystemEngine,
+    FieldError, GaugeTransport, GlobalField, StereographicSphere, SubsystemLayer, SystemEngine,
     SystemFiber, Vector,
 };
 
@@ -29,16 +29,20 @@ const OBSERVATION_TAU_SECONDS: f64 = 0.5;
 
 /// Per-fiber homeostatic relaxation times (seconds). Between
 /// observations each fiber's engine drifts its state toward nominal
-/// — the ball's origin — at its own clearance rate: an
-/// Ornstein–Uhlenbeck drift in the ambient coordinates the engine
-/// integrates, projected back onto the ball. This is the honest
-/// prior for unobserved physiology: monoamines clear in minutes,
-/// loads decay, no state holds forever. The observation stays the
-/// authority — the drift only fills the gaps it leaves. Rates are
-/// first-pass physiological guesses ordered by how slowly each
-/// subsystem's measured variables genuinely relax: neurochemical
-/// clearance is minutes-scale, the inference signals are faster
-/// statistics, the social variables linger longest.
+/// — the sphere's pole — at its own clearance rate: an
+/// Ornstein–Uhlenbeck inflow in the ambient coordinates the engine
+/// integrates, wound by a skew generator so the relaxation traces a
+/// loxodrome — a constant-bearing spiral into the pole, arcing
+/// inward along the sphere's own positive curvature — projected
+/// back into the cap. This is the honest prior for unobserved
+/// physiology: monoamines clear in minutes, loads decay, no state
+/// holds forever. The observation stays the authority — the drift
+/// only fills the gaps it leaves. Rates are first-pass physiological
+/// guesses ordered by how slowly each subsystem's measured variables
+/// genuinely relax: neurochemical clearance is minutes-scale, the
+/// inference signals are faster statistics, the social variables
+/// linger longest. The winding rate matches each fiber's own τ —
+/// a 45° loxodrome, one radian of turn per e-fold of decay.
 const BODY_RELAX_TAU_S: f64 = 120.0;
 const PREDICTION_RELAX_TAU_S: f64 = 40.0;
 const AGENCY_RELAX_TAU_S: f64 = 60.0;
@@ -61,7 +65,7 @@ pub struct FieldRuntime {
 
 impl FieldRuntime {
     pub fn new() -> Result<Self, FieldError> {
-        let manifold = PoincareBall::new(LATENT_DIMENSION, 1.0)?;
+        let manifold = StereographicSphere::new(LATENT_DIMENSION, 1.0)?;
         let mut field = GlobalField::new(manifold.clone());
 
         for (id, relax_tau) in [
@@ -72,7 +76,9 @@ impl FieldRuntime {
             let layer = SubsystemLayer::new(format!("{id}:latent"), vec![0.0; LATENT_DIMENSION]);
             let engine = SystemEngine::zero(1, LATENT_DIMENSION)
                 .with_damping(vec![1.0 / relax_tau])
-                .expect("positive finite damping always validates");
+                .expect("positive finite damping always validates")
+                .with_spiral(vec![loxodrome(LATENT_DIMENSION, 0, 1, 1.0 / relax_tau)])
+                .expect("a skew generator always validates");
             field.add_fiber(SystemFiber::with_engine(
                 id,
                 manifold.clone(),
@@ -214,6 +220,18 @@ fn identity(n: usize) -> Vec<Vec<f64>> {
     matrix
 }
 
+/// The loxodromic drift generator: a skew-symmetric rotation in the
+/// (i, j) coordinate plane at angular rate `omega` — the winding
+/// half of the homeostatic spiral. With damping at the same rate it
+/// traces a 45° loxodrome into the pole: each e-fold of radial decay
+/// carries one radian of turn.
+fn loxodrome(n: usize, i: usize, j: usize, omega: f64) -> Vec<Vec<f64>> {
+    let mut m = vec![vec![0.0; n]; n];
+    m[i][j] = -omega;
+    m[j][i] = omega;
+    m
+}
+
 fn unit(value: f32, min: f32, max: f32) -> f64 {
     if !value.is_finite() {
         return 0.5;
@@ -223,10 +241,10 @@ fn unit(value: f32, min: f32, max: f32) -> f64 {
 
 /// Signed latent half-width. Normalized channels live in [0,1];
 /// the latent coordinate centers them on the origin at ±0.25 —
-/// neutral state is the ball's center, and the corner of the
-/// operating box (√6·0.25 ≈ 0.61) stays well inside the unit
-/// ball, where the log/exp maps are accurate instead of being
-/// radially clamped onto the boundary shell.
+/// neutral state is the sphere's pole, and the corner of the
+/// operating box (√6·0.25 ≈ 0.61) stays well inside the
+/// hemisphere cap, where the log/exp maps are accurate instead of
+/// being radially clamped onto the equator rim.
 const LATENT_HALF: f64 = 0.25;
 
 fn latent(unit: f64) -> f64 {
@@ -407,11 +425,11 @@ mod tests {
     }
 
     #[test]
-    fn fibers_relax_toward_nominal_between_observations() {
-        // The engines carry a real law now: an unobserved fiber
-        // drifts toward the ball's origin at its own clearance
-        // rate. The drift must shrink the state's norm, never
-        // grow it, and never leave the manifold.
+    fn fibers_spiral_inward_toward_nominal_between_observations() {
+        // The engines carry a real law: an unobserved fiber winds
+        // toward the sphere's pole at its own clearance rate — the
+        // loxodrome. The drift must shrink the state's norm and
+        // turn its phase, never grow it, never leave the cap.
         let mut runtime = FieldRuntime::new().unwrap();
         runtime.field.fibers[0].layers[0].state = vec![0.2; LATENT_DIMENSION];
         let before: f64 = runtime.field.fibers[0].layers[0]
@@ -420,17 +438,19 @@ mod tests {
             .map(|v| v * v)
             .sum::<f64>()
             .sqrt();
+        let before_first_two: f64 =
+            runtime.field.fibers[0].layers[0].state[0] / runtime.field.fibers[0].layers[0].state[1];
         runtime.field.fibers[0].step(1.0).unwrap();
-        let after: f64 = runtime.field.fibers[0].layers[0]
-            .state
-            .iter()
-            .map(|v| v * v)
-            .sum::<f64>()
-            .sqrt();
+        let state = &runtime.field.fibers[0].layers[0].state;
+        let after: f64 = state.iter().map(|v| v * v).sum::<f64>().sqrt();
         assert!(after < before, "damping must contract the state");
         // 1 s at τ=120 s ≈ 0.83% contraction — real but gentle.
         assert!(after > before * 0.97, "the drift is a leak, not a collapse");
         assert!(after < before * (1.0 - 0.5 / BODY_RELAX_TAU_S));
+        // The (0,1)-plane winding turned the phase between the first
+        // two coordinates — the spiral, not just the sink.
+        let after_first_two = state[0] / state[1];
+        assert_ne!(after_first_two, before_first_two, "the skew term must wind");
     }
 
     #[test]
@@ -469,19 +489,19 @@ mod tests {
     #[test]
     fn latent_maps_unit_interval_into_signed_half_width() {
         assert_eq!(latent(0.0), -LATENT_HALF);
-        assert_eq!(latent(0.5), 0.0); // neutral state is the ball's center
+        assert_eq!(latent(0.5), 0.0); // neutral state is the sphere's pole
         assert_eq!(latent(1.0), LATENT_HALF);
     }
 
     #[test]
-    fn projections_stay_inside_the_ball_unclamped() {
+    fn projections_stay_inside_the_cap_unclamped() {
         // Every projection component passes through a [0,1]
         // normalizer and then `latent`, so the reachable set is the
         // box [−0.25, 0.25]^6. Its corner norm is √6·0.25 ≈ 0.61 —
-        // interior to the unit ball, so project() must leave even
-        // corner projections untouched rather than clamping them
-        // onto the boundary shell.
-        let manifold = PoincareBall::new(LATENT_DIMENSION, 1.0).unwrap();
+        // interior to the hemisphere cap, so project() must leave
+        // even corner projections untouched rather than clamping
+        // them onto the equator rim.
+        let manifold = StereographicSphere::new(LATENT_DIMENSION, 1.0).unwrap();
         for sign in [1.0, -1.0] {
             let corner = vec![sign * LATENT_HALF; LATENT_DIMENSION];
             assert_eq!(manifold.project(&corner).unwrap(), corner);

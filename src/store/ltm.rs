@@ -44,7 +44,7 @@
 //! matching. The SDR provides higher-dimensional similarity for
 //! `find_similar` queries.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -481,6 +481,11 @@ pub enum LtmError {
     DecompressFailed(String),
     /// Compressing an episode payload failed (with a reason string).
     CompressFailed(String),
+    /// The episode text was empty or all whitespace — an episode with
+    /// no content is noise, not a memory (it also degenerates the
+    /// SimHash to 0, which makes it "associated" with every other
+    /// empty episode at distance 0).
+    EmptyPayload,
 }
 
 impl std::fmt::Display for LtmError {
@@ -502,6 +507,7 @@ impl std::fmt::Display for LtmError {
             }
             Self::DecompressFailed(e) => write!(f, "decompression failed: {e}"),
             Self::CompressFailed(e) => write!(f, "compression failed: {e}"),
+            Self::EmptyPayload => write!(f, "episode text is empty"),
         }
     }
 }
@@ -534,6 +540,14 @@ pub struct LtmStore {
     meta_header: IndexHeader,
     /// Base path (without extension) for rebuilding the bundle store
     base_path: std::path::PathBuf,
+    /// SimHash fingerprints of active meta-memory texts — the
+    /// association engine's global dedup index. A bridge's fingerprint
+    /// is `simhash` of its full meta text (episode IDs embedded), so
+    /// a pair is bridged at most once across the whole store, no
+    /// matter which later pass re-encounters it. Rebuilt from active
+    /// meta entries at `open` (archived connections may legitimately
+    /// re-form) and maintained on every meta store.
+    meta_hashes: HashSet<u64>,
 }
 
 unsafe impl Send for LtmStore {}
@@ -612,6 +626,7 @@ impl LtmStore {
             active_ids: Vec::new(),
             meta_header,
             base_path: base,
+            meta_hashes: HashSet::new(),
         })
     }
 
@@ -879,6 +894,18 @@ impl LtmStore {
             );
         }
 
+        // Rebuild the association dedup index from the active meta
+        // entries — O(active) over the in-memory index, no payload
+        // reads. Archived bridges stay out of the set: a connection
+        // that was archived may legitimately re-form.
+        let meta_hashes: HashSet<u64> = active_ids
+            .iter()
+            .filter_map(|id| id_to_idx.get(id))
+            .map(|&idx| &entries[idx])
+            .filter(|e| e.is_meta_memory())
+            .map(|e| e.association_hash)
+            .collect();
+
         let mut reconciled_store = Self {
             bundles,
             meta_file,
@@ -886,6 +913,7 @@ impl LtmStore {
             entries,
             id_to_idx,
             active_ids,
+            meta_hashes,
             meta_header: IndexHeader {
                 episode_count: active_count,
                 next_episode_id: reconciled_next,
@@ -1207,6 +1235,14 @@ impl LtmStore {
                 ))
             })?;
         let text_bytes = text.as_bytes();
+        // An episode with no text is noise, not a memory — and its
+        // SimHash degenerates to 0, "associating" it with every other
+        // empty episode at distance 0. Reject at the boundary so all
+        // producers (STM consolidation, IPC, meta stores) share the
+        // guard.
+        if text.trim().is_empty() {
+            return Err(LtmError::EmptyPayload);
+        }
         // The full payload is 52 bytes (header + emotional tag) + text.
         // Check the total payload size, not just the text size, so that
         // a text of exactly MAX_PAYLOAD_SIZE doesn't produce a payload
@@ -1364,6 +1400,9 @@ impl LtmStore {
         // See the migration in `open` for the full module list.
         if is_meta_memory {
             entry.mark_meta_memory();
+            // Record the fingerprint so the association engine's
+            // global dedup sees this bridge immediately.
+            self.meta_hashes.insert(assoc_hash);
         }
 
         // Append to metadata file
@@ -1443,6 +1482,7 @@ impl LtmStore {
 
         // Mark the entry and persist the updated flags byte.
         self.entries[idx].mark_meta_memory();
+        self.meta_hashes.insert(self.entries[idx].association_hash);
 
         // The IndexHeader is 64 bytes, each IndexEntry is 64 bytes,
         // and the flags field is at offset 60 within each entry.
@@ -2027,6 +2067,60 @@ impl LtmStore {
         Ok(())
     }
 
+    /// Archive many episodes in one pass — the bulk form of
+    /// [`Self::archive`].
+    ///
+    /// Per-episode work is identical (flags byte write, active-list
+    /// removal, SDR subtraction for non-meta episodes), but the
+    /// metadata header is written and fsynced once for the whole
+    /// batch instead of once per episode — the difference between
+    /// seconds and minutes at ~200K episodes. Unknown, deleted, and
+    /// already-archived IDs are skipped. Returns the number archived.
+    pub fn archive_many(&mut self, ids: &[u64]) -> Result<u32, LtmError> {
+        let mut archived_ids: HashSet<u64> = HashSet::with_capacity(ids.len());
+        for &episode_id in ids {
+            let Some(&idx) = self.id_to_idx.get(&episode_id) else {
+                continue;
+            };
+            if self.entries[idx].is_deleted() || self.entries[idx].is_archived() {
+                continue;
+            }
+
+            // Subtract the SDR contribution for real episodes —
+            // meta-memories were never bundled, same as `archive`.
+            if !self.entries[idx].is_meta_memory()
+                && let Ok(episode) = self.retrieve(episode_id)
+            {
+                self.unbundle(episode_id, &episode);
+            }
+
+            // Disk first, memory after — a failed write must not
+            // diverge the in-memory index from the file. The flags
+            // field is at offset 60 within each 64-byte entry.
+            let flags_offset = 64 + (idx as u64 * INDEX_ENTRY_SIZE as u64) + 60;
+            let flags = self.entries[idx].flags | IndexEntry::ARCHIVED_FLAG;
+            self.meta_file
+                .seek(SeekFrom::Start(flags_offset))
+                .map_err(LtmError::Io)?;
+            self.meta_file.write_all(&[flags]).map_err(LtmError::Io)?;
+            self.entries[idx].flags = flags;
+            archived_ids.insert(episode_id);
+        }
+
+        if archived_ids.is_empty() {
+            return Ok(0);
+        }
+
+        self.meta_header.episode_count = self
+            .meta_header
+            .episode_count
+            .saturating_sub(archived_ids.len() as u32);
+        self.write_meta_header()?;
+        self.active_ids.retain(|id| !archived_ids.contains(id));
+
+        Ok(archived_ids.len() as u32)
+    }
+
     /// Number of active (non-deleted, non-archived) episodes.
     pub fn count(&self) -> u32 {
         self.meta_header.episode_count
@@ -2041,6 +2135,27 @@ impl LtmStore {
     /// Returns `None` for slots outside the index bounds.
     pub fn index_entry_ref(&self, slot: usize) -> Option<&IndexEntry> {
         self.entries.get(slot)
+    }
+
+    /// Whether a meta-memory with this SimHash fingerprint is active.
+    ///
+    /// The association engine's dedup check: a bridge's fingerprint is
+    /// the SimHash of its full meta text, which embeds the normalized
+    /// episode-ID pair — so one stored bridge suppresses the same
+    /// pair forever, regardless of which pass re-encounters it.
+    /// O(1); replaces the old last-N-entries scan that fell behind
+    /// the bridge write rate.
+    pub fn meta_hash_known(&self, fingerprint: u64) -> bool {
+        self.meta_hashes.contains(&fingerprint)
+    }
+
+    /// Whether an episode is a meta-memory (association bridge, dream
+    /// insight, or other internal bookkeeping record). Unknown IDs
+    /// return `false`.
+    pub fn is_meta_episode(&self, episode_id: u64) -> bool {
+        self.id_to_idx
+            .get(&episode_id)
+            .is_some_and(|&idx| self.entries[idx].is_meta_memory())
     }
 
     /// Get the most recently stored episode IDs.

@@ -44,10 +44,21 @@ use crate::store::{LtmStore, hamming_distance, simhash};
 /// Lower = stricter matching. 20 out of 64 bits is ~31% dissimilarity.
 pub const ASSOCIATION_THRESHOLD: u32 = 20;
 
-/// How many candidates to fetch from `find_associations` before filtering
-/// out meta-memories. We over-fetch to compensate for filtered-out
-/// `[association]` and `[dream-insight]` episodes so the engine still
-/// has enough real source memories to build bridges between.
+/// Minimum Hamming distance for two memories to be worth bridging.
+///
+/// Below this, the SimHashes are near-identical — same text or
+/// trivially edited — so the "association" is a duplicate detection,
+/// not a connection between two memories. The floor also breaks the
+/// degenerate case where repeated or empty texts (SimHash 0) all sit
+/// at distance 0 from each other: without it, every identical episode
+/// bridges to up to `ASSOCIATION_CANDIDATE_LIMIT` others each pass,
+/// which is how the store accumulated a quarter-million junk bridges
+/// in the first place.
+pub const MIN_ASSOCIATION_DISTANCE: u32 = 6;
+
+/// How many association candidates a single source episode may
+/// produce per pass — caps the bridges one episode can spawn so a
+/// single hot memory can't dominate a pass's writes.
 const ASSOCIATION_CANDIDATE_LIMIT: usize = 20;
 
 /// Returns true if the episode text is a meta-memory (an association
@@ -92,14 +103,24 @@ impl AssociationEngine {
     /// Returns a list of (episode_id, hamming_distance) pairs for
     /// memories whose SimHash is within `ASSOCIATION_THRESHOLD` bits
     /// of the query episode's hash.
+    ///
+    /// Two exclusions keep the result meaningful:
+    /// - meta-memories are bookkeeping, not memories — they can
+    ///   neither source nor anchor an association;
+    /// - distances at or under `MIN_ASSOCIATION_DISTANCE` are
+    ///   near-duplicates — a bridge between them is noise, not a
+    ///   connection (see the constant's doc).
     pub fn find_associations(ltm: &LtmStore, episode_hash: u64, limit: usize) -> Vec<(u64, u32)> {
         let mut results: Vec<(u64, u32)> = Vec::new();
 
         // Iterate only active entries via in-memory index — O(active)
         // instead of O(capacity) scanning all 65K slots.
         for (_id, entry) in ltm.active_entries() {
+            if entry.is_meta_memory() {
+                continue;
+            }
             let dist = hamming_distance(episode_hash, entry.association_hash);
-            if dist <= ASSOCIATION_THRESHOLD {
+            if (MIN_ASSOCIATION_DISTANCE..=ASSOCIATION_THRESHOLD).contains(&dist) {
                 results.push((entry.episode_id, dist));
             }
         }
@@ -107,31 +128,6 @@ impl AssociationEngine {
         results.sort_by_key(|(_, dist)| *dist);
         results.truncate(limit);
         results
-    }
-
-    /// Check if a hash close to `target_hash` exists among the most
-    /// recent episodes. Only scans the last `scan_count` entries instead
-    /// of the full LTM, making it O(scan_count) instead of O(active).
-    ///
-    /// This is used for duplicate detection during association: a
-    /// duplicate meta-memory would have been stored recently, so we
-    /// only need to check the tail of the index.
-    fn hash_exists_recent(
-        ltm: &LtmStore,
-        target_hash: u64,
-        threshold: u32,
-        scan_count: usize,
-    ) -> bool {
-        let ids = ltm.active_episode_ids();
-        let start = ids.len().saturating_sub(scan_count);
-        for &id in &ids[start..] {
-            if let Some(hash) = ltm.episode_hash(id)
-                && hamming_distance(target_hash, hash) < threshold
-            {
-                return true;
-            }
-        }
-        false
     }
 
     /// Run an association pass on recently-stored episodes.
@@ -148,6 +144,13 @@ impl AssociationEngine {
 
         for &episode_id in recent_ids {
             result.scanned += 1;
+
+            // Cheap flag check first — a flagged meta-memory is
+            // bookkeeping, not a bridge source, so don't even
+            // decompress it.
+            if ltm.is_meta_episode(episode_id) {
+                continue;
+            }
 
             // Retrieve the episode to get its hash and text
             let episode = match ltm.retrieve(episode_id) {
@@ -190,27 +193,45 @@ impl AssociationEngine {
                 // Check if this association already exists by searching
                 // for a meta-memory about this pair.
                 //
+                // Normalize the endpoint order so (A,B) and (B,A)
+                // produce the same bridge text — and therefore the
+                // same dedup fingerprint — no matter which episode the
+                // pass started from.
+                //
                 // We embed the text of both endpoint episodes directly
                 // in the association text (tab-delimited) so the
                 // insight is self-contained. Without this, the Python
                 // side would need to retrieve the episodes by ID later
                 // — but sleep compression may have deleted them by
                 // then, leaving stale references.
-                let ep_a_text = truncate_text(&episode.text, 200);
-                let ep_b_text = truncate_text(&assoc_episode.text, 200);
+                let (id_a, id_b, ep_a_text, ep_b_text) = if episode_id < assoc_id {
+                    (
+                        episode_id,
+                        assoc_id,
+                        truncate_text(&episode.text, 200),
+                        truncate_text(&assoc_episode.text, 200),
+                    )
+                } else {
+                    (
+                        assoc_id,
+                        episode_id,
+                        truncate_text(&assoc_episode.text, 200),
+                        truncate_text(&episode.text, 200),
+                    )
+                };
                 let meta_text = format!(
                     "[association] episode {} ↔ episode {} (distance: {})\t{}\t{}",
-                    episode_id, assoc_id, dist, ep_a_text, ep_b_text
+                    id_a, id_b, dist, ep_a_text, ep_b_text
                 );
                 let meta_hash = simhash(&meta_text);
 
-                // Check if we already have this meta-memory.
-                // Instead of scanning all 259K+ entries via
-                // find_associations (O(n) per check, up to 100 checks
-                // per pass), only scan the most recent episodes — a
-                // duplicate would be among them since associations are
-                // stored sequentially in LTM.
-                if Self::hash_exists_recent(ltm, meta_hash, 5, 200) {
+                // Global dedup: one active bridge per normalized pair,
+                // period. The old check scanned only the last ~200
+                // episodes, which the flood's own write rate outran
+                // (and each bridge's unique IDs changed its hash
+                // anyway); the meta-hash index covers every active
+                // bridge in O(1).
+                if ltm.meta_hash_known(meta_hash) {
                     result.duplicates += 1;
                     continue;
                 }
@@ -350,22 +371,24 @@ impl AssociationEngine {
                         start_text,
                         end_text
                     );
-
-                    let neutral_tag = [0.5f32; 12];
-                    let compact_tag = [0.6, 0.2, 0.1, 0.6]; // mildly positive, curious
-                    if ltm
-                        .store_meta(
-                            now_ms,
-                            0.7, // Dream insights are high-salience
-                            neutral_tag,
-                            compact_tag,
-                            2, // Internal
-                            9, // Dreaming module
-                            &insight_text,
-                        )
-                        .is_ok()
-                    {
-                        result.insights += 1;
+                    let insight_hash = simhash(&insight_text);
+                    if !ltm.meta_hash_known(insight_hash) {
+                        let neutral_tag = [0.5f32; 12];
+                        let compact_tag = [0.6, 0.2, 0.1, 0.6]; // mildly positive, curious
+                        if ltm
+                            .store_meta(
+                                now_ms,
+                                0.7, // Dream insights are high-salience
+                                neutral_tag,
+                                compact_tag,
+                                2, // Internal
+                                9, // Dreaming module
+                                &insight_text,
+                            )
+                            .is_ok()
+                        {
+                            result.insights += 1;
+                        }
                     }
                 }
             }
@@ -389,7 +412,17 @@ impl AssociationEngine {
         if ids.is_empty() {
             return None;
         }
-        Some(ids[rng.next_usize() % ids.len()])
+        // A dream must seed from a real memory, not a bridge or
+        // insight — meta-memories can't be association anchors.
+        // Retry a few picks before giving up; when the store is mostly
+        // real episodes the first pick nearly always lands.
+        for _ in 0..8 {
+            let id = ids[rng.next_usize() % ids.len()];
+            if !ltm.is_meta_episode(id) {
+                return Some(id);
+            }
+        }
+        None
     }
 }
 

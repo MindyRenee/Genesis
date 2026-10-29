@@ -149,15 +149,17 @@ pub const SLEEP_RECEPTOR_RESENSITIZATION_RATE: f32 = 0.001;
 /// `factor = 1 / (1 + d/REF)`: disagreement attenuates confidence
 /// by exactly the noise it measures.
 ///
-/// Calibrated to the field's measured operating envelope: the
-/// fibers' standing disagreement on a quiet host is ~0.2–0.3, so a
-/// scale of 0.1 floored precision at 0.5 *always* — and crushed
-/// precision kept the prediction fiber displaced, which re-created
-/// the disagreement that attenuated it (a self-sustaining loop).
-/// At 0.4 the standing disagreement attenuates ~35% while a genuine
-/// incoherence excursion (d≳0.5) reaches the 0.5 floor — the field
-/// reports its noise without halving confidence as a baseline.
-const DISAGREEMENT_PRECISION_SCALE: f64 = 0.4;
+/// Calibrated to the field's measured operating envelope on the
+/// stereographic sphere (examples/field_remeasure.rs): bounded
+/// distances keep the fibers closer — standing disagreement on a
+/// quiet host measures ~0.07–0.08 where the unbounded ball let it
+/// sit ~0.2–0.3, and a sustained incoherence excursion peaks
+/// ~0.15, so the old d≳0.5 excursion band is geometrically
+/// unreachable. At 0.15 the standing band attenuates ~33% —
+/// matching the original intent — while a genuine excursion
+/// (d≳0.15) reaches the 0.5 floor: the field reports its noise
+/// without halving confidence as a baseline.
+const DISAGREEMENT_PRECISION_SCALE: f64 = 0.15;
 
 /// The field reports; it does not rule. Disagreement may halve the
 /// confidence the body publishes about itself — never silence it.

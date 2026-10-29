@@ -11,6 +11,28 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
 
 ## [Unreleased]
 
+### Changed
+
+- **The system field's manifold: Poincaré ball → stereographic
+  sphere** — `src/field/` now charts the three major systems'
+  shared latent space on a κ-stereographic sphere (positive
+  curvature κ = 1, the Poincaré ball's same-formalism counterpart),
+  the pole at the origin, states held inside the hemisphere cap
+  ‖x‖ < 1. Honest positive-curvature geometry throughout: bounded
+  `atan2`-form distance (max π), `atan`/`tan` log/exp, spherical
+  Möbius addition, and true antipodes `−x/(κ‖x‖²)` —
+  `anticonsensus` is now literally the far side of the sphere.
+  Inside the cap the Fréchet mean stays unique (Buss–Fillmore), so
+  cross-fiber consensus survives the curvature flip unchanged.
+  Between observations each fiber's drift is now a loxodrome: a
+  skew-symmetric winding (`SystemEngine::spiral`, Jᵀ = −J, wired
+  into derivatives, Jacobian, and growth bound) paired with the
+  existing homeostatic damping, so unobserved fibers spiral into
+  the pole at their own clearance rates (τ 120/40/60 s) rather than
+  decaying straight in. The engine also supports the mirrored
+  regime — negative damping + isotropic saturation settles onto a
+  mid-cap limit cycle — tested but not wired.
+
 ### Removed
 
 - **ARC and the whole world-play stack** — owner direction: nothing

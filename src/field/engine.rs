@@ -52,17 +52,34 @@ fn mat_vec(m: &[Vector], x: &[f64]) -> Result<Vector, FieldError> {
 /// couplings[target][source] is the linear local Jacobian contribution
 /// from one layer into another. Nonlinear/state-dependent engines can be
 /// layered on top of this interface without changing the field topology.
+///
+/// `spiral` holds a per-layer skew-symmetric generator: dx += J·x with
+/// Jᵀ = −J. A skew term is norm-preserving — ⟨x, Jx⟩ = 0 — so it rotates
+/// the state without damping it. Combined with a radial term the
+/// trajectory is a logarithmic spiral on the stereographic chart: a
+/// loxodrome, the constant-bearing curve around the pole of the sphere.
+/// Contractive damping winds it inward toward the pole; negative
+/// (excitatory) damping winds it outward, where an isotropic saturation
+/// bound catches it onto a limit cycle — a circle, the closed arc of
+/// positive curvature.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SystemEngine {
     pub couplings: Vec<Vec<Matrix>>,
     pub biases: Vec<Vector>,
     /// Per-layer dissipative coefficient. Positive values make the local
-    /// dynamics contractive; zero preserves the undamped linear system.
+    /// dynamics contractive — relaxation toward nominal. Negative values
+    /// are excitatory — a repulsion from the pole, the radial drive of an
+    /// outward spiral. Only finiteness is policed; the sign is the caller's
+    /// dynamical intent.
     pub damping: Vec<f64>,
     /// Isotropic nonlinear saturation coefficient per layer. The term is
     /// -saturation * ||state||² * state, which bounds growth without choosing
     /// a coordinate-specific activation function.
     pub saturation: Vec<f64>,
+    /// Per-layer skew-symmetric spiral generator (Jᵀ = −J): the angular
+    /// component of the loxodromic drift. Zero matrices disable winding,
+    /// leaving the purely radial OU relaxation.
+    pub spiral: Vec<Matrix>,
     pub time_scale: f64,
 }
 
@@ -73,6 +90,7 @@ impl SystemEngine {
             biases: vec![vec![0.0; dimension]; layer_count],
             damping: vec![0.0; layer_count],
             saturation: vec![0.0; layer_count],
+            spiral: vec![vec![vec![0.0; dimension]; dimension]; layer_count],
             time_scale: 1.0,
         }
     }
@@ -107,6 +125,7 @@ impl SystemEngine {
             biases,
             damping: vec![0.0; n],
             saturation: vec![0.0; n],
+            spiral: vec![vec![vec![0.0; d]; d]; n],
             time_scale,
         })
     }
@@ -122,14 +141,21 @@ impl SystemEngine {
             || self.couplings.len() != n
             || self.damping.len() != n
             || self.saturation.len() != n
+            || self.spiral.len() != n
             || !self.time_scale.is_finite()
             || self.time_scale <= 0.0
             || self
                 .biases
                 .iter()
                 .any(|b| b.len() != d || b.iter().any(|x| !x.is_finite()))
-            || self.damping.iter().any(|x| !x.is_finite() || *x < 0.0)
+            || self.damping.iter().any(|x| !x.is_finite())
             || self.saturation.iter().any(|x| !x.is_finite() || *x < 0.0)
+            || self.spiral.iter().any(|m| {
+                m.len() != d
+                    || m.iter()
+                        .any(|r| r.len() != d || r.iter().any(|x| !x.is_finite()))
+                    || (0..d).any(|i| (0..d).any(|j| m[i][j] != -m[j][i]))
+            })
             || self.couplings.iter().any(|row| {
                 row.len() != n
                     || row.iter().any(|m| {
@@ -144,10 +170,12 @@ impl SystemEngine {
         Ok((n, d))
     }
 
-    /// Set non-negative local damping for every subsystem layer.
+    /// Set local damping for every subsystem layer. Positive values
+    /// contract toward nominal; negative values excite — they drive
+    /// the state outward, and belong paired with a saturation bound
+    /// so the spiral lands on a limit cycle rather than the cap rim.
     pub fn with_damping(mut self, damping: Vec<f64>) -> Result<Self, FieldError> {
-        if damping.len() != self.biases.len() || damping.iter().any(|x| !x.is_finite() || *x < 0.0)
-        {
+        if damping.len() != self.biases.len() || damping.iter().any(|x| !x.is_finite()) {
             return Err(FieldError::InvalidDynamics);
         }
         self.damping = damping;
@@ -165,10 +193,24 @@ impl SystemEngine {
         Ok(self)
     }
 
+    /// Set a skew-symmetric spiral generator per layer. Each matrix must
+    /// satisfy Jᵀ = −J exactly — only then is the drift a pure rotation,
+    /// so damping alone decides the radius and the state traces a
+    /// logarithmic spiral.
+    pub fn with_spiral(mut self, spiral: Vec<Matrix>) -> Result<Self, FieldError> {
+        if spiral.len() != self.biases.len() {
+            return Err(FieldError::InvalidDynamics);
+        }
+        self.spiral = spiral;
+        self.validate()?;
+        Ok(self)
+    }
+
     /// State-dependent Jacobian of the complete nonlinear vector field.
     ///
     /// For the local term -s ||x||² x, the derivative is
-    /// -s (||x||² I + 2 x xᵀ). Coupling and damping are added directly.
+    /// -s (||x||² I + 2 x xᵀ). Coupling, spiral, and damping are added
+    /// directly.
     pub fn jacobian(&self, layers: &[SubsystemLayer]) -> Result<Vec<Vec<Matrix>>, FieldError> {
         let (n, d) = self.validate()?;
         if layers.len() != n {
@@ -195,6 +237,7 @@ impl SystemEngine {
             let state = &layers[target].state;
             for (k, row) in out[target][target].iter_mut().enumerate() {
                 for (j, cell) in row.iter_mut().enumerate() {
+                    *cell += self.spiral[target][k][j];
                     let nonlinear = if saturation == 0.0 {
                         0.0
                     } else {
@@ -240,6 +283,15 @@ impl SystemEngine {
         for target in 0..n {
             for coordinate in 0..d {
                 let mut row_sum = -self.damping[target];
+                // A skew generator cannot contract, but its entries bound
+                // how much it can amplify one coordinate in the worst
+                // case, so it belongs in the conservative bound.
+                for value in &self.spiral[target][coordinate] {
+                    row_sum += value.abs();
+                    if !row_sum.is_finite() {
+                        return Err(FieldError::NonFiniteState);
+                    }
+                }
                 for source in 0..n {
                     let row = &self.couplings[target][source][coordinate];
                     if row.len() != d {
@@ -280,6 +332,12 @@ impl SystemEngine {
             }
             for (dst, state) in out[i].iter_mut().zip(&layer.state) {
                 *dst -= self.damping[i] * state;
+            }
+            if self.spiral[i].iter().flatten().any(|v| *v != 0.0) {
+                let wound = mat_vec(&self.spiral[i], &layer.state)?;
+                for (dst, w) in out[i].iter_mut().zip(wound) {
+                    *dst += w;
+                }
             }
         }
         for (target, out_row) in out.iter_mut().enumerate() {
@@ -410,9 +468,93 @@ mod tests {
     }
 
     #[test]
+    fn spiral_winds_state_without_changing_its_radius() {
+        // A skew generator alone is a pure rotation: the derivative
+        // is perpendicular to the state, so the radial component of
+        // the drift is exactly zero.
+        let j = vec![vec![0.0, -1.0], vec![1.0, 0.0]];
+        let engine = SystemEngine::zero(1, 2).with_spiral(vec![j]).unwrap();
+        let layers = vec![SubsystemLayer::new("a", vec![0.3, 0.4])];
+        let d = engine.derivatives(&layers).unwrap();
+        assert!((d[0][0] + 0.4).abs() < 1e-12);
+        assert!((d[0][1] - 0.3).abs() < 1e-12);
+        let radial = layers[0].state[0] * d[0][0] + layers[0].state[1] * d[0][1];
+        assert!(radial.abs() < 1e-12);
+    }
+
+    #[test]
+    fn damped_spiral_contracts_while_rotating() {
+        // Damping plus a skew generator is the loxodrome: each step
+        // shrinks the radius and turns the phase — a logarithmic
+        // spiral into the pole.
+        let j = vec![vec![0.0, -0.5], vec![0.5, 0.0]];
+        let engine = SystemEngine::zero(1, 2)
+            .with_damping(vec![0.5])
+            .unwrap()
+            .with_spiral(vec![j])
+            .unwrap();
+        let layers = vec![SubsystemLayer::new("a", vec![0.3, 0.0])];
+        let d = engine.derivatives(&layers).unwrap();
+        // Radial inflow (−0.5·0.3 = −0.15) plus winding (+0.5·0.3
+        // into the second coordinate).
+        assert!((d[0][0] + 0.15).abs() < 1e-12);
+        assert!((d[0][1] - 0.15).abs() < 1e-12);
+    }
+
+    #[test]
+    fn spiral_must_be_skew_symmetric() {
+        let bad = vec![vec![0.0, -1.0], vec![-1.0, 0.0]];
+        assert_eq!(
+            SystemEngine::zero(1, 2).with_spiral(vec![bad]),
+            Err(FieldError::InvalidDynamics)
+        );
+        let mut engine = SystemEngine::zero(1, 2);
+        engine.spiral[0][0][1] = 1.0;
+        let layers = vec![SubsystemLayer::new("a", vec![0.1, 0.2])];
+        assert_eq!(
+            engine.derivatives(&layers),
+            Err(FieldError::InvalidDynamics)
+        );
+    }
+
+    #[test]
+    fn outward_spiral_settles_onto_a_limit_cycle() {
+        // Negative damping winds the state out from the pole; the
+        // isotropic saturation term bounds it. The fixed point of the
+        // radial law ṙ = αr − s·r³ is r* = √(α/s) — a stable ring:
+        // inside it the drift pushes out, outside it pulls back.
+        let j = vec![vec![0.0, -1.0], vec![1.0, 0.0]];
+        let engine = SystemEngine::zero(1, 2)
+            .with_damping(vec![-0.5])
+            .unwrap()
+            .with_spiral(vec![j])
+            .unwrap()
+            .with_saturation(vec![2.0])
+            .unwrap();
+        // r* = √(0.5/2) = 0.5. Below it, the radial drift is outward.
+        let inner = vec![SubsystemLayer::new("a", vec![0.2, 0.0])];
+        let d_in = engine.derivatives(&inner).unwrap();
+        let radial_in = inner[0].state[0] * d_in[0][0] + inner[0].state[1] * d_in[0][1];
+        assert!(radial_in > 0.0, "inside the ring the spiral pushes out");
+        // Above it, saturation dominates — the drift is inward.
+        let outer = vec![SubsystemLayer::new("a", vec![0.9, 0.0])];
+        let d_out = engine.derivatives(&outer).unwrap();
+        let radial_out = outer[0].state[0] * d_out[0][0] + outer[0].state[1] * d_out[0][1];
+        assert!(radial_out < 0.0, "outside the ring saturation pulls in");
+        // And on it, the radial component vanishes: pure winding.
+        let on = vec![SubsystemLayer::new("a", vec![0.5, 0.0])];
+        let d_on = engine.derivatives(&on).unwrap();
+        let radial_on = on[0].state[0] * d_on[0][0] + on[0].state[1] * d_on[0][1];
+        assert!(
+            radial_on.abs() < 1e-12,
+            "on the ring the drift is pure rotation"
+        );
+    }
+
+    #[test]
     fn public_engine_mutation_cannot_bypass_dynamics_validation() {
         let mut engine = SystemEngine::zero(1, 1);
-        engine.damping = vec![-1.0];
+        engine.damping = vec![f64::NAN];
         let layers = vec![SubsystemLayer::new("a", vec![0.1])];
         assert_eq!(
             engine.derivatives(&layers),
