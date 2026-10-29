@@ -65,7 +65,16 @@ from occipital_lobe.v1 import name_color
 from temporal_lobe import DetectedObject, ObjectRecognizer
 from temporal_lobe.concepts import RelationType
 
-from genesis_client.optic_nerve import latest_frame
+from genesis_client.optic_nerve import (
+    NAME as _OPTIC_NERVE_NAME,
+)
+from genesis_client.optic_nerve import (
+    SCREEN_NAME as _SCREEN_NERVE_NAME,
+)
+from genesis_client.optic_nerve import (
+    OpticNerve,
+    latest_frame,
+)
 from genesis_client.protocol import (
     CHEM_ACETYLCHOLINE,
     CHEM_DOPAMINE,
@@ -90,6 +99,12 @@ logger = logging.getLogger(__name__)
 # REM near 0.08, drowsy/overwhelmed and waking phases well above 0.15 —
 # so the gate is effectively the sleep boundary, not an arousal ramp.
 _THALAMIC_BLOCK = 0.15
+
+# The afferent nerves cortex can look through: the body's own eye and
+# the screen-capture nerve a relay feeds (``genesis_optic_nerve`` and
+# ``genesis_screen_nerve`` segments). A bare segment name also works —
+# the map is a vocabulary, not a gate.
+NERVE_SEGMENTS = {"optic": _OPTIC_NERVE_NAME, "screen": _SCREEN_NERVE_NAME}
 
 # Corticothalamic feedback decays with a 20 s half-life after the last
 # look — attention gain onto the dLGN persists only while cortex keeps
@@ -116,6 +131,10 @@ class VisionScene:
 
     # "ok" | "unavailable" | "mid_update" | "unprocessed" | "gated"
     status: str = "ok"
+    # Which afferent nerve this look came through — "optic" (the
+    # body's camera eye) or "screen" (the display-capture nerve).
+    # Provenance, not prose: the report can say where it looked.
+    nerve: str = "optic"
     # The thalamic relay gain the body reported for this look — None
     # when no optic reading was taken (older daemon, no client).
     relay_gate: float | None = None
@@ -171,6 +190,7 @@ class VisionScene:
     def as_metadata(self) -> dict:
         """The scene as language-engine metadata (the ``vision_scene`` slot)."""
         return {
+            "nerve": self.nerve,
             "light": self.light_level,
             "warmth": self.warmth,
             "color": self.dominant_color,
@@ -284,6 +304,11 @@ class Vision:
         # successive looks — self-motion and parallax depth. Lazily
         # created on first use, like the other sublayers.
         self._epipolar: EpipolarProcessor | None = None
+        # The same stage per named nerve — two-view geometry relates
+        # successive looks through ONE afferent, so the screen nerve
+        # keeps its own pair history instead of contaminating the room
+        # eye's motion parallax with desktop frames.
+        self._epipolars: dict[str, EpipolarProcessor] = {}
         # Corticothalamic engagement — how strongly recent seeing has
         # been attending vision, decayed toward the next look. The
         # heartbeat pushes it to the body as SET_OPTIC_GAIN — V1's
@@ -314,8 +339,20 @@ class Vision:
         """
         self._on_sight = callback
 
-    def is_available(self) -> bool:
-        """Return whether a live optic-nerve feed can be read."""
+    def is_available(self, nerve: str = "optic") -> bool:
+        """Return whether a live optic-nerve feed can be read.
+
+        ``nerve`` selects the afferent: ``"optic"`` is the body's own
+        eye (its availability is probed once and cached); any other
+        entry in ``NERVE_SEGMENTS`` — or a bare segment name — is
+        probed live by attach, since a relay comes and goes.
+        """
+        if nerve != "optic":
+            try:
+                OpticNerve(NERVE_SEGMENTS.get(nerve, nerve)).close()
+            except OSError:
+                return False
+            return True
         if self._available is None:
             try:
                 img = latest_frame(copy=True)
@@ -362,11 +399,20 @@ class Vision:
             return None
         return self._object_recognizer
 
-    def _get_epipolar(self) -> EpipolarProcessor:
-        """Get or lazily create the dorsal-stream two-view stage (MSTd)."""
-        if self._epipolar is None:
-            self._epipolar = EpipolarProcessor()
-        return self._epipolar
+    def _get_epipolar(self, nerve: str = "optic") -> EpipolarProcessor:
+        """Get or lazily create the dorsal-stream two-view stage (MSTd).
+
+        The processor is keyed by afferent: successive looks through
+        different nerves are different scenes, so each nerve keeps its
+        own previous-frame history.
+        """
+        if nerve == "optic":
+            if self._epipolar is None:
+                self._epipolar = EpipolarProcessor()
+            return self._epipolar
+        if nerve not in self._epipolars:
+            self._epipolars[nerve] = EpipolarProcessor()
+        return self._epipolars[nerve]
 
     def _get_phototransduction(self) -> PhototransductionCascade:
         """Get or lazily create the phototransduction cascade model."""
@@ -394,13 +440,13 @@ class Vision:
             cascade.step(brightness)
         return cascade.state
 
-    def _two_view_geometry(self, rgb) -> TwoViewReport | None:
+    def _two_view_geometry(self, rgb, nerve: str = "optic") -> TwoViewReport | None:
         """Relate this look to the last one — self-motion and depth.
 
         A geometry failure degrades the percept; it doesn't blind it.
         """
         try:
-            return self._get_epipolar().process(rgb)
+            return self._get_epipolar(nerve).process(rgb)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "occipital_lobe.perception.vision._two_view_geometry",
@@ -522,8 +568,9 @@ class Vision:
         emotion: EmotionalState | None = None,
         network=None,
         mirror: bool | None = None,
+        nerve: str = "optic",
     ) -> VisionScene:
-        """Look through the optic nerve and return the structured scene.
+        """Look through an afferent nerve and return the structured scene.
 
         This runs the full visual pipeline:
         1. Capture a frame from the nerve (shared memory)
@@ -539,20 +586,27 @@ class Vision:
         ``None`` (default) follows ``self.mirror``; ``False`` looks
         out at the world, ``True`` takes the facing (mirror) view.
 
+        ``nerve`` selects the afferent — ``"optic"`` is the body's
+        camera eye, ``"screen"`` the screen-capture nerve a relay
+        feeds (see ``NERVE_SEGMENTS``); a bare segment name is also
+        accepted. The thalamic gate applies to every nerve — cortex
+        cannot see around a closed thalamus on any channel.
+
         The return value is structured percept data, not a sentence —
         the caller hands ``scene.as_metadata()`` to the language engine,
         which composes its actual report from it.
         """
         gate = self._optic_gate(client)
         if isinstance(gate, VisionScene):
+            gate.nerve = nerve
             return gate
         relay_gate, pupil_mm, focus_m, lid = gate
-        if not self.is_available():
-            return VisionScene(status="unavailable", relay_gate=relay_gate)
+        if not self.is_available(nerve):
+            return VisionScene(status="unavailable", relay_gate=relay_gate, nerve=nerve)
         try:
-            frame = latest_frame(copy=True)
+            frame = latest_frame(copy=True, name=NERVE_SEGMENTS.get(nerve, nerve))
             if frame is None:
-                return VisionScene(status="mid_update")
+                return VisionScene(status="mid_update", nerve=nerve)
 
             # Convert to RGB. The nerve reader returns (H, W, 3) for
             # RGB3/BGR3, (H, W, 2) packed YUYV pairs for YUYV, and the
@@ -563,9 +617,9 @@ class Vision:
             elif frame.ndim == 3 and frame.shape[2] == 2:
                 rgb = _yuyv_to_rgb(frame)
             else:
-                return VisionScene(status="unprocessed", relay_gate=relay_gate)
+                return VisionScene(status="unprocessed", relay_gate=relay_gate, nerve=nerve)
 
-            return self._analyze_frame(
+            scene = self._analyze_frame(
                 rgb,
                 pupil_mm,
                 focus_m,
@@ -575,7 +629,10 @@ class Vision:
                 emotion,
                 network,
                 self.mirror if mirror is None else mirror,
+                nerve,
             )
+            scene.nerve = nerve
+            return scene
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "occipital_lobe.perception.vision.see",
@@ -628,6 +685,7 @@ class Vision:
         emotion: EmotionalState | None,
         network,
         mirror: bool,
+        nerve: str = "optic",
     ) -> VisionScene:
         """The cortical pipeline on one captured frame: optics,
         illumination, recognition, packaging, integration."""
@@ -698,7 +756,7 @@ class Vision:
 
         # ── MSTd (dorsal stream): two-view geometry of this look
         # against the last — self-motion, heading, parallax depth
-        two_view = self._two_view_geometry(rgb)
+        two_view = self._two_view_geometry(rgb, nerve)
 
         # ── Package the structured scene percept ────────────────
         scene = _build_scene(

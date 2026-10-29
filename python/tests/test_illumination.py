@@ -169,10 +169,12 @@ class TestSeeIntegration:
         from occipital_lobe.perception.vision import Vision
 
         monkeypatch.setattr(Vision, "_run_v1_sparse_coding", lambda self, rgb: None)
-        monkeypatch.setattr(Vision, "_two_view_geometry", lambda self, rgb: None)
+        monkeypatch.setattr(Vision, "_two_view_geometry", lambda self, rgb, nerve="optic": None)
         monkeypatch.setattr(Vision, "_get_object_recognizer", lambda self: None)
         monkeypatch.setattr(Vision, "_get_face_recognizer", lambda self: None)
-        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True: _shadow_scene())
+        monkeypatch.setattr(
+            vision_mod, "latest_frame", lambda copy=True, name=None: _shadow_scene()
+        )
         vis = Vision()
         vis._available = True
         scene = vis.see(client=_OpticClient(_optic()))

@@ -1240,8 +1240,12 @@ class ConversationMixin:
         # wander into bug scans, drawing, or exploration.
         self._resume_inner_life()
 
-    def see(self) -> str:
-        """Look through the optic nerve, store the observation, and report it.
+    def see(self, nerve: str = "optic") -> str:
+        """Look through an afferent nerve, store the observation, and report it.
+
+        ``nerve`` selects which eye: ``"optic"`` is the body's camera,
+        ``"screen"`` the screen-capture nerve a relay feeds. The
+        thalamic gate applies either way.
 
         ``vision.see`` returns the scene as structured percept data;
         the language engine composes its report from it — nothing here
@@ -1253,6 +1257,7 @@ class ConversationMixin:
                 client=self.client,
                 emotion=emotion,
                 network=self.brain.frontal.network,
+                nerve=nerve,
             )
             self._note_faces_seen()
             if scene.status == "ok":

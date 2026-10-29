@@ -1252,7 +1252,9 @@ class VolitionMixin:
         """
         if self.is_resting:
             return
-        if not self.vision.is_available():
+        # Any live afferent lets her look — the room eye or the screen
+        # nerve a relay feeds; only total darkness vetoes the urge.
+        if not (self.vision.is_available() or self.vision.is_available("screen")):
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -1265,12 +1267,22 @@ class VolitionMixin:
                 "mind.volition._perform_look",
                 e,
             )
+        # Two afferents when a screen nerve is live: the room eye and
+        # the display itself. Volitional looks alternate between them —
+        # the world and what the world shows her get equal shares of
+        # her attention.
+        nerve = "optic"
+        if self.vision.is_available("screen"):
+            self._look_screen = not getattr(self, "_look_screen", False)
+            if self._look_screen:
+                nerve = "screen"
         self._emit_volition_thought(("vision", "seeing", "looking"), "looking")
         try:
             self.vision.see(
                 client=self.client,
                 emotion=self.feel(),
                 network=self.brain.frontal.network,
+                nerve=nerve,
             )
             # Faces it recognizes become presences in its world.
             self._note_faces_seen()

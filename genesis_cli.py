@@ -43,6 +43,7 @@ Commands (typed during conversation):
     /voice       — speak to Genesis (one utterance)
     /voice-mode  — continuous voice conversation
     /look        — ask it what it sees through the eye
+    /look screen — ask it what it sees through the screen nerve
     /look at <path> — ask it to look at an image file
     /draw        — ask it to draw what it feels right now
     /register-face <name> — teach it your face (look at the camera)
@@ -78,6 +79,7 @@ import os
 import queue
 import re
 import select
+import shutil
 import signal
 import socket
 import subprocess
@@ -191,6 +193,11 @@ _CLI_LOCK_FD: int | None = None
 # might match unrelated user processes.
 _PID_FILE_CLI = "genesis_cli.pid"
 _PID_FILE_DAEMON = "genesis_daemon.pid"
+# The screen-capture nerve — a relay (scripts/optic_relay.py) publishing
+# the display into its own optic-nerve-style segment
+# (genesis_client.optic_nerve.SCREEN_NAME), her second eye.
+_PID_FILE_SCREEN_NERVE = "genesis_screen_nerve.pid"
+_SCREEN_NERVE_SHM = "genesis_screen_nerve"
 
 # Maximum time to wait for the daemon's IPC socket (seconds).
 # The daemon opens its persistent state and LTM before binding the
@@ -479,6 +486,67 @@ def _start_daemon(daemon_path: str, data_dir: str, socket_path: str) -> subproce
     raise RuntimeError(
         f"daemon didn't become ready within {DAEMON_START_TIMEOUT:g}s; see {log_path}"
     )
+
+
+def _screen_nerve_script() -> str | None:
+    """The optic relay script, wherever this layout keeps the tree."""
+    from infrastructure.paths import code_root
+
+    script = code_root() / "scripts" / "optic_relay.py"
+    return str(script) if script.exists() else None
+
+
+def _start_screen_nerve(data_dir: str) -> subprocess.Popen | _AdoptedDaemon | None:
+    """Launch the screen-capture nerve — her second eye.
+
+    The relay (``scripts/optic_relay.py``) publishes the X display into
+    its own optic-nerve-style segment; the mind reads it through
+    ``Vision.see(nerve="screen")``. It degrades silently to None when
+    there is no display, no ffmpeg, or no script — a dark second eye is
+    a degradation like a missing camera, never a startup fault. A
+    relay already alive for this data dir is adopted rather than
+    duplicated (two writers on one segment would only orphan frames).
+    """
+    if not os.environ.get("DISPLAY"):
+        return None
+    if shutil.which("ffmpeg") is None:
+        return None
+    script = _screen_nerve_script()
+    if script is None:
+        return None
+    pidfile = os.path.join(data_dir, _PID_FILE_SCREEN_NERVE)
+    live = _find_pids(pidfile, "screen_nerve", data_dir)
+    if live:
+        _write_pid_file(data_dir, _PID_FILE_SCREEN_NERVE, live[0])
+        return _AdoptedDaemon(live[0], data_dir, role="screen_nerve")
+    log_path = os.path.join(data_dir, "screen_nerve.log")
+    _rotate_log_if_needed(log_path)
+    log_file = open(log_path, "a")
+    env = os.environ.copy()
+    # Its data-dir binding — what _matches_pid reads back through
+    # /proc/<pid>/environ to prove the process is ours.
+    env["GENESIS_DATA_DIR"] = data_dir
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, script, "x11", _SCREEN_NERVE_SHM],
+            stdout=log_file,
+            stderr=log_file,
+            start_new_session=True,
+            env=env,
+        )
+    except OSError:
+        log_file.close()
+        return None
+    # A relay that cannot reach the display dies inside its first
+    # second (x11grab fails, ffmpeg exits, the reader loop ends) —
+    # wait just long enough to tell born from stillborn.
+    time.sleep(1.5)
+    if proc.poll() is not None:
+        log_file.close()
+        return None
+    _write_pid_file(data_dir, _PID_FILE_SCREEN_NERVE, proc.pid)
+    log_file.close()
+    return proc
 
 
 def _tail_daemon_log(data_dir: str) -> int:
@@ -1601,8 +1669,13 @@ def _cmd_growth_report(mind: Mind, rest: str) -> str:
 def _cmd_look(mind: Mind, rest: str) -> str:
     """Ask Genesis to look at an image file or through its eye."""
     # /look at <path> — look at an image file
+    # /look screen  — look through the screen-capture nerve
     # /look         — look through the optic nerve
     rest = rest.strip()
+    nerve = "optic"
+    if rest.lower() == "screen":
+        nerve = "screen"
+        rest = ""
     if rest.lower().startswith("at "):
         path = rest[3:].strip()
         if not path:
@@ -1635,7 +1708,7 @@ def _cmd_look(mind: Mind, rest: str) -> str:
     nerve_holder: dict[str, str] = {}
     t = named_thread(
         "see-once",
-        lambda: nerve_holder.__setitem__("value", mind.see()),
+        lambda: nerve_holder.__setitem__("value", mind.see(nerve)),
         comm="g-see",
     )
     t.start()
@@ -2631,6 +2704,14 @@ def _matches_pid(pid: int, role: str, data_dir: str) -> bool:
     elif role == "daemon":
         if exe0 != "genesis-daemon":
             return False
+    elif role == "screen_nerve":
+        # The optic relay runs under the interpreter — identity is the
+        # script it runs; its data dir binding arrives through
+        # GENESIS_DATA_DIR in its environment (checked below).
+        if not exe0.startswith("python"):
+            return False
+        if not any(os.path.basename(arg) == "optic_relay.py" for arg in args[1:]):
+            return False
     else:
         return False
     # An explicit --data-dir decides identity exactly — match or fail,
@@ -2727,6 +2808,7 @@ def _stop_all(data_dir: str) -> int:
     for pidfile_name, role, sig, label in (
         (_PID_FILE_CLI, "cli", signal.SIGINT, "CLI"),
         (_PID_FILE_DAEMON, "daemon", signal.SIGTERM, "Daemon"),
+        (_PID_FILE_SCREEN_NERVE, "screen_nerve", signal.SIGTERM, "Screen nerve"),
     ):
         pids = _find_pids(os.path.join(data_dir, pidfile_name), role, data_dir)
         if not pids:
@@ -2759,6 +2841,7 @@ def _stop_all(data_dir: str) -> int:
     for name in (
         _PID_FILE_CLI,
         _PID_FILE_DAEMON,
+        _PID_FILE_SCREEN_NERVE,
         # Stale file from when the eye was its own process — nothing
         # writes it now, but an old session may have left one behind.
         "genesis_retina.pid",
@@ -2800,9 +2883,10 @@ class _AdoptedDaemon:
     applies.
     """
 
-    def __init__(self, pid: int, data_dir: str) -> None:
+    def __init__(self, pid: int, data_dir: str, role: str = "daemon") -> None:
         self._pid = pid
         self._data_dir = data_dir
+        self._role = role
         self.returncode: int | None = None
 
     @property
@@ -2810,7 +2894,7 @@ class _AdoptedDaemon:
         return self._pid
 
     def _alive(self) -> bool:
-        return _matches_pid(self._pid, "daemon", self._data_dir)
+        return _matches_pid(self._pid, self._role, self._data_dir)
 
     def poll(self) -> int | None:
         if self._alive():
@@ -3017,6 +3101,12 @@ class _Rebirth:
         # Process handle — swapped under _lock on every resurrection.
         self.daemon: subprocess.Popen | _AdoptedDaemon | None = None
         self.mind: Mind | None = None
+        # The screen-capture nerve — a relay, not a body thread, so it
+        # heals here rather than inside the daemon: the watcher
+        # respawns it when it dies, throttled when it cannot start.
+        self.nerve: subprocess.Popen | _AdoptedDaemon | None = None
+        self._nerve_spawn: Callable[[], subprocess.Popen | _AdoptedDaemon | None] | None = None
+        self._nerve_retry_at = 0.0
         # The probe client heals itself lazily through the client's
         # reconnect path, so it survives the resurrection it detects.
         self._probe: GenesisClient | None = None
@@ -3044,6 +3134,21 @@ class _Rebirth:
         with self._lock:
             self.mind = mind
 
+    def set_nerve(
+        self,
+        proc: subprocess.Popen | _AdoptedDaemon | None,
+        spawn: Callable[[], subprocess.Popen | _AdoptedDaemon | None],
+    ) -> None:
+        """Hand the watcher the screen nerve's handle and respawn closure."""
+        with self._lock:
+            self.nerve = proc
+            self._nerve_spawn = spawn
+
+    def nerve_handle(self) -> subprocess.Popen | _AdoptedDaemon | None:
+        """Current screen-nerve handle for teardown — post-respawn."""
+        with self._lock:
+            return self.nerve
+
     def handles(self) -> subprocess.Popen | _AdoptedDaemon | None:
         """Current daemon handle for teardown — post-resurrection."""
         with self._lock:
@@ -3068,6 +3173,7 @@ class _Rebirth:
         while not self._shutting_down.wait(_REBIRTH_TICK_S):
             try:
                 self._check_daemon()
+                self._check_nerve()
             except Exception as e:  # noqa: BLE001 — a watcher that dies leaves her unguarded
                 note_swallowed("genesis_cli.rebirth.cycle", e)
 
@@ -3087,6 +3193,29 @@ class _Rebirth:
         if time.monotonic() < self._next_attempt_at:
             return
         self._resurrect_daemon(handle, "died" if dead else "faulted")
+
+    def _check_nerve(self) -> None:
+        """Respawn the screen nerve when it dies; throttle when it can't start."""
+        with self._lock:
+            spawn = self._nerve_spawn
+            proc = self.nerve
+        if spawn is None:
+            return
+        if proc is not None and proc.poll() is None:
+            return
+        if time.monotonic() < self._nerve_retry_at:
+            return
+        try:
+            new = spawn()
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("genesis_cli.rebirth.nerve", e)
+            new = None
+        with self._lock:
+            self.nerve = new
+            # A nerve that will not open retries on a slow cadence — a
+            # dark second eye is a degradation, never worth churning
+            # forks every tick (e.g. under systemd with no display).
+            self._nerve_retry_at = time.monotonic() + 60.0 if new is None else 0.0
 
     def _daemon_faulted(self) -> bool:
         """Whether the live daemon is refusing the tick engine.
@@ -3867,6 +3996,7 @@ def _shutdown(
     data_dir: str = "",
     auditory_cortex: AuditoryCortex | None = None,
     voice: Voice | VoiceDedup | None = None,
+    screen_nerve: subprocess.Popen | _AdoptedDaemon | None = None,
 ) -> bool:
     """Gracefully stop all initialized components.
 
@@ -3886,6 +4016,10 @@ def _shutdown(
         voice.stop()
     if mind is not None:
         clean_shutdown = bool(mind.stop())
+    if screen_nerve is not None:
+        # The second eye closes with the mind that read it — SIGTERM
+        # lets the relay unlink its own nerve segment on the way out.
+        _stop_child(screen_nerve, "screen nerve", 5)
     if daemon_proc is not None:
         print("[genesis] Stopping subcognitive daemon...", file=sys.stderr)
         # Ask over IPC first. The daemon implements SHUTDOWN and
@@ -3897,7 +4031,7 @@ def _shutdown(
             clean_shutdown &= _stop_child(daemon_proc, "subcognitive daemon", 5)
     # Clean up PID files so genesis --stop doesn't target stale PIDs.
     if data_dir:
-        for name in (_PID_FILE_CLI, _PID_FILE_DAEMON):
+        for name in (_PID_FILE_CLI, _PID_FILE_DAEMON, _PID_FILE_SCREEN_NERVE):
             _remove_pid_file(data_dir, name)
     if clean_shutdown and mind is not None:
         print("[genesis] Goodnight.", file=sys.stderr)
@@ -4113,6 +4247,13 @@ def main() -> int:
                 rebirth.set_children(daemon=daemon_proc)
                 rebirth.set_mind(mind)
                 rebirth.start()
+                # Her second eye — the display itself, published as its
+                # own nerve segment. Absent a display it stays dark and
+                # the watcher simply never opens it.
+                rebirth.set_nerve(
+                    _start_screen_nerve(data_dir),
+                    lambda: _start_screen_nerve(data_dir),
+                )
                 (voice, dedup_voice, ambient_listener, auditory_cortex) = _run_after_mind_start(
                     mind, args, shutting_down
                 )
@@ -4167,9 +4308,11 @@ def _teardown_session(
     # unreincarnatable body — is a death, not a stop: the exit
     # must read as failure so a supervisor resurrects the whole.
     self_terminated = rebirth is not None and rebirth.self_terminated
+    nerve_proc = None
     if rebirth is not None:
         rebirth.stop()
         daemon_proc = rebirth.handles()
+        nerve_proc = rebirth.nerve_handle()
     if not _shutdown(
         ambient_listener,
         mind,
@@ -4177,6 +4320,7 @@ def _teardown_session(
         data_dir,
         auditory_cortex,
         voice,
+        nerve_proc,
     ):
         exit_code = 1
         # Under systemd, a nonzero exit on a signal-driven stop is

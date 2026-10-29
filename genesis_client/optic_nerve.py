@@ -25,6 +25,12 @@ from multiprocessing import resource_tracker, shared_memory
 import numpy as np
 
 NAME = "genesis_optic_nerve"
+# The screen-capture nerve — a second afferent segment fed by
+# ``scripts/optic_relay.py`` (an x11grab of the display, or any relayed
+# source), carrying the same 28-byte header + seqlock protocol. The
+# body's subcortical channels stay on the primary nerve; this one is
+# cortical only — it is how cortex sees what the world shows her.
+SCREEN_NAME = "genesis_screen_nerve"
 HEADER = 28
 
 # Layout, same as src/daemon/optic_nerve.rs:
@@ -159,7 +165,7 @@ class OpticNerve:
         return None
 
 
-def latest_frame(copy: bool = True) -> np.ndarray | None:
+def latest_frame(copy: bool = True, name: str = NAME) -> np.ndarray | None:
     """One-shot: return the latest frame.
 
     Always returns a copy. The ``copy`` parameter is accepted for
@@ -171,11 +177,15 @@ def latest_frame(copy: bool = True) -> np.ndarray | None:
     construct an ``OpticNerve`` directly and keep it alive for the
     lifetime of the view.
 
+    ``name`` selects the nerve segment — the default is the body's own
+    eye; ``SCREEN_NAME`` reads the screen-capture nerve when a relay
+    feeds it.
+
     Returns ``None`` if no consistent frame could be read (e.g. the
     writer is producing frames faster than we can read them).
     """
     try:
-        nerve = OpticNerve()
+        nerve = OpticNerve(name)
     except FileNotFoundError:
         # No nerve segment — the body's eye is dark (camera absent or
         # the capture limb between re-open attempts). That is the

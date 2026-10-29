@@ -19,10 +19,10 @@ Usage:
     optic_relay.py [source] [shm_name]
 
   source defaults to /dev/video2. Sources ending in :// are treated as
-  HTTP MJPEG streams; ``x11:WxH+X+Y`` captures a region of the X11
-  display and ``x11win:ID:WxH`` captures a window's own pixels by id,
-  cropped to WxH (the screen as an eye); anything else is a V4L2
-  device.
+  HTTP MJPEG streams; ``x11`` captures the whole display, ``x11:WxH+X+Y``
+  captures a region of it, and ``x11win:ID:WxH`` captures a window's own
+  pixels by id, cropped to WxH (the screen as an eye); anything else is
+  a V4L2 device.
 
   shm_name defaults to genesis_optic_nerve; pass a different name to
   publish a second eye (e.g. a screen-capture nerve) without
@@ -31,6 +31,7 @@ Usage:
 
 import mmap
 import os
+import re
 import signal
 import struct
 import subprocess
@@ -52,6 +53,27 @@ HEADER_FMT = "<QII4sII"  # seq, width, height, fourcc, size, stride
 # order are BGR3, and RGB3 would mean B,G,R bytes (the reader flips
 # those). Tag honestly or every downstream channel is swapped.
 _WIRE_FOURCC = b"BGR3"
+
+
+def _screen_size() -> str:
+    """The root window's WxH — the full desktop across every monitor.
+
+    ``xdpyinfo`` reports the screen's bounding box directly; ``xrandr``
+    is the fallback (its first line carries the same span). Failing
+    both — a headless Xvfb with no tools — 1920x1080 is the last resort;
+    x11grab crops or pads the nerve frame either way.
+    """
+    for cmd in (["xdpyinfo"], ["xrandr"]):
+        try:
+            out = subprocess.run(cmd, capture_output=True, text=True, timeout=5).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        m = re.search(r"dimensions:\s*(\d+)x(\d+)", out) or re.search(
+            r"current\s+(\d+)\s*x\s*(\d+)", out
+        )
+        if m:
+            return f"{m.group(1)}x{m.group(2)}"
+    return "1920x1080"
 
 
 def _ffmpeg_cmd(source: str) -> list[str]:
@@ -92,15 +114,23 @@ def _ffmpeg_cmd(source: str) -> list[str]:
             "rgb24",
             "-",
         ]
-    if source.startswith("x11:"):
-        # x11:WxH+X+Y — a rect of the display, captured like a camera
-        # pointed at the monitor. Aspect is preserved into the
-        # 640x480 frame with black padding so readers can map the
-        # region back deterministically.
-        spec = source[4:]
+    if source == "x11" or source.startswith("x11:"):
+        # x11 or x11:WxH+X+Y — the display (or a rect of it), captured
+        # like a camera pointed at the monitor. Aspect is preserved
+        # into the 640x480 frame with black padding so readers can map
+        # the region back deterministically. Bare ``x11`` takes the
+        # whole root window.
+        if source == "x11":
+            spec = "+".join((_screen_size(), "0+0"))
+        else:
+            spec = source[4:]
         size, _, offset = spec.partition("+")
         w, _, h = size.partition("x")
-        x, _, y = offset.partition(",")
+        # The offset is X+Y (per the usage above); a comma-separated
+        # X,Y form slips through to the same place.
+        x, sep, y = offset.partition("+")
+        if not sep:
+            x, _, y = offset.partition(",")
         display = os.environ.get("DISPLAY", ":0.0")
         return [
             *base,

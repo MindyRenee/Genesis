@@ -11,6 +11,7 @@ engagement feeds back onto the relay it looked through.
 import struct
 import time
 
+import numpy as np
 import pytest
 
 from genesis_client.types import OpticState
@@ -143,7 +144,7 @@ class TestThalamicGate:
         import occipital_lobe.perception.vision as vision_mod
         from occipital_lobe.perception.vision import Vision
 
-        def _unread_frame(copy: bool = True):
+        def _unread_frame(copy: bool = True, name: str | None = None):
             raise AssertionError("the gate must close before the frame read")
 
         monkeypatch.setattr(vision_mod, "latest_frame", _unread_frame)
@@ -159,7 +160,7 @@ class TestThalamicGate:
         from occipital_lobe.perception.vision import Vision
 
         vis = Vision()
-        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True: None)
+        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True, name=None: None)
         vis._available = True
         awake = OpticState.unpack(_optic_wire(relay_gain=0.8))
         # Frame read returns mid_update — the gate itself was honoured;
@@ -174,7 +175,7 @@ class TestThalamicGate:
         from occipital_lobe.perception.vision import Vision
 
         vis = Vision()
-        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True: None)
+        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True, name=None: None)
         vis._available = True
         scene = vis.see(client=_OpticClient(None))
         assert scene.status == "mid_update"
@@ -185,7 +186,7 @@ class TestThalamicGate:
         from occipital_lobe.perception.vision import Vision
 
         vis = Vision()
-        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True: None)
+        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True, name=None: None)
         vis._available = True
         scene = vis.see()
         assert scene.status == "mid_update"
@@ -225,3 +226,91 @@ class TestCorticothalamicGain:
         )
         content = vocab._compose_vision_status_content("gated", emotion)
         assert content is not None and len(content) > 4
+
+
+class _AttachProbe:
+    """An OpticNerve stand-in that records which segment was opened."""
+
+    def __init__(self, names: list[str]) -> None:
+        self._names = names
+
+    def __call__(self, name: str) -> "_AttachProbe":
+        self._names.append(name)
+        return self
+
+    def close(self) -> None:
+        pass
+
+
+class TestScreenNerve:
+    """The second afferent — the display as an eye of its own."""
+
+    def _stub_heavy_stages(self, monkeypatch) -> None:
+        from occipital_lobe.perception.vision import Vision
+
+        monkeypatch.setattr(Vision, "_run_v1_sparse_coding", lambda self, rgb: None)
+        monkeypatch.setattr(Vision, "_two_view_geometry", lambda self, rgb, nerve="optic": None)
+        monkeypatch.setattr(Vision, "_get_object_recognizer", lambda self: None)
+        monkeypatch.setattr(Vision, "_get_face_recognizer", lambda self: None)
+
+    def test_screen_look_reads_the_screen_segment(self, monkeypatch) -> None:
+        """A screen look must read ``genesis_screen_nerve`` — never the
+        body's eye — and carry that provenance onto the scene."""
+        import occipital_lobe.perception.vision as vision_mod
+        from occipital_lobe.perception.vision import Vision
+
+        from genesis_client.optic_nerve import SCREEN_NAME
+
+        attached: list[str] = []
+        monkeypatch.setattr(vision_mod, "OpticNerve", _AttachProbe(attached))
+        reads: list[str | None] = []
+
+        def _read(copy: bool = True, name: str | None = None):
+            reads.append(name)
+            return np.zeros((48, 64, 3), dtype=np.uint8)
+
+        monkeypatch.setattr(vision_mod, "latest_frame", _read)
+        self._stub_heavy_stages(monkeypatch)
+
+        scene = Vision().see(nerve="screen")
+        assert scene.status == "ok"
+        assert scene.nerve == "screen"
+        assert attached == [SCREEN_NAME]
+        assert reads == [SCREEN_NAME]
+
+    def test_screen_nerve_availability_is_probed_live(self, monkeypatch) -> None:
+        """The relay comes and goes — a named nerve's availability is an
+        attach probe, not the optic eye's once-cached verdict."""
+        import occipital_lobe.perception.vision as vision_mod
+        from occipital_lobe.perception.vision import Vision
+
+        vis = Vision()
+        monkeypatch.setattr(
+            vision_mod,
+            "OpticNerve",
+            lambda name: (_ for _ in ()).throw(FileNotFoundError(name)),
+        )
+        assert vis.is_available("screen") is False
+        attached: list[str] = []
+        monkeypatch.setattr(vision_mod, "OpticNerve", _AttachProbe(attached))
+        assert vis.is_available("screen") is True
+        assert attached == ["genesis_screen_nerve"]
+
+    def test_closed_gate_covers_the_screen_nerve_too(self, monkeypatch) -> None:
+        """The TRN blocks transmission upstream of cortex on every
+        afferent — a sleeping thalamus gates the screen eye the same
+        as the room eye."""
+        import occipital_lobe.perception.vision as vision_mod
+        from occipital_lobe.perception.vision import Vision
+
+        def _unread_frame(copy: bool = True, name: str | None = None):
+            raise AssertionError("the gate must close before the frame read")
+
+        attached: list[str] = []
+        monkeypatch.setattr(vision_mod, "OpticNerve", _AttachProbe(attached))
+        monkeypatch.setattr(vision_mod, "latest_frame", _unread_frame)
+        nrem = OpticState.unpack(_optic_wire(relay_gain=0.02))
+        scene = Vision().see(client=_OpticClient(nrem), nerve="screen")
+        assert scene.status == "gated"
+        assert scene.nerve == "screen"
+        assert attached == []

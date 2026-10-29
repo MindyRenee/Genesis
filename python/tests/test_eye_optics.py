@@ -213,13 +213,13 @@ class TestMirrorView:
 
         monkeypatch.setattr(optics, "apply", _spy_apply)
         monkeypatch.setattr(Vision, "_run_v1_sparse_coding", _spy_v1)
-        monkeypatch.setattr(Vision, "_two_view_geometry", lambda self, rgb: None)
+        monkeypatch.setattr(Vision, "_two_view_geometry", lambda self, rgb, nerve="optic": None)
         monkeypatch.setattr(Vision, "_get_object_recognizer", lambda self: None)
         monkeypatch.setattr(Vision, "_get_face_recognizer", lambda self: None)
 
         frame = np.zeros((48, 64, 3), dtype=np.uint8)
         frame[:, :16] = 200
-        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True: frame)
+        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True, name=None: frame)
 
         vis = Vision()
         vis._available = True
@@ -248,12 +248,12 @@ class TestMirrorView:
 
         monkeypatch.setattr(Vision, "_recognize_faces", _spy_faces)
         monkeypatch.setattr(Vision, "_run_v1_sparse_coding", lambda self, rgb: None)
-        monkeypatch.setattr(Vision, "_two_view_geometry", lambda self, rgb: None)
+        monkeypatch.setattr(Vision, "_two_view_geometry", lambda self, rgb, nerve="optic": None)
         monkeypatch.setattr(Vision, "_get_object_recognizer", lambda self: None)
 
         frame = np.zeros((48, 64, 3), dtype=np.uint8)
         frame[:, :16] = 200  # bright on the capture's left
-        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True: frame)
+        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True, name=None: frame)
 
         vis = Vision()
         vis._available = True
@@ -272,9 +272,9 @@ class TestSeeIntegration:
         import occipital_lobe.perception.vision as vision_mod
         from occipital_lobe.perception.vision import Vision
 
-        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True: None)
+        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True, name=None: None)
         monkeypatch.setattr(Vision, "_run_v1_sparse_coding", lambda self, rgb: None)
-        monkeypatch.setattr(Vision, "_two_view_geometry", lambda self, rgb: None)
+        monkeypatch.setattr(Vision, "_two_view_geometry", lambda self, rgb, nerve="optic": None)
         monkeypatch.setattr(Vision, "_get_object_recognizer", lambda self: None)
         monkeypatch.setattr(Vision, "_get_face_recognizer", lambda self: None)
         vis = Vision()
@@ -286,7 +286,7 @@ class TestSeeIntegration:
         monkeypatch.setattr(
             vision_mod,
             "latest_frame",
-            lambda copy=True: np.full((48, 64, 3), 200, dtype=np.uint8),
+            lambda copy=True, name=None: np.full((48, 64, 3), 200, dtype=np.uint8),
         )
         scene = vis.see(client=_OpticClient(_optic(8.0)))
         assert scene.status == "ok"
@@ -299,7 +299,7 @@ class TestSeeIntegration:
         monkeypatch.setattr(
             vision_mod,
             "latest_frame",
-            lambda copy=True: np.full((48, 64, 3), 200, dtype=np.uint8),
+            lambda copy=True, name=None: np.full((48, 64, 3), 200, dtype=np.uint8),
         )
         captured: list[float] = []
         orig = vis._run_phototransduction
@@ -320,7 +320,7 @@ class TestSeeIntegration:
         """A daemon that predates the field: identity transform."""
         vis, vision_mod = self._vision_with_stub_stages(monkeypatch)
         frame = np.full((48, 64, 3), 200, dtype=np.uint8)
-        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True: frame)
+        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True, name=None: frame)
         applied: list[optics.OpticalResult] = []
         orig_apply = optics.apply
 
@@ -345,7 +345,7 @@ class TestSeeIntegration:
         monkeypatch.setattr(
             vision_mod,
             "latest_frame",
-            lambda copy=True: np.full((48, 64, 3), 200, dtype=np.uint8),
+            lambda copy=True, name=None: np.full((48, 64, 3), 200, dtype=np.uint8),
         )
         scene = vis.see(client=_OpticClient(_optic(4.5, accommodation_dpt=2.0)))
         assert scene.status == "ok"
@@ -358,7 +358,7 @@ class TestSeeIntegration:
         monkeypatch.setattr(
             vision_mod,
             "latest_frame",
-            lambda copy=True: np.full((48, 64, 3), 200, dtype=np.uint8),
+            lambda copy=True, name=None: np.full((48, 64, 3), 200, dtype=np.uint8),
         )
         scene = vis.see(client=_OpticClient(_optic(4.5, lid=0.5)))
         assert scene.status == "ok"
@@ -380,9 +380,9 @@ class TestVisualEncoding:
         from occipital_lobe.perception.vision import Vision
 
         queue = list(frames)
-        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True: queue.pop(0))
+        monkeypatch.setattr(vision_mod, "latest_frame", lambda copy=True, name=None: queue.pop(0))
         monkeypatch.setattr(Vision, "_run_v1_sparse_coding", lambda self, rgb: None)
-        monkeypatch.setattr(Vision, "_two_view_geometry", lambda self, rgb: None)
+        monkeypatch.setattr(Vision, "_two_view_geometry", lambda self, rgb, nerve="optic": None)
         monkeypatch.setattr(Vision, "_get_object_recognizer", lambda self: None)
         monkeypatch.setattr(Vision, "_get_face_recognizer", lambda self: None)
         vis = Vision()
