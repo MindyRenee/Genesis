@@ -243,6 +243,17 @@ Practice play on the ARC benchmark.
 \fB--delay\fR paces steps;
 \fB--recover\fR waits up to S seconds for her to settle at a
 wellness gate instead of abandoning the suite.
+.SS Stewardship
+.TP
+.B /steward
+Steward channel status: stamped, authenticated, principal,
+directives.
+.TP
+.BR /steward " release \fIN\fR"
+Lift directive N (authenticated sessions only).
+.TP
+.B /steward unbind
+Seal this session's authority until the next authenticated start.
 .SS Session
 .TP
 .B /help

@@ -629,16 +629,24 @@ const METAPLASTICITY_BOOST: f32 = 5.0;
 /// cannot claim maturity.
 const MATURITY_ERROR_EMA_RATE: f32 = 0.002;
 
-/// Scale for the *legacy* maturity mapping `exp(-err / this)`, retained
-/// only to reconstruct `maturity_error_ema` from a pre-v4 model file
-/// whose stored value is a maturity rather than an error level
-/// (`err = -scale * ln(maturity)`). It does not participate in any
-/// live computation of `model_maturity`.
-const MATURITY_ERROR_SCALE: f32 = 0.001;
+/// Scale of the live maturity fit mapping `exp(-err / this)` used by
+/// `_update_maturity`, and of its inverse in the pre-v4 model-file
+/// load path (`err = -scale * ln(maturity)`), where a stored maturity
+/// is converted back into an error estimate.
+///
+/// Calibrated so the knee sits inside the error range a living system
+/// actually reaches: sustained RMS surprise ~0.006 (good prediction —
+/// the observed operating residual) reads ~0.55 fit; ~0.002 reads
+/// ~0.82; ~0.02 reads ~0.14; ~0.07 (one dimension making repeated
+/// 0.3 excursions — the failing case) reads ~0.001; and the 0.5
+/// untrained init reads exp(-50) ≈ 0. The previous 0.001 demanded a
+/// sustained error an order of magnitude below the achievable noise
+/// floor, so even an accurate model read ~0 maturity indefinitely.
+const MATURITY_ERROR_SCALE: f32 = 0.01;
 
-/// Initial value of the retained `maturity_error_ema` tracker. A fresh
-/// engine starts maximally unproven; the value only has to round-trip
-/// through the model file, since nothing maps it to maturity now.
+/// Initial value of `maturity_error_ema`. A fresh engine starts
+/// maximally unproven (0.5 → exp(-50) ≈ 0 fit), and sustained accuracy
+/// has to pull the EMA down before maturity rises.
 const MATURITY_ERROR_INIT: f32 = 0.5;
 
 // ─── Variational posterior (Kalman filter) ───────────────────────
@@ -1085,20 +1093,22 @@ pub struct ActiveInferenceEngine {
     /// computed without a prior prediction).
     initialized: bool,
     /// Model maturity [0, 1] — evidence of a useful model, not elapsed
-    /// time. Computed in [`Self::_update_maturity`] as sample-count
-    /// evidence tempered by predictive fit and posterior certainty, so
-    /// experience alone cannot raise it. A fresh engine reads near 0 and
-    /// must demonstrate accuracy to earn trust; sustained surprise drops
-    /// it again. The cognitive mind treats this as a trust signal for the
-    /// inference outputs.
+    /// time. Computed in [`Self::_update_maturity`] as the predictive
+    /// fit of `maturity_error_ema` (`exp(-err / MATURITY_ERROR_SCALE)`)
+    /// tempered by posterior certainty, so experience alone cannot
+    /// raise it. A fresh engine reads near 0 and must demonstrate
+    /// accuracy to earn trust; sustained surprise drops it again. The
+    /// cognitive mind treats this as a trust signal for the inference
+    /// outputs.
     model_maturity: f32,
-    /// Slow EMA of instantaneous surprise, on the ~500-tick timescale the
-    /// old stopwatch used.
+    /// Slow EMA of instantaneous surprise, on the ~500-tick timescale
+    /// over which `model_maturity` is earned.
     ///
-    /// Retained for model-file compatibility only: it is still EMA-updated
-    /// and still serialized (format v4), so v4 files round-trip and
-    /// older files can be seeded consistently, but `_update_maturity`
-    /// no longer derives `model_maturity` from it. Nothing else reads it.
+    /// This is the live driver of `model_maturity`: `_update_maturity`
+    /// maps it through `exp(-err / MATURITY_ERROR_SCALE)`. It is also
+    /// serialized (format v4) and reloaded, and the pre-v4 load path
+    /// reconstructs it from a stored maturity by inverting that
+    /// mapping.
     maturity_error_ema: f32,
     /// xorshift32 PRNG state for stochastic policy sampling. Seeded
     /// from tick_count so that each tick produces a different draw,
@@ -1787,12 +1797,11 @@ impl ActiveInferenceEngine {
         result.surprise = self.surprise_ema; // Report the EMA, not the instantaneous
 
         // Maturity error tracker: very slow EMA of the instantaneous
-        // surprise. Retained for model-file compatibility: it is
-        // serialized (format v4) and reloaded, but `_update_maturity`
-        // no longer derives `model_maturity` from it. The EMA is kept
-        // on the ~500-tick timescale that `model_maturity` is earned
-        // over, so a stored v4 tracker stays on the scale its stored
-        // maturity was inverted from.
+        // surprise, on the ~500-tick timescale over which
+        // `model_maturity` is earned. `_update_maturity` maps it
+        // through `exp(-err / MATURITY_ERROR_SCALE)`; it is serialized
+        // (format v4) and reloaded, and the pre-v4 load path
+        // reconstructs it by inverting that same mapping.
         let mat_alpha =
             crate::state::sanitize::finite_clamp(MATURITY_ERROR_EMA_RATE * dt_scale, 0.0, 1.0);
         self.maturity_error_ema = crate::state::sanitize::finite_clamp(
@@ -2740,7 +2749,7 @@ impl ActiveInferenceEngine {
         // The time-scaling that actually matters is already inside the
         // two factors below, and is better behaved than a tick counter:
         // `maturity_error_ema` has a ~500-tick time constant and starts
-        // at `MATURITY_ERROR_INIT` (0.5, i.e. exp(-500) ≈ 0 fit), so a
+        // at `MATURITY_ERROR_INIT` (0.5, i.e. exp(-50) ≈ 0 fit), so a
         // handful of lucky early predictions cannot claim maturity, and
         // sustained accuracy raises it on its own schedule.
         //

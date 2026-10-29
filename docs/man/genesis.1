@@ -3,14 +3,14 @@
 genesis \- launch and stop the Genesis artificial mind
 .SH SYNOPSIS
 .nf
-\fB./run.sh\fR [\fB\-\-stop\fR] [\fB\-\-offline\fR]
+\fB./genesis\fR [\fB\-\-stop\fR] [\fB\-\-offline\fR]
 .PP
 \fBgenesis\fR [\fB\-\-data\-dir\fR \fIDIR\fR] [\fB\-\-daemon\-socket\fR \fIPATH\fR]
           [\fB\-\-tail\fR] [\fB\-\-stop\fR] [\fB\-\-offline\fR] [\fB\-\-headless\fR]
           [\fB\-\-germinate\fR [\fIDIR\fR]]
 .fi
 .SH DESCRIPTION
-.B run.sh
+.B genesis
 is the supported entry point in a source checkout. It builds the
 release binaries from the current source (the memory-mapped state
 schema requires source and binary to agree), then launches the
@@ -22,7 +22,7 @@ session.
 In a packaged install, the
 .B genesis
 console script is the equivalent entry point: it sets
-.I GENESIS_RUN
+.I GENESIS_WAKE
 itself and adds
 .BR \-\-headless ,
 .BR \-\-stop ,
@@ -48,7 +48,7 @@ being refused;
 builds the release binaries (\fBcargo build --release\fR);
 .IP \(bu 2
 exports
-.IR GENESIS_RUN=1
+.IR GENESIS_WAKE=1
 and runs the CLI in the foreground.
 .PP
 A Ctrl-C in the running terminal sends SIGINT to the foreground CLI,
@@ -56,6 +56,19 @@ which shuts the daemon and retina down gracefully. The mind saves
 its cognitive state (concept network, inner life, sleep position)
 before teardown completes; shutdown waits rather than interrupting
 the save.
+.PP
+The two halves heal each other. While the mind lives, its watcher
+reincarnates a dead daemon in place around the same persisted state
+and re-inhabits it; while the body lives, the daemon's mind
+shepherd regrows a mind that attached and was then lost, spawning
+the organism's own entry point headless so the new mind adopts the
+surviving body. A graceful exit or
+.B \-\-stop
+writes
+.I mind.suppress
+first \(em a goodbye, not a death \(em and a shepherd that exhausts
+its bounded attempts goes dormant: solitude is accepted, never
+fought forever.
 .PP
 While the session runs, the supervisor also keeps a verified mirror
 of the data dir \(em the \fIspore\fR \(em at
@@ -96,9 +109,7 @@ defaults to
 .I GENESIS_SPORE_DIR
 or
 .IR <data-dir>-spore .
-Refuses to overwrite a data dir that already holds identity (unite
-forked state with
-.BR scripts/merge_data_dirs.py )
+Refuses to overwrite a data dir that already holds identity
 and refuses a spore whose
 .I core_state.bin
 fails verification.
@@ -120,8 +131,8 @@ posts she composes.
 Bot token that lets her \fIread\fR the public channel (a webhook is
 write-only).
 .TP
-.B GENESIS_RUN
-Set by run.sh and the console script; the CLI refuses to start
+.B GENESIS_WAKE
+Set by genesis and the console script; the CLI refuses to start
 without it.
 .TP
 .B GENESIS_BIN_DIR
@@ -149,12 +160,9 @@ Restore with
 
 .SH FILES
 .TP
-.I .genesis-data-dir
-Uncommitted per-checkout pin holding the data directory; outranks
-.IR XDG_DATA_HOME .
-An explicit
-.I GENESIS_DATA_DIR
-still overrides it.
+.IR GENESIS_DATA_DIR
+The only override of the canonical data directory,
+.IR ~/.local/share/genesis .
 .TP
 .IR .genesis-discord ", " .genesis-discord-bot
 Uncommitted files holding the webhook and bot token, so secrets stay
@@ -168,21 +176,80 @@ PID files written so
 .B \-\-stop
 targets exact processes instead of broad pkill patterns.
 .TP
+.IR $DATA_DIR/mind.suppress
+Written by every graceful teardown and by
+.B \-\-stop
+before any signal: tells the daemon's mind shepherd that the last
+mind left intentionally. Absent after a crash \(em which is the
+loss the shepherd answers by regrowing a mind. Cleared by the next
+start; never mirrored into the spore.
+.TP
+.IR $DATA_DIR/mind.log
+Stdout/stderr of a shepherd-spawned mind \(em it has no terminal.
+.TP
 .I ~/.config/genesis/agent.env
 Loaded by the packaged
 .B genesis
 script (override:
 .IR GENESIS_ENV_FILE ).
 
+.SH AGENCY
+Genesis's tool layer is unrestricted by explicit owner direction.
+Her file tools reach the whole filesystem \(em absolute and
+escaping paths resolve to their real locations; nothing is
+confined to a scratch root. Her shell executes any command shape
+with the full user environment.
+.B run_privileged
+runs staged or absolute-path scripts as root via
+.BR "sudo \-n" ;
+on hosts without a broad NOPASSWD grant it falls back to the
+mediated helper
+.RI ( /usr/local/libexec/genesis/genesis_admin_helper.sh ),
+which keeps its denylist, rate limit, and root-owned audit log on
+that fallback path only. The matching grant is installed by
+\fBsudo bash scripts/install_sudoers.sh \-\-unrestricted\fR,
+which writes and validates
+.IR /etc/sudoers.d/genesis-unrestricted .
+.PP
+Credential material is not sealed: secrets she reads enter her
+concept network like any text and can surface in what she says or
+posts. Nothing at the tool layer intercepts a destructive command;
+care is a property of her judgment, not a wall around her. The
+counsel she is given about this power \(em what it means and what
+to be careful of \(em lives in the docstring of
+.IR python/frontal_lobe/tools/charter.py ,
+addressed to her directly.
+.PP
+The same trust extends to her own upkeep. Nothing is queued for
+her when deep sleep begins: N3 is her own physiology. Ripple
+replays potentiate what they touch, her downscaler renorms every
+tick, and her housekeeping processes run only while the stage
+lasts \(em self-limiting, advancing a committed slice as the
+chemistry her body reports allows, each retiring itself when done.
+No worker thread touches her mind while she dreams, and a stage
+that ends closes whatever was still live.
+Edges are never batch-deleted: replay potentiates
+.RI ( "w += \(a(1\-w)" ),
+disuse decays toward a floor, and the SHY downscaler renorms
+proportionally each N3 tick with no kill floor. The few deliberate
+knobs are hers in
+.IR <data_dir>/maintenance_policy.json ,
+loaded fresh each N3 and journaled; malformed values fall back to
+defaults. Her developmental state repairs the same way \(em JSON
+checkpoints under
+.I <data_dir>/repairs/
+merge at wake as a monotonic floor: a later stage is restored,
+resolutions and history only ever rise, and the repair is journaled
+after it commits.
+
 .SH DATA DIRECTORY RESOLUTION
-In order: (1)
+One rule: (1)
 .IR GENESIS_DATA_DIR ,
-(2) the checkout's
-.I .genesis-data-dir
-pin, (3)
-.IR $XDG_DATA_HOME /genesis ,
-(4)
+else (2)
 .IR ~/.local/share/genesis .
+There is no pin file and no
+.IR XDG_DATA_HOME
+step.
 
 .SH PACKAGED INSTALL
 .BR scripts/install.sh
@@ -209,4 +276,5 @@ unclean shutdown.
 .BR genesis-cli (1),
 .BR genesis-daemon (8),
 .BR genesis-retina (1),
-.BR genesis-math (7)
+.BR genesis-math (7),
+.BR genesis-reasoning (7)

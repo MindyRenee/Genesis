@@ -19,7 +19,7 @@ It is built from
 and is normally launched and supervised by
 .BR genesis-cli (1)
 (the \fBgenesis\fR console script), which is in turn launched by
-.BR run.sh (1)
+.BR genesis (1)
 in a source checkout or by the \fBgenesis.service\fR systemd user unit
 in a packaged install.
 Direct invocation is supported for diagnostics and testing.
@@ -185,11 +185,7 @@ stays where the mind left it until it moves it again.
 Data directory holding the core state file, STM ring buffer, and LTM
 store. Default is resolved (see FILES below):
 .I GENESIS_DATA_DIR ,
-then the checkout's
-.I .genesis-data-dir
-pin, then
-.IR $XDG_DATA_HOME /genesis ,
-then
+else
 .IR ~/.local/share/genesis .
 Setting this also resets the default socket path to
 .IR <data-dir> /genesis.sock .
