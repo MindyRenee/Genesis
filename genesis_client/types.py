@@ -1458,10 +1458,13 @@ class SubsystemTelemetry:
 
     Answers "which part of it is firing": each process in its
     process tree reports its own share of the aggregate body
-    signals (same scales as BodyState's ``stress_load`` and
-    ``io_activity``) plus its own microarchitectural
-    prediction-error ratios. The cognitive mind correlates this
-    with its task zone to feel *where* its activity lives.
+    signals plus its own microarchitectural prediction-error
+    ratios. ``cpu`` is the process's share of ``stress_load`` on a
+    [0, 2] scale — the shares across the tree sum to the aggregate
+    and one busy multi-core process can exceed 1. ``io``,
+    ``cache_miss_rate``, and ``branch_miss_rate`` are [0, 1]. The
+    cognitive mind correlates this with its task zone to feel
+    *where* its activity lives.
     """
 
     subsystem: int
@@ -1614,16 +1617,23 @@ class SubsystemReport:
     parts from the runtime manifest. The module section is empty
     when talking to a daemon that predates it or before the mind
     has registered its modules.
+
+    ``published_at_ms`` is the wall-clock millisecond the daemon
+    published the reading — the sample's freshness stamp, so a live
+    repeated value can be told from a dead reader's last one. It is
+    ``None`` against a daemon that predates the tail.
     """
 
     subsystems: tuple[SubsystemTelemetry, ...]
     modules: tuple[ModuleTelemetry, ...]
+    published_at_ms: int | None = None
 
     @classmethod
     def unpack(cls, data: bytes) -> SubsystemReport:
         """Unpack a GET_SUBSYSTEM_TELEMETRY response (subsystems + modules)."""
         subsystems = tuple(SubsystemTelemetry.unpack_all(data))
         modules: tuple[ModuleTelemetry, ...] = ()
+        published_at_ms: int | None = None
         tail = 1 + len(subsystems) * 21
         if len(data) > tail:
             mcount = data[tail]
@@ -1633,7 +1643,7 @@ class SubsystemReport:
             # far as it goes, with the optional tail left at zero.
             available = len(data) - (tail + 1)
             if not mcount:
-                modules = ()
+                stride = 0
             elif available >= mcount * MODULE_REC_V3:
                 stride = MODULE_REC_V3
             elif available >= mcount * MODULE_REC_V2:
@@ -1660,7 +1670,12 @@ class SubsystemReport:
                 )
 
             modules = tuple(_rec(i) for i in range(mcount))
-        return cls(subsystems=subsystems, modules=modules)
+            # Freshness tail — the wall-clock ms the daemon published
+            # this reading, appended after the module section.
+            end = tail + 1 + mcount * stride
+            if len(data) >= end + 8:
+                published_at_ms = _U64.unpack(data[end : end + 8])[0]
+        return cls(subsystems=subsystems, modules=modules, published_at_ms=published_at_ms)
 
 
 # ─── ZoneTransitions (GET_ZONE_TRANSITIONS) ───────────────────

@@ -304,15 +304,15 @@ const DIM: usize = NEUROCHEMICAL_COUNT;
 /// Groups the five dyadic-model outputs so `update_signals` stays
 /// under the argument-count threshold.
 pub struct DyadicSignals {
-    /// Oxytocin-mediated attunement to the user [0,1].
+    /// Oxytocin-mediated attunement to the user \[0,1\].
     pub attunement: f32,
-    /// Dyadic synchrony — how in sync Genesis and the user are [0,1].
+    /// Dyadic synchrony — how in sync Genesis and the user are \[0,1\].
     pub synchrony: f32,
     /// Inferred valence of the user's affective state [-1,+1].
     pub user_valence: f32,
-    /// Inferred arousal of the user's affective state [0,1].
+    /// Inferred arousal of the user's affective state \[0,1\].
     pub user_arousal: f32,
-    /// Inferred engagement of the user [0,1].
+    /// Inferred engagement of the user \[0,1\].
     pub user_engagement: f32,
 }
 
@@ -1206,7 +1206,7 @@ impl ActiveInferenceEngine {
     /// Predict the next effective-level vector from the current one,
     /// **without** any action. This is the endogenous prediction —
     /// where the state will move on its own, without the engine's
-    /// interventions. Delegates to [`predict_with_action`] with a
+    /// interventions. Delegates to `predict_with_action` with a
     /// zero action vector.
     ///
     /// This is the top-down generative pass: the model uses its
@@ -2905,14 +2905,14 @@ impl ActiveInferenceEngine {
     /// - 4 bytes: allostasis_load (f32)
     /// - 4 bytes: model_maturity (f32)
     /// - 4 bytes: tick_count (u32)
-    /// - 18×4 bytes: belief_mean (f32) [v2]
-    /// - 18×4 bytes: belief_var (f32) [v2]
-    /// - 18×4 bytes: prior_var (f32) [v2]
-    /// - 4 bytes: last_free_energy (f32) [v2]
-    /// - 18×18×4 bytes: action matrix B (row-major f32) [v3]
-    /// - 18×4 bytes: last_action vector (f32) [v3]
-    /// - 4 bytes: surprise_var_ema (f32) [v4]
-    /// - 4 bytes: maturity_error_ema (f32) [v4]
+    /// - 18×4 bytes: belief_mean (f32) \[v2\]
+    /// - 18×4 bytes: belief_var (f32) \[v2\]
+    /// - 18×4 bytes: prior_var (f32) \[v2\]
+    /// - 4 bytes: last_free_energy (f32) \[v2\]
+    /// - 18×18×4 bytes: action matrix B (row-major f32) \[v3\]
+    /// - 18×4 bytes: last_action vector (f32) \[v3\]
+    /// - 4 bytes: surprise_var_ema (f32) \[v4\]
+    /// - 4 bytes: maturity_error_ema (f32) \[v4\]
     ///
     /// Total: 3068 bytes (v5, including the 18-element preference vector)
     /// Move her preference toward states she actually fares well in.

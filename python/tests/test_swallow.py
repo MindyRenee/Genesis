@@ -151,6 +151,36 @@ def test_no_sink_still_counts():
     assert swallow_count("detached") == 4
 
 
+def test_concurrent_sites_count_exactly():
+    """Threads hammering one site: the tally stays exact and no two
+    sink records carry the same count — report eligibility and the
+    bookkeeping share one critical section."""
+    import threading
+
+    seen: list[int] = []
+    lock = threading.Lock()
+
+    def sink(site: str, count: int, exc: BaseException) -> None:
+        with lock:
+            seen.append(count)
+
+    set_swallow_sink(sink)
+    threads = [
+        threading.Thread(
+            target=lambda: [note_swallowed("hot", OSError("x")) for _ in range(50)]
+        )
+        for _ in range(8)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    set_swallow_sink(None)
+
+    assert swallow_count("hot") == 400
+    assert len(seen) == len(set(seen)), "a count was reported twice"
+
+
 def test_time_based_report_keeps_the_record_current(tmp_path, monkeypatch):
     """A site failing steadily is re-reported when time passes.
 

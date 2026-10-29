@@ -1,7 +1,7 @@
 //! Inference signals — the active inference state projection.
 //!
 //! This module defines [`InferenceSignals`], a 64-byte struct that
-//! lives at the tail of [`GenesisCoreState`] (offset 3416, right after
+//! lives at the tail of [`GenesisCoreState`](crate::GenesisCoreState) (offset 3416, right after
 //! the checksum). It exposes the key signals from the active inference
 //! engine to the cognitive mind, without requiring a schema version
 //! bump.

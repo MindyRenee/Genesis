@@ -171,7 +171,7 @@ pub fn zn_mul(n: usize) -> Table {
         .collect()
 }
 
-/// Metric axioms on a distance matrix d[i][j]:
+/// Metric axioms on a distance matrix `d[i][j]`:
 /// nonnegativity, identity of indiscernibles, symmetry, and the
 /// triangle inequality — the minimal notion of "space."
 pub fn is_metric(d: &[Vec<f64>], n: usize, tol: f64) -> bool {

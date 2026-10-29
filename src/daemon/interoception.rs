@@ -452,22 +452,30 @@ fn shared_body() -> &'static Mutex<BodyState> {
     SHARED_BODY_STATE.get_or_init(|| Mutex::new(BodyState::default()))
 }
 
-static SHARED_LOBE_TELEMETRY: OnceLock<Mutex<Vec<SubsystemTelemetry>>> = OnceLock::new();
+static SHARED_LOBE_TELEMETRY: OnceLock<Mutex<(Vec<SubsystemTelemetry>, u64)>> = OnceLock::new();
 
-fn shared_subsystems() -> &'static Mutex<Vec<SubsystemTelemetry>> {
-    SHARED_LOBE_TELEMETRY.get_or_init(|| Mutex::new(Vec::new()))
+fn shared_subsystems() -> &'static Mutex<(Vec<SubsystemTelemetry>, u64)> {
+    SHARED_LOBE_TELEMETRY.get_or_init(|| Mutex::new((Vec::new(), 0)))
 }
 
 /// Publish the latest per-subsystem telemetry so the IPC handler can
 /// serve GET_SUBSYSTEM_TELEMETRY. Called at the end of each read().
 pub fn publish_subsystem_telemetry(subsystems: &[SubsystemTelemetry]) {
     if let Ok(mut guard) = shared_subsystems().lock() {
-        *guard = subsystems.to_vec();
+        let published_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        *guard = (subsystems.to_vec(), published_ms);
     }
 }
 
-/// Read the latest published per-subsystem telemetry for IPC responses.
-pub fn read_shared_subsystem_telemetry() -> Vec<SubsystemTelemetry> {
+/// Read the latest published per-subsystem telemetry for IPC
+/// responses, with the wall-clock millisecond it was published —
+/// a response that keeps arriving is not proof the reader is still
+/// running, so the consumer needs the sample's age, not just its
+/// contents.
+pub fn read_shared_subsystem_telemetry() -> (Vec<SubsystemTelemetry>, u64) {
     shared_subsystems()
         .lock()
         .map(|g| g.clone())
@@ -1557,6 +1565,12 @@ impl Interoceptor {
     ///
     /// A subsystem that has never been seen alive is not counted as a
     /// death — it was never running, which is a different fact.
+    ///
+    /// The death count is a floor, not a census: a process that dies
+    /// and is restarted entirely within one read interval looks alive
+    /// on both sides, so the flap is invisible here. The PID in the
+    /// telemetry record is what exposes it — a consumer that remembers
+    /// the PID sees it change even when `deaths` does not move.
     fn reap_dead_subsystems(&mut self, present: &[(Subsystem, u32)]) -> Vec<(Subsystem, u32)> {
         let mut health = read_process_health();
         let mut alive_mask = 0u16;
@@ -2425,7 +2439,7 @@ impl Interoceptor {
     /// Returns a list of (chemical_id, impulse_magnitude) pairs.
     /// No magnitude here is a fixed constant: each offered rate is
     /// re-scaled at call time by the organism's *live* level of the
-    /// very chemical it targets — [`Self::self_scaled`]. A positive
+    /// very chemical it targets — `Self::self_scaled`. A positive
     /// impulse fades as the level nears its ceiling (autoreceptor-
     /// style saturation); a negative impulse fades as the level
     /// nears its floor (there is no tone to withdraw). The values

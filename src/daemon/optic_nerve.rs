@@ -274,7 +274,7 @@ unsafe impl Send for OpticNerve {}
 pub struct OpticState {
     /// The segment is attached and frames were ever consumed.
     pub eye_present: bool,
-    /// A new frame was consumed within [`FRESH_WINDOW_MS`].
+    /// A new frame was consumed within `FRESH_WINDOW_MS`.
     pub frames_fresh: bool,
     /// Photopic illuminance EMA [0, 1].
     pub illuminance: f32,
@@ -646,7 +646,7 @@ impl OpticNerve {
     }
 
     /// The mind's corticothalamic feedback, clamped into [0, 1].
-    /// Modulatory only — see [`CORTICAL_FLOOR`]. The relay re-derives
+    /// Modulatory only — see `CORTICAL_FLOOR`. The relay re-derives
     /// against the last known stage so the feedback lands now, not
     /// at the next advance.
     pub fn set_cortical_gain(&mut self, gain: f32) {

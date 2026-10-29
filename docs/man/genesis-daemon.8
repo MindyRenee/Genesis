@@ -19,7 +19,7 @@ It is built from
 and is normally launched and supervised by
 .BR genesis-cli (1)
 (the \fBgenesis\fR console script), which is in turn launched by
-.BR genesis (1)
+.BR run.sh (1)
 in a source checkout or by the \fBgenesis.service\fR systemd user unit
 in a packaged install.
 Direct invocation is supported for diagnostics and testing.
@@ -185,7 +185,11 @@ stays where the mind left it until it moves it again.
 Data directory holding the core state file, STM ring buffer, and LTM
 store. Default is resolved (see FILES below):
 .I GENESIS_DATA_DIR ,
-else
+then the checkout's
+.I .genesis-data-dir
+pin, then
+.IR $XDG_DATA_HOME /genesis ,
+then
 .IR ~/.local/share/genesis .
 Setting this also resets the default socket path to
 .IR <data-dir> /genesis.sock .
@@ -234,15 +238,7 @@ read_consistent() or ask the daemon.
 Short-term memory ring buffer.
 .TP
 .I $DATA_DIR/ltm_store.{bundles,meta,dat}
-Long-term memory store (compressed, SimHash-indexed episodes). The
-bundles file is a LogHD superposition over the real
-(non-meta-memory, non-archived, non-deleted) episode set: an
-episode's SDR contribution is subtracted the moment it leaves
-that set \(em archived, deleted, or marked meta-memory after
-storage \(em so routine lifecycle churn no longer drifts the
-superposition. Startup rebuilds fire only on material drift (a
-residual beyond ~25% of the real set) or on migrated
-meta-memories, not on every boot.
+Long-term memory store (compressed, SimHash-indexed episodes).
 .TP
 .I $DATA_DIR/genesis.sock
 Unix domain socket for IPC.
@@ -259,6 +255,10 @@ allostatic load).
 .TP
 .I $DATA_DIR/face_clusters.json
 Stable \fIface:N\fR cluster identities for unnamed presences.
+.TP
+.I $DATA_DIR/steward.json
+Provenance stamp for the steward channel (key fingerprint,
+principal, directives).
 .TP
 .I $DATA_DIR/daemon.log
 Daemon stdout/stderr (rotated at 5 MB by the launcher).

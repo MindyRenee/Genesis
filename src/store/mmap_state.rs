@@ -27,7 +27,7 @@
 //! ## Memory safety: why no `&GenesisCoreState`?
 //!
 //! The mmap'd region is `MAP_SHARED` — it can be modified by another
-//! thread (via [`modify`]) or another process at any time. Returning
+//! thread (via [`MmapState::modify`]) or another process at any time. Returning
 //! a Rust `&GenesisCoreState` from the mmap'd memory would be
 //! **undefined behaviour**: Rust's aliasing rules forbid a `&` from
 //! coexisting with a `&mut` to the same bytes, even if the seqlock
@@ -35,14 +35,14 @@
 //! reference's pointee does not change, which could cause miscompilation
 //! when another thread writes through `&mut`.
 //!
-//! Instead, the read API ([`read`] and [`read_consistent`]) performs
+//! Instead, the read API ([`MmapState::read`] and [`MmapState::read_consistent`]) performs
 //! volatile byte copies through raw pointers, returning an **owned**
 //! `GenesisCoreState` on the stack. Readers therefore create no
 //! reference to the mmap'd memory at all.
 //!
 //! ### The writer never forms a reference into the mapping
 //!
-//! Every production write path — [`modify`] and the open-time
+//! Every production write path — [`MmapState::modify`] and the open-time
 //! repairs/migrations — runs its mutation on a **stack copy** and
 //! publishes it with `publish_stack` (seqlock odd → single
 //! `write_volatile` → seqlock even). No `&` or `&mut` into
@@ -54,7 +54,7 @@
 //!
 //! Consequences, kept deliberately:
 //!
-//! - A panicking [`modify`] closure only ever saw the stack copy, so
+//! - A panicking [`MmapState::modify`] closure only ever saw the stack copy, so
 //!   the mapping needs no rollback — it was never touched.
 //! - `read_volatile` in the readers remains load-bearing: it stops
 //!   the compiler eliding or merging the seqlock-guarded loads, it is
@@ -164,16 +164,16 @@ pub(crate) fn local_seconds_of_day(now_ms: u64) -> i64 {
 /// # Concurrency model
 ///
 /// The mmap'd region is `MAP_SHARED` and may be written to by another
-/// thread in this process (via [`modify`]) or by another process at
+/// thread in this process (via [`MmapState::modify`]) or by another process at
 /// any time. To avoid Rust aliasing undefined behaviour, the read API
-/// ([`read`], [`read_consistent`]) **never** creates a `&GenesisCoreState`
+/// ([`MmapState::read`], [`MmapState::read_consistent`]) **never** creates a `&GenesisCoreState`
 /// to the mmap'd bytes. Instead, it performs volatile byte copies through
 /// raw pointers, returning an owned `GenesisCoreState` on the caller's
 /// stack.
 ///
-/// Writers are serialised by an in-process `Mutex` ([`modify`]) and a
+/// Writers are serialised by an in-process `Mutex` ([`MmapState::modify`]) and a
 /// cross-process `flock(LOCK_EX)` advisory lock on the state file.
-/// [`modify`] copies the current snapshot to an owned stack value,
+/// [`MmapState::modify`] copies the current snapshot to an owned stack value,
 /// hands the closure a `&mut GenesisCoreState` to that private copy,
 /// and publishes it with volatile byte copies that preserve the live
 /// `seq_lock` word. No production write path creates a Rust reference
@@ -200,10 +200,10 @@ pub struct MmapState {
     /// seeing torn writes, but it does **not** serialize multiple
     /// writers. This mutex ensures only one writer proceeds at a
     /// time, preventing data races on `seq_lock`, checksums, and state
-    /// fields. Reads via [`read`] and [`read_consistent`] remain
+    /// fields. Reads via [`MmapState::read`] and [`MmapState::read_consistent`] remain
     /// lock-free.
     ///
-    /// If the lock is poisoned, [`modify`] returns
+    /// If the lock is poisoned, [`MmapState::modify`] returns
     /// `StateFileError::LockFailed`. The daemon intentionally panics
     /// on this rather than risk writing to a potentially-torn shared
     /// state.
@@ -790,7 +790,7 @@ impl MmapState {
     ///
     /// The copy may be **torn** if a write is in progress on another
     /// thread. For a seqlock-guarded consistent read, use
-    /// [`read_consistent`] instead.
+    /// [`MmapState::read_consistent`] instead.
     ///
     /// This method is lock-free and wait-free.
     pub fn read(&self) -> GenesisCoreState {
@@ -898,7 +898,7 @@ impl MmapState {
     }
 
     /// Consistent read serialized against writers by the same
-    /// cross-process `flock` that [`modify`](Self::modify) holds for
+    /// cross-process `flock` that [`MmapState::modify`](Self::modify) holds for
     /// its entire transaction.
     ///
     /// This is the escalation path for seqlock readers whose retries
@@ -906,7 +906,7 @@ impl MmapState {
     /// exclusive (writer) lock is released, so the volatile copy
     /// cannot overlap a publish — even a wedged seqlock (a panic that
     /// left the counter odd) cannot stall it. Unlike
-    /// [`read_consistent`] it can block briefly while a writer
+    /// [`MmapState::read_consistent`] it can block briefly while a writer
     /// publishes, so callers should try the lock-free path first.
     pub fn read_consistent_locked(&self) -> Result<GenesisCoreState, StateFileError> {
         // SAFETY: `self.fd` is a valid open file descriptor kept alive
@@ -926,7 +926,7 @@ impl MmapState {
     ///
     /// The closure runs against a **stack copy**, never against the
     /// mapping: no `&` or `&mut` into the mmap'd memory is formed on
-    /// any path here (see [`publish_stack`]). On success the prepared
+    /// any path here (see `publish_stack`). On success the prepared
     /// copy is published atomically w.r.t. seqlock readers
     /// (odd → volatile write → even) and the checksum with it; on
     /// closure panic the mapping is untouched — there is nothing to

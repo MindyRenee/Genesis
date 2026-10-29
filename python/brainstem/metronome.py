@@ -885,25 +885,41 @@ class MetronomeMixin:
         """One sensor sample, shared by three consumers: the
         interoception layer (acute stress), the self-model (raw
         hardware and per-module activity), and the thalamic channel
-        (posted module messages)."""
+        (posted module messages).
+
+        Each call reports under its own site. Consumers can raise
+        anything (a malformed wire record is a ``struct.error``, not
+        a ``ValueError``), and one narrow bucket both dropped
+        non-transport failures into the whole-cycle ``except`` —
+        aborting the rest of the cycle — and made different bugs
+        indistinguishable in the tally.
+        """
         try:
             body_state = self.client.read_sensors()
-            if body_state is not None:
-                # Which sensors this machine actually has. Fetched
-                # with the body state rather than counted from it:
-                # a BodyState field exists whether or not hardware
-                # backs it, so without this the self-model would
-                # treat an absent battery as a reading.
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.metronome.sensors.read_sensors", e)
+            body_state = None
+        if body_state is not None:
+            # Which sensors this machine actually has. Fetched
+            # with the body state rather than counted from it:
+            # a BodyState field exists whether or not hardware
+            # backs it, so without this the self-model would
+            # treat an absent battery as a reading.
+            try:
                 presence = self.client.get_sensor_presence()
-                # Afferents land at the brainstem first — the NTS/
-                # parabrachial relay (Craig 2002): it forwards the
-                # threat channels to the limbic low road (PBN→CeA)
-                # and modulates the monoamine source nuclei directly
-                # (lamina I → catecholamine groups). Only then does
-                # the hypothalamic evaluative layer (the regulator's
-                # felt state) and the cortical image (the self-model)
-                # receive their copies — one fetch, three consumers,
-                # anatomically ordered.
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.metronome.sensors.sensor_presence", e)
+                presence = None
+            # Afferents land at the brainstem first — the NTS/
+            # parabrachial relay (Craig 2002): it forwards the
+            # threat channels to the limbic low road (PBN→CeA)
+            # and modulates the monoamine source nuclei directly
+            # (lamina I → catecholamine groups). Only then does
+            # the hypothalamic evaluative layer (the regulator's
+            # felt state) and the cortical image (the self-model)
+            # receive their copies — one fetch, three consumers,
+            # anatomically ordered.
+            try:
                 relay = getattr(self, "_interoceptive_relay", None)
                 if relay is None:
                     from brainstem.interoceptive_relay import InteroceptiveRelay
@@ -923,24 +939,40 @@ class MetronomeMixin:
                     )
                     self._interoceptive_relay = relay
                 relay.relay(body_state, presence)
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.metronome.sensors.interoceptive_relay", e)
+            try:
                 self.regulator.interoception.update_from_body_state(body_state, presence)
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.metronome.sensors.body_state_update", e)
+            try:
                 self.self_model.update_hardware_body(body_state, presence)
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.metronome.sensors.hardware_body", e)
+        try:
             report = self.client.get_subsystem_telemetry()
-            self.regulator.interoception.update_subsystem_telemetry(report)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.metronome.sensors.subsystem_telemetry", e)
+        else:
+            try:
+                self.regulator.interoception.update_subsystem_telemetry(report)
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.metronome.sensors.telemetry_update", e)
             # Feed the same report into its self-model — which
             # part of it is firing becomes part of what it
             # knows about itself (body_model.subsystem_activity /
             # module_activity → embodiment_facts → language).
-            self.self_model.update_brain_activity(report)
+            try:
+                self.self_model.update_brain_activity(report)
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.metronome.sensors.brain_activity", e)
             # Deliver the same report to the regions that posted
             # a message — the channel is carried on this sample.
             if channel is not None:
-                channel.deliver(getattr(report, "modules", ()))
-        except (OSError, ConnectionError, ValueError) as e:
-            note_swallowed(
-                "mind.metronome._cycle_sensors",
-                e,
-            )
+                try:
+                    channel.deliver(getattr(report, "modules", ()))
+                except Exception as e:  # noqa: BLE001
+                    note_swallowed("mind.metronome.sensors.thalamic_deliver", e)
 
     def _cycle_connectivity(self, now: float) -> None:
         """Sense network connectivity (cycle step 5b).

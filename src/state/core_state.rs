@@ -784,13 +784,13 @@ impl GenesisCoreState {
     /// progress) or the samples differ, returns `None` and the caller
     /// should retry.
     ///
-    /// **When to use this vs [`MmapState::read_consistent`]:**
+    /// **When to use this vs [`MmapState::read_consistent`](crate::MmapState::read_consistent):**
     ///
     /// - This method is for **stack-allocated** `GenesisCoreState`
     ///   values (e.g. in unit tests) where there is no aliasing
     ///   concern — the caller owns the value exclusively.
     /// - For **mmap'd** state (the production daemon, IPC handler,
-    ///   tick loop), use [`MmapState::read_consistent`] instead.
+    ///   tick loop), use [`MmapState::read_consistent`](crate::MmapState::read_consistent) instead.
     ///   That method operates on the raw mmap pointer and never
     ///   creates a `&GenesisCoreState` reference to the mmap'd
     ///   memory, eliminating the aliasing UB that would occur if a
@@ -801,7 +801,7 @@ impl GenesisCoreState {
     /// The caller must ensure that `self` is not being deallocated or
     /// remapped while this function runs, and that no `&mut` reference
     /// to the same memory coexists with the `&self` used to call this
-    /// method. For mmap'd state, use [`MmapState::read_consistent`]
+    /// method. For mmap'd state, use [`MmapState::read_consistent`](crate::MmapState::read_consistent)
     /// instead.
     pub unsafe fn read_consistent(&self) -> Option<GenesisCoreState> {
         // SAFETY: `AtomicU64::from_ptr` requires `*mut`, but atomic

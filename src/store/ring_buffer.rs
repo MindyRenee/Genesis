@@ -214,7 +214,7 @@ pub struct RingBufferEntry {
     /// Snapshot of effective neurochemical levels at insertion time.
     ///
     /// Order matches the 12-element emotional tag on the IPC wire (see
-    /// `ipc.rs` PUSH_EVENT), **not** [`NeurochemicalId::all()`] — the
+    /// `ipc.rs` PUSH_EVENT), **not** [`NeurochemicalId::all()`](crate::state::neurochemical::NeurochemicalId::all) — the
     /// six v3 chemicals are not carried here.
     /// `consolidation::expand_emotional_tag` maps this into the full
     /// 18-chemical LTM tag.

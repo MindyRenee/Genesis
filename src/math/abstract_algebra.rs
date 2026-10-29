@@ -50,7 +50,7 @@ impl Permutation {
         Some(p)
     }
 
-    /// Composition — `self` then `other`: x ↦ other[self[x]].
+    /// Composition — `self` then `other`: x ↦ `other[self[x]]`.
     /// Written `self * other` reading moves left to right.
     pub fn then(&self, other: &Permutation) -> Option<Permutation> {
         if self.image.len() != other.image.len() {

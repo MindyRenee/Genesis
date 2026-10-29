@@ -1654,6 +1654,13 @@ fn test_get_lobe_telemetry() {
         "self-reported cpu_share should round-trip, got {}",
         lang.cpu_share
     );
+
+    // The freshness tail: publish_subsystem_telemetry stamped the
+    // reading, so the report carries a nonzero wall-clock ms.
+    assert!(
+        report.published_ms > 0,
+        "telemetry report should carry the publish timestamp"
+    );
 }
 
 #[test]

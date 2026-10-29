@@ -208,7 +208,7 @@ pub struct TickLoop {
     /// Process-local rather than in the mmap'd state: `ActiveZones` is
     /// exactly 96 bytes with no reserved tail, so adding fields there
     /// would shift every later offset and force a layout migration.
-    /// See [`TransitionTally`] for the full rationale.
+    /// See [`TransitionTally`](crate::state::zones::TransitionTally) for the full rationale.
     pub zone_tally: crate::state::zones::TransitionTally,
     /// Emergent-phase transition counts, with time in each phase.
     ///

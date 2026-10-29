@@ -342,7 +342,7 @@ impl StereographicSphere {
     }
     /// The geodesic from x toward y at fraction t of the spherical
     /// distance: d(x, γ(t)) = t·d(x,y) exactly. γ(0) = x, γ(1) = y;
-    /// t outside [0,1] continues along the same great circle — the
+    /// t outside \[0,1\] continues along the same great circle — the
     /// geodesic wraps around the sphere.
     pub fn geodesic(&self, x: &[f64], y: &[f64], t: f64) -> Result<Vector, FieldError> {
         if !t.is_finite() {

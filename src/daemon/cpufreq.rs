@@ -47,7 +47,7 @@
 //! *silent*: a missing sudoers rule, an unsupported EPP, or a rejected
 //! sysfs write were indistinguishable from success, and the IPC handler
 //! acknowledged unconditionally. Failures are now reported through
-//! [`report_failure`], which deduplicates so a persistent condition
+//! `report_failure`, which deduplicates so a persistent condition
 //! (the common case — a machine that was never configured for this)
 //! logs once rather than on every heartbeat.
 
@@ -143,7 +143,7 @@ pub struct BodyControlState {
     pub cognitive_nice: i32,
     /// I/O scheduling class as a string ("idle", "best-effort-0".."best-effort-7").
     pub io_class: String,
-    /// Plasticity gate value that drove the I/O priority [0,1].
+    /// Plasticity gate value that drove the I/O priority \[0,1\].
     pub plasticity_gate: f32,
     /// Whether the tick is controlling the cognitive mind's PID.
     /// Always false now — the tick never controls the cognitive mind.
@@ -211,7 +211,7 @@ fn sudo_available() -> bool {
 /// the fragment only ever carries vetted data.
 ///
 /// Returns whether the write landed. On failure the cause is reported
-/// through [`report_failure`]: unusable sudo is a configuration
+/// through `report_failure`: unusable sudo is a configuration
 /// problem worth naming, and a write that ran but failed carries the
 /// real reason on stderr.
 fn sudo_sh(script: &str, cause: &str) -> bool {
@@ -340,7 +340,7 @@ fn resolve_governor(policy: &std::path::Path, requested: &str) -> Option<String>
 /// unconditionally buried the daemon log on a machine that simply
 /// cannot be controlled. Each specific cause is already reported by
 /// its own setter, so this states the outcome once and then stays
-/// quiet — see [`report_failure`] for why a later success does not
+/// quiet — see `report_failure` for why a later success does not
 /// re-arm reporting.
 pub fn report_body_control_outcome(applied: bool) {
     if !applied {

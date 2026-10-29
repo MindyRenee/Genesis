@@ -11,7 +11,10 @@ thread is credited only when its *leaf* frame is executing Genesis
 bytecode — under the GIL at most one thread runs at a time, so each
 sample answers "which brain part is executing right now". Threads
 parked in ``sleep``/``recv``/``join`` contribute nothing, exactly like
-an idle region contributes nothing to an EEG trace. When the leaf is
+an idle region contributes nothing to an EEG trace: a C-level wait
+pushes no Python frame, so a parked leaf sits on the same instruction
+sample after sample, and a frame is credited only when it has moved
+since the last tick. When the leaf is
 inside ``genesis_client`` (an IPC call in flight), the sample is
 credited to the deepest cognitive frame — the module that
 initiated the call.
@@ -24,6 +27,7 @@ can never drift from a hand-maintained stage table.
 
 from __future__ import annotations
 
+import importlib.util
 import logging
 import os
 import sys
@@ -31,6 +35,7 @@ import threading
 import time
 from collections.abc import Callable
 
+import genesis_client
 from genesis_client.protocol import (
     MODULE_ATTENTION,
     MODULE_DREAMING,
@@ -43,27 +48,64 @@ from genesis_client.protocol import (
     MODULE_REASONING,
     MODULE_SENSORY,
 )
+from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
 
 logger = logging.getLogger(__name__)
 
 
 def _package_root() -> str:
-    """The ``python/`` source directory — the whole-brain tree.
+    """The directory holding the region packages — the whole-brain tree.
 
-    This module lives inside a brain-region subpackage, but it samples
-    code across the whole package, so it needs the package root — not
-    its own directory. Walking up while the parent is itself a package
-    keeps this correct wherever the file ends up living.
+    This module lives inside a brain-region subpackage, so the
+    region-tree root is the directory *above* its own package —
+    ``python/`` in a checkout, the site root in an installed layout.
+    Resolving through the imported package (rather than walking
+    ``__file__`` parents for ``__init__.py``) makes it correct in
+    both: a checkout wraps the regions in the ``python`` namespace
+    package, an install does not — the filesystem walk used to stop
+    at ``site-packages/brainstem`` and attribute nothing.
     """
-    current = os.path.dirname(os.path.abspath(__file__))
-    while os.path.exists(os.path.join(os.path.dirname(current), "__init__.py")):
-        current = os.path.dirname(current)
-    return current
+    parts = __name__.split(".")
+    # A ``python.``-rooted import sees the regions as subpackages —
+    # anchor on ``python.<region>``; otherwise the first component IS
+    # the region package.
+    anchor = ".".join(parts[:2]) if parts[0] == "python" else parts[0]
+    pkg = sys.modules.get(anchor)
+    if pkg is not None:
+        path = getattr(pkg, "__path__", None)
+        pkg_dir = path[0] if path else os.path.dirname(pkg.__file__ or "")
+        return os.path.dirname(pkg_dir)
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 _PKG_DIR = _package_root()
-_CLIENT_DIR = os.path.join(os.path.dirname(_PKG_DIR), "genesis_client")
+_CLIENT_DIR = genesis_client.__path__[0]
+
+
+def _sibling_dir(package: str) -> str | None:
+    """Real directory of a support package beside the region tree.
+
+    The support packages (``infrastructure``, ``eval``) sit *next to*
+    ``python/`` in a checkout and inside the site root when installed,
+    so the region-tree relpath alone cannot find them — resolving by
+    import works in either layout.
+    """
+    try:
+        spec = importlib.util.find_spec(package)
+    except (ImportError, AttributeError, ValueError):
+        return None
+    if spec is None:
+        return None
+    if spec.submodule_search_locations:
+        return os.path.abspath(spec.submodule_search_locations[0])
+    if spec.origin:
+        return os.path.dirname(os.path.abspath(spec.origin))
+    return None
+
+
+_INFRA_DIR = _sibling_dir("infrastructure")
+_EVAL_DIR = _sibling_dir("eval")
 
 # Subsystem directory → manifest module. The brain-region packages
 # (frontal_lobe, limbic_system, …) are documented views over the
@@ -84,10 +126,14 @@ _DIR_MODULE = {
     "limbic_system": MODULE_EMOTION,
     "neurochemical": MODULE_EMOTION,
     "brainstem": MODULE_EMOTION,  # arousal / neurochemical regulation
+    "hypothalamus": MODULE_EMOTION,  # homeostatic nuclei (VLPO, HPA, SCN)
+    "insula": MODULE_EMOTION,  # interoceptive cortex — somatic markers
+    "basal_forebrain": MODULE_EMOTION,  # ACh / adenosine source nuclei
     "sleep": MODULE_DREAMING,
     "tools": MODULE_INTENTION,
     "self": MODULE_METACOGNITION,
-    "world": MODULE_REASONING,  # model of the world and other minds
+    "world": MODULE_REASONING,  # nested world-model packages
+    "worlds": MODULE_REASONING,  # model of the world and other minds
     "eval": MODULE_METACOGNITION,  # measuring herself
 }
 
@@ -98,6 +144,25 @@ _INFRA_FILE_MODULE = {
     "vq_codebook.py": MODULE_MEMORY,
     "wordnet_dictionary.py": MODULE_MEMORY,
 }
+
+# Organism-level py-modules that live *beside* the region tree at the
+# repository root (resolved by real path — in an installed layout they
+# sit inside the site root and resolve by basename instead, so both
+# ``_FILE_MODULE`` and this table name them).
+_ROOT_FILE_MODULE: dict[str, int] = {}
+for _root_name, _root_mod in (
+    ("mind", MODULE_METACOGNITION),  # the assembled organ
+    ("turn", MODULE_METACOGNITION),  # one turn across regions — orchestration
+    ("genesis_cli", MODULE_METACOGNITION),  # launcher / rebirth shepherd
+    ("commitment", MODULE_INTENTION),  # boundary machinery — volition's digitizer
+    ("discord_feed", MODULE_SENSORY),  # the public channel — an ear
+):
+    try:
+        _spec = importlib.util.find_spec(_root_name)
+    except (ImportError, AttributeError, ValueError):
+        _spec = None
+    if _spec is not None and _spec.origin:
+        _ROOT_FILE_MODULE[os.path.abspath(_spec.origin)] = _root_mod
 
 # Individual module files → manifest module. Checked before the
 # directory table so a file that belongs to one brain part attributes
@@ -116,6 +181,7 @@ _FILE_MODULE = {
     "comprehension.py": MODULE_LANGUAGE,
     "concept_learner.py": MODULE_LANGUAGE,
     "conversation.py": MODULE_LANGUAGE,
+    "discord_feed.py": MODULE_SENSORY,
     "dual.py": MODULE_MEMORY,
     "emotional_regulator.py": MODULE_EMOTION,
     "emotion.py": MODULE_EMOTION,
@@ -123,6 +189,7 @@ _FILE_MODULE = {
     "figurative.py": MODULE_LANGUAGE,
     "flow.py": MODULE_LANGUAGE,
     "generator.py": MODULE_LANGUAGE,
+    "genesis_cli.py": MODULE_METACOGNITION,
     "global_workspace.py": MODULE_ATTENTION,
     "grammar.py": MODULE_LANGUAGE,
     "graph_walk.py": MODULE_LANGUAGE,
@@ -151,9 +218,19 @@ _FILE_MODULE = {
     "system_monitor.py": MODULE_METACOGNITION,
     "thought_composer.py": MODULE_LANGUAGE,
     "topic_resolver.py": MODULE_LANGUAGE,
+    "turn.py": MODULE_METACOGNITION,
     "voice.py": MODULE_LANGUAGE,
     "vocabulary.py": MODULE_LANGUAGE,
     "volition.py": MODULE_INTENTION,
+}
+
+# Files at the *root of the region tree* itself — not inside any
+# brain-region package. Pinned separately because the basename also
+# exists inside regions (``temporal_lobe/concepts/topology.py`` is the
+# concept kind, not the organ's own topology map) and must keep its
+# region attribution there.
+_TOPLEVEL_FILE_MODULE = {
+    "topology.py": MODULE_METACOGNITION,  # the organism's own wiring map
 }
 
 
@@ -161,10 +238,26 @@ def _module_of_filename(filename: str) -> int | None:
     """Resolve a code filename to a manifest module, or None."""
     rel = os.path.relpath(filename, _PKG_DIR)
     if rel.startswith(".."):
-        return None
+        # Outside the region tree: the support packages and the
+        # organism-level root modules, resolved by their own anchors.
+        # They sit beside the region tree in a checkout and inside
+        # the site root when installed, so they only reach this
+        # branch in the checkout layout.
+        if _INFRA_DIR and not os.path.relpath(filename, _INFRA_DIR).startswith(".."):
+            return _INFRA_FILE_MODULE.get(
+                os.path.basename(filename), MODULE_METACOGNITION
+            )
+        if _EVAL_DIR and not os.path.relpath(filename, _EVAL_DIR).startswith(".."):
+            return MODULE_METACOGNITION
+        return _ROOT_FILE_MODULE.get(os.path.abspath(filename))
     parts = rel.split(os.sep)
+    if parts[0] == "python" and len(parts) > 1:
+        # An install can keep the checkout's ``python`` namespace
+        # package — site-packages/python/brainstem/x.py — so look one
+        # level deeper for the region.
+        parts = parts[1:]
     if len(parts) == 1:
-        return _FILE_MODULE.get(parts[0])
+        return _TOPLEVEL_FILE_MODULE.get(parts[0], _FILE_MODULE.get(parts[0]))
     # A named module file keeps its own attribution even when it is
     # filed inside a brain-region package.
     per_file = _FILE_MODULE.get(parts[-1])
@@ -225,6 +318,11 @@ class ModuleSampler:
         self._credit = credit
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        # thread ident → (id of leaf frame, f_lasti) at the last
+        # sample. An identical pair twice in a row means the leaf has
+        # not advanced — the thread is parked in a C-level wait, not
+        # executing.
+        self._prev: dict[int, tuple[int, int]] = {}
 
     def start(self) -> None:
         """Start the sampling thread (idempotent)."""
@@ -256,12 +354,30 @@ class ModuleSampler:
             try:
                 self._sample(now - last)
             except Exception as e:  # noqa: BLE001 — telemetry must never kill the loop
-                logger.debug(f"module sample failed: {e}")
+                note_swallowed("brainstem.module_sampler._sample", e)
             last = now
 
     def _sample(self, dt: float) -> None:
-        """One sample tick: credit each executing thread's module dt."""
-        for frame in sys._current_frames().values():
+        """One sample tick: credit each *executing* thread's module dt.
+
+        A thread is credited only when its leaf frame advanced since
+        the previous sample — a different frame or a different
+        instruction offset. C-level waits (``time.sleep``, a lock
+        acquire, a blocking ``recv``) push no Python frame, so a
+        parked thread keeps the identical leaf ``(frame, f_lasti)``
+        for the whole wait — skipping it is what makes the
+        docstring's "parked contributes nothing" actually true. The
+        same shape covers long C-level compute (a big numpy call),
+        which errs toward undercount — honest, and far smaller than
+        crediting a 10 s park as 10 s of work.
+        """
+        current: dict[int, tuple[int, int]] = {}
+        for ident, frame in sys._current_frames().items():
+            leaf = (id(frame), frame.f_lasti)
+            current[ident] = leaf
+            if self._prev.get(ident) == leaf:
+                continue  # leaf unmoved — parked, not executing
             module = _module_for_frame(frame)
             if module is not None:
                 self._credit(module, dt)
+        self._prev = current

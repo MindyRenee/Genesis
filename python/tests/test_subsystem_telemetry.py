@@ -13,8 +13,9 @@ in ``src/daemon/ipc.rs``:
     [u8 count] then per subsystem (21 bytes):
       [u8 subsystem][u32 pid][f32 cpu][f32 io]
       [f32 cache_miss_rate][f32 branch_miss_rate]
-    [u8 module_count] then per module (6 bytes):
-      [u8 module_id][u8 status][f32 cpu_share]
+    [u8 module_count] then per module (6 bytes v2 / 18 bytes v3):
+      [u8 module_id][u8 status][f32 cpu_share][u64 task_id][u32 error_code]
+    [u64 published_ms] — freshness tail, absent on older daemons
 """
 
 import struct
@@ -175,6 +176,32 @@ def test_unpack_both_sections() -> None:
     assert len(report.subsystems) == 1
     assert len(report.modules) == 1
     assert report.modules[0].module_name == "reasoning"
+
+
+def test_published_at_ms_parses_and_defaults_none() -> None:
+    """The freshness tail carries the daemon's publish stamp; a
+    daemon that predates it leaves the field None."""
+    stamped = (
+        bytes([0])
+        + bytes([1])
+        + _module_rec_v3(MODULE_REASONING, 2, 1.0, task_id=7, error_code=0)
+        + struct.pack("<Q", 1_700_000_123_456)
+    )
+    report = SubsystemReport.unpack(stamped)
+    assert report.published_at_ms == 1_700_000_123_456
+    assert report.modules[0].task_id == 7
+
+    # An empty module section can still carry the stamp.
+    stamped_empty = bytes([0]) + bytes([0]) + struct.pack("<Q", 42)
+    assert SubsystemReport.unpack(stamped_empty).published_at_ms == 42
+
+    # No tail → None, not a misparsed zero.
+    old = bytes([0]) + bytes([1]) + _module_rec_v3(MODULE_REASONING, 2, 1.0)
+    assert SubsystemReport.unpack(old).published_at_ms is None
+
+    # A truncated tail must not corrupt the field either.
+    short = old + b"\x01\x02"
+    assert SubsystemReport.unpack(short).published_at_ms is None
 
 
 def test_unpack_missing_module_section_is_empty() -> None:

@@ -100,6 +100,10 @@ def note_swallowed(site: str, exc: BaseException) -> None:
         exc: The exception that was swallowed.
     """
     now = time.monotonic()
+    # Decision and bookkeeping stay in one critical section: splitting
+    # them lets two threads on the same site both decide to report
+    # (duplicate sink records) and lets a slower writer overwrite
+    # ``_reported_upto`` with an older count, shifting the backoff.
     with _lock:
         count = _counts.get(site, 0) + 1
         _counts[site] = count
@@ -108,14 +112,14 @@ def note_swallowed(site: str, exc: BaseException) -> None:
         last_at = _reported_at.get(site)
         due_by_time = last_at is not None and (now - last_at) >= _TAIL_SECONDS
         should_report = due_by_count or due_by_time
+        if should_report:
+            _reported_upto[site] = count
+            _reported_at[site] = now
 
     logger.debug(f"{site}: {exc!r}")
 
     if not should_report:
         return
-    with _lock:
-        _reported_upto[site] = count
-        _reported_at[site] = now
     sink = _sink
     if sink is not None:
         # A failing sink must not turn a swallowed exception into a

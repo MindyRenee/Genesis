@@ -28,6 +28,8 @@ import threading
 import time
 from collections.abc import Callable
 
+from genesis_client.swallow import note_swallowed
+
 # kind is the low 8 bits of the module's task_id. 0 means the module
 # has nothing to say. The remaining bits are a per-post salt so two
 # identical messages in a row still register as a change on the wire.
@@ -176,7 +178,10 @@ class Thalamus:
             self._seen[module_id] = task_id
             handlers = list(self._handlers.get(module_id, ()))
         for handler in handlers:
-            handler(kind, payload)
+            try:
+                handler(kind, payload)
+            except Exception as e:  # noqa: BLE001 — a broken projection must not fault the poster
+                note_swallowed("thalamus.relay.post", e)
         return task_id
 
     def take(self, module_id: int) -> int | None:
@@ -185,6 +190,12 @@ class Thalamus:
         The payload stays until a newer post replaces it: a reader
         sampling the manifest between metronome passes and telemetry still
         resolves the message.
+
+        There is deliberately no expiry — ``task_id`` records what the
+        module *last said*, and a message stays the last said thing
+        until the module says something else. A consumer that needs
+        recency reads ``SubsystemReport.published_at_ms`` — the
+        sample's own freshness — rather than a message TTL.
         """
         with self._lock:
             pending = self._pending.get(module_id)
@@ -211,4 +222,7 @@ class Thalamus:
                 payload = posted[1] if posted and posted[0] == task_id else None
                 handlers = list(self._handlers.get(module_id, ()))
             for handler in handlers:
-                handler(unpack(task_id), payload)
+                try:
+                    handler(unpack(task_id), payload)
+                except Exception as e:  # noqa: BLE001 — a broken projection must not kill the carrier
+                    note_swallowed("thalamus.relay.deliver", e)

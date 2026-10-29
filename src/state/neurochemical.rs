@@ -1713,15 +1713,15 @@ pub struct NeurochemicalVector {
     pub coupling_matrix: CouplingMatrix,
     /// Cached effective levels (level × receptor_sensitivity ×
     /// desensitization × internalization, plus phasic boost for DA/SRT).
-    /// Recomputed by [`recompute_derived`].
+    /// Recomputed by [`NeurochemicalVector::recompute_derived`].
     pub effective_levels: [f32; NEUROCHEMICAL_COUNT],
     /// Overall affective tone — weighted mean of effective levels.
     pub global_tone: f32,
-    /// Arousal axis [0,1]: high = alert, low = drowsy.
+    /// Arousal axis \[0,1\]: high = alert, low = drowsy.
     pub arousal: f32,
     /// Valence axis [-1,+1]: positive = good, negative = bad.
     pub valence: f32,
-    /// Plasticity gate [0,1]: how capable the system is of forming
+    /// Plasticity gate \[0,1\]: how capable the system is of forming
     /// new memories right now. Derived from BDNF and cortisol.
     /// High BDNF + low cortisol = high plasticity.
     /// Low BDNF or high cortisol = low plasticity.
@@ -1929,7 +1929,7 @@ impl NeurochemicalVector {
     ///
     /// This must produce the same value as
     /// `self.effective_levels[id as usize]` after
-    /// [`recompute_derived`](Self::recompute_derived) has been called.
+    /// [`NeurochemicalVector::recompute_derived`](Self::recompute_derived) has been called.
     /// Previously this method omitted the phasic boost for DA and SRT,
     /// causing [`sync_neurochemistry_to_state`](super::core_state::GenesisCoreState::sync_neurochemistry_to_state)
     /// — which drives memory gating weights — to miss reward burst
@@ -4578,7 +4578,7 @@ impl NeurochemicalVector {
     /// Advance the neurochemical system by one tick with explicit
     /// rate parameters.
     ///
-    /// This is a convenience wrapper around [`tick_with_params`] that
+    /// This is a convenience wrapper around [`NeurochemicalVector::tick_with_params`] that
     /// constructs a [`NeuroTickParams`] from the individual parameters.
     /// The `dt` and `coupling_scale` use the default constants.
     ///
@@ -4707,7 +4707,7 @@ pub struct NeuroTickParams {
     /// from EEG slow-wave activity buildup during wakefulness.
     ///
     /// The actual rate is multiplied by an activity factor (see
-    /// [`adenosine_activity_coupling`]) so sleep pressure builds faster
+    /// [`NeuroTickParams::adenosine_activity_coupling`]) so sleep pressure builds faster
     /// during high arousal, and by a drowsy factor (0.5× during Drowsy).
     ///
     /// For compressed-time testing, use
@@ -4728,7 +4728,7 @@ pub struct NeuroTickParams {
     ///
     /// Adenosine is a byproduct of ATP metabolism, so its production
     /// should scale with recent neural/metabolic activity. This factor
-    /// multiplies the base [`adenosine_accumulation_rate`] by
+    /// multiplies the base [`NeuroTickParams::adenosine_accumulation_rate`] by
     /// `(1.0 + adenosine_activity_coupling * arousal)` during wakefulness.
     /// A value of 0.0 disables the activity dependence; 0.5 means sleep
     /// pressure builds at 1.0–1.5× the base rate depending on arousal.
@@ -4918,7 +4918,7 @@ impl NeuroTickParams {
 
     /// Compressed-time parameters for testing and fast iteration.
     ///
-    /// Same as [`DEFAULT`] but with adenosine rates ~100x faster,
+    /// Same as [`NeuroTickParams::DEFAULT`] but with adenosine rates ~100x faster,
     /// giving ~9 min sleep latency and ~1 min clearance. Use this
     /// for tests that need to observe sleep/wake cycles within a
     /// reasonable test duration. NOT for production use — the

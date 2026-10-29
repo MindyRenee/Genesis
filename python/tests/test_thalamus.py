@@ -80,6 +80,38 @@ def test_unregister_removes_projection() -> None:
     assert heard == []
 
 
+def test_broken_subscriber_does_not_fault_poster() -> None:
+    """A handler that raises is tallied and skipped — the post still
+    returns its task_id and the other subscribers still hear."""
+    ch = Thalamus()
+    heard: list[object] = []
+
+    def boom(kind, payload):
+        raise RuntimeError("projection blew a fuse")
+
+    ch.register(MOD_A, boom)
+    ch.register(MOD_A, lambda k, p: heard.append(p))
+    task_id = ch.post(MOD_A, KIND_HEARD, "x")
+    assert heard == ["x"]
+    assert unpack(task_id) == KIND_HEARD
+
+
+def test_broken_subscriber_does_not_kill_deliver() -> None:
+    """The same isolation on the wire side: one bad projection must
+    not keep the carrier from reaching the rest."""
+    ch = Thalamus()
+    heard: list[object] = []
+    task_id = pack(KIND_SPOKE, 9)
+
+    def boom(kind, payload):
+        raise RuntimeError("projection blew a fuse")
+
+    ch.register(MOD_B, boom)
+    ch.register(MOD_B, lambda k, p: heard.append(p))
+    ch.deliver([_mod(MOD_B, task_id)])
+    assert heard == [None]  # wire delivery carries no local payload
+
+
 # ─── once ─────────────────────────────────────────────────────────
 
 

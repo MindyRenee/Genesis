@@ -49,7 +49,7 @@ fn mat_vec(m: &[Vector], x: &[f64]) -> Result<Vector, FieldError> {
 
 /// Coupled continuous-time dynamical system over subsystem layers.
 ///
-/// couplings[target][source] is the linear local Jacobian contribution
+/// `couplings[target][source]` is the linear local Jacobian contribution
 /// from one layer into another. Nonlinear/state-dependent engines can be
 /// layered on top of this interface without changing the field topology.
 ///

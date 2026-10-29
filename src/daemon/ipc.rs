@@ -709,17 +709,17 @@ pub struct IonSummary {
     pub kcl_cotransporter_flux: f32,
     /// Na⁺/Ca²⁺ exchange flux in mM/s of Ca²⁺ (positive = extrusion).
     pub ncx_flux: f32,
-    /// ATP availability [0,1].
+    /// ATP availability \[0,1\].
     pub atp_availability: f32,
-    /// Log-normalized intracellular Ca²⁺ signal [0,1].
+    /// Log-normalized intracellular Ca²⁺ signal \[0,1\].
     pub calcium_signal: f32,
-    /// Effective inhibitory Cl⁻ driving force [0,1].
+    /// Effective inhibitory Cl⁻ driving force \[0,1\].
     pub chloride_efficacy: f32,
-    /// Depolarization above resting potential [0,1].
+    /// Depolarization above resting potential \[0,1\].
     pub excitability: f32,
-    /// Mean preservation of the four ion gradients [0,1].
+    /// Mean preservation of the four ion gradients \[0,1\].
     pub gradient_integrity: f32,
-    /// Normalized channel/transporter workload [0,1].
+    /// Normalized channel/transporter workload \[0,1\].
     pub energy_load: f32,
     /// Net membrane current including the electrogenic Na⁺/K⁺ pump.
     pub net_membrane_current: f32,
@@ -876,7 +876,7 @@ const _: () = {
 ///
 /// | Field | Meaning |
 /// |-------|---------|
-/// | `plasticity_gate` | BDNF/cortisol-derived gate [0,1]. High = capable of new memory formation. |
+/// | `plasticity_gate` | BDNF/cortisol-derived gate \[0,1\]. High = capable of new memory formation. |
 /// | `bdnf_effective` | Effective BDNF level (level × receptor sensitivity). Drives plasticity. |
 /// | `bdnf_tonic` | Sustained (tonic) BDNF. Slow signal that drives metaplasticity. |
 /// | `cortisol_effective` | Effective cortisol. Acute stress. |
@@ -938,23 +938,23 @@ const _: () = {
 pub struct BodyStateSummary {
     /// CPU temperature in degrees Celsius (raw).
     pub cpu_temp_c: f32,
-    /// Body temperature normalized [0,1], 0.5 = normal (50°C).
+    /// Body temperature normalized \[0,1\], 0.5 = normal (50°C).
     pub temperature: f32,
     /// CPU frequency as fraction of max — its arousal level.
     pub arousal_freq: f32,
-    /// Memory pressure [0,1] — cognitive load.
+    /// Memory pressure \[0,1\] — cognitive load.
     pub cognitive_load: f32,
-    /// I/O throughput fraction [0,1] — data exchange activity.
+    /// I/O throughput fraction \[0,1\] — data exchange activity.
     /// This is active data processing (reading from and writing to
     /// external storage), not drowsiness.
     pub io_activity: f32,
-    /// Self-process CPU usage as a fraction of CPU capacity [0,2].
+    /// Self-process CPU usage as a fraction of CPU capacity \[0,2\].
     /// 0.0 = idle, 1.0 = all cores busy, >1.0 = overloaded. Values
     /// above 1.0 indicate the process tree is using more than its
     /// fair share (multiple threads on all cores). The interoceptor
-    /// clamps to [0,2]; the distress threshold is >1.5.
+    /// clamps to \[0,2\]; the distress threshold is >1.5.
     pub stress_load: f32,
-    /// Battery level [0,1], 1.0 = full or on AC.
+    /// Battery level \[0,1\], 1.0 = full or on AC.
     pub energy_reserve: f32,
     /// On AC power (true) or battery (false).
     pub on_ac_power: bool,
@@ -968,11 +968,11 @@ pub struct BodyStateSummary {
     /// 0.0 = no EC detected. Informational only; regularity is
     /// normal and does not produce stress.
     pub autonomic_rate: f32,
-    /// Thermoregulatory effort — fan speed normalized [0,1].
+    /// Thermoregulatory effort — fan speed normalized \[0,1\].
     /// How hard the cooling system is working to remove waste
     /// heat. This is thermoregulation, not cardiac output.
     pub thermoregulatory_effort: f32,
-    /// Metabolic rate — power draw normalized [0,1]. How much
+    /// Metabolic rate — power draw normalized \[0,1\]. How much
     /// energy the machine is consuming right now. 0.0 if no
     /// power sensor is available.
     pub metabolic_rate: f32,
@@ -984,42 +984,42 @@ pub struct BodyStateSummary {
     /// signal (a CRH impulse when critically low). 0.0 if no
     /// battery sensor is available.
     pub supply_voltage: f32,
-    /// RAPL core-domain switching rate [0,1] — execution-unit
+    /// RAPL core-domain switching rate \[0,1\] — execution-unit
     /// firing at the electron level. 0.0 if no powercap driver.
     pub core_activity: f32,
-    /// RAPL uncore-domain switching rate [0,1] — integration
+    /// RAPL uncore-domain switching rate \[0,1\] — integration
     /// fabric (cache/memory-controller) activity.
     pub uncore_activity: f32,
-    /// RAPL DRAM-domain switching rate [0,1] — memory-subsystem
+    /// RAPL DRAM-domain switching rate \[0,1\] — memory-subsystem
     /// firing (encoding/retrieval traffic).
     pub dram_activity: f32,
-    /// Cache miss ratio of its process tree [0,1] from perf
+    /// Cache miss ratio of its process tree \[0,1\] from perf
     /// counters — microarchitectural prediction errors. 0.0 if
     /// perf is unavailable (perf_event_paranoid ≥ 4).
     pub cache_miss_rate: f32,
-    /// Branch misprediction ratio of its process tree [0,1] —
+    /// Branch misprediction ratio of its process tree \[0,1\] —
     /// the hardware branch predictor guessing wrong while
     /// running it.
     pub branch_miss_rate: f32,
     /// Local-timer interrupt rate (beats/sec) — the machine's pulse.
     /// Tickless (NO_HZ) cores pause their beat while idle.
     pub pulse_hz: f32,
-    /// Pulse normalized [0,1]: pulse_hz / (cores × TICK_HZ).
+    /// Pulse normalized \[0,1\]: pulse_hz / (cores × TICK_HZ).
     pub pulse: f32,
-    /// Passive thermal throttle state [0,1] — the cooling
+    /// Passive thermal throttle state \[0,1\] — the cooling
     /// framework's involuntary cur_state/max_state maximum.
     pub throttle_state: f32,
-    /// Share of the last read window at max P-state [0,1] —
+    /// Share of the last read window at max P-state \[0,1\] —
     /// sustained exertion from cpufreq time_in_state.
     pub top_freq_share: f32,
-    /// PSI "some" stall fractions [0,1] — runnable work stalled on
+    /// PSI "some" stall fractions \[0,1\] — runnable work stalled on
     /// CPU, I/O, and memory respectively, kernel-computed.
     pub psi_cpu: f32,
     pub psi_io: f32,
     pub psi_mem: f32,
     /// Battery charge cycles — cumulative lifetime wear.
     pub battery_cycles: f32,
-    /// Kernel entropy pool level [0,1].
+    /// Kernel entropy pool level \[0,1\].
     pub entropy_level: f32,
     /// Current clocksource id (0=unknown, 1=tsc, 2=hpet,
     /// 3=acpi_pm, 4=other).
@@ -1027,7 +1027,7 @@ pub struct BodyStateSummary {
     /// Suspend capabilities bitmask (bit0=mem sleep offered,
     /// bit1=RTC wakealarm exists).
     pub suspend_caps: u8,
-    /// Parasympathetic rest channel [0,1] — depth-weighted cpuidle
+    /// Parasympathetic rest channel \[0,1\] — depth-weighted cpuidle
     /// residency. High = the body is idling in deep C-states.
     /// 0.0 when cpuidle telemetry is unavailable (v4+; 0.0 on
     /// older packets).
@@ -1049,13 +1049,13 @@ pub struct SubsystemTelemetrySummary {
     pub subsystem: u8,
     /// Process ID.
     pub pid: u32,
-    /// This process's CPU share [0,2] — its slice of stress_load.
+    /// This process's CPU share \[0,2\] — its slice of stress_load.
     pub cpu: f32,
-    /// This process's I/O share [0,1] — its slice of io_activity.
+    /// This process's I/O share \[0,1\] — its slice of io_activity.
     pub io: f32,
-    /// This process's cache-miss ratio [0,1].
+    /// This process's cache-miss ratio \[0,1\].
     pub cache_miss_rate: f32,
-    /// This process's branch-miss ratio [0,1].
+    /// This process's branch-miss ratio \[0,1\].
     pub branch_miss_rate: f32,
 }
 
@@ -1066,7 +1066,7 @@ pub struct ModuleTelemetrySummary {
     pub module_id: u8,
     /// ModuleStatus discriminant (0=Stopped … 5=Error).
     pub status: u8,
-    /// Self-reported activity share of the cognitive process [0,1].
+    /// Self-reported activity share of the cognitive process \[0,1\].
     pub cpu_share: f32,
     /// The task this part is working on (0 = none). Distinguishes a
     /// part that is busy from one that is busy *on something*.
@@ -1085,6 +1085,9 @@ pub struct SubsystemTelemetryReport {
     pub subsystems: Vec<SubsystemTelemetrySummary>,
     /// Per-module brain-part telemetry.
     pub modules: Vec<ModuleTelemetrySummary>,
+    /// Wall-clock millisecond the interoception read was published —
+    /// the sample's freshness stamp. 0 when the daemon predates it.
+    pub published_ms: u64,
 }
 
 /// Body control state summary — what Genesis is doing to its body.
@@ -1110,7 +1113,7 @@ pub struct BodyControlSummary {
     pub cognitive_nice: i32,
     /// I/O scheduling class label.
     pub io_class: String,
-    /// Plasticity gate [0,1] that drove I/O priority.
+    /// Plasticity gate \[0,1\] that drove I/O priority.
     pub plasticity_gate: f32,
     /// Whether it's controlling the cognitive mind's PID.
     pub controlling_cognitive: bool,
@@ -1350,14 +1353,17 @@ fn serialize_body_state(body: &super::interoception::BodyState) -> Vec<u8> {
 /// The task_id and error_code tail was added in protocol v3; a parser
 /// that stops after `cpu_share` still reads the original six-byte
 /// record, and both Rust and Python clients tolerate a short tail.
+/// The trailing [u64 published_ms] is the freshness stamp — when the
+/// interoception read was published — which older parsers ignore.
 ///
-/// 1 + count × 21 + 1 + module_count × 18 bytes.
-/// An empty report serializes as [0][0].
+/// 1 + count × 21 + 1 + module_count × 18 + 8 bytes.
+/// An empty report serializes as [0][0][published_ms].
 fn serialize_subsystem_telemetry(
     subsystems: &[super::interoception::SubsystemTelemetry],
     modules: &[(u8, u8, f32, u64, u32)],
+    published_ms: u64,
 ) -> Vec<u8> {
-    let mut resp = Vec::with_capacity(2 + subsystems.len() * 21 + modules.len() * 18);
+    let mut resp = Vec::with_capacity(10 + subsystems.len() * 21 + modules.len() * 18);
     resp.push(subsystems.len().min(u8::MAX as usize) as u8);
     for subsystem in subsystems.iter().take(u8::MAX as usize) {
         resp.push(subsystem.subsystem.to_wire());
@@ -1388,6 +1394,10 @@ fn serialize_subsystem_telemetry(
         resp.extend_from_slice(&task_id.to_le_bytes());
         resp.extend_from_slice(&error_code.to_le_bytes());
     }
+    // Freshness stamp: the wall-clock ms the interoception read was
+    // published, so a consumer can tell a live repeated reading from
+    // a dead reader's last value. Older parsers ignore the tail.
+    resp.extend_from_slice(&published_ms.to_le_bytes());
     resp
 }
 
@@ -2419,6 +2429,7 @@ impl IpcClient {
         let mut report = SubsystemTelemetryReport {
             subsystems: Vec::with_capacity(count),
             modules: Vec::new(),
+            published_ms: 0,
         };
         for i in 0..count {
             let base = 1 + i * REC;
@@ -2472,6 +2483,16 @@ impl IpcClient {
                             .map(u32::from_le_bytes)
                             .unwrap_or(0),
                     });
+                }
+                // Freshness tail — the wall-clock ms the reading was
+                // published, appended after the module section.
+                let end = tail + 1 + mcount * MOD_REC_V3;
+                if let Some(stamp) = resp
+                    .get(end..end + 8)
+                    .and_then(|s| s.try_into().ok())
+                    .map(u64::from_le_bytes)
+                {
+                    report.published_ms = stamp;
                 }
             }
         }
@@ -3659,7 +3680,8 @@ pub fn default_handler<L: LtmAccess>(
             // Subsystems are hardware-measured per process; modules are
             // self-reported by the cognitive mind via
             // UPDATE_MODULE_STATUS's optional cpu_share.
-            let subsystems = super::interoception::read_shared_subsystem_telemetry();
+            let (subsystems, published_ms) =
+                super::interoception::read_shared_subsystem_telemetry();
             let mut modules = Vec::new();
             if let Some(state) = mmap.read_consistent() {
                 for m in &state.manifest.modules {
@@ -3668,7 +3690,7 @@ pub fn default_handler<L: LtmAccess>(
                     }
                 }
             }
-            serialize_subsystem_telemetry(&subsystems, &modules)
+            serialize_subsystem_telemetry(&subsystems, &modules, published_ms)
         }
 
         cmd::GET_SENSOR_PRESENCE => {

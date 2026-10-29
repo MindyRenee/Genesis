@@ -2000,7 +2000,7 @@ impl FieldProbe {
     /// The substrate's measured thermal level — *excess* jitter as a
     /// fraction of the nominal period: the current RMS loop-period
     /// error minus the machine's own timing climate (a slow EMA of
-    /// the same quantity, floored at [`JITTER_ABS_FLOOR`] so noise
+    /// the same quantity, floored at `JITTER_ABS_FLOOR` so noise
     /// beyond one full missed period counts however ordinary it is
     /// here). The field's Langevin reservoir samples real silicon
     /// noise — but a chronically contended host is not "under

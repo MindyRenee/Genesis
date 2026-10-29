@@ -236,7 +236,7 @@ impl DyadicAffectModel {
     }
 
     /// Whether the user is considered present (an observation arrived
-    /// within [`PRESENCE_TIMEOUT_TICKS`]).
+    /// within `PRESENCE_TIMEOUT_TICKS`).
     pub fn user_present(&self) -> bool {
         self.initialized && self.ticks_since_observation <= PRESENCE_TIMEOUT_TICKS
     }
