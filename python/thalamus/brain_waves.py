@@ -1728,9 +1728,7 @@ class BrainWaveOscillator:
         # Compute targets from neurochemistry (same classification
         # logic as before — these are the neurochemically-driven
         # equilibrium amplitudes)
-        targets, label, description = self._compute_targets(
-            summary, sleep_stage, chemicals
-        )
+        targets, label, description = self._compute_targets(summary, sleep_stage, chemicals)
 
         # Apply continuous stimulus to targets — held levels plus
         # still-ringing pulses on the same band combine.

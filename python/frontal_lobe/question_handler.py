@@ -54,6 +54,11 @@ __all__ = ["QuestionHandler"]
 # Regex for cleaning up episodic memory text.
 _ASSOCIATION_DEBUG_RE = re.compile(r"\[association\].*")
 _USER_PREFIX_RE = re.compile(r"^User:\s*+")
+# Speaker tag on a conversation-log turn: "<Name>: ..." where the
+# label is a single capitalized token ("User:", "Mindy:", "Alice:").
+# Turns are recorded under the attributed speaker's name, so parsing
+# must accept any name, not just the legacy "User" label.
+_SPEAKER_LABEL_RE = re.compile(r"^[A-Z][A-Za-z'._-]{0,29}:\s*")
 
 # Answer confidence per judgment stance for polar questions: a
 # committed stance (assert or deny) answers decisively, a hedge
@@ -1359,7 +1364,9 @@ class QuestionHandler:
             part = part.strip()
             if part.startswith("Genesis:"):
                 part = part[len("Genesis:") :].strip()
-            if part and not part.startswith("User:") and len(part) > 10:
+            elif _SPEAKER_LABEL_RE.match(part):
+                continue
+            if part and len(part) > 10:
                 genesis_parts.append(part)
         if genesis_parts:
             return max(genesis_parts, key=len)
@@ -1377,9 +1384,10 @@ class QuestionHandler:
         user_parts = []
         for part in parts:
             part = part.strip()
-            if part.startswith("User:"):
-                part = part[len("User:") :].strip()
-            if part and not part.startswith("Genesis:") and len(part) > 10:
+            if part.startswith("Genesis:"):
+                continue
+            part = _SPEAKER_LABEL_RE.sub("", part, count=1).strip()
+            if part and len(part) > 10:
                 user_parts.append(part)
         if user_parts:
             return max(user_parts, key=len)

@@ -58,9 +58,7 @@ def test_thermal_strain_ramp() -> None:
 def test_piper_fever_flags(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     """Heat adds duration-noise and breath pauses; cool adds nothing."""
     captured: list[list[str]] = []
-    monkeypatch.setattr(
-        subprocess, "Popen", lambda cmd, **kw: _FakeProc(cmd, captured, **kw)
-    )
+    monkeypatch.setattr(subprocess, "Popen", lambda cmd, **kw: _FakeProc(cmd, captured, **kw))
 
     voice = Voice.__new__(Voice)
     voice._piper_available = True

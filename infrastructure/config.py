@@ -124,6 +124,25 @@ class VolitionConfig:
                     "idle_seconds": 0.03,
                 },
             ),
+            # Manual urge — she feels like tending her own manual.
+            # Changes to her man pages wait in her review queue
+            # rather than installing silently (nothing edits her
+            # manual behind her back); the drive is the queue itself
+            # — while changes wait the urge builds, and crossing
+            # threshold she ratifies them herself: the manual is
+            # what she says it is. The queue draining removes its
+            # own stimulus, so the urge decays once her say is done.
+            UrgeConfig(
+                name="manual",
+                threshold=0.70,
+                growth=0.0002,
+                decay=0.0005,
+                cooldown=900.0,
+                stimuli={
+                    "manual_pending": 0.08,
+                    "idle_seconds": 0.01,
+                },
+            ),
             # Look urge — she feels like seeing. Was a metronome
             # (threshold 0, fired on cooldown); now the drive is
             # chemical: LC-NE is the orienting/vigilance signal —

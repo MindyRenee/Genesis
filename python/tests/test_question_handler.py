@@ -264,6 +264,36 @@ def test_enrich_with_memory_prefers_user_fact():
     assert thought.metadata["memory"] == "a quoll eats insects"
 
 
+def test_enrich_with_memory_named_speaker():
+    """A turn recorded under the speaker's name parses like 'User:'.
+
+    Conversation memories are attributed to whoever she believes is
+    speaking ("Mindy: ... | Genesis: ..."), so enrichment must lift
+    the named speaker's side, not only the generic label's.
+    """
+    handler = _handler(_network())
+    memory, retrieve = _memory_context(
+        "Mindy: a quoll eats insects | Genesis: Quoll requires insect."
+    )
+    thought = handler._enrich_with_memory(
+        _bare_thought(),
+        _perception("tell me about quolls", QuestionType.NONE),
+        memory,
+        retrieve,
+    )
+    assert thought.metadata["memory"] == "a quoll eats insects"
+
+
+def test_named_speaker_side_not_recalled_as_genesis_reply():
+    """The user's named turn must not leak into Genesis's side."""
+    handler = _handler(_network())
+    _, retrieve = _memory_context(
+        "Mindy: tell me everything you know about quolls | Genesis: Quoll requires insect."
+    )
+    ep = retrieve(7)
+    assert handler._extract_genesis_response(ep.text) == "Quoll requires insect."
+
+
 def test_produced_passive_is_incoming():
     meta = _relation_meta(_handler(_network()), "What produced cognition?", QuestionType.WHAT)
     assert meta is not None

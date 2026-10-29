@@ -456,7 +456,7 @@ BORED_NE = 0.27
 # The daemon's own latent field (src/field/) publishes the
 # organism's self-coherence: the Fréchet variance of the
 # body/prediction/agency fibers about their barycenter on the
-# shared ball, and that center's displacement from nominal. Per
+# shared sphere, and that center's displacement from nominal. Per
 # the precision literature (Clark & Friston 2018 — "mood is the
 # precision of predictions"), internal incoherence IS a felt
 # signal: loss of precision reads as unsettled, coherence

@@ -267,9 +267,7 @@ class Voice:
         # off the current speech.
         for i, chunk in enumerate(chunks):
             if i == 0:
-                self._speak_single(
-                    chunk, blocking, alertness, valence, caution, creativity, temp_c
-                )
+                self._speak_single(chunk, blocking, alertness, valence, caution, creativity, temp_c)
             else:
                 with self._queue_lock:
                     max_q = self._speech_queue.maxlen or 3
@@ -367,9 +365,7 @@ class Voice:
         with self._queue_lock:
             if not self._speech_queue:
                 return
-            text, alertness, _valence, caution, _creativity, temp_c = (
-                self._speech_queue.popleft()
-            )
+            text, alertness, _valence, caution, _creativity, temp_c = self._speech_queue.popleft()
         # Play the queued utterance. We call the internal playback
         # directly (not speak()) to avoid re-checking is_speaking,
         # which would re-queue and never play.

@@ -296,9 +296,7 @@ class Psychoanalysis:
         latent = [cid for cid, _ in latent_ranked[: self.LATENT_TOP]]
         latent_set = set(latent)
 
-        condensation = [
-            cid for cid in latent if hits.get(cid, 0) >= self.CONDENSATION_MIN_HITS
-        ]
+        condensation = [cid for cid in latent if hits.get(cid, 0) >= self.CONDENSATION_MIN_HITS]
         # A manifest element displaces onto the strongest charged
         # latent it stands in for — keep the best target per stand-in.
         displacement: dict[str, str] = {}
@@ -319,9 +317,7 @@ class Psychoanalysis:
                     continue
                 trace.pressure = max(0.0, trace.pressure - trace.charge * self.DREAM_DISCHARGE)
                 discharged.append(cid)
-            self._register = {
-                cid: t for cid, t in self._register.items() if t.pressure > 0.01
-            }
+            self._register = {cid: t for cid, t in self._register.items() if t.pressure > 0.01}
 
         found_charge = sum(reach.values())
         confidence = coverage * min(1.0, found_charge)
@@ -442,7 +438,5 @@ class Psychoanalysis:
                 trace.slips += 1
                 trace.pressure = max(0.0, trace.pressure - trace.charge * self.SLIP_DISCHARGE)
                 slipped.append(trace.concept_id)
-            self._register = {
-                cid: t for cid, t in self._register.items() if t.pressure > 0.01
-            }
+            self._register = {cid: t for cid, t in self._register.items() if t.pressure > 0.01}
         return slipped

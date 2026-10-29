@@ -491,6 +491,7 @@ class FrontalLobe:
             self_model=self_model,
             td_learner=self.td_learner,
             is_bonded_speaker=self._is_bonded_speaker,
+            current_speaker_getter=self._current_speaker,
             last_summary_getter=lambda: self._last_summary,
             last_memory_mode_getter=lambda: self._last_memory_mode,
         )
@@ -7597,8 +7598,9 @@ class FrontalLobe:
 
             # Record both sides of the conversation in full. The
             # separator " | " matches the LTM conversation-memory
-            # format (User: ... | Genesis: ...).
-            summary = f"User said: {perception.raw_text}"
+            # format (<speaker>: ... | Genesis: ...).
+            speaker = self._current_speaker() or "User"
+            summary = f"{speaker} said: {perception.raw_text}"
             if response:
                 summary += f" | Genesis responded: {response}"
 

@@ -244,9 +244,7 @@ class UserProfile:
             for entry in history:
                 if isinstance(entry, (list, tuple)) and len(entry) == 3:
                     try:
-                        parsed_history.append(
-                            (float(entry[0]), str(entry[1]), float(entry[2]))
-                        )
+                        parsed_history.append((float(entry[0]), str(entry[1]), float(entry[2])))
                     except (TypeError, ValueError):
                         continue
         profile = cls(

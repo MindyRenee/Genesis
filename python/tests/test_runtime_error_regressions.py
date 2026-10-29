@@ -232,7 +232,7 @@ def test_missing_camera_is_not_tallied_as_an_error() -> None:
 
     import occipital_lobe.perception.vision as vision_mod
 
-    def _no_frame(copy: bool = True):
+    def _no_frame(copy: bool = True, name: str | None = None):
         raise FileNotFoundError(2, "No such file or directory")
 
     original = vision_mod.latest_frame

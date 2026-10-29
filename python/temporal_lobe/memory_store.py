@@ -13,6 +13,8 @@ Dependencies (passed to ``__init__``):
     - td_learner: TDLearner for dopamine signal
     - is_bonded_speaker: callable reporting whether the current
       attributed speaker is the person her profile names
+    - current_speaker_getter: callable returning the attributed
+      speaker's name, or "" when the turn is unattributed
     - last_summary_getter: callable returning last neuro summary
     - last_memory_mode_getter: callable returning current memory mode
 """
@@ -59,6 +61,7 @@ class MemoryStore:
         self_model: SelfModel,
         td_learner: TDLearner,
         is_bonded_speaker: Callable[[], bool],
+        current_speaker_getter: Callable[[], str],
         last_summary_getter: Callable[[], Any],
         last_memory_mode_getter: Callable[[], str],
     ) -> None:
@@ -69,6 +72,7 @@ class MemoryStore:
         self._self_model = self_model
         self._td_learner = td_learner
         self._is_bonded_speaker = is_bonded_speaker
+        self._current_speaker_getter = current_speaker_getter
         self._last_summary_getter = last_summary_getter
         self._last_memory_mode_getter = last_memory_mode_getter
 
@@ -156,7 +160,11 @@ class MemoryStore:
             salience = 0.5
 
         emotional_tag = self.build_emotional_tag(emotion, perception)
-        text = f"User: {user_input} | Genesis: {response}"
+        # The turn belongs to whoever she attributes it to — a known
+        # speaker is named in her own memory; the unattributed stay
+        # "User" until they introduce themselves.
+        speaker = self._current_speaker_getter() or "User"
+        text = f"{speaker}: {user_input} | Genesis: {response}"
         self._memory.store_memory(
             text=text,
             salience=salience,

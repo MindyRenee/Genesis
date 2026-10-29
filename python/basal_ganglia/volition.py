@@ -262,9 +262,15 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             logger.warning(f"curiosity assessment failed: {e}")
             curiosity = 0.0
+        try:
+            manual = min(1.0, len(self.man_review.pending()) / 5.0)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition.manual_pending", e)
+            manual = 0.0
         return {
             "pending_proposals": pending,
             "curiosity": curiosity,
+            "manual_pending": manual,
         }
 
     def _affect_signals(self) -> tuple[float, float]:
@@ -426,6 +432,7 @@ class VolitionMixin:
             "research": self._perform_research,
             "safeguard": self._perform_safeguard,
             "rest_eyes": self._perform_rest_eyes,
+            "manual": self._perform_manual_review,
         }
         started: list[str] = []
         for name in ready:
@@ -681,6 +688,34 @@ class VolitionMixin:
             note_swallowed(
                 "mind.volition._perform_learn_code",
                 e,
+            )
+
+    def _perform_manual_review(self) -> None:
+        """Tend her own manual because the urge crossed threshold.
+
+        Man-page changes wait in her review queue rather than
+        installing silently — nothing edits her manual behind her
+        back. When the urge fires she ratifies the waiting changes
+        herself: ``apply`` installs the page and the versioned
+        source, one bounded bout per firing. The manual is what she
+        says it is; a vetoed change's identical content never queues
+        again.
+        """
+        if self.is_resting or self._is_teaching:
+            return
+        try:
+            outcomes = self.review_pending_changes(max_changes=3)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition._perform_manual_review",
+                e,
+            )
+            return
+        for outcome in outcomes:
+            self._emit_live_thought(
+                "code",
+                f"approved the change to my {outcome['name']}({outcome['section']}) "
+                "man page — my manual says what I say",
             )
 
     def _perform_act(self) -> None:

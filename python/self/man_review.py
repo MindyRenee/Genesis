@@ -354,3 +354,26 @@ class ManReviewMixin:
         """She declines a change — dropped, and the identical content
         never queues again."""
         return self.man_review.veto(change_id, note)
+
+    def review_pending_changes(self, max_changes: int = 3) -> list[dict]:
+        """Drain the review queue under her own volition.
+
+        The manual urge calls this when it crosses: each pending
+        change is applied through her own ``apply`` — her say over
+        what her manual is, not an installer's. Returns one outcome
+        dict per ratified change and keeps the pending count in
+        self_knowledge current.
+        """
+        outcomes: list[dict] = []
+        for change in self.man_review.pending()[:max_changes]:
+            if self.man_review.apply(change.id):
+                outcomes.append(
+                    {
+                        "id": change.id,
+                        "name": change.name,
+                        "section": change.section,
+                        "status": "applied",
+                    }
+                )
+        self.self_model.self_knowledge["manual_pending_review"] = len(self.man_review.pending())
+        return outcomes

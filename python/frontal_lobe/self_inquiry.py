@@ -863,23 +863,12 @@ class SelfInquiryHandler:
         presence must not inherit the caregiver's number. For anyone
         else the honest report is the relationship record so far.
         """
-        person = (
-            self._self_model.self_knowledge.get("current_speaker", "")
-            or self._self_model.self_knowledge.get("user_name", "")
-        )
-        profile_name = (
-            self._user_profile.get_name() if self._user_profile is not None else ""
-        )
-        bonded = (
-            bool(person)
-            and bool(profile_name)
-            and person.lower() == profile_name.lower()
-        )
-        bond = (
-            float(self._self_model.self_knowledge.get("bond", 0.0) or 0.0)
-            if bonded
-            else 0.0
-        )
+        person = self._self_model.self_knowledge.get(
+            "current_speaker", ""
+        ) or self._self_model.self_knowledge.get("user_name", "")
+        profile_name = self._user_profile.get_name() if self._user_profile is not None else ""
+        bonded = bool(person) and bool(profile_name) and person.lower() == profile_name.lower()
+        bond = float(self._self_model.self_knowledge.get("bond", 0.0) or 0.0) if bonded else 0.0
 
         fragments: list[tuple[str, str]] = []
         if person and bond >= 0.6:

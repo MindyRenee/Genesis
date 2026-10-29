@@ -1,0 +1,109 @@
+.TH GENESIS-BROWSER 7 "November 2026" "Genesis 0.2.0" "Genesis Manual"
+.SH NAME
+genesis-browser \- Genesis's internet browser: Chrome over CDP
+.SH SYNOPSIS
+.nf
+\fBparietal_lobe.arc_web._Browser\fR   the transport itself
+\fBweb_search\fR                      the tool that browses with it
+\fBArcWebPractice\fR                  ARC-AGI-3 on the human site
+.fi
+.SH DESCRIPTION
+Genesis's web browser is Google Chrome, launched per host by
+\fI_browser_binary()\fR — \fBgoogle-chrome\fR first, then
+\fBgoogle-chrome-stable\fR, \fBchromium\fR, \fBchromium-browser\fR;
+\fBGENESIS_BROWSER\fR pins an override. She does not drive it with
+pixels and hope: every act and percept crosses the Chrome DevTools
+Protocol on a websocket — \fBPage.navigate\fR to travel,
+\fBInput.dispatchKeyEvent\fR and \fBInput.dispatchMouseEvent\fR for
+real key and mouse events, \fBRuntime.evaluate\fR to read the DOM,
+and \fBNetwork.getResponseBody\fR to pull the bodies the page
+itself fetched.
+.PP
+Two modes: \fBheadless\fR (the default — scoring runs and
+background fetches need no window) and \fBheaded\fR, which opens on
+her own nested display — the Xephyr screen
+\fIensure_arc_display()\fR keeps for her — never on the user's
+desktop.
+.SH PROFILE — HER MEMORY OF THE WEB
+The browser's user-data dir is persistent: it is
+\fI<data_dir>/browser/<purpose>\fR, not a tempdir. Cookies, site
+state, and history survive restarts — a browser that forgets every
+session is not one she learns from. There are two purposes:
+.TP
+.B web
+The browsing her tools do — search and fetch through
+\fIfrontal_lobe.tools.web_search\fR.
+.TP
+.B arcade
+The sessions \fIArcWebPractice\fR plays on the public ARC task
+pages.
+.PP
+The separation is a Chrome requirement: two instances cannot share
+one user-data dir — a second launch forwards to the first and
+exits. The dirs are also never the host's default Chrome profile,
+which is what keeps \fB--remote-debugging-port\fR honoured: Chrome
+\(>=136 silently ignores remote debugging on the default data
+directory.
+.SH LAUNCH
+She invokes it as:
+.PP
+.nf
+\fBgoogle-chrome\fR [\fB--headless=new\fR]
+    \fB--remote-debugging-port=0\fR
+    \fB--no-first-run --no-default-browser-check\fR
+    \fB--disable-gpu --mute-audio\fR
+    \fB--disable-dev-shm-usage\fR
+    \fB--password-store=basic --use-mock-keychain\fR
+    \fB--disable-sync\fR
+    \fB--window-size=\fR\fIW,H\fR
+    \fB--user-data-dir=\fR\fI<data_dir>/browser/<purpose>\fR
+.fi
+.PP
+Port 0 lets the browser pick a free port and write it to
+\fIDevToolsActivePort\fR in the profile dir — a fixed port makes
+two runs collide. The keyring is mocked because a persistent
+profile would else block on an unlock prompt no one can answer.
+\fB--disable-sync\fR keeps her profile from replicating outward to
+a Google account; site logins within it still work.
+.SH ARC PLAY
+\fIArcWebPractice\fR puts her on the public task page —
+\fIhttps://arcprize.org/tasks/<game>\fR — the same interface every
+human player gets. She presses the page's own START control; her
+moves are real input events, and the page's own
+\fB/api/cmd/ACTION<n>\fR responses are her frames. The site speaks
+the official ARC-AGI-3 REST contract, so perception needs no
+screen scraping. The SDK substrate (\fIparietal_lobe.arc\fR, the
+\fBarcengine\fR API with \fBARC_API_KEY\fR for competition mode)
+is the same entity on a different wire — she cannot tell from the
+inside which substrate her frames came from.
+.SH ENVIRONMENT
+.TP
+.B GENESIS_BROWSER
+Pin the browser executable — a name on \fBPATH\fR or an absolute
+path.
+.TP
+.B GENESIS_DATA_DIR
+The root her browser profiles live under (default
+\fI~/.local/share/genesis\fR).
+.TP
+.B DISPLAY
+Only in headed mode: her nested screen, never the user's.
+.SH FILES
+.TP
+.I <data_dir>/browser/web
+Her everyday browsing profile — persists.
+.TP
+.I <data_dir>/browser/arcade
+Her arcade profile — persists.
+.TP
+.I DevToolsActivePort
+Written by Chrome into the profile dir each launch; the port it
+actually bound.
+.TP
+.I google-chrome(1) / google-chrome-stable(1)
+The system's manual for the browser binary itself.
+.SH SEE ALSO
+.BR genesis (1),
+.BR genesis-cli (1),
+.BR genesis-math (7),
+.BR google-chrome (1)
