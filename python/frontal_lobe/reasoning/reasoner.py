@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import heapq
 import math
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, ClassVar
@@ -33,6 +34,9 @@ __all__ = [
     "MetaReasoning",
     "ProbabilisticReasoning",
     "Reasoner",
+    "ReasoningEdge",
+    "ReasoningGraph",
+    "ReasoningNode",
     "ReasoningRecord",
     "ReasoningResult",
     "ReasoningStrategy",
@@ -105,6 +109,138 @@ class ReasoningResult:
         return "\n".join(lines)
 
 
+@dataclass(slots=True)
+class ReasoningEdge:
+    """One inference step the frontiers carried into a conclusion.
+
+    Deduplicated across results — two conclusions whose paths share a
+    prefix fold onto the same edge, so shared warrant surfaces as
+    shared structure instead of repeated rows in a list.
+
+    Attributes:
+        source: The concept the step left.
+        relation: The relation type value it crossed ("is_a", "causes").
+        target: The concept it arrived at.
+        weight: The network edge's weight as the path recorded it.
+        strategies: Every reasoning type that arrived through this
+            step — an edge the deductive and causal frontiers both
+            crossed shows both.
+        best_confidence: The strongest conclusion confidence the
+            step carried.
+    """
+
+    source: str
+    relation: str
+    target: str
+    weight: float
+    strategies: set[ReasoningType] = field(default_factory=set)
+    best_confidence: float = 0.0
+
+
+@dataclass(slots=True)
+class ReasoningNode:
+    """A concept the pass reached — what arrived here, not just that
+    something did.
+
+    Attributes:
+        concept: The concept id, in the network's own vocabulary.
+        strategies: Every reasoning type whose path touched this
+            node — corroboration is visible as a set, not a count.
+        best_confidence: The strongest conclusion confidence carried
+            through this node.
+        depth: Shortest hops into a warrant path where this node
+            appeared (root is 0).
+        terminal: Whether a conclusion ended here.
+        warrants: How many results' paths ended on this node — two
+            results corroborating the same concept read as 2.
+    """
+
+    concept: str
+    strategies: set[ReasoningType] = field(default_factory=set)
+    best_confidence: float = 0.0
+    depth: int = 0
+    terminal: bool = False
+    warrants: int = 0
+
+
+class ReasoningGraph(list[ReasoningResult]):
+    """The subgraph a ``reason_about`` pass wove — shaped by her
+    network, not by the report.
+
+    The simultaneous frontiers do not really produce a list: they
+    leave a confluence structure inside the concept space — nodes
+    reached, edges traversed, arrivals that corroborate each other.
+    A flat list can name the conclusions but not the shape they
+    stand on. This type keeps the list behavior callers rely on
+    (iteration, slicing, ``sort``, truthiness) while exposing the
+    shape underneath: ``nodes`` and ``edges`` are folded from every
+    result's structured path in the network's own vocabulary —
+    concept ids and relation types — and ``confluence()`` names the
+    nodes independent strategies corroborated.
+    """
+
+    def __init__(self, root: str, results: Iterable[ReasoningResult] = ()) -> None:
+        super().__init__(results)
+        self.root = root
+        self.nodes: dict[str, ReasoningNode] = {}
+        self.edges: dict[tuple[str, str, str], ReasoningEdge] = {}
+        self._fold()
+
+    def _fold(self) -> None:
+        """Fold every result's path into shared nodes and edges.
+
+        The graph emerges one step at a time from the warrants the
+        results actually carry: each ``(source, relation, target)``
+        step lands on the same edge no matter how many paths crossed
+        it, so confluence — several strategies or several paths
+        arriving at the same concept — is structure, not inference
+        after the fact.
+        """
+        self.nodes[self.root] = ReasoningNode(self.root)
+        for result in self:
+            rtype = result.reasoning_type
+            for i, (src, rel, tgt, w) in enumerate(result.path):
+                edge = self.edges.get((src, rel, tgt))
+                if edge is None:
+                    edge = self.edges[(src, rel, tgt)] = ReasoningEdge(src, rel, tgt, w)
+                edge.strategies.add(rtype)
+                edge.best_confidence = max(edge.best_confidence, result.confidence)
+                # The step's source is warrant too — abductive paths
+                # begin at the explanans, off the root's own frontier.
+                for concept, depth in ((src, i), (tgt, i + 1)):
+                    node = self.nodes.get(concept)
+                    if node is None:
+                        node = self.nodes[concept] = ReasoningNode(concept, depth=depth)
+                    elif depth < node.depth:
+                        node.depth = depth
+                    node.strategies.add(rtype)
+                    node.best_confidence = max(node.best_confidence, result.confidence)
+                if i == len(result.path) - 1:
+                    node = self.nodes[tgt]
+                    node.terminal = True
+                    node.warrants += 1
+        # The root was the question, not a waypoint — keep it at 0.
+        self.nodes[self.root].depth = 0
+
+    def confluence(self) -> dict[str, set[ReasoningType]]:
+        """Concepts independent strategies corroborated.
+
+        Where the simultaneous frontiers arrived by different
+        inference modes — a node the deductive sweep and the causal
+        search both reached — the conclusion rests on more than one
+        warrant. A flat list cannot see this; the graph can.
+        """
+        return {
+            concept: node.strategies
+            for concept, node in self.nodes.items()
+            if len(node.strategies) > 1
+        }
+
+    def terminals(self) -> dict[str, ReasoningNode]:
+        """Nodes a conclusion ended on — the frontier's leaves."""
+        return {c: n for c, n in self.nodes.items() if n.terminal}
+
+
 # ─── Inference budgeting ────────────────────────────────────────────
 #
 # Graph inference is exponential in branching factor. The old DFS
@@ -171,7 +307,7 @@ class Reasoner:
         """Store the concept network that this engine will reason over."""
         self.network = network
 
-    def reason_about(self, concept_name: str, depth: int = 3) -> list[ReasoningResult]:
+    def reason_about(self, concept_name: str, depth: int = 3) -> ReasoningGraph:
         """Run all applicable reasoning about a concept.
 
         This is the main entry point. Given a concept, it:
@@ -183,13 +319,15 @@ class Reasoner:
         5. Finds analogies — transfer through SIMILAR_TO
         6. Abductive reasoning — inference to best explanation
 
-        Returns a list of reasoning results, sorted by confidence.
+        Returns a :class:`ReasoningGraph` — the results sorted by
+        confidence, plus the confluence structure their warrants wove
+        (``nodes``, ``edges``, ``confluence()``, ``terminals()``).
         """
         results: list[ReasoningResult] = []
 
         concept = self.network.get_concept(concept_name)
         if concept is None:
-            return results
+            return ReasoningGraph(concept_name)
 
         # A shared expansion budget bounds the whole pass — wide hub
         # regions (a "life" concept with hundreds of neighbors) can't
@@ -198,11 +336,25 @@ class Reasoner:
         # branches.
         budget = _InferenceBudget(_expansions_for_depth(depth))
 
-        # 1. Deductive: transitive chains for all transitive relations
-        results.extend(self._transitive_chains(concept.id, depth, budget))
-
-        # 2. Causal: follow CAUSES and LEADS_TO chains
-        results.extend(self._causal_chains(concept.id, depth, budget))
+        # 1–2. Deductive and causal chain searches advance together.
+        # The right hemisphere does not run its inference modes in
+        # series: the two frontiers interleave one result at a time
+        # and compete for the shared budget on every step, so a
+        # hub-dense transitive sweep cannot starve the causal search
+        # before it has expanded a single edge.
+        frontiers: list[Iterator[ReasoningResult]] = [
+            self._transitive_chains(concept.id, depth, budget),
+            self._causal_chains(concept.id, depth, budget),
+        ]
+        while frontiers:
+            advancing: list[Iterator[ReasoningResult]] = []
+            for frontier in frontiers:
+                try:
+                    results.append(next(frontier))
+                    advancing.append(frontier)
+                except StopIteration:
+                    pass
+            frontiers = advancing
 
         # 3. Contradiction detection
         results.extend(self._detect_contradictions(concept.id))
@@ -226,7 +378,9 @@ class Reasoner:
         # been_thinking expresses _cat:utterance:reflection_opener"
         # leak into speech as raw concept IDs.
         results = [r for r in results if not self._references_internal_concept(r)]
-        return results
+        # Fold the warrants into the shape they wove — the graph is
+        # hers: concept ids and relation types from her own network.
+        return ReasoningGraph(concept.id, results)
 
     @staticmethod
     def _references_internal_concept(result: ReasoningResult) -> bool:
@@ -265,7 +419,7 @@ class Reasoner:
         concept_id: str,
         depth: int,
         budget: _InferenceBudget | None = None,
-    ) -> list[ReasoningResult]:
+    ) -> Iterator[ReasoningResult]:
         """Follow transitive chains for all transitive relation types.
 
         If A is_a B and B is_a C, then A is_a C.
@@ -273,45 +427,44 @@ class Reasoner:
         If A depends_on B and B depends_on C, then A depends_on C.
         If A enables B and B enables C, then A enables C.
 
-        The search is best-first within each relation family: the
-        frontier is a max-heap on path confidence, so the strongest
-        inferences are found before the budget runs out. Confidence is
-        the product of per-hop (relation prior × edge weight) — an
-        inference is only as strong as its weakest link, and weak edges
-        now actually weaken conclusions instead of being ignored.
+        One frontier holds every relation family at once — is_a,
+        part_of, depends_on, and enables edges compete on the same
+        heap, each weighted by its own relation prior. The strongest
+        interpretation of a node wins the single emission; the serial
+        per-family sweep it replaced could emit the same node once per
+        family, in dict order, with whatever budget the earlier
+        families had left. Confidence is the product of per-hop
+        (relation prior × edge weight) — an inference is only as
+        strong as its weakest link, and weak edges now actually
+        weaken conclusions instead of being ignored.
         """
-        results: list[ReasoningResult] = []
         if budget is None:
             budget = _InferenceBudget(_expansions_for_depth(depth))
-
-        for rel_type, base_conf in self._TRANSITIVE.items():
-            for result in self._best_first_chains(
-                concept_id,
-                depth,
-                budget,
-                relations={rel_type},
-                step_conf=base_conf,
-                reasoning_type=ReasoningType.DEDUCTIVE,
-                min_emit_depth=1,
-                emit_conf=lambda hops, conf: conf,
-                conclusion=lambda target, via, rel_type=rel_type: (
-                    f"{concept_id} {rel_type.value} {target}"
-                    + (f" (transitively, through {via})" if via != "—" else "")
-                ),
-            ):
-                results.append(result)
-        return results
+        yield from self._best_first_chains(
+            concept_id,
+            depth,
+            budget,
+            relations=set(self._TRANSITIVE),
+            step_conf=self._TRANSITIVE,
+            reasoning_type=ReasoningType.DEDUCTIVE,
+            min_emit_depth=1,
+            emit_conf=lambda hops, conf: conf,
+            conclusion=lambda edge, via: (
+                f"{concept_id} {edge.relation.value} {edge.target}"
+                + (f" (transitively, through {via})" if via != "—" else "")
+            ),
+        )
 
     def _causal_chains(
         self,
         concept_id: str,
         depth: int,
         budget: _InferenceBudget | None = None,
-    ) -> list[ReasoningResult]:
+    ) -> Iterator[ReasoningResult]:
         """Follow CAUSES and LEADS_TO chains, strongest-first."""
         if budget is None:
             budget = _InferenceBudget(_expansions_for_depth(depth))
-        return self._best_first_chains(
+        yield from self._best_first_chains(
             concept_id,
             depth,
             budget,
@@ -320,8 +473,8 @@ class Reasoner:
             reasoning_type=ReasoningType.CAUSAL,
             min_emit_depth=2,
             emit_conf=lambda hops, conf: conf,
-            conclusion=lambda target, _via: (
-                f"{concept_id} ultimately leads to {target} through a causal chain"
+            conclusion=lambda edge, _via: (
+                f"{concept_id} ultimately leads to {edge.target} through a causal chain"
             ),
         )
 
@@ -332,12 +485,12 @@ class Reasoner:
         budget: _InferenceBudget,
         *,
         relations: set[RelationType],
-        step_conf: float,
+        step_conf: float | dict[RelationType, float],
         reasoning_type: ReasoningType,
         min_emit_depth: int,
         emit_conf: Any,
         conclusion: Any,
-    ) -> list[ReasoningResult]:
+    ) -> Iterator[ReasoningResult]:
         """Best-first multi-hop search over a set of relations.
 
         Pops the highest-confidence partial path, expands its outgoing
@@ -345,11 +498,26 @@ class Reasoner:
         node once — the first time it is popped, which is its best
         possible score (Dijkstra ordering over multiplicative rewards).
 
+        ``step_conf`` is the per-hop relation prior: either one scalar
+        for the whole search, or a per-relation mapping when several
+        relation families share the frontier (each hop decays by the
+        prior of the edge actually taken). ``conclusion`` receives the
+        edge that reaches the emitted node, so the relation in the
+        conclusion is the one that won the competition — not whichever
+        family happened to be sweeping.
+
+        Results are yielded as they are found: the search runs
+        incrementally so several frontiers can interleave inside one
+        ``reason_about`` pass instead of draining in series. When the
+        shared budget dies mid-search every emitted result is marked
+        ``partial`` — the objects are shared with the caller, so the
+        mark lands after the frontier has already yielded them.
+
         Every emitted result carries its full structured ``path`` so
         the critical-thinking layer can score the actual edges instead
         of re-parsing strings.
         """
-        results: list[ReasoningResult] = []
+        emitted_results: list[ReasoningResult] = []
         # frontier: (-confidence, tiebreak, node, path-of-steps)
         # path entries are (source, relation_value, target, weight).
         # The root starts at confidence 1.0 — the product accumulates
@@ -361,7 +529,7 @@ class Reasoner:
         expanded: set[str] = set()
         counter = 1
 
-        while frontier and len(results) < self._CHAIN_RESULT_CAP:
+        while frontier and len(emitted_results) < self._CHAIN_RESULT_CAP:
             neg_conf, _order, node, path = heapq.heappop(frontier)
             conf = -neg_conf
             if len(path) >= depth or node in expanded:
@@ -379,24 +547,25 @@ class Reasoner:
                     continue
                 if any(edge.target == step[2] for step in path) or edge.target == concept_id:
                     continue
-                hop_conf = conf * step_conf * max(0.0, min(1.0, edge.weight))
+                prior = step_conf[edge.relation] if isinstance(step_conf, dict) else step_conf
+                hop_conf = conf * prior * max(0.0, min(1.0, edge.weight))
                 if hop_conf < _MIN_PATH_CONFIDENCE:
                     continue
                 new_path = (*path, (node, edge.relation.value, edge.target, edge.weight))
                 if len(new_path) >= min_emit_depth and edge.target not in emitted:
                     emitted.add(edge.target)
                     via = ", ".join(step[2] for step in new_path[:-1]) or "—"
-                    results.append(
-                        ReasoningResult(
-                            conclusion=conclusion(edge.target, via),
-                            reasoning_type=reasoning_type,
-                            evidence=[f"{src} {rel} {tgt}" for src, rel, tgt, _w in new_path],
-                            confidence=min(1.0, emit_conf(len(new_path), hop_conf)),
-                            knowledge=[(edge.relation.value, edge.target, hop_conf)],
-                            path=list(new_path),
-                            partial=budget.exhausted,
-                        )
+                    result = ReasoningResult(
+                        conclusion=conclusion(edge, via),
+                        reasoning_type=reasoning_type,
+                        evidence=[f"{src} {rel} {tgt}" for src, rel, tgt, _w in new_path],
+                        confidence=min(1.0, emit_conf(len(new_path), hop_conf)),
+                        knowledge=[(edge.relation.value, edge.target, hop_conf)],
+                        path=list(new_path),
+                        partial=budget.exhausted,
                     )
+                    emitted_results.append(result)
+                    yield result
                 heapq.heappush(
                     frontier,
                     (-hop_conf, counter, edge.target, new_path),
@@ -404,9 +573,11 @@ class Reasoner:
                 counter += 1
 
         if budget.exhausted:
-            for result in results:
+            # The budget died mid-search: every result this frontier
+            # already yielded is partial coverage, not the whole
+            # frontier. The marks land on objects the caller holds.
+            for result in emitted_results:
                 result.partial = True
-        return results
 
     def _detect_contradictions(self, concept_id: str) -> list[ReasoningResult]:
         """Detect contradictions involving this concept.

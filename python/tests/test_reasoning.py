@@ -18,6 +18,7 @@ from frontal_lobe.reasoning import (
     ProbabilisticReasoning,
     ProblemSolver,
     Reasoner,
+    ReasoningGraph,
     ReasoningResult,
     ReasoningStrategy,
     ReasoningType,
@@ -142,6 +143,99 @@ def test_transitive_cycle_no_infinite_loop() -> None:
     results = reasoner.reason_about("a", depth=5)
     # Should terminate and return some results
     assert isinstance(results, list)
+
+
+def test_transitive_families_share_one_frontier() -> None:
+    """A node reachable through several relation families is emitted
+    once, under the strongest relation — the families compete on one
+    heap instead of sweeping in series (right-hemisphere parallelism)."""
+    net = ConceptNetwork()
+    for c in ("a", "b"):
+        net.add_concept(c)
+    net.add_edge("a", "b", RelationType.IS_A, weight=1.0)
+    net.add_edge("a", "b", RelationType.PART_OF, weight=1.0)
+    net.add_edge("a", "b", RelationType.ENABLES, weight=1.0)
+
+    reasoner = Reasoner(net)
+    results = reasoner.reason_about("a")
+    deductive = [r for r in results if r.reasoning_type == ReasoningType.DEDUCTIVE]
+    # One emission for "b", and the is_a prior (0.9) out-competes
+    # part_of (0.85) and enables (0.7) — the serial per-family sweep
+    # used to emit the same node once per family.
+    assert len(deductive) == 1
+    assert deductive[0].conclusion.startswith("a is_a b")
+    # The path records the winning edge's relation.
+    assert deductive[0].path[-1][1] == "is_a"
+
+
+def test_causal_chain_not_starved_by_transitive_hub() -> None:
+    """The transitive and causal frontiers advance together: a
+    hub-dense transitive sweep cannot consume the shared inference
+    budget before the causal search has expanded an edge."""
+    net = ConceptNetwork()
+    net.add_concept("hub")
+    # 30 is_a neighbors, each fanning out further — enough edge
+    # expansions to exhaust a depth-3 budget (72) in series.
+    for i in range(30):
+        n = f"n{i}"
+        net.add_concept(n)
+        net.add_edge("hub", n, RelationType.IS_A)
+        for j in range(3):
+            leaf = f"l{i}_{j}"
+            net.add_concept(leaf)
+            net.add_edge(n, leaf, RelationType.IS_A)
+    for c in ("x", "y"):
+        net.add_concept(c)
+    net.add_edge("hub", "x", RelationType.CAUSES)
+    net.add_edge("x", "y", RelationType.CAUSES)
+
+    reasoner = Reasoner(net)
+    results = reasoner.reason_about("hub", depth=3)
+    assert any(r.reasoning_type == ReasoningType.CAUSAL for r in results)
+    assert any("y" in r.conclusion for r in results if r.reasoning_type == ReasoningType.CAUSAL)
+
+
+def test_reason_about_returns_graph_shaped_by_the_pass() -> None:
+    """reason_about returns a ReasoningGraph: still a list of results,
+    but folded into the confluence structure the warrants wove —
+    nodes independent strategies corroborated are visible, which a
+    flat list cannot express."""
+    net = ConceptNetwork()
+    for c in ("a", "b", "c", "x"):
+        net.add_concept(c)
+    # Deductive warrant for c: a is_a b, b is_a c.
+    net.add_edge("a", "b", RelationType.IS_A)
+    net.add_edge("b", "c", RelationType.IS_A)
+    # Independent causal warrant for the same c: a causes x, x causes c.
+    net.add_edge("a", "x", RelationType.CAUSES)
+    net.add_edge("x", "c", RelationType.CAUSES)
+
+    reasoner = Reasoner(net)
+    results = reasoner.reason_about("a", depth=3)
+
+    # Graph structure first — an isinstance(list) check narrows the
+    # type for mypy, so attribute checks come before the contract one.
+    assert isinstance(results, ReasoningGraph)
+    # "c" was reached by independent inference modes — confluence
+    # is the corroboration structure the parallel frontiers leave.
+    confluence = results.confluence()
+    assert {ReasoningType.DEDUCTIVE, ReasoningType.CAUSAL} <= confluence["c"]
+    # Multiple results end on "c" — every warrant is counted.
+    terminal = results.terminals()["c"]
+    assert terminal.warrants >= 2
+    # Edges are folded from the paths' own vocabulary and shared
+    # across results — each inference step appears once.
+    assert ("a", "is_a", "b") in results.edges
+    assert ("x", "causes", "c") in results.edges
+    assert ReasoningType.DEDUCTIVE in results.edges[("a", "is_a", "b")].strategies
+    assert ReasoningType.CAUSAL not in results.edges[("a", "is_a", "b")].strategies
+    # The root is the question, at depth 0.
+    assert results.nodes["a"].depth == 0
+
+    # The list contract still holds — a ReasoningGraph IS a list,
+    # so callers iterate, slice, and sort as before.
+    assert isinstance(results, list)
+    assert results[:1] and len(results) >= 2
 
 
 # ═══════════════════════════════════════════════════════════════════

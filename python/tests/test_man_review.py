@@ -191,11 +191,33 @@ class _VolitionMind(ManReviewMixin, VolitionMixin):
     """Same holder plus the volition performer's dependencies."""
 
     def __init__(self, review: ManPageReview) -> None:
+        from temporal_lobe.concepts import ConceptNetwork
+
         self.man_review = review
         self.self_model = SimpleNamespace(self_knowledge={})
         self.is_resting = False
         self._is_teaching = False
         self.emitted: list[tuple[str, str]] = []
+        # _emit_volition_thought composes through the concept network
+        # — give it the seeds it looks up and a composer that answers.
+        net = ConceptNetwork()
+        for seed in ("manual", "self", "documentation"):
+            net.add_concept(seed, confidence=0.9)
+        self.brain = SimpleNamespace(
+            frontal=SimpleNamespace(
+                network=net,
+                composer=SimpleNamespace(
+                    compose_about=lambda seed, emotion, focused=True: SimpleNamespace(
+                        content=f"thought about {seed}",
+                        confidence=0.9,
+                    ),
+                    has_said_similar=lambda seed, content: False,
+                ),
+            )
+        )
+
+    def feel(self):
+        return SimpleNamespace(label="curious")
 
     def _emit_live_thought(self, kind: str, text: str, **kw) -> None:
         self.emitted.append((kind, text))

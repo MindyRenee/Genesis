@@ -472,7 +472,14 @@ class FigurativeLanguageProcessor:
         if not text:
             return None
 
-        # Search for "X is/are/was/were Y" patterns
+        # The right hemisphere does not take the first cross-domain
+        # pair it finds: every "X is Y" candidate and every domain
+        # mapping inside each phrase compete at once, and the mapping
+        # carrying the most shared structure wins. First-found order
+        # survives only as the deterministic tiebreak — evaluation is
+        # over all candidates, never early-exit on the first.
+        best: Metaphor | None = None
+        best_score = (0, 0)
         for match in _IS_A_RE.finditer(text):
             source_raw = match.group(1).strip().lower()
             target_raw = match.group(2).strip().lower()
@@ -483,29 +490,31 @@ class FigurativeLanguageProcessor:
             if len(source_raw) > 50 or len(target_raw) > 50:
                 continue
 
-            # Look up domains
-            source_domain = self._lookup_domain(source_raw)
-            target_domain = self._lookup_domain(target_raw)
+            # Every domain pairing present in the two phrases is a
+            # simultaneous candidate mapping — "a river of fire" offers
+            # both fluid and fire mappings, not just the first word's.
+            for source_domain in self._domains_in(source_raw):
+                for target_domain in self._domains_in(target_raw):
+                    if source_domain == target_domain:
+                        continue
+                    shared = self._find_shared_properties(
+                        source_raw, target_raw, source_domain, target_domain
+                    )
+                    # Richer interpretation first; larger matched span
+                    # breaks ties (a more specific utterance).
+                    score = (len(shared), len(source_raw) + len(target_raw))
+                    if score > best_score:
+                        best_score = score
+                        best = Metaphor(
+                            source=source_raw,
+                            target=target_raw,
+                            source_domain=source_domain,
+                            target_domain=target_domain,
+                            sentence=text,
+                            shared_properties=shared,
+                        )
 
-            # If both domains are known and different → metaphor
-            if (
-                source_domain is not None
-                and target_domain is not None
-                and source_domain != target_domain
-            ):
-                shared = self._find_shared_properties(
-                    source_raw, target_raw, source_domain, target_domain
-                )
-                return Metaphor(
-                    source=source_raw,
-                    target=target_raw,
-                    source_domain=source_domain,
-                    target_domain=target_domain,
-                    sentence=text,
-                    shared_properties=shared,
-                )
-
-        return None
+        return best
 
     def interpret_metaphor(self, metaphor: Metaphor) -> str:
         """Interpret what a metaphor means.
@@ -671,10 +680,15 @@ class FigurativeLanguageProcessor:
         if not text:
             return None
         text_lower = text.lower()
-        for idiom, meaning in self._IDIOMS.items():
-            if idiom in text_lower:
-                return (idiom, meaning)
-        return None
+        # Every idiom present in the text competes at once; the longest
+        # match is the most specific non-compositional reading — dict
+        # order is not semantics.
+        matches = [
+            (idiom, meaning) for idiom, meaning in self._IDIOMS.items() if idiom in text_lower
+        ]
+        if not matches:
+            return None
+        return max(matches, key=lambda m: len(m[0]))
 
     def get_idiom_meaning(self, idiom: str) -> str | None:
         """Get the meaning of a known idiom.
@@ -694,21 +708,24 @@ class FigurativeLanguageProcessor:
 
     # ─── Internal helpers ─────────────────────────────────────────
 
-    def _lookup_domain(self, phrase: str) -> str | None:
-        """Look up the semantic domain for a word or phrase.
+    def _domains_in(self, phrase: str) -> list[str]:
+        """All semantic domains present in a phrase, deduplicated.
 
-        Checks each word in the phrase against the domain map.
-        Returns the first matching domain.
+        A phrase can carry several domain words ("a river of fire"
+        offers fluid and fire); the parallel evaluation above needs
+        every one of them, not just the first word that maps.
         """
-        words = phrase.split()
-        for word in words:
+        seen: set[str] = set()
+        domains: list[str] = []
+        for word in phrase.split():
             # Strip trailing 's' for simple plural handling
             domain = self._WORD_TO_DOMAIN.get(word)
             if domain is None and word.endswith("s"):
                 domain = self._WORD_TO_DOMAIN.get(word[:-1])
-            if domain is not None:
-                return domain
-        return None
+            if domain is not None and domain not in seen:
+                seen.add(domain)
+                domains.append(domain)
+        return domains
 
     def _find_shared_properties(
         self,

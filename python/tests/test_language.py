@@ -1615,6 +1615,57 @@ def test_shared_subject_coordination_unchanged() -> None:
     assert "came" in preds and "saw" in preds
 
 
+# ── Figurative language: parallel candidate evaluation ────────────
+# The right hemisphere holds every candidate mapping at once and the
+# strongest wins — it does not commit to the first cross-domain pair
+# it encounters.
+
+
+def _figurative():
+    from temporal_lobe.figurative import FigurativeLanguageProcessor
+
+    return FigurativeLanguageProcessor()
+
+
+def test_metaphor_richest_mapping_wins_not_first() -> None:
+    """An earlier bare cross-domain match loses to a later candidate
+    carrying a richer shared-property mapping — every candidate is
+    evaluated, not just the first."""
+    flp = _figurative()
+    # "engine is a tree" is cross-domain (machine→plant) but carries
+    # no shared-property mapping; "time is a river" maps richly
+    # (temporal→fluid). Serial first-found returned the engine.
+    metaphor = flp.detect_metaphor("the engine is a tree. time is a river.")
+    assert metaphor is not None
+    assert metaphor.source == "time"
+    assert metaphor.target_domain == "fluid"
+    assert metaphor.shared_properties
+
+
+def test_metaphor_all_domains_in_phrase_compete() -> None:
+    """A phrase carrying several domain words offers every pairing —
+    the winner may be a later word's domain, not the first word's."""
+    flp = _figurative()
+    # Target carries war (battle) then fluid (rivers): (temporal, war)
+    # has no mapping, (temporal, fluid) does — fluid wins even though
+    # "battle" is the first domain word in the phrase.
+    metaphor = flp.detect_metaphor("time is a battle of rivers")
+    assert metaphor is not None
+    assert metaphor.source_domain == "temporal"
+    assert metaphor.target_domain == "fluid"
+
+
+def test_idiom_longest_match_wins() -> None:
+    """Every idiom present competes; the longest — the most specific
+    non-compositional reading — wins over dict order."""
+    flp = _figurative()
+    # "break a leg" precedes "piece of cake" in the idiom table;
+    # the longer match is the stronger reading.
+    found = flp.detect_idiom("break a leg — this exam is a piece of cake")
+    assert found is not None
+    assert found[0] == "piece of cake"
+
+
 # ======================================================================
 # Composed-knowledge rendering — utterance integrity
 # ======================================================================
