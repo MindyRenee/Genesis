@@ -135,3 +135,28 @@ def test_real_signal_observation_is_deterministic_and_validates_inputs() -> None
     assert first["agency_fiber_states"] == other["agency_fiber_states"]
     with pytest.raises(ValueError, match="salience"):
         model.observe_signal("bad", kind="test", salience=2.0)
+
+
+
+def test_self_latent_state_round_trips_with_transition_context() -> None:
+    original = SelfLatentSpaceArchitecture()
+    original.observe_signal("perception", kind="world:perception")
+    original.observe_signal("action", kind="world:action", inbound=False)
+    payload = original.to_dict()
+
+    restored = SelfLatentSpaceArchitecture()
+    restored.restore(payload)
+    assert restored.observations == 2
+    assert restored.snapshot()["kind"] == "world:action"
+
+    restored.observe_signal("next event", kind="world:notification")
+    assert restored.observations == 3
+
+
+def test_self_latent_restore_rejects_malformed_state_without_mutation() -> None:
+    model = SelfLatentSpaceArchitecture()
+    model.observe_signal("existing", kind="thought:reflection")
+    before = model.to_dict()
+    with pytest.raises(ValueError, match="previous vector"):
+        model.restore({"version": 1, "observations": 2, "last_state": None, "last_snapshot": {}})
+    assert model.to_dict() == before
