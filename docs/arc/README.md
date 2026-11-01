@@ -51,7 +51,8 @@ The command prints JSON with the exact-verification status, rule, predictions, s
         list_arc1_tasks, load_arc1_task, arc1_problem_view,
         list_arc3_games, open_arc3_game, step_arc3_game,
     )
-    from parietal_lobe.arc_play import ARC3Decision, run_arc3_episode
+    from parietal_lobe.arc_play import run_arc3_episode
+    from parietal_lobe.arc_policy import ARC3ExplorationPolicy
 
     task_path = list_arc1_tasks("training")[0]
     task = load_arc1_task(task_path)
@@ -59,14 +60,14 @@ The command prints JSON with the exact-verification status, rule, predictions, s
 
     games = list_arc3_games()
     environment, observation = open_arc3_game(games[0]["game_id"])
-    # Genesis's own policy must return an ARC3Decision on each turn.
-    # The loop enforces legal actions, records transitions, and stops at
-    # a terminal state or the configured step limit.
+    # This baseline autonomously selects legal controls by state/action novelty.
+    # It is exploratory, not a task-solving guarantee.
+    policy = ARC3ExplorationPolicy()
     episode = run_arc3_episode(
         environment,
         game_id=games[0]["game_id"],
         initial_observation=observation,
-        choose_action=genesis_policy,  # must be Genesis' real decision policy
+        choose_action=policy.choose_action,
         max_steps=100,
         outer_world=mind.world,  # routes observations/actions through OuterWorld
     )
@@ -77,4 +78,4 @@ The command prints JSON with the exact-verification status, rule, predictions, s
 - Test outputs are omitted by default from arc1_problem_view so the agent-facing view does not reveal answers.
 - Keep training and evaluation splits distinct. Develop on training tasks; reserve evaluation tasks for controlled measurements. Repeatedly tuning against evaluation scores makes them unsuitable as unbiased final measurements.
 - Retain ARC-AGI-3 observations, actions, and recordings for reproducibility. Never expose API credentials in source files, recordings, logs, or commits.
-- The bounded ARC-AGI-3 loop provides closed-loop observation/action execution, checks state-dependent legal actions, retains per-step transitions, and stops on terminal states or a step budget. Supplying `outer_world=mind.world` routes each observation through `OuterWorld.perceive` and each executed action through `OuterWorld.it_acted`, which notifies the registered cognitive event listener. Each post-action observation, including terminal feedback, carries metadata linking it to the action and state transition. If OuterWorld rejects perception (for example, because Genesis is asleep), the loop stops rather than silently continuing without a recorded observation. Grid-shaped observations are exposed in the format the existing scene parser accepts. The loop still requires a caller-supplied policy: this wiring does not yet establish autonomous ARC action selection or outcome-driven learning. ARC-AGI-1 has a bridge to the existing spatial reasoner, but neither benchmark integration nor these changes have been runtime-tested in Termux.
+- The bounded ARC-AGI-3 loop provides closed-loop observation/action execution, checks state-dependent legal actions, retains per-step transitions, and stops on terminal states or a step budget. Supplying `outer_world=mind.world` routes each observation through `OuterWorld.perceive` and each executed action through `OuterWorld.it_acted`, which notifies the registered cognitive event listener. Each post-action observation, including terminal feedback, carries metadata linking it to the action and state transition. If OuterWorld rejects perception (for example, because Genesis is asleep), the loop stops rather than silently continuing without a recorded observation. Grid-shaped observations are exposed in the format the existing scene parser accepts. The loop accepts a caller-supplied policy and now includes `ARC3ExplorationPolicy`, a bounded model-free baseline that autonomously chooses among current legal controls using episode-local state/action visit counts. Its scores mean exploration priority, not success probability; it does not infer game rules, optimize a game objective, or guarantee a win. It uses recorded transitions to avoid repeating previously tried controls in the same observed state. Outcome-driven adaptation beyond this explicit novelty heuristic remains unimplemented. ARC-AGI-1 has a bridge to the existing spatial reasoner, but neither benchmark integration nor these changes have been runtime-tested in Termux.
