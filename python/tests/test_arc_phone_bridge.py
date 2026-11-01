@@ -6,6 +6,7 @@ import threading
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
+from typing import ClassVar
 
 import pytest
 
@@ -13,7 +14,7 @@ from parietal_lobe.arc_phone_bridge import ArcPhoneBridge, serve
 
 
 class FakeEnvironment:
-    action_space = ["ACTION1", "ACTION2"]
+    action_space: ClassVar[list[str]] = ["ACTION1", "ACTION2"]
 
 
 def test_session_exposes_legal_actions_and_advances_observation() -> None:

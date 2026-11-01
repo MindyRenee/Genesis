@@ -12,9 +12,10 @@ import json
 import logging
 import secrets
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
