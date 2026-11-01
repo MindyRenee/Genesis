@@ -2,8 +2,8 @@
 
 This is an autonomous action-selection baseline, not a task solver. It chooses
 only currently legal controls, prioritizes unexplored state/action pairs, and
-uses state/action novelty and explicit terminal feedback to update its
-instance-local action preferences. It does not claim to infer game rules or guarantee progress.
+uses explicit terminal feedback to update instance-local preferences. It does
+not claim to infer game rules or guarantee progress.
 """
 from __future__ import annotations
 
@@ -118,7 +118,9 @@ class ARC3ExplorationPolicy:
             "state_novel": is_novel_state,
             "local_state_action_visits": local_count,
             "exploration_score": round(score, 6),
-            "score_semantics": "exploration_plus_observed_terminal_outcome_not_success_probability",
+            "score_semantics": (
+                "exploration_plus_observed_terminal_outcome_not_success_probability"
+            ),
             "candidate_scores": [
                 {"action": candidate, "score": round(candidate_score, 6)}
                 for candidate_score, candidate, _ in sorted(scored, key=lambda item: item[1])
@@ -127,7 +129,7 @@ class ARC3ExplorationPolicy:
         self._observations_seen.add(state_key)
         return ARC3Decision(action=action, reasoning=reasoning)
 
-    
+
     def observe_transition(
         self,
         observation: Any,
