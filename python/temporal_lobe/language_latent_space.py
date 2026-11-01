@@ -289,7 +289,10 @@ class LanguageLatentSpace:
         speech_act = getattr(getattr(result, "speech_act", None), "name", "")
         if not speech_act:
             speech_act = str(getattr(result, "speech_act", ""))
-        digest = hashlib.blake2b(speech_act.casefold().encode("ascii", errors="backslashreplace"), digest_size=8).digest()
+        digest = hashlib.blake2b(
+            speech_act.casefold().encode("ascii", errors="backslashreplace"),
+            digest_size=8,
+        ).digest()
         vector[8 + digest[0] % 8] += 1.0
 
         propositions = getattr(result, "propositions", ()) or ()
@@ -302,7 +305,9 @@ class LanguageLatentSpace:
             for slot in ("subject", "predicate", "object"):
                 term = str(getattr(proposition, slot, "") or "").casefold().strip()
                 if term:
-                    token_digest = hashlib.blake2b(term.encode("ascii", errors="backslashreplace"), digest_size=8).digest()
+                    token_digest = hashlib.blake2b(
+                    term.encode("ascii", errors="backslashreplace"), digest_size=8
+                ).digest()
                     vector[16 + token_digest[0] % 16] += -1.0 if token_digest[1] & 1 else 1.0
         grounded = getattr(result, "grounded", ()) or ()
         for proposition in grounded:
@@ -322,7 +327,9 @@ class LanguageLatentSpace:
                     -1.0 if concept_digest[1] & 1 else 1.0
                 )
         for token in tokens:
-            token_digest = hashlib.blake2b(token.encode("ascii", errors="backslashreplace"), digest_size=8).digest()
+            token_digest = hashlib.blake2b(
+                token.encode("ascii", errors="backslashreplace"), digest_size=8
+            ).digest()
             vector[16 + token_digest[0] % 16] += -1.0 if token_digest[1] & 1 else 1.0
         vector[16:] /= max(1.0, math.sqrt(len(tokens) + 3 * len(propositions)))
         if not np.all(np.isfinite(vector)):
