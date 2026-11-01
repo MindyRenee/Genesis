@@ -150,20 +150,26 @@ class LanguageLatentSpace:
             cells = (BitCell(0),)
         features = self._features(text, comprehension)
         histogram = _cell_histogram(cells)
-        target = np.abs(features)
-        target += _EPS
+        # Each signed latent coordinate maps to a pair of six-dot codewords:
+        # even = negative, odd = positive. This is an explicit codebook, not
+        # a claim that Hamming-near cells are semantically equivalent.
+        target = np.full(_CELL_COUNT, _EPS, dtype=np.float64)
+        for index, value in enumerate(features):
+            target[2 * index] += max(0.0, -float(value))
+            target[2 * index + 1] += max(0.0, float(value))
         target /= target.sum()
         source_ids = np.flatnonzero(histogram)
         source_mass = histogram[source_ids]
-        target_ids = np.arange(_LATENT_DIM)
-        target_mass = target[target_ids]
-        costs = np.empty((source_ids.size, _LATENT_DIM), dtype=np.float64)
+        target_ids = np.arange(_CELL_COUNT)
+        costs = np.empty((source_ids.size, _CELL_COUNT), dtype=np.float64)
         for row, cell_value in enumerate(source_ids):
             costs[row] = [
-                (int(cell_value ^ int(proto)).bit_count() / 6.0)
+                int(cell_value ^ int(proto)).bit_count() / 6.0
                 for proto in target_ids
             ]
-        plan, transport_cost = _sinkhorn(source_mass, target_mass, costs)
+        plan, transport_cost = _sinkhorn(source_mass, target, costs)
+        row_marginal_error = float(np.max(np.abs(plan.sum(axis=1) - source_mass)))
+        column_marginal_error = float(np.max(np.abs(plan.sum(axis=0) - target)))
 
         logits = features - float(np.max(features))
         probabilities = np.exp(logits)
@@ -203,6 +209,11 @@ class LanguageLatentSpace:
                 "cell_distribution": histogram.tolist(),
                 "transport_cost": transport_cost,
                 "transport_plan_shape": [int(plan.shape[0]), int(plan.shape[1])],
+                "transport_source_cells": source_ids.tolist(),
+                "transport_target_distribution": target.tolist(),
+                "transport_plan": plan.tolist(),
+                "transport_row_marginal_error": row_marginal_error,
+                "transport_column_marginal_error": column_marginal_error,
                 "transition_residual": transition,
                 "feature_covariance_diagonal": np.diag(covariance).tolist(),
                 "fisher_information": fisher.tolist(),
