@@ -1129,7 +1129,7 @@ class AutonomousLearner:
         if self._on_live_thought:
             try:
                 self._on_live_thought(kind, content)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "frontal_lobe.autonomous._emit",
                     e,
@@ -1373,7 +1373,7 @@ class AutonomousLearner:
         # Query the source registry (Wikipedia, dictionary, cache)
         try:
             source_results = self._sources.query(topic, max_results=3)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.autonomous.lookup_topic_sync",
                 e,
@@ -1407,7 +1407,7 @@ class AutonomousLearner:
                         )
                     else:
                         continue
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     note_swallowed(
                         "frontal_lobe.autonomous.lookup_topic_sync",
                         e,
@@ -1425,7 +1425,7 @@ class AutonomousLearner:
                         f"{len(result.relationships_learned)} relationships"
                     )
                     return result
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "frontal_lobe.autonomous.lookup_topic_sync",
                     e,
@@ -2098,7 +2098,7 @@ class AutonomousLearner:
                 # background stream.
                 if self._volition_granted:
                     self._volition_granted = False
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.exception(f"autonomous learner cycle failed: {e}")
 
             # Rate limit — when throttled by the emotional regulator
@@ -2253,7 +2253,7 @@ class AutonomousLearner:
         if self._get_agency_topic:
             try:
                 topic = self._get_agency_topic()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "frontal_lobe.autonomous._next_topic",
                     e,
@@ -2511,7 +2511,7 @@ class AutonomousLearner:
                     if rel not in seen:
                         seen.add(rel)
                         new_relationships.append(rel)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"semantic fact extraction failed: {e}")
 
     def _connect_co_occurring(self, topic: str, concepts: list[str]) -> None:
@@ -2798,7 +2798,7 @@ class AutonomousLearner:
             concept_name = topic.strip().lower().replace(" ", "_")
             if self.visual_cortex:
                 self.visual_cortex.learn_from_image(frame, concept_name)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.autonomous._try_visual_learning",
                 e,
@@ -3044,7 +3044,7 @@ class AutonomousLearner:
             self.network._create_semantic_bridges()
             self.network._create_associative_bridges(max_new=assoc_max)
             self.network._attach_orphans_to_hubs(max_new=orphan_max)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.autonomous._bridge_and_post_learn",
                 e,
@@ -3264,7 +3264,7 @@ class AutonomousLearner:
 
         try:
             result = _hardened_fetch(url)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.autonomous._fetch_page_text",
                 e,
@@ -3395,7 +3395,7 @@ class AutonomousLearner:
             ):
                 seen.append(dict(source))
             del seen[:-WEB_SOURCES_CAP]
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("web source record failed", exc_info=True)
 
     def _extract_and_add_concepts(
@@ -3527,7 +3527,7 @@ class AutonomousLearner:
                 weight=max(0.3, score),
                 origin="semantic_connect",
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # Embedding search is best-effort — never let it crash
             # the learning pipeline.
             note_swallowed(
@@ -3758,7 +3758,7 @@ class AutonomousLearner:
                         continue
                     # Blend: take the max of graph-derived and embedding weight.
                     expectations[n] = max(expectations.get(n, 0.0), sim * 0.5)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "frontal_lobe.autonomous.generate_deep_expectations",
                     e,
@@ -3891,7 +3891,7 @@ class AutonomousLearner:
                         src, k=min(20, len(candidates) + 5), threshold=0.0
                     )
                     semantic_scores = {name: max(0.0, min(1.0, score)) for name, score in similar}
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     note_swallowed(
                         "frontal_lobe.autonomous.transfer_learning",
                         exc,
@@ -4197,7 +4197,7 @@ class AutonomousLearner:
         # 1. STDP — strengthen sequential concept connections
         try:
             self._apply_stdp(topic, new_concepts, new_relationships)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.autonomous._post_learning_hook",
                 e,
@@ -4207,7 +4207,7 @@ class AutonomousLearner:
         try:
             experience = new_concepts if new_concepts else [topic]
             self.dual_system.encode_fast(experience)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.autonomous._post_learning_hook",
                 e,
@@ -4217,7 +4217,7 @@ class AutonomousLearner:
         try:
             for concept in new_concepts:
                 self.spaced_repetition.record_review(concept, success=True)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.autonomous._post_learning_hook",
                 e,
@@ -4226,7 +4226,7 @@ class AutonomousLearner:
         # 4. TD learning — reward prediction error and curiosity drive
         try:
             self._update_td(topic, new_concepts, new_relationships, surprise)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.autonomous._post_learning_hook",
                 e,
@@ -4379,7 +4379,7 @@ class AutonomousLearner:
         # 1. Dual-system: consolidate fast (hippocampal) → slow (neocortical)
         try:
             self.dual_system.consolidate_to_slow()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.autonomous._idle_consolidation",
                 e,
@@ -4397,7 +4397,7 @@ class AutonomousLearner:
                 phase=(core.phase_name if core is not None else None),
             )
             self._review_due_concepts(limit=review_limit)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.autonomous._idle_consolidation",
                 e,
