@@ -37,6 +37,14 @@ ARC-AGI-1 is connected to Genesis' existing `SpatialReasoner`; this is not a sep
 
 The solver converts the demonstration grids to Genesis `Grid` objects and searches the existing symbolic transformation space. It returns predictions only when the selected rule exactly reproduces every training pair. An unsolved task returns diagnostic information rather than claiming success. Search limits can be configured through `max_depth`, `beam_width`, `max_nodes`, and `time_budget`.
 
+You can run the solver directly from the repository root, including in Termux:
+
+    python scripts/arc1_solve.py
+    python scripts/arc1_solve.py --split training --index 0
+    python scripts/arc1_solve.py data/arc/ARC-AGI-1/data/training/007bbfb7.json
+
+The command prints JSON with the exact-verification status, rule, predictions, search cost, and failure diagnostics. Exit status is 0 for a verified solve, 1 for an unsolved task, and 2 for an input/setup error. The default search budget is deliberately bounded; an unsolved result does not prove a task is impossible.
+
 ## Python API
 
     from parietal_lobe.arc_sources import (
