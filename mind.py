@@ -259,11 +259,16 @@ class Mind(
         if os.environ.get("GENESIS_ANDROID_CAMERA", "0") == "1":
             from brainstem.android_media import AndroidCameraAdapter, is_android_termux_camera
 
-            if is_android_termux_camera():
-                camera_id = int(os.environ.get("GENESIS_ANDROID_CAMERA_ID", "0"))
-                adapter = AndroidCameraAdapter(self._on_android_camera_frame, camera_id=camera_id)
+            camera_id_text = os.environ.get("GENESIS_ANDROID_CAMERA_ID", "0")
+            if is_android_termux_camera() and camera_id_text.isdigit():
+                adapter = AndroidCameraAdapter(
+                    self._on_android_camera_frame,
+                    camera_id=int(camera_id_text),
+                )
                 if adapter.start():
                     self.android_camera_adapter = adapter
+            elif not camera_id_text.isdigit():
+                logger.warning("Ignoring invalid GENESIS_ANDROID_CAMERA_ID=%r", camera_id_text)
 
     def _on_android_camera_frame(self, frame) -> None:
         """Run a measured Android camera frame through Genesis's visual cortex."""
