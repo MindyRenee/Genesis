@@ -15,6 +15,8 @@ information unless a probability model and likelihood are supplied.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import threading
 from typing import Any
 
 import numpy as np
@@ -265,6 +267,92 @@ class SelfLatentSpaceArchitecture:
         self.grassmannian = GrassmannianSubspaceModule(total_dim, subspace_dim)
         self.consistency_geometry = SelfConsistencyInformationGeometry(total_dim)
         self.autopoietic_flow = AutopoieticSymplecticFlow(total_dim, flow_stiffness)
+        self._last_state: FloatArray | None = None
+        self._observations = 0
+        self._last_snapshot: dict[str, Any] = {}
+        self._lock = threading.RLock()
+
+    @property
+    def observations(self) -> int:
+        """Number of real signals integrated by observe_signal()."""
+        with self._lock:
+            return self._observations
+
+    def observe_signal(
+        self,
+        content: str,
+        *,
+        kind: str,
+        salience: float = 0.4,
+        inbound: bool = True,
+        addressed: bool = False,
+        metadata: dict[str, Any] | None = None,
+        dt: float = 0.01,
+    ) -> dict[str, Any]:
+        """Integrate a real thought or world event into the self-state.
+
+        A stable digest turns actual content into bounded, reproducible
+        features. The previous latent state serves as the transition
+        observation for residual geometry; the first observation uses its
+        own state as the baseline, avoiding fabricated initial surprise.
+        This is deterministic feature coding, not semantic understanding.
+        """
+        if not isinstance(content, str):
+            raise TypeError("content must be a string")
+        if not isinstance(kind, str) or not kind:
+            raise ValueError("kind must be a non-empty string")
+        if not np.isfinite(salience) or not 0.0 <= salience <= 1.0:
+            raise ValueError("salience must be finite and in [0, 1]")
+        payload = (kind + "\\0" + content[:4096]).encode("utf-8", errors="replace")
+        digest = hashlib.sha256(payload).digest()
+        ego = (np.frombuffer(digest[:32], dtype=np.uint8).astype(np.float64) / 127.5) - 1.0
+        efficacy_value = 0.0
+        if metadata:
+            raw_efficacy = metadata.get("causal_efficacy", metadata.get("success", 0.0))
+            try:
+                efficacy_value = float(raw_efficacy)
+            except (TypeError, ValueError):
+                efficacy_value = 0.0
+            if not np.isfinite(efficacy_value):
+                efficacy_value = 0.0
+        narrative = np.array([[
+            salience,
+            float(inbound),
+            float(addressed),
+            min(len(content), 4096) / 4096.0,
+        ]], dtype=np.float64)
+        with self._lock:
+            fiber = self.agency_bundle.forward(ego.reshape(1, -1))
+            previous = fiber.copy() if self._last_state is None else self._last_state.reshape(1, -1).copy()
+            metric, efficacy_weight = self.base_manifold.forward(
+                narrative, np.array([[efficacy_value]], dtype=np.float64)
+            )
+            subspace, projector = self.grassmannian.forward(fiber)
+            consistency_metric, coherence_loss, predicted = self.consistency_geometry.forward(
+                previous, fiber
+            )
+            evolved = self.autopoietic_flow.forward(fiber, dt=dt)
+            self._last_state = fiber[0].copy()
+            self._observations += 1
+            self._last_snapshot = {
+                "observations": self._observations,
+                "kind": kind,
+                "narrative_base_metric": metric[0].tolist(),
+                "efficacy_weight": float(efficacy_weight[0]),
+                "agency_fiber_states": fiber[0].tolist(),
+                "grassmannian_subspace_states": subspace[0].tolist(),
+                "grassmannian_projection_operator": projector.tolist(),
+                "consistency_information_metric": consistency_metric[0].tolist(),
+                "coherence_loss": float(coherence_loss[0]),
+                "predicted_transition_state": predicted[0].tolist(),
+                "autopoietic_evolved_states": evolved[0].tolist(),
+            }
+            return dict(self._last_snapshot)
+
+    def snapshot(self) -> dict[str, Any]:
+        """Return a detached snapshot of the most recent integrated signal."""
+        with self._lock:
+            return dict(self._last_snapshot)
 
     def forward(
         self,
