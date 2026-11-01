@@ -371,25 +371,6 @@ class ConversationMixin:
             if not is_world_concept(bare):
                 logger.debug(f"suppressed internal-id thought: {bare}")
                 return
-        # Feed the composed thought into the same latent-state instance
-        # used by outer-world events. This makes thought→event transitions
-        # measurable without treating deterministic features as semantics.
-        try:
-            self.self_latent_space.observe_signal(
-                text,
-                kind=f"thought:{kind}",
-                salience=0.6 if is_expression else (0.5 if is_question else 0.4),
-                inbound=False,
-                addressed=is_question,
-                metadata={
-                    "trigger": getattr(thought, "trigger", ""),
-                    "chain_id": getattr(thought, "chain_id", 0),
-                    "is_lucid": getattr(thought, "is_lucid", False),
-                },
-            )
-        except Exception:
-            logger.debug("self latent thought observation failed", exc_info=True)
-
         self._emit_live_thought(
             kind,
             text,
@@ -439,6 +420,20 @@ class ConversationMixin:
                         slipped=slipped,
                         stream=kind,
                     )
+
+    def _observe_self_latent_signal(
+        self, content: str, kind: str, metadata: dict[str, Any] | None = None
+    ) -> None:
+        """Integrate an internally recorded thought into the shared self state."""
+        details = metadata or {}
+        self.self_latent_space.observe_signal(
+            content,
+            kind=kind,
+            salience=float(details.get("salience", 0.4)),
+            inbound=False,
+            addressed=bool(details.get("addressed", False)),
+            metadata=details,
+        )
 
     def _on_world_event(self, event: ExternalEvent) -> None:
         """Route an external world event into its cognition.
