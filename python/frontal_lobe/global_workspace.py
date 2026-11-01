@@ -292,7 +292,7 @@ class GlobalWorkspace:
         for responder in self._responders:
             try:
                 reply = responder(item)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.debug("region responder failed", exc_info=True)
                 continue
             if reply:
@@ -347,7 +347,7 @@ class GlobalWorkspace:
             if id(item) in just_ignited and self.on_ignition is not None:
                 try:
                     self.on_ignition(item, id(item) in recurrent_ignitions)
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     # The ignition hook must never crash the workspace
                     note_swallowed(
                         "frontal_lobe.global_workspace.broadcast",
@@ -454,7 +454,7 @@ class GlobalWorkspace:
         for module in self._modules:
             try:
                 module.receive_broadcast(item)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 # A module failing to receive shouldn't crash the workspace
                 note_swallowed(
                     "frontal_lobe.global_workspace._distribute",
