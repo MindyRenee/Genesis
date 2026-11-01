@@ -4,11 +4,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import numpy as np
+import numpy as np  # noqa: E402
 
-from temporal_lobe.events import EventKind, ExternalEvent
-from worlds.experiential_space import ExperientialLatentSpace
-from worlds.world import OuterWorld
+from temporal_lobe.events import EventKind, ExternalEvent  # noqa: E402
+from worlds.experiential_space import ExperientialLatentSpace  # noqa: E402
+from worlds.world import OuterWorld  # noqa: E402
 
 
 def _event(kind=EventKind.PERCEPTION, timestamp=1_700_000_000.0):
@@ -113,3 +113,11 @@ def test_user_speech_sentiment_reaches_outer_world_valence():
     result = world.experiential_space.snapshot()
     assert result["valence"] > 0.0
     assert result["valence_sign"] == "positive"
+
+
+def test_nested_mapping_payload_extracts_numeric_grid():
+    event = _event()
+    event.percept = {"grid": [[0, 0, 1], [0, 1, 0]], "label": "grid"}
+    result = ExperientialLatentSpace().observe(event)
+    assert result["state"][21] == 1.0
+    assert result["state"][17] > 0.0
