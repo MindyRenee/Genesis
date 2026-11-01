@@ -41,6 +41,24 @@ def encode_text_cells(text: str) -> tuple[tuple[BitCell, ...], int]:
     return tuple(BitCell(int(bits[i:i + 6], 2)) for i in range(0, len(bits), 6)), bit_length
 
 
+def embed_dot_cell(cell: BitCell, target_dim: int = 32) -> np.ndarray:
+    """Embed a finite six-dot cell into Euclidean space without distance loss.
+
+    The first six coordinates are the raised-dot indicators and all remaining
+    coordinates are zero. Squared Euclidean distance between two embeddings
+    equals the Hamming distance between their dot patterns. This is an exact
+    finite-code isometry, not a differentiable manifold map or semantic decoder.
+    """
+    if not isinstance(cell, BitCell):
+        raise TypeError("cell must be a BitCell")
+    if isinstance(target_dim, bool) or not isinstance(target_dim, int) or target_dim < 6:
+        raise ValueError("target_dim must be an integer of at least 6")
+    embedded = np.zeros(target_dim, dtype=np.float64)
+    for dot in cell.raised_dots:
+        embedded[dot - 1] = 1.0
+    return embedded
+
+
 def decode_text_cells(cells: tuple[BitCell, ...], bit_length: int) -> str:
     """Decode six-dot cells back to their original UTF-8 text."""
     if isinstance(bit_length, bool) or not isinstance(bit_length, int):
