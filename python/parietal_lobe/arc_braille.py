@@ -9,7 +9,7 @@ claim to be words or meanings.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any, Mapping
 
 from parietal_lobe.binary_language import BitCell
@@ -30,12 +30,41 @@ class BrailleGameRecord:
             raise ValueError("bit_length must fit the supplied cells")
 
 
+def _plain(value: Any, depth: int = 0) -> Any:
+    """Convert common toolkit objects to deterministic JSON-safe structures."""
+    if depth > 12:
+        return type(value).__name__
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if is_dataclass(value) and not isinstance(value, type):
+        return _plain(asdict(value), depth + 1)
+    if isinstance(value, Mapping):
+        return {
+            str(key): _plain(item, depth + 1)
+            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+        }
+    if isinstance(value, (list, tuple)):
+        return [_plain(item, depth + 1) for item in value]
+    if hasattr(value, "tolist"):
+        try:
+            return _plain(value.tolist(), depth + 1)
+        except (TypeError, ValueError):
+            pass
+    if hasattr(value, "__dict__"):
+        return {
+            key: _plain(item, depth + 1)
+            for key, item in sorted(vars(value).items())
+            if not key.startswith("_")
+        }
+    return type(value).__name__
+
+
 def _canonical_bytes(record: Mapping[str, Any]) -> bytes:
     if not isinstance(record, Mapping):
         raise TypeError("game record must be a mapping")
     try:
         payload = json.dumps(
-            record, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+            _plain(record), sort_keys=True, separators=(",", ":"), ensure_ascii=False,
             allow_nan=False,
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
