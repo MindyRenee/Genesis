@@ -43,7 +43,7 @@ class AndroidCameraAdapter:
         self,
         on_frame: Callable[[np.ndarray], None],
         *,
-        interval_seconds: float = 5.0,
+        interval_seconds: float = 10.0,
         command_timeout: float = 15.0,
         camera_id: int = 0,
     ) -> None:
@@ -102,7 +102,7 @@ class AndroidCameraAdapter:
                         text=True,
                         timeout=self._timeout,
                     )
-                    if result.returncode == 0 and image_path.is_file():
+                    if not self._stop.is_set() and result.returncode == 0 and image_path.is_file():
                         frame = load_rgb_frame(image_path)
                         if frame.size:
                             try:
@@ -273,6 +273,8 @@ class AndroidMicrophoneAdapter:
                         timeout=self._timeout,
                     )
                     samples = decode_float32_audio(decoded.stdout)
+                    if self._stop.is_set():
+                        break
                     try:
                         self._on_clip(samples, self._sample_rate)
                     except Exception:  # noqa: BLE001 — microphone callback is isolated
