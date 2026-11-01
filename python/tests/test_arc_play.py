@@ -6,8 +6,8 @@ from types import SimpleNamespace
 from typing import ClassVar
 
 import pytest
-from parietal_lobe.arc_braille import BrailleGameRecord, decode_game_record
 from parietal_lobe import arc_play
+from parietal_lobe.arc_braille import BrailleGameRecord, decode_game_record
 from parietal_lobe.arc_play import ARC3Decision, run_arc3_episode
 from parietal_lobe.arc_sources import ARCSourceError
 from parietal_lobe.binary_language import BitCell
