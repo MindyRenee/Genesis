@@ -10,7 +10,8 @@ def test_cognitive_map_publishes_self_and_outer_events():
     snapshot = cognitive_map.spacetime.snapshot()
     assert snapshot.apex.domain is WorldDomain.SELF
     assert snapshot.apex.position == (2.0, 3.0, 0.0)
-    assert any(item.domain is WorldDomain.OUTER for item in cognitive_map.spacetime.geometry._events.values())
+    assert snapshot.outer_view
+    assert snapshot.outer_view[0].domain is WorldDomain.OUTER
 
 
 def test_cognitive_map_context_change_is_recorded_as_inner_event():
