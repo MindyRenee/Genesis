@@ -1,14 +1,8 @@
 """Tests for the outer world's numerical experiential geometry."""
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import numpy as np  # noqa: E402
-
-from temporal_lobe.events import EventKind, ExternalEvent  # noqa: E402
-from worlds.experiential_space import ExperientialLatentSpace  # noqa: E402
-from worlds.world import OuterWorld  # noqa: E402
+import numpy as np
+from temporal_lobe.events import EventKind, ExternalEvent
+from worlds.experiential_space import ExperientialLatentSpace
+from worlds.world import OuterWorld
 
 
 def _event(kind=EventKind.PERCEPTION, timestamp=1_700_000_000.0):
