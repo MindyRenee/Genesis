@@ -3137,7 +3137,12 @@ fn json_number_field(text: &str, key: &str) -> Option<f32> {
 #[cfg(any(target_os = "android", test))]
 fn json_string_field(text: &str, key: &str) -> Option<String> {
     let key = format!("\"{key}\"");
-    let value = text.split_once(&key)?.1.trim_start().strip_prefix(':')?.trim_start();
+    let value = text
+        .split_once(&key)?
+        .1
+        .trim_start()
+        .strip_prefix(':')?
+        .trim_start();
     let value = value.strip_prefix('"')?;
     let end = value.find('"')?;
     Some(value[..end].to_string())
