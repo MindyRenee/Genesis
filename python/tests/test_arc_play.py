@@ -198,3 +198,20 @@ def test_episode_runner_feeds_terminal_outcome_back_to_bound_policy(monkeypatch)
     key = (observation_signature(initial), episode.transitions[0]["action"])
     assert episode.terminal_state == "WIN"
     assert policy._outcomes[key] == (1.0, 1)
+
+
+def test_episode_runner_recognizes_mapping_shaped_terminal_state() -> None:
+    """Stop immediately when an environment supplies a terminal mapping."""
+    episode = run_arc3_episode(
+        FakeEnvironment(),
+        game_id="mapping-game",
+        initial_observation={"state": "WIN", "grid": [[1]]},
+        choose_action=lambda observation, legal, history: pytest.fail(
+            "terminal mapping must not trigger an action"
+        ),
+        max_steps=2,
+    )
+
+    assert episode.terminal_state == "WIN"
+    assert episode.stopped_reason == "terminal_state"
+    assert episode.transitions == []
