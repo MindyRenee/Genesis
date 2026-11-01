@@ -124,7 +124,7 @@ class AndroidCameraAdapter:
             if frame is not None:
                 try:
                     self._on_frame(frame)
-                except Exception:  # noqa: BLE001 — camera callback is isolated
+                except Exception:  # Camera callback failures must not stop capture.
                     logger.exception("Android camera callback failed")
             else:
                 now = time.monotonic()
