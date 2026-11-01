@@ -366,7 +366,7 @@ class OuterWorld:
             addressed=True,
             topics=topics,
             timestamp=now,
-            metadata={"presence": presence.display_name},
+            metadata={"presence": presence.display_name, "valence": sentiment},
         )
         self._impulse(CHEM_OXYTOCIN, 0.03)
         self._impulse(CHEM_DOPAMINE, 0.02)
@@ -409,6 +409,7 @@ class OuterWorld:
             addressed=False,
             topics=topics,
             timestamp=now,
+            metadata={"valence": sentiment},
         )
         # Orienting — something happened nearby.
         self._impulse(CHEM_NOREPINEPHRINE, 0.01)
