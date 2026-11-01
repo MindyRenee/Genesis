@@ -319,6 +319,18 @@ class Vision:
         # Lazily created on first use. Simulates the enzyme kinetics that
         # convert photon absorption into electrical signals.
         self._phototransduction: PhototransductionCascade | None = None
+        # Optional calibrated bridge to the shared self/inner/outer causal
+        # workspace. Disabled until the caller supplies a valid coordinate
+        # transform; raw camera pixels are never treated as world position.
+        self._visual_spacetime_bridge = None
+
+    def set_visual_spacetime_bridge(self, bridge) -> None:
+        """Connect a calibrated VisualSpacetimeBridge to this visual cortex."""
+        from occipital_lobe.visual_spacetime import VisualSpacetimeBridge
+
+        if not isinstance(bridge, VisualSpacetimeBridge):
+            raise TypeError("bridge must be a VisualSpacetimeBridge")
+        self._visual_spacetime_bridge = bridge
 
     def set_gamma_callback(self, callback: Callable[[float], None]) -> None:
         """Register a callback for V1 gamma power updates.
@@ -809,6 +821,14 @@ class Vision:
         # ── MSTd (dorsal stream): two-view geometry of this look
         # against the last — self-motion, heading, parallax depth
         two_view = self._two_view_geometry(rgb, nerve)
+        if two_view is not None and self._visual_spacetime_bridge is not None:
+            try:
+                # Camera report timestamps and the shared workspace use
+                # the same monotonic clock; coordinate conversion remains
+                # the responsibility of the explicitly calibrated bridge.
+                self._visual_spacetime_bridge.publish(two_view, time_s=time.monotonic())
+            except Exception as error:  # noqa: BLE001 — causal telemetry must not blind vision
+                note_swallowed("occipital_lobe.perception.vision.visual_spacetime", error)
 
         # ── Package the structured scene percept ────────────────
         scene = _build_scene(
