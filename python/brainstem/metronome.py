@@ -1377,7 +1377,7 @@ class MetronomeMixin:
 
                 # ── Wait for the next cycle — adaptive cadence ──
                 self._cycle_pace(now)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(
                     f"cycle failed ({type(e).__name__}: {e}); continuing",
                     exc_info=True,
