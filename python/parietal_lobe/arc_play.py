@@ -173,6 +173,8 @@ def run_arc3_episode(
                 percept=_outer_world_percept(next_observation),
             )
             if outcome_event is None:
+                if next_state_name in {"WIN", "GAME_OVER"}:
+                    episode.terminal_state = next_state_name
                 episode.stopped_reason = "outer_world_unavailable"
                 return episode
 
