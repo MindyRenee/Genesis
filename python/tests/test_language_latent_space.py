@@ -83,3 +83,36 @@ def test_sinkhorn_rejects_invalid_marginals() -> None:
 
     with pytest.raises(ValueError):
         _sinkhorn(np.array([0.4, 0.4]), np.array([1.0]), np.zeros((2, 1)))
+
+
+
+def test_language_latent_tracks_direction_for_inbound_and_outbound_text() -> None:
+    parser = Comprehension()
+    latent = LanguageLatentSpace()
+    inbound = latent.observe("What is light?", parser.comprehend("What is light?"))
+    outbound = latent.observe(
+        "Light is electromagnetic radiation.",
+        parser.comprehend("Light is electromagnetic radiation."),
+        direction="outbound",
+    )
+    assert inbound["direction"] == "inbound"
+    assert outbound["direction"] == "outbound"
+    assert outbound["observations"] == 2
+
+
+def test_language_latent_handles_empty_text_with_explicit_blank_cell() -> None:
+    latent = LanguageLatentSpace()
+    snapshot = latent.observe("", Comprehension().comprehend(""))
+    assert snapshot["cell_count"] == 1
+    assert snapshot["bit_length"] == 0
+    assert np.isfinite(snapshot["transport_cost"])
+
+
+def test_sinkhorn_rejects_negative_or_nonfinite_marginals() -> None:
+    from temporal_lobe.language_latent_space import _sinkhorn
+
+    cost = np.zeros((2, 2))
+    with pytest.raises(ValueError):
+        _sinkhorn(np.array([-0.1, 1.1]), np.array([0.5, 0.5]), cost)
+    with pytest.raises(ValueError):
+        _sinkhorn(np.array([np.nan, np.nan]), np.array([0.5, 0.5]), cost)
