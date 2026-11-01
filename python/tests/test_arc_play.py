@@ -10,13 +10,17 @@ from parietal_lobe.arc_sources import ARCSourceError
 
 
 class FakeEnvironment:
+    """Minimal environment stub exposing two legal action names."""
+
     action_space = ["ACTION1", "ACTION2"]
 
 
 def test_episode_runner_observes_feedback_and_stops_on_win(monkeypatch) -> None:
+    """Record the executed action and stop when the environment reports WIN."""
     calls = []
 
     def fake_step(environment, action_name, *, data=None, reasoning=None):
+        """Return a terminal observation while recording the step arguments."""
         calls.append((action_name, data, reasoning))
         return SimpleNamespace(state=SimpleNamespace(name="WIN"))
 
@@ -39,6 +43,7 @@ def test_episode_runner_observes_feedback_and_stops_on_win(monkeypatch) -> None:
 
 
 def test_episode_runner_rejects_illegal_policy_action(monkeypatch) -> None:
+    """Reject policy output outside the environment's legal action set."""
     monkeypatch.setattr(
         arc_play,
         "step_arc3_game",
@@ -57,6 +62,7 @@ def test_episode_runner_rejects_illegal_policy_action(monkeypatch) -> None:
 
 
 def test_episode_runner_requires_positive_step_budget() -> None:
+    """Reject zero or negative episode step budgets before stepping."""
     with pytest.raises(ValueError, match="positive"):
         run_arc3_episode(
             FakeEnvironment(),
@@ -71,14 +77,18 @@ def test_episode_runner_requires_positive_step_budget() -> None:
 
 
 def test_episode_runner_routes_observations_and_actions_to_outer_world(monkeypatch) -> None:
+    """Send structured percepts and action outcomes through OuterWorld APIs."""
     events = []
 
     class FakeOuterWorld:
+        """Capture calls made to the OuterWorld event boundary."""
         def perceive(self, content, **kwargs):
+            """Capture an inbound percept and its structured metadata."""
             events.append(("perceive", content, kwargs))
             return object()
 
         def it_acted(self, description, *, detail=""):
+            """Capture an outbound action and its transition detail."""
             events.append(("act", description, detail))
             return object()
 
@@ -88,6 +98,7 @@ def test_episode_runner_routes_observations_and_actions_to_outer_world(monkeypat
     ]
 
     def fake_step(environment, action_name, *, data=None, reasoning=None):
+        """Return the preconfigured winning observation."""
         return observations[1]
 
     monkeypatch.setattr(arc_play, "step_arc3_game", fake_step)
