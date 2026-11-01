@@ -144,7 +144,7 @@ def open_arc3_game(
     observation = env.reset()
     if observation is None:
         raise ARCSourceError(f"ARC-AGI-3 game {game_id!r} returned no initial observation")
-    setattr(env, "_genesis_arcade_owner", arcade)
+    # The environment wrapper owns the interaction; callers retain it for the session.
     return env, observation
 
 
