@@ -104,7 +104,7 @@ def test_episode_runner_routes_observations_and_actions_to_outer_world(monkeypat
 
     assert episode.terminal_state == "WIN"
     assert [event[0] for event in events] == ["perceive", "act"]
-    assert events[0][2]["percept"] is observations[0]
+    assert events[0][2]["percept"] == {"grid": [[1, 0]]}
     assert events[0][2]["source"] == "arc3:grid-game"
     assert "ACTION1" in events[1][1]
     assert "state_after=WIN" in events[1][2]
