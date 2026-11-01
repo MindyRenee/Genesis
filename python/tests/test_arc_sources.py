@@ -60,7 +60,6 @@ def test_list_arc1_tasks_rejects_unknown_split() -> None:
         list_arc1_tasks("private")
 
 
-
 def test_arc3_legal_actions_reads_current_environment_action_space() -> None:
     """Return sorted action names from the environment's current action space."""
     class Action:
