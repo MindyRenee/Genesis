@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 import threading
+from copy import deepcopy
 from typing import Any
 
 import numpy as np
@@ -48,6 +49,13 @@ class InteroceptiveBaseManifold:
         deviation = float(np.dot(state - self.setpoint, state - self.setpoint))
         scale = math.exp(min(deviation, 10.0))
         return np.eye(_BASE_DIM, dtype=np.float64) * scale, scale
+
+    def adapt_setpoint(self, current: Any, rate: float = 0.001) -> None:
+        """Slowly adapt the viable-state baseline without chasing transients."""
+        state = _finite_vector(current, _BASE_DIM, "homeostatic state")
+        if not math.isfinite(rate) or not 0.0 <= rate <= 0.01:
+            raise ValueError("setpoint adaptation rate must be in [0, 0.01]")
+        self.setpoint += rate * (state - self.setpoint)
 
     def to_dict(self) -> dict[str, Any]:
         return {"setpoint": self.setpoint.tolist()}
@@ -178,7 +186,13 @@ class UltrametricEpisodicMemorySpace:
             if any(value < 0 or value >= 2**levels for value in code):
                 raise ValueError("inner-memory code out of range")
             seen_ids.add(record_id)
-            checked.append({"id": record_id, "code": list(code), "label": str(record.get("label", ""))[:256]})
+            checked.append(
+                {
+                    "id": record_id,
+                    "code": list(code),
+                    "label": str(record.get("label", ""))[:256],
+                }
+            )
         next_id = int(data["next_id"])
         if next_id < 0 or (seen_ids and next_id <= max(seen_ids)):
             raise ValueError("invalid next inner-memory id")
@@ -234,9 +248,15 @@ class InnerWorldExperientialLatentSpace:
     def observations(self) -> int:
         return self._observations
 
-    def observe(self, homeostatic_state: Any, interoceptive_signals: Any, label: str = "") -> dict[str, Any]:
+    def observe(
+        self,
+        homeostatic_state: Any,
+        interoceptive_signals: Any,
+        label: str = "",
+    ) -> dict[str, Any]:
         with self._lock:
             metric, scale = self.base_manifold.forward(homeostatic_state)
+            self.base_manifold.adapt_setpoint(homeostatic_state)
             fiber = self.affective_bundle.forward(interoceptive_signals)
             memory_id = self.ultrametric_memory.add(fiber, label)
             kl_metric, free_energy, mu, variance = self.free_energy_geometry.forward(fiber)
@@ -275,8 +295,7 @@ class InnerWorldExperientialLatentSpace:
                     "latent_variance": [1.0] * _LATENT_DIM,
                     "recursive_meta_states": [0.0] * _LATENT_DIM,
                 }
-            return {key: (dict(value) if isinstance(value, dict) else list(value) if isinstance(value, list) else value)
-                    for key, value in self._last.items()}
+            return deepcopy(self._last)
 
     def to_dict(self) -> dict[str, Any]:
         with self._lock:
@@ -301,6 +320,25 @@ class InnerWorldExperientialLatentSpace:
         last = data.get("last", {})
         if not isinstance(last, dict):
             raise ValueError("invalid inner-world snapshot")
+        if observations:
+            expected_shapes = {
+                "internal_base_metric": (_BASE_DIM, _BASE_DIM),
+                "affective_fiber_states": (_LATENT_DIM,),
+                "kl_information_metric": (_LATENT_DIM, _LATENT_DIM),
+                "latent_mean": (_LATENT_DIM,),
+                "latent_variance": (_LATENT_DIM,),
+                "recursive_meta_states": (_LATENT_DIM,),
+            }
+            for key, shape in expected_shapes.items():
+                array = np.asarray(last.get(key), dtype=np.float64)
+                if array.shape != shape or not np.all(np.isfinite(array)):
+                    raise ValueError(f"invalid inner-world snapshot field: {key}")
+            scale = float(last.get("autonomic_scaling_factor", float("nan")))
+            free_energy = float(last.get("free_energy_divergence", float("nan")))
+            if not math.isfinite(scale) or scale < 1.0:
+                raise ValueError("invalid autonomic scaling factor")
+            if not math.isfinite(free_energy) or free_energy < -1e-9:
+                raise ValueError("invalid free-energy divergence")
         with self._lock:
             self.base_manifold = base
             self.ultrametric_memory = memory
