@@ -127,3 +127,31 @@ def test_episode_runner_routes_observations_and_actions_to_outer_world(monkeypat
     assert events[2][2]["metadata"]["phase"] == "outcome"
     assert events[2][2]["metadata"]["action"] == "ACTION1"
     assert events[2][2]["metadata"]["state_after"] == "WIN"
+
+
+def test_episode_runner_stops_when_outer_world_cannot_perceive() -> None:
+    """Do not take an action if the initial observation was sleep-gated."""
+
+    class SleepingOuterWorld:
+        """Represent an OuterWorld that rejects perception while asleep."""
+
+        def perceive(self, content, **kwargs):
+            """Signal that no perception event was recorded."""
+            return None
+
+    episode = run_arc3_episode(
+        FakeEnvironment(),
+        game_id="sleeping-game",
+        initial_observation=SimpleNamespace(
+            state=SimpleNamespace(name="PLAYING")
+        ),
+        choose_action=lambda observation, legal, history: pytest.fail(
+            "policy must not run without a recorded initial perception"
+        ),
+        max_steps=2,
+        outer_world=SleepingOuterWorld(),
+    )
+
+    assert episode.transitions == []
+    assert episode.stopped_reason == "outer_world_unavailable"
+
