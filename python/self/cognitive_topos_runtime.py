@@ -57,7 +57,11 @@ class CognitiveToposRuntime:
     """Thread-safe bridge from live Genesis events to the unified engine."""
 
     def __init__(self, latent_dim: int = _STATE_DIM) -> None:
-        if isinstance(latent_dim, bool) or not isinstance(latent_dim, int) or latent_dim < 1:
+        if (
+            isinstance(latent_dim, bool)
+            or not isinstance(latent_dim, int)
+            or latent_dim < 1
+        ):
             raise ValueError("latent_dim must be a positive integer")
         self.latent_dim = latent_dim
         self.engine = MasterCognitiveToposEngine(latent_dim)
@@ -100,7 +104,11 @@ class CognitiveToposRuntime:
         with self._lock:
             if domain == "outer" and outer_snapshot:
                 source = outer_snapshot.get("state")
-                self._states[domain] = _resize(source, self.latent_dim) if source is not None else _text_features(kind, content, self.latent_dim)
+                self._states[domain] = (
+                    _resize(source, self.latent_dim)
+                    if source is not None
+                    else _text_features(kind, content, self.latent_dim)
+                )
             elif domain == "inner" and inner_snapshot:
                 source = inner_snapshot.get("recursive_meta_states")
                 if source is None:
