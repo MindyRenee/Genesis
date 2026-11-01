@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
-# Run from the Genesis repository root.
+# Install the official ARC-AGI-1 dataset and ARC-AGI-3 toolkit.
+#
+# Usage:
+#   bash scripts/install_arc_resources.sh
+#
+# Run from the Genesis repository root. Set GENESIS_ARC1_DIR to choose a
+# different dataset checkout location. The script updates an existing official
+# checkout with fast-forward-only semantics, refuses to overwrite a non-Git
+# directory, and selects a Termux-specific dependency installation path.
 set -euo pipefail
 ROOT="$(pwd)"
 DEST="${GENESIS_ARC1_DIR:-data/arc/ARC-AGI-1}"
