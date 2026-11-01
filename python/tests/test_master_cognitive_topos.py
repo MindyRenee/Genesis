@@ -35,6 +35,20 @@ def test_free_energy_is_finite_nonnegative_and_coupled() -> None:
         objective.forward([-1.], [1.], [1.], [1.])
 
 
+
+def test_free_energy_alignment_penalty_does_not_cancel_across_batch() -> None:
+    objective = MasterFreeEnergyOptimizer(lambda_1=1.0, lambda_2=0.0)
+    # Equal and opposite per-sample errors have zero signed mean but nonzero
+    # mismatch; the objective must not misreport them as aligned.
+    total, penalty = objective.forward(
+        [1.0, 3.0],
+        [1.0, 1.0],
+        [1.0, 1.0],
+        [3.0, 1.0],
+    )
+    assert penalty == pytest.approx(2.0)
+    assert total > 0
+
 def test_kuramoto_uses_theta_j_minus_theta_i_sign() -> None:
     sync = KuramotoRiemannianSynchronizer(2, np.zeros(2))
     phases = np.array([[0.0, np.pi / 2]])
