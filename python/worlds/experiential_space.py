@@ -17,7 +17,6 @@ from copy import deepcopy
 from typing import Any
 
 import numpy as np
-
 from temporal_lobe.events import EventKind, ExternalEvent
 
 _STATE_DIM = 22
