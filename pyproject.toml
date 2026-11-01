@@ -63,6 +63,12 @@ math = [
     "mpmath<1.4",
 ]
 
+# Official ARC-AGI-3 environment toolkit. ARC-AGI-1 task data is fetched
+# separately from the upstream dataset repository by scripts/install_arc_resources.sh.
+arc = [
+    "arc-agi==0.9.9",
+]
+
 [project.scripts]
 genesis = "genesis_cli:_console_main"
 
