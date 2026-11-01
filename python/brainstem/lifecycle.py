@@ -1638,6 +1638,24 @@ class LifecycleMixin:
                         note_swallowed("mind.lifecycle._stage_inner_life.self_latent_space", error)
                     else:
                         scalar_updates.append((self, "self_latent_space", staged_self_latent))
+                if ils.get("language_latent_space") is not None:
+                    try:
+                        from temporal_lobe.language_latent_space import LanguageLatentSpace
+
+                        staged_language_latent = LanguageLatentSpace()
+                        staged_language_latent.restore(ils["language_latent_space"])
+                    except (KeyError, TypeError, ValueError, OverflowError, ArithmeticError) as error:
+                        note_swallowed(
+                            "mind.lifecycle._stage_inner_life.language_latent_space", error
+                        )
+                    else:
+                        scalar_updates.append(
+                            (
+                                self.brain.temporal,
+                                "language_latent_space",
+                                staged_language_latent,
+                            )
+                        )
                 logger.info(
                     "Restored inner life state: thoughts=%d, dreams=%d, lucid=%d",
                     *counts,
@@ -1774,6 +1792,9 @@ class LifecycleMixin:
                         else None
                     ),
                     "self_latent_space": self.self_latent_space.to_dict(),
+                    "language_latent_space": (
+                        self.brain.temporal.language_latent_space.to_dict()
+                    ),
                 },
                 world_state=self.world.to_dict(),
                 executive=self.brain.frontal.executive,
