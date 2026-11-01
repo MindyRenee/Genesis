@@ -109,22 +109,22 @@ class UltrametricEpisodicMemorySpace:
         bins = np.floor(bounded * (2**self.levels)).astype(np.int64)
         return tuple(int(item) for item in bins)
 
-    def distance(self, left: Any, right: Any) -> float:
-        """Tree distance: 0 for same code, 2^-LCP for differing codes."""
-        a = self._code(left)
-        b = self._code(right)
+    def _distance_codes(self, a: tuple[int, ...], b: tuple[int, ...]) -> float:
+        """Prefix-tree distance on validated quantized codes."""
         if a == b:
             return 0.0
-        # Prefix level compares progressively finer quantized partitions.
-        a_bits = tuple(bit for value in a for bit in format(value, f"0{self.levels}b"))
-        b_bits = tuple(bit for value in b for bit in format(value, f"0{self.levels}b"))
+        a_bits = "".join(format(value, f"0{self.levels}b") for value in a)
+        b_bits = "".join(format(value, f"0{self.levels}b") for value in b)
         common = 0
         for abit, bbit in zip(a_bits, b_bits, strict=True):
             if abit != bbit:
                 break
             common += 1
-        max_depth = len(a_bits)
-        return math.ldexp(1.0, -(common + 1) * self.levels / max_depth)
+        return math.ldexp(1.0, -(common + 1))
+
+    def distance(self, left: Any, right: Any) -> float:
+        """Tree distance: zero for identical leaves, otherwise 2^-LCP."""
+        return self._distance_codes(self._code(left), self._code(right))
 
     def add(self, vector: Any, label: str = "") -> int:
         code = self._code(vector)
@@ -143,7 +143,7 @@ class UltrametricEpisodicMemorySpace:
         query = self._code(vector)
         ranked = []
         for record in self._records:
-            distance = self.distance(query, record["code"])
+            distance = self._distance_codes(query, tuple(record["code"]))
             ranked.append({"id": record["id"], "label": record["label"], "distance": distance})
         return sorted(ranked, key=lambda item: (item["distance"], item["id"]))[:max(0, limit)]
 
