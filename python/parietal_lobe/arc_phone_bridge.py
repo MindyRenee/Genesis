@@ -220,7 +220,7 @@ class ArcPhoneBridge:
                         self._send(200, bridge.games())
                     else:
                         self._send(404, {"error": "not_found"})
-                except (ARCSourceError, RuntimeError) as exc:
+                except RuntimeError as exc:
                     self._send(503, {"error": "arc_unavailable", "message": str(exc)})
 
             def do_POST(self) -> None:
@@ -239,9 +239,9 @@ class ArcPhoneBridge:
                     self._send(404, {"error": "session_not_found", "message": str(exc)})
                 except OverflowError as exc:
                     self._send(409, {"error": "step_budget_exhausted", "message": str(exc)})
-                except (ValueError, json.JSONDecodeError) as exc:
+                except ValueError as exc:
                     self._send(400, {"error": "invalid_request", "message": str(exc)})
-                except (ARCSourceError, RuntimeError) as exc:
+                except RuntimeError as exc:
                     self._send(503, {"error": "arc_unavailable", "message": str(exc)})
 
             def do_DELETE(self) -> None:
