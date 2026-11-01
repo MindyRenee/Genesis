@@ -1,10 +1,11 @@
-"""Machine-native language latent geometry with six-dot mathematical symbols.
+"""Machine-native language latent geometry using strict 7-bit ASCII.
 
-The six-dot cells are a reversible binary code, not standard literary Braille.
-The latent vector combines parse structure with deterministic hashed lexical
-features. A Sinkhorn coupling transports empirical cell mass to latent-feature
-mass under an explicit Hamming prototype cost. This is an optimal-transport
-summary, not a learned semantic map or a claim of isometry.
+Text is represented as ASCII character codes (0..127); non-ASCII input is
+rejected rather than silently transliterated or UTF-8 encoded. The latent
+vector combines parsed structure with deterministic hashed lexical features.
+A Sinkhorn coupling compares the observed ASCII-code distribution with an
+explicit latent-feature codebook using normalized 7-bit Hamming cost. This is
+an optimal-transport summary, not a learned semantic map or isometry.
 
 NumPy only; no LLM, Torch, pretrained weights, or network access.
 """
@@ -18,10 +19,9 @@ from copy import deepcopy
 from typing import Any
 
 import numpy as np
-from parietal_lobe.binary_language import BitCell
 
 _LATENT_DIM = 32
-_CELL_COUNT = 64
+_ASCII_COUNT = 128
 _EPS = 1e-10
 _ROLE_CHANNELS = (
     "AGENT", "PATIENT", "LOCATION", "SOURCE", "DESTINATION",
@@ -30,50 +30,33 @@ _ROLE_CHANNELS = (
 _TOKEN_RE = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 
 
-def encode_text_cells(text: str) -> tuple[tuple[BitCell, ...], int]:
-    """Losslessly encode UTF-8 text into six-dot cells and exact bit length."""
+def encode_ascii(text: str) -> tuple[tuple[int, ...], int]:
+    """Return strict ASCII character codes and their exact 7-bit length."""
     if not isinstance(text, str):
         raise TypeError("text must be a string")
-    raw = text.encode("utf-8")
-    bits = "".join(f"{byte:08b}" for byte in raw)
-    bit_length = len(bits)
-    bits += "0" * ((-len(bits)) % 6)
-    return tuple(BitCell(int(bits[i:i + 6], 2)) for i in range(0, len(bits), 6)), bit_length
+    try:
+        raw = text.encode("ascii", errors="strict")
+    except UnicodeEncodeError as exc:
+        raise ValueError("language latent space accepts ASCII text only") from exc
+    return tuple(raw), len(raw) * 7
 
 
-def embed_dot_cell(cell: BitCell, target_dim: int = 32) -> np.ndarray:
-    """Embed a finite six-dot cell into Euclidean space without distance loss.
-
-    The first six coordinates are the raised-dot indicators and all remaining
-    coordinates are zero. Squared Euclidean distance between two embeddings
-    equals the Hamming distance between their dot patterns. This is an exact
-    finite-code isometry, not a differentiable manifold map or semantic decoder.
-    """
-    if not isinstance(cell, BitCell):
-        raise TypeError("cell must be a BitCell")
-    if isinstance(target_dim, bool) or not isinstance(target_dim, int) or target_dim < 6:
-        raise ValueError("target_dim must be an integer of at least 6")
-    embedded = np.zeros(target_dim, dtype=np.float64)
-    for dot in cell.raised_dots:
-        embedded[dot - 1] = 1.0
-    return embedded
-
-
-def decode_text_cells(cells: tuple[BitCell, ...], bit_length: int) -> str:
-    """Decode six-dot cells back to their original UTF-8 text."""
+def decode_ascii(codes: tuple[int, ...], bit_length: int) -> str:
+    """Decode ASCII character codes after validating the exact 7-bit length."""
     if isinstance(bit_length, bool) or not isinstance(bit_length, int):
         raise TypeError("bit_length must be an integer")
-    if bit_length < 0 or bit_length > len(cells) * 6 or bit_length % 8:
-        raise ValueError("bit_length must be byte-aligned and fit the cells")
-    bits = "".join(cell.bits for cell in cells)[:bit_length]
-    raw = bytes(int(bits[i:i + 8], 2) for i in range(0, bit_length, 8))
-    return raw.decode("utf-8", errors="strict")
+    if bit_length < 0 or bit_length % 7 or bit_length != len(codes) * 7:
+        raise ValueError("bit_length must equal the number of ASCII codes times 7")
+    if any(isinstance(code, bool) or not isinstance(code, int) or not 0 <= code < 128
+           for code in codes):
+        raise ValueError("ASCII codes must be integers in range 0..127")
+    return bytes(codes).decode("ascii", errors="strict")
 
 
-def _cell_histogram(cells: tuple[BitCell, ...]) -> np.ndarray:
-    counts = np.zeros(_CELL_COUNT, dtype=np.float64)
-    for cell in cells:
-        counts[cell.value] += 1.0
+def _ascii_histogram(codes: tuple[int, ...]) -> np.ndarray:
+    counts = np.zeros(_ASCII_COUNT, dtype=np.float64)
+    for code in codes:
+        counts[code] += 1.0
     total = float(counts.sum())
     if total:
         counts /= total
@@ -125,7 +108,7 @@ def _sinkhorn(
 
 
 class LanguageLatentSpace:
-    """Online language state coupled to parsed structure and six-dot cells.
+    """Online language state coupled to parsed structure and ASCII character codes.
 
     Geometry is empirical and interpretable: online feature covariance,
     transition residuals, categorical Fisher information over a softmax
@@ -163,26 +146,24 @@ class LanguageLatentSpace:
             raise TypeError("text must be a string")
         if direction not in {"inbound", "outbound", "internal"}:
             raise ValueError("direction must be inbound, outbound, or internal")
-        cells, bit_length = encode_text_cells(text)
-        if not cells:
-            cells = (BitCell(0),)
+        codes, bit_length = encode_ascii(text)
         features = self._features(text, comprehension)
-        histogram = _cell_histogram(cells)
-        # Each signed latent coordinate maps to a pair of six-dot codewords:
-        # even = negative, odd = positive. This is an explicit codebook, not
-        # a claim that Hamming-near cells are semantically equivalent.
-        target = np.full(_CELL_COUNT, _EPS, dtype=np.float64)
+        histogram = _ascii_histogram(codes if codes else (0,))
+        # Each signed latent coordinate maps to a pair of ASCII-indexed
+        # prototypes: even = negative, odd = positive. Remaining ASCII bins
+        # retain only epsilon mass. This codebook is not semantic grounding.
+        target = np.full(_ASCII_COUNT, _EPS, dtype=np.float64)
         for index, value in enumerate(features):
             target[2 * index] += max(0.0, -float(value))
             target[2 * index + 1] += max(0.0, float(value))
         target /= target.sum()
         source_ids = np.flatnonzero(histogram)
         source_mass = histogram[source_ids]
-        target_ids = np.arange(_CELL_COUNT)
+        target_ids = np.arange(_ASCII_COUNT)
         costs = np.empty((source_ids.size, _CELL_COUNT), dtype=np.float64)
         for row, cell_value in enumerate(source_ids):
             costs[row] = [
-                int(cell_value ^ int(proto)).bit_count() / 6.0
+                int(cell_value ^ int(proto)).bit_count() / 7.0
                 for proto in target_ids
             ]
         plan, transport_cost = _sinkhorn(source_mass, target, costs)
@@ -221,13 +202,13 @@ class LanguageLatentSpace:
                 "version": 1,
                 "observations": self._observations,
                 "latent_state": features.tolist(),
-                "cell_count": len(cells),
+                "ascii_character_count": len(codes),
                 "bit_length": bit_length,
                 "direction": direction,
-                "cell_distribution": histogram.tolist(),
+                "ascii_distribution": histogram.tolist(),
                 "transport_cost": transport_cost,
                 "transport_plan_shape": [int(plan.shape[0]), int(plan.shape[1])],
-                "transport_source_cells": source_ids.tolist(),
+                "transport_source_ascii_codes": source_ids.tolist(),
                 "transport_target_distribution": target.tolist(),
                 "transport_plan": plan.tolist(),
                 "transport_row_marginal_error": row_marginal_error,
@@ -276,7 +257,7 @@ class LanguageLatentSpace:
         speech_act = getattr(getattr(result, "speech_act", None), "name", "")
         if not speech_act:
             speech_act = str(getattr(result, "speech_act", ""))
-        digest = hashlib.blake2b(speech_act.casefold().encode("utf-8"), digest_size=8).digest()
+        digest = hashlib.blake2b(speech_act.casefold().encode("ascii", errors="backslashreplace"), digest_size=8).digest()
         vector[8 + digest[0] % 8] += 1.0
 
         propositions = getattr(result, "propositions", ()) or ()
@@ -289,7 +270,7 @@ class LanguageLatentSpace:
             for slot in ("subject", "predicate", "object"):
                 term = str(getattr(proposition, slot, "") or "").casefold().strip()
                 if term:
-                    token_digest = hashlib.blake2b(term.encode("utf-8"), digest_size=8).digest()
+                    token_digest = hashlib.blake2b(term.encode("ascii", errors="backslashreplace"), digest_size=8).digest()
                     vector[16 + token_digest[0] % 16] += -1.0 if token_digest[1] & 1 else 1.0
         grounded = getattr(result, "grounded", ()) or ()
         for proposition in grounded:
@@ -303,13 +284,13 @@ class LanguageLatentSpace:
                 if not isinstance(concept_id, str) or not concept_id:
                     continue
                 concept_digest = hashlib.blake2b(
-                    ("concept:" + concept_id).encode("utf-8"), digest_size=8
+                    ("concept:" + concept_id).encode("ascii", errors="backslashreplace"), digest_size=8
                 ).digest()
                 vector[16 + concept_digest[0] % 16] += (
                     -1.0 if concept_digest[1] & 1 else 1.0
                 )
         for token in tokens:
-            token_digest = hashlib.blake2b(token.encode("utf-8"), digest_size=8).digest()
+            token_digest = hashlib.blake2b(token.encode("ascii", errors="backslashreplace"), digest_size=8).digest()
             vector[16 + token_digest[0] % 16] += -1.0 if token_digest[1] & 1 else 1.0
         vector[16:] /= max(1.0, math.sqrt(len(tokens) + 3 * len(propositions)))
         if not np.all(np.isfinite(vector)):
