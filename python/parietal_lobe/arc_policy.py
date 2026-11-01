@@ -12,7 +12,7 @@ import json
 import math
 from collections import Counter
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any
 
 from parietal_lobe.arc_play import ARC3Decision
@@ -24,6 +24,8 @@ def _plain(value: Any, depth: int = 0) -> Any:
         return type(value).__name__
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
+    if is_dataclass(value) and not isinstance(value, type):
+        return _plain(asdict(value), depth + 1)
     if isinstance(value, Mapping):
         return {
             str(key): _plain(item, depth + 1)
@@ -65,9 +67,12 @@ class ARC3ExplorationPolicy:
     """
 
     exploration_weight: float = 1.0
-    _observations_seen: set[str] = field(default_factory=set, init=False)
-    _action_counts: Counter[tuple[str, str]] = field(default_factory=Counter, init=False)
-    _global_action_counts: Counter[str] = field(default_factory=Counter, init=False)
+    _observations_seen: set[str] = None  # initialized lazily to keep the public API small
+
+    def __post_init__(self) -> None:
+        """Initialize private novelty memory for this policy instance."""
+        if self._observations_seen is None:
+            self._observations_seen = set()
 
     def choose_action(
         self,
@@ -106,7 +111,7 @@ class ARC3ExplorationPolicy:
             scored.append((score, action, local_count))
 
         # Stable tie-break avoids hidden randomness and makes replays auditable.
-        score, action, local_count = max(scored, key=lambda item: (item[0], item[1]))
+        score, action, local_count = min(scored, key=lambda item: (-item[0], item[1]))
         reasoning = {
             "policy": "bounded_novelty_exploration",
             "state_signature": state_key,
