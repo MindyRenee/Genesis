@@ -12,7 +12,7 @@ import json
 import math
 from collections import Counter
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any
 
 from parietal_lobe.arc_play import ARC3Decision
@@ -68,15 +68,8 @@ class ARC3ExplorationPolicy:
 
     exploration_weight: float = 1.0
     outcome_weight: float = 1.0
-    _observations_seen: set[str] | None = None  # initialized lazily
-    _outcomes: dict[tuple[str, str], tuple[float, int]] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize private novelty memory for this policy instance."""
-        if self._observations_seen is None:
-            self._observations_seen = set()
-        if self._outcomes is None:
-            self._outcomes = {}
+    _observations_seen: set[str] = field(default_factory=set, init=False)
+    _outcomes: dict[tuple[str, str], tuple[float, int]] = field(default_factory=dict, init=False)
 
     def choose_action(
         self,
