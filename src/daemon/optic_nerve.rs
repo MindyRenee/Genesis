@@ -307,11 +307,9 @@ const ACCOM_TAU_FAR_S: f32 = 0.7;
 /// describes the same instant as the chemistry it rides beside.
 pub struct OpticNerve {
     /// Segment name — a parameter so tests can use private segments.
-    #[cfg(not(target_os = "android"))]
     shm_name: String,
     /// The open shared-memory attachment; `None` until the capture
     /// limb creates the segment, re-tried every sample.
-    #[cfg(not(target_os = "android"))]
     shm: Option<optic_shmem::Shmem>,
     /// Last consumed seqlock value — a frame is consumed once, so an
     /// unchanged counter means the limb has not written since.
@@ -466,12 +464,8 @@ impl OpticNerve {
 
     /// Attach to a named segment (tests use private names).
     pub fn with_name(name: &str) -> Self {
-        #[cfg(target_os = "android")]
-        let _ = name;
         Self {
-            #[cfg(not(target_os = "android"))]
             shm_name: name.to_string(),
-            #[cfg(not(target_os = "android"))]
             shm: None,
             last_seq: 0,
             last_fresh_ms: 0,
@@ -1337,11 +1331,11 @@ mod tests {
         height: u32,
         fourcc: &[u8; 4],
         frame: &[u8],
-    ) -> (shared_memory::Shmem, String) {
+    ) -> (optic_shmem::Shmem, String) {
         let name = format!("/genesis_optic_nerve_test_{}_{}", std::process::id(), tag);
         let stride = width * 3;
         let size = (stride * height) as usize;
-        let shmem = shared_memory::ShmemConf::new()
+        let shmem = optic_shmem::ShmemConf::new()
             .os_id(&name)
             .size(HEADER_SIZE + size.max(frame.len()))
             .create()
