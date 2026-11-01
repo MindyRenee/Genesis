@@ -1619,7 +1619,7 @@ class LifecycleMixin:
                 )
                 # Validate into a detached instance during staging. The live
                 # inner world is replaced only when the state transaction commits.
-                if "inner_world" in ils:
+                if ils.get("inner_world") is not None:
                     try:
                         from sleep.inner_world import InnerWorldExperientialLatentSpace
 
@@ -1759,7 +1759,11 @@ class LifecycleMixin:
                     "thought_count": self.inner_life.thought_count,
                     "dream_count": self.inner_life.dream_count,
                     "lucid_dream_count": self.inner_life.lucid_dream_count,
-                    "inner_world": self.inner_life.inner_world.to_dict(),
+                    "inner_world": (
+                        self.inner_life.inner_world.to_dict()
+                        if hasattr(self.inner_life, "inner_world")
+                        else None
+                    ),
                 },
                 world_state=self.world.to_dict(),
                 executive=self.brain.frontal.executive,
