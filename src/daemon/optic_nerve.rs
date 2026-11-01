@@ -203,9 +203,11 @@ const ACCOM_TAU_FAR_S: f32 = 0.7;
 /// describes the same instant as the chemistry it rides beside.
 pub struct OpticNerve {
     /// Segment name — a parameter so tests can use private segments.
+    #[cfg(not(target_os = "android"))]
     shm_name: String,
     /// The open shared-memory attachment; `None` until the capture
     /// limb creates the segment, re-tried every sample.
+    #[cfg(not(target_os = "android"))]
     shm: Option<shared_memory::Shmem>,
     /// Last consumed seqlock value — a frame is consumed once, so an
     /// unchanged counter means the limb has not written since.
@@ -360,8 +362,12 @@ impl OpticNerve {
 
     /// Attach to a named segment (tests use private names).
     pub fn with_name(name: &str) -> Self {
+        #[cfg(target_os = "android")]
+        let _ = name;
         Self {
+            #[cfg(not(target_os = "android"))]
             shm_name: name.to_string(),
+            #[cfg(not(target_os = "android"))]
             shm: None,
             last_seq: 0,
             last_fresh_ms: 0,
@@ -387,6 +393,14 @@ impl OpticNerve {
     /// frame has arrived pool it into the channel signals. Absent or
     /// stalled segments are the no-eye condition — the afference just
     /// reports no fresh input, it is never a fault.
+    #[cfg(target_os = "android")]
+    pub fn sample(&mut self, _now_ms: u64) {
+        // The Android capture limb is deliberately absent: native V4L2
+        // and this POSIX shared-memory transport are not available here.
+        // Keep the same no-eye state without linking unsupported symbols.
+    }
+
+    #[cfg(not(target_os = "android"))]
     pub fn sample(&mut self, now_ms: u64) {
         // A stale feed can mean the mapping is a corpse: a dead limb
         // unlinks the segment on its way out, and the next life
@@ -1260,6 +1274,7 @@ mod tests {
         assert_eq!(optic.retinal_lux(1000), None);
     }
 
+    #[cfg(not(target_os = "android"))]
     #[test]
     fn rgb_frame_feeds_the_channels() {
         // 64x48 RGB3, mid-blue — melanopsin-weighted should read high.
@@ -1284,6 +1299,7 @@ mod tests {
         drop(seg);
     }
 
+    #[cfg(not(target_os = "android"))]
     #[test]
     fn a_changed_frame_is_motion_and_orienting() {
         let (seg, name) = fake_nerve("motion", 64, 48, b"RGB3", &[0u8].repeat(64 * 48 * 3));
@@ -1603,6 +1619,7 @@ mod tests {
         assert_eq!(optic.lid(), 0.0);
     }
 
+    #[cfg(not(target_os = "android"))]
     #[test]
     fn a_voluntary_close_dims_the_oscillator_too() {
         // The voluntary lid rides the same afference as the phase
