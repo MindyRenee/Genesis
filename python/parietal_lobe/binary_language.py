@@ -8,6 +8,7 @@ This module provides an encoding and a small evidence-based association
 store. It does not claim that bit patterns alone produce language: meanings
 must be grounded in observations and tested against later evidence.
 """
+
 from __future__ import annotations
 
 from collections.abc import Iterable
