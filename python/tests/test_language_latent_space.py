@@ -21,12 +21,12 @@ def test_ascii_encoding_is_lossless_for_ascii() -> None:
 
 
 def test_ascii_encoding_round_trips_unicode_and_literal_escape_sequences() -> None:
-    text = "language → café 你好 \\\\u{41};"
+    text = "language → café 你好 \\u{41};"
     codes, bit_length = encode_ascii(text)
     assert all(0 <= code < 128 for code in codes)
     assert bit_length == len(codes) * 7
     encoded_text = bytes(codes).decode("ascii")
-    assert "\\\\u{2192};" in encoded_text
+    assert "\\u{2192};" in encoded_text
     assert decode_ascii(codes, bit_length) == text
 
 
