@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Run from the Genesis repository root.
+set -euo pipefail
+ROOT="$(pwd)"
+DEST="${GENESIS_ARC1_DIR:-data/arc/ARC-AGI-1}"
+if ! command -v git >/dev/null 2>&1; then
+  echo "ERROR: git is required." >&2
+  exit 1
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ERROR: python3 is required." >&2
+  exit 1
+fi
+mkdir -p "$(dirname -- "$DEST")"
+if [[ -d "$DEST/.git" ]]; then
+  echo "Updating official ARC-AGI-1 repository at $DEST"
+  git -C "$DEST" pull --ff-only
+elif [[ -e "$DEST" ]]; then
+  echo "ERROR: $DEST exists but is not a Git checkout; move it or set GENESIS_ARC1_DIR." >&2
+  exit 1
+else
+  git clone --depth 1 https://github.com/fchollet/ARC-AGI.git "$DEST"
+fi
+python3 -m pip install -e "$ROOT[arc]"
+echo "ARC-AGI-1 data: $DEST/data/{training,evaluation}"
+echo "ARC-AGI-3 toolkit installed. ARC_API_KEY is optional for additional games."
+echo "No model or LLM is installed by this script."
