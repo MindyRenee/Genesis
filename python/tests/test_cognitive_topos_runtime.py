@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-
 from self.cognitive_topos_runtime import CognitiveToposRuntime
 
 
