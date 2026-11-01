@@ -80,8 +80,8 @@ class ARC3ExplorationPolicy:
             raise ValueError("legal_actions must not be empty")
         state_key = observation_signature(observation)
         seen = set(self._observations_seen)
-        action_counts = self._action_counts.copy()
-        global_counts = self._global_action_counts.copy()
+        action_counts: Counter[tuple[str, str]] = Counter()
+        global_counts: Counter[str] = Counter()
 
         # Reconstruct policy evidence from the explicit episode history.
         for transition in previous_transitions:
@@ -120,6 +120,4 @@ class ARC3ExplorationPolicy:
             ],
         }
         self._observations_seen.add(state_key)
-        self._action_counts[(state_key, action)] += 1
-        self._global_action_counts[action] += 1
         return ARC3Decision(action=action, reasoning=reasoning)
