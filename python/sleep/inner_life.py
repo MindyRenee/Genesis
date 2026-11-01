@@ -614,7 +614,7 @@ class InnerLife:
             return
         try:
             self._on_thought(_LiveEvent(content, kind, is_dream))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "sleep.inner_life._emit",
                 e,
@@ -950,7 +950,7 @@ class InnerLife:
                     self._run_thought_generation(now)
 
                 self._drives_tick(now)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.exception(f"inner life cycle failed: {e}")
 
             self._workspace_tick(now)
@@ -1005,7 +1005,7 @@ class InnerLife:
                 try:
                     stats = self._learner.stats
                     queue_depth = stats.get("curiosity_queue_size", 0)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     note_swallowed(
                         "sleep.inner_life._run",
                         e,
@@ -1052,7 +1052,7 @@ class InnerLife:
                     if now - self._last_executive_feed >= _EXECUTIVE_FEED_EVERY:
                         self._last_executive_feed = now
                         self._feed_executive_focus()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "sleep.inner_life._run",
                     e,
@@ -1305,7 +1305,7 @@ class InnerLife:
             return None
         try:
             return self._get_fold_margins()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed("sleep.inner_life._fold_margins", e)
             return None
 
@@ -1350,7 +1350,7 @@ class InnerLife:
         if not is_sleeping and self._is_mind_sleeping:
             try:
                 is_sleeping = self._is_mind_sleeping()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "sleep.inner_life._is_currently_sleeping",
                     e,
@@ -1496,7 +1496,7 @@ class InnerLife:
             self._last_reported_stage = stage
             try:
                 self._on_sleep_stage_transition(stage, dt)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "sleep.inner_life._determine_dream_stage",
                     e,
@@ -1564,7 +1564,7 @@ class InnerLife:
         if self._on_sleep_tick is not None:
             try:
                 self._on_sleep_tick(stage, dt)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "sleep.inner_life._generate_dream_neural_events",
                     e,
@@ -1590,7 +1590,7 @@ class InnerLife:
                     from thalamus.brain_waves import assess_brain_waves
 
                     waves = assess_brain_waves(summary, fold=self._fold_margins())
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     note_swallowed(
                         "sleep.inner_life._run_dream_synthesis",
                         e,
@@ -1607,7 +1607,7 @@ class InnerLife:
                         f"(similarity: {p.structural_similarity:.2f})",
                         is_dream=True,
                     )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "sleep.inner_life._run_dream_synthesis",
                 e,
@@ -1633,7 +1633,7 @@ class InnerLife:
                         f"— {r.reason}",
                         is_dream=True,
                     )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "sleep.inner_life._review_dream_proposals",
                 e,
@@ -3531,7 +3531,7 @@ class InnerLife:
                     question_type=q.question_type,
                     gap_detail=q.gap_detail or "",
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "sleep.inner_life._surface_curiosity_question",
                 e,
@@ -3692,7 +3692,7 @@ class InnerLife:
                         topics.add(str(t))
                 for cid in matcher(str(getattr(item, "content", "") or "")):
                     topics.add(cid)
-        except Exception as e: — focus must never kill the stream
+        except Exception as e:  # noqa: BLE001 — focus must never kill the stream
             note_swallowed("sleep.inner_life._ignited_world_topics", e)
         return topics
 
@@ -3702,7 +3702,7 @@ class InnerLife:
             return False
         try:
             neighbors = self.network.get_neighbors(topic)
-        except Exception: — treat lookup failure as not adjacent
+        except Exception:  # noqa: BLE001 — treat lookup failure as not adjacent
             return False
         return any(n[0] in world_topics for n in neighbors)
 
@@ -3725,7 +3725,7 @@ class InnerLife:
                 concept = self.network._concepts.get(cid)
                 if concept is not None:
                     concept.activation = max(concept.activation or 0.0, level)
-        except Exception as e: — priming is advisory
+        except Exception as e:  # noqa: BLE001 — priming is advisory
             note_swallowed("sleep.inner_life._prime_world_topics", e)
 
     def _feed_executive_focus(self) -> None:
@@ -3743,7 +3743,7 @@ class InnerLife:
             return
         try:
             executive.ingest_candidates(self.executive_candidates(emotion))
-        except Exception as e: — intentions are advisory
+        except Exception as e:  # noqa: BLE001 — intentions are advisory
             note_swallowed("sleep.inner_life._feed_executive_focus", e)
 
     def _collect_activation_candidates(self) -> list[dict[str, Any]]:
@@ -3781,7 +3781,7 @@ class InnerLife:
         if self.curiosity is not None:
             try:
                 questions = self.curiosity.generate_questions(emotion, max_questions=5)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 questions = []
             for q in questions:
                 # The curiosity engine already ranks by gap pressure.
@@ -3928,7 +3928,7 @@ class InnerLife:
             self._last_env_sample = now
             try:
                 monitor.snapshot()
-            except Exception:  # env sensing must never kill the loop
+            except Exception:  # noqa: BLE001 — env sensing must never kill the loop
                 logger.debug("environment snapshot failed", exc_info=True)
         snap = monitor.last_snapshot
         if snap is None:
@@ -5106,7 +5106,7 @@ class InnerLife:
                         "addressed": getattr(thought, "intent", "") == "question",
                     },
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.debug("self latent thought integration failed", exc_info=True)
         with self._thoughts_lock:
             self._thoughts.append(thought)
@@ -5819,7 +5819,7 @@ class InnerLife:
         weight = _INSIGHT_EDGE_WEIGHT
         try:
             network.add_edge(c1, c2, RelationType.RELATED_TO, weight, origin="insight")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed("sleep.inner_life._record_insight_edge", e)
 
     def _make_insight(
@@ -5895,7 +5895,7 @@ class InnerLife:
                             f"composed: {novel_thought.content[:80]}",
                             is_dream=is_dream,
                         )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "sleep.inner_life._make_insight",
                     e,
