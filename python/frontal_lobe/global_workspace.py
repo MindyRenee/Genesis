@@ -292,7 +292,7 @@ class GlobalWorkspace:
         for responder in self._responders:
             try:
                 reply = responder(item)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.debug("region responder failed", exc_info=True)
                 continue
             if reply:
