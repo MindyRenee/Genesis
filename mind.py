@@ -240,6 +240,19 @@ class Mind(
                 adapter = AndroidSensorAdapter(self._on_android_sensor_sample)
                 if adapter.start():
                     self.android_sensor_adapter = adapter
+        # Microphone capture is separately opt-in; clips are processed locally
+        # and the temporary audio file is deleted after feature extraction.
+        self.android_microphone_adapter = None
+        if os.environ.get("GENESIS_ANDROID_MICROPHONE", "0") == "1":
+            from brainstem.android_media import (
+                AndroidMicrophoneAdapter,
+                is_android_termux_microphone,
+            )
+
+            if is_android_termux_microphone():
+                adapter = AndroidMicrophoneAdapter(self._on_android_audio_clip)
+                if adapter.start():
+                    self.android_microphone_adapter = adapter
         # Camera capture is separately opt-in because it uses a privacy-sensitive
         # sensor and runs only while the Mind process is active.
         self.android_camera_adapter = None
@@ -275,6 +288,42 @@ class Mind(
             )
         except Exception:  # noqa: BLE001 — optional camera cannot crash cognition
             logger.exception("Android camera frame processing failed")
+
+    def _on_android_audio_clip(self, samples, sample_rate: int) -> None:
+        """Classify a measured Android audio clip and publish the sound event."""
+        try:
+            from temporal_lobe.auditory import classify_audio_clip
+
+            event = classify_audio_clip(samples, sample_rate)
+            if event.is_silence:
+                return
+            self.world.perceive(
+                event.description,
+                salience=max(0.1, min(1.0, event.loudness * event.confidence)),
+                source="android_microphone",
+                topics=[event.sound_type],
+                metadata={
+                    "sound_type": event.sound_type,
+                    "confidence": event.confidence,
+                    "loudness": event.loudness,
+                    "brightness": event.brightness,
+                    "noisiness": event.noisiness,
+                    "duration": event.duration,
+                    "valence": event.emotional_valence,
+                    "sample_rate": sample_rate,
+                    "sample_count": int(len(samples)),
+                },
+                percept={
+                    "sound_type": event.sound_type,
+                    "confidence": event.confidence,
+                    "loudness": event.loudness,
+                    "brightness": event.brightness,
+                    "noisiness": event.noisiness,
+                    "duration": event.duration,
+                },
+            )
+        except Exception:  # noqa: BLE001 — optional microphone cannot crash cognition
+            logger.exception("Android microphone clip processing failed")
 
     def _on_android_sensor_sample(self, reading: dict) -> None:
         """Publish measured Android sensor data into the ordinary world event path."""
