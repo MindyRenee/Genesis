@@ -1,3 +1,5 @@
+"""Tests for the ARC-AGI-1 adapter into Genesis' spatial reasoner."""
+
 from __future__ import annotations
 
 import json
