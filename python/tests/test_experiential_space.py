@@ -35,7 +35,15 @@ def test_experiential_space_uses_observed_events_and_returns_finite_geometry():
     assert len(result["global_geometry"]["euclidean_state"]) == 8
     assert len(result["toroidal_state"]) == 8
     assert np.all(np.isfinite(np.asarray(result["fisher_information"])))
+    assert np.all(np.linalg.eigvalsh(np.asarray(result["fisher_information"])) > 0)
     assert np.all(np.linalg.eigvalsh(np.asarray(result["base_metric"])) > 0)
+    geometry = result["global_geometry"]
+    assert np.linalg.norm(geometry["hyperbolic_state"]) < 1.0
+    np.testing.assert_allclose(np.linalg.norm(geometry["spherical_state"]), 1.0)
+    assert all(
+        np.isfinite(value)
+        for value in geometry["distances_from_reference"].values()
+    )
     assert result["fisher_volume"] > 0
 
 
