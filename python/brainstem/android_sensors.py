@@ -233,7 +233,7 @@ class AndroidSensorAdapter:
                         continue
                     try:
                         self._on_sample(reading)
-                    except Exception:  # noqa: BLE001 — sensor failures cannot kill cognition
+                    except Exception:
                         logger.exception("Android sensor callback failed")
             except (OSError, subprocess.SubprocessError, ValueError):
                 now = time.monotonic()
