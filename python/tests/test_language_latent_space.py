@@ -1,15 +1,15 @@
 """Tests for Genesis's machine-native language latent geometry."""
 from __future__ import annotations
 
-import numpy as np
-import pytest
-
 from temporal_lobe.comprehension import Comprehension
 from temporal_lobe.language_latent_space import (
     LanguageLatentSpace,
     decode_text_cells,
     encode_text_cells,
 )
+
+import numpy as np
+import pytest
 
 
 def test_six_dot_text_encoding_is_lossless_for_unicode() -> None:
