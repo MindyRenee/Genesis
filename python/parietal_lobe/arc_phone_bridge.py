@@ -18,15 +18,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import urlsplit
 
-logger = logging.getLogger(__name__)
-
 from parietal_lobe.arc_sources import (
-    ARCSourceError,
     arc3_legal_actions,
     list_arc3_games,
     open_arc3_game,
     step_arc3_game,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _jsonable(value: Any, depth: int = 0) -> Any:
@@ -308,13 +307,22 @@ def serve(
         observer = None
         if mind_socket:
             from mind import Mind
+
             from parietal_lobe.arc_genesis_observer import GenesisArcObserver
             mind = Mind(mind_socket, headless=True)
             mind.start()
             observer = GenesisArcObserver(mind)
-        server = ThreadingHTTPServer((host, port), ArcPhoneBridge(observer=observer).handler())
-        connection = "connected to Genesis cognitive event stream" if observer else "transport-only (no Mind socket)"
-        print(f"Genesis ARC phone bridge listening at http://{host}:{server.server_port}; {connection}")
+        bridge = ArcPhoneBridge(observer=observer)
+        server = ThreadingHTTPServer((host, port), bridge.handler())
+        connection = (
+            "connected to Genesis cognitive event stream"
+            if observer
+            else "transport-only (no Mind socket)"
+        )
+        print(
+            f"Genesis ARC phone bridge listening at "
+            f"http://{host}:{server.server_port}; {connection}"
+        )
         server.serve_forever()
     finally:
         if server is not None:
