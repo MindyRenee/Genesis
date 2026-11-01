@@ -6,24 +6,31 @@ import pytest
 from temporal_lobe.comprehension import Comprehension
 from temporal_lobe.language_latent_space import (
     LanguageLatentSpace,
-    decode_text_cells,
-    embed_dot_cell,
-    encode_text_cells,
+    decode_ascii,
+    encode_ascii,
 )
 
 
-def test_six_dot_text_encoding_is_lossless_for_unicode() -> None:
-    text = "Genesis: braille math → language; 你好"
-    cells, bit_length = encode_text_cells(text)
-    assert cells
-    assert all(0 <= cell.value < 64 for cell in cells)
-    assert decode_text_cells(cells, bit_length) == text
+def test_ascii_encoding_is_lossless_for_ascii() -> None:
+    text = "Genesis: ASCII math -> language; 123"
+    codes, bit_length = encode_ascii(text)
+    assert codes
+    assert all(0 <= code < 128 for code in codes)
+    assert bit_length == len(codes) * 7
+    assert decode_ascii(codes, bit_length) == text
 
 
-def test_six_dot_decoder_rejects_bad_bit_lengths() -> None:
-    cells, _ = encode_text_cells("hello")
+def test_ascii_encoding_rejects_non_ascii_without_transliteration() -> None:
+    with pytest.raises(ValueError, match="ASCII text only"):
+        encode_ascii("language → symbol")
+
+
+def test_ascii_decoder_rejects_bad_bit_lengths_and_codes() -> None:
+    codes, _ = encode_ascii("hello")
     with pytest.raises(ValueError):
-        decode_text_cells(cells, 7)
+        decode_ascii(codes, 8)
+    with pytest.raises(ValueError):
+        decode_ascii((128,), 7)
 
 
 def test_language_latent_observes_real_parse_and_ot_geometry() -> None:
@@ -37,9 +44,9 @@ def test_language_latent_observes_real_parse_and_ot_geometry() -> None:
     assert first["observations"] == 1
     assert second["observations"] == 2
     assert len(second["latent_state"]) == 32
-    assert len(second["cell_distribution"]) == 64
-    assert second["transport_plan_shape"][1] == 64
-    assert len(second["transport_target_distribution"]) == 64
+    assert len(second["ascii_distribution"]) == 128
+    assert second["transport_plan_shape"][1] == 128
+    assert len(second["transport_target_distribution"]) == 128
     assert len(second["transport_plan"]) == second["transport_plan_shape"][0]
     assert second["transport_row_marginal_error"] < 5e-3
     assert second["transport_column_marginal_error"] < 5e-3
@@ -107,7 +114,7 @@ def test_language_latent_tracks_direction_for_inbound_and_outbound_text() -> Non
 def test_language_latent_handles_empty_text_with_explicit_blank_cell() -> None:
     latent = LanguageLatentSpace()
     snapshot = latent.observe("", Comprehension().comprehend(""))
-    assert snapshot["cell_count"] == 1
+    assert snapshot["ascii_character_count"] == 0
     assert snapshot["bit_length"] == 0
     assert np.isfinite(snapshot["transport_cost"])
 
@@ -123,10 +130,15 @@ def test_sinkhorn_rejects_negative_or_nonfinite_marginals() -> None:
 
 
 
-def test_dot_cell_embedding_preserves_euclidean_distances() -> None:
-    from parietal_lobe.binary_language import BitCell
+def test_ascii_hamming_cost_is_seven_bit_metric() -> None:
+    from temporal_lobe.language_latent_space import _sinkhorn
 
-    left = embed_dot_cell(BitCell.from_dots([1, 4, 6]))
-    right = embed_dot_cell(BitCell.from_dots([1, 3, 6]))
-    assert left.shape == (32,)
-    assert np.isclose(np.sum((left - right) ** 2), 2.0)
+    left, right = ord("A"), ord("C")
+    assert (left ^ right).bit_count() == 1
+    source = np.array([1.0])
+    target = np.zeros(128)
+    target[ord("C")] = 1.0
+    cost = np.array([[(left ^ int(code)).bit_count() / 7.0 for code in range(128)]])
+    plan, transport_cost = _sinkhorn(source, target, cost)
+    assert plan.shape == (1, 128)
+    assert transport_cost >= 0.0
