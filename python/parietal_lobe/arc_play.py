@@ -57,6 +57,21 @@ def _outer_world_percept(observation: Any) -> Any:
     return observation
 
 
+def _state_name(observation: Any) -> str | None:
+    """Read terminal state names from object- or mapping-shaped observations."""
+    state = (
+        observation.get("state")
+        if isinstance(observation, dict)
+        else getattr(observation, "state", None)
+    )
+    if state is None:
+        return None
+    if isinstance(state, dict):
+        state = state.get("name", state.get("value", state))
+    name = getattr(state, "name", None)
+    return str(name if name is not None else state)
+
+
 def run_arc3_episode(
     environment: Any,
     *,
@@ -103,8 +118,7 @@ def run_arc3_episode(
             return episode
 
     for step_index in range(max_steps):
-        state = getattr(observation, "state", None)
-        state_name = getattr(state, "name", str(state)) if state is not None else None
+        state_name = _state_name(observation)
         if state_name in {"WIN", "GAME_OVER"}:
             episode.terminal_state = state_name
             episode.stopped_reason = "terminal_state"
@@ -130,12 +144,7 @@ def run_arc3_episode(
             data=decision.data,
             reasoning=decision.reasoning,
         )
-        next_state = getattr(next_observation, "state", None)
-        next_state_name = (
-            getattr(next_state, "name", str(next_state))
-            if next_state is not None
-            else None
-        )
+        next_state_name = _state_name(next_observation)
 
         policy_owner = getattr(choose_action, "__self__", None)
         observe_transition = getattr(policy_owner, "observe_transition", None)
