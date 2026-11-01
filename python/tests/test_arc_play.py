@@ -114,8 +114,14 @@ def test_episode_runner_routes_observations_and_actions_to_outer_world(monkeypat
     )
 
     assert episode.terminal_state == "WIN"
-    assert [event[0] for event in events] == ["perceive", "act"]
+    assert [event[0] for event in events] == ["perceive", "act", "perceive"]
     assert events[0][2]["percept"] == {"grid": [[1, 0]]}
     assert events[0][2]["source"] == "arc3:grid-game"
+    assert events[0][2]["metadata"]["phase"] == "initial"
     assert "ACTION1" in events[1][1]
     assert "state_after=WIN" in events[1][2]
+    # The terminal grid must be delivered before the episode returns.
+    assert events[2][2]["percept"] == {"grid": [[1, 1]]}
+    assert events[2][2]["metadata"]["phase"] == "outcome"
+    assert events[2][2]["metadata"]["action"] == "ACTION1"
+    assert events[2][2]["metadata"]["state_after"] == "WIN"
