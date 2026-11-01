@@ -20,7 +20,7 @@ Run from the Genesis repository root:
 
     bash scripts/install_arc_resources.sh
 
-The script clones the official ARC-AGI-1 repository to data/arc/ARC-AGI-1 and installs Genesis with the optional official ARC-AGI-3 toolkit. The dataset is kept outside source control; do not commit downloaded benchmark data.
+The script clones the official ARC-AGI-1 repository to data/arc/ARC-AGI-1. On desktop Python it installs Genesis with the optional official ARC-AGI-3 toolkit; in Termux it installs the toolkit directly to avoid forcing all desktop-oriented base dependencies. The dataset is kept outside source control; do not commit downloaded benchmark data.
 
 Set GENESIS_ARC1_DIR if the dataset clone should live elsewhere. Set ARC_API_KEY to a key from https://three.arcprize.org if you need additional ARC-AGI-3 games available to registered users. The toolkit can use an anonymous key when none is set, but available games may be limited.
 
@@ -31,7 +31,6 @@ Set GENESIS_ARC1_DIR if the dataset clone should live elsewhere. Set ARC_API_KEY
         list_arc3_games, open_arc3_game, step_arc3_game,
     )
     from parietal_lobe.arc_play import ARC3Decision, run_arc3_episode
-    )
 
     task_path = list_arc1_tasks("training")[0]
     task = load_arc1_task(task_path)
