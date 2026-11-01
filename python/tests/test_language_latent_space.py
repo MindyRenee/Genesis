@@ -20,9 +20,14 @@ def test_ascii_encoding_is_lossless_for_ascii() -> None:
     assert decode_ascii(codes, bit_length) == text
 
 
-def test_ascii_encoding_rejects_non_ascii_without_transliteration() -> None:
-    with pytest.raises(ValueError, match="ASCII text only"):
-        encode_ascii("language → symbol")
+def test_ascii_encoding_round_trips_unicode_and_literal_escape_sequences() -> None:
+    text = "language → café 你好 \\\\u{41};"
+    codes, bit_length = encode_ascii(text)
+    assert all(0 <= code < 128 for code in codes)
+    assert bit_length == len(codes) * 7
+    encoded_text = bytes(codes).decode("ascii")
+    assert "\\\\u{2192};" in encoded_text
+    assert decode_ascii(codes, bit_length) == text
 
 
 def test_ascii_decoder_rejects_bad_bit_lengths_and_codes() -> None:
