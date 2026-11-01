@@ -2934,23 +2934,75 @@ fn hwmon_name(device: &str) -> Option<String> {
         .map(|name| name.trim().to_string())
 }
 
-/// Find the CPU die temperature sensor path (k10temp/coretemp/k8temp),
-/// falling back to the acpitz thermal zone if k10temp is not available.
+/// Find a processor/SoC thermal sensor without mistaking battery or skin
+/// temperature for CPU temperature.
+///
+/// Desktop Linux prefers a known CPU-die hwmon driver. Android devices often
+/// expose thermal zones through `/sys/class/thermal/thermal_zoneN`, with
+/// vendor-specific names such as `cpu-therm`, `soc-therm`, or `tsens_tz_sensor0`.
+/// Zone zero is not assumed to be the CPU: Android commonly numbers battery,
+/// skin, charger, and GPU zones too. If no processor/SoC zone is identifiable,
+/// return an empty path so the caller can report the measurement unavailable.
 fn find_temp_sensor() -> String {
-    // Look for k10temp (AMD) or coretemp (Intel) first — these
-    // are the actual CPU die temperatures.
+    // Prefer known CPU-die hwmon drivers on desktop Linux.
     for device in hwmon_devices() {
         if let Some(name) = hwmon_name(&device) {
             if name == "k10temp" || name == "coretemp" || name == "k8temp" {
                 let temp_path = format!("{device}/temp1_input");
-                if fs::metadata(&temp_path).is_ok() {
+                if readable_temp(&temp_path) {
                     return temp_path;
                 }
             }
         }
     }
-    // Fall back to ACPI thermal zone
-    "/sys/class/thermal/thermal_zone0/temp".to_string()
+
+    // Android/Linux thermal-zone names are vendor-specific. Select only a
+    // zone whose declared type explicitly identifies the processor or SoC;
+    // do not silently use zone0, which can represent skin or battery.
+    let mut zones: Vec<(u32, String, String)> = fs::read_dir("/sys/class/thermal")
+        .ok()
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let index = name.strip_prefix("thermal_zone")?.parse::<u32>().ok()?;
+            let path = entry.path();
+            let zone_type = fs::read_to_string(path.join("type")).ok()?.trim().to_ascii_lowercase();
+            let temp = path.join("temp").to_string_lossy().into_owned();
+            readable_temp(&temp).then_some((index, zone_type, temp))
+        })
+        .collect();
+    zones.sort_by_key(|(index, _, _)| *index);
+
+    if let Some((_, _, path)) = zones.iter().find(|(_, kind, _)| is_processor_thermal_zone(kind)) {
+        return path.clone();
+    }
+
+    // ACPI thermal zones are a useful desktop fallback, but not a generic
+    // Android fallback: an untyped thermal zone is not a trustworthy CPU
+    // temperature measurement.
+    if let Some((_, kind, path)) = zones.iter().find(|(_, kind, _)| kind == "acpitz") {
+        return path.clone();
+    }
+    String::new()
+}
+
+fn readable_temp(path: &str) -> bool {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|value| value.trim().parse::<f32>().ok())
+        .is_some_and(|value| value.is_finite() && (0.0..=150_000.0).contains(&value))
+}
+
+fn is_processor_thermal_zone(kind: &str) -> bool {
+    let kind = kind.trim().to_ascii_lowercase();
+    kind.contains("cpu")
+        || kind.contains("soc")
+        || kind.contains("tsens")
+        || kind.contains("package")
+        || kind == "ap"
+        || kind.starts_with("ap_")
 }
 
 /// Find per-core CPU frequency sensor paths.
@@ -3017,15 +3069,42 @@ fn read_max_freq() -> Option<u64> {
     None
 }
 
-/// Find the battery capacity path.
+/// Find a readable battery capacity path.
+///
+/// Desktop names such as BAT0 are preferred, but Android commonly names its
+/// power supply simply `battery`. Discovery uses the kernel's declared
+/// `type=Battery` rather than assuming laptop naming.
 fn find_battery() -> Option<String> {
-    for supply in &["BAT0", "BAT1", "BATT"] {
-        let path = format!("/sys/class/power_supply/{supply}/capacity");
-        if fs::metadata(&path).is_ok() {
-            return Some(path);
-        }
-    }
-    None
+    let root = "/sys/class/power_supply";
+    let entries = fs::read_dir(root).ok()?;
+    let mut candidates: Vec<(u8, String)> = entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+            let supply_type = fs::read_to_string(path.join("type")).ok()?;
+            if supply_type.trim() != "Battery" {
+                return None;
+            }
+            let capacity = path.join("capacity");
+            let value = fs::read_to_string(&capacity).ok()?;
+            let percent = value.trim().parse::<u8>().ok()?;
+            if percent > 100 {
+                return None;
+            }
+            let priority = if matches!(name.as_str(), "bat0" | "bat1" | "batt") { 0 } else { 1 };
+            Some((priority, capacity.to_string_lossy().into_owned()))
+        })
+        .collect();
+    candidates.sort();
+    candidates.into_iter().next().map(|(_, path)| path)
+}
+
+fn is_external_power_type(kind: &str) -> bool {
+    matches!(
+        kind.trim(),
+        "Mains" | "USB" | "USB_C" | "USB_PD" | "USB_PD_DRP" | "Wireless" | "Dock"
+    )
 }
 
 /// Find the AC adapter online status path.
@@ -3045,8 +3124,9 @@ fn find_ac_adapter() -> Option<String> {
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            let is_mains = fs::read_to_string(path.join("type")).is_ok_and(|t| t.trim() == "Mains");
-            if !is_mains {
+            let is_external_power = fs::read_to_string(path.join("type"))
+                .is_ok_and(|kind| is_external_power_type(kind.trim()));
+            if !is_external_power {
                 return None;
             }
             let online = path.join("online");
@@ -5394,5 +5474,35 @@ mod sensor_presence_tests {
             0,
             "unreadable MemTotal must not claim MEMORY present"
         );
+    }
+}
+
+
+#[cfg(test)]
+mod android_power_discovery_tests {
+    use super::{is_external_power_type, is_processor_thermal_zone};
+
+    #[test]
+    fn android_processor_thermal_zone_names_are_recognized() {
+        for name in ["cpu-therm", "cpu_thermal", "soc-therm", "tsens_tz_sensor0", "package-0"] {
+            assert!(is_processor_thermal_zone(name), "expected processor zone: {name}");
+        }
+    }
+
+    #[test]
+    fn non_processor_thermal_zones_are_not_mislabeled_as_cpu() {
+        for name in ["battery", "skin-therm", "charger", "gpu-therm", "ambient"] {
+            assert!(!is_processor_thermal_zone(name), "must not call {name} CPU temperature");
+        }
+    }
+
+    #[test]
+    fn android_external_power_types_are_supported() {
+        for kind in ["Mains", "USB", "USB_C", "USB_PD", "USB_PD_DRP", "Wireless", "Dock"] {
+            assert!(is_external_power_type(kind), "expected external power type: {kind}");
+        }
+        for kind in ["Battery", "Unknown", ""] {
+            assert!(!is_external_power_type(kind), "must not treat {kind} as external power");
+        }
     }
 }
