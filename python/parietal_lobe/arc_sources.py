@@ -44,6 +44,15 @@ def list_arc1_tasks(
 
 
 def _validate_grid(grid: Any, *, context: str) -> list[list[int]]:
+    """Validate an ARC color grid and return it unchanged.
+
+    Args:
+        grid: Candidate grid represented as nested lists of integer colors.
+        context: Location label included in validation errors.
+
+    Raises:
+        ARCSourceError: If the grid is empty, ragged, oversized, or invalid.
+    """
     if not isinstance(grid, list) or not grid:
         raise ARCSourceError(f"{context}: grid must be a non-empty list")
     if any(not isinstance(row, list) or not row for row in grid):
@@ -61,7 +70,12 @@ def _validate_grid(grid: Any, *, context: str) -> list[list[int]]:
 
 
 def load_arc1_task(path: str | Path) -> dict[str, Any]:
-    """Load and validate an ARC task."""
+    """Load and validate an ARC task JSON file.
+
+    Both training and test inputs are validated; outputs are validated when
+    present. Test outputs remain in the loaded source payload but should be
+    removed with :func:`arc1_problem_view` before solving.
+    """
     task_path = Path(path)
     try:
         payload = json.loads(task_path.read_text(encoding="utf-8"))
@@ -84,7 +98,11 @@ def load_arc1_task(path: str | Path) -> dict[str, Any]:
 def arc1_problem_view(
     task: dict[str, Any], *, include_test_outputs: bool = False
 ) -> dict[str, Any]:
-    """Return demonstrations and test inputs; omit test outputs by default."""
+    """Build the agent-facing task view without leaking test answers.
+
+    Training input/output pairs are retained. Test inputs are always retained,
+    while test outputs are included only when ``include_test_outputs`` is true.
+    """
     train = [
         {"input": pair["input"], "output": pair["output"]}
         for pair in task["train"]
@@ -134,7 +152,17 @@ def open_arc3_game(
     seed: int = 0,
     save_recording: bool = True,
 ) -> tuple[Any, Any]:
-    """Create an official ARC-AGI-3 environment and return it with its first observation."""
+    """Create an official environment and return it with its initial observation.
+
+    Args:
+        game_id: Official environment identifier.
+        offline: Whether to request offline operation mode.
+        seed: Initial environment seed.
+        save_recording: Whether the toolkit should save a recording.
+
+    Raises:
+        ARCSourceError: If the toolkit is unavailable or environment startup fails.
+    """
     Arcade, OperationMode = _arc3_toolkit()
     mode = OperationMode.OFFLINE if offline else OperationMode.NORMAL
     arcade = Arcade(operation_mode=mode)
@@ -173,7 +201,17 @@ def step_arc3_game(
     data: dict[str, Any] | None = None,
     reasoning: dict[str, Any] | None = None,
 ) -> Any:
-    """Apply one named official GameAction; Genesis remains responsible for action selection."""
+    """Apply one named official action and return the next observation.
+
+    ``data`` and ``reasoning`` are passed through to the toolkit unchanged.
+    This adapter validates the action name and, when exposed, the current
+    legal-action set; it does not choose an action for Genesis.
+
+    Raises:
+        ARCSourceError: If the toolkit is unavailable or stepping fails to
+            produce an observation.
+        ValueError: If the action name is unknown or currently illegal.
+    """
     try:
         from arcengine import GameAction
     except ImportError as exc:
