@@ -1,0 +1,78 @@
+"""Tests for the outer world's numerical experiential geometry."""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import numpy as np
+
+from temporal_lobe.events import EventKind, ExternalEvent
+from worlds.experiential_space import ExperientialLatentSpace
+from worlds.world import OuterWorld
+
+
+def _event(kind=EventKind.PERCEPTION, timestamp=1_700_000_000.0):
+    return ExternalEvent(
+        kind=kind,
+        source="sensor",
+        content="a structured observation",
+        salience=0.7,
+        addressed=False,
+        topics=["observation"],
+        timestamp=timestamp,
+    )
+
+
+def test_experiential_space_uses_observed_events_and_returns_finite_geometry():
+    space = ExperientialLatentSpace()
+    result = space.observe(_event())
+    assert result["observations"] == 1
+    assert len(result["state"]) == 16
+    assert np.asarray(result["base_metric"]).shape == (4, 4)
+    assert np.asarray(result["fisher_information"]).shape == (16, 16)
+    assert len(result["global_geometry"]["hyperbolic_state"]) == 5
+    assert len(result["global_geometry"]["spherical_state"]) == 5
+    assert len(result["global_geometry"]["euclidean_state"]) == 6
+    assert len(result["toroidal_state"]) == 8
+    assert np.all(np.isfinite(np.asarray(result["fisher_information"])))
+    assert np.all(np.linalg.eigvalsh(np.asarray(result["base_metric"])) > 0)
+    assert result["fisher_volume"] > 0
+
+
+def test_toroidal_factors_lie_on_unit_circles():
+    result = ExperientialLatentSpace().observe(_event())
+    torus = np.asarray(result["toroidal_state"]).reshape(4, 2)
+    np.testing.assert_allclose(np.sum(torus * torus, axis=1), 1.0, atol=1e-12)
+
+
+def test_hamiltonian_flow_preserves_phase_space_norm():
+    space = ExperientialLatentSpace()
+    result = space.observe(_event())
+    before = np.asarray(result["state"])
+    after = np.asarray(result["symplectic_state"])
+    np.testing.assert_allclose(np.linalg.norm(before), np.linalg.norm(after), rtol=1e-12, atol=1e-12)
+
+
+def test_experiential_state_roundtrip_preserves_online_statistics():
+    original = ExperientialLatentSpace()
+    original.observe(_event(EventKind.PERCEPTION))
+    original.observe(_event(EventKind.USER_SPEECH, 1_700_000_010.0))
+    restored = ExperientialLatentSpace()
+    restored.restore(original.to_dict())
+    assert restored.observations == original.observations
+    np.testing.assert_allclose(restored.snapshot()["state"], original.snapshot()["state"])
+    np.testing.assert_allclose(
+        restored.snapshot()["fisher_information"],
+        original.snapshot()["fisher_information"],
+    )
+
+
+def test_outer_world_records_each_event_into_experiential_space_and_persists_it():
+    world = OuterWorld()
+    world.perceive("a visual observation", source="camera")
+    assert world.experiential_space.observations == 1
+    saved = world.to_dict()
+    restored = OuterWorld()
+    restored.restore_from_dict(saved)
+    assert restored.experiential_space.observations == 1
+    assert len(restored.experiential_space.snapshot()["state"]) == 16
