@@ -36,6 +36,31 @@ def load_rgb_frame(path: str | Path) -> np.ndarray:
         return np.asarray(image.convert("RGB"), dtype=np.uint8).copy()
 
 
+def capture_android_frame(camera_id: int = 0, timeout: float = 15.0) -> np.ndarray | None:
+    """Capture one on-demand still frame through Termux:API, or return None."""
+    if isinstance(camera_id, bool) or not isinstance(camera_id, int) or camera_id < 0:
+        raise ValueError("camera_id must be a non-negative integer")
+    if timeout < 2.0:
+        raise ValueError("camera timeout must be at least 2 seconds")
+    if not is_android_termux_camera():
+        return None
+    try:
+        with tempfile.TemporaryDirectory(prefix="genesis-camera-once-") as directory:
+            image_path = Path(directory) / "frame.jpg"
+            result = subprocess.run(
+                ["termux-camera-photo", "-c", str(camera_id), str(image_path)],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            if result.returncode != 0 or not image_path.is_file():
+                return None
+            return load_rgb_frame(image_path)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+
 class AndroidCameraAdapter:
     """Low-rate still-frame producer for Genesis's shared vision pipeline."""
 
