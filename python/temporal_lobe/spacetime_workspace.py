@@ -8,9 +8,9 @@ positions; the workspace keeps one self apex and returns per-domain relations.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import time
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from temporal_lobe.light_cones import (
     ConeRelation,
