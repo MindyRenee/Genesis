@@ -18,6 +18,11 @@ from parietal_lobe.arc_sources import ARCSourceError, list_arc1_tasks  # noqa: E
 
 
 def main() -> int:
+    """Parse CLI options, solve one task, and emit a JSON result.
+
+    Returns exit code 0 for a verified solve, 1 when no verified solution is
+    found, and 2 when task loading or setup fails.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "task",
