@@ -115,13 +115,25 @@ class CognitiveToposRuntime:
                     source = inner_snapshot.get("affective_fiber_states")
                 if source is None:
                     source = inner_snapshot.get("latent_mean")
-                self._states[domain] = _resize(source, self.latent_dim) if source is not None else _text_features(kind, content, self.latent_dim)
+                self._states[domain] = (
+                    _resize(source, self.latent_dim)
+                    if source is not None
+                    else _text_features(kind, content, self.latent_dim)
+                )
             elif domain == "self" and self_snapshot:
                 source = self_snapshot.get("agency_fiber_states")
-                self._states[domain] = _resize(source, self.latent_dim) if source is not None else _text_features(kind, content, self.latent_dim)
+                self._states[domain] = (
+                    _resize(source, self.latent_dim)
+                    if source is not None
+                    else _text_features(kind, content, self.latent_dim)
+                )
             elif domain == "language" and language_snapshot:
                 source = language_snapshot.get("latent_state")
-                self._states[domain] = _resize(source, self.latent_dim) if source is not None else _text_features(kind, content, self.latent_dim)
+                self._states[domain] = (
+                    _resize(source, self.latent_dim)
+                    if source is not None
+                    else _text_features(kind, content, self.latent_dim)
+                )
             else:
                 self._states[domain] = _text_features(kind, content, self.latent_dim)
 
