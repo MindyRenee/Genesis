@@ -5493,25 +5493,51 @@ mod android_power_discovery_tests {
 
     #[test]
     fn android_processor_thermal_zone_names_are_recognized() {
-        for name in ["cpu-therm", "cpu_thermal", "soc-therm", "tsens_tz_sensor0", "package-0"] {
-            assert!(is_processor_thermal_zone(name), "expected processor zone: {name}");
+        for name in [
+            "cpu-therm",
+            "cpu_thermal",
+            "soc-therm",
+            "tsens_tz_sensor0",
+            "package-0",
+        ] {
+            assert!(
+                is_processor_thermal_zone(name),
+                "expected processor zone: {name}"
+            );
         }
     }
 
     #[test]
     fn non_processor_thermal_zones_are_not_mislabeled_as_cpu() {
         for name in ["battery", "skin-therm", "charger", "gpu-therm", "ambient"] {
-            assert!(!is_processor_thermal_zone(name), "must not call {name} CPU temperature");
+            assert!(
+                !is_processor_thermal_zone(name),
+                "must not call {name} CPU temperature"
+            );
         }
     }
 
     #[test]
     fn android_external_power_types_are_supported() {
-        for kind in ["Mains", "USB", "USB_C", "USB_PD", "USB_PD_DRP", "Wireless", "Dock"] {
-            assert!(is_external_power_type(kind), "expected external power type: {kind}");
+        for kind in [
+            "Mains",
+            "USB",
+            "USB_C",
+            "USB_PD",
+            "USB_PD_DRP",
+            "Wireless",
+            "Dock",
+        ] {
+            assert!(
+                is_external_power_type(kind),
+                "expected external power type: {kind}"
+            );
         }
         for kind in ["Battery", "Unknown", ""] {
-            assert!(!is_external_power_type(kind), "must not treat {kind} as external power");
+            assert!(
+                !is_external_power_type(kind),
+                "must not treat {kind} as external power"
+            );
         }
     }
 }
