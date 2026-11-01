@@ -1,9 +1,9 @@
 """Tests for the shared three-domain spacetime workspace."""
 
-import pytest
-
 from temporal_lobe.light_cones import WorldDomain
 from temporal_lobe.spacetime_workspace import SpacetimeWorkspace
+
+import pytest
 
 
 def test_workspace_exposes_three_views_against_one_self_apex():
