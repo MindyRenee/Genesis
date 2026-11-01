@@ -46,3 +46,52 @@ def test_runtime_rejects_unknown_domain_without_advancing() -> None:
     else:
         raise AssertionError("unknown domain should be rejected")
     assert runtime.updates == 0
+
+
+
+def test_runtime_consumes_real_inner_and_language_latent_snapshots() -> None:
+    runtime = CognitiveToposRuntime(latent_dim=8)
+    inner_state = np.linspace(-0.8, 0.8, 32)
+    language_state = np.linspace(0.9, -0.9, 32)
+    output = runtime.observe(
+        "inner",
+        kind="thought",
+        content="reflecting",
+        self_snapshot={"agency_fiber_states": np.zeros(40).tolist()},
+        inner_snapshot={
+            "recursive_meta_states": inner_state.tolist(),
+            "affective_fiber_states": np.zeros(32).tolist(),
+        },
+        language_snapshot={"latent_state": language_state.tolist()},
+    )
+    # The inner domain consumes the real recursive state, not the text hash.
+    expected_inner = np.tanh(np.interp(
+        np.linspace(0.0, 1.0, 8),
+        np.linspace(0.0, 1.0, inner_state.size),
+        inner_state,
+    ))
+    assert np.allclose(output["states"]["inner"], expected_inner)
+
+    runtime.observe(
+        "language",
+        kind="utterance",
+        content="the parsed language",
+        self_snapshot={"agency_fiber_states": np.zeros(40).tolist()},
+        language_snapshot={"latent_state": language_state.tolist()},
+    )
+    expected_language = np.tanh(np.interp(
+        np.linspace(0.0, 1.0, 8),
+        np.linspace(0.0, 1.0, language_state.size),
+        language_state,
+    ))
+    assert np.allclose(runtime.snapshot()["states"]["language"], expected_language)
+
+
+def test_runtime_rejects_invalid_latent_dimension() -> None:
+    for dimension in (0, -1, True, 2.5):
+        try:
+            CognitiveToposRuntime(latent_dim=dimension)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid latent dimension accepted: {dimension!r}")
