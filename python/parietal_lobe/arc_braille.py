@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, is_dataclass
+from enum import Enum
 from typing import Any
 
 from parietal_lobe.binary_language import BitCell
@@ -37,6 +38,8 @@ def _plain(value: Any, depth: int = 0) -> Any:
         return type(value).__name__
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
+    if isinstance(value, Enum):
+        return {"name": value.name, "value": _plain(value.value, depth + 1)}
     if is_dataclass(value) and not isinstance(value, type):
         return _plain(asdict(value), depth + 1)
     if isinstance(value, Mapping):
