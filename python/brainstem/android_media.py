@@ -115,33 +115,24 @@ class AndroidCameraAdapter:
         self._thread = None
 
     def _run(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="genesis-camera-") as directory:
-            image_path = Path(directory) / "frame.jpg"
-            while not self._stop.is_set():
-                started = time.monotonic()
+        while not self._stop.is_set():
+            started = time.monotonic()
+            frame = capture_android_frame(
+                camera_id=self._camera_id,
+                timeout=self._timeout,
+            )
+            if frame is not None:
                 try:
-                    result = subprocess.run(
-                        ["termux-camera-photo", "-c", str(self._camera_id), str(image_path)],
-                        check=True,
-                        capture_output=True,
-                        text=True,
-                        timeout=self._timeout,
-                    )
-                    if not self._stop.is_set() and result.returncode == 0 and image_path.is_file():
-                        frame = load_rgb_frame(image_path)
-                        if frame.size:
-                            try:
-                                self._on_frame(frame)
-                            except Exception:
-                                logger.exception("Android camera callback failed")
-                        image_path.unlink(missing_ok=True)
-                except (OSError, subprocess.SubprocessError, ValueError) as error:
-                    now = time.monotonic()
-                    if now - self._last_error_log >= 60.0:
-                        logger.warning("Termux camera capture unavailable; retrying: %s", error)
-                        self._last_error_log = now
-                remaining = self._interval - (time.monotonic() - started)
-                self._stop.wait(max(0.0, remaining))
+                    self._on_frame(frame)
+                except Exception:  # noqa: BLE001 — camera callback is isolated
+                    logger.exception("Android camera callback failed")
+            else:
+                now = time.monotonic()
+                if now - self._last_error_log >= 60.0:
+                    logger.warning("Termux camera capture unavailable; retrying")
+                    self._last_error_log = now
+            remaining = self._interval - (time.monotonic() - started)
+            self._stop.wait(max(0.0, remaining))
 
 
 
