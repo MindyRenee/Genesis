@@ -10,9 +10,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import time
-from typing import Iterable
+from collections.abc import Iterable
 
-from temporal_lobe.light_cones import ConeRelation, LightConeModel, SpacetimeEvent, WorldDomain
+from temporal_lobe.light_cones import (
+    ConeRelation,
+    LightConeModel,
+    SpacetimeEvent,
+    WorldDomain,
+)
 
 
 @dataclass(frozen=True, slots=True)
