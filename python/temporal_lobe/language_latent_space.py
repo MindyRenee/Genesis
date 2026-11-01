@@ -18,7 +18,6 @@ from copy import deepcopy
 from typing import Any
 
 import numpy as np
-
 from parietal_lobe.binary_language import BitCell
 
 _LATENT_DIM = 32

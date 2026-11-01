@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from temporal_lobe.comprehension import Comprehension
 from temporal_lobe.language_latent_space import (
     LanguageLatentSpace,

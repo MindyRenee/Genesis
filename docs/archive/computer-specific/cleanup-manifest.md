@@ -18,7 +18,8 @@ This inventory records each platform-specific integration reviewed so far. It di
 |---|---|
 | `Cargo.toml` | `v4l` is now a Linux-only target dependency. |
 | `src/daemon/optic_nerve.rs` | Linux V4L2 capture is compiled only on Linux. Android reports the camera channel unavailable; no false camera data is generated. |
-| `src/daemon/interoception.rs` | Detects readable CPU/SoC thermal zones by declared type; discovers Android-style battery supplies by `type=Battery`; recognizes USB/USB-C/USB-PD/wireless power sources; falls back to Termux:API battery percentage and known charging state when sysfs is missing or unreadable. |\n| `python/brainstem/android_sensors.py` | Opt-in (`GENESIS_ANDROID_SENSORS=1`) Termux:API sampler publishes changed sensor readings to `OuterWorld.perceive`; supports accelerometer, gyroscope, magnetic field, light, proximity, pressure, and rotation vector only when exposed by the device. |
+| `src/daemon/interoception.rs` | Detects readable CPU/SoC thermal zones by declared type; discovers Android-style battery supplies by `type=Battery`; recognizes USB/USB-C/USB-PD/wireless power sources; falls back to Termux:API battery percentage and known charging state when sysfs is missing or unreadable. |
+| `python/brainstem/android_sensors.py` | Opt-in (`GENESIS_ANDROID_SENSORS=1`) Termux:API sampler publishes changed sensor readings to `OuterWorld.perceive`; supports accelerometer, gyroscope, magnetic field, light, proximity, pressure, and rotation vector only when exposed by the device. |
 | `python/brainstem/android_media.py` | Opt-in camera (`GENESIS_ANDROID_CAMERA=1`) feeds real still frames into `Vision.see_frame`; opt-in microphone (`GENESIS_ANDROID_MICROPHONE=1`) captures short clips and uses ffmpeg plus the existing auditory feature classifier. Both require Termux:API permissions and on-device verification. |
 | `src/daemon/cpufreq.rs` | Privileged host CPU-frequency controls cannot use sudo on Android. |
 | `src/daemon/rtc_wake.rs` | RTC wake-alarm control is disabled on Android. |
@@ -44,7 +45,7 @@ This inventory records each platform-specific integration reviewed so far. It di
 
 - Cross-compile and run the full Rust daemon on an actual Android/Termux device; Linux CI does not prove this.
 - Verify camera, microphone, and sensor adapters on an actual phone; automated tests cover decoding and payload parsing, not Android permissions or device availability.
-- Speech transcription remains separate from the microphone sound-event adapter; connect Termux speech-to-text only after validating its language and permission behavior.
+- Interactive speech input can fall back to `termux-speech-to-text` when no local audio backend is available. Its recognition behavior depends on the Android speech service and is not claimed to be offline.
 - Keep browser automation marked unavailable until a real Android-browser control interface is available; `termux-open-url` is not browser automation.
 - Provide a Termux-native installer after validating package names and dependency availability on-device.
 - Re-audit the browser/tool integrations and stale Linux manuals after the Android runtime path is established.
