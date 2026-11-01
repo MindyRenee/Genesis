@@ -5608,9 +5608,8 @@ mod android_power_discovery_tests {
 
     #[test]
     fn termux_battery_status_rejects_missing_or_unknown_values() {
-        let missing_plug =
-            parse_termux_battery_status(r#"{"percentage": 30}"#)
-                .expect("valid percentage remains available without a plugged field");
+        let missing_plug = parse_termux_battery_status(r#"{"percentage": 30}"#)
+            .expect("valid percentage remains available without a plugged field");
         assert!((missing_plug.0 - 0.30).abs() < 1e-6);
         assert_eq!(missing_plug.1, None);
         assert!(
