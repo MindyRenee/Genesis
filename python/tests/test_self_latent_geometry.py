@@ -98,3 +98,40 @@ def test_integrated_architecture_rejects_batch_mismatch() -> None:
             np.zeros((3, 8)),
             np.zeros((3, 40)),
         )
+
+
+
+def test_real_signal_observation_updates_shared_transition_state() -> None:
+    model = SelfLatentSpaceArchitecture()
+    first = model.observe_signal(
+        "Genesis receives an observation",
+        kind="world:perception",
+        salience=0.7,
+        inbound=True,
+        metadata={"source": "test"},
+    )
+    second = model.observe_signal(
+        "Genesis chooses an action",
+        kind="world:action",
+        salience=0.5,
+        inbound=False,
+        metadata={"success": True},
+    )
+    assert first["observations"] == 1
+    assert second["observations"] == 2
+    assert first["kind"] == "world:perception"
+    assert second["kind"] == "world:action"
+    assert len(second["agency_fiber_states"]) == 40
+    assert second["coherence_loss"] > 0.0
+    assert model.snapshot()["observations"] == 2
+
+
+def test_real_signal_observation_is_deterministic_and_validates_inputs() -> None:
+    model = SelfLatentSpaceArchitecture()
+    first = model.observe_signal("same input", kind="thought:reflection")
+    other = SelfLatentSpaceArchitecture().observe_signal(
+        "same input", kind="thought:reflection"
+    )
+    assert first["agency_fiber_states"] == other["agency_fiber_states"]
+    with pytest.raises(ValueError, match="salience"):
+        model.observe_signal("bad", kind="test", salience=2.0)
