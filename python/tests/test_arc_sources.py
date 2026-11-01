@@ -7,6 +7,7 @@ import pytest
 from parietal_lobe.arc_sources import (
     ARCSourceError,
     arc1_problem_view,
+    arc3_legal_actions,
     list_arc1_tasks,
     load_arc1_task,
 )
@@ -50,3 +51,23 @@ def test_load_arc1_task_rejects_out_of_range_colors(tmp_path) -> None:
 def test_list_arc1_tasks_rejects_unknown_split() -> None:
     with pytest.raises(ValueError, match="split"):
         list_arc1_tasks("private")
+
+
+
+def test_arc3_legal_actions_reads_current_environment_action_space() -> None:
+    class Action:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+    class Environment:
+        action_space = [Action("ACTION3"), Action("ACTION1")]
+
+    assert arc3_legal_actions(Environment()) == ["ACTION1", "ACTION3"]
+
+
+def test_arc3_legal_actions_rejects_missing_action_space() -> None:
+    class Environment:
+        pass
+
+    with pytest.raises(ARCSourceError, match="action_space"):
+        arc3_legal_actions(Environment())
