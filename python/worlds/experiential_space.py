@@ -18,7 +18,7 @@ import numpy as np
 
 from temporal_lobe.events import EventKind, ExternalEvent
 
-_STATE_DIM = 16
+_STATE_DIM = 20
 _KIND_COUNT = len(EventKind)
 _EPS = 1e-8
 
@@ -67,9 +67,9 @@ class ExperientialLatentSpace:
                 "conformal_scale": 1.0,
                 "toroidal_state": [0.0] * 8,
                 "global_geometry": {
-                    "hyperbolic_state": [0.0] * 5,
-                    "spherical_state": [0.0] * 5,
-                    "euclidean_state": [0.0] * 6,
+                    "hyperbolic_state": [0.0] * 6,
+                    "spherical_state": [0.0] * 6,
+                    "euclidean_state": [0.0] * 8,
                 },
                 "fisher_information": np.eye(_STATE_DIM).tolist(),
                 "fisher_volume": 1.0,
@@ -135,6 +135,18 @@ class ExperientialLatentSpace:
         source = event.source.encode("utf-8", errors="replace")
         values[14] = (sum(source) % 997) / 996.0 if source else 0.0
         values[15] = min(len(event.content), 300) / 300.0
+        # Structured sensory payloads (e.g. ARC grids or numeric camera
+        # features) are summarized deterministically; never stringify them.
+        try:
+            payload = np.asarray(event.percept, dtype=np.float64).reshape(-1)[:4096]
+            payload = payload[np.isfinite(payload)]
+        except (TypeError, ValueError):
+            payload = np.empty(0, dtype=np.float64)
+        if payload.size:
+            values[16] = math.tanh(float(np.mean(payload)))
+            values[17] = math.tanh(float(np.std(payload)))
+            values[18] = math.tanh(float(np.min(payload)))
+            values[19] = math.tanh(float(np.max(payload)))
         return values
 
     def _derive(self, state: np.ndarray, timestamp: float) -> dict[str, Any]:
@@ -146,23 +158,23 @@ class ExperientialLatentSpace:
         base_metric = conformal_scale * np.eye(4) + 0.1 * np.outer(attention, attention)
         # A product space: negative-curvature ball, positive-curvature sphere,
         # and flat Euclidean coordinates, each with its own valid domain.
-        hyper = np.tanh(state[:5])
+        hyper = np.tanh(state[:6])
         norm_h = float(np.linalg.norm(hyper))
         if norm_h >= 0.95:
             hyper *= 0.95 / max(norm_h, _EPS)
-        sphere = state[5:10].copy()
+        sphere = state[6:12].copy()
         sphere_norm = float(np.linalg.norm(sphere))
         if sphere_norm > _EPS:
             sphere /= sphere_norm
         else:
             sphere[0] = 1.0
-        euclidean = state[10:16].copy()
-        # Four S^1 factors represented as (sin θ, cos θ) pairs.
-        phase = (timestamp % 86400.0) / 86400.0 * 2.0 * math.pi
+        euclidean = state[12:20].copy()
+        # Four S^1 factors encode four sensory summary coordinates. Their
+        # phase is driven by observed payload values, not a random projection.
+        sensory_phase = np.pi * np.tanh(state[16:20])
         toroidal = np.array(
-            [component for i in range(4)
-             for component in (math.sin(phase + i * math.pi / 2),
-                               math.cos(phase + i * math.pi / 2))],
+            [component for phase in sensory_phase
+             for component in (math.sin(float(phase)), math.cos(float(phase)))],
             dtype=np.float64,
         )
         # Diagonal Fisher information for independent Bernoulli feature
