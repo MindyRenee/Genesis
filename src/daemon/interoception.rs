@@ -3001,7 +3001,7 @@ fn find_temp_sensor() -> String {
     // ACPI thermal zones are a useful desktop fallback, but not a generic
     // Android fallback: an untyped thermal zone is not a trustworthy CPU
     // temperature measurement.
-    if let Some((_, kind, path)) = zones.iter().find(|(_, kind, _)| kind == "acpitz") {
+    if let Some((_, _, path)) = zones.iter().find(|(_, kind, _)| kind == "acpitz") {
         return path.clone();
     }
     String::new()

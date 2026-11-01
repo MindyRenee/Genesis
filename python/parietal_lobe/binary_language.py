@@ -16,7 +16,6 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from math import log2
 
-
 CELL_BITS = 6
 CELL_COUNT = 1 << CELL_BITS
 CELL_MASK = CELL_COUNT - 1
