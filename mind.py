@@ -932,6 +932,12 @@ class Mind(
         # reach its global workspace, salient ones become memories,
         # and its sleep replays what happened in its world.
         self.world.on_external_event = self._on_world_event
+        # The unified E/I/S/language engine consumes the same live signals
+        # as the existing workspace and self-state systems.
+        from self.cognitive_topos_runtime import CognitiveToposRuntime
+
+        self.cognitive_topos = CognitiveToposRuntime()
+        self.add_live_thought_listener(self._on_cognitive_topos_thought)
         # Give cognition access to inner life so introspection can
         # report spontaneous thoughts when no conversation has happened.
         self.brain.frontal.inner_life = self.inner_life
@@ -942,6 +948,42 @@ class Mind(
         # gated by the chemistry her body reports (no worker thread).
         self.inner_life.set_sleep_stage_transition_callback(self._on_sleep_stage_transition)
         self.inner_life.set_sleep_tick_callback(self._on_sleep_tick)
+
+    def _on_cognitive_topos_thought(self, kind: str, content: str) -> None:
+        """Integrate actual inner-life/learning emissions into the four-domain engine."""
+        self._integrate_cognitive_topos("inner", kind, content)
+
+    def _integrate_cognitive_topos(
+        self,
+        domain: str,
+        kind: str,
+        content: str,
+        *,
+        outer_snapshot: dict | None = None,
+        self_snapshot: dict | None = None,
+    ) -> None:
+        """Bridge a live event into the cognitive topos engine without blocking cognition."""
+        try:
+            if self_snapshot is None:
+                self_snapshot = self.self_latent_space.observe_signal(
+                    content,
+                    kind=f"topos:{domain}:{kind}",
+                    salience=0.4,
+                    inbound=domain != "language",
+                )
+            if outer_snapshot is None and domain == "outer":
+                outer_snapshot = self.world.experiential_space.snapshot()
+            self.cognitive_topos.observe(
+                domain,
+                kind=kind,
+                content=content,
+                self_snapshot=self_snapshot,
+                outer_snapshot=outer_snapshot,
+            )
+        except Exception:
+            # This is an observer: a geometry failure must not stop the
+            # event stream, response path, or inner-life thread.
+            logger.debug("cognitive topos integration failed", exc_info=True)
 
     def _journal_swallow_sink(
         self,
