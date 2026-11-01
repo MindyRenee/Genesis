@@ -114,7 +114,10 @@ mod optic_shmem {
 
         pub fn open(self) -> io::Result<Shmem> {
             let name = self.name.ok_or_else(|| {
-                io::Error::new(io::ErrorKind::InvalidInput, "frame transport name is missing")
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "frame transport name is missing",
+                )
             })?;
             let leaf = name.trim_start_matches('/');
             if leaf.is_empty() || leaf.contains('/') || leaf == "." || leaf == ".." {
@@ -150,7 +153,11 @@ mod optic_shmem {
             let ptr = NonNull::new(mapped.cast::<u8>()).ok_or_else(|| {
                 io::Error::new(io::ErrorKind::Other, "mmap returned a null address")
             })?;
-            Ok(Shmem { ptr, len, _file: file })
+            Ok(Shmem {
+                ptr,
+                len,
+                _file: file,
+            })
         }
     }
 }
