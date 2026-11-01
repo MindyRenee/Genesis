@@ -303,7 +303,7 @@ class LifecycleMixin:
             logger.debug(
                 f"LTM warmup find_similar took {_warmup_time.perf_counter() - _warmup_t0:.2f}s"
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.lifecycle._start_restore_state",
                 e,
@@ -312,7 +312,7 @@ class LifecycleMixin:
         try:
             self.brain.frontal.embeddings.find_similar_to_text("warmup", k=1, threshold=0.5)
             logger.debug(f"embeddings warmup took {_warmup_time.perf_counter() - _embed_t0:.2f}s")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.lifecycle._start_restore_state",
                 e,
@@ -415,7 +415,7 @@ class LifecycleMixin:
         # a queue-full of stale phase/episode events.
         try:
             self.notifications.reset()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed("mind.lifecycle.rejoin_body", e)
         # The daemon rebooted under a living mind — its fresh sentinel
         # carries a new boot_ms and an unclean previous stop. Acknowledge
@@ -442,7 +442,7 @@ class LifecycleMixin:
         """
         try:
             self._note_discontinuity_inner(mind_rejoin=mind_rejoin)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed("mind.lifecycle._note_discontinuity", e)
 
     def _note_discontinuity_inner(self, *, mind_rejoin: bool) -> None:
@@ -538,7 +538,7 @@ class LifecycleMixin:
 
         try:
             emotion = assess_emotion(self.client.get_neuro_summary())
-        except Exception:  # noqa: BLE001 — client absent (tests, offline)
+        except Exception: — client absent (tests, offline)
             emotion = EmotionalState(
                 label="surprised",
                 cognitive_style="startled",
@@ -551,7 +551,7 @@ class LifecycleMixin:
                 emotion=emotion,
                 concepts=["interruption", "self"],
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed("mind.lifecycle._narrate_discontinuity", e)
 
     def _mark_modules_stopping(self) -> None:
@@ -690,7 +690,7 @@ class LifecycleMixin:
                 # on-demand when the user asks for a report.
                 try:
                     self.record_growth_snapshot()
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     note_swallowed(
                         "mind.lifecycle._autosave_loop",
                         e,
@@ -729,7 +729,7 @@ class LifecycleMixin:
                 self._autosave_cycle += 1
                 if self._autosave_cycle % 10 == 0:
                     self._archive_dormant_concepts()
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 # autosave failure shouldn't crash the thread
                 self._autosave_failures += 1
                 logger.warning(f"autosave failed: {e}")
@@ -832,7 +832,7 @@ class LifecycleMixin:
             network = self.brain.frontal.network
             recalled = network.restore_archive_to_working_memory()
             return recalled
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.lifecycle.restore_archive",
                 e,
@@ -855,7 +855,7 @@ class LifecycleMixin:
             if adapter is not None:
                 try:
                     adapter.close()
-                except Exception as error:  # noqa: BLE001 — cleanup must continue
+                except Exception as error: — cleanup must continue
                     logger.warning("Android %s adapter cleanup failed: %s", label, error)
                 setattr(self, attribute, None)
 
@@ -888,7 +888,7 @@ class LifecycleMixin:
         if channel is not None:
             try:
                 channel.stop()
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 note_swallowed("mind.lifecycle.stop.listener", e)
 
         clean_shutdown &= self._join_service_threads()
@@ -904,7 +904,7 @@ class LifecycleMixin:
         if channel is not None:
             try:
                 channel.close()
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 note_swallowed("mind.lifecycle.stop.channel", e)
 
         # Close the cognitive journal last of all writers — it is the
@@ -1045,7 +1045,7 @@ class LifecycleMixin:
             save_ok = self._save_state()
             self._shutdown_save_ok: bool | None = save_ok
             clean &= save_ok
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"shutdown save failed: {e}")
             self._shutdown_save_ok = False
             clean = False
@@ -1168,7 +1168,7 @@ class LifecycleMixin:
                                     tname,
                                     entry.strip(),
                                 )
-                except Exception:  # noqa: BLE001
+                except Exception:
                     logger.debug("stack dump unavailable", exc_info=True)
                 return False
             thread.join(timeout=min(0.5, remaining))
@@ -1248,7 +1248,7 @@ class LifecycleMixin:
                     restored += 1
             if restored:
                 logger.info("Rehydrated %d learned sentiment scores", restored)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.lifecycle._load_saved_state",
                 e,
@@ -1406,7 +1406,7 @@ class LifecycleMixin:
                 continue
             try:
                 state[name] = copy.deepcopy(value)
-            except Exception:  # noqa: BLE001 — locks/callbacks stay shared
+            except Exception: — locks/callbacks stay shared
                 state[name] = value
         vars(staged).update(state)
         return staged
@@ -1521,7 +1521,7 @@ class LifecycleMixin:
                     lambda t, p: t.restore_from_dict(p),
                     data["dream_synthesis"],
                 )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 note_swallowed(
                     "mind.lifecycle._stage_cognitive_systems",
                     e,
@@ -1821,7 +1821,7 @@ class LifecycleMixin:
             )
             if not self.user_profile.save():
                 return False
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             # orjson/gzip/TypeError can escape serialization; a failed
             # save must return False, never crash shutdown.
             logger.warning(f"could not save state: {e}")
