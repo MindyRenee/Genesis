@@ -18,7 +18,7 @@ This inventory records each platform-specific integration reviewed so far. It di
 |---|---|
 | `Cargo.toml` | `v4l` is now a Linux-only target dependency. |
 | `src/daemon/optic_nerve.rs` | Linux V4L2 capture is compiled only on Linux. Android reports the camera channel unavailable; no false camera data is generated. |
-| `src/daemon/interoception.rs` | Detects readable CPU/SoC thermal zones by declared type; discovers Android-style battery supplies by `type=Battery`; recognizes USB/USB-C/USB-PD/wireless power sources; falls back to Termux:API battery percentage and known charging state when sysfs is missing or unreadable. |
+| `src/daemon/interoception.rs` | Detects readable CPU/SoC thermal zones by declared type; discovers Android-style battery supplies by `type=Battery`; recognizes USB/USB-C/USB-PD/wireless power sources; falls back to Termux:API battery percentage and known charging state when sysfs is missing or unreadable. |\n| `python/brainstem/android_sensors.py` | Opt-in (`GENESIS_ANDROID_SENSORS=1`) Termux:API sampler publishes changed sensor readings to `OuterWorld.perceive`; supports accelerometer, gyroscope, magnetic field, light, proximity, pressure, and rotation vector only when exposed by the device. |
 | `src/daemon/cpufreq.rs` | Privileged host CPU-frequency controls cannot use sudo on Android. |
 | `src/daemon/rtc_wake.rs` | RTC wake-alarm control is disabled on Android. |
 | `src/daemon/rtkit.rs` | RTKit system-bus priority requests are disabled on Android. |
@@ -43,8 +43,8 @@ This inventory records each platform-specific integration reviewed so far. It di
 
 - Cross-compile and run the full Rust daemon on an actual Android/Termux device; Linux CI does not prove this.
 - Add and test a real Android camera bridge before claiming live vision.
-- Add a permission-aware Android sensor adapter for accelerometer, gyroscope, light, proximity, and magnetometer only where the device reports them.
-- Replace or explicitly disable the PortAudio microphone path on Android; do not treat an absent microphone as a measured signal.
+- Verify the opt-in Termux sensor adapter on an actual phone; automated tests cover payload parsing, not Android permissions or device availability.
+- Add an Android microphone bridge for speech input or explicitly disable the PortAudio microphone path on Android; do not treat an absent microphone as a measured signal.
 - Provide a Termux-native installer after validating package names and dependency availability on-device.
 - Re-audit the browser/tool integrations and stale Linux manuals after the Android runtime path is established.
 

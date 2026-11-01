@@ -88,9 +88,16 @@ def _sensor_names(output: str) -> list[str]:
 def _readings(output: str) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     for document in _json_documents(output):
-        if not isinstance(document, dict):
+        if isinstance(document, list):
+            entries = [
+                (str(item.get("name", "sensor")), item)
+                for item in document
+                if isinstance(item, dict)
+            ]
+        elif isinstance(document, dict):
+            entries = list(document.items())
+        else:
             continue
-        entries = document.items()
         for key, item in entries:
             if not isinstance(item, dict):
                 continue

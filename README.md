@@ -1053,9 +1053,14 @@ than assuming `thermal_zone0` is the CPU.
 Its V4L2 camera capture, CPU-frequency actuation, RTC wake, and RTKit integrations
 remain Linux-specific. Do not run the desktop installer on the phone and assume
 those features will work. Termux:API can expose selected Android functions, but
-camera, microphone, and motion-sensor streaming are not yet connected to the
-daemon. Battery percentage and charging state can fall back to Termux:API when
-Android sysfs does not expose them. Unavailable measurements must remain unavailable,
+camera and microphone streaming are not yet connected to the daemon. A
+Python-side Termux:API adapter can feed available accelerometer, gyroscope,
+magnetic-field, light, proximity, pressure, and rotation-vector readings into
+the ordinary world-event telemetry path when explicitly enabled with
+\`GENESIS_ANDROID_SENSORS=1\`. This requires the Termux:API companion app and
+package; actual sensors vary by device. Battery percentage and charging state
+can fall back to Termux:API when Android sysfs does not expose them.
+Unavailable measurements must remain unavailable,
 not be treated as readings. See `docs/archive/README.md` for the archived
 integrations and measurement rules.
 
