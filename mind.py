@@ -55,6 +55,7 @@ from self import (
     EmergentIdentitySource,
     HeuristicExperiment,
     SelfImprovement,
+    SelfLatentSpaceArchitecture,
     SelfModel,
 )
 from sleep.inner_life import InnerLife
@@ -198,6 +199,10 @@ class Mind(
         # Self-model — who Genesis is
         self.self_model = SelfModel(born_at=int(time.time() * 1000))
         self.self_model.body_model.socket_path = socket_path
+        # Shared geometric self-state model. Real thought and world-event
+        # callbacks feed this same instance so transitions are measured
+        # across the inner/outer boundary rather than in isolated demos.
+        self.self_latent_space = SelfLatentSpaceArchitecture()
 
         # User profile — a structured, persistent model of the human.
         profile_path = Path(self.data_dir) / "user_profile.json"
