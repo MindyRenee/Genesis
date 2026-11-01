@@ -24,6 +24,19 @@ The script clones the official ARC-AGI-1 repository to data/arc/ARC-AGI-1. On de
 
 Set GENESIS_ARC1_DIR if the dataset clone should live elsewhere. Set ARC_API_KEY to a key from https://three.arcprize.org if you need additional ARC-AGI-3 games available to registered users. The toolkit can use an anonymous key when none is set, but available games may be limited.
 
+## ARC-AGI-1 solving
+
+ARC-AGI-1 is connected to Genesis' existing `SpatialReasoner`; this is not a separate model. From the repository root with the Python package installed:
+
+    from parietal_lobe.arc_solver import solve_arc1_task
+    from parietal_lobe.arc_sources import list_arc1_tasks
+
+    task_path = list_arc1_tasks("training")[0]
+    result = solve_arc1_task(task_path)
+    print(result.solved, result.rule, result.predictions)
+
+The solver converts the demonstration grids to Genesis `Grid` objects and searches the existing symbolic transformation space. It returns predictions only when the selected rule exactly reproduces every training pair. An unsolved task returns diagnostic information rather than claiming success. Search limits can be configured through `max_depth`, `beam_width`, `max_nodes`, and `time_budget`.
+
 ## Python API
 
     from parietal_lobe.arc_sources import (
