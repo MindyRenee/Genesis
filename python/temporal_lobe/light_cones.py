@@ -15,10 +15,10 @@ must provide physical/spatial coordinates and timestamps with defined units.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import StrEnum
 import math
 from collections.abc import Iterable
+from dataclasses import dataclass
+from enum import StrEnum
 
 
 class WorldDomain(StrEnum):
