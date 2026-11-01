@@ -9,7 +9,6 @@ from http.server import ThreadingHTTPServer
 from typing import ClassVar
 
 import pytest
-
 from parietal_lobe.arc_phone_bridge import ArcPhoneBridge, serve
 
 
