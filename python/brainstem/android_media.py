@@ -107,7 +107,7 @@ class AndroidCameraAdapter:
                         if frame.size:
                             try:
                                 self._on_frame(frame)
-                            except Exception:  # noqa: BLE001 — camera callback is isolated
+                            except Exception:
                                 logger.exception("Android camera callback failed")
                         image_path.unlink(missing_ok=True)
                 except (OSError, subprocess.SubprocessError, ValueError) as error:
@@ -277,7 +277,7 @@ class AndroidMicrophoneAdapter:
                         break
                     try:
                         self._on_clip(samples, self._sample_rate)
-                    except Exception:  # noqa: BLE001 — microphone callback is isolated
+                    except Exception:
                         logger.exception("Android microphone callback failed")
                     audio_path.unlink(missing_ok=True)
                 except (OSError, subprocess.SubprocessError, ValueError, TimeoutError) as error:
