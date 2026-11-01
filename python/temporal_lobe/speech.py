@@ -27,6 +27,7 @@ import logging
 import os
 import subprocess
 import sys
+import shutil
 import tempfile
 import threading
 import time
@@ -585,6 +586,14 @@ class Voice:
 # ═══════════════════════════════════════════════════════════════════
 
 
+def _can_use_termux_speech() -> bool:
+    """Check for the Android system speech command without invoking it."""
+    return bool(
+        (os.environ.get("ANDROID_ROOT") or os.environ.get("ANDROID_DATA"))
+        and shutil.which("termux-speech-to-text")
+    )
+
+
 class VoiceInput:
     """Speech-to-text from the microphone.
 
@@ -625,8 +634,13 @@ class VoiceInput:
                     logger.info("Voice input: using Google Web Speech API (online)")
                     return
 
+        if _can_use_termux_speech():
+            self._backend = "termux-api"
+            logger.info("Voice input: using Android system speech recognition through Termux:API")
+            return
+
         logger.warning(
-            "Voice input: no backend available. Install vosk model or check internet connection."
+            "Voice input: no backend available. Install a Vosk model or configure an audio backend."
         )
 
     def _can_use_vosk(self) -> bool:
@@ -704,16 +718,43 @@ class VoiceInput:
         """
         if not self._backend:
             return None
-
+        if self._backend == "termux-api":
+            return self._listen_termux_speech(timeout, phrase_limit)
         if not self._ensure_loaded():
             return None
 
         with self._lock:
             if self._backend == "vosk":
                 return self._listen_vosk(timeout, phrase_limit)
-            elif self._backend == "google":
+            if self._backend == "google":
                 return self._listen_google(timeout, phrase_limit)
         return None
+
+    @staticmethod
+    def _listen_termux_speech(
+        timeout: float | None,
+        phrase_limit: float,
+    ) -> str | None:
+        """Use Android system speech recognition when local audio capture is unavailable."""
+        if not _can_use_termux_speech():
+            return None
+        command_timeout = max(15.0, phrase_limit + (timeout or 0.0) + 5.0)
+        try:
+            result = subprocess.run(
+                ["termux-speech-to-text"],
+                capture_output=True,
+                text=True,
+                timeout=command_timeout,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if result.returncode != 0:
+            return None
+        transcript = result.stdout.strip()
+        if not transcript or transcript.casefold() in {"null", "none"}:
+            return None
+        return transcript
 
     def _listen_vosk(self, timeout: float | None, phrase_limit: float) -> str | None:
         """Listen using Vosk (offline)."""
