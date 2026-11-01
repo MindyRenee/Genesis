@@ -89,13 +89,16 @@ def run_arc3_episode(
     # subsequent observation is published immediately after its action so
     # even terminal feedback reaches the world's inbound cognitive pathway.
     if outer_world is not None:
-        outer_world.perceive(
+        initial_event = outer_world.perceive(
             f"ARC-AGI-3 observation for game {game_id}, step 1",
             salience=0.7,
             source=f"arc3:{game_id}",
             metadata={"game_id": game_id, "step": 1, "phase": "initial"},
             percept=_outer_world_percept(observation),
         )
+        if initial_event is None:
+            episode.stopped_reason = "outer_world_unavailable"
+            return episode
 
     for step_index in range(max_steps):
         state = getattr(observation, "state", None)
@@ -154,7 +157,7 @@ def run_arc3_episode(
         observation = next_observation
 
         if outer_world is not None:
-            outer_world.perceive(
+            outcome_event = outer_world.perceive(
                 f"ARC-AGI-3 observation after action {decision.action} "
                 f"in game {game_id}, step {step_index + 1}",
                 salience=0.8 if next_state_name in {"WIN", "GAME_OVER"} else 0.7,
@@ -169,6 +172,9 @@ def run_arc3_episode(
                 },
                 percept=_outer_world_percept(next_observation),
             )
+            if outcome_event is None:
+                episode.stopped_reason = "outer_world_unavailable"
+                return episode
 
         if next_state_name in {"WIN", "GAME_OVER"}:
             episode.terminal_state = next_state_name
