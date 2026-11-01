@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 import math
-from typing import Mapping
+from collections.abc import Mapping
 
 import numpy as np
 from numpy.typing import NDArray
