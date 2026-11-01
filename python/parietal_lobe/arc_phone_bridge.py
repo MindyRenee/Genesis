@@ -306,9 +306,8 @@ def serve(
     try:
         observer = None
         if mind_socket:
-            from mind import Mind
-
             from parietal_lobe.arc_genesis_observer import GenesisArcObserver
+            from mind import Mind
             mind = Mind(mind_socket, headless=True)
             mind.start()
             observer = GenesisArcObserver(mind)
