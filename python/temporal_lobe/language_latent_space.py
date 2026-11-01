@@ -210,7 +210,15 @@ class LanguageLatentSpace:
             float(bool(getattr(result, "is_question", False))),
             float(bool(getattr(result, "is_command", False))),
             min(1.0, len(tokens) / 64.0),
-            min(1.0, len(getattr(result, "propositions", ()) or ()) / 8.0),
+            min(
+                1.0,
+                (
+                    sum(bool(getattr(item, "fully_grounded", False)) for item in result.grounded)
+                    / len(result.grounded)
+                )
+                if getattr(result, "grounded", None)
+                else len(getattr(result, "propositions", ()) or ()) / 8.0,
+            ),
             min(1.0, len(getattr(result, "unresolved_tokens", ()) or ()) / max(1, len(tokens))),
         )
         speech_act = getattr(getattr(result, "speech_act", None), "name", "")
@@ -231,6 +239,23 @@ class LanguageLatentSpace:
                 if term:
                     token_digest = hashlib.blake2b(term.encode("utf-8"), digest_size=8).digest()
                     vector[16 + token_digest[0] % 16] += -1.0 if token_digest[1] & 1 else 1.0
+        grounded = getattr(result, "grounded", ()) or ()
+        for proposition in grounded:
+            arguments = [
+                getattr(proposition, "subject", None),
+                getattr(proposition, "object", None),
+                *getattr(proposition, "roles", {}).values(),
+            ]
+            for argument in arguments:
+                concept_id = getattr(argument, "concept_id", None)
+                if not isinstance(concept_id, str) or not concept_id:
+                    continue
+                concept_digest = hashlib.blake2b(
+                    ("concept:" + concept_id).encode("utf-8"), digest_size=8
+                ).digest()
+                vector[16 + concept_digest[0] % 16] += (
+                    -1.0 if concept_digest[1] & 1 else 1.0
+                )
         for token in tokens:
             token_digest = hashlib.blake2b(token.encode("utf-8"), digest_size=8).digest()
             vector[16 + token_digest[0] % 16] += -1.0 if token_digest[1] & 1 else 1.0

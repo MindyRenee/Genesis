@@ -4014,6 +4014,14 @@ class FrontalLobe:
             user_input,
             context={"recent_entities": self.comprehension.recent_entities},
         )
+        # Bind language arguments to the same persistent concepts used by
+        # reasoning. Grounding is read-only; unknown words remain visible
+        # to the learning system instead of becoming fabricated concepts.
+        comprehension_result.grounded = self.semantic_grounder.ground_all(
+            comprehension_result.propositions,
+            context=user_input,
+        )
+
         # Record the parsed utterance in the shared temporal language geometry.
         # This observes user input only; self-monitor reparses are not counted as
         # independent language experiences.
@@ -4023,14 +4031,6 @@ class FrontalLobe:
             except (ArithmeticError, TypeError, ValueError, OverflowError):
                 # Geometry is observational and must not break comprehension.
                 pass
-
-        # Bind language arguments to the same persistent concepts used by
-        # reasoning. Grounding is read-only; unknown words remain visible
-        # to the learning system instead of becoming fabricated concepts.
-        comprehension_result.grounded = self.semantic_grounder.ground_all(
-            comprehension_result.propositions,
-            context=user_input,
-        )
 
         # If a metaphor was detected, interpret it so Genesis
         # understands what the metaphor means — not just that it
