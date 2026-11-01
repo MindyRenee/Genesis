@@ -112,7 +112,7 @@ class ArcPhoneBridge:
             return
         try:
             self._observer(event, payload)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.exception("Genesis ARC observer failed for event %s", event)
 
     def games(self) -> dict[str, Any]:
@@ -329,5 +329,5 @@ def serve(
         if mind is not None:
             try:
                 mind.stop()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.exception("Failed to stop bridge-owned Genesis Mind cleanly")
