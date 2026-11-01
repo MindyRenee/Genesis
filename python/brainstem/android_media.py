@@ -6,6 +6,7 @@ pipeline. Missing commands, permissions, or hardware mean no frame is emitted.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import shutil
