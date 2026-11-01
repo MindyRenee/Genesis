@@ -50,7 +50,9 @@ def test_hamiltonian_flow_preserves_phase_space_norm():
     result = space.observe(_event())
     before = np.asarray(result["state"])
     after = np.asarray(result["symplectic_state"])
-    np.testing.assert_allclose(np.linalg.norm(before), np.linalg.norm(after), rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(
+        np.linalg.norm(before), np.linalg.norm(after), rtol=1e-12, atol=1e-12
+    )
 
 
 def test_experiential_state_roundtrip_preserves_online_statistics():
