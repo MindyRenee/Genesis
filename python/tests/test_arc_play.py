@@ -1,3 +1,5 @@
+"""Tests for bounded ARC-AGI-3 episodes and OuterWorld event routing."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace
