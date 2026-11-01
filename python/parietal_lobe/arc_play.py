@@ -47,12 +47,20 @@ def run_arc3_episode(
     initial_observation: Any,
     choose_action: Policy,
     max_steps: int = 100,
+    outer_world: Any | None = None,
 ) -> ARC3Episode:
     """Run a bounded closed loop using a caller-supplied Genesis policy.
 
     The policy receives the current observation, legal action names, and
     previous transitions. It must return an ARC3Decision. This function
     never invents an action when the policy fails or returns an illegal one.
+
+    When ``outer_world`` is supplied, each current observation is sent
+    through its public ``perceive`` API and each executed action through
+    ``it_acted``. This wires environmental events into Genesis' existing
+    world event stream and its registered cognitive listener. It does not
+    select a policy on Genesis' behalf: ``choose_action`` must still be
+    supplied by the caller.
     """
     if isinstance(max_steps, bool) or not isinstance(max_steps, int) or max_steps < 1:
         raise ValueError("max_steps must be a positive integer")
@@ -67,6 +75,15 @@ def run_arc3_episode(
             episode.terminal_state = state_name
             episode.stopped_reason = "terminal_state"
             return episode
+
+        if outer_world is not None:
+            outer_world.perceive(
+                f"ARC-AGI-3 observation for game {game_id}, step {step_index + 1}",
+                salience=0.7,
+                source=f"arc3:{game_id}",
+                metadata={"game_id": game_id, "step": step_index + 1},
+                percept=observation,
+            )
 
         legal_actions = arc3_legal_actions(environment)
         if not legal_actions:
@@ -94,6 +111,15 @@ def run_arc3_episode(
             if next_state is not None
             else None
         )
+        if outer_world is not None:
+            outer_world.it_acted(
+                f"ARC-AGI-3 action {decision.action} in game {game_id}",
+                detail=(
+                    f"step={step_index + 1}; state_before={state_name}; "
+                    f"state_after={next_state_name}; reasoning={decision.reasoning!r}"
+                ),
+            )
+
         episode.transitions.append(
             {
                 "step": step_index + 1,
