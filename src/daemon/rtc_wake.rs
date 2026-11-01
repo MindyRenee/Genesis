@@ -22,6 +22,7 @@
 //! whether the permission is installed.
 
 use std::process::Command;
+#[cfg(not(target_os = "android"))]
 use std::sync::OnceLock;
 
 /// RTC wake-alarm control is not exposed by the Termux runtime.

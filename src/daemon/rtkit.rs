@@ -18,8 +18,10 @@
 
 use std::io::{self, Read, Write};
 use std::os::unix::net::UnixStream;
+#[cfg(not(target_os = "android"))]
 use std::time::Duration;
 
+#[cfg(not(target_os = "android"))]
 const SYSTEM_BUS_PATH: &str = "/run/dbus/system_bus_socket";
 
 /// Levels tried strictest-first — rtkit clamps or denies a request

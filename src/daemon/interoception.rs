@@ -3104,6 +3104,7 @@ fn read_termux_battery_status() -> Option<(f32, bool)> {
     }
 }
 
+#[cfg(any(target_os = "android", test))]
 fn parse_termux_battery_status(text: &str) -> Option<(f32, bool)> {
     let percentage = json_number_field(text, "percentage")?;
     if !percentage.is_finite() || !(0.0..=100.0).contains(&percentage) {
@@ -3118,6 +3119,7 @@ fn parse_termux_battery_status(text: &str) -> Option<(f32, bool)> {
     Some((percentage / 100.0, external_power))
 }
 
+#[cfg(any(target_os = "android", test))]
 fn json_number_field(text: &str, key: &str) -> Option<f32> {
     let key = format!("\"{key}\"");
     let value = text.split_once(&key)?.1.trim_start().strip_prefix(':')?.trim_start();
@@ -3128,6 +3130,7 @@ fn json_number_field(text: &str, key: &str) -> Option<f32> {
     token.parse().ok()
 }
 
+#[cfg(any(target_os = "android", test))]
 fn json_string_field(text: &str, key: &str) -> Option<String> {
     let key = format!("\"{key}\"");
     let value = text.split_once(&key)?.1.trim_start().strip_prefix(':')?.trim_start();
