@@ -238,7 +238,8 @@ class MasterCognitiveToposEngine:
         transported_sl = self.transport_s_to_l.forward(own + transported_is)
         macro_state = language + transported_sl
 
-        energy = lambda state: np.sum(state * state, axis=-1)
+        def energy(state: FloatArray) -> FloatArray:
+            return np.sum(state * state, axis=-1)
         total_fe, coupling_penalty = self.free_energy_engine.forward(
             energy(outer), energy(inner), energy(own), energy(language)
         )
