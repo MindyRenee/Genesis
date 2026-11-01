@@ -1628,6 +1628,16 @@ class LifecycleMixin:
                         note_swallowed("mind.lifecycle._stage_inner_life.inner_world", error)
                     else:
                         scalar_updates.append((self.inner_life, "inner_world", staged_world))
+                if ils.get("self_latent_space") is not None:
+                    try:
+                        from self.latent_geometry import SelfLatentSpaceArchitecture
+
+                        staged_self_latent = SelfLatentSpaceArchitecture()
+                        staged_self_latent.restore(ils["self_latent_space"])
+                    except (KeyError, TypeError, ValueError, OverflowError) as error:
+                        note_swallowed("mind.lifecycle._stage_inner_life.self_latent_space", error)
+                    else:
+                        scalar_updates.append((self, "self_latent_space", staged_self_latent))
                 logger.info(
                     "Restored inner life state: thoughts=%d, dreams=%d, lucid=%d",
                     *counts,
@@ -1763,6 +1773,7 @@ class LifecycleMixin:
                         if hasattr(self.inner_life, "inner_world")
                         else None
                     ),
+                    "self_latent_space": self.self_latent_space.to_dict(),
                 },
                 world_state=self.world.to_dict(),
                 executive=self.brain.frontal.executive,
