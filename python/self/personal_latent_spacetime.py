@@ -13,10 +13,10 @@ in the self-space's coordinates.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import StrEnum
 import math
 from collections.abc import Mapping
+from dataclasses import dataclass
+from enum import StrEnum
 
 import numpy as np
 from numpy.typing import NDArray
