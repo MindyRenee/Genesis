@@ -10,6 +10,7 @@ from temporal_lobe.auditory import (
     _classify_sound,
     _compute_features,
     _describe_sound,
+    classify_audio_clip,
 )
 
 # ─── Feature extraction ────────────────────────────────────────────────
@@ -339,3 +340,13 @@ def test_ambient_start_refuses_second_worker_while_predecessor_alive(
     finally:
         hold.set()
         zombie.join(timeout=5)
+
+
+def test_clip_classifier_returns_structured_event_from_measured_samples() -> None:
+    samples = _generate_tone(freq=440.0, duration=0.5, amplitude=0.2)
+    event = classify_audio_clip(samples, 16000)
+    assert event.duration == 0.5
+    assert event.sound_type in {"silence", "noise", "impact", "music", "nature"}
+    assert 0.0 <= event.confidence <= 1.0
+    assert 0.0 <= event.loudness <= 1.0
+    assert event.description
