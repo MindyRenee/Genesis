@@ -153,6 +153,8 @@ def run_arc3_episode(
                 "reasoning": decision.reasoning,
                 "state_before": state_name,
                 "state_after": next_state_name,
+                "state_signature": observation_signature(observation),
+                "next_state_signature": observation_signature(next_observation),
                 "observation": next_observation,
             }
         )
