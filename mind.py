@@ -231,8 +231,13 @@ class Mind(
         self._init_sleep_compression()
         self._wire_modules()
         self._init_runtime_state()
-        # Android sensor collection is explicitly opt-in and uses Termux:API.
+        # Hardware adapters start only after lifecycle startup connects the daemon.
         self.android_sensor_adapter = None
+        self.android_microphone_adapter = None
+        self.android_camera_adapter = None
+
+    def _start_android_adapters(self) -> None:
+        """Start only explicitly enabled Termux adapters after Mind startup."""
         if os.environ.get("GENESIS_ANDROID_SENSORS", "0") == "1":
             from brainstem.android_sensors import AndroidSensorAdapter, is_android_termux
 
@@ -240,9 +245,6 @@ class Mind(
                 adapter = AndroidSensorAdapter(self._on_android_sensor_sample)
                 if adapter.start():
                     self.android_sensor_adapter = adapter
-        # Microphone capture is separately opt-in; clips are processed locally
-        # and the temporary audio file is deleted after feature extraction.
-        self.android_microphone_adapter = None
         if os.environ.get("GENESIS_ANDROID_MICROPHONE", "0") == "1":
             from brainstem.android_media import (
                 AndroidMicrophoneAdapter,
@@ -253,9 +255,6 @@ class Mind(
                 adapter = AndroidMicrophoneAdapter(self._on_android_audio_clip)
                 if adapter.start():
                     self.android_microphone_adapter = adapter
-        # Camera capture is separately opt-in because it uses a privacy-sensitive
-        # sensor and runs only while the Mind process is active.
-        self.android_camera_adapter = None
         if os.environ.get("GENESIS_ANDROID_CAMERA", "0") == "1":
             from brainstem.android_media import AndroidCameraAdapter, is_android_termux_camera
 
