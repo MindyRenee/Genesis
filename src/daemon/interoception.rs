@@ -1636,12 +1636,17 @@ impl Interoceptor {
         if probe.max_freq_khz > 0 {
             mask |= sensor::MAX_FREQUENCY;
         }
-        let termux_battery_available = (probe.battery_path.is_none() || probe.ac_path.is_none())
-            && read_termux_battery_status().is_some();
-        if probe.battery_path.is_some() || termux_battery_available {
+        let termux_battery = if probe.battery_path.is_none() || probe.ac_path.is_none() {
+            read_termux_battery_status()
+        } else {
+            None
+        };
+        if probe.battery_path.is_some() || termux_battery.is_some() {
             mask |= sensor::BATTERY;
         }
-        if probe.ac_path.is_some() || termux_battery_available {
+        if probe.ac_path.is_some()
+            || termux_battery.is_some_and(|(_, plugged)| plugged.is_some())
+        {
             mask |= sensor::AC_ADAPTER;
         }
         if probe.fan_path.is_some() {
@@ -2866,27 +2871,30 @@ impl Interoceptor {
         // Termux:API is a fallback only when Android's sysfs interface is
         // absent or unreadable. Its companion app and `termux-api` package
         // must be installed; failures remain unavailable, never guessed.
-        let termux = if self.battery_path.is_none() || self.ac_path.is_none() {
+        let sysfs_on_ac = self
+            .ac_path
+            .as_ref()
+            .and_then(|path| fs::read_to_string(path).ok())
+            // Power-supply `online`: 0 means unplugged; nonzero means
+            // externally powered, including USB-PD's value 2.
+            .map(|value| value.trim() != "0");
+        let sysfs_energy = self
+            .battery_path
+            .as_ref()
+            .and_then(|path| fs::read_to_string(path).ok())
+            .and_then(|value| value.trim().parse::<u32>().ok())
+            .map(|value| {
+                crate::state::sanitize::finite_clamp((value as f32) / 100.0, 0.0, 1.0)
+            });
+        let termux = if sysfs_energy.is_none() || sysfs_on_ac.is_none() {
             read_termux_battery_status()
         } else {
             None
         };
-        let on_ac = self
-            .ac_path
-            .as_ref()
-            .and_then(|p| fs::read_to_string(p).ok())
-            // Power-supply `online`: 0 means unplugged; nonzero means
-            // externally powered, including USB-PD's value 2.
-            .map(|s| s.trim() != "0")
-            .or_else(|| termux.map(|(_, plugged)| plugged))
+        let on_ac = sysfs_on_ac
+            .or_else(|| termux.and_then(|(_, plugged)| plugged))
             .unwrap_or(true); // ignored when the AC-adapter presence bit is clear
-
-        let energy = self
-            .battery_path
-            .as_ref()
-            .and_then(|p| fs::read_to_string(p).ok())
-            .and_then(|s| s.trim().parse::<u32>().ok())
-            .map(|v| crate::state::sanitize::finite_clamp((v as f32) / 100.0, 0.0, 1.0))
+        let energy = sysfs_energy
             .or_else(|| termux.map(|(level, _)| level))
             .unwrap_or(1.0); // ignored when the battery presence bit is clear
 
@@ -3085,7 +3093,7 @@ fn read_max_freq() -> Option<u64> {
 /// Output is parsed narrowly for the documented `percentage` and `plugged`
 /// fields. This function returns None on desktop Linux, missing permissions,
 /// missing package, malformed output, or unknown charging state.
-fn read_termux_battery_status() -> Option<(f32, bool)> {
+fn read_termux_battery_status() -> Option<(f32, Option<bool>)> {
     #[cfg(target_os = "android")]
     {
         let output = std::process::Command::new("termux-battery-status")
@@ -3104,16 +3112,17 @@ fn read_termux_battery_status() -> Option<(f32, bool)> {
 }
 
 #[cfg(any(target_os = "android", test))]
-fn parse_termux_battery_status(text: &str) -> Option<(f32, bool)> {
+fn parse_termux_battery_status(text: &str) -> Option<(f32, Option<bool>)> {
     let percentage = json_number_field(text, "percentage")?;
     if !percentage.is_finite() || !(0.0..=100.0).contains(&percentage) {
         return None;
     }
-    let plugged = json_string_field(text, "plugged")?;
-    let external_power = match plugged.as_str() {
-        "UNPLUGGED" => false,
-        "PLUGGED_AC" | "PLUGGED_USB" | "PLUGGED_WIRELESS" | "PLUGGED_DOCK" => true,
-        _ => return None,
+    let external_power = match json_string_field(text, "plugged").as_deref() {
+        Some("UNPLUGGED") => Some(false),
+        Some("PLUGGED_AC" | "PLUGGED_USB" | "PLUGGED_WIRELESS" | "PLUGGED_DOCK") => {
+            Some(true)
+        }
+        _ => None,
     };
     Some((percentage / 100.0, external_power))
 }
@@ -5595,12 +5604,12 @@ mod android_power_discovery_tests {
         let result = parse_termux_battery_status(r#"{"percentage": 42, "plugged": "PLUGGED_USB"}"#)
             .expect("valid Termux battery response");
         assert!((result.0 - 0.42).abs() < 1e-6);
-        assert!(result.1);
+        assert_eq!(result.1, Some(true));
 
         let unplugged = parse_termux_battery_status(r#"{"percentage": 7, "plugged": "UNPLUGGED"}"#)
             .expect("valid unplugged response");
         assert!((unplugged.0 - 0.07).abs() < 1e-6);
-        assert!(!unplugged.1);
+        assert_eq!(unplugged.1, Some(false));
     }
 
     #[test]
@@ -5610,10 +5619,12 @@ mod android_power_discovery_tests {
             parse_termux_battery_status(r#"{"percentage": 140, "plugged": "UNPLUGGED"}"#,)
                 .is_none()
         );
-        assert!(
-            parse_termux_battery_status(r#"{"percentage": 30, "plugged": "PLUGGED_UNKNOWN"}"#,)
-                .is_none()
-        );
+        let unknown_plug = parse_termux_battery_status(
+            r#"{"percentage": 30, "plugged": "PLUGGED_UNKNOWN"}"#,
+        )
+        .expect("percentage remains useful when charging state is unknown");
+        assert!((unknown_plug.0 - 0.30).abs() < 1e-6);
+        assert_eq!(unknown_plug.1, None);
     }
 
     #[test]
