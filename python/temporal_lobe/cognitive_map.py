@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 from collections import Counter, deque
 from dataclasses import dataclass, field
 from typing import Any
@@ -61,6 +62,9 @@ from typing import Any
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+from temporal_lobe.light_cones import WorldDomain
+from temporal_lobe.spacetime_workspace import SpacetimeWorkspace
 
 Cell = tuple[int, int]
 
@@ -217,6 +221,9 @@ class CognitiveMap:
         self._pos: tuple[float, float] | None = None
         self._code: np.ndarray | None = None
         self._place: Place | None = None
+        # Shared causal view over allocentric map coordinates. The signal
+        # speed is normalized (map-units/second), not physical light speed.
+        self.spacetime = SpacetimeWorkspace(signal_speed=1.0)
 
     # ─── Observation ────────────────────────────────────────────
 
@@ -302,6 +309,36 @@ class CognitiveMap:
             # No allocentric fix — dead-reckon from self-reported
             # motion; the estimate is corrected on the next fix.
             self.path_integrate(delta)
+
+        # Publish this map integration into the shared causal workspace.
+        # The map's coordinate frame is 2-D allocentric space, embedded at
+        # z=0; timestamps use monotonic seconds. No pixel coordinates or
+        # semantic embedding coordinates are mixed into this frame.
+        if self._pos is not None:
+            event_time = time.monotonic()
+            x, y = self._pos
+            location = (float(x), float(y), 0.0)
+            self.spacetime.record(
+                WorldDomain.OUTER,
+                location,
+                time_s=event_time,
+                event_id=f"map-observation:{self._episode}:{self._place.id if self._place else 0}:{len(self._context.places) if self._context else 0}",
+                confidence=1.0 if position is not None else 0.5,
+            )
+            self.spacetime.record_self(
+                location,
+                time_s=event_time,
+                event_id=f"map-self:{self._episode}:{self._place.id if self._place else 0}",
+                confidence=1.0 if position is not None else 0.5,
+            )
+            for index, map_event in enumerate(events):
+                self.spacetime.record(
+                    WorldDomain.INNER,
+                    location,
+                    time_s=event_time,
+                    event_id=f"map-inner:{self._episode}:{index}:{map_event.kind}",
+                    confidence=max(0.0, min(1.0, map_event.salience)),
+                )
         return events
 
     def path_integrate(self, delta: tuple[float, float]) -> None:
