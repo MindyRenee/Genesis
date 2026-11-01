@@ -109,3 +109,25 @@ def test_policy_reconstructs_seen_state_from_prior_transition_key() -> None:
     )
 
     assert decision.reasoning["state_novel"] is False
+
+
+def test_policy_restores_terminal_outcomes_from_saved_history() -> None:
+    """A fresh policy should retain explicit terminal feedback from replay history."""
+    observation = {"grid": [[0, 1]], "state": "PLAYING"}
+    signature = observation_signature(observation)
+    history = [
+        {
+            "state_signature": signature,
+            "next_state_signature": observation_signature(
+                {"grid": [[1, 1]], "state": "WIN"}
+            ),
+            "action": "ACTION2",
+            "state_after": "WIN",
+        }
+    ]
+
+    decision = ARC3ExplorationPolicy().choose_action(
+        observation, ["ACTION1", "ACTION2"], history
+    )
+
+    assert decision.action == "ACTION2"
