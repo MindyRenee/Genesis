@@ -37,7 +37,7 @@ from occipital_lobe.perception.core import (
     _extract_topics,
     perceive,
 )
-from occipital_lobe.perception.vision import ColorInfo, _build_scene, _learn_objects
+from occipital_lobe.perception.vision import ColorInfo, Vision, _build_scene, _learn_objects
 from occipital_lobe.v1 import _build_summary
 from self import PersonalityTraits
 from temporal_lobe import (
@@ -1842,3 +1842,11 @@ class TestSpatialColorScene:
 
 
 pytestmark = pytest.mark.usefixtures("learned_sentiment")
+
+
+
+def test_android_frame_entry_rejects_non_rgb_without_running_pipeline() -> None:
+    vision = Vision()
+    result = vision.see_frame(np.zeros((4, 4), dtype=np.uint8), nerve="android_camera")
+    assert result.status == "unprocessed"
+    assert result.nerve == "android_camera"
