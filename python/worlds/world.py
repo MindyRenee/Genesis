@@ -764,8 +764,9 @@ class OuterWorld:
         if distances:
             lines.append(
                 f"  experiential geometry: {geometry['observations']} observations; "
-                f"Fisher volume {geometry['fisher_volume']:.3g}; "
-                f"curvature distances H/S/E "
+                f"last-event valence {geometry['valence']:+.2f} "
+                f"({geometry['valence_sign']}); Fisher volume "
+                f"{geometry['fisher_volume']:.3g}; curvature distances H/S/E "
                 f"{distances['hyperbolic']:.3g}/"
                 f"{distances['spherical']:.3g}/"
                 f"{distances['euclidean']:.3g}"
