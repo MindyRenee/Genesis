@@ -371,6 +371,25 @@ class ConversationMixin:
             if not is_world_concept(bare):
                 logger.debug(f"suppressed internal-id thought: {bare}")
                 return
+        # Feed the composed thought into the same latent-state instance
+        # used by outer-world events. This makes thought→event transitions
+        # measurable without treating deterministic features as semantics.
+        try:
+            self.self_latent_space.observe_signal(
+                text,
+                kind=f"thought:{kind}",
+                salience=0.6 if is_expression else (0.5 if is_question else 0.4),
+                inbound=False,
+                addressed=is_question,
+                metadata={
+                    "trigger": getattr(thought, "trigger", ""),
+                    "chain_id": getattr(thought, "chain_id", 0),
+                    "is_lucid": getattr(thought, "is_lucid", False),
+                },
+            )
+        except Exception:
+            logger.debug("self latent thought observation failed", exc_info=True)
+
         self._emit_live_thought(
             kind,
             text,
@@ -442,6 +461,22 @@ class ConversationMixin:
         cognition engine's think() already stores addressed turns;
         recording them here would double-write every conversation.
         """
+        # Integrate every real world event, including Genesis's own
+        # actions, into the shared self-state before inbound routing.
+        # This observer is diagnostic/stateful and must never block the
+        # world's event stream if numerical integration fails.
+        try:
+            self.self_latent_space.observe_signal(
+                event.describe(),
+                kind=f"world:{event.kind.value}",
+                salience=event.salience,
+                inbound=event.inbound,
+                addressed=event.addressed,
+                metadata=event.metadata,
+            )
+        except Exception:
+            logger.debug("self latent world observation failed", exc_info=True)
+
         if not event.inbound:
             return
         # Broadcast into its cognitive field. Best-effort — workspace
