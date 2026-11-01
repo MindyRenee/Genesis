@@ -66,8 +66,9 @@ The command prints JSON with the exact-verification status, rule, predictions, s
         environment,
         game_id=games[0]["game_id"],
         initial_observation=observation,
-        choose_action=genesis_policy,  # integrate Genesis policy here
+        choose_action=genesis_policy,  # must be Genesis' real decision policy
         max_steps=100,
+        outer_world=mind.world,  # routes observations/actions through OuterWorld
     )
 
 ## Integrity and evaluation rules
@@ -76,4 +77,4 @@ The command prints JSON with the exact-verification status, rule, predictions, s
 - Test outputs are omitted by default from arc1_problem_view so the agent-facing view does not reveal answers.
 - Keep training and evaluation splits distinct. Develop on training tasks; reserve evaluation tasks for controlled measurements. Repeatedly tuning against evaluation scores makes them unsuitable as unbiased final measurements.
 - Retain ARC-AGI-3 observations, actions, and recordings for reproducibility. Never expose API credentials in source files, recordings, logs, or commits.
-- The bounded ARC-AGI-3 loop now provides closed-loop observation/action execution, checks state-dependent legal actions, retains per-step transitions, and stops on terminal states or a step budget. It deliberately requires a caller-supplied Genesis policy: autonomous action selection and learning are not yet wired. ARC-AGI-1 currently provides validated task loading and answer-hidden problem views, not a grid solver. Neither benchmark integration has been run on Termux yet.
+- The bounded ARC-AGI-3 loop provides closed-loop observation/action execution, checks state-dependent legal actions, retains per-step transitions, and stops on terminal states or a step budget. Supplying `outer_world=mind.world` routes each observation through `OuterWorld.perceive` and each executed action through `OuterWorld.it_acted`, which notifies the registered cognitive event listener. Grid-shaped observations are exposed in the format the existing scene parser accepts. The loop still requires a caller-supplied policy: this wiring does not yet establish autonomous ARC action selection or outcome-driven learning. ARC-AGI-1 has a bridge to the existing spatial reasoner, but neither benchmark integration nor these changes have been runtime-tested in Termux.
