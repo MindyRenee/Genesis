@@ -128,8 +128,11 @@ class MasterFreeEnergyOptimizer:
             raise ValueError("energies must be non-negative")
         outer, inner, self_energy, language = energies
         base_energy = float(np.mean(outer + inner + self_energy + language))
-        outer_language = abs(float(np.mean(outer - language)))
-        inner_self = abs(float(np.mean(inner - self_energy)))
+        # Penalize per-sample mismatch before aggregation. Taking the
+        # absolute value only after averaging would let opposite errors
+        # cancel across a batch and report false alignment.
+        outer_language = float(np.mean(np.abs(outer - language)))
+        inner_self = float(np.mean(np.abs(inner - self_energy)))
         coupling = outer_language + inner_self
         total = base_energy + self.lambda_1 * coupling + self.lambda_2 * (
             outer_language**2 + inner_self**2
