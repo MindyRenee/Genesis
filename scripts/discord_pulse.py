@@ -79,7 +79,7 @@ def _ipc_block(data_dir: Path) -> dict[str, str]:
             f"arousal {neuro.arousal:.2f} · valence {neuro.valence:+.2f} · "
             f"tone {neuro.global_tone:.2f}"
         )
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.debug("neuro summary unavailable", exc_info=True)
     try:
         inf = client.get_inference_summary(timeout=5.0)
@@ -90,12 +90,12 @@ def _ipc_block(data_dir: Path) -> dict[str, str]:
         )
         out["ticks"] = str(inf.inference_tick_count)
         out["authority"] = f"{inf.policy_authority:.2f}"
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.debug("inference summary unavailable", exc_info=True)
     try:
         mem = client.get_memory_stats(timeout=5.0)
         out["mem"] = f"stm {mem.stm_count} · ltm {mem.ltm_count} eps"
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.debug("memory stats unavailable", exc_info=True)
     return out
 
@@ -312,7 +312,7 @@ def main() -> int:
         while True:
             try:
                 run_once(args.data_dir, feed)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.exception("pulse cycle failed")
             time.sleep(args.interval)
     finally:
