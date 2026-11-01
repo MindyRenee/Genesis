@@ -1053,8 +1053,9 @@ than assuming `thermal_zone0` is the CPU.
 Its V4L2 camera capture, CPU-frequency actuation, RTC wake, and RTKit integrations
 remain Linux-specific. Do not run the desktop installer on the phone and assume
 those features will work. Termux:API can expose selected Android functions, but
-camera, microphone, motion sensors, and API-based battery fallback are not yet
-fully connected to the daemon. Unavailable measurements must remain unavailable,
+camera, microphone, and motion-sensor streaming are not yet connected to the
+daemon. Battery percentage and charging state can fall back to Termux:API when
+Android sysfs does not expose them. Unavailable measurements must remain unavailable,
 not be treated as readings. See `docs/archive/README.md` for the archived
 integrations and measurement rules.
 

@@ -1636,10 +1636,13 @@ impl Interoceptor {
         if probe.max_freq_khz > 0 {
             mask |= sensor::MAX_FREQUENCY;
         }
-        if probe.battery_path.is_some() {
+        let termux_battery_available =
+            (probe.battery_path.is_none() || probe.ac_path.is_none())
+                && read_termux_battery_status().is_some();
+        if probe.battery_path.is_some() || termux_battery_available {
             mask |= sensor::BATTERY;
         }
-        if probe.ac_path.is_some() {
+        if probe.ac_path.is_some() || termux_battery_available {
             mask |= sensor::AC_ADAPTER;
         }
         if probe.fan_path.is_some() {
@@ -2861,21 +2864,23 @@ impl Interoceptor {
 
     /// Read battery level and AC power status.
     fn read_power(&self) -> (f32, bool) {
+        // Termux:API is a fallback only when Android's sysfs interface is
+        // absent or unreadable. Its companion app and `termux-api` package
+        // must be installed; failures remain unavailable, never guessed.
+        let termux = if self.battery_path.is_none() || self.ac_path.is_none() {
+            read_termux_battery_status()
+        } else {
+            None
+        };
         let on_ac = self
             .ac_path
             .as_ref()
             .and_then(|p| fs::read_to_string(p).ok())
-            // The power_supply `online` attribute is strictly numeric:
-            // 0 = Offline, 1 = Online (fixed line), 2 = Online
-            // (programmable, e.g. USB-PD). Only 0 means unplugged, so
-            // compare against that. The previous test also accepted
-            // anything containing "on", which is a heuristic against a
-            // numeric ABI and can only misfire — "2" is online but
-            // failed both halves, reporting the machine as unplugged
-            // and un-gating the low-battery and low-supply-voltage CRH
-            // branches.
+            // Power-supply `online`: 0 means unplugged; nonzero means
+            // externally powered, including USB-PD's value 2.
             .map(|s| s.trim() != "0")
-            .unwrap_or(true); // default to AC if no sensor
+            .or_else(|| termux.map(|(_, plugged)| plugged))
+            .unwrap_or(true); // ignored when the AC-adapter presence bit is clear
 
         let energy = self
             .battery_path
@@ -2883,7 +2888,8 @@ impl Interoceptor {
             .and_then(|p| fs::read_to_string(p).ok())
             .and_then(|s| s.trim().parse::<u32>().ok())
             .map(|v| crate::state::sanitize::finite_clamp((v as f32) / 100.0, 0.0, 1.0))
-            .unwrap_or(1.0); // default to full if no battery
+            .or_else(|| termux.map(|(level, _)| level))
+            .unwrap_or(1.0); // ignored when the battery presence bit is clear
 
         (energy, on_ac)
     }
@@ -3073,6 +3079,61 @@ fn read_max_freq() -> Option<u64> {
         }
     }
     None
+}
+
+/// Query Android's Termux:API battery command when sysfs is unavailable.
+///
+/// Output is parsed narrowly for the documented `percentage` and `plugged`
+/// fields. This function returns None on desktop Linux, missing permissions,
+/// missing package, malformed output, or unknown charging state.
+fn read_termux_battery_status() -> Option<(f32, bool)> {
+    #[cfg(target_os = "android")]
+    {
+        let output = std::process::Command::new("termux-battery-status")
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let text = String::from_utf8(output.stdout).ok()?;
+        parse_termux_battery_status(&text)
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        None
+    }
+}
+
+fn parse_termux_battery_status(text: &str) -> Option<(f32, bool)> {
+    let percentage = json_number_field(text, "percentage")?;
+    if !percentage.is_finite() || !(0.0..=100.0).contains(&percentage) {
+        return None;
+    }
+    let plugged = json_string_field(text, "plugged")?;
+    let external_power = match plugged.as_str() {
+        "UNPLUGGED" => false,
+        "PLUGGED_AC" | "PLUGGED_USB" | "PLUGGED_WIRELESS" | "PLUGGED_DOCK" => true,
+        _ => return None,
+    };
+    Some((percentage / 100.0, external_power))
+}
+
+fn json_number_field(text: &str, key: &str) -> Option<f32> {
+    let key = format!("\"{key}\"");
+    let value = text.split_once(&key)?.1.trim_start().strip_prefix(':')?.trim_start();
+    let token: String = value
+        .chars()
+        .take_while(|ch| ch.is_ascii_digit() || matches!(ch, '.' | '-'))
+        .collect();
+    token.parse().ok()
+}
+
+fn json_string_field(text: &str, key: &str) -> Option<String> {
+    let key = format!("\"{key}\"");
+    let value = text.split_once(&key)?.1.trim_start().strip_prefix(':')?.trim_start();
+    let value = value.strip_prefix('"')?;
+    let end = value.find('"')?;
+    Some(value[..end].to_string())
 }
 
 /// Find a readable battery capacity path.
@@ -5489,7 +5550,9 @@ mod sensor_presence_tests {
 
 #[cfg(test)]
 mod android_power_discovery_tests {
-    use super::{is_external_power_type, is_processor_thermal_zone};
+    use super::{
+        is_external_power_type, is_processor_thermal_zone, parse_termux_battery_status,
+    };
 
     #[test]
     fn android_processor_thermal_zone_names_are_recognized() {
@@ -5515,6 +5578,40 @@ mod android_power_discovery_tests {
                 "must not call {name} CPU temperature"
             );
         }
+    }
+
+    #[test]
+    fn termux_battery_status_parses_real_level_and_charging_state() {
+        let result = parse_termux_battery_status(
+            r#"{"percentage": 42, "plugged": "PLUGGED_USB"}"#,
+        )
+        .expect("valid Termux battery response");
+        assert!((result.0 - 0.42).abs() < 1e-6);
+        assert!(result.1);
+
+        let unplugged = parse_termux_battery_status(
+            r#"{"percentage": 7, "plugged": "UNPLUGGED"}"#,
+        )
+        .expect("valid unplugged response");
+        assert!((unplugged.0 - 0.07).abs() < 1e-6);
+        assert!(!unplugged.1);
+    }
+
+    #[test]
+    fn termux_battery_status_rejects_missing_or_unknown_values() {
+        assert!(parse_termux_battery_status(r#"{"percentage": 30}"#).is_none());
+        assert!(
+            parse_termux_battery_status(
+                r#"{"percentage": 140, "plugged": "UNPLUGGED"}"#,
+            )
+            .is_none()
+        );
+        assert!(
+            parse_termux_battery_status(
+                r#"{"percentage": 30, "plugged": "PLUGGED_UNKNOWN"}"#,
+            )
+            .is_none()
+        );
     }
 
     #[test]

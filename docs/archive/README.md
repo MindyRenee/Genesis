@@ -11,7 +11,7 @@ The original Genesis branch is not changed. These archives are retained only in 
 
 Use real measurements only when the device exposes them. Linux `/proc` data can provide process CPU/RSS and memory information where Android permissions allow it. The kernel power-supply interface can expose battery percentage and charging state, but names vary by device; Genesis3 now discovers supplies by their declared type rather than assuming a laptop-style `BAT0`. Processor temperature is accepted only from a readable sensor whose type identifies CPU/SoC, or the known desktop `acpitz` fallback. It must not mistake skin, battery, charger, or GPU temperature for CPU temperature.
 
-Termux:API can expose selected Android services through an installed companion app and the `termux-api` package, subject to Android permissions. Camera, microphone, motion-sensor streaming, and Android battery API fallback are **not yet fully wired into the Genesis daemon**. Do not interpret an unavailable sensor as a measured zero, full battery, or normal temperature.
+Termux:API can expose selected Android services through an installed companion app and the `termux-api` package, subject to Android permissions. Camera, microphone, and motion-sensor streaming are **not yet wired into the Genesis daemon**. Battery percentage and charging state have a Termux:API fallback when sysfs is unavailable. Do not interpret an unavailable sensor as a measured zero, full battery, or normal temperature.
 
 Reference documentation:
 - Android sensor discovery: https://developer.android.com/develop/sensors-and-location/sensors/sensors_overview
