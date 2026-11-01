@@ -846,6 +846,7 @@ class LifecycleMixin:
         for attribute, label in (
             ("android_sensor_adapter", "sensor"),
             ("android_camera_adapter", "camera"),
+            ("android_microphone_adapter", "microphone"),
         ):
             adapter = getattr(self, attribute, None)
             if adapter is not None:
