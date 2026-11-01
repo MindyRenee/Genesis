@@ -160,3 +160,12 @@ def test_self_latent_restore_rejects_malformed_state_without_mutation() -> None:
     with pytest.raises(ValueError, match="previous vector"):
         model.restore({"version": 1, "observations": 2, "last_state": None, "last_snapshot": {}})
     assert model.to_dict() == before
+
+
+
+def test_self_latent_snapshot_cannot_mutate_internal_state() -> None:
+    model = SelfLatentSpaceArchitecture()
+    model.observe_signal("immutable snapshot", kind="thought:reflection")
+    snapshot = model.snapshot()
+    snapshot["agency_fiber_states"][0] = 999.0
+    assert model.snapshot()["agency_fiber_states"][0] != 999.0
