@@ -60,6 +60,16 @@ def test_observer_routes_action_and_updates_transition_geometry():
     mind = FakeMind()
     observer = GenesisArcObserver(mind)
     observer(
+        "observation",
+        {
+            "game_id": "demo",
+            "step": 0,
+            "phase": "initial",
+            "observation": {"state": "PLAY"},
+            "legal_actions": ["ACTION1"],
+        },
+    )
+    observer(
         "action",
         {
             "game_id": "demo",
@@ -75,11 +85,12 @@ def test_observer_routes_action_and_updates_transition_geometry():
     assert kind == "action"
     assert "ACTION1" in content
     assert '"state_after":"WIN"' in detail
-    assert mind.language_latent_space.observations == 1
+    assert mind.language_latent_space.observations == 2
     snapshot = observer.snapshot()
-    assert snapshot["events_seen"] == 1
+    assert snapshot["events_seen"] == 2
     assert snapshot["events_failed"] == 0
-    assert snapshot["latent_observations"] == 1
+    assert snapshot["latent_observations"] == 2
+    assert snapshot["last_transition_residual"] > 0.0
 
 
 def test_observer_rejects_unknown_event():
