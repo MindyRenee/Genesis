@@ -98,7 +98,7 @@ class ARC3ExplorationPolicy:
             if isinstance(prior_key, str) and isinstance(action, str):
                 action_counts[(prior_key, action)] += 1
                 global_counts[action] += 1
-                terminal = transition.get("terminal_state", transition.get("state_after"))
+                terminal = transition.get("terminal_state") or transition.get("state_after")
                 if terminal in {"WIN", "GAME_OVER"}:
                     key = (prior_key, action)
                     total, count = history_outcomes.get(key, (0.0, 0))
