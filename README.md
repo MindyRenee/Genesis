@@ -1053,13 +1053,11 @@ than assuming `thermal_zone0` is the CPU.
 Its V4L2 camera capture, CPU-frequency actuation, RTC wake, and RTKit integrations
 remain Linux-specific. Do not run the desktop installer on the phone and assume
 those features will work. Termux:API can expose selected Android functions, but
-camera and microphone streaming are not yet connected to the daemon. A
-Python-side Termux:API adapter can feed available accelerometer, gyroscope,
-magnetic-field, light, proximity, pressure, and rotation-vector readings into
-the ordinary world-event telemetry path when explicitly enabled with
-\`GENESIS_ANDROID_SENSORS=1\`. This requires the Termux:API companion app and
-package; actual sensors vary by device. Battery percentage and charging state
-can fall back to Termux:API when Android sysfs does not expose them.
+Android hardware adapters are Python-side and explicitly opt-in:
+- \`GENESIS_ANDROID_SENSORS=1\` samples available motion/environment sensors into world telemetry.
+- \`GENESIS_ANDROID_CAMERA=1\` captures still frames with \`termux-camera-photo\` and sends them through the existing visual cortex. Select camera ID with \`GENESIS_ANDROID_CAMERA_ID\` (default 0).
+- \`GENESIS_ANDROID_MICROPHONE=1\` records short clips with \`termux-microphone-record\`, decodes them with \`ffmpeg\`, and sends measured audio features through the existing sound classifier. This is non-speech sound classification, not speech transcription.
+All three require the matching Termux:API command and the companion app, plus the requested Android permissions. Install the Termux package with \`pkg install termux-api ffmpeg\` for microphone support. Actual sensors and cameras vary by device. Battery percentage and charging state can fall back to Termux:API when Android sysfs does not expose them. These adapters have unit-tested parsing but still require on-device verification; the full Rust daemon is not yet verified in Termux.
 Unavailable measurements must remain unavailable,
 not be treated as readings. See `docs/archive/README.md` for the archived
 integrations and measurement rules.
