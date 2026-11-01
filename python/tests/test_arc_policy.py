@@ -90,3 +90,22 @@ def test_policy_does_not_invent_reward_for_nonterminal_transition() -> None:
     )
 
     assert policy._outcomes == {}
+
+
+def test_policy_reconstructs_seen_state_from_prior_transition_key() -> None:
+    """A resumed policy must recognize a prior state even if it never reappears as next state."""
+    observation = {"grid": [[0]], "state": "PLAYING"}
+    other_state = {"grid": [[1]], "state": "PLAYING"}
+    history = [
+        {
+            "state_signature": observation_signature(observation),
+            "next_state_signature": observation_signature(other_state),
+            "action": "ACTION1",
+        }
+    ]
+
+    decision = ARC3ExplorationPolicy().choose_action(
+        observation, ["ACTION1", "ACTION2"], history
+    )
+
+    assert decision.reasoning["state_novel"] is False
