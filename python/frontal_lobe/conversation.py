@@ -205,13 +205,13 @@ class ConversationMixin:
                         "topics": [kind],
                     },
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("volition workspace broadcast failed", exc_info=True)
 
         for listener in self._live_thought_listeners:
             try:
                 listener(kind, content)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # a listener must never crash its mind
                 logger.debug("live thought listener failed", exc_info=True)
 
@@ -354,7 +354,7 @@ class ConversationMixin:
                 text = thought.rendered_text(self.language, emotion)
             else:
                 text = thought.content
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("thought rendering failed, using raw content", exc_info=True)
             text = thought.content
         # A thought whose entire text is a single internal identifier
@@ -499,7 +499,7 @@ class ConversationMixin:
                 addressed=event.addressed,
                 metadata=event.metadata,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("self latent world observation failed", exc_info=True)
 
         # Feed the observed outer-world geometry and the just-updated self
@@ -535,7 +535,7 @@ class ConversationMixin:
                     "percept": event.percept,
                 },
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("world event workspace broadcast failed", exc_info=True)
 
         # A structured percept is *seen*, not just narrated: a grid
