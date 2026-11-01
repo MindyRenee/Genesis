@@ -1,8 +1,9 @@
 """Tests for opt-in Android camera frame decoding."""
 from __future__ import annotations
 
-import numpy as np
 from PIL import Image
+
+import numpy as np
 
 from brainstem.android_media import decode_float32_audio, load_rgb_frame
 
