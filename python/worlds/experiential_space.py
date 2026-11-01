@@ -18,7 +18,7 @@ import numpy as np
 
 from temporal_lobe.events import EventKind, ExternalEvent
 
-_STATE_DIM = 20
+_STATE_DIM = 22
 _KIND_COUNT = len(EventKind)
 _EPS = 1e-8
 
@@ -63,14 +63,16 @@ class ExperientialLatentSpace:
             return {
                 "observations": 0,
                 "state": self._state.tolist(),
+                "valence": 0.0,
+                "valence_sign": "neutral",
                 "feature_variance": [0.0] * _STATE_DIM,
                 "event_kind_probabilities": [0.0] * _KIND_COUNT,
                 "base_metric": np.eye(4).tolist(),
                 "conformal_scale": 1.0,
                 "toroidal_state": [0.0] * 8,
                 "global_geometry": {
-                    "hyperbolic_state": [0.0] * 6,
-                    "spherical_state": [0.0] * 6,
+                    "hyperbolic_state": [0.0] * 7,
+                    "spherical_state": [0.0] * 7,
                     "euclidean_state": [0.0] * 8,
                 },
                 "fisher_information": np.eye(_STATE_DIM).tolist(),
@@ -87,6 +89,12 @@ class ExperientialLatentSpace:
         total_kinds = float(self._kind_counts.sum())
         result["event_kind_probabilities"] = (
             (self._kind_counts / total_kinds).tolist() if total_kinds else [0.0] * _KIND_COUNT
+        )
+        result["valence"] = float(self._state[20])
+        result["valence_sign"] = (
+            "positive" if self._state[20] > 0.0
+            else "negative" if self._state[20] < 0.0
+            else "neutral"
         )
         return result
 
@@ -157,6 +165,13 @@ class ExperientialLatentSpace:
             values[17] = math.tanh(float(np.std(payload)))
             values[18] = math.tanh(float(np.min(payload)))
             values[19] = math.tanh(float(np.max(payload)))
+            values[21] = 1.0
+        # Sentiment is an observed linguistic cue, not a claim about
+        # internal feeling. Neutral defaults to exactly zero.
+        try:
+            values[20] = float(np.clip(event.metadata.get("valence", 0.0), -1.0, 1.0))
+        except (AttributeError, TypeError, ValueError):
+            values[20] = 0.0
         return values
 
     def _derive(self, state: np.ndarray, timestamp: float) -> dict[str, Any]:
@@ -168,17 +183,17 @@ class ExperientialLatentSpace:
         base_metric = conformal_scale * np.eye(4) + 0.1 * np.outer(attention, attention)
         # A product space: negative-curvature ball, positive-curvature sphere,
         # and flat Euclidean coordinates, each with its own valid domain.
-        hyper = np.tanh(state[:6])
+        hyper = np.tanh(state[:7])
         norm_h = float(np.linalg.norm(hyper))
         if norm_h >= 0.95:
             hyper *= 0.95 / max(norm_h, _EPS)
-        sphere = state[6:12].copy()
+        sphere = state[7:14].copy()
         sphere_norm = float(np.linalg.norm(sphere))
         if sphere_norm > _EPS:
             sphere /= sphere_norm
         else:
             sphere[0] = 1.0
-        euclidean = state[12:20].copy()
+        euclidean = state[14:22].copy()
         hyperbolic_norm = min(float(np.linalg.norm(hyper)), 1.0 - _EPS)
         hyperbolic_distance_from_origin = 2.0 * math.atanh(hyperbolic_norm)
         # Geodesic distance from the sphere north pole on the unit sphere.
@@ -199,7 +214,7 @@ class ExperientialLatentSpace:
         # The two cyclic coordinates are signed; map them from [-1, 1]
         # into the Bernoulli parameter domain before evaluating Fisher info.
         p[12:14] = (p[12:14] + 1.0) / 2.0
-        p[16:20] = (p[16:20] + 1.0) / 2.0
+        p[16:21] = (p[16:21] + 1.0) / 2.0
         p = np.clip(p, 1e-3, 1.0 - 1e-3)
         fisher_diag = 1.0 / (p * (1.0 - p))
         fim = np.diag(np.clip(fisher_diag, 1.0, 1000.0))
@@ -207,7 +222,7 @@ class ExperientialLatentSpace:
         volume = float(math.exp(min(300.0, 0.5 * logdet))) if sign > 0 else 0.0
         # Exact harmonic Hamiltonian flow H=(q·q+p·p)/2, a symplectic
         # rotation; unlike explicit Euler, this preserves phase-space area.
-        q, p_phase = state[:10], state[10:20]
+        q, p_phase = state[:11], state[11:22]
         dt = 0.01
         c, s = math.cos(dt), math.sin(dt)
         evolved = np.concatenate((c * q + s * p_phase, c * p_phase - s * q))
