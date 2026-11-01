@@ -43,3 +43,8 @@ def test_android_photo_capture_is_absent_outside_android(monkeypatch) -> None:
     monkeypatch.delenv("ANDROID_ROOT", raising=False)
     monkeypatch.delenv("ANDROID_DATA", raising=False)
     assert capture_android_photo() is None
+
+
+def test_android_extra_sensor_names_are_discovered() -> None:
+    payload = '[{"name":"Gravity"},{"name":"Ambient Temperature"},{"name":"Step Counter"}]'
+    assert _sensor_names(payload) == ["Gravity", "Ambient Temperature", "Step Counter"]
