@@ -26,11 +26,11 @@ from numpy.typing import NDArray
 FloatArray = NDArray[np.float64]
 
 __all__ = [
-    "NarrativeAgencyBaseManifold",
     "AgencyOwnershipFiberBundle",
-    "GrassmannianSubspaceModule",
-    "SelfConsistencyInformationGeometry",
     "AutopoieticSymplecticFlow",
+    "GrassmannianSubspaceModule",
+    "NarrativeAgencyBaseManifold",
+    "SelfConsistencyInformationGeometry",
     "SelfLatentSpaceArchitecture",
 ]
 
@@ -324,7 +324,11 @@ class SelfLatentSpaceArchitecture:
         ]], dtype=np.float64)
         with self._lock:
             fiber = self.agency_bundle.forward(ego.reshape(1, -1))
-            previous = fiber.copy() if self._last_state is None else self._last_state.reshape(1, -1).copy()
+            previous = (
+                fiber.copy()
+                if self._last_state is None
+                else self._last_state.reshape(1, -1).copy()
+            )
             metric, efficacy_weight = self.base_manifold.forward(
                 narrative, np.array([[efficacy_value]], dtype=np.float64)
             )
@@ -377,18 +381,31 @@ class SelfLatentSpaceArchitecture:
         if observations == 0:
             if state is not None:
                 raise ValueError("empty self latent state cannot have a previous vector")
-        elif state is None or state.shape != (self.agency_bundle.output_dim,) or not np.isfinite(state).all():
+        elif (
+            state is None
+            or state.shape != (self.agency_bundle.output_dim,)
+            or not np.isfinite(state).all()
+        ):
             raise ValueError("invalid self latent previous vector")
         snapshot = data.get("last_snapshot", {})
         if not isinstance(snapshot, dict):
             raise ValueError("invalid self latent snapshot")
         if observations:
             for key, shape in (
-                ("narrative_base_metric", (self.base_manifold.base_dim, self.base_manifold.base_dim)),
+                (
+                    "narrative_base_metric",
+                    (self.base_manifold.base_dim, self.base_manifold.base_dim),
+                ),
                 ("agency_fiber_states", (self.agency_bundle.output_dim,)),
                 ("grassmannian_subspace_states", (self.agency_bundle.output_dim,)),
-                ("grassmannian_projection_operator", (self.agency_bundle.output_dim, self.agency_bundle.output_dim)),
-                ("consistency_information_metric", (self.agency_bundle.output_dim, self.agency_bundle.output_dim)),
+                (
+                    "grassmannian_projection_operator",
+                    (self.agency_bundle.output_dim, self.agency_bundle.output_dim),
+                ),
+                (
+                    "consistency_information_metric",
+                    (self.agency_bundle.output_dim, self.agency_bundle.output_dim),
+                ),
                 ("predicted_transition_state", (self.agency_bundle.output_dim,)),
                 ("autopoietic_evolved_states", (self.agency_bundle.output_dim,)),
             ):

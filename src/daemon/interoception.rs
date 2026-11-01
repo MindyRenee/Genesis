@@ -2968,14 +2968,20 @@ fn find_temp_sensor() -> String {
             let name = entry.file_name().to_string_lossy().into_owned();
             let index = name.strip_prefix("thermal_zone")?.parse::<u32>().ok()?;
             let path = entry.path();
-            let zone_type = fs::read_to_string(path.join("type")).ok()?.trim().to_ascii_lowercase();
+            let zone_type = fs::read_to_string(path.join("type"))
+                .ok()?
+                .trim()
+                .to_ascii_lowercase();
             let temp = path.join("temp").to_string_lossy().into_owned();
             readable_temp(&temp).then_some((index, zone_type, temp))
         })
         .collect();
     zones.sort_by_key(|(index, _, _)| *index);
 
-    if let Some((_, _, path)) = zones.iter().find(|(_, kind, _)| is_processor_thermal_zone(kind)) {
+    if let Some((_, _, path)) = zones
+        .iter()
+        .find(|(_, kind, _)| is_processor_thermal_zone(kind))
+    {
         return path.clone();
     }
 
@@ -3092,7 +3098,11 @@ fn find_battery() -> Option<String> {
             if percent > 100 {
                 return None;
             }
-            let priority = if matches!(name.as_str(), "bat0" | "bat1" | "batt") { 0 } else { 1 };
+            let priority = if matches!(name.as_str(), "bat0" | "bat1" | "batt") {
+                0
+            } else {
+                1
+            };
             Some((priority, capacity.to_string_lossy().into_owned()))
         })
         .collect();
@@ -5476,7 +5486,6 @@ mod sensor_presence_tests {
         );
     }
 }
-
 
 #[cfg(test)]
 mod android_power_discovery_tests {
