@@ -7,6 +7,7 @@ from temporal_lobe.comprehension import Comprehension
 from temporal_lobe.language_latent_space import (
     LanguageLatentSpace,
     decode_text_cells,
+    embed_dot_cell,
     encode_text_cells,
 )
 
@@ -37,7 +38,11 @@ def test_language_latent_observes_real_parse_and_ot_geometry() -> None:
     assert second["observations"] == 2
     assert len(second["latent_state"]) == 32
     assert len(second["cell_distribution"]) == 64
-    assert second["transport_plan_shape"][1] == 32
+    assert second["transport_plan_shape"][1] == 64
+    assert len(second["transport_target_distribution"]) == 64
+    assert len(second["transport_plan"]) == second["transport_plan_shape"][0]
+    assert second["transport_row_marginal_error"] < 5e-3
+    assert second["transport_column_marginal_error"] < 5e-3
     assert np.isfinite(second["transport_cost"])
     assert second["transport_cost"] >= 0.0
     assert second["transition_residual"] > 0.0
@@ -115,3 +120,13 @@ def test_sinkhorn_rejects_negative_or_nonfinite_marginals() -> None:
         _sinkhorn(np.array([-0.1, 1.1]), np.array([0.5, 0.5]), cost)
     with pytest.raises(ValueError):
         _sinkhorn(np.array([np.nan, np.nan]), np.array([0.5, 0.5]), cost)
+
+
+
+def test_dot_cell_embedding_preserves_euclidean_distances() -> None:
+    from parietal_lobe.binary_language import BitCell
+
+    left = embed_dot_cell(BitCell.from_dots([1, 4, 6]))
+    right = embed_dot_cell(BitCell.from_dots([1, 3, 6]))
+    assert left.shape == (32,)
+    assert np.isclose(np.sum((left - right) ** 2), 2.0)
