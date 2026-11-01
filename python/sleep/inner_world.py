@@ -46,8 +46,9 @@ class InteroceptiveBaseManifold:
 
     def forward(self, current: Any) -> tuple[np.ndarray, float]:
         state = _finite_vector(current, _BASE_DIM, "homeostatic state")
-        deviation = float(np.dot(state - self.setpoint, state - self.setpoint))
-        scale = math.exp(min(deviation, 10.0))
+        delta = np.clip(state - self.setpoint, -math.sqrt(10.0), math.sqrt(10.0))
+        deviation = min(float(np.dot(delta, delta)), 10.0)
+        scale = math.exp(deviation)
         return np.eye(_BASE_DIM, dtype=np.float64) * scale, scale
 
     def adapt_setpoint(self, current: Any, rate: float = 0.001) -> None:
@@ -75,7 +76,11 @@ class AffectiveFiberQualiaSpace:
         self._frequencies = np.arange(1, _FIBER_DIM + 1, dtype=np.float64)
 
     def forward(self, signals: Any) -> np.ndarray:
-        x = _finite_vector(signals, _INTERO_DIM, "interoceptive signals")
+        x = np.clip(
+            _finite_vector(signals, _INTERO_DIM, "interoceptive signals"),
+            -1.0,
+            1.0,
+        )
         # Bounded deterministic Fourier feature map, 32 coordinates.
         projected = np.outer(self._frequencies, x)
         weights = np.arange(1, _INTERO_DIM + 1, dtype=np.float64)
@@ -288,7 +293,11 @@ class InnerWorldExperientialLatentSpace:
                     "internal_base_metric": np.eye(_BASE_DIM).tolist(),
                     "autonomic_scaling_factor": 1.0,
                     "affective_fiber_states": [0.0] * _LATENT_DIM,
-                    "ultrametric_memory_nodes": {"memory_id": None, "size": 0, "code": []},
+                    "ultrametric_memory_nodes": {
+                        "memory_id": None,
+                        "size": 0,
+                        "code": [],
+                    },
                     "kl_information_metric": np.eye(_LATENT_DIM).tolist(),
                     "free_energy_divergence": 0.0,
                     "latent_mean": [0.0] * _LATENT_DIM,
