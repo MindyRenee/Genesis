@@ -58,6 +58,110 @@
 
 use std::ffi::CString;
 use std::sync::Arc;
+#[cfg(not(target_os = "android"))]
+mod optic_shmem {
+    pub use shared_memory::{Shmem, ShmemConf};
+}
+
+#[cfg(target_os = "android")]
+mod optic_shmem {
+    use std::ffi::CString;
+    use std::io;
+    use std::os::fd::RawFd;
+    use std::ptr::NonNull;
+
+    /// Read-side POSIX shared-memory mapping for Android/Bionic.
+    /// The creator owns unlinking; readers only map and detach.
+    pub struct Shmem {
+        ptr: NonNull<u8>,
+        len: usize,
+        fd: RawFd,
+    }
+
+    // The mapping is process-local and the pointer is only read by the optic nerve.
+    // Synchronization of frame publication is provided by the shared seqlock protocol.
+    unsafe impl Send for Shmem {}
+
+    impl Shmem {
+        pub fn as_ptr(&self) -> *mut u8 {
+            self.ptr.as_ptr()
+        }
+    }
+
+    impl Drop for Shmem {
+        fn drop(&mut self) {
+            unsafe {
+                libc::munmap(self.ptr.as_ptr().cast(), self.len);
+                libc::close(self.fd);
+            }
+        }
+    }
+
+    pub struct ShmemConf {
+        name: Option<String>,
+    }
+
+    impl ShmemConf {
+        pub fn new() -> Self {
+            Self { name: None }
+        }
+
+        pub fn os_id(mut self, name: &str) -> Self {
+            self.name = Some(name.to_owned());
+            self
+        }
+
+        pub fn open(self) -> io::Result<Shmem> {
+            let name = self.name.ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "shared-memory name is missing")
+            })?;
+            let name = if name.starts_with('/') { name } else { format!("/{name}") };
+            let c_name = CString::new(name)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "NUL in shared-memory name"))?;
+            let fd = unsafe { libc::shm_open(c_name.as_ptr(), libc::O_RDONLY, 0) };
+            if fd < 0 {
+                return Err(io::Error::last_os_error());
+            }
+
+            let mut stat = unsafe { std::mem::zeroed::<libc::stat>() };
+            if unsafe { libc::fstat(fd, &mut stat) } != 0 {
+                let err = io::Error::last_os_error();
+                unsafe { libc::close(fd); }
+                return Err(err);
+            }
+            let len = usize::try_from(stat.st_size).map_err(|_| {
+                unsafe { libc::close(fd); }
+                io::Error::new(io::ErrorKind::InvalidData, "invalid shared-memory size")
+            })?;
+            if len < 28 {
+                unsafe { libc::close(fd); }
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "optic shared-memory segment is smaller than its frame header",
+                ));
+            }
+
+            let mapped = unsafe {
+                libc::mmap(
+                    std::ptr::null_mut(),
+                    len,
+                    libc::PROT_READ,
+                    libc::MAP_SHARED,
+                    fd,
+                    0,
+                )
+            };
+            if mapped == libc::MAP_FAILED {
+                let err = io::Error::last_os_error();
+                unsafe { libc::close(fd); }
+                return Err(err);
+            }
+            let ptr = NonNull::new(mapped.cast::<u8>()).expect("mmap returned a non-null mapping");
+            Ok(Shmem { ptr, len, fd })
+        }
+    }
+}
+
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -208,7 +312,7 @@ pub struct OpticNerve {
     /// The open shared-memory attachment; `None` until the capture
     /// limb creates the segment, re-tried every sample.
     #[cfg(not(target_os = "android"))]
-    shm: Option<shared_memory::Shmem>,
+    shm: Option<optic_shmem::Shmem>,
     /// Last consumed seqlock value — a frame is consumed once, so an
     /// unchanged counter means the limb has not written since.
     last_seq: u64,
@@ -393,14 +497,6 @@ impl OpticNerve {
     /// frame has arrived pool it into the channel signals. Absent or
     /// stalled segments are the no-eye condition — the afference just
     /// reports no fresh input, it is never a fault.
-    #[cfg(target_os = "android")]
-    pub fn sample(&mut self, _now_ms: u64) {
-        // The Android capture limb is deliberately absent: native V4L2
-        // and this POSIX shared-memory transport are not available here.
-        // Keep the same no-eye state without linking unsupported symbols.
-    }
-
-    #[cfg(not(target_os = "android"))]
     pub fn sample(&mut self, now_ms: u64) {
         // A stale feed can mean the mapping is a corpse: a dead limb
         // unlinks the segment on its way out, and the next life
@@ -417,7 +513,7 @@ impl OpticNerve {
             self.shm = None;
         }
         if self.shm.is_none() {
-            match shared_memory::ShmemConf::new().os_id(&self.shm_name).open() {
+            match optic_shmem::ShmemConf::new().os_id(&self.shm_name).open() {
                 Ok(s) => {
                     // The capture limb owns the segment's lifetime;
                     // we are a recipient, so unlinking is never ours
