@@ -12,8 +12,8 @@ and explicitly marked sentiment-derived valence.
 """
 from __future__ import annotations
 
-from copy import deepcopy
 import math
+from copy import deepcopy
 from typing import Any
 
 import numpy as np
@@ -157,11 +157,7 @@ class ExperientialLatentSpace:
         values[15] = min(len(event.content), 300) / 300.0
         # Structured sensory payloads (e.g. ARC grids or numeric camera
         # features) are summarized deterministically; never stringify them.
-        try:
-            payload = np.asarray(event.percept, dtype=np.float64).reshape(-1)[:4096]
-            payload = payload[np.isfinite(payload)]
-        except (TypeError, ValueError):
-            payload = np.empty(0, dtype=np.float64)
+        payload = self._numeric_payload(event.percept)
         if payload.size:
             values[16] = math.tanh(float(np.mean(payload)))
             values[17] = math.tanh(float(np.std(payload)))
@@ -176,6 +172,38 @@ class ExperientialLatentSpace:
             values[20] = 0.0
         return values
 
+    @staticmethod
+    def _numeric_payload(value: Any) -> np.ndarray:
+        """Extract bounded finite numeric data from arrays or nested payloads."""
+        if value is None:
+            return np.empty(0, dtype=np.float64)
+        if isinstance(value, dict):
+            chunks = [
+                ExperientialLatentSpace._numeric_payload(item)
+                for item in value.values()
+            ]
+            chunks = [chunk for chunk in chunks if chunk.size]
+            return (
+                np.concatenate(chunks)[:4096]
+                if chunks
+                else np.empty(0, dtype=np.float64)
+            )
+        try:
+            array = np.asarray(value, dtype=np.float64).reshape(-1)
+        except (TypeError, ValueError):
+            if isinstance(value, (list, tuple)):
+                chunks = [
+                    ExperientialLatentSpace._numeric_payload(item) for item in value
+                ]
+                chunks = [chunk for chunk in chunks if chunk.size]
+                return (
+                    np.concatenate(chunks)[:4096]
+                    if chunks
+                    else np.empty(0, dtype=np.float64)
+                )
+            return np.empty(0, dtype=np.float64)
+        array = array[np.isfinite(array)]
+        return array[:4096]
     def _derive(self, state: np.ndarray, timestamp: float) -> dict[str, Any]:
         # Attention is bounded and derived from observed salience/direction.
         attention = np.clip(np.abs(state[8:12]), 0.0, 1.0)
