@@ -67,7 +67,7 @@ class ARC3ExplorationPolicy:
     """
 
     exploration_weight: float = 1.0
-    _observations_seen: set[str] = None  # initialized lazily to keep the public API small
+    _observations_seen: set[str] | None = None  # initialized lazily to keep the public API small
 
     def __post_init__(self) -> None:
         """Initialize private novelty memory for this policy instance."""
