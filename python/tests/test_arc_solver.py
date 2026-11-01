@@ -8,6 +8,7 @@ from parietal_lobe.arc_solver import solve_arc1_task
 
 
 def test_arc1_solver_uses_spatial_reasoner_and_returns_grid_predictions(tmp_path: Path) -> None:
+    """Use Genesis' reasoner and ensure hidden test outputs do not leak in."""
     path = tmp_path / "task.json"
     path.write_text(
         json.dumps(
@@ -20,7 +21,9 @@ def test_arc1_solver_uses_spatial_reasoner_and_returns_grid_predictions(tmp_path
     )
 
     class FakeReasoner:
+        """Record the problem passed to the reasoner and return a known result."""
         def solve(self, examples, tests, **kwargs):
+            """Assert task conversion and return a deterministic fake solution."""
             assert len(examples) == 1
             assert examples[0][0].to_lists() == [[0, 1]]
             assert examples[0][1].to_lists() == [[1, 0]]
