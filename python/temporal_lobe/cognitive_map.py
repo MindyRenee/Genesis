@@ -213,7 +213,7 @@ class CognitiveMap:
     boundary evidence.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, spacetime: SpacetimeWorkspace | None = None) -> None:
         self.grid = GridCode()
         self.contexts: list[ContextMap] = []
         self._context: ContextMap | None = None
@@ -223,7 +223,7 @@ class CognitiveMap:
         self._place: Place | None = None
         # Shared causal view over allocentric map coordinates. The signal
         # speed is normalized (map-units/second), not physical light speed.
-        self.spacetime = SpacetimeWorkspace(signal_speed=1.0)
+        self.spacetime = spacetime if spacetime is not None else SpacetimeWorkspace(signal_speed=1.0)
         self._spacetime_observation_count = 0
 
     # ─── Observation ────────────────────────────────────────────
