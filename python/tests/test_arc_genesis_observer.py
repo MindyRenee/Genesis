@@ -81,7 +81,7 @@ def test_observer_routes_action_and_updates_transition_geometry():
             "observation_after": {"state": "WIN"},
         },
     )
-    kind, content, detail = mind.world.events[0]
+    kind, content, detail = mind.world.events[1]
     assert kind == "action"
     assert "ACTION1" in content
     assert '"state_after":"WIN"' in detail
