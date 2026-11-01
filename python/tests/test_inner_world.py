@@ -82,7 +82,12 @@ def test_kl_geometry_is_finite_positive_definite_and_nonnegative():
 def test_hamiltonian_flow_preserves_phase_space_norm():
     state = AffectiveFiberQualiaSpace().forward(_signals())
     evolved = RecursiveMetaCognitiveSymplecticFlow().forward(state)
-    np.testing.assert_allclose(np.linalg.norm(evolved), np.linalg.norm(state), rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(
+        np.linalg.norm(evolved),
+        np.linalg.norm(state),
+        rtol=1e-12,
+        atol=1e-12,
+    )
 
 
 def test_integrated_inner_world_updates_memory_and_restores_state():
