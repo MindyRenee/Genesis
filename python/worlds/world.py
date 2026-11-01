@@ -868,7 +868,7 @@ class OuterWorld:
         if listener is not None:
             try:
                 listener(event)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 # A listener must never break the world.
                 logger.debug("world event listener failed", exc_info=True)
 
@@ -954,7 +954,7 @@ class OuterWorld:
             return
         try:
             self._neuro_impulse(chem, amount)
-        except Exception:  # noqa: BLE001  # impulses are best-effort
+        except Exception:  # impulses are best-effort
             logger.debug("world neuro impulse failed", exc_info=True)
 
     def _asleep(self) -> bool:
