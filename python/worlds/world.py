@@ -758,6 +758,19 @@ class OuterWorld:
             f"  social isolation: {isolation:.0%}   "
             f"activity: {self.activity_level():.1f} events/min"
         )
+        geometry = self.experiential_space.snapshot()
+        distances = geometry["global_geometry"].get("distances_from_reference", {})
+        if distances:
+            lines.append(
+                f"  experiential geometry: {geometry['observations']} observations; "
+                f"Fisher volume {geometry['fisher_volume']:.3g}; "
+                f"curvature distances H/S/E "
+                f"{distances['hyperbolic']:.3g}/"
+                f"{distances['spherical']:.3g}/"
+                f"{distances['euclidean']:.3g}"
+            )
+        else:
+            lines.append("  experiential geometry: awaiting first observation")
         expected = self.expected_events()
         if expected:
             top = sorted(expected.items(), key=lambda kv: -kv[1])[:3]
