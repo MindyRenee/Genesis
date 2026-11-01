@@ -162,7 +162,11 @@ class ExperientialLatentSpace:
         # Diagonal Fisher information for independent Bernoulli feature
         # parameters: I_i = 1 / (p_i * (1-p_i)). Online means provide p_i;
         # clipping avoids singular infinities at the boundary.
-        p = np.clip(self._mean, 1e-3, 1.0 - 1e-3)
+        p = self._mean.copy()
+        # The two cyclic coordinates are signed; map them from [-1, 1]
+        # into the Bernoulli parameter domain before evaluating Fisher info.
+        p[12:14] = (p[12:14] + 1.0) / 2.0
+        p = np.clip(p, 1e-3, 1.0 - 1e-3)
         fisher_diag = 1.0 / (p * (1.0 - p))
         fim = np.diag(np.clip(fisher_diag, 1.0, 1000.0))
         sign, logdet = np.linalg.slogdet(fim)
