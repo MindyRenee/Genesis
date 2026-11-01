@@ -1,4 +1,4 @@
-"""Machine-native language latent geometry using strict 7-bit ASCII.
+"""Machine-native language latent geometry using reversible 7-bit ASCII notation.
 
 Text is represented as ASCII character codes (0..127); non-ASCII input is
 rejected rather than silently transliterated or UTF-8 encoded. The latent
@@ -31,18 +31,28 @@ _TOKEN_RE = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 
 
 def encode_ascii(text: str) -> tuple[tuple[int, ...], int]:
-    """Return strict ASCII character codes and their exact 7-bit length."""
+    """Encode arbitrary Unicode text as reversible 7-bit ASCII notation.
+
+    Printable ASCII is preserved. A literal backslash is doubled; each
+    non-ASCII code point becomes the ASCII sequence \\u{HEX};.
+    """
     if not isinstance(text, str):
         raise TypeError("text must be a string")
-    try:
-        raw = text.encode("ascii", errors="strict")
-    except UnicodeEncodeError as exc:
-        raise ValueError("language latent space accepts ASCII text only") from exc
+    escaped = []
+    for character in text:
+        codepoint = ord(character)
+        if character == "\\\\":
+            escaped.append("\\\\\\\\")
+        elif codepoint < 128:
+            escaped.append(character)
+        else:
+            escaped.append("\\\\u{" + format(codepoint, "X") + "};")
+    raw = "".join(escaped).encode("ascii", errors="strict")
     return tuple(raw), len(raw) * 7
 
 
 def decode_ascii(codes: tuple[int, ...], bit_length: int) -> str:
-    """Decode ASCII character codes after validating the exact 7-bit length."""
+    """Decode reversible ASCII notation after validating its exact bit length."""
     if isinstance(bit_length, bool) or not isinstance(bit_length, int):
         raise TypeError("bit_length must be an integer")
     if bit_length < 0 or bit_length % 7 or bit_length != len(codes) * 7:
@@ -50,8 +60,29 @@ def decode_ascii(codes: tuple[int, ...], bit_length: int) -> str:
     if any(isinstance(code, bool) or not isinstance(code, int) or not 0 <= code < 128
            for code in codes):
         raise ValueError("ASCII codes must be integers in range 0..127")
-    return bytes(codes).decode("ascii", errors="strict")
-
+    encoded = bytes(codes).decode("ascii", errors="strict")
+    decoded = []
+    index = 0
+    while index < len(encoded):
+        if encoded.startswith("\\\\\\\\", index):
+            decoded.append("\\\\")
+            index += 2
+        elif encoded.startswith("\\\\u{", index):
+            end = encoded.find("};", index + 3)
+            if end < 0:
+                raise ValueError("malformed Unicode escape in ASCII text")
+            try:
+                codepoint = int(encoded[index + 3:end], 16)
+                if not 0 <= codepoint <= 0x10FFFF or 0xD800 <= codepoint <= 0xDFFF:
+                    raise ValueError
+                decoded.append(chr(codepoint))
+            except ValueError as exc:
+                raise ValueError("invalid Unicode code point in ASCII escape") from exc
+            index = end + 2
+        else:
+            decoded.append(encoded[index])
+            index += 1
+    return "".join(decoded)
 
 def _ascii_histogram(codes: tuple[int, ...]) -> np.ndarray:
     counts = np.zeros(_ASCII_COUNT, dtype=np.float64)
