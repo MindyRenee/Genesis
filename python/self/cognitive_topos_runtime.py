@@ -128,7 +128,9 @@ class CognitiveToposRuntime:
             # Self state is refreshed from the same real signal whenever it
             # exists; do not fabricate a second self model if a caller omits it.
             if self_snapshot and self_snapshot.get("agency_fiber_states") is not None:
-                self._states["self"] = _resize(self_snapshot["agency_fiber_states"], self.latent_dim)
+                self._states["self"] = _resize(
+                    self_snapshot["agency_fiber_states"], self.latent_dim
+                )
 
             states = [self._states[key][None, :] for key in ("outer", "inner", "self", "language")]
             # The oscillator phases are tied to current state coordinates.
