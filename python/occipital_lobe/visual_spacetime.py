@@ -58,7 +58,9 @@ class VisualSpacetimeBridge:
         if not math.isfinite(time_s):
             raise ValueError("time_s must be finite")
         if self.camera_to_workspace is None:
-            return VisualEventResult(None, False, "calibrated camera-to-workspace transform required")
+            return VisualEventResult(
+                None, False, "calibrated camera-to-workspace transform required"
+            )
         if report.kind not in {"still", "turn", "travel", "unresolved"}:
             return VisualEventResult(None, False, "report has no classified two-view result")
         if report.kind == "unresolved":
