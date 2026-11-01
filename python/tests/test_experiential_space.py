@@ -27,11 +27,11 @@ def test_experiential_space_uses_observed_events_and_returns_finite_geometry():
     space = ExperientialLatentSpace()
     result = space.observe(_event())
     assert result["observations"] == 1
-    assert len(result["state"]) == 20
+    assert len(result["state"]) == 22
     assert np.asarray(result["base_metric"]).shape == (4, 4)
-    assert np.asarray(result["fisher_information"]).shape == (20, 20)
-    assert len(result["global_geometry"]["hyperbolic_state"]) == 6
-    assert len(result["global_geometry"]["spherical_state"]) == 6
+    assert np.asarray(result["fisher_information"]).shape == (22, 22)
+    assert len(result["global_geometry"]["hyperbolic_state"]) == 7
+    assert len(result["global_geometry"]["spherical_state"]) == 7
     assert len(result["global_geometry"]["euclidean_state"]) == 8
     assert len(result["toroidal_state"]) == 8
     assert np.all(np.isfinite(np.asarray(result["fisher_information"])))
@@ -79,7 +79,7 @@ def test_outer_world_records_each_event_into_experiential_space_and_persists_it(
     restored = OuterWorld()
     restored.restore_from_dict(saved)
     assert restored.experiential_space.observations == 1
-    assert len(restored.experiential_space.snapshot()["state"]) == 20
+    assert len(restored.experiential_space.snapshot()["state"]) == 22
 
 
 def test_structured_payload_changes_sensory_coordinates():
@@ -96,3 +96,20 @@ def test_structured_payload_changes_sensory_coordinates():
     )
     assert first["state"][16:20] != second["state"][16:20]
     assert first["toroidal_state"] != second["toroidal_state"]
+
+
+def test_valence_sign_is_positive_negative_or_neutral():
+    for value, expected in ((0.4, "positive"), (-0.4, "negative"), (0.0, "neutral")):
+        event = _event()
+        event.metadata["valence"] = value
+        result = ExperientialLatentSpace().observe(event)
+        assert result["valence"] == value
+        assert result["valence_sign"] == expected
+
+
+def test_user_speech_sentiment_reaches_outer_world_valence():
+    world = OuterWorld()
+    world.hear_user("This is wonderful and excellent.")
+    result = world.experiential_space.snapshot()
+    assert result["valence"] > 0.0
+    assert result["valence_sign"] == "positive"
