@@ -8,9 +8,9 @@ heading/depth values or to conflate camera pixels with allocentric coordinates.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
-from typing import Callable
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from occipital_lobe.epipolar import TwoViewReport
 from temporal_lobe.light_cones import SpacetimeEvent, WorldDomain
