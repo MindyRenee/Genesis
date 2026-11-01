@@ -1,7 +1,7 @@
 import numpy as np
-import pytest
-
 from self.personal_latent_spacetime import LatentDomain, PersonalLatentSpacetime
+
+import pytest
 
 
 def test_domains_keep_independent_dimensions_and_metrics() -> None:
