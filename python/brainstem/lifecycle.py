@@ -1644,7 +1644,9 @@ class LifecycleMixin:
 
                         staged_language_latent = LanguageLatentSpace()
                         staged_language_latent.restore(ils["language_latent_space"])
-                    except (KeyError, TypeError, ValueError, OverflowError, ArithmeticError) as error:
+                    except (
+                        KeyError, TypeError, ValueError, OverflowError, ArithmeticError
+                    ) as error:
                         note_swallowed(
                             "mind.lifecycle._stage_inner_life.language_latent_space", error
                         )
