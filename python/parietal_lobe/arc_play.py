@@ -40,6 +40,23 @@ class ARC3Episode:
 Policy = Callable[[Any, list[str], list[dict[str, Any]]], ARC3Decision]
 
 
+def _outer_world_percept(observation: Any) -> Any:
+    """Expose grid-shaped observations in the format Genesis already parses.
+
+    Keep the original observation for policy and episode history. For
+    OuterWorld's percept path, unwrap only explicit grid containers; do not
+    guess at arbitrary toolkit fields or stringify structured state.
+    """
+    if isinstance(observation, dict):
+        if "grid" in observation:
+            return observation
+        return observation
+    grid = getattr(observation, "grid", None)
+    if grid is not None:
+        return {"grid": grid}
+    return observation
+
+
 def run_arc3_episode(
     environment: Any,
     *,
@@ -82,7 +99,7 @@ def run_arc3_episode(
                 salience=0.7,
                 source=f"arc3:{game_id}",
                 metadata={"game_id": game_id, "step": step_index + 1},
-                percept=observation,
+                percept=_outer_world_percept(observation),
             )
 
         legal_actions = arc3_legal_actions(environment)
