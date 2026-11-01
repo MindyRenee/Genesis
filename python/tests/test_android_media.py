@@ -1,11 +1,9 @@
 """Tests for opt-in Android camera frame decoding."""
 from __future__ import annotations
 
-from PIL import Image
-
 import numpy as np
-
 from brainstem.android_media import capture_android_frame, decode_float32_audio, load_rgb_frame
+from PIL import Image
 
 
 def test_camera_jpeg_decodes_to_detached_rgb_uint8(tmp_path) -> None:
