@@ -486,6 +486,16 @@ class ConversationMixin:
         except Exception:
             logger.debug("self latent world observation failed", exc_info=True)
 
+        # Feed the observed outer-world geometry and the just-updated self
+        # representation into the unified cross-domain engine.
+        self._integrate_cognitive_topos(
+            "outer",
+            event.kind.value,
+            event.describe(),
+            outer_snapshot=self.world.experiential_space.snapshot(),
+            self_snapshot=self.self_latent_space.snapshot(),
+        )
+
         if not event.inbound:
             return
         # Broadcast into its cognitive field. Best-effort — workspace
@@ -1019,6 +1029,9 @@ class ConversationMixin:
                 "mind.conversation._said",
                 e,
             )
+        # Language state is updated at the actual outward utterance boundary,
+        # including fallbacks, so the engine sees what was emitted.
+        self._integrate_cognitive_topos("language", "utterance", text)
         return text
 
     def _note_faces_seen(self) -> None:
