@@ -199,6 +199,7 @@ class ExperientialLatentSpace:
         # The two cyclic coordinates are signed; map them from [-1, 1]
         # into the Bernoulli parameter domain before evaluating Fisher info.
         p[12:14] = (p[12:14] + 1.0) / 2.0
+        p[16:20] = (p[16:20] + 1.0) / 2.0
         p = np.clip(p, 1e-3, 1.0 - 1e-3)
         fisher_diag = 1.0 / (p * (1.0 - p))
         fim = np.diag(np.clip(fisher_diag, 1.0, 1000.0))
