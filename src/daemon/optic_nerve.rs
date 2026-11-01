@@ -65,21 +65,23 @@ mod optic_shmem {
 
 #[cfg(target_os = "android")]
 mod optic_shmem {
-    use std::ffi::CString;
+    use std::fs::File;
     use std::io;
-    use std::os::fd::RawFd;
+    use std::os::fd::AsRawFd;
+    use std::path::PathBuf;
     use std::ptr::NonNull;
 
-    /// Read-side POSIX shared-memory mapping for Android/Bionic.
-    /// The creator owns unlinking; readers only map and detach.
+    /// Android/Termux read-side mapping. Bionic does not implement
+    /// POSIX shm_open/shm_unlink, so this uses a named file-backed mmap
+    /// in Termux's private temporary directory. A same-UID producer can
+    /// publish the same frame protocol through this file.
     pub struct Shmem {
         ptr: NonNull<u8>,
         len: usize,
-        fd: RawFd,
+        _file: File,
     }
 
-    // The mapping is process-local and the pointer is only read by the optic nerve.
-    // Synchronization of frame publication is provided by the shared seqlock protocol.
+    // The mapping is process-local and only read by the optic nerve.
     unsafe impl Send for Shmem {}
 
     impl Shmem {
@@ -92,7 +94,6 @@ mod optic_shmem {
         fn drop(&mut self) {
             unsafe {
                 libc::munmap(self.ptr.as_ptr().cast(), self.len);
-                libc::close(self.fd);
             }
         }
     }
@@ -113,51 +114,43 @@ mod optic_shmem {
 
         pub fn open(self) -> io::Result<Shmem> {
             let name = self.name.ok_or_else(|| {
-                io::Error::new(io::ErrorKind::InvalidInput, "shared-memory name is missing")
+                io::Error::new(io::ErrorKind::InvalidInput, "frame transport name is missing")
             })?;
-            let name = if name.starts_with('/') { name } else { format!("/{name}") };
-            let c_name = CString::new(name)
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "NUL in shared-memory name"))?;
-            let fd = unsafe { libc::shm_open(c_name.as_ptr(), libc::O_RDONLY, 0) };
-            if fd < 0 {
-                return Err(io::Error::last_os_error());
-            }
-
-            let mut stat = unsafe { std::mem::zeroed::<libc::stat>() };
-            if unsafe { libc::fstat(fd, &mut stat) } != 0 {
-                let err = io::Error::last_os_error();
-                unsafe { libc::close(fd); }
-                return Err(err);
-            }
-            let len = usize::try_from(stat.st_size).map_err(|_| {
-                unsafe { libc::close(fd); }
-                io::Error::new(io::ErrorKind::InvalidData, "invalid shared-memory size")
-            })?;
-            if len < 28 {
-                unsafe { libc::close(fd); }
+            let leaf = name.trim_start_matches('/');
+            if leaf.is_empty() || leaf.contains('/') || leaf == "." || leaf == ".." {
                 return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "optic shared-memory segment is smaller than its frame header",
+                    io::ErrorKind::InvalidInput,
+                    "optic transport name must be a single path component",
                 ));
             }
-
+            let path: PathBuf = std::env::temp_dir().join(format!("{leaf}.frame"));
+            let file = File::open(path)?;
+            let len = usize::try_from(file.metadata()?.len()).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidData, "invalid optic transport size")
+            })?;
+            if len < 28 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "optic transport is smaller than its frame header",
+                ));
+            }
             let mapped = unsafe {
                 libc::mmap(
                     std::ptr::null_mut(),
                     len,
                     libc::PROT_READ,
                     libc::MAP_SHARED,
-                    fd,
+                    file.as_raw_fd(),
                     0,
                 )
             };
             if mapped == libc::MAP_FAILED {
-                let err = io::Error::last_os_error();
-                unsafe { libc::close(fd); }
-                return Err(err);
+                return Err(io::Error::last_os_error());
             }
-            let ptr = NonNull::new(mapped.cast::<u8>()).expect("mmap returned a non-null mapping");
-            Ok(Shmem { ptr, len, fd })
+            let ptr = NonNull::new(mapped.cast::<u8>()).ok_or_else(|| {
+                io::Error::new(io::ErrorKind::Other, "mmap returned a null address")
+            })?;
+            Ok(Shmem { ptr, len, _file: file })
         }
     }
 }
