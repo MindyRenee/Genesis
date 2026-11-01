@@ -51,7 +51,12 @@ def test_load_arc1_task_rejects_out_of_range_colors(tmp_path) -> None:
     """Reject cells outside ARC's valid color range."""
     path = tmp_path / "bad-color.json"
     path.write_text(
-        json.dumps({"train": [{"input": [[10]], "output": [[0]]}], "test": [{"input": [[0]]}]}),
+        json.dumps(
+            {
+                "train": [{"input": [[10]], "output": [[0]]}],
+                "test": [{"input": [[0]]}],
+            }
+        ),
         encoding="utf-8",
     )
     with pytest.raises(ARCSourceError, match=r"0\.\.9"):
