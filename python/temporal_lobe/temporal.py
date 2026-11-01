@@ -16,6 +16,7 @@ from typing import Any
 from temporal_lobe.comprehension import Comprehension
 from temporal_lobe.concept_learner import ConceptLearner
 from temporal_lobe.memory_store import MemoryStore
+from temporal_lobe.language_latent_space import LanguageLatentSpace
 from temporal_lobe.semantic_grounding import SemanticGrounder
 from temporal_lobe.topic_resolver import TopicResolver
 
@@ -35,6 +36,8 @@ class TemporalLobe:
         self.network = network
         # Wernicke — utterance comprehension
         self.comprehension = Comprehension()
+        # Shared geometry for the same parsed language used by grounding.
+        self.language_latent_space = LanguageLatentSpace()
         # Anterior temporal semantic hub — grounding + topics
         self.semantic_grounder = SemanticGrounder(network)
         self.topic_resolver = TopicResolver(network)
@@ -49,6 +52,10 @@ class TemporalLobe:
         from temporal_lobe.cognitive_map import CognitiveMap
 
         self.cognitive_map = CognitiveMap()
+
+    def observe_language(self, text: str, result: Any) -> dict[str, Any]:
+        # Update language geometry from a real comprehension result.
+        return self.language_latent_space.observe(text, result)
 
     def grow_concept_learner(self, synapses) -> ConceptLearner:
         """Grow the label-acquisition machinery on the synaptic substrate."""
