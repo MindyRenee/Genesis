@@ -843,6 +843,14 @@ class LifecycleMixin:
         still runs in that case so a persistence error does not strand
         the daemon or leave registered modules marked running.
         """
+        adapter = getattr(self, "android_sensor_adapter", None)
+        if adapter is not None:
+            try:
+                adapter.close()
+            except Exception as error:  # noqa: BLE001 — cleanup must continue
+                logger.warning("Android sensor adapter cleanup failed: %s", error)
+            self.android_sensor_adapter = None
+
         if not self._running:
             return True
 

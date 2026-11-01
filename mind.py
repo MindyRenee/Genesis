@@ -231,6 +231,41 @@ class Mind(
         self._init_sleep_compression()
         self._wire_modules()
         self._init_runtime_state()
+        # Android sensor collection is explicitly opt-in and uses Termux:API.
+        self.android_sensor_adapter = None
+        if os.environ.get("GENESIS_ANDROID_SENSORS", "0") == "1":
+            from brainstem.android_sensors import AndroidSensorAdapter, is_android_termux
+
+            if is_android_termux():
+                adapter = AndroidSensorAdapter(self._on_android_sensor_sample)
+                if adapter.start():
+                    self.android_sensor_adapter = adapter
+
+
+    def _on_android_sensor_sample(self, reading: dict) -> None:
+        """Publish measured Android sensor data into the ordinary world event path."""
+        name = str(reading.get("name", "sensor"))
+        values = reading.get("values")
+        if not isinstance(values, list):
+            return
+        from brainstem.android_sensors import _SENSOR_UNITS
+
+        lowered = name.casefold()
+        sensor_type = next((item for item in _SENSOR_UNITS if item in lowered), "unknown")
+        self.world.perceive(
+            f"Android sensor reading: {name}",
+            salience=0.25,
+            source="android_sensor",
+            topics=[],
+            metadata={
+                "sensor": name,
+                "sensor_type": sensor_type,
+                "values": values,
+                "units": _SENSOR_UNITS.get(sensor_type, "unknown"),
+                "accuracy": reading.get("accuracy"),
+                "sensor_timestamp": reading.get("timestamp"),
+            },
+        )
 
     @property
     def regulator(self):
