@@ -82,6 +82,8 @@ def run_arc3_episode(
     if isinstance(max_steps, bool) or not isinstance(max_steps, int) or max_steps < 1:
         raise ValueError("max_steps must be a positive integer")
 
+    from parietal_lobe.arc_policy import observation_signature
+
     episode = ARC3Episode(game_id=game_id)
     observation = initial_observation
 
