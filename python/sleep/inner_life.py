@@ -233,6 +233,7 @@ class InnerLife:
         engagement=None,
         get_fold_margins=None,
         seed: int | None = None,
+        on_latent_signal=None,
     ) -> None:
         """Initialize the inner life with its cognitive engines and callbacks.
 
@@ -282,6 +283,7 @@ class InnerLife:
         self.reflection = reflection
         self._get_emotion = get_emotion
         self._on_thought = on_thought
+        self._on_latent_signal = on_latent_signal
         self._on_neuro_impulse = on_neuro_impulse
         self._self_composer = self_composer
         self._self_model = self_model
@@ -5090,6 +5092,22 @@ class InnerLife:
     def _record_thought(self, thought: SpontaneousThought, emotion: EmotionalState) -> None:
         """Record a spontaneous thought and update its inner-world state."""
         self._observe_inner_world(thought, emotion)
+        # Every recorded thought enters the shared self latent space,
+        # including sub-verbal thoughts that are not surfaced to language.
+        if self._on_latent_signal is not None:
+            try:
+                self._on_latent_signal(
+                    thought.content,
+                    f"thought:{thought.trigger or 'internal'}",
+                    {
+                        "trigger": thought.trigger,
+                        "is_dream": bool(getattr(thought, "is_dream", False)),
+                        "salience": 0.4,
+                        "addressed": getattr(thought, "intent", "") == "question",
+                    },
+                )
+            except Exception:
+                logger.debug("self latent thought integration failed", exc_info=True)
         with self._thoughts_lock:
             self._thoughts.append(thought)
             self._thought_count += 1
