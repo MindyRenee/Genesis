@@ -158,3 +158,32 @@ def test_episode_runner_stops_when_outer_world_cannot_perceive() -> None:
     assert episode.transitions == []
     assert episode.stopped_reason == "outer_world_unavailable"
 
+
+
+
+def test_episode_runner_feeds_terminal_outcome_back_to_bound_policy(monkeypatch) -> None:
+    """The episode loop reports explicit terminal feedback to Genesis' policy."""
+    from parietal_lobe.arc_policy import ARC3ExplorationPolicy, observation_signature
+
+    monkeypatch.setattr(
+        arc_play,
+        "step_arc3_game",
+        lambda *args, **kwargs: SimpleNamespace(
+            state=SimpleNamespace(name="WIN"), grid=[[1]]
+        ),
+    )
+    initial = SimpleNamespace(
+        state=SimpleNamespace(name="PLAYING"), grid=[[0]]
+    )
+    policy = ARC3ExplorationPolicy()
+    episode = run_arc3_episode(
+        FakeEnvironment(),
+        game_id="feedback-game",
+        initial_observation=initial,
+        choose_action=policy.choose_action,
+        max_steps=1,
+    )
+
+    key = (observation_signature(initial), episode.transitions[0]["action"])
+    assert episode.terminal_state == "WIN"
+    assert policy._outcomes[key] == (1.0, 1)
