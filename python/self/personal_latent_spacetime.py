@@ -14,7 +14,7 @@ in the self-space's coordinates.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 import math
 from collections.abc import Mapping
 
@@ -25,7 +25,7 @@ FloatVector = NDArray[np.float64]
 FloatMatrix = NDArray[np.float64]
 
 
-class LatentDomain(str, Enum):
+class LatentDomain(StrEnum):
     SELF = "self"
     INNER = "inner"
     OUTER = "outer"
