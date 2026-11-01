@@ -60,13 +60,21 @@ use std::ffi::CString;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread::{self, JoinHandle};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+#[cfg(target_os = "linux")]
+use std::time::Instant;
 
+#[cfg(target_os = "linux")]
 use v4l::Device;
+#[cfg(target_os = "linux")]
 use v4l::buffer::Type;
+#[cfg(target_os = "linux")]
 use v4l::format::FourCC;
+#[cfg(target_os = "linux")]
 use v4l::io::mmap::Stream as MmapStream;
+#[cfg(target_os = "linux")]
 use v4l::io::traits::CaptureStream;
+#[cfg(target_os = "linux")]
 use v4l::video::Capture;
 
 use crate::state::sanitize::finite_clamp;
@@ -801,24 +809,29 @@ impl Default for OpticNerve {
 /// Bounded re-open table: after each un-lived life the limb waits
 /// this long before the next attempt — the same widening sequence
 /// the process-level rebirth used.
+#[cfg(target_os = "linux")]
 const EYE_BACKOFF_S: [u64; 5] = [2, 5, 15, 30, 60];
 
 /// A life at least this long counts the eye as having lived — the
 /// attempt count refunds, the same stability rule the watcher kept.
+#[cfg(target_os = "linux")]
 const EYE_STABLE_S: f64 = 60.0;
 
 /// Consecutive dequeue errors that declare the device lost; at the
 /// 500 ms error sleep this is ~15 s of a truly dead camera before
 /// the limb counts it a life ended and re-opens.
+#[cfg(target_os = "linux")]
 const EYE_ERR_LIMIT: u32 = 30;
 
 /// The socket the eye opens absent a `GENESIS_CAMERA` override —
 /// and the fallback when an exhausted override names another
 /// device: a working eye beats the preferred dead one.
+#[cfg(target_os = "linux")]
 const DEFAULT_CAMERA_PATH: &str = "/dev/video0";
 
 /// The sockets the limb will try, preferred first: the configured
 /// device, then the default when the override names another.
+#[cfg(target_os = "linux")]
 fn camera_candidates(configured: &str) -> Vec<String> {
     let mut candidates = vec![configured.to_string()];
     if configured != DEFAULT_CAMERA_PATH {
@@ -894,6 +907,7 @@ impl Drop for OpticCapture {
 /// where the loss actually happens. Bounded: after the table's
 /// worth of un-lived lives the eye is accepted absent and the limb
 /// rests — the organism goes on without sight.
+#[cfg(target_os = "linux")]
 fn capture_limb(shm_name: &str, stop: &AtomicBool) {
     let configured =
         std::env::var("GENESIS_CAMERA").unwrap_or_else(|_| DEFAULT_CAMERA_PATH.to_string());
@@ -942,11 +956,24 @@ fn capture_limb(shm_name: &str, stop: &AtomicBool) {
     );
 }
 
+#[cfg(target_os = "android")]
+fn capture_limb(shm_name: &str, stop: &AtomicBool) {
+    let _ = shm_name;
+    eprintln!(
+        "[genesis] eye: native V4L2 capture is unavailable on Android; \
+         camera input remains absent until an Android camera bridge is installed"
+    );
+    while !stop.load(Ordering::Relaxed) {
+        thread::sleep(Duration::from_secs(1));
+    }
+}
+
 /// One life of the eye: device open → format negotiate → segment
 /// create → frame loop, until the hardware fails or `stop` lands.
 /// Returns the seconds the eye stayed open — `EYE_STABLE_S` is the
 /// refund threshold. Every failure inside is quiet logging, never a
 /// panic: this thread dying must never cost the body.
+#[cfg(target_os = "linux")]
 fn eye_life(shm_name: &str, camera_index: usize, camera_path: &str, stop: &AtomicBool) -> f64 {
     let born = Instant::now();
 
@@ -1597,6 +1624,7 @@ mod tests {
         drop(seg);
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn the_default_socket_is_the_only_candidate_unless_overridden() {
         // No override — one candidate, the default itself.
