@@ -1,13 +1,13 @@
 """Tests for the shared self/inner/outer spacetime causal model."""
 
-import pytest
-
 from temporal_lobe.light_cones import (
     IntervalKind,
     LightConeModel,
     SpacetimeEvent,
     WorldDomain,
 )
+
+import pytest
 
 
 def event(name, t, x, domain=WorldDomain.OUTER):
