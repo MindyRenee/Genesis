@@ -50,6 +50,10 @@ The example selects the first legal action only to demonstrate transport; it is 
 
 Each session response includes the current observation, current legal action names, step count, terminal state, and remaining step budget. The server revalidates actions against the environment before executing them. Session IDs are unguessable, requests are size-limited, and the default bridge binds only to loopback.
 
-## Limits
+## Cognitive telemetry and limits
 
-This is a transport and event-integration bridge, not proof of autonomous ARC solving. With `--mind-socket`, ARC observations/actions enter Genesis through the existing OuterWorld event path, which is wired to self-state and cognitive-topos updates. This does not make the policy a solver, and it does not directly translate ARC records into language or guarantee learned semantic alignment. The Python service also needs the optional official ARC toolkit and any required API access to list/open live games.
+With `--mind-socket`, each ARC observation enters `Mind.world.perceive()` and each executed action enters `Mind.world.it_acted()`. The OuterWorld event path updates its experiential latent geometry and existing cognitive integrations. `GenesisArcObserver` also sends a stable natural-language event description through `brain.temporal.comprehension` and `brain.temporal.observe_language()`, so the existing language latent space records event-level features, online covariance, Fisher information, transport cost, and latent transition residuals. This is an explicit event-description path, **not** a claim that the language parser semantically decodes the raw ARC grid. The raw structured percept remains attached to the world event.
+
+The observer snapshot reports `events_seen`, `events_failed`, `latent_observations`, and `last_transition_residual`; these are runtime diagnostics, not a claim that every cognitive subsystem was updated. In particular, the current brain-wave module synthesizes model oscillations; it does not measure biological EEG. Actual biological brainwave input requires an EEG/biosignal sensor and calibrated acquisition path, neither of which is supplied by the phone bridge. Do not describe the oscillator output as real measured brainwaves.
+
+This remains a transport and event-integration bridge, not proof of autonomous ARC solving or semantic alignment. The Python service also needs the optional official ARC toolkit and any required API access to list/open live games.
