@@ -421,6 +421,22 @@ class ConversationMixin:
                         stream=kind,
                     )
 
+    def _observe_language_input(self, content: str) -> None:
+        """Record received language in the same temporal latent space as output."""
+        temporal = getattr(self.brain, "temporal", None)
+        frontal = getattr(self.brain, "frontal", None)
+        comprehension = getattr(frontal, "comprehension", None)
+        if temporal is None or comprehension is None or not isinstance(content, str):
+            return
+        try:
+            parsed = comprehension.comprehend(content)
+            temporal.observe_language(content, parsed, direction="inbound")
+            self._integrate_cognitive_topos("language", "inbound", content)
+        except (ArithmeticError, AttributeError, TypeError, ValueError, OverflowError):
+            # Language geometry is observational; malformed input must not
+            # interrupt the actual conversation pipeline.
+            logger.debug("language latent input observation failed", exc_info=True)
+
     def _observe_language_output(self, content: str) -> None:
         """Record Genesis's generated utterance in the temporal language space."""
         temporal = getattr(self.brain, "temporal", None)
@@ -901,6 +917,8 @@ class ConversationMixin:
         """
         if not self._running:
             raise RuntimeError("Mind is not started — call start() first")
+
+        self._observe_language_input(user_input)
 
         # Wake it if it's asleep or meditating — the user is talking
         # to it, so it should be present. This makes respond()
