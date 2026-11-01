@@ -108,11 +108,19 @@ def test_valence_sign_is_positive_negative_or_neutral():
 
 
 def test_user_speech_sentiment_reaches_outer_world_valence():
-    world = OuterWorld()
-    world.hear_user("This is wonderful and excellent.")
-    result = world.experiential_space.snapshot()
-    assert result["valence"] > 0.0
-    assert result["valence_sign"] == "positive"
+    from limbic_system.sentiment import clear_learned_sentiment, learn_sentiment
+
+    clear_learned_sentiment()
+    learn_sentiment("wonderful", 3.0)
+    learn_sentiment("excellent", 3.0)
+    try:
+        world = OuterWorld()
+        world.hear_user("This is wonderful and excellent.")
+        result = world.experiential_space.snapshot()
+        assert result["valence"] > 0.0
+        assert result["valence_sign"] == "positive"
+    finally:
+        clear_learned_sentiment()
 
 
 def test_nested_mapping_payload_extracts_numeric_grid():
