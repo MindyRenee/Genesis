@@ -205,13 +205,13 @@ class ConversationMixin:
                         "topics": [kind],
                     },
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("volition workspace broadcast failed", exc_info=True)
 
         for listener in self._live_thought_listeners:
             try:
                 listener(kind, content)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # a listener must never crash its mind
                 logger.debug("live thought listener failed", exc_info=True)
 
@@ -221,7 +221,7 @@ class ConversationMixin:
         if kind in ("expression", "distress", "question"):
             try:
                 self.world.it_said(content)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.conversation._emit_live_thought",
                     e,
@@ -354,7 +354,7 @@ class ConversationMixin:
                 text = thought.rendered_text(self.language, emotion)
             else:
                 text = thought.content
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("thought rendering failed, using raw content", exc_info=True)
             text = thought.content
         # A thought whose entire text is a single internal identifier
@@ -410,7 +410,7 @@ class ConversationMixin:
         if psychoanalysis is not None:
             try:
                 slipped = psychoanalysis.note_surfaced(getattr(thought, "topics", None) or ())
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed("mind.conversation._on_spontaneous_thought", e)
             else:
                 if slipped:
@@ -499,7 +499,7 @@ class ConversationMixin:
                 addressed=event.addressed,
                 metadata=event.metadata,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("self latent world observation failed", exc_info=True)
 
         # Feed the observed outer-world geometry and the just-updated self
@@ -535,7 +535,7 @@ class ConversationMixin:
                     "percept": event.percept,
                 },
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("world event workspace broadcast failed", exc_info=True)
 
         # A structured percept is *seen*, not just narrated: a grid
@@ -560,7 +560,7 @@ class ConversationMixin:
                     source="world",
                     source_confidence=0.85,
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.conversation._on_world_event",
                     e,
@@ -575,7 +575,7 @@ class ConversationMixin:
                     [event.describe()[:200]],
                     salience=event.salience,
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.conversation._on_world_event",
                     e,
@@ -618,7 +618,7 @@ class ConversationMixin:
                 )
             ground_scene(network, scene, ns=f"world:{event.source}")
             seen[event.source] = grid
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.conversation._ground_world_percept",
                 e,
@@ -739,7 +739,7 @@ class ConversationMixin:
                 salience=salience,
             )
             self.inner_life.accumulate_synaptic_load(salience * 0.1)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.conversation._learner_store_memory",
                 e,
@@ -750,7 +750,7 @@ class ConversationMixin:
         # internal change.
         try:
             self.world.it_acted("studied the web", detail=text[:200])
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.conversation._learner_store_memory",
                 e,
@@ -821,7 +821,7 @@ class ConversationMixin:
         # is not updated when think() times out.
         try:
             self.brain.frontal.attention.clear()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.conversation._respond_timeout",
                 e,
@@ -940,7 +940,7 @@ class ConversationMixin:
         # neurochemical coupling.
         try:
             self.world.hear_user(user_input)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.conversation._respond_once",
                 e,
@@ -1042,7 +1042,7 @@ class ConversationMixin:
         """
         try:
             self.world.it_said(text)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.conversation._said",
                 e,
@@ -1078,7 +1078,7 @@ class ConversationMixin:
                 )
             if persons:
                 self.client.update_user_affect(0.0, 0.0, 0.0, confidence=0.0)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.conversation._note_faces_seen",
                 e,
@@ -1130,7 +1130,7 @@ class ConversationMixin:
                 result = reply.get("result")
                 if result is not None:
                     result_holder["result"] = result
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 result_holder["error"] = e
 
         worker = named_thread("think-worker", _think_worker, comm="g-think")
@@ -1211,7 +1211,7 @@ class ConversationMixin:
                     )
                     self.self_invoke("/sleep")
                     return
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.conversation._check_post_conversation_self_invoke",
                     e,
@@ -1229,12 +1229,12 @@ class ConversationMixin:
                         "thinking",
                     )
                     self.self_invoke("/introspect")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.conversation._check_post_conversation_self_invoke",
                     e,
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.conversation._check_post_conversation_self_invoke",
                 e,
@@ -1374,13 +1374,13 @@ class ConversationMixin:
             report = self.language.render(thought, emotion)
             try:
                 self.world.it_acted("looked through the eye", detail=report[:200])
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.conversation.see",
                     e,
                 )
             return report
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.conversation.see",
                 e,
@@ -1434,7 +1434,7 @@ class ConversationMixin:
             n_unknown_faces = 0
             try:
                 face_names, n_unknown_faces = self.vision.recognize_faces_in(frame)
-            except Exception as e: — a bad frame is not a failed look
+            except Exception as e:  # noqa: BLE001 — a bad frame is not a failed look
                 note_swallowed(
                     "mind.conversation.look_at_image.faces",
                     e,
@@ -1482,13 +1482,13 @@ class ConversationMixin:
             rendered = self.language.render(thought, emo)
             try:
                 self.world.it_acted("looked at an image", detail=rendered[:200])
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.conversation.look_at_image",
                     e,
                 )
             return rendered
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.conversation.look_at_image",
                 e,
@@ -1593,7 +1593,7 @@ class ConversationMixin:
                 self.brain.frontal.teaching_topic = topic
                 try:
                     self.brain.frontal.executive.switch_task(topic)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.debug(f"executive task switch failed: {e}")
             return
         self._answering_questions: bool = True
@@ -1609,7 +1609,7 @@ class ConversationMixin:
         self._prior_qa_task = self.brain.frontal.executive.active_task
         try:
             self.brain.frontal.executive.switch_task(topic or "answering questions")
-        except Exception as e: — task-set is advisory
+        except Exception as e:  # noqa: BLE001 — task-set is advisory
             logger.debug(f"executive task switch failed: {e}")
         self.learner.pause()
         self.inner_life.pause()
@@ -1634,7 +1634,7 @@ class ConversationMixin:
             self.brain.frontal.teaching_topic = self._teaching_topic
         try:
             self.brain.frontal.executive.switch_task(getattr(self, "_prior_qa_task", "") or "idle")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"executive task restore failed: {e}")
         if not self._is_teaching:
             self.learner.resume()
