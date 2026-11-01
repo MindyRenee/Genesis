@@ -1040,6 +1040,20 @@ This path can use a Linux camera device, optional microphone input, and the
 existing Linux daemon integrations. `scripts/install.sh` installs a resident
 systemd user service on systems that support it.
 
+### Android / Termux bootstrap
+
+Genesis3 includes an experimental native Termux installer at
+scripts/install_termux.sh. From the repository root in native Termux, run:
+
+    bash scripts/install_termux.sh
+
+The installer deliberately does not run pkg upgrade, install a systemd
+service, or enable privacy-sensitive sensors automatically. It installs
+Termux-native scientific packages, verifies Python imports, and attempts to
+build the Rust daemon. A successful build is not proof that the complete
+runtime works on every phone; verify it on-device before relying on it.
+See docs/archive/computer-specific/cleanup-manifest.md for limitations.
+
 ### Android / Termux status
 
 Genesis3 is being adapted for phone-first development. The desktop X11 screen

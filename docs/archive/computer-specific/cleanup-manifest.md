@@ -31,6 +31,7 @@ This inventory records each platform-specific integration reviewed so far. It di
 | File | Decision and limitation |
 |---|---|
 | `scripts/install.sh` | Retained for Linux; it installs a systemd user service where available and is not the Termux installer. |
+| `scripts/install_termux.sh` | Experimental native Termux bootstrap; installs Android-compatible packages, checks Python imports, and attempts a daemon build without systemd or `pkg upgrade`. It still requires on-device runtime verification. |
 | `scripts/install_optional_deps.sh` | Retained for Linux package managers and PortAudio/pycairo setup; not an Android setup path. |
 | `scripts/cargo-env.sh` | Retained as a Linux build-toolchain helper; not a runtime connection. |
 | `.github/workflows/ci.yml` | Retained as Linux CI; it validates the existing Linux target, not Android. |
@@ -47,7 +48,7 @@ This inventory records each platform-specific integration reviewed so far. It di
 - Verify camera, microphone, and sensor adapters on an actual phone; automated tests cover decoding and payload parsing, not Android permissions or device availability.
 - Interactive speech input can fall back to `termux-speech-to-text` when no local audio backend is available. Its recognition behavior depends on the Android speech service and is not claimed to be offline.
 - Keep browser automation marked unavailable until a real Android-browser control interface is available; `termux-open-url` is not browser automation.
-- Provide a Termux-native installer after validating package names and dependency availability on-device.
+- Validate `scripts/install_termux.sh` package names and complete the build/run smoke test on an actual Termux device.
 - Re-audit the browser/tool integrations and stale Linux manuals after the Android runtime path is established.
 
 The Termux:API battery fallback accepts only a valid percentage. It records charging state only for known values; an unknown charging value does not erase a valid battery percentage or get misreported as unplugged.
