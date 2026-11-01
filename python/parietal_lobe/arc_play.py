@@ -1,0 +1,115 @@
+"""Bounded ARC-AGI-3 interaction loop for Genesis-owned action policies.
+
+This module deliberately does not contain a solver or select actions. The
+caller supplies Genesis' policy; the loop enforces a step budget, passes
+each observation and available action set to that policy, and returns a
+replayable in-memory episode record.
+"""
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
+from typing import Any
+
+from parietal_lobe.arc_sources import (
+    ARCSourceError,
+    arc3_legal_actions,
+    step_arc3_game,
+)
+
+
+@dataclass(frozen=True)
+class ARC3Decision:
+    """One policy decision, using an action name exposed by the toolkit."""
+
+    action: str
+    data: dict[str, Any] | None = None
+    reasoning: dict[str, Any] | None = None
+
+
+@dataclass
+class ARC3Episode:
+    """Outcome and auditable transition history for one bounded game session."""
+
+    game_id: str
+    transitions: list[dict[str, Any]] = field(default_factory=list)
+    terminal_state: str | None = None
+    stopped_reason: str = "step_limit"
+
+
+Policy = Callable[[Any, list[str], list[dict[str, Any]]], ARC3Decision]
+
+
+def run_arc3_episode(
+    environment: Any,
+    *,
+    game_id: str,
+    initial_observation: Any,
+    choose_action: Policy,
+    max_steps: int = 100,
+) -> ARC3Episode:
+    """Run a bounded closed loop using a caller-supplied Genesis policy.
+
+    The policy receives the current observation, legal action names, and
+    previous transitions. It must return an ARC3Decision. This function
+    never invents an action when the policy fails or returns an illegal one.
+    """
+    if isinstance(max_steps, bool) or not isinstance(max_steps, int) or max_steps < 1:
+        raise ValueError("max_steps must be a positive integer")
+
+    episode = ARC3Episode(game_id=game_id)
+    observation = initial_observation
+
+    for step_index in range(max_steps):
+        state = getattr(observation, "state", None)
+        state_name = getattr(state, "name", str(state)) if state is not None else None
+        if state_name in {"WIN", "GAME_OVER"}:
+            episode.terminal_state = state_name
+            episode.stopped_reason = "terminal_state"
+            return episode
+
+        legal_actions = arc3_legal_actions(environment)
+        if not legal_actions:
+            episode.stopped_reason = "no_legal_actions"
+            return episode
+
+        decision = choose_action(observation, legal_actions, episode.transitions)
+        if not isinstance(decision, ARC3Decision):
+            raise TypeError("choose_action must return ARC3Decision")
+        if decision.action not in legal_actions:
+            raise ARCSourceError(
+                f"Policy selected illegal action {decision.action!r}; "
+                f"available actions: {legal_actions}"
+            )
+
+        next_observation = step_arc3_game(
+            environment,
+            decision.action,
+            data=decision.data,
+            reasoning=decision.reasoning,
+        )
+        next_state = getattr(next_observation, "state", None)
+        next_state_name = (
+            getattr(next_state, "name", str(next_state))
+            if next_state is not None
+            else None
+        )
+        episode.transitions.append(
+            {
+                "step": step_index + 1,
+                "action": decision.action,
+                "data": decision.data,
+                "reasoning": decision.reasoning,
+                "state_before": state_name,
+                "state_after": next_state_name,
+                "observation": next_observation,
+            }
+        )
+        observation = next_observation
+
+        if next_state_name in {"WIN", "GAME_OVER"}:
+            episode.terminal_state = next_state_name
+            episode.stopped_reason = "terminal_state"
+            return episode
+
+    return episode
