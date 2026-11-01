@@ -160,7 +160,7 @@ class LanguageLatentSpace:
         source_ids = np.flatnonzero(histogram)
         source_mass = histogram[source_ids]
         target_ids = np.arange(_ASCII_COUNT)
-        costs = np.empty((source_ids.size, _CELL_COUNT), dtype=np.float64)
+        costs = np.empty((source_ids.size, _ASCII_COUNT), dtype=np.float64)
         for row, cell_value in enumerate(source_ids):
             costs[row] = [
                 int(cell_value ^ int(proto)).bit_count() / 7.0
