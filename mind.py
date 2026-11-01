@@ -758,6 +758,14 @@ class Mind(
         self.vision = self.brain.occipital.vision
         self.vision.set_gamma_callback(self._on_v1_gamma)
         self.vision.set_sight_callback(self._on_sight)
+        from occipital_lobe.visual_spacetime import VisualSpacetimeBridge
+        from temporal_lobe.spacetime_workspace import SpacetimeWorkspace
+
+        self.spacetime_workspace = SpacetimeWorkspace(signal_speed=1.0)
+        self.visual_spacetime_bridge = VisualSpacetimeBridge(
+            self.spacetime_workspace
+        )
+        self.vision.set_visual_spacetime_bridge(self.visual_spacetime_bridge)
         # Wire the face recognizer to its data directory so known
         # faces persist across sessions
         self.vision._face_recognizer = FaceRecognizer(data_dir=self.data_dir)
