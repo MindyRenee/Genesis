@@ -53,9 +53,11 @@ class TemporalLobe:
 
         self.cognitive_map = CognitiveMap()
 
-    def observe_language(self, text: str, result: Any) -> dict[str, Any]:
-        # Update language geometry from a real comprehension result.
-        return self.language_latent_space.observe(text, result)
+    def observe_language(
+        self, text: str, result: Any, *, direction: str = "inbound"
+    ) -> dict[str, Any]:
+        """Update language geometry from a real parsed utterance."""
+        return self.language_latent_space.observe(text, result, direction=direction)
 
     def grow_concept_learner(self, synapses) -> ConceptLearner:
         """Grow the label-acquisition machinery on the synaptic substrate."""
