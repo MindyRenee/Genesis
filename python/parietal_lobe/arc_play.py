@@ -162,7 +162,11 @@ def run_arc3_episode(
             step=step_index + 1,
             observation=observation,
             legal_actions=legal_actions,
-            action={"name": decision.action, "data": decision.data, "reasoning": decision.reasoning},
+            action={
+                "name": decision.action,
+                "data": decision.data,
+                "reasoning": decision.reasoning,
+            },
             next_observation=next_observation,
             terminal_state=next_state_name if next_state_name in {"WIN", "GAME_OVER"} else None,
         )
