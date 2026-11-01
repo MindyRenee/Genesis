@@ -169,6 +169,11 @@ class ExperientialLatentSpace:
         else:
             sphere[0] = 1.0
         euclidean = state[12:20].copy()
+        hyperbolic_norm = min(float(np.linalg.norm(hyper)), 1.0 - _EPS)
+        hyperbolic_distance_from_origin = 2.0 * math.atanh(hyperbolic_norm)
+        # Geodesic distance from the sphere north pole on the unit sphere.
+        spherical_distance_from_north_pole = math.acos(float(np.clip(sphere[0], -1.0, 1.0)))
+        euclidean_distance_from_origin = float(np.linalg.norm(euclidean))
         # Four S^1 factors encode four sensory summary coordinates. Their
         # phase is driven by observed payload values, not a random projection.
         sensory_phase = np.pi * np.tanh(state[16:20])
@@ -203,6 +208,11 @@ class ExperientialLatentSpace:
                 "hyperbolic_state": hyper.tolist(),
                 "spherical_state": sphere.tolist(),
                 "euclidean_state": euclidean.tolist(),
+                "distances_from_reference": {
+                    "hyperbolic": hyperbolic_distance_from_origin,
+                    "spherical": spherical_distance_from_north_pole,
+                    "euclidean": euclidean_distance_from_origin,
+                },
             },
             "fisher_information": fim.tolist(),
             "fisher_volume": volume,
