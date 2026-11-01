@@ -2,8 +2,8 @@
 
 This is an autonomous action-selection baseline, not a task solver. It chooses
 only currently legal controls, prioritizes unexplored state/action pairs, and
-uses observed novelty and terminal outcomes to update its episode-local
-preferences. It does not claim to infer game rules or guarantee progress.
+uses state/action novelty and explicit terminal feedback to update its
+instance-local action preferences. It does not claim to infer game rules or guarantee progress.
 """
 from __future__ import annotations
 
@@ -67,12 +67,16 @@ class ARC3ExplorationPolicy:
     """
 
     exploration_weight: float = 1.0
-    _observations_seen: set[str] | None = None  # initialized lazily to keep the public API small
+    outcome_weight: float = 1.0
+    _observations_seen: set[str] | None = None  # initialized lazily
+    _outcomes: dict[tuple[str, str], tuple[float, int]] | None = None
 
     def __post_init__(self) -> None:
         """Initialize private novelty memory for this policy instance."""
         if self._observations_seen is None:
             self._observations_seen = set()
+        if self._outcomes is None:
+            self._outcomes = {}
 
     def choose_action(
         self,
@@ -108,6 +112,9 @@ class ARC3ExplorationPolicy:
             # not a learned value estimate or expected reward.
             score = self.exploration_weight / math.sqrt(1 + local_count)
             score += 0.1 / math.sqrt(1 + global_count)
+            total_reward, outcome_count = self._outcomes.get((state_key, action), (0.0, 0))
+            outcome_mean = total_reward / outcome_count if outcome_count else 0.0
+            score += self.outcome_weight * outcome_mean
             scored.append((score, action, local_count))
 
         # Stable tie-break avoids hidden randomness and makes replays auditable.
@@ -118,7 +125,7 @@ class ARC3ExplorationPolicy:
             "state_novel": is_novel_state,
             "local_state_action_visits": local_count,
             "exploration_score": round(score, 6),
-            "score_semantics": "exploration_priority_not_success_probability",
+            "score_semantics": "exploration_plus_observed_terminal_outcome_not_success_probability",
             "candidate_scores": [
                 {"action": candidate, "score": round(candidate_score, 6)}
                 for candidate_score, candidate, _ in sorted(scored, key=lambda item: item[1])
@@ -126,3 +133,27 @@ class ARC3ExplorationPolicy:
         }
         self._observations_seen.add(state_key)
         return ARC3Decision(action=action, reasoning=reasoning)
+
+    
+    def observe_transition(
+        self,
+        observation: Any,
+        action: str,
+        next_observation: Any,
+        terminal_state: str | None,
+    ) -> None:
+        """Store explicit terminal feedback for this observed state/action pair.
+
+        WIN is positive evidence and GAME_OVER is negative evidence. Nonterminal
+        transitions are not assigned an invented reward. This simple feedback
+        is state-specific and is not a learned transition model.
+        """
+        if terminal_state not in {"WIN", "GAME_OVER"}:
+            return
+        state_key = observation_signature(observation)
+        key = (state_key, action)
+        total, count = self._outcomes.get(key, (0.0, 0))
+        reward = 1.0 if terminal_state == "WIN" else -1.0
+        self._outcomes[key] = (total + reward, count + 1)
+        self._observations_seen.add(state_key)
+        self._observations_seen.add(observation_signature(next_observation))
