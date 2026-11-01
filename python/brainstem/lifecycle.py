@@ -187,6 +187,9 @@ class LifecycleMixin:
         self._start_autonomous_subsystems()
         self._start_engage_restored_sleep()
         self._start_background_threads()
+        # Hardware adapters must start only after the daemon, restored state,
+        # and cognitive event pathways are live.
+        self._start_android_adapters()
 
     def _start_connect_and_register(self) -> None:
         """Connect to the daemon and register cognitive modules.
