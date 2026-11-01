@@ -61,10 +61,10 @@ from typing import Any
 
 import numpy as np
 
-logger = logging.getLogger(__name__)
-
 from temporal_lobe.light_cones import WorldDomain
 from temporal_lobe.spacetime_workspace import SpacetimeWorkspace
+
+logger = logging.getLogger(__name__)
 
 Cell = tuple[int, int]
 
@@ -224,6 +224,7 @@ class CognitiveMap:
         # Shared causal view over allocentric map coordinates. The signal
         # speed is normalized (map-units/second), not physical light speed.
         self.spacetime = SpacetimeWorkspace(signal_speed=1.0)
+        self._spacetime_observation_count = 0
 
     # ─── Observation ────────────────────────────────────────────
 
@@ -316,19 +317,21 @@ class CognitiveMap:
         # semantic embedding coordinates are mixed into this frame.
         if self._pos is not None:
             event_time = time.monotonic()
+            self._spacetime_observation_count += 1
+            observation_id = self._spacetime_observation_count
             x, y = self._pos
             location = (float(x), float(y), 0.0)
             self.spacetime.record(
                 WorldDomain.OUTER,
                 location,
                 time_s=event_time,
-                event_id=f"map-observation:{self._episode}:{self._place.id if self._place else 0}:{len(self._context.places) if self._context else 0}",
+                event_id=f"map-observation:{observation_id}",
                 confidence=1.0 if position is not None else 0.5,
             )
             self.spacetime.record_self(
                 location,
                 time_s=event_time,
-                event_id=f"map-self:{self._episode}:{self._place.id if self._place else 0}",
+                event_id=f"map-self:{observation_id}",
                 confidence=1.0 if position is not None else 0.5,
             )
             for index, map_event in enumerate(events):
@@ -336,7 +339,7 @@ class CognitiveMap:
                     WorldDomain.INNER,
                     location,
                     time_s=event_time,
-                    event_id=f"map-inner:{self._episode}:{index}:{map_event.kind}",
+                    event_id=f"map-inner:{observation_id}:{index}:{map_event.kind}",
                     confidence=max(0.0, min(1.0, map_event.salience)),
                 )
         return events
