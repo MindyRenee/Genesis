@@ -3092,14 +3092,29 @@ fn read_max_freq() -> Option<u64> {
 fn read_termux_battery_status() -> Option<(f32, Option<bool>)> {
     #[cfg(target_os = "android")]
     {
-        let output = std::process::Command::new("termux-battery-status")
-            .output()
-            .ok()?;
-        if !output.status.success() {
-            return None;
+        // The daemon polls much faster than battery percentage changes.
+        // Cache successes and failures for 15 s to avoid spawning a Termux
+        // process on every body tick when sysfs is unavailable.
+        static CACHE: OnceLock<Mutex<Option<(Instant, Option<(f32, Option<bool>)>)>>> =
+            OnceLock::new();
+        let cache = CACHE.get_or_init(|| Mutex::new(None));
+        if let Ok(guard) = cache.lock() {
+            if let Some((updated, value)) = guard.as_ref() {
+                if updated.elapsed().as_secs_f32() < 15.0 {
+                    return *value;
+                }
+            }
         }
-        let text = String::from_utf8(output.stdout).ok()?;
-        parse_termux_battery_status(&text)
+        let value = std::process::Command::new("termux-battery-status")
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .and_then(|output| String::from_utf8(output.stdout).ok())
+            .and_then(|text| parse_termux_battery_status(&text));
+        if let Ok(mut guard) = cache.lock() {
+            *guard = Some((Instant::now(), value));
+        }
+        value
     }
     #[cfg(not(target_os = "android"))]
     {
