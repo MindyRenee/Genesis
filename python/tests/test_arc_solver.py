@@ -16,7 +16,7 @@ def test_arc1_solver_uses_spatial_reasoner_and_returns_grid_predictions(tmp_path
         json.dumps(
             {
                 "train": [{"input": [[0, 1]], "output": [[1, 0]]}],
-                "test": [{"input": [[0, 2]], "output": [[99, 99]]}],
+                "test": [{"input": [[0, 2]], "output": [[9, 9]]}],
             }
         ),
         encoding="utf-8",
