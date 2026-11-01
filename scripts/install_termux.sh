@@ -25,7 +25,7 @@ pkg update
 pkg install -y \
     git python python-pip python-setuptools rust clang make pkg-config \
     ffmpeg termux-api python-numpy python-pillow python-psutil \
-    python-scipy python-cairo opencv-python
+    python-scipy python-cairo opencv
 
 INSTALL_HOME="$HOME/.local/lib/genesis"
 VENV="$INSTALL_HOME/venv"
