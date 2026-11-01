@@ -354,6 +354,55 @@ class SelfLatentSpaceArchitecture:
         with self._lock:
             return dict(self._last_snapshot)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize only bounded, JSON-compatible dynamic state."""
+        with self._lock:
+            return {
+                "version": 1,
+                "observations": self._observations,
+                "last_state": None if self._last_state is None else self._last_state.tolist(),
+                "last_snapshot": dict(self._last_snapshot),
+            }
+
+    def restore(self, data: dict[str, Any]) -> None:
+        """Validate a saved state fully before mutating the live instance."""
+        if not isinstance(data, dict) or data.get("version") != 1:
+            raise ValueError("unsupported self latent state")
+        observations = data.get("observations")
+        if isinstance(observations, bool) or not isinstance(observations, int) or observations < 0:
+            raise ValueError("invalid self latent observation count")
+        raw_state = data.get("last_state")
+        state = None if raw_state is None else np.asarray(raw_state, dtype=np.float64)
+        if observations == 0:
+            if state is not None:
+                raise ValueError("empty self latent state cannot have a previous vector")
+        elif state is None or state.shape != (self.agency_bundle.output_dim,) or not np.isfinite(state).all():
+            raise ValueError("invalid self latent previous vector")
+        snapshot = data.get("last_snapshot", {})
+        if not isinstance(snapshot, dict):
+            raise ValueError("invalid self latent snapshot")
+        if observations:
+            for key, shape in (
+                ("narrative_base_metric", (self.base_manifold.base_dim, self.base_manifold.base_dim)),
+                ("agency_fiber_states", (self.agency_bundle.output_dim,)),
+                ("grassmannian_subspace_states", (self.agency_bundle.output_dim,)),
+                ("grassmannian_projection_operator", (self.agency_bundle.output_dim, self.agency_bundle.output_dim)),
+                ("consistency_information_metric", (self.agency_bundle.output_dim, self.agency_bundle.output_dim)),
+                ("predicted_transition_state", (self.agency_bundle.output_dim,)),
+                ("autopoietic_evolved_states", (self.agency_bundle.output_dim,)),
+            ):
+                array = np.asarray(snapshot.get(key), dtype=np.float64)
+                if array.shape != shape or not np.isfinite(array).all():
+                    raise ValueError(f"invalid self latent snapshot field: {key}")
+            loss = float(snapshot.get("coherence_loss", float("nan")))
+            efficacy = float(snapshot.get("efficacy_weight", float("nan")))
+            if not np.isfinite(loss) or loss < 0.0 or not np.isfinite(efficacy) or efficacy <= 0.0:
+                raise ValueError("invalid self latent scalar state")
+        with self._lock:
+            self._observations = observations
+            self._last_state = None if state is None else state.copy()
+            self._last_snapshot = dict(snapshot)
+
     def forward(
         self,
         narrative_coords: Any,
