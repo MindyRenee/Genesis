@@ -14,7 +14,9 @@ def test_policy_selects_only_legal_actions_and_explains_scores() -> None:
 
     assert decision.action in {"ACTION1", "ACTION2"}
     assert decision.reasoning["policy"] == "bounded_novelty_exploration"
-    assert decision.reasoning["score_semantics"] == "exploration_plus_observed_terminal_outcome_not_success_probability"
+    assert decision.reasoning["score_semantics"] == (
+        "exploration_plus_observed_terminal_outcome_not_success_probability"
+    )
     assert len(decision.reasoning["candidate_scores"]) == 2
 
 
