@@ -13,6 +13,7 @@ import math
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, is_dataclass
+from enum import Enum
 from typing import Any
 
 from parietal_lobe.arc_play import ARC3Decision
@@ -24,6 +25,8 @@ def _plain(value: Any, depth: int = 0) -> Any:
         return type(value).__name__
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
+    if isinstance(value, Enum):
+        return {"name": value.name, "value": _plain(value.value, depth + 1)}
     if is_dataclass(value) and not isinstance(value, type):
         return _plain(asdict(value), depth + 1)
     if isinstance(value, Mapping):
@@ -43,7 +46,7 @@ def _plain(value: Any, depth: int = 0) -> Any:
         return {
             key: _plain(item, depth + 1)
             for key, item in sorted(vars(value).items())
-            if not key.startswith("_")
+            if not key.startswith("_") and key not in {"timestamp", "time", "elapsed"}
         }
     return type(value).__name__
 
