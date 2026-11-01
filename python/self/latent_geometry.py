@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import threading
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
@@ -347,7 +348,7 @@ class SelfLatentSpaceArchitecture:
                 "predicted_transition_state": predicted[0].tolist(),
                 "autopoietic_evolved_states": evolved[0].tolist(),
             }
-            return dict(self._last_snapshot)
+            return deepcopy(self._last_snapshot)
 
     def snapshot(self) -> dict[str, Any]:
         """Return a detached snapshot of the most recent integrated signal."""
@@ -361,7 +362,7 @@ class SelfLatentSpaceArchitecture:
                 "version": 1,
                 "observations": self._observations,
                 "last_state": None if self._last_state is None else self._last_state.tolist(),
-                "last_snapshot": dict(self._last_snapshot),
+                "last_snapshot": deepcopy(self._last_snapshot),
             }
 
     def restore(self, data: dict[str, Any]) -> None:
@@ -401,7 +402,7 @@ class SelfLatentSpaceArchitecture:
         with self._lock:
             self._observations = observations
             self._last_state = None if state is None else state.copy()
-            self._last_snapshot = dict(snapshot)
+            self._last_snapshot = deepcopy(snapshot)
 
     def forward(
         self,
