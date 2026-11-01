@@ -19,6 +19,7 @@ This inventory records each platform-specific integration reviewed so far. It di
 | `Cargo.toml` | `v4l` is now a Linux-only target dependency. |
 | `src/daemon/optic_nerve.rs` | Linux V4L2 capture is compiled only on Linux. Android reports the camera channel unavailable; no false camera data is generated. |
 | `src/daemon/interoception.rs` | Detects readable CPU/SoC thermal zones by declared type; discovers Android-style battery supplies by `type=Battery`; recognizes USB/USB-C/USB-PD/wireless power sources; falls back to Termux:API battery percentage and known charging state when sysfs is missing or unreadable. |\n| `python/brainstem/android_sensors.py` | Opt-in (`GENESIS_ANDROID_SENSORS=1`) Termux:API sampler publishes changed sensor readings to `OuterWorld.perceive`; supports accelerometer, gyroscope, magnetic field, light, proximity, pressure, and rotation vector only when exposed by the device. |
+| `python/brainstem/android_media.py` | Opt-in camera (`GENESIS_ANDROID_CAMERA=1`) feeds real still frames into `Vision.see_frame`; opt-in microphone (`GENESIS_ANDROID_MICROPHONE=1`) captures short clips and uses ffmpeg plus the existing auditory feature classifier. Both require Termux:API permissions and on-device verification. |
 | `src/daemon/cpufreq.rs` | Privileged host CPU-frequency controls cannot use sudo on Android. |
 | `src/daemon/rtc_wake.rs` | RTC wake-alarm control is disabled on Android. |
 | `src/daemon/rtkit.rs` | RTKit system-bus priority requests are disabled on Android. |
@@ -35,16 +36,16 @@ This inventory records each platform-specific integration reviewed so far. It di
 | `python/brainstem/cpufreq.py` | Retained for process-local CPU affinity and I/O scheduling. It is distinct from privileged host CPU-frequency control. |
 | `python/brainstem/field_audio.py` | Retained as an optional PortAudio self-emission channel. Termux microphone recording is not an equivalent substitute for hearing the device's internal electrical/acoustic signature, so no false replacement was wired. |
 | `python/tools/browser.py` | Retained as an optional Chrome/Chromium DevTools Protocol browser. It is not an Android-browser bridge. |
-| `genesis_client/optic_nerve.py` and `python/occipital_lobe/perception/vision.py` | Retained as frame-consumer/perception code. An Android camera producer is not yet connected, so visual input remains absent on Android. |
+| `genesis_client/optic_nerve.py` | Retained for the Linux shared-memory camera producer; Android still frames enter through the separate `Vision.see_frame` seam. |
 | `docs/man/genesis-browser.7`, `docs/man/genesis-retina.1`, `docs/man/genesis-daemon.8`, `docs/man/genesis-cli.1` | Retained as existing Linux-oriented manuals; they do not activate hardware connections. |
 | `docs/arc/README.md` and `scripts/install_arc_resources.sh` | Retained; their Termux support applies to ARC resources/benchmark tooling, not proof that the complete daemon runs on Android. |
 
 ## Remaining work before calling the phone port complete
 
 - Cross-compile and run the full Rust daemon on an actual Android/Termux device; Linux CI does not prove this.
-- Add and test a real Android camera bridge before claiming live vision.
-- Verify the opt-in Termux sensor adapter on an actual phone; automated tests cover payload parsing, not Android permissions or device availability.
-- Add an Android microphone bridge for speech input or explicitly disable the PortAudio microphone path on Android; do not treat an absent microphone as a measured signal.
+- Verify camera, microphone, and sensor adapters on an actual phone; automated tests cover decoding and payload parsing, not Android permissions or device availability.
+- Speech transcription remains separate from the microphone sound-event adapter; connect Termux speech-to-text only after validating its language and permission behavior.
+- Keep browser automation marked unavailable until a real Android-browser control interface is available; `termux-open-url` is not browser automation.
 - Provide a Termux-native installer after validating package names and dependency availability on-device.
 - Re-audit the browser/tool integrations and stale Linux manuals after the Android runtime path is established.
 
