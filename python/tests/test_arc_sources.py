@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 
 import pytest
-
 from parietal_lobe.arc_sources import (
     ARCSourceError,
     arc1_problem_view,
@@ -36,7 +35,12 @@ def test_load_arc1_task_rejects_non_rectangular_grid(tmp_path) -> None:
     """Reject malformed grids whose rows have different widths."""
     path = tmp_path / "bad.json"
     path.write_text(
-        json.dumps({"train": [{"input": [[0, 1], [1]], "output": [[0]]}], "test": [{"input": [[0]]}]}),
+        json.dumps(
+            {
+                "train": [{"input": [[0, 1], [1]], "output": [[0]]}],
+                "test": [{"input": [[0]]}],
+            }
+        ),
         encoding="utf-8",
     )
     with pytest.raises(ARCSourceError, match="rectangular"):
@@ -50,7 +54,7 @@ def test_load_arc1_task_rejects_out_of_range_colors(tmp_path) -> None:
         json.dumps({"train": [{"input": [[10]], "output": [[0]]}], "test": [{"input": [[0]]}]}),
         encoding="utf-8",
     )
-    with pytest.raises(ARCSourceError, match="0..9"):
+    with pytest.raises(ARCSourceError, match=r"0\.\.9"):
         load_arc1_task(path)
 
 
@@ -71,7 +75,8 @@ def test_arc3_legal_actions_reads_current_environment_action_space() -> None:
     class Environment:
         """Expose representative actions for the adapter test."""
 
-        action_space = [Action("ACTION3"), Action("ACTION1")]
+        def __init__(self) -> None:
+            self.action_space = [Action("ACTION3"), Action("ACTION1")]
 
     assert arc3_legal_actions(Environment()) == ["ACTION1", "ACTION3"]
 
