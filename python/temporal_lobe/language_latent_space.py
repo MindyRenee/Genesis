@@ -17,9 +17,9 @@ import threading
 from copy import deepcopy
 from typing import Any
 
-import numpy as np
-
 from parietal_lobe.binary_language import BitCell
+
+import numpy as np
 
 _LATENT_DIM = 32
 _CELL_COUNT = 64
@@ -80,7 +80,7 @@ def _sinkhorn(
         raise ValueError("regularization must be finite and positive")
     if not np.isclose(source.sum(), 1.0) or not np.isclose(target.sum(), 1.0):
         raise ValueError("OT marginals must each sum to one")
-    kernel = np.exp(-cost / regularization).clip(min=_EPS)
+    kernel = np.maximum(np.exp(-cost / regularization), _EPS)
     u = np.ones_like(source)
     v = np.ones_like(target)
     for _ in range(iterations):
@@ -160,7 +160,11 @@ class LanguageLatentSpace:
             self._mean += delta / self._observations
             centered = features - self._mean
             self._m2 += np.outer(delta, centered)
-            transition = float(np.linalg.norm(features - previous)) if self._observations > 1 else 0.0
+            transition = (
+                float(np.linalg.norm(features - previous))
+                if self._observations > 1
+                else 0.0
+            )
             covariance = (
                 self._m2 / (self._observations - 1)
                 if self._observations > 1
