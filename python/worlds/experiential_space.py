@@ -63,6 +63,8 @@ class ExperientialLatentSpace:
             return {
                 "observations": 0,
                 "state": self._state.tolist(),
+                "feature_variance": [0.0] * _STATE_DIM,
+                "event_kind_probabilities": [0.0] * _KIND_COUNT,
                 "base_metric": np.eye(4).tolist(),
                 "conformal_scale": 1.0,
                 "toroidal_state": [0.0] * 8,
@@ -78,6 +80,14 @@ class ExperientialLatentSpace:
         result = dict(self._last)
         result["observations"] = self._seen
         result["state"] = self._state.tolist()
+        result["feature_variance"] = (
+            (self._m2 / (self._seen - 1)).tolist() if self._seen > 1
+            else [0.0] * _STATE_DIM
+        )
+        total_kinds = float(self._kind_counts.sum())
+        result["event_kind_probabilities"] = (
+            (self._kind_counts / total_kinds).tolist() if total_kinds else [0.0] * _KIND_COUNT
+        )
         return result
 
     def to_dict(self) -> dict[str, Any]:
