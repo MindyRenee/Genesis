@@ -42,6 +42,9 @@ def test_episode_runner_observes_feedback_and_stops_on_win(monkeypatch) -> None:
     assert episode.terminal_state == "WIN"
     assert episode.stopped_reason == "terminal_state"
     assert len(episode.transitions) == 1
+    assert len(episode.transitions[0]["state_signature"]) == 64
+    assert len(episode.transitions[0]["next_state_signature"]) == 64
+    assert episode.transitions[0]["state_signature"] != episode.transitions[0]["next_state_signature"]
 
 
 def test_episode_runner_rejects_illegal_policy_action(monkeypatch) -> None:
