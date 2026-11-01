@@ -28,6 +28,12 @@ _SENSOR_KEYWORDS = (
     "proximity",
     "pressure",
     "rotation vector",
+    "gravity",
+    "linear acceleration",
+    "ambient temperature",
+    "relative humidity",
+    "step counter",
+    "step detector",
 )
 _SENSOR_UNITS = {
     "accelerometer": "m/s^2",
@@ -38,6 +44,12 @@ _SENSOR_UNITS = {
     "proximity": "cm",
     "pressure": "hPa",
     "rotation vector": "unitless",
+    "gravity": "m/s^2",
+    "linear acceleration": "m/s^2",
+    "ambient temperature": "degC",
+    "relative humidity": "%",
+    "step counter": "steps",
+    "step detector": "event",
 }
 _THRESHOLDS = {
     "accelerometer": 0.15,
@@ -48,6 +60,12 @@ _THRESHOLDS = {
     "proximity": 1.0,
     "pressure": 0.5,
     "rotation vector": 0.03,
+    "gravity": 0.15,
+    "linear acceleration": 0.15,
+    "ambient temperature": 0.5,
+    "relative humidity": 2.0,
+    "step counter": 1.0,
+    "step detector": 0.5,
 }
 
 
