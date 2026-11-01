@@ -105,13 +105,17 @@ class ARC3ExplorationPolicy:
             # not a learned value estimate or expected reward.
             score = self.exploration_weight / math.sqrt(1 + local_count)
             score += 0.1 / math.sqrt(1 + global_count)
-            total_reward, outcome_count = self._outcomes.get((state_key, action), (0.0, 0))
+            total_reward, outcome_count = self._outcomes.get(
+                (state_key, action), (0.0, 0)
+            )
             outcome_mean = total_reward / outcome_count if outcome_count else 0.0
             score += self.outcome_weight * outcome_mean
             scored.append((score, action, local_count))
 
         # Stable tie-break avoids hidden randomness and makes replays auditable.
-        score, action, local_count = min(scored, key=lambda item: (-item[0], item[1]))
+        score, action, local_count = min(
+            scored, key=lambda item: (-item[0], item[1])
+        )
         reasoning = {
             "policy": "bounded_novelty_exploration",
             "state_signature": state_key,
@@ -123,12 +127,13 @@ class ARC3ExplorationPolicy:
             ),
             "candidate_scores": [
                 {"action": candidate, "score": round(candidate_score, 6)}
-                for candidate_score, candidate, _ in sorted(scored, key=lambda item: item[1])
+                for candidate_score, candidate, _ in sorted(
+                    scored, key=lambda item: item[1]
+                )
             ],
         }
         self._observations_seen.add(state_key)
         return ARC3Decision(action=action, reasoning=reasoning)
-
 
     def observe_transition(
         self,
