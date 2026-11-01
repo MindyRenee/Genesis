@@ -87,6 +87,7 @@ class ARC3ExplorationPolicy:
         seen = set(self._observations_seen)
         action_counts: Counter[tuple[str, str]] = Counter()
         global_counts: Counter[str] = Counter()
+        history_outcomes: dict[tuple[str, str], tuple[float, int]] = {}
 
         # Reconstruct policy evidence from the explicit episode history.
         for transition in previous_transitions:
@@ -97,6 +98,14 @@ class ARC3ExplorationPolicy:
             if isinstance(prior_key, str) and isinstance(action, str):
                 action_counts[(prior_key, action)] += 1
                 global_counts[action] += 1
+                terminal = transition.get("terminal_state", transition.get("state_after"))
+                if terminal in {"WIN", "GAME_OVER"}:
+                    key = (prior_key, action)
+                    total, count = history_outcomes.get(key, (0.0, 0))
+                    history_outcomes[key] = (
+                        total + (1.0 if terminal == "WIN" else -1.0),
+                        count + 1,
+                    )
             next_key = transition.get("next_state_signature")
             if isinstance(next_key, str):
                 seen.add(next_key)
@@ -110,8 +119,11 @@ class ARC3ExplorationPolicy:
             # not a learned value estimate or expected reward.
             score = self.exploration_weight / math.sqrt(1 + local_count)
             score += 0.1 / math.sqrt(1 + global_count)
-            total_reward, outcome_count = self._outcomes.get(
-                (state_key, action), (0.0, 0)
+            outcome_key = (state_key, action)
+            # Saved episode history is authoritative when it contains terminal
+            # feedback; otherwise use this instance's in-memory evidence.
+            total_reward, outcome_count = history_outcomes.get(
+                outcome_key, self._outcomes.get(outcome_key, (0.0, 0))
             )
             outcome_mean = total_reward / outcome_count if outcome_count else 0.0
             score += self.outcome_weight * outcome_mean
