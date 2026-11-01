@@ -57,6 +57,9 @@ class CognitiveToposRuntime:
     """Thread-safe bridge from live Genesis events to the unified engine."""
 
     def __init__(self, latent_dim: int = _STATE_DIM) -> None:
+        if isinstance(latent_dim, bool) or not isinstance(latent_dim, int) or latent_dim < 1:
+            raise ValueError("latent_dim must be a positive integer")
+        self.latent_dim = latent_dim
         self.engine = MasterCognitiveToposEngine(latent_dim)
         self._lock = threading.RLock()
         self._states = {
@@ -86,6 +89,8 @@ class CognitiveToposRuntime:
         content: str,
         self_snapshot: dict[str, Any] | None = None,
         outer_snapshot: dict[str, Any] | None = None,
+        inner_snapshot: dict[str, Any] | None = None,
+        language_snapshot: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Update one live domain and recompute the integrated macro-state."""
         if domain not in self._states:
@@ -95,17 +100,27 @@ class CognitiveToposRuntime:
         with self._lock:
             if domain == "outer" and outer_snapshot:
                 source = outer_snapshot.get("state")
-                self._states[domain] = _resize(source) if source is not None else _text_features(kind, content)
+                self._states[domain] = _resize(source, self.latent_dim) if source is not None else _text_features(kind, content, self.latent_dim)
+            elif domain == "inner" and inner_snapshot:
+                source = inner_snapshot.get("recursive_meta_states")
+                if source is None:
+                    source = inner_snapshot.get("affective_fiber_states")
+                if source is None:
+                    source = inner_snapshot.get("latent_mean")
+                self._states[domain] = _resize(source, self.latent_dim) if source is not None else _text_features(kind, content, self.latent_dim)
             elif domain == "self" and self_snapshot:
                 source = self_snapshot.get("agency_fiber_states")
-                self._states[domain] = _resize(source) if source is not None else _text_features(kind, content)
+                self._states[domain] = _resize(source, self.latent_dim) if source is not None else _text_features(kind, content, self.latent_dim)
+            elif domain == "language" and language_snapshot:
+                source = language_snapshot.get("latent_state")
+                self._states[domain] = _resize(source, self.latent_dim) if source is not None else _text_features(kind, content, self.latent_dim)
             else:
-                self._states[domain] = _text_features(kind, content)
+                self._states[domain] = _text_features(kind, content, self.latent_dim)
 
             # Self state is refreshed from the same real signal whenever it
             # exists; do not fabricate a second self model if a caller omits it.
             if self_snapshot and self_snapshot.get("agency_fiber_states") is not None:
-                self._states["self"] = _resize(self_snapshot["agency_fiber_states"])
+                self._states["self"] = _resize(self_snapshot["agency_fiber_states"], self.latent_dim)
 
             states = [self._states[key][None, :] for key in ("outer", "inner", "self", "language")]
             # The oscillator phases are tied to current state coordinates.
