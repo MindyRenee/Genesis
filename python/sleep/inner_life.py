@@ -65,6 +65,7 @@ from limbic_system.emotion import (
 )
 from self import Insight, Reflection
 from sleep.dream_synthesis import DreamSynthesis
+from sleep.inner_world import InnerWorldExperientialLatentSpace
 from temporal_lobe.concepts import ConceptNetwork, RelationType, strip_sense_suffix
 from temporal_lobe.concepts.types import Neighbor
 from thalamus.brain_waves import (  # canonical definition — avoids threshold drift
@@ -323,6 +324,8 @@ class InnerLife:
         self._init_sleep_cycle()
         self._init_replay_systems()
         self._init_dream_synthesis()
+        # Persistent numerical state model updated by each recorded thought.
+        self.inner_world = InnerWorldExperientialLatentSpace()
 
     def _init_awareness_agency(self) -> None:
         """Set up self-awareness module slots and curiosity-driven agency."""
@@ -5047,8 +5050,46 @@ class InnerLife:
                     facts.append(f"{rel_str} {target_display}")
         return ". ".join(facts), knowledge
 
+    def _observe_inner_world(self, thought: SpontaneousThought, emotion: EmotionalState) -> None:
+        """Map measured affect and this thought into the inner-world state."""
+        def bounded(name: str, default: float, low: float = -1.0, high: float = 1.0) -> float:
+            try:
+                value = float(getattr(emotion, name, default))
+            except (TypeError, ValueError):
+                value = default
+            return max(low, min(high, value)) if math.isfinite(value) else default
+
+        valence = bounded("valence", 0.0)
+        arousal = bounded("arousal", 0.5, 0.0, 1.0)
+        tone = bounded("tone", 0.0)
+        plasticity = bounded("plasticity", 0.5, 0.0, 1.0)
+        intensity = bounded("intensity", 0.0, 0.0, 1.0)
+        novelty = 0.0
+        metadata = getattr(thought, "metadata", None)
+        if isinstance(metadata, dict):
+            try:
+                novelty = max(0.0, min(1.0, float(metadata.get("novelty", 0.0))))
+            except (TypeError, ValueError):
+                novelty = 0.0
+        is_dream = bool(getattr(thought, "is_dream", False))
+        content = str(getattr(thought, "content", ""))
+        signals = [
+            valence, arousal, tone, plasticity, intensity, novelty,
+            float(is_dream), min(len(content), 1000) / 1000.0,
+        ]
+        try:
+            self.inner_world.observe(
+                [valence, arousal, tone, plasticity],
+                signals,
+                label=str(getattr(thought, "trigger", ""))[:128],
+            )
+        except (TypeError, ValueError, ArithmeticError):
+            # Observational geometry must not interrupt the existing pipeline.
+            logger.debug("inner-world observation rejected", exc_info=True)
+
     def _record_thought(self, thought: SpontaneousThought, emotion: EmotionalState) -> None:
-        """Record a spontaneous thought and its effects."""
+        """Record a spontaneous thought and update its inner-world state."""
+        self._observe_inner_world(thought, emotion)
         with self._thoughts_lock:
             self._thoughts.append(thought)
             self._thought_count += 1
