@@ -1636,9 +1636,8 @@ impl Interoceptor {
         if probe.max_freq_khz > 0 {
             mask |= sensor::MAX_FREQUENCY;
         }
-        let termux_battery_available =
-            (probe.battery_path.is_none() || probe.ac_path.is_none())
-                && read_termux_battery_status().is_some();
+        let termux_battery_available = (probe.battery_path.is_none() || probe.ac_path.is_none())
+            && read_termux_battery_status().is_some();
         if probe.battery_path.is_some() || termux_battery_available {
             mask |= sensor::BATTERY;
         }
@@ -3122,7 +3121,12 @@ fn parse_termux_battery_status(text: &str) -> Option<(f32, bool)> {
 #[cfg(any(target_os = "android", test))]
 fn json_number_field(text: &str, key: &str) -> Option<f32> {
     let key = format!("\"{key}\"");
-    let value = text.split_once(&key)?.1.trim_start().strip_prefix(':')?.trim_start();
+    let value = text
+        .split_once(&key)?
+        .1
+        .trim_start()
+        .strip_prefix(':')?
+        .trim_start();
     let token: String = value
         .chars()
         .take_while(|ch| ch.is_ascii_digit() || matches!(ch, '.' | '-'))
@@ -5553,9 +5557,7 @@ mod sensor_presence_tests {
 
 #[cfg(test)]
 mod android_power_discovery_tests {
-    use super::{
-        is_external_power_type, is_processor_thermal_zone, parse_termux_battery_status,
-    };
+    use super::{is_external_power_type, is_processor_thermal_zone, parse_termux_battery_status};
 
     #[test]
     fn android_processor_thermal_zone_names_are_recognized() {
@@ -5585,17 +5587,13 @@ mod android_power_discovery_tests {
 
     #[test]
     fn termux_battery_status_parses_real_level_and_charging_state() {
-        let result = parse_termux_battery_status(
-            r#"{"percentage": 42, "plugged": "PLUGGED_USB"}"#,
-        )
-        .expect("valid Termux battery response");
+        let result = parse_termux_battery_status(r#"{"percentage": 42, "plugged": "PLUGGED_USB"}"#)
+            .expect("valid Termux battery response");
         assert!((result.0 - 0.42).abs() < 1e-6);
         assert!(result.1);
 
-        let unplugged = parse_termux_battery_status(
-            r#"{"percentage": 7, "plugged": "UNPLUGGED"}"#,
-        )
-        .expect("valid unplugged response");
+        let unplugged = parse_termux_battery_status(r#"{"percentage": 7, "plugged": "UNPLUGGED"}"#)
+            .expect("valid unplugged response");
         assert!((unplugged.0 - 0.07).abs() < 1e-6);
         assert!(!unplugged.1);
     }
@@ -5604,16 +5602,12 @@ mod android_power_discovery_tests {
     fn termux_battery_status_rejects_missing_or_unknown_values() {
         assert!(parse_termux_battery_status(r#"{"percentage": 30}"#).is_none());
         assert!(
-            parse_termux_battery_status(
-                r#"{"percentage": 140, "plugged": "UNPLUGGED"}"#,
-            )
-            .is_none()
+            parse_termux_battery_status(r#"{"percentage": 140, "plugged": "UNPLUGGED"}"#,)
+                .is_none()
         );
         assert!(
-            parse_termux_battery_status(
-                r#"{"percentage": 30, "plugged": "PLUGGED_UNKNOWN"}"#,
-            )
-            .is_none()
+            parse_termux_battery_status(r#"{"percentage": 30, "plugged": "PLUGGED_UNKNOWN"}"#,)
+                .is_none()
         );
     }
 
