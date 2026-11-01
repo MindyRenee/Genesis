@@ -692,12 +692,12 @@ class Mind(
         drives: dict[str, float] = {}
         try:
             drives["social"] = float(self.world.social_isolation())
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
         try:
             for name, urge in self.volition.urges.items():
                 drives[name] = float(getattr(urge, "value", 0.0))
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
         return drives
 
@@ -994,7 +994,7 @@ class Mind(
                 inner_snapshot=inner_snapshot,
                 language_snapshot=language_snapshot,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             # This is an observer: a geometry failure must not stop the
             # event stream, response path, or inner-life thread.
             logger.debug("cognitive topos integration failed", exc_info=True)
