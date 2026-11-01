@@ -1617,6 +1617,17 @@ class LifecycleMixin:
                         (self.inner_life, "_lucid_dream_count", counts[2]),
                     )
                 )
+                # Validate into a detached object before committing restored state.
+                if ils.get("inner_world") is not None:
+                    try:
+                        from sleep.inner_world import InnerWorldExperientialLatentSpace
+
+                        staged_world = InnerWorldExperientialLatentSpace()
+                        staged_world.restore(ils["inner_world"])
+                    except (KeyError, TypeError, ValueError, OverflowError) as error:
+                        note_swallowed("mind.lifecycle._stage_inner_life.inner_world", error)
+                    else:
+                        scalar_updates.append((self.inner_life, "inner_world", staged_world))
                 logger.info(
                     "Restored inner life state: thoughts=%d, dreams=%d, lucid=%d",
                     *counts,
@@ -1747,6 +1758,11 @@ class LifecycleMixin:
                     "thought_count": self.inner_life.thought_count,
                     "dream_count": self.inner_life.dream_count,
                     "lucid_dream_count": self.inner_life.lucid_dream_count,
+                    "inner_world": (
+                        self.inner_life.inner_world.to_dict()
+                        if hasattr(self.inner_life, "inner_world")
+                        else None
+                    ),
                 },
                 world_state=self.world.to_dict(),
                 executive=self.brain.frontal.executive,
