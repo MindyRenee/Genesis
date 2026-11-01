@@ -85,6 +85,18 @@ def run_arc3_episode(
     episode = ARC3Episode(game_id=game_id)
     observation = initial_observation
 
+    # Publish the initial observation once before the first decision. Each
+    # subsequent observation is published immediately after its action so
+    # even terminal feedback reaches the world's inbound cognitive pathway.
+    if outer_world is not None:
+        outer_world.perceive(
+            f"ARC-AGI-3 observation for game {game_id}, step 1",
+            salience=0.7,
+            source=f"arc3:{game_id}",
+            metadata={"game_id": game_id, "step": 1, "phase": "initial"},
+            percept=_outer_world_percept(observation),
+        )
+
     for step_index in range(max_steps):
         state = getattr(observation, "state", None)
         state_name = getattr(state, "name", str(state)) if state is not None else None
@@ -92,15 +104,6 @@ def run_arc3_episode(
             episode.terminal_state = state_name
             episode.stopped_reason = "terminal_state"
             return episode
-
-        if outer_world is not None:
-            outer_world.perceive(
-                f"ARC-AGI-3 observation for game {game_id}, step {step_index + 1}",
-                salience=0.7,
-                source=f"arc3:{game_id}",
-                metadata={"game_id": game_id, "step": step_index + 1},
-                percept=_outer_world_percept(observation),
-            )
 
         legal_actions = arc3_legal_actions(environment)
         if not legal_actions:
@@ -149,6 +152,23 @@ def run_arc3_episode(
             }
         )
         observation = next_observation
+
+        if outer_world is not None:
+            outer_world.perceive(
+                f"ARC-AGI-3 observation after action {decision.action} "
+                f"in game {game_id}, step {step_index + 1}",
+                salience=0.8 if next_state_name in {"WIN", "GAME_OVER"} else 0.7,
+                source=f"arc3:{game_id}",
+                metadata={
+                    "game_id": game_id,
+                    "step": step_index + 1,
+                    "phase": "outcome",
+                    "action": decision.action,
+                    "state_before": state_name,
+                    "state_after": next_state_name,
+                },
+                percept=_outer_world_percept(next_observation),
+            )
 
         if next_state_name in {"WIN", "GAME_OVER"}:
             episode.terminal_state = next_state_name
