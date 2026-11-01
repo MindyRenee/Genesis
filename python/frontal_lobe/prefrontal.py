@@ -4014,6 +4014,15 @@ class FrontalLobe:
             user_input,
             context={"recent_entities": self.comprehension.recent_entities},
         )
+        # Record the parsed utterance in the shared temporal language geometry.
+        # This observes user input only; self-monitor reparses are not counted as
+        # independent language experiences.
+        if self._temporal is not None:
+            try:
+                self._temporal.observe_language(user_input, comprehension_result)
+            except (ArithmeticError, TypeError, ValueError, OverflowError):
+                # Geometry is observational and must not break comprehension.
+                pass
 
         # Bind language arguments to the same persistent concepts used by
         # reasoning. Grounding is read-only; unknown words remain visible
