@@ -1,3 +1,5 @@
+"""Tests for ARC dataset validation and toolkit action discovery."""
+
 from __future__ import annotations
 
 import json
