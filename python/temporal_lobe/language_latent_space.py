@@ -17,9 +17,9 @@ import threading
 from copy import deepcopy
 from typing import Any
 
-import numpy as np
-
 from parietal_lobe.binary_language import BitCell
+
+import numpy as np
 
 _LATENT_DIM = 32
 _CELL_COUNT = 64
@@ -74,6 +74,13 @@ def _sinkhorn(
     """Entropy-regularized OT coupling for finite probability measures."""
     if source.ndim != 1 or target.ndim != 1 or cost.shape != (source.size, target.size):
         raise ValueError("OT marginal and cost dimensions do not agree")
+    if (
+        not np.all(np.isfinite(source))
+        or not np.all(np.isfinite(target))
+        or np.any(source < 0)
+        or np.any(target < 0)
+    ):
+        raise ValueError("OT marginals must be finite and non-negative")
     if not np.all(np.isfinite(cost)) or np.any(cost < 0):
         raise ValueError("OT costs must be finite and non-negative")
     if not math.isfinite(regularization) or regularization <= 0:
@@ -91,6 +98,12 @@ def _sinkhorn(
     if not math.isfinite(mass) or mass <= 0:
         raise ArithmeticError("OT solver produced invalid transport mass")
     plan /= mass
+    row_error = float(np.max(np.abs(plan.sum(axis=1) - source)))
+    column_error = float(np.max(np.abs(plan.sum(axis=0) - target)))
+    if max(row_error, column_error) > 5e-3:
+        raise ArithmeticError(
+            f"OT marginals did not converge (row={row_error:.3g}, column={column_error:.3g})"
+        )
     return plan, float(np.sum(plan * cost))
 
 
@@ -121,11 +134,21 @@ class LanguageLatentSpace:
     def dimension(self) -> int:
         return _LATENT_DIM
 
-    def observe(self, text: str, comprehension: Any) -> dict[str, Any]:
-        """Update geometry from one real utterance and its parse result."""
+    def observe(
+        self, text: str, comprehension: Any, *, direction: str = "inbound"
+    ) -> dict[str, Any]:
+        """Update geometry from one parsed utterance.
+
+        Direction separates received language from Genesis's generated output
+        without treating either direction as evidence of semantic correctness.
+        """
         if not isinstance(text, str):
             raise TypeError("text must be a string")
+        if direction not in {"inbound", "outbound", "internal"}:
+            raise ValueError("direction must be inbound, outbound, or internal")
         cells, bit_length = encode_text_cells(text)
+        if not cells:
+            cells = (BitCell(0),)
         features = self._features(text, comprehension)
         histogram = _cell_histogram(cells)
         target = np.abs(features)
@@ -177,6 +200,7 @@ class LanguageLatentSpace:
                 "latent_state": features.tolist(),
                 "cell_count": len(cells),
                 "bit_length": bit_length,
+                "direction": direction,
                 "cell_distribution": histogram.tolist(),
                 "transport_cost": transport_cost,
                 "transport_plan_shape": [int(plan.shape[0]), int(plan.shape[1])],
