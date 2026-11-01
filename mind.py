@@ -973,12 +973,26 @@ class Mind(
                 )
             if outer_snapshot is None and domain == "outer":
                 outer_snapshot = self.world.experiential_space.snapshot()
+            inner_snapshot = None
+            inner_life = getattr(self, "inner_life", None)
+            inner_world = getattr(inner_life, "inner_world", None)
+            if inner_world is not None and hasattr(inner_world, "snapshot"):
+                inner_snapshot = inner_world.snapshot()
+
+            language_snapshot = None
+            temporal = getattr(getattr(self, "brain", None), "temporal", None)
+            language_space = getattr(temporal, "language_latent_space", None)
+            if language_space is not None and hasattr(language_space, "snapshot"):
+                language_snapshot = language_space.snapshot()
+
             self.cognitive_topos.observe(
                 domain,
                 kind=kind,
                 content=content,
                 self_snapshot=self_snapshot,
                 outer_snapshot=outer_snapshot,
+                inner_snapshot=inner_snapshot,
+                language_snapshot=language_snapshot,
             )
         except Exception:
             # This is an observer: a geometry failure must not stop the
