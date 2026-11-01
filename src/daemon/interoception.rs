@@ -1644,9 +1644,7 @@ impl Interoceptor {
         if probe.battery_path.is_some() || termux_battery.is_some() {
             mask |= sensor::BATTERY;
         }
-        if probe.ac_path.is_some()
-            || termux_battery.is_some_and(|(_, plugged)| plugged.is_some())
-        {
+        if probe.ac_path.is_some() || termux_battery.is_some_and(|(_, plugged)| plugged.is_some()) {
             mask |= sensor::AC_ADAPTER;
         }
         if probe.fan_path.is_some() {
@@ -2883,9 +2881,7 @@ impl Interoceptor {
             .as_ref()
             .and_then(|path| fs::read_to_string(path).ok())
             .and_then(|value| value.trim().parse::<u32>().ok())
-            .map(|value| {
-                crate::state::sanitize::finite_clamp((value as f32) / 100.0, 0.0, 1.0)
-            });
+            .map(|value| crate::state::sanitize::finite_clamp((value as f32) / 100.0, 0.0, 1.0));
         let termux = if sysfs_energy.is_none() || sysfs_on_ac.is_none() {
             read_termux_battery_status()
         } else {
@@ -3119,9 +3115,7 @@ fn parse_termux_battery_status(text: &str) -> Option<(f32, Option<bool>)> {
     }
     let external_power = match json_string_field(text, "plugged").as_deref() {
         Some("UNPLUGGED") => Some(false),
-        Some("PLUGGED_AC" | "PLUGGED_USB" | "PLUGGED_WIRELESS" | "PLUGGED_DOCK") => {
-            Some(true)
-        }
+        Some("PLUGGED_AC" | "PLUGGED_USB" | "PLUGGED_WIRELESS" | "PLUGGED_DOCK") => Some(true),
         _ => None,
     };
     Some((percentage / 100.0, external_power))
@@ -5619,10 +5613,9 @@ mod android_power_discovery_tests {
             parse_termux_battery_status(r#"{"percentage": 140, "plugged": "UNPLUGGED"}"#,)
                 .is_none()
         );
-        let unknown_plug = parse_termux_battery_status(
-            r#"{"percentage": 30, "plugged": "PLUGGED_UNKNOWN"}"#,
-        )
-        .expect("percentage remains useful when charging state is unknown");
+        let unknown_plug =
+            parse_termux_battery_status(r#"{"percentage": 30, "plugged": "PLUGGED_UNKNOWN"}"#)
+                .expect("percentage remains useful when charging state is unknown");
         assert!((unknown_plug.0 - 0.30).abs() < 1e-6);
         assert_eq!(unknown_plug.1, None);
     }
