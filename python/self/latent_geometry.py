@@ -14,9 +14,9 @@ information unless a probability model and likelihood are supplied.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import threading
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
