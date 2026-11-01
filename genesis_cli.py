@@ -488,66 +488,15 @@ def _start_daemon(daemon_path: str, data_dir: str, socket_path: str) -> subproce
     )
 
 
-def _screen_nerve_script() -> str | None:
-    """The optic relay script, wherever this layout keeps the tree."""
-    from infrastructure.paths import code_root
+def _start_screen_nerve(data_dir: str) -> None:
+    """Desktop X11 screen capture is archived and intentionally disabled.
 
-    script = code_root() / "scripts" / "optic_relay.py"
-    return str(script) if script.exists() else None
-
-
-def _start_screen_nerve(data_dir: str) -> subprocess.Popen | _AdoptedDaemon | None:
-    """Launch the screen-capture nerve — her second eye.
-
-    The relay (``scripts/optic_relay.py``) publishes the X display into
-    its own optic-nerve-style segment; the mind reads it through
-    ``Vision.see(nerve="screen")``. It degrades silently to None when
-    there is no display, no ffmpeg, or no script — a dark second eye is
-    a degradation like a missing camera, never a startup fault. A
-    relay already alive for this data dir is adopted rather than
-    duplicated (two writers on one segment would only orphan frames).
+    Genesis3 is being adapted for Android/Termux. A desktop display relay is
+    not a phone sensor and must not be launched as part of its active runtime.
+    The former implementation is preserved under docs/archive/computer-specific.
     """
-    if not os.environ.get("DISPLAY"):
-        return None
-    if shutil.which("ffmpeg") is None:
-        return None
-    script = _screen_nerve_script()
-    if script is None:
-        return None
-    pidfile = os.path.join(data_dir, _PID_FILE_SCREEN_NERVE)
-    live = _find_pids(pidfile, "screen_nerve", data_dir)
-    if live:
-        _write_pid_file(data_dir, _PID_FILE_SCREEN_NERVE, live[0])
-        return _AdoptedDaemon(live[0], data_dir, role="screen_nerve")
-    log_path = os.path.join(data_dir, "screen_nerve.log")
-    _rotate_log_if_needed(log_path)
-    log_file = open(log_path, "a")
-    env = os.environ.copy()
-    # Its data-dir binding — what _matches_pid reads back through
-    # /proc/<pid>/environ to prove the process is ours.
-    env["GENESIS_DATA_DIR"] = data_dir
-    try:
-        proc = subprocess.Popen(
-            [sys.executable, script, "x11", _SCREEN_NERVE_SHM],
-            stdout=log_file,
-            stderr=log_file,
-            start_new_session=True,
-            env=env,
-        )
-    except OSError:
-        log_file.close()
-        return None
-    # A relay that cannot reach the display dies inside its first
-    # second (x11grab fails, ffmpeg exits, the reader loop ends) —
-    # wait just long enough to tell born from stillborn.
-    time.sleep(1.5)
-    if proc.poll() is not None:
-        log_file.close()
-        return None
-    _write_pid_file(data_dir, _PID_FILE_SCREEN_NERVE, proc.pid)
-    log_file.close()
-    return proc
-
+    del data_dir
+    return None
 
 def _tail_daemon_log(data_dir: str) -> int:
     """Stream the daemon's log to the terminal."""
