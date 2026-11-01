@@ -3395,7 +3395,7 @@ class AutonomousLearner:
             ):
                 seen.append(dict(source))
             del seen[:-WEB_SOURCES_CAP]
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("web source record failed", exc_info=True)
 
     def _extract_and_add_concepts(
