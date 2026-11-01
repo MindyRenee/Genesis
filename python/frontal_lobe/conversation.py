@@ -421,6 +421,20 @@ class ConversationMixin:
                         stream=kind,
                     )
 
+    def _observe_language_output(self, content: str) -> None:
+        """Record Genesis's generated utterance in the temporal language space."""
+        temporal = getattr(self.brain, "temporal", None)
+        frontal = getattr(self.brain, "frontal", None)
+        comprehension = getattr(frontal, "comprehension", None)
+        if temporal is None or comprehension is None or not isinstance(content, str):
+            return
+        try:
+            parsed = comprehension.comprehend(content)
+            temporal.observe_language(content, parsed, direction="outbound")
+        except (ArithmeticError, TypeError, ValueError, OverflowError):
+            # Metrics are observational and must never suppress a valid reply.
+            logger.debug("language latent output observation failed", exc_info=True)
+
     def _observe_self_latent_signal(
         self, content: str, kind: str, metadata: dict[str, Any] | None = None
     ) -> None:
@@ -936,6 +950,7 @@ class ConversationMixin:
 
         response, state = think_result
         self.brain.frontal.self_learner.resume()
+        self._observe_language_output(response)
         self._after_thought(user_input, response, state)
         return self._said(response)
 
