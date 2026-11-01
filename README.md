@@ -1022,38 +1022,45 @@ not composed words.
 
 ## Running it
 
-Requirements: Rust 1.85+ (edition 2024), Python 3.12+, Linux. The daemon
-build needs **libclang** and kernel V4L2 headers, and the canvas dependency
-(`pycairo`) builds from source — on Debian/Ubuntu:
-`sudo apt install libclang-dev linux-libc-dev libcairo2-dev pkg-config`.
+### Linux desktop workflow
+
+The established daemon workflow targets Linux desktop/server systems and requires
+Rust 1.85+ (edition 2024), Python 3.12+, libclang, and V4L2 headers. On
+Debian/Ubuntu the native build dependencies are installed with:
 
 ```bash
+sudo apt install libclang-dev linux-libc-dev libcairo2-dev pkg-config
 cargo build --release
 pip install -r python/requirements.txt
 python3 -c "import nltk; nltk.download('wordnet'); nltk.download('punkt_tab')"
 ./genesis
 ```
 
-`genesis` launches the daemon (which captures the camera itself) and
-the cognitive CLI, plus TTS; Ctrl-C tears everything down
-gracefully — a guided descent, not a
-kill. `./genesis --stop` stops a running session; `./genesis --offline`
-disables network access. With no camera or microphone it runs text-only —
-absent sensors are never reported as readings. State lives in
-`~/.local/share/genesis` (`GENESIS_DATA_DIR` is the only override —
-there is no pin file and no `XDG_DATA_HOME` step). On first boot the instance is a
-fresh system — a small concept network, no memories, no learned names.
-Introduce yourself; teach it.
+This path can use a Linux camera device, optional microphone input, and the
+existing Linux daemon integrations. `scripts/install.sh` installs a resident
+systemd user service on systems that support it.
 
-The repo root is also an installable package: `pip install .` provides a
-`genesis` command (the packaged `genesis`, plus `--headless` resident mode,
-`--stop`, `--tail`), and `scripts/install.sh` performs the full local
-install — editable venv, release binaries, launcher, and an enabled
-`genesis.service` systemd user unit. One instance at a time per data dir;
-the CLI lock refuses a second. For the privileged body levers (CPU
-governor, RTC wake alarm) a NOPASSWD sudo grant for the daemon's user
-is enough — the levers invoke `sudo -n` directly; there are no helper
-scripts to install.
+### Android / Termux status
+
+Genesis3 is being adapted for phone-first development. The desktop X11 screen
+relay and the passwordless-sudoers example have been moved to
+`docs/archive/computer-specific/`; the CLI no longer launches the X11 relay.
+The interoception sensor discovery now recognizes Android-style power-supply
+names and selects processor/SoC thermal zones by their declared type rather
+than assuming `thermal_zone0` is the CPU.
+
+**The full Rust daemon is not yet verified as buildable or runnable in Termux.**
+Its V4L2 camera capture, CPU-frequency actuation, RTC wake, and RTKit integrations
+remain Linux-specific. Do not run the desktop installer on the phone and assume
+those features will work. Termux:API can expose selected Android functions, but
+camera, microphone, motion sensors, and API-based battery fallback are not yet
+fully connected to the daemon. Unavailable measurements must remain unavailable,
+not be treated as readings. See `docs/archive/README.md` for the archived
+integrations and measurement rules.
+
+State lives in `~/.local/share/genesis` by default, with `GENESIS_DATA_DIR`
+as the explicit override. Preserve this directory when moving or rebuilding the
+runtime; it contains Genesis's persistent state.
 
 Operational notes, in brief:
 
