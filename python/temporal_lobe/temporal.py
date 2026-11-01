@@ -15,8 +15,8 @@ from typing import Any
 
 from temporal_lobe.comprehension import Comprehension
 from temporal_lobe.concept_learner import ConceptLearner
-from temporal_lobe.memory_store import MemoryStore
 from temporal_lobe.language_latent_space import LanguageLatentSpace
+from temporal_lobe.memory_store import MemoryStore
 from temporal_lobe.semantic_grounding import SemanticGrounder
 from temporal_lobe.topic_resolver import TopicResolver
 
