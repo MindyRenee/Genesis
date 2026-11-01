@@ -27,12 +27,12 @@ def test_experiential_space_uses_observed_events_and_returns_finite_geometry():
     space = ExperientialLatentSpace()
     result = space.observe(_event())
     assert result["observations"] == 1
-    assert len(result["state"]) == 16
+    assert len(result["state"]) == 20
     assert np.asarray(result["base_metric"]).shape == (4, 4)
-    assert np.asarray(result["fisher_information"]).shape == (16, 16)
-    assert len(result["global_geometry"]["hyperbolic_state"]) == 5
-    assert len(result["global_geometry"]["spherical_state"]) == 5
-    assert len(result["global_geometry"]["euclidean_state"]) == 6
+    assert np.asarray(result["fisher_information"]).shape == (20, 20)
+    assert len(result["global_geometry"]["hyperbolic_state"]) == 6
+    assert len(result["global_geometry"]["spherical_state"]) == 6
+    assert len(result["global_geometry"]["euclidean_state"]) == 8
     assert len(result["toroidal_state"]) == 8
     assert np.all(np.isfinite(np.asarray(result["fisher_information"])))
     assert np.all(np.linalg.eigvalsh(np.asarray(result["base_metric"])) > 0)
@@ -71,10 +71,28 @@ def test_experiential_state_roundtrip_preserves_online_statistics():
 
 def test_outer_world_records_each_event_into_experiential_space_and_persists_it():
     world = OuterWorld()
-    world.perceive("a visual observation", source="camera")
+    world.perceive(
+        "a visual observation", source="camera", percept=np.array([[0, 1], [2, 3]])
+    )
     assert world.experiential_space.observations == 1
     saved = world.to_dict()
     restored = OuterWorld()
     restored.restore_from_dict(saved)
     assert restored.experiential_space.observations == 1
     assert len(restored.experiential_space.snapshot()["state"]) == 16
+
+
+def test_structured_payload_changes_sensory_coordinates():
+    first = ExperientialLatentSpace().observe(_event())
+    second = ExperientialLatentSpace().observe(
+        ExternalEvent(
+            kind=EventKind.PERCEPTION,
+            source="sensor",
+            content="a structured observation",
+            salience=0.7,
+            percept=np.array([[0.0, 1.0], [2.0, 3.0]]),
+            timestamp=1_700_000_000.0,
+        )
+    )
+    assert first["state"][16:20] != second["state"][16:20]
+    assert first["toroidal_state"] != second["toroidal_state"]
