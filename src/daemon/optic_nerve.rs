@@ -1234,6 +1234,7 @@ mod tests {
     /// Build a private nerve segment carrying `payload` bytes after a
     /// valid header, then hand back the segment (kept alive by the
     /// caller so the mapping persists) and its name.
+    #[cfg(not(target_os = "android"))]
     fn fake_nerve(
         tag: &str,
         width: u32,
@@ -1506,6 +1507,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(target_os = "android"))]
     #[test]
     fn closed_lids_dim_the_oscillator_but_do_not_black_it_out() {
         // A bright blue frame — the melanopic channel reads high.
