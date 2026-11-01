@@ -30,6 +30,8 @@ Set GENESIS_ARC1_DIR if the dataset clone should live elsewhere. Set ARC_API_KEY
         list_arc1_tasks, load_arc1_task, arc1_problem_view,
         list_arc3_games, open_arc3_game, step_arc3_game,
     )
+    from parietal_lobe.arc_play import ARC3Decision, run_arc3_episode
+    )
 
     task_path = list_arc1_tasks("training")[0]
     task = load_arc1_task(task_path)
@@ -37,8 +39,16 @@ Set GENESIS_ARC1_DIR if the dataset clone should live elsewhere. Set ARC_API_KEY
 
     games = list_arc3_games()
     environment, observation = open_arc3_game(games[0]["game_id"])
-    # Genesis chooses the action; the adapter does not choose for her.
-    next_observation = step_arc3_game(environment, "ACTION1")
+    # Genesis's own policy must return an ARC3Decision on each turn.
+    # The loop enforces legal actions, records transitions, and stops at
+    # a terminal state or the configured step limit.
+    episode = run_arc3_episode(
+        environment,
+        game_id=games[0]["game_id"],
+        initial_observation=observation,
+        choose_action=genesis_policy,  # integrate Genesis policy here
+        max_steps=100,
+    )
 
 ## Integrity and evaluation rules
 
@@ -46,4 +56,4 @@ Set GENESIS_ARC1_DIR if the dataset clone should live elsewhere. Set ARC_API_KEY
 - Test outputs are omitted by default from arc1_problem_view so the agent-facing view does not reveal answers.
 - Keep training and evaluation splits distinct. Develop on training tasks; reserve evaluation tasks for controlled measurements. Repeatedly tuning against evaluation scores makes them unsuitable as unbiased final measurements.
 - Retain ARC-AGI-3 observations, actions, and recordings for reproducibility. Never expose API credentials in source files, recordings, logs, or commits.
-- This integration supplies official datasets/tooling and adapters only. It does not claim autonomous solving or gameplay is complete; Genesis' task-solving policy, closed-loop exploration, persistent learning, stop conditions, and benchmark evaluation still need to be wired and tested.
+- The bounded ARC-AGI-3 loop now provides closed-loop observation/action execution, checks state-dependent legal actions, retains per-step transitions, and stops on terminal states or a step budget. It deliberately requires a caller-supplied Genesis policy: autonomous action selection and learning are not yet wired. ARC-AGI-1 currently provides validated task loading and answer-hidden problem views, not a grid solver. Neither benchmark integration has been run on Termux yet.
