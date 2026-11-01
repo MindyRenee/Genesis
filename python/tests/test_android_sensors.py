@@ -1,7 +1,7 @@
 """Tests for Android sensor payload parsing and sampling thresholds."""
 from __future__ import annotations
 
-from brainstem.android_sensors import _readings, _sensor_names
+from brainstem.android_sensors import _readings, _sensor_names, capture_android_photo
 
 
 def test_sensor_names_are_filtered_to_supported_physical_metrics() -> None:
@@ -36,3 +36,10 @@ def test_readings_accept_json_lines() -> None:
         '{"Proximity":{"name":"Proximity","values":[3.0]}}\n'
     )
     assert [item["name"] for item in _readings(payload)] == ["Light", "Proximity"]
+
+
+
+def test_android_photo_capture_is_absent_outside_android(monkeypatch) -> None:
+    monkeypatch.delenv("ANDROID_ROOT", raising=False)
+    monkeypatch.delenv("ANDROID_DATA", raising=False)
+    assert capture_android_photo() is None

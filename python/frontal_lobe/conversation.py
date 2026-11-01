@@ -1289,6 +1289,21 @@ class ConversationMixin:
                 network=self.brain.frontal.network,
                 nerve=nerve,
             )
+            # Android's Termux:API exposes still-photo capture, not a V4L2
+            # stream. Fall back only when the camera nerve is unavailable;
+            # never bypass a closed thalamic gate or a mid-update frame.
+            if scene.status == "unavailable" and nerve == "optic":
+                from brainstem.android_sensors import capture_android_photo
+
+                photo_path = capture_android_photo()
+                if photo_path is not None:
+                    try:
+                        return self.look_at_image(photo_path)
+                    finally:
+                        try:
+                            os.unlink(photo_path)
+                        except OSError:
+                            pass
             self._note_faces_seen()
             if scene.status == "ok":
                 thought = Thought(
