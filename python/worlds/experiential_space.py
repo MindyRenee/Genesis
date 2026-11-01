@@ -204,6 +204,7 @@ class ExperientialLatentSpace:
             return np.empty(0, dtype=np.float64)
         array = array[np.isfinite(array)]
         return array[:4096]
+
     def _derive(self, state: np.ndarray, timestamp: float) -> dict[str, Any]:
         # Attention is bounded and derived from observed salience/direction.
         attention = np.clip(np.abs(state[8:12]), 0.0, 1.0)
