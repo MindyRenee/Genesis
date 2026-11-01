@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 import math
-from typing import Iterable
+from collections.abc import Iterable
 
 
 class WorldDomain(str, Enum):
@@ -150,7 +150,9 @@ class LightConeModel:
             time_delta_s=dt,
         )
 
-    def classify_all(self, events: Iterable[SpacetimeEvent] | None = None) -> tuple[ConeRelation, ...]:
+    def classify_all(
+        self, events: Iterable[SpacetimeEvent] | None = None
+    ) -> tuple[ConeRelation, ...]:
         """Return deterministic classifications for supplied or registered events."""
         source = self._events.values() if events is None else events
         return tuple(
