@@ -92,6 +92,8 @@ class ARC3ExplorationPolicy:
         for transition in previous_transitions:
             prior_key = transition.get("state_signature")
             action = transition.get("action")
+            if isinstance(prior_key, str):
+                seen.add(prior_key)
             if isinstance(prior_key, str) and isinstance(action, str):
                 action_counts[(prior_key, action)] += 1
                 global_counts[action] += 1
