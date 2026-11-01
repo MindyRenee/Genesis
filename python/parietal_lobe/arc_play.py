@@ -11,7 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from parietal_lobe.arc_sources import (
+from parietal_lobe.arc_policy import observation_signature\nfrom parietal_lobe.arc_sources import (
     ARCSourceError,
     arc3_legal_actions,
     step_arc3_game,
