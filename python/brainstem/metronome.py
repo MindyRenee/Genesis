@@ -132,7 +132,7 @@ class MetronomeMixin:
                 # (BDNF suppressed, receptors burning out)
                 if emotion.plasticity < 0.40:
                     receptor_fatigue = min(1.0, (0.40 - emotion.plasticity) * 3.0)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.metronome._read_interoceptive_signals",
                 e,
@@ -146,7 +146,7 @@ class MetronomeMixin:
             # NeuroSummary doesn't expose cortisol directly.
             if summary.global_tone > 0.35 and summary.valence < 0.1:
                 elevated_cortisol = min(1.0, (summary.global_tone - 0.35) * 3.0)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.metronome._read_interoceptive_signals",
                 e,
@@ -199,7 +199,7 @@ class MetronomeMixin:
                         1.0,
                         (time.monotonic() - self._daemon_lost_since) / 30.0,
                     )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 note_swallowed(
                     "mind.metronome._read_threat_signals",
                     e,
@@ -218,7 +218,7 @@ class MetronomeMixin:
                     telemetry_anomaly = min(1.0, len(anomalies) / 3.0)
                 body_distress = min(1.0, len(snapshot.self_concerns()) / 2.0)
                 self._last_threat_snapshot = now
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 note_swallowed(
                     "mind.metronome._read_threat_signals",
                     e,
@@ -253,7 +253,7 @@ class MetronomeMixin:
             wave_integration = waves.integration
             wave_consolidation = waves.consolidation
             wave_dominant = waves.dominant.value
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.metronome._read_wave_and_adenosine",
                 e,
@@ -263,7 +263,7 @@ class MetronomeMixin:
         try:
             state = self.client.get_state()
             adenosine_level = state.chemicals.get("adenosine", 0.0)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.metronome._read_wave_and_adenosine",
                 e,
@@ -524,7 +524,7 @@ class MetronomeMixin:
                             "source": f"self_improvement:{proposal.title}",
                         }
                     )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 note_swallowed(
                     "mind.metronome._cycle_feed_executive",
                     exc,
@@ -554,7 +554,7 @@ class MetronomeMixin:
                 )
 
             executive.ingest_candidates(candidates)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             note_swallowed(
                 "mind.metronome._cycle_feed_executive",
                 exc,
@@ -587,7 +587,7 @@ class MetronomeMixin:
                 # unknown performer must not erase a ready urge.
                 for name in started:
                     self.volition.consume(name)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.metronome._cycle_volition",
                 e,
@@ -896,7 +896,7 @@ class MetronomeMixin:
         """
         try:
             body_state = self.client.read_sensors()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed("mind.metronome.sensors.read_sensors", e)
             body_state = None
         if body_state is not None:
@@ -907,7 +907,7 @@ class MetronomeMixin:
             # treat an absent battery as a reading.
             try:
                 presence = self.client.get_sensor_presence()
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 note_swallowed("mind.metronome.sensors.sensor_presence", e)
                 presence = None
             # Afferents land at the brainstem first — the NTS/
@@ -939,24 +939,24 @@ class MetronomeMixin:
                     )
                     self._interoceptive_relay = relay
                 relay.relay(body_state, presence)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 note_swallowed("mind.metronome.sensors.interoceptive_relay", e)
             try:
                 self.regulator.interoception.update_from_body_state(body_state, presence)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 note_swallowed("mind.metronome.sensors.body_state_update", e)
             try:
                 self.self_model.update_hardware_body(body_state, presence)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 note_swallowed("mind.metronome.sensors.hardware_body", e)
         try:
             report = self.client.get_subsystem_telemetry()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed("mind.metronome.sensors.subsystem_telemetry", e)
         else:
             try:
                 self.regulator.interoception.update_subsystem_telemetry(report)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 note_swallowed("mind.metronome.sensors.telemetry_update", e)
             # Feed the same report into its self-model — which
             # part of it is firing becomes part of what it
@@ -964,14 +964,14 @@ class MetronomeMixin:
             # module_activity → embodiment_facts → language).
             try:
                 self.self_model.update_brain_activity(report)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 note_swallowed("mind.metronome.sensors.brain_activity", e)
             # Deliver the same report to the regions that posted
             # a message — the channel is carried on this sample.
             if channel is not None:
                 try:
                     channel.deliver(getattr(report, "modules", ()))
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     note_swallowed("mind.metronome.sensors.thalamic_deliver", e)
 
     def _cycle_connectivity(self, now: float) -> None:
@@ -1016,7 +1016,7 @@ class MetronomeMixin:
                     self._connectivity_gate.relax()
                 else:
                     self._connectivity_gate.demand()
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 note_swallowed(
                     "mind.metronome._cycle_connectivity",
                     e,
@@ -1049,7 +1049,7 @@ class MetronomeMixin:
                 # impulse strength by the measured interval — the
                 # per-second regulation rate stays invariant.
                 self.regulator.continuous_regulate(emotion, getattr(self, "_cycle_dt", 1.0))
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.metronome._cycle_emotion",
                 e,
@@ -1083,7 +1083,7 @@ class MetronomeMixin:
                 fed=fed,
                 energy_reserve=reserve,
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.metronome._cycle_emotion",
                 e,
@@ -1096,7 +1096,7 @@ class MetronomeMixin:
             user_present = idle < 60.0
             engagement = max(0.0, 1.0 - idle / 120.0) if user_present else 0.0
             self.regulator.social_modulation(user_present, engagement)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.metronome._cycle_emotion",
                 e,
@@ -1124,7 +1124,7 @@ class MetronomeMixin:
             self.inner_life.feed_social_drive(
                 self.world.social_isolation() * 0.02 * getattr(self, "_cycle_dt", 1.0)
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.metronome.final_steps.world_tick",
                 e,
@@ -1136,7 +1136,7 @@ class MetronomeMixin:
         # arrhythmia), internally rate-limited. It schedules nothing.
         try:
             self.heart.tick()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.metronome.final_steps.heart_tick",
                 e,
@@ -1145,7 +1145,7 @@ class MetronomeMixin:
         # ── 10. Sleep-state sync ──
         try:
             self._check_sleep_sync()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.metronome.final_steps.sleep_sync",
                 e,
@@ -1161,7 +1161,7 @@ class MetronomeMixin:
         try:
             # warn() internally checks if the warning changed
             self.warn(speak=True)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.metronome.final_steps.warn",
                 e,
@@ -1176,7 +1176,7 @@ class MetronomeMixin:
             # shared DT_MAX so a stalled cycle is bounded growth, not
             # an instant decay of every foci/caution/window at once.
             self.brain.frontal.tick(dt=min(DT_MAX, max(0.0, getattr(self, "_cycle_dt", 1.0))))
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             note_swallowed(
                 "mind.metronome.final_steps.cognition_tick",
                 e,
@@ -1269,7 +1269,7 @@ class MetronomeMixin:
             try:
                 self.emergent_identity()
                 self._experience_since_identity = 0
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 note_swallowed(
                     "mind.metronome._cycle_loop",
                     e,
@@ -1377,7 +1377,7 @@ class MetronomeMixin:
 
                 # ── Wait for the next cycle — adaptive cadence ──
                 self._cycle_pace(now)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning(
                     f"cycle failed ({type(e).__name__}: {e}); continuing",
                     exc_info=True,
