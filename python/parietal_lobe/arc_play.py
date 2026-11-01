@@ -136,6 +136,16 @@ def run_arc3_episode(
             if next_state is not None
             else None
         )
+
+        policy_owner = getattr(choose_action, "__self__", None)
+        observe_transition = getattr(policy_owner, "observe_transition", None)
+        if callable(observe_transition):
+            observe_transition(
+                observation,
+                decision.action,
+                next_observation,
+                next_state_name,
+            )
         if outer_world is not None:
             outer_world.it_acted(
                 f"ARC-AGI-3 action {decision.action} in game {game_id}",
