@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import logging
 import secrets
 import threading
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 from urllib.parse import urlsplit
+
+logger = logging.getLogger(__name__)
 
 from parietal_lobe.arc_sources import (
     ARCSourceError,
@@ -86,6 +89,7 @@ class ArcPhoneBridge:
         legal_actions: Callable[[Any], list[str]] = arc3_legal_actions,
         step_game: Callable[..., Any] = step_arc3_game,
         max_steps: int = 500,
+        observer: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
         if isinstance(max_steps, bool) or not isinstance(max_steps, int) or max_steps < 1:
             raise ValueError("max_steps must be a positive integer")
@@ -94,11 +98,22 @@ class ArcPhoneBridge:
         self._legal_actions = legal_actions
         self._step_game = step_game
         self._max_steps = max_steps
+        self._observer = observer
         self._sessions: dict[str, _Session] = {}
         self._lock = threading.RLock()
 
     def health(self) -> dict[str, Any]:
-        return {"ok": True, "service": "genesis-arc-phone-bridge", "protocol": 1}
+        return {"ok": True, "service": "genesis-arc-phone-bridge", "protocol": 1,
+                "genesis_observer_connected": self._observer is not None}
+
+    def _notify(self, event: str, payload: dict[str, Any]) -> None:
+        """Publish bridge events without letting telemetry failure corrupt a game step."""
+        if self._observer is None:
+            return
+        try:
+            self._observer(event, payload)
+        except Exception:
+            logger.exception("Genesis ARC observer failed for event %s", event)
 
     def games(self) -> dict[str, Any]:
         return {"games": _jsonable(self._game_lister())}
@@ -120,6 +135,10 @@ class ArcPhoneBridge:
         session = _Session(game_id=game_id, environment=env, observation=observation)
         with self._lock:
             self._sessions[session_id] = session
+        self._notify("observation", {
+            "game_id": game_id, "step": 0, "phase": "initial",
+            "observation": observation, "legal_actions": self._legal_actions(env),
+        })
         return self._session_view(session_id, session)
 
     def step_session(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -144,11 +163,23 @@ class ArcPhoneBridge:
             legal = self._legal_actions(session.environment)
             if action not in legal:
                 raise ValueError(f"illegal action {action!r}; legal actions: {legal}")
+            previous_observation = session.observation
             next_observation = self._step_game(
                 session.environment, action, data=data, reasoning=reasoning
             )
             session.observation = next_observation
             session.steps += 1
+            self._notify("action", {
+                "game_id": session.game_id, "step": session.steps, "action": action,
+                "data": data, "reasoning": reasoning,
+                "observation_before": previous_observation,
+                "observation_after": next_observation,
+            })
+            self._notify("observation", {
+                "game_id": session.game_id, "step": session.steps,
+                "phase": "after_action", "observation": next_observation,
+                "legal_actions": self._legal_actions(session.environment),
+            })
             return self._session_view(session_id, session)
 
     def close_session(self, session_id: str) -> dict[str, Any]:
@@ -257,13 +288,38 @@ class ArcPhoneBridge:
         return Handler
 
 
-def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
-    """Run the unauthenticated bridge on loopback only."""
+def serve(
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    *,
+    mind_socket: str | None = None,
+) -> None:
+    """Run the loopback bridge, optionally attached to a live Genesis Mind.
+
+    mind_socket connects a headless Mind to an already-running Genesis daemon.
+    ARC observations/actions then use Mind.world's normal cognitive event path.
+    """
     if not ipaddress.ip_address(host).is_loopback:
         raise ValueError("the unauthenticated phone bridge must bind to loopback only")
-    server = ThreadingHTTPServer((host, port), ArcPhoneBridge().handler())
+    mind = None
+    server = None
     try:
-        print(f"Genesis ARC phone bridge listening at http://{host}:{server.server_port}")
+        observer = None
+        if mind_socket:
+            from mind import Mind
+            from parietal_lobe.arc_genesis_observer import GenesisArcObserver
+            mind = Mind(mind_socket, headless=True)
+            mind.start()
+            observer = GenesisArcObserver(mind)
+        server = ThreadingHTTPServer((host, port), ArcPhoneBridge(observer=observer).handler())
+        connection = "connected to Genesis cognitive event stream" if observer else "transport-only (no Mind socket)"
+        print(f"Genesis ARC phone bridge listening at http://{host}:{server.server_port}; {connection}")
         server.serve_forever()
     finally:
-        server.server_close()
+        if server is not None:
+            server.server_close()
+        if mind is not None:
+            try:
+                mind.stop()
+            except Exception:
+                logger.exception("Failed to stop bridge-owned Genesis Mind cleanly")

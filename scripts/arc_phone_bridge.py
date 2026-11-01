@@ -12,8 +12,12 @@ def main() -> int:
         "--host", default="127.0.0.1", help="loopback address (default: 127.0.0.1)"
     )
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument(
+        "--mind-socket",
+        help="connect a headless Genesis Mind to an existing daemon socket",
+    )
     args = parser.parse_args()
-    serve(args.host, args.port)
+    serve(args.host, args.port, mind_socket=args.mind_socket)
     return 0
 
 
