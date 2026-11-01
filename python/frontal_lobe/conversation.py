@@ -431,7 +431,7 @@ class ConversationMixin:
         try:
             parsed = comprehension.comprehend(content)
             temporal.observe_language(content, parsed, direction="outbound")
-        except (ArithmeticError, TypeError, ValueError, OverflowError):
+        except (ArithmeticError, AttributeError, TypeError, ValueError, OverflowError):
             # Metrics are observational and must never suppress a valid reply.
             logger.debug("language latent output observation failed", exc_info=True)
 
