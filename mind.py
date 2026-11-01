@@ -291,7 +291,7 @@ class Mind(
                 metadata=metadata,
                 percept=metadata,
             )
-        except Exception:  # noqa: BLE001 — optional camera cannot crash cognition
+        except Exception:
             logger.exception("Android camera frame processing failed")
 
     def _on_android_audio_clip(self, samples, sample_rate: int) -> None:
@@ -316,7 +316,7 @@ class Mind(
                     "duration": event.duration,
                     "valence": event.emotional_valence,
                     "sample_rate": sample_rate,
-                    "sample_count": int(len(samples)),
+                    "sample_count": len(samples),
                 },
                 percept={
                     "sound_type": event.sound_type,
@@ -327,7 +327,7 @@ class Mind(
                     "duration": event.duration,
                 },
             )
-        except Exception:  # noqa: BLE001 — optional microphone cannot crash cognition
+        except Exception:
             logger.exception("Android microphone clip processing failed")
 
     def _on_android_sensor_sample(self, reading: dict) -> None:
