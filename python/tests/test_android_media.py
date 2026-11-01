@@ -27,3 +27,14 @@ def test_microphone_pcm_decoder_rejects_partial_and_nonfinite_samples() -> None:
         decode_float32_audio(b"abc")
     with pytest.raises(ValueError):
         decode_float32_audio(np.array([np.nan], dtype="<f4").tobytes())
+
+
+def test_float32_pcm_decoder_rejects_partial_and_nonfinite_samples() -> None:
+    samples = decode_float32_audio(np.array([0.25, -0.5], dtype="<f4").tobytes())
+    assert np.allclose(samples, [0.25, -0.5])
+    import pytest
+
+    with pytest.raises(ValueError):
+        decode_float32_audio(b"abc")
+    with pytest.raises(ValueError):
+        decode_float32_audio(np.array([np.nan], dtype="<f4").tobytes())
