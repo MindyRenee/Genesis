@@ -12,7 +12,6 @@ import math
 import os
 import shutil
 import subprocess
-import tempfile
 import threading
 import time
 from collections.abc import Callable
@@ -56,41 +55,6 @@ def is_android_termux() -> bool:
     """Return true only for an Android environment with the Termux command."""
     android = bool(os.environ.get("ANDROID_ROOT") or os.environ.get("ANDROID_DATA"))
     return android and shutil.which("termux-sensor") is not None
-
-
-def capture_android_photo(camera_id: str = "0", timeout: float = 20.0) -> str | None:
-    """Capture one JPEG on demand through Termux:API; return its path or None."""
-    if not (os.environ.get("ANDROID_ROOT") or os.environ.get("ANDROID_DATA")):
-        return None
-    command = shutil.which("termux-camera-photo")
-    if command is None:
-        return None
-    if not isinstance(camera_id, str) or not camera_id.isdigit():
-        raise ValueError("camera_id must be a non-negative integer string")
-    if not math.isfinite(timeout) or timeout < 1.0:
-        raise ValueError("timeout must be finite and at least one second")
-    descriptor, path = tempfile.mkstemp(prefix="genesis-camera-", suffix=".jpg")
-    os.close(descriptor)
-    try:
-        subprocess.run(
-            [command, "-c", camera_id, path],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        if os.path.getsize(path) < 4:
-            raise OSError("Termux camera returned an empty image")
-        with open(path, "rb") as image_file:
-            if image_file.read(2) != b"\xff\xd8":
-                raise OSError("Termux camera output is not a JPEG")
-        return path
-    except (OSError, subprocess.SubprocessError):
-        try:
-            os.unlink(path)
-        except OSError:
-            pass
-        return None
 
 
 def _json_documents(output: str) -> list[Any]:
