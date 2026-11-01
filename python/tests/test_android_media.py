@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 from PIL import Image
 
-from brainstem.android_media import load_rgb_frame
+from brainstem.android_media import decode_float32_audio, load_rgb_frame
 
 
 def test_camera_jpeg_decodes_to_detached_rgb_uint8(tmp_path) -> None:
@@ -15,3 +15,15 @@ def test_camera_jpeg_decodes_to_detached_rgb_uint8(tmp_path) -> None:
     assert frame.dtype == np.uint8
     assert frame.flags.owndata
     assert np.allclose(frame[0, 0], [20, 80, 140], atol=3)
+
+
+
+def test_microphone_pcm_decoder_rejects_partial_and_nonfinite_samples() -> None:
+    samples = decode_float32_audio(np.array([0.25, -0.5], dtype="<f4").tobytes())
+    assert np.allclose(samples, [0.25, -0.5])
+    import pytest
+
+    with pytest.raises(ValueError):
+        decode_float32_audio(b"abc")
+    with pytest.raises(ValueError):
+        decode_float32_audio(np.array([np.nan], dtype="<f4").tobytes())
