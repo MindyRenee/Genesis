@@ -1071,6 +1071,7 @@ Android hardware adapters are Python-side and explicitly opt-in:
 - `GENESIS_ANDROID_SENSORS=1` samples available motion/environment sensors into world telemetry.
 - `GENESIS_ANDROID_CAMERA=1` captures still frames with `termux-camera-photo` and sends them through the existing visual cortex. Select camera ID with `GENESIS_ANDROID_CAMERA_ID` (default 0).
 - `GENESIS_ANDROID_MICROPHONE=1` records short clips with `termux-microphone-record`, decodes them with `ffmpeg`, and sends measured audio features through the existing sound classifier. This is non-speech sound classification, not speech transcription.
+- Explicit voice-input requests can use Termux's `termux-speech-to-text` command when available; this separate path returns a transcript and is not the background sound classifier.
 All three require the matching Termux:API command and the companion app, plus the requested Android permissions. Install the Termux package with `pkg install termux-api ffmpeg` for microphone support. Actual sensors and cameras vary by device. Battery percentage and charging state can fall back to Termux:API when Android sysfs does not expose them. These adapters have unit-tested parsing but still require on-device verification; the full Rust daemon is not yet verified in Termux.
 Unavailable measurements must remain unavailable,
 not be treated as readings. See `docs/archive/README.md` for the archived
