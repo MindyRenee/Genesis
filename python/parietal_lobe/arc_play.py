@@ -164,7 +164,7 @@ def run_arc3_episode(
                 ),
             )
 
-        from parietal_lobe.arc_braille import encode_game_record, transition_record
+        from parietal_lobe.arc_ascii import encode_game_record, transition_record
 
         game_record = transition_record(
             game_id=game_id,
@@ -183,11 +183,11 @@ def run_arc3_episode(
                 else None
             ),
         )
-        braille_record = encode_game_record(game_record)
+        ascii_record = encode_game_record(game_record)
         episode.transitions.append(
             {
-                "braille_cells": [cell.value for cell in braille_record.cells],
-                "braille_bit_length": braille_record.bit_length,
+                "ascii_codes": list(ascii_record.codes),
+                "ascii_character_count": len(ascii_record.codes),
                 "step": step_index + 1,
                 "action": decision.action,
                 "data": decision.data,
