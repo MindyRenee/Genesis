@@ -13,7 +13,6 @@ import threading
 from typing import Any
 
 import numpy as np
-
 from self.master_cognitive_topos import MasterCognitiveToposEngine
 
 _STATE_DIM = 32
