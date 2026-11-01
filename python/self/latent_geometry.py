@@ -305,7 +305,7 @@ class SelfLatentSpaceArchitecture:
             raise ValueError("salience must be finite and in [0, 1]")
         payload = (kind + "\\0" + content[:4096]).encode("utf-8", errors="replace")
         digest = hashlib.sha256(payload).digest()
-        ego = (np.frombuffer(digest[:32], dtype=np.uint8).astype(np.float64) / 127.5) - 1.0
+        ego = (np.frombuffer(digest[:8], dtype=np.uint8).astype(np.float64) / 127.5) - 1.0
         efficacy_value = 0.0
         if metadata:
             raw_efficacy = metadata.get("causal_efficacy", metadata.get("success", 0.0))
