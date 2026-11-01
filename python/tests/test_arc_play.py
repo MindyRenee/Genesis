@@ -67,3 +67,44 @@ def test_episode_runner_requires_positive_step_budget() -> None:
             choose_action=lambda observation, legal, history: ARC3Decision("ACTION1"),
             max_steps=0,
         )
+
+
+
+def test_episode_runner_routes_observations_and_actions_to_outer_world(monkeypatch) -> None:
+    events = []
+
+    class FakeOuterWorld:
+        def perceive(self, content, **kwargs):
+            events.append(("perceive", content, kwargs))
+            return object()
+
+        def it_acted(self, description, *, detail=""):
+            events.append(("act", description, detail))
+            return object()
+
+    observations = [
+        SimpleNamespace(state=SimpleNamespace(name="PLAYING"), grid=[[1, 0]]),
+        SimpleNamespace(state=SimpleNamespace(name="WIN"), grid=[[1, 1]]),
+    ]
+
+    def fake_step(environment, action_name, *, data=None, reasoning=None):
+        return observations[1]
+
+    monkeypatch.setattr(arc_play, "step_arc3_game", fake_step)
+    episode = run_arc3_episode(
+        FakeEnvironment(),
+        game_id="grid-game",
+        initial_observation=observations[0],
+        choose_action=lambda observation, legal, history: ARC3Decision(
+            "ACTION1", reasoning={"prediction": "cell changes"}
+        ),
+        max_steps=3,
+        outer_world=FakeOuterWorld(),
+    )
+
+    assert episode.terminal_state == "WIN"
+    assert [event[0] for event in events] == ["perceive", "act"]
+    assert events[0][2]["percept"] is observations[0]
+    assert events[0][2]["source"] == "arc3:grid-game"
+    assert "ACTION1" in events[1][1]
+    assert "state_after=WIN" in events[1][2]
