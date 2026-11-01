@@ -168,7 +168,11 @@ def run_arc3_episode(
                 "reasoning": decision.reasoning,
             },
             next_observation=next_observation,
-            terminal_state=next_state_name if next_state_name in {"WIN", "GAME_OVER"} else None,
+            terminal_state=(
+                next_state_name
+                if next_state_name in {"WIN", "GAME_OVER"}
+                else None
+            ),
         )
         braille_record = encode_game_record(game_record)
         episode.transitions.append(
