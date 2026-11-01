@@ -110,3 +110,26 @@ def test_http_endpoints_and_error_mapping() -> None:
 def test_service_refuses_non_loopback_binding() -> None:
     with pytest.raises(ValueError, match="loopback"):
         serve("0.0.0.0", 8765)
+
+
+
+def test_bridge_publishes_initial_action_and_result_events():
+    events = []
+    env = FakeEnvironment()
+    bridge = ArcPhoneBridge(
+        game_opener=lambda *args, **kwargs: (env, {"state": "PLAY", "frame": 0}),
+        legal_actions=lambda environment: environment.action_space,
+        step_game=lambda environment, action, **kwargs: {
+            "state": "WIN", "frame": 1, "action": action,
+        },
+        observer=lambda event, payload: events.append((event, payload)),
+    )
+    created = bridge.create_session({"game_id": "fake"})
+    assert bridge.health()["genesis_observer_connected"] is True
+    assert events[0][0] == "observation"
+    assert events[0][1]["phase"] == "initial"
+
+    bridge.step_session(created["session_id"], {"action": "ACTION1"})
+    assert [event for event, _ in events] == ["observation", "action", "observation"]
+    assert events[1][1]["action"] == "ACTION1"
+    assert events[2][1]["observation"]["state"] == "WIN"

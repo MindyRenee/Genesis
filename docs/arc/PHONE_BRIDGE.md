@@ -8,10 +8,10 @@ From the Genesis repository root in Termux:
 
 ```sh
 python -m pip install -e '.[arc]'
-PYTHONPATH=python:. python scripts/arc_phone_bridge.py --host 127.0.0.1 --port 8765
+PYTHONPATH=python:. python scripts/arc_phone_bridge.py --host 127.0.0.1 --port 8765 --mind-socket /path/to/running/genesis.sock
 ```
 
-The service intentionally binds to loopback only and has no authentication. Do not change it to listen on a LAN/public interface. It stores active sessions in memory; restarting the service ends them.
+The service intentionally binds to loopback only and has no authentication. Do not change it to listen on a LAN/public interface. It stores active sessions in memory; restarting the service ends them. Replace `/path/to/running/genesis.sock` with the actual socket path of an already-running Genesis daemon. The bridge starts a headless Mind connected to that daemon and forwards each initial/resulting observation through `Mind.world.perceive()` and each executed action through `Mind.world.it_acted()`. Those are the existing event boundaries used by Genesis's live cognitive integration. If `--mind-socket` is omitted, the bridge remains transport-only.
 
 In the Dart/Flutter app, add this package as a path dependency:
 
@@ -52,4 +52,4 @@ Each session response includes the current observation, current legal action nam
 
 ## Limits
 
-This is a transport bridge, not proof of autonomous ARC solving. It does not automatically attach a live `Mind`/OuterWorld instance, the cognitive topos engine, telemetry, or the binary-language substrate. Those require a separate explicit integration and end-to-end tests. The Python service also needs the optional official ARC toolkit and any required API access to list/open live games.
+This is a transport and event-integration bridge, not proof of autonomous ARC solving. With `--mind-socket`, ARC observations/actions enter Genesis through the existing OuterWorld event path, which is wired to self-state and cognitive-topos updates. This does not make the policy a solver, and it does not directly translate ARC records into language or guarantee learned semantic alignment. The Python service also needs the optional official ARC toolkit and any required API access to list/open live games.
