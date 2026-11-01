@@ -16,12 +16,12 @@ must provide physical/spatial coordinates and timestamps with defined units.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 import math
 from collections.abc import Iterable
 
 
-class WorldDomain(str, Enum):
+class WorldDomain(StrEnum):
     """The three mutually distinguishable but causally linked state domains."""
 
     SELF = "self"
@@ -29,7 +29,7 @@ class WorldDomain(str, Enum):
     OUTER = "outer"
 
 
-class IntervalKind(str, Enum):
+class IntervalKind(StrEnum):
     """Minkowski separation class relative to an apex event."""
 
     TIMELIKE = "timelike"
