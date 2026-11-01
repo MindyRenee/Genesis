@@ -105,6 +105,8 @@ class LightConeModel:
 
     def advance_apex(self, event: SpacetimeEvent) -> None:
         """Advance the apex monotonically; equal timestamps are allowed."""
+        if event.domain is not WorldDomain.SELF:
+            raise ValueError("the shared apex must be a self-domain event")
         if self._apex is not None and event.time_s < self._apex.time_s:
             raise ValueError("apex time cannot move backwards")
         self._apex = event
@@ -154,6 +156,14 @@ class LightConeModel:
         return tuple(
             self.classify(event)
             for event in sorted(source, key=lambda item: (item.time_s, item.event_id))
+        )
+
+    def cone_for(self, domain: WorldDomain) -> tuple[ConeRelation, ...]:
+        """Return this domain's events classified against the same self apex."""
+        return tuple(
+            relation
+            for relation in self.classify_all()
+            if relation.domain is domain
         )
 
     def state_summary(self) -> dict[str, object]:
