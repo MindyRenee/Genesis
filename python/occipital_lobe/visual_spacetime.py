@@ -13,7 +13,7 @@ import math
 from typing import Callable
 
 from occipital_lobe.epipolar import TwoViewReport
-from temporal_lobe.light_cones import WorldDomain
+from temporal_lobe.light_cones import SpacetimeEvent, WorldDomain
 from temporal_lobe.spacetime_workspace import SpacetimeWorkspace
 
 
