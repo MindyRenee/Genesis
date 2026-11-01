@@ -21,7 +21,14 @@ elif [[ -e "$DEST" ]]; then
 else
   git clone --depth 1 https://github.com/fchollet/ARC-AGI.git "$DEST"
 fi
-python3 -m pip install -e "$ROOT[arc]"
+# Termux cannot reliably install every optional desktop dependency in the
+# project's base dependency set (notably Cairo/OpenCV wheels). Install the
+# official toolkit directly there; desktop environments use the project extra.
+if [[ -n "${PREFIX:-}" && "${PREFIX}" == *com.termux* ]]; then
+  python3 -m pip install "arc-agi==0.9.9"
+else
+  python3 -m pip install -e "$ROOT[arc]"
+fi
 echo "ARC-AGI-1 data: $DEST/data/{training,evaluation}"
 echo "ARC-AGI-3 toolkit installed. ARC_API_KEY is optional for additional games."
 echo "No model or LLM is installed by this script."
