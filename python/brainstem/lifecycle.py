@@ -1168,7 +1168,7 @@ class LifecycleMixin:
                                     tname,
                                     entry.strip(),
                                 )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     logger.debug("stack dump unavailable", exc_info=True)
                 return False
             thread.join(timeout=min(0.5, remaining))
