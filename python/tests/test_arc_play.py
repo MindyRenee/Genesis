@@ -7,9 +7,9 @@ from types import SimpleNamespace
 import pytest
 
 from parietal_lobe import arc_play
+from parietal_lobe.arc_braille import BrailleGameRecord, decode_game_record
 from parietal_lobe.arc_play import ARC3Decision, run_arc3_episode
 from parietal_lobe.arc_sources import ARCSourceError
-from parietal_lobe.arc_braille import BrailleGameRecord, decode_game_record
 from parietal_lobe.binary_language import BitCell
 
 
@@ -92,7 +92,6 @@ def test_episode_runner_requires_positive_step_budget() -> None:
         )
 
 
-
 def test_episode_runner_routes_observations_and_actions_to_outer_world(monkeypatch) -> None:
     """Send structured percepts and action outcomes through OuterWorld APIs."""
     events = []
@@ -169,8 +168,6 @@ def test_episode_runner_stops_when_outer_world_cannot_perceive() -> None:
 
     assert episode.transitions == []
     assert episode.stopped_reason == "outer_world_unavailable"
-
-
 
 
 def test_episode_runner_feeds_terminal_outcome_back_to_bound_policy(monkeypatch) -> None:
