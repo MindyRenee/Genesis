@@ -226,6 +226,7 @@ class AndroidMicrophoneAdapter:
             audio_path = Path(directory) / "clip.m4a"
             while not self._stop.is_set():
                 started = time.monotonic()
+                audio_path.unlink(missing_ok=True)
                 try:
                     subprocess.run(
                         [
