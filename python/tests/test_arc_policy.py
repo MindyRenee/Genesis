@@ -122,6 +122,7 @@ def test_policy_restores_terminal_outcomes_from_saved_history() -> None:
                 {"grid": [[1, 1]], "state": "WIN"}
             ),
             "action": "ACTION2",
+            "terminal_state": None,
             "state_after": "WIN",
         }
     ]
