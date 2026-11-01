@@ -240,7 +240,41 @@ class Mind(
                 adapter = AndroidSensorAdapter(self._on_android_sensor_sample)
                 if adapter.start():
                     self.android_sensor_adapter = adapter
+        # Camera capture is separately opt-in because it uses a privacy-sensitive
+        # sensor and runs only while the Mind process is active.
+        self.android_camera_adapter = None
+        if os.environ.get("GENESIS_ANDROID_CAMERA", "0") == "1":
+            from brainstem.android_media import AndroidCameraAdapter, is_android_termux_camera
 
+            if is_android_termux_camera():
+                camera_id = int(os.environ.get("GENESIS_ANDROID_CAMERA_ID", "0"))
+                adapter = AndroidCameraAdapter(self._on_android_camera_frame, camera_id=camera_id)
+                if adapter.start():
+                    self.android_camera_adapter = adapter
+
+    def _on_android_camera_frame(self, frame) -> None:
+        """Run a measured Android camera frame through Genesis's visual cortex."""
+        try:
+            scene = self.vision.see_frame(
+                frame,
+                client=self.client,
+                emotion=self.feel(),
+                network=self.brain.frontal.network,
+                nerve="android_camera",
+            )
+            if scene.status != "ok":
+                return
+            metadata = scene.as_metadata()
+            self.world.perceive(
+                "Android camera scene",
+                salience=scene.salience,
+                source="android_camera",
+                topics=[],
+                metadata=metadata,
+                percept=metadata,
+            )
+        except Exception:  # noqa: BLE001 — optional camera cannot crash cognition
+            logger.exception("Android camera frame processing failed")
 
     def _on_android_sensor_sample(self, reading: dict) -> None:
         """Publish measured Android sensor data into the ordinary world event path."""
