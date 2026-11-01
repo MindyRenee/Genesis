@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import ClassVar
 
 import pytest
-
 from parietal_lobe import arc_play
 from parietal_lobe.arc_braille import BrailleGameRecord, decode_game_record
 from parietal_lobe.arc_play import ARC3Decision, run_arc3_episode
@@ -16,7 +16,7 @@ from parietal_lobe.binary_language import BitCell
 class FakeEnvironment:
     """Minimal environment stub exposing two legal action names."""
 
-    action_space = ["ACTION1", "ACTION2"]
+    action_space: ClassVar[list[str]] = ["ACTION1", "ACTION2"]
 
 
 def test_episode_runner_observes_feedback_and_stops_on_win(monkeypatch) -> None:
@@ -46,7 +46,9 @@ def test_episode_runner_observes_feedback_and_stops_on_win(monkeypatch) -> None:
     assert len(episode.transitions) == 1
     assert len(episode.transitions[0]["state_signature"]) == 64
     assert len(episode.transitions[0]["next_state_signature"]) == 64
-    assert episode.transitions[0]["state_signature"] != episode.transitions[0]["next_state_signature"]
+    assert episode.transitions[0]["state_signature"] != (
+        episode.transitions[0]["next_state_signature"]
+    )
     transition = episode.transitions[0]
     encoded = BrailleGameRecord(
         cells=tuple(BitCell(value) for value in transition["braille_cells"]),
