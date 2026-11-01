@@ -32,6 +32,7 @@ class ExperientialLatentSpace:
         self._mean = np.zeros(_STATE_DIM, dtype=np.float64)
         self._m2 = np.zeros(_STATE_DIM, dtype=np.float64)
         self._kind_counts = np.zeros(_KIND_COUNT, dtype=np.float64)
+        self._last_timestamp = 0.0
         self._last: dict[str, Any] = {}
 
     @property
@@ -52,7 +53,8 @@ class ExperientialLatentSpace:
         kind_index = list(EventKind).index(event.kind)
         self._kind_counts[kind_index] += 1.0
         self._state = features
-        self._last = self._derive(features, event.timestamp)
+        self._last_timestamp = float(event.timestamp)
+        self._last = self._derive(features, self._last_timestamp)
         return self.snapshot()
 
     def snapshot(self) -> dict[str, Any]:
@@ -87,6 +89,7 @@ class ExperientialLatentSpace:
             "m2": self._m2.tolist(),
             "kind_counts": self._kind_counts.tolist(),
             "state": self._state.tolist(),
+            "last_timestamp": self._last_timestamp,
         }
 
     def restore(self, data: dict[str, Any]) -> None:
@@ -98,12 +101,14 @@ class ExperientialLatentSpace:
         m2 = np.asarray(data.get("m2"), dtype=np.float64)
         counts = np.asarray(data.get("kind_counts"), dtype=np.float64)
         state = np.asarray(data.get("state"), dtype=np.float64)
+        last_timestamp = float(data.get("last_timestamp", 0.0))
         if (
             seen < 0
             or mean.shape != (_STATE_DIM,)
             or m2.shape != (_STATE_DIM,)
             or state.shape != (_STATE_DIM,)
             or counts.shape != (_KIND_COUNT,)
+            or not math.isfinite(last_timestamp)
             or not all(np.all(np.isfinite(a)) for a in (mean, m2, counts, state))
             or np.any(m2 < -1e-9)
             or np.any(counts < 0)
@@ -111,7 +116,8 @@ class ExperientialLatentSpace:
             raise ValueError("malformed experiential-space state")
         self._seen, self._mean, self._m2 = seen, mean, np.maximum(m2, 0.0)
         self._kind_counts, self._state = counts, state
-        self._last = self._derive(state, 0.0) if seen else {}
+        self._last_timestamp = last_timestamp
+        self._last = self._derive(state, last_timestamp) if seen else {}
 
     @staticmethod
     def _encode(event: ExternalEvent) -> np.ndarray:
