@@ -66,7 +66,7 @@ class BitCell:
         return format(self.value, "06b")
 
     @property
-    def information_capacity_bits(self) -> int:
+    def information_capacity_bits(self) -> float:
         """Maximum raw information per unconstrained six-bit cell."""
         return log2(CELL_COUNT)
 
