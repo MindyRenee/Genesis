@@ -562,6 +562,58 @@ class Vision:
         subsystem = self._get_occipital()
         return subsystem.process(rgb_small, learn=True)
 
+    def see_frame(
+        self,
+        frame: np.ndarray,
+        client=None,
+        emotion: EmotionalState | None = None,
+        network=None,
+        mirror: bool = False,
+        nerve: str = "android_camera",
+    ) -> VisionScene:
+        """Process a supplied RGB frame through the same visual cortex path as the optic nerve.
+
+        This is the ingestion seam for Android camera adapters that cannot
+        publish into the Linux V4L2 shared-memory producer. The frame is still
+        gated by the body's thalamic relay and passes through the same optics,
+        illumination, recognition, and scene-integration stages.
+        """
+        gate = self._optic_gate(client)
+        if isinstance(gate, VisionScene):
+            gate.nerve = nerve
+            return gate
+        relay_gate, pupil_mm, focus_m, lid = gate
+        rgb = np.asarray(frame)
+        if (
+            rgb.ndim != 3
+            or rgb.shape[2] != 3
+            or rgb.shape[0] < 1
+            or rgb.shape[1] < 1
+            or not np.issubdtype(rgb.dtype, np.number)
+            or not np.all(np.isfinite(rgb))
+        ):
+            return VisionScene(status="unprocessed", relay_gate=relay_gate, nerve=nerve)
+        if rgb.dtype != np.uint8:
+            rgb = np.clip(rgb, 0, 255).astype(np.uint8)
+        try:
+            scene = self._analyze_frame(
+                rgb,
+                pupil_mm,
+                focus_m,
+                lid,
+                relay_gate,
+                client,
+                emotion,
+                network,
+                mirror,
+                nerve,
+            )
+            scene.nerve = nerve
+            return scene
+        except Exception as error:  # noqa: BLE001 — bad frames cannot crash cognition
+            note_swallowed("occipital_lobe.perception.vision.see_frame", error)
+            return VisionScene(status="unprocessed", relay_gate=relay_gate, nerve=nerve)
+
     def see(
         self,
         client=None,
