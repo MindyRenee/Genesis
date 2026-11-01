@@ -425,6 +425,7 @@ class Mind(
             frontal=self.brain.frontal,
             is_nap_mode=lambda: self._nap_mode,
             engagement=lambda: 0.0,
+            on_latent_signal=self._observe_self_latent_signal,
         )
 
         # Wire the emotional memory callback: when a high-emotion
