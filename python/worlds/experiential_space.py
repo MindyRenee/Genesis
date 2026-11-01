@@ -6,11 +6,13 @@ subjective experience or physically models spacetime. It preserves the
 useful geometric ideas without introducing an untrained Torch network
 or a new runtime dependency.
 
-The state is grounded in event fields already present in OuterWorld:
-event kind, direction, salience, addressedness, topic count, and time.
+The state is grounded in OuterWorld events: kind, direction, salience,
+addressedness, topic count, time, structured numeric payload summaries,
+and explicitly marked sentiment-derived valence.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 import math
 from typing import Any
 
@@ -79,7 +81,7 @@ class ExperientialLatentSpace:
                 "fisher_volume": 1.0,
                 "symplectic_state": self._state.tolist(),
             }
-        result = dict(self._last)
+        result = deepcopy(self._last)
         result["observations"] = self._seen
         result["state"] = self._state.tolist()
         result["feature_variance"] = (
