@@ -25,9 +25,9 @@ import collections
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
-import shutil
 import tempfile
 import threading
 import time
