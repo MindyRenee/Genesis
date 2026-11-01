@@ -148,6 +148,24 @@ def open_arc3_game(
     return env, observation
 
 
+def arc3_legal_actions(environment: Any) -> list[str]:
+    """Return the action names currently exposed as legal by the environment.
+
+    The available action set is state-dependent; callers should request it
+    again after every observation rather than assume every action is legal.
+    """
+    actions = getattr(environment, "action_space", None)
+    if actions is None:
+        raise ARCSourceError("ARC-AGI-3 environment does not expose action_space")
+    names = sorted(
+        {
+            str(getattr(action, "name", action))
+            for action in actions
+        }
+    )
+    return names
+
+
 def step_arc3_game(
     environment: Any,
     action_name: str,
@@ -166,6 +184,12 @@ def step_arc3_game(
     if action is None:
         valid = sorted(name for name in dir(GameAction) if name.startswith("ACTION"))
         raise ValueError(f"Unknown ARC action {action_name!r}; valid actions: {valid}")
+    legal = arc3_legal_actions(environment)
+    if legal and action_name not in legal:
+        raise ValueError(
+            f"ARC action {action_name!r} is not legal in the current state; "
+            f"available actions: {legal}"
+        )
     result = environment.step(action, data=data, reasoning=reasoning)
     if result is None:
         raise ARCSourceError("ARC-AGI-3 environment returned no observation after action")
