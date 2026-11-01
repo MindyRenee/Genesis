@@ -9,6 +9,8 @@ import pytest
 from parietal_lobe import arc_play
 from parietal_lobe.arc_play import ARC3Decision, run_arc3_episode
 from parietal_lobe.arc_sources import ARCSourceError
+from parietal_lobe.arc_braille import BrailleGameRecord, decode_game_record
+from parietal_lobe.binary_language import BitCell
 
 
 class FakeEnvironment:
@@ -45,6 +47,16 @@ def test_episode_runner_observes_feedback_and_stops_on_win(monkeypatch) -> None:
     assert len(episode.transitions[0]["state_signature"]) == 64
     assert len(episode.transitions[0]["next_state_signature"]) == 64
     assert episode.transitions[0]["state_signature"] != episode.transitions[0]["next_state_signature"]
+    transition = episode.transitions[0]
+    encoded = BrailleGameRecord(
+        cells=tuple(BitCell(value) for value in transition["braille_cells"]),
+        bit_length=transition["braille_bit_length"],
+    )
+    decoded = decode_game_record(encoded)
+    assert decoded["record_type"] == "arc_transition"
+    assert decoded["game_id"] == "fake-game"
+    assert decoded["action"]["name"] == "ACTION1"
+    assert decoded["terminal_state"] == "WIN"
 
 
 def test_episode_runner_rejects_illegal_policy_action(monkeypatch) -> None:
