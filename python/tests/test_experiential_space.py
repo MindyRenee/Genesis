@@ -79,7 +79,7 @@ def test_outer_world_records_each_event_into_experiential_space_and_persists_it(
     restored = OuterWorld()
     restored.restore_from_dict(saved)
     assert restored.experiential_space.observations == 1
-    assert len(restored.experiential_space.snapshot()["state"]) == 16
+    assert len(restored.experiential_space.snapshot()["state"]) == 20
 
 
 def test_structured_payload_changes_sensory_coordinates():
