@@ -24,8 +24,10 @@ flate2 = "1.1.9"
 libc = "0.2.189"
 proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
 quote = "1.0.47"
-shared_memory = "0.12.4"
 syn = { version = "3.0.3", features = ["full", "parsing", "printing", "visit"] }
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+shared_memory = "0.12.4"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 v4l = "0.14.0"
