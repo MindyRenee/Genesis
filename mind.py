@@ -994,7 +994,7 @@ class Mind(
                 inner_snapshot=inner_snapshot,
                 language_snapshot=language_snapshot,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             # This is an observer: a geometry failure must not stop the
             # event stream, response path, or inner-life thread.
             logger.debug("cognitive topos integration failed", exc_info=True)
