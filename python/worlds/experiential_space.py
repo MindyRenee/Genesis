@@ -191,7 +191,7 @@ class ExperientialLatentSpace:
         volume = float(math.exp(min(300.0, 0.5 * logdet))) if sign > 0 else 0.0
         # Exact harmonic Hamiltonian flow H=(q·q+p·p)/2, a symplectic
         # rotation; unlike explicit Euler, this preserves phase-space area.
-        q, p_phase = state[:8], state[8:16]
+        q, p_phase = state[:10], state[10:20]
         dt = 0.01
         c, s = math.cos(dt), math.sin(dt)
         evolved = np.concatenate((c * q + s * p_phase, c * p_phase - s * q))
