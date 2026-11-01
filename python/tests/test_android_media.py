@@ -5,7 +5,7 @@ from PIL import Image
 
 import numpy as np
 
-from brainstem.android_media import decode_float32_audio, load_rgb_frame
+from brainstem.android_media import capture_android_frame, decode_float32_audio, load_rgb_frame
 
 
 def test_camera_jpeg_decodes_to_detached_rgb_uint8(tmp_path) -> None:
@@ -39,3 +39,10 @@ def test_float32_pcm_decoder_rejects_partial_and_nonfinite_samples() -> None:
         decode_float32_audio(b"abc")
     with pytest.raises(ValueError):
         decode_float32_audio(np.array([np.nan], dtype="<f4").tobytes())
+
+
+
+def test_on_demand_camera_capture_is_absent_outside_android(monkeypatch) -> None:
+    monkeypatch.delenv("ANDROID_ROOT", raising=False)
+    monkeypatch.delenv("ANDROID_DATA", raising=False)
+    assert capture_android_frame() is None
