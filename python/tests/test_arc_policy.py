@@ -14,7 +14,7 @@ def test_policy_selects_only_legal_actions_and_explains_scores() -> None:
 
     assert decision.action in {"ACTION1", "ACTION2"}
     assert decision.reasoning["policy"] == "bounded_novelty_exploration"
-    assert decision.reasoning["score_semantics"] == "exploration_priority_not_success_probability"
+    assert decision.reasoning["score_semantics"] == "exploration_plus_observed_terminal_outcome_not_success_probability"
     assert len(decision.reasoning["candidate_scores"]) == 2
 
 
@@ -47,3 +47,44 @@ def test_policy_fingerprint_is_stable_for_equivalent_mappings() -> None:
     assert observation_signature({"grid": [[1, 0]], "state": "PLAYING"}) == (
         observation_signature({"state": "PLAYING", "grid": [[1, 0]]})
     )
+
+
+def test_policy_uses_explicit_terminal_outcome_for_same_state_action() -> None:
+    """A win raises and a game-over lowers the observed action preference."""
+    observation = {"grid": [[0, 1]], "state": "PLAYING"}
+    next_observation = {"grid": [[1, 1]], "state": "WIN"}
+    policy = ARC3ExplorationPolicy()
+
+    policy.observe_transition(observation, "ACTION2", next_observation, "WIN")
+    decision = policy.choose_action(observation, ["ACTION1", "ACTION2"], [])
+
+    assert decision.action == "ACTION2"
+    assert decision.reasoning["score_semantics"] == (
+        "exploration_plus_observed_terminal_outcome_not_success_probability"
+    )
+
+    losing_policy = ARC3ExplorationPolicy()
+    losing_policy.observe_transition(
+        observation,
+        "ACTION2",
+        {"grid": [[0, 0]], "state": "GAME_OVER"},
+        "GAME_OVER",
+    )
+    losing_decision = losing_policy.choose_action(
+        observation, ["ACTION1", "ACTION2"], []
+    )
+    assert losing_decision.action == "ACTION1"
+
+
+def test_policy_does_not_invent_reward_for_nonterminal_transition() -> None:
+    """A state change without explicit terminal feedback gets no reward."""
+    observation = {"grid": [[0, 1]], "state": "PLAYING"}
+    policy = ARC3ExplorationPolicy()
+    policy.observe_transition(
+        observation,
+        "ACTION2",
+        {"grid": [[1, 1]], "state": "PLAYING"},
+        "PLAYING",
+    )
+
+    assert policy._outcomes == {}
