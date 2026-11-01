@@ -12,7 +12,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-
 DEFAULT_ARC1_ROOT = Path("data/arc/ARC-AGI-1")
 
 
