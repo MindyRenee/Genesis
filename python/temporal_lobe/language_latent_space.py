@@ -1,7 +1,7 @@
 """Machine-native language latent geometry using reversible 7-bit ASCII notation.
 
 Text is represented as ASCII character codes (0..127); non-ASCII input is
-rejected rather than silently transliterated or UTF-8 encoded. The latent
+escaped reversibly rather than transliterated or UTF-8 encoded. The latent
 vector combines parsed structure with deterministic hashed lexical features.
 A Sinkhorn coupling compares the observed ASCII-code distribution with an
 explicit latent-feature codebook using normalized 7-bit Hamming cost. This is
@@ -41,12 +41,12 @@ def encode_ascii(text: str) -> tuple[tuple[int, ...], int]:
     escaped = []
     for character in text:
         codepoint = ord(character)
-        if character == "\\\\":
-            escaped.append("\\\\\\\\")
+        if character == "\\":
+            escaped.append("\\\\")
         elif codepoint < 128:
             escaped.append(character)
         else:
-            escaped.append("\\\\u{" + format(codepoint, "X") + "};")
+            escaped.append("\\u{" + format(codepoint, "X") + "};")
     raw = "".join(escaped).encode("ascii", errors="strict")
     return tuple(raw), len(raw) * 7
 
@@ -64,10 +64,10 @@ def decode_ascii(codes: tuple[int, ...], bit_length: int) -> str:
     decoded = []
     index = 0
     while index < len(encoded):
-        if encoded.startswith("\\\\\\\\", index):
-            decoded.append("\\\\")
+        if encoded.startswith("\\\\", index):
+            decoded.append("\\")
             index += 2
-        elif encoded.startswith("\\\\u{", index):
+        elif encoded.startswith("\\u{", index):
             end = encoded.find("};", index + 3)
             if end < 0:
                 raise ValueError("malformed Unicode escape in ASCII text")
@@ -83,6 +83,7 @@ def decode_ascii(codes: tuple[int, ...], bit_length: int) -> str:
             decoded.append(encoded[index])
             index += 1
     return "".join(decoded)
+
 
 def _ascii_histogram(codes: tuple[int, ...]) -> np.ndarray:
     counts = np.zeros(_ASCII_COUNT, dtype=np.float64)
