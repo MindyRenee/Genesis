@@ -4,11 +4,17 @@ This package connects a Dart/Flutter phone client to the existing Python ARC-AGI
 
 ## Run on the same Android phone
 
-From the Genesis repository root in Termux:
+From the Genesis repository root in Termux, install only the official ARC toolkit. The full editable project extra can pull in desktop-oriented dependencies that are not needed to run this bridge on Android:
+
+```sh
+python -m pip install "arc-agi==0.9.9"
+PYTHONPATH=python:. python scripts/arc_phone_bridge.py --host 127.0.0.1 --port 8765 --mind-socket /path/to/running/genesis.sock
+```
+
+On a desktop Linux development environment, the optional project extra is also supported:
 
 ```sh
 python -m pip install -e '.[arc]'
-PYTHONPATH=python:. python scripts/arc_phone_bridge.py --host 127.0.0.1 --port 8765 --mind-socket /path/to/running/genesis.sock
 ```
 
 The service intentionally binds to loopback only and has no authentication. Do not change it to listen on a LAN/public interface. It stores active sessions in memory; restarting the service ends them. Replace `/path/to/running/genesis.sock` with the actual socket path of an already-running Genesis daemon. The bridge starts a headless Mind connected to that daemon and forwards each initial/resulting observation through `Mind.world.perceive()` and each executed action through `Mind.world.it_acted()`. Those are the existing event boundaries used by Genesis's live cognitive integration. If `--mind-socket` is omitted, the bridge remains transport-only.
