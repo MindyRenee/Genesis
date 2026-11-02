@@ -21,6 +21,7 @@ from typing import Any
 from parietal_lobe.arc_play import ARC3Decision
 from parietal_lobe.arc_sources import (
     GAME_OVER,
+    RESET_ACTION,
     TERMINAL_WIN,
     is_complex_action,
     observation_grid,
@@ -129,6 +130,7 @@ class _Logged:
     after: dict[str, Any]
     reward: float
     state_after: str | None
+    cls: str | None = None
 
 
 @dataclass
@@ -145,6 +147,10 @@ class _Graph:
     rewards: dict[tuple[str, str], tuple[float, int]] = field(default_factory=dict)
     dead: set[str] = field(default_factory=set)
     seen: set[str] = field(default_factory=set)
+    departures: Counter[str] = field(default_factory=Counter)
+    class_tries: Counter[str] = field(default_factory=Counter)
+    class_changes: Counter[str] = field(default_factory=Counter)
+    key_class: dict[str, str] = field(default_factory=dict)
 
     def add(
         self,
@@ -154,21 +160,32 @@ class _Graph:
         nxt: str | None,
         reward: float | None,
         state_after: str | None,
+        cls: str | None = None,
     ) -> None:
-        """Record one transition ``prior --key--> nxt``."""
+        """Record one transition ``prior --key--> nxt``; ``cls`` groups similar actions."""
+        if cls is not None:
+            self.key_class[key] = cls
+            self.class_tries[cls] += 1
+            if nxt is not None and nxt != prior:
+                self.class_changes[cls] += 1
         self.seen.add(prior)
+        self.departures[prior] += 1
         self.visits[(prior, key)] += 1
         self.tried.setdefault(prior, set()).add(key)
         self.key_tries[key] += 1
         self.action_tries[action] += 1
         if nxt is not None:
             self.seen.add(nxt)
-            self.edges.setdefault(prior, {})[key] = nxt
             if nxt != prior:
                 self.key_changes[key] += 1
                 self.action_changes[action] += 1
             if state_after == GAME_OVER:
+                # A game over usually means an exhausted step budget, not a bad
+                # move, so it must not overwrite a live edge learned earlier.
                 self.dead.add(nxt)
+                self.edges.setdefault(prior, {}).setdefault(key, nxt)
+            else:
+                self.edges.setdefault(prior, {})[key] = nxt
         if reward is None:
             reward = {TERMINAL_WIN: 1.0, GAME_OVER: -1.0}.get(state_after or "", 0.0)
         if reward:
@@ -218,6 +235,8 @@ class ARC3ExplorationPolicy:
     _grid_transitions: int = field(default=0, init=False)
     _candidate_cache: dict[str, list[Candidate]] = field(default_factory=dict, init=False)
     _observations_seen: set[str] = field(default_factory=set, init=False)
+    _start_view: dict[str, Any] | None = field(default=None, init=False)
+    _reset_pending: bool = field(default=True, init=False)
 
     @property
     def _outcomes(self) -> dict[tuple[str, str], tuple[float, int]]:
@@ -302,6 +321,7 @@ class ARC3ExplorationPolicy:
                 self._view_signature(item.after),
                 item.reward,
                 item.state_after,
+                item.cls,
             )
         self._graph = graph
         self._candidate_cache.clear()
@@ -316,9 +336,14 @@ class ARC3ExplorationPolicy:
                     targets = click_targets(
                         observation_grid(observation), limit=self.max_click_targets
                     )
+                grid = observation_grid(observation)
                 for x, y in targets:
                     data = {"x": x, "y": y}
-                    candidates.append((action_key(action, data), action, data))
+                    key = action_key(action, data)
+                    cls = _action_class(grid, action, data)
+                    if cls is not None:
+                        self._graph.key_class[key] = cls
+                    candidates.append((key, action, data))
             else:
                 candidates.append((action, action, None))
         return candidates
@@ -361,6 +386,9 @@ class ARC3ExplorationPolicy:
             graph.rewards.update(
                 {k: v for k, v in self._graph.rewards.items() if k not in graph.rewards}
             )
+        if self._reset_pending or self._start_view is None:
+            self._start_view = observation_view(observation)
+            self._reset_pending = False
         state_key = self.signature(observation)
         candidates = self._candidates(observation, legal_actions)
         self._candidate_cache[state_key] = candidates
@@ -385,11 +413,16 @@ class ARC3ExplorationPolicy:
         if outcome(best[2]) > 0:
             mode = "exploit_reward"
         elif mode != "untested_here" or self._known_noop(graph, best[2]):
-            step = self._frontier_step(state_key, graph)
-            if step is not None:
+            step = self._route_to_frontier(state_key, graph)
+            if step == RESET_ACTION:
+                best, mode = (0.0, -1, RESET_ACTION, RESET_ACTION, None), "reset_to_frontier"
+                self._reset_pending = True
+            elif step is not None:
                 match = next((item for item in scored if item[2] == step), None)
                 if match is not None:
                     best, mode = match, "walk_to_frontier"
+            else:
+                best, mode = self._least_visited_successor(state_key, graph, scored), "cover"
 
         score, _, key, action, data = best
         reasoning = {
@@ -425,7 +458,13 @@ class ARC3ExplorationPolicy:
     def _effect_prior(graph: _Graph, key: str, action: str) -> float:
         """Smoothed probability that this action changes the masked board."""
         action_rate = (graph.action_changes[action] + 1) / (graph.action_tries[action] + 2)
-        return (graph.key_changes[key] + 2 * action_rate) / (graph.key_tries[key] + 2)
+        cls = graph.key_class.get(key)
+        class_rate = (
+            (graph.class_changes[cls] + 2 * action_rate) / (graph.class_tries[cls] + 2)
+            if cls is not None
+            else action_rate
+        )
+        return (graph.key_changes[key] + 2 * class_rate) / (graph.key_tries[key] + 2)
 
     def _has_untested(self, graph: _Graph, state: str) -> bool:
         """Whether a known state still offers an untested, not-known-useless action."""
@@ -437,23 +476,65 @@ class ARC3ExplorationPolicy:
             key not in tried and not self._known_noop(graph, key) for key, _a, _d in candidates
         )
 
-    def _frontier_step(self, start: str, graph: _Graph) -> str | None:
-        """First action key on the shortest known path to a state with untested actions.
+    def _frontier_step(
+        self, start: str, graph: _Graph, *, include_start: bool = False
+    ) -> tuple[str | None, int] | None:
+        """Shortest known path to a state with untested actions as ``(first key, length)``.
 
-        Edges into game-over states and self-loops are skipped.
+        Breadth-first search over the observed graph; edges into game-over
+        states and self-loops are skipped. ``include_start`` lets the start
+        state itself count as the frontier (length 0).
         """
-        queue: deque[tuple[str, str | None]] = deque([(start, None)])
+        queue: deque[tuple[str, str | None, int]] = deque([(start, None, 0)])
         visited = {start}
         while queue:
-            state, first = queue.popleft()
-            if state != start and self._has_untested(graph, state):
-                return first
+            state, first, depth = queue.popleft()
+            if (include_start or state != start) and self._has_untested(graph, state):
+                return first, depth
             for key, nxt in sorted(graph.edges.get(state, {}).items()):
                 if nxt in visited or nxt in graph.dead or nxt == state:
                     continue
                 visited.add(nxt)
-                queue.append((nxt, first if first is not None else key))
+                queue.append((nxt, first if first is not None else key, depth + 1))
         return None
+
+    def _route_to_frontier(self, state: str, graph: _Graph) -> str | None:
+        """Next step toward the nearest frontier, treating RESET as an edge to the start.
+
+        RESET is available from every state and returns to the current
+        level's start, so the shortest route is ``min(d(state, F), 1 + d(start, F))``.
+        Returns an action key, :data:`RESET_ACTION`, or None when no frontier is reachable.
+        """
+        direct = self._frontier_step(state, graph)
+        via_reset = None
+        if self._start_view is not None:
+            start = self._view_signature(self._start_view)
+            if start != state:
+                via_reset = self._frontier_step(start, graph, include_start=True)
+        if via_reset is not None and (direct is None or 1 + via_reset[1] < direct[1]):
+            return RESET_ACTION
+        return direct[0] if direct is not None else None
+
+    @staticmethod
+    def _least_visited_successor(
+        state: str, graph: _Graph, scored: list[tuple[float, int, str, str, Any]]
+    ) -> tuple[float, int, str, str, Any]:
+        """Count-based coverage when no frontier is known: the least-tried live action here.
+
+        Outcomes can depend on hidden state the board does not show, so a
+        tried action is not fully known. Minimising ``N(s, a)`` (with
+        self-loops and game-over edges penalised) cycles through every
+        action instead of oscillating between two states.
+        """
+        edges = graph.edges.get(state, {})
+
+        def rank(item: tuple[float, int, str, str, Any]) -> tuple[int, int]:
+            """Visits plus a penalty for known self-loops and game-over edges."""
+            nxt = edges.get(item[2])
+            stuck = nxt is not None and (nxt == state or nxt in graph.dead)
+            return (graph.visits[(state, item[2])] + 3 * int(stuck), item[1])
+
+        return min(scored, key=rank)
 
     def observe_transition(
         self,
@@ -482,8 +563,18 @@ class ARC3ExplorationPolicy:
             after=after,
             reward=float(reward),
             state_after=after.get("state") or terminal_state,
+            cls=_action_class(before.get("grid"), action, data),
         )
         self._log.append(item)
+        if item.state_after == GAME_OVER:
+            self._reset_pending = True
+        levels_before, levels_after = before.get("levels_completed"), after.get("levels_completed")
+        if (
+            isinstance(levels_before, int)
+            and isinstance(levels_after, int)
+            and levels_after > levels_before
+        ):
+            self._start_view = after
         if self._learn_volatile(before.get("grid"), after.get("grid")):
             self._rebuild()
             return
@@ -494,7 +585,21 @@ class ARC3ExplorationPolicy:
             self._view_signature(after),
             item.reward,
             item.state_after,
+            item.cls,
         )
+
+
+def _action_class(grid: Any, action: str, data: dict[str, Any] | None) -> str | None:
+    """Group a click with every other click on the same colour (hierarchical prior level)."""
+    if not (isinstance(data, dict) and isinstance(grid, list) and grid):
+        return None
+    x, y = data.get("x"), data.get("y")
+    if not (isinstance(x, int) and isinstance(y, int) and 0 <= y < len(grid)):
+        return None
+    row = grid[y]
+    if not (isinstance(row, list) and 0 <= x < len(row)):
+        return None
+    return f"{action}#colour{row[x]}"
 
 
 def _maskable(grid: Any) -> bool:

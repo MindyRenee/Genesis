@@ -160,3 +160,21 @@ def test_policy_defers_actions_that_never_change_the_board() -> None:
     policy.observe_transition(_big(4), "ACTION2", _big(5, mark=3), "NOT_FINISHED")
     decision = policy.choose_action(_big(6, mark=3), ["ACTION1", "ACTION2"], [])
     assert decision.action == "ACTION2"
+
+
+def test_policy_generalises_click_effects_by_colour() -> None:
+    """Clicks on a colour that never changes the board lose to clicks on an untried colour."""
+    grid = [[0] * 32 for _ in range(32)]
+    for y in range(4, 8):
+        for x in range(4, 8):
+            grid[y][x] = 3
+    for y in range(20, 24):
+        for x in range(20, 24):
+            grid[y][x] = 5
+    board = {"grid": grid, "state": "NOT_FINISHED"}
+    policy = ARC3ExplorationPolicy()
+    for x in range(4, 8):
+        policy.observe_transition(board, "ACTION6", board, "NOT_FINISHED", data={"x": x, "y": 4})
+    decision = policy.choose_action(board, ["ACTION6"], [])
+    assert decision.data is not None
+    assert grid[decision.data["y"]][decision.data["x"]] != 3
