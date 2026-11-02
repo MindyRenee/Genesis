@@ -7,7 +7,7 @@
 #
 # Layout:
 #   ~/.local/lib/genesis/venv/    python env, genesis-cognitive (editable)
-#   ~/.local/lib/genesis/venv/bin/{genesis-daemon,retina}
+#   ~/.local/lib/genesis/venv/bin/genesis-daemon
 #   ~/.local/bin/genesis          PATH-visible launcher
 #   ~/.config/genesis/agent.env   deployed environment (Discord webhook, etc.)
 #   ~/.config/systemd/user/genesis.service
@@ -98,8 +98,7 @@ fi
 # Ship the binaries next to the interpreter — the CLI's packaged-install
 # lookup (venv/bin). Editable installs also find target/release first;
 # these copies keep the venv self-contained.
-cp "$REPO/target/release/genesis-daemon" "$REPO/target/release/retina" \
-    "$VENV/bin/"
+cp "$REPO/target/release/genesis-daemon" "$VENV/bin/"
 
 mkdir -p "$USER_BIN"
 ln -sf "$VENV/bin/genesis" "$USER_BIN/genesis"
