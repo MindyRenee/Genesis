@@ -1184,35 +1184,24 @@ if __name__ == "__main__":
     sys.exit(0 if success else 1)
 
 
-def test_nrem_depth_follows_chemical_arousal() -> None:
-    """NREM depth is read off her chemical arousal — which the
-    sleep-wake network drives down through the descent (measured
-    ~0.49 at onset to ~0.14 once LC silences), so the bands trace a
-    real N1 → N2 → N3 architecture. The earlier homeostat mapping
-    pinned the stage at N1 whenever adenosine sat low, because a live
-    h is a decaying remainder, not a depth."""
-    assert _sleep_stage_from_summary(_make_summary(arousal=0.49, phase=PHASE_NREM)) is SleepStage.N1
-    assert _sleep_stage_from_summary(_make_summary(arousal=0.28, phase=PHASE_NREM)) is SleepStage.N2
-    assert _sleep_stage_from_summary(_make_summary(arousal=0.15, phase=PHASE_NREM)) is SleepStage.N3
+def test_nrem_summary_does_not_infer_depth_from_arousal() -> None:
+    """Arousal is not a substitute for EEG-based NREM stage scoring."""
+    for arousal in (0.49, 0.28, 0.15):
+        assert (
+            _sleep_stage_from_summary(_make_summary(arousal=arousal, phase=PHASE_NREM))
+            is SleepStage.N1
+        )
 
 
-def test_nrem_arousal_descent_reports_deepening_stages() -> None:
-    """The fallback arousal mapping still descends when arousal does:
-    used only when no sleep-cycle tracker is active, it must report the
-    full N1→N2→N3 band sweep rather than pinning at N1."""
-    descent = [0.48, 0.40, 0.33, 0.26, 0.21, 0.18, 0.14]
-    stages = [
-        _sleep_stage_from_summary(_make_summary(arousal=a, phase=PHASE_NREM)) for a in descent
-    ]
-    assert stages == [
-        SleepStage.N1,
-        SleepStage.N1,
-        SleepStage.N2,
-        SleepStage.N2,
-        SleepStage.N2,
-        SleepStage.N3,
-        SleepStage.N3,
-    ]
+def test_explicit_sleep_tracker_stage_controls_nrem_signature() -> None:
+    """A caller with actual stage tracking can request N2/N3 signatures."""
+    from thalamus.brain_waves import _sleep_phase_powers
+
+    summary = _make_summary(arousal=0.4, phase=PHASE_NREM)
+    n2, _, _ = _sleep_phase_powers(summary, SleepStage.N2)
+    n3, _, _ = _sleep_phase_powers(summary, SleepStage.N3)
+    assert n2[BrainWave.SIGMA] > n3[BrainWave.SIGMA]
+    assert n3[BrainWave.DELTA] > n2[BrainWave.DELTA]
 
 
 # ─── Bistable-switch readout: early-warning stats and the
