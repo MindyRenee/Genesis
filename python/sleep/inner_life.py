@@ -1353,22 +1353,16 @@ class InnerLife:
         return is_sleeping
 
     def _sleep_stage(self, summary) -> SleepStage:
-        """Determine the fine-grained sleep stage from the summary.
+        """Resolve sleep stage without treating arousal as an EEG scorer.
 
-        Maps the arousal level during sleep onto the NREM-REM cycle
-        stages (AASM scoring; Iber et al., 2007):
+        Explicit REM remains REM. For explicit NREM without an active
+        ultradian tracker, the canonical fallback is N1 because a broad
+        NREM phase and its arousal value do not establish N2 spindles or
+        N3 slow-wave activity. During normal tracked sleep, the tracker
+        supplies the stage progression used by sleep-event processing.
 
-            arousal > 0.50        → REM
-            0.35 < arousal ≤ 0.50 → N1
-            0.20 < arousal ≤ 0.35 → N2
-            arousal ≤ 0.20        → N3
-
-        If the phase name is explicitly "rem" (the split phase from
-        the Rust side), REM is returned directly regardless of arousal.
-
-        Returns ``SleepStage.N3`` (the deepest) as a safe default if
-        the summary is missing or not a sleeping phase, since the
-        deepest stage is where the most consolidation occurs.
+        Preserve the existing N3 fallback for missing/non-sleeping
+        summaries; callers should invoke this only in the sleep path.
         """
         if not InnerLife._is_sleeping(summary):
             return SleepStage.N3
