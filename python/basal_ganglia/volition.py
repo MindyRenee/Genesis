@@ -39,17 +39,6 @@ _VOLITION_NICE = 10
 # closed.
 _CHANNEL_REPLY_MIN_S = 45.0
 
-# The voluntary lid's held positions — openness [0, 1] over SET_LID.
-# _LID_REST is a shut eye, not a shutter: a few percent of light
-# still leaks, matching the phase-closed transmission the body
-# already models for sleep.
-_LID_OPEN = 1.0
-_LID_REST = 0.05
-
-# Seconds a self-chosen eye-rest holds the lid down before
-# releasing it back to the phase's own position.
-_REST_EYES_HOLD_S = 20.0
-
 # Accumulator noise σ per √s on every registered urge — the
 # stochastic fluctuation that makes near-threshold crossings arrive
 # early or late rather than on a fixed schedule (the readiness
@@ -432,7 +421,6 @@ class VolitionMixin:
             "broadcast": self._perform_broadcast,
             "research": self._perform_research,
             "safeguard": self._perform_safeguard,
-            "rest_eyes": self._perform_rest_eyes,
             "manual": self._perform_manual_review,
         }
         started: list[str] = []
@@ -2018,56 +2006,3 @@ class VolitionMixin:
             comm="g-meditate",
         ).start()
 
-    def set_lid(self, openness: float) -> bool:
-        """Voluntary eyelid — the orbicularis oculi the hardware lacks.
-
-        The requested openness composes with the sleep phase's own
-        lid position by min on the body side: she can shut an open
-        eye but cannot open one the stage has closed. Held, not
-        momentary — the lid stays where she left it until she moves
-        it again.
-        """
-        try:
-            return self.client.set_lid(openness)
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition.set_lid",
-                e,
-            )
-            return False
-
-    def close_eyes(self) -> bool:
-        """Shut her eye by choice — the lid held down until she opens it."""
-        return self.set_lid(_LID_REST)
-
-    def open_eyes(self) -> bool:
-        """Release the lid back to the phase's own position."""
-        return self.set_lid(_LID_OPEN)
-
-    def _perform_rest_eyes(self) -> None:
-        """Close her eye because the rest_eyes urge crossed threshold.
-
-        A volitional eye-rest: overstimulation and fatigue build the
-        urge, and the discharge is holding the lid shut for a short
-        spell — sensory relief she grants herself, lighter than
-        meditation. The lid dims every afferent channel and the V1
-        that reads them, so the rest is real, not symbolic. Skipped
-        while sleeping or meditating — those states already own
-        their darkness.
-        """
-        if self.is_resting:
-            return
-        if not self.close_eyes():
-            return
-        self._emit_volition_thought(
-            ("eyes", "vision", "rest", "darkness"),
-            "thought",
-        )
-        try:
-            hold = _REST_EYES_HOLD_S
-            while hold > 0.0 and self._running and not self._suppress_volition:
-                step = min(1.0, hold)
-                time.sleep(step)
-                hold -= step
-        finally:
-            self.open_eyes()

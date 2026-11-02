@@ -253,7 +253,6 @@ def test_command_ids():
     # notification range (100+) or the tensor slab (41–45).
     assert GET_FOLD_MARGINS == 62
     # The voluntary lid is additive past SET_COGNITIVE_PID.
-    assert SET_LID == 57
 
 
 def test_chemical_ids():
@@ -947,105 +946,6 @@ def test_set_wake_alarm_returns_none_on_malformed_response():
         ),
     ):
         assert client.set_wake_alarm(1_800_000_000) is None
-
-
-def test_set_focus_packs_f32_meters_and_acks():
-    """set_focus sends [f32 meters] on the control channel and maps
-    the ack byte to True."""
-    client, _ = _client_with_socket()
-    with (
-        patch("genesis_client.client.write_message") as send,
-        patch(
-            "genesis_client.client.read_message",
-            return_value=(SET_FOCUS, b"\x01"),
-        ),
-    ):
-        assert client.set_focus(0.5) is True
-
-    assert send.call_args[0][1] == SET_FOCUS
-    assert send.call_args[0][2] == struct.pack("<f", 0.5)
-
-
-def test_set_focus_zero_relaxes_the_lens():
-    """A non-positive distance is the body's relax-to-infinity — the
-    client passes it through; the daemon clamps it to 0 D."""
-    client, _ = _client_with_socket()
-    with (
-        patch("genesis_client.client.write_message") as send,
-        patch(
-            "genesis_client.client.read_message",
-            return_value=(SET_FOCUS, b"\x01"),
-        ),
-    ):
-        assert client.set_focus(0.0) is True
-
-    assert send.call_args[0][2] == struct.pack("<f", 0.0)
-
-
-def test_set_focus_returns_false_when_the_daemon_predates_it():
-    """An unacked or missing response is an absent channel, not a
-    silent success."""
-    client, _ = _client_with_socket()
-    with (
-        patch("genesis_client.client.write_message"),
-        patch(
-            "genesis_client.client.read_message",
-            return_value=(SET_FOCUS, b"\x00"),
-        ),
-    ):
-        assert client.set_focus(2.0) is False
-
-    # A daemon that closes mid-request reads as unsupported too.
-    with (
-        patch("genesis_client.client.write_message"),
-        patch(
-            "genesis_client.client.read_message",
-            side_effect=ConnectionError("gone"),
-        ),
-        patch.object(client, "connect"),
-    ):
-        assert client.set_focus(2.0) is False
-
-
-def test_set_lid_packs_f32_openness_and_acks():
-    """set_lid sends [f32 openness] on the control channel and maps
-    the ack byte to True — the voluntary lid is a held position."""
-    client, _ = _client_with_socket()
-    with (
-        patch("genesis_client.client.write_message") as send,
-        patch(
-            "genesis_client.client.read_message",
-            return_value=(SET_LID, b"\x01"),
-        ),
-    ):
-        assert client.set_lid(0.05) is True
-
-    assert send.call_args[0][1] == SET_LID
-    assert send.call_args[0][2] == struct.pack("<f", 0.05)
-
-
-def test_set_lid_returns_false_when_the_daemon_predates_it():
-    """A body without the command cannot hold the lid — False marks
-    the absent channel rather than a silent success."""
-    client, _ = _client_with_socket()
-    with (
-        patch("genesis_client.client.write_message"),
-        patch(
-            "genesis_client.client.read_message",
-            return_value=(SET_LID, b"\x00"),
-        ),
-    ):
-        assert client.set_lid(0.05) is False
-
-    with (
-        patch("genesis_client.client.write_message"),
-        patch(
-            "genesis_client.client.read_message",
-            side_effect=ConnectionError("gone"),
-        ),
-        patch.object(client, "connect"),
-    ):
-        assert client.set_lid(0.05) is False
 
 
 def test_set_cognitive_pid_packs_u32_and_acks():

@@ -162,8 +162,6 @@ class Mind(
         "/explore": "explore_files",
         "/world": "world_status",
         "/arcade": "arcade_status",
-        "/close-eyes": "close_eyes",
-        "/open-eyes": "open_eyes",
     }
 
     def __init__(

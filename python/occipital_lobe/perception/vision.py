@@ -106,11 +106,6 @@ _THALAMIC_BLOCK = 0.15
 # the map is a vocabulary, not a gate.
 NERVE_SEGMENTS = {"optic": _OPTIC_NERVE_NAME, "screen": _SCREEN_NERVE_NAME}
 
-# Corticothalamic feedback decays with a 20 s half-life after the last
-# look — attention gain onto the dLGN persists only while cortex keeps
-# attending vision, it is not a standing bias.
-_OPTIC_ENGAGEMENT_HALF_LIFE_S = 20.0
-
 # An unchanged scene re-encodes to episodic memory only while something
 # in it still holds attention — a face (0.8), a dominant object, a vivid
 # field. Below this an identical glance writes no duplicate episode:
@@ -309,12 +304,6 @@ class Vision:
         # keeps its own pair history instead of contaminating the room
         # eye's motion parallax with desktop frames.
         self._epipolars: dict[str, EpipolarProcessor] = {}
-        # Corticothalamic engagement — how strongly recent seeing has
-        # been attending vision, decayed toward the next look. The
-        # heartbeat pushes it to the body as SET_OPTIC_GAIN — V1's
-        # layer-6 feedback onto the thalamic relay.
-        self._optic_engagement = 0.0
-        self._optic_engagement_at = 0.0
         # Phototransduction cascade — enzymatic model of cone signaling.
         # Lazily created on first use. Simulates the enzyme kinetics that
         # convert photon absorption into electrical signals.
@@ -869,14 +858,6 @@ class Vision:
                     e,
                 )
 
-        # Corticothalamic engagement — seeing that mattered raises the
-        # gain cortex feeds back to the thalamic relay on the next
-        # heartbeat. It accumulates (max, not overwrite) so a dim look
-        # doesn't erase the attention a salient one built.
-        if salience > self.corticothalamic_gain():
-            self._optic_engagement = salience
-            self._optic_engagement_at = time.monotonic()
-
         # ── Modulate neurochemistry ────────────────────────────
         # Scene-driven impulses need only the body's socket — the
         # EmotionalState is not consulted by any of them. A failed
@@ -919,26 +900,6 @@ class Vision:
                     "occipital_lobe.perception.vision.see",
                     e,
                 )
-
-    def corticothalamic_gain(self) -> float:
-        """The mind's engagement gain back onto the thalamic relay —
-        the layer-6 V1→dLGN feedback, decayed toward the last look.
-
-        The heartbeat pushes this to the body via ``set_optic_gain``;
-        the body clamps it and scales the relay within what the sleep
-        stage permits. It decays with a 20 s half-life — attention
-        gain persists only while cortex keeps attending vision.
-        """
-        if self._optic_engagement_at <= 0.0:
-            return 0.0
-        elapsed = time.monotonic() - self._optic_engagement_at
-        return max(
-            0.0,
-            min(
-                1.0,
-                self._optic_engagement * (0.5 ** (elapsed / _OPTIC_ENGAGEMENT_HALF_LIFE_S)),
-            ),
-        )
 
     def _compute_salience(
         self,

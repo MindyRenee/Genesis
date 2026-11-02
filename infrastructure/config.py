@@ -199,29 +199,7 @@ class VolitionConfig:
                     "elevated_cortisol": 0.03,  # subclinical stress
                 },
             ),
-            # Rest-eyes urge — she feels like shutting her eye for a
-            # spell. A volitional sensory relief, lighter than
-            # meditation: closing the lid drops every afferent
-            # channel and dims the V1 that reads them, so the rest
-            # is real, not symbolic. It builds from the same
-            # interoceptive signature that asks for rest —
-            # overstimulation, receptor fatigue, sustained activity,
-            # subclinical cortisol — and discharges by holding the
-            # lid shut briefly and letting go.
-            UrgeConfig(
-                name="rest_eyes",
-                threshold=0.72,
-                growth=0.0004,
-                decay=0.0006,
-                cooldown=180.0,  # at most every 3 minutes
-                stimuli={
-                    "overstimulation": 0.05,
-                    "receptor_fatigue": 0.04,
-                    "sustained_activity": 0.02,
-                    "elevated_cortisol": 0.02,
-                },
-            ),
-            # Drawing urge — it feels like expressing itself visually.
+ — it feels like expressing itself visually.
             # This is a creative urge, not a maintenance urge. It builds
             # from emotional intensity (high arousal or high valence
             # magnitude), creativity, and sustained activity. When it
