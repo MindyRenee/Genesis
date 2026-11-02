@@ -104,7 +104,6 @@ from .protocol import (
     GET_MEMORY_STATS,
     GET_MOTOR_TARGET,
     GET_NEURO_SUMMARY,
-    GET_OPTIC_STATE,
     GET_PHASE,
     GET_PLASTICITY_PROFILE,
     GET_PROCESS_HEALTH,
@@ -136,9 +135,6 @@ from .protocol import (
     SET_COGNITIVE_PID,
     SET_FIELD_CARRIER,
     SET_FIELD_PULSE,
-    SET_FOCUS,
-    SET_LID,
-    SET_OPTIC_GAIN,
     SET_POLICY_AUTHORITY,
     SET_WAKE_ALARM,
     SET_ZONE,
@@ -180,7 +176,6 @@ from .types import (
     IonSummary,
     MemoryStats,
     NeuroSummary,
-    OpticState,
     PhaseInfo,
     PingResponse,
     PlasticityProfile,
@@ -426,7 +421,6 @@ class GenesisClient:
             GET_INTERNALS,
             GET_ION_SUMMARY,
             GET_MOTOR_TARGET,
-            GET_OPTIC_STATE,
             GET_PROCESS_HEALTH,
             GET_RECENT_EPISODES,
             GET_SENSOR_PRESENCE,
@@ -505,7 +499,6 @@ class GenesisClient:
             GET_RECENT_EPISODES,
             SEARCH_ARCHIVED,
             SEARCH_EPISODES,
-            GET_OPTIC_STATE,
             PUT_TENSOR,
             GET_TENSOR,
             LIST_TENSORS,
@@ -549,10 +542,6 @@ class GenesisClient:
             DROP_TENSOR,
             # GET_INTERNALS leads with an ack byte before its text body.
             GET_INTERNALS,
-            # Optic state leads with an ack byte before the snapshot.
-            GET_OPTIC_STATE,
-            SET_OPTIC_GAIN,
-            SET_FOCUS,
         }
     )
 
@@ -934,51 +923,6 @@ class GenesisClient:
             return False
         return bool(resp) and resp[0] == 1
 
-    def get_optic_state(self, *, timeout: float | None = None) -> OpticState | None:
-        """The optic nerve's subcortical channel state — the body's own
-        read of the eye.
-
-        Photopic and melanopic irradiance, motion energy, the
-        collicular orienting transient, the SCN light drive the body
-        feeds its circadian oscillator, and the thalamic relay gate
-        the mind must honour — near zero in NREM/REM, open while
-        awake. A look through a closed gate is a blind look.
-
-        ``eye_present`` distinguishes "the eye exists but sees nothing"
-        from "there is no eye"; ``frame_seq``/``frame_age_ms`` let the
-        caller tell a stalled feed from a live one.
-
-        Returns ``None`` on transport failure or when the daemon
-        predates the command — an absent channel is no reading, never
-        a zero reading.
-        """
-        try:
-            resp = self._request(GET_OPTIC_STATE, timeout=timeout)
-        except (ConnectionError, OSError, ProtocolError):
-            return None
-        try:
-            return OpticState.unpack(resp)
-        except (IndexError, struct.error, ValueError):
-            return None
-
-    def set_optic_gain(self, gain: float, *, timeout: float | None = None) -> bool:
-        """Corticothalamic feedback — the mind's engagement gain onto
-        the thalamic relay (the layer-6 V1→dLGN projection).
-
-        Modulatory only: the body clamps ``gain`` into 0..1 and scales
-        the relay within ±40% of what the sleep stage permits — it can
-        never open a gate NREM has closed. 0.5 is neutral, above 1.0
-        is meaningless (clamped).
-
-        Returns ``False`` when the daemon predates the command — an
-        absent channel, never silent.
-        """
-        try:
-            resp = self._request(SET_OPTIC_GAIN, _F32.pack(gain), timeout=timeout)
-        except (ConnectionError, OSError, ProtocolError):
-            return False
-        return bool(resp) and resp[0] == 1
-
     def analyze_code(
         self, path: str, source: str, *, timeout: float | None = None
     ) -> dict[str, Any] | None:
@@ -1012,44 +956,6 @@ class GenesisClient:
         if not resp or resp[0] != 1:
             return None
         return _decode_code_analysis(resp[1:].decode("utf-8", "replace"))
-
-    def set_focus(self, meters: float, *, timeout: float | None = None) -> bool:
-        """Accommodation — the mind's focus request in metres.
-
-        The body converts the distance to the ciliary drive
-        (``1/m`` dioptres, clamped to 0..6 — infinity out to a ~17 cm
-        near point) and slews toward it on the advance clock, pulling
-        in faster than it releases. ``meters <= 0`` or non-finite
-        relaxes the eye to infinity. Monocular: the ciliary servo
-        only — no vergence exists to request.
-
-        Returns ``False`` when the daemon predates the command — an
-        absent channel, never silent.
-        """
-        try:
-            resp = self._request(SET_FOCUS, _F32.pack(meters), timeout=timeout)
-        except (ConnectionError, OSError, ProtocolError):
-            return False
-        return bool(resp) and resp[0] == 1
-
-    def set_lid(self, openness: float, *, timeout: float | None = None) -> bool:
-        """Voluntary eyelid — the orbicularis oculi the hardware lacks.
-
-        ``openness`` in 0..1 composes with the sleep phase's own lid
-        position by min: the mind can shut an open eye (to rest it,
-        to dim the world) but can never open one the stage has
-        closed. Held, not momentary — lids stay where the mind left
-        them until it moves them again. 1.0 releases the eye to the
-        phase's own position.
-
-        Returns ``False`` when the daemon predates the command — an
-        absent channel, never silent.
-        """
-        try:
-            resp = self._request(SET_LID, _F32.pack(openness), timeout=timeout)
-        except (ConnectionError, OSError, ProtocolError):
-            return False
-        return bool(resp) and resp[0] == 1
 
     def set_cognitive_pid(self, pid: int, *, timeout: float | None = None) -> bool:
         """Tell the body which process is its cognitive mind.

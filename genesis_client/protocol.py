@@ -76,7 +76,6 @@ __all__ = [
     "GET_MEMORY_STATS",
     "GET_MOTOR_TARGET",
     "GET_NEURO_SUMMARY",
-    "GET_OPTIC_STATE",
     "GET_PHASE",
     "GET_PLASTICITY_PROFILE",
     "GET_PROCESS_HEALTH",
@@ -152,9 +151,6 @@ __all__ = [
     "SET_FIELD_CARRIER",
     "SET_FIELD_PHASE",
     "SET_FIELD_PULSE",
-    "SET_FOCUS",
-    "SET_LID",
-    "SET_OPTIC_GAIN",
     "SET_POLICY_AUTHORITY",
     "SET_VOLITION",
     "SET_WAKE_ALARM",
@@ -350,39 +346,6 @@ GET_DYADIC_STATE = 50
 # Additive: PROTOCOL_VERSION stays 3.
 GET_INTERNALS = 51
 
-# The optic nerve's subcortical channel state — the body's own read
-# of the retinal segment, not the mind's: photopic and melanopic
-# irradiance, motion energy, the collicular orienting transient, the
-# SCN light drive it currently feeds the circadian oscillator, and
-# the thalamic relay gate the mind must honour (it approaches 0 in
-# NREM — sensory transmission is blocked at the thalamus, so a look
-# during sleep is a blind look). This is the same /genesis_optic_nerve
-# segment the mind reads frames from — the daemon consumes the
-# nerve's non-image-forming branches, the mind the relayed image.
-# Response: [u8 ack] then 46 bytes —
-#   [u8 flags][u8 pad][7 × f32][u64 frame_seq][i64 frame_age_ms]
-#   flags bit0 = eye ever produced a frame, bit1 = frames fresh (<5 s)
-# A daemon that has never seen a frame still answers — an absent eye
-# is a reading, not an error. A daemon that predates the command
-# returns UNKNOWN_COMMAND, which the client turns into None.
-# Additive: PROTOCOL_VERSION stays 3.
-GET_OPTIC_STATE = 52
-
-# Corticothalamic feedback — the mind's engagement gain onto the
-# thalamic relay, the layer-6 V1→dLGN projection. Modulatory only:
-# it scales the relay within ±40 % and can never open a gate the
-# sleep stage has closed. Request: [f32 gain] in 0..1 (0.5 = neutral).
-# Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
-SET_OPTIC_GAIN = 53
-
-# Accommodation — the mind's focus request in metres. The body
-# converts it to the ciliary drive (1/m dioptres, clamped to 0..6 —
-# infinity to a ~17 cm near point) and slews toward it on the
-# advance clock; non-positive/non-finite distances relax to
-# infinity. Monocular: no vergence component. Request:
-# [f32 meters]. Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
-SET_FOCUS = 54
-
 # Structural code analysis — the daemon's code sense. The mind sends a
 # source file it already read ([u16 path_len][path utf-8]
 # [u32 source_len][source utf-8]); the body parses it into a real Rust
@@ -400,15 +363,6 @@ ANALYZE_CODE = 55
 # Request: [u32 pid]. Response: [u8 ack] (1).
 # Additive: PROTOCOL_VERSION unaffected.
 SET_COGNITIVE_PID = 56
-
-# Voluntary eyelid — the orbicularis oculi the camera hardware lacks.
-# The mind's requested lid openness composes with the sleep phase's
-# own lid position by min: the will can shut an open eye (to rest it,
-# to dim the world) but cannot open one the stage has closed.
-# Request: [f32 openness] in 0..1 (1.0 = released to phase). Held,
-# not momentary — lids stay where the mind left them.
-# Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
-SET_LID = 57
 
 # Deep recall — SimHash similarity scan over the archived tier of
 # LTM. Sleep compression retires low-salience episodes to the
