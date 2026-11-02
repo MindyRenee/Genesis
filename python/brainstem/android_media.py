@@ -141,7 +141,7 @@ class AndroidCameraAdapter:
             if frame is not None:
                 try:
                     self._on_frame(frame)
-                except Exception:  # noqa: BLE001 — camera callback is isolated
+                except Exception:
                     logger.exception("Android camera callback failed")
             else:
                 now = time.monotonic()
@@ -255,74 +255,74 @@ class AndroidMicrophoneAdapter:
             audio_path.unlink(missing_ok=True)
             try:
                 subprocess.run(
-                        [
-                            "termux-microphone-record",
-                            "-f",
-                            str(audio_path),
-                            "-l",
-                            str(self._clip_seconds),
-                            "-e",
-                            "aac",
-                            "-r",
-                            str(self._sample_rate),
-                            "-c",
-                            "1",
-                        ],
+                    [
+                        "termux-microphone-record",
+                        "-f",
+                        str(audio_path),
+                        "-l",
+                        str(self._clip_seconds),
+                        "-e",
+                        "aac",
+                        "-r",
+                        str(self._sample_rate),
+                        "-c",
+                        "1",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=self._timeout,
+                )
+                deadline = time.monotonic() + self._timeout
+                while not self._stop.is_set() and time.monotonic() < deadline:
+                    info = subprocess.run(
+                        ["termux-microphone-record", "-i"],
                         check=True,
                         capture_output=True,
                         text=True,
-                        timeout=self._timeout,
+                        timeout=min(self._timeout, 3.0),
                     )
-                    deadline = time.monotonic() + self._timeout
-                    while not self._stop.is_set() and time.monotonic() < deadline:
-                        info = subprocess.run(
-                            ["termux-microphone-record", "-i"],
-                            check=True,
-                            capture_output=True,
-                            text=True,
-                            timeout=min(self._timeout, 3.0),
-                        )
-                        try:
-                            status = json.loads(info.stdout)
-                        except json.JSONDecodeError:
-                            status = {}
-                        if isinstance(status, dict) and status.get("isRecording") is False:
-                            break
-                        self._stop.wait(0.2)
-                    else:
-                        raise TimeoutError("Termux microphone recording did not finish")
-                    if not audio_path.is_file() or audio_path.stat().st_size == 0:
-                        raise OSError("Termux microphone produced no audio file")
-                    decoded = subprocess.run(
-                        [
-                            "ffmpeg",
-                            "-nostdin",
-                            "-v",
-                            "error",
-                            "-i",
-                            str(audio_path),
-                            "-f",
-                            "f32le",
-                            "-acodec",
-                            "pcm_f32le",
-                            "-ac",
-                            "1",
-                            "-ar",
-                            str(self._sample_rate),
-                            "pipe:1",
-                        ],
-                        check=True,
-                        capture_output=True,
-                        timeout=self._timeout,
-                    )
-                    samples = decode_float32_audio(decoded.stdout)
-                    if self._stop.is_set():
-                        break
                     try:
-                        self._on_clip(samples, self._sample_rate)
-                    except Exception:
-                        logger.exception("Android microphone callback failed")
-                    audio_path.unlink(missing_ok=True)
+                        status = json.loads(info.stdout)
+                    except json.JSONDecodeError:
+                        status = {}
+                    if isinstance(status, dict) and status.get("isRecording") is False:
+                        break
+                    self._stop.wait(0.2)
+                else:
+                    raise TimeoutError("Termux microphone recording did not finish")
+                if not audio_path.is_file() or audio_path.stat().st_size == 0:
+                    raise OSError("Termux microphone produced no audio file")
+                decoded = subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-nostdin",
+                        "-v",
+                        "error",
+                        "-i",
+                        str(audio_path),
+                        "-f",
+                        "f32le",
+                        "-acodec",
+                        "pcm_f32le",
+                        "-ac",
+                        "1",
+                        "-ar",
+                        str(self._sample_rate),
+                        "pipe:1",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    timeout=self._timeout,
+                )
+                samples = decode_float32_audio(decoded.stdout)
+                if self._stop.is_set():
+                    break
+                try:
+                    self._on_clip(samples, self._sample_rate)
+                except Exception:
+                    logger.exception("Android microphone callback failed")
+                audio_path.unlink(missing_ok=True)
             except (OSError, subprocess.SubprocessError, ValueError, TimeoutError) as error:
                 now = time.monotonic()
                 if now - self._last_error_log >= 60.0:

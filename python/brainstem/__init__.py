@@ -416,6 +416,10 @@ _EXPORTS: dict[str, str] = {
     # limbic_system)
     "ProtoSelf": "insula.damasio",
     "ProtoSelfState": "insula.damasio",
+    # Opt-in Android sensory afferents through Termux:API — the
+    # camera and microphone nerves when the body is a phone
+    "AndroidCameraAdapter": "brainstem.android_media",
+    "AndroidMicrophoneAdapter": "brainstem.android_media",
     # The region itself — the reticular core
     "Brainstem": "brainstem.brainstem",
 }
