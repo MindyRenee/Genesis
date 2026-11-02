@@ -14,10 +14,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections import Counter, deque
 from dataclasses import dataclass, field
 from typing import Any
 
+from basal_ganglia.basal_ganglia import ActionBid, BasalGanglia
 from parietal_lobe.arc_play import ARC3Decision
 from parietal_lobe.arc_sources import (
     GAME_OVER,
@@ -227,6 +229,13 @@ class ARC3ExplorationPolicy:
 
     max_click_targets: int = 96
     outcome_weight: float = 1.0
+
+    STRIATAL_BIDS = 16
+    VALUE_WEIGHT = 0.5
+    NOVELTY_REWARD = 0.05
+    TD_DISCOUNT = 0.9
+    TD_RATE = 0.3
+    DOPAMINE_GAIN = 4.0
     _log: list[_Logged] = field(default_factory=list, init=False)
     _graph: _Graph = field(default_factory=_Graph, init=False)
     _volatile: set[tuple[str, int]] = field(default_factory=set, init=False)
@@ -237,6 +246,9 @@ class ARC3ExplorationPolicy:
     _observations_seen: set[str] = field(default_factory=set, init=False)
     _start_view: dict[str, Any] | None = field(default=None, init=False)
     _reset_pending: bool = field(default=True, init=False)
+    _striatum: BasalGanglia = field(default_factory=BasalGanglia, init=False)
+    _value: dict[str, float] = field(default_factory=dict, init=False)
+    _dopamine: float = field(default=0.0, init=False)
 
     @property
     def _outcomes(self) -> dict[tuple[str, str], tuple[float, int]]:
@@ -405,10 +417,11 @@ class ARC3ExplorationPolicy:
                 self._novelty(graph, key, action, untested)
                 + 0.5 * self._effect_prior(graph, key, action)
                 + self.outcome_weight * outcome(key)
+                + self.VALUE_WEIGHT * self._successor_value(graph, state_key, key)
             )
             scored.append((score, index, key, action, data))
 
-        best = max(scored, key=lambda item: (item[0], -item[1]))
+        best, disinhibition = self._striatal_select(scored)
         mode = "untested_here" if graph.visits[(state_key, best[2])] == 0 else "exploit_or_retry"
         if outcome(best[2]) > 0:
             mode = "exploit_reward"
@@ -435,6 +448,9 @@ class ARC3ExplorationPolicy:
             "score_semantics": "exploration_priority_plus_observed_reward_not_success_probability",
             "candidate_count": len(candidates),
             "masked_border_lines": len(self._volatile),
+            "dopamine_rpe": round(self._dopamine, 6),
+            "striatal_disinhibition": round(disinhibition, 6),
+            "gaba_inhibited": self._known_noop(graph, key),
             "top_candidates": [
                 {"action": item[2], "score": round(item[0], 6)}
                 for item in sorted(scored, key=lambda item: (-item[0], item[1]))[:5]
@@ -442,6 +458,48 @@ class ARC3ExplorationPolicy:
         }
         self._observations_seen.add(state_key)
         return ARC3Decision(action=action, data=dict(data) if data else None, reasoning=reasoning)
+
+    def _successor_value(self, graph: _Graph, state: str, key: str) -> float:
+        """Learned TD value of the state this action is known to lead to."""
+        nxt = graph.edges.get(state, {}).get(key)
+        return self._value.get(nxt, 0.0) if nxt is not None else 0.0
+
+    def _striatal_select(
+        self, scored: list[tuple[float, int, str, str, Any]]
+    ) -> tuple[tuple[float, int, str, str, Any], float]:
+        """Let Genesis' basal-ganglia circuit release one action, gated by dopamine.
+
+        Scores become saliences in [0, 1]; the striatum's D1/D2 channels are
+        modulated by the latest dopamine RPE. When no channel clears the
+        release threshold, the highest-scoring action is taken.
+        """
+        ranked = sorted(scored, key=lambda item: (-item[0], item[1]))[: self.STRIATAL_BIDS]
+        top, low = ranked[0][0], ranked[-1][0]
+        span = top - low
+
+        def salience(score: float) -> float:
+            """Min-max normalised score."""
+            return (score - low) / span if span > 0 else 1.0
+
+        result = self._striatum.select(
+            [ActionBid(item[2], salience(item[0])) for item in ranked],
+            dopamine_rpe=self._dopamine,
+        )
+        chosen = next((item for item in ranked if item[2] == result.selected), ranked[0])
+        return chosen, result.disinhibition.get(chosen[2], 0.0)
+
+    def _dopamine_update(self, prior: str, nxt: str, reward: float, terminal: bool) -> None:
+        """TD(0) on masked board states; the phasic RPE is her dopamine signal.
+
+        ``r`` is level progress plus a small intrinsic reward for reaching a
+        never-seen board, ``delta = r + gamma * V(s') - V(s)``.
+        """
+        novel = nxt != prior and nxt not in self._graph.seen
+        r = reward + (self.NOVELTY_REWARD if novel else 0.0)
+        future = 0.0 if terminal else self._value.get(nxt, 0.0)
+        delta = r + self.TD_DISCOUNT * future - self._value.get(prior, 0.0)
+        self._value[prior] = self._value.get(prior, 0.0) + self.TD_RATE * delta
+        self._dopamine = math.tanh(self.DOPAMINE_GAIN * delta)
 
     @staticmethod
     def _known_noop(graph: _Graph, key: str) -> bool:
@@ -578,14 +636,11 @@ class ARC3ExplorationPolicy:
         if self._learn_volatile(before.get("grid"), after.get("grid")):
             self._rebuild()
             return
+        prior, nxt = self._view_signature(before), self._view_signature(after)
+        terminal = item.state_after in {TERMINAL_WIN, GAME_OVER}
+        self._dopamine_update(prior, nxt, item.reward, terminal)
         self._graph.add(
-            self._view_signature(before),
-            item.key,
-            item.action,
-            self._view_signature(after),
-            item.reward,
-            item.state_after,
-            item.cls,
+            prior, item.key, item.action, nxt, item.reward, item.state_after, item.cls
         )
 
 
