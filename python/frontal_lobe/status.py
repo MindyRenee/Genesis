@@ -269,6 +269,11 @@ class StatusMixin:
         """
         return self.world.summarize()
 
+    def arcade_status(self) -> str:
+        """What the arcade in her world offers and what she remembers of each game."""
+        arcade = getattr(self.world, "arcade", None)
+        return arcade.status() if arcade is not None else "no arcade in her world"
+
     def regulation_status(self) -> str:
         """Get a description of its emotional self-regulation."""
         return self.regulator.describe_regulation()

@@ -135,6 +135,7 @@ class Mind(
         "speech": 0.0,  # talking — immediate
         "meditate": 0.0,  # self-regulation — immediate
         "look": 20.0,  # vision — light creative
+        "play": 60.0,  # games — needs wake settling
         "draw": 30.0,  # art — moderate creative
         "improve": 90.0,  # self-improvement — heaviest CPU
         "create": 60.0,  # project creation — heavy CPU (compile + test)
@@ -160,6 +161,7 @@ class Mind(
         "/learn-code": "learn_code",
         "/explore": "explore_files",
         "/world": "world_status",
+        "/arcade": "arcade_status",
         "/close-eyes": "close_eyes",
         "/open-eyes": "open_eyes",
     }
@@ -498,6 +500,18 @@ class Mind(
         # her vitals, posted to her page); the metronome only ticks
         # the world, never composes for it.
         self.world.board = ChannelBoard(self)
+        # The arcade — games offered in her world (official ARC-AGI-3
+        # API). She chooses when to play; boards and moves flow back
+        # through the world into memory, cognition, chemistry, waves.
+        from tools.framework import get_tools
+        from worlds.games.arcade import Arcade
+
+        arcade = Arcade(
+            self.world,
+            voice=lambda text: self._emit_live_thought("play", text),
+            image_dir=os.path.join(self.data_dir, "arcade"),
+        )
+        arcade.register_tools(get_tools())
 
         # The cardiac control center — the medullary organ that reads
         # the body's carrier pulse (daemon field probe), drives

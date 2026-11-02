@@ -418,6 +418,7 @@ class VolitionMixin:
             "improve": self._perform_improve,
             "speech": self._perform_speech,
             "look": self._perform_look,
+            "play": self._perform_play,
             "meditate": self._perform_meditate,
             "draw": self._perform_draw,
             "create": self._perform_create,
@@ -1328,6 +1329,27 @@ class VolitionMixin:
                 "mind.volition._perform_look",
                 e,
             )
+
+    def _perform_play(self) -> None:
+        """Play a bout in the arcade because the play urge crossed its threshold.
+
+        This is a video game. It is not real and it is just for fun.
+        She can't know the instructions: she explores, remembers, and
+        works out how to win each level, carrying what she learned to
+        the next. Rest-gated and delta/theta-gated like every act.
+        """
+        arcade = getattr(self.world, "arcade", None)
+        if arcade is None or self.is_resting:
+            return
+        try:
+            from thalamus.brain_waves import BrainWave
+
+            if self.brain_waves().dominant in (BrainWave.DELTA, BrainWave.THETA):
+                return
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition._perform_play", e)
+        self._emit_volition_thought(("game", "play", "fun"), "playing")
+        self._emit_live_thought("play", arcade.play())
 
     def _perform_meditate(self) -> None:
         """Meditate because the rest urge crossed its threshold.

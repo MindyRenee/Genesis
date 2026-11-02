@@ -289,6 +289,9 @@ class OuterWorld:
         # after construction (it reads the whole mind, which does not
         # exist yet here). None until then.
         self.board = None
+        # The arcade — games on offer in this world (``worlds.games.
+        # arcade.Arcade``), attached by the mind. None until then.
+        self.arcade: Any = None
 
         self._stream = EventStream(max_size=200)
         self._presences: dict[str, Presence] = {}
@@ -758,6 +761,8 @@ class OuterWorld:
         if expected:
             top = sorted(expected.items(), key=lambda kv: -kv[1])[:3]
             lines.append("  expects next: " + ", ".join(f"{k.value} ({v:.2f})" for k, v in top))
+        if self.arcade is not None:
+            lines.append(self.arcade.summary_line())
         events = self._stream.recent(8)
         if events:
             lines.append("  recent:")
@@ -781,6 +786,7 @@ class OuterWorld:
                     "kinds": self._kind_map.to_dict(lambda k: k.value),
                     "sources": self._presence_map.to_dict(str),
                 },
+                "arcade": self.arcade.to_dict() if self.arcade is not None else None,
             }
 
     def restore_from_dict(self, data: dict[str, Any]) -> None:
@@ -825,6 +831,8 @@ class OuterWorld:
                 self._kind_map.restore(maps["kinds"], EventKind)
             if isinstance(maps.get("sources"), dict):
                 self._presence_map.restore(maps["sources"], str)
+        if self.arcade is not None and isinstance(data.get("arcade"), dict):
+            self.arcade.restore(data["arcade"])
 
     # ── Internals ───────────────────────────────────────────────
 

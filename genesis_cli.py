@@ -1337,6 +1337,11 @@ def _cmd_world(mind: Mind, rest: str) -> str:
     return f"\n  genesis> {mind.world_status()}\n"
 
 
+def _cmd_arcade(mind: Mind, rest: str) -> str:
+    """Show the arcade in her world — games offered and what she remembers."""
+    return f"\n  genesis> {mind.arcade_status()}\n"
+
+
 def _cmd_regulate(mind: Mind, rest: str) -> str:
     """Show Genesis's emotional regulation status."""
     return f"\n  genesis> {mind.regulation_status()}\n"
@@ -2243,6 +2248,7 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/learning": _cmd_learning,
     "/thoughts": _cmd_thoughts,
     "/world": _cmd_world,
+    "/arcade": _cmd_arcade,
     "/regulate": _cmd_regulate,
     "/dreams": _cmd_dreams,
     "/memories": _cmd_memories,

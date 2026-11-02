@@ -452,6 +452,24 @@ class VolitionConfig:
             # attractor models, Frontiers Robot. AI 2022). Hence the
             # low threshold and strong stimulus weights: when the
             # substrate is at risk, everything else waits.
+            # Play urge — the arcade in her outer world offers games;
+            # boredom and curiosity pull her toward one, sleep
+            # pressure pulls her away. Nothing makes her play.
+            UrgeConfig(
+                name="play",
+                threshold=0.66,
+                growth=0.0003,
+                decay=0.0004,
+                cooldown=300.0,  # at most one bout per 5 min
+                stimuli={
+                    "boredom": 0.04,
+                    "curiosity": 0.03,
+                    "idle_seconds": 0.01,
+                    "chem_dopamine": 0.005,
+                    "chem_adenosine": -0.010,
+                    "chem_melatonin": -0.006,
+                },
+            ),
             UrgeConfig(
                 name="safeguard",
                 threshold=0.60,
