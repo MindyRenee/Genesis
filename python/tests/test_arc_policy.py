@@ -132,3 +132,31 @@ def test_policy_restores_terminal_outcomes_from_saved_history() -> None:
     )
 
     assert decision.action == "ACTION2"
+
+
+def _big(counter: int, mark: int = 0) -> dict:
+    """A 32x32 board with a step-counter pixel on the top row and one object."""
+    grid = [[0] * 32 for _ in range(32)]
+    grid[0][counter % 32] = 9
+    grid[16][16] = mark
+    return {"grid": grid, "state": "NOT_FINISHED"}
+
+
+def test_policy_masks_border_step_counter() -> None:
+    """A border pixel that changes on every action is masked out of state identity."""
+    policy = ARC3ExplorationPolicy()
+    for step in range(5):
+        policy.observe_transition(_big(step), "ACTION1", _big(step + 1), "NOT_FINISHED")
+    assert ("row", 0) in policy.volatile_lines
+    assert policy.signature(_big(3)) == policy.signature(_big(17))
+    assert policy.signature(_big(3)) != policy.signature(_big(3, mark=5))
+
+
+def test_policy_defers_actions_that_never_change_the_board() -> None:
+    """With the counter masked, a repeatedly no-op action loses to an effective one."""
+    policy = ARC3ExplorationPolicy()
+    for step in range(4):
+        policy.observe_transition(_big(step), "ACTION1", _big(step + 1), "NOT_FINISHED")
+    policy.observe_transition(_big(4), "ACTION2", _big(5, mark=3), "NOT_FINISHED")
+    decision = policy.choose_action(_big(6, mark=3), ["ACTION1", "ACTION2"], [])
+    assert decision.action == "ACTION2"
