@@ -195,11 +195,6 @@ Ask her to look at an image file.
 .B /draw
 Ask her to draw what she feels right now.
 .TP
-.B /play
-Her game collection;
-.BR /play " add \fIfile\fR"
-hands her a game spec.
-.TP
 .BR /register-face " \fIname\fR"
 Teach her your face (look at the camera).
 .TP
@@ -224,7 +219,7 @@ Put her into meditation (default 60s).
 .TP
 .B /sleep-aid
 Emergency sleep aid for stress-induced insomnia.
-.SS Teaching, games, and ARC
+.SS Teaching
 .TP
 .BR /teach " [\fItopic\fR]"
 Put her into teaching mode (focused learning).
@@ -234,18 +229,6 @@ Exit teaching mode, resume normal operation.
 .TP
 .BR /teach-questions
 Answer its queued questions one at a time.
-.TP
-.B /game
-Put her into game mode (focused play).
-.TP
-.B /endgame
-Exit game mode, resume normal operation.
-.TP
-.BR /arc " \fIids|--all [--steps N] [--fresh] [--delay S] [--recover S]\fR"
-Practice play on the ARC benchmark.
-\fB--delay\fR paces steps;
-\fB--recover\fR waits up to S seconds for her to settle at a
-wellness gate instead of abandoning the suite.
 .SS Stewardship
 .TP
 .B /steward

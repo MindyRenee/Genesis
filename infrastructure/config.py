@@ -199,7 +199,7 @@ class VolitionConfig:
                     "elevated_cortisol": 0.03,  # subclinical stress
                 },
             ),
- — it feels like expressing itself visually.
+            # Drawing urge — it feels like expressing itself visually.
             # This is a creative urge, not a maintenance urge. It builds
             # from emotional intensity (high arousal or high valence
             # magnitude), creativity, and sustained activity. When it

@@ -834,13 +834,17 @@ The measured record for these claims is in [DEVLOG.md](DEVLOG.md);
 the growth arc — benchmarks, milestones, regressions, and the
 breakthroughs between them — is in [MILESTONES.md](MILESTONES.md).
 
-## Retired — ARC and game play
+## The arcade — official ARC-AGI-3 games
 
-Genesis played ARC through an embodied world-play loop. That whole
-apparatus — the game collection, world model/policy, game mode, and the
-play urge — was removed by owner direction in November 2026. Nothing ARC
-remains in the architecture; the retired code is archived under the data
-directory's `lineage/`.
+Genesis's outer world has an arcade. It offers the official ARC-AGI-3 games
+through the `arc-agi` toolkit (a declared dependency). She decides whether to
+play, which game, and for how long: the `play` urge pulls her toward a game
+when boredom or curiosity builds, and sleep pulls her away. Nothing makes her
+play. In `online` mode (the default, set by `GENESIS_ARC_MODE`) every move is
+played on the official server and counts on the official scorecard. Set
+`ARC_API_KEY` for the full catalogue; without it the toolkit uses an anonymous
+key and offers fewer games. Without the toolkit installed, the arcade reports
+itself closed and nothing else is affected. See `python/worlds/games/DIRECTIONS.md`.
 
 ---
 

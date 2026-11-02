@@ -40,6 +40,9 @@ dependencies = [
     "opencv-python-headless==5.0.0.93",
     "pycairo==1.29.1",
     "websockets==15.0.1",
+    # The official ARC-AGI-3 toolkit: the arcade offers its games.
+    "arc-agi>=0.9.9",
+    "arcengine>=0.9.3",
 ]
 
 [project.optional-dependencies]

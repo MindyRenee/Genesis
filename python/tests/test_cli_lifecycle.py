@@ -748,6 +748,9 @@ def test_daemon_fault_needs_sustained_probe_failure(tmp_path):
     assert not rebirth._daemon_faulted()
     rebirth._next_probe_at = 0.0
     assert rebirth._daemon_faulted()
+    # A failed probe drops its client so the next one reconnects;
+    # the recovered daemon answers the same probe object.
+    rebirth._probe = probe
     probe.get_zone_transitions.side_effect = None
     probe.get_zone_transitions.return_value = object()
     rebirth._next_probe_at = 0.0
