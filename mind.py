@@ -7,7 +7,7 @@ with Genesis as a cognitive being.
 The class is decomposed into mixins by anatomical owner — each
 mixin lives in the region whose function it implements:
 brainstem (heartbeat, lifecycle, sleep-wake), basal_ganglia
-(volition), frontal_lobe (conversation, status, projects),
+(volition), worlds (conversation / outer-world interface), frontal_lobe (status, projects),
 parietal_lobe (embodiment), and self (proposals). This module
 holds the class definition, the brain wiring, and the core
 respond() entry point.
