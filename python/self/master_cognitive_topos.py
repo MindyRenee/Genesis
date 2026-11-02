@@ -76,6 +76,7 @@ class EhresmannConnectionTransport:
 
     def forward(self, state_source: object) -> FloatArray:
         source = _state(state_source, "state_source", self.source_dim)
+        assert self.connection is not None  # set in __post_init__
         transported = source @ self.connection.T
         norms = np.linalg.norm(transported, axis=-1, keepdims=True)
         return np.divide(
@@ -183,6 +184,7 @@ class KuramotoRiemannianSynchronizer:
         # diff[b, i, j] = theta_j - theta_i
         phase_diffs = theta[:, None, :] - theta[:, :, None]
         coupling = np.sum(weights * np.sin(phase_diffs), axis=-1)
+        assert self.natural_frequencies is not None  # set in __post_init__
         d_theta = self.natural_frequencies[None, :] + (K / self.num_oscillators) * coupling
         return theta + d_theta * dt
 

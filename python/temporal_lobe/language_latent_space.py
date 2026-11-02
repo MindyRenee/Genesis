@@ -321,7 +321,8 @@ class LanguageLatentSpace:
                 if not isinstance(concept_id, str) or not concept_id:
                     continue
                 concept_digest = hashlib.blake2b(
-                    ("concept:" + concept_id).encode("ascii", errors="backslashreplace"), digest_size=8
+                    ("concept:" + concept_id).encode("ascii", errors="backslashreplace"),
+                    digest_size=8,
                 ).digest()
                 vector[16 + concept_digest[0] % 16] += (
                     -1.0 if concept_digest[1] & 1 else 1.0

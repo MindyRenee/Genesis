@@ -2098,7 +2098,7 @@ class AutonomousLearner:
                 # background stream.
                 if self._volition_granted:
                     self._volition_granted = False
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.exception(f"autonomous learner cycle failed: {e}")
 
             # Rate limit — when throttled by the emotional regulator
@@ -3395,7 +3395,7 @@ class AutonomousLearner:
             ):
                 seen.append(dict(source))
             del seen[:-WEB_SOURCES_CAP]
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.debug("web source record failed", exc_info=True)
 
     def _extract_and_add_concepts(

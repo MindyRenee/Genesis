@@ -312,7 +312,7 @@ def main() -> int:
         while True:
             try:
                 run_once(args.data_dir, feed)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.exception("pulse cycle failed")
             time.sleep(args.interval)
     finally:

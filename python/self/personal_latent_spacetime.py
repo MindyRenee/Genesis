@@ -176,7 +176,7 @@ class PersonalLatentSpacetime:
         for event in self._events[domain]:
             delta_time = event.time_s - apex.time_s
             vector = np.asarray(event.state, dtype=np.float64) - apex_vector
-            distance = float(np.sqrt(max(0.0, vector @ metric @ vector)))
+            distance = float(np.sqrt(max(0.0, float(vector @ metric @ vector))))
             reachable = distance <= self._rates[domain] * abs(delta_time)
             relation = (
                 "coincident"

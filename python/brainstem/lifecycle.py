@@ -797,7 +797,7 @@ class LifecycleMixin:
                     pruned = network.remove_concepts_batch(to_remove)
                     if pruned > 0:
                         logger.info(f"Pruned {pruned} dormant concepts (no archive)")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             # Log loudly as well as tallying. This runs from a background
             # autosave thread and the tally is only visible via
             # `swallow_report()`, so an exception here used to mean
@@ -1168,7 +1168,7 @@ class LifecycleMixin:
                                     tname,
                                     entry.strip(),
                                 )
-                except Exception:  # noqa: BLE001
+                except Exception:
                     logger.debug("stack dump unavailable", exc_info=True)
                 return False
             thread.join(timeout=min(0.5, remaining))

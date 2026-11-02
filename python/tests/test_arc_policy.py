@@ -13,11 +13,11 @@ def test_policy_selects_only_legal_actions_and_explains_scores() -> None:
     decision = policy.choose_action(observation, ["ACTION1", "ACTION2"], [])
 
     assert decision.action in {"ACTION1", "ACTION2"}
-    assert decision.reasoning["policy"] == "bounded_novelty_exploration"
+    assert decision.reasoning["policy"] == "graph_frontier_exploration"
     assert decision.reasoning["score_semantics"] == (
-        "exploration_plus_observed_terminal_outcome_not_success_probability"
+        "exploration_priority_plus_observed_reward_not_success_probability"
     )
-    assert len(decision.reasoning["candidate_scores"]) == 2
+    assert decision.reasoning["candidate_count"] == 2
 
 
 def test_policy_uses_transition_history_to_avoid_repeating_state_action() -> None:
@@ -62,7 +62,7 @@ def test_policy_uses_explicit_terminal_outcome_for_same_state_action() -> None:
 
     assert decision.action == "ACTION2"
     assert decision.reasoning["score_semantics"] == (
-        "exploration_plus_observed_terminal_outcome_not_success_probability"
+        "exploration_priority_plus_observed_reward_not_success_probability"
     )
 
     losing_policy = ARC3ExplorationPolicy()

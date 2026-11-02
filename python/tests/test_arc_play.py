@@ -1,217 +1,204 @@
-"""Tests for bounded ARC-AGI-3 episodes and OuterWorld event routing."""
+"""Tests for the bounded ARC-AGI-3 episode loop."""
 
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import ClassVar
 
 import pytest
 from parietal_lobe import arc_play
-from parietal_lobe.arc_braille import BrailleGameRecord, decode_game_record
+from parietal_lobe.arc_ascii import AsciiGameRecord, decode_game_record
 from parietal_lobe.arc_play import ARC3Decision, run_arc3_episode
+from parietal_lobe.arc_policy import ARC3ExplorationPolicy
 from parietal_lobe.arc_sources import ARCSourceError
-from parietal_lobe.binary_language import BitCell
 
 
-class FakeEnvironment:
-    """Minimal environment stub exposing two legal action names."""
-
-    action_space: ClassVar[list[str]] = ["ACTION1", "ACTION2"]
-
-
-def test_episode_runner_observes_feedback_and_stops_on_win(monkeypatch) -> None:
-    """Record the executed action and stop when the environment reports WIN."""
-    calls = []
-
-    def fake_step(environment, action_name, *, data=None, reasoning=None):
-        """Return a terminal observation while recording the step arguments."""
-        calls.append((action_name, data, reasoning))
-        return SimpleNamespace(state=SimpleNamespace(name="WIN"))
-
-    monkeypatch.setattr(arc_play, "step_arc3_game", fake_step)
-    initial = SimpleNamespace(state=SimpleNamespace(name="NOT_FINISHED"))
-    episode = run_arc3_episode(
-        FakeEnvironment(),
-        game_id="fake-game",
-        initial_observation=initial,
-        choose_action=lambda observation, legal, history: ARC3Decision(
-            "ACTION1", reasoning={"hypothesis": "probe"}
-        ),
-        max_steps=5,
+def _obs(grid, state="NOT_FINISHED", levels=0, win_levels=3):
+    """Build a toolkit-shaped observation namespace."""
+    return SimpleNamespace(
+        frame=[grid], state=state, levels_completed=levels, win_levels=win_levels,
+        guid="session", available_actions=[1, 2],
     )
 
-    assert calls == [("ACTION1", None, {"hypothesis": "probe"})]
-    assert episode.terminal_state == "WIN"
-    assert episode.stopped_reason == "terminal_state"
-    assert len(episode.transitions) == 1
-    assert len(episode.transitions[0]["state_signature"]) == 64
-    assert len(episode.transitions[0]["next_state_signature"]) == 64
-    assert episode.transitions[0]["state_signature"] != (
-        episode.transitions[0]["next_state_signature"]
-    )
-    transition = episode.transitions[0]
-    encoded = BrailleGameRecord(
-        cells=tuple(BitCell(value) for value in transition["braille_cells"]),
-        bit_length=transition["braille_bit_length"],
-    )
-    decoded = decode_game_record(encoded)
-    assert decoded["record_type"] == "arc_transition"
-    assert decoded["game_id"] == "fake-game"
-    assert decoded["action"]["name"] == "ACTION1"
-    assert decoded["terminal_state"] == "WIN"
+
+class ScriptedEnv:
+    """Fake environment returning a scripted observation per step."""
+
+    def __init__(self, script, legal=("ACTION1", "ACTION2")):
+        self.script = list(script)
+        self.legal = list(legal)
+        self.calls = []
+
+    def step(self, action, *, data=None, reasoning=None):
+        """Record the call and return the next scripted observation."""
+        self.calls.append((action, data))
+        return self.script.pop(0)
 
 
-def test_episode_runner_rejects_illegal_policy_action(monkeypatch) -> None:
-    """Reject policy output outside the environment's legal action set."""
+@pytest.fixture
+def scripted(monkeypatch):
+    """Route the loop's toolkit calls to a ScriptedEnv."""
+    monkeypatch.setattr(arc_play, "arc3_legal_actions", lambda env: list(env.legal))
     monkeypatch.setattr(
         arc_play,
         "step_arc3_game",
-        lambda *args, **kwargs: pytest.fail("must not execute an illegal action"),
+        lambda env, action, data=None, reasoning=None: env.step(
+            action, data=data, reasoning=reasoning
+        ),
     )
-    with pytest.raises(ARCSourceError, match="illegal action"):
+    return ScriptedEnv
+
+
+def _first(observation, legal, history):
+    """Policy that always picks the first legal action."""
+    return ARC3Decision(legal[0])
+
+
+def test_episode_runner_records_board_and_stops_on_win(scripted) -> None:
+    """Record decodable transitions that carry the real board, and stop on WIN."""
+    env = scripted([_obs([[2]], "WIN", levels=3)])
+    episode = run_arc3_episode(
+        env, game_id="g", initial_observation=_obs([[1]]), choose_action=_first
+    )
+    assert episode.terminal_state == "WIN"
+    assert episode.stopped_reason == "terminal_state"
+    assert episode.levels_completed == 3 and episode.win_levels == 3
+    record = decode_game_record(AsciiGameRecord(tuple(episode.transitions[0]["ascii_codes"])))
+    assert record["observation"]["grid"] == [[1]]
+    assert record["next_observation"]["grid"] == [[2]]
+    assert episode.transitions[0]["reward"] == 4.0  # three levels plus the win
+
+
+def test_episode_runner_rejects_illegal_policy_action(scripted) -> None:
+    """Never execute an action outside the current legal set."""
+    env = scripted([])
+    with pytest.raises(ARCSourceError):
         run_arc3_episode(
-            FakeEnvironment(),
-            game_id="fake-game",
-            initial_observation=SimpleNamespace(
-                state=SimpleNamespace(name="NOT_FINISHED")
-            ),
-            choose_action=lambda observation, legal, history: ARC3Decision("ACTION7"),
-            max_steps=2,
+            env, game_id="g", initial_observation=_obs([[1]]),
+            choose_action=lambda o, legal, h: ARC3Decision("ACTION9"),
         )
+    assert env.calls == []
 
 
 def test_episode_runner_requires_positive_step_budget() -> None:
-    """Reject zero or negative episode step budgets before stepping."""
-    with pytest.raises(ValueError, match="positive"):
-        run_arc3_episode(
-            FakeEnvironment(),
-            game_id="fake-game",
-            initial_observation=SimpleNamespace(
-                state=SimpleNamespace(name="NOT_FINISHED")
-            ),
-            choose_action=lambda observation, legal, history: ARC3Decision("ACTION1"),
-            max_steps=0,
-        )
+    """Reject zero, negative, and boolean step budgets."""
+    for bad in (0, -1, True):
+        with pytest.raises(ValueError):
+            run_arc3_episode(
+                object(), game_id="g", initial_observation={}, choose_action=_first,
+                max_steps=bad,
+            )
 
 
-def test_episode_runner_routes_observations_and_actions_to_outer_world(monkeypatch) -> None:
-    """Send structured percepts and action outcomes through OuterWorld APIs."""
+def test_game_over_is_recovered_with_reset_and_play_continues(scripted) -> None:
+    """Issue RESET after GAME_OVER, count it, and keep playing."""
+    env = scripted([
+        _obs([[3]], "GAME_OVER", levels=1),
+        _obs([[1]], levels=1),
+        _obs([[4]], "WIN", levels=3),
+    ])
+    episode = run_arc3_episode(
+        env, game_id="g", initial_observation=_obs([[1]]), choose_action=_first
+    )
+    assert [call[0] for call in env.calls] == ["ACTION1", "RESET", "ACTION1"]
+    assert episode.resets == 1
+    assert episode.actions_taken == 3
+    assert episode.terminal_state == "WIN"
+    assert episode.transitions[0]["reward"] == 0.0  # +1 level, -1 game over
+
+
+def test_game_over_stops_when_reset_disabled_or_exhausted(scripted) -> None:
+    """Honour reset_on_game_over=False and max_resets."""
+    episode = run_arc3_episode(
+        scripted([_obs([[3]], "GAME_OVER")]), game_id="g", initial_observation=_obs([[1]]),
+        choose_action=_first, reset_on_game_over=False,
+    )
+    assert episode.terminal_state == "GAME_OVER"
+    assert episode.stopped_reason == "terminal_state"
+    episode = run_arc3_episode(
+        scripted([_obs([[3]], "GAME_OVER")]), game_id="g", initial_observation=_obs([[1]]),
+        choose_action=_first, max_resets=0,
+    )
+    assert episode.stopped_reason == "reset_limit"
+
+
+def test_episode_runner_routes_board_percepts_to_outer_world(scripted) -> None:
+    """Send the board (not the raw object) to OuterWorld and actions to it_acted."""
     events = []
 
-    class FakeOuterWorld:
-        """Capture calls made to the OuterWorld event boundary."""
+    class World:
+        """Fake OuterWorld recording calls."""
+
         def perceive(self, content, **kwargs):
-            """Capture an inbound percept and its structured metadata."""
-            events.append(("perceive", content, kwargs))
+            """Record a perception."""
+            events.append(("perceive", kwargs))
             return object()
 
         def it_acted(self, description, *, detail=""):
-            """Capture an outbound action and its transition detail."""
-            events.append(("act", description, detail))
-            return object()
+            """Record an action."""
+            events.append(("acted", description))
 
-    observations = [
-        SimpleNamespace(state=SimpleNamespace(name="PLAYING"), grid=[[1, 0]]),
-        SimpleNamespace(state=SimpleNamespace(name="WIN"), grid=[[1, 1]]),
-    ]
-
-    def fake_step(environment, action_name, *, data=None, reasoning=None):
-        """Return the preconfigured winning observation."""
-        return observations[1]
-
-    monkeypatch.setattr(arc_play, "step_arc3_game", fake_step)
-    episode = run_arc3_episode(
-        FakeEnvironment(),
-        game_id="grid-game",
-        initial_observation=observations[0],
-        choose_action=lambda observation, legal, history: ARC3Decision(
-            "ACTION1", reasoning={"prediction": "cell changes"}
-        ),
-        max_steps=3,
-        outer_world=FakeOuterWorld(),
+    env = scripted([_obs([[2, 0]], "WIN")])
+    run_arc3_episode(
+        env, game_id="g", initial_observation=_obs([[1, 0]]), choose_action=_first,
+        outer_world=World(),
     )
-
-    assert episode.terminal_state == "WIN"
-    assert [event[0] for event in events] == ["perceive", "act", "perceive"]
-    assert events[0][2]["percept"] == {"grid": [[1, 0]]}
-    assert events[0][2]["source"] == "arc3:grid-game"
-    assert events[0][2]["metadata"]["phase"] == "initial"
-    assert "ACTION1" in events[1][1]
-    assert "state_after=WIN" in events[1][2]
-    # The terminal grid must be delivered before the episode returns.
-    assert events[2][2]["percept"] == {"grid": [[1, 1]]}
-    assert events[2][2]["metadata"]["phase"] == "outcome"
-    assert events[2][2]["metadata"]["action"] == "ACTION1"
-    assert events[2][2]["metadata"]["state_after"] == "WIN"
+    assert events[0][1]["percept"] == {"grid": [[1, 0]]}
+    assert events[1] == ("acted", "ARC-AGI-3 action ACTION1 in game g")
+    assert events[2][1]["percept"] == {"grid": [[2, 0]]}
+    assert events[2][1]["metadata"]["state_after"] == "WIN"
 
 
-def test_episode_runner_stops_when_outer_world_cannot_perceive() -> None:
-    """Do not take an action if the initial observation was sleep-gated."""
-
-    class SleepingOuterWorld:
-        """Represent an OuterWorld that rejects perception while asleep."""
-
-        def perceive(self, content, **kwargs):
-            """Signal that no perception event was recorded."""
-            return None
-
+def test_episode_runner_stops_when_outer_world_cannot_perceive(scripted) -> None:
+    """Stop before acting when the world is asleep."""
+    world = SimpleNamespace(perceive=lambda *a, **k: None, it_acted=lambda *a, **k: None)
+    env = scripted([])
     episode = run_arc3_episode(
-        FakeEnvironment(),
-        game_id="sleeping-game",
-        initial_observation=SimpleNamespace(
-            state=SimpleNamespace(name="PLAYING")
-        ),
-        choose_action=lambda observation, legal, history: pytest.fail(
-            "policy must not run without a recorded initial perception"
-        ),
-        max_steps=2,
-        outer_world=SleepingOuterWorld(),
+        env, game_id="g", initial_observation=_obs([[1]]), choose_action=_first,
+        outer_world=world,
     )
-
-    assert episode.transitions == []
     assert episode.stopped_reason == "outer_world_unavailable"
+    assert env.calls == []
 
 
-def test_episode_runner_feeds_terminal_outcome_back_to_bound_policy(monkeypatch) -> None:
-    """The episode loop reports explicit terminal feedback to Genesis' policy."""
-    from parietal_lobe.arc_policy import ARC3ExplorationPolicy, observation_signature
-
-    monkeypatch.setattr(
-        arc_play,
-        "step_arc3_game",
-        lambda *args, **kwargs: SimpleNamespace(
-            state=SimpleNamespace(name="WIN"), grid=[[1]]
-        ),
-    )
-    initial = SimpleNamespace(
-        state=SimpleNamespace(name="PLAYING"), grid=[[0]]
-    )
+def test_episode_runner_feeds_level_reward_back_to_bound_policy(scripted) -> None:
+    """Pass level-progress reward to the bound policy's observe_transition."""
     policy = ARC3ExplorationPolicy()
+    seen = []
+    original = policy.observe_transition
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs["reward"])
+        original(*args, **kwargs)
+
+    object.__setattr__(policy, "observe_transition", spy)
+    env = scripted([_obs([[2]], levels=1), _obs([[5]], "WIN", levels=3)])
     episode = run_arc3_episode(
-        FakeEnvironment(),
-        game_id="feedback-game",
-        initial_observation=initial,
+        env, game_id="g", initial_observation=_obs([[1]]),
         choose_action=policy.choose_action,
-        max_steps=1,
     )
-
-    key = (observation_signature(initial), episode.transitions[0]["action"])
-    assert episode.terminal_state == "WIN"
-    assert policy._outcomes[key] == (1.0, 1)
+    assert seen == [1.0, 3.0]
+    assert episode.levels_completed == 3
 
 
-def test_episode_runner_recognizes_mapping_shaped_terminal_state() -> None:
-    """Stop immediately when an environment supplies a terminal mapping."""
+def test_episode_runner_recognizes_mapping_shaped_terminal_state(scripted) -> None:
+    """Treat {"state": {"name": "WIN"}} as terminal."""
     episode = run_arc3_episode(
-        FakeEnvironment(),
-        game_id="mapping-game",
-        initial_observation={"state": "WIN", "grid": [[1]]},
-        choose_action=lambda observation, legal, history: pytest.fail(
-            "terminal mapping must not trigger an action"
-        ),
-        max_steps=2,
+        scripted([]), game_id="g",
+        initial_observation={"grid": [[1]], "state": {"name": "WIN"}},
+        choose_action=_first,
     )
-
     assert episode.terminal_state == "WIN"
-    assert episode.stopped_reason == "terminal_state"
-    assert episode.transitions == []
+    assert episode.actions_taken == 0
+
+
+def test_policy_clicks_objects_with_coordinates(scripted) -> None:
+    """ACTION6 decisions carry in-range coordinates on a visible object."""
+    grid = [[0] * 8 for _ in range(8)]
+    grid[5][2] = 7
+    env = scripted([_obs(grid, "WIN")], legal=("ACTION6",))
+    episode = run_arc3_episode(
+        env, game_id="g", initial_observation=_obs(grid),
+        choose_action=ARC3ExplorationPolicy().choose_action,
+    )
+    assert env.calls == [("ACTION6", {"x": 2, "y": 5})]
+    assert episode.transitions[0]["action_key"] == "ACTION6@2,5"
