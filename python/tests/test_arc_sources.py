@@ -100,7 +100,18 @@ def test_arc3_legal_actions_rejects_missing_action_space() -> None:
 
 def test_arc3_step_rejects_action_when_legal_set_is_empty(monkeypatch) -> None:
     """Never send an action when the toolkit reports no legal actions."""
+    import sys
+    from types import SimpleNamespace
+
     from parietal_lobe import arc_sources
+
+    class FakeGameAction:
+        """Stand in for the official action enum."""
+
+        ACTION1 = object()
+        RESET = object()
+
+    monkeypatch.setitem(sys.modules, "arcengine", SimpleNamespace(GameAction=FakeGameAction))
 
     class Environment:
         """Expose an empty action set."""
