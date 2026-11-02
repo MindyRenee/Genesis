@@ -14,7 +14,21 @@ if str(PYTHON_DIR) not in sys.path:
     sys.path.insert(0, str(PYTHON_DIR))
 
 from parietal_lobe.arc_solver import solve_arc1_task  # noqa: E402
-from parietal_lobe.arc_sources import ARCSourceError, list_arc1_tasks  # noqa: E402
+from parietal_lobe.arc_sources import (  # noqa: E402
+    ARCSourceError,
+    list_arc1_tasks,
+    load_arc1_task,
+)
+
+
+def score_guesses(guesses: list, expected: list) -> bool | None:
+    """Official ARC-AGI-1 scoring: some guess matches every test output.
+
+    Returns None when the task file carries no test outputs.
+    """
+    if not expected or any(output is None for output in expected):
+        return None
+    return any(guess == expected for guess in guesses)
 
 
 def main() -> int:
@@ -35,6 +49,7 @@ def main() -> int:
     parser.add_argument("--beam-width", type=int, default=32)
     parser.add_argument("--max-nodes", type=int, default=2000)
     parser.add_argument("--time-budget", type=float, default=30.0)
+    parser.add_argument("--num-guesses", type=int, default=2, help="Attempts per task (pass@k).")
     args = parser.parse_args()
 
     try:
@@ -52,7 +67,9 @@ def main() -> int:
             beam_width=args.beam_width,
             max_nodes=args.max_nodes,
             time_budget=args.time_budget,
+            num_guesses=args.num_guesses,
         )
+        expected = [pair.get("output") for pair in load_arc1_task(task_path)["test"]]
     except (ARCSourceError, OSError, ValueError) as exc:
         print(f"ARC solve error: {exc}", file=sys.stderr)
         return 2
@@ -62,6 +79,9 @@ def main() -> int:
         "solved": result.solved,
         "rule": result.rule,
         "predictions": result.predictions,
+        "guesses": result.guesses,
+        "correct_first_guess": score_guesses(result.guesses[:1], expected),
+        f"correct_within_{args.num_guesses}_guesses": score_guesses(result.guesses, expected),
         "verified_rules": result.verified_rules,
         "nodes_explored": result.nodes_explored,
         "failure": result.failure,

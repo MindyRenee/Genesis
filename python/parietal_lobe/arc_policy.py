@@ -51,14 +51,16 @@ def observation_signature(observation: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def click_targets(grid: list[list[int]] | None, *, limit: int = 32) -> list[tuple[int, int]]:
-    """Return ``(x, y)`` click coordinates, one per visible connected object.
+def click_targets(grid: list[list[int]] | None, *, limit: int = 96) -> list[tuple[int, int]]:
+    """Return ``(x, y)`` click coordinates: visible objects first, then a coarse scan.
 
     The background is the most common colour. Every 4-connected component
     of another single colour contributes the member cell nearest its
     centroid. Smaller objects come first because buttons, switches, and
-    selectable pieces are usually small. ``x`` is the column and ``y`` the
-    row, both restricted to the toolkit's 0..63 range.
+    selectable pieces are usually small. Some games only react to clicks
+    inside large regions, so the centres of an 8x8 tiling follow as a
+    fallback. ``x`` is the column and ``y`` the row, both restricted to the
+    toolkit's 0..63 range.
     """
     if not grid:
         return [(32, 32)]
@@ -95,6 +97,11 @@ def click_targets(grid: list[list[int]] | None, *, limit: int = 32) -> list[tupl
             components.append((len(members), colour, r, c))
     components.sort()
     targets = [(c, r) for _, _, r, c in components if r <= 63 and c <= 63]
+    seen_targets = set(targets)
+    for y in range(4, min(height, 64), 8):
+        for x in range(4, min(width, 64), 8):
+            if (x, y) not in seen_targets:
+                targets.append((x, y))
     return targets[:limit] or [(min(32, width - 1), min(32, height - 1))]
 
 
@@ -112,12 +119,13 @@ class ARC3ExplorationPolicy:
         outcome_weight: Weight of observed reward when exploiting a state.
     """
 
-    max_click_targets: int = 32
+    max_click_targets: int = 96
     outcome_weight: float = 1.0
     _outcomes: dict[tuple[str, str], tuple[float, int]] = field(default_factory=dict, init=False)
     _observations_seen: set[str] = field(default_factory=set, init=False)
 
     def _candidates(self, observation: Any, legal_actions: list[str]) -> list[Candidate]:
+        """Expand legal actions into concrete candidates (one per click target)."""
         candidates: list[Candidate] = []
         targets: list[tuple[int, int]] | None = None
         for action in sorted(set(legal_actions)):
