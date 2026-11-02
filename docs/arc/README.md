@@ -14,6 +14,8 @@ This integration supports two different benchmark formats:
 
 The ARC-AGI-3 Python toolkit is installed as an optional dependency pinned in pyproject.toml. It is a game/environment API, not a reasoning model. Genesis' reasoning and action-selection logic remains separate.
 
+For the current upstream compatibility review, adapter fixes, and regression-test status, see [the ARC upstream audit](UPSTREAM_AUDIT.md). The Android/Termux bridge has separate install instructions in [PHONE_BRIDGE.md](PHONE_BRIDGE.md).
+
 ## Install
 
 Run from the Genesis repository root:
