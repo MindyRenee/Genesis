@@ -1023,7 +1023,7 @@ _EXPORTS: dict[str, str] = {
     "WordNetSource": "tools.source_registry",
     # Broca's voice — identity-expressive production style
     "Voice": "frontal_lobe.voice",
-    # Speech-act control — the conversational turn (Broca's loop)
+    # Conversation turn integration, hosted by the outer world
     "ConversationMixin": "worlds.conversation",
     # Metacognitive self-report — status queries and reports
     "StatusMixin": "frontal_lobe.status",
