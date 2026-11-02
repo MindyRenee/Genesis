@@ -283,12 +283,22 @@ class ArcPhoneBridge:
                 session_id, {"action": action, "data": data, "reasoning": reasoning}
             )
             if action != RESET_ACTION:
+                before_view = observation_view(before)
+                after_view = observation_view(session.observation)
+                from parietal_lobe.arc_play import transition_reward
+
+                reward = transition_reward(
+                    before_view["levels_completed"] or 0,
+                    after_view["levels_completed"] or 0,
+                    _state_name(session.observation),
+                )
                 session.policy.observe_transition(
                     before,
                     action,
                     session.observation,
                     _state_name(session.observation),
                     data=data,
+                    reward=reward,
                 )
             return {**view, "genesis_reasoning": reasoning}
 
