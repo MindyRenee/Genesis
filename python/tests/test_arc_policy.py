@@ -191,3 +191,19 @@ def test_policy_replays_previous_level_solution() -> None:
     policy.observe_transition(middle, "ACTION1", won, "NOT_FINISHED")
     first = policy.choose_action(won, ["ACTION1", "ACTION2"], [])
     assert (first.action, first.reasoning["mode"]) == ("ACTION2", "procedural_replay")
+
+
+def test_neuro_loop_closes_field_waves_and_chemicals() -> None:
+    """Game events move her chemicals, the waves respond, and the field channel is honest."""
+    from parietal_lobe.arc_neuro import ArcNeuroLoop
+
+    calls: list[int] = []
+    loop = ArcNeuroLoop(field_source=lambda osc: calls.append(1) is None)
+    base = dict(loop.chemicals)
+    state = loop.beat(dopamine_rpe=0.8, novel=True, changed=False)
+    assert calls == [1] and loop.field_live
+    assert loop.chemicals["dopamine"] > base["dopamine"]
+    assert loop.chemicals["norepinephrine"] > base["norepinephrine"]
+    assert loop.chemicals["gaba"] > base["gaba"]
+    assert 0.0 <= state.focus <= 1.0
+    assert ArcNeuroLoop().telemetry()["em_field"] == "absent"

@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from basal_ganglia.basal_ganglia import ActionBid, BasalGanglia
+from parietal_lobe.arc_neuro import ArcNeuroLoop
 from parietal_lobe.arc_play import ARC3Decision
 from parietal_lobe.arc_sources import (
     GAME_OVER,
@@ -249,6 +250,7 @@ class ARC3ExplorationPolicy:
     _striatum: BasalGanglia = field(default_factory=BasalGanglia, init=False)
     _value: dict[str, float] = field(default_factory=dict, init=False)
     _dopamine: float = field(default=0.0, init=False)
+    _neuro: ArcNeuroLoop = field(default_factory=ArcNeuroLoop, init=False)
     _payload: dict[str, tuple[str, dict[str, Any] | None]] = field(
         default_factory=dict, init=False
     )
@@ -418,6 +420,7 @@ class ARC3ExplorationPolicy:
             total, count = graph.rewards.get((state_key, key), (0.0, 0))
             return total / count if count else 0.0
 
+        value_weight = self.VALUE_WEIGHT * (0.5 + self._neuro.focus)
         scored = []
         for index, (key, action, data) in enumerate(candidates):
             untested = graph.visits[(state_key, key)] == 0
@@ -425,7 +428,7 @@ class ARC3ExplorationPolicy:
                 self._novelty(graph, key, action, untested)
                 + 0.5 * self._effect_prior(graph, key, action)
                 + self.outcome_weight * outcome(key)
-                + self.VALUE_WEIGHT * self._successor_value(graph, state_key, key)
+                + value_weight * self._successor_value(graph, state_key, key)
             )
             scored.append((score, index, key, action, data))
 
@@ -459,6 +462,7 @@ class ARC3ExplorationPolicy:
             "dopamine_rpe": round(self._dopamine, 6),
             "striatal_disinhibition": round(disinhibition, 6),
             "gaba_inhibited": self._known_noop(graph, key),
+            "neuro": self._neuro.telemetry(),
             "top_candidates": [
                 {"action": item[2], "score": round(item[0], 6)}
                 for item in sorted(scored, key=lambda item: (-item[0], item[1]))[:5]
@@ -705,7 +709,9 @@ class ARC3ExplorationPolicy:
             return
         prior, nxt = self._view_signature(before), self._view_signature(after)
         terminal = item.state_after in {TERMINAL_WIN, GAME_OVER}
+        novel = nxt != prior and nxt not in self._graph.seen
         self._dopamine_update(prior, nxt, item.reward, terminal)
+        self._neuro.beat(dopamine_rpe=self._dopamine, novel=novel, changed=not unchanged)
         self._graph.add(
             prior, item.key, item.action, nxt, item.reward, item.state_after, item.cls
         )

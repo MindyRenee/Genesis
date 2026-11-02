@@ -99,3 +99,14 @@ What the integration relies on from the toolkit (`arc-agi==0.9.9`):
 - **Scoring.** Official ARC-AGI-3 scoring is per completed level, `(human_actions / agent_actions)^2` capped at 1.15, weighted toward later levels; every submitted action counts, `RESET` included. Episodes therefore record `levels_completed`, `win_levels`, `resets`, and `actions_taken`, and the loop rewards each transition with +1 per level completed, +1 for `WIN`, and -1 for `GAME_OVER`.
 
 `ARC3ExplorationPolicy` builds a graph of observed board states. In each state it tries untested actions first (each click target counts as its own action; targets are visible objects, smallest first, then the centres of an 8x8 tiling for games that react to clicks inside large regions), weighting actions by how often they changed the board and by observed reward. When the current state has nothing left to try it walks the shortest known path to a state that still has untested actions.
+
+## Her brain during ARC-AGI-3 play
+
+The policy is pixel and graph math only; these existing organs take part:
+
+- **Outer world** — `worlds.arc_arena.ArcArena` plays each game inside her `OuterWorld`: boards arrive via `perceive`, moves leave via `it_acted`, and both update her experiential latent space. `scripts/arc3_play.py --no-world` opts out.
+- **Basal ganglia** — `basal_ganglia.BasalGanglia` releases the final action from the scored candidates, gated by her dopamine RPE (TD(0) on masked board states). Moves known to change nothing are GABA-inhibited.
+- **EM field -> brain waves -> chemicals** — `parietal_lobe.arc_neuro.ArcNeuroLoop` runs one closed loop per move: game events release dopamine/norepinephrine/GABA, `thalamus.brain_waves.BrainWaveOscillator` turns chemicals into band powers, and `hypothalamus.transduction.wave_impulses` lets the bands release their peptides. An optional field source holds measured EM levels on the oscillator (`em_field: absent` otherwise). Wave `focus` scales how much she trusts learned state values.
+- **Procedural replay** — at each new level she first retries the shortest solution of the previous level.
+
+Every decision's `reasoning` carries this telemetry (`mode`, `dopamine_rpe`, `striatal_disinhibition`, `gaba_inhibited`, `neuro`).
