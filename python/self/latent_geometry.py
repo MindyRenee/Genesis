@@ -357,7 +357,7 @@ class SelfLatentSpaceArchitecture:
     def snapshot(self) -> dict[str, Any]:
         """Return a detached snapshot of the most recent integrated signal."""
         with self._lock:
-            return dict(self._last_snapshot)
+            return deepcopy(self._last_snapshot)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize only bounded, JSON-compatible dynamic state."""

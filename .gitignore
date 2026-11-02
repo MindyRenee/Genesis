@@ -54,3 +54,7 @@ AGENTS.md
 # never shipped. Callers import it guarded; without the file the
 # channel exists only as a sealed stand-in.
 genesis_client/creator.py
+
+# Dart package tooling
+dart/genesis_arc_bridge/.dart_tool/
+dart/genesis_arc_bridge/pubspec.lock

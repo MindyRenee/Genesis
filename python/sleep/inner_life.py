@@ -950,7 +950,7 @@ class InnerLife:
                     self._run_thought_generation(now)
 
                 self._drives_tick(now)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.exception(f"inner life cycle failed: {e}")
 
             self._workspace_tick(now)
@@ -3928,7 +3928,7 @@ class InnerLife:
             self._last_env_sample = now
             try:
                 monitor.snapshot()
-            except Exception:  # noqa: BLE001 — env sensing must never kill the loop
+            except Exception:
                 logger.debug("environment snapshot failed", exc_info=True)
         snap = monitor.last_snapshot
         if snap is None:
@@ -5106,7 +5106,7 @@ class InnerLife:
                         "addressed": getattr(thought, "intent", "") == "question",
                     },
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.debug("self latent thought integration failed", exc_info=True)
         with self._thoughts_lock:
             self._thoughts.append(thought)

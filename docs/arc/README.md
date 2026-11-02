@@ -42,6 +42,9 @@ You can run the solver directly from the repository root, including in Termux:
     python scripts/arc1_solve.py
     python scripts/arc1_solve.py --split training --index 0
     python scripts/arc1_solve.py data/arc/ARC-AGI-1/data/training/007bbfb7.json
+    python scripts/arc1_benchmark.py --split evaluation --time-budget 3
+
+`arc1_solve.py` reports every guess (`--num-guesses`, default 2, matching the official two-attempt rule) and, when the task file includes test outputs, whether the first guess and any guess are correct. `arc1_benchmark.py` runs a whole split and reports pass@1, pass@2, unsolved tasks, and verified-but-wrong answers (rules that fit every demonstration but miss the test). Among rules that fit the demonstrations equally, the solver prefers the fewest transforms and then the smallest parameter description, counting every entry of a lookup table, so memorised colour maps and shape tables rank below compact rules.
 
 The command prints JSON with the exact-verification status, rule, predictions, search cost, and failure diagnostics. Exit status is 0 for a verified solve, 1 for an unsolved task, and 2 for an input/setup error. The default search budget is deliberately bounded; an unsolved result does not prove a task is impossible.
 
@@ -60,8 +63,8 @@ The command prints JSON with the exact-verification status, rule, predictions, s
 
     games = list_arc3_games()
     environment, observation = open_arc3_game(games[0]["game_id"])
-    # This baseline autonomously selects legal controls by state/action novelty.
-    # It is exploratory, not a task-solving guarantee.
+    # Graph-frontier exploration over observed boards; exploratory, not a
+    # task-solving guarantee.
     policy = ARC3ExplorationPolicy()
     episode = run_arc3_episode(
         environment,
@@ -78,11 +81,32 @@ The command prints JSON with the exact-verification status, rule, predictions, s
 - Test outputs are omitted by default from arc1_problem_view so the agent-facing view does not reveal answers.
 - Keep training and evaluation splits distinct. Develop on training tasks; reserve evaluation tasks for controlled measurements. Repeatedly tuning against evaluation scores makes them unsuitable as unbiased final measurements.
 - Retain ARC-AGI-3 observations, actions, and recordings for reproducibility. Never expose API credentials in source files, recordings, logs, or commits.
-- The bounded ARC-AGI-3 loop provides closed-loop observation/action execution, checks state-dependent legal actions, retains per-step transitions, and stops on terminal states or a step budget. Supplying `outer_world=mind.world` routes each observation through `OuterWorld.perceive` and each executed action through `OuterWorld.it_acted`, which notifies the registered cognitive event listener. Each post-action observation, including terminal feedback, carries metadata linking it to the action and state transition. If OuterWorld rejects perception (for example, because Genesis is asleep), the loop stops rather than silently continuing without a recorded observation. Grid-shaped observations are exposed in the format the existing scene parser accepts. The loop accepts a caller-supplied policy and now includes `ARC3ExplorationPolicy`, a bounded model-free baseline that autonomously chooses among current legal controls using episode-local state/action visit counts. Its scores mean exploration priority, not success probability; it does not infer game rules, optimize a game objective, or guarantee a win. It uses recorded transitions to avoid repeating previously tried controls in the same observed state. When the bound policy supports `observe_transition`, the loop passes explicit `WIN` and `GAME_OVER` outcomes back to it; the baseline records state/action-specific terminal feedback and uses it to adjust later action priorities. Nonterminal transitions are not assigned invented rewards. This is a minimal empirical adaptation mechanism, not a learned game model or a guarantee of strategic progress. ARC-AGI-1 has a bridge to the existing spatial reasoner, but neither benchmark integration nor these changes have been runtime-tested in Termux.
+- The bounded ARC-AGI-3 loop checks state-dependent legal actions, retains per-step transitions (board, action, coordinates, level counts, reward), recovers from `GAME_OVER` with `RESET` (configurable via `reset_on_game_over` / `max_resets`), and stops on `WIN` or a step budget.
 
+## ARC-AGI-3 play
 
-## Binary Mathematical Language substrate
+Run games from the repository root (Python 3.12+, toolkit installed):
 
-`parietal_lobe.binary_language` adds an experimental six-bit symbolic substrate inspired by the *shape* of Braille cells, without importing Braille's human-assigned letter mapping. Each cell is a value from 0 to 63; cells can compose ordered, typed frames (observation, entity, property, action, relation, agent, patient, time, negation, question, unknown). `GroundingMemory` records competing pattern-to-referent hypotheses, contexts, supporting observations, and counterexamples. Its support ratio is bookkeeping, not a calibrated probability.
+    PYTHONPATH=python python scripts/arc3_play.py ls20 ft09 --max-steps 300
 
-This is an encoding and grounding primitive, not a natural-language system by itself. It does not yet connect to Genesis' live language production, concept network, perception loop, or telemetry. A runtime integration must supply actual perceptual evidence, preserve the distinction between observation and hypothesis, and test whether learned associations generalize to held-out contexts before this is treated as language learning.
+All games in one run share a single toolkit `Arcade`, so one API key and one scorecard; the scorecard is closed at the end and its id and score are printed. Pass `arcade=` to `list_arc3_games` / `open_arc3_game` to do the same from Python, and close it with `close_arc3_scorecard`.
+
+What the integration relies on from the toolkit (`arc-agi==0.9.9`):
+
+- **Board.** Observations are `arcengine.FrameDataRaw`. The board is the private `frame` field (a list of 64x64 NumPy layers, colours 0..15) and is not part of the public model fields, so generic serializers drop it. `observation_grid`, `observation_frames`, `observation_view`, and `observation_percept` in `arc_sources` extract it; the policy signature, Genesis `OuterWorld` percepts (`{"grid": ...}`), ASCII transition records, and phone-bridge JSON (`board`) all use it. Session ids, timestamps, and echoed action inputs are excluded from state identity.
+- **States.** `NOT_PLAYED`, `NOT_FINISHED`, `WIN`, `GAME_OVER`. `WIN` means every level is cleared. After `GAME_OVER` the only valid action is `RESET`, which restarts the current level; the episode loop and the bridge both handle this.
+- **Actions.** `ACTION1`..`ACTION5` and `ACTION7` take no data. `ACTION6` is a click and requires `{"x": column, "y": row}` with integers 0..63; `step_arc3_game` rejects it without coordinates (the toolkit would otherwise click (0, 0)).
+- **Scoring.** Official ARC-AGI-3 scoring is per completed level, `(human_actions / agent_actions)^2` capped at 1.15, weighted toward later levels; every submitted action counts, `RESET` included. Episodes therefore record `levels_completed`, `win_levels`, `resets`, and `actions_taken`, and the loop rewards each transition with +1 per level completed, +1 for `WIN`, and -1 for `GAME_OVER`.
+
+`ARC3ExplorationPolicy` builds a graph of observed board states. In each state it tries untested actions first (each click target counts as its own action; targets are visible objects, smallest first, then the centres of an 8x8 tiling for games that react to clicks inside large regions), weighting actions by how often they changed the board and by observed reward. When the current state has nothing left to try it walks the shortest known path to a state that still has untested actions.
+
+## Her brain during ARC-AGI-3 play
+
+The policy is pixel and graph math only; these existing organs take part:
+
+- **Outer world** — `worlds.arc_arena.ArcArena` plays each game inside her `OuterWorld`: boards arrive via `perceive`, moves leave via `it_acted`, and both update her experiential latent space. `scripts/arc3_play.py --no-world` opts out.
+- **Basal ganglia** — `basal_ganglia.BasalGanglia` releases the final action from the scored candidates, gated by her dopamine RPE (TD(0) on masked board states). Moves known to change nothing are GABA-inhibited.
+- **EM field -> brain waves -> chemicals** — `parietal_lobe.arc_neuro.ArcNeuroLoop` runs one closed loop per move: game events release dopamine/norepinephrine/GABA, `thalamus.brain_waves.BrainWaveOscillator` turns chemicals into band powers, and `hypothalamus.transduction.wave_impulses` lets the bands release their peptides. An optional field source holds measured EM levels on the oscillator (`em_field: absent` otherwise). Wave `focus` scales how much she trusts learned state values.
+- **Procedural replay** — at each new level she first retries the shortest solution of the previous level.
+
+Every decision's `reasoning` carries this telemetry (`mode`, `dopamine_rpe`, `striatal_disinhibition`, `gaba_inhibited`, `neuro`).

@@ -4198,10 +4198,8 @@ def main() -> int:
                 # Her second eye — the display itself, published as its
                 # own nerve segment. Absent a display it stays dark and
                 # the watcher simply never opens it.
-                rebirth.set_nerve(
-                    _start_screen_nerve(data_dir),
-                    lambda: _start_screen_nerve(data_dir),
-                )
+                _start_screen_nerve(data_dir)
+                rebirth.set_nerve(None, lambda: _start_screen_nerve(data_dir))
                 (voice, dedup_voice, ambient_listener, auditory_cortex) = _run_after_mind_start(
                     mind, args, shutting_down
                 )

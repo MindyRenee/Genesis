@@ -76,6 +76,7 @@ class EhresmannConnectionTransport:
 
     def forward(self, state_source: object) -> FloatArray:
         source = _state(state_source, "state_source", self.source_dim)
+        assert self.connection is not None  # set in __post_init__
         transported = source @ self.connection.T
         norms = np.linalg.norm(transported, axis=-1, keepdims=True)
         return np.divide(
@@ -183,6 +184,7 @@ class KuramotoRiemannianSynchronizer:
         # diff[b, i, j] = theta_j - theta_i
         phase_diffs = theta[:, None, :] - theta[:, :, None]
         coupling = np.sum(weights * np.sin(phase_diffs), axis=-1)
+        assert self.natural_frequencies is not None  # set in __post_init__
         d_theta = self.natural_frequencies[None, :] + (K / self.num_oscillators) * coupling
         return theta + d_theta * dt
 
@@ -235,6 +237,8 @@ class MasterCognitiveToposEngine:
         batch_shape = outer.shape[0]
         if any(value.shape[0] != batch_shape for value in (inner, own, language)):
             raise ValueError("all four domain states must have the same batch size")
+        if _state(phases, "phases", self.dim).shape[0] != batch_shape:
+            raise ValueError("phase batch size must match domain-state batch size")
 
         transported_ei = self.transport_e_to_i.forward(outer)
         transported_is = self.transport_i_to_s.forward(inner + transported_ei)
@@ -247,8 +251,6 @@ class MasterCognitiveToposEngine:
             energy(outer), energy(inner), energy(own), energy(language)
         )
         synchronized = self.kuramoto_sync.forward(phases, metric_weights, K=K, dt=dt)
-        if synchronized.shape[0] != batch_shape:
-            raise ValueError("phase batch size must match domain-state batch size")
         return {
             "transported_macro_state": macro_state,
             "transported_outer_to_inner": transported_ei,

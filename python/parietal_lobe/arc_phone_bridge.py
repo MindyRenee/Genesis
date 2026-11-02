@@ -19,8 +19,16 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from parietal_lobe.arc_sources import (
+    GAME_OVER,
+    RESET_ACTION,
+    TERMINAL_WIN,
+    arc3_arcade,
     arc3_legal_actions,
+    close_arc3_scorecard,
     list_arc3_games,
+    observation_frames,
+    observation_state,
+    observation_view,
     open_arc3_game,
     step_arc3_game,
 )
@@ -40,42 +48,42 @@ def _jsonable(value: Any, depth: int = 0) -> Any:
         return {str(key): _jsonable(item, depth + 1) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [_jsonable(item, depth + 1) for item in value]
-    if hasattr(value, "name"):
-        return str(value.name)
     if hasattr(value, "tolist"):
         try:
             return _jsonable(value.tolist(), depth + 1)
         except (TypeError, ValueError):
             pass
-    if hasattr(value, "__dict__"):
-        return {
+    if hasattr(value, "name") and not hasattr(value, "__dict__"):
+        return str(value.name)
+    if hasattr(value, "__dict__") and not isinstance(value, type):
+        plain = {
             str(key): _jsonable(item, depth + 1)
             for key, item in vars(value).items()
             if not str(key).startswith("_")
         }
+        frames = observation_frames(value)
+        if frames:
+            # FrameDataRaw keeps its board in a private field.
+            plain["frame"] = frames
+        return plain
+    if hasattr(value, "name"):
+        return str(value.name)
     return str(value)
 
 
-def _state_name(observation: Any) -> str | None:
-    state = (
-        observation.get("state")
-        if isinstance(observation, dict)
-        else getattr(observation, "state", None)
-    )
-    if state is None:
-        return None
-    if isinstance(state, dict):
-        state = state.get("name", state.get("value", state))
-    return str(getattr(state, "name", state))
+_state_name = observation_state
 
 
 @dataclass
 class _Session:
+    """One live game session held by the bridge."""
+
     game_id: str
     environment: Any
     observation: Any
     steps: int = 0
     closed: bool = False
+    policy: Any = None
 
 
 class ArcPhoneBridge:
@@ -84,17 +92,19 @@ class ArcPhoneBridge:
     def __init__(
         self,
         *,
-        game_lister: Callable[..., list[dict[str, Any]]] = list_arc3_games,
-        game_opener: Callable[..., tuple[Any, Any]] = open_arc3_game,
+        game_lister: Callable[..., list[dict[str, Any]]] | None = None,
+        game_opener: Callable[..., tuple[Any, Any]] | None = None,
         legal_actions: Callable[[Any], list[str]] = arc3_legal_actions,
         step_game: Callable[..., Any] = step_arc3_game,
         max_steps: int = 500,
         observer: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
+        """Configure toolkit adapters, session limits, and the optional Genesis observer."""
         if isinstance(max_steps, bool) or not isinstance(max_steps, int) or max_steps < 1:
             raise ValueError("max_steps must be a positive integer")
-        self._game_lister = game_lister
-        self._game_opener = game_opener
+        self._game_lister = game_lister or self._list_with_shared_arcade
+        self._game_opener = game_opener or self._open_with_shared_arcade
+        self._arcades: dict[bool, Any] = {}
         self._legal_actions = legal_actions
         self._step_game = step_game
         self._max_steps = max_steps
@@ -102,7 +112,40 @@ class ArcPhoneBridge:
         self._sessions: dict[str, _Session] = {}
         self._lock = threading.RLock()
 
+    def _arcade(self, offline: bool) -> Any:
+        """Return the bridge's single Arcade (one scorecard) for this mode."""
+        with self._lock:
+            if offline not in self._arcades:
+                self._arcades[offline] = arc3_arcade(offline=offline)
+            return self._arcades[offline]
+
+    def _list_with_shared_arcade(self, **kwargs: Any) -> list[dict[str, Any]]:
+        """List games through the shared Arcade instead of opening a new one."""
+        offline = bool(kwargs.get("offline", False))
+        return list_arc3_games(offline=offline, arcade=self._arcade(offline))
+
+    def _open_with_shared_arcade(self, game_id: str, **kwargs: Any) -> tuple[Any, Any]:
+        """Open a game on the shared Arcade so all sessions share one scorecard."""
+        offline = bool(kwargs.pop("offline", False))
+        return open_arc3_game(game_id, offline=offline, arcade=self._arcade(offline), **kwargs)
+
+    def close(self) -> list[Any]:
+        """Close every session and the scorecards of the Arcades this bridge opened."""
+        with self._lock:
+            for session in self._sessions.values():
+                session.closed = True
+            self._sessions.clear()
+            arcades, self._arcades = list(self._arcades.values()), {}
+        scorecards = []
+        for arcade in arcades:
+            try:
+                scorecards.append(close_arc3_scorecard(arcade))
+            except Exception:
+                logger.exception("Failed to close ARC-AGI-3 scorecard")
+        return scorecards
+
     def health(self) -> dict[str, Any]:
+        """Report liveness, protocol version, and whether Genesis is attached."""
         return {"ok": True, "service": "genesis-arc-phone-bridge", "protocol": 1,
                 "genesis_observer_connected": self._observer is not None}
 
@@ -112,13 +155,19 @@ class ArcPhoneBridge:
             return
         try:
             self._observer(event, payload)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.exception("Genesis ARC observer failed for event %s", event)
 
     def games(self) -> dict[str, Any]:
+        """List the available ARC-AGI-3 games."""
         return {"games": _jsonable(self._game_lister())}
 
     def create_session(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Open a game session from ``{"game_id", "seed"?, "offline"?}``.
+
+        Raises:
+            ValueError: If the payload fields are missing or malformed.
+        """
         game_id = payload.get("game_id")
         if not isinstance(game_id, str) or not game_id.strip() or len(game_id) > 256:
             raise ValueError("game_id must be a non-empty string of at most 256 characters")
@@ -142,6 +191,17 @@ class ArcPhoneBridge:
         return self._session_view(session_id, session)
 
     def step_session(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Apply ``{"action", "data"?, "reasoning"?}`` to a session.
+
+        ``RESET`` is accepted in any non-WIN state and is the only action
+        accepted after ``GAME_OVER``. ACTION6 requires ``data`` with
+        integer ``x`` and ``y`` in 0..63.
+
+        Raises:
+            KeyError: If the session does not exist.
+            OverflowError: If the session step budget is exhausted.
+            ValueError: If the action, data, or reasoning is invalid.
+        """
         action = payload.get("action")
         if not isinstance(action, str) or not action:
             raise ValueError("action must be a non-empty string")
@@ -158,11 +218,14 @@ class ArcPhoneBridge:
             if session.steps >= self._max_steps:
                 raise OverflowError("session step budget exhausted")
             state = _state_name(session.observation)
-            if state in {"WIN", "GAME_OVER"}:
+            if state == TERMINAL_WIN:
                 return self._session_view(session_id, session)
-            legal = self._legal_actions(session.environment)
-            if action not in legal:
-                raise ValueError(f"illegal action {action!r}; legal actions: {legal}")
+            if state == GAME_OVER and action != RESET_ACTION:
+                raise ValueError("game over: the only accepted action is RESET")
+            if action != RESET_ACTION:
+                legal = self._legal_actions(session.environment)
+                if action not in legal:
+                    raise ValueError(f"illegal action {action!r}; legal actions: {legal}")
             previous_observation = session.observation
             next_observation = self._step_game(
                 session.environment, action, data=data, reasoning=reasoning
@@ -182,7 +245,55 @@ class ArcPhoneBridge:
             })
             return self._session_view(session_id, session)
 
+    def genesis_step(self, session_id: str) -> dict[str, Any]:
+        """Let Genesis choose and play the next move of a session herself.
+
+        Her pixel-only ``ARC3ExplorationPolicy`` (one per session, so her
+        state graph persists) picks from the legal actions; after
+        ``GAME_OVER`` she answers with ``RESET``. The move goes through
+        :meth:`step_session`, so it reaches the observer and her
+        OuterWorld like any other action. The response is the session view
+        plus ``genesis_reasoning``, her decision telemetry.
+
+        Raises:
+            KeyError: If the session does not exist.
+            OverflowError: If the session step budget is exhausted.
+        """
+        from parietal_lobe.arc_policy import ARC3ExplorationPolicy
+
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None or session.closed:
+                raise KeyError("session not found")
+            state = _state_name(session.observation)
+            if state == TERMINAL_WIN:
+                return {**self._session_view(session_id, session), "genesis_reasoning": None}
+            if session.policy is None:
+                session.policy = ARC3ExplorationPolicy()
+            before = session.observation
+            if state == GAME_OVER:
+                action, data = RESET_ACTION, None
+                reasoning: dict[str, Any] = {"policy": "episode_loop", "reason": "game_over"}
+            else:
+                decision = session.policy.choose_action(
+                    before, self._legal_actions(session.environment), []
+                )
+                action, data, reasoning = decision.action, decision.data, decision.reasoning
+            view = self.step_session(
+                session_id, {"action": action, "data": data, "reasoning": reasoning}
+            )
+            if action != RESET_ACTION:
+                session.policy.observe_transition(
+                    before,
+                    action,
+                    session.observation,
+                    _state_name(session.observation),
+                    data=data,
+                )
+            return {**view, "genesis_reasoning": reasoning}
+
     def close_session(self, session_id: str) -> dict[str, Any]:
+        """Forget a session; its game is not stepped again."""
         with self._lock:
             session = self._sessions.get(session_id)
             if session is None:
@@ -192,32 +303,46 @@ class ArcPhoneBridge:
         return {"closed": True, "session_id": session_id}
 
     def _session_view(self, session_id: str, session: _Session) -> dict[str, Any]:
+        """Serialize a session, including the board, state, and level progress."""
         state = _state_name(session.observation)
-        terminal = state in {"WIN", "GAME_OVER"}
+        terminal = state in {TERMINAL_WIN, GAME_OVER}
+        view = observation_view(session.observation)
+        if session.closed or state == TERMINAL_WIN:
+            legal: list[str] = []
+        elif state == GAME_OVER:
+            legal = [RESET_ACTION]
+        else:
+            legal = self._legal_actions(session.environment)
         return {
             "session_id": session_id,
             "game_id": session.game_id,
             "step": session.steps,
             "observation": _jsonable(session.observation),
-            "legal_actions": (
-                [] if terminal or session.closed else self._legal_actions(session.environment)
-            ),
+            "board": view["grid"],
+            "state": state,
+            "levels_completed": view["levels_completed"],
+            "win_levels": view["win_levels"],
+            "legal_actions": legal,
             "terminal_state": state if terminal else None,
             "closed": session.closed,
             "step_budget_remaining": max(0, self._max_steps - session.steps),
         }
 
     def handler(self) -> type[BaseHTTPRequestHandler]:
+        """Build the HTTP request handler class bound to this bridge."""
         bridge = self
 
         class Handler(BaseHTTPRequestHandler):
+            """JSON-over-HTTP handler delegating to the bound bridge."""
             server_version = "GenesisArcBridge/1"
 
             def log_message(self, fmt: str, *args: Any) -> None:
+                """Suppress default access logging."""
                 # Avoid logging request bodies, observations, or credentials.
                 return
 
             def _send(self, status: int, value: dict[str, Any]) -> None:
+                """Write a JSON response with no-store caching."""
                 body = json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode()
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -227,6 +352,7 @@ class ArcPhoneBridge:
                 self.wfile.write(body)
 
             def _body(self) -> dict[str, Any]:
+                """Read and validate a JSON object body of at most 1 MiB."""
                 raw_length = self.headers.get("Content-Length", "0")
                 try:
                     length = int(raw_length)
@@ -243,6 +369,7 @@ class ArcPhoneBridge:
                 return value
 
             def do_GET(self) -> None:
+                """Serve ``/health`` and ``/games``."""
                 path = urlsplit(self.path).path
                 try:
                     if path == "/health":
@@ -255,6 +382,7 @@ class ArcPhoneBridge:
                     self._send(503, {"error": "arc_unavailable", "message": str(exc)})
 
             def do_POST(self) -> None:
+                """Serve ``/sessions`` and ``/sessions/<id>/step``."""
                 path = urlsplit(self.path).path
                 try:
                     payload = self._body()
@@ -264,6 +392,8 @@ class ArcPhoneBridge:
                     parts = path.strip("/").split("/")
                     if len(parts) == 3 and parts[0] == "sessions" and parts[2] == "step":
                         self._send(200, bridge.step_session(parts[1], payload))
+                    elif len(parts) == 3 and parts[0] == "sessions" and parts[2] == "genesis":
+                        self._send(200, bridge.genesis_step(parts[1]))
                         return
                     self._send(404, {"error": "not_found"})
                 except KeyError as exc:
@@ -276,6 +406,7 @@ class ArcPhoneBridge:
                     self._send(503, {"error": "arc_unavailable", "message": str(exc)})
 
             def do_DELETE(self) -> None:
+                """Serve ``/sessions/<id>`` session closing."""
                 parts = urlsplit(self.path).path.strip("/").split("/")
                 if len(parts) != 2 or parts[0] != "sessions":
                     self._send(404, {"error": "not_found"})
@@ -303,10 +434,12 @@ def serve(
         raise ValueError("the unauthenticated phone bridge must bind to loopback only")
     mind = None
     server = None
+    bridge = None
     try:
         observer = None
         if mind_socket:
             from parietal_lobe.arc_genesis_observer import GenesisArcObserver
+
             from mind import Mind
             mind = Mind(mind_socket, headless=True)
             mind.start()
@@ -326,8 +459,10 @@ def serve(
     finally:
         if server is not None:
             server.server_close()
+        if bridge is not None:
+            bridge.close()
         if mind is not None:
             try:
                 mind.stop()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.exception("Failed to stop bridge-owned Genesis Mind cleanly")

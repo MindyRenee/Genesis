@@ -56,4 +56,49 @@ void main() {
     expect(game.gameId, 'game-1');
     expect(game.tags, ['test']);
   });
+
+  test('parses board, level progress, and RESET after GAME_OVER', () {
+    final session = ArcSession.fromJson({
+      'session_id': 's',
+      'game_id': 'g',
+      'step': 3,
+      'observation': null,
+      'legal_actions': ['RESET'],
+      'terminal_state': 'GAME_OVER',
+      'step_budget_remaining': 10,
+      'closed': false,
+      'board': [
+        [0, 1],
+        [2, 3],
+      ],
+      'state': 'GAME_OVER',
+      'levels_completed': 1,
+      'win_levels': 7,
+    });
+    expect(session.isTerminal, isTrue);
+    expect(session.isWon, isFalse);
+    expect(session.legalActions, ['RESET']);
+    expect(session.board, [
+      [0, 1],
+      [2, 3],
+    ]);
+    expect(session.levelsCompleted, 1);
+    expect(session.winLevels, 7);
+  });
+
+  test('parses Genesis decision telemetry', () {
+    final session = ArcSession.fromJson({
+      'session_id': 's',
+      'game_id': 'g',
+      'step': 1,
+      'observation': null,
+      'legal_actions': ['ACTION1'],
+      'terminal_state': null,
+      'step_budget_remaining': 9,
+      'closed': false,
+      'genesis_reasoning': {'mode': 'procedural_replay', 'dopamine_rpe': 0.25},
+    });
+    expect(session.genesisReasoning?['mode'], 'procedural_replay');
+    expect(session.genesisReasoning?['dopamine_rpe'], 0.25);
+  });
 }

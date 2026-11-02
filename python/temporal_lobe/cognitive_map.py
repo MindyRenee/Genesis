@@ -60,7 +60,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
-
 from temporal_lobe.light_cones import WorldDomain
 from temporal_lobe.spacetime_workspace import SpacetimeWorkspace
 
