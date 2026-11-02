@@ -1024,7 +1024,7 @@ _EXPORTS: dict[str, str] = {
     # Broca's voice — identity-expressive production style
     "Voice": "frontal_lobe.voice",
     # Speech-act control — the conversational turn (Broca's loop)
-    "ConversationMixin": "frontal_lobe.conversation",
+    "ConversationMixin": "worlds.conversation",
     # Metacognitive self-report — status queries and reports
     "StatusMixin": "frontal_lobe.status",
     # Executive task tracking — projects the mind is building
