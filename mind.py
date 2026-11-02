@@ -86,7 +86,7 @@ from basal_ganglia.volition import VolitionMixin
 from brainstem.heart import Heart
 from brainstem.lifecycle import LifecycleMixin
 from brainstem.metronome import MetronomeMixin
-from frontal_lobe.conversation import ConversationMixin
+from worlds.conversation import ConversationMixin
 from frontal_lobe.projects import ProjectsMixin
 from frontal_lobe.status import StatusMixin
 from self.man_review import ManReviewMixin
