@@ -441,14 +441,6 @@ fn main() {
         });
     }
 
-    // The eye — the optic nerve's retinal end. The daemon captures
-    // the camera itself (no separate process): the limb opens the
-    // device on its own thread, publishes frames into the nerve
-    // segment, re-opens on a bounded backoff, and accepts absence —
-    // sight is a degradation, never a fault. `stop` runs in the
-    // shutdown sequence below; `Drop` covers every other exit path.
-    let eye = genesis::daemon::optic_nerve::OpticCapture::start();
-
     // Set up shutdown coordination
     let shutdown_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
@@ -824,11 +816,6 @@ fn main() {
 
     // Shutdown sequence
     eprintln!("[genesis] Shutting down...");
-
-    // Close the eye first so no reader attaches to a dead nerve — the
-    // limb's thread is reaped by process exit if it is still blocked
-    // in the driver's dequeue.
-    eye.stop();
 
     // Restore the host's CPU policy captured at startup. This runs
     // before the sync block below (which can bail out on a poisoned

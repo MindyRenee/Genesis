@@ -137,48 +137,6 @@ requires a present user and attunement above 0.3 \(em a silent room
 is not a rejecting user, so a left-open channel cannot trickle
 rejection CRH forever.
 
-.SS Optic nerve
-The daemon itself attaches to the retina's
-.I /genesis_retina
-segment \(em the optic nerve terminates in the body, not only the
-mind \(em and pools each frame into the subcortical channels the
-nerve actually carries. No pixels leave the module: the channels
-are scalar signals, the same thing the anatomical fibres carry.
-.IP \(bu 2
-\fBMelanopic illuminance\fR (the ipRGC channel) feeds
-.IR sleep_network::VisualAfference::light ,
-replacing the wall-clock photoperiod while frames are fresh \(em
-the dominant circadian zeitgeber.
-.IP \(bu 2
-\fBA collicular orienting transient\fR (motion/luminance) becomes a
-brief LC alerting pulse, but only below the sleep network's own
-wake threshold \(em sensory gaining during sleep, not a bypass.
-.IP \(bu 2
-\fBThe TRN relay gate\fR \(em
-.IR relay_base (phase):
-NREM 0.02, REM 0.10, drowsy 0.6, overwhelmed 0.3, else 1.0 \(em
-scaled by a bounded \(+-40% corticothalamic feedback set through
-\fBSET_OPTIC_GAIN\fR. The mind reads the gate over
-\fBGET_OPTIC_STATE\fR and honours it: a \fIsee\fR during NREM is a
-blind look.
-.PP
-The nerve also owns the eye's body state. The \fBpupil\fR (2\(en8
-mm: a log-compressive light reflex on the photopic channel plus NE
-sympathetic dilation, constricting faster than it dilates; a
-central miosis term overrides the dark reflex in sleep).
-\fBAccommodation\fR (ciliary lens power 0\(en6 D, set by the mind's
-\fBSET_FOCUS\fR request in metres; near pull-in faster than far
-release, released to tonic rest when the lids shut). And the
-\fBeyelid\fR \(em a transmission on every afferent channel: open
-awake, ~0.5 drowsy, ~0.03 in NREM/REM, so light still entrains
-weakly through closed lids and a flash can still wake. The mind
-also holds a voluntary lid through \fBSET_LID\fR \(em the
-orbicularis oculi the camera hardware lacks. The requested
-openness composes with the phase's own position by \fBmin\fR: a
-will can shut an open eye (to rest it, to dim the world) but can
-never pry a sleeping one open. Held, not momentary \(em the lid
-stays where the mind left it until it moves it again.
-
 .SH OPTIONS
 .TP
 .BR --data-dir " \fIDIR\fR"
@@ -362,27 +320,6 @@ GET_INTERNALS \(em the adaptive gates' full snapshot (bounds, period,
 next-fire countdown, smoothed demand), mind lease, tick count,
 and the fallback's AUTO_* gears. Observation only.
 .TP
-.B 52
-GET_OPTIC_STATE \(em the optic nerve's subcortical channel state:
-photopic/melanopic irradiance, motion energy, the collicular
-transient, the SCN light drive, the relay gate, and the
-pupil/lens/lid ocular state (the 58-byte
-.IR OpticState::to_wire ;
-a shorter body decodes the tail as unreported).
-.TP
-.B 53
-SET_OPTIC_GAIN \(em corticothalamic feedback. Request:
-.RI [ f32 " gain" ]
-in [0, 1] (0.5 = neutral); scales the thalamic relay within
-\(+-40% and can never open a gate the sleep stage has closed.
-.TP
-.B 54
-SET_FOCUS \(em accommodation request. Request:
-.RI [ f32 " meters" ];
-the body converts it to ciliary drive in dioptres clamped to
-[0, 6] (~17 cm near point); non-positive or non-finite distances
-relax to infinity.
-.TP
 .B 55
 ANALYZE_CODE \(em structural code sense. Request:
 .RI [ u16 " path_len" ]
@@ -403,22 +340,7 @@ outranks the
 .I GENESIS_COGNITIVE_PID
 environment variable, which still names whoever spawned the
 daemon and holds the dead launcher's PID after a mind's death.
-.TP
-.B 57
-SET_LID \(em the voluntary eyelid, the orbicularis oculi the
-camera hardware lacks. Request:
-.RI [ f32 " openness" ]
-in [0, 1] (1.0 releases the eye to the phase's own position).
-Composes with the sleep phase's lid by \fBmin\fR \(em the will
-can shut an open eye but cannot open one the stage has closed.
-Held: lids stay where the mind left them until it moves them.
-Reply:
-.RI [ u8 " ack" ] .
-.PP
-Notification pushes (daemon \(-> client, mirrored as
-.IR NOTIFY_* )
-occupy 100\(en103: PHASE_CHANGED, EPISODE_CONSOLIDATED,
-DREAM_INSIGHT, ERROR_DETECTED.
+
 .SH EXIT STATUS
 .TP
 .B 0
@@ -439,6 +361,5 @@ genesis-daemon --data-dir /tmp/genesis-debug --ltm-capacity 131072
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-cli (1),
-.BR genesis-retina (1),
 .BR genesis-math (7),
 .BR genesis-reasoning (7)

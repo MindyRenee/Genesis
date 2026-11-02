@@ -62,9 +62,6 @@ pub mod interoception;
 pub mod ipc;
 /// Maxwell's equations applied to the measured carrier current.
 pub mod maxwell;
-/// Optic nerve — the retinal afferent's subcortical branches (SCN,
-/// superior colliculus, pretectum, TRN relay gate).
-pub mod optic_nerve;
 /// RTC wake alarm — scheduling its own return from suspension.
 pub mod rtc_wake;
 pub mod rtkit;
