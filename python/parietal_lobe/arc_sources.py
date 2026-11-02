@@ -367,6 +367,8 @@ def step_arc3_game(
         ValueError: If the action name is unknown, currently illegal, or
             missing required coordinates.
     """
+    if not isinstance(action_name, str) or not action_name:
+        raise ValueError("action_name must be a non-empty string")
     try:
         from arcengine import GameAction
     except ImportError as exc:
@@ -379,8 +381,6 @@ def step_arc3_game(
             name for name in dir(GameAction) if name.startswith("ACTION") or name == "RESET"
         )
         raise ValueError(f"Unknown ARC action {action_name!r}; valid actions: {valid}")
-    if not isinstance(action_name, str) or not action_name:
-        raise ValueError("action_name must be a non-empty string")
     if action_name != RESET_ACTION:
         legal = arc3_legal_actions(environment)
         if not legal:
