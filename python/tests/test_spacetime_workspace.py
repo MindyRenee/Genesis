@@ -9,7 +9,7 @@ def test_workspace_exposes_three_views_against_one_self_apex():
     workspace = SpacetimeWorkspace(signal_speed=1.0)
     workspace.record(time_s=8.0, position=(1.0, 0.0, 0.0), domain=WorldDomain.INNER,
                      event_id="memory")
-    workspace.record(time_s=9.0, position=(2.0, 0.0, 0.0), domain=WorldDomain.OUTER,
+    workspace.record(time_s=9.0, position=(0.5, 0.0, 0.0), domain=WorldDomain.OUTER,
                      event_id="camera")
     apex = workspace.record_self((0.0, 0.0, 0.0), time_s=10.0, event_id="self-now")
     snapshot = workspace.snapshot()

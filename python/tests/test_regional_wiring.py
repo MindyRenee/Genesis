@@ -235,6 +235,22 @@ _ALLOWLIST: dict[str, str] = {
     "parietal_lobe.math.real_analysis": "math leaf — parietal library tissue",
     "parietal_lobe.math.topology": "math leaf — parietal library tissue",
     "parietal_lobe.math.trig": "math leaf — parietal library tissue",
+    # ARC benchmark adapters — external task harness over parietal
+    # spatial reasoning, not a brain function of their own.
+    "parietal_lobe.arc_ascii": "ARC benchmark adapter — task I/O encoding",
+    "parietal_lobe.arc_genesis_observer": "ARC benchmark adapter — routes games into Genesis",
+    "parietal_lobe.arc_phone_bridge": "ARC benchmark adapter — HTTP bridge for phone clients",
+    "parietal_lobe.arc_play": "ARC benchmark adapter — ARC-AGI-3 episode loop",
+    "parietal_lobe.arc_policy": "ARC benchmark adapter — ARC-AGI-3 exploration policy",
+    "parietal_lobe.arc_solver": "ARC benchmark adapter — ARC-AGI-1 front-end",
+    "parietal_lobe.arc_sources": "ARC benchmark adapter — toolkit and dataset access",
+    "brainstem.android_media": "Termux platform adapter",
+    "brainstem.android_sensors": "Termux platform adapter",
+    # Spacetime geometry library used by the claimed self/workspace views.
+    "temporal_lobe.light_cones": "spacetime geometry library tissue",
+    "temporal_lobe.spacetime_workspace": "spacetime geometry library tissue",
+    "temporal_lobe.language_latent_space": "language latent geometry library tissue",
+    "occipital_lobe.visual_spacetime": "visual spacetime geometry library tissue",
 }
 
 _FUNCTIONAL_PACKAGES = (
