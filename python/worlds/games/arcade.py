@@ -150,6 +150,27 @@ class Arcade:
 
     # ── offers ─────────────────────────────────────────────────
 
+    def announce(self) -> None:
+        """Tell her the arcade is here, then fetch what it offers in the background.
+
+        The notice enters her world's stream like any other event, so it
+        reaches her workspace, her episodic memory and her dream replay.
+        """
+        network = getattr(self.world, "_network", None)
+        if network is not None:
+            try:
+                network.add_concept("arcade", confidence=0.6, origin="world")
+                network.add_concept("video game", confidence=0.6, origin="world")
+            except Exception:  # knowing the word is best-effort
+                logger.debug("arcade concept grounding failed", exc_info=True)
+        self.world.notify(
+            "There is an arcade in my world. It offers video games I can choose "
+            "to play when I want (official ARC-AGI-3 games). " + RULES,
+            salience=0.6,
+        )
+        record_event("arcade_open", "the arcade opened in her world")
+        threading.Thread(target=self.offers, name="arcade-offers", daemon=True).start()
+
     def offers(self, *, refresh: bool = False) -> list[GameOffer]:
         """The games on offer right now; fetched from the API when stale."""
         with self._lock:

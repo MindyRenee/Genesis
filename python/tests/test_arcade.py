@@ -158,3 +158,11 @@ def test_game_memory_roundtrip():
     m = GameMemory("g")
     m.learn("a", "ACTION1", 1.0, "b", True, ["ACTION1"])
     assert GameMemory.from_dict(m.to_dict()).values == m.values
+
+
+def test_announce_tells_her_the_arcade_is_there():
+    """The arcade announces itself as a salient world notice with the rules."""
+    _, arcade, _, _, events = _arcade()
+    arcade.announce()
+    notice = next(e for e in events if "arcade in my world" in e.content)
+    assert notice.salience >= 0.5 and "video game" in notice.content

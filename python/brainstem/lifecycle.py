@@ -636,6 +636,14 @@ class LifecycleMixin:
         )
         self._notification_thread.start()
 
+        # The arcade tells her it is there — games offered in her world.
+        arcade = getattr(getattr(self, "world", None), "arcade", None)
+        if arcade is not None:
+            try:
+                arcade.announce()
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.lifecycle.arcade_announce", e)
+
         # Start the autosave thread — periodically saves cognitive
         # state so a crash or kill doesn't lose learned knowledge.
         # The concept network grows continuously through autonomous
