@@ -21,6 +21,7 @@ class ArcSession {
     this.state,
     this.levelsCompleted,
     this.winLevels,
+    this.genesisReasoning,
   });
 
   /// Bridge-assigned session identifier.
@@ -59,6 +60,14 @@ class ArcSession {
   /// Levels needed to win the game.
   final int? winLevels;
 
+  /// Genesis's own decision telemetry when she chose the move
+  /// ([GenesisArcClient.genesisStep]); null for moves you chose.
+  ///
+  /// Typical keys: `mode` (e.g. `untested_here`, `walk_to_frontier`,
+  /// `procedural_replay`), `dopamine_rpe`, `striatal_disinhibition`,
+  /// `gaba_inhibited`, `masked_border_lines`.
+  final Map<String, Object?>? genesisReasoning;
+
   /// Whether the game is over or won (a `GAME_OVER` can still be RESET).
   bool get isTerminal => terminalState == 'WIN' || terminalState == 'GAME_OVER';
 
@@ -87,6 +96,7 @@ class ArcSession {
       state: json['state'] as String?,
       levelsCompleted: json['levels_completed'] as int?,
       winLevels: json['win_levels'] as int?,
+      genesisReasoning: _optionalObject(json['genesis_reasoning']),
     );
   }
 }
@@ -207,6 +217,22 @@ class GenesisArcClient {
     return ArcSession.fromJson(response);
   }
 
+  /// Lets Genesis choose and play the next move of [session] herself.
+  ///
+  /// She decides from the board pixels only, keeps her state graph for the
+  /// whole session, and answers `GAME_OVER` with `RESET`. Read her reasons
+  /// from [ArcSession.genesisReasoning] on the returned session.
+  Future<ArcSession> genesisStep(ArcSession session) async {
+    if (session.isWon) throw StateError('Cannot step a won session');
+    if (session.closed) throw StateError('Cannot step a closed session');
+    final response = await _request(
+      'POST',
+      '/sessions/${Uri.encodeComponent(session.sessionId)}/genesis',
+      <String, Object?>{},
+    );
+    return ArcSession.fromJson(response);
+  }
+
   /// Closes [session] on the bridge.
   Future<void> closeSession(ArcSession session) async {
     await _request(
@@ -246,6 +272,14 @@ class GenesisArcClient {
 bool _validClick(Map<String, Object?>? data) {
   bool coordinate(Object? value) => value is int && value >= 0 && value <= 63;
   return data != null && coordinate(data['x']) && coordinate(data['y']);
+}
+
+Map<String, Object?>? _optionalObject(Object? value) {
+  if (value == null) return null;
+  if (value is! Map<String, dynamic>) {
+    throw const FormatException('genesis_reasoning must be an object');
+  }
+  return Map<String, Object?>.unmodifiable(value);
 }
 
 List<List<int>>? _optionalBoard(Object? value) {

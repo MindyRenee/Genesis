@@ -140,3 +140,31 @@ def test_bridge_publishes_initial_action_and_result_events():
     assert [event for event, _ in events] == ["observation", "action", "observation"]
     assert events[1][1]["action"] == "ACTION1"
     assert events[2][1]["observation"]["state"] == "WIN"
+
+
+def test_genesis_step_lets_her_choose_and_answers_game_over_with_reset() -> None:
+    """Genesis picks a legal move herself and answers GAME_OVER with RESET."""
+    env = FakeEnvironment()
+    sent: list[str] = []
+
+    def step(environment, action, **kwargs):
+        """Lose on the first move, then keep playing."""
+        sent.append(action)
+        state = "GAME_OVER" if len(sent) == 1 else "NOT_FINISHED"
+        return {"state": state, "frame": [[[len(sent) % 2, 0]]]}
+
+    bridge = ArcPhoneBridge(
+        game_lister=lambda: [],
+        game_opener=lambda *args, **kwargs: (env, {"state": "NOT_FINISHED", "frame": [[[0, 0]]]}),
+        legal_actions=lambda environment: environment.action_space,
+        step_game=step,
+        max_steps=5,
+    )
+    session_id = bridge.create_session({"game_id": "fake"})["session_id"]
+    first = bridge.genesis_step(session_id)
+    assert sent[0] in FakeEnvironment.action_space
+    assert first["genesis_reasoning"]["policy"] == "graph_frontier_exploration"
+    assert first["state"] == "GAME_OVER"
+    second = bridge.genesis_step(session_id)
+    assert sent[1] == "RESET"
+    assert second["genesis_reasoning"]["reason"] == "game_over"

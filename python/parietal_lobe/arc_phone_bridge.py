@@ -83,6 +83,7 @@ class _Session:
     observation: Any
     steps: int = 0
     closed: bool = False
+    policy: Any = None
 
 
 class ArcPhoneBridge:
@@ -244,6 +245,53 @@ class ArcPhoneBridge:
             })
             return self._session_view(session_id, session)
 
+    def genesis_step(self, session_id: str) -> dict[str, Any]:
+        """Let Genesis choose and play the next move of a session herself.
+
+        Her pixel-only ``ARC3ExplorationPolicy`` (one per session, so her
+        state graph persists) picks from the legal actions; after
+        ``GAME_OVER`` she answers with ``RESET``. The move goes through
+        :meth:`step_session`, so it reaches the observer and her
+        OuterWorld like any other action. The response is the session view
+        plus ``genesis_reasoning``, her decision telemetry.
+
+        Raises:
+            KeyError: If the session does not exist.
+            OverflowError: If the session step budget is exhausted.
+        """
+        from parietal_lobe.arc_policy import ARC3ExplorationPolicy
+
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None or session.closed:
+                raise KeyError("session not found")
+            state = _state_name(session.observation)
+            if state == TERMINAL_WIN:
+                return {**self._session_view(session_id, session), "genesis_reasoning": None}
+            if session.policy is None:
+                session.policy = ARC3ExplorationPolicy()
+            before = session.observation
+            if state == GAME_OVER:
+                action, data = RESET_ACTION, None
+                reasoning: dict[str, Any] = {"policy": "episode_loop", "reason": "game_over"}
+            else:
+                decision = session.policy.choose_action(
+                    before, self._legal_actions(session.environment), []
+                )
+                action, data, reasoning = decision.action, decision.data, decision.reasoning
+            view = self.step_session(
+                session_id, {"action": action, "data": data, "reasoning": reasoning}
+            )
+            if action != RESET_ACTION:
+                session.policy.observe_transition(
+                    before,
+                    action,
+                    session.observation,
+                    _state_name(session.observation),
+                    data=data,
+                )
+            return {**view, "genesis_reasoning": reasoning}
+
     def close_session(self, session_id: str) -> dict[str, Any]:
         """Forget a session; its game is not stepped again."""
         with self._lock:
@@ -344,6 +392,8 @@ class ArcPhoneBridge:
                     parts = path.strip("/").split("/")
                     if len(parts) == 3 and parts[0] == "sessions" and parts[2] == "step":
                         self._send(200, bridge.step_session(parts[1], payload))
+                    elif len(parts) == 3 and parts[0] == "sessions" and parts[2] == "genesis":
+                        self._send(200, bridge.genesis_step(parts[1]))
                         return
                     self._send(404, {"error": "not_found"})
                 except KeyError as exc:

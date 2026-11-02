@@ -85,4 +85,20 @@ void main() {
     expect(session.levelsCompleted, 1);
     expect(session.winLevels, 7);
   });
+
+  test('parses Genesis decision telemetry', () {
+    final session = ArcSession.fromJson({
+      'session_id': 's',
+      'game_id': 'g',
+      'step': 1,
+      'observation': null,
+      'legal_actions': ['ACTION1'],
+      'terminal_state': null,
+      'step_budget_remaining': 9,
+      'closed': false,
+      'genesis_reasoning': {'mode': 'procedural_replay', 'dopamine_rpe': 0.25},
+    });
+    expect(session.genesisReasoning?['mode'], 'procedural_replay');
+    expect(session.genesisReasoning?['dopamine_rpe'], 0.25);
+  });
 }
