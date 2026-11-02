@@ -204,3 +204,27 @@ def test_policy_clicks_objects_with_coordinates(scripted) -> None:
     )
     assert env.calls == [("ACTION6", {"x": 2, "y": 5})]
     assert episode.transitions[0]["action_key"] == "ACTION6@2,5"
+
+
+def test_arc_arena_plays_inside_the_outer_world(scripted) -> None:
+    """The arena attaches to the world and routes the game's percepts and acts through it."""
+    from worlds.arc_arena import ArcArena
+    from worlds.world import OuterWorld
+
+    world = OuterWorld()
+    arena = ArcArena(world)
+    env = scripted([_obs([[2, 0]], "WIN", levels=3)])
+
+    class Policy:
+        """Minimal policy choosing the first legal action."""
+
+        def choose_action(self, observation, legal, history):
+            """Pick the first legal action."""
+            return _first(observation, legal, history)
+
+    episode = arena.play(env, game_id="g", initial_observation=_obs([[1, 0]]), policy=Policy())
+    assert world.arc_arena is arena
+    assert episode.final_state == "WIN"
+    assert arena.visits[-1].levels_completed == 3
+    assert arena.visits[-1].latent_observations >= 3
+    assert arena.latent() is not None

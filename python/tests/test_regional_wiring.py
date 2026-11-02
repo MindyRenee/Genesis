@@ -239,6 +239,7 @@ _ALLOWLIST: dict[str, str] = {
     # spatial reasoning, not a brain function of their own.
     "parietal_lobe.arc_ascii": "ARC benchmark adapter — task I/O encoding",
     "parietal_lobe.arc_genesis_observer": "ARC benchmark adapter — routes games into Genesis",
+    "worlds.arc_arena": "ARC-AGI-3 games as a place in the outer world (benchmark adapter)",
     "parietal_lobe.arc_phone_bridge": "ARC benchmark adapter — HTTP bridge for phone clients",
     "parietal_lobe.arc_play": "ARC benchmark adapter — ARC-AGI-3 episode loop",
     "parietal_lobe.arc_policy": "ARC benchmark adapter — ARC-AGI-3 exploration policy",

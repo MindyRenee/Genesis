@@ -17,6 +17,8 @@ from parietal_lobe.arc_sources import (
     list_arc3_games,
     open_arc3_game,
 )
+from worlds.arc_arena import ArcArena
+from worlds.world import OuterWorld
 
 
 def main() -> int:
@@ -26,9 +28,15 @@ def main() -> int:
     parser.add_argument("--max-steps", type=int, default=200)
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--no-recording", action="store_true")
+    parser.add_argument(
+        "--no-world",
+        action="store_true",
+        help="play outside her OuterWorld (no percepts, acts, or latent updates)",
+    )
     args = parser.parse_args()
 
     arcade = arc3_arcade(offline=args.offline)
+    arena = None if args.no_world else ArcArena(OuterWorld())
     try:
         game_ids = args.games or [g["game_id"] for g in list_arc3_games(arcade=arcade)]
         for game_id in game_ids:
@@ -36,13 +44,22 @@ def main() -> int:
                 game_id, arcade=arcade, save_recording=not args.no_recording
             )
             policy = ARC3ExplorationPolicy()
-            episode = run_arc3_episode(
-                env,
-                game_id=game_id,
-                initial_observation=observation,
-                choose_action=policy.choose_action,
-                max_steps=args.max_steps,
-            )
+            if arena is not None:
+                episode = arena.play(
+                    env,
+                    game_id=game_id,
+                    initial_observation=observation,
+                    policy=policy,
+                    max_steps=args.max_steps,
+                )
+            else:
+                episode = run_arc3_episode(
+                    env,
+                    game_id=game_id,
+                    initial_observation=observation,
+                    choose_action=policy.choose_action,
+                    max_steps=args.max_steps,
+                )
             print(json.dumps({
                 "game_id": game_id,
                 "actions": episode.actions_taken,
@@ -52,6 +69,7 @@ def main() -> int:
                 "final_state": episode.final_state,
                 "stopped_reason": episode.stopped_reason,
                 "distinct_states": len({t["next_state_signature"] for t in episode.transitions}),
+                "world_latent_observations": arena.visits[-1].latent_observations if arena else 0,
             }), flush=True)
     finally:
         scorecard = close_arc3_scorecard(arcade)
