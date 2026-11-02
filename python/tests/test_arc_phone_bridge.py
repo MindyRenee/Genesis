@@ -206,3 +206,15 @@ def test_genesis_step_feeds_level_reward_back_to_policy(monkeypatch) -> None:
 
     assert result["state"] == "WIN"
     assert rewards == [3.0]
+
+
+def test_bridge_rejects_actions_after_win() -> None:
+    """A terminal WIN must not silently accept or ignore another action."""
+    bridge = ArcPhoneBridge(
+        game_opener=lambda *args, **kwargs: (FakeEnvironment(), {"state": "WIN"}),
+        legal_actions=lambda environment: environment.action_space,
+        step_game=lambda *args, **kwargs: pytest.fail("terminal game must not be stepped"),
+    )
+    session_id = bridge.create_session({"game_id": "fake"})["session_id"]
+    with pytest.raises(ValueError, match="already won"):
+        bridge.step_session(session_id, {"action": "ACTION1"})
