@@ -379,9 +379,15 @@ def step_arc3_game(
             name for name in dir(GameAction) if name.startswith("ACTION") or name == "RESET"
         )
         raise ValueError(f"Unknown ARC action {action_name!r}; valid actions: {valid}")
+    if not isinstance(action_name, str) or not action_name:
+        raise ValueError("action_name must be a non-empty string")
     if action_name != RESET_ACTION:
         legal = arc3_legal_actions(environment)
-        if legal and action_name not in legal:
+        if not legal:
+            raise ValueError(
+                "ARC-AGI-3 environment exposes no legal actions in the current state"
+            )
+        if action_name not in legal:
             raise ValueError(
                 f"ARC action {action_name!r} is not legal in the current state; "
                 f"available actions: {legal}"
