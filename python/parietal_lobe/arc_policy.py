@@ -249,6 +249,11 @@ class ARC3ExplorationPolicy:
     _striatum: BasalGanglia = field(default_factory=BasalGanglia, init=False)
     _value: dict[str, float] = field(default_factory=dict, init=False)
     _dopamine: float = field(default=0.0, init=False)
+    _payload: dict[str, tuple[str, dict[str, Any] | None]] = field(
+        default_factory=dict, init=False
+    )
+    _skill: list[str] = field(default_factory=list, init=False)
+    _replay: int = field(default=-1, init=False)
 
     @property
     def _outcomes(self) -> dict[tuple[str, str], tuple[float, int]]:
@@ -402,6 +407,9 @@ class ARC3ExplorationPolicy:
             self._start_view = observation_view(observation)
             self._reset_pending = False
         state_key = self.signature(observation)
+        replay = self._replay_step(legal_actions)
+        if replay is not None:
+            return replay
         candidates = self._candidates(observation, legal_actions)
         self._candidate_cache[state_key] = candidates
 
@@ -458,6 +466,60 @@ class ARC3ExplorationPolicy:
         }
         self._observations_seen.add(state_key)
         return ARC3Decision(action=action, data=dict(data) if data else None, reasoning=reasoning)
+
+    def _replay_step(self, legal_actions: list[str]) -> ARC3Decision | None:
+        """Hippocampal replay: retry the previous level's shortest solution at a new level.
+
+        Levels of one game tend to share mechanics, so the action sequence
+        that solved the last level is tried first. Replay stops at the first
+        step that is illegal, leaves the board unchanged, or ends the game.
+        """
+        if not 0 <= self._replay < len(self._skill):
+            self._replay = -1
+            return None
+        key = self._skill[self._replay]
+        action, data = self._payload[key]
+        if action not in legal_actions:
+            self._replay = -1
+            return None
+        self._replay += 1
+        return ARC3Decision(
+            action=action,
+            data=dict(data) if data else None,
+            reasoning={
+                "policy": "graph_frontier_exploration",
+                "mode": "procedural_replay",
+                "replay_step": self._replay,
+                "replay_length": len(self._skill),
+            },
+        )
+
+    def _shortest_path(self, start: str, goal: str) -> list[str] | None:
+        """Breadth-first action-key path through the known state graph."""
+        parents: dict[str, tuple[str, str] | None] = {start: None}
+        queue = deque([start])
+        while queue:
+            state = queue.popleft()
+            if state == goal:
+                path: list[str] = []
+                while (link := parents[state]) is not None:
+                    state, key = link
+                    path.append(key)
+                return path[::-1]
+            for key, nxt in self._graph.edges.get(state, {}).items():
+                if nxt not in parents and nxt not in self._graph.dead:
+                    parents[nxt] = (state, key)
+                    queue.append(nxt)
+        return None
+
+    def _learn_skill(self, winning_state: str, winning_key: str) -> None:
+        """Store the shortest known solution of the level just completed and arm replay."""
+        start = self._view_signature(self._start_view) if self._start_view else winning_state
+        path = self._shortest_path(start, winning_state)
+        if path is None:
+            return
+        self._skill = [*path, winning_key]
+        self._replay = 0
 
     def _successor_value(self, graph: _Graph, state: str, key: str) -> float:
         """Learned TD value of the state this action is known to lead to."""
@@ -624,6 +686,10 @@ class ARC3ExplorationPolicy:
             cls=_action_class(before.get("grid"), action, data),
         )
         self._log.append(item)
+        self._payload[item.key] = (action, dict(data) if data else None)
+        unchanged = self._view_signature(before) == self._view_signature(after)
+        if self._replay > 0 and (item.state_after == GAME_OVER or unchanged):
+            self._replay = -1
         if item.state_after == GAME_OVER:
             self._reset_pending = True
         levels_before, levels_after = before.get("levels_completed"), after.get("levels_completed")
@@ -632,6 +698,7 @@ class ARC3ExplorationPolicy:
             and isinstance(levels_after, int)
             and levels_after > levels_before
         ):
+            self._learn_skill(self._view_signature(before), item.key)
             self._start_view = after
         if self._learn_volatile(before.get("grid"), after.get("grid")):
             self._rebuild()

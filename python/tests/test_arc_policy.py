@@ -178,3 +178,16 @@ def test_policy_generalises_click_effects_by_colour() -> None:
     decision = policy.choose_action(board, ["ACTION6"], [])
     assert decision.data is not None
     assert grid[decision.data["y"]][decision.data["x"]] != 3
+
+
+def test_policy_replays_previous_level_solution() -> None:
+    """After a level completes, the shortest known solution is tried first on the next level."""
+    policy = ARC3ExplorationPolicy()
+    start = {"grid": [[0, 0]], "state": "NOT_FINISHED", "levels_completed": 0}
+    middle = {"grid": [[1, 0]], "state": "NOT_FINISHED", "levels_completed": 0}
+    won = {"grid": [[2, 2]], "state": "NOT_FINISHED", "levels_completed": 1}
+    policy.choose_action(start, ["ACTION1", "ACTION2"], [])
+    policy.observe_transition(start, "ACTION2", middle, "NOT_FINISHED")
+    policy.observe_transition(middle, "ACTION1", won, "NOT_FINISHED")
+    first = policy.choose_action(won, ["ACTION1", "ACTION2"], [])
+    assert (first.action, first.reasoning["mode"]) == ("ACTION2", "procedural_replay")
