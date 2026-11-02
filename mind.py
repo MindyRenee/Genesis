@@ -693,12 +693,12 @@ class Mind(
         try:
             drives["social"] = float(self.world.social_isolation())
         except Exception:
-            pass
+            logger.debug("social drive unavailable", exc_info=True)
         try:
             for name, urge in self.volition.urges.items():
                 drives[name] = float(getattr(urge, "value", 0.0))
         except Exception:
-            pass
+            logger.debug("volition drives unavailable", exc_info=True)
         return drives
 
     def _on_v1_gamma(self, gamma_power: float) -> None:

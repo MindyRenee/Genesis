@@ -22,6 +22,8 @@ class ARC1SolveResult:
     task_path: str
     solved: bool
     predictions: list[list[list[int]]] = field(default_factory=list)
+    # Up to ``num_guesses`` attempts, each a prediction per test input.
+    guesses: list[list[list[list[int]]]] = field(default_factory=list)
     rule: str | None = None
     verified_rules: list[str] = field(default_factory=list)
     nodes_explored: int = 0
@@ -66,6 +68,11 @@ def solve_arc1_task(
         task_path=str(task_path),
         solved=solution.solved,
         predictions=[grid.to_lists() for grid in solution.predictions],
+        guesses=[
+            [grid.to_lists() for grid in guess]
+            for guess in (getattr(solution, "guesses", None) or [solution.predictions])
+            if guess
+        ],
         rule=solution.hypothesis.describe() if solution.hypothesis else None,
         verified_rules=solution.verified_rules,
         nodes_explored=solution.nodes_explored,

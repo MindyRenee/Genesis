@@ -81,6 +81,7 @@ def test_arc3_legal_actions_reads_current_environment_action_space() -> None:
         """Expose representative actions for the adapter test."""
 
         def __init__(self) -> None:
+            """Initialize the fake's recorded state."""
             self.action_space = [Action("ACTION3"), Action("ACTION1")]
 
     assert arc3_legal_actions(Environment()) == ["ACTION1", "ACTION3"]

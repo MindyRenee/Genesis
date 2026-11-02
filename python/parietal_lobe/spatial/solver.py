@@ -86,6 +86,15 @@ class FailureInfo:
         )
 
 
+def _param_size(value: object) -> int:
+    """Count the entries in a (possibly nested) parameter structure."""
+    if isinstance(value, dict):
+        return sum(1 + _param_size(item) for item in value.values())
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return sum(1 + _param_size(item) for item in value)
+    return 0
+
+
 @dataclass
 class SpatialSolution:
     """The result of solving a task.
@@ -926,15 +935,16 @@ class SpatialReasoner:
     ) -> list[SpatialHypothesis]:
         """Pick the most general rules among exact matches.
 
-        Fewest transforms, then fewest parameters. A rule with no
-        conditions (gravity_down) beats an equally accurate but more
-        specific one (gravity_down_1) — specific rules overfit the
-        training colors.
+        Fewest transforms, then the smallest parameter description. A
+        rule with no conditions (gravity_down) beats an equally accurate
+        but more specific one (gravity_down_1), and a lookup table counts
+        every entry, so a colour map or shape table that merely memorises
+        the training pairs loses to any compact rule that fits equally.
         """
         exact_hits.sort(
             key=lambda h: (
                 len(h.transforms),
-                sum(len(t.params) for t in h.transforms),
+                sum(_param_size(t.params) for t in h.transforms),
             )
         )
         return exact_hits[:num_guesses]

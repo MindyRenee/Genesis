@@ -5,27 +5,17 @@ import json
 import logging
 from typing import Any
 
+from parietal_lobe.arc_sources import (
+    observation_percept,
+    observation_state,
+    observation_view,
+)
+
 logger = logging.getLogger(__name__)
 
 
-def _state_name(observation: Any) -> str | None:
-    state = (
-        observation.get("state")
-        if isinstance(observation, dict)
-        else getattr(observation, "state", None)
-    )
-    if isinstance(state, dict):
-        state = state.get("name", state.get("value"))
-    if state is None:
-        return None
-    return str(getattr(state, "name", state))
-
-
-def _percept(observation: Any) -> Any:
-    if isinstance(observation, dict):
-        return observation
-    grid = getattr(observation, "grid", None)
-    return {"grid": grid} if grid is not None else observation
+_state_name = observation_state
+_percept = observation_percept
 
 
 def _event_text(event: str, payload: dict[str, Any]) -> str:
@@ -60,6 +50,7 @@ class GenesisArcObserver:
     """Route ARC events to OuterWorld and the actual temporal language space."""
 
     def __init__(self, mind: Any) -> None:
+        """Bind to the mind's OuterWorld and, if present, its temporal language latent."""
         world = getattr(mind, "world", None)
         if world is None or not callable(getattr(world, "perceive", None)):
             raise TypeError("mind must expose world.perceive")
@@ -80,7 +71,8 @@ class GenesisArcObserver:
         self.last_transition_residual = 0.0
 
     def _update_language_latent(self, event: str, payload: dict[str, Any]) -> None:
-        if self._language_observer is None:
+        """Feed the event's text surface into the temporal language latent space."""
+        if self._language_observer is None or self._comprehension is None:
             return
         text = _event_text(event, payload)
         parsed = self._comprehension.comprehend(text)
@@ -92,6 +84,12 @@ class GenesisArcObserver:
         self.latent_observations += 1
 
     def __call__(self, event: str, payload: dict[str, Any]) -> None:
+        """Route one bridge ``action`` or ``observation`` event into Genesis.
+
+        Observations reach ``world.perceive`` with the board as a grid
+        percept; actions reach ``world.it_acted``. Failures are counted,
+        logged, and re-raised.
+        """
         try:
             game_id = str(payload.get("game_id", "unknown"))
             step = int(payload.get("step", 0))
@@ -127,6 +125,7 @@ class GenesisArcObserver:
                         "step": step,
                         "phase": phase,
                         "state": _state_name(observation),
+                        "levels_completed": observation_view(observation)["levels_completed"],
                         "legal_actions": payload.get("legal_actions", []),
                     },
                     percept=_percept(observation),

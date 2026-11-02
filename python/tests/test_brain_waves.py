@@ -1095,15 +1095,20 @@ def test_negative_stimulus_suppresses_band():
 
     reset_oscillator()
     summary = _make_summary(arousal=0.5, phase=PHASE_ACTIVE)
-    alpha_before = assess_brain_waves(summary).powers[BrainWave.ALPHA]
 
-    add_stimulus(BrainWave.ALPHA, -0.3)
-    # The meter needs post-stimulus wave in its window before the
-    # suppression shows — let the field run.
-    for _ in range(10):
-        time.sleep(0.05)
-        state = assess_brain_waves(summary)
-    alpha_after = state.powers[BrainWave.ALPHA]
+    def mean_alpha(samples: int = 20) -> float:
+        # Instantaneous band power rides the oscillation (±0.04), so a
+        # single reading cannot resolve a stimulus; average a window.
+        total = 0.0
+        for _ in range(samples):
+            time.sleep(0.05)
+            total += assess_brain_waves(summary).powers[BrainWave.ALPHA]
+        return total / samples
+
+    alpha_before = mean_alpha()
+    add_stimulus(BrainWave.ALPHA, -0.5)
+    mean_alpha(5)  # let the meter window fill with post-stimulus wave
+    alpha_after = mean_alpha()
 
     assert alpha_after < alpha_before, (
         f"inhibitory stimulus should suppress alpha: {alpha_before} → {alpha_after}"

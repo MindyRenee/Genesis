@@ -12,6 +12,8 @@ from dataclasses import asdict, dataclass, is_dataclass
 from enum import Enum
 from typing import Any
 
+from parietal_lobe.arc_sources import observation_frames
+
 
 @dataclass(frozen=True, slots=True)
 class AsciiGameRecord:
@@ -20,19 +22,30 @@ class AsciiGameRecord:
     codes: tuple[int, ...]
 
     def __post_init__(self) -> None:
+        """Reject codes outside 7-bit ASCII."""
         if any(isinstance(code, bool) or not isinstance(code, int) or not 0 <= code < 128
                for code in self.codes):
             raise ValueError("ASCII codes must be integers in range 0..127")
 
 
 def _plain(value: Any, depth: int = 0) -> Any:
-    """Convert common toolkit objects to deterministic JSON-safe structures."""
+    """Convert toolkit objects to deterministic JSON-safe structures.
+
+    Toolkit observations keep their board in a private ``frame`` field, so
+    any recognised board is added explicitly under ``"frame"``. Values that
+    have no faithful JSON form (bare objects, callables, classes) are
+    rejected with ``ValueError`` rather than silently stringified.
+    """
     if depth > 12:
-        return type(value).__name__
+        raise ValueError("game record nesting exceeds 12 levels")
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, Enum):
-        return {"name": value.name, "value": _plain(value.value, depth + 1)}
+        inner = value.value
+        return {
+            "name": value.name,
+            "value": inner if isinstance(inner, (str, int, float, bool)) else value.name,
+        }
     if is_dataclass(value) and not isinstance(value, type):
         return _plain(asdict(value), depth + 1)
     if isinstance(value, Mapping):
@@ -40,15 +53,18 @@ def _plain(value: Any, depth: int = 0) -> Any:
                 for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))}
     if isinstance(value, (list, tuple)):
         return [_plain(item, depth + 1) for item in value]
+    if isinstance(value, type) or callable(value):
+        raise ValueError(f"unsupported game record value of type {type(value).__name__}")
     if hasattr(value, "tolist"):
-        try:
-            return _plain(value.tolist(), depth + 1)
-        except (TypeError, ValueError):
-            pass
+        return _plain(value.tolist(), depth + 1)
     if hasattr(value, "__dict__"):
-        return {key: _plain(item, depth + 1) for key, item in sorted(vars(value).items())
-                if not key.startswith("_")}
-    return type(value).__name__
+        plain = {key: _plain(item, depth + 1) for key, item in sorted(vars(value).items())
+                 if not key.startswith("_")}
+        frames = observation_frames(value)
+        if frames:
+            plain["frame"] = frames
+        return plain
+    raise ValueError(f"unsupported game record value of type {type(value).__name__}")
 
 
 def encode_game_record(record: Mapping[str, Any]) -> AsciiGameRecord:

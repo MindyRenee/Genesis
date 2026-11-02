@@ -292,7 +292,7 @@ class GlobalWorkspace:
         for responder in self._responders:
             try:
                 reply = responder(item)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.debug("region responder failed", exc_info=True)
                 continue
             if reply:
@@ -790,6 +790,6 @@ def _content_equal(a: Any, b: Any) -> bool:
         return True
     try:
         return a == b
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.exception(f"content comparison failed: {e}")
         return False
