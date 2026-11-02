@@ -168,3 +168,41 @@ def test_genesis_step_lets_her_choose_and_answers_game_over_with_reset() -> None
     second = bridge.genesis_step(session_id)
     assert sent[1] == "RESET"
     assert second["genesis_reasoning"]["reason"] == "game_over"
+
+
+def test_genesis_step_feeds_level_reward_back_to_policy(monkeypatch) -> None:
+    """Pass official level-completion and WIN feedback into Genesis policy learning."""
+    from parietal_lobe import arc_policy
+    from parietal_lobe.arc_play import ARC3Decision
+
+    rewards: list[float | None] = []
+
+    class RecordingPolicy:
+        """Small policy test double that records reward feedback."""
+
+        def choose_action(self, observation, legal_actions, history):
+            """Choose one action from the current legal set."""
+            return ARC3Decision(legal_actions[0])
+
+        def observe_transition(
+            self, observation, action, next_observation, terminal_state, *, data=None, reward=None
+        ):
+            """Capture the reward delivered by the bridge."""
+            rewards.append(reward)
+
+    monkeypatch.setattr(arc_policy, "ARC3ExplorationPolicy", RecordingPolicy)
+    bridge = ArcPhoneBridge(
+        game_opener=lambda *args, **kwargs: (
+            FakeEnvironment(),
+            {"state": "NOT_FINISHED", "levels_completed": 0, "win_levels": 2},
+        ),
+        legal_actions=lambda environment: environment.action_space,
+        step_game=lambda *args, **kwargs: {
+            "state": "WIN", "levels_completed": 2, "win_levels": 2,
+        },
+    )
+    session_id = bridge.create_session({"game_id": "fake"})["session_id"]
+    result = bridge.genesis_step(session_id)
+
+    assert result["state"] == "WIN"
+    assert rewards == [3.0]
