@@ -219,7 +219,7 @@ class ArcPhoneBridge:
                 raise OverflowError("session step budget exhausted")
             state = _state_name(session.observation)
             if state == TERMINAL_WIN:
-                return self._session_view(session_id, session)
+                raise ValueError("game already won; no further actions are accepted")
             if state == GAME_OVER and action != RESET_ACTION:
                 raise ValueError("game over: the only accepted action is RESET")
             if action != RESET_ACTION:
