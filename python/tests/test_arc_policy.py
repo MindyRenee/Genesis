@@ -198,7 +198,13 @@ def test_neuro_loop_closes_field_waves_and_chemicals() -> None:
     from parietal_lobe.arc_neuro import ArcNeuroLoop
 
     calls: list[int] = []
-    loop = ArcNeuroLoop(field_source=lambda osc: calls.append(1) is None)
+
+    def field(oscillator) -> bool:
+        """A live EM channel that records each beat."""
+        calls.append(1)
+        return True
+
+    loop = ArcNeuroLoop(field_source=field)
     base = dict(loop.chemicals)
     state = loop.beat(dopamine_rpe=0.8, novel=True, changed=False)
     assert calls == [1] and loop.field_live
