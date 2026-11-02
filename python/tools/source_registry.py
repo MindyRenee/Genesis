@@ -529,6 +529,14 @@ _DEFAULT_MAN_PATHS = (
 )
 
 
+def _is_existing_dir(candidate: str) -> bool:
+    """True when ``candidate`` names an existing directory; never raises."""
+    try:
+        return Path(candidate).is_dir()
+    except (OSError, ValueError):
+        return False
+
+
 def _resolve_man_paths() -> tuple[str, ...]:
     """Resolve the man-page search paths the way ``man`` itself does.
 
@@ -552,7 +560,13 @@ def _resolve_man_paths() -> tuple[str, ...]:
         except (OSError, subprocess.SubprocessError):
             continue
         if out.returncode == 0:
-            paths = tuple(p for p in out.stdout.strip().split(":") if p and Path(p).is_dir())
+            # manpath can print advisory text (a minimized system says so on
+            # stdout) instead of a path list; only real, single-line
+            # directories count, and a non-path can never raise here.
+            paths = tuple(
+                p for p in out.stdout.strip().split(":")
+                if p and "\n" not in p and _is_existing_dir(p)
+            )
             if paths:
                 return paths
     return _DEFAULT_MAN_PATHS
