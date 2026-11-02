@@ -189,11 +189,13 @@ class ARC3ExplorationPolicy:
         candidates = self._candidates(observation, legal_actions)
 
         def outcome(key: str) -> float:
+            """Mean observed reward of an action in this state."""
             fallback = self._outcomes.get((state_key, key), (0.0, 0))
             total, count = rewards.get((state_key, key), fallback)
             return total / count if count else 0.0
 
         def change_rate(action: str) -> float:
+            """Fraction of this action's tries (in any state) that changed the board."""
             return (changed_by_action[action] + 1) / (tried_by_action[action] + 2)
 
         scored = []

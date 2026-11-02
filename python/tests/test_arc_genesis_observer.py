@@ -9,20 +9,26 @@ from temporal_lobe.language_latent_space import LanguageLatentSpace
 
 
 class FakeWorld:
+    """OuterWorld stand-in recording perceptions and actions."""
     def __init__(self):
+        """Initialize the fake's recorded state."""
         self.events = []
 
     def perceive(self, content, **kwargs):
+        """Record a perception and return a truthy event."""
         self.events.append(("observation", content, kwargs))
         return object()
 
     def it_acted(self, description, *, detail=""):
+        """Record an action."""
         self.events.append(("action", description, detail))
         return object()
 
 
 class FakeMind:
+    """Mind stand-in exposing a world and temporal language hooks."""
     def __init__(self):
+        """Initialize the fake's recorded state."""
         self.world = FakeWorld()
         self.language_latent_space = LanguageLatentSpace()
         self.brain = SimpleNamespace(
@@ -34,6 +40,7 @@ class FakeMind:
 
 
 def test_observer_routes_observation_into_world_and_language_latent():
+    """Check that observer routes observation into world and language latent."""
     mind = FakeMind()
     observer = GenesisArcObserver(mind)
     observer(
@@ -57,6 +64,7 @@ def test_observer_routes_observation_into_world_and_language_latent():
 
 
 def test_observer_routes_action_and_updates_transition_geometry():
+    """Check that observer routes action and updates transition geometry."""
     mind = FakeMind()
     observer = GenesisArcObserver(mind)
     observer(
@@ -94,6 +102,7 @@ def test_observer_routes_action_and_updates_transition_geometry():
 
 
 def test_observer_rejects_unknown_event():
+    """Check that observer rejects unknown event."""
     mind = FakeMind()
     observer = GenesisArcObserver(mind)
     try:

@@ -203,6 +203,7 @@ def observation_grid(observation: Any) -> list[list[int]] | None:
 
 
 def _int_field(observation: Any, key: str) -> int | None:
+    """Read a non-boolean integer field from a mapping or object, else None."""
     value = (
         observation.get(key)
         if isinstance(observation, dict)

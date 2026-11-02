@@ -81,6 +81,7 @@ def test_action6_requires_coordinates() -> None:
         """Fake env exposing ACTION6."""
 
         def __init__(self):
+            """Initialize the fake's recorded state."""
             self.action_space = [arcengine.GameAction.ACTION6]
 
         def step(self, action, data=None, reasoning=None):
@@ -124,6 +125,7 @@ def test_bridge_game_over_offers_only_reset() -> None:
     steps = []
 
     def step(env, action, data=None, reasoning=None):
+        """Record the step and return the next observation."""
         steps.append(action)
         return fresh
 

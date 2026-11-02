@@ -63,6 +63,7 @@ Policy = Callable[[Any, list[str], list[dict[str, Any]]], ARC3Decision]
 
 
 def _levels(observation: Any) -> tuple[int, int | None]:
+    """Return ``(levels_completed, win_levels)`` of an observation (0, None if absent)."""
     view = observation_view(observation)
     return view["levels_completed"] or 0, view["win_levels"]
 

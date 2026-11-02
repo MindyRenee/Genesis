@@ -48,7 +48,7 @@ The example selects the first legal action only to demonstrate transport; it is 
 - `POST /sessions/{session_id}/step`: `{"action":"ACTION…","data":null,"reasoning":null}`.
 - `DELETE /sessions/{session_id}`: close a session.
 
-Each session response includes the current observation, current legal action names, step count, terminal state, and remaining step budget. The server revalidates actions against the environment before executing them. Session IDs are unguessable, requests are size-limited, and the default bridge binds only to loopback.
+Each session response includes the current observation (with the toolkit's private `frame` board added), `board` (the visible 64x64 grid), `state`, `levels_completed`, `win_levels`, current legal action names, step count, terminal state, and remaining step budget. After `GAME_OVER` the only legal action is `RESET`, which restarts the level; after `WIN` no action is accepted. `ACTION6` is a click and requires `data` `{"x": column, "y": row}` with integers 0..63. All sessions share one toolkit `Arcade` (one scorecard), which is closed when the server stops. The server revalidates actions against the environment before executing them. Session IDs are unguessable, requests are size-limited, and the default bridge binds only to loopback.
 
 ## Cognitive telemetry and limits
 

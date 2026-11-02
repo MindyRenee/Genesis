@@ -98,6 +98,7 @@ class ArcPhoneBridge:
         max_steps: int = 500,
         observer: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
+        """Configure toolkit adapters, session limits, and the optional Genesis observer."""
         if isinstance(max_steps, bool) or not isinstance(max_steps, int) or max_steps < 1:
             raise ValueError("max_steps must be a positive integer")
         self._game_lister = game_lister or self._list_with_shared_arcade
@@ -284,6 +285,7 @@ class ArcPhoneBridge:
         bridge = self
 
         class Handler(BaseHTTPRequestHandler):
+            """JSON-over-HTTP handler delegating to the bound bridge."""
             server_version = "GenesisArcBridge/1"
 
             def log_message(self, fmt: str, *args: Any) -> None:

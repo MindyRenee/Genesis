@@ -24,6 +24,7 @@ class ScriptedEnv:
     """Fake environment returning a scripted observation per step."""
 
     def __init__(self, script, legal=("ACTION1", "ACTION2")):
+        """Initialize the fake's recorded state."""
         self.script = list(script)
         self.legal = list(legal)
         self.calls = []
@@ -167,6 +168,7 @@ def test_episode_runner_feeds_level_reward_back_to_bound_policy(scripted) -> Non
     original = policy.observe_transition
 
     def spy(*args, **kwargs):
+        """Record the reward, then delegate to the real policy."""
         seen.append(kwargs["reward"])
         original(*args, **kwargs)
 

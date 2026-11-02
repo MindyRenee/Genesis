@@ -13,10 +13,12 @@ from parietal_lobe.arc_phone_bridge import ArcPhoneBridge, serve
 
 
 class FakeEnvironment:
+    """Environment stand-in for bridge tests."""
     action_space: ClassVar[list[str]] = ["ACTION1", "ACTION2"]
 
 
 def test_session_exposes_legal_actions_and_advances_observation() -> None:
+    """Check that session exposes legal actions and advances observation."""
     env = FakeEnvironment()
     bridge = ArcPhoneBridge(
         game_lister=lambda: [{"game_id": "fake", "title": "Fake"}],
@@ -40,6 +42,7 @@ def test_session_exposes_legal_actions_and_advances_observation() -> None:
 
 
 def test_rejects_illegal_action_without_advancing() -> None:
+    """Check that rejects illegal action without advancing."""
     env = FakeEnvironment()
     bridge = ArcPhoneBridge(
         game_opener=lambda *args, **kwargs: (env, {"state": "PLAY"}),
@@ -53,6 +56,7 @@ def test_rejects_illegal_action_without_advancing() -> None:
 
 
 def test_validates_session_input_and_budget() -> None:
+    """Check that validates session input and budget."""
     bridge = ArcPhoneBridge(
         game_opener=lambda *args, **kwargs: (FakeEnvironment(), {"state": "PLAY"}),
         legal_actions=lambda environment: environment.action_space,
@@ -68,6 +72,7 @@ def test_validates_session_input_and_budget() -> None:
 
 
 def test_http_endpoints_and_error_mapping() -> None:
+    """Check that http endpoints and error mapping."""
     bridge = ArcPhoneBridge(
         game_lister=lambda: [{"game_id": "fake"}],
         game_opener=lambda *args, **kwargs: (FakeEnvironment(), {"state": "PLAY"}),
@@ -108,12 +113,14 @@ def test_http_endpoints_and_error_mapping() -> None:
 
 
 def test_service_refuses_non_loopback_binding() -> None:
+    """Check that service refuses non loopback binding."""
     with pytest.raises(ValueError, match="loopback"):
         serve("0.0.0.0", 8765)
 
 
 
 def test_bridge_publishes_initial_action_and_result_events():
+    """Check that bridge publishes initial action and result events."""
     events = []
     env = FakeEnvironment()
     bridge = ArcPhoneBridge(

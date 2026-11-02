@@ -22,6 +22,7 @@ class AsciiGameRecord:
     codes: tuple[int, ...]
 
     def __post_init__(self) -> None:
+        """Reject codes outside 7-bit ASCII."""
         if any(isinstance(code, bool) or not isinstance(code, int) or not 0 <= code < 128
                for code in self.codes):
             raise ValueError("ASCII codes must be integers in range 0..127")

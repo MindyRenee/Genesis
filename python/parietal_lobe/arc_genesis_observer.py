@@ -50,6 +50,7 @@ class GenesisArcObserver:
     """Route ARC events to OuterWorld and the actual temporal language space."""
 
     def __init__(self, mind: Any) -> None:
+        """Bind to the mind's OuterWorld and, if present, its temporal language latent."""
         world = getattr(mind, "world", None)
         if world is None or not callable(getattr(world, "perceive", None)):
             raise TypeError("mind must expose world.perceive")
