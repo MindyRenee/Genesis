@@ -30,16 +30,19 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    # Pinned mirrors of requirements.txt — update both together.
-    "numpy==2.5.3",
-    "nltk==3.10.3",
-    "scipy==1.16.3",
-    "orjson==3.12.0",
-    "psutil==7.2.2",
-    "Pillow==12.3.0",
-    "opencv-python-headless==5.0.0.93",
-    "pycairo==1.29.1",
-    "websockets==15.0.1",
+    # Minimum versions, not exact pins: an exact pin forces a source build
+    # wherever no prebuilt wheel matches (e.g. Termux on Android), and that
+    # build needs toolchains most machines lack. pip and uv resolve the
+    # newest compatible prebuilt release instead.
+    "numpy>=2.5.3",
+    "nltk>=3.10.3",
+    "scipy>=1.16.3",
+    "orjson>=3.12.0",
+    "psutil>=7.2.2",
+    "Pillow>=12.3.0",
+    "opencv-python-headless>=5.0.0.93",
+    "pycairo>=1.29.1",
+    "websockets>=15.0.1",
     # The official ARC-AGI-3 toolkit: the arcade offers its games.
     "arc-agi>=0.9.9",
     "arcengine>=0.9.3",
