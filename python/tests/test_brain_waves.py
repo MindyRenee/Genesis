@@ -1098,7 +1098,7 @@ def test_negative_stimulus_suppresses_band():
 
     def mean_alpha(samples: int = 20) -> float:
         # Instantaneous band power rides the oscillation (±0.04), so a
-        # single reading cannot resolve a −0.3 stimulus; average a window.
+        # single reading cannot resolve a stimulus; average a window.
         total = 0.0
         for _ in range(samples):
             time.sleep(0.05)
@@ -1106,7 +1106,8 @@ def test_negative_stimulus_suppresses_band():
         return total / samples
 
     alpha_before = mean_alpha()
-    add_stimulus(BrainWave.ALPHA, -0.3)
+    add_stimulus(BrainWave.ALPHA, -0.5)
+    mean_alpha(5)  # let the meter window fill with post-stimulus wave
     alpha_after = mean_alpha()
 
     assert alpha_after < alpha_before, (
