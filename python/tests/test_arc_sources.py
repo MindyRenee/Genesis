@@ -96,3 +96,29 @@ def test_arc3_legal_actions_rejects_missing_action_space() -> None:
 
     with pytest.raises(ARCSourceError, match="action_space"):
         arc3_legal_actions(Environment())
+
+
+def test_arc3_step_rejects_action_when_legal_set_is_empty(monkeypatch) -> None:
+    """Never send an action when the toolkit reports no legal actions."""
+    from parietal_lobe import arc_sources
+
+    class Environment:
+        """Expose an empty action set."""
+
+        action_space = []
+
+        def step(self, *args, **kwargs):
+            """Fail if the adapter incorrectly attempts a step."""
+            pytest.fail("step must not be called when there are no legal actions")
+
+    monkeypatch.setattr(arc_sources, "is_complex_action", lambda _name: False)
+    with pytest.raises(ARCSourceError, match="no legal actions"):
+        arc_sources.step_arc3_game(Environment(), "ACTION1")
+
+
+def test_arc3_step_rejects_non_string_action_name() -> None:
+    """Reject malformed action names before enum lookup."""
+    from parietal_lobe.arc_sources import step_arc3_game
+
+    with pytest.raises(ValueError, match="non-empty string"):
+        step_arc3_game(object(), "")
