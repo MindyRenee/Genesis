@@ -1309,7 +1309,9 @@ const IDX_BRANCH_MISSES: usize = 3;
 
 /// `PERF_EVENT_IOC_ENABLE` — start a counter opened disabled.
 /// `_IO('$', 0)` on the perf fd. Not exported by the libc crate.
-const PERF_IOC_ENABLE: libc::c_ulong = 0x2400;
+// libc::Ioctl is c_ulong on glibc but c_int on Android's bionic libc,
+// so the request constant takes the platform's own type.
+const PERF_IOC_ENABLE: libc::Ioctl = 0x2400;
 
 /// Open one perf hardware counter for `pid`. Returns the fd, or
 /// -1 if the event can't be opened (permissions, missing PMU
