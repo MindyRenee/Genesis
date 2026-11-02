@@ -341,6 +341,12 @@ outranks the
 environment variable, which still names whoever spawned the
 daemon and holds the dead launcher's PID after a mind's death.
 
+.PP
+Opcodes 52, 53, 54 and 57 are retired along with the optic nerve.
+They are never reused; a request carrying one is answered
+.B UNKNOWN_COMMAND
+(0x82).
+
 .SH EXIT STATUS
 .TP
 .B 0

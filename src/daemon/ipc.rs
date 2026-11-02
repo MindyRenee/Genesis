@@ -483,6 +483,11 @@ pub mod cmd {
     /// Additive: PROTOCOL_VERSION is unaffected.
     pub const GET_INTERNALS: u8 = 51;
 
+    // Wire numbers 52, 53, 54 and 57 belonged to the optic nerve
+    // (GET_OPTIC_STATE, SET_OPTIC_GAIN, SET_FOCUS, SET_LID) and are
+    // retired with it. Retired — never reuse these numbers. Any
+    // request carrying them is answered UNKNOWN_COMMAND.
+
     /// Structural code analysis — the daemon's code sense. Request:
     /// `[u16 path_len][path utf-8][u32 source_len][source utf-8]`.
     /// Response: `[u8 ack]` + the UTF-8 line report described on
