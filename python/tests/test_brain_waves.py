@@ -1091,19 +1091,23 @@ def test_pulse_survives_held_level_on_same_band():
 
 def test_negative_stimulus_suppresses_band():
     """Inhibitory stimulus (alpha blocking) lowers band power."""
-    from thalamus.brain_waves import add_stimulus, reset_oscillator
+    from thalamus.brain_waves import _get_oscillator, add_stimulus, reset_oscillator
 
     reset_oscillator()
     summary = _make_summary(arousal=0.5, phase=PHASE_ACTIVE)
+    osc = _get_oscillator()
+
+    # Powers are Goertzel-metered over 4 s of emitted trace — half a
+    # second of wall-clock sleeps leaves the window mostly
+    # pre-stimulus wave. Step the oscillator's own clock so both
+    # readings sit on filled windows (see test_stimulus_decays).
+    assess_brain_waves(summary)  # establishes _last_time
+    osc._last_time -= 4.0
     alpha_before = assess_brain_waves(summary).powers[BrainWave.ALPHA]
 
     add_stimulus(BrainWave.ALPHA, -0.3)
-    # The meter needs post-stimulus wave in its window before the
-    # suppression shows — let the field run.
-    for _ in range(10):
-        time.sleep(0.05)
-        state = assess_brain_waves(summary)
-    alpha_after = state.powers[BrainWave.ALPHA]
+    osc._last_time -= 4.0
+    alpha_after = assess_brain_waves(summary).powers[BrainWave.ALPHA]
 
     assert alpha_after < alpha_before, (
         f"inhibitory stimulus should suppress alpha: {alpha_before} → {alpha_after}"
