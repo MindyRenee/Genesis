@@ -127,7 +127,7 @@ def test_arc3_step_rejects_action_when_legal_set_is_empty(monkeypatch) -> None:
         arc_sources.step_arc3_game(Environment(), "ACTION1")
 
 
-def test_arc3_step_rejects_non_string_action_name() -> None:
+def test_arc3_step_rejects_empty_action_name() -> None:
     """Reject malformed action names before enum lookup."""
     from parietal_lobe.arc_sources import step_arc3_game
 
