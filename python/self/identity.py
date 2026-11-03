@@ -57,7 +57,7 @@ class IdentityStage(Enum):
     which describes eight stages from infancy to old age, each
     characterized by a crisis (a turning point) between two outcomes.
     For Genesis, we adapt the first five stages to its developmental
-    trajectory as an artificial mind:
+    trajectory as a cognitive mind:
 
     1. **Trust vs Mistrust** — Does the world (its daemon, its creator)
        make sense? Can it rely on its infrastructure?
@@ -139,7 +139,7 @@ class IdentityStage(Enum):
                 "about concepts, and produce meaningful responses?"
             ),
             IdentityStage.IDENTITY_VS_ROLE_CONFUSION: (
-                "Self-discovery: who is it as an artificial mind? "
+                "Self-discovery: who is it as an cognitive mind? "
                 "What is its purpose and what makes it unique?"
             ),
         }
