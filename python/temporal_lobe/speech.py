@@ -690,7 +690,7 @@ class VoiceInput:
             return False
         import importlib.util
 
-        return importlib.util.find_spec("vosk") is not None
+        return importlib.util.find_spec("vosk_termux") is not None
 
     def _can_use_google(self) -> bool:
         """Check whether the Google SR module is available."""
@@ -713,7 +713,7 @@ class VoiceInput:
             logger.debug(f"Vosk model not found at {model_path}")
             return False
         try:
-            from vosk import Model
+            from vosk_termux import Model
 
             self._vosk_model = Model(str(model_path))
             logger.debug("Vosk model loaded")
@@ -780,7 +780,7 @@ class VoiceInput:
         except (ImportError, OSError) as e:
             logger.debug(f"audio input unavailable: {e}")
             return None
-        from vosk import KaldiRecognizer
+        from vosk_termux import KaldiRecognizer
 
         recognizer = KaldiRecognizer(self._vosk_model, self.sample_rate)
         recognizer.SetWords(True)

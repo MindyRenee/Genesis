@@ -155,10 +155,7 @@ class LatentSpaceGraph:
 
         output = tuple(
             boundary.gain
-            * sum(
-                weight * value
-                for weight, value in zip(row, state.values, strict=True)
-            )
+            * sum(weight * value for weight, value in zip(row, state.values, strict=True))
             for row in boundary.matrix
         )
         if not all(math.isfinite(v) for v in output):

@@ -8,6 +8,7 @@ Example:
     export PYTHONPATH="$PWD:$PWD/python${PYTHONPATH:+:$PYTHONPATH}"
     python scripts/genesis_android_scene_vision.py --camera-id 1 --interval 10
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,9 +19,8 @@ import time
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
-
 from occipital_lobe.perception.vision import Vision
+from PIL import Image
 
 
 def capture_rgb(camera_id: int, destination: Path, timeout: float) -> np.ndarray:

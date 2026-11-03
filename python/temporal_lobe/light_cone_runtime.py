@@ -75,10 +75,7 @@ class LightConeExperienceBridge:
             if apex is not None:
                 timestamp = max(timestamp, apex.time_s)
             self._sequence += 1
-            event_id = (
-                f"world:{event.source}:{event.kind.value}:"
-                f"{timestamp:.9f}:{self._sequence}"
-            )
+            event_id = f"world:{event.source}:{event.kind.value}:{timestamp:.9f}:{self._sequence}"
             experience = SpacetimeEvent(
                 event_id=event_id,
                 time_s=timestamp,
