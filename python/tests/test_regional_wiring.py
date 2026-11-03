@@ -212,6 +212,7 @@ _ALLOWLIST: dict[str, str] = {
     "frontal_lobe.krita_studio": "Krita plugin bridge — platform adapter, not a brain function",
     # Differentiable light-cone adapter is optional on platforms without PyTorch.
     "temporal_lobe.light_cone_torch": "optional PyTorch light-cone adapter",
+    "temporal_lobe.light_cone_runtime": "event-to-manifold runtime adapter",
     "commitment": "top-level support module",
     "discord_feed": "platform adapter",
     "setup_embeddings": "one-off embedding setup script",
