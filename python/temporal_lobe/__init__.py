@@ -862,6 +862,13 @@ _EXPORTS: dict[str, str] = {
 
 # The five eager names stay in a literal list so static checkers
 # (pyflakes) recognize them as intentional re-exports.
+# Do not advertise the optional differentiable export when PyTorch is absent.
+# The pure-Python light-cone implementation remains available in all environments.
+from importlib.util import find_spec as _find_spec
+
+if _find_spec("torch") is None:
+    _EXPORTS.pop("TorchLightConeField", None)
+
 __all__ = [
     "COCO_CLASSES",
     "AuditoryCortex",
