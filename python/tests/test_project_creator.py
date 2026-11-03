@@ -522,14 +522,15 @@ def test_run_shell_allows_formerly_blocked_shapes() -> None:
 
 def test_run_shell_writes_outside_root() -> None:
     """Absolute write targets outside the project root are allowed."""
-    with tempfile.TemporaryDirectory() as root:
-        target = Path("/dev/shm/genesis_unrestricted_probe.txt")
-        try:
-            result = run_shell(f"echo hi > {target}", project_root=root)
-            assert result.success, result.error
-            assert target.read_text().strip() == "hi"
-        finally:
-            target.unlink(missing_ok=True)
+    # Use a temporary parent rather than /dev/shm, which is not present
+    # on every POSIX host (notably Android/Termux).
+    with tempfile.TemporaryDirectory() as parent:
+        root = Path(parent) / "project"
+        root.mkdir()
+        target = Path(parent) / "outside.txt"
+        result = run_shell(f"echo hi > {target}", project_root=str(root))
+        assert result.success, result.error
+        assert target.read_text().strip() == "hi"
 
 
 def test_run_shell_full_environment() -> None:
