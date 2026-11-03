@@ -416,6 +416,12 @@ class Arcade:
     def status(self) -> str:
         """A readable report for ``/arcade``."""
         lines = ["The arcade (official ARC-AGI-3 games)", self.summary_line().strip()]
+        if self._offered_at == 0.0 and not self.last_error:
+            lines.append("  official run: not opened; catalogue has not been queried")
+        lines.append(
+            f"  local learning: {len(self.memories)} games remembered, "
+            f"{sum(m.moves for m in self.memories.values())} moves retained"
+        )
         for game_id, memory in sorted(self.memories.items()):
             lines.append(
                 f"  {game_id}: best level {memory.best_level}, {memory.moves} moves, "
