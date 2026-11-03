@@ -115,8 +115,8 @@ from .logic import (
     Deduction,
     Formula,
     Polysyllogism,
-    SyllogisticStep,
     Quantifier,
+    SyllogisticStep,
     all_of,
     and_,
     any_of,
@@ -131,11 +131,11 @@ from .logic import (
     not_,
     or_,
     parse,
+    polysyllogism,
     ramsey,
     revise,
     satisfiable,
     syllogism,
-    polysyllogism,
     verify,
 )
 from .modal import (
