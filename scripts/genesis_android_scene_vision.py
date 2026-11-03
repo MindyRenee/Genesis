@@ -53,6 +53,12 @@ def main() -> int:
     )
     parser.add_argument("--camera-id", type=int, default=1, help="Termux camera ID (default: 1)")
     parser.add_argument(
+        "--socket-path",
+        type=Path,
+        default=None,
+        help="Optional path to the already-running Genesis daemon socket",
+    )
+    parser.add_argument(
         "--interval",
         type=float,
         default=10.0,
@@ -76,6 +82,29 @@ def main() -> int:
     if args.max_frames < 0:
         parser.error("max-frames must be non-negative")
 
+    client = None
+    if args.socket_path is not None:
+        # Connect to the existing daemon only. This script never starts or
+        # shuts down a daemon, and it never constructs a second Mind.
+        from genesis_client import GenesisClient
+
+        client = GenesisClient(str(args.socket_path))
+        try:
+            client.connect()
+        except Exception as exc:
+            print(
+                json.dumps(
+                    {
+                        "event": "daemon_connection_error",
+                        "socket_path": str(args.socket_path),
+                        "error": str(exc),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
+            return 2
+
     vision = Vision()
     successful = 0
     failures = 0
@@ -85,6 +114,7 @@ def main() -> int:
             {
                 "event": "started",
                 "pipeline": "Vision.see_frame",
+                "daemon_connected": client is not None,
                 "camera_id": args.camera_id,
                 "interval_s": args.interval,
                 "max_frames": args.max_frames,
@@ -102,7 +132,7 @@ def main() -> int:
                     rgb = capture_rgb(args.camera_id, image_path, args.camera_timeout)
                     capture_ms = (time.monotonic() - frame_started) * 1000
                     scene_started = time.monotonic()
-                    scene = vision.see_frame(rgb, nerve="android")
+                    scene = vision.see_frame(rgb, client=client, nerve="android")
                     processing_ms = (time.monotonic() - scene_started) * 1000
                     successful += 1
                     print(
@@ -139,6 +169,9 @@ def main() -> int:
                 time.sleep(max(0.0, args.interval - elapsed))
     except KeyboardInterrupt:
         print("Stopped by user.", flush=True)
+    finally:
+        if client is not None:
+            client.disconnect()
 
     print(
         json.dumps(
