@@ -14,7 +14,6 @@ python/genesis_data/
 .genesis-discord-bot
 python/voices/
 launch/
-docs/
 
 # Per-instance project notes — documents this machine's setup.
 # All markdown is local-only; only the public readme is tracked.
