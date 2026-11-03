@@ -32,7 +32,9 @@ _libc: Any = None
 def _prctl() -> Any:
     global _libc
     if _libc is None:
-        _libc = ctypes.CDLL("libc.so.6", use_errno=True)
+        # Resolve through the process' default symbol namespace. Hard-coding
+        # "libc.so.6" breaks on Android/Termux, which uses Bionic libc.
+        _libc = ctypes.CDLL(None, use_errno=True)
     return _libc.prctl
 
 
