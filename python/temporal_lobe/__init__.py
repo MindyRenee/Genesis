@@ -623,6 +623,8 @@ Modules claimed by this subsystem:
 
 from __future__ import annotations
 
+from importlib.util import find_spec as _find_spec
+
 from _views import view_getattr
 
 # Internal modules — the auditory cortex (A1) and inferotemporal
@@ -864,8 +866,6 @@ _EXPORTS: dict[str, str] = {
 # (pyflakes) recognize them as intentional re-exports.
 # Do not advertise the optional differentiable export when PyTorch is absent.
 # The pure-Python light-cone implementation remains available in all environments.
-from importlib.util import find_spec as _find_spec
-
 if _find_spec("torch") is None:
     _EXPORTS.pop("TorchLightConeField", None)
 
