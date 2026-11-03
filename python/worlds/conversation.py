@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from temporal_lobe.events import ExternalEvent
 
 logger = logging.getLogger(__name__)
+_LIGHT_CONE_BRIDGE_INIT_LOCK = threading.Lock()
 
 # How long the recovery thread waits for a timed-out think() worker to
 # exit before declaring it wedged. Python cannot kill a thread, so this
@@ -436,11 +437,7 @@ class ConversationMixin:
                 return
             bridge = getattr(self, "_light_cone_experience_bridge", None)
             if bridge is None:
-                lock = getattr(self, "_light_cone_experience_bridge_lock", None)
-                if lock is None:
-                    lock = threading.RLock()
-                    self._light_cone_experience_bridge_lock = lock
-                with lock:
+                with _LIGHT_CONE_BRIDGE_INIT_LOCK:
                     bridge = getattr(self, "_light_cone_experience_bridge", None)
                     if bridge is None:
                         bridge = LightConeExperienceBridge()
