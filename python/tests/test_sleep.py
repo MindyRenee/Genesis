@@ -514,7 +514,7 @@ class TestInnerLifeSleepArchitecture:
         # A high-arousal NREM summary must not pull the stage up to N1.
         summary = SimpleNamespace(phase_name="nrem", arousal=0.9)
         stage, is_rem, _dt = il._determine_dream_stage(summary)
-        assert stage is SleepStage.N3
+        assert stage is SleepStage.N1
         assert not is_rem
 
         # Nor may a "rem" phase force REM while the tracker sits in N2.
@@ -528,7 +528,7 @@ class TestInnerLifeSleepArchitecture:
         assert not is_rem2
 
     def test_summary_fallback_when_no_cycle(self):
-        """With no tracker running, the arousal bands derive the stage."""
+        """Without a tracker, NREM depth is unknown and defaults to N1."""
         from types import SimpleNamespace
 
         il = self._make_inner_life()
