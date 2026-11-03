@@ -10,7 +10,6 @@ import threading
 from typing import Any
 
 import numpy as np
-
 from temporal_lobe.events import ExternalEvent
 from temporal_lobe.light_cones import AdaptiveLightConeManifold, SpacetimeEvent, WorldDomain
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-
 from temporal_lobe.events import EventKind, ExternalEvent
 from temporal_lobe.light_cone_runtime import LightConeExperienceBridge
 from temporal_lobe.light_cones import WorldDomain
