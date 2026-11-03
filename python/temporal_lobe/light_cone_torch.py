@@ -94,7 +94,7 @@ class TorchLightConeField(nn.Module):
         time, angle = torch.broadcast_tensors(time, angle)
         if not torch.is_floating_point(time) or not torch.is_floating_point(angle):
             raise TypeError("time and angle tensors must use floating-point dtypes")
-        phase = angle + torch.sign(time) * self.angular_speed * time.abs() + self.phase_bias
+        phase = angle - torch.sign(time) * self.angular_speed * time.abs() + self.phase_bias
         radius = self.signal_speed * time.abs()
         y = radius * torch.cos(phase)
         z = radius * torch.sin(phase)
