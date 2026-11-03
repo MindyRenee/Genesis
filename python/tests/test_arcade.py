@@ -107,6 +107,7 @@ def test_status_distinguishes_unopened_run_from_saved_learning():
     assert "official run: not opened" in status
     assert "local learning: 0 games remembered, 0 moves retained" in status
 
+
 def test_memory_survives_the_world_save():
     """What she learned is saved with her world and restored."""
     world, arcade, *_ = _arcade()
