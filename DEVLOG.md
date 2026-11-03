@@ -5,6 +5,32 @@ evidence behind them, not just the claims. Entries are dated, newest
 first. Code references are commit SHAs; runtime artifacts live in the
 instance's data dir (`~/.local/share/genesis*`).
 
+## 2026-11-03 — Categorical polysyllogism: explicit proof traces
+
+The formal categorical engine previously checked one two-premise
+syllogism at a time. Added `SyllogisticStep` and `polysyllogism()`
+in `python/frontal_lobe/reasoning/logic.py` (commit
+`97f827fcc859e90cac0894bf09e44dd957962573`). Each proposed step is
+checked by the existing eight-region model semantics. Every later step
+must reuse the immediately preceding conclusion as a premise; a failed
+inference stops the trace and retains its countermodel. The new result
+exposes the checked deductions, final checked conclusion, overall validity,
+and one-based failed-step index.
+
+Exported the API through `frontal_lobe.reasoning`, added focused tests for
+a valid three-step chain, invalid inference and countermodel preservation,
+disconnected chains, and empty input, and updated
+`docs/man/genesis-reasoning.7` (commits
+`3658dd06c16a679f6336ead5e47003cbd0a99ef9`,
+`c4712d90edb587abb59fc629e12fe9d58f9f5f3b`,
+`c85db81a5949f4d9df123c20382ce745aeaa5053`).
+
+**Boundary of the change:** this verifies caller-supplied categorical
+chains; it does not search for a chain or establish that conversational
+reasoning automatically invokes the new API. Tests were added but have
+not been executed in this environment; correctness remains pending the
+documented Python test and lint checks.
+
 ## 2026-10-22 (late) — Schema drift: v6 state recovered by field surgery
 
 An evening boot found `core_state.bin` unreadable: `schema version
