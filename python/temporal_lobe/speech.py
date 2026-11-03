@@ -2,8 +2,9 @@
 
 This module provides two classes:
 
-  ``Voice`` — text-to-speech (TTS). Uses Piper neural TTS when
-  available (offline, high quality), falling back to espeak-ng.
+  ``Voice`` — text-to-speech (TTS). Uses Android system TTS through
+  Termux:API on Termux, otherwise Piper neural TTS when available,
+  falling back to espeak-ng.
 
   ``VoiceInput`` — speech-to-text (STT). Uses Vosk (offline) when
   a model is installed, falling back to Google Web Speech API.
@@ -155,10 +156,11 @@ def _chunk_text_for_tts(text: str) -> list[str]:
 
 
 class Voice:
-    """Text-to-speech using Piper neural TTS.
+    """Text-to-speech with Termux, Piper, and espeak-ng backends.
 
-    Piper runs entirely offline using ONNX models. If Piper or a
-    voice model isn't available, falls back to espeak-ng.
+    On Termux, Android system TTS is preferred when the Termux:API
+    command is installed. Elsewhere, Piper runs offline using ONNX
+    models, with espeak-ng as a fallback.
     """
 
     def __init__(self) -> None:
