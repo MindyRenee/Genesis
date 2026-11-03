@@ -266,11 +266,12 @@ def test_sleep_stage_override_drives_nrem_waves():
     assert n2.dominant == BrainWave.THETA, "N2 background is theta-dominant"
     assert n2.powers[BrainWave.SIGMA] > n3.powers[BrainWave.SIGMA]
     assert n3.dominant == BrainWave.DELTA, "N3 is slow-wave dominant"
-    # Without the override the same summary reads as N3.
+    # Without a tracker, explicit NREM defaults conservatively to N1;
+    # arousal alone cannot identify N2 or N3.
     from thalamus.brain_waves import reset_oscillator
 
     reset_oscillator()
-    assert assess_brain_waves(summary).dominant == BrainWave.DELTA
+    assert assess_brain_waves(summary).dominant == BrainWave.THETA
     reset_oscillator()
 
 
@@ -930,7 +931,7 @@ def test_beta_subbands_distinct():
 def test_n2_sleep_has_sigma():
     """N2 sleep has sigma band (sleep spindles)."""
     summary = _make_summary(arousal=0.25, phase=PHASE_NREM)
-    state = assess_brain_waves(summary)
+    state = assess_brain_waves(summary, SleepStage.N2)
     assert state.powers[BrainWave.SIGMA] > 0.1
 
 
@@ -947,7 +948,7 @@ def test_waking_no_sigma():
 def test_deep_sleep_has_infraslow():
     """Deep sleep (N3) has infraslow activity."""
     summary = _make_summary(arousal=0.1, phase=PHASE_NREM)
-    state = assess_brain_waves(summary)
+    state = assess_brain_waves(summary, SleepStage.N3)
     assert state.powers[BrainWave.INFRASLOW] > 0.03
 
 
@@ -961,7 +962,7 @@ def test_waking_has_infraslow():
 def test_n3_has_epsilon():
     """N3 sleep has epsilon (HFO) activity — sharp wave-ripples."""
     summary = _make_summary(arousal=0.1, phase=PHASE_NREM)
-    state = assess_brain_waves(summary)
+    state = assess_brain_waves(summary, SleepStage.N3)
     assert state.powers[BrainWave.EPSILON] > 0.01
 
 
