@@ -35,10 +35,11 @@ def test_bridge_uses_existing_topic_vectors_and_updates_self_apex():
     assert apex.domain is WorldDomain.SELF
     assert apex.time_s == 0.0
     assert apex.causes[0].startswith("world:arc:")
-    assert bridge.manifold.hologram.plastic_state == (
-        complex(0.05, 0.0),
-        complex(0.1, 0.0),
-        complex(0.15, 0.0),
+    np.testing.assert_allclose(
+        bridge.manifold.hologram.plastic_state,
+        (0.05 + 0j, 0.1 + 0j, 0.15 + 0j),
+        rtol=1e-12,
+        atol=1e-12,
     )
 
 
