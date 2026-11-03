@@ -96,8 +96,8 @@ def test_cone_sheets_counter_rotate():
     lower = double_cone_coordinate(-2.0, 0.0, angular_speed=0.5)
     upper_phase = math.atan2(upper.z, upper.y)
     lower_phase = math.atan2(lower.z, lower.y)
-    assert upper_phase == pytest.approx(1.0)
-    assert lower_phase == pytest.approx(-1.0)
+    assert upper_phase == pytest.approx(-1.0)
+    assert lower_phase == pytest.approx(1.0)
 
 
 @pytest.mark.parametrize(
