@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Feed Android camera stills into Genesis's full scene-perception pipeline.
+"""Diagnostic adapter for Android frames through Genesis vision perception.
 
-Requires Termux:API and Pillow. This deliberately uses the direct RGB-frame
-entry point rather than the desktop-only shared-memory optic relay.
+Requires Termux:API and Pillow. This process connects to the existing daemon,
+but does not own the running cognitive Mind; it therefore cannot wire the
+Mind-owned concept network, visual cortex, emotion, or brain-wave callbacks.
+Use the in-process Mind path for fully integrated perception.
 
 Example:
     export PYTHONPATH="$PWD:$PWD/python${PYTHONPATH:+:$PYTHONPATH}"
@@ -12,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import tempfile
 import time
@@ -55,8 +58,8 @@ def main() -> int:
     parser.add_argument(
         "--socket-path",
         type=Path,
-        required=True,
-        help="Path to the already-running Genesis daemon socket (required)",
+        default=Path(os.environ["GENESIS_SOCKET"]) if os.environ.get("GENESIS_SOCKET") else None,
+        help="Path to the already-running Genesis daemon socket (or GENESIS_SOCKET)",
     )
     parser.add_argument(
         "--interval",
@@ -77,6 +80,8 @@ def main() -> int:
         help="Per-capture timeout in seconds (default: 30)",
     )
     args = parser.parse_args()
+    if args.socket_path is None:
+        parser.error("--socket-path or GENESIS_SOCKET is required; the Genesis daemon is not optional")
     if args.camera_id < 0 or args.interval < 0 or args.camera_timeout <= 0:
         parser.error("camera-id and interval must be non-negative; camera-timeout must be positive")
     if args.max_frames < 0:
