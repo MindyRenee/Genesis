@@ -68,6 +68,12 @@ math = [
     # (ctx_mp.bitcount, mpnumeric) — keep it below the break.
     "mpmath<1.4",
 ]
+# Differentiable light-cone geometry and adaptive complex fields.
+# Kept optional because prebuilt PyTorch wheels are not available for every
+# platform, including some Android/Termux environments.
+torch = [
+    "torch>=2.6",
+]
 
 [project.scripts]
 genesis = "genesis_cli:_console_main"
