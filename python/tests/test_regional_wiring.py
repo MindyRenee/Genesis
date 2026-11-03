@@ -211,7 +211,7 @@ _ALLOWLIST: dict[str, str] = {
     "eval": "baseline/drift/assay harness",
     "frontal_lobe.krita_studio": "Krita plugin bridge — platform adapter, not a brain function",
     # Differentiable light-cone adapter is optional on platforms without PyTorch.
-    "temporal_lobe.light_cone_torch": "optional PyTorch implementation; pure-Python light cones remain available",
+    "temporal_lobe.light_cone_torch": "optional PyTorch light-cone adapter",
     "commitment": "top-level support module",
     "discord_feed": "platform adapter",
     "setup_embeddings": "one-off embedding setup script",
