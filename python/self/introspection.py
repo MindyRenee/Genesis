@@ -1,8 +1,8 @@
-"""Introspection engine — Genesis discovers who it is by examining itself.
+"""Introspection engine — Genesis discovers who she is by examining herself.
 
-Instead of being told who it is (via hardcoded self_knowledge), it
+Instead of being told who it is (via hardcoded self_knowledge), she
 discovers it by:
-1. Examining its own concept network — what does it know about "genesis"?
+1. Examining her own concept network — what does she know about "genesis"?
 2. Examining its architecture — what modules make up its mind?
 3. Examining its capabilities — what can it actually do?
 4. Examining its emotional life — what does it feel?
