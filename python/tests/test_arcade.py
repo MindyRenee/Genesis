@@ -100,6 +100,13 @@ def test_play_feeds_world_chemistry_waves_and_learns_levels():
     assert memory.effect_rate("ACTION1") > memory.effect_rate("ACTION2")
 
 
+def test_status_distinguishes_unopened_run_from_saved_learning():
+    """Terminal status explains that no official run exists yet."""
+    _, arcade, *_ = _arcade()
+    status = arcade.status()
+    assert "official run: not opened" in status
+    assert "local learning: 0 games remembered, 0 moves retained" in status
+
 def test_memory_survives_the_world_save():
     """What she learned is saved with her world and restored."""
     world, arcade, *_ = _arcade()
