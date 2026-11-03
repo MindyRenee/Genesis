@@ -44,6 +44,7 @@ Commands (typed during conversation):
     /voice-mode  — continuous voice conversation
     /look        — ask it what it sees through the eye
     /look screen — ask it what it sees through the screen nerve
+    /look android — capture a frame through the active Mind's vision
     /look at <path> — ask it to look at an image file
     /draw        — ask it to draw what it feels right now
     /register-face <name> — teach it your face (look at the camera)
@@ -1711,7 +1712,7 @@ def _cmd_look(mind: Mind, rest: str) -> str:
                 confidence=0.6 if scene.status == "ok" else 0.3,
                 metadata={"vision_scene": scene.as_metadata(), "vision_status": scene.status},
             )
-            return f"\\n  genesis> {report or scene.memory_text()}\\n"
+            return f"\n  genesis> {report or scene.memory_text()}\n"
         except Exception as e:  # noqa: BLE001
             logger.warning(f"Android camera look failed: {e}")
             report = mind._render_self_report(
@@ -1719,7 +1720,7 @@ def _cmd_look(mind: Mind, rest: str) -> str:
                 confidence=0.3,
                 metadata={"android_camera_error": str(e)},
             )
-            return f"\\n  genesis> {report or '[Android camera unavailable]'}\\n"
+            return f"\n  genesis> {report or '[Android camera unavailable]'}\n"
     nerve = "optic"
     if rest.lower() == "screen":
         nerve = "screen"
