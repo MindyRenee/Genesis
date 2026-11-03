@@ -343,7 +343,9 @@ def test_polysyllogism_valid_chain_carries_each_conclusion_forward():
 
     result = polysyllogism(
         [
-            SyllogisticStep((mammals_are_animals, dogs_are_mammals), dogs_are_animals),
+            SyllogisticStep(
+                (mammals_are_animals, dogs_are_mammals), dogs_are_animals
+            ),
             SyllogisticStep((dogs_are_animals, no_animals_are_plants), no_dogs_are_plants),
             SyllogisticStep((no_dogs_are_plants, poodles_are_dogs), no_poodles_are_plants),
         ]
@@ -384,7 +386,10 @@ def test_polysyllogism_rejects_disconnected_chain():
         polysyllogism(
             [
                 SyllogisticStep(
-                    (Cat(Quantifier.ALL, "mammal", "animal"), Cat(Quantifier.ALL, "dog", "mammal")),
+                    (
+                        Cat(Quantifier.ALL, "mammal", "animal"),
+                        Cat(Quantifier.ALL, "dog", "mammal"),
+                    ),
                     first_conclusion,
                 ),
                 SyllogisticStep((unrelated_premise, other_premise), unrelated_premise),
