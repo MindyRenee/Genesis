@@ -6,11 +6,15 @@ import pytest
 
 from temporal_lobe.light_cones import (
     ConeCoordinate,
+    ElasticPlasticHologram,
     IntervalKind,
     LightConeModel,
     SpacetimeEvent,
     WorldDomain,
     double_cone_coordinate,
+    light_cone_coordinate,
+    spine_point,
+    time_sunburst_ray,
 )
 
 
@@ -106,3 +110,69 @@ def test_cone_sheets_counter_rotate():
 def test_double_cone_rejects_invalid_parameters(kwargs):
     with pytest.raises(ValueError):
         double_cone_coordinate(**kwargs)
+
+
+def test_light_cone_boundary_is_preserved_under_rotation():
+    speed = 3.0
+    for time_coordinate in (-4.0, -1.0, 1.0, 4.0):
+        point = light_cone_coordinate(
+            time_coordinate,
+            angle=0.37,
+            signal_speed=speed,
+            angular_speed=0.8,
+        )
+        radius_squared = point.y**2 + point.z**2
+        assert radius_squared == pytest.approx((speed * abs(time_coordinate)) ** 2)
+        assert point.x == time_coordinate
+        assert point.sheet == ("upper" if time_coordinate > 0 else "lower")
+
+
+def test_spine_and_horizontal_time_sunburst_share_self_apex():
+    spine = spine_point(2.5)
+    start, endpoint = time_sunburst_ray(0, 8, 10.0)
+    assert (spine.x, spine.y, spine.z) == (0.0, 0.0, 2.5)
+    assert (start.x, start.y, start.z) == (0.0, 0.0, 0.0)
+    assert endpoint.x == pytest.approx(10.0)
+    assert endpoint.y == pytest.approx(0.0)
+    assert endpoint.z == 0.0
+
+
+def test_hologram_separates_temporary_response_from_persistent_learning():
+    field = ElasticPlasticHologram(
+        [0j],
+        elastic_rate=1.0,
+        plastic_rate=0.25,
+    )
+    response = field.observe([4 + 2j])
+    assert response == (4 + 2j,)
+    assert field.plastic_state == (1 + 0.5j,)
+    assert field.elastic_state == (4 + 2j,)
+    relaxed = field.relax(1.0)
+    assert relaxed == field.plastic_state
+
+
+def test_hologram_can_expand_dimensions_without_shrinking():
+    field = ElasticPlasticHologram([1 + 0j], elastic_rate=0.5, plastic_rate=0.0)
+    field.observe([1 + 0j, 2 + 1j, 3 + 0j])
+    assert len(field.plastic_state) == 3
+    field.observe([2 + 0j])
+    assert len(field.plastic_state) == 3
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"elastic_rate": -0.1},
+        {"plastic_rate": 1.1},
+        {"elastic_rate": float("nan")},
+    ],
+)
+def test_hologram_rejects_invalid_learning_rates(kwargs):
+    with pytest.raises(ValueError):
+        ElasticPlasticHologram(**kwargs)
+
+
+def test_hologram_rejects_nonfinite_observations():
+    field = ElasticPlasticHologram()
+    with pytest.raises(ValueError, match="must be finite"):
+        field.observe([complex(float("inf"), 0.0)])
