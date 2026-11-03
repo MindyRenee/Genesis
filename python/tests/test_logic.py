@@ -7,6 +7,7 @@ from frontal_lobe.reasoning.logic import (
     MAX_ATOMS,
     Categorical,
     Quantifier,
+    SyllogisticStep,
     all_of,
     and_,
     atom,
@@ -20,6 +21,7 @@ from frontal_lobe.reasoning.logic import (
     not_,
     or_,
     parse,
+    polysyllogism,
     ramsey,
     revise,
     satisfiable,
@@ -328,3 +330,68 @@ def test_syllogism_requires_three_terms():
             Cat(Quantifier.ALL, "b", "a"),
             Cat(Quantifier.ALL, "a", "b"),
         )
+
+
+def test_polysyllogism_valid_chain_carries_each_conclusion_forward():
+    mammals_are_animals = Cat(Quantifier.ALL, "mammal", "animal")
+    dogs_are_mammals = Cat(Quantifier.ALL, "dog", "mammal")
+    dogs_are_animals = Cat(Quantifier.ALL, "dog", "animal")
+    no_animals_are_plants = Cat(Quantifier.NO, "animal", "plant")
+    no_dogs_are_plants = Cat(Quantifier.NO, "dog", "plant")
+    poodles_are_dogs = Cat(Quantifier.ALL, "poodle", "dog")
+    no_poodles_are_plants = Cat(Quantifier.NO, "poodle", "plant")
+
+    result = polysyllogism(
+        [
+            SyllogisticStep((mammals_are_animals, dogs_are_mammals), dogs_are_animals),
+            SyllogisticStep((dogs_are_animals, no_animals_are_plants), no_dogs_are_plants),
+            SyllogisticStep((no_dogs_are_plants, poodles_are_dogs), no_poodles_are_plants),
+        ]
+    )
+
+    assert result.valid
+    assert result.failed_step is None
+    assert len(result.deductions) == 3
+    assert result.conclusion == no_poodles_are_plants
+
+
+def test_polysyllogism_stops_at_first_invalid_step_with_countermodel():
+    all_a_are_b = Cat(Quantifier.ALL, "a", "b")
+    all_c_are_b = Cat(Quantifier.ALL, "c", "b")
+    incorrectly_claim_all_a_are_c = Cat(Quantifier.ALL, "a", "c")
+    all_d_are_a = Cat(Quantifier.ALL, "d", "a")
+    final_claim = Cat(Quantifier.ALL, "d", "c")
+
+    result = polysyllogism(
+        [
+            SyllogisticStep((all_a_are_b, all_c_are_b), incorrectly_claim_all_a_are_c),
+            SyllogisticStep((incorrectly_claim_all_a_are_c, all_d_are_a), final_claim),
+        ]
+    )
+
+    assert not result.valid
+    assert result.failed_step == 1
+    assert len(result.deductions) == 1
+    assert result.deductions[0].countermodel is not None
+
+
+def test_polysyllogism_rejects_disconnected_chain():
+    first_conclusion = Cat(Quantifier.ALL, "dog", "animal")
+    unrelated_premise = Cat(Quantifier.ALL, "bird", "feathered")
+    other_premise = Cat(Quantifier.ALL, "bird", "animal")
+
+    with pytest.raises(ValueError, match="preceding conclusion"):
+        polysyllogism(
+            [
+                SyllogisticStep(
+                    (Cat(Quantifier.ALL, "mammal", "animal"), Cat(Quantifier.ALL, "dog", "mammal")),
+                    first_conclusion,
+                ),
+                SyllogisticStep((unrelated_premise, other_premise), unrelated_premise),
+            ]
+        )
+
+
+def test_polysyllogism_rejects_empty_chain():
+    with pytest.raises(ValueError, match="at least one step"):
+        polysyllogism([])
