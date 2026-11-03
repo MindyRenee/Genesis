@@ -393,8 +393,10 @@ class Vision:
         if self._available is None:
             try:
                 img = latest_frame(copy=True)
-                self._available = (img is not None and img.size > 0) or (
-                    nerve == "optic" and shutil.which("termux-camera-photo") is not None
+                self._available = (
+                    (img is not None and img.size > 0)
+                    or latest_stream_frame() is not None
+                    or (nerve == "optic" and shutil.which("termux-camera-photo") is not None)
                 )
             except (OSError, FileNotFoundError) as e:
                 # No frame on disk — no camera, or the body's eye is
