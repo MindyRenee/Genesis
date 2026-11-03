@@ -55,10 +55,17 @@ _APOSTROPHES = str.maketrans({"\u2018": "'", "\u2019": "'", "\u02bc": "'", "\u20
 # joined by apostrophes so contractions survive as single tokens.
 _WORD_RE = re.compile(r"[^\W_]+(?:'[^\W_]+)*")
 
-# Fallback sentence boundary when NLTK's punkt model is unavailable:
-# sentence-final punctuation followed by whitespace. It cannot see
-# abbreviations or ellipsis — the real segmenter is preferred.
+# Fallback sentence boundary when NLTK's Punkt model is unavailable.
+# Protect common abbreviations before splitting so "Dr. Smith" remains
+# one sentence fragment. This is deliberately a small deterministic
+# fallback, not a replacement for a trained sentence segmenter.
 _SENTENCE_FALLBACK_RE = re.compile(r"(?<=[.!?])\s+")
+_SENTENCE_ABBREVIATIONS = re.compile(
+    r"\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|etc|e\.g|i\.e|"
+    r"Fig|No|Inc|Ltd|Co|approx|Dept|Univ)\.",
+    re.IGNORECASE,
+)
+_SENTENCE_INITIAL_RE = re.compile(r"\b([A-Z])\.")
 
 
 def canon_text(text: str) -> str:
@@ -128,4 +135,17 @@ def sentences(text: str) -> list[str]:
 
         return sent_tokenize(text)
     except (ImportError, LookupError):
-        return [s for s in _SENTENCE_FALLBACK_RE.split(text) if s]
+        # Replace abbreviation periods with a private-use marker while
+        # splitting, then restore them. A private-use code point avoids
+        # changing normal visible text or confusing punctuation handling.
+        marker = "\\ue000"
+        protected = _SENTENCE_ABBREVIATIONS.sub(
+            lambda match: match.group(0)[:-1] + marker,
+            text,
+        )
+        protected = _SENTENCE_INITIAL_RE.sub(
+            lambda match: match.group(1) + marker,
+            protected,
+        )
+        parts = _SENTENCE_FALLBACK_RE.split(protected)
+        return [part.replace(marker, ".") for part in parts if part]
