@@ -381,3 +381,93 @@ class ElasticPlasticHologram:
             "elastic_rate": self.elastic_rate,
             "plastic_rate": self.plastic_rate,
         }
+
+
+class AdaptiveLightConeManifold:
+    """Coordinate causal events, the shared Self apex, and adaptive field state.
+
+    Every non-Self event is recorded and then produces a same-time Self
+    integration event whose causes reference the experience. Event time must
+    be monotonic relative to the current Self apex. This is a software feedback
+    mechanism, not evidence of consciousness or physical relativistic behavior.
+    """
+
+    def __init__(
+        self,
+        *,
+        signal_speed: float = 1.0,
+        angular_speed: float = 0.0,
+        elastic_rate: float = 0.5,
+        plastic_rate: float = 0.05,
+    ) -> None:
+        if not math.isfinite(angular_speed):
+            raise ValueError("angular_speed must be finite")
+        self.causal_model = LightConeModel(signal_speed=signal_speed)
+        self.angular_speed = angular_speed
+        self.hologram = ElasticPlasticHologram(
+            elastic_rate=elastic_rate,
+            plastic_rate=plastic_rate,
+        )
+        self._experience_count = 0
+
+    @property
+    def apex(self) -> SpacetimeEvent | None:
+        """Current shared Self/Identity integration event."""
+        return self.causal_model.apex
+
+    def surface_point(self, time_coordinate: float, angle: float) -> ConeCoordinate:
+        """Project onto the future/past light-cone boundary."""
+        return light_cone_coordinate(
+            time_coordinate,
+            angle,
+            signal_speed=self.causal_model.signal_speed,
+            angular_speed=self.angular_speed,
+        )
+
+    def process_experience(
+        self,
+        event: SpacetimeEvent,
+        latent_values: Iterable[complex],
+    ) -> tuple[SpacetimeEvent, tuple[complex, ...]]:
+        """Encode an experience and feed its result back into the Self apex.
+
+        The supplied event is retained in its own domain. A non-Self event
+        generates a Self event at the same timestamp and position, linked via
+        its causes field. The latent field is updated before event mutation so
+        invalid observations do not partially advance the causal timeline.
+        """
+        if self.causal_model.get_event(event.event_id) is not None:
+            raise ValueError(f"event already exists: {event.event_id}")
+        current_apex = self.causal_model.apex
+        if current_apex is not None and event.time_s < current_apex.time_s:
+            raise ValueError("experience time cannot precede the current Self apex")
+
+        response = self.hologram.observe(latent_values)
+        self.causal_model.add_event(event)
+        if event.domain is WorldDomain.SELF:
+            self_event = event
+        else:
+            self_event = SpacetimeEvent(
+                event_id=f"self-feedback:{event.event_id}",
+                time_s=event.time_s,
+                position=event.position,
+                domain=WorldDomain.SELF,
+                confidence=event.confidence,
+                causes=(event.event_id,),
+            )
+            self.causal_model.advance_apex(self_event)
+        self._experience_count += 1
+        return self_event, response
+
+    def summary(self) -> dict[str, object]:
+        """Expose structural diagnostics without latent field contents."""
+        return {
+            "apex_id": None if self.apex is None else self.apex.event_id,
+            "experience_count": self._experience_count,
+            "causal": self.causal_model.state_summary(),
+            "hologram": self.hologram.summary(),
+            "rotation_rate": self.angular_speed,
+            "time_axis": "horizontal",
+            "spine_axis": "vertical",
+            "surface": "open_future_past_light_cones",
+        }
