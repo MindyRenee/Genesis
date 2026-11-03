@@ -151,6 +151,18 @@ def test_sight_and_observation_adapter(tmp_path):
     )
     board = board_from_observation(obs)
     assert board is not None and board.actions == ["ACTION1", "ACTION6"]
+    import numpy as np
+
+    array_obs = SimpleNamespace(
+        frame=np.asarray([grid]),
+        state=SimpleNamespace(value="NOT_FINISHED"),
+        levels_completed=0,
+        win_levels=3,
+        available_actions=[1, 6],
+        game_id="array-game",
+    )
+    array_board = board_from_observation(array_obs)
+    assert array_board is not None and array_board.grid == grid
 
 
 def test_game_memory_roundtrip():
