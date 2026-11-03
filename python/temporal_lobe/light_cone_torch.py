@@ -55,7 +55,11 @@ class TorchLightConeField(nn.Module):
             raise ValueError("elastic_rate must be in [0, 1]")
         if not 0.0 <= plastic_rate <= 1.0:
             raise ValueError("plastic_rate must be in [0, 1]")
-        if isinstance(initial_dimensions, bool) or not isinstance(initial_dimensions, int) or initial_dimensions < 0:
+        if (
+            isinstance(initial_dimensions, bool)
+            or not isinstance(initial_dimensions, int)
+            or initial_dimensions < 0
+        ):
             raise ValueError("initial_dimensions must be a non-negative integer")
 
         self.log_signal_speed = nn.Parameter(
