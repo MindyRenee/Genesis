@@ -88,14 +88,12 @@ def test_double_cone_has_shared_apex_and_straight_time_axis():
 
 
 def test_cone_sheets_counter_rotate():
-    upper_a = double_cone_coordinate(2.0, 0.0, angular_speed=0.5)
-    upper_b = double_cone_coordinate(2.0, 0.2, angular_speed=0.5)
-    lower_a = double_cone_coordinate(-2.0, 0.0, angular_speed=0.5)
-    lower_b = double_cone_coordinate(-2.0, 0.2, angular_speed=0.5)
-    upper_delta = math.atan2(upper_b.y, upper_b.x) - math.atan2(upper_a.y, upper_a.x)
-    lower_delta = math.atan2(lower_b.y, lower_b.x) - math.atan2(lower_a.y, lower_a.x)
-    assert upper_delta == pytest.approx(0.2)
-    assert lower_delta == pytest.approx(0.2)
+    upper = double_cone_coordinate(2.0, 0.0, angular_speed=0.5)
+    lower = double_cone_coordinate(-2.0, 0.0, angular_speed=0.5)
+    upper_phase = math.atan2(upper.y, upper.x)
+    lower_phase = math.atan2(lower.y, lower.x)
+    assert upper_phase == pytest.approx(1.0)
+    assert lower_phase == pytest.approx(-1.0)
 
 
 @pytest.mark.parametrize(
