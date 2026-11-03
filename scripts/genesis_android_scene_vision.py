@@ -6,7 +6,7 @@ entry point rather than the desktop-only shared-memory optic relay.
 
 Example:
     export PYTHONPATH="$PWD:$PWD/python${PYTHONPATH:+:$PYTHONPATH}"
-    python scripts/genesis_android_scene_vision.py --camera-id 1 --interval 10
+    python scripts/genesis_android_scene_vision.py --socket-path "$GENESIS_SOCKET" --camera-id 1 --interval 10
 """
 from __future__ import annotations
 
@@ -55,8 +55,8 @@ def main() -> int:
     parser.add_argument(
         "--socket-path",
         type=Path,
-        default=None,
-        help="Optional path to the already-running Genesis daemon socket",
+        required=True,
+        help="Path to the already-running Genesis daemon socket (required)",
     )
     parser.add_argument(
         "--interval",
@@ -82,28 +82,26 @@ def main() -> int:
     if args.max_frames < 0:
         parser.error("max-frames must be non-negative")
 
-    client = None
-    if args.socket_path is not None:
-        # Connect to the existing daemon only. This script never starts or
-        # shuts down a daemon, and it never constructs a second Mind.
-        from genesis_client import GenesisClient
+    # This adapter must use Genesis's already-running daemon. It never starts
+    # or shuts down a daemon, and it never constructs a second Mind.
+    from genesis_client import GenesisClient
 
-        client = GenesisClient(str(args.socket_path))
-        try:
-            client.connect()
-        except Exception as exc:
-            print(
-                json.dumps(
-                    {
-                        "event": "daemon_connection_error",
-                        "socket_path": str(args.socket_path),
-                        "error": str(exc),
-                    },
-                    ensure_ascii=False,
-                ),
-                flush=True,
-            )
-            return 2
+    client = GenesisClient(str(args.socket_path))
+    try:
+        client.connect()
+    except Exception as exc:
+        print(
+            json.dumps(
+                {
+                    "event": "daemon_connection_error",
+                    "socket_path": str(args.socket_path),
+                    "error": str(exc),
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+        return 2
 
     vision = Vision()
     successful = 0
@@ -114,7 +112,7 @@ def main() -> int:
             {
                 "event": "started",
                 "pipeline": "Vision.see_frame",
-                "daemon_connected": client is not None,
+                "daemon_connected": True,
                 "camera_id": args.camera_id,
                 "interval_s": args.interval,
                 "max_frames": args.max_frames,
