@@ -465,18 +465,18 @@ def test_nrem_phase_high_arousal_n1():
     assert stage == SleepStage.N1
 
 
-def test_nrem_phase_mid_arousal_n2():
-    """NREM phase with mid arousal → N2."""
+def test_nrem_phase_mid_arousal_defaults_n1():
+    """NREM phase alone cannot establish N2 depth."""
     summary = _make_summary(arousal=0.25, phase=PHASE_NREM)
     stage = _sleep_stage_from_summary(summary)
-    assert stage == SleepStage.N2
+    assert stage == SleepStage.N1
 
 
-def test_nrem_phase_low_arousal_n3():
-    """NREM phase with low arousal → N3 (deepest)."""
+def test_nrem_phase_low_arousal_defaults_n1():
+    """Low arousal alone cannot establish N3 depth."""
     summary = _make_summary(arousal=0.10, phase=PHASE_NREM)
     stage = _sleep_stage_from_summary(summary)
-    assert stage == SleepStage.N3
+    assert stage == SleepStage.N1
 
 
 def test_rem_phase_returns_rem():
