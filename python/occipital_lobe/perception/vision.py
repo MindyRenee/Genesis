@@ -92,6 +92,7 @@ from ..epipolar import EpipolarProcessor, TwoViewReport
 from . import illumination, optics
 from .phototransduction import PhototransductionCascade, PhototransductionState
 from .recognition import FaceRecognizer
+from .android_stream import ensure_stream_server, latest_stream_frame
 
 if TYPE_CHECKING:
     from limbic_system.emotion import EmotionalState
@@ -385,6 +386,10 @@ class Vision:
             except OSError:
                 return False
             return True
+        # The native companion app publishes a continuous Camera2 stream
+        # to loopback. Start the receiver lazily from the existing vision
+        # object; no second perception pipeline is created.
+        ensure_stream_server()
         if self._available is None:
             try:
                 img = latest_frame(copy=True)
@@ -640,6 +645,19 @@ class Vision:
         try:
             frame = latest_frame(copy=True, name=NERVE_SEGMENTS.get(nerve, nerve))
             if frame is None and nerve == "optic":
+                # Prefer the continuous native Camera2 stream. A stale or
+                # disconnected stream is ignored; still capture remains a
+                # compatibility fallback for installations without the app.
+                android_rgb = latest_stream_frame()
+                if android_rgb is not None:
+                    return self.see_frame(
+                        android_rgb,
+                        client=client,
+                        emotion=emotion,
+                        network=network,
+                        mirror=mirror,
+                        nerve="optic",
+                    )
                 android_rgb = self._capture_android_frame()
                 if android_rgb is not None:
                     return self.see_frame(
