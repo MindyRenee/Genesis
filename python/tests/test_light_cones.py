@@ -124,7 +124,7 @@ def test_light_cone_boundary_is_preserved_under_rotation():
         radius_squared = point.y**2 + point.z**2
         assert radius_squared == pytest.approx((speed * abs(time_coordinate)) ** 2)
         assert point.x == time_coordinate
-        assert point.sheet == ("upper" if time_coordinate > 0 else "lower")
+        assert point.sheet == ("future" if time_coordinate > 0 else "past")
 
 
 def test_spine_and_horizontal_time_sunburst_share_self_apex():
