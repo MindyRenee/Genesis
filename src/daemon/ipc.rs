@@ -483,10 +483,37 @@ pub mod cmd {
     /// Additive: PROTOCOL_VERSION is unaffected.
     pub const GET_INTERNALS: u8 = 51;
 
-    // Wire numbers 52, 53, 54 and 57 belonged to the optic nerve
-    // (GET_OPTIC_STATE, SET_OPTIC_GAIN, SET_FOCUS, SET_LID) and are
-    // retired with it. Retired — never reuse these numbers. Any
-    // request carrying them is answered UNKNOWN_COMMAND.
+    /// The optic nerve's subcortical channel state — the body's own
+    /// read of the retinal segment, not the mind's: photopic and
+    /// melanopic irradiance, motion energy, the collicular orienting
+    /// transient, the SCN light drive it is currently feeding the
+    /// oscillator, and the thalamic relay gate the mind must honour
+    /// (it approaches 0 in NREM — sensory transmission is blocked at
+    /// the thalamus, so a `see` during sleep is a blind look).
+    /// Response: `[u8 ack]` then `optic_nerve::OpticState::to_wire`
+    /// (58 bytes, fixed layout — additive tail: a daemon that predates
+    /// the pupil/lens/lid fields sends the shorter body and the mind
+    /// reads them as unreported). A daemon that has never seen a frame
+    /// still answers — the eye_absent flag is a reading, not an error.
+    /// Additive: PROTOCOL_VERSION is unaffected.
+    pub const GET_OPTIC_STATE: u8 = 52;
+
+    /// Corticothalamic feedback — the mind's engagement gain onto the
+    /// thalamic relay, the layer-6 V1→dLGN projection. Modulatory
+    /// only: it scales the relay within ±40% and can never open a
+    /// gate the sleep stage has closed. Request: `[f32 gain]` in
+    /// [0, 1] (0.5 = neutral). Response: `[u8 ack]` (1) or
+    /// `PAYLOAD_TOO_SHORT`. Additive: PROTOCOL_VERSION unaffected.
+    pub const SET_OPTIC_GAIN: u8 = 53;
+
+    /// Accommodation — the mind's focus request in metres. The body
+    /// converts it to the ciliary drive (`1/m` dioptres, clamped to
+    /// [0, 6] — infinity to a ~17 cm near point) and slews toward it
+    /// on the advance clock; non-positive/non-finite distances relax
+    /// to infinity. Monocular: no vergence component. Request:
+    /// `[f32 meters]`. Response: `[u8 ack]` (1) or
+    /// `PAYLOAD_TOO_SHORT`. Additive: PROTOCOL_VERSION unaffected.
+    pub const SET_FOCUS: u8 = 54;
 
     /// Structural code analysis — the daemon's code sense. Request:
     /// `[u16 path_len][path utf-8][u32 source_len][source utf-8]`.
@@ -504,6 +531,12 @@ pub mod cmd {
     /// corpse. Request: `[u32 pid]`. Response: `[u8 ack]` (1) or
     /// `PAYLOAD_TOO_SHORT`. Additive: PROTOCOL_VERSION unaffected.
     pub const SET_COGNITIVE_PID: u8 = 56;
+
+    /// The mind's voluntary eyelid openness [0, 1] — the orbicularis
+    /// oculi the camera hardware lacks. Composes with the sleep
+    /// phase's own lid position by `min`: the will can shut an open
+    /// eye but cannot open one the stage has closed.
+    pub const SET_LID: u8 = 57;
 
     /// Deep recall — SimHash similarity scan over the *archived* tier
     /// of LTM. Sleep compression retires low-salience episodes to the
@@ -4504,6 +4537,89 @@ where
                 let mut resp = vec![1u8];
                 resp.extend_from_slice(out.as_bytes());
                 resp
+            }
+
+            cmd::GET_OPTIC_STATE => {
+                // The optic nerve's subcortical channels — the body's
+                // measured read of the retinal segment plus the
+                // thalamic relay gate. Held by the TickLoop (it samples
+                // the nerve inside the advance), so this lives on the
+                // reactive path. An eye that has never produced a frame
+                // still answers — absent is a reading, not an error.
+                let now_ms = super::tick::current_ms();
+                let state = match tick_loop.lock() {
+                    Ok(tl) => tl.optic_state(now_ms),
+                    Err(e) => {
+                        eprintln!("[ipc] GET_OPTIC_STATE: tick_loop poisoned: {e}");
+                        return vec![error::INTERNAL_ERROR];
+                    }
+                };
+                let mut resp = vec![1u8];
+                resp.extend_from_slice(&state.to_wire());
+                resp
+            }
+
+            cmd::SET_OPTIC_GAIN => {
+                // Corticothalamic feedback — the mind's layer-6 gain
+                // onto the thalamic relay. Modulatory only; the nerve
+                // clamps it into [0, 1] and the sleep stage still owns
+                // the gate it multiplies.
+                if payload.len() < 4 {
+                    return vec![error::PAYLOAD_TOO_SHORT];
+                }
+                let gain = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
+                match tick_loop.lock() {
+                    Ok(mut tl) => {
+                        tl.set_optic_gain(gain);
+                        vec![1u8]
+                    }
+                    Err(e) => {
+                        eprintln!("[ipc] SET_OPTIC_GAIN: tick_loop poisoned: {e}");
+                        vec![error::INTERNAL_ERROR]
+                    }
+                }
+            }
+
+            cmd::SET_FOCUS => {
+                // The mind's focus request in metres — the ciliary
+                // muscle's drive toward `1/m` dioptres. Bounded and
+                // non-negative by construction on the nerve side.
+                if payload.len() < 4 {
+                    return vec![error::PAYLOAD_TOO_SHORT];
+                }
+                let meters = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
+                match tick_loop.lock() {
+                    Ok(mut tl) => {
+                        tl.set_focus(meters);
+                        vec![1u8]
+                    }
+                    Err(e) => {
+                        eprintln!("[ipc] SET_FOCUS: tick_loop poisoned: {e}");
+                        vec![error::INTERNAL_ERROR]
+                    }
+                }
+            }
+
+            cmd::SET_LID => {
+                // The mind's voluntary lid — orbicularis oculi for
+                // the eye the hardware lacks. The nerve clamps it
+                // into [0, 1] and composes it with the phase lid by
+                // min: will can shut an open eye, never open a
+                // sleeping one.
+                if payload.len() < 4 {
+                    return vec![error::PAYLOAD_TOO_SHORT];
+                }
+                let openness = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
+                match tick_loop.lock() {
+                    Ok(mut tl) => {
+                        tl.set_lid(openness);
+                        vec![1u8]
+                    }
+                    Err(e) => {
+                        eprintln!("[ipc] SET_LID: tick_loop poisoned: {e}");
+                        vec![error::INTERNAL_ERROR]
+                    }
+                }
             }
 
             // Delegate all other commands to the default handler.

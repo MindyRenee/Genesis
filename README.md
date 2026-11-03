@@ -281,6 +281,7 @@ the industry will notice that it does.
 │    ├─ active inference (generative self-model)            │
 │    ├─ operator affective coupling                         │
 │    ├─ interoception (hardware sensors → neurochemistry)   │
+│    ├─ optic nerve (camera → subcortical channels)         │
 │    ├─ field probe (measured substrate ↔ model phase lock) │
 │    ├─ structural code sense (syn AST → analysis report)   │
 │    └─ body recommendation (published; the mind applies)   │

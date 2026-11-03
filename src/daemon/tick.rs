@@ -295,6 +295,12 @@ pub struct TickLoop {
     /// watch (it *should* be heartbeating); an absent mind drifts the
     /// check toward 5 min — the autonomous loop marks its own.
     staleness_gate: super::adaptive::AdaptiveGate,
+    /// Optic nerve — the retinal afferent's subcortical termination:
+    /// SCN light drive, collicular alerting, and the TRN relay gate
+    /// the mind honours. Sampled once per advance (afference to that
+    /// step, like the network levels read inside it — not a gated
+    /// maintenance task).
+    pub optic: super::optic_nerve::OpticNerve,
 }
 
 impl TickLoop {
@@ -322,6 +328,7 @@ impl TickLoop {
             dream_gate: super::adaptive::AdaptiveGate::new(4_000, 2_000, 30_000),
             sync_gate: super::adaptive::AdaptiveGate::new(20_000, 5_000, 100_000),
             staleness_gate: super::adaptive::AdaptiveGate::new(60_000, 10_000, 300_000),
+            optic: super::optic_nerve::OpticNerve::new(),
         }
     }
 
@@ -365,6 +372,7 @@ impl TickLoop {
             dream_gate: super::adaptive::AdaptiveGate::new(4_000, 2_000, 30_000),
             sync_gate: super::adaptive::AdaptiveGate::new(20_000, 5_000, 100_000),
             staleness_gate: super::adaptive::AdaptiveGate::new(60_000, 10_000, 300_000),
+            optic: super::optic_nerve::OpticNerve::new(),
         }
     }
 
@@ -457,6 +465,25 @@ impl TickLoop {
                 let _ = writeln!(out, "field.integration=absent");
             }
         }
+        let optic = self.optic.state(now_ms);
+        let _ = writeln!(out, "optic.eye_present={}", optic.eye_present as u8);
+        let _ = writeln!(out, "optic.frames_fresh={}", optic.frames_fresh as u8);
+        let _ = writeln!(out, "optic.illuminance={:.4}", optic.illuminance);
+        let _ = writeln!(out, "optic.melanopic={:.4}", optic.melanopic);
+        let _ = writeln!(out, "optic.motion={:.4}", optic.motion);
+        let _ = writeln!(out, "optic.orienting={:.4}", optic.orienting);
+        let _ = writeln!(out, "optic.relay_gain={:.4}", optic.relay_gain);
+        let _ = writeln!(out, "optic.cortical_gain={:.4}", optic.cortical_gain);
+        let _ = writeln!(out, "optic.retinal_lux={:.1}", optic.retinal_lux);
+        let _ = writeln!(out, "optic.frame_seq={}", optic.frame_seq);
+        let _ = writeln!(out, "optic.frame_age_ms={}", optic.frame_age_ms);
+        let _ = writeln!(out, "optic.pupil_mm={:.2}", optic.pupil_mm);
+        let _ = writeln!(
+            out,
+            "optic.accommodation_dpt={:.2}",
+            optic.accommodation_dpt
+        );
+        let _ = writeln!(out, "optic.lid={:.2}", self.optic.lid());
         for (name, gate) in [
             ("intero", &self.intero_gate),
             ("cpufreq", &self.cpufreq_gate),
@@ -586,6 +613,15 @@ impl TickLoop {
         neuro_params.maturation_level =
             super::hpa_development::hpa_competence(elapsed_secs, ltm_count);
         neuro_params.noise_seed = self.tick_count;
+        // Retinal illuminance for acute melatonin suppression — the
+        // same retinohypothalamic channel that entrains the clock. An
+        // absent or dark eye is darkness: nothing suppressed.
+        self.optic.sample(now_ms);
+        neuro_params.light_lux = self
+            .optic
+            .retinal_lux(now_ms)
+            .map(|lux| lux as f32)
+            .unwrap_or(0.0);
         // Apply the metaplasticity boost from the last inference cycle.
         // High surprise → faster coupling-matrix learning (the system
         // learns how to learn faster when its predictions fail).
@@ -1214,6 +1250,31 @@ impl TickLoop {
         TICK_INTERVAL_MS as f32 / 1000.0
     }
 
+    /// The optic nerve's current channel state — the measured retinal
+    /// signals and the thalamic gate — for `GET_OPTIC_STATE`.
+    pub fn optic_state(&self, now_ms: u64) -> super::optic_nerve::OpticState {
+        self.optic.state(now_ms)
+    }
+
+    /// The mind's corticothalamic feedback onto the thalamic relay —
+    /// layer-6 V1→dLGN attention gain, modulatory only (`SET_OPTIC_GAIN`).
+    pub fn set_optic_gain(&mut self, gain: f32) {
+        self.optic.set_cortical_gain(gain);
+    }
+
+    /// The mind's focus request in metres — the ciliary muscle's
+    /// drive toward `1/m` dioptres (`SET_FOCUS`).
+    pub fn set_focus(&mut self, meters: f32) {
+        self.optic.set_focus_m(meters);
+    }
+
+    /// The mind's voluntary lid openness — orbicularis oculi the
+    /// hardware lacks (`SET_LID`). Composes with the phase lid by
+    /// `min`: will can shut an open eye, never open a sleeping one.
+    pub fn set_lid(&mut self, openness: f32) {
+        self.optic.set_lid(openness);
+    }
+
     /// Advance neurochemical dynamics by dt, run active inference,
     /// and update the dyadic model. This is the core "physics
     /// integration" step — it advances the coupled differential
@@ -1239,6 +1300,12 @@ impl TickLoop {
         // Read pre-tick state for sleep-tuned parameters.
         let pre_snapshot = mmap.read_consistent();
 
+        // The optic nerve's subcortical branches sample the retinal
+        // segment — SCN illuminance, collicular transients — so the
+        // afference fed into this advance describes the same instant
+        // as the chemistry it rides beside. An absent or stalled eye
+        // is the documented no-vision condition, never a fault.
+        self.optic.sample(now_ms);
         let is_sleeping_pre = pre_snapshot.as_ref().is_some_and(|s| {
             let p = s.zones.phase();
             p == MentalPhase::NREM || p == MentalPhase::REM
@@ -1278,6 +1345,13 @@ impl TickLoop {
         neuro_params.maturation_level =
             super::hpa_development::hpa_competence(elapsed_secs, ltm_count);
         neuro_params.noise_seed = self.tick_count;
+        // Acute melatonin suppression rides the same retinal sample
+        // the sleep network entrains on — the eye was sampled above.
+        neuro_params.light_lux = self
+            .optic
+            .retinal_lux(now_ms)
+            .map(|lux| lux as f32)
+            .unwrap_or(0.0);
 
         // Metaplasticity boost from last inference cycle.
         if self.metaplasticity_boost > 1.0 {
@@ -1331,12 +1405,13 @@ impl TickLoop {
                 // drive at saturation.
                 state.sleep_network[4] = crate::state::sleep_network::h_from_adenosine(adn);
                 let t = clock_start + f64::from(i) * sub_dt_min;
-                // No retinal afference: with no eye, the built-in
-                // photoperiod entrains the oscillator and no visual
-                // transient alerts LC.
-                let aff = crate::state::sleep_network::VisualAfference::default();
+                // The optic nerve's afference enters per sub-step:
+                // retinal light drives the SCN continuously, and the
+                // collicular pulse fires only while LC sits below the
+                // wake threshold — a wake-up call, not a bias.
+                let aff = self.optic.afference(now_ms, state.sleep_network[0]);
                 // The humoral alerting input: the stress axis speaks to
-                // the network through the same LC channel —
+                // the network through the same LC channel the eye uses —
                 // circulating cortisol above the basal floor arouses the
                 // LC/NE system (the waking side of the diurnal surge, and
                 // the path by which nocturnal stress elevation fragments
@@ -1393,6 +1468,27 @@ impl TickLoop {
             .as_ref()
             .map(|s| s.neurochemicals.effective_levels)
             .unwrap_or(pre_effective);
+
+        // The thalamic relay gate follows the stage the network just
+        // settled into — NREM blocks transmission at the thalamus, REM
+        // nearly so, waking phases pass it through (modulated by the
+        // mind's corticothalamic feedback). The mind reads the gate
+        // over GET_OPTIC_STATE; its V1 cannot see around a closed one.
+        // The same advance steps the pupil: the light reflex off the
+        // nerve's own illuminance plus the sympathetic dilation that
+        // effective norepinephrine carries — the aperture is body
+        // state, integrated here where the chemistry it rides lives.
+        if let Some(snap) = post_snapshot.as_ref() {
+            self.optic.update_gate(snap.zones.phase());
+            self.optic.update_pupil(
+                now_ms,
+                snap.neurochemicals.effective_levels
+                    [crate::state::neurochemical::NeurochemicalId::Norepinephrine as usize],
+            );
+        }
+        // The ciliary state slews on the same clock — it needs no
+        // chemistry, only elapsed time toward the requested power.
+        self.optic.update_accommodation(now_ms);
 
         let baselines = post_snapshot
             .as_ref()
