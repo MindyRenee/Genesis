@@ -80,7 +80,8 @@ class ConeCoordinate:
     """A point on a counter-rotating double-cone view.
 
     x is the displayed time-axis coordinate, horizontal through the origin.
-    y and z are transverse coordinates around that axis.
+    y and z are transverse spatial coordinates. Because x is time, positive
+    time is the future sheet and negative time is the past sheet.
     """
 
     x: float
@@ -99,9 +100,9 @@ def double_cone_coordinate(
     """Map a parameter to a double-cone sheet with opposite rotation.
 
     Time runs horizontally along x through the shared origin. Positive time
-    occupies the upper sheet (counterclockwise around +x); negative time
-    occupies the lower sheet (clockwise). Radius grows linearly with distance
-    from the apex.
+    occupies the future sheet; negative time occupies the past sheet. Their
+    angular phases evolve in opposite directions when measured outward from
+    the apex. Radius grows linearly with distance from the apex.
     """
     values = (time_coordinate, angle, angular_speed, radial_scale)
     if not all(math.isfinite(value) for value in values):
@@ -119,7 +120,7 @@ def double_cone_coordinate(
         x=time_coordinate,
         y=radius * math.cos(phase),
         z=radius * math.sin(phase),
-        sheet="upper" if sign > 0 else "lower",
+        sheet="future" if sign > 0 else "past",
     )
 
 
