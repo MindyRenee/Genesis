@@ -44,7 +44,6 @@ Commands (typed during conversation):
     /voice-mode  — continuous voice conversation
     /look        — ask it what it sees through the eye
     /look screen — ask it what it sees through the screen nerve
-    /look android — capture a frame through the active Mind's vision
     /look at <path> — ask it to look at an image file
     /draw        — ask it to draw what it feels right now
     /register-face <name> — teach it your face (look at the camera)
@@ -84,7 +83,6 @@ import shutil
 import signal
 import socket
 import subprocess
-import tempfile
 import sys
 import threading
 import time
@@ -1677,50 +1675,8 @@ def _cmd_look(mind: Mind, rest: str) -> str:
     """Ask Genesis to look at an image file or through its eye."""
     # /look at <path> — look at an image file
     # /look screen  — look through the screen-capture nerve
-    # /look android — capture one Termux camera frame through this Mind's vision
     # /look         — look through the optic nerve
     rest = rest.strip()
-    if rest.lower() == "android":
-        try:
-            import numpy as np
-            from PIL import Image
-
-            with tempfile.TemporaryDirectory(prefix="genesis-android-look-") as temp_dir:
-                image_path = Path(temp_dir) / "frame.jpg"
-                captured = subprocess.run(
-                    ["termux-camera-photo", "-c", "1", str(image_path)],
-                    capture_output=True,
-                    text=True,
-                    timeout=30.0,
-                    check=False,
-                )
-                if captured.returncode != 0 or not image_path.is_file() or image_path.stat().st_size == 0:
-                    detail = (captured.stderr or captured.stdout).strip()
-                    raise RuntimeError(detail or "Termux camera did not produce an image")
-                with Image.open(image_path) as image:
-                    image = image.convert("RGB")
-                    image.thumbnail((640, 640), Image.Resampling.LANCZOS)
-                    rgb = np.asarray(image, dtype=np.uint8).copy()
-            scene = mind.vision.see_frame(
-                rgb,
-                client=mind.client,
-                network=mind.network,
-                nerve="android",
-            )
-            report = mind._render_self_report(
-                "looked through the Android camera",
-                confidence=0.6 if scene.status == "ok" else 0.3,
-                metadata={"vision_scene": scene.as_metadata(), "vision_status": scene.status},
-            )
-            return f"\n  genesis> {report or scene.memory_text()}\n"
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"Android camera look failed: {e}")
-            report = mind._render_self_report(
-                "Android camera unavailable",
-                confidence=0.3,
-                metadata={"android_camera_error": str(e)},
-            )
-            return f"\n  genesis> {report or '[Android camera unavailable]'}\n"
     nerve = "optic"
     if rest.lower() == "screen":
         nerve = "screen"
