@@ -86,12 +86,12 @@ from basal_ganglia.volition import VolitionMixin
 from brainstem.heart import Heart
 from brainstem.lifecycle import LifecycleMixin
 from brainstem.metronome import MetronomeMixin
-from worlds.conversation import ConversationMixin
 from frontal_lobe.projects import ProjectsMixin
 from frontal_lobe.status import StatusMixin
 from self.man_review import ManReviewMixin
 from self.proposals import ProposalsMixin
 from sleep.sleep import SleepMixin
+from worlds.conversation import ConversationMixin
 
 # Provenance marker — one letter of the creator lattice (see
 # PROVENANCE.md).

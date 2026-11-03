@@ -12,9 +12,9 @@ The graph enables exchange without collapsing E, I, S, and L into one space.
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Iterable
 
 
 class LatentDomain(StrEnum):
@@ -143,8 +143,7 @@ class LatentSpaceGraph:
 
         if state.domain is not boundary.source:
             raise ValueError(
-                f"{boundary.name} accepts {boundary.source.value}, "
-                f"not {state.domain.value}"
+                f"{boundary.name} accepts {boundary.source.value}, not {state.domain.value}"
             )
         if len(state.values) != boundary.input_dimensions:
             raise ValueError(
@@ -152,9 +151,7 @@ class LatentSpaceGraph:
                 f"coordinates, received {len(state.values)}"
             )
         if boundary.allowed_categories and state.category not in boundary.allowed_categories:
-            raise ValueError(
-                f"category {state.category!r} is not permitted across {boundary.name}"
-            )
+            raise ValueError(f"category {state.category!r} is not permitted across {boundary.name}")
 
         output = tuple(
             boundary.gain

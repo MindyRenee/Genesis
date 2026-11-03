@@ -564,7 +564,8 @@ def _resolve_man_paths() -> tuple[str, ...]:
             # stdout) instead of a path list; only real, single-line
             # directories count, and a non-path can never raise here.
             paths = tuple(
-                p for p in out.stdout.strip().split(":")
+                p
+                for p in out.stdout.strip().split(":")
                 if p and "\n" not in p and _is_existing_dir(p)
             )
             if paths:

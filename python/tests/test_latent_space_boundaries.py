@@ -1,7 +1,6 @@
 """Tests for typed latent-space boundaries and category-preserving flow."""
 
 import pytest
-
 from latent_spaces.boundaries import (
     Boundary,
     LatentDomain,
@@ -34,15 +33,17 @@ def test_boundary_connects_spaces_without_merging_categories() -> None:
 
 
 def test_category_boundary_rejects_unpermitted_flow() -> None:
-    graph = LatentSpaceGraph([
-        Boundary(
-            "language_to_inner",
-            LatentDomain.L,
-            LatentDomain.I,
-            ((1.0,),),
-            allowed_categories=frozenset({"intent"}),
-        )
-    ])
+    graph = LatentSpaceGraph(
+        [
+            Boundary(
+                "language_to_inner",
+                LatentDomain.L,
+                LatentDomain.I,
+                ((1.0,),),
+                allowed_categories=frozenset({"intent"}),
+            )
+        ]
+    )
     with pytest.raises(ValueError, match="not permitted"):
         graph.flow(
             "language_to_inner",
@@ -51,9 +52,9 @@ def test_category_boundary_rejects_unpermitted_flow() -> None:
 
 
 def test_boundary_rejects_wrong_domain_and_dimension() -> None:
-    graph = LatentSpaceGraph([
-        Boundary("outer_to_language", LatentDomain.E, LatentDomain.L, ((1.0, 2.0),))
-    ])
+    graph = LatentSpaceGraph(
+        [Boundary("outer_to_language", LatentDomain.E, LatentDomain.L, ((1.0, 2.0),))]
+    )
     with pytest.raises(ValueError, match="accepts"):
         graph.flow(
             "outer_to_language",
@@ -67,11 +68,13 @@ def test_boundary_rejects_wrong_domain_and_dimension() -> None:
 
 
 def test_reachability_uses_directed_edges_not_implicit_mixing() -> None:
-    graph = LatentSpaceGraph([
-        Boundary("E_to_S", LatentDomain.E, LatentDomain.S, ((1.0,),)),
-        Boundary("S_to_L", LatentDomain.S, LatentDomain.L, ((1.0,),)),
-        Boundary("I_to_S", LatentDomain.I, LatentDomain.S, ((1.0,),)),
-    ])
+    graph = LatentSpaceGraph(
+        [
+            Boundary("E_to_S", LatentDomain.E, LatentDomain.S, ((1.0,),)),
+            Boundary("S_to_L", LatentDomain.S, LatentDomain.L, ((1.0,),)),
+            Boundary("I_to_S", LatentDomain.I, LatentDomain.S, ((1.0,),)),
+        ]
+    )
     assert graph.reachable(LatentDomain.E, LatentDomain.L)
     assert graph.reachable(LatentDomain.I, LatentDomain.L)
     assert not graph.reachable(LatentDomain.L, LatentDomain.E)

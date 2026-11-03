@@ -65,13 +65,9 @@ class TorchLightConeField(nn.Module):
         self.log_signal_speed = nn.Parameter(
             torch.tensor(math.log(signal_speed), dtype=dtype, device=device)
         )
-        self.angular_speed = nn.Parameter(
-            torch.tensor(angular_speed, dtype=dtype, device=device)
-        )
+        self.angular_speed = nn.Parameter(torch.tensor(angular_speed, dtype=dtype, device=device))
         self.phase_bias = nn.Parameter(torch.zeros((), dtype=dtype, device=device))
-        self.log_amplitude_gain = nn.Parameter(
-            torch.zeros((), dtype=dtype, device=device)
-        )
+        self.log_amplitude_gain = nn.Parameter(torch.zeros((), dtype=dtype, device=device))
         self.elastic_rate = float(elastic_rate)
         self.plastic_rate = float(plastic_rate)
         self.register_buffer(
@@ -137,10 +133,14 @@ class TorchLightConeField(nn.Module):
         if not torch.isfinite(observation).all():
             raise ValueError("observation must contain only finite values")
 
-        values = observation.detach().to(
-            device=self.plastic_state.device,
-            dtype=self.plastic_state.dtype,
-        ).reshape(-1)
+        values = (
+            observation.detach()
+            .to(
+                device=self.plastic_state.device,
+                dtype=self.plastic_state.dtype,
+            )
+            .reshape(-1)
+        )
         old_size = self.plastic_state.numel()
         size = max(old_size, values.numel())
         if size > old_size:
@@ -165,9 +165,7 @@ class TorchLightConeField(nn.Module):
         """Relax temporary state toward persistent memory without unlearning."""
         if not math.isfinite(recovery_rate) or not 0.0 <= recovery_rate <= 1.0:
             raise ValueError("recovery_rate must be finite and in [0, 1]")
-        self.elastic_state.add_(
-            recovery_rate * (self.plastic_state - self.elastic_state)
-        )
+        self.elastic_state.add_(recovery_rate * (self.plastic_state - self.elastic_state))
         return self.elastic_state.clone()
 
     def spine(self, distance: Tensor) -> Tensor:

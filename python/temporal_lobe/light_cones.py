@@ -222,7 +222,6 @@ class LightConeModel:
         }
 
 
-
 @dataclass(frozen=True, slots=True)
 class DiagramPoint:
     """A point in the visualization frame, not a physical spacetime event."""
@@ -352,7 +351,7 @@ class ElasticPlasticHologram:
 
         size = max(len(self._plastic), len(observation))
         self._plastic.extend([0j] * (size - len(self._plastic)))
-        self._elastic.extend(self._plastic[len(self._elastic):])
+        self._elastic.extend(self._plastic[len(self._elastic) :])
         observation.extend([0j] * (size - len(observation)))
 
         response = []

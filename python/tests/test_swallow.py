@@ -166,9 +166,7 @@ def test_concurrent_sites_count_exactly():
 
     set_swallow_sink(sink)
     threads = [
-        threading.Thread(
-            target=lambda: [note_swallowed("hot", OSError("x")) for _ in range(50)]
-        )
+        threading.Thread(target=lambda: [note_swallowed("hot", OSError("x")) for _ in range(50)])
         for _ in range(8)
     ]
     for t in threads:

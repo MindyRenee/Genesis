@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from limbic_system.curiosity import Question
 from parietal_lobe.agency import _TOOL_SCOPES, ActingLoop, ActingResult, Intention
 from temporal_lobe.concepts import ConceptNetwork

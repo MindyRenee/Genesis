@@ -3,7 +3,6 @@
 import math
 
 import pytest
-
 from temporal_lobe.light_cones import (
     AdaptiveLightConeManifold,
     ConeCoordinate,

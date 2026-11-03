@@ -26,9 +26,9 @@ import collections
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
-import shutil
 import tempfile
 import threading
 import time
@@ -419,13 +419,21 @@ class Voice:
     ) -> None:
         """Speak through Android TTS on Termux, with bounded process lifetime."""
         cmd = [
-            "termux-tts-speak", "-s", "MUSIC",
-            "-r", f"{rate_factor:.2f}", "-p", f"{pitch:.2f}", text,
+            "termux-tts-speak",
+            "-s",
+            "MUSIC",
+            "-r",
+            f"{rate_factor:.2f}",
+            "-p",
+            f"{pitch:.2f}",
+            text,
         ]
         try:
             proc = subprocess.Popen(
-                cmd, stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                cmd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             self._play_proc = proc
             with self._procs_lock:
@@ -440,8 +448,10 @@ class Voice:
                     proc.wait(timeout=2)
             else:
                 named_thread(
-                    "tts-reaper", self._reap_children,
-                    args=((proc,), timeout), comm="g-tts-reap",
+                    "tts-reaper",
+                    self._reap_children,
+                    args=((proc,), timeout),
+                    comm="g-tts-reap",
                 ).start()
         except (OSError, subprocess.SubprocessError) as e:
             logger.warning("Termux TTS failed: %s", e)
