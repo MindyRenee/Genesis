@@ -23,6 +23,7 @@ _server_started = False
 _frame_lock = threading.Lock()
 _latest_frame: np.ndarray | None = None
 _latest_at = 0.0
+_latest_sequence = 0
 
 
 def _read_exact(connection: socket.socket, size: int) -> bytes | None:
@@ -40,7 +41,7 @@ def _read_exact(connection: socket.socket, size: int) -> bytes | None:
 
 def _serve() -> None:
     """Accept the companion app and retain only its most recent JPEG frame."""
-    global _latest_frame, _latest_at
+    global _latest_frame, _latest_at, _latest_sequence
     try:
         from PIL import Image
         import io
@@ -79,6 +80,7 @@ def _serve() -> None:
                             with _frame_lock:
                                 _latest_frame = rgb
                                 _latest_at = time.monotonic()
+                                _latest_sequence += 1
                         except (OSError, ValueError, RuntimeError) as exc:
                             logger.debug("Android camera stream disconnected: %s", exc)
                             break
@@ -108,3 +110,12 @@ def latest_stream_frame(max_age_seconds: float = 2.0) -> np.ndarray | None:
         if _latest_frame is None or time.monotonic() - _latest_at > max_age_seconds:
             return None
         return _latest_frame.copy()
+
+
+def _reset_stream_state_for_tests() -> None:
+    """Reset process-local stream state for isolated tests."""
+    global _latest_frame, _latest_at, _latest_sequence
+    with _frame_lock:
+        _latest_frame = None
+        _latest_at = 0.0
+        _latest_sequence = 0
