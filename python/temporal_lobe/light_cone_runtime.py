@@ -26,6 +26,7 @@ class LightConeExperienceBridge:
         self.manifold = AdaptiveLightConeManifold()
         self.max_dimensions = max_dimensions
         self._sequence = 0
+        self._epoch_origin: float | None = None
         self._lock = threading.RLock()
 
     def process(self, event: ExternalEvent, embeddings: Any) -> bool:
@@ -45,7 +46,10 @@ class LightConeExperienceBridge:
                 continue
             if vector is None:
                 continue
-            values = np.asarray(vector, dtype=np.float64).reshape(-1)
+            try:
+                values = np.asarray(vector, dtype=np.float64).reshape(-1)
+            except (TypeError, ValueError):
+                continue
             if values.size == 0 or not np.all(np.isfinite(values)):
                 continue
             vectors.append(values[: self.max_dimensions])
@@ -59,9 +63,15 @@ class LightConeExperienceBridge:
             return False
 
         timestamp = float(event.timestamp)
-        if not math.isfinite(timestamp):
+        salience = float(event.salience)
+        if not math.isfinite(timestamp) or not math.isfinite(salience):
             return False
         with self._lock:
+            if self._epoch_origin is None:
+                self._epoch_origin = timestamp
+            # Convert wall-clock epoch seconds to a session-relative timeline;
+            # the causal model requires one consistent time origin.
+            timestamp -= self._epoch_origin
             apex = self.manifold.apex
             if apex is not None:
                 timestamp = max(timestamp, apex.time_s)
@@ -75,7 +85,7 @@ class LightConeExperienceBridge:
                 time_s=timestamp,
                 position=(0.0, 0.0, 0.0),
                 domain=WorldDomain.OUTER,
-                confidence=max(0.0, min(1.0, float(event.salience))),
+                confidence=max(0.0, min(1.0, salience)),
             )
             self.manifold.process_experience(
                 experience,
