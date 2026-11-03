@@ -21,7 +21,7 @@ class LatentDomain(StrEnum):
     """Distinct latent-space categories."""
 
     E = "experiential_outer"
-    I = "interoceptive_inner"
+    I = "interoceptive_inner"  # noqa: E741 — intentional domain symbol
     S = "self_identity"
     L = "language"
 
@@ -157,7 +157,11 @@ class LatentSpaceGraph:
             )
 
         output = tuple(
-            boundary.gain * sum(weight * value for weight, value in zip(row, state.values, strict=True))
+            boundary.gain
+            * sum(
+                weight * value
+                for weight, value in zip(row, state.values, strict=True)
+            )
             for row in boundary.matrix
         )
         if not all(math.isfinite(v) for v in output):
