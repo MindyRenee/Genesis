@@ -35,6 +35,7 @@ class CameraStreamService : Service() {
     private var sender: Thread? = null
     private val frameLock = Any()
     private var latestJpeg: ByteArray? = null
+    private var latestSequence: Long = 0
 
     override fun onCreate() {
         super.onCreate()
@@ -73,7 +74,10 @@ class CameraStreamService : Service() {
                     val buffer = it.planes[0].buffer
                     val bytes = ByteArray(buffer.remaining())
                     buffer.get(bytes)
-                    synchronized(frameLock) { latestJpeg = bytes }
+                    synchronized(frameLock) {
+                        latestJpeg = bytes
+                        latestSequence += 1
+                    }
                 }
             }, cameraHandler)
             manager.openCamera(cameraId, object : CameraDevice.StateCallback() {
@@ -93,12 +97,17 @@ class CameraStreamService : Service() {
                                         return
                                     }
                                     session = configured
-                                    val request = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
+                                    val requestBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
                                         addTarget(reader!!.surface)
                                         set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
-                                        set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
-                                            android.util.Range(5, 10))
-                                    }.build()
+                                    }
+                                    val ranges = manager.getCameraCharacteristics(cameraId).get(
+                                        android.hardware.camera2.CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES
+                                    )
+                                    ranges?.filter { it.upper <= 10 && it.lower <= 5 }
+                                        ?.maxByOrNull { it.upper }
+                                        ?.let { requestBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
+                                    val request = requestBuilder.build()
                                     configured.setRepeatingRequest(request, null, cameraHandler)
                                 }
 
@@ -132,6 +141,7 @@ class CameraStreamService : Service() {
     }
 
     private fun sendFrames() {
+        var lastSentSequence = 0L
         while (running.get()) {
             try {
                 Socket().use { socket ->
@@ -139,13 +149,20 @@ class CameraStreamService : Service() {
                     socket.tcpNoDelay = true
                     DataOutputStream(BufferedOutputStream(socket.getOutputStream())).use { output ->
                         while (running.get()) {
-                            val frame = synchronized(frameLock) { latestJpeg?.copyOf() }
-                            if (frame != null) {
+                            val snapshot = synchronized(frameLock) {
+                                if (latestJpeg != null && latestSequence != lastSentSequence) {
+                                    Pair(latestJpeg!!.copyOf(), latestSequence)
+                                } else null
+                            }
+                            if (snapshot != null) {
+                                val (frame, sequence) = snapshot
                                 output.writeInt(frame.size)
                                 output.write(frame)
                                 output.flush()
+                                lastSentSequence = sequence
+                            } else {
+                                Thread.sleep(20)
                             }
-                            Thread.sleep(150)
                         }
                     }
                 }
