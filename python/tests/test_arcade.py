@@ -160,9 +160,11 @@ def test_game_memory_roundtrip():
     assert GameMemory.from_dict(m.to_dict()).values == m.values
 
 
-def test_announce_tells_her_the_arcade_is_there():
-    """The arcade announces itself as a salient world notice with the rules."""
+def test_announce_tells_her_the_arcade_is_there_without_opening_a_run():
+    """Startup announces ARC but does not create an empty official scorecard."""
     _, arcade, _, _, events = _arcade()
     arcade.announce()
     notice = next(e for e in events if "arcade in my world" in e.content)
     assert notice.salience >= 0.5 and "video game" in notice.content
+    assert arcade._offers == []
+    assert arcade._offered_at == 0.0
