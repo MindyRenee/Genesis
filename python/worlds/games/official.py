@@ -93,7 +93,13 @@ def board_from_observation(observation: Any, game_id: str = "") -> Board | None:
     """Turn a toolkit observation (``FrameDataRaw``) into a ``Board``."""
     if observation is None:
         return None
-    frames = list(getattr(observation, "frame", None) or [])
+    raw_frames = getattr(observation, "frame", None)
+    if raw_frames is None:
+        return None
+    # Avoid boolean coercion: NumPy arrays with multiple elements raise
+    # ValueError when used in a boolean context. The toolkit may return
+    # either arrays or ordinary nested lists here.
+    frames = list(raw_frames)
     if not frames:
         return None
     state = getattr(observation, "state", "")
