@@ -20,6 +20,12 @@ logic function:
   of inhabited regions. "All A are B" empties A∧¬B; "Some A are B"
   inhabits A∧B. Validity is checked over all 256 patterns.
 
+- **Polysyllogism — explicit proof chains**: each step is checked by the
+  same categorical model theory; a valid conclusion must be carried
+  forward as a premise of the next step. The trace stops at the first
+  invalid step and preserves its countermodel. This constructs and
+  verifies a chain; it does not search for a chain automatically.
+
 - **Belief revision — AGM**: expansion ``K + p``, contraction
   ``K ÷ p``, revision ``K * p = (K ÷ ¬p) + p`` (the Levi identity).
   Contraction surrenders the *least entrenched* sentences first —
@@ -52,6 +58,8 @@ __all__ = [
     "Categorical",
     "Deduction",
     "Formula",
+    "Polysyllogism",
+    "SyllogisticStep",
     "Quantifier",
     "all_of",
     "and_",
@@ -71,6 +79,7 @@ __all__ = [
     "revise",
     "satisfiable",
     "syllogism",
+    "polysyllogism",
     "verify",
 ]
 
@@ -613,6 +622,58 @@ def _categorical_ok(cat: Categorical, inhabited: int, order: tuple[str, str, str
     return inhabited & a & ~b != 0
 
 
+@dataclass(frozen=True, slots=True)
+class SyllogisticStep:
+    """One proposed categorical inference in an explicit proof chain.
+
+    Exactly two premises are required because each step is a classical
+    categorical syllogism. In later steps, one premise must be the
+    preceding step's conclusion; the other premise extends the chain.
+    """
+
+    premises: tuple[Categorical, Categorical]
+    conclusion: Categorical
+
+    def __post_init__(self) -> None:
+        if len(self.premises) != 2:
+            raise ValueError("a syllogistic step requires exactly two premises")
+
+
+@dataclass(frozen=True, slots=True)
+class Polysyllogism:
+    """Auditable result of checking a sequence of categorical syllogisms.
+
+    ``deductions`` contains each checked step, including the first invalid
+    step and its countermodel. Later steps are not evaluated after a failed
+    inference, because an unjustified conclusion cannot license a next step.
+    ``requested_steps`` distinguishes a complete proof from a stopped trace.
+    """
+
+    deductions: tuple[Deduction, ...]
+    requested_steps: int
+
+    @property
+    def valid(self) -> bool:
+        """Whether every requested step was checked and found valid."""
+        return len(self.deductions) == self.requested_steps and all(
+            deduction.valid for deduction in self.deductions
+        )
+
+    @property
+    def conclusion(self) -> Categorical:
+        """The conclusion of the last step actually checked."""
+        return self.deductions[-1].conclusion
+
+    @property
+    def failed_step(self) -> int | None:
+        """One-based index of the first invalid step, or ``None``."""
+        return next(
+            (index for index, deduction in enumerate(self.deductions, 1)
+             if not deduction.valid),
+            None,
+        )
+
+
 def syllogism(p1: Categorical, p2: Categorical, conclusion: Categorical) -> Deduction:
     """Validity of a two-premise categorical argument over the 256
     Venn-region patterns — the categorical subsystem of deduction
@@ -636,3 +697,39 @@ def syllogism(p1: Categorical, p2: Categorical, conclusion: Categorical) -> Dedu
                     examined,
                 )
     return Deduction(True, (p1, p2), conclusion, None, examined)
+
+
+def polysyllogism(steps: Iterable[SyllogisticStep]) -> Polysyllogism:
+    """Verify an explicit chain of categorical syllogisms.
+
+    The first step establishes the chain from two initial premises. Every
+    later step must reuse the immediately preceding conclusion as one of its
+    two premises. Each step is checked with syllogism(), so the same
+    three-term, eight-region semantics and countermodel reporting apply.
+
+    Raises:
+        ValueError: If the chain is empty or a later step does not carry
+            forward the preceding conclusion.
+
+    The result is a proof trace, not a search procedure: the caller supplies
+    candidate steps, and this function reports where the chain is or is not
+    justified.
+    """
+    chain = tuple(steps)
+    if not chain:
+        raise ValueError("a polysyllogism requires at least one step")
+
+    deductions: list[Deduction] = []
+    previous: Categorical | None = None
+    for step in chain:
+        if previous is not None and previous not in step.premises:
+            raise ValueError(
+                "each later step must use the preceding conclusion as a premise"
+            )
+        deduction = syllogism(*step.premises, step.conclusion)
+        deductions.append(deduction)
+        if not deduction.valid:
+            break
+        previous = step.conclusion
+
+    return Polysyllogism(tuple(deductions), len(chain))
