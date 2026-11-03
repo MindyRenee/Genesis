@@ -27,6 +27,7 @@ import logging
 import os
 import subprocess
 import sys
+import shutil
 import tempfile
 import threading
 import time
@@ -162,6 +163,8 @@ class Voice:
 
     def __init__(self) -> None:
         """Detect available TTS backends and load the Piper voice model."""
+        # Termux uses Android's speech service instead of desktop audio playback.
+        self._termux_available = shutil.which("termux-tts-speak") is not None
         self._piper_available = self._check_piper()
         self._espeak_available = self._check_espeak()
         self._model = (
@@ -214,13 +217,15 @@ class Voice:
 
     def is_available(self) -> bool:
         """True if any TTS backend is available."""
-        return bool(self._piper_available or self._espeak_available)
+        return bool(self._termux_available or self._piper_available or self._espeak_available)
 
     def describe(self) -> str:
         """Human-readable description of the current TTS setup."""
+        if self._termux_available:
+            return "Android system TTS via Termux:API"
         if self._piper_available and self._model:
             return f"Voice: Piper neural TTS ({self._model.name})"
-        elif self._espeak_available:
+        if self._espeak_available:
             return "espeak-ng (fallback)"
         return "unavailable"
 
@@ -318,7 +323,10 @@ class Voice:
         rate_factor = max(0.9, min(1.8, rate_factor))
 
         try:
-            if self._piper_available and self._model:
+            if self._termux_available:
+                pitch = max(0.7, min(1.3, 1.0 + valence * 0.15 + creativity * 0.05))
+                self._speak_termux(text, blocking, rate_factor, pitch)
+            elif self._piper_available and self._model:
                 self._speak_piper(text, blocking, rate_factor, heat)
             elif self._espeak_available:
                 self._speak_espeak(text, blocking, rate_factor)
@@ -374,7 +382,9 @@ class Voice:
         rate_factor = 1.25 + (alertness - 0.5) * 0.4 - caution * 0.15 - heat * 0.35
         rate_factor = max(0.9, min(1.8, rate_factor))
         try:
-            if self._piper_available and self._model:
+            if self._termux_available:
+                self._speak_termux(text, False, rate_factor, 1.0)
+            elif self._piper_available and self._model:
                 self._speak_piper(text, False, rate_factor, heat)
             elif self._espeak_available:
                 self._speak_espeak(text, False, rate_factor)
@@ -401,6 +411,38 @@ class Voice:
             if self._speaking_count > 0:
                 return True
         return time.time() - self._last_spoke_time < self._speech_tail
+
+    def _speak_termux(
+        self, text: str, blocking: bool, rate_factor: float, pitch: float = 1.0
+    ) -> None:
+        """Speak through Android TTS on Termux, with bounded process lifetime."""
+        cmd = [
+            "termux-tts-speak", "-s", "MUSIC",
+            "-r", f"{rate_factor:.2f}", "-p", f"{pitch:.2f}", text,
+        ]
+        try:
+            proc = subprocess.Popen(
+                cmd, stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            self._play_proc = proc
+            with self._procs_lock:
+                self._all_procs.append(proc)
+            timeout = max(15.0, min(60.0, len(text) * 0.25 + 10.0))
+            if blocking:
+                try:
+                    proc.wait(timeout=timeout)
+                except subprocess.TimeoutExpired:
+                    logger.warning("Termux TTS timed out; stopping speech process")
+                    proc.kill()
+                    proc.wait(timeout=2)
+            else:
+                named_thread(
+                    "tts-reaper", self._reap_children,
+                    args=((proc,), timeout), comm="g-tts-reap",
+                ).start()
+        except (OSError, subprocess.SubprocessError) as e:
+            logger.warning("Termux TTS failed: %s", e)
 
     def _speak_piper(
         self, text: str, blocking: bool, rate_factor: float = 1.0, heat: float = 0.0
