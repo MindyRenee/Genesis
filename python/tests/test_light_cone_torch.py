@@ -4,7 +4,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from temporal_lobe.light_cone_torch import TorchLightConeField
+from temporal_lobe.light_cone_torch import TorchLightConeField  # noqa: E402
 
 
 def test_torch_light_cone_preserves_causal_boundary_and_axis_convention():
