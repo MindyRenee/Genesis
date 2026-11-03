@@ -441,14 +441,21 @@ class AdaptiveLightConeManifold:
         current_apex = self.causal_model.apex
         if current_apex is not None and event.time_s < current_apex.time_s:
             raise ValueError("experience time cannot precede the current Self apex")
+        self_event_id = f"self-feedback:{event.event_id}"
+        if (
+            event.domain is not WorldDomain.SELF
+            and self.causal_model.get_event(self_event_id) is not None
+        ):
+            raise ValueError(f"feedback event already exists: {self_event_id}")
 
         response = self.hologram.observe(latent_values)
         self.causal_model.add_event(event)
         if event.domain is WorldDomain.SELF:
             self_event = event
+            self.causal_model.advance_apex(self_event)
         else:
             self_event = SpacetimeEvent(
-                event_id=f"self-feedback:{event.event_id}",
+                event_id=self_event_id,
                 time_s=event.time_s,
                 position=event.position,
                 domain=WorldDomain.SELF,
