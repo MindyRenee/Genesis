@@ -829,6 +829,8 @@ _EXPORTS: dict[str, str] = {
     "double_cone_coordinate": "temporal_lobe.light_cones",
     "spine_point": "temporal_lobe.light_cones",
     "time_sunburst_ray": "temporal_lobe.light_cones",
+    # Optional differentiable implementation; importing the base package does not require PyTorch
+    "TorchLightConeField": "temporal_lobe.light_cone_torch",
     # Social perception — the superior temporal sulcus detects people,
     # their presence, and the events they produce (speech, arrival, departure)
     "Presence": "temporal_lobe.presence",
