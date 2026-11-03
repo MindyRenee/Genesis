@@ -42,6 +42,7 @@ __all__ = [
     "MemoryStats",
     "ModuleTelemetry",
     "NeuroSummary",
+    "OpticState",
     "PhaseInfo",
     "PingResponse",
     "PlasticityProfile",
@@ -2303,6 +2304,111 @@ class FieldProbeSignature:
             "rf_flux_phases": struct.unpack_from("<10f", data, 328),
             "rf_flux_phase_coherence": struct.unpack_from("<10f", data, 368),
         }
+
+
+@dataclass(frozen=True, slots=True)
+class OpticState:
+    """The optic nerve's subcortical channel state — the body's own
+    read of its nerve segment (GET_OPTIC_STATE).
+
+    Not pixels: the optic nerve's non-image-forming branches pooled
+    into the signals the SCN, superior colliculus, and thalamic relay
+    actually receive. ``illuminance`` is photopic luma, ``melanopic``
+    the blue-weighted ipRGC proxy, ``motion`` pooled frame-to-frame
+    luma change, ``orienting`` the unsmoothed salient transient.
+    ``retinal_lux`` is what currently entrains the circadian
+    oscillator (0 while the scheduled photoperiod is in charge).
+
+    ``relay_gain`` is the thalamic gate the mind must honour — near
+    zero in NREM/REM, open while awake. ``eye_present`` distinguishes
+    "the eye exists but sees nothing" from "there is no eye":
+    ``False`` means no frame was ever consumed this boot.
+
+    ``pupil_mm`` is the body's own aperture — the light reflex off the
+    photopic channel plus the sympathetic dilation effective
+    norepinephrine carries. ``0.0`` means unreported (a daemon that
+    predates the field; a real pupil is never narrower than ~1.5 mm).
+
+    ``accommodation_dpt`` is the ciliary muscle's lens power in
+    dioptres — 0 D is focus at infinity, the focus distance is
+    ``1/dpt`` metres (see the ``focus_m`` property).
+
+    ``lid`` is the eyelid transmission — how much scene light the
+    phase's lid position still passes: 1.0 awake, ~0.5 drowsy, ~0.03
+    in NREM/REM. A daemon that predates the field reports nothing
+    and decodes as fully open (1.0), never fully shut — a legacy
+    body cannot look asleep to the optics layer.
+    """
+
+    eye_present: bool
+    frames_fresh: bool
+    illuminance: float
+    melanopic: float
+    motion: float
+    orienting: float
+    relay_gain: float
+    cortical_gain: float
+    retinal_lux: float
+    frame_seq: int
+    frame_age_ms: int
+    pupil_mm: float = 0.0
+    accommodation_dpt: float = 0.0
+    lid: float = 1.0
+
+    @property
+    def focus_m(self) -> float | None:
+        """The distance the lens is currently powered for, in metres.
+
+        ``1/dpt`` — ``None`` when the eye is relaxed to infinity
+        (0 D) or the daemon predates the field and reports nothing.
+        """
+        return 1.0 / self.accommodation_dpt if self.accommodation_dpt > 0.05 else None
+
+    @classmethod
+    def unpack(cls, data: bytes) -> OpticState | None:
+        """Unpack the GET_OPTIC_STATE body: ``[u8 ack][u8 flags][u8
+        pad][7 × f32][u64 frame_seq][i64 frame_age_ms][f32 pupil_mm]
+        [f32 accommodation_dpt][f32 lid]``.
+
+        Returns ``None`` on a short or unacked response — an absent
+        channel is no reading, never a zero reading. The trailing
+        fields are additive: a 46-byte body from an older daemon
+        decodes with ``pupil_mm``/``accommodation_dpt`` = 0.0 and
+        ``lid`` = 1.0 (open — an unreported lid is not a shut one).
+        """
+        if len(data) < 47 or data[0] != 1:
+            return None
+        flags = data[1]
+        (
+            illuminance,
+            melanopic,
+            motion,
+            orienting,
+            relay_gain,
+            cortical_gain,
+            retinal_lux,
+        ) = struct.unpack_from("<7f", data, 3)
+        (frame_seq,) = struct.unpack_from("<Q", data, 31)
+        (frame_age_ms,) = struct.unpack_from("<q", data, 39)
+        (pupil_mm,) = struct.unpack_from("<f", data, 47) if len(data) >= 51 else (0.0,)
+        (accommodation_dpt,) = struct.unpack_from("<f", data, 51) if len(data) >= 55 else (0.0,)
+        (lid,) = struct.unpack_from("<f", data, 55) if len(data) >= 59 else (1.0,)
+        return cls(
+            eye_present=bool(flags & 1),
+            frames_fresh=bool(flags & 2),
+            illuminance=illuminance,
+            melanopic=melanopic,
+            motion=motion,
+            orienting=orienting,
+            relay_gain=relay_gain,
+            cortical_gain=cortical_gain,
+            retinal_lux=retinal_lux,
+            frame_seq=frame_seq,
+            frame_age_ms=frame_age_ms,
+            pupil_mm=pupil_mm,
+            accommodation_dpt=accommodation_dpt,
+            lid=lid,
+        )
 
 
 @dataclass(frozen=True, slots=True)

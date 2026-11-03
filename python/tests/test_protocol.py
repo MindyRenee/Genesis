@@ -29,6 +29,7 @@ from genesis_client.protocol import (
     GET_FOLD_MARGINS,
     GET_ION_SUMMARY,
     GET_NEURO_SUMMARY,
+    GET_OPTIC_STATE,
     GET_PHASE,
     GET_SENSOR_PRESENCE,
     GET_STATE,
@@ -58,6 +59,8 @@ from genesis_client.protocol import (
     PROTOCOL_VERSION,
     SET_FIELD_CARRIER,
     SET_FIELD_PHASE,
+    SET_FOCUS,
+    SET_OPTIC_GAIN,
     SET_WAKE_ALARM,
     SHUTDOWN,
     STORE_EPISODE,
@@ -248,6 +251,12 @@ def test_command_ids():
     assert GET_FIELD_PROBE == 47
     assert SET_FIELD_PHASE == 48
     assert SET_FIELD_CARRIER == 49
+    # The optic pair is additive and continues past the field
+    # commands: the optic-state read, the corticothalamic gain, and
+    # the accommodation request must not collide with them.
+    assert GET_OPTIC_STATE == 52
+    assert SET_OPTIC_GAIN == 53
+    assert SET_FOCUS == 54
     # The fold-margins read is additive past DELETE_EPISODE — the
     # highest core command id — and must not collide with the
     # notification range (100+) or the tensor slab (41–45).

@@ -3077,10 +3077,14 @@ class _Rebirth:
       daemon reopens the same persisted state, so neurochemistry,
       sleep phase, and memory continue unbroken; the mind re-inhabits
       it through ``Mind.rejoin_body``. The eye re-opens with the body
+      — the capture limb rides inside the daemon, so its bounded
+      re-open table (``src/daemon/optic_nerve.rs``) needs no watching
+      here; a camera that will not come back is a tolerated
+      degradation, never a fatal one.
     - **Fault** — a daemon alive but refusing every command that
       touches the tick engine (a poisoned lock never clears) is worse
       than a dead one: it looks connected while the body is inert.
-      ``GET_ZONE_TRANSITIONS`` takes the tick lock, so sustained failure
+      ``GET_OPTIC_STATE`` takes the tick lock, so sustained failure
       there means faulted — the watcher asks the body to flush
       gracefully (SHUTDOWN works even mid-fault), then reincarnates.
     - **Giving up** — a body that still will not reincarnate after the
@@ -3222,7 +3226,7 @@ class _Rebirth:
     def _daemon_faulted(self) -> bool:
         """Whether the live daemon is refusing the tick engine.
 
-        ``GET_ZONE_TRANSITIONS`` holds the ``tick_loop`` lock: a poisoned
+        ``GET_OPTIC_STATE`` holds the ``tick_loop`` lock: a poisoned
         lock — which never clears — answers ``INTERNAL_ERROR`` to
         every command that touches the body while the socket stays
         open and reads as connected, so process liveness alone misses
@@ -3248,11 +3252,7 @@ class _Rebirth:
                 # connect stays connected-capable: its lazy reconnect
                 # survives the resurrection it detects.
                 self._probe.connect()
-            # GET_ZONE_TRANSITIONS takes the tick lock and answers
-            # INTERNAL_ERROR on a poisoned one, so it probes the same
-            # thing the optic read did.
-            self._probe.get_zone_transitions()
-            ok = True
+            ok = self._probe.get_optic_state() is not None
         except Exception as e:  # noqa: BLE001
             logger.debug(f"rebirth probe failed: {e}")
             self._probe = None

@@ -813,6 +813,20 @@ class MetronomeMixin:
                     )
         if self._sensor_gate.due(now):
             self._poll_body_sensors(channel)
+            # Corticothalamic feedback — the layer-6 V1→dLGN gain the
+            # mind keeps on the thalamic relay, refreshed on the same
+            # gate as the body poll. Recent seeing raises it, decay
+            # lets it lapse; the body clamps it into what the sleep
+            # stage permits, so it can never open a gate NREM closed.
+            try:
+                vision = getattr(self, "vision", None)
+                if vision is not None:
+                    self.client.set_optic_gain(vision.corticothalamic_gain())
+            except (OSError, ConnectionError, RuntimeError) as e:
+                note_swallowed(
+                    "mind.metronome._cycle_sensors",
+                    e,
+                )
             # Engagement is the demand: recent interaction → sense
             # sooner; asleep or long idle → drift toward the ceiling.
             idle = now - getattr(self, "_last_interaction_time", 0.0)

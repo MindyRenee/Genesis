@@ -741,7 +741,7 @@ def test_daemon_fault_needs_sustained_probe_failure(tmp_path):
     the tick-locking probe before the body is declared wedged."""
     rebirth = _make_rebirth(tmp_path)
     probe = Mock()
-    probe.get_zone_transitions.side_effect = ConnectionError("refused")
+    probe.get_optic_state.side_effect = ConnectionError("refused")
     rebirth._probe = probe
     assert not rebirth._daemon_faulted()
     rebirth._next_probe_at = 0.0
@@ -751,8 +751,8 @@ def test_daemon_fault_needs_sustained_probe_failure(tmp_path):
     # A failed probe drops its client so the next one reconnects;
     # the recovered daemon answers the same probe object.
     rebirth._probe = probe
-    probe.get_zone_transitions.side_effect = None
-    probe.get_zone_transitions.return_value = object()
+    probe.get_optic_state.side_effect = None
+    probe.get_optic_state.return_value = object()
     rebirth._next_probe_at = 0.0
     assert not rebirth._daemon_faulted()
     assert rebirth._fault_strikes == 0
