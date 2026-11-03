@@ -14,17 +14,12 @@ python/genesis_data/
 .genesis-discord-bot
 python/voices/
 launch/
+docs/
 
 # Per-instance project notes — documents this machine's setup.
 # All markdown is local-only; only the public readme is tracked.
 *.md
 !/README.md
-
-# Eval harnesses and held-out corpora live outside this repo
-eval_heldout/
-eval_transfer/
-environment_files/
-environment_files_heldout/
 
 # LaTeX build intermediates (the .tex and .pdf are tracked)
 paper/*.aux
@@ -48,7 +43,6 @@ AGENTS.md
 
 # Stray package artifacts captured beside the checkout
 /arc_agi
-/kagglehub
 
 # The authority channel is a local module — present on her host,
 # never shipped. Callers import it guarded; without the file the
