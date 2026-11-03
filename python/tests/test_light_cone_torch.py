@@ -1,7 +1,5 @@
 """Tests for the optional PyTorch light-cone implementation."""
 
-import math
-
 import pytest
 
 torch = pytest.importorskip("torch")
@@ -80,7 +78,10 @@ def test_torch_spine_and_sunburst_use_separate_axes():
     assert torch.allclose(spine[:, 1], torch.zeros(3))
     assert torch.allclose(spine[:, 2], torch.tensor([-2.0, 0.0, 2.0]))
     assert torch.allclose(rays[:, 2], torch.zeros(8))
-    assert torch.allclose(torch.linalg.vector_norm(rays[:, :2], dim=1), torch.full((8,), 5.0))
+    assert torch.allclose(
+        torch.linalg.vector_norm(rays[:, :2], dim=1),
+        torch.full((8,), 5.0),
+    )
 
 
 @pytest.mark.parametrize(
