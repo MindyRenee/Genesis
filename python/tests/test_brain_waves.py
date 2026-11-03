@@ -114,7 +114,7 @@ def test_very_low_arousal_delta():
 def test_sleep_phase_delta():
     """Sleep phase → delta dominant."""
     summary = _make_summary(arousal=0.1, phase=PHASE_SLEEPING)
-    state = assess_brain_waves(summary)
+    state = assess_brain_waves(summary, sleep_stage=SleepStage.N3)
     assert state.dominant == BrainWave.DELTA
     assert state.powers[BrainWave.DELTA] > 0.4
 
@@ -509,7 +509,10 @@ def _make_wave_state(dominant: BrainWave) -> BrainWaveState:
     elif dominant == BrainWave.THETA:
         return assess_brain_waves(_make_summary(arousal=0.35, plasticity=0.5, phase=PHASE_ACTIVE))
     elif dominant == BrainWave.DELTA:
-        return assess_brain_waves(_make_summary(arousal=0.1, phase=PHASE_SLEEPING))
+        return assess_brain_waves(
+            _make_summary(arousal=0.1, phase=PHASE_SLEEPING),
+            sleep_stage=SleepStage.N3,
+        )
     else:
         return assess_brain_waves(_make_summary(arousal=0.5, phase=PHASE_ACTIVE))
 
