@@ -629,6 +629,75 @@ class Vision:
             )
             return VisionScene(status="unprocessed")
 
+    def see_frame(
+        self,
+        rgb: np.ndarray,
+        client=None,
+        emotion: EmotionalState | None = None,
+        network=None,
+        mirror: bool | None = None,
+        nerve: str = "android",
+    ) -> VisionScene:
+        """Process an externally captured RGB frame through the full vision pipeline.
+
+        This is the frame-injection counterpart to :meth:`see`: Android or
+        another camera adapter can supply pixels without taking ownership of
+        Genesis's shared-memory optic nerve. The same thalamic gate, optical
+        stages, recognition, scene integration, and callbacks still apply.
+
+        Args:
+            rgb: RGB image with shape (height, width, 3) and dtype uint8.
+            client: Optional body client used for relay state, chemistry, and memory.
+            emotion: Optional current emotional state for episodic tagging.
+            network: Optional semantic concept network.
+            mirror: Facing orientation; defaults to this instance's setting.
+            nerve: Provenance label for this frame source.
+
+        Returns:
+            A structured VisionScene. Invalid input returns status "unprocessed".
+        """
+        gate = self._optic_gate(client)
+        if isinstance(gate, VisionScene):
+            gate.nerve = nerve
+            return gate
+
+        relay_gate, pupil_mm, focus_m, lid = gate
+        if (
+            not isinstance(rgb, np.ndarray)
+            or rgb.ndim != 3
+            or rgb.shape[2] != 3
+            or rgb.shape[0] < 2
+            or rgb.shape[1] < 2
+            or rgb.dtype != np.uint8
+        ):
+            return VisionScene(status="unprocessed", relay_gate=relay_gate, nerve=nerve)
+
+        try:
+            scene = self._analyze_frame(
+                rgb,
+                pupil_mm,
+                focus_m,
+                lid,
+                relay_gate,
+                client,
+                emotion,
+                network,
+                self.mirror if mirror is None else mirror,
+                nerve,
+            )
+            scene.nerve = nerve
+            return scene
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "occipital_lobe.perception.vision.see_frame",
+                e,
+            )
+            return VisionScene(
+                status="unprocessed",
+                relay_gate=relay_gate,
+                nerve=nerve,
+            )
+
     def _optic_gate(self, client) -> tuple[float | None, float, float | None, float] | VisionScene:
         """The thalamic gate — the body's own read of the optic nerve.
 
