@@ -321,8 +321,10 @@ class ManReviewMixin:
         try:
             source = ManPageSource()
             learned: list[str] = []
-            for name, _section in self.man_review.owned_pages():
-                sr = source.lookup(name)
+            for name, section in self.man_review.owned_pages():
+                # Resolve the exact section declared by the versioned page;
+                # otherwise a same-named page in another section could win.
+                sr = source.lookup(name, section=section)
                 if sr is None:
                     continue
                 if self.learner.ingest_endogenous(sr, topic=name):
