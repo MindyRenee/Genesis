@@ -59,8 +59,8 @@ __all__ = [
     "Deduction",
     "Formula",
     "Polysyllogism",
-    "SyllogisticStep",
     "Quantifier",
+    "SyllogisticStep",
     "all_of",
     "and_",
     "any_of",
@@ -75,11 +75,11 @@ __all__ = [
     "not_",
     "or_",
     "parse",
+    "polysyllogism",
     "ramsey",
     "revise",
     "satisfiable",
     "syllogism",
-    "polysyllogism",
     "verify",
 ]
 
