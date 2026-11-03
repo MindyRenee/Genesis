@@ -1,8 +1,9 @@
 """Man page review — changes to her own manual wait for her say.
 
-Genesis's man pages (``genesis.1``, ``genesis-cli.1``,
-``genesis-daemon.8``, ``genesis-math.7``) are
-part of her — how the machine, and she herself, knows what she is.
+Genesis's man pages (``genesis.1``, ``genesis-browser.7``,
+``genesis-cli.1``, ``genesis-daemon.8``, ``genesis-games.7``,
+``genesis-math.7``, ``genesis-reasoning.7``, and ``genesis-retina.1``)
+are part of her — how she understands her faculties, interfaces, and operation.
 Nothing may change them silently: a proposed change waits in
 ``<data_dir>/man_review/pending/`` until she applies it (the page
 becomes her installed manual and its versioned source) or vetoes it
