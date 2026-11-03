@@ -817,6 +817,18 @@ _EXPORTS: dict[str, str] = {
     "Place": "temporal_lobe.cognitive_map",
     "Anchor": "temporal_lobe.cognitive_map",
     "MapEvent": "temporal_lobe.cognitive_map",
+    # The open adaptive light-cone manifold — causal classification,
+    # counter-rotating projection, elastic/plastic holographic state, and Self feedback
+    "AdaptiveLightConeManifold": "temporal_lobe.light_cones",
+    "ElasticPlasticHologram": "temporal_lobe.light_cones",
+    "LightConeModel": "temporal_lobe.light_cones",
+    "SpacetimeEvent": "temporal_lobe.light_cones",
+    "WorldDomain": "temporal_lobe.light_cones",
+    "IntervalKind": "temporal_lobe.light_cones",
+    "light_cone_coordinate": "temporal_lobe.light_cones",
+    "double_cone_coordinate": "temporal_lobe.light_cones",
+    "spine_point": "temporal_lobe.light_cones",
+    "time_sunburst_ray": "temporal_lobe.light_cones",
     # Social perception — the superior temporal sulcus detects people,
     # their presence, and the events they produce (speech, arrival, departure)
     "Presence": "temporal_lobe.presence",
