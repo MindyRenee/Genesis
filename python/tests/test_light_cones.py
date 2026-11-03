@@ -5,6 +5,7 @@ import math
 import pytest
 
 from temporal_lobe.light_cones import (
+    AdaptiveLightConeManifold,
     ConeCoordinate,
     ElasticPlasticHologram,
     IntervalKind,
@@ -176,3 +177,35 @@ def test_hologram_rejects_nonfinite_observations():
     field = ElasticPlasticHologram()
     with pytest.raises(ValueError, match="must be finite"):
         field.observe([complex(float("inf"), 0.0)])
+
+
+def test_adaptive_manifold_routes_experience_back_to_self():
+    manifold = AdaptiveLightConeManifold(
+        signal_speed=2.0,
+        angular_speed=0.25,
+        elastic_rate=0.8,
+        plastic_rate=0.1,
+    )
+    experience = event("camera-frame-1", 1.0, 2.0, WorldDomain.OUTER)
+    self_event, response = manifold.process_experience(experience, [1 + 2j])
+    assert self_event.domain is WorldDomain.SELF
+    assert self_event.causes == ("camera-frame-1",)
+    assert self_event.time_s == experience.time_s
+    assert manifold.apex == self_event
+    assert response == (0.8 + 1.6j,)
+    assert manifold.summary()["experience_count"] == 1
+    point = manifold.surface_point(2.0, 0.0)
+    assert math.hypot(point.y, point.z) == pytest.approx(4.0)
+
+
+def test_adaptive_manifold_rejects_time_reversal_without_advancing_state():
+    manifold = AdaptiveLightConeManifold()
+    first = event("first", 3.0, 0.0, WorldDomain.OUTER)
+    manifold.process_experience(first, [1 + 0j])
+    prior_apex = manifold.apex
+    prior_field = manifold.hologram.plastic_state
+    earlier = event("earlier", 2.0, 0.0, WorldDomain.INNER)
+    with pytest.raises(ValueError, match="cannot precede"):
+        manifold.process_experience(earlier, [9 + 0j])
+    assert manifold.apex == prior_apex
+    assert manifold.hologram.plastic_state == prior_field
