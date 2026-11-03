@@ -514,7 +514,7 @@ class TestInnerLifeSleepArchitecture:
         # A high-arousal NREM summary must not pull the stage up to N1.
         summary = SimpleNamespace(phase_name="nrem", arousal=0.9)
         stage, is_rem, _dt = il._determine_dream_stage(summary)
-        assert stage is SleepStage.N1
+        assert stage is SleepStage.N3
         assert not is_rem
 
         # Nor may a "rem" phase force REM while the tracker sits in N2.
