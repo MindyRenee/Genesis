@@ -151,10 +151,13 @@ class Arcade:
     # ── offers ─────────────────────────────────────────────────
 
     def announce(self) -> None:
-        """Tell her the arcade is here, then fetch what it offers in the background.
+        """Tell her the arcade is here without opening a scored run.
 
         The notice enters her world's stream like any other event, so it
-        reaches her workspace, her episodic memory and her dream replay.
+        reaches her workspace, episodic memory and dream replay. The
+        official toolkit may open a scorecard when initialized; therefore
+        listing games is deferred until she asks to inspect or enter the
+        arcade, rather than creating an empty scorecard at every startup.
         """
         network = getattr(self.world, "_network", None)
         if network is not None:
@@ -169,7 +172,6 @@ class Arcade:
             salience=0.6,
         )
         record_event("arcade_open", "the arcade opened in her world")
-        threading.Thread(target=self.offers, name="arcade-offers", daemon=True).start()
 
     def offers(self, *, refresh: bool = False) -> list[GameOffer]:
         """The games on offer right now; fetched from the API when stale."""
