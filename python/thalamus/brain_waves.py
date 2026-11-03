@@ -463,16 +463,11 @@ def _sleep_stage_from_summary(summary: NeuroSummary) -> SleepStage | None:
     names (the Rust side distinguishes NREM from REM).
 
     For the legacy "sleeping" phase, arousal > 0.50 maps to REM
-    (since the old daemon didn't distinguish NREM from REM). For the
-    explicit "nrem" phase, only N1/N2/N3 are produced — the daemon
-    said NREM, so it's NREM regardless of arousal. In practice the
-    daemon clamps NREM arousal into a narrow band, so while a sleep
-    cycle is active the ultradian tracker — not this mapping — is the
-    stage authority; this is the fallback when no tracker is running:
-
-        0.35 < arousal         → N1
-        0.20 < arousal ≤ 0.35  → N2
-        arousal ≤ 0.20         → N3
+    (since the old daemon didn't distinguish REM from NREM). For the
+    explicit "nrem" phase, arousal cannot establish sleep depth. The
+    daemon clamps NREM arousal into a narrow band, and arousal is not
+    an EEG staging signal, so this function conservatively returns N1
+    unless a live sleep-cycle tracker supplies an explicit stage.
     """
     phase = summary.phase_name
     if phase == "rem":
