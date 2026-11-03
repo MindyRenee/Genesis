@@ -219,3 +219,164 @@ class LightConeModel:
                 for domain in WorldDomain
             },
         }
+
+
+
+@dataclass(frozen=True, slots=True)
+class DiagramPoint:
+    """A point in the visualization frame, not a physical spacetime event."""
+
+    x: float
+    y: float
+    z: float
+    component: str
+
+
+def light_cone_coordinate(
+    time_coordinate: float,
+    angle: float,
+    *,
+    signal_speed: float = 1.0,
+    angular_speed: float = 0.0,
+) -> ConeCoordinate:
+    """Return a point on a causal light-cone boundary in a horizontal-time view.
+
+    The displayed time coordinate is x. The transverse radius is exactly
+    signal_speed * abs(time_coordinate), so the Minkowski boundary
+    (signal_speed * t)**2 - y**2 - z**2 == 0 is preserved by rotation.
+    The two temporal sheets counter-rotate as measured outward from the apex.
+    This is a diagram embedding; it does not change the causal metric.
+    """
+    if not math.isfinite(signal_speed) or signal_speed <= 0.0:
+        raise ValueError("signal_speed must be finite and positive")
+    return double_cone_coordinate(
+        time_coordinate,
+        angle,
+        angular_speed=angular_speed,
+        radial_scale=signal_speed,
+    )
+
+
+def spine_point(distance: float) -> DiagramPoint:
+    """Return a point on the vertical identity spine through the shared apex."""
+    if not math.isfinite(distance):
+        raise ValueError("spine distance must be finite")
+    return DiagramPoint(0.0, 0.0, distance, "spine")
+
+
+def time_sunburst_ray(
+    index: int,
+    ray_count: int,
+    radius: float,
+) -> tuple[DiagramPoint, DiagramPoint]:
+    """Return one radial sunburst ray in the horizontal plane through Self.
+
+    Rays beyond the two horizontal directions are visual encodings of temporal
+    scales or relationships, not additional physical time dimensions.
+    """
+    if isinstance(index, bool) or not isinstance(index, int):
+        raise ValueError("ray index must be an integer")
+    if isinstance(ray_count, bool) or not isinstance(ray_count, int) or ray_count < 2:
+        raise ValueError("ray_count must be an integer of at least 2")
+    if not 0 <= index < ray_count:
+        raise ValueError("ray index must be in [0, ray_count)")
+    if not math.isfinite(radius) or radius <= 0.0:
+        raise ValueError("sunburst radius must be finite and positive")
+    angle = 2.0 * math.pi * index / ray_count
+    endpoint = DiagramPoint(
+        radius * math.cos(angle),
+        radius * math.sin(angle),
+        0.0,
+        "time_sunburst",
+    )
+    return DiagramPoint(0.0, 0.0, 0.0, "self_apex"), endpoint
+
+
+class ElasticPlasticHologram:
+    """A small dependency-free adaptive complex field.
+
+    Complex values encode amplitude and phase. Elastic response is temporary;
+    plastic values are persistent. New input dimensions can be appended as
+    needed. This is a computational representation, not physical holography
+    and not an unlimited-memory guarantee.
+    """
+
+    def __init__(
+        self,
+        initial_state: Iterable[complex] = (),
+        *,
+        elastic_rate: float = 0.5,
+        plastic_rate: float = 0.05,
+    ) -> None:
+        self._validate_rate("elastic_rate", elastic_rate)
+        self._validate_rate("plastic_rate", plastic_rate)
+        self.elastic_rate = elastic_rate
+        self.plastic_rate = plastic_rate
+        self._plastic = [complex(value) for value in initial_state]
+        self._elastic = list(self._plastic)
+        self._validate_field(self._plastic)
+
+    @staticmethod
+    def _validate_rate(name: str, value: float) -> None:
+        if not math.isfinite(value) or not 0.0 <= value <= 1.0:
+            raise ValueError(f"{name} must be finite and in [0, 1]")
+
+    @staticmethod
+    def _validate_field(values: Iterable[complex]) -> None:
+        for value in values:
+            if not (math.isfinite(value.real) and math.isfinite(value.imag)):
+                raise ValueError("holographic field values must be finite")
+
+    @property
+    def plastic_state(self) -> tuple[complex, ...]:
+        """Persistent learned field, exposed immutably."""
+        return tuple(self._plastic)
+
+    @property
+    def elastic_state(self) -> tuple[complex, ...]:
+        """Current temporarily deformed field, exposed immutably."""
+        return tuple(self._elastic)
+
+    def observe(self, values: Iterable[complex]) -> tuple[complex, ...]:
+        """Apply an observation, returning elastic response and updating memory.
+
+        The returned response is computed relative to the pre-update plastic
+        state. Plastic consolidation then moves persistent values toward the
+        observation. Input dimensionality can grow, but never shrinks silently.
+        """
+        observation = [complex(value) for value in values]
+        if not observation:
+            raise ValueError("observation must contain at least one value")
+        self._validate_field(observation)
+
+        size = max(len(self._plastic), len(observation))
+        self._plastic.extend([0j] * (size - len(self._plastic)))
+        self._elastic.extend(self._plastic[len(self._elastic):])
+        observation.extend([0j] * (size - len(observation)))
+
+        response = []
+        for index, value in enumerate(observation):
+            prior = self._plastic[index]
+            temporary = prior + self.elastic_rate * (value - prior)
+            persistent = prior + self.plastic_rate * (value - prior)
+            response.append(temporary)
+            self._plastic[index] = persistent
+            self._elastic[index] = temporary
+        return tuple(response)
+
+    def relax(self, recovery_rate: float = 0.5) -> tuple[complex, ...]:
+        """Relax temporary deformation toward learned state without unlearning."""
+        self._validate_rate("recovery_rate", recovery_rate)
+        self._elastic = [
+            current + recovery_rate * (learned - current)
+            for current, learned in zip(self._elastic, self._plastic, strict=True)
+        ]
+        return self.elastic_state
+
+    def summary(self) -> dict[str, int | float]:
+        """Return non-sensitive diagnostics without exposing field values."""
+        return {
+            "dimensions": len(self._plastic),
+            "elastic_rate": self.elastic_rate,
+            "plastic_rate": self.plastic_rate,
+        }
