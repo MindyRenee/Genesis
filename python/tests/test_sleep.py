@@ -536,7 +536,7 @@ class TestInnerLifeSleepArchitecture:
         stage, is_rem, _ = il._determine_dream_stage(
             SimpleNamespace(phase_name="nrem", arousal=0.15)
         )
-        assert stage is SleepStage.N3
+        assert stage is SleepStage.N1
         assert not is_rem
         stage, is_rem, _ = il._determine_dream_stage(SimpleNamespace(phase_name="rem", arousal=0.6))
         assert stage is SleepStage.REM
