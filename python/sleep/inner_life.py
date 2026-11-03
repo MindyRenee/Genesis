@@ -1469,7 +1469,14 @@ class InnerLife:
         if self._sleep_cycle is not None:
             dt = now - self._last_cycle_advance if self._last_cycle_advance > 0.0 else 0.0
             self._last_cycle_advance = now
-            stage = self._sleep_cycle.advance(dt)
+            # A newly attached tracker has no elapsed interval yet.
+            # Preserve its current stage until real time has accumulated;
+            # advance(0) must not reset the tracker's stage.
+            stage = (
+                self._sleep_cycle.current_stage
+                if dt <= 0.0
+                else self._sleep_cycle.advance(dt)
+            )
         else:
             stage = self._sleep_stage(summary)
         # A nap is light sleep only: the network's N3 and REM are capped.
