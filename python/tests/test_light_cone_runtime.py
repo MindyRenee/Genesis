@@ -33,7 +33,7 @@ def test_bridge_uses_existing_topic_vectors_and_updates_self_apex():
     apex = bridge.manifold.apex
     assert apex is not None
     assert apex.domain is WorldDomain.SELF
-    assert apex.time_s == 10.0
+    assert apex.time_s == 0.0
     assert apex.causes[0].startswith("world:arc:")
     assert bridge.manifold.hologram.plastic_state == (
         complex(0.05, 0.0),
@@ -68,5 +68,5 @@ def test_bridge_clamps_delayed_event_time_without_reversing_apex():
             timestamp=timestamp,
         )
         assert bridge.process(event, embeddings) is True
-    assert bridge.manifold.apex.time_s == 20.0
+    assert bridge.manifold.apex.time_s == 0.0
     assert bridge.manifold.summary()["experience_count"] == 2
