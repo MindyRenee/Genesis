@@ -54,6 +54,10 @@ the language engine — it doesn't recite a template.
 from __future__ import annotations
 
 import logging
+import os
+import shutil
+import subprocess
+import tempfile
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -328,6 +332,45 @@ class Vision:
         """
         self._on_sight = callback
 
+    @staticmethod
+    def _capture_android_frame() -> np.ndarray | None:
+        """Capture one RGB frame when running in Termux without a retina relay.
+
+        Android's Termux:API exposes still capture rather than the POSIX
+        shared-memory stream used by the native retina. Capture is on-demand:
+        Genesis's existing volitional look decides when to open the eye.
+        """
+        camera = shutil.which("termux-camera-photo")
+        if camera is None:
+            return None
+        try:
+            from PIL import Image
+
+            with tempfile.TemporaryDirectory(prefix="genesis-retina-") as temp_dir:
+                image_path = os.path.join(temp_dir, "frame.jpg")
+                result = subprocess.run(
+                    [camera, "-c", "1", image_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=30.0,
+                    check=False,
+                )
+                if (
+                    result.returncode != 0
+                    or not os.path.isfile(image_path)
+                    or os.path.getsize(image_path) == 0
+                ):
+                    detail = (result.stderr or result.stdout).strip()
+                    logger.debug("Android camera capture unavailable: %s", detail)
+                    return None
+                with Image.open(image_path) as image:
+                    image = image.convert("RGB")
+                    image.thumbnail((640, 640), Image.Resampling.LANCZOS)
+                    return np.asarray(image, dtype=np.uint8).copy()
+        except (OSError, RuntimeError, subprocess.SubprocessError) as e:
+            logger.debug("Android camera capture failed: %s", e)
+            return None
+
     def is_available(self, nerve: str = "optic") -> bool:
         """Return whether a live optic-nerve feed can be read.
 
@@ -345,7 +388,9 @@ class Vision:
         if self._available is None:
             try:
                 img = latest_frame(copy=True)
-                self._available = img is not None and img.size > 0
+                self._available = (img is not None and img.size > 0) or (
+                    nerve == "optic" and shutil.which("termux-camera-photo") is not None
+                )
             except (OSError, FileNotFoundError) as e:
                 # No frame on disk — no camera, or the body's eye is
                 # dark. That is the documented text-only degradation,
@@ -594,6 +639,18 @@ class Vision:
             return VisionScene(status="unavailable", relay_gate=relay_gate, nerve=nerve)
         try:
             frame = latest_frame(copy=True, name=NERVE_SEGMENTS.get(nerve, nerve))
+            if frame is None and nerve == "optic":
+                android_rgb = self._capture_android_frame()
+                if android_rgb is not None:
+                    return self.see_frame(
+                        android_rgb,
+                        client=client,
+                        emotion=emotion,
+                        network=network,
+                        mirror=mirror,
+                        nerve="optic",
+                    )
+                return VisionScene(status="unavailable", relay_gate=relay_gate, nerve=nerve)
             if frame is None:
                 return VisionScene(status="mid_update", nerve=nerve)
 
