@@ -421,6 +421,35 @@ class ConversationMixin:
                         stream=kind,
                     )
 
+    def _feed_light_cone_experience(self, event: ExternalEvent) -> None:
+        """Feed grounded world concepts into the shared Self light-cone model.
+
+        This auxiliary representation path leaves workspace, grounding,
+        memory, and replay behavior unchanged. Events without usable concept
+        vectors are skipped rather than encoded from salience or raw text.
+        """
+        try:
+            from temporal_lobe.light_cone_runtime import LightConeExperienceBridge
+
+            embeddings = getattr(self.brain.frontal, "embeddings", None)
+            if embeddings is None:
+                return
+            bridge = getattr(self, "_light_cone_experience_bridge", None)
+            if bridge is None:
+                lock = getattr(self, "_light_cone_experience_bridge_lock", None)
+                if lock is None:
+                    lock = threading.RLock()
+                    self._light_cone_experience_bridge_lock = lock
+                with lock:
+                    bridge = getattr(self, "_light_cone_experience_bridge", None)
+                    if bridge is None:
+                        bridge = LightConeExperienceBridge()
+                        self._light_cone_experience_bridge = bridge
+            bridge.process(event, embeddings)
+        except Exception as exc:  # noqa: BLE001
+            # Experimental geometry must never interrupt established cognition.
+            note_swallowed("mind.conversation._feed_light_cone_experience", exc)
+
     def _on_world_event(self, event: ExternalEvent) -> None:
         """Route an external world event into its cognition.
 
@@ -473,6 +502,7 @@ class ConversationMixin:
         # concept network so cognition reasons over what arrived,
         # not over a description of it.
         self._ground_world_percept(event)
+        self._feed_light_cone_experience(event)
 
         if event.kind == EventKind.USER_SPEECH:
             return
