@@ -115,7 +115,7 @@ def double_cone_coordinate(
     sign = 1.0 if time_coordinate > 0.0 else -1.0
     radius = radial_scale * abs(time_coordinate)
     # Upper sheet advances CCW; lower sheet advances CW.
-    phase = angle + sign * angular_speed * abs(time_coordinate)
+    phase = angle - sign * angular_speed * abs(time_coordinate)
     return ConeCoordinate(
         x=time_coordinate,
         y=radius * math.cos(phase),
