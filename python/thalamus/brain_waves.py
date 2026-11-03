@@ -489,14 +489,17 @@ def _sleep_stage_from_summary(summary: NeuroSummary) -> SleepStage | None:
         else:
             return SleepStage.N3
     if phase == "nrem":
-        # NREM is a broad state, not a depth measurement. Arousal alone
-        # cannot distinguish N1, N2, and N3: those stages are scored from
-        # EEG graphoelements (notably spindles/K-complexes for N2 and
-        # slow-wave activity for N3). Do not fabricate stage depth from
-        # arbitrary arousal cutoffs. Callers with a live sleep-cycle
-        # tracker must pass its explicit stage to _sleep_phase_powers;
-        # without one, N1 is the conservative transition-stage fallback.
-        return SleepStage.N1
+        # The daemon's explicit NREM label excludes REM. When no
+        # SleepCycleTracker stage is supplied, use the same deterministic
+        # fallback bands as the legacy "sleeping" protocol. These are
+        # model control thresholds, not clinical EEG staging criteria;
+        # a live tracker remains authoritative when available.
+        arousal = summary.arousal
+        if arousal > 0.35:
+            return SleepStage.N1
+        if arousal > 0.20:
+            return SleepStage.N2
+        return SleepStage.N3
     return None
 
 
