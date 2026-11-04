@@ -375,10 +375,10 @@ class Vision:
                     detail = (result.stderr or result.stdout).strip()
                     logger.debug("Android camera capture unavailable: %s", detail)
                     return None
-                with Image.open(image_path) as image:
-                    image = image.convert("RGB")
-                    image.thumbnail((640, 640), Image.Resampling.LANCZOS)
-                    return np.asarray(image, dtype=np.uint8).copy()
+                with Image.open(image_path) as source_image:
+                    rgb_image = source_image.convert("RGB")
+                    rgb_image.thumbnail((640, 640), Image.Resampling.LANCZOS)
+                    return np.asarray(rgb_image, dtype=np.uint8).copy()
         except (OSError, RuntimeError, subprocess.SubprocessError) as e:
             logger.debug("Android camera capture failed: %s", e)
             return None
