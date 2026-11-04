@@ -12,9 +12,13 @@ import android.widget.TextView
 class MainActivity : Activity() {
     private companion object {
         const val EXTRA_STOP_CAMERA = "org.genesis.camerabridge.STOP_CAMERA"
+        const val EXTRA_LENS_FACING = "org.genesis.camerabridge.LENS_FACING"
+        const val FRONT_CAMERA = android.hardware.camera2.CameraCharacteristics.LENS_FACING_FRONT
+        const val REAR_CAMERA = android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK
     }
 
     private lateinit var status: TextView
+    private var selectedLensFacing: Int = FRONT_CAMERA
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,9 +27,17 @@ class MainActivity : Activity() {
             textSize = 16f
             setPadding(24, 24, 24, 24)
         }
+        val front = Button(this).apply {
+            text = "Use front camera"
+            setOnClickListener { requestCameraAndStart(FRONT_CAMERA) }
+        }
+        val rear = Button(this).apply {
+            text = "Use rear camera"
+            setOnClickListener { requestCameraAndStart(REAR_CAMERA) }
+        }
         val start = Button(this).apply {
-            text = "Start / retry camera stream"
-            setOnClickListener { requestCameraAndStart() }
+            text = "Start / retry selected camera"
+            setOnClickListener { requestCameraAndStart(selectedLensFacing) }
         }
         val stop = Button(this).apply {
             text = "Stop camera stream"
@@ -37,6 +49,8 @@ class MainActivity : Activity() {
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(status)
+            addView(front)
+            addView(rear)
             addView(start)
             addView(stop)
         })
@@ -58,7 +72,10 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun requestCameraAndStart() {
+    private fun requestCameraAndStart(lensFacing: Int = FRONT_CAMERA) {
+        selectedLensFacing = lensFacing
+        val cameraName = if (lensFacing == FRONT_CAMERA) "front" else "rear"
+        status.text = "Selected $cameraName camera."
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.CAMERA), 41)
             return
@@ -81,8 +98,12 @@ class MainActivity : Activity() {
 
     private fun startStreamService() {
         try {
-            startForegroundService(Intent(this, CameraStreamService::class.java))
-            status.text = "Camera service starting. Its notification reports camera and daemon connection state."
+            startForegroundService(
+                Intent(this, CameraStreamService::class.java)
+                    .putExtra(EXTRA_LENS_FACING, selectedLensFacing)
+            )
+            val cameraName = if (selectedLensFacing == FRONT_CAMERA) "front" else "rear"
+            status.text = "Starting $cameraName camera. The notification reports camera and daemon connection state."
         } catch (error: SecurityException) {
             status.text = "Android refused camera startup: ${error.message ?: "permission or foreground-service restriction"}"
         } catch (error: Exception) {
