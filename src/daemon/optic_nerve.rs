@@ -63,6 +63,8 @@
 use std::io::Read;
 #[cfg(target_os = "android")]
 use std::net::TcpStream;
+#[cfg(target_os = "android")]
+use std::time::Instant;
 use std::sync::Arc;
 #[cfg(not(target_os = "android"))]
 mod optic_shmem {
