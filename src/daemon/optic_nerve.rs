@@ -63,9 +63,9 @@
 use std::io::Read;
 #[cfg(target_os = "android")]
 use std::net::TcpStream;
+use std::sync::Arc;
 #[cfg(target_os = "android")]
 use std::time::Instant;
-use std::sync::Arc;
 #[cfg(not(target_os = "android"))]
 mod optic_shmem {
     pub use shared_memory::{Shmem, ShmemConf};
@@ -1319,7 +1319,9 @@ fn capture_limb(shm_name: &str, stop: &AtomicBool) {
                 stream
             }
             Err(error) => {
-                if !waiting_notice_sent || last_connect_notice.elapsed() >= Duration::from_secs(10) {
+                if !waiting_notice_sent
+                    || last_connect_notice.elapsed() >= Duration::from_secs(10)
+                {
                     eprintln!(
                         "[genesis] eye: waiting for Android Camera2 adapter at 127.0.0.1:8765: {error}"
                     );
