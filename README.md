@@ -1043,8 +1043,11 @@ python3 -c "import nltk; nltk.download('wordnet'); nltk.download('punkt_tab')"
 ./genesis
 ```
 
-`genesis` launches the daemon (which captures the camera itself) and
-the cognitive CLI, plus TTS; Ctrl-C tears everything down
+`genesis` launches the daemon (which owns the optic-capture limb and
+publishes camera frames) and the cognitive CLI, plus TTS. On Linux the
+daemon captures V4L2 directly; on Android the Camera2 adapter forwards
+raw sensor frames to that same daemon-owned optic nerve. Ctrl-C tears
+everything down
 gracefully — a guided descent, not a
 kill. `./genesis --stop` stops a running session; `./genesis --offline`
 disables network access. With no camera or microphone it runs text-only —
