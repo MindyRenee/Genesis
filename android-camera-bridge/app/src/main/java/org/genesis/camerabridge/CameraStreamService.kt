@@ -89,7 +89,9 @@ class CameraStreamService : Service() {
             reader!!.setOnImageAvailableListener({ source ->
                 val image: Image = source.acquireLatestImage() ?: return@setOnImageAvailableListener
                 val captureAt = System.nanoTime()
-                if (captureAt - lastCaptureAtNanos < 100_000_000L) {
+                if (lastCaptureAtNanos != 0L &&
+                    captureAt - lastCaptureAtNanos < 100_000_000L
+                ) {
                     image.close()
                     return@setOnImageAvailableListener
                 }
