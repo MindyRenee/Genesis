@@ -22,6 +22,14 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+def _shared_download_dir() -> Path | None:
+    """Return Termux's shared Download directory when writable."""
+    path = Path.home() / "storage" / "shared" / "Download"
+    if not path.is_dir() or not os.access(path, os.W_OK):
+        return None
+    return path
+
+
 def decode_float32_audio(data: bytes) -> np.ndarray:
     """Decode mono little-endian float32 PCM emitted by ffmpeg."""
     if not data or len(data) % 4:
