@@ -8,12 +8,15 @@ It does not decode scenes, recognize objects, or run perception.
 ## Single visual-afferent path
 
 `Android Camera2` -> `YUV_420_888` to packed RGB24 -> loopback TCP
-(`127.0.0.1:8765`) -> Rust `OpticCapture` limb -> the canonical
+(`127.0.0.1:8765`, Android adapter hosts; daemon connects outward) -> Rust
+`OpticCapture` limb -> the canonical
 `/genesis_optic_nerve` frame mapping -> `genesis_client/optic_nerve.py` ->
 the existing mind-side V1 and perception path.
 
 The transport is only an operating-system boundary between the Android
-hardware sandbox and the Termux daemon. The daemon owns the optic mapping,
+hardware sandbox and the Termux daemon. The Android hardware adapter hosts
+the loopback endpoint; the daemon makes an outbound connection, preserving
+Genesis's single inbound daemon IPC listener. The daemon owns the optic mapping,
 validates frame dimensions and payload lengths, and publishes frames using
 the same 28-byte header and seqlock protocol as the Linux V4L2 capture limb.
 The Python mind has no Android-specific camera fallback or alternate frame
@@ -33,10 +36,11 @@ pushes to this directory or by manual workflow dispatch. Download the
 ## Run on the phone
 
 1. In Termux, update the Genesis checkout on `audit-fixes` and build/start
-   Genesis normally. The daemon starts its Android optic-capture listener.
+   Genesis normally. The daemon starts its Android optic-capture client and retries until the
+Android hardware adapter is active.
 2. Open **Genesis Camera Adapter**, grant camera permission, and tap
    **Start camera stream**.
-3. The service connects to the daemon on loopback. The daemon publishes each
+3. The service hosts the loopback camera endpoint for the daemon to connect to. The daemon publishes each
    validated frame to the canonical optic mapping; the ordinary mind-side
    vision path consumes it when Genesis chooses to look.
 4. Tap **Stop camera stream** or stop the service to release the camera.

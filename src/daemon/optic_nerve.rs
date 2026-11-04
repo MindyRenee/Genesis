@@ -62,7 +62,11 @@
 #[cfg(target_os = "android")]
 use std::io::Read;
 #[cfg(target_os = "android")]
+<<<<<<< HEAD
 use std::net::{TcpListener, TcpStream};
+=======
+use std::net::TcpStream;
+>>>>>>> 393897162c2df531721afe67c6070759c6547d7c
 use std::sync::Arc;
 #[cfg(not(target_os = "android"))]
 mod optic_shmem {
@@ -1234,7 +1238,7 @@ fn publish_android_frame(
 fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, stop: &AtomicBool) {
     use std::io::ErrorKind;
 
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
     loop {
         if stop.load(Ordering::Relaxed) {
             return;
@@ -1300,27 +1304,23 @@ fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, sto
 /// never branches around the optic nerve.
 #[cfg(target_os = "android")]
 fn capture_limb(shm_name: &str, stop: &AtomicBool) {
-    use std::io::ErrorKind;
-
-    let listener = match TcpListener::bind(("127.0.0.1", 8765)) {
-        Ok(listener) => listener,
-        Err(error) => {
-            eprintln!("[genesis] eye: cannot bind Android camera input: {error}");
-            return;
-        }
-    };
-    if let Err(error) = listener.set_nonblocking(true) {
-        eprintln!("[genesis] eye: cannot configure Android camera listener: {error}");
-        return;
-    }
-    eprintln!("[genesis] eye: Android optic limb listening on 127.0.0.1:8765");
-
+    // The Android Camera2 service owns the platform-facing listener.
+    // The daemon connects outward, preserving the body's single inbound
+    // IPC entrance while still publishing into its canonical optic map.
     while !stop.load(Ordering::Relaxed) {
-        // Each connection owns one mapping lifetime. If the camera app
-        // disconnects or stops producing frames, the two-second read
-        // timeout closes this life and unlinks its mapping. A later
-        // connection receives a fresh mapping, so readers cannot mistake
-        // a dead camera's last frame for live input.
+        let stream = match TcpStream::connect(("127.0.0.1", 8765)) {
+            Ok(stream) => stream,
+            Err(_) => {
+                thread::sleep(Duration::from_millis(500));
+                continue;
+            }
+        };
+        if let Err(error) = stream.set_read_timeout(Some(Duration::from_secs(2))) {
+            eprintln!("[genesis] eye: cannot configure Android camera stream: {error}");
+            thread::sleep(Duration::from_millis(500));
+            continue;
+        }
+
         optic_shmem::unlink(shm_name);
         let mapping_size = HEADER_SIZE + ANDROID_MAX_FRAME_BYTES;
         let shmem = match optic_shmem::ShmemConf::new()
@@ -1336,35 +1336,13 @@ fn capture_limb(shm_name: &str, stop: &AtomicBool) {
             }
         };
 
-        let mut connected = false;
-        while !stop.load(Ordering::Relaxed) {
-            match listener.accept() {
-                Ok((stream, _peer)) => {
-                    connected = true;
-                    eprintln!("[genesis] eye: Android camera adapter connected");
-                    receive_android_frames(stream, &shmem, stop);
-                    break;
-                }
-                Err(error) if error.kind() == ErrorKind::WouldBlock => {
-                    thread::sleep(Duration::from_millis(50));
-                }
-                Err(error) => {
-                    eprintln!("[genesis] eye: Android camera accept failed: {error}");
-                    thread::sleep(Duration::from_millis(250));
-                }
-            }
-        }
-
-        // Remove the public name before releasing our mapping. Any
-        // in-flight reader may finish against its existing mapping;
-        // new readers see the absent-eye condition until the next life.
+        eprintln!("[genesis] eye: Android camera adapter connected");
+        receive_android_frames(stream, &shmem, stop);
         optic_shmem::unlink(shm_name);
         drop(shmem);
-        if stop.load(Ordering::Relaxed) {
-            break;
-        }
-        if connected {
-            eprintln!("[genesis] eye: Android camera adapter disconnected; awaiting reconnect");
+        if !stop.load(Ordering::Relaxed) {
+            eprintln!("[genesis] eye: Android camera adapter disconnected; reconnecting");
+            thread::sleep(Duration::from_millis(250));
         }
     }
     optic_shmem::unlink(shm_name);

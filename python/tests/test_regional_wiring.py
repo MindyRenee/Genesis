@@ -210,9 +210,6 @@ _ALLOWLIST: dict[str, str] = {
     "infrastructure": "support layer (persistence, config, journal)",
     "eval": "baseline/drift/assay harness",
     "frontal_lobe.krita_studio": "Krita plugin bridge — platform adapter, not a brain function",
-    "occipital_lobe.perception.android_stream": (
-        "Android camera frame transport adapter for the perception input path"
-    ),
     # Differentiable light-cone adapter is optional on platforms without PyTorch.
     "temporal_lobe.light_cone_torch": "optional PyTorch light-cone adapter",
     "temporal_lobe.light_cone_runtime": "event-to-manifold runtime adapter",

@@ -19,8 +19,9 @@ import android.os.HandlerThread
 import android.os.IBinder
 import java.io.BufferedOutputStream
 import java.io.DataOutputStream
+import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.net.Socket
+import java.net.ServerSocket
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
@@ -40,6 +41,7 @@ class CameraStreamService : Service() {
     private var cameraThread: HandlerThread? = null
     private var cameraHandler: Handler? = null
     private var sender: Thread? = null
+    @Volatile private var serverSocket: ServerSocket? = null
     private val frameLock = Any()
     private var latestRgb: ByteArray? = null
     private var latestWidth: Int = 0
@@ -218,19 +220,30 @@ class CameraStreamService : Service() {
     }
 
     /**
-     * Send GOPT | width:u32 BE | height:u32 BE | payload_bytes:u32 BE
-     * | packed RGB24. The daemon is the only receiver and writes the
-     * canonical shared-memory optic-nerve frame.
+     * Host the hardware-boundary endpoint on loopback. The daemon
+     * connects outward and remains the sole owner of the optic mapping;
+     * this avoids adding a second inbound listener to the daemon.
      */
     private fun sendFrames() {
-        var lastSentSequence = 0L
-        while (running.get()) {
-            try {
-                Socket().use { socket ->
-                    socket.connect(InetSocketAddress("127.0.0.1", 8765), 1000)
-                    socket.tcpNoDelay = true
-                    DataOutputStream(BufferedOutputStream(socket.getOutputStream())).use { output ->
-                        while (running.get()) {
+        try {
+            ServerSocket().use { server ->
+                server.reuseAddress = true
+                server.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 8765))
+                serverSocket = server
+                while (running.get()) {
+                    val socket = try {
+                        server.accept()
+                    } catch (_: Exception) {
+                        if (!running.get()) break
+                        continue
+                    }
+                    socket.use { connection ->
+                        connection.tcpNoDelay = true
+                        val output = DataOutputStream(
+                            BufferedOutputStream(connection.getOutputStream())
+                        )
+                        var lastSentSequence = 0L
+                        while (running.get() && !connection.isClosed) {
                             val snapshot = synchronized(frameLock) {
                                 val frame = latestRgb
                                 if (frame != null && latestSequence != lastSentSequence) {
@@ -258,18 +271,17 @@ class CameraStreamService : Service() {
                         }
                     }
                 }
-            } catch (_: Exception) {
-                try {
-                    Thread.sleep(1000)
-                } catch (_: InterruptedException) {
-                    return
-                }
             }
+        } catch (_: Exception) {
+            if (running.get()) stopSelf()
+        } finally {
+            serverSocket = null
         }
     }
 
     override fun onDestroy() {
         running.set(false)
+        try { serverSocket?.close() } catch (_: Exception) { }
         try {
             session?.stopRepeating()
         } catch (_: Exception) {
