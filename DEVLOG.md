@@ -17,7 +17,8 @@ frame transmission. Camera open, configuration, permission, frame conversion,
 and transport failures are logged. The foreground notification no longer
 claims a live connection before a frame has been sent. The Rust limb also
 reports rate-limited connection failures and receipt of the first published
-frame.
+frame. The supported `./genesis --stop` path requests graceful camera-service
+shutdown through the adapter's owning activity after the daemon exits.
 
 **Verification boundary:** source-level integration and CI compilation do
 not prove the device will grant permission, launch the activity from Termux,

@@ -10,6 +10,10 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 class MainActivity : Activity() {
+    private companion object {
+        const val EXTRA_STOP_CAMERA = "org.genesis.camerabridge.STOP_CAMERA"
+    }
+
     private lateinit var status: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,6 +40,15 @@ class MainActivity : Activity() {
             addView(start)
             addView(stop)
         })
+        // The Genesis stop command enters through this explicit activity
+        // action so the service is stopped inside its owning application.
+        if (intent.getBooleanExtra(EXTRA_STOP_CAMERA, false)) {
+            stopService(Intent(this, CameraStreamService::class.java))
+            status.text = "Camera stream stopped."
+            finish()
+            return
+        }
+
         // Genesis launches this activity from its supported Termux entry
         // point. Request permission here while the activity is visible;
         // Android will not grant a camera foreground service access from

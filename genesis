@@ -243,13 +243,29 @@ for arg in "$@"; do
     esac
 done
 
+# Stop the Android Camera2 service through its owning activity.
+# Termux cannot stop a non-exported Android service directly; this explicit
+# activity action keeps service ownership and Android's app boundary intact.
+_stop_android_camera() {
+    if [ -n "${TERMUX_VERSION:-}" ] || [ -d /data/data/com.termux ]; then
+        if command -v am >/dev/null 2>&1; then
+            if ! am start -W -n org.genesis.camerabridge/.MainActivity \
+                --ez org.genesis.camerabridge.STOP_CAMERA true >/dev/null 2>&1; then
+                echo "[genesis] Android camera adapter was unavailable to stop." >&2
+            fi
+        fi
+    fi
+}
+
 # ─── Handle --stop ───────────────────────────────────────────────────
 if [ "$WANT_STOP" -eq 1 ]; then
     if _is_running; then
         echo "  Stopping Genesis..."
         _stop_all || exit 1
+        _stop_android_camera
         echo "  Genesis stopped."
     else
+        _stop_android_camera
         echo "  Genesis is not running."
     fi
     exit 0

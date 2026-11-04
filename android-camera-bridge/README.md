@@ -49,8 +49,8 @@ pushes to this directory or by manual workflow dispatch. Download the
    connection merely because the service started.
 4. The daemon publishes validated frames to the canonical optic mapping;
    the ordinary mind-side vision path consumes them when Genesis chooses to
-   look. Stop the stream from the activity or stop Genesis to release the
-   camera.
+   look. Stop the stream from the activity or run `./genesis --stop`; the
+   supported launcher stops the camera service after the daemon shuts down.
 
 Android requires a user-granted runtime camera permission and a visible
 foreground activity when starting a camera foreground service. Termux cannot
