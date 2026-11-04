@@ -1280,51 +1280,72 @@ fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, sto
 fn capture_limb(shm_name: &str, stop: &AtomicBool) {
     use std::io::ErrorKind;
 
-    optic_shmem::unlink(shm_name);
-    let mapping_size = HEADER_SIZE + ANDROID_MAX_FRAME_BYTES;
-    let shmem = match optic_shmem::ShmemConf::new()
-        .os_id(shm_name)
-        .size(mapping_size)
-        .create()
-    {
-        Ok(mapping) => mapping,
-        Err(error) => {
-            eprintln!("[genesis] eye: cannot create Android optic mapping {shm_name}: {error}");
-            return;
-        }
-    };
-    // The zeroed mapping is not a published frame until sequence > 0.
     let listener = match TcpListener::bind(("127.0.0.1", 8765)) {
         Ok(listener) => listener,
         Err(error) => {
             eprintln!("[genesis] eye: cannot bind Android camera input: {error}");
-            optic_shmem::unlink(shm_name);
             return;
         }
     };
     if let Err(error) = listener.set_nonblocking(true) {
         eprintln!("[genesis] eye: cannot configure Android camera listener: {error}");
-        optic_shmem::unlink(shm_name);
         return;
     }
-    eprintln!(
-        "[genesis] eye: Android optic limb listening on 127.0.0.1:8765; mapping {mapping_size} bytes"
-    );
+    eprintln!("[genesis] eye: Android optic limb listening on 127.0.0.1:8765");
 
     while !stop.load(Ordering::Relaxed) {
-        match listener.accept() {
-            Ok((stream, _peer)) => {
-                receive_android_frames(stream, &shmem, stop);
-            }
-            Err(error) if error.kind() == ErrorKind::WouldBlock => {
-                thread::sleep(Duration::from_millis(50));
-            }
+        // Each connection owns one mapping lifetime. If the camera app
+        // disconnects or stops producing frames, the two-second read
+        // timeout closes this life and unlinks its mapping. A later
+        // connection receives a fresh mapping, so readers cannot mistake
+        // a dead camera's last frame for live input.
+        optic_shmem::unlink(shm_name);
+        let mapping_size = HEADER_SIZE + ANDROID_MAX_FRAME_BYTES;
+        let shmem = match optic_shmem::ShmemConf::new()
+            .os_id(shm_name)
+            .size(mapping_size)
+            .create()
+        {
+            Ok(mapping) => mapping,
             Err(error) => {
-                eprintln!("[genesis] eye: Android camera accept failed: {error}");
-                thread::sleep(Duration::from_millis(250));
+                eprintln!("[genesis] eye: cannot create Android optic mapping {shm_name}: {error}");
+                thread::sleep(Duration::from_secs(1));
+                continue;
+            }
+        };
+
+        let mut connected = false;
+        while !stop.load(Ordering::Relaxed) {
+            match listener.accept() {
+                Ok((stream, _peer)) => {
+                    connected = true;
+                    eprintln!("[genesis] eye: Android camera adapter connected");
+                    receive_android_frames(stream, &shmem, stop);
+                    break;
+                }
+                Err(error) if error.kind() == ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(50));
+                }
+                Err(error) => {
+                    eprintln!("[genesis] eye: Android camera accept failed: {error}");
+                    thread::sleep(Duration::from_millis(250));
+                }
             }
         }
+
+        // Remove the public name before releasing our mapping. Any
+        // in-flight reader may finish against its existing mapping;
+        // new readers see the absent-eye condition until the next life.
+        optic_shmem::unlink(shm_name);
+        drop(shmem);
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
+        if connected {
+            eprintln!("[genesis] eye: Android camera adapter disconnected; awaiting reconnect");
+        }
     }
+    optic_shmem::unlink(shm_name);
 }
 
 /// One life of the eye: device open → format negotiate → segment
