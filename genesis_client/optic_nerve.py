@@ -19,6 +19,8 @@ which is the words side.
 
 from __future__ import annotations
 
+import mmap
+import os
 import struct
 from multiprocessing import resource_tracker, shared_memory
 
@@ -45,12 +47,53 @@ _HEADER_FMT = "<QII4sII"
 _MAX_RETRIES = 64
 
 
+class _FrameFile:
+    """Read-only attach to a file-backed frame segment.
+
+    Android (Termux) has no POSIX shared-memory namespace, so the native
+    producer publishes the same frame protocol as a file named
+    ``<name>.frame`` in the temporary directory. This mirrors its
+    ``.buf`` / ``close()`` surface so the reader needs no other change.
+    """
+
+    def __init__(self, path: str) -> None:
+        self._file = open(path, "rb")
+        try:
+            self._mmap = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
+        except (OSError, ValueError):
+            self._file.close()
+            raise
+        self.buf = memoryview(self._mmap)
+        # Not a POSIX segment, so nothing for the resource tracker to own.
+        self._name = None
+        self.name = None
+
+    def close(self) -> None:
+        self.buf.release()
+        self._mmap.close()
+        self._file.close()
+
+
+def _attach_segment(name: str):
+    """Attach to the POSIX segment, or to the Termux frame file if that is all there is."""
+    try:
+        return shared_memory.SharedMemory(name=name, create=False)
+    except OSError:
+        # The Rust producer's frame file: the name's leaf, plus ".frame",
+        # under $TMPDIR (or /tmp), exactly as std::env::temp_dir() resolves it.
+        leaf = name.lstrip("/")
+        path = os.path.join(os.environ.get("TMPDIR") or "/tmp", leaf + ".frame")
+        if os.path.isfile(path):
+            return _FrameFile(path)
+        raise
+
+
 class OpticNerve:
     """Attach to the live optic-nerve segment and expose frames as numpy arrays."""
 
     def __init__(self, name: str = NAME) -> None:
-        """Attach to the named optic-nerve shared-memory segment without creating it."""
-        self._shmem = shared_memory.SharedMemory(name=name, create=False)
+        """Attach to the named optic-nerve segment without creating it."""
+        self._shmem = _attach_segment(name)
         # Prevent the multiprocessing resource tracker from unlinking the
         # persistent shared memory when this Python process exits. The
         # tracker was registered with the POSIX name (leading slash);
