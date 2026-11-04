@@ -601,9 +601,7 @@ impl OpticNerve {
         // disconnected limb is eventually detached and a replacement
         // mapping under the same name can be discovered.
         let last_activity_ms = self.last_attach_ms.max(self.last_fresh_ms);
-        if self.shm.is_some()
-            && now_ms.saturating_sub(last_activity_ms) > FRESH_WINDOW_MS
-        {
+        if self.shm.is_some() && now_ms.saturating_sub(last_activity_ms) > FRESH_WINDOW_MS {
             self.shm = None;
             self.last_seq = 0;
             self.last_attach_ms = 0;
@@ -1171,8 +1169,7 @@ const ANDROID_MAX_WIDTH: u32 = 640;
 #[cfg(any(target_os = "android", test))]
 const ANDROID_MAX_HEIGHT: u32 = 480;
 #[cfg(any(target_os = "android", test))]
-const ANDROID_MAX_FRAME_BYTES: usize =
-    ANDROID_MAX_WIDTH as usize * ANDROID_MAX_HEIGHT as usize * 3;
+const ANDROID_MAX_FRAME_BYTES: usize = ANDROID_MAX_WIDTH as usize * ANDROID_MAX_HEIGHT as usize * 3;
 #[cfg(target_os = "android")]
 const ANDROID_FRAME_MAGIC: &[u8; 4] = b"GOPT";
 
@@ -1208,7 +1205,10 @@ fn publish_android_frame(
         ));
     }
     if mapping_len < HEADER_SIZE.saturating_add(expected) {
-        return Err(Error::new(\n            ErrorKind::InvalidData,\n            "Android frame exceeds optic mapping",\n        ));
+        return Err(Error::new(
+            ErrorKind::InvalidData,
+            "Android frame exceeds optic mapping",
+        ));
     }
 
     // SAFETY: the capture limb creates a page-aligned mapping whose
@@ -1234,7 +1234,7 @@ fn publish_android_frame(
 fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, stop: &AtomicBool) {
     use std::io::ErrorKind;
 
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
     loop {
         if stop.load(Ordering::Relaxed) {
             return;
@@ -1270,7 +1270,10 @@ fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, sto
                     && width <= ANDROID_MAX_WIDTH
                     && height <= ANDROID_MAX_HEIGHT
                     && size == payload_len
-                    && size <= ANDROID_MAX_FRAME_BYTES =>\n            {\n                size\n            }
+                    && size <= ANDROID_MAX_FRAME_BYTES =>
+            {
+                size
+            }
             _ => {
                 eprintln!("[genesis] eye: rejected malformed Android frame dimensions or length");
                 return;
@@ -2016,7 +2019,10 @@ mod tests {
             let mut fourcc = [0u8; 4];
             std::ptr::copy_nonoverlapping(base.add(16), fourcc.as_mut_ptr(), 4);
             assert_eq!(&fourcc, b"RGB3");
-            assert_eq!(\n                std::ptr::read_volatile(base.add(20) as *const u32),\n                rgb.len() as u32\n            );
+            assert_eq!(
+                std::ptr::read_volatile(base.add(20) as *const u32),
+                rgb.len() as u32
+            );
             assert_eq!(std::ptr::read_volatile(base.add(24) as *const u32), 24);
             assert_eq!(
                 std::slice::from_raw_parts(base.add(HEADER_SIZE), rgb.len()),
