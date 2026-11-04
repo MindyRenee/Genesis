@@ -28,12 +28,12 @@ The adapter requests a YUV_420_888 output size no larger than
 .B CONTROL_MODE_AUTO
 and a preview template. The adapter selects an available
 auto-exposure target frame-rate range when one fits its low-rate
-capture policy. It does not set manual exposure time, sensor ISO,
-exposure compensation, explicit autofocus mode or focus region,
-or a manual white-balance override. Effective sensor behavior
-therefore depends on the Camera2 preview template and device
-implementation; Genesis does not expose those physical controls
-as configurable settings here.
+capture policy. The adapter does not explicitly override sensor exposure
+time, ISO, exposure compensation, autofocus mode or regions, or
+white-balance mode. Those behaviors are left to the Camera2
+preview-template defaults and the device implementation; Genesis
+does not expose manual physical-camera controls as configurable
+settings here.
 .PP
 The Android service hosts a loopback TCP listener at
 .IR 127.0.0.1:8765 .
