@@ -56,11 +56,21 @@
 //! `relay_gain`, and the meaning of the pixels lives entirely in the
 //! mind — the words side.
 
-use std::ffi::CString;
 use std::sync::Arc;
 #[cfg(not(target_os = "android"))]
 mod optic_shmem {
     pub use shared_memory::{Shmem, ShmemConf};
+
+    /// Remove a POSIX segment name. Mappings already held keep the
+    /// data until they detach; a missing name is ENOENT, ignored.
+    pub fn unlink(name: &str) {
+        if let Ok(cname) = std::ffi::CString::new(name) {
+            // SAFETY: `cname` is a valid NUL-terminated CString.
+            unsafe {
+                let _ = libc::shm_unlink(cname.as_ptr());
+            }
+        }
+    }
 }
 
 #[cfg(target_os = "android")]
@@ -88,6 +98,10 @@ mod optic_shmem {
         pub fn as_ptr(&self) -> *mut u8 {
             self.ptr.as_ptr()
         }
+
+        pub fn len(&self) -> usize {
+            self.len
+        }
     }
 
     impl Drop for Shmem {
@@ -100,16 +114,93 @@ mod optic_shmem {
 
     pub struct ShmemConf {
         name: Option<String>,
+        size: Option<usize>,
+    }
+
+    /// Frame file for a segment name: one path component under the
+    /// Termux temporary directory, shared by producer and reader.
+    fn frame_path(name: &str) -> io::Result<PathBuf> {
+        let leaf = name.trim_start_matches('/');
+        if leaf.is_empty() || leaf.contains('/') || leaf == "." || leaf == ".." {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "optic transport name must be a single path component",
+            ));
+        }
+        Ok(std::env::temp_dir().join(format!("{leaf}.frame")))
+    }
+
+    /// Remove a segment's frame file. Mappings already held keep the
+    /// data until they detach, matching POSIX shm_unlink semantics.
+    pub fn unlink(name: &str) {
+        if let Ok(path) = frame_path(name) {
+            let _ = std::fs::remove_file(path);
+        }
     }
 
     impl ShmemConf {
         pub fn new() -> Self {
-            Self { name: None }
+            Self {
+                name: None,
+                size: None,
+            }
         }
 
         pub fn os_id(mut self, name: &str) -> Self {
             self.name = Some(name.to_owned());
             self
+        }
+
+        pub fn size(mut self, bytes: usize) -> Self {
+            self.size = Some(bytes);
+            self
+        }
+
+        /// Create a fresh frame file of `size` bytes and map it
+        /// read-write. The producer owns the file; readers attach with
+        /// `open`.
+        pub fn create(self) -> io::Result<Shmem> {
+            let name = self.name.ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "frame transport name is missing")
+            })?;
+            let size = self.size.ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "frame transport size is missing")
+            })?;
+            if size < 28 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "optic transport is smaller than its frame header",
+                ));
+            }
+            let path = frame_path(&name)?;
+            let file = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(path)?;
+            file.set_len(size as u64)?;
+            let mapped = unsafe {
+                libc::mmap(
+                    std::ptr::null_mut(),
+                    size,
+                    libc::PROT_READ | libc::PROT_WRITE,
+                    libc::MAP_SHARED,
+                    file.as_raw_fd(),
+                    0,
+                )
+            };
+            if mapped == libc::MAP_FAILED {
+                return Err(io::Error::last_os_error());
+            }
+            let ptr = NonNull::new(mapped.cast::<u8>()).ok_or_else(|| {
+                io::Error::new(io::ErrorKind::Other, "mmap returned a null address")
+            })?;
+            Ok(Shmem {
+                ptr,
+                len: size,
+                _file: file,
+            })
         }
 
         pub fn open(self) -> io::Result<Shmem> {
@@ -119,14 +210,7 @@ mod optic_shmem {
                     "frame transport name is missing",
                 )
             })?;
-            let leaf = name.trim_start_matches('/');
-            if leaf.is_empty() || leaf.contains('/') || leaf == "." || leaf == ".." {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "optic transport name must be a single path component",
-                ));
-            }
-            let path: PathBuf = std::env::temp_dir().join(format!("{leaf}.frame"));
+            let path = frame_path(&name)?;
             let file = File::open(path)?;
             let len = usize::try_from(file.metadata()?.len()).map_err(|_| {
                 io::Error::new(io::ErrorKind::InvalidData, "invalid optic transport size")
@@ -989,13 +1073,7 @@ impl OpticCapture {
     /// harmlessly, ENOENT.
     pub fn stop(&self) {
         self.stop.store(true, Ordering::Relaxed);
-        if let Ok(name) = CString::new(self.shm_name.as_str()) {
-            // SAFETY: `name` is a valid NUL-terminated CString;
-            // shm_unlink of a missing name returns ENOENT, ignored.
-            unsafe {
-                let _ = libc::shm_unlink(name.as_ptr());
-            }
-        }
+        optic_shmem::unlink(&self.shm_name);
     }
 }
 
@@ -1173,15 +1251,9 @@ fn eye_life(shm_name: &str, camera_index: usize, camera_path: &str, stop: &Atomi
     // Drop any stale segment so the create below succeeds. One life,
     // one segment — the handle stays the owner, so its drop unlinks
     // the name and the next life starts fresh.
-    if let Ok(cname) = CString::new(shm_name) {
-        // SAFETY: `cname` is a valid NUL-terminated CString; ENOENT
-        // is expected and discarded.
-        unsafe {
-            let _ = libc::shm_unlink(cname.as_ptr());
-        }
-    }
+    optic_shmem::unlink(shm_name);
     let shm_size = HEADER_SIZE + fmt.size as usize;
-    let shmem = match shared_memory::ShmemConf::new()
+    let shmem = match optic_shmem::ShmemConf::new()
         .os_id(shm_name)
         .size(shm_size)
         .create()
