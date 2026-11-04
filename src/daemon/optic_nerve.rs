@@ -85,17 +85,20 @@ mod optic_shmem {
     use std::path::PathBuf;
     use std::ptr::NonNull;
 
-    /// Android/Termux read-side mapping. Bionic does not implement
-    /// POSIX shm_open/shm_unlink, so this uses a named file-backed mmap
-    /// in Termux's private temporary directory. A same-UID producer can
-    /// publish the same frame protocol through this file.
+    /// Android/Termux file-backed mapping. Bionic does not implement
+    /// POSIX shm_open/shm_unlink, so the daemon owns a named mmap in
+    /// Termux's private temporary directory. The sandboxed Camera2 app
+    /// sends frames to the daemon over loopback; the Python mind attaches
+    /// read-only to this same file and consumes the ordinary optic protocol.
     pub struct Shmem {
         ptr: NonNull<u8>,
         len: usize,
         _file: File,
     }
 
-    // The mapping is process-local and only read by the optic nerve.
+    // SAFETY: moving the mapping handle between threads does not move
+    // or invalidate the mmap address. The handle is not Sync; concurrent
+    // frame access is coordinated through the shared seqlock protocol.
     unsafe impl Send for Shmem {}
 
     impl Shmem {
@@ -1197,7 +1200,10 @@ fn publish_android_frame(
         .checked_mul(height as usize)
         .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "Android frame size overflow"))?;
     if rgb.len() != expected || rgb.len() > ANDROID_MAX_FRAME_BYTES {
-        return Err(Error::new(ErrorKind::InvalidData, "Android RGB payload length does not match dimensions"));
+        return Err(Error::new(
+            ErrorKind::InvalidData,
+            "Android RGB payload length does not match dimensions",
+        ));
     }
     if mapping_len < HEADER_SIZE.saturating_add(expected) {
         return Err(Error::new(ErrorKind::InvalidData, "Android frame exceeds optic mapping"));
@@ -1249,8 +1255,11 @@ fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, sto
         }
         let width = u32::from_be_bytes(header[4..8].try_into().expect("four-byte width"));
         let height = u32::from_be_bytes(header[8..12].try_into().expect("four-byte height"));
-        let payload_len =
-            u32::from_be_bytes(header[12..16].try_into().expect("four-byte payload length")) as usize;
+        let payload_len = u32::from_be_bytes(
+            header[12..16]
+                .try_into()
+                .expect("four-byte payload length"),
+        ) as usize;
         let expected = match (width as usize)
             .checked_mul(height as usize)
             .and_then(|pixels| pixels.checked_mul(3))
@@ -1318,7 +1327,9 @@ fn capture_limb(shm_name: &str, stop: &AtomicBool) {
         {
             Ok(mapping) => mapping,
             Err(error) => {
-                eprintln!("[genesis] eye: cannot create Android optic mapping {shm_name}: {error}");
+                eprintln!(
+                    "[genesis] eye: cannot create Android optic mapping {shm_name}: {error}"
+                );
                 thread::sleep(Duration::from_secs(1));
                 continue;
             }
