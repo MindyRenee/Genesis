@@ -51,6 +51,7 @@ from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from itertools import product
+from typing import cast
 
 __all__ = [
     "MAX_ATOMS",
@@ -662,7 +663,7 @@ class Polysyllogism:
     @property
     def conclusion(self) -> Categorical:
         """The conclusion of the last step actually checked."""
-        return self.deductions[-1].conclusion
+        return cast(Categorical, self.deductions[-1].conclusion)
 
     @property
     def failed_step(self) -> int | None:
