@@ -26,8 +26,9 @@ class TorchLightConeField(nn.Module):
 
     Coordinates use x as horizontal time and (y, z) as transverse coordinates.
     The future and past sheets counter-rotate when measured outward from the
-    shared apex. The radius remains exactly c*abs(t), so rotation cannot alter
-    the represented light-cone boundary.
+    shared apex: phase advances with positive time and retreats with negative
+    time. The radius remains exactly c*abs(t), so rotation cannot alter the
+    represented light-cone boundary.
 
     plastic_state is a persistent buffer; elastic_state is a temporary buffer.
     Call observe to update both explicitly. Use forward for differentiable
@@ -91,13 +92,14 @@ class TorchLightConeField(nn.Module):
         """Map times and angles to [..., 3] points on the causal boundary.
 
         Positive time selects the future sheet, negative time the past sheet.
-        Opposite phase signs encode counter-rotation while preserving
+        The signed-time phase makes the sheets counter-rotate when followed
+        outward from their shared apex, while preserving
         y**2 + z**2 == (signal_speed * abs(time))**2.
         """
         time, angle = torch.broadcast_tensors(time, angle)
         if not torch.is_floating_point(time) or not torch.is_floating_point(angle):
             raise TypeError("time and angle tensors must use floating-point dtypes")
-        phase = angle - torch.sign(time) * self.angular_speed * time.abs() + self.phase_bias
+        phase = angle + self.angular_speed * time + self.phase_bias
         radius = self.signal_speed * time.abs()
         y = radius * torch.cos(phase)
         z = radius * torch.sin(phase)
