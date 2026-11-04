@@ -1,9 +1,12 @@
 //! Optic nerve — the whole retinal afferent path, held inside the body.
 //!
-//! The nerve's retinal end is the body's own limb: the daemon opens
-//! the camera itself and writes raw frames into the POSIX
-//! shared-memory segment `/genesis_optic_nerve` — that segment is
-//! the optic nerve. Anatomically the nerve does not reach cortex
+//! The nerve's retinal end is the body's own limb. On Linux the daemon
+//! opens the camera directly through V4L2; on Android a Camera2 adapter
+//! opens the sandboxed device and forwards raw frames to the daemon's
+//! capture limb. The daemon publishes both sources through the same
+//! `/genesis_optic_nerve` frame contract (POSIX shared memory on Linux,
+//! file-backed mmap on Android) — that mapping is the optic nerve.
+//! Anatomically the nerve does not reach cortex
 //! directly: its ~10⁶ ganglion-cell axons fan out to roughly forty
 //! subcortical targets, and only the thalamocortical radiation
 //! carries what the thalamus relays onward. The subcortical
