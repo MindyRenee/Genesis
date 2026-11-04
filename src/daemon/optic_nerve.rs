@@ -58,15 +58,127 @@
 
 use std::ffi::CString;
 use std::sync::Arc;
+#[cfg(not(target_os = "android"))]
+mod optic_shmem {
+    pub use shared_memory::{Shmem, ShmemConf};
+}
+
+#[cfg(target_os = "android")]
+mod optic_shmem {
+    use std::fs::File;
+    use std::io;
+    use std::os::fd::AsRawFd;
+    use std::path::PathBuf;
+    use std::ptr::NonNull;
+
+    /// Android/Termux read-side mapping. Bionic does not implement
+    /// POSIX shm_open/shm_unlink, so this uses a named file-backed mmap
+    /// in Termux's private temporary directory. A same-UID producer can
+    /// publish the same frame protocol through this file.
+    pub struct Shmem {
+        ptr: NonNull<u8>,
+        len: usize,
+        _file: File,
+    }
+
+    // The mapping is process-local and only read by the optic nerve.
+    unsafe impl Send for Shmem {}
+
+    impl Shmem {
+        pub fn as_ptr(&self) -> *mut u8 {
+            self.ptr.as_ptr()
+        }
+    }
+
+    impl Drop for Shmem {
+        fn drop(&mut self) {
+            unsafe {
+                libc::munmap(self.ptr.as_ptr().cast(), self.len);
+            }
+        }
+    }
+
+    pub struct ShmemConf {
+        name: Option<String>,
+    }
+
+    impl ShmemConf {
+        pub fn new() -> Self {
+            Self { name: None }
+        }
+
+        pub fn os_id(mut self, name: &str) -> Self {
+            self.name = Some(name.to_owned());
+            self
+        }
+
+        pub fn open(self) -> io::Result<Shmem> {
+            let name = self.name.ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "frame transport name is missing",
+                )
+            })?;
+            let leaf = name.trim_start_matches('/');
+            if leaf.is_empty() || leaf.contains('/') || leaf == "." || leaf == ".." {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "optic transport name must be a single path component",
+                ));
+            }
+            let path: PathBuf = std::env::temp_dir().join(format!("{leaf}.frame"));
+            let file = File::open(path)?;
+            let len = usize::try_from(file.metadata()?.len()).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidData, "invalid optic transport size")
+            })?;
+            if len < 28 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "optic transport is smaller than its frame header",
+                ));
+            }
+            let mapped = unsafe {
+                libc::mmap(
+                    std::ptr::null_mut(),
+                    len,
+                    libc::PROT_READ,
+                    libc::MAP_SHARED,
+                    file.as_raw_fd(),
+                    0,
+                )
+            };
+            if mapped == libc::MAP_FAILED {
+                return Err(io::Error::last_os_error());
+            }
+            let ptr = NonNull::new(mapped.cast::<u8>()).ok_or_else(|| {
+                io::Error::new(io::ErrorKind::Other, "mmap returned a null address")
+            })?;
+            Ok(Shmem {
+                ptr,
+                len,
+                _file: file,
+            })
+        }
+    }
+}
+
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread::{self, JoinHandle};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+#[cfg(target_os = "linux")]
+use std::time::Instant;
 
+#[cfg(target_os = "linux")]
 use v4l::Device;
+#[cfg(target_os = "linux")]
 use v4l::buffer::Type;
+#[cfg(target_os = "linux")]
 use v4l::format::FourCC;
+#[cfg(target_os = "linux")]
 use v4l::io::mmap::Stream as MmapStream;
+#[cfg(target_os = "linux")]
 use v4l::io::traits::CaptureStream;
+#[cfg(target_os = "linux")]
 use v4l::video::Capture;
 
 use crate::state::sanitize::finite_clamp;
@@ -198,7 +310,7 @@ pub struct OpticNerve {
     shm_name: String,
     /// The open shared-memory attachment; `None` until the capture
     /// limb creates the segment, re-tried every sample.
-    shm: Option<shared_memory::Shmem>,
+    shm: Option<optic_shmem::Shmem>,
     /// Last consumed seqlock value — a frame is consumed once, so an
     /// unchanged counter means the limb has not written since.
     last_seq: u64,
@@ -395,7 +507,7 @@ impl OpticNerve {
             self.shm = None;
         }
         if self.shm.is_none() {
-            match shared_memory::ShmemConf::new().os_id(&self.shm_name).open() {
+            match optic_shmem::ShmemConf::new().os_id(&self.shm_name).open() {
                 Ok(s) => {
                     // The capture limb owns the segment's lifetime;
                     // we are a recipient, so unlinking is never ours
@@ -801,24 +913,29 @@ impl Default for OpticNerve {
 /// Bounded re-open table: after each un-lived life the limb waits
 /// this long before the next attempt — the same widening sequence
 /// the process-level rebirth used.
+#[cfg(target_os = "linux")]
 const EYE_BACKOFF_S: [u64; 5] = [2, 5, 15, 30, 60];
 
 /// A life at least this long counts the eye as having lived — the
 /// attempt count refunds, the same stability rule the watcher kept.
+#[cfg(target_os = "linux")]
 const EYE_STABLE_S: f64 = 60.0;
 
 /// Consecutive dequeue errors that declare the device lost; at the
 /// 500 ms error sleep this is ~15 s of a truly dead camera before
 /// the limb counts it a life ended and re-opens.
+#[cfg(target_os = "linux")]
 const EYE_ERR_LIMIT: u32 = 30;
 
 /// The socket the eye opens absent a `GENESIS_CAMERA` override —
 /// and the fallback when an exhausted override names another
 /// device: a working eye beats the preferred dead one.
+#[cfg(target_os = "linux")]
 const DEFAULT_CAMERA_PATH: &str = "/dev/video0";
 
 /// The sockets the limb will try, preferred first: the configured
 /// device, then the default when the override names another.
+#[cfg(target_os = "linux")]
 fn camera_candidates(configured: &str) -> Vec<String> {
     let mut candidates = vec![configured.to_string()];
     if configured != DEFAULT_CAMERA_PATH {
@@ -894,6 +1011,7 @@ impl Drop for OpticCapture {
 /// where the loss actually happens. Bounded: after the table's
 /// worth of un-lived lives the eye is accepted absent and the limb
 /// rests — the organism goes on without sight.
+#[cfg(target_os = "linux")]
 fn capture_limb(shm_name: &str, stop: &AtomicBool) {
     let configured =
         std::env::var("GENESIS_CAMERA").unwrap_or_else(|_| DEFAULT_CAMERA_PATH.to_string());
@@ -942,11 +1060,24 @@ fn capture_limb(shm_name: &str, stop: &AtomicBool) {
     );
 }
 
+#[cfg(target_os = "android")]
+fn capture_limb(shm_name: &str, stop: &AtomicBool) {
+    let _ = shm_name;
+    eprintln!(
+        "[genesis] eye: native V4L2 capture is unavailable on Android; \
+         camera input remains absent until an Android camera bridge is installed"
+    );
+    while !stop.load(Ordering::Relaxed) {
+        thread::sleep(Duration::from_secs(1));
+    }
+}
+
 /// One life of the eye: device open → format negotiate → segment
 /// create → frame loop, until the hardware fails or `stop` lands.
 /// Returns the seconds the eye stayed open — `EYE_STABLE_S` is the
 /// refund threshold. Every failure inside is quiet logging, never a
 /// panic: this thread dying must never cost the body.
+#[cfg(target_os = "linux")]
 fn eye_life(shm_name: &str, camera_index: usize, camera_path: &str, stop: &AtomicBool) -> f64 {
     let born = Instant::now();
 
@@ -1193,17 +1324,18 @@ mod tests {
     /// Build a private nerve segment carrying `payload` bytes after a
     /// valid header, then hand back the segment (kept alive by the
     /// caller so the mapping persists) and its name.
+    #[cfg(not(target_os = "android"))]
     fn fake_nerve(
         tag: &str,
         width: u32,
         height: u32,
         fourcc: &[u8; 4],
         frame: &[u8],
-    ) -> (shared_memory::Shmem, String) {
+    ) -> (optic_shmem::Shmem, String) {
         let name = format!("/genesis_optic_nerve_test_{}_{}", std::process::id(), tag);
         let stride = width * 3;
         let size = (stride * height) as usize;
-        let shmem = shared_memory::ShmemConf::new()
+        let shmem = optic_shmem::ShmemConf::new()
             .os_id(&name)
             .size(HEADER_SIZE + size.max(frame.len()))
             .create()
@@ -1233,6 +1365,7 @@ mod tests {
         assert_eq!(optic.retinal_lux(1000), None);
     }
 
+    #[cfg(not(target_os = "android"))]
     #[test]
     fn rgb_frame_feeds_the_channels() {
         // 64x48 RGB3, mid-blue — melanopsin-weighted should read high.
@@ -1257,6 +1390,7 @@ mod tests {
         drop(seg);
     }
 
+    #[cfg(not(target_os = "android"))]
     #[test]
     fn a_changed_frame_is_motion_and_orienting() {
         let (seg, name) = fake_nerve("motion", 64, 48, b"RGB3", &[0u8].repeat(64 * 48 * 3));
@@ -1463,6 +1597,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(target_os = "android"))]
     #[test]
     fn closed_lids_dim_the_oscillator_but_do_not_black_it_out() {
         // A bright blue frame — the melanopic channel reads high.
@@ -1576,6 +1711,7 @@ mod tests {
         assert_eq!(optic.lid(), 0.0);
     }
 
+    #[cfg(not(target_os = "android"))]
     #[test]
     fn a_voluntary_close_dims_the_oscillator_too() {
         // The voluntary lid rides the same afference as the phase
@@ -1597,6 +1733,7 @@ mod tests {
         drop(seg);
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn the_default_socket_is_the_only_candidate_unless_overridden() {
         // No override — one candidate, the default itself.
