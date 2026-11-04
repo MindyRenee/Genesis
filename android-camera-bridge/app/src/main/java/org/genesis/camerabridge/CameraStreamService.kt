@@ -39,6 +39,8 @@ class CameraStreamService : Service() {
         const val TAG = "GenesisCamera"
         const val NOTIFICATION_ID = 7
         const val NOTIFICATION_CHANNEL = "genesis_camera"
+        const val EXTRA_LENS_FACING = "org.genesis.camerabridge.LENS_FACING"
+        const val DEFAULT_LENS_FACING = android.hardware.camera2.CameraCharacteristics.LENS_FACING_FRONT
     }
 
     private val running = AtomicBoolean(false)
@@ -55,6 +57,8 @@ class CameraStreamService : Service() {
     private var latestHeight: Int = 0
     private var latestSequence: Long = 0
     private var lastCaptureAtNanos: Long = 0
+    @Volatile private var requestedLensFacing: Int = DEFAULT_LENS_FACING
+    @Volatile private var activeLensFacing: Int = DEFAULT_LENS_FACING
 
     override fun onCreate() {
         super.onCreate()
@@ -63,12 +67,27 @@ class CameraStreamService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val facing = intent?.getIntExtra(EXTRA_LENS_FACING, DEFAULT_LENS_FACING)
+            ?: DEFAULT_LENS_FACING
+        if (facing != android.hardware.camera2.CameraCharacteristics.LENS_FACING_FRONT &&
+            facing != android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK
+        ) {
+            reportStatus("Camera unavailable: unsupported lens-facing selection")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        requestedLensFacing = facing
         if (running.compareAndSet(false, true)) {
-            reportStatus("Opening Camera2; waiting for camera capture to initialize")
+            reportStatus("Opening front camera; waiting for camera capture to initialize")
             cameraThread = HandlerThread("GenesisCamera2").also { it.start() }
             cameraHandler = Handler(cameraThread!!.looper)
             sender = thread(name = "GenesisOpticSender", isDaemon = true) { sendFrames() }
             openCamera()
+        } else if (activeLensFacing != facing) {
+            cameraHandler?.post {
+                closeCameraDevice()
+                openCamera()
+            }
         }
         // Camera access is a while-in-use permission. A sticky background
         // restart cannot reliably reacquire it without a visible activity.
@@ -82,12 +101,15 @@ class CameraStreamService : Service() {
             val cameraId = cameraIds.firstOrNull { id ->
                 manager.getCameraCharacteristics(id).get(
                     android.hardware.camera2.CameraCharacteristics.LENS_FACING
-                ) == android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK
-            } ?: cameraIds.firstOrNull() ?: run {
-                reportStatus("Camera unavailable: Android reports no camera devices")
+                ) == requestedLensFacing
+            } ?: run {
+                reportStatus("Camera unavailable: Android reports no ${lensFacingName(requestedLensFacing)} camera")
                 stopSelf()
                 return
             }
+            activeLensFacing = requestedLensFacing
+            val selectedCamera = lensFacingName(activeLensFacing)
+            reportStatus("Opening $selectedCamera camera; configuring Camera2")
             val map = manager.getCameraCharacteristics(cameraId).get(
                 android.hardware.camera2.CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP
             )
@@ -136,7 +158,7 @@ class CameraStreamService : Service() {
                         return
                     }
                     camera = device
-                    reportStatus("Camera opened; configuring capture session")
+                    reportStatus("$selectedCamera camera opened; configuring capture session")
                     try {
                         device.createCaptureSession(
                             listOf(reader!!.surface),
@@ -173,7 +195,7 @@ class CameraStreamService : Service() {
                                             null,
                                             cameraHandler
                                         )
-                                        reportStatus("Camera capture active; waiting for Genesis daemon")
+                                        reportStatus("$selectedCamera camera capture active; waiting for Genesis daemon")
                                     } catch (error: Exception) {
                                         reportStatus("Camera capture setup failed: ${error.message ?: error.javaClass.simpleName}")
                                         stopSelf()
@@ -308,7 +330,7 @@ class CameraStreamService : Service() {
                                 lastSentSequence = sequence
                                 if (!firstFrameSent) {
                                     firstFrameSent = true
-                                    reportStatus("Camera frames streaming to Genesis optic nerve")
+                                    reportStatus("${lensFacingName(activeLensFacing)} camera frames streaming to Genesis optic nerve")
                                 }
                             } else {
                                 if (!noFrameNoticeSent &&
@@ -336,16 +358,30 @@ class CameraStreamService : Service() {
         }
     }
 
-    override fun onDestroy() {
-        running.set(false)
-        try { serverSocket?.close() } catch (_: Exception) { }
+    private fun closeCameraDevice() {
         try {
             session?.stopRepeating()
         } catch (_: Exception) {
         }
         session?.close()
+        session = null
         camera?.close()
+        camera = null
         reader?.close()
+        reader = null
+    }
+
+    private fun lensFacingName(facing: Int): String =
+        if (facing == android.hardware.camera2.CameraCharacteristics.LENS_FACING_FRONT) {
+            "front"
+        } else {
+            "rear"
+        }
+
+    override fun onDestroy() {
+        running.set(false)
+        try { serverSocket?.close() } catch (_: Exception) { }
+        closeCameraDevice()
         cameraThread?.quitSafely()
         cameraThread = null
         cameraHandler = null
