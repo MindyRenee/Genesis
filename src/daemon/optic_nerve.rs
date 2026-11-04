@@ -57,6 +57,10 @@
 //! mind — the words side.
 
 use std::sync::Arc;
+#[cfg(target_os = "android")]
+use std::io::Read;
+#[cfg(target_os = "android")]
+use std::net::{TcpListener, TcpStream};
 #[cfg(not(target_os = "android"))]
 mod optic_shmem {
     pub use shared_memory::{Shmem, ShmemConf};
@@ -1144,15 +1148,182 @@ fn capture_limb(shm_name: &str, stop: &AtomicBool) {
     );
 }
 
+/// Maximum Android camera frame dimensions. The capture app negotiates
+/// within these bounds; the optic bus reserves one full RGB frame.
+#[cfg(any(target_os = "android", test))]
+const ANDROID_MAX_WIDTH: u32 = 640;
+#[cfg(any(target_os = "android", test))]
+const ANDROID_MAX_HEIGHT: u32 = 480;
+#[cfg(any(target_os = "android", test))]
+const ANDROID_MAX_FRAME_BYTES: usize =
+    ANDROID_MAX_WIDTH as usize * ANDROID_MAX_HEIGHT as usize * 3;
+#[cfg(target_os = "android")]
+const ANDROID_FRAME_MAGIC: &[u8; 4] = b"GOPT";
+
+/// Publish one packed RGB frame into the same seqlock segment used by
+/// the Linux camera limb. The Android capture adapter sends raw RGB;
+/// BGR3 is the optic protocol's RGB-in-memory format.
+#[cfg(any(target_os = "android", test))]
+fn publish_android_frame(
+    base: *mut u8,
+    mapping_len: usize,
+    width: u32,
+    height: u32,
+    rgb: &[u8],
+) -> std::io::Result<()> {
+    use std::io::{Error, ErrorKind};
+
+    if width == 0
+        || height == 0
+        || width > ANDROID_MAX_WIDTH
+        || height > ANDROID_MAX_HEIGHT
+    {
+        return Err(Error::new(ErrorKind::InvalidInput, "Android frame dimensions are invalid"));
+    }
+    let stride = width
+        .checked_mul(3)
+        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "Android frame stride overflow"))?;
+    let expected = (stride as usize)
+        .checked_mul(height as usize)
+        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "Android frame size overflow"))?;
+    if rgb.len() != expected || rgb.len() > ANDROID_MAX_FRAME_BYTES {
+        return Err(Error::new(ErrorKind::InvalidData, "Android RGB payload length does not match dimensions"));
+    }
+    if mapping_len < HEADER_SIZE.saturating_add(expected) {
+        return Err(Error::new(ErrorKind::InvalidData, "Android frame exceeds optic mapping"));
+    }
+
+    // SAFETY: the capture limb creates a page-aligned mapping whose
+    // length is checked above. Offset zero is an aligned AtomicU64;
+    // every header and payload write is within the mapped region.
+    unsafe {
+        let counter = &*(base as *const AtomicU64);
+        let sequence = counter.load(Ordering::Relaxed);
+        counter.store(sequence.wrapping_add(1), Ordering::Relaxed);
+        std::sync::atomic::fence(Ordering::SeqCst);
+        std::ptr::write_volatile(base.add(8) as *mut u32, width);
+        std::ptr::write_volatile(base.add(12) as *mut u32, height);
+        std::ptr::copy_nonoverlapping(b"BGR3".as_ptr(), base.add(16), 4);
+        std::ptr::write_volatile(base.add(20) as *mut u32, rgb.len() as u32);
+        std::ptr::write_volatile(base.add(24) as *mut u32, stride);
+        std::ptr::copy_nonoverlapping(rgb.as_ptr(), base.add(HEADER_SIZE), rgb.len());
+        counter.store(sequence.wrapping_add(2), Ordering::Release);
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "android")]
+fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, stop: &AtomicBool) {
+    use std::io::ErrorKind;
+
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+    loop {
+        if stop.load(Ordering::Relaxed) {
+            return;
+        }
+        // GOPT | width:u32 BE | height:u32 BE | payload_bytes:u32 BE.
+        let mut header = [0u8; 16];
+        if let Err(error) = stream.read_exact(&mut header) {
+            if error.kind() != ErrorKind::UnexpectedEof
+                && error.kind() != ErrorKind::ConnectionReset
+                && error.kind() != ErrorKind::TimedOut
+                && error.kind() != ErrorKind::WouldBlock
+            {
+                eprintln!("[genesis] eye: Android camera stream ended: {error}");
+            }
+            return;
+        }
+        if &header[..4] != ANDROID_FRAME_MAGIC {
+            eprintln!("[genesis] eye: rejected Android frame with invalid protocol magic");
+            return;
+        }
+        let width = u32::from_be_bytes(header[4..8].try_into().expect("four-byte width"));
+        let height = u32::from_be_bytes(header[8..12].try_into().expect("four-byte height"));
+        let payload_len =
+            u32::from_be_bytes(header[12..16].try_into().expect("four-byte payload length")) as usize;
+        let expected = match (width as usize)
+            .checked_mul(height as usize)
+            .and_then(|pixels| pixels.checked_mul(3))
+        {
+            Some(size)
+                if width > 0
+                    && height > 0
+                    && width <= ANDROID_MAX_WIDTH
+                    && height <= ANDROID_MAX_HEIGHT
+                    && size == payload_len
+                    && size <= ANDROID_MAX_FRAME_BYTES => size,
+            _ => {
+                eprintln!("[genesis] eye: rejected malformed Android frame dimensions or length");
+                return;
+            }
+        };
+        let mut frame = vec![0u8; expected];
+        if let Err(error) = stream.read_exact(&mut frame) {
+            eprintln!("[genesis] eye: incomplete Android camera frame: {error}");
+            return;
+        }
+        if let Err(error) =
+            publish_android_frame(shmem.as_ptr(), shmem.len(), width, height, &frame)
+        {
+            eprintln!("[genesis] eye: could not publish Android frame: {error}");
+            return;
+        }
+    }
+}
+
+/// Android's Camera2 adapter is the physical sensor driver; this daemon
+/// limb owns the optic mapping and publishes its frames using the same
+/// seqlock/header consumed on every platform. TCP is only the OS boundary
+/// between the separately sandboxed Android app and Termux — perception
+/// never branches around the optic nerve.
 #[cfg(target_os = "android")]
 fn capture_limb(shm_name: &str, stop: &AtomicBool) {
-    let _ = shm_name;
+    use std::io::{Error, ErrorKind};
+
+    optic_shmem::unlink(shm_name);
+    let mapping_size = HEADER_SIZE + ANDROID_MAX_FRAME_BYTES;
+    let shmem = match optic_shmem::ShmemConf::new()
+        .os_id(shm_name)
+        .size(mapping_size)
+        .create()
+    {
+        Ok(mapping) => mapping,
+        Err(error) => {
+            eprintln!("[genesis] eye: cannot create Android optic mapping {shm_name}: {error}");
+            return;
+        }
+    };
+    // The zeroed mapping is not a published frame until sequence > 0.
+    let listener = match TcpListener::bind(("127.0.0.1", 8765)) {
+        Ok(listener) => listener,
+        Err(error) => {
+            eprintln!("[genesis] eye: cannot bind Android camera input: {error}");
+            optic_shmem::unlink(shm_name);
+            return;
+        }
+    };
+    if let Err(error) = listener.set_nonblocking(true) {
+        eprintln!("[genesis] eye: cannot configure Android camera listener: {error}");
+        optic_shmem::unlink(shm_name);
+        return;
+    }
     eprintln!(
-        "[genesis] eye: native V4L2 capture is unavailable on Android; \
-         camera input remains absent until an Android camera bridge is installed"
+        "[genesis] eye: Android optic limb listening on 127.0.0.1:8765; mapping {mapping_size} bytes"
     );
+
     while !stop.load(Ordering::Relaxed) {
-        thread::sleep(Duration::from_secs(1));
+        match listener.accept() {
+            Ok((stream, _peer)) => {
+                receive_android_frames(stream, &shmem, stop);
+            }
+            Err(error) if error.kind() == ErrorKind::WouldBlock => {
+                thread::sleep(Duration::from_millis(50));
+            }
+            Err(error) => {
+                eprintln!("[genesis] eye: Android camera accept failed: {error}");
+                thread::sleep(Duration::from_millis(250));
+            }
+        }
     }
 }
 
@@ -1809,6 +1980,44 @@ mod tests {
             "a voluntary close attenuates the RHT drive: {shut} vs {open}"
         );
         drop(seg);
+    }
+
+    #[test]
+    fn android_rgb_publication_uses_the_shared_optic_frame_contract() {
+        // u64 storage gives the test buffer the alignment required by
+        // the atomic seqlock word at offset zero.
+        let mut storage = vec![0u64; (HEADER_SIZE + 8 * 6 * 3).div_ceil(8)];
+        let base = storage.as_mut_ptr().cast::<u8>();
+        let rgb: Vec<u8> = (0..8 * 6 * 3).map(|value| value as u8).collect();
+        publish_android_frame(base, storage.len() * 8, 8, 6, &rgb)
+            .expect("publish a valid Android RGB frame");
+
+        // SAFETY: the test buffer is aligned u64 storage and contains
+        // the full header and payload written by publish_android_frame.
+        unsafe {
+            let sequence = (*(base as *const AtomicU64)).load(Ordering::Acquire);
+            assert_eq!(sequence, 2);
+            assert_eq!(std::ptr::read_volatile(base.add(8) as *const u32), 8);
+            assert_eq!(std::ptr::read_volatile(base.add(12) as *const u32), 6);
+            let mut fourcc = [0u8; 4];
+            std::ptr::copy_nonoverlapping(base.add(16), fourcc.as_mut_ptr(), 4);
+            assert_eq!(&fourcc, b"BGR3");
+            assert_eq!(std::ptr::read_volatile(base.add(20) as *const u32), rgb.len() as u32);
+            assert_eq!(std::ptr::read_volatile(base.add(24) as *const u32), 24);
+            assert_eq!(
+                std::slice::from_raw_parts(base.add(HEADER_SIZE), rgb.len()),
+                rgb.as_slice()
+            );
+        }
+    }
+
+    #[test]
+    fn android_rgb_publication_rejects_bad_dimensions_and_payloads() {
+        let mut storage = vec![0u64; (HEADER_SIZE + 64).div_ceil(8)];
+        let base = storage.as_mut_ptr().cast::<u8>();
+        assert!(publish_android_frame(base, storage.len() * 8, 0, 2, &[0; 12]).is_err());
+        assert!(publish_android_frame(base, storage.len() * 8, 2, 2, &[0; 11]).is_err());
+        assert!(publish_android_frame(base, storage.len() * 8, 2, 2, &[0; 12]).is_err());
     }
 
     #[cfg(target_os = "linux")]
