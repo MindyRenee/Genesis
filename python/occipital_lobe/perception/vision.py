@@ -90,9 +90,9 @@ from genesis_client.swallow import note_swallowed
 
 from ..epipolar import EpipolarProcessor, TwoViewReport
 from . import illumination, optics
+from .android_stream import ensure_stream_server, latest_stream_frame
 from .phototransduction import PhototransductionCascade, PhototransductionState
 from .recognition import FaceRecognizer
-from .android_stream import ensure_stream_server, latest_stream_frame
 
 if TYPE_CHECKING:
     from limbic_system.emotion import EmotionalState

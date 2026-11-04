@@ -4,6 +4,7 @@ The companion app sends length-prefixed JPEG frames over loopback TCP.
 This module keeps only the newest frame: perception consumes current visual
 input rather than building an unbounded queue of stale images.
 """
+
 from __future__ import annotations
 
 import logging
@@ -42,8 +43,9 @@ def _serve() -> None:
     """Accept the companion app and retain only its most recent JPEG frame."""
     global _latest_frame, _latest_at
     try:
-        from PIL import Image
         import io
+
+        from PIL import Image
     except ImportError:
         logger.warning("Android camera stream requires Pillow")
         return
@@ -58,7 +60,7 @@ def _serve() -> None:
             while True:
                 try:
                     connection, _ = server.accept()
-                except socket.timeout:
+                except TimeoutError:
                     continue
                 with connection:
                     connection.settimeout(5.0)

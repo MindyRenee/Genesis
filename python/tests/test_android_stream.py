@@ -1,10 +1,10 @@
 """Tests for the native Android camera stream receiver."""
+
 from __future__ import annotations
 
 import time
 
 import numpy as np
-
 from occipital_lobe.perception import android_stream
 
 

@@ -668,8 +668,7 @@ class Polysyllogism:
     def failed_step(self) -> int | None:
         """One-based index of the first invalid step, or ``None``."""
         return next(
-            (index for index, deduction in enumerate(self.deductions, 1)
-             if not deduction.valid),
+            (index for index, deduction in enumerate(self.deductions, 1) if not deduction.valid),
             None,
         )
 
@@ -723,9 +722,7 @@ def polysyllogism(steps: Iterable[SyllogisticStep]) -> Polysyllogism:
     previous: Categorical | None = None
     for step in chain:
         if previous is not None and previous not in step.premises:
-            raise ValueError(
-                "each later step must use the preceding conclusion as a premise"
-            )
+            raise ValueError("each later step must use the preceding conclusion as a premise")
         deduction = syllogism(*step.premises, step.conclusion)
         deductions.append(deduction)
         if not deduction.valid:
