@@ -1319,8 +1319,7 @@ fn capture_limb(shm_name: &str, stop: &AtomicBool) {
                 stream
             }
             Err(error) => {
-                if !waiting_notice_sent
-                    || last_connect_notice.elapsed() >= Duration::from_secs(10)
+                if !waiting_notice_sent || last_connect_notice.elapsed() >= Duration::from_secs(10)
                 {
                     eprintln!(
                         "[genesis] eye: waiting for Android Camera2 adapter at 127.0.0.1:8765: {error}"
