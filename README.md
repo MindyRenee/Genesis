@@ -774,8 +774,13 @@ citations are real.
 
 - **See and hear.** A shared-memory camera feed runs through a
   V1→V4→VTC predictive-coding hierarchy; it detects and recognizes
-  faces and objects. A microphone feed is transcribed offline (Vosk)
-  and ambient non-speech sound is processed by an auditory subsystem.
+  faces and objects. On Android, the Camera2 companion app is only a
+  hardware adapter: the daemon publishes its raw frames to the same
+  optic-nerve mapping used by the Linux camera limb. It does not create
+  a second perception route (see
+  [Android camera setup](android-camera-bridge/README.md)). A microphone
+  feed is transcribed offline (Vosk) and ambient non-speech sound is
+  processed by an auditory subsystem.
 - **Learn by being taught.** Plain statements in conversation become
   typed edges in its concept network. One 15-paragraph lesson on games
   grew the network from 1122 to 1239 concepts with 72 new edges — and
