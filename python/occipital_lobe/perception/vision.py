@@ -387,7 +387,8 @@ class Vision:
         """Return whether a live optic-nerve feed can be read.
 
         ``nerve`` selects the afferent: ``"optic"`` is the body's own
-        eye (its availability is probed once and cached); any other
+        eye (a found feed is cached; absence is probed again, since the
+        companion app may connect after the first look); any other
         entry in ``NERVE_SEGMENTS`` — or a bare segment name — is
         probed live by attach, since a relay comes and goes.
         """
@@ -401,20 +402,21 @@ class Vision:
         # to loopback. Start the receiver lazily from the existing vision
         # object; no second perception pipeline is created.
         ensure_stream_server()
-        if self._available is None:
+        if not self._available:
             try:
-                img = latest_frame(copy=True)
+                try:
+                    img = latest_frame(copy=True)
+                except (OSError, FileNotFoundError) as e:
+                    # No shared-memory eye segment — always the case on
+                    # Termux. That is not a verdict: the companion app's
+                    # stream is still checked below. Not a swallowed fault.
+                    logger.debug("no optic-nerve segment: %s", e)
+                    img = None
                 self._available = (
                     (img is not None and img.size > 0)
                     or latest_stream_frame() is not None
                     or (nerve == "optic" and shutil.which("termux-camera-photo") is not None)
                 )
-            except (OSError, FileNotFoundError) as e:
-                # No frame on disk — no camera, or the body's eye is
-                # dark. That is the documented text-only degradation,
-                # so it must not be tallied beside genuine faults.
-                logger.debug("no vision frame available: %s", e)
-                self._available = False
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "occipital_lobe.perception.vision.is_available",
@@ -656,7 +658,13 @@ class Vision:
         if not self.is_available(nerve):
             return VisionScene(status="unavailable", relay_gate=relay_gate, nerve=nerve)
         try:
-            frame = latest_frame(copy=True, name=NERVE_SEGMENTS.get(nerve, nerve))
+            try:
+                frame = latest_frame(copy=True, name=NERVE_SEGMENTS.get(nerve, nerve))
+            except (OSError, FileNotFoundError) as e:
+                # No shared-memory segment (Termux has none): fall through
+                # to the companion stream below, which is the real source.
+                logger.debug("no optic-nerve segment for see(): %s", e)
+                frame = None
             if frame is None and nerve == "optic":
                 # Prefer the continuous native Camera2 stream. A stale or
                 # disconnected stream is ignored; still capture remains a

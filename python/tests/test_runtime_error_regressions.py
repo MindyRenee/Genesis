@@ -330,3 +330,38 @@ def test_cortical_tick_tolerates_active_set_mutation() -> None:
         t.join(timeout=5)
     finally:
         pass  # ConceptNetwork owns no background threads to stop
+
+
+def test_optic_availability_recovers_when_camera_connects_late() -> None:
+    """The companion app connects after the first look; absence must not stick."""
+    import numpy as np
+    import occipital_lobe.perception.vision as vision_mod
+    from occipital_lobe.perception.vision import Vision
+
+    class _Vision:
+        def __init__(self) -> None:
+            self._available = None
+
+        is_available = Vision.is_available  # type: ignore[assignment,misc]
+
+    def _no_frame(copy: bool = True, name: str | None = None):
+        raise FileNotFoundError(2, "No such file or directory")
+
+    frame = np.zeros((2, 2, 3), dtype=np.uint8)
+    stream = {"frame": None}
+
+    original_latest = vision_mod.latest_frame
+    original_stream = vision_mod.latest_stream_frame
+    original_ensure = vision_mod.ensure_stream_server
+    vision_mod.latest_frame = _no_frame
+    vision_mod.latest_stream_frame = lambda *a, **k: stream["frame"]
+    vision_mod.ensure_stream_server = lambda: True
+    try:
+        vis = _Vision()
+        assert vis.is_available() is False  # type: ignore[misc]
+        stream["frame"] = frame  # the bridge connects now
+        assert vis.is_available() is True  # type: ignore[misc]
+    finally:
+        vision_mod.latest_frame = original_latest
+        vision_mod.latest_stream_frame = original_stream
+        vision_mod.ensure_stream_server = original_ensure
