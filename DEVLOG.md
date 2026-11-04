@@ -1,3 +1,19 @@
+## 2026-11-04 — Android optic adapter selects the intended camera
+
+The Android Camera2 adapter previously hard-coded `LENS_FACING_BACK` and
+silently fell back to the first enumerated camera when no rear lens was
+reported. It now defaults explicitly to `LENS_FACING_FRONT`, exposes front
+and rear selection in the adapter activity, switches the active Camera2
+device through the existing service, and reports the selected lens in its
+status notifications. An unavailable requested lens is reported as an error;
+the adapter no longer substitutes a different physical camera. Frame
+transport remains the existing single daemon-owned optic nerve.
+
+**Verification boundary:** source changes and the Android CI build are not
+physical-device validation. Rebuild and reinstall the
+`genesis-camera-bridge-debug` APK, then confirm that the notification reports
+the front camera and that the captured frame shows the intended scene.
+
 # Genesis Devlog
 
 ## 2026-11-04 — Android camera activation is wired into supported startup
