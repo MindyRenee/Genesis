@@ -228,7 +228,7 @@ class CameraStreamService : Service() {
         try {
             ServerSocket().use { server ->
                 server.reuseAddress = true
-                server.bind(InetSocketAddress(InetAddress.getLoopbackAddress(), 8765))
+                server.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 8765))
                 serverSocket = server
                 while (running.get()) {
                     val socket = try {
