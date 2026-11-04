@@ -1,54 +1,52 @@
-# Genesis native Android camera bridge
+# Genesis native Android camera adapter
 
-This companion app provides continuous camera frames to Genesis running in
-Termux. It uses Android Camera2 repeating capture requests; it does not perform
-recognition or create a second perception system.
+This companion app is the hardware-facing Camera2 adapter for Genesis running
+in Termux. Android applications and Termux run under separate UIDs, so the
+camera adapter forwards raw sensor frames over loopback to the Genesis daemon.
+It does not decode scenes, recognize objects, or run perception.
 
-## Data path
+## Single visual-afferent path
 
-`Camera2` -> latest JPEG frame -> loopback TCP (`127.0.0.1:8765>) ->
-`python/occipital_lobe/perception/android_stream.py` -> existing
-`Vision.see_frame()` pipeline.
+`Android Camera2` -> `YUV_420_888` to packed RGB24 -> loopback TCP
+(`127.0.0.1:8765`) -> Rust `OpticCapture` limb -> the canonical
+`/genesis_optic_nerve` frame mapping -> `genesis_client/optic_nerve.py` ->
+the existing mind-side V1 and perception path.
 
-Frames use a 4-byte big-endian length followed by JPEG bytes. The receiver keeps
-only the newest frame and rejects frames older than two seconds. The camera
-service targets up to 10 frames/second at a resolution no larger than 640x480;
-Genesis's existing volition still decides when to run the perception pipeline.
+The transport is only an operating-system boundary between the Android
+hardware sandbox and the Termux daemon. The daemon owns the optic mapping,
+validates frame dimensions and payload lengths, and publishes frames using
+the same 28-byte header and seqlock protocol as the Linux V4L2 capture limb.
+The Python mind has no Android-specific camera fallback or alternate frame
+queue.
+
+Each packet is `GOPT`, width (u32 big-endian), height (u32 big-endian),
+payload length (u32 big-endian), then packed RGB24 pixels. Frames are bounded
+to 640x480 and the service targets up to 10 frames per second.
 
 ## Build the APK
 
 The GitHub Actions workflow **Android camera bridge** builds a debug APK on
 pushes to this directory or by manual workflow dispatch. Download the
 `genesis-camera-bridge-debug` artifact from the workflow run and install
-`app-debug.apk` on the Android phone. Android may require allowing installs
-from the browser or file manager used to open the APK.
+`app-debug.apk` on the Android phone.
 
 ## Run on the phone
 
-1. In Termux, update the Genesis checkout on `audit-fixes` and install the
-   project's Python dependencies as usual. Pillow must be available.
-2. Start Genesis in Termux. Its Vision subsystem starts the loopback receiver
-   when vision availability is checked.
-3. Open **Genesis Camera Bridge**, grant camera permission, and tap **Start
-   camera stream**. Android displays a foreground-service notification while
-   the camera is active.
-4. Return to Genesis. When autonomous volition chooses to look, the normal
-   vision pipeline consumes the latest stream frame. The bridge does not
-   issue a look command or decide when Genesis should perceive.
-5. Tap **Stop camera stream** or stop the service to release the camera.
+1. In Termux, update the Genesis checkout on `audit-fixes` and build/start
+   Genesis normally. The daemon starts its Android optic-capture listener.
+2. Open **Genesis Camera Adapter**, grant camera permission, and tap
+   **Start camera stream**.
+3. The service connects to the daemon on loopback. The daemon publishes each
+   validated frame to the canonical optic mapping; the ordinary mind-side
+   vision path consumes it when Genesis chooses to look.
+4. Tap **Stop camera stream** or stop the service to release the camera.
 
-The listener binds only to loopback and is not exposed to the local network.
-The bridge does not save camera frames to disk. If the app is not installed or
-streaming, Genesis retains the existing shared-memory optic feed and the
-Termux still-capture fallback where available.
+Android requires explicit camera permission and a visible foreground-service
+notification. If the app is not installed or streaming, the optic nerve reports
+the eye absent; there is no second Python camera path that bypasses the nerve.
 
-## Current limitations
+## Verification boundary
 
-- This first implementation is source-complete but has not yet been built on
-  the project's CI runner or tested on the user's phone.
-- The Android app must be launched and streaming for continuous frames to be
-  available; Android requires an explicit camera permission and visible
-  foreground-service notification.
-- It currently streams JPEGs at a fixed capture cadence. Adaptive camera
-  cadence and device-specific camera selection can be added after validating
-  the initial end-to-end path.
+CI can compile the Android app and run the repository's Rust/Python checks.
+Actual camera permission, device-specific YUV plane layout, and end-to-end
+frame delivery still require a physical Android device test.
