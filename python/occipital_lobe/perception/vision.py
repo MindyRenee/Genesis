@@ -612,8 +612,8 @@ class Vision:
             try:
                 frame = latest_frame(copy=True, name=NERVE_SEGMENTS.get(nerve, nerve))
             except (OSError, FileNotFoundError) as e:
-                # No shared-memory segment (Termux has none): fall through
-                # to the companion stream below, which is the real source.
+                # No shared-memory segment means no current retinal frame.
+                # The Android sensor adapter must publish through this bus too.
                 logger.debug("no optic-nerve segment for see(): %s", e)
                 frame = None
             if frame is None and nerve == "optic":
