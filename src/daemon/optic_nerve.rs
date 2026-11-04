@@ -408,7 +408,9 @@ pub struct OpticNerve {
     /// Last consumed seqlock value — a frame is consumed once, so an
     /// unchanged counter means the limb has not written since.
     last_seq: u64,
-    /// `current_ms` of the last consumed frame (0 = never).
+    /// `current_ms` when the current mapping was attached.
+    last_attach_ms: u64,
+    /// `current_ms` of the last consumed frame (0 = none in this life).
     last_fresh_ms: u64,
     /// Subsampled luma of the previous frame — the motion baseline.
     prev_luma: Vec<u8>,
@@ -562,6 +564,7 @@ impl OpticNerve {
             shm_name: name.to_string(),
             shm: None,
             last_seq: 0,
+            last_attach_ms: 0,
             last_fresh_ms: 0,
             prev_luma: Vec::new(),
             illuminance: 0.0,
@@ -586,27 +589,34 @@ impl OpticNerve {
     /// stalled segments are the no-eye condition — the afference just
     /// reports no fresh input, it is never a fault.
     pub fn sample(&mut self, now_ms: u64) {
-        // A stale feed can mean the mapping is a corpse: a dead limb
-        // unlinks the segment on its way out, and the next life
-        // creates a *new* object under the same name — this handle
-        // still points at the dead one, whose counter is frozen
-        // forever. Once frames have been seen, a feed that stays
-        // stale past the fresh window is dropped so the open below
-        // re-resolves the name to whatever segment exists now. A
-        // merely-paused writer re-opens the same object harmlessly.
+        // A mapping can be stale even before its first frame: Android
+        // creates the segment while waiting for Camera2 to connect. Use
+        // the later of attachment and last-frame times so an empty or
+        // disconnected limb is eventually detached and a replacement
+        // mapping under the same name can be discovered.
+        let last_activity_ms = self.last_attach_ms.max(self.last_fresh_ms);
         if self.shm.is_some()
-            && self.frames_seen > 0
-            && now_ms.saturating_sub(self.last_fresh_ms) > FRESH_WINDOW_MS
+            && now_ms.saturating_sub(last_activity_ms) > FRESH_WINDOW_MS
         {
             self.shm = None;
+            self.last_seq = 0;
+            self.last_attach_ms = 0;
+            self.last_fresh_ms = 0;
+            self.frames_seen = 0;
+            self.prev_luma.clear();
         }
         if self.shm.is_none() {
             match optic_shmem::ShmemConf::new().os_id(&self.shm_name).open() {
                 Ok(s) => {
                     // The capture limb owns the segment's lifetime;
                     // we are a recipient, so unlinking is never ours
-                    // to do.
+                    // to do. A new mapping begins a new retinal life.
                     self.shm = Some(s);
+                    self.last_seq = 0;
+                    self.last_attach_ms = now_ms;
+                    self.last_fresh_ms = 0;
+                    self.frames_seen = 0;
+                    self.prev_luma.clear();
                 }
                 Err(_) => return,
             }
