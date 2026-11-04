@@ -55,7 +55,13 @@ def _load_concept_vocab(data_dir: str) -> tuple[object, set[str]] | None:
 
     Returns (network, vocab) or None if no saved state is found.
     """
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    # The brain-region packages live under ``python/``; the repository root
+    # alone does not make ``temporal_lobe`` importable when this file is run
+    # directly as ``python setup_embeddings.py``.
+    python_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "python")
+    if python_dir not in sys.path:
+        sys.path.insert(0, python_dir)
+
     from temporal_lobe.concepts import ConceptNetwork
 
     from infrastructure.persistence import load_state, restore_network
