@@ -7,7 +7,7 @@
 
     <application
         android:allowBackup="false"
-        android:label="Genesis Camera Bridge"
+        android:label="Genesis Camera Adapter"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".MainActivity"
