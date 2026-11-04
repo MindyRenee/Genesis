@@ -5,6 +5,11 @@ on:
   push:
     paths:
       - "android-camera-bridge/**"
+      - "src/daemon/optic_nerve.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "genesis_client/optic_nerve.py"
+      - "python/occipital_lobe/perception/vision.py"
       - ".github/workflows/android-camera-bridge.yml"
 
 permissions:
@@ -19,6 +24,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - name: Compile the Android optic-capture limb
+        run: cargo check --target aarch64-linux-android
       - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
