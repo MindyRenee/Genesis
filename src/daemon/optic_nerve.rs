@@ -1162,7 +1162,7 @@ const ANDROID_FRAME_MAGIC: &[u8; 4] = b"GOPT";
 
 /// Publish one packed RGB frame into the same seqlock segment used by
 /// the Linux camera limb. The Android capture adapter sends raw RGB;
-/// BGR3 is the optic protocol's RGB-in-memory format.
+/// RGB3 denotes packed R,G,B byte order in the shared frame protocol.
 #[cfg(any(target_os = "android", test))]
 fn publish_android_frame(
     base: *mut u8,
@@ -1203,7 +1203,7 @@ fn publish_android_frame(
         std::sync::atomic::fence(Ordering::SeqCst);
         std::ptr::write_volatile(base.add(8) as *mut u32, width);
         std::ptr::write_volatile(base.add(12) as *mut u32, height);
-        std::ptr::copy_nonoverlapping(b"BGR3".as_ptr(), base.add(16), 4);
+        std::ptr::copy_nonoverlapping(b"RGB3".as_ptr(), base.add(16), 4);
         std::ptr::write_volatile(base.add(20) as *mut u32, rgb.len() as u32);
         std::ptr::write_volatile(base.add(24) as *mut u32, stride);
         std::ptr::copy_nonoverlapping(rgb.as_ptr(), base.add(HEADER_SIZE), rgb.len());
@@ -1278,7 +1278,7 @@ fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, sto
 /// never branches around the optic nerve.
 #[cfg(target_os = "android")]
 fn capture_limb(shm_name: &str, stop: &AtomicBool) {
-    use std::io::{Error, ErrorKind};
+    use std::io::ErrorKind;
 
     optic_shmem::unlink(shm_name);
     let mapping_size = HEADER_SIZE + ANDROID_MAX_FRAME_BYTES;
@@ -2001,7 +2001,7 @@ mod tests {
             assert_eq!(std::ptr::read_volatile(base.add(12) as *const u32), 6);
             let mut fourcc = [0u8; 4];
             std::ptr::copy_nonoverlapping(base.add(16), fourcc.as_mut_ptr(), 4);
-            assert_eq!(&fourcc, b"BGR3");
+            assert_eq!(&fourcc, b"RGB3");
             assert_eq!(std::ptr::read_volatile(base.add(20) as *const u32), rgb.len() as u32);
             assert_eq!(std::ptr::read_volatile(base.add(24) as *const u32), 24);
             assert_eq!(
