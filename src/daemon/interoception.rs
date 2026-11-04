@@ -3365,7 +3365,7 @@ fn find_voltage_sensors() -> (Option<String>, Option<String>) {
             for idx in 0..=10 {
                 let label_path = format!("{device}/in{idx}_label");
                 let input_path = format!("{device}/in{idx}_input");
-                if !fs::metadata(&input_path).is_ok() {
+                if fs::metadata(&input_path).is_err() {
                     continue;
                 }
                 // Try to read the label. If no label file, skip —

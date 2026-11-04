@@ -111,7 +111,7 @@ pub fn has_cancellation(table: &Table, n: usize) -> bool {
     (0..n).all(|a| {
         (0..n).all(|x| {
             (0..n).all(|y| {
-                (table[a][x] != table[a][y] || x == y) && (table[x][a] != table[y][a] || x == y)
+                x == y || (table[a][x] != table[a][y] && table[x][a] != table[y][a])
             })
         })
     })
