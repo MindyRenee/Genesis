@@ -348,7 +348,7 @@ def test_optic_availability_recovers_when_camera_connects_late() -> None:
         raise FileNotFoundError(2, "No such file or directory")
 
     frame = np.zeros((2, 2, 3), dtype=np.uint8)
-    stream = {"frame": None}
+    stream: dict[str, np.ndarray | None] = {"frame": None}
 
     original_latest = vision_mod.latest_frame
     original_stream = vision_mod.latest_stream_frame
