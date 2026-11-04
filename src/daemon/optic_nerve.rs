@@ -2017,7 +2017,7 @@ mod tests {
         let base = storage.as_mut_ptr().cast::<u8>();
         assert!(publish_android_frame(base, storage.len() * 8, 0, 2, &[0; 12]).is_err());
         assert!(publish_android_frame(base, storage.len() * 8, 2, 2, &[0; 11]).is_err());
-        assert!(publish_android_frame(base, storage.len() * 8, 2, 2, &[0; 12]).is_err());
+        assert!(publish_android_frame(base, HEADER_SIZE + 8, 2, 2, &[0; 12]).is_err());
     }
 
     #[cfg(target_os = "linux")]
