@@ -188,7 +188,8 @@ class CameraStreamService : Service() {
                             },
                             cameraHandler
                         )
-                    } catch (_: Exception) {
+                    } catch (error: Exception) {
+                        reportStatus("Camera capture-session creation failed: ${error.message ?: error.javaClass.simpleName}")
                         stopSelf()
                     }
                 }
