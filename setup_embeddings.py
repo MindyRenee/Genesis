@@ -167,7 +167,10 @@ def _download_and_extract_glove(tmpdir: str, dim: int) -> str:
                 raise RuntimeError(
                     f"GloVe download failed after {max_attempts} attempts: HTTP {exc.code}"
                 ) from exc
-            print(f"  Download attempt {attempt}/{max_attempts} failed (HTTP {exc.code}); retrying...")
+            print(
+                f"  Download attempt {attempt}/{max_attempts} failed "
+                f"(HTTP {exc.code}); retrying..."
+            )
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             if attempt == max_attempts:
                 raise RuntimeError(
