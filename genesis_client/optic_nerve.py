@@ -1,11 +1,11 @@
 """Optic nerve — the mind's end of the afferent path.
 
-The body's optic nerve (``src/daemon/optic_nerve.rs`` — the daemon owns
-the camera now, a capture thread inside the body rather than a separate
-process) writes raw frames into the POSIX shared-memory segment
-``/genesis_optic_nerve``. This module attaches to that segment and wraps
-the live frame directly into a NumPy array without any serialization,
-JSON, or socket round-trips.
+The body's optic nerve (``src/daemon/optic_nerve.rs``) owns the camera
+capture limb and writes raw frames into the canonical
+``/genesis_optic_nerve`` mapping. Linux uses POSIX shared memory;
+Android uses a file-backed mmap because Bionic lacks the POSIX namespace.
+This module attaches to that same frame contract and wraps the live frame
+directly into a NumPy array without serialization or JSON.
 
 The frame counter uses a seqlock protocol: the writer increments it to an
 odd value before writing the frame, then to an even value when the write
