@@ -17,7 +17,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
-import android.util.Size
 import java.io.BufferedOutputStream
 import java.io.DataOutputStream
 import java.net.InetSocketAddress
@@ -46,6 +45,7 @@ class CameraStreamService : Service() {
     private var latestWidth: Int = 0
     private var latestHeight: Int = 0
     private var latestSequence: Long = 0
+    private var lastCaptureAtNanos: Long = 0
 
     override fun onCreate() {
         super.onCreate()
@@ -75,8 +75,11 @@ class CameraStreamService : Service() {
                 android.hardware.camera2.CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP
             )
             val size = map?.getOutputSizes(ImageFormat.YUV_420_888)
-                ?.filter { it.width <= 640 && it.height <= 480 }
-                ?.maxByOrNull { it.width * it.height } ?: Size(640, 480)
+                ?.filter { it.width in 1..640 && it.height in 1..480 }
+                ?.maxByOrNull { it.width * it.height } ?: run {
+                    stopSelf()
+                    return
+                }
             reader = ImageReader.newInstance(
                 size.width,
                 size.height,
@@ -85,6 +88,12 @@ class CameraStreamService : Service() {
             )
             reader!!.setOnImageAvailableListener({ source ->
                 val image: Image = source.acquireLatestImage() ?: return@setOnImageAvailableListener
+                val captureAt = System.nanoTime()
+                if (captureAt - lastCaptureAtNanos < 100_000_000L) {
+                    image.close()
+                    return@setOnImageAvailableListener
+                }
+                lastCaptureAtNanos = captureAt
                 image.use {
                     val rgb = yuv420ToRgb(it)
                     synchronized(frameLock) {
