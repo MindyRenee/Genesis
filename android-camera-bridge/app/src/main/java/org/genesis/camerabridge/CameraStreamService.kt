@@ -286,7 +286,7 @@ class CameraStreamService : Service() {
                 server.reuseAddress = true
                 server.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 8765))
                 serverSocket = server
-                reportStatus("Camera adapter listening; waiting for Genesis daemon")
+                reportStatus("${lensFacingName(activeLensFacing)} camera adapter listening; waiting for Genesis daemon")
                 while (running.get()) {
                     val socket = try {
                         server.accept()
@@ -298,7 +298,7 @@ class CameraStreamService : Service() {
                     }
                     socket.use { connection ->
                         connection.tcpNoDelay = true
-                        reportStatus("Genesis daemon connected; waiting for first camera frame")
+                        reportStatus("Genesis daemon connected; waiting for first ${lensFacingName(activeLensFacing)} camera frame")
                         val output = DataOutputStream(
                             BufferedOutputStream(connection.getOutputStream())
                         )
@@ -337,7 +337,7 @@ class CameraStreamService : Service() {
                                     System.nanoTime() - connectedAt > 10_000_000_000L
                                 ) {
                                     noFrameNoticeSent = true
-                                    reportStatus("Genesis daemon connected, but Camera2 has not delivered a frame")
+                                    reportStatus("Genesis daemon connected, but Camera2 has not delivered a ${lensFacingName(activeLensFacing)} camera frame")
                                 }
                                 Thread.sleep(20)
                             }
