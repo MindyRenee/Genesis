@@ -161,10 +161,16 @@ mod optic_shmem {
         /// `open`.
         pub fn create(self) -> io::Result<Shmem> {
             let name = self.name.ok_or_else(|| {
-                io::Error::new(io::ErrorKind::InvalidInput, "frame transport name is missing")
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "frame transport name is missing",
+                )
             })?;
             let size = self.size.ok_or_else(|| {
-                io::Error::new(io::ErrorKind::InvalidInput, "frame transport size is missing")
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "frame transport size is missing",
+                )
             })?;
             if size < 28 {
                 return Err(io::Error::new(
