@@ -59,11 +59,11 @@
 //! `relay_gain`, and the meaning of the pixels lives entirely in the
 //! mind — the words side.
 
-use std::sync::Arc;
 #[cfg(target_os = "android")]
 use std::io::Read;
 #[cfg(target_os = "android")]
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpStream;
+use std::sync::Arc;
 #[cfg(not(target_os = "android"))]
 mod optic_shmem {
     pub use shared_memory::{Shmem, ShmemConf};
@@ -1189,12 +1189,11 @@ fn publish_android_frame(
 ) -> std::io::Result<()> {
     use std::io::{Error, ErrorKind};
 
-    if width == 0
-        || height == 0
-        || width > ANDROID_MAX_WIDTH
-        || height > ANDROID_MAX_HEIGHT
-    {
-        return Err(Error::new(ErrorKind::InvalidInput, "Android frame dimensions are invalid"));
+    if width == 0 || height == 0 || width > ANDROID_MAX_WIDTH || height > ANDROID_MAX_HEIGHT {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            "Android frame dimensions are invalid",
+        ));
     }
     let stride = width
         .checked_mul(3)
@@ -1209,7 +1208,7 @@ fn publish_android_frame(
         ));
     }
     if mapping_len < HEADER_SIZE.saturating_add(expected) {
-        return Err(Error::new(ErrorKind::InvalidData, "Android frame exceeds optic mapping"));
+        return Err(Error::new(\n            ErrorKind::InvalidData,\n            "Android frame exceeds optic mapping",\n        ));
     }
 
     // SAFETY: the capture limb creates a page-aligned mapping whose
@@ -1258,11 +1257,9 @@ fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, sto
         }
         let width = u32::from_be_bytes(header[4..8].try_into().expect("four-byte width"));
         let height = u32::from_be_bytes(header[8..12].try_into().expect("four-byte height"));
-        let payload_len = u32::from_be_bytes(
-            header[12..16]
-                .try_into()
-                .expect("four-byte payload length"),
-        ) as usize;
+        let payload_len =
+            u32::from_be_bytes(header[12..16].try_into().expect("four-byte payload length"))
+                as usize;
         let expected = match (width as usize)
             .checked_mul(height as usize)
             .and_then(|pixels| pixels.checked_mul(3))
@@ -1273,7 +1270,7 @@ fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, sto
                     && width <= ANDROID_MAX_WIDTH
                     && height <= ANDROID_MAX_HEIGHT
                     && size == payload_len
-                    && size <= ANDROID_MAX_FRAME_BYTES => size,
+                    && size <= ANDROID_MAX_FRAME_BYTES =>\n            {\n                size\n            }
             _ => {
                 eprintln!("[genesis] eye: rejected malformed Android frame dimensions or length");
                 return;
@@ -1300,27 +1297,23 @@ fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, sto
 /// never branches around the optic nerve.
 #[cfg(target_os = "android")]
 fn capture_limb(shm_name: &str, stop: &AtomicBool) {
-    use std::io::ErrorKind;
-
-    let listener = match TcpListener::bind(("127.0.0.1", 8765)) {
-        Ok(listener) => listener,
-        Err(error) => {
-            eprintln!("[genesis] eye: cannot bind Android camera input: {error}");
-            return;
-        }
-    };
-    if let Err(error) = listener.set_nonblocking(true) {
-        eprintln!("[genesis] eye: cannot configure Android camera listener: {error}");
-        return;
-    }
-    eprintln!("[genesis] eye: Android optic limb listening on 127.0.0.1:8765");
-
+    // The Android Camera2 service owns the platform-facing listener.
+    // The daemon connects outward, preserving the body's single inbound
+    // IPC entrance while still publishing into its canonical optic map.
     while !stop.load(Ordering::Relaxed) {
-        // Each connection owns one mapping lifetime. If the camera app
-        // disconnects or stops producing frames, the two-second read
-        // timeout closes this life and unlinks its mapping. A later
-        // connection receives a fresh mapping, so readers cannot mistake
-        // a dead camera's last frame for live input.
+        let stream = match TcpStream::connect(("127.0.0.1", 8765)) {
+            Ok(stream) => stream,
+            Err(_) => {
+                thread::sleep(Duration::from_millis(500));
+                continue;
+            }
+        };
+        if let Err(error) = stream.set_read_timeout(Some(Duration::from_secs(2))) {
+            eprintln!("[genesis] eye: cannot configure Android camera stream: {error}");
+            thread::sleep(Duration::from_millis(500));
+            continue;
+        }
+
         optic_shmem::unlink(shm_name);
         let mapping_size = HEADER_SIZE + ANDROID_MAX_FRAME_BYTES;
         let shmem = match optic_shmem::ShmemConf::new()
@@ -1330,43 +1323,19 @@ fn capture_limb(shm_name: &str, stop: &AtomicBool) {
         {
             Ok(mapping) => mapping,
             Err(error) => {
-                eprintln!(
-                    "[genesis] eye: cannot create Android optic mapping {shm_name}: {error}"
-                );
+                eprintln!("[genesis] eye: cannot create Android optic mapping {shm_name}: {error}");
                 thread::sleep(Duration::from_secs(1));
                 continue;
             }
         };
 
-        let mut connected = false;
-        while !stop.load(Ordering::Relaxed) {
-            match listener.accept() {
-                Ok((stream, _peer)) => {
-                    connected = true;
-                    eprintln!("[genesis] eye: Android camera adapter connected");
-                    receive_android_frames(stream, &shmem, stop);
-                    break;
-                }
-                Err(error) if error.kind() == ErrorKind::WouldBlock => {
-                    thread::sleep(Duration::from_millis(50));
-                }
-                Err(error) => {
-                    eprintln!("[genesis] eye: Android camera accept failed: {error}");
-                    thread::sleep(Duration::from_millis(250));
-                }
-            }
-        }
-
-        // Remove the public name before releasing our mapping. Any
-        // in-flight reader may finish against its existing mapping;
-        // new readers see the absent-eye condition until the next life.
+        eprintln!("[genesis] eye: Android camera adapter connected");
+        receive_android_frames(stream, &shmem, stop);
         optic_shmem::unlink(shm_name);
         drop(shmem);
-        if stop.load(Ordering::Relaxed) {
-            break;
-        }
-        if connected {
-            eprintln!("[genesis] eye: Android camera adapter disconnected; awaiting reconnect");
+        if !stop.load(Ordering::Relaxed) {
+            eprintln!("[genesis] eye: Android camera adapter disconnected; reconnecting");
+            thread::sleep(Duration::from_millis(250));
         }
     }
     optic_shmem::unlink(shm_name);
@@ -2047,7 +2016,7 @@ mod tests {
             let mut fourcc = [0u8; 4];
             std::ptr::copy_nonoverlapping(base.add(16), fourcc.as_mut_ptr(), 4);
             assert_eq!(&fourcc, b"RGB3");
-            assert_eq!(std::ptr::read_volatile(base.add(20) as *const u32), rgb.len() as u32);
+            assert_eq!(\n                std::ptr::read_volatile(base.add(20) as *const u32),\n                rgb.len() as u32\n            );
             assert_eq!(std::ptr::read_volatile(base.add(24) as *const u32), 24);
             assert_eq!(
                 std::slice::from_raw_parts(base.add(HEADER_SIZE), rgb.len()),
