@@ -59,11 +59,11 @@
 //! `relay_gain`, and the meaning of the pixels lives entirely in the
 //! mind — the words side.
 
-use std::sync::Arc;
 #[cfg(target_os = "android")]
 use std::io::Read;
 #[cfg(target_os = "android")]
 use std::net::{TcpListener, TcpStream};
+use std::sync::Arc;
 #[cfg(not(target_os = "android"))]
 mod optic_shmem {
     pub use shared_memory::{Shmem, ShmemConf};
@@ -601,9 +601,7 @@ impl OpticNerve {
         // disconnected limb is eventually detached and a replacement
         // mapping under the same name can be discovered.
         let last_activity_ms = self.last_attach_ms.max(self.last_fresh_ms);
-        if self.shm.is_some()
-            && now_ms.saturating_sub(last_activity_ms) > FRESH_WINDOW_MS
-        {
+        if self.shm.is_some() && now_ms.saturating_sub(last_activity_ms) > FRESH_WINDOW_MS {
             self.shm = None;
             self.last_seq = 0;
             self.last_attach_ms = 0;
@@ -1171,8 +1169,7 @@ const ANDROID_MAX_WIDTH: u32 = 640;
 #[cfg(any(target_os = "android", test))]
 const ANDROID_MAX_HEIGHT: u32 = 480;
 #[cfg(any(target_os = "android", test))]
-const ANDROID_MAX_FRAME_BYTES: usize =
-    ANDROID_MAX_WIDTH as usize * ANDROID_MAX_HEIGHT as usize * 3;
+const ANDROID_MAX_FRAME_BYTES: usize = ANDROID_MAX_WIDTH as usize * ANDROID_MAX_HEIGHT as usize * 3;
 #[cfg(target_os = "android")]
 const ANDROID_FRAME_MAGIC: &[u8; 4] = b"GOPT";
 
@@ -1189,12 +1186,11 @@ fn publish_android_frame(
 ) -> std::io::Result<()> {
     use std::io::{Error, ErrorKind};
 
-    if width == 0
-        || height == 0
-        || width > ANDROID_MAX_WIDTH
-        || height > ANDROID_MAX_HEIGHT
-    {
-        return Err(Error::new(ErrorKind::InvalidInput, "Android frame dimensions are invalid"));
+    if width == 0 || height == 0 || width > ANDROID_MAX_WIDTH || height > ANDROID_MAX_HEIGHT {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            "Android frame dimensions are invalid",
+        ));
     }
     let stride = width
         .checked_mul(3)
@@ -1209,7 +1205,10 @@ fn publish_android_frame(
         ));
     }
     if mapping_len < HEADER_SIZE.saturating_add(expected) {
-        return Err(Error::new(ErrorKind::InvalidData, "Android frame exceeds optic mapping"));
+        return Err(Error::new(
+            ErrorKind::InvalidData,
+            "Android frame exceeds optic mapping",
+        ));
     }
 
     // SAFETY: the capture limb creates a page-aligned mapping whose
@@ -1258,11 +1257,9 @@ fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, sto
         }
         let width = u32::from_be_bytes(header[4..8].try_into().expect("four-byte width"));
         let height = u32::from_be_bytes(header[8..12].try_into().expect("four-byte height"));
-        let payload_len = u32::from_be_bytes(
-            header[12..16]
-                .try_into()
-                .expect("four-byte payload length"),
-        ) as usize;
+        let payload_len =
+            u32::from_be_bytes(header[12..16].try_into().expect("four-byte payload length"))
+                as usize;
         let expected = match (width as usize)
             .checked_mul(height as usize)
             .and_then(|pixels| pixels.checked_mul(3))
@@ -1273,7 +1270,10 @@ fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, sto
                     && width <= ANDROID_MAX_WIDTH
                     && height <= ANDROID_MAX_HEIGHT
                     && size == payload_len
-                    && size <= ANDROID_MAX_FRAME_BYTES => size,
+                    && size <= ANDROID_MAX_FRAME_BYTES =>
+            {
+                size
+            }
             _ => {
                 eprintln!("[genesis] eye: rejected malformed Android frame dimensions or length");
                 return;
@@ -1330,9 +1330,7 @@ fn capture_limb(shm_name: &str, stop: &AtomicBool) {
         {
             Ok(mapping) => mapping,
             Err(error) => {
-                eprintln!(
-                    "[genesis] eye: cannot create Android optic mapping {shm_name}: {error}"
-                );
+                eprintln!("[genesis] eye: cannot create Android optic mapping {shm_name}: {error}");
                 thread::sleep(Duration::from_secs(1));
                 continue;
             }
@@ -2047,7 +2045,10 @@ mod tests {
             let mut fourcc = [0u8; 4];
             std::ptr::copy_nonoverlapping(base.add(16), fourcc.as_mut_ptr(), 4);
             assert_eq!(&fourcc, b"RGB3");
-            assert_eq!(std::ptr::read_volatile(base.add(20) as *const u32), rgb.len() as u32);
+            assert_eq!(
+                std::ptr::read_volatile(base.add(20) as *const u32),
+                rgb.len() as u32
+            );
             assert_eq!(std::ptr::read_volatile(base.add(24) as *const u32), 24);
             assert_eq!(
                 std::slice::from_raw_parts(base.add(HEADER_SIZE), rgb.len()),

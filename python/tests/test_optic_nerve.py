@@ -28,9 +28,7 @@ def test_latest_normalizes_rgb_fourcc_channel_order(
     monkeypatch.setenv("TMPDIR", str(tmp_path))
     name = "genesis_optic_nerve_test_channels"
     frame_path = tmp_path / f"{name}.frame"
-    frame_path.write_bytes(
-        struct.pack("<QII4sII", 2, 1, 1, fourcc, len(payload), 3) + payload
-    )
+    frame_path.write_bytes(struct.pack("<QII4sII", 2, 1, 1, fourcc, len(payload), 3) + payload)
 
     nerve = OpticNerve(name)
     try:
