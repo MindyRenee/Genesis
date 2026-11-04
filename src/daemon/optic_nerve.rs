@@ -1326,9 +1326,7 @@ fn capture_limb(shm_name: &str, stop: &AtomicBool) {
         {
             Ok(mapping) => mapping,
             Err(error) => {
-                eprintln!(
-                    "[genesis] eye: cannot create Android optic mapping {shm_name}: {error}"
-                );
+                eprintln!("[genesis] eye: cannot create Android optic mapping {shm_name}: {error}");
                 thread::sleep(Duration::from_secs(1));
                 continue;
             }
