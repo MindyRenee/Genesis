@@ -32,8 +32,8 @@ def test_reader_attaches_to_frame_file_when_no_posix_segment(tmp_path, monkeypat
 
     assert frame is not None
     assert frame.shape == (2, 2, 3)
-    # RGB3 is stored BGR; the reader converts to RGB by reversing channels.
-    expected = np.frombuffer(pixels, dtype=np.uint8).reshape(2, 2, 3)[..., ::-1]
+    # RGB3 is packed R,G,B; no channel reversal is needed.
+    expected = np.frombuffer(pixels, dtype=np.uint8).reshape(2, 2, 3)
     assert np.array_equal(frame, expected)
 
 
