@@ -147,27 +147,27 @@ class CameraStreamService : Service() {
                                         return
                                     }
                                     session = configured
-                                    val requestBuilder = device.createCaptureRequest(
-                                        CameraDevice.TEMPLATE_PREVIEW
-                                    ).apply {
-                                        addTarget(reader!!.surface)
-                                        set(
-                                            CaptureRequest.CONTROL_MODE,
-                                            CaptureRequest.CONTROL_MODE_AUTO
-                                        )
-                                    }
-                                    val ranges = manager.getCameraCharacteristics(cameraId).get(
-                                        android.hardware.camera2.CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES
-                                    )
-                                    ranges?.filter { it.upper <= 10 && it.lower <= 5 }
-                                        ?.maxByOrNull { it.upper }
-                                        ?.let {
-                                            requestBuilder.set(
-                                                CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
-                                                it
+                                    try {
+                                        val requestBuilder = device.createCaptureRequest(
+                                            CameraDevice.TEMPLATE_PREVIEW
+                                        ).apply {
+                                            addTarget(reader!!.surface)
+                                            set(
+                                                CaptureRequest.CONTROL_MODE,
+                                                CaptureRequest.CONTROL_MODE_AUTO
                                             )
                                         }
-                                    try {
+                                        val ranges = manager.getCameraCharacteristics(cameraId).get(
+                                            android.hardware.camera2.CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES
+                                        )
+                                        ranges?.filter { it.upper <= 10 && it.lower <= 5 }
+                                            ?.maxByOrNull { it.upper }
+                                            ?.let {
+                                                requestBuilder.set(
+                                                    CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
+                                                    it
+                                                )
+                                            }
                                         configured.setRepeatingRequest(
                                             requestBuilder.build(),
                                             null,
@@ -175,7 +175,7 @@ class CameraStreamService : Service() {
                                         )
                                         reportStatus("Camera capture active; waiting for Genesis daemon")
                                     } catch (error: Exception) {
-                                        reportStatus("Camera capture request failed: ${error.message ?: error.javaClass.simpleName}")
+                                        reportStatus("Camera capture setup failed: ${error.message ?: error.javaClass.simpleName}")
                                         stopSelf()
                                     }
                                 }
