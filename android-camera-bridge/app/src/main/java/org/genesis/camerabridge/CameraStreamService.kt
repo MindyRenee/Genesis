@@ -78,7 +78,7 @@ class CameraStreamService : Service() {
         }
         requestedLensFacing = facing
         if (running.compareAndSet(false, true)) {
-            reportStatus("Opening front camera; waiting for camera capture to initialize")
+            reportStatus("Opening ${lensFacingName(requestedLensFacing)} camera; waiting for capture to initialize")
             cameraThread = HandlerThread("GenesisCamera2").also { it.start() }
             cameraHandler = Handler(cameraThread!!.looper)
             sender = thread(name = "GenesisOpticSender", isDaemon = true) { sendFrames() }
