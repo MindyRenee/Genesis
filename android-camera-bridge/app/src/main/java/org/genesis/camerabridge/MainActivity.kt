@@ -15,7 +15,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         status = TextView(this).apply {
-            text = "Genesis camera bridge sends live frames to Termux on 127.0.0.1:8765."
+            text = "Genesis Camera2 input publishes frames to the native optic nerve in the Termux daemon."
             textSize = 16f
             setPadding(24, 24, 24, 24)
         }
@@ -61,6 +61,6 @@ class MainActivity : Activity() {
 
     private fun startStreamService() {
         startForegroundService(Intent(this, CameraStreamService::class.java))
-        status.text = "Starting camera stream. Keep Genesis running in Termux."
+        status.text = "Connecting Camera2 to the Genesis optic nerve. Keep the daemon running in Termux."
     }
 }
