@@ -357,7 +357,7 @@ class Vision:
         # Every physical camera frame arrives through the daemon-owned
         # optic segment. Android's Camera2 adapter is only a sensor
         # driver; it does not bypass this shared afferent.
-        if not self._available:
+        if self._available is not True:
             try:
                 try:
                     img = latest_frame(copy=True)
