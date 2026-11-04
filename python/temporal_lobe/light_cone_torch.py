@@ -34,6 +34,9 @@ class TorchLightConeField(nn.Module):
     coordinates and encode for differentiable field output.
     """
 
+    plastic_state: Tensor
+    elastic_state: Tensor
+
     def __init__(
         self,
         *,
