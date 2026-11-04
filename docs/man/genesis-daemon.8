@@ -138,46 +138,54 @@ is not a rejecting user, so a left-open channel cannot trickle
 rejection CRH forever.
 
 .SS Optic nerve
-The daemon itself attaches to the retina's
-.I /genesis_retina
-segment \(em the optic nerve terminates in the body, not only the
-mind \(em and pools each frame into the subcortical channels the
-nerve actually carries. No pixels leave the module: the channels
-are scalar signals, the same thing the anatomical fibres carry.
-.IP \(bu 2
-\fBMelanopic illuminance\fR (the ipRGC channel) feeds
-.IR sleep_network::VisualAfference::light ,
-replacing the wall-clock photoperiod while frames are fresh \(em
-the dominant circadian zeitgeber.
-.IP \(bu 2
-\fBA collicular orienting transient\fR (motion/luminance) becomes a
-brief LC alerting pulse, but only below the sleep network's own
-wake threshold \(em sensory gaining during sleep, not a bypass.
-.IP \(bu 2
-\fBThe TRN relay gate\fR \(em
-.IR relay_base (phase):
-NREM 0.02, REM 0.10, drowsy 0.6, overwhelmed 0.3, else 1.0 \(em
-scaled by a bounded \(+-40% corticothalamic feedback set through
-\fBSET_OPTIC_GAIN\fR. The mind reads the gate over
-\fBGET_OPTIC_STATE\fR and honours it: a \fIsee\fR during NREM is a
-blind look.
+The daemon owns the canonical optic frame mapping named
+.I /genesis_optic_nerve .
+On Linux the capture limb opens the V4L2 device selected by
+.I GENESIS_CAMERA
+(default
+.IR /dev/video0 ),
+requests 640x480 RGB24 and falls back to YUYV when RGB24 is
+unavailable. On Android, a separate Camera2 foreground service
+captures YUV_420_888 frames, converts them to packed RGB24, and
+hosts a loopback TCP stream at
+.IR 127.0.0.1:8765 ;
+the daemon connects outward, validates the bounded frame packets,
+and publishes them into the same optic mapping. Android frames are
+bounded to 640x480 and the adapter targets up to 10 frames per
+second. The mapping is POSIX shared memory on Linux and a
+file-backed mapping on Android. The transport protocol and platform
+details are documented in
+.BR genesis-vision (7).
 .PP
-The nerve also owns the eye's body state. The \fBpupil\fR (2\(en8
-mm: a log-compressive light reflex on the photopic channel plus NE
-sympathetic dilation, constricting faster than it dilates; a
-central miosis term overrides the dark reflex in sleep).
-\fBAccommodation\fR (ciliary lens power 0\(en6 D, set by the mind's
-\fBSET_FOCUS\fR request in metres; near pull-in faster than far
-release, released to tonic rest when the lids shut). And the
-\fBeyelid\fR \(em a transmission on every afferent channel: open
-awake, ~0.5 drowsy, ~0.03 in NREM/REM, so light still entrains
-weakly through closed lids and a flash can still wake. The mind
-also holds a voluntary lid through \fBSET_LID\fR \(em the
-orbicularis oculi the camera hardware lacks. The requested
-openness composes with the phase's own position by \fBmin\fR: a
-will can shut an open eye (to rest it, to dim the world) but can
-never pry a sleeping one open. Held, not momentary \(em the lid
-stays where the mind left it until it moves it again.
+The daemon has two outputs from each fresh frame. It pools sampled
+pixels into scalar subcortical channels, and it retains the full
+frame in the canonical mapping for the Python mind's cortical
+perception path. The scalar channels do not replace the image.
+.IP \\(bu 2
+\\fBPhotopic and melanopic irradiance\\fR feed the visual-afference
+and circadian pathways while frames are fresh.
+.IP \\(bu 2
+\\fBMotion energy and the collicular orienting transient\\fR provide
+a brief alerting signal, subject to the sleep network's wake
+threshold.
+.IP \\(bu 2
+\\fBThe thalamic relay gate\\fR modulates how much visual input reaches
+cortex. The mind reads the gate through
+.B GET_OPTIC_STATE
+and honours it; a look can be gated during sleep.
+.PP
+The body also owns a modeled pupil (2--8 mm), accommodation, and
+eyelid state. The mind can request focus through
+.B SET_FOCUS
+and voluntary eyelid openness through
+.BR SET_LID ;
+corticothalamic feedback adjusts relay gain through
+.BR SET_OPTIC_GAIN .
+These are internal ocular and relay models. They do not set Android
+sensor exposure, ISO, autofocus, or white balance. See
+.BR genesis-vision (7)
+for the distinction between physical capture controls and the
+software visual pathway.
 
 .SH OPTIONS
 .TP
@@ -221,6 +229,13 @@ variable.
 .TP
 .B GENESIS_DATA_DIR
 Overrides the resolved data directory.
+.TP
+.B GENESIS_CAMERA
+Linux V4L2 capture device used by the daemon's optic-capture limb.
+Default
+.IR /dev/video0 .
+Android uses the Camera2 adapter instead; see
+.BR genesis-vision (7).
 .SH FILES
 .TP
 .I $DATA_DIR/core_state.bin
@@ -443,4 +458,5 @@ genesis-daemon --data-dir /tmp/genesis-debug --ltm-capacity 131072
 .BR genesis-games (7),
 .BR genesis-math (7),
 .BR genesis-reasoning (7),
+.BR genesis-vision (7),
 .BR genesis-retina (1)

@@ -11,12 +11,14 @@ genesis-cli \- Genesis cognitive mind and interactive terminal
 .B genesis-cli
 is the cognitive mind of Genesis and the interactive terminal through
 which a user converses with her. It creates and starts the cognitive
-Mind in-process, starts the Rust daemon and retina if needed, and
-handles the terminal directly.
+Mind in-process, starts the Rust daemon if needed, and handles the terminal
+directly. On Android, the launcher separately opens the Camera2
+adapter; Linux V4L2 capture is integrated into the daemon.
 
 .PP
-The CLI owns the daemon and retina lifecycles as child processes. It
-passes its PID to the daemon via
+The CLI owns the daemon lifecycle as a child process. The Android
+Camera2 adapter is a separate foreground service, not a child
+capture process. The CLI passes its PID to the daemon via
 .I GENESIS_COGNITIVE_PID
 so the daemon can include the mind in interoception \(em reading its
 CPU/memory/IO metrics as part of feeling its body state. The daemon
@@ -61,8 +63,9 @@ cognitive mind. Useful for diagnostics.
 .B --stop
 Stop the running session for this data dir (same staged teardown as
 .BR genesis " \fB--stop\fR):"
-SIGINT the CLI, then SIGTERM the daemon and retina, each with its own
-grace period.
+SIGINT the CLI, then SIGTERM the daemon, each with its own grace
+period. The launcher also requests shutdown of the Android camera
+adapter when that adapter is active.
 .TP
 .B --offline
 Start in offline mode \(em skip all network access. Autonomous
@@ -109,19 +112,26 @@ See her recent long-term memories.
 .SS Learning and requests
 .TP
 .B /requests
-See sites she wants to access.
+Inactive in the current configuration: all domains are allowed, so
+site-approval requests are not queued.
 .TP
 .BR /approve " \fIURL\fR"
-Approve a site she requested.
+Inactive while the all-domains policy is enabled; no pending
+requests are created.
 .TP
 .BR /deny " \fIURL\fR"
-Deny a site she requested.
+Inactive while the all-domains policy is enabled; no pending
+requests are created.
 .TP
 .B /learn-code
 Study her own source code.
 .TP
 .BR /explore " [\fIpath\fR]"
-Explore local files and docs.
+Explore local files and docs. Text content is learned into the
+concept network; binary and oversized files are catalogued rather
+than absorbed as text. Exploring the manual directory reads the
+manual contents, unlike the automatic man-page genus pass, which
+extracts only command names and short NAME-section descriptions.
 .TP
 .B /code-summary
 Summary of her code self-knowledge.
@@ -187,7 +197,10 @@ Speak to Genesis (one utterance).
 Continuous voice conversation.
 .TP
 .B /look
-Ask her what she sees through the retina.
+Ask her what she sees through the optic nerve.
+.TP
+.BR /look " screen"
+Ask her what she sees through the screen-capture nerve.
 .TP
 .BR /look " at \fIpath\fR"
 Ask her to look at an image file.
@@ -228,7 +241,7 @@ Put her into teaching mode (focused learning).
 Exit teaching mode, resume normal operation.
 .TP
 .BR /teach-questions
-Answer its queued questions one at a time.
+Answer her queued questions one at a time.
 .SS Stewardship
 .TP
 .B /steward
@@ -329,6 +342,7 @@ before anything runs.
 .BR genesis-games (7),
 .BR genesis-math (7),
 .BR genesis-reasoning (7),
+.BR genesis-vision (7),
 .BR genesis-retina (1)
 .TH GENESIS-CLI 1 "October 2026" "Genesis 0.2.0" "Genesis Manual"
 .SH NAME
@@ -343,12 +357,14 @@ genesis-cli \- Genesis cognitive mind and interactive terminal
 .B genesis-cli
 is the cognitive mind of Genesis and the interactive terminal through
 which a user converses with her. It creates and starts the cognitive
-Mind in-process, starts the Rust daemon and retina if needed, and
-handles the terminal directly.
+Mind in-process, starts the Rust daemon if needed, and handles the terminal
+directly. On Android, the launcher separately opens the Camera2
+adapter; Linux V4L2 capture is integrated into the daemon.
 
 .PP
-The CLI owns the daemon and retina lifecycles as child processes. It
-passes its PID to the daemon via
+The CLI owns the daemon lifecycle as a child process. The Android
+Camera2 adapter is a separate foreground service, not a child
+capture process. The CLI passes its PID to the daemon via
 .I GENESIS_COGNITIVE_PID
 so the daemon can include the mind in interoception \(em reading its
 CPU/memory/IO metrics as part of feeling its body state. The daemon
@@ -393,8 +409,9 @@ cognitive mind. Useful for diagnostics.
 .B --stop
 Stop the running session for this data dir (same staged teardown as
 .BR genesis " \fB--stop\fR):"
-SIGINT the CLI, then SIGTERM the daemon and retina, each with its own
-grace period.
+SIGINT the CLI, then SIGTERM the daemon, each with its own grace
+period. The launcher also requests shutdown of the Android camera
+adapter when that adapter is active.
 .TP
 .B --offline
 Start in offline mode \(em skip all network access. Autonomous
@@ -441,19 +458,26 @@ See her recent long-term memories.
 .SS Learning and requests
 .TP
 .B /requests
-See sites she wants to access.
+Inactive in the current configuration: all domains are allowed, so
+site-approval requests are not queued.
 .TP
 .BR /approve " \fIURL\fR"
-Approve a site she requested.
+Inactive while the all-domains policy is enabled; no pending
+requests are created.
 .TP
 .BR /deny " \fIURL\fR"
-Deny a site she requested.
+Inactive while the all-domains policy is enabled; no pending
+requests are created.
 .TP
 .B /learn-code
 Study her own source code.
 .TP
 .BR /explore " [\fIpath\fR]"
-Explore local files and docs.
+Explore local files and docs. Text content is learned into the
+concept network; binary and oversized files are catalogued rather
+than absorbed as text. Exploring the manual directory reads the
+manual contents, unlike the automatic man-page genus pass, which
+extracts only command names and short NAME-section descriptions.
 .TP
 .B /code-summary
 Summary of her code self-knowledge.
@@ -519,7 +543,10 @@ Speak to Genesis (one utterance).
 Continuous voice conversation.
 .TP
 .B /look
-Ask her what she sees through the retina.
+Ask her what she sees through the optic nerve.
+.TP
+.BR /look " screen"
+Ask her what she sees through the screen-capture nerve.
 .TP
 .BR /look " at \fIpath\fR"
 Ask her to look at an image file.
@@ -560,7 +587,7 @@ Put her into teaching mode (focused learning).
 Exit teaching mode, resume normal operation.
 .TP
 .BR /teach-questions
-Answer its queued questions one at a time.
+Answer her queued questions one at a time.
 .SS Stewardship
 .TP
 .B /steward

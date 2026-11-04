@@ -16,8 +16,9 @@ release binaries from the current source (the memory-mapped state
 schema requires source and binary to agree), then launches the
 installed interpreter on
 .IR genesis_cli.py ,
-which supervises the daemon, retina, and cognitive mind as one
-session.
+which supervises the Rust daemon and cognitive mind as one session.
+On Android, the launcher also opens the Camera2 adapter; on Linux,
+V4L2 capture is a limb inside the daemon.
 .PP
 In a packaged install, the
 .B genesis
@@ -41,9 +42,8 @@ marker \(em two trees sharing one mind corrupt each other's
 developmental record);
 .IP \(bu 2
 refuses to start if a Genesis CLI (the mind) is already running for
-that data dir \(em a surviving daemon or retina alone is the body
-outliving its last mind, and the CLI re-inhabits it rather than
-being refused;
+that data dir \(em a surviving daemon is the body outliving its
+last mind, and the CLI re-inhabits it rather than being refused;
 .IP \(bu 2
 builds the release binaries (\fBcargo build --release\fR);
 .IP \(bu 2
@@ -52,7 +52,8 @@ exports
 and runs the CLI in the foreground.
 .PP
 A Ctrl-C in the running terminal sends SIGINT to the foreground CLI,
-which shuts the daemon and retina down gracefully. The mind saves
+which shuts the daemon down gracefully and asks the Android camera
+adapter to stop when that platform adapter is active. The mind saves
 its cognitive state (concept network, inner life, sleep position)
 before teardown completes; shutdown waits rather than interrupting
 the save.
@@ -84,7 +85,7 @@ host resurrects her anywhere the spore was kept, via
 .B \-\-stop
 Tear down every Genesis process for the data dir: SIGINT the CLI
 first (it owns the child lifecycle and saves state), then SIGTERM
-the daemon and retina. Each stage has its own grace period; a
+the daemon. Each stage has its own grace period; a
 process still saving at the deadline is a "retry later", never a
 kill. Socket, lock, and PID files are preserved for their owners
 and later recovery.
@@ -142,14 +143,17 @@ Set by genesis and the console script; the CLI refuses to start
 without it.
 .TP
 .B GENESIS_BIN_DIR
-Override for locating the built daemon and retina binaries;
-resolution order is this variable, then the checkout's
+Override for locating the built daemon binary; resolution order is
+this variable, then the checkout's
 .IR target/release ,
 then beside the interpreter.
 .TP
 .B GENESIS_CAMERA
-V4L2 capture device handed to the retina. Default
+Linux V4L2 capture device used by the daemon's optic-capture limb.
+Default
 .IR /dev/video0 .
+Android capture uses the separate Camera2 adapter; see
+.BR genesis-vision (7).
 .TP
 .B GENESIS_ROOT
 Explicit source-tree override for unusual install layouts (see
@@ -177,7 +181,7 @@ out of the repo and shell history.
 .IR $DATA_DIR/.project_root
 Marker recording which checkout created this data dir.
 .TP
-.IR $DATA_DIR/genesis_cli.pid ", " genesis_daemon.pid ", " genesis_retina.pid
+.IR $DATA_DIR/genesis_cli.pid ", " genesis_daemon.pid
 PID files written so
 .B \-\-stop
 targets exact processes instead of broad pkill patterns.
@@ -285,4 +289,5 @@ unclean shutdown.
 .BR genesis-games (7),
 .BR genesis-math (7),
 .BR genesis-reasoning (7),
+.BR genesis-vision (7),
 .BR genesis-retina (1)

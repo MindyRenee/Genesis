@@ -1,126 +1,140 @@
-.TH GENESIS-MATH 7 "October 2026" "Genesis 0.2.0" "Genesis Manual"
+.TH GENESIS-MATH 7 "November 2026" "Genesis 0.2.0" "Genesis Manual"
 .SH NAME
-genesis-math \- the parietal mathematics faculty of the Genesis mind
+genesis-math \- the parietal mathematics faculties of the Genesis mind
 .SH SYNOPSIS
 .nf
-\fBparietal_lobe.math.number_sense\fR  approximate magnitude (ANS)
-\fBparietal_lobe.math.arithmetic\fR    exact symbolic calculation
-\fBparietal_lobe.math.statistics\fR    descriptive statistics
-\fBparietal_lobe.math.symbolic\fR      SymPy-backed manipulation
+\fBparietal_lobe.math.number_sense\fR    approximate magnitude (ANS)
+\fBparietal_lobe.math.arithmetic\fR      exact arithmetic expressions
+\fBparietal_lobe.math.statistics\fR      descriptive and sampling statistics
+\fBparietal_lobe.math.symbolic\fR        algebra, calculus, equations, matrices
 .fi
 .SH DESCRIPTION
-The parietal lobe is Genesis's number cortex, modelled on the
-intraparietal sulcus (IPS): the region that encodes quantity before
-any symbolic procedure. The faculty is layered the way the anatomy
-is layered.
-.PP
+The parietal lobe contains several distinct mathematical faculties.
+They should not be conflated: approximate magnitude, exact arithmetic,
+descriptive statistics, and symbolic mathematics have different
+representations and verification limits.
+.SS Number sense
 .B number_sense.py
-is the approximate number system \(em subitizing, Weber-Fechner
-magnitude comparison, estimation, and plausibility checking. It is
-the intuition underneath: it judges whether a quantity
-.IR feels
-bigger and flags answers that violate magnitude intuition.
-.PP
+implements approximate-number operations: magnitude estimation,
+comparison, subitizing, Weber--Fechner scaling, and plausibility
+checks. These are estimates and magnitude intuitions, not exact
+arithmetic results.
+.SS Exact arithmetic
 .B arithmetic.py
-is exact symbolic calculation \(em a recursive-descent evaluator
-over digits, symbols, and number/operator words
-.RI ( "7 + 5" ,
+is a recursive-descent expression evaluator over digits, symbols,
+and number/operator words (for example
+.IR "7 + 5"
+or
 .IR "nine times eight" ).
-No
-.BR eval() :
-each step is explicit so arithmetic errors are traceable the way a
-person's slips are.
-.PP
+It does not use Python
+.BR eval() ;
+the expression is parsed and evaluated through explicit operations.
+.SS Descriptive statistics
 .B statistics.py
-describes collections rather than single quantities \(em where a
-sample's center is, how widely it scatters, and what shape it has.
-Three families:
-
-.SS Central tendency
-The named means. The Pythagorean three \(em
+implements central tendency, dispersion, distribution shape, and
+sampling summaries. It includes the following measures:
+.PP
+.B Central tendency:
+arithmetic, geometric, harmonic, power, quadratic, cubic,
+contraharmonic, Heronian, Heinz, Lehmer, median, mode, midrange,
+and trimmed means. The Heronian, Heinz, and Lehmer means operate on
+two values; they are individual functions, not members of the
+.B mean()
+dispatcher.
+.PP
+.B Dispersion:
+population or sample variance and standard deviation (sample mode
+uses Bessel's correction), mean absolute deviation, median absolute
+deviation, percentiles, percentile ranges, interquartile range,
+coefficient of variation, and data range.
+.PP
+.B Shape and sampling:
+raw and central moments, skewness, kurtosis (raw or excess), standard
+error, and
+.B sampling_means()
+which draws repeated samples with replacement to inspect the
+empirical sampling distribution of the mean. This is a simulation
+of sampling behavior, not a proof of the central limit theorem.
+.PP
+The
+.B mean()
+dispatcher accepts exactly these
+.B MEAN_KINDS:
 .IR arithmetic ,
 .IR geometric ,
-.I harmonic
-\(em sit on the power-mean ladder
-.RI ( "(\(*Sx^p / n)^(1/p)" ),
-alongside
-.I quadratic
-.RI ( p =2),
-.I cubic
-.RI ( p =3),
-and
-.I contraharmonic
-.RI ( "\(*Sx^2 / \(*Sx" ).
-The two-value interpolating family
-.I ( heronian ", " heinz ", " lehmer )
-smoothly connects the classical cases; Lehmer's ladder recovers
-arithmetic, geometric, harmonic, and contraharmonic at integer and
-half-integer
-.IR p .
+.IR harmonic ,
+.IR quadratic ,
+.IR cubic ,
+.IR contraharmonic ,
+.IR power ,
 .IR median ,
 .IR mode ,
-.IR midrange ,
 and
-.I trimmed_mean
-complete the set.
-.SS Dispersion
-.IR variance
-and
-.I standard_deviation
-(with Bessel's correction for samples),
-.IR mean_absolute_deviation ,
-the fully robust
-.IR median_absolute_deviation ,
-.IR percentile
-and
-.IR percentile_range /
-.IR interquartile_range ,
-.IR coefficient_of_variation ,
-and
-.IR data_range .
-.SS Shape
-Raw and central
-.IR moments ,
-.IR skewness
-(tail direction),
-.I kurtosis
-(tail weight, with an
-.I excess
-convention so the normal reads 0), and
-.IR standard_error .
-.I sampling_means
-draws the empirical sampling distribution of the mean \(em the
-central limit theorem demonstrated on the data rather than asserted.
+.IR midrange .
+It does not dispatch to every standalone mean function. The
+.B summarize()
+facade returns a
+.B StatSummary
+whose variance and standard deviation are population measures.
+.SS Symbolic mathematics
+.B symbolic.py
+provides a separate symbolic layer backed by SymPy. It is loaded
+lazily; when SymPy is not installed, operations that require it
+return an unavailable result rather than silently substituting
+numeric approximations.
+.PP
+Supported expression operations include simplification, expansion,
+factoring, cancellation, partial fractions, combining rational
+expressions, trigonometric simplification, differentiation,
+integration (indefinite or definite), equation solving, limits,
+series expansion, and 20-digit numerical evaluation. Matrix
+operations include determinant, eigenvalues, trace, inverse, and
+characteristic polynomial.
+.PP
+The equality and inequality oracle can return
+.IR verified ,
+.IR refuted ,
+or
+.IR undecided .
+A bounded equality check that passes every tested integer remains
+.IR undecided ;
+finite testing is not promoted to a proof. This module is a symbolic
+computer-algebra faculty, not a general theorem prover or a
+complete proof assistant.
 .SH ENTRY POINTS
 .TP
 .B ParietalMath
-The facade the rest of the mind talks to:
-.BR looks_like_math () " and " looks_like_statistics ()
-classify a question;
-.BR evaluate () " computes arithmetic;"
-.BR mean ( values ", " kind ", " p )
-dispatches over
-.BR MEAN_KINDS ;
-.BR summarize ( values )
-returns a
-.B StatSummary
-(center, spread, and shape in one pass).
+The facade used by the rest of the mind. It classifies mathematical
+and statistical questions, evaluates arithmetic, dispatches named
+means through
+.BR MEAN_KINDS ,
+and returns statistical summaries.
 .TP
 .B parietal_lobe.math.statistics
-The module itself when the measures are needed individually.
+The individual statistical functions when a specific measure is
+needed.
+.TP
+.B parietal_lobe.math.symbolic
+The symbolic operations and equality/inequality verdicts.
 .SH FILES
 .TP
 .I python/parietal_lobe/math/
-The package source.
+The mathematical faculty source.
 .TP
 .I python/tests/test_statistics.py
-The taxonomy under test \(em the mean inequality, both ladders, the
-CLT demonstration.
+Tests for statistical measures and sampling behavior.
+.TP
+.I python/tests/test_symbolic.py
+Tests for symbolic operations and verification verdicts.
+.SH LIMITATIONS
+These are implemented mathematical faculties, not evidence that
+every conversation automatically invokes every operation. The
+presence of a callable function does not establish autonomous
+mathematical competence across arbitrary problem classes. Symbolic
+operations require SymPy; approximate-number results are estimates;
+and bounded checks remain evidence rather than general proofs.
 .SH SEE ALSO
 .BR genesis (1),
-.BR genesis-browser (7),
 .BR genesis-cli (1),
-.BR genesis-daemon (8),
-.BR genesis-games (7),
 .BR genesis-reasoning (7),
-.BR genesis-retina (1)
+.BR genesis-vision (7)
