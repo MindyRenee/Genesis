@@ -25,6 +25,14 @@ import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
+/**
+ * Android's hardware-facing camera adapter.
+ *
+ * It converts Camera2 YUV planes to packed RGB and forwards raw frames to
+ * the Genesis daemon's optic-capture limb. It performs no recognition,
+ * scene analysis, or perception; the daemon publishes frames to the
+ * canonical /genesis_optic_nerve mapping consumed by the existing mind.
+ */
 class CameraStreamService : Service() {
     private val running = AtomicBoolean(false)
     private var camera: CameraDevice? = null
@@ -34,13 +42,15 @@ class CameraStreamService : Service() {
     private var cameraHandler: Handler? = null
     private var sender: Thread? = null
     private val frameLock = Any()
-    private var latestJpeg: ByteArray? = null
+    private var latestRgb: ByteArray? = null
+    private var latestWidth: Int = 0
+    private var latestHeight: Int = 0
     private var latestSequence: Long = 0
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        startForeground(7, notification("Camera stream active"))
+        startForeground(7, notification("Camera input connected to Genesis optic nerve"))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -48,7 +58,7 @@ class CameraStreamService : Service() {
             cameraThread = HandlerThread("GenesisCamera2").also { it.start() }
             cameraHandler = Handler(cameraThread!!.looper)
             openCamera()
-            sender = thread(name = "GenesisFrameSender", isDaemon = true) { sendFrames() }
+            sender = thread(name = "GenesisOpticSender", isDaemon = true) { sendFrames() }
         }
         return START_STICKY
     }
@@ -64,18 +74,23 @@ class CameraStreamService : Service() {
             val map = manager.getCameraCharacteristics(cameraId).get(
                 android.hardware.camera2.CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP
             )
-            val size = map?.getOutputSizes(ImageFormat.JPEG)
+            val size = map?.getOutputSizes(ImageFormat.YUV_420_888)
                 ?.filter { it.width <= 640 && it.height <= 480 }
                 ?.maxByOrNull { it.width * it.height } ?: Size(640, 480)
-            reader = ImageReader.newInstance(size.width, size.height, ImageFormat.JPEG, 2)
+            reader = ImageReader.newInstance(
+                size.width,
+                size.height,
+                ImageFormat.YUV_420_888,
+                2
+            )
             reader!!.setOnImageAvailableListener({ source ->
                 val image: Image = source.acquireLatestImage() ?: return@setOnImageAvailableListener
                 image.use {
-                    val buffer = it.planes[0].buffer
-                    val bytes = ByteArray(buffer.remaining())
-                    buffer.get(bytes)
+                    val rgb = yuv420ToRgb(it)
                     synchronized(frameLock) {
-                        latestJpeg = bytes
+                        latestRgb = rgb
+                        latestWidth = it.width
+                        latestHeight = it.height
                         latestSequence += 1
                     }
                 }
@@ -97,18 +112,31 @@ class CameraStreamService : Service() {
                                         return
                                     }
                                     session = configured
-                                    val requestBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
+                                    val requestBuilder = device.createCaptureRequest(
+                                        CameraDevice.TEMPLATE_PREVIEW
+                                    ).apply {
                                         addTarget(reader!!.surface)
-                                        set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+                                        set(
+                                            CaptureRequest.CONTROL_MODE,
+                                            CaptureRequest.CONTROL_MODE_AUTO
+                                        )
                                     }
                                     val ranges = manager.getCameraCharacteristics(cameraId).get(
                                         android.hardware.camera2.CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES
                                     )
                                     ranges?.filter { it.upper <= 10 && it.lower <= 5 }
                                         ?.maxByOrNull { it.upper }
-                                        ?.let { requestBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
-                                    val request = requestBuilder.build()
-                                    configured.setRepeatingRequest(request, null, cameraHandler)
+                                        ?.let {
+                                            requestBuilder.set(
+                                                CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
+                                                it
+                                            )
+                                        }
+                                    configured.setRepeatingRequest(
+                                        requestBuilder.build(),
+                                        null,
+                                        cameraHandler
+                                    )
                                 }
 
                                 override fun onConfigureFailed(failed: CameraCaptureSession) {
@@ -140,6 +168,49 @@ class CameraStreamService : Service() {
         }
     }
 
+    /**
+     * Convert Android's flexible YUV 4:2:0 planes to packed RGB24.
+     * Row and pixel strides are honored independently for all planes;
+     * this is required because Camera2 does not promise contiguous NV21.
+     */
+    private fun yuv420ToRgb(image: Image): ByteArray {
+        val width = image.width
+        val height = image.height
+        val yPlane = image.planes[0]
+        val uPlane = image.planes[1]
+        val vPlane = image.planes[2]
+        val yBuffer = yPlane.buffer
+        val uBuffer = uPlane.buffer
+        val vBuffer = vPlane.buffer
+        val output = ByteArray(width * height * 3)
+        var out = 0
+
+        for (row in 0 until height) {
+            val yRow = row * yPlane.rowStride
+            val uRow = (row / 2) * uPlane.rowStride
+            val vRow = (row / 2) * vPlane.rowStride
+            for (column in 0 until width) {
+                val y = (yBuffer.get(yRow + column).toInt() and 0xff) - 16
+                val chromaColumn = (column / 2)
+                val u = (uBuffer.get(uRow + chromaColumn * uPlane.pixelStride).toInt() and 0xff) - 128
+                val v = (vBuffer.get(vRow + chromaColumn * vPlane.pixelStride).toInt() and 0xff) - 128
+                val c = maxOf(0, y)
+                val red = ((298 * c + 409 * v + 128) shr 8).coerceIn(0, 255)
+                val green = ((298 * c - 100 * u - 208 * v + 128) shr 8).coerceIn(0, 255)
+                val blue = ((298 * c + 516 * u + 128) shr 8).coerceIn(0, 255)
+                output[out++] = red.toByte()
+                output[out++] = green.toByte()
+                output[out++] = blue.toByte()
+            }
+        }
+        return output
+    }
+
+    /**
+     * Send GOPT | width:u32 BE | height:u32 BE | payload_bytes:u32 BE
+     * | packed RGB24. The daemon is the only receiver and writes the
+     * canonical shared-memory optic-nerve frame.
+     */
     private fun sendFrames() {
         var lastSentSequence = 0L
         while (running.get()) {
@@ -150,12 +221,22 @@ class CameraStreamService : Service() {
                     DataOutputStream(BufferedOutputStream(socket.getOutputStream())).use { output ->
                         while (running.get()) {
                             val snapshot = synchronized(frameLock) {
-                                if (latestJpeg != null && latestSequence != lastSentSequence) {
-                                    Pair(latestJpeg!!.copyOf(), latestSequence)
-                                } else null
+                                val frame = latestRgb
+                                if (frame != null && latestSequence != lastSentSequence) {
+                                    Triple(
+                                        frame.copyOf(),
+                                        latestWidth to latestHeight,
+                                        latestSequence
+                                    )
+                                } else {
+                                    null
+                                }
                             }
                             if (snapshot != null) {
-                                val (frame, sequence) = snapshot
+                                val (frame, dimensions, sequence) = snapshot
+                                output.write(byteArrayOf(0x47, 0x4f, 0x50, 0x54))
+                                output.writeInt(dimensions.first)
+                                output.writeInt(dimensions.second)
                                 output.writeInt(frame.size)
                                 output.write(frame)
                                 output.flush()
@@ -167,14 +248,21 @@ class CameraStreamService : Service() {
                     }
                 }
             } catch (_: Exception) {
-                try { Thread.sleep(1000) } catch (_: InterruptedException) { return }
+                try {
+                    Thread.sleep(1000)
+                } catch (_: InterruptedException) {
+                    return
+                }
             }
         }
     }
 
     override fun onDestroy() {
         running.set(false)
-        try { session?.stopRepeating() } catch (_: Exception) { }
+        try {
+            session?.stopRepeating()
+        } catch (_: Exception) {
+        }
         session?.close()
         camera?.close()
         reader?.close()
@@ -205,7 +293,7 @@ class CameraStreamService : Service() {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
         }
-        return builder.setContentTitle("Genesis Camera Bridge")
+        return builder.setContentTitle("Genesis optic input")
             .setContentText(message)
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setOngoing(true)
