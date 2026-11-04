@@ -1235,6 +1235,7 @@ fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, sto
     use std::io::ErrorKind;
 
     let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
+    let mut first_frame = true;
     loop {
         if stop.load(Ordering::Relaxed) {
             return;
@@ -1290,6 +1291,10 @@ fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, sto
             eprintln!("[genesis] eye: could not publish Android frame: {error}");
             return;
         }
+        if first_frame {
+            eprintln!("[genesis] eye: first Android frame published ({width}x{height})");
+            first_frame = false;
+        }
     }
 }
 
@@ -1303,10 +1308,22 @@ fn capture_limb(shm_name: &str, stop: &AtomicBool) {
     // The Android Camera2 service owns the platform-facing listener.
     // The daemon connects outward, preserving the body's single inbound
     // IPC entrance while still publishing into its canonical optic map.
+    let mut last_connect_notice = Instant::now();
+    let mut waiting_notice_sent = false;
     while !stop.load(Ordering::Relaxed) {
         let stream = match TcpStream::connect(("127.0.0.1", 8765)) {
-            Ok(stream) => stream,
-            Err(_) => {
+            Ok(stream) => {
+                waiting_notice_sent = false;
+                stream
+            }
+            Err(error) => {
+                if !waiting_notice_sent || last_connect_notice.elapsed() >= Duration::from_secs(10) {
+                    eprintln!(
+                        "[genesis] eye: waiting for Android Camera2 adapter at 127.0.0.1:8765: {error}"
+                    );
+                    last_connect_notice = Instant::now();
+                    waiting_notice_sent = true;
+                }
                 thread::sleep(Duration::from_millis(500));
                 continue;
             }

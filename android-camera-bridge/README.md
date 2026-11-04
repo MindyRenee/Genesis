@@ -35,19 +35,33 @@ pushes to this directory or by manual workflow dispatch. Download the
 
 ## Run on the phone
 
-1. In Termux, update the Genesis checkout on `audit-fixes` and build/start
-   Genesis normally. The daemon starts its Android optic-capture client and retries until the
-Android hardware adapter is active.
-2. Open **Genesis Camera Adapter**, grant camera permission, and tap
-   **Start camera stream**.
-3. The service hosts the loopback camera endpoint for the daemon to connect to. The daemon publishes each
-   validated frame to the canonical optic mapping; the ordinary mind-side
-   vision path consumes it when Genesis chooses to look.
-4. Tap **Stop camera stream** or stop the service to release the camera.
+1. Install the current `app-debug.apk` once. The adapter is the Android
+   platform boundary for Camera2; it does not own perception.
+2. Start Genesis with `./genesis` in Termux. On Android, the supported
+   launcher opens the adapter activity automatically. On first use, Android
+   presents its camera permission prompt; grant it while the activity is
+   visible. The activity then starts the Camera2 foreground service. If the
+   activity does not open, launch **Genesis Camera Adapter** manually and
+   use **Start / retry camera stream**.
+3. The foreground notification reports the actual progression: Camera2
+   initialization, capture-session readiness, listener readiness, daemon
+   connection, and first-frame transmission. It does not claim a live
+   connection merely because the service started.
+4. The daemon publishes validated frames to the canonical optic mapping;
+   the ordinary mind-side vision path consumes them when Genesis chooses to
+   look. Stop the stream from the activity or stop Genesis to release the
+   camera.
 
-Android requires explicit camera permission and a visible foreground-service
-notification. If the app is not installed or streaming, the optic nerve reports
-the eye absent; there is no second Python camera path that bypasses the nerve.
+Android requires a user-granted runtime camera permission and a visible
+foreground activity when starting a camera foreground service. Termux cannot
+open Camera2 directly; the launcher opens the existing hardware adapter
+rather than bypassing Android's permission boundary. If the adapter is
+unavailable or permission is denied, Genesis continues without visual
+input. There is still only one optic nerve and one mind-side perception path.
+
+For device-side diagnostics, inspect the Android log with
+`logcat -s GenesisCamera`; the foreground notification also shows the
+latest service state.
 
 ## Verification boundary
 

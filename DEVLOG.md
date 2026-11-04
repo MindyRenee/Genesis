@@ -1,5 +1,29 @@
 # Genesis Devlog
 
+## 2026-11-04 — Android camera activation is wired into supported startup
+
+The Termux launcher now opens the existing Android Camera2 hardware-boundary
+activity as part of the normal `./genesis` startup. The activity requests the
+runtime camera permission while visible and starts the foreground capture
+service after permission is granted. This respects Android's camera
+while-in-use boundary; Termux does not attempt to access Camera2 itself.
+Missing APK, unavailable activity manager, or denied permission degrades
+visual input without blocking the mind or creating an alternate perception
+path.
+
+The camera service now reports distinct states for Camera2 initialization,
+capture-session readiness, listener readiness, daemon connection, and first
+frame transmission. Camera open, configuration, permission, frame conversion,
+and transport failures are logged. The foreground notification no longer
+claims a live connection before a frame has been sent. The Rust limb also
+reports rate-limited connection failures and receipt of the first published
+frame.
+
+**Verification boundary:** source-level integration and CI compilation do
+not prove the device will grant permission, launch the activity from Termux,
+or deliver frames on a particular Android build. Physical-device validation
+is still required.
+
 ## 2026-11-04 — Android Camera2 joins the native optic nerve
 
 The Android camera implementation had split visual input into a second

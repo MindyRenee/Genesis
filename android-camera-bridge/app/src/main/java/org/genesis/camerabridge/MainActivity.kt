@@ -20,7 +20,7 @@ class MainActivity : Activity() {
             setPadding(24, 24, 24, 24)
         }
         val start = Button(this).apply {
-            text = "Start camera stream"
+            text = "Start / retry camera stream"
             setOnClickListener { requestCameraAndStart() }
         }
         val stop = Button(this).apply {
@@ -36,6 +36,13 @@ class MainActivity : Activity() {
             addView(start)
             addView(stop)
         })
+        // Genesis launches this activity from its supported Termux entry
+        // point. Request permission here while the activity is visible;
+        // Android will not grant a camera foreground service access from
+        // an ordinary background start.
+        if (savedInstanceState == null) {
+            requestCameraAndStart()
+        }
     }
 
     private fun requestCameraAndStart() {
@@ -60,7 +67,13 @@ class MainActivity : Activity() {
     }
 
     private fun startStreamService() {
-        startForegroundService(Intent(this, CameraStreamService::class.java))
-        status.text = "Connecting Camera2 to the Genesis optic nerve. Keep the daemon running in Termux."
+        try {
+            startForegroundService(Intent(this, CameraStreamService::class.java))
+            status.text = "Camera service starting. Its notification reports camera and daemon connection state."
+        } catch (error: SecurityException) {
+            status.text = "Android refused camera startup: ${error.message ?: "permission or foreground-service restriction"}"
+        } catch (error: Exception) {
+            status.text = "Could not start camera service: ${error.message ?: error.javaClass.simpleName}"
+        }
     }
 }

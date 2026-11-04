@@ -17,6 +17,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import android.util.Log
 import java.io.BufferedOutputStream
 import java.io.DataOutputStream
 import java.net.InetAddress
@@ -34,6 +35,12 @@ import kotlin.concurrent.thread
  * canonical /genesis_optic_nerve mapping consumed by the existing mind.
  */
 class CameraStreamService : Service() {
+    private companion object {
+        const val TAG = "GenesisCamera"
+        const val NOTIFICATION_ID = 7
+        const val NOTIFICATION_CHANNEL = "genesis_camera"
+    }
+
     private val running = AtomicBoolean(false)
     private var camera: CameraDevice? = null
     private var session: CameraCaptureSession? = null
@@ -52,33 +59,42 @@ class CameraStreamService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        startForeground(7, notification("Camera input connected to Genesis optic nerve"))
+        startForeground(NOTIFICATION_ID, notification("Starting Android camera hardware"))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (running.compareAndSet(false, true)) {
+            reportStatus("Opening Camera2; waiting for camera capture to initialize")
             cameraThread = HandlerThread("GenesisCamera2").also { it.start() }
             cameraHandler = Handler(cameraThread!!.looper)
-            openCamera()
             sender = thread(name = "GenesisOpticSender", isDaemon = true) { sendFrames() }
+            openCamera()
         }
-        return START_STICKY
+        // Camera access is a while-in-use permission. A sticky background
+        // restart cannot reliably reacquire it without a visible activity.
+        return START_NOT_STICKY
     }
 
     private fun openCamera() {
         try {
             val manager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
-            val cameraId = manager.cameraIdList.firstOrNull { id ->
+            val cameraIds = manager.cameraIdList
+            val cameraId = cameraIds.firstOrNull { id ->
                 manager.getCameraCharacteristics(id).get(
                     android.hardware.camera2.CameraCharacteristics.LENS_FACING
                 ) == android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK
-            } ?: manager.cameraIdList.first()
+            } ?: cameraIds.firstOrNull() ?: run {
+                reportStatus("Camera unavailable: Android reports no camera devices")
+                stopSelf()
+                return
+            }
             val map = manager.getCameraCharacteristics(cameraId).get(
                 android.hardware.camera2.CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP
             )
             val size = map?.getOutputSizes(ImageFormat.YUV_420_888)
                 ?.filter { it.width in 1..640 && it.height in 1..480 }
                 ?.maxByOrNull { it.width * it.height } ?: run {
+                    reportStatus("Camera unavailable: no YUV_420_888 size fits the 640x480 optic limit")
                     stopSelf()
                     return
                 }
@@ -99,12 +115,17 @@ class CameraStreamService : Service() {
                 }
                 lastCaptureAtNanos = captureAt
                 image.use {
-                    val rgb = yuv420ToRgb(it)
-                    synchronized(frameLock) {
-                        latestRgb = rgb
-                        latestWidth = it.width
-                        latestHeight = it.height
-                        latestSequence += 1
+                    try {
+                        val rgb = yuv420ToRgb(it)
+                        synchronized(frameLock) {
+                            latestRgb = rgb
+                            latestWidth = it.width
+                            latestHeight = it.height
+                            latestSequence += 1
+                        }
+                    } catch (error: Exception) {
+                        reportStatus("Camera frame conversion failed: ${error.message ?: error.javaClass.simpleName}")
+                        stopSelf()
                     }
                 }
             }, cameraHandler)
@@ -115,6 +136,7 @@ class CameraStreamService : Service() {
                         return
                     }
                     camera = device
+                    reportStatus("Camera opened; configuring capture session")
                     try {
                         device.createCaptureSession(
                             listOf(reader!!.surface),
@@ -145,15 +167,22 @@ class CameraStreamService : Service() {
                                                 it
                                             )
                                         }
-                                    configured.setRepeatingRequest(
-                                        requestBuilder.build(),
-                                        null,
-                                        cameraHandler
-                                    )
+                                    try {
+                                        configured.setRepeatingRequest(
+                                            requestBuilder.build(),
+                                            null,
+                                            cameraHandler
+                                        )
+                                        reportStatus("Camera capture active; waiting for Genesis daemon")
+                                    } catch (error: Exception) {
+                                        reportStatus("Camera capture request failed: ${error.message ?: error.javaClass.simpleName}")
+                                        stopSelf()
+                                    }
                                 }
 
                                 override fun onConfigureFailed(failed: CameraCaptureSession) {
                                     failed.close()
+                                    reportStatus("Camera capture session configuration failed")
                                     stopSelf()
                                 }
                             },
@@ -166,17 +195,21 @@ class CameraStreamService : Service() {
 
                 override fun onDisconnected(device: CameraDevice) {
                     device.close()
+                    reportStatus("Camera disconnected by Android")
                     stopSelf()
                 }
 
                 override fun onError(device: CameraDevice, error: Int) {
                     device.close()
+                    reportStatus("Android Camera2 reported device error $error")
                     stopSelf()
                 }
             }, cameraHandler)
-        } catch (_: SecurityException) {
+        } catch (error: SecurityException) {
+            reportStatus("Camera permission denied or revoked: ${error.message ?: "SecurityException"}")
             stopSelf()
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            reportStatus("Camera startup failed: ${error.message ?: error.javaClass.simpleName}")
             stopSelf()
         }
     }
@@ -230,19 +263,26 @@ class CameraStreamService : Service() {
                 server.reuseAddress = true
                 server.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 8765))
                 serverSocket = server
+                reportStatus("Camera adapter listening; waiting for Genesis daemon")
                 while (running.get()) {
                     val socket = try {
                         server.accept()
-                    } catch (_: Exception) {
+                    } catch (error: Exception) {
                         if (!running.get()) break
+                        Log.w(TAG, "Camera transport accept failed; retrying", error)
+                        Thread.sleep(250)
                         continue
                     }
                     socket.use { connection ->
                         connection.tcpNoDelay = true
+                        reportStatus("Genesis daemon connected; waiting for first camera frame")
                         val output = DataOutputStream(
                             BufferedOutputStream(connection.getOutputStream())
                         )
                         var lastSentSequence = 0L
+                        var firstFrameSent = false
+                        var noFrameNoticeSent = false
+                        val connectedAt = System.nanoTime()
                         while (running.get() && !connection.isClosed) {
                             val snapshot = synchronized(frameLock) {
                                 val frame = latestRgb
@@ -265,15 +305,31 @@ class CameraStreamService : Service() {
                                 output.write(frame)
                                 output.flush()
                                 lastSentSequence = sequence
+                                if (!firstFrameSent) {
+                                    firstFrameSent = true
+                                    reportStatus("Camera frames streaming to Genesis optic nerve")
+                                }
                             } else {
+                                if (!noFrameNoticeSent &&
+                                    System.nanoTime() - connectedAt > 10_000_000_000L
+                                ) {
+                                    noFrameNoticeSent = true
+                                    reportStatus("Genesis daemon connected, but Camera2 has not delivered a frame")
+                                }
                                 Thread.sleep(20)
                             }
                         }
                     }
+                    if (running.get()) {
+                        reportStatus("Genesis daemon disconnected; waiting for reconnection")
+                    }
                 }
             }
-        } catch (_: Exception) {
-            if (running.get()) stopSelf()
+        } catch (error: Exception) {
+            if (running.get()) {
+                reportStatus("Camera transport failed: ${error.message ?: error.javaClass.simpleName}")
+                stopSelf()
+            }
         } finally {
             serverSocket = null
         }
@@ -292,15 +348,23 @@ class CameraStreamService : Service() {
         cameraThread?.quitSafely()
         cameraThread = null
         cameraHandler = null
+        Log.i(TAG, "Camera service stopped")
+        stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private fun reportStatus(message: String) {
+        Log.i(TAG, message)
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(NOTIFICATION_ID, notification(message))
+    }
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                "genesis_camera",
+                NOTIFICATION_CHANNEL,
                 "Genesis camera",
                 NotificationManager.IMPORTANCE_LOW
             )
@@ -311,7 +375,7 @@ class CameraStreamService : Service() {
 
     private fun notification(message: String): Notification {
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, "genesis_camera")
+            Notification.Builder(this, NOTIFICATION_CHANNEL)
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)

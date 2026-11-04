@@ -362,4 +362,24 @@ if [ ! -x "$VENV_PY" ]; then
     echo "[genesis] $VENV_PY not found — run scripts/install.sh first"
     exit 1
 fi
+
+# Android reserves Camera2 access for an application holding the runtime
+# CAMERA permission. Termux cannot open that hardware directly, so the
+# supported launcher brings the existing hardware-boundary activity to
+# the foreground. The activity requests permission when needed and starts
+# the Camera2 service only after Android grants it. Missing adapter/app
+# access degrades sight only; it must not prevent cognition from starting.
+if [ -n "${TERMUX_VERSION:-}" ] || [ -d /data/data/com.termux ]; then
+    if command -v am >/dev/null 2>&1; then
+        echo "[genesis] Requesting Android camera startup..."
+        if am start -n org.genesis.camerabridge/.MainActivity >/dev/null 2>&1; then
+            echo "[genesis] Camera activity launched; approve camera permission if Android prompts."
+        else
+            echo "[genesis] Camera adapter could not be launched. Install its current APK; Genesis will continue without visual input."
+        fi
+    else
+        echo "[genesis] Android activity manager unavailable; Genesis will continue without visual input."
+    fi
+fi
+
 PYTHONPATH="$PWD/python:${PYTHONPATH:-}" "$VENV_PY" genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:+$OFFLINE_ARG} ${GAME_ARG:+$GAME_ARG}
