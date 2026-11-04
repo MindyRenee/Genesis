@@ -43,10 +43,13 @@ pushes to this directory or by manual workflow dispatch. Download the
    visible. The activity then starts the Camera2 foreground service. If the
    activity does not open, launch **Genesis Camera Adapter** manually and
    use **Start / retry camera stream**.
-3. The foreground notification reports the actual progression: Camera2
-   initialization, capture-session readiness, listener readiness, daemon
-   connection, and first-frame transmission. It does not claim a live
-   connection merely because the service started.
+3. The adapter defaults to the **front-facing camera**. Use **Use front
+   camera** or **Use rear camera** in the activity to select the physical
+   lens; the active service switches cameras without creating another frame
+   receiver or perception path. The foreground notification names the
+   selected lens and reports Camera2 initialization, capture-session
+   readiness, daemon connection, and first-frame transmission. It does not
+   claim a live connection merely because the service started.
 4. The daemon publishes validated frames to the canonical optic mapping;
    the ordinary mind-side vision path consumes them when Genesis chooses to
    look. Stop the stream from the activity or run `./genesis --stop`; the
