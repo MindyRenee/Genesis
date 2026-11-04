@@ -17,8 +17,8 @@ GENESIS_DATA_DIR if set, else ~/.local/share/genesis.
 from __future__ import annotations
 
 import os
+import shutil
 import sys
-import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -273,13 +273,18 @@ def main() -> None:
     print(f"\nDownloading GloVe ({dim}d) from {GLOVE_URL}...")
     print("This is a ~822 MB download. It may take several minutes.")
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        glove_path = _download_and_extract_glove(tmpdir, dim)
-        filtered = _filter_glove_vectors(glove_path, vocab)
-        if filtered is None:
-            return
-        words, vectors = filtered
-        _normalize_and_save_vectors(words, vectors, output_path)
+    # Keep the archive between runs so an interrupted mobile download can resume.
+    # Remove this cache only after the filtered embeddings have been saved.
+    download_dir = os.path.join(data_dir, ".glove-download")
+    os.makedirs(download_dir, exist_ok=True)
+
+    glove_path = _download_and_extract_glove(download_dir, dim)
+    filtered = _filter_glove_vectors(glove_path, vocab)
+    if filtered is None:
+        return
+    words, vectors = filtered
+    _normalize_and_save_vectors(words, vectors, output_path)
+    shutil.rmtree(download_dir)
 
 
 if __name__ == "__main__":
