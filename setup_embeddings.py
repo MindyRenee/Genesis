@@ -128,9 +128,7 @@ def _download_and_extract_glove(tmpdir: str, dim: int) -> str:
                     existing_size = 0
                     total_header = response.headers.get("Content-Length")
                     total_size = (
-                        int(total_header)
-                        if total_header and total_header.isdigit()
-                        else None
+                        int(total_header) if total_header and total_header.isdigit() else None
                     )
                     mode = "wb"
                 else:
@@ -168,8 +166,7 @@ def _download_and_extract_glove(tmpdir: str, dim: int) -> str:
                     f"GloVe download failed after {max_attempts} attempts: HTTP {exc.code}"
                 ) from exc
             print(
-                f"  Download attempt {attempt}/{max_attempts} failed "
-                f"(HTTP {exc.code}); retrying..."
+                f"  Download attempt {attempt}/{max_attempts} failed (HTTP {exc.code}); retrying..."
             )
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             if attempt == max_attempts:
@@ -191,9 +188,7 @@ def _download_and_extract_glove(tmpdir: str, dim: int) -> str:
     print(f"Extracting {glove_filename}...")
     with zipfile.ZipFile(zip_path, "r") as zf:
         if glove_filename not in zf.namelist():
-            raise RuntimeError(
-                f"{glove_filename} is not present in the downloaded GloVe archive."
-            )
+            raise RuntimeError(f"{glove_filename} is not present in the downloaded GloVe archive.")
         zf.extract(glove_filename, tmpdir)
 
     return os.path.join(tmpdir, glove_filename)
