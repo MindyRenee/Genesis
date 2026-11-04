@@ -1,5 +1,41 @@
 # Genesis Devlog
 
+## 2026-11-04 — Android Camera2 joins the native optic nerve
+
+The Android camera implementation had split visual input into a second
+Python receiver and direct still-capture paths. Those paths bypassed the
+daemon-owned optic nerve and could not exercise the same retinal transport
+as the Linux camera limb. The Android app is now only a Camera2 hardware
+adapter: it converts Camera2 YUV_420_888 planes to packed RGB24 and sends
+bounded frames over loopback to the daemon. The daemon creates and owns the
+file-backed Android optic mapping, validates each packet, and publishes
+through the existing 28-byte header and seqlock. The Python mind reads only
+the canonical optic segment and continues through its existing V1/perception
+path.
+
+Removed the Python TCP receiver, its tests, Termux still-camera fallback,
+the unused Android camera adapter export, and two direct Android vision
+scripts. Android microphone capture remains separate and unchanged.
+Corrected RGB/BGR FourCC normalization so both Rust pooling and Python
+perception receive consistent RGB channels. Mapping lifetimes now expire
+on disconnect, including a mapping that never received its first frame,
+and readers reset their sequence/motion baseline when attaching to a new
+retinal life.
+
+Focused checks added:
+- Rust tests validate Android frame header/payload publication and reject
+  invalid dimensions, payload sizes, and undersized mappings.
+- Python tests validate RGB3 and BGR3 channel normalization.
+- The Android workflow now cross-compiles the daemon for
+  `aarch64-linux-android` before building the Camera2 APK.
+
+**Boundary of the change:** CI and physical-device validation are pending.
+The code-level path is unified; this does not yet prove that the user's
+specific Android device grants camera access, negotiates the expected YUV
+planes, or delivers live frames end to end. See
+`android-camera-bridge/README.md` for the protocol and setup.
+
+
 A running log of what Genesis has done — the breakthroughs and the
 evidence behind them, not just the claims. Entries are dated, newest
 first. Code references are commit SHAs; runtime artifacts live in the
