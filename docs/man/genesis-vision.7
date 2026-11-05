@@ -195,11 +195,11 @@ Inspect known identities and recent anonymous or named sightings.
 On Android, launch the Genesis Camera Adapter activity and inspect
 its foreground notification for camera selection, permission,
 capture-session, daemon-connection, and first-frame status. Device
-logs can be inspected with
-.BR logcat (1)
-using the
+logs can be inspected with the
+.B logcat
+command using the
 .I GenesisCamera
-tag. On Linux, inspect the daemon log for V4L2 open, format
+tag (filter the Android log by that tag). On Linux, inspect the daemon log for V4L2 open, format
 negotiation, and frame-publication messages.
 .SH FILES
 .TP
