@@ -32,7 +32,7 @@ def _answer(result: Any, operation: str | None = None) -> ParietalAnswer:
         if ok
         else (result.error or "The mathematical faculty could not solve that form.")
     )
-    steps = [f"{result.operation}: {result.input}"]
+    steps = [f"{operation or result.operation}: {result.input}"]
     if result.data:
         steps.append(f"Result data: {result.data}")
     return ParietalAnswer(operation or result.operation, output, steps, ok)
