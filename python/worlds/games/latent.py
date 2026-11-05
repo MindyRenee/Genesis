@@ -324,8 +324,9 @@ def encode_graph(graph: SceneGraph) -> LatentState:
 
 @dataclass
 class _ActionStatistics:
-    """Welford statistics for observed latent deltas under one action."""
+    """Welford statistics for one local region of latent state space."""
 
+    reference_state: tuple[float, ...]
     samples: int = 0
     mean_delta: list[float] = field(default_factory=list)
     squared_deviation: list[float] = field(default_factory=list)
@@ -354,6 +355,15 @@ class _ActionStatistics:
 
 
 @dataclass(frozen=True, slots=True)
+class LatentPrediction:
+    """Predicted feature coordinates, explicitly not an observed scene graph."""
+
+    vector: tuple[float, ...]
+    epistemic_variance: tuple[float, ...]
+    source_distance: float
+
+
+@dataclass(frozen=True, slots=True)
 class GoalEvidence:
     """Evidence about progress; official terminal status remains authoritative."""
 
@@ -372,88 +382,137 @@ class GoalEvidence:
 
 
 class ArcEnvironmentDecoder:
-    """Encode observations and learn empirical action-conditioned dynamics."""
+    """Encode observations and learn local, action-conditioned dynamics."""
+
+    MAX_CONTEXTS_PER_ACTION = 256
+    CONTEXT_RADIUS = 0.15
 
     def __init__(self, saved: dict[str, Any] | None = None) -> None:
-        self._actions: dict[str, _ActionStatistics] = {}
+        self._actions: dict[str, list[_ActionStatistics]] = {}
         if saved:
-            for action, values in saved.items():
-                samples = int(values.get("samples", 0))
-                mean = [float(value) for value in values.get("mean_delta", [])]
-                m2 = [float(value) for value in values.get("squared_deviation", [])]
-                if (
-                    samples >= 0
-                    and len(mean) == FEATURE_DIMENSIONS
-                    and len(m2) == FEATURE_DIMENSIONS
-                    and all(isfinite(value) for value in mean + m2)
-                    and all(value >= 0 for value in m2)
-                ):
-                    self._actions[str(action)] = _ActionStatistics(samples, mean, m2)
+            for action, raw_contexts in saved.items():
+                contexts = raw_contexts if isinstance(raw_contexts, list) else [raw_contexts]
+                restored: list[_ActionStatistics] = []
+                for values in contexts:
+                    if not isinstance(values, dict):
+                        continue
+                    reference = tuple(
+                        float(value) for value in values.get("reference_state", [])
+                    )
+                    samples = int(values.get("samples", 0))
+                    mean = [float(value) for value in values.get("mean_delta", [])]
+                    m2 = [float(value) for value in values.get("squared_deviation", [])]
+                    if (
+                        len(reference) == FEATURE_DIMENSIONS
+                        and samples >= 0
+                        and len(mean) == FEATURE_DIMENSIONS
+                        and len(m2) == FEATURE_DIMENSIONS
+                        and all(isfinite(value) for value in reference + tuple(mean) + tuple(m2))
+                        and all(value >= 0 for value in m2)
+                    ):
+                        restored.append(_ActionStatistics(reference, samples, mean, m2))
+                if restored:
+                    self._actions[str(action)] = restored[: self.MAX_CONTEXTS_PER_ACTION]
 
     def encode(self, rows: list[list[int]]) -> LatentState:
         """Decode one observation into a graph-backed latent state."""
         state = GridState.from_rows(rows)
         return encode_graph(SceneGraph.extract(state))
 
+    def _nearest_context(
+        self, action: str, state: LatentState
+    ) -> tuple[_ActionStatistics | None, float]:
+        contexts = self._actions.get(action, [])
+        if not contexts:
+            return None, float("inf")
+        nearest = min(
+            contexts,
+            key=lambda context: _vector_distance(context.reference_state, state.vector),
+        )
+        return nearest, _vector_distance(nearest.reference_state, state.vector)
+
     def observe_transition(
         self, action: str, before: LatentState, after: LatentState
     ) -> None:
-        """Update the action model from a real before/action/after observation."""
+        """Update a local action model from a real before/action/after observation."""
         if not action or not action.strip():
             raise ValueError("action name must be non-empty")
         if len(before.vector) != len(after.vector):
             raise ValueError("transition latent dimensions must agree")
+        contexts = self._actions.setdefault(action, [])
+        statistics, distance = self._nearest_context(action, before)
+        if statistics is None or (
+            distance > self.CONTEXT_RADIUS
+            and len(contexts) < self.MAX_CONTEXTS_PER_ACTION
+        ):
+            statistics = _ActionStatistics(before.vector)
+            contexts.append(statistics)
         delta = tuple(
             right - left
             for left, right in zip(before.vector, after.vector, strict=True)
         )
-        self._actions.setdefault(action, _ActionStatistics()).update(delta)
+        statistics.update(delta)
 
-    def predict(self, action: str, state: LatentState) -> LatentState | None:
-        """Predict a next feature state only after observing this action."""
-        statistics = self._actions.get(action)
-        if statistics is None or statistics.samples == 0:
+    def predict(self, action: str, state: LatentState) -> LatentPrediction | None:
+        """Predict only from a sufficiently nearby observed state/action context."""
+        statistics, distance = self._nearest_context(action, state)
+        if (
+            statistics is None
+            or statistics.samples == 0
+            or distance > self.CONTEXT_RADIUS
+        ):
             return None
         vector = tuple(
             value + change
             for value, change in zip(state.vector, statistics.mean_delta, strict=True)
         )
         variance = statistics.epistemic_variance()
-        return LatentState(
+        return LatentPrediction(
             vector,
-            tuple(
-                prior + uncertainty
-                for prior, uncertainty in zip(
-                    state.epistemic_variance, variance, strict=True
-                )
-            ),
-            state.graph,
+            tuple(value + distance**2 for value in variance),
+            distance,
         )
 
     def action_evidence(self) -> dict[str, dict[str, Any]]:
-        """Expose sample counts and empirical uncertainty without hiding evidence."""
-        return {
-            action: {
-                "samples": stats.samples,
+        """Expose samples and local model uncertainty without hiding evidence."""
+        evidence = {}
+        for action, contexts in sorted(self._actions.items()):
+            sample_count = sum(context.samples for context in contexts)
+            variances = [
+                sum(context.epistemic_variance()) / FEATURE_DIMENSIONS
+                for context in contexts
+                if context.mean_delta
+            ]
+            evidence[action] = {
+                "samples": sample_count,
+                "contexts": len(contexts),
                 "epistemic_variance_mean": (
-                    sum(stats.epistemic_variance()) / FEATURE_DIMENSIONS
-                    if stats.mean_delta
-                    else 1.0
+                    sum(variances) / len(variances) if variances else 1.0
                 ),
             }
-            for action, stats in sorted(self._actions.items())
-        }
+        return evidence
 
     def to_dict(self) -> dict[str, Any]:
         """Persist empirical transition statistics with game memory."""
         return {
-            action: {
-                "samples": stats.samples,
-                "mean_delta": list(stats.mean_delta),
-                "squared_deviation": list(stats.squared_deviation),
-            }
-            for action, stats in self._actions.items()
+            action: [
+                {
+                    "reference_state": list(stats.reference_state),
+                    "samples": stats.samples,
+                    "mean_delta": list(stats.mean_delta),
+                    "squared_deviation": list(stats.squared_deviation),
+                }
+                for stats in contexts
+            ]
+            for action, contexts in self._actions.items()
         }
+
+
+def _vector_distance(first: tuple[float, ...], second: tuple[float, ...]) -> float:
+    """Euclidean distance for equal-dimensional feature coordinates."""
+    if len(first) != len(second):
+        raise ValueError("latent dimensions must agree")
+    return sqrt(sum((a - b) ** 2 for a, b in zip(first, second, strict=True)))
 
 
 __all__ = [
