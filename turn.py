@@ -63,7 +63,12 @@ class Turn:
         # Frontal: route before the full pipeline. An early route is
         # a complete answer and ends the turn here.
         t1 = _time.perf_counter()
-        early = engine._think_early_routes(resolved, perception, raw_input)
+        early = engine._think_early_routes(
+            resolved,
+            perception,
+            raw_input,
+            comprehension,
+        )
         timing["early_routes"] = _time.perf_counter() - t1
         if early is not None:
             timing["total"] = _time.perf_counter() - t0
