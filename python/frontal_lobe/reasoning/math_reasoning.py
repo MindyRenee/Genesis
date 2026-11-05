@@ -2466,7 +2466,8 @@ def try_math(
             _record_math_episode(task_competence, question, result, salience)
         return result
 
-    # Build rule registry from concept network if available    enabled_rules: set[str] | None = None
+    # Build rule registry from concept network if available
+    enabled_rules: set[str] | None = None
     if network is not None:
         registry = MathRuleRegistry.from_concept_network(network)
         enabled_rules = registry.enabled_rules
