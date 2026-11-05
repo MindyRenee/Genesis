@@ -783,3 +783,21 @@ Focused tests were added for nonzero background inference, metric geometry,
 goal-attractor membership, affine operator application, Lie brackets, and
 closure. **Verification is pending**: these remote source updates have not
 been executed in a Termux checkout. No test-pass claim is made.
+
+
+## 2026-11-05 — Parietal math routing and ARC topology test corrections
+
+- Exported `ParietalAnswer` and `route_parietal_math` from the parietal
+  regional facade. The cognitive router is an actual parietal-owned entry
+  point, not an undocumented support module; regional wiring pins now
+  verify that ownership.
+- Made the ring-topology test declare its background color explicitly.
+  Its fixture uses color 9 for all 16 border cells and color 0 for the
+  nine enclosed cells, so the mode-based default correctly selects 9
+  under the parser's documented rule. The test's intended question is
+  whether color 9 has one component and one enclosed hole when color 0
+  is designated as background; the fixture now states that condition
+  rather than contradicting the default background contract.
+- No parser heuristic, mathematical faculty, or ARC latent feature was
+  removed or weakened.
+- Verification remains pending on the resulting `audit-fixes` head.
