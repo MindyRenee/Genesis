@@ -63,6 +63,16 @@ from parietal_lobe.math.linear_algebra import solve_text
         ("is this a tautology: ('imp', ('atom', 'P'), ('atom', 'P'))", "tautology"),
         ("distance between (0,0) and (3,4)", "5"),
         ("choose 3 from 10", "120"),
+        ("convert 180 degrees to radians", "3.14159"),
+        ("triangle with sides 3, 4, 5", "area 6"),
+        ("complex cube roots of -8", "-2"),
+        ("solve 3x ≡ 1 (mod 7)", "x ≡ 5"),
+        ("totient of 9", "φ(9) = 6"),
+        ("chinese remainder [(2, 3), (3, 5)]", "8"),
+        ("is (1,1) inside polygon [(0,0), (4,0), (0,4)]", "inside"),
+        ("is graph {(1,2), (2,3)} connected", "connected"),
+        ("Stirling number S(5,2)", "S(5, 2) = 15"),
+        ("stars and bars: 3 identical objects into 2 bins", "= 4"),
     ],
 )
 def test_cognitive_entry_point_reaches_native_parietal_faculty(question: str, expected: str):
