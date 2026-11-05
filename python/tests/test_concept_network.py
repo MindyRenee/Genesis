@@ -1653,6 +1653,77 @@ def test_spill_dormant_with_edge_log_retracts_edges() -> None:
         net._archive.close()
 
 
+def test_spill_does_not_retract_edges_when_archive_write_reports_zero() -> None:
+    """A closed archive must not be treated as a successful edge commit."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        net = ConceptNetwork()
+        archive = open_archive(tmpdir)
+        net.attach_archive(archive)
+        log = open_edge_log(tmpdir)
+        net.attach_edge_log(log)
+
+        net.add_concept("edge_source", confidence=0.8, origin="learned")
+        net.add_concept("edge_target", confidence=0.8, origin="learned")
+        net.add_edge("edge_source", "edge_target", RelationType.RELATED_TO)
+        for concept_id in ("edge_source", "edge_target"):
+            concept = net.get_concept(concept_id)
+            assert concept is not None
+            concept.activation = 0.0
+
+        archive.archive_edges_batch = lambda items: 0  # type: ignore[method-assign]
+        spilled = net.spill_dormant(activation_threshold=0.01, max_in_memory=0)
+
+        assert spilled == 0
+        assert net.size == 2, "concepts remain resident until their edges are durable"
+        assert len(log.fold()) == 1, "canonical edge must not be retracted"
+        log.close()
+        archive.close()
+
+
+def test_dedupe_archive_restores_missing_edges_before_removal() -> None:
+    """An interrupted spill's archived edges must survive stale-row cleanup."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        original = ConceptNetwork()
+        archive = open_archive(tmpdir)
+        original.attach_archive(archive)
+        original_log = open_edge_log(tmpdir)
+        original.attach_edge_log(original_log)
+        original.add_concept("edge_source", confidence=0.8, origin="learned")
+        original.add_concept("edge_target", confidence=0.8, origin="learned")
+        original.add_edge("edge_source", "edge_target", RelationType.RELATED_TO, weight=0.7)
+        for concept_id in ("edge_source", "edge_target"):
+            concept = original.get_concept(concept_id)
+            assert concept is not None
+            concept.activation = 0.0
+
+        assert original.spill_dormant(activation_threshold=0.01, max_in_memory=0) == 2
+        assert len(original_log.fold()) == 0
+        original_log.close()
+        archive.close()
+
+        # Simulate a save that restored the concepts but not the archived
+        # relationship. Startup deduplication must repair the edge first.
+        restored = ConceptNetwork()
+        restored.add_concept("edge_source", confidence=0.8, origin="learned")
+        restored.add_concept("edge_target", confidence=0.8, origin="learned")
+        restored_archive = open_archive(tmpdir)
+        restored.attach_archive(restored_archive)
+        restored_log = open_edge_log(tmpdir)
+        restored.attach_edge_log(restored_log)
+
+        assert restored.dedupe_archive() == 2
+        edges = restored.get_edges("edge_source", "out")
+        assert any(
+            edge.target == "edge_target" and edge.relation == RelationType.RELATED_TO
+            for edge in edges
+        )
+        assert len(restored_log.fold()) == 1
+        assert restored.archive_size == 0
+
+        restored_log.close()
+        restored_archive.close()
+
+
 def test_spill_reports_when_it_trims_nothing(caplog) -> None:
     """A no-op spill explains itself instead of silently returning 0.
 
