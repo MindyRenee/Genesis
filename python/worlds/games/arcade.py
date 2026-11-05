@@ -576,6 +576,7 @@ class Arcade:
         latent = latent or decoder.encode(board.grid)
         memory = self._memory(board.game_id)
         memory.environment_model = decoder.to_dict()
+        typed_latent = latent.to_experiential_latent()
         salience = 0.45 + (0.15 if new else 0.0) + min(0.2, change.count / 400)
         if new:
             self._impulse(CHEM_NOREPINEPHRINE, 0.01)
@@ -593,8 +594,8 @@ class Arcade:
                 "changed_cells": change.count,
                 "new_board": new,
                 "latent_state": latent.to_dict(),
-                "latent_domain": latent.to_experiential_latent().domain.value,
-                "latent_category": latent.to_experiential_latent().category,
+                "latent_domain": typed_latent.domain.value,
+                "latent_category": typed_latent.category,
                 "action_dynamics": decoder.action_evidence(),
                 "latent_prediction_error": prediction_error,
                 "goal_evidence": (
