@@ -125,7 +125,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         r"\d\s*[+*/%^()]|[+*/%^()]\s*\d", lower
     )
     symbolic_input = re.search(r"\b(?:[t-z]|pi|e)\b", lower)
-    if (arithmetic_cue or arithmetic_expression or question_arithmetic) and not symbolic_input:
+    if (arithmetic_cue or arithmetic_expression or question_arithmetic or arithmetic_text != text) and not symbolic_input:
         result = faculty.evaluate(arithmetic_text)
         if result.ok:
             return ParietalAnswer(
