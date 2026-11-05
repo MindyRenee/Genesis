@@ -20,6 +20,7 @@ from typing import Any
 
 from parietal_lobe.grid import Grid
 from parietal_lobe.scene import perceive
+from latent_spaces.boundaries import LatentDomain, LatentState as DomainLatentState
 
 ARC_COLORS = 16
 FEATURE_DIMENSIONS = 35
@@ -242,6 +243,15 @@ class LatentState:
         if len(self.vector) != len(other.vector):
             raise ValueError("latent dimensions must agree")
         return sqrt(sum((a - b) ** 2 for a, b in zip(self.vector, other.vector, strict=True)))
+
+    def to_experiential_latent(self) -> DomainLatentState:
+        """Project the board features into Genesis's typed outer E domain."""
+        return DomainLatentState(
+            domain=LatentDomain.E,
+            values=self.vector,
+            category="arc_observation",
+            confidence=1.0,
+        )
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize only stable numeric features and graph summary."""
@@ -521,6 +531,7 @@ __all__ = [
     "GoalEvidence",
     "GridState",
     "LatentState",
+    "LatentPrediction",
     "SceneEdge",
     "SceneGraph",
     "SceneNode",
