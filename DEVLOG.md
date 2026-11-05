@@ -50,7 +50,9 @@ computed and retained on `ComprehensionResult` without influencing the
 topic stream consumed by memory retrieval, attention, and reasoning.
 
 The turn handoff now passes the same turn's comprehension result into
-the perception stage. The prefrontal integration adds only already-bound,
+the perception stage. Grounding runs after the self-directed learning pass,
+so concepts acquired from the current utterance can be bound during that
+same interaction. The prefrontal integration adds only already-bound,
 non-structural concept IDs to `Perception.topics`, deduplicating against
 the surface-topic output. Unknown arguments remain unresolved and are not
 minted as concepts. This makes temporal semantic binding available to the
