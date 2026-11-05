@@ -288,7 +288,16 @@ for determinant, rank, transpose, inverse, trace, addition,
 subtraction, scalar multiplication, matrix multiplication, and unique
 square-system solving, plus explicit vector literals for addition,
 subtraction, dot products, and three-dimensional cross products. It does not automatically
-infer omitted matrices or vectors.
+infer omitted matrices or vectors. The cognitive router also accepts
+angle conversions (for example, 180 degrees to radians), triangle
+side triples, complex nth-root requests, linear congruences in the
+form ax ≡ b (mod m), Euler totients, and Chinese remainder systems
+as explicit lists of (residue, modulus) pairs. Geometry accepts a
+point literal followed by polygon vertices for point-in-polygon
+queries. Discrete mathematics accepts explicit edge-pair literals
+for graph connectivity. Combinatorics accepts Stirling S(n,k)
+questions and stars-and-bars counts with explicit object and bin
+counts.
 This is not unrestricted mathematical language understanding: each
 domain still requires its documented operand syntax, and a missing
 operand produces an honest failure rather than an invented value.
