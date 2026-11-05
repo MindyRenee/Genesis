@@ -261,7 +261,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
     # Topology's Euler characteristic is directly expressible as V, E, F.
     euler = re.search(
-        r"\beuler characteristic\b.*?\b(\d+)\s+vertices?\b.*?\b(\d+)\s+edges?\b.*?\b(\d+)\s+faces?\b",
+        r"\\beuler characteristic\\b.*?\\b(\\d+)\\s+vertices?\\b.*?\\b(\\d+)\\s+edges?\\b.*?\\b(\\d+)\\s+faces?\\b",
         lower,
     )
     if euler:
