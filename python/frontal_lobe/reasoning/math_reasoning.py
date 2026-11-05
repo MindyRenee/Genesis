@@ -2448,8 +2448,25 @@ def try_math(
     """
     lower = question.lower().strip()
 
-    # Build rule registry from concept network if available
-    enabled_rules: set[str] | None = None
+    # Route domain-specific questions into the native parietal faculties
+    # before the narrower arithmetic/algebra parser. The normalized result
+    # rejoins this entry point so competence records and frontal deliberation
+    # observe one consistent MathResult contract.
+    from parietal_lobe.math.cognitive import route_parietal_math
+
+    parietal_result = route_parietal_math(question)
+    if parietal_result is not None:
+        result = MathResult(
+            parietal_result.answer,
+            parietal_result.operation,
+            parietal_result.steps,
+            parietal_result.success,
+        )
+        if task_competence is not None:
+            _record_math_episode(task_competence, question, result, salience)
+        return result
+
+    # Build rule registry from concept network if available    enabled_rules: set[str] | None = None
     if network is not None:
         registry = MathRuleRegistry.from_concept_network(network)
         enabled_rules = registry.enabled_rules
