@@ -289,7 +289,7 @@ class Arcade:
             decoder = self._decoder(session.game_id)
             before_latent = decoder.encode(before.grid)
             after_latent = decoder.encode(after.grid)
-            decoder.observe_transition(name, before_latent, after_latent)
+            decoder.observe_transition(move, before_latent, after_latent)
             memory.environment_model = decoder.to_dict()
             goal_evidence = GoalEvidence(
                 after.state,
@@ -459,6 +459,7 @@ class Arcade:
         """Restore memories saved by ``to_dict``."""
         if not data:
             return
+        self._decoders.clear()
         self.visits = int(data.get("visits", 0))
         self.memories = {
             k: GameMemory.from_dict(v) for k, v in (data.get("memories") or {}).items()
@@ -580,6 +581,8 @@ class Arcade:
                 "changed_cells": change.count,
                 "new_board": new,
                 "latent_state": latent.to_dict(),
+                "latent_domain": latent.to_experiential_latent().domain.value,
+                "latent_category": latent.to_experiential_latent().category,
                 "action_dynamics": decoder.action_evidence(),
                 "goal_evidence": (
                     {
