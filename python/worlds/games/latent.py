@@ -775,7 +775,8 @@ class ArcEnvironmentDecoder:
     def encode(self, rows: list[list[int]]) -> LatentState:
         """Decode one observation into a graph-backed latent state."""
         state = GridState.from_rows(rows)
-        return encode_graph(SceneGraph.extract(state))
+        graph = SceneGraph.extract(state)
+        return LatentState.from_graph(graph)
 
     def _nearest_context(
         self, action: str, state: LatentState
