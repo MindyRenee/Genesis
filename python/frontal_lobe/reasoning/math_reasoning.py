@@ -2448,13 +2448,17 @@ def try_math(
     """
     lower = question.lower().strip()
     parietal_cues = re.search(
-        r"\b(simplify|expand|factor|differentiate|derivative|integral|mean|average|median|"
-        r"variance|standard deviation|summarize|sin|cos|tan|determinant|matrix|rank|"
+        r"\\b(calculate|compute|evaluate|what is|what's|add|subtract|multiply|divide|"
+        r"plus|minus|times|divided by|square root|sqrt|raised to|power of|percent|"
+        r"half|double|triple|square of|cube of|compare|which is larger|which is greater|"
+        r"which is smaller|which is less|simplify|expand|factor|solve|differentiate|"
+        r"derivative|integral|mean|average|median|variance|standard deviation|summarize|"
+        r"sin|cos|tan|determinant|matrix|matrices|matrix product|linear system|rank|"
         r"permutation|cycle|order of|limit|complex|roots? of unity|polar form|prime|"
         r"primality|factorization|gcd|distance|polygon area|area of|convex hull|"
         r"relation|reflexive|symmetric|antisymmetric|transitive|choose|combination|"
         r"arrange|derangement|topology|euler characteristic|tautology|satisfiable|"
-        r"cayley table|algebraic axioms)\b",
+        r"cayley table|algebraic axioms)\\b",
         lower,
     ) or "[[" in lower
     if parietal_cues:
