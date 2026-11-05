@@ -101,6 +101,18 @@ logger = logging.getLogger(__name__)
 # so the gate is effectively the sleep boundary, not an arousal ramp.
 _THALAMIC_BLOCK = 0.15
 
+
+def _face_recognition_input(sensor_rgb: np.ndarray, mirror: bool) -> np.ndarray:
+    """Return the captured sensor image in the canonical outward view.
+
+    Face models are trained on ordinary photographs. Feed them the
+    captured image, not the later synthetic pupil/defocus or Retinex
+    transforms used to model other cortical stages: those transforms
+    can distort the embedding and turn a detectable face into an
+    unmatchable one. The camera has already applied its physical optics.
+    """
+    return optics.mirror_view(sensor_rgb) if mirror else sensor_rgb
+
 # The afferent nerves cortex can look through: the body's own eye and
 # the screen-capture nerve a relay feeds (``genesis_optic_nerve`` and
 # ``genesis_screen_nerve`` segments). A bare segment name also works —
@@ -781,6 +793,10 @@ class Vision:
         # report reads the way they experience the scene. Whatever
         # orientation this look takes holds for everything
         # downstream: regions, directions and motion share it.
+        # Keep the captured sensor image for the face models. Synthetic
+        # eye optics and Retinex are useful for cortical scene analysis,
+        # but should not alter the photographic input used for identity.
+        sensor_rgb = rgb
         if mirror:
             rgb = optics.mirror_view(rgb)
 
@@ -823,15 +839,10 @@ class Vision:
         objects, object_colors = self._recognize_objects(rgb)
 
         # ── Face recognition (FFA) ─────────────────────────────
-        # Identity is handedness-independent, but the detector and
-        # SFace embeddings are trained on standard photographs —
-        # the looking-out frame is the canonical view. Registration
-        # and matching always run on it so a mirrored look can't
-        # flip who she knows; only her *report* carries the facing
-        # orientation. (Un-mirroring the adapted frame is exact:
-        # von Kries gain is per-pixel and the illuminant map
-        # mirrors with its input.)
-        faces_rgb = optics.mirror_view(rgb) if mirror else rgb
+        # Identity is handedness-independent. Use the captured sensor
+        # image in the canonical outward view, before synthetic optics
+        # and Retinex alter facial texture and colour statistics.
+        faces_rgb = _face_recognition_input(sensor_rgb, mirror)
         face_names, n_unknown_faces = self._recognize_faces(faces_rgb)
 
         # ── V1 sparse coding (sublayer: edges, gamma) ──────────
