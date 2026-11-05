@@ -801,3 +801,28 @@ been executed in a Termux checkout. No test-pass claim is made.
 - No parser heuristic, mathematical faculty, or ARC latent feature was
   removed or weakened.
 - Verification remains pending on the resulting `audit-fixes` head.
+
+
+## 2026-11-05 — Face-recognition input and SFace threshold audit
+
+The face recognizer was receiving the image after the synthetic pupil/defocus
+stage and Retinex/von Kries illumination adaptation. Those transforms are
+appropriate for cortical scene analysis, but they alter facial texture and
+photometric statistics relative to the ordinary photographs used to train
+YuNet/SFace. Face detection and identity embeddings now receive the captured
+sensor frame in the canonical outward orientation; the rest of visual
+perception continues to use the modeled retinal and illumination stages.
+
+The named-identity cosine threshold was also stricter than OpenCV's published
+SFace operating threshold (0.363). It now uses 0.363, with boundary regression
+tests above and below the threshold. Added tests also pin the raw sensor-frame
+and mirror-orientation contract.
+
+**Verification boundary:** source and focused regression tests are committed
+to `audit-fixes`; they have not been executed in Termux or CI during this
+remote edit session. The prior runtime audit found no running Genesis process,
+no live optic-nerve frame, and no listener on the camera bridge port, so this
+code correction does not establish that the physical camera is currently
+publishing frames. Rebuild/restart through the supported launcher and validate
+live detection, registration, and repeat recognition before claiming end-to-end
+success. No Genesis runtime state was accessed, cleared, or modified.
