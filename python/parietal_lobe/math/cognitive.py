@@ -120,12 +120,12 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     # Basic number sense compares magnitudes without pretending its
     # approximate faculty is exact arithmetic outside the subitizing range.
     comparison = re.search(
-        r"\\b(?:compare|which is larger|which is greater|which is smaller|which is less)\\b"
-        r".*?(-?\\d+(?:\\.\\d+)?).*?(-?\\d+(?:\\.\\d+)?)",
+        r"\b(?:compare|which is larger|which is greater|which is smaller|which is less)\b"
+        r".*?(-?\d+(?:\.\d+)?).*?(-?\d+(?:\.\d+)?)",
         lower,
     )
     ordered_comparison = re.search(
-        r"\\bis\\s+(-?\\d+(?:\\.\\d+)?)\\s+(greater|larger|less|smaller)\\s+than\\s+(-?\\d+(?:\\.\\d+)?)\\b",
+        r"\bis\s+(-?\d+(?:\.\d+)?)\s+(greater|larger|less|smaller)\s+than\s+(-?\d+(?:\.\d+)?)\b",
         lower,
     )
     if comparison or ordered_comparison:
