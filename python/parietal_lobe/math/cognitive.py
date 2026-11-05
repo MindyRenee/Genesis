@@ -192,7 +192,13 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     symbolic_factor = "factor" not in lower and "factorize" not in lower or re.search(
         r"\b[a-zA-Z]\b", lower.split("factor", 1)[-1]
     )
-    if algebra_cue and symbolic_factor and re.search(r"[a-zA-Z]", lower) and "[[" not in text:
+    if (
+        algebra_cue
+        and symbolic_factor
+        and re.search(r"[a-zA-Z]", lower)
+        and "[[" not in text
+        and not re.search(r"\\b(mod|modulo|congruence)\\b", lower)
+    ):
         if re.search(r"\bsimplify\b", lower):
             return _answer(faculty.simplify(text), "algebra")
         if re.search(r"\bexpand\b", lower):
@@ -240,6 +246,26 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
         result = ratio_text(trig.group(1), trig.group(2).strip(" ()"))
         return _answer(result, "trigonometry")
+
+
+    # Angle conversion and triangle solving share the native trig faculty.
+    conversion = re.search(
+        r"\\b(?:convert\\s+)?(.+?)\\s+to\\s+(degrees?|deg|radians?|rad)\\b[?.!]*$",
+        lower,
+    )
+    if conversion and any(unit in lower for unit in ("degree", "deg", "radian", "rad")):
+        from .trig import convert_text
+
+        target = "degrees" if conversion.group(2).startswith(("deg", "degree")) else "radians"
+        return _answer(convert_text(conversion.group(1).strip(), target), "trigonometry")
+    if "triangle" in lower and "side" in lower:
+        from .trig import triangle_text
+
+        sides = [
+            float(value)
+            for value in re.findall(r"(?<![\\w.])-?\\d+(?:\\.\\d+)?", lower)
+        ]
+        return _answer(triangle_text(sides[-3:]), "trigonometry")
 
     # Linear algebra: dispatch supported matrix operations through the
     # exact Fraction-based faculty. Each operand must be an explicit literal.
@@ -343,6 +369,9 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         if "rank" in lower:
             return _answer(rank_text(matrix), "linear algebra")
 
+
+    # Complex roots are routed before the generic complex-number description.
+
     # Abstract algebra: cycle notation is the input language of this faculty.
     has_group_words = re.search(r"\b(permutation|cycle|cycles|order of)\b", lower)
     has_cycle_literal = re.search(r"\(\s*\d+(?:\s+\d+)+\s*\)", lower)
@@ -374,6 +403,28 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     ):
         from .complex_analysis import describe_text, power_text, roots_unity_text
 
+
+        root_match = re.search(
+            r"\\b(\\d+)(?:st|nd|rd|th)\\s+roots?\\s+of\\s+(.+?)[?.!]*$",
+            lower,
+        )
+        if root_match and "unity" not in lower:
+            from .complex_analysis import roots_text
+
+            return _answer(
+                roots_text(root_match.group(2), int(root_match.group(1))),
+                "complex analysis",
+            )
+        named_root = re.search(
+            r"\\b(square|cube|fourth)\\s+roots?\\s+of\\s+(.+?)[?.!]*$",
+            lower,
+        )
+        if named_root:
+            from .complex_analysis import roots_text
+
+            degree = {"square": 2, "cube": 3, "fourth": 4}[named_root.group(1)]
+            return _answer(roots_text(named_root.group(2), degree), "complex analysis")
+
         unity = re.search(r"\b(\d+)\s*(?:th|st|nd|rd)?\s+roots? of unity", lower)
         if unity:
             return _answer(roots_unity_text(int(unity.group(1))), "complex analysis")
@@ -388,6 +439,60 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             "A supported complex-number expression is required.",
             success=False,
         )
+
+
+    # Modular arithmetic is distinct from polynomial equation solving.
+    congruence = re.search(
+        r"\\bsolve\\s+(-?\\d+)\\s*x\\s*[≡=]\\s*(-?\\d+)\\s*"
+        r"\\(\\s*mod(?:ulo)?\\s+(-?\\d+)\\s*\\)",
+        lower,
+    )
+    if congruence:
+        from .number_theory import solve_congruence_text
+
+        return _answer(
+            solve_congruence_text(*(int(value) for value in congruence.groups())),
+            "number theory",
+        )
+    if re.search(r"\\b(totient|euler.?s phi)\\b", lower):
+        from .number_theory import totient
+
+        values = _integer_values(lower)
+        if not values:
+            return ParietalAnswer(
+                "number theory", "An integer operand is required for totient.", success=False
+            )
+        n = values[-1]
+        if n < 1:
+            return ParietalAnswer(
+                "number theory", "Totient is defined here for positive integers.", success=False
+            )
+        value = totient(n)
+        return ParietalAnswer("number theory", f"φ({n}) = {value}", [f"φ({n}) = {value}"])
+    if "chinese remainder" in lower or re.search(r"\\bcrt\\b", lower):
+        from .number_theory import crt_text
+
+        literal = _literal_after(text)
+        if literal is None:
+            return ParietalAnswer(
+                "number theory",
+                "Provide congruence pairs as [(residue, modulus), ...].",
+                success=False,
+            )
+        try:
+            pairs = ast.literal_eval(literal[0])
+            if not isinstance(pairs, (list, tuple)) or not pairs:
+                raise ValueError("at least one congruence pair is required")
+            if any(
+                not isinstance(pair, (list, tuple))
+                or len(pair) != 2
+                or any(not isinstance(value, int) or isinstance(value, bool) for value in pair)
+                for pair in pairs
+            ):
+                raise ValueError("each congruence must be an integer (residue, modulus) pair")
+        except (SyntaxError, ValueError) as error:
+            return ParietalAnswer("number theory", str(error), success=False)
+        return _answer(crt_text([tuple(pair) for pair in pairs]), "number theory")
 
     # Number theory: integer operands are explicit and validated by the faculty.
     if re.search(
@@ -409,6 +514,22 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             return _answer(factor_text(values[-1]), "number theory")
         return _answer(prime_text(values[-1]), "number theory")
 
+
+    # Point-in-polygon uses two explicit coordinate literals: one point,
+    # followed by the polygon vertices.
+    if re.search(r"\\b(inside|outside)\\b", lower) and "polygon" in lower:
+        from .geometry import inside_text
+
+        point = _literal_after(text)
+        polygon = _literal_after(text, point[1]) if point else None
+        if point is None or polygon is None:
+            return ParietalAnswer(
+                "geometry",
+                "Provide a point literal followed by at least three polygon vertices.",
+                success=False,
+            )
+        return _answer(inside_text(point[0], polygon[0]), "geometry")
+
     # Euclidean geometry: the faculty validates point counts and computes.
     if re.search(r"\b(distance|polygon area|area of|convex hull)\b", lower):
         from .geometry import area_text, distance_text, hull_text
@@ -418,6 +539,21 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         if "hull" in lower:
             return _answer(hull_text(text), "geometry")
         return _answer(area_text(text), "geometry")
+
+
+    # Graph connectivity consumes explicit edge pairs; omitted vertices are
+    # not inferred from the surrounding prose.
+    if "graph" in lower and re.search(r"\\b(connected|connectivity)\\b", lower):
+        from .discrete import connected_text
+
+        literal = _literal_after(text)
+        if literal is None:
+            return ParietalAnswer(
+                "discrete mathematics",
+                "An explicit edge-pair literal is required.",
+                success=False,
+            )
+        return _answer(connected_text(literal[0]), "discrete mathematics")
 
     # Discrete structures: relation properties over an explicit set of pairs.
     if re.search(r"\b(relation|reflexive|symmetric|antisymmetric|transitive)\b", lower):
@@ -431,6 +567,43 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
                 success=False,
             )
         return _answer(relation_text(literal[0]), "discrete mathematics")
+
+
+    if re.search(r"\\bstirling(?: number)?\\b", lower):
+        from .combinatorics import stirling2
+
+        values = _integer_values(lower)
+        if len(values) < 2:
+            return ParietalAnswer(
+                "combinatorics", "Two integers n and k are required for S(n, k).", success=False
+            )
+        n, k = values[-2:]
+        if n < 0 or k < 0 or k > n:
+            return ParietalAnswer(
+                "combinatorics", "Require integers with 0 ≤ k ≤ n.", success=False
+            )
+        value = stirling2(n, k)
+        return ParietalAnswer("combinatorics", f"S({n}, {k}) = {value}")
+    if "stars and bars" in lower:
+        from .combinatorics import stars_bars
+
+        values = _integer_values(lower)
+        if len(values) < 2:
+            return ParietalAnswer(
+                "combinatorics",
+                "Specify the number of identical objects and the number of bins.",
+                success=False,
+            )
+        objects, bins = values[-2:]
+        if objects < 0 or bins < 1:
+            return ParietalAnswer(
+                "combinatorics", "Require objects ≥ 0 and bins ≥ 1.", success=False
+            )
+        value = stars_bars(objects, bins)
+        return ParietalAnswer(
+            "combinatorics",
+            f"C({objects + bins - 1}, {bins - 1}) = {value}",
+        )
 
     # Combinatorics: choose/arrange/derange are unambiguous operation names.
     if re.search(r"\b(choose|combination|combinations|arrange|permutation|derangement)\b", lower):
