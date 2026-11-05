@@ -1,3 +1,23 @@
+## 2026-11-05 — Math routing regression audit
+
+Termux execution of `test_higher_math_cognition.py` exposed dispatch gaps that
+source review had not caught: percent-symbol questions were not admitted by
+the frontal parietal cue; plural `matrices` phrasing fell through to the
+arithmetic parser; differentiation and antiderivatives had no cognitive
+router branch; and a limit containing `sin` could be claimed by the
+trigonometry matcher before real analysis.
+
+The frontal cue now admits `%`. The parietal router recognizes both
+`matrix` and `matrices` for matrix addition/subtraction, dispatches
+differentiation and indefinite integration through the native calculus
+faculty, and prevents trigonometric matching from stealing explicit limit
+questions. Existing end-to-end regression cases exercise these forms.
+
+**Verification boundary:** changes are committed to `audit-fixes`; the
+reported Termux failures have not yet been rerun against these corrections.
+The remaining failure details from the original run were not included in the
+report, so the full test result remains open. No runtime state was modified.
+
 ## 2026-11-04 — Linear-system input validation audit
 
 A focused review of the new exact linear-algebra route found that
