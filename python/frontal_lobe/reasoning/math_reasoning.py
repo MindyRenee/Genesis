@@ -2432,7 +2432,7 @@ def try_math(
 
     This is the entry point for the cognition engine. It detects
     what kind of math question is being asked and routes it to
-    the appropriate engine (computation, solving, proof, discovery).
+    the appropriate native faculty (higher-math domain routing, computation, solving, proof, discovery).
 
     If a concept network is provided, the simplification rules are
     gated by what Genesis has learned (see ``MathRuleRegistry``).
