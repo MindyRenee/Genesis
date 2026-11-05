@@ -6,10 +6,10 @@ ARC-AGI-3 board observations. It reuses the canonical parietal `Grid` and
 segmentation path. The decoder validates ARC palette/dimensions, extracts
 stable-ID connected components, records geometry and shape signatures,
 computes enclosed-hole counts with a declared digital-topology convention,
-and builds a sparse directed adjacency graph. A fixed 35-coordinate
+and builds a sparse directed adjacency graph. A fixed 51-coordinate
 interpretable feature embedding captures board geometry, occupancy,
-component/topology statistics, spatial distribution, adjacency and color
-frequencies. The typed feature state projects into the existing experiential
+component/topology statistics, spatial distribution, adjacency, color
+frequencies, and the eight largest object sizes and radial positions. The typed feature state projects into the existing experiential
 outer latent domain `E`.
 
 The arcade now sends the graph-backed latent summary and typed `E`-domain
@@ -30,7 +30,7 @@ uncertainty, persistence, goal evidence, and the live arcade perception event.
 **Verification boundary:** source, integration, tests, and manual changes are
 committed to `audit-fixes`. They have not been executed in Termux or CI during
 this remote edit session. No official ARC game was opened, no API key was
-used, and no persistent runtime state was accessed or modified. The 35
+used, and no persistent runtime state was accessed or modified. The 51
 coordinates are explicit structural descriptors, not a learned semantic
 embedding or a complete environment simulator; solving performance remains
 to be measured on actual ARC-AGI-3 sessions.
