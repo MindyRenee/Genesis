@@ -269,11 +269,40 @@ class LatentState:
         if any(not isfinite(value) or value < 0 for value in self.epistemic_variance):
             raise ValueError("epistemic variances must be finite and non-negative")
 
+    @classmethod
+    def from_graph(cls, graph: SceneGraph) -> LatentState:
+        """Construct a latent state from an attributed scene graph."""
+        return encode_graph(graph)
+
     def distance(self, other: LatentState) -> float:
         """Euclidean distance in this fixed feature coordinate system."""
         if len(self.vector) != len(other.vector):
             raise ValueError("latent dimensions must agree")
         return sqrt(sum((a - b) ** 2 for a, b in zip(self.vector, other.vector, strict=True)))
+
+    def geodesic_distance(
+        self,
+        other: LatentState,
+        metric: tuple[tuple[float, ...], ...] | None = None,
+    ) -> float:
+        """Distance under a constant positive-definite Riemannian metric.
+
+        With a constant metric tensor, the minimizing geodesic is the
+        straight segment and its length is sqrt((y-x)^T G (y-x)).
+        A varying metric requires an actual metric field and is not implied.
+        """
+        if len(self.vector) != len(other.vector):
+            raise ValueError("latent dimensions must agree")
+        delta = tuple(b - a for a, b in zip(self.vector, other.vector, strict=True))
+        if metric is None:
+            return self.distance(other)
+        _validate_spd_metric(metric, len(delta))
+        squared = sum(
+            delta[i] * metric[i][j] * delta[j]
+            for i in range(len(delta))
+            for j in range(len(delta))
+        )
+        return sqrt(max(0.0, squared)))
 
     def to_experiential_latent(self) -> DomainLatentState:
         """Project the board features into Genesis's typed outer E domain."""
@@ -319,6 +348,34 @@ class LatentState:
                 for edge in self.graph.edges[:256]
             ],
         }
+
+
+def _validate_spd_metric(
+    metric: tuple[tuple[float, ...], ...], dimensions: int
+) -> None:
+    """Validate symmetry and positive definiteness by Cholesky factorization."""
+    if len(metric) != dimensions or any(len(row) != dimensions for row in metric):
+        raise ValueError("metric dimensions must match the latent state")
+    if not all(isfinite(value) for row in metric for value in row):
+        raise ValueError("metric entries must be finite")
+    scale = max(1.0, max(abs(value) for row in metric for value in row))
+    tolerance = 1e-10 * scale
+    for row in range(dimensions):
+        for column in range(row):
+            if abs(metric[row][column] - metric[column][row]) > tolerance:
+                raise ValueError("metric tensor must be symmetric")
+    lower = [[0.0] * dimensions for _ in range(dimensions)]
+    for row in range(dimensions):
+        for column in range(row + 1):
+            residual = metric[row][column] - sum(
+                lower[row][k] * lower[column][k] for k in range(column)
+            )
+            if row == column:
+                if residual <= tolerance:
+                    raise ValueError("metric tensor must be positive definite")
+                lower[row][column] = sqrt(residual)
+            else:
+                lower[row][column] = residual / lower[column][column]
 
 
 def encode_graph(graph: SceneGraph) -> LatentState:
