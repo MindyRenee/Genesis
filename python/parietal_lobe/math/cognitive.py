@@ -105,7 +105,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     matrix_language = any(
         term in lower
         for term in (
-            "matrix", "determinant", "matrix rank", "rank of", "linear system",
+            "matrix", "matrices", "determinant", "matrix rank", "rank of", "linear system",
             "transpose", "inverse", "trace", "dot product", "inner product", "vector",
             "cross product",
         )
@@ -239,7 +239,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     matrix_cue = any(
         word in lower
         for word in (
-            "determinant", "matrix rank", "rank of", "matrix", "linear system",
+            "determinant", "matrix rank", "rank of", "matrix", "matrices", "linear system",
             "solve the system", "transpose", "inverse", "trace", "dot product",
             "inner product", "vector", "cross product",
         )
@@ -297,7 +297,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
                 vector_add_text(matrix, second[0], subtract="subtract" in lower),
                 "linear algebra",
             )
-        if "matrix" in lower and ("add" in lower or "subtract" in lower):
+        if re.search(r"\bmatri(?:x|ces)\b", lower) and ("add" in lower or "subtract" in lower):
             second = _literal_after(text, first_end)
             if second is None:
                 return ParietalAnswer(
