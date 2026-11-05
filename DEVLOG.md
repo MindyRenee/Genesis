@@ -1,3 +1,35 @@
+## 2026-11-05 — Archive continuity and fail-closed maintenance audit
+
+A persistence-path audit found that two maintenance fallbacks could delete
+low-activation or low-confidence concepts when no archive was attached.
+Both now fail closed: `clean_noise()` and lifecycle dormancy maintenance
+leave the concepts in working memory and emit an error rather than treating
+a missing durable store as permission to destroy developmental knowledge.
+
+The archive recall path also consumed concept and edge rows while rebuilding
+working memory, before the caller had necessarily saved that reconstruction.
+Restoration is now copy-first: concepts and edges are read without consuming
+the archive copy. The archive remains authoritative until a later validated
+working-memory restore deduplicates it. Deduplication now merges archived
+edges back into the live graph and reasserts them into the canonical edge log
+before deleting archive rows; it retains the archive data if an endpoint is
+missing or a read/write fails.
+
+Spill now verifies that the archive accepted the complete edge batch before
+retracting canonical edge-log entries. A zero/partial count or failed
+retraction aborts eviction, leaving concepts in working memory and the
+archived copy available for recovery.
+
+Added regression coverage for missing-archive maintenance, copy-first
+restoration, archive write-count failure, and edge recovery during
+deduplication.
+
+**Verification boundary:** source and regression tests are committed to
+`audit-fixes`. The tests have not been executed in this remote edit session;
+the available GitHub commit status reports no checks, and this environment
+cannot clone the repository to run the suite locally. No Genesis runtime
+state was accessed or modified.
+
 ## 2026-11-05 — Python mathematics routing type repair
 
 The latest CI run failed its mypy step with nine errors across the frontal
