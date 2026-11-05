@@ -696,6 +696,10 @@ its structural feature vector as the entire latent-space implementation.
   most-common-color background unless an environment supplies an explicit
   background. Grid dimensions and palette cells reject booleans and malformed
   input rather than silently accepting Python's bool-as-int behavior.
+- `compute_local_betti` calculates beta-0 foreground components and beta-1
+  enclosed complement components using four-connected foreground and
+  eight-connected background; scene-level Betti totals are exposed on the
+  attributed graph.
 - `LatentState.from_graph` provides the graph-to-latent construction path.
   `geodesic_distance` supports a validated constant symmetric
   positive-definite metric, using the exact quadratic form
