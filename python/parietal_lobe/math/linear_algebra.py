@@ -112,6 +112,75 @@ def rank(m: Matrix) -> int:
     return len(_echelon(m)[1])
 
 
+def transpose(m: Matrix) -> Matrix:
+    """Transpose a rectangular matrix."""
+    return [list(column) for column in zip(*m, strict=True)]
+
+
+def trace(m: Matrix) -> Fraction | None:
+    """Return the exact trace of a square matrix."""
+    if any(len(row) != len(m) for row in m):
+        return None
+    return sum((m[i][i] for i in range(len(m))), Fraction(0))
+
+
+def inverse(m: Matrix) -> Matrix | None:
+    """Invert a nonsingular square matrix by exact Gauss–Jordan elimination."""
+    n = len(m)
+    if any(len(row) != n for row in m):
+        return None
+    augmented = [
+        [*row[:], *(Fraction(int(i == j)) for j in range(n))]
+        for i, row in enumerate(m)
+    ]
+    for column in range(n):
+        pivot = next(
+            (row for row in range(column, n) if augmented[row][column] != 0),
+            None,
+        )
+        if pivot is None:
+            return None
+        augmented[column], augmented[pivot] = augmented[pivot], augmented[column]
+        divisor = augmented[column][column]
+        augmented[column] = [value / divisor for value in augmented[column]]
+        for row in range(n):
+            if row == column:
+                continue
+            factor = augmented[row][column]
+            if factor:
+                augmented[row] = [
+                    augmented[row][j] - factor * augmented[column][j]
+                    for j in range(2 * n)
+                ]
+    return [row[n:] for row in augmented]
+
+
+def vector_dot(a: list[Fraction], b: list[Fraction]) -> Fraction | None:
+    """Return the exact dot product when vector dimensions agree."""
+    if len(a) != len(b):
+        return None
+    return sum((x * y for x, y in zip(a, b, strict=True)), Fraction(0))
+
+
+def vector_add(
+    a: list[Fraction], b: list[Fraction], sign: int = 1
+) -> list[Fraction] | None:
+    """Add vectors, or subtract when sign is -1."""
+    if len(a) != len(b):
+        return None
+    return [x + sign * y for x, y in zip(a, b, strict=True)]
+
+
+def _parse_vector(text: str) -> list[Fraction]:
+    """Parse a one-dimensional vector literal into exact fractions."""
+    literal = ast.literal_eval(text.strip())
+    if not isinstance(literal, (list, tuple)) or not literal:
+        raise ValueError("a non-empty vector literal is required")
+    if any(isinstance(value, (list, tuple, dict)) for value in literal):
+        raise ValueError("a vector must be one-dimensional")
+    return [Fraction(str(value)) for value in literal]
+
+
 def solve(a: Matrix, b: list[Fraction]) -> list[Fraction] | None:
     """Solve Ax = b by Gauss–Jordan — exact fractions."""
     n = len(a)
@@ -146,6 +215,69 @@ def looks_like_linear_algebra(text: str) -> bool:
     matrix", "solve the system" — the vocabulary of maps.
     """
     return bool(_MATRIX_OP.search(text) or "[[" in text)
+
+
+def transpose_text(text: str) -> LinearResult:
+    """Transpose a matrix literal."""
+    try:
+        matrix = parse_matrix(text)
+    except ValueError as error:
+        return LinearResult("transpose", text, "", False, str(error))
+    return LinearResult("transpose", text, render_matrix(transpose(matrix)), True)
+
+
+def inverse_text(text: str) -> LinearResult:
+    """Invert a nonsingular square matrix using exact fractions."""
+    try:
+        matrix = parse_matrix(text)
+    except ValueError as error:
+        return LinearResult("inverse", text, "", False, str(error))
+    result = inverse(matrix)
+    if result is None:
+        return LinearResult(
+            "inverse", text, "", False, "inverse requires a nonsingular square matrix"
+        )
+    return LinearResult("inverse", text, render_matrix(result), True)
+
+
+def trace_text(text: str) -> LinearResult:
+    """Compute the trace of a square matrix."""
+    try:
+        matrix = parse_matrix(text)
+    except ValueError as error:
+        return LinearResult("trace", text, "", False, str(error))
+    result = trace(matrix)
+    if result is None:
+        return LinearResult("trace", text, "", False, "trace requires a square matrix")
+    return LinearResult("trace", text, _fmt(result), True)
+
+
+def vector_dot_text(a_text: str, b_text: str) -> LinearResult:
+    """Compute the dot product of two explicit vector literals."""
+    try:
+        a, b = _parse_vector(a_text), _parse_vector(b_text)
+    except (SyntaxError, ValueError, ZeroDivisionError) as error:
+        return LinearResult("dot", f"{a_text} · {b_text}", "", False, str(error))
+    result = vector_dot(a, b)
+    if result is None:
+        return LinearResult(
+            "dot", f"{a_text} · {b_text}", "", False, "vector dimensions must agree"
+        )
+    return LinearResult("dot", f"{a_text} · {b_text}", _fmt(result), True)
+
+
+def vector_add_text(a_text: str, b_text: str, subtract: bool = False) -> LinearResult:
+    """Add or subtract two explicit vector literals."""
+    try:
+        a, b = _parse_vector(a_text), _parse_vector(b_text)
+    except (SyntaxError, ValueError, ZeroDivisionError) as error:
+        return LinearResult("vector", f"{a_text}, {b_text}", "", False, str(error))
+    result = vector_add(a, b, -1 if subtract else 1)
+    if result is None:
+        return LinearResult(
+            "vector", f"{a_text}, {b_text}", "", False, "vector dimensions must agree"
+        )
+    return LinearResult("vector", f"{a_text}, {b_text}", "(" + ", ".join(_fmt(x) for x in result) + ")", True)
 
 
 def determinant_text(text: str) -> LinearResult:
