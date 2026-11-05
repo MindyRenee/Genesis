@@ -1,3 +1,40 @@
+## 2026-11-04 — ARC structural latent decoder and empirical dynamics
+
+Added `python/worlds/games/latent.py` as a graph-backed decoder for live
+ARC-AGI-3 board observations. It reuses the canonical parietal `Grid` and
+`scene.perceive` implementation rather than creating a parallel image
+segmentation path. The decoder validates ARC palette/dimensions, extracts
+stable-ID connected components, records geometry and shape signatures,
+computes enclosed-hole counts with a declared digital-topology convention,
+and builds a sparse directed adjacency graph. A fixed 35-coordinate
+interpretable feature embedding captures board geometry, occupancy,
+component/topology statistics, spatial distribution, adjacency and color
+frequencies. The typed feature state projects into the existing experiential
+outer latent domain `E`.
+
+The arcade now sends the graph-backed latent summary and typed `E)-domain
+metadata through `OuterWorld.perceive`. For each actual action/result pair,
+the decoder updates a local action-conditioned model indexed by nearby
+pre-action latent contexts. Welford statistics retain sample counts and
+estimate uncertainty; predictions are withheld for unknown actions or
+distant contexts. The model is serialized with each game's existing
+`GameMemory`, so it survives the established world save/restore path.
+Goal evidence reports observed level progress and official terminal state;
+the official game state remains authoritative and no fixed target vector
+is used to declare success.
+
+Focused tests cover malformed grids, enclosed holes, stable object IDs,
+latent dimensionality and typed-domain projection, local transition learning,
+uncertainty, persistence, goal evidence, and the live arcade perception event.
+
+**Verification boundary:** source, integration, tests, and manual changes are
+committed to `audit-fixes`. They have not been executed in Termux or CI during
+this remote edit session. No official ARC game was opened, no API key was
+used, and no persistent runtime state was accessed or modified. The 35
+coordinates are explicit structural descriptors, not a learned semantic
+embedding or a complete environment simulator; solving performance remains
+to be measured on actual ARC-AGI-3 sessions.
+
 ## 2026-11-04 — Foundational arithmetic and linear algebra completion
 
 Expanded the existing parietal linear-algebra faculty without replacing its
