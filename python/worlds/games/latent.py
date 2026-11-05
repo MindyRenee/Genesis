@@ -509,6 +509,203 @@ class GoalEvidence:
         return self.state.upper() == "WIN"
 
 
+
+@dataclass(frozen=True, slots=True)
+class GoalAttractorManifold:
+    """A metric neighborhood around an explicitly supplied latent goal.
+
+    The center must come from an observed or explicitly specified target.
+    No goal vector is inferred from reward or terminal status.
+    """
+
+    center: tuple[float, ...]
+    metric: tuple[tuple[float, ...], ...]
+    tolerance: float
+
+    def __post_init__(self) -> None:
+        if not self.center or not all(isfinite(value) for value in self.center):
+            raise ValueError("goal center must contain finite coordinates")
+        if not isfinite(self.tolerance) or self.tolerance < 0:
+            raise ValueError("goal tolerance must be finite and non-negative")
+        _validate_spd_metric(self.metric, len(self.center))
+
+    def distance(self, state: LatentState) -> float:
+        """Return the constant-metric distance from a state to this goal."""
+        if len(state.vector) != len(self.center):
+            raise ValueError("goal and state dimensions must agree")
+        delta = tuple(
+            value - center
+            for value, center in zip(state.vector, self.center, strict=True)
+        )
+        squared = sum(
+            delta[i] * self.metric[i][j] * delta[j]
+            for i in range(len(delta))
+            for j in range(len(delta))
+        )
+        return sqrt(max(0.0, squared))
+
+    def is_satisfied(self, state: LatentState) -> bool:
+        """Whether an observed state lies inside the specified goal neighborhood."""
+        return self.distance(state) <= self.tolerance
+
+
+@dataclass(frozen=True, slots=True)
+class TransitionOperator:
+    """An explicitly calibrated affine vector field x -> A x + b.
+
+    Discrete ARC action identifiers are not automatically interpreted as
+    differentiable operators. An operator must be supplied in a declared
+    coordinate chart before differential operations are meaningful.
+    """
+
+    matrix: tuple[tuple[float, ...], ...]
+    bias: tuple[float, ...]
+
+    def __post_init__(self) -> None:
+        dimensions = len(self.bias)
+        if dimensions == 0 or len(self.matrix) != dimensions:
+            raise ValueError("operator output dimensions must match its bias")
+        if any(len(row) != dimensions for row in self.matrix):
+            raise ValueError("operator matrix must be square")
+        if not all(isfinite(value) for row in self.matrix for value in row):
+            raise ValueError("operator matrix must be finite")
+        if not all(isfinite(value) for value in self.bias):
+            raise ValueError("operator bias must be finite")
+
+    @property
+    def dimensions(self) -> int:
+        return len(self.bias)
+
+    def apply(self, state: tuple[float, ...]) -> tuple[float, ...]:
+        """Evaluate the affine vector field at one state."""
+        if len(state) != self.dimensions:
+            raise ValueError("operator and state dimensions must agree")
+        if not all(isfinite(value) for value in state):
+            raise ValueError("operator input must be finite")
+        return tuple(
+            sum(weight * value for weight, value in zip(row, state, strict=True)) + offset
+            for row, offset in zip(self.matrix, self.bias, strict=True)
+        )
+
+    def lie_bracket(self, other: TransitionOperator) -> TransitionOperator:
+        """Return [self, other] = D(other) self - D(self) other.
+
+        For f(x)=Ax+a and g(x)=Bx+b, this is
+        ((BA-AB)x + (Ba-Ab)).
+        """
+        if self.dimensions != other.dimensions:
+            raise ValueError("operator dimensions must agree")
+        n = self.dimensions
+        matrix = tuple(
+            tuple(
+                sum(
+                    other.matrix[i][k] * self.matrix[k][j]
+                    - self.matrix[i][k] * other.matrix[k][j]
+                    for k in range(n)
+                )
+                for j in range(n)
+            )
+            for i in range(n)
+        )
+        bias = tuple(
+            sum(other.matrix[i][k] * self.bias[k] for k in range(n))
+            - sum(self.matrix[i][k] * other.bias[k] for k in range(n))
+            for i in range(n)
+        )
+        return TransitionOperator(matrix, bias)
+
+
+class DifferentiableOperatorSpace:
+    """Finite-dimensional space of explicitly defined affine vector fields."""
+
+    def __init__(
+        self, operators: dict[str, TransitionOperator] | None = None
+    ) -> None:
+        self.operators = dict(operators or {})
+        dimensions = {operator.dimensions for operator in self.operators.values()}
+        if len(dimensions) > 1:
+            raise ValueError("all operators must use the same coordinate dimension")
+        if any(not name.strip() for name in self.operators):
+            raise ValueError("operator names must be non-empty")
+
+    def apply(self, name: str, state: tuple[float, ...]) -> tuple[float, ...]:
+        """Apply a named operator in its declared coordinate chart."""
+        try:
+            operator = self.operators[name]
+        except KeyError as error:
+            raise KeyError(f"unknown transition operator: {name}") from error
+        return operator.apply(state)
+
+    def bracket(self, first: str, second: str) -> TransitionOperator:
+        """Compute the Lie bracket of two declared vector fields."""
+        try:
+            left = self.operators[first]
+            right = self.operators[second]
+        except KeyError as error:
+            raise KeyError(f"unknown transition operator: {error.args[0]}") from error
+        return left.lie_bracket(right)
+
+    def validate_lie_bracket_closure(self, tolerance: float = 1e-9) -> bool:
+        """Check that every pairwise bracket belongs to the declared linear span.
+
+        Coefficients are flattened into one finite-dimensional vector space.
+        Modified Gram-Schmidt tests span membership without treating noisy
+        discrete game actions as a Lie algebra.
+        """
+        if not isfinite(tolerance) or tolerance <= 0:
+            raise ValueError("closure tolerance must be finite and positive")
+        operators = list(self.operators.values())
+        if not operators:
+            return True
+        basis: list[list[float]] = []
+        for operator in operators:
+            _extend_operator_basis(basis, _operator_coordinates(operator), tolerance)
+        for index, first in enumerate(operators):
+            for second in operators[index + 1 :]:
+                bracket = _operator_coordinates(first.lie_bracket(second))
+                residual = _operator_residual(bracket, basis)
+                norm = sqrt(sum(value * value for value in bracket))
+                residual_norm = sqrt(sum(value * value for value in residual))
+                if residual_norm > tolerance * max(1.0, norm):
+                    return False
+        return True
+
+
+def _operator_coordinates(operator: TransitionOperator) -> list[float]:
+    return [value for row in operator.matrix for value in row] + list(operator.bias)
+
+
+def _operator_residual(
+    vector: list[float], basis: list[list[float]]
+) -> list[float]:
+    residual = vector[:]
+    for direction in basis:
+        projection = sum(
+            value * axis for value, axis in zip(residual, direction, strict=True)
+        )
+        residual = [
+            value - projection * axis
+            for value, axis in zip(residual, direction, strict=True)
+        ]
+    return residual
+
+
+def _extend_operator_basis(
+    basis: list[list[float]], vector: list[float], tolerance: float
+) -> None:
+    residual = _operator_residual(vector, basis)
+    norm = sqrt(sum(value * value for value in residual))
+    if norm > tolerance:
+        basis.append([value / norm for value in residual])
+
+
+def validate_lie_bracket_closure(
+    operators: DifferentiableOperatorSpace, tolerance: float = 1e-9
+) -> bool:
+    """Public closure check for an explicitly declared operator space."""
+    return operators.validate_lie_bracket_closure(tolerance)
+
+
 class ArcEnvironmentDecoder:
     """Encode observations and learn local, action-conditioned dynamics."""
 
@@ -650,11 +847,15 @@ __all__ = [
     "FEATURE_DIMENSIONS",
     "OBJECT_FEATURES",
     "GoalEvidence",
+    "GoalAttractorManifold",
     "GridState",
     "LatentState",
     "LatentPrediction",
     "SceneEdge",
     "SceneGraph",
     "SceneNode",
+    "TransitionOperator",
+    "DifferentiableOperatorSpace",
     "encode_graph",
+    "validate_lie_bracket_closure",
 ]
