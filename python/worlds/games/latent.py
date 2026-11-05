@@ -36,6 +36,7 @@ class GridState:
     data: tuple[int, ...]
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "data", tuple(self.data))
         if self.width < 1 or self.height < 1:
             raise ValueError("grid dimensions must be positive")
         if len(self.data) != self.width * self.height:
@@ -444,12 +445,15 @@ class ArcEnvironmentDecoder:
                 for values in contexts:
                     if not isinstance(values, dict):
                         continue
-                    reference = tuple(
-                        float(value) for value in values.get("reference_state", [])
-                    )
-                    samples = int(values.get("samples", 0))
-                    mean = [float(value) for value in values.get("mean_delta", [])]
-                    m2 = [float(value) for value in values.get("squared_deviation", [])]
+                    try:
+                        reference = tuple(
+                            float(value) for value in values.get("reference_state", [])
+                        )
+                        samples = int(values.get("samples", 0))
+                        mean = [float(value) for value in values.get("mean_delta", [])]
+                        m2 = [float(value) for value in values.get("squared_deviation", [])]
+                    except (TypeError, ValueError, OverflowError):
+                        continue
                     if (
                         len(reference) == FEATURE_DIMENSIONS
                         and samples >= 0
