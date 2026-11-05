@@ -1,3 +1,11 @@
+## 2026-11-04 — Higher mathematics cognitive integration
+
+Connected the native parietal mathematics faculties to the existing frontal `try_math()` entry point through `parietal_lobe.math.cognitive.route_parietal_math()`. Supported explicit operation forms now dispatch to native algebra, calculus, statistics, trigonometry, linear algebra, abstract algebra, real analysis, complex analysis, number theory, geometry, discrete mathematics, combinatorics, topology, and Cayley-table axiom classification. Results return through the existing `MathResult` contract so deliberation and task-competence recording retain one pathway. The router delegates computation to the existing faculties; it does not add canned answers, an external model, or invented operands. The propositional proof API remains structured-input only because no natural-language proposition parser exists.
+
+Added `test_higher_math_cognition.py` to exercise the frontal entry point and preserve the arithmetic path. Updated `genesis-math(7)` to describe the live routing layer and its explicit limits.
+
+**Verification boundary:** source and focused tests are committed on `audit-fixes`, but Python tests, ruff, pyflakes, mypy, Rust checks, Android runtime, and physical-device behavior have not been executed in this remote editing session. Run the required project checks from Termux before treating the integration as verified. The referenced `AGENTS.md` is absent from this branch; `CONTRIBUTING.md`, `SECURITY.md`, and `DEVLOG.md` were used as the available project rules.
+
 ## 2026-11-04 — Man-page audit: optic, vision, and mathematical faculties
 
 Reconciled the manuals against the current Android Camera2 adapter,
