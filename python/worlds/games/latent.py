@@ -262,7 +262,7 @@ class LatentState:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize only stable numeric features and graph summary."""
+        """Serialize numeric features and bounded object/edge evidence."""
         return {
             "vector": list(self.vector),
             "epistemic_variance": list(self.epistemic_variance),
@@ -279,8 +279,21 @@ class LatentState:
                     "bbox": node.bbox,
                     "betti_0": node.betti_0,
                     "betti_1": node.betti_1,
+                    "shape_signature": node.shape_signature,
                 }
                 for node in self.graph.nodes[:128]
+            ],
+            "edges": [
+                {
+                    "source": edge.source,
+                    "target": edge.target,
+                    "dx": edge.dx,
+                    "dy": edge.dy,
+                    "adjacency": edge.adjacency,
+                    "same_color": edge.same_color,
+                    "same_shape": edge.same_shape,
+                }
+                for edge in self.graph.edges[:256]
             ],
         }
 
