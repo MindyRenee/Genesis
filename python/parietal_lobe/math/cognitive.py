@@ -307,7 +307,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
                 "linear algebra",
             )
         if ("scale" in lower or "scalar" in lower) and "matrix" in lower:
-            scalar = re.search(r"\\bby\\s+(-?\\d+(?:/\\d+)?(?:\\.\\d+)?)\\b", lower)
+            scalar = re.search(r"\bby\s+(-?\d+(?:/\d+)?(?:\.\d+)?)\b", lower)
             if scalar is None:
                 return ParietalAnswer(
                     "linear algebra", "An explicit rational scalar is required.", success=False
