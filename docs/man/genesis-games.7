@@ -91,6 +91,37 @@ Game observations may contain multiple frames, the current state,
 available actions, completed-level count, and total win-level count.
 Genesis converts the latest frame to a grid for perception. The
 official environment remains authoritative for the actual game state.
+.SH STRUCTURAL LATENT DECODER
+Each ARC board is passed through
+.B worlds.games.latent.ArcEnvironmentDecoder
+alongside Genesis's existing parietal grid and scene parser. The decoder
+validates the 0–15 grid, extracts connected same-color components,
+canonicalizes object order, records centroids, bounding boxes, shape
+signatures and enclosed-hole topology, and constructs a sparse directed
+adjacency graph. It produces a fixed 35-coordinate structural feature
+vector containing board dimensions, occupancy, object statistics,
+topological counts, spatial distribution and color frequencies.
+.PP
+The vector is an interpretable feature embedding, not a pretrained or
+learned neural embedding. The attributed graph is retained alongside it;
+the vector does not replace object-level evidence. The feature state is
+projected into the typed experiential outer domain
+.BR E .
+Perception events carry the latent vector, uncertainty, object summary,
+and current action-model evidence into the world's normal perception
+path.
+.PP
+For each observed action, the decoder compares the before and after
+latent states and updates local action-conditioned transition statistics.
+Predictions are made only from a sufficiently nearby previously observed
+state/action context. Welford running statistics estimate transition
+uncertainty; uncertainty is not reduced merely because an action was
+attempted. These empirical models are saved inside per-game world memory.
+.PP
+Goal evidence records observed level changes and the official terminal
+state. The official toolkit remains authoritative for level completion
+and wins; the decoder does not invent a target vector or declare a win
+from latent distance.
 .SH LEARNING AND MEMORY
 Genesis keeps per-game memory in her world state. It includes action
 effect counts, board visits, action-value estimates, moves and paths
@@ -119,6 +150,18 @@ The official toolkit separately supports JSONL game recordings and
 scorecard operations. Its recording directory and scorecard behavior
 are controlled by the toolkit configuration, not by Genesis's
 cognitive-journal path.
+.SH LIMITATIONS
+The structural feature coordinates are hand-designed, deterministic
+descriptors. They are not yet learned semantic concepts, object
+identities, or a complete physical simulator. Components use four-way
+same-color connectivity with color 0 treated as background; enclosed
+holes use the complementary eight-neighbor convention. The transition
+model is local empirical evidence, not a globally valid dynamics law.
+Unknown actions or distant latent contexts produce no prediction.
+.PP
+No claim is made that this decoder alone solves ARC-AGI-3. It supplies
+structured observations and measurable transition hypotheses to the
+existing memory, reasoning, and action-selection faculties.
 .SH DIAGNOSTICS
 Use
 .B /arcade
