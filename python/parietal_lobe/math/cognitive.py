@@ -174,8 +174,6 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             lower,
         )
     ):
-        r"(?<![\w.])-?\d+(?:\.\d+)?\s*[+-]\s*\d+(?:\.\d+)?i\b", lower
-    ):
         from .complex_analysis import describe_text, power_text, roots_unity_text
 
         unity = re.search(r"\b(\d+)\s*(?:th|st|nd|rd)?\s+roots? of unity", lower)
@@ -261,7 +259,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
     # Topology's Euler characteristic is directly expressible as V, E, F.
     euler = re.search(
-        r"\\beuler characteristic\\b.*?\\b(\\d+)\\s+vertices?\\b.*?\\b(\\d+)\\s+edges?\\b.*?\\b(\\d+)\\s+faces?\\b",
+        r"\beuler characteristic\b.*?\b(\d+)\s+vertices?\b.*?\b(\d+)\s+edges?\b.*?\b(\d+)\s+faces?\b",
         lower,
     )
     if euler:
