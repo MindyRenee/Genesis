@@ -87,6 +87,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         (r"\bmultiply\s+(.+?)\s+by\s+(.+?)[?.!]*$", r"\1 * \2"),
         (r"\bdivide\s+(.+?)\s+by\s+(.+?)[?.!]*$", r"\1 / \2"),
         (r"\b(-?\d+(?:\.\d+)?)\s*percent\s+of\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"(\1 / 100) * \2"),
+        (r"\b(-?\d+(?:\.\d+)?)%\s*of\s*(-?\d+(?:\.\d+)?)[?.!]*$", r"(\1 / 100) * \2"),
         (r"\bhalf\s+of\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"\1 / 2"),
         (r"\bdouble\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"\1 * 2"),
         (r"\btriple\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"\1 * 3"),
