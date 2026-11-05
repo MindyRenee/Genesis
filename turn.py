@@ -48,7 +48,9 @@ class Turn:
         # words — anaphora resolution rewrites "you" and would mark
         # every second-person question as being about Genesis.
         t1 = _time.perf_counter()
-        perception, prediction_error = engine._think_perceive_and_error(raw_input, prediction)
+        perception, prediction_error = engine._think_perceive_and_error(
+            raw_input, prediction, comprehension
+        )
         timing["perceive"] = _time.perf_counter() - t1
         logger.debug(
             "perceive done in %.3fs, topics=%s",
