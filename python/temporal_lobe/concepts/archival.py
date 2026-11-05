@@ -562,8 +562,14 @@ class ArchivalMixin:
             logger.warning(f"archive batch spill failed: {e}")
             spilled = 0
 
-        if spilled <= 0:
-            return spilled
+        if spilled != len(items):
+            logger.error(
+                "spill archived %d of %d concepts; leaving all candidates "
+                "in working memory",
+                spilled,
+                len(items),
+            )
+            return 0
 
         to_spill = {cid for cid, _, _ in items}
         # Archive edges involving spilled concepts.
