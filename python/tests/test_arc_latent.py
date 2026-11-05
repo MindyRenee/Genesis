@@ -4,15 +4,16 @@ import pytest
 
 from worlds.games.latent import (
     ArcEnvironmentDecoder,
+    compute_local_betti,
     DifferentiableOperatorSpace,
     FEATURE_DIMENSIONS,
     GoalAttractorManifold,
     GoalEvidence,
     GridState,
+    LatentState,
     SceneGraph,
     TransitionOperator,
     validate_lie_bracket_closure,
-    compute_local_betti,
 )
 
 
@@ -44,12 +45,13 @@ def test_scene_graph_extracts_components_and_exact_enclosed_holes():
     assert ring.betti_1 == 1
     assert graph.betti_0 == 1
     assert graph.betti_1 == 1
-    assert compute_local_betti(ring_cells := frozenset(
+    ring_cells = frozenset(
         (row, col)
         for row, values in enumerate(grid)
         for col, value in enumerate(values)
         if value == 9
-    ), 0, 0, 4, 4) == (1, 1)
+    )
+    assert compute_local_betti(ring_cells, 0, 0, 4, 4) == (1, 1)
     assert ring.bbox == (0, 0, 4, 4)
 
 
@@ -166,8 +168,6 @@ def test_scene_graph_infers_nonzero_background_using_parietal_rule():
 
 
 def test_constant_metric_geodesic_distance_and_goal_attractor():
-    from worlds.games.latent import LatentState
-
     graph = SceneGraph(1, 1, 0, (), ())
     first = LatentState((0.0, 0.0), (1.0, 1.0), graph)
     second = LatentState((3.0, 4.0), (1.0, 1.0), graph)
