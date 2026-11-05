@@ -197,7 +197,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         and symbolic_factor
         and re.search(r"[a-zA-Z]", lower)
         and "[[" not in text
-        and not re.search(r"\\b(mod|modulo|congruence)\\b", lower)
+        and not re.search(r"\b(mod|modulo|congruence)\b", lower)
     ):
         if re.search(r"\bsimplify\b", lower):
             return _answer(faculty.simplify(text), "algebra")
@@ -250,7 +250,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
     # Angle conversion and triangle solving share the native trig faculty.
     conversion = re.search(
-        r"\\b(?:convert\\s+)?(.+?)\\s+to\\s+(degrees?|deg|radians?|rad)\\b[?.!]*$",
+        r"\b(?:convert\s+)?(.+?)\s+to\s+(degrees?|deg|radians?|rad)\b[?.!]*$",
         lower,
     )
     if conversion and any(unit in lower for unit in ("degree", "deg", "radian", "rad")):
@@ -263,7 +263,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
         sides = [
             float(value)
-            for value in re.findall(r"(?<![\\w.])-?\\d+(?:\\.\\d+)?", lower)
+            for value in re.findall(r"(?<![\w.])-?\d+(?:\.\d+)?", lower)
         ]
         return _answer(triangle_text(sides[-3:]), "trigonometry")
 
@@ -370,8 +370,6 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             return _answer(rank_text(matrix), "linear algebra")
 
 
-    # Complex roots are routed before the generic complex-number description.
-
     # Abstract algebra: cycle notation is the input language of this faculty.
     has_group_words = re.search(r"\b(permutation|cycle|cycles|order of)\b", lower)
     has_cycle_literal = re.search(r"\(\s*\d+(?:\s+\d+)+\s*\)", lower)
@@ -405,7 +403,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
 
         root_match = re.search(
-            r"\\b(\\d+)(?:st|nd|rd|th)\\s+roots?\\s+of\\s+(.+?)[?.!]*$",
+            r"\b(\d+)(?:st|nd|rd|th)\s+roots?\s+of\s+(.+?)[?.!]*$",
             lower,
         )
         if root_match and "unity" not in lower:
@@ -416,7 +414,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
                 "complex analysis",
             )
         named_root = re.search(
-            r"\\b(square|cube|fourth)\\s+roots?\\s+of\\s+(.+?)[?.!]*$",
+            r"\b(square|cube|fourth)\s+roots?\s+of\s+(.+?)[?.!]*$",
             lower,
         )
         if named_root:
@@ -443,8 +441,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
     # Modular arithmetic is distinct from polynomial equation solving.
     congruence = re.search(
-        r"\\bsolve\\s+(-?\\d+)\\s*x\\s*[≡=]\\s*(-?\\d+)\\s*"
-        r"\\(\\s*mod(?:ulo)?\\s+(-?\\d+)\\s*\\)",
+        r"\bsolve\s+(-?\d+)\s*x\s*[≡=]\s*(-?\d+)\s*"
+        r"\(\s*mod(?:ulo)?\s+(-?\d+)\s*\)",
         lower,
     )
     if congruence:
@@ -454,7 +452,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             solve_congruence_text(*(int(value) for value in congruence.groups())),
             "number theory",
         )
-    if re.search(r"\\b(totient|euler.?s phi)\\b", lower):
+    if re.search(r"\b(totient|euler.?s phi)\b", lower):
         from .number_theory import totient
 
         values = _integer_values(lower)
@@ -469,7 +467,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             )
         value = totient(n)
         return ParietalAnswer("number theory", f"φ({n}) = {value}", [f"φ({n}) = {value}"])
-    if "chinese remainder" in lower or re.search(r"\\bcrt\\b", lower):
+    if "chinese remainder" in lower or re.search(r"\bcrt\b", lower):
         from .number_theory import crt_text
 
         literal = _literal_after(text)
@@ -517,7 +515,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
     # Point-in-polygon uses two explicit coordinate literals: one point,
     # followed by the polygon vertices.
-    if re.search(r"\\b(inside|outside)\\b", lower) and "polygon" in lower:
+    if re.search(r"\b(inside|outside)\b", lower) and "polygon" in lower:
         from .geometry import inside_text
 
         point = _literal_after(text)
@@ -543,7 +541,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
     # Graph connectivity consumes explicit edge pairs; omitted vertices are
     # not inferred from the surrounding prose.
-    if "graph" in lower and re.search(r"\\b(connected|connectivity)\\b", lower):
+    if "graph" in lower and re.search(r"\b(connected|connectivity)\b", lower):
         from .discrete import connected_text
 
         literal = _literal_after(text)
@@ -569,7 +567,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         return _answer(relation_text(literal[0]), "discrete mathematics")
 
 
-    if re.search(r"\\bstirling(?: number)?\\b", lower):
+    if re.search(r"\bstirling(?: number)?\b", lower):
         from .combinatorics import stirling2
 
         values = _integer_values(lower)
