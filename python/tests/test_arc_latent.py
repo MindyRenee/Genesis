@@ -75,6 +75,7 @@ def test_action_dynamics_are_learned_from_observed_transitions_only():
     prediction = decoder.predict("ACTION1", before)
     assert prediction is not None
     assert prediction.vector == pytest.approx(after.vector)
+    assert prediction.distance_to(after) == pytest.approx(0.0)
     assert min(prediction.epistemic_variance) >= 1.0
     assert decoder.action_evidence()["ACTION1"]["samples"] == 1
 
