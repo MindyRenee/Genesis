@@ -170,6 +170,7 @@ class CameraStreamService : Service() {
                                     }
                                     session = configured
                                     try {
+                                        val characteristics = manager.getCameraCharacteristics(cameraId)
                                         val requestBuilder = device.createCaptureRequest(
                                             CameraDevice.TEMPLATE_PREVIEW
                                         ).apply {
@@ -178,11 +179,45 @@ class CameraStreamService : Service() {
                                                 CaptureRequest.CONTROL_MODE,
                                                 CaptureRequest.CONTROL_MODE_AUTO
                                             )
+
+                                            // Let the sensor adapt exposure to the scene.
+                                            val aeModes = characteristics.get(
+                                                android.hardware.camera2.CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES
+                                            )
+                                            if (aeModes?.contains(CaptureRequest.CONTROL_AE_MODE_ON) == true) {
+                                                set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                                            }
+
+                                            // Continuous autofocus is preferred for a live, changing
+                                            // visual field. Fixed-focus cameras simply omit this control.
+                                            val afModes = characteristics.get(
+                                                android.hardware.camera2.CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES
+                                            )
+                                            when {
+                                                afModes?.contains(CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO) == true ->
+                                                    set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+                                                afModes?.contains(CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE) == true ->
+                                                    set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+                                                afModes?.contains(CaptureRequest.CONTROL_AF_MODE_AUTO) == true ->
+                                                    set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO)
+                                            }
+
+                                            // Automatic white balance preserves usable color under
+                                            // changing indoor and outdoor illumination.
+                                            val awbModes = characteristics.get(
+                                                android.hardware.camera2.CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES
+                                            )
+                                            if (awbModes?.contains(CaptureRequest.CONTROL_AWB_MODE_AUTO) == true) {
+                                                set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO)
+                                            }
                                         }
-                                        val ranges = manager.getCameraCharacteristics(cameraId).get(
+                                        // The eye consumes at most 10 frames/s downstream, but
+                                        // letting AE operate at a normal sensor cadence avoids
+                                        // forcing long exposure times merely to meet that limit.
+                                        val ranges = characteristics.get(
                                             android.hardware.camera2.CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES
                                         )
-                                        ranges?.filter { it.upper <= 10 && it.lower <= 5 }
+                                        ranges?.filter { it.upper <= 30 && it.upper >= 15 }
                                             ?.maxByOrNull { it.upper }
                                             ?.let {
                                                 requestBuilder.set(
@@ -195,7 +230,7 @@ class CameraStreamService : Service() {
                                             null,
                                             cameraHandler
                                         )
-                                        reportStatus("$selectedCamera camera capture active; waiting for Genesis daemon")
+                                        reportStatus("$selectedCamera eye active: automatic exposure, supported continuous focus and automatic white balance; waiting for Genesis daemon")
                                     } catch (error: Exception) {
                                         reportStatus("Camera capture setup failed: ${error.message ?: error.javaClass.simpleName}")
                                         stopSelf()
