@@ -104,7 +104,10 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
     matrix_language = any(
         term in lower
-        for term in ("matrix", "determinant", "matrix rank", "rank of", "linear system", "transpose", "inverse", "trace", "dot product", "inner product", "vector")
+        for term in (
+            "matrix", "determinant", "matrix rank", "rank of", "linear system",
+            "transpose", "inverse", "trace", "dot product", "inner product", "vector",
+        )
     )
     arithmetic_cue = re.search(
         r"\b(calculate|compute|evaluate|add|subtract|"
