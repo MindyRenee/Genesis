@@ -3,62 +3,90 @@
 genesis-math \- the parietal mathematics faculties of the Genesis mind
 .SH SYNOPSIS
 .nf
-\fBparietal_lobe.math.number_sense\fR    approximate magnitude (ANS)
-\fBparietal_lobe.math.arithmetic\fR      exact arithmetic expressions
-\fBparietal_lobe.math.statistics\fR      descriptive and sampling statistics
-\fBparietal_lobe.math.symbolic\fR        algebra, calculus, equations, matrices
+\fBParietalMath\fR                 parietal faculty facade
+\fBparietal_lobe.math.algebra\fR   symbolic expression trees
+\fBparietal_lobe.math.calculus\fR  differentiation and integration
+\fBparietal_lobe.math.statistics\fR descriptive and sampling statistics
+\fBparietal_lobe.math.symbolic\fR optional SymPy verification oracle
 .fi
 .SH DESCRIPTION
-The parietal lobe contains several distinct mathematical faculties.
-They should not be conflated: approximate magnitude, exact arithmetic,
-descriptive statistics, and symbolic mathematics have different
-representations and verification limits.
-.SS Number sense
-.B number_sense.py
-implements approximate-number operations: magnitude estimation,
-comparison, subitizing, Weber--Fechner scaling, and plausibility
-checks. These are estimates and magnitude intuitions, not exact
-arithmetic results.
-.SS Exact arithmetic
-.B arithmetic.py
-is a recursive-descent expression evaluator over digits, symbols,
-and number/operator words (for example
-.IR "7 + 5"
-or
-.IR "nine times eight" ).
-It does not use Python
-.BR eval() ;
-the expression is parsed and evaluated through explicit operations.
-.SS Descriptive statistics
-.B statistics.py
-implements central tendency, dispersion, distribution shape, and
-sampling summaries. It includes the following measures:
+Genesis's parietal lobe contains a family of mathematical faculties,
+not one monolithic calculator. The native faculties represent and
+manipulate expressions, matrices, permutations, relations, graphs,
+geometric objects, and propositions. They are exposed through the
+.B ParietalMath
+facade in
+.I python/parietal_lobe/math/__init__.py .
+The package also has corresponding Rust mathematics modules under
+.IR src/math/ .
 .PP
-.B Central tendency:
-arithmetic, geometric, harmonic, power, quadratic, cubic,
-contraharmonic, Heronian, Heinz, Lehmer, median, mode, midrange,
-and trimmed means. The Heronian, Heinz, and Lehmer means operate on
-two values; they are individual functions, not members of the
-.B mean()
-dispatcher.
-.PP
-.B Dispersion:
-population or sample variance and standard deviation (sample mode
-uses Bessel's correction), mean absolute deviation, median absolute
-deviation, percentiles, percentile ranges, interquartile range,
-coefficient of variation, and data range.
-.PP
-.B Shape and sampling:
-raw and central moments, skewness, kurtosis (raw or excess), standard
-error, and
+The native algebra and calculus faculties operate on Genesis's own
+expression trees and rule systems. They do not delegate their
+mathematical work to an external language model or computer-algebra
+system. The separate
+.B symbolic.py
+module is an optional SymPy-backed oracle used to check claims and
+support research provenance; it is not the implementation of all
+the native faculties.
+.SS Foundational faculties
+.TP
+.B Number sense
+.I number_sense.py
+implements approximate magnitude comparison, subitizing,
+estimation, Weber--Fechner scaling, and plausibility judgments.
+These are approximate judgments, not exact arithmetic.
+.TP
+.B Arithmetic
+.I arithmetic.py
+parses and evaluates arithmetic expressions using an explicit
+recursive-descent evaluator. It accepts numeric expressions and
+number/operator words. It does not use Python
+.BR eval() .
+.TP
+.B Algebra
+.I algebra.py
+parses expressions into immutable trees for constants, variables,
+negation, sums, products, powers, and elementary function calls.
+It simplifies to canonical form, combines like terms and factors,
+expands products, evaluates expressions, and solves supported
+equations. The parser supports implicit multiplication such as
+.IR 2x ,
+.IR 3(x+1) ,
+and
+.IR (x+1)(x-1) .
+.TP
+.B Calculus
+.I calculus.py
+differentiates expression trees using constant, sum, product,
+quotient, chain, power, and elementary-function rules. It computes
+supported antiderivatives, definite integrals, slopes at a point,
+and Taylor polynomials. Definite integration falls back to composite
+Simpson quadrature when the antiderivative rules do not find a
+closed form.
+.TP
+.B Statistics
+.I statistics.py
+provides central tendency, dispersion, distribution shape, and
+sampling summaries:
+.IP \(bu 2
+Central tendency: arithmetic, geometric, harmonic, generalized
+power, quadratic, cubic, contraharmonic, Heronian, Heinz, Lehmer,
+median, mode, midrange, and trimmed means.
+.IP \(bu 2
+Dispersion: population or sample variance and standard deviation,
+mean absolute deviation, median absolute deviation, percentiles,
+percentile ranges, interquartile range, coefficient of variation,
+and data range.
+.IP \(bu 2
+Shape and sampling: raw and central moments, skewness, kurtosis
+(raw or excess), standard error, and
 .B sampling_means()
-which draws repeated samples with replacement to inspect the
-empirical sampling distribution of the mean. This is a simulation
-of sampling behavior, not a proof of the central limit theorem.
+for repeated samples with replacement.
 .PP
-The
+The Heronian, Heinz, and Lehmer means are two-value functions; they
+are not members of the
 .B mean()
-dispatcher accepts exactly these
+dispatcher. The dispatcher accepts exactly
 .B MEAN_KINDS:
 .IR arithmetic ,
 .IR geometric ,
@@ -71,68 +99,184 @@ dispatcher accepts exactly these
 .IR mode ,
 and
 .IR midrange .
-It does not dispatch to every standalone mean function. The
+The
 .B summarize()
-facade returns a
-.B StatSummary
-whose variance and standard deviation are population measures.
-.SS Symbolic mathematics
+facade reports population variance and standard deviation.
+.SS Higher mathematical domains
+Each domain has a Python faculty and a corresponding Rust module
+under
+.IR src/math/ .
+.TP
+.B Trigonometry
+.I trig.py
+handles angle expressions, degree/radian conversion, trigonometric
+ratios, exact names for common special angles, and triangle solving.
+.TP
+.B Linear algebra
+.I linear_algebra.py
+parses matrix literals and performs matrix multiplication,
+determinants, rank, and square-system solving. Elimination uses
+rational
+.B Fraction
+arithmetic, preserving exact rational results for supported inputs.
+.TP
+.B Abstract algebra
+.I abstract_algebra.py
+parses permutations in cycle notation and computes composition,
+inverse, cycles, order, parity, orbits, and generated subgroups.
+Subgroup generation is bounded by a configured cap.
+.TP
+.B Real analysis
+.I real_analysis.py
+provides numerical limit exploration, sampled function graphs,
+Riemann sums, Simpson quadrature, and bisection. Its epsilon-delta
+challenge uses finite numerical probes; it is not a formal
+universal proof over every real point.
+.TP
+.B Complex analysis
+.I complex_analysis.py
+parses complex values in rectangular, pair, and cis notation and
+computes magnitude, argument, polar descriptions, integer powers,
+nth roots, and roots of unity.
+.TP
+.B Number theory
+.I number_theory.py
+provides primality checks, prime factorization, greatest common
+divisors with Bezout coefficients, modular inverses, congruence
+solving, Euler's totient, and the Chinese remainder theorem.
+.TP
+.B Topology
+.I topology.py
+works with finite topological spaces: validates topology axioms,
+computes closure and interior, and evaluates Euler characteristics
+and simple finite-space invariants.
+.TP
+.B Geometry
+.I geometry.py
+computes point distances, polygon areas and orientation, point-in-
+polygon membership, and convex hulls from coordinate data.
+.TP
+.B Discrete mathematics
+.I discrete.py
+checks finite relations for reflexivity, symmetry, antisymmetry,
+transitivity, and equivalence; it also explores graph connectivity
+and reachability.
+.TP
+.B Combinatorics
+.I combinatorics.py
+counts combinations, ordered arrangements, multinomial
+arrangements, derangements, and Stirling partitions without
+enumerating every arrangement.
+.SS Mathematical foundations
+.TP
+.B Axioms
+.I axioms.py
+checks finite binary-operation tables for closure, associativity,
+identity, inverses, and commutativity. It classifies the resulting
+structure along the magma, semigroup, monoid, group, and abelian
+group ladder, retaining a witness when an axiom fails.
+.TP
+.B Propositional proof
+.I proof.py
+represents propositions built from atoms, negation, conjunction,
+disjunction, implication, and biconditional. It checks truth tables,
+tautology, satisfiability, entailment, and named inference rules;
+invalid entailments can return a countermodel. This is a
+propositional proof faculty, not a general first-order theorem
+prover.
+.SS Symbolic oracle and research workbench
 .B symbolic.py
-provides a separate symbolic layer backed by SymPy. It is loaded
-lazily; when SymPy is not installed, operations that require it
-return an unavailable result rather than silently substituting
-numeric approximations.
+is backed by SymPy and imported lazily. It can be unavailable when
+SymPy is not installed; the native algebra and calculus modules do
+not depend on that optional package for their own operations.
 .PP
-Supported expression operations include simplification, expansion,
-factoring, cancellation, partial fractions, combining rational
-expressions, trigonometric simplification, differentiation,
-integration (indefinite or definite), equation solving, limits,
-series expansion, and 20-digit numerical evaluation. Matrix
-operations include determinant, eigenvalues, trace, inverse, and
-characteristic polynomial.
+The oracle supports symbolic simplification, expansion, factoring,
+cancellation, partial fractions, rational-expression combination,
+trigonometric simplification, differentiation, integration,
+equation solving, limits, series, numerical evaluation, and matrix
+determinant, eigenvalue, trace, inverse, and characteristic-
+polynomial operations.
 .PP
-The equality and inequality oracle can return
+Equality and inequality checks return
 .IR verified ,
 .IR refuted ,
 or
 .IR undecided .
 A bounded equality check that passes every tested integer remains
 .IR undecided ;
-finite testing is not promoted to a proof. This module is a symbolic
-computer-algebra faculty, not a general theorem prover or a
-complete proof assistant.
+a finite range is not promoted to a proof. An undecidable claim
+stays unverified.
+.PP
+The
+.B ResearchWorkbench
+in
+.I python/frontal_lobe/research.py
+persists open mathematical problems, conjectures, readings,
+empirical evidence, and recorded attempts under
+.IR $DATA_DIR/research/workbench.json .
+Only an oracle verdict can give a claim terminal
+.I verified
+or
+.I refuted
+provenance. Bounded checks can refute with a witness or add
+evidence, but cannot verify a universal claim merely because all
+tested points passed.
 .SH ENTRY POINTS
 .TP
 .B ParietalMath
-The facade used by the rest of the mind. It classifies mathematical
-and statistical questions, evaluates arithmetic, dispatches named
-means through
-.BR MEAN_KINDS ,
-and returns statistical summaries.
+The facade for the parietal faculties. It exposes operation
+detectors and methods for arithmetic, algebra, calculus, statistics,
+trigonometry, linear algebra, abstract algebra, real analysis,
+complex analysis, number theory, topology, geometry, discrete
+mathematics, combinatorics, axioms, and propositional proof.
 .TP
-.B parietal_lobe.math.statistics
-The individual statistical functions when a specific measure is
-needed.
+.B parietal_lobe.math
+The package-level exports, result types, and domain detectors.
 .TP
 .B parietal_lobe.math.symbolic
-The symbolic operations and equality/inequality verdicts.
+The optional symbolic oracle used for claim verification.
+.TP
+.B frontal_lobe.research
+The persistent mathematical research workbench.
 .SH FILES
 .TP
 .I python/parietal_lobe/math/
-The mathematical faculty source.
+The native mathematical faculties and the optional symbolic oracle.
+.TP
+.I src/math/
+Rust mathematical modules corresponding to the parietal domains.
+.TP
+.I python/frontal_lobe/research.py
+Persistent research threads, claims, evidence, attempts, and oracle
+verification.
+.TP
+.I python/tests/test_higher_math.py
+Tests for the native algebra, calculus, and higher mathematical
+faculties.
+.TP
+.I python/tests/test_research_math.py
+Tests for symbolic verification and the research workbench.
 .TP
 .I python/tests/test_statistics.py
 Tests for statistical measures and sampling behavior.
-.TP
-.I python/tests/test_symbolic.py
-Tests for symbolic operations and verification verdicts.
 .SH LIMITATIONS
-These are implemented mathematical faculties, not evidence that
-every conversation automatically invokes every operation. The
-presence of a callable function does not establish autonomous
-mathematical competence across arbitrary problem classes. Symbolic
-operations require SymPy; approximate-number results are estimates;
-and bounded checks remain evidence rather than general proofs.
+A listed faculty or callable method establishes an implemented
+interface, not that every natural-language conversation
+automatically routes every problem to it. The facade exposes the
+domain methods; automatic cognitive dispatch must be assessed
+separately.
+.PP
+Algebraic solving has supported closed-form cases and a numerical
+root-search fallback; a numerical root is an approximation.
+Integration uses a finite rule table and numerical quadrature when
+no closed antiderivative is found. Real-analysis limit exploration
+uses finite numerical probes, not a proof over the continuum.
+.PP
+The optional SymPy oracle is not the source of the native
+faculties, and it is not a complete proof assistant. Propositional
+truth-table checks, finite algebraic-structure checks, symbolic
+identities, and numerical evidence each have their own scope.
+Unsupported or undecidable claims must remain unverified.
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-cli (1),
