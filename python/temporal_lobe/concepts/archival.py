@@ -219,9 +219,11 @@ class ArchivalMixin:
         ``add_concept``'s archive check, and the stale archive row is
         never cleaned because every lookup finds the hot concept first.
 
-        Call after state restore. Working memory always wins — the
-        archived copy is by definition older. Returns the number of
-        stale rows removed.
+        Call after a validated state restore. Before dropping stale
+        concept rows, merge their archived edges into working memory and
+        reassert them into the canonical edge log. If an edge endpoint is
+        absent or a read/write fails, retain the archive rows. Returns
+        the number of stale rows removed.
         """
         if self._archive is None:
             return 0
@@ -230,8 +232,87 @@ class ArchivalMixin:
             dupes = [cid for cid in archived_ids if cid in self._concepts]
             if not dupes:
                 return 0
+
+            # A stale archive concept can still be the only durable copy
+            # of an edge: the edge log may have been partially retracted
+            # during an interrupted spill. Merge archived edges back into
+            # the live graph before removing any archive rows.
+            archived_edges: dict[tuple[str, str, str], dict[str, Any]] = {}
+            for concept_id in dupes:
+                for edge_data in self._archive.peek_edges(concept_id):
+                    key = (
+                        edge_data["source"],
+                        edge_data["target"],
+                        edge_data["relation"],
+                    )
+                    archived_edges[key] = edge_data
+
+            parsed_edges: list[tuple[tuple[str, str, RelationType], Edge]] = []
+            for edge_data in archived_edges.values():
+                source = edge_data["source"]
+                target = edge_data["target"]
+                if source not in self._concepts or target not in self._concepts:
+                    logger.warning(
+                        "Keeping %d archive concept rows: archived edge %s->%s "
+                        "has an endpoint outside working memory",
+                        len(dupes),
+                        source,
+                        target,
+                    )
+                    return 0
+                try:
+                    relation = RelationType(edge_data["relation"])
+                except ValueError:
+                    logger.error(
+                        "Keeping %d archive concept rows: unknown archived edge "
+                        "relation %r",
+                        len(dupes),
+                        edge_data["relation"],
+                    )
+                    return 0
+                edge = Edge(
+                    source=source,
+                    target=target,
+                    relation=relation,
+                    weight=edge_data["weight"],
+                    created_at=edge_data["created_at"],
+                    origin=edge_data["origin"],
+                )
+                parsed_edges.append(((source, target, relation), edge))
+
+            # Reassert every archived edge into the canonical log before
+            # deleting its durable archive copy. Repeated assertions are
+            # idempotent under the edge-log fold (last write wins).
+            if self._edge_log is not None:
+                for _key, edge in parsed_edges:
+                    if is_derivable_edge(edge.relation, edge.origin):
+                        continue
+                    self._edge_log.assert_edge(
+                        edge.source,
+                        edge.target,
+                        edge.relation,
+                        edge.weight,
+                        edge.origin,
+                        edge.created_at,
+                    )
+
+            for key, edge in parsed_edges:
+                if key in self._edge_key_index:
+                    continue
+                self._edges.append(edge)
+                self._edge_index.setdefault(edge.source, []).append(edge)
+                self._reverse_index.setdefault(edge.target, []).append(edge)
+                self._edge_key_index[key] = edge
+
             removed = self._archive.remove_concepts_batch(dupes)
-        except (sqlite3.Error, RuntimeError) as e:
+            if removed != len(dupes):
+                logger.error(
+                    "Archive deduplication removed %d of %d rows; "
+                    "durable archive data may still contain duplicates",
+                    removed,
+                    len(dupes),
+                )
+        except (sqlite3.Error, OSError, RuntimeError, ValueError) as e:
             _note_archive_error(
                 "temporal_lobe.concepts.archival.dedupe_archive",
                 e,
