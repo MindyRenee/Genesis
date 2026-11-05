@@ -148,7 +148,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             return _answer(rank_text(matrix), "linear algebra")
 
     # Abstract algebra: cycle notation is the input language of this faculty.
-    if re.search(r"\b(permutation|cycle|cycles|order of)\b", lower):
+    if re.search(r"\b(permutation|cycle|cycles|order of)\b", lower) and re.search(r"\(\s*\d+(?:\s+\d+)+\s*\)", lower):
         from .abstract_algebra import describe_text, order_text
 
         if "order" in lower:
@@ -193,7 +193,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
     # Number theory: integer operands are explicit and validated by the faculty.
     if re.search(
-        r"\b(prime|primality|factorization|prime factor|gcd|greatest common divisor)\b",
+        r"\b(prime|primality|factor|factorization|prime factor|gcd|greatest common divisor)\b",
         lower,
     ):
         from .number_theory import factor_text, gcd_text, prime_text
@@ -259,7 +259,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
     # Topology's Euler characteristic is directly expressible as V, E, F.
     euler = re.search(
-        r"\beuler characteristic\b.*?\b(\d+)\s+vertices?\b.*?\b(\d+)\s+edges?\b.*?\b(\d+)\s+faces?\b",
+        r"\beuler characteristic\b.*?\b(\d+)\s+vertices?\b.*?"
+        r"(\d+)\s+edges?\b.*?\b(\d+)\s+faces?\b",
         lower,
     )
     if euler:
