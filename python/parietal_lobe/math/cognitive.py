@@ -120,16 +120,28 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     # Basic number sense compares magnitudes without pretending its
     # approximate faculty is exact arithmetic outside the subitizing range.
     comparison = re.search(
-        r"\b(?:compare|which is larger|which is greater|which is smaller|"
-        r"which is less|is (?:\d+(?:\.\d+)?) greater than|is (?:\d+(?:\.\d+)?) less than)\b.*?(-?\d+(?:\.\d+)?).*?(-?\d+(?:\.\d+)?)",
+        r"\\b(?:compare|which is larger|which is greater|which is smaller|which is less)\\b"
+        r".*?(-?\\d+(?:\\.\\d+)?).*?(-?\\d+(?:\\.\\d+)?)",
         lower,
     )
-    if comparison:
-        left, right = map(float, comparison.groups())
-        judgment = faculty.compare(left, right)
+    ordered_comparison = re.search(
+        r"\\bis\\s+(-?\\d+(?:\\.\\d+)?)\\s+(greater|larger|less|smaller)\\s+than\\s+(-?\\d+(?:\\.\\d+)?)\\b",
+        lower,
+    )
+    if comparison or ordered_comparison:
+        if ordered_comparison:
+            left, relation, right = ordered_comparison.groups()
+            left_value, right_value = float(left), float(right)
+            result_relation = "greater" if left_value > right_value else "less" if left_value < right_value else "equal"
+            judgment = faculty.compare(left_value, right_value)
+            answer = f"{left_value:g} is {result_relation} than {right_value:g}"
+        else:
+            left, right = map(float, comparison.groups())
+            judgment = faculty.compare(left, right)
+            answer = f"{judgment.a:g} is {judgment.relation} than {judgment.b:g}"
         return ParietalAnswer(
             "number sense",
-            f"{judgment.a:g} is {judgment.relation} than {judgment.b:g}",
+            answer,
             [f"confidence={judgment.confidence:.3f}", f"exact={judgment.exact}"],
         )
 
