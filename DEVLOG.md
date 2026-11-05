@@ -12,7 +12,7 @@ component/topology statistics, spatial distribution, adjacency and color
 frequencies. The typed feature state projects into the existing experiential
 outer latent domain `E`.
 
-The arcade now sends the graph-backed latent summary and typed `E)-domain
+The arcade now sends the graph-backed latent summary and typed `E`-domain
 metadata through `OuterWorld.perceive`. For each actual action/result pair,
 the decoder updates a local action-conditioned model indexed by nearby
 pre-action latent contexts. Welford statistics retain sample counts and
