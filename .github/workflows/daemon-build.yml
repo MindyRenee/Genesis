@@ -1,0 +1,76 @@
+name: Daemon build
+
+on:
+  push:
+    branches: [audit-fixes]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "build.rs"
+      - "src/**"
+      - ".github/workflows/daemon-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daemon-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  daemon:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Install native build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev linux-libc-dev
+      - uses: Swatinem/rust-cache@v2
+      - name: Check formatting without modifying files
+        run: cargo fmt --check
+      - name: Run Clippy with warnings denied
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Build release daemon
+        run: cargo build --release --locked --bin genesis-daemon
+      - name: Run Rust tests
+        run: cargo test --release --locked
+      - name: Smoke-test daemon using disposable state
+        run: |
+          set -euo pipefail
+          data_dir="$(mktemp -d)"
+          log="$RUNNER_TEMP/genesis-daemon-smoke.log"
+          pid=""
+          cleanup() {
+            if [[ -n "$pid" ]]; then
+              kill -TERM "$pid" 2>/dev/null || true
+              wait "$pid" 2>/dev/null || true
+            fi
+            rm -rf "$data_dir"
+          }
+          trap cleanup EXIT
+          target/release/genesis-daemon --data-dir "$data_dir" >"$log" 2>&1 &
+          pid=$!
+          for _ in {1..100}; do
+            [[ -S "$data_dir/genesis.sock" ]] && break
+            if ! kill -0 "$pid" 2>/dev/null; then cat "$log"; exit 1; fi
+            sleep 0.1
+          done
+          if [[ ! -S "$data_dir/genesis.sock" ]]; then
+            cat "$log"
+            echo "daemon did not publish its IPC socket"
+            exit 1
+          fi
+          sleep 2
+          if ! kill -0 "$pid" 2>/dev/null; then
+            cat "$log"
+            echo "daemon exited after startup"
+            exit 1
+          fi
+          kill -TERM "$pid"
+          wait "$pid"
+          pid=""
