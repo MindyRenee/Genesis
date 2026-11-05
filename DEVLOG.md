@@ -1,3 +1,24 @@
+## 2026-11-05 — Python mathematics routing type repair
+
+The latest CI run failed its mypy step with nine errors across the frontal
+math entry point and the parietal cognitive router. The failures came from
+reusing local names for values with different types, leaving a regex match
+insufficiently narrowed, and assigning an optional fallback result to a
+variable already inferred as a non-optional frontal result.
+
+Separated the fallback result from the parietal result, gave regex matches,
+boolean predicates, and domain-faculty outputs distinct names, explicitly
+narrowed the optional comparison match, and aliased the abstract-algebra and
+complex-analysis description functions. Added focused end-to-end regression
+coverage for number comparison, trigonometry, abstract algebra, complex
+analysis, number theory, and combinatorics. No faculty, mathematical
+operation, or static-analysis check was removed or weakened.
+
+**Verification boundary:** source corrections and regression tests are
+committed to `audit-fixes`. The previous CI failure is understood; the
+corrected code still requires a fresh mypy run and the full required workflow.
+No Genesis runtime state was accessed or modified.
+
 ## 2026-11-05 — Higher-math faculty reachability audit
 
 The end-to-end entry-point audit found that several implemented native
