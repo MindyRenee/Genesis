@@ -110,14 +110,16 @@ class ArchivalMixin:
     def restore_archive_to_working_memory(self) -> int:
         """Recall ALL archived concepts back into working memory.
 
-        Migrates every concept from the long-term archive back into
-        the in-memory network. This is the inverse of
-        :meth:`spill_dormant` — it loads the entire archive into RAM.
+        Copies every archived concept and its edges into the in-memory
+        network. The archive remains intact: this method cannot know
+        whether the caller has durably saved the reconstructed working
+        state. After that save succeeds, :meth:`dedupe_archive` can
+        remove the now-redundant archive rows.
 
         Use this when you need the full concept network in working
-        memory (e.g., before a bulk analysis pass, or to reset the
-        working/archive split). After this call, the archive will be
-        empty and all concepts will be in working memory.
+        memory (e.g., before a bulk analysis pass). Keeping the archive
+        copy until durable acknowledgement prevents a crash between
+        reconstruction and save from destroying the only persisted copy.
 
         Returns:
             The number of concepts recalled from the archive.
@@ -144,9 +146,11 @@ class ArchivalMixin:
                 self._add_alias(alias, concept.id)
             for col in concept.columns or {_column_of(concept.origin, concept.id)}:
                 self._column_index.setdefault(col, set()).add(concept.id)
-            # Recall archived edges for this concept.
+            # Read archived edges without consuming the durable copy.
+            # The caller must persist this reconstructed network before
+            # dedupe_archive removes the archive rows.
             try:
-                archived_edges = self._archive.recall_edges(concept.id)
+                archived_edges = self._archive.peek_edges(concept.id)
             except (sqlite3.Error, RuntimeError) as e:
                 _note_archive_error(
                     "temporal_lobe.concepts.archival.restore_archive_to_working_memory",
@@ -186,14 +190,9 @@ class ArchivalMixin:
                         edge.origin,
                         edge.created_at,
                     )
-            # Remove from the archive (concept + aliases).
-            try:
-                self._archive.recall_concept(concept_id)
-            except (sqlite3.Error, RuntimeError) as e:
-                _note_archive_error(
-                    "temporal_lobe.concepts.archival.restore_archive_to_working_memory",
-                    e,
-                )
+            # Keep the archive row until the reconstructed network has
+            # been durably saved. A crash before that point must leave
+            # the original concept and its relationships recoverable.
             recalled += 1
         # Invalidate caches
         self._concept_ids_cache: list[str] | None = None
