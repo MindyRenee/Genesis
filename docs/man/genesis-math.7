@@ -114,11 +114,15 @@ ratios, exact names for common special angles, and triangle solving.
 .TP
 .B Linear algebra
 .I linear_algebra.py
-parses matrix literals and performs matrix multiplication,
-determinants, rank, and square-system solving. Elimination uses
+parses explicit matrix and vector literals. Matrix operations include
+transpose, multiplication, determinant, rank, inverse, trace, and
+unique square-system solving. Vector operations include addition,
+subtraction, and dot product. Elimination and vector arithmetic use
 rational
 .B Fraction
 arithmetic, preserving exact rational results for supported inputs.
+Inverse and trace require square matrices; inverse additionally
+requires nonsingularity. Vector operations require matching dimensions.
 .TP
 .B Abstract algebra
 .I abstract_algebra.py
@@ -274,10 +278,13 @@ only explicit operation forms implemented in
 .I python/parietal_lobe/math/cognitive.py .
 Foundational arithmetic includes numeric and number-word expressions,
 spoken addition/subtraction/multiplication/division, percentages,
-squares, cubes, and magnitude comparisons. Linear algebra language
-currently supports explicit matrix literals for determinant, rank,
-matrix multiplication, and unique square-system solving; it does not
-automatically infer omitted matrices or vectors.
+halves, doubles, triples, squares, cubes, square roots, powers,
+parenthesized order-of-operations expressions, and magnitude
+comparisons. Linear algebra language supports explicit matrix literals
+for determinant, rank, transpose, inverse, trace, matrix multiplication,
+and unique square-system solving, plus explicit vector literals for
+addition, subtraction, and dot products. It does not automatically
+infer omitted matrices or vectors.
 This is not unrestricted mathematical language understanding: each
 domain still requires its documented operand syntax, and a missing
 operand produces an honest failure rather than an invented value.
