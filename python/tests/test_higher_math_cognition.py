@@ -20,6 +20,8 @@ from frontal_lobe.reasoning.math_reasoning import try_math
         ("limit of sin(x)/x at 0", "1"),
         ("describe complex number 3+4i", "|z| = 5"),
         ("is 91 prime", "not prime"),
+        ("factor 360", "360 ="),
+        ("Euler characteristic of a surface with 4 vertices, 6 edges, 4 faces", "2"),
         ("distance between (0,0) and (3,4)", "5"),
         ("choose 3 from 10", "120"),
     ],
