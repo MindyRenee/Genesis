@@ -2452,7 +2452,7 @@ def try_math(
         r"plus|minus|times|divided by|square root|sqrt|raised to|power of|percent|fraction|"
         r"half|halves|thirds?|quarters?|double|triple|square of|cube of|compare|greater than|less than|"
         r"larger than|smaller than|which is larger|which is greater|"
-        r"which is smaller|which is less|transpose|inverse|trace|dot product|inner product|vector|"
+        r"which is smaller|which is less|transpose|inverse|trace|dot product|inner product|vector|cross product|"
         r"simplify|expand|factor|solve|differentiate|"
         r"derivative|integral|mean|average|median|variance|standard deviation|summarize|"
         r"sin|cos|tan|determinant|matrix|matrices|matrix product|linear system|rank|"
