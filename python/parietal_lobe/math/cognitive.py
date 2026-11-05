@@ -259,6 +259,38 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             success=False,
         )
 
+    # Finite topological spaces are represented by their open-set family.
+    finite_topology = re.search(r"\btopology on (\d+) points?\b", lower)
+    if finite_topology:
+        literal = _literal_after(text)
+        if literal is None:
+            return ParietalAnswer(
+                "topology", "An explicit family of open sets is required.", success=False
+            )
+        try:
+            opens = ast.literal_eval(literal[0])
+        except (SyntaxError, ValueError) as error:
+            return ParietalAnswer("topology", str(error), success=False)
+        return _answer(faculty.is_topology(int(finite_topology.group(1)), opens), "topology")
+
+    # The propositional faculty consumes its documented structured tuple
+    # representation; this is not a natural-language formula parser.
+    if "tautology" in lower or "satisfiable" in lower:
+        literal = _literal_after(text)
+        if literal is None:
+            return ParietalAnswer(
+                "propositional proof", "A structured proposition tuple is required.", success=False
+            )
+        try:
+            proposition = ast.literal_eval(literal[0])
+        except (SyntaxError, ValueError) as error:
+            return ParietalAnswer("propositional proof", str(error), success=False)
+        if not isinstance(proposition, tuple):
+            return ParietalAnswer("propositional proof", "The proposition must be a tuple.", success=False)
+        if "tautology" in lower:
+            return _answer(faculty.is_tautology(proposition, words=text), "propositional proof")
+        return _answer(faculty.is_satisfiable(proposition, words=text), "propositional proof")
+
     # Topology's Euler characteristic is directly expressible as V, E, F.
     euler = re.search(
         r"\beuler characteristic\b.*?\b(\d+)\s+vertices?\b.*?"
