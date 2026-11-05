@@ -105,8 +105,11 @@ and color frequencies.
 .PP
 The vector is an interpretable feature embedding, not a pretrained or
 learned neural embedding. The attributed graph is retained alongside it;
-the vector does not replace object-level evidence. The feature state is
-projected into the typed experiential outer domain
+the vector does not replace object-level evidence. Background defaults
+to the most common grid color, using the parietal parser's canonical
+rule; callers may supply an explicit background when the environment
+establishes one. The feature state is projected into the typed
+experiential outer domain
 .BR E .
 Perception events carry the latent vector, uncertainty, object summary,
 and current action-model evidence into the world's normal perception
@@ -125,9 +128,20 @@ in the perception metadata. These empirical models are saved inside
 per-game world memory.
 .PP
 Goal evidence records observed level changes and the official terminal
-state. The official toolkit remains authoritative for level completion
-and wins; the decoder does not invent a target vector or declare a win
-from latent distance.
+state. The
+.B GoalAttractorManifold
+represents an explicitly supplied goal center and constant positive-
+definite metric tensor. Its satisfaction test measures membership in a
+specified metric neighborhood; it does not manufacture a target from
+reward or infer a win. The
+.B LatentState.geodesic_distance
+uses the exact constant-metric expression
+.nf
+d(x,y) = sqrt((y-x)^T G (y-x))
+.fi
+This is a geodesic only for the declared constant metric on that
+coordinate chart; no varying Riemannian metric is claimed. The official
+toolkit remains authoritative for level completion and wins.
 .SH LEARNING AND MEMORY
 Genesis keeps per-game memory in her world state. It includes action
 effect counts, board visits, action-value estimates, moves and paths
@@ -161,19 +175,29 @@ The structural feature coordinates are hand-designed, deterministic
 descriptors. Their diagonal variance describes transition-model
 uncertainty, not pixel-detection confidence or a full covariance matrix. They are not learned semantic concepts,
 persistent object identity tracking, or a complete physical simulator.
-Components use four-way same-color connectivity with color 0 treated as
-background; enclosed
-holes use the complementary eight-neighbor convention. The transition
-model is local empirical evidence, not a globally valid dynamics law.
+Components use four-way same-color connectivity with the inferred or
+explicit background color; enclosed holes use the complementary
+eight-neighbor convention. The transition model is local empirical
+evidence, not a globally valid dynamics law. The current transition
+uncertainty is diagonal and does not represent a full covariance matrix.
 Unknown actions or distant latent contexts produce no prediction.
 .PP
-ARC action identifiers are opaque discrete controls, not a declared
-basis for a Lie algebra; no Lie-bracket closure or differentiable
-operator claim is made. Completion is grounded in the toolkit's
-terminal state, not a Euclidean target-vector threshold. No claim is
-made that this decoder alone solves ARC-AGI-3. It supplies structured
-observations and measurable transition hypotheses to the existing
-memory, reasoning, and action-selection faculties.
+The
+.B TransitionOperator
+and
+.B DifferentiableOperatorSpace
+types implement explicitly declared affine vector fields
+.BR f(x)=Ax+b ,
+their application, and their Lie bracket. Closure validation checks
+whether pairwise brackets lie in the declared coefficient span. These
+operators are a mathematical facility, not a fabricated interpretation
+of ARC action identifiers: the official actions remain opaque discrete
+controls and are not automatically promoted to differentiable vector
+fields. Completion is grounded in the toolkit's terminal state, not a
+Euclidean target-vector threshold. No claim is made that this decoder
+alone solves ARC-AGI-3. It supplies structured observations and
+measurable transition hypotheses to the existing memory, reasoning,
+and action-selection faculties.
 .SH DIAGNOSTICS
 Use
 .B /arcade
