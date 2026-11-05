@@ -108,7 +108,17 @@ _POSTFIX_WORDS = {
     "cube": "** 3",
 }
 
-_NUMBER_WORDS = set(_UNITS) | set(_TENS) | set(_SCALES) | {"a", "an"}
+_FRACTION_DENOMINATORS = {
+    "half": 2, "halves": 2,
+    "third": 3, "thirds": 3,
+    "quarter": 4, "quarters": 4,
+    "fourth": 4, "fourths": 4,
+    "fifth": 5, "fifths": 5,
+    "sixth": 6, "sixths": 6,
+    "eighth": 8, "eighths": 8,
+    "tenth": 10, "tenths": 10,
+}
+_NUMBER_WORDS = set(_UNITS) | set(_TENS) | set(_SCALES) | set(_FRACTION_DENOMINATORS) | {"a", "an", "and"}
 
 # The scan grammar — numbers first, the two multi-char operators
 # ahead of single-char symbols, parens, words, punctuation. Anything
@@ -168,9 +178,26 @@ def _words_to_number(words: list[str]) -> tuple[float | None, int]:
             total += max(1.0, current) * _SCALES[w]
             current = 0.0
             saw = True
-        elif w == "half":
-            current += 0.5
+        elif w in _FRACTION_DENOMINATORS:
+            denominator = _FRACTION_DENOMINATORS[w]
+            numerator = current if current else 1.0
+            current = numerator / denominator
             saw = True
+        elif w == "and":
+            # Mixed numbers: "two and a half", "one and three quarters".
+            if (
+                saw
+                and i + 2 < len(words)
+                and words[i + 1] in {"a", "an", *_UNITS}
+                and words[i + 2] in _FRACTION_DENOMINATORS
+            ):
+                numerator = 1.0 if words[i + 1] in {"a", "an"} else float(_UNITS[words[i + 1]])
+                total += current
+                current = numerator / _FRACTION_DENOMINATORS[words[i + 2]]
+                i += 3
+                continue
+            if not saw:
+                break
         elif w == "point":
             # Decimal tail: consume digit words after "point".
             i += 1
