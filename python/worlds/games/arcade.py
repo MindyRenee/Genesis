@@ -288,7 +288,13 @@ class Arcade:
             change = sight.see_change(before.grid, after.grid)
             decoder = self._decoder(session.game_id)
             before_latent = decoder.encode(before.grid)
+            predicted_latent = decoder.predict(move, before_latent)
             after_latent = decoder.encode(after.grid)
+            prediction_error = (
+                predicted_latent.distance_to(after_latent)
+                if predicted_latent is not None
+                else None
+            )
             decoder.observe_transition(move, before_latent, after_latent)
             memory.environment_model = decoder.to_dict()
             goal_evidence = GoalEvidence(
@@ -318,7 +324,12 @@ class Arcade:
             self._wave("beta2", 0.05)
             self._impulse(CHEM_DOPAMINE, max(-0.05, min(0.05, 0.05 * rpe)))
             self._perceive(
-                after, change, new=new, latent=after_latent, goal_evidence=goal_evidence
+                after,
+                change,
+                new=new,
+                latent=after_latent,
+                goal_evidence=goal_evidence,
+                prediction_error=prediction_error,
             )
             if levelled:
                 memory.level_up(after.levels_completed)
@@ -558,6 +569,7 @@ class Arcade:
         new: bool,
         latent: LatentState | None = None,
         goal_evidence: GoalEvidence | None = None,
+        prediction_error: float | None = None,
     ) -> None:
         """Send the grid and its graph-backed latent representation into the world."""
         decoder = self._decoder(board.game_id)
@@ -584,6 +596,7 @@ class Arcade:
                 "latent_domain": latent.to_experiential_latent().domain.value,
                 "latent_category": latent.to_experiential_latent().category,
                 "action_dynamics": decoder.action_evidence(),
+                "latent_prediction_error": prediction_error,
                 "goal_evidence": (
                     {
                         "state": goal_evidence.state,
