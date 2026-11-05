@@ -1,3 +1,11 @@
+## 2026-11-04 — Foundational arithmetic and linear algebra cognition
+
+Extended the frontal-to-parietal math pathway after review found that the initial router omitted basic number operations and exposed only determinant/rank for matrix questions. The router now delegates explicit arithmetic expressions and spoken addition, subtraction, multiplication, division, percentages, halves, doubles, triples, squares, and cubes to the native exact arithmetic faculty. It also routes number-magnitude comparisons through NumberSense while retaining its confidence and exactness metadata. Linear algebra routing now covers determinant, rank, matrix multiplication, and unique square-system solving using explicit matrix/vector literals and the existing Fraction-based faculty. Algebraic equation solving is also exposed through the native algebra facade.
+
+Expanded end-to-end tests for these paths and updated `genesis-math(7)` to enumerate their actual supported language forms and operand requirements. These additions preserve the existing frontal `MathResult` contract and do not replace the native faculties with canned responses or an external model.
+
+**Verification boundary:** the remote GitHub edits are committed to `audit-fixes`. The full CI workflow must complete before treating the changes as verified; no local Termux test run or physical Android validation was performed during this edit session.
+
 ## 2026-11-04 — Higher mathematics cognitive integration
 
 Connected the native parietal mathematics faculties to the existing frontal `try_math()` entry point through `parietal_lobe.math.cognitive.route_parietal_math()`. Supported explicit operation forms now dispatch to native algebra, calculus, statistics, trigonometry, linear algebra, abstract algebra, real analysis, complex analysis, number theory, geometry, discrete mathematics, combinatorics, topology, Cayley-table axiom classification, and structured propositional tautology/satisfiability checks. Results return through the existing `MathResult` contract so deliberation and task-competence recording retain one pathway. The router delegates computation to the existing faculties; it does not add canned answers, an external model, or invented operands. Propositional proofs still require the faculty's structured tuple representation; no natural-language proposition parser was added.
