@@ -1,3 +1,22 @@
+## 2026-11-05 — Closed-archive zero-write guard
+
+A follow-up persistence audit found that `ConceptArchive.archive_concepts_batch`
+returns zero when its SQLite connection is closed instead of raising an
+exception. `clean_noise()` previously checked only for exceptions, so a
+closed-but-attached archive could be mistaken for a successful write and
+the concepts could then be evicted from working memory without a durable
+copy.
+
+`clean_noise()` now requires the returned count to equal the full batch
+size before archiving edges or removing concepts. The dormant spill commit
+path applies the same exact-count invariant. Zero or partial counts leave
+all candidates in working memory and emit an error. Added a regression
+test for the closed-archive case.
+
+**Verification boundary:** regression test and source are committed to
+`audit-fixes`; execution remains pending. The branch's GitHub commit
+status currently reports no checks.
+
 ## 2026-11-05 — Temporal grounding enters the cognitive attention stream
 
 The comprehension stage already produced `GroundedProposition` bindings
