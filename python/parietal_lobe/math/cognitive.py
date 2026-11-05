@@ -155,7 +155,6 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         r"\b[a-zA-Z]\b", lower.split("factor", 1)[-1]
     )
     if algebra_cue and symbolic_factor and re.search(r"[a-zA-Z]", lower) and "[[" not in text:
-    if algebra_cue and re.search(r"[a-zA-Z]", lower) and "[[" not in text:
         if re.search(r"\bsimplify\b", lower):
             return _answer(faculty.simplify(text), "algebra")
         if re.search(r"\bexpand\b", lower):
