@@ -27,7 +27,11 @@ class ParietalAnswer:
 def _answer(result: Any, operation: str | None = None) -> ParietalAnswer:
     """Normalize the shared result contract used by the parietal faculties."""
     ok = bool(result.ok)
-    output = result.output if ok else (result.error or "The mathematical faculty could not solve that form.")
+    output = (
+        result.output
+        if ok
+        else (result.error or "The mathematical faculty could not solve that form.")
+    )
     steps = [f"{result.operation}: {result.input}"]
     if result.data:
         steps.append(f"Result data: {result.data}")
@@ -162,7 +166,14 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         return _answer(limit_text(limit.group(1).strip(), float(limit.group(2))), "real analysis")
 
     # Complex analysis: description, integer powers, and roots of unity.
-    if "complex" in lower or re.search(r"\b(roots? of unity|polar form|argument of)\b", lower) or re.search(
+    if (
+        "complex" in lower
+        or re.search(r"\b(roots? of unity|polar form|argument of)\b", lower)
+        or re.search(
+            r"(?<![\w.])-?\d+(?:\.\d+)?\s*[+-]\s*\d+(?:\.\d+)?i\b",
+            lower,
+        )
+    ):
         r"(?<![\w.])-?\d+(?:\.\d+)?\s*[+-]\s*\d+(?:\.\d+)?i\b", lower
     ):
         from .complex_analysis import describe_text, power_text, roots_unity_text
@@ -176,16 +187,25 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         value = re.search(r"([+-]?\d+(?:\.\d+)?\s*[+-]\s*\d+(?:\.\d+)?i)", lower)
         if value:
             return _answer(describe_text(value.group(1)), "complex analysis")
-        return ParietalAnswer("complex analysis", "A supported complex-number expression is required.", success=False)
+        return ParietalAnswer(
+            "complex analysis",
+            "A supported complex-number expression is required.",
+            success=False,
+        )
 
     # Number theory: integer operands are explicit and validated by the faculty.
-    if re.search(r"\b(prime|primality|factorization|prime factor|gcd|greatest common divisor)\b", lower):
+    if re.search(
+        r"\b(prime|primality|factorization|prime factor|gcd|greatest common divisor)\b",
+        lower,
+    ):
         from .number_theory import factor_text, gcd_text, prime_text
 
         values = _integer_values(lower)
         if "gcd" in lower or "greatest common divisor" in lower:
             if len(values) < 2:
-                return ParietalAnswer("number theory", "Two integer operands are required for gcd.", success=False)
+                return ParietalAnswer(
+                    "number theory", "Two integer operands are required for gcd.", success=False
+                )
             return _answer(gcd_text(values[-2], values[-1]), "number theory")
         if not values:
             return ParietalAnswer("number theory", "An integer operand is required.", success=False)
@@ -209,7 +229,11 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
         literal = _literal_after(text)
         if literal is None:
-            return ParietalAnswer("discrete mathematics", "A relation literal such as {(1, 1), (1, 2)} is required.", success=False)
+            return ParietalAnswer(
+                "discrete mathematics",
+                "A relation literal such as {(1, 1), (1, 2)} is required.",
+                success=False,
+            )
         return _answer(relation_text(literal[0]), "discrete mathematics")
 
     # Combinatorics: choose/arrange/derange are unambiguous operation names.
@@ -223,14 +247,23 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         arrange = re.search(r"\barrange\s+(?:(-?\d+)\s+of\s+)?(-?\d+)", lower)
         if arrange:
             k_text, n_text = arrange.groups()
-            return _answer(arrange_text(int(n_text), int(k_text) if k_text else None), "combinatorics")
+            return _answer(
+                arrange_text(int(n_text), int(k_text) if k_text else None), "combinatorics"
+            )
         derange = re.search(r"\bderangements?\s+of\s+(-?\d+)", lower)
         if derange:
             return _answer(derange_text(int(derange.group(1))), "combinatorics")
-        return ParietalAnswer("combinatorics", "State a supported choose, arrange, or derangement operation.", success=False)
+        return ParietalAnswer(
+            "combinatorics",
+            "State a supported choose, arrange, or derangement operation.",
+            success=False,
+        )
 
     # Topology's Euler characteristic is directly expressible as V, E, F.
-    euler = re.search(r"\beuler characteristic\b.*?\b(\d+)\s+vertices?\b.*?\b(\d+)\s+edges?\b.*?\b(\d+)\s+faces?\b", lower)
+    euler = re.search(
+        r"\beuler characteristic\b.*?\b(\d+)\s+vertices?\b.*?\b(\d+)\s+edges?\b.*?\b(\d+)\s+faces?\b",
+        lower,
+    )
     if euler:
         from .topology import euler_surface
 
@@ -242,7 +275,9 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
         literal = _literal_after(text)
         if literal is None:
-            return ParietalAnswer("axioms", "A square Cayley-table literal is required.", success=False)
+            return ParietalAnswer(
+                "axioms", "A square Cayley-table literal is required.", success=False
+            )
         try:
             table = ast.literal_eval(literal[0])
         except (SyntaxError, ValueError) as error:
