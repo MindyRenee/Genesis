@@ -230,7 +230,7 @@ def solve(a: Matrix, b: list[Fraction]) -> list[Fraction] | None:
 _MATRIX_OP = re.compile(
     r"\b(?:determinant|det|rank|transpose|inverse|matrix|matrices|"
     r"eigenvalue|eigenvector|solve the system|linear system|trace|"
-    r"dot product|inner product|vector)\b",
+    r"dot product|inner product|cross product|vector)\b",
     re.IGNORECASE,
 )
 
