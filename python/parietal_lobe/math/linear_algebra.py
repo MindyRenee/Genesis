@@ -277,7 +277,8 @@ def vector_add_text(a_text: str, b_text: str, subtract: bool = False) -> LinearR
         return LinearResult(
             "vector", f"{a_text}, {b_text}", "", False, "vector dimensions must agree"
         )
-    return LinearResult("vector", f"{a_text}, {b_text}", "(" + ", ".join(_fmt(x) for x in result) + ")", True)
+    rendered = "(" + ", ".join(_fmt(value) for value in result) + ")"
+    return LinearResult("vector", f"{a_text}, {b_text}", rendered, True)
 
 
 def determinant_text(text: str) -> LinearResult:
