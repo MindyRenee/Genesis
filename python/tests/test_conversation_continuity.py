@@ -177,6 +177,41 @@ def test_comparison_normalizes_each_side(engine):
     assert "dog" in state.thought.topics
 
 
+def test_grounded_comprehension_reaches_downstream_perception(engine, monkeypatch):
+    """Known multiword arguments must reach attention and reasoning as concept IDs."""
+    from frontal_lobe import prefrontal as prefrontal_module
+
+    eng, network, _memory = engine
+    network.add_concept("quantum mechanism", confidence=0.9)
+    text = "The quantum mechanism is stable."
+    comprehension = eng.comprehension.comprehend(text)
+    comprehension.grounded = eng.semantic_grounder.ground_all(
+        comprehension.propositions,
+        context=text,
+    )
+    assert comprehension.grounded
+    assert comprehension.grounded[0].subject.concept_id == "quantum mechanism"
+
+    # Isolate the handoff: prove the grounded topic is added even when
+    # the independent surface-topic extractor contributes no topic.
+    original_perceive = prefrontal_module.perceive
+
+    def without_surface_topics(*args, **kwargs):
+        perception = original_perceive(*args, **kwargs)
+        perception.topics.clear()
+        return perception
+
+    monkeypatch.setattr(prefrontal_module, "perceive", without_surface_topics)
+    prediction, _recent_turns = eng._pre_input_prediction()
+    perception, _error = eng._think_perceive_and_error(
+        text,
+        prediction,
+        comprehension,
+    )
+
+    assert perception.topics == ["quantum mechanism"]
+
+
 def test_non_routed_input_still_falls_through(engine):
     """A plain statement with no route keeps going to the full pipeline."""
     eng, _network, memory = engine
