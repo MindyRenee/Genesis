@@ -68,6 +68,59 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     if not text:
         return None
 
+    # The facade is the native parietal API. These operations are dispatched
+    # here before the narrower frontal expression solver.
+    from . import ParietalMath
+
+    faculty = ParietalMath()
+
+    # Symbolic algebra and calculus retain their native expression trees.
+    if re.search(r"\\b(simplify|expand|factor(?:ize)?)\\b", lower) and re.search(r"[a-zA-Z]", lower):
+        if re.search(r"\\bsimplify\\b", lower):
+            return _answer(faculty.simplify(text), "algebra")
+        if re.search(r"\\bexpand\\b", lower):
+            return _answer(faculty.expand(text), "algebra")
+        return _answer(faculty.factor(text), "algebra")
+
+    definite_integral = re.search(
+        r"\\bintegral\\s+of\\s+(.+?)\\s+from\\s+(-?\\d+(?:\\.\\d+)?)\\s+to\\s+(-?\\d+(?:\\.\\d+)?)",
+        lower,
+    )
+    if definite_integral:
+        expression, lo, hi = definite_integral.groups()
+        return _answer(faculty.integrate_between(expression, float(lo), float(hi)), "calculus")
+    derivative = re.search(r"\\b(?:differentiate|derivative\\s+of)\\s+(.+?)[?.!]*$", lower)
+    if derivative:
+        return _answer(faculty.differentiate(derivative.group(1)), "calculus")
+    integral = re.search(r"\\bintegral\\s+of\\s+(.+?)[?.!]*$", lower)
+    if integral:
+        return _answer(faculty.integrate(integral.group(1)), "calculus")
+
+    # Statistics accepts an explicit numeric collection; it never invents
+    # a sample from surrounding prose.
+    if re.search(r"\\b(mean|average|median|variance|standard deviation|summarize)\\b", lower):
+        literal = _literal_after(text)
+        if literal is not None:
+            try:
+                values = ast.literal_eval(literal[0])
+                if not isinstance(values, (list, tuple)) or not values:
+                    raise ValueError("provide a non-empty numeric list")
+                numeric = [float(value) for value in values]
+            except (SyntaxError, ValueError, TypeError) as error:
+                return ParietalAnswer("statistics", str(error), success=False)
+            summary = faculty.summarize(numeric)
+            if "median" in lower:
+                answer = f"median = {summary.median:g}"
+            elif "variance" in lower:
+                answer = f"population variance = {summary.variance:g}"
+            elif "standard deviation" in lower:
+                answer = f"population standard deviation = {summary.stddev:g}"
+            elif "summarize" in lower:
+                answer = str(summary)
+            else:
+                answer = f"arithmetic mean = {faculty.mean(numeric):g}"
+            return ParietalAnswer("statistics", answer, [f"Values: {numeric}"])
+
     # Trigonometry: explicit ratio and angle; angle parsing remains in trig.py.
     trig = re.search(r"\\b(sin|cos|tan|asin|acos|atan)\\s*(?:of\\s*)?(.+?)\\s*[?.!]*$", lower)
     if trig and any(token in lower for token in ("sin", "cos", "tan")):
