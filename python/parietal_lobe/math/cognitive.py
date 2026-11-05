@@ -122,7 +122,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             bool(re.search(r"\\d", candidate))
             and bool(
                 re.search(
-                    r"[+*/%^]|\\b(plus|minus|times|divided|percent|power|sqrt)\\b",
+                    r"[+*/%^]|\b(plus|minus|times|divided|percent|power|sqrt)\b",
                     candidate,
                 )
             )
@@ -137,7 +137,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     if (
         (arithmetic_cue or arithmetic_expression or question_arithmetic or arithmetic_text != text)
         and not symbolic_input
-        and not matrix_language,
+        and not matrix_language
     ):
         result = faculty.evaluate(arithmetic_text)
         if result.ok:
