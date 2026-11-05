@@ -118,7 +118,9 @@ _FRACTION_DENOMINATORS = {
     "eighth": 8, "eighths": 8,
     "tenth": 10, "tenths": 10,
 }
-_NUMBER_WORDS = set(_UNITS) | set(_TENS) | set(_SCALES) | set(_FRACTION_DENOMINATORS) | {"a", "an", "and"}
+_NUMBER_WORDS = (
+    set(_UNITS) | set(_TENS) | set(_SCALES) | set(_FRACTION_DENOMINATORS) | {"a", "an", "and"}
+)
 
 # The scan grammar — numbers first, the two multi-char operators
 # ahead of single-char symbols, parens, words, punctuation. Anything
