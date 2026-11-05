@@ -59,6 +59,7 @@ class GameMemory:
     wins: int = 0
     game_overs: int = 0
     moves: int = 0
+    environment_model: dict[str, Any] = field(default_factory=dict)
 
     # ── learning ───────────────────────────────────────────────
 
@@ -160,6 +161,7 @@ class GameMemory:
             "wins": self.wins,
             "game_overs": self.game_overs,
             "moves": self.moves,
+            "environment_model": self.environment_model,
         }
 
     @classmethod
@@ -177,4 +179,5 @@ class GameMemory:
             wins=int(data.get("wins", 0)),
             game_overs=int(data.get("game_overs", 0)),
             moves=int(data.get("moves", 0)),
+            environment_model=dict(data.get("environment_model") or {}),
         )
