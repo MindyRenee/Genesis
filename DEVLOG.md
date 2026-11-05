@@ -1,3 +1,18 @@
+## 2026-11-04 — Linear-system input validation audit
+
+A focused review of the new exact linear-algebra route found that
+`solve_text()` iterated over the parsed right-hand side before confirming
+that it was a one-dimensional vector. Scalar and nested-list inputs could
+therefore escape the structured `LinearResult` failure contract as Python
+exceptions. The route now reuses the shared vector-literal parser, which
+validates non-empty one-dimensional input and retains exact Fraction
+conversion. Added regression cases for scalar, nested, and mapping
+right-hand sides.
+
+**Verification boundary:** source and regression tests are committed to
+`audit-fixes`; they have not yet been executed locally or in CI. No
+persistent Genesis runtime state was accessed or modified.
+
 ## 2026-11-04 — ARC structural latent decoder and empirical dynamics
 
 Added `python/worlds/games/latent.py` as a graph-backed decoder for live
