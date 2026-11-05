@@ -4212,17 +4212,27 @@ class FrontalLobe:
         )
 
     def _think_perceive_and_error(
-        self, user_input: str, prediction: Prediction
+        self,
+        user_input: str,
+        prediction: Prediction,
+        comprehension_result: ComprehensionResult | None = None,
     ) -> tuple[Perception, PCPredictionError]:
-        """Stages 1–1.6: perceive input, recognize creator, compute prediction error."""
+        """Stages 1–1.6: perceive, integrate temporal grounding, attribute, predict."""
         # 1. Perceive — with embeddings for semantic topic recognition
-        # and network for context-aware (origin-biased) topic resolution
+        # and network for context-aware (origin-biased) topic resolution.
         perception = perceive(
             user_input,
             embeddings=self.embeddings,
             network=self.network,
             brain_waves=self.language.current_brain_waves,
         )
+
+        # Temporal comprehension has already bound known arguments to
+        # persistent concept IDs. Carry those bindings into the topic
+        # set before attention, memory retrieval, and reasoning consume
+        # perception. Unknown arguments stay unresolved and are left
+        # to the learning path; no concepts are minted here.
+        self._integrate_grounded_topics(perception, comprehension_result)
 
         # 1.5 Attribute the speaker — who is talking (introductions
         # ground every speaker as a person; recognition is by
@@ -4259,6 +4269,43 @@ class FrontalLobe:
                 salience=min(1.0, prediction_error.magnitude),
             )
         return perception, prediction_error
+
+    def _integrate_grounded_topics(
+        self,
+        perception: Perception,
+        comprehension_result: ComprehensionResult | None,
+    ) -> None:
+        """Project temporal concept bindings into the shared attention stream.
+
+        Comprehension preserves the linguistic surface form; semantic
+        grounding binds each argument to an existing concept ID. The
+        bound IDs are the canonical cues consumed by memory retrieval,
+        attention, and topic reasoning. Unknown arguments and internal
+        structural hubs are deliberately excluded.
+        """
+        if comprehension_result is None:
+            return
+
+        existing = {topic.casefold() for topic in perception.topics}
+        for proposition in comprehension_result.grounded:
+            arguments = (
+                proposition.subject,
+                proposition.object,
+                *proposition.roles.values(),
+            )
+            for argument in arguments:
+                concept_id = getattr(argument, "concept_id", None)
+                if not isinstance(concept_id, str) or not concept_id:
+                    continue
+                if concept_id.startswith("_"):
+                    continue
+                concept = self.network.get_concept(concept_id)
+                if concept is None or getattr(concept, "origin", "") == "structural":
+                    continue
+                key = concept_id.casefold()
+                if key not in existing:
+                    perception.topics.append(concept_id)
+                    existing.add(key)
 
     def _maybe_store_user_model_memory(self, user_model, emotion, perception) -> None:
         """Store an LTM entry when the user model update is significant."""
