@@ -2,7 +2,9 @@
 
 Expanded the existing parietal linear-algebra faculty without replacing its
 exact rational arithmetic. Added rectangular-matrix transpose, square-matrix
-inverse and trace, plus exact vector addition, subtraction, and dot product.
+inverse and trace, matrix addition, subtraction, scalar multiplication,
+plus exact vector addition, subtraction, dot product, and three-dimensional
+cross product.
 Exposed the operations through `ParietalMath` and routed explicit matrix and
 vector literals from the frontal math entry point. Singular inverses,
 non-square trace/inverse requests, malformed literals, and dimension
@@ -15,7 +17,7 @@ represent halves, thirds, quarters, other common unit fractions, and mixed
 numbers such as “two and a half”. These retain the arithmetic parser's
 precedence and validation. Added cognitive-entry tests for signed arithmetic,
 numeric and spoken fractions, mixed numbers, precedence, powers, roots,
-matrix operations, vector operations, and invalid dimensions.
+matrix operations, vector operations, spoken fractions, and invalid dimensions.
 
 **Verification boundary:** source and focused tests are committed to
 `audit-fixes`. They have not been executed in Termux or CI during this
