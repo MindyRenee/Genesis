@@ -22,7 +22,9 @@ distant contexts. The model is serialized with each game's existing
 `GameMemory`, so it survives the established world save/restore path.
 Goal evidence reports observed level progress and official terminal state;
 the official game state remains authoritative and no fixed target vector
-is used to declare success.
+is used to declare success. ARC action IDs are discrete opaque controls,
+so no Lie-bracket closure or differentiable-operator claim is asserted;
+completion remains grounded in the official terminal state.
 
 Focused tests cover malformed grids, enclosed holes, stable object IDs,
 latent dimensionality and typed-domain projection, local transition learning,
