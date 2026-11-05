@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from frontal_lobe.reasoning.math_reasoning import try_math
+from parietal_lobe.math.linear_algebra import solve_text
 
 
 @pytest.mark.parametrize(
@@ -119,3 +120,11 @@ def test_cross_product_requires_three_dimensions():
     assert result is not None
     assert not result.success
     assert "3D vectors" in result.answer
+
+
+
+@pytest.mark.parametrize("right_hand_side", ["5", "[[5], [1]]", "{'x': 5}"])
+def test_linear_system_rejects_non_vector_right_hand_side(right_hand_side: str):
+    result = solve_text("[[2, 1], [1, -1]]", right_hand_side)
+    assert not result.ok
+    assert result.error
