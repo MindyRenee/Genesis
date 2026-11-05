@@ -286,7 +286,9 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         except (SyntaxError, ValueError) as error:
             return ParietalAnswer("propositional proof", str(error), success=False)
         if not isinstance(proposition, tuple):
-            return ParietalAnswer("propositional proof", "The proposition must be a tuple.", success=False)
+            return ParietalAnswer(
+                "propositional proof", "The proposition must be a tuple.", success=False
+            )
         if "tautology" in lower:
             return _answer(faculty.is_tautology(proposition, words=text), "propositional proof")
         return _answer(faculty.is_satisfiable(proposition, words=text), "propositional proof")
