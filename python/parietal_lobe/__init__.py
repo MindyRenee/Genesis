@@ -488,6 +488,8 @@ _EXPORTS: dict[str, str] = {
     "try_math": "frontal_lobe.reasoning.math_reasoning",
     "CalcResult": "parietal_lobe.math.arithmetic",
     "NumberSense": "parietal_lobe.math.number_sense",
+    "ParietalAnswer": "parietal_lobe.math.cognitive",
+    "route_parietal_math": "parietal_lobe.math.cognitive",
     # Descriptive statistics over collections — the same IPS
     # magnitude machinery asked about a sample rather than a
     # quantity.
