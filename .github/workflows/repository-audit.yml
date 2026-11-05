@@ -1,0 +1,228 @@
+name: Repository audit
+
+on:
+  push:
+    branches: [audit-fixes]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Create immutable source snapshot
+        id: backup
+        continue-on-error: true
+        run: |
+          mkdir -p audit-output
+          git archive --format=tar.gz --output=audit-output/genesis-${GITHUB_SHA}.tar.gz HEAD
+          sha256sum audit-output/genesis-${GITHUB_SHA}.tar.gz > audit-output/backup.sha256
+
+      - name: Store source snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: genesis-source-backup-${{ github.sha }}
+          path: audit-output/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install native build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev linux-libc-dev libcairo2-dev pkg-config
+
+      - name: Install Python development dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r python/requirements-dev.txt
+          python -c "import nltk; nltk.download('wordnet', quiet=True); nltk.download('punkt_tab', quiet=True)"
+
+      - name: Rust formatting (check only)
+        id: rustfmt
+        continue-on-error: true
+        run: cargo fmt --check
+
+      - name: Python formatting and lint (check only)
+        id: ruff
+        continue-on-error: true
+        run: ruff check
+
+      - name: Python unused-name analysis
+        id: pyflakes
+        continue-on-error: true
+        run: python3 -m pyflakes python/ genesis_client/ infrastructure/ eval/ *.py scripts/*.py
+
+      - name: Python type analysis
+        id: mypy
+        continue-on-error: true
+        run: python3 -m mypy python/ genesis_client/ infrastructure/ eval/ --ignore-missing-imports
+
+      - name: Rust static analysis
+        id: clippy
+        continue-on-error: true
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Rust tests
+        id: rust-tests
+        continue-on-error: true
+        run: cargo test --locked
+
+      - name: Python tests
+        id: python-tests
+        continue-on-error: true
+        run: PYTHONPATH=python:. python3 -m pytest python/tests/ -q -o addopts=''
+
+      - name: Documentation reference audit
+        id: docs
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          root = Path(".")
+          docs = [p for p in root.rglob("*") if p.is_file() and p.suffix.lower() in {".md", ".rst"} and not any(part.startswith(".") or part in {"target", ".venv", "venv"} for part in p.parts)]
+          pattern = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+          failures = []
+          checked = 0
+          for doc in docs:
+              try:
+                  source = doc.read_text(encoding="utf-8")
+              except (OSError, UnicodeError):
+                  continue
+              for raw in pattern.findall(source):
+                  target = raw.strip().split()[0].strip("<>")
+                  if not target or target.startswith(("https://", "http://", "mailto:", "#", "data:")):
+                      continue
+                  target_path = target.split("#", 1)[0].split("?", 1)[0]
+                  if not target_path:
+                      continue
+                  checked += 1
+                  resolved = (doc.parent / target_path).resolve()
+                  if not resolved.exists():
+                      failures.append(f"{doc}: missing reference {target_path}")
+          required = [Path("AGENTS.md"), Path("CONTRIBUTING.md"), Path("SECURITY.md"), Path("DEVLOG.md")]
+          for item in required:
+              if not item.is_file():
+                  failures.append(f"repository rule/document missing: {item}")
+          print(f"Checked {len(docs)} documentation files and {checked} relative links.")
+          if failures:
+              print("Documentation discrepancies:")
+              for failure in failures:
+                  print(f"  - {failure}")
+              sys.exit(1)
+          print("Documentation references are internally consistent.")
+          PY
+
+      - name: Sensitive-data inventory (metadata only; never print matched values)
+        id: sensitive
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+          import sys
+
+          tracked = subprocess.run(["git", "ls-files", "-z"], check=True, capture_output=True).stdout.split(b"\0")
+          paths = [Path(p.decode("utf-8", "replace")) for p in tracked if p]
+          categories = {
+              "biometric_or_face_data": re.compile(r"(face|facial|biometric|embedding|identity.?registry)", re.I),
+              "photo_or_image": re.compile(r"\.(png|jpe?g|gif|webp|heic|bmp|tiff?)$", re.I),
+              "audio_or_video_recording": re.compile(r"\.(wav|mp3|m4a|aac|ogg|flac|mp4|mov|mkv|webm|3gp)$", re.I),
+              "android_or_device_identifier": re.compile(r"(imei|imsi|android.?id|device.?serial|build.?fingerprint)", re.I),
+              "location_data": re.compile(r"(gps|geolocation|location|coordinates|latitude|longitude)", re.I),
+          }
+          secret_patterns = {
+              "private_key_material": re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+              "github_token": re.compile(rb"\bgh[pousr]_[A-Za-z0-9_]{20,}\b"),
+              "aws_access_key": re.compile(rb"\bAKIA[0-9A-Z]{16}\b"),
+              "slack_token": re.compile(rb"\bxox[baprs]-[A-Za-z0-9-]{20,}\b"),
+              "credential_assignment": re.compile(rb"(?i)\b(password|passwd|client_secret|api_key|access_token)\s*[:=]\s*['\"][^'\"]{12,}"),
+          }
+          inventory = []
+          secret_hits = []
+          for path in paths:
+              path_text = path.as_posix()
+              for category, pattern in categories.items():
+                  if pattern.search(path_text):
+                      inventory.append((category, path_text))
+              try:
+                  data = path.read_bytes()
+              except OSError:
+                  continue
+              if b"\0" in data[:8192] or len(data) > 5_000_000:
+                  continue
+              for category, pattern in secret_patterns.items():
+                  if pattern.search(data):
+                      secret_hits.append((category, path_text))
+          report = Path("audit-output")
+          report.mkdir(exist_ok=True)
+          lines = ["Sensitive-data inventory (paths and categories only; no matched values):"]
+          lines += [f"INVENTORY {category}: {path}" for category, path in sorted(set(inventory))]
+          lines += [f"SECRET_PATTERN {category}: {path}" for category, path in sorted(set(secret_hits))]
+          if not inventory and not secret_hits:
+              lines.append("No path-based privacy indicators or configured secret patterns detected.")
+          (report / "sensitive-data-report.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          print(f"Privacy indicators: {len(set(inventory))}; secret-pattern matches: {len(set(secret_hits))}.")
+          print("Detailed report is stored as an artifact; matched contents are never printed.")
+          if secret_hits:
+              sys.exit(1)
+          PY
+
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: genesis-audit-report-${{ github.sha }}
+          path: audit-output/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Final audit status
+        if: always()
+        env:
+          RUSTFMT: ${{ steps.rustfmt.outcome }}
+          RUFF: ${{ steps.ruff.outcome }}
+          PYFLAKES: ${{ steps.pyflakes.outcome }}
+          MYPY: ${{ steps.mypy.outcome }}
+          CLIPPY: ${{ steps.clippy.outcome }}
+          RUST_TESTS: ${{ steps.rust-tests.outcome }}
+          PYTHON_TESTS: ${{ steps.python-tests.outcome }}
+          DOCS: ${{ steps.docs.outcome }}
+          SENSITIVE: ${{ steps.sensitive.outcome }}
+          BACKUP: ${{ steps.backup.outcome }}
+        run: |
+          printf '%s\n' "## Repository audit results" >> "$GITHUB_STEP_SUMMARY"
+          failed=0
+          for item in "Backup:$BACKUP" "Rust formatting:$RUSTFMT" "Ruff:$RUFF" "Pyflakes:$PYFLAKES" "Mypy:$MYPY" "Clippy:$CLIPPY" "Rust tests:$RUST_TESTS" "Python tests:$PYTHON_TESTS" "Documentation:$DOCS" "Sensitive-data scan:$SENSITIVE"; do
+            name="${item%%:*}"
+            result="${item#*:}"
+            printf '%s: **%s**\n' "$name" "$result" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$result" != "success" ]; then failed=1; fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "One or more audit checks failed or were incomplete." >&2
+            exit 1
+          fi
+          echo "All audit checks passed."
