@@ -132,7 +132,10 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         if ordered_comparison:
             left, relation, right = ordered_comparison.groups()
             left_value, right_value = float(left), float(right)
-            result_relation = "greater" if left_value > right_value else "less" if left_value < right_value else "equal"
+            result_relation = (
+                "greater" if left_value > right_value else
+                "less" if left_value < right_value else "equal"
+            )
             judgment = faculty.compare(left_value, right_value)
             answer = f"{left_value:g} is {result_relation} than {right_value:g}"
         else:
@@ -146,7 +149,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         )
 
     # Symbolic algebra and calculus retain their native expression trees.
-    if re.search(r"\b(simplify|expand|factor(?:ize)?|solve)\b", lower) and re.search(r"[a-zA-Z]", lower) and "[[" not in text:
+    algebra_cue = re.search(r"\b(simplify|expand|factor(?:ize)?|solve)\b", lower)
+    if algebra_cue and re.search(r"[a-zA-Z]", lower) and "[[" not in text:
         if re.search(r"\bsimplify\b", lower):
             return _answer(faculty.simplify(text), "algebra")
         if re.search(r"\bexpand\b", lower):
@@ -190,7 +194,11 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
     # Linear algebra: dispatch supported matrix operations through the
     # exact Fraction-based faculty. Each operand must be an explicit literal.
-    if any(word in lower for word in ("determinant", "matrix rank", "rank of", "matrix", "linear system", "solve the system")) or "[[" in text:
+    matrix_cue = any(
+        word in lower
+        for word in ("determinant", "matrix rank", "rank of", "matrix", "linear system", "solve the system")
+    )
+    if matrix_cue or "[[" in text:
         from .linear_algebra import determinant_text, matmul_text, rank_text, solve_text
 
         first = _literal_after(text)
@@ -201,7 +209,9 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             second = _literal_after(text, first_end)
             if second is None:
                 return ParietalAnswer(
-                    "linear algebra", "Two matrix literals are required for multiplication.", success=False
+                    "linear algebra",
+                    "Two matrix literals are required for multiplication.",
+                    success=False,
                 )
             return _answer(matmul_text(matrix, second[0]), "linear algebra")
         if "solve" in lower or "linear system" in lower:
