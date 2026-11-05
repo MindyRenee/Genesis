@@ -101,7 +101,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             break
 
     matrix_language = any(
-        term in lower for term in ("matrix", "determinant", "matrix rank", "rank of", "linear system")
+        term in lower
+        for term in ("matrix", "determinant", "matrix rank", "rank of", "linear system")
     )
     arithmetic_cue = re.search(
         r"\b(calculate|compute|evaluate|add|subtract|"
@@ -119,7 +120,12 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         )
         question_arithmetic = (
             bool(re.search(r"\\d", candidate))
-            and bool(re.search(r"[+*/%^]|\\b(plus|minus|times|divided|percent|power|sqrt)\\b", candidate))
+            and bool(
+                re.search(
+                    r"[+*/%^]|\\b(plus|minus|times|divided|percent|power|sqrt)\\b",
+                    candidate,
+                )
+            )
             and not any(term in candidate for term in domain_terms)
         )
     else:
@@ -128,7 +134,11 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         r"\d\s*[+*/%^()]|[+*/%^()]\s*\d", lower
     )
     symbolic_input = re.search(r"\b(?:[t-z]|pi|e)\b", lower)
-    if (arithmetic_cue or arithmetic_expression or question_arithmetic or arithmetic_text != text) and not symbolic_input and not matrix_language:
+    if (
+        (arithmetic_cue or arithmetic_expression or question_arithmetic or arithmetic_text != text)
+        and not symbolic_input
+        and not matrix_language,
+    ):
         result = faculty.evaluate(arithmetic_text)
         if result.ok:
             return ParietalAnswer(
