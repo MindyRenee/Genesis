@@ -105,7 +105,9 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         r"raised to|power of|percent|half|double|triple|square of|cube of)\b",
         lower,
     )
-    arithmetic_expression = re.search(r"\d\s*[+*/%^()]|[+*/%^()]\s*\d", lower)
+    arithmetic_expression = not re.search(r"[a-zA-Z]", lower) and re.search(
+        r"\d\s*[+*/%^()]|[+*/%^()]\s*\d", lower
+    )
     if arithmetic_cue or arithmetic_expression:
         result = faculty.evaluate(arithmetic_text)
         if result.ok:
@@ -149,7 +151,10 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         )
 
     # Symbolic algebra and calculus retain their native expression trees.
-    algebra_cue = re.search(r"\b(simplify|expand|factor(?:ize)?|solve)\b", lower)
+    symbolic_factor = "factor" not in lower and "factorize" not in lower or re.search(
+        r"\b[a-zA-Z]\b", lower.split("factor", 1)[-1]
+    )
+    if algebra_cue and symbolic_factor and re.search(r"[a-zA-Z]", lower) and "[[" not in text:
     if algebra_cue and re.search(r"[a-zA-Z]", lower) and "[[" not in text:
         if re.search(r"\bsimplify\b", lower):
             return _answer(faculty.simplify(text), "algebra")
