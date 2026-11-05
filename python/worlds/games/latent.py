@@ -386,6 +386,10 @@ class LatentPrediction:
     epistemic_variance: tuple[float, ...]
     source_distance: float
 
+    def distance_to(self, observed: LatentState) -> float:
+        """Prediction error against a subsequently observed latent state."""
+        return _vector_distance(self.vector, observed.vector)
+
 
 @dataclass(frozen=True, slots=True)
 class GoalEvidence:
