@@ -95,6 +95,32 @@ def matmul(a: Matrix, b: Matrix) -> Matrix | None:
     ]
 
 
+def matrix_add(a: Matrix, b: Matrix, sign: int = 1) -> Matrix | None:
+    """Add or subtract matrices with identical dimensions."""
+    if len(a) != len(b) or any(len(x) != len(y) for x, y in zip(a, b, strict=True)):
+        return None
+    return [
+        [x + sign * y for x, y in zip(row_a, row_b, strict=True)]
+        for row_a, row_b in zip(a, b, strict=True)
+    ]
+
+
+def matrix_scale(m: Matrix, scalar: Fraction) -> Matrix:
+    """Multiply every matrix entry by an exact scalar."""
+    return [[scalar * value for value in row] for row in m]
+
+
+def vector_cross(a: list[Fraction], b: list[Fraction]) -> list[Fraction] | None:
+    """Return the three-dimensional cross product."""
+    if len(a) != 3 or len(b) != 3:
+        return None
+    return [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+
+
 def determinant(m: Matrix) -> Fraction | None:
     n = len(m)
     if any(len(r) != n for r in m):
@@ -280,6 +306,44 @@ def vector_add_text(a_text: str, b_text: str, subtract: bool = False) -> LinearR
         )
     rendered = "(" + ", ".join(_fmt(value) for value in result) + ")"
     return LinearResult("vector", f"{a_text}, {b_text}", rendered, True)
+
+
+def matrix_add_text(a_text: str, b_text: str, subtract: bool = False) -> LinearResult:
+    """Add or subtract matrices with matching dimensions."""
+    try:
+        a, b = parse_matrix(a_text), parse_matrix(b_text)
+    except ValueError as error:
+        return LinearResult("matrix", f"{a_text}, {b_text}", "", False, str(error))
+    result = matrix_add(a, b, -1 if subtract else 1)
+    if result is None:
+        return LinearResult(
+            "matrix", f"{a_text}, {b_text}", "", False, "matrix dimensions must agree"
+        )
+    return LinearResult("matrix", f"{a_text}, {b_text}", render_matrix(result), True)
+
+
+def matrix_scale_text(matrix_text: str, scalar_text: str) -> LinearResult:
+    """Multiply a matrix by an exact rational scalar."""
+    try:
+        matrix = parse_matrix(matrix_text)
+        scalar = Fraction(scalar_text.strip())
+    except (ValueError, ZeroDivisionError) as error:
+        return LinearResult("scale", f"{scalar_text} * {matrix_text}", "", False, str(error))
+    result = matrix_scale(matrix, scalar)
+    return LinearResult("scale", f"{scalar_text} * {matrix_text}", render_matrix(result), True)
+
+
+def vector_cross_text(a_text: str, b_text: str) -> LinearResult:
+    """Compute the exact cross product of two 3D vectors."""
+    try:
+        a, b = _parse_vector(a_text), _parse_vector(b_text)
+    except (SyntaxError, ValueError, ZeroDivisionError) as error:
+        return LinearResult("cross", f"{a_text} × {b_text}", "", False, str(error))
+    result = vector_cross(a, b)
+    if result is None:
+        return LinearResult("cross", f"{a_text} × {b_text}", "", False, "cross product requires two 3D vectors")
+    rendered = "(" + ", ".join(_fmt(value) for value in result) + ")"
+    return LinearResult("cross", f"{a_text} × {b_text}", rendered, True)
 
 
 def determinant_text(text: str) -> LinearResult:
