@@ -18,6 +18,7 @@ def test_grid_state_rejects_ragged_and_invalid_arc_grids():
         GridState.from_rows([[0, 16]])
     with pytest.raises(ValueError, match="positive"):
         GridState(0, 1, ())
+    assert GridState.from_rows([[2, 3]]).get(1, 0) == 3
 
 
 def test_scene_graph_extracts_components_and_exact_enclosed_holes():
@@ -59,6 +60,7 @@ def test_latent_encoding_is_fixed_width_and_keeps_graph_evidence():
     assert len(state.graph.nodes) == 3
     assert state.to_dict()["object_count"] == 3
     assert state.to_dict()["objects"]
+    assert state.to_dict()["edges"]
     typed = state.to_experiential_latent()
     assert typed.domain.value == "experiential_outer"
     assert typed.category == "arc_observation"
@@ -119,3 +121,12 @@ def test_goal_evidence_uses_observed_level_and_terminal_state():
     assert not progress.terminal_success
     assert not win.level_progress
     assert win.terminal_success
+
+
+
+def test_empty_board_has_a_valid_zero_object_embedding():
+    state = ArcEnvironmentDecoder().encode([[0, 0], [0, 0]])
+    assert state.graph.nodes == ()
+    assert state.graph.edges == ()
+    assert len(state.vector) == FEATURE_DIMENSIONS
+    assert all(value == 0.0 for value in state.vector[3:])
