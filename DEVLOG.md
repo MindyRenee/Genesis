@@ -1,3 +1,27 @@
+## 2026-11-05 — Fast-route discourse-state parity
+
+The fast specialist route records user and assistant turns in working and
+long-term conversation memory, but previously returned before the normal
+post-response path updated the comprehension referent context and
+`SituationModel`. A statement handled as an answer to a pending question
+could therefore be remembered as dialogue while remaining absent from the
+structured situation being discussed.
+
+The turn sequencer now passes its already-computed `ComprehensionResult`
+into the early-route handler. Both the fast and full paths call one shared
+`_update_comprehension_context` operation, which refreshes recent subject
+entities and applies the result to the situation model. The situation model
+continues to distinguish assertions/commands from questions; this change
+does not make questions mutate described world state.
+
+Added a regression test for a fast-routed statement that places Mary in the
+kitchen and verifies that the discourse model reflects that location.
+
+**Verification boundary:** source and regression test are committed to
+`audit-fixes`; tests have not run. A local clone attempt could not reach
+GitHub because DNS/network access is unavailable in the execution
+environment. GitHub reports no commit status checks.
+
 ## 2026-11-05 — Closed-archive zero-write guard
 
 A follow-up persistence audit found that `ConceptArchive.archive_concepts_batch`
