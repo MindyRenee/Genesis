@@ -757,51 +757,32 @@ class LifecycleMixin:
         knowledge (working + archive) grows unboundedly while RAM
         stays bounded.
 
-        If no archive is attached, falls back to the old pruning
-        behavior (``remove_concepts_batch``) to prevent unbounded
-        memory growth.
+        If no archive is attached, maintenance fails closed and leaves
+        dormant concepts resident. A missing durable store is an
+        infrastructure failure, not permission to destroy knowledge.
         """
         try:
             network = self.brain.frontal.network
-            if network._archive is not None:
-                # Archive mode: spill to disk instead of deleting.
-                # The budget is hers — maintenance_policy.json is the
-                # knob she owns; the dormancy threshold is the
-                # definition of dormant, not a policy choice.
-                from infrastructure.maintenance_policy import load_policy
+            if network._archive is None:
+                logger.error(
+                    "Cannot archive dormant concepts: no concept archive is "
+                    "attached; preserving %d working-memory concepts",
+                    network.size,
+                )
+                return
 
-                policy = load_policy(getattr(self.brain, "data_dir", None))
-                spilled = network.spill_dormant(
-                    activation_threshold=0.01,
-                    max_in_memory=policy.max_in_memory,
-                )
-                if spilled > 0:
-                    logger.info(f"Archived {spilled} dormant concepts")
-            else:
-                # Fallback: no archive attached, prune destructively
-                _DEAD_THRESHOLD = 0.01
-                _PROTECTED = frozenset(
-                    {
-                        "identity",
-                        "introspection",
-                        "foundational",
-                        "seeded",
-                        "structural",
-                    }
-                )
-                to_remove: set[str] = set()
-                for cid, concept in list(network._concepts.items()):
-                    if concept.origin in _PROTECTED:
-                        continue
-                    if (concept.activation or 0.0) >= _DEAD_THRESHOLD:
-                        continue
-                    if concept.review_count > 0:
-                        continue
-                    to_remove.add(cid)
-                if to_remove:
-                    pruned = network.remove_concepts_batch(to_remove)
-                    if pruned > 0:
-                        logger.info(f"Pruned {pruned} dormant concepts (no archive)")
+            # The budget is hers — maintenance_policy.json is the
+            # knob she owns; the dormancy threshold is the
+            # definition of dormant, not a policy choice.
+            from infrastructure.maintenance_policy import load_policy
+
+            policy = load_policy(getattr(self.brain, "data_dir", None))
+            spilled = network.spill_dormant(
+                activation_threshold=0.01,
+                max_in_memory=policy.max_in_memory,
+            )
+            if spilled > 0:
+                logger.info(f"Archived {spilled} dormant concepts")
         except Exception as e:
             # Log loudly as well as tallying. This runs from a background
             # autosave thread and the tally is only visible via
