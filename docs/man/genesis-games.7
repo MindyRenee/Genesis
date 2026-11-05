@@ -116,7 +116,11 @@ latent states and updates local action-conditioned transition statistics.
 Predictions are made only from a sufficiently nearby previously observed
 state/action context. Welford running statistics estimate transition
 uncertainty; uncertainty is not reduced merely because an action was
-attempted. These empirical models are saved inside per-game world memory.
+attempted. When a prediction is available, its distance from the next
+observed state is reported as
+.B latent_prediction_error
+in the perception metadata. These empirical models are saved inside
+per-game world memory.
 .PP
 Goal evidence records observed level changes and the official terminal
 state. The official toolkit remains authoritative for level completion
