@@ -196,7 +196,9 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     # exact Fraction-based faculty. Each operand must be an explicit literal.
     matrix_cue = any(
         word in lower
-        for word in ("determinant", "matrix rank", "rank of", "matrix", "linear system", "solve the system")
+        for word in (
+            "determinant", "matrix rank", "rank of", "matrix", "linear system", "solve the system"
+        )
     )
     if matrix_cue or "[[" in text:
         from .linear_algebra import determinant_text, matmul_text, rank_text, solve_text
