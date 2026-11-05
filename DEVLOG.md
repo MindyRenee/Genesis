@@ -17,7 +17,7 @@ represent halves, thirds, quarters, other common unit fractions, and mixed
 numbers such as “two and a half”. These retain the arithmetic parser's
 precedence and validation. Added cognitive-entry tests for signed arithmetic,
 numeric and spoken fractions, mixed numbers, precedence, powers, roots,
-matrix operations, vector operations, spoken fractions, and invalid dimensions.
+matrix operations, vector operations, and invalid dimensions.
 
 **Verification boundary:** source and focused tests are committed to
 `audit-fixes`. They have not been executed in Termux or CI during this
