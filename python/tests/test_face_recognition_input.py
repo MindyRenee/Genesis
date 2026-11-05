@@ -1,7 +1,6 @@
 """Face identity input must remain photographic and canonical."""
 
 import numpy as np
-
 from occipital_lobe.perception.recognition import FaceRecognizer, KnownFace
 from occipital_lobe.perception.vision import _face_recognition_input
 

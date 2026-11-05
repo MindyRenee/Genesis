@@ -113,6 +113,7 @@ def _face_recognition_input(sensor_rgb: np.ndarray, mirror: bool) -> np.ndarray:
     """
     return optics.mirror_view(sensor_rgb) if mirror else sensor_rgb
 
+
 # The afferent nerves cortex can look through: the body's own eye and
 # the screen-capture nerve a relay feeds (``genesis_optic_nerve`` and
 # ``genesis_screen_nerve`` segments). A bare segment name also works —

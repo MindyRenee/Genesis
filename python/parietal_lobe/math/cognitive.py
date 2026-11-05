@@ -163,9 +163,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         )
     else:
         is_question_arithmetic = False
-    arithmetic_expression = (
-        not re.search(r"[a-zA-Z]", lower)
-        and bool(re.search(r"\d\s*[+*/%^()]|[+*/%^()]\s*\d", lower))
+    arithmetic_expression = not re.search(r"[a-zA-Z]", lower) and bool(
+        re.search(r"\d\s*[+*/%^()]|[+*/%^()]\s*\d", lower)
     )
     symbolic_input = re.search(r"\b(?:[t-z]|pi|e)\b", lower)
     if (

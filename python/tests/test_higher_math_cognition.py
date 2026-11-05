@@ -82,7 +82,6 @@ def test_cognitive_entry_point_reaches_native_parietal_faculty(question: str, ex
     assert expected in result.answer
 
 
-
 @pytest.mark.parametrize(
     ("question", "operation", "expected"),
     [
@@ -95,9 +94,7 @@ def test_cognitive_entry_point_reaches_native_parietal_faculty(question: str, ex
         ("Stirling number S(5,2)", "combinatorics", "S(5, 2) = 15"),
     ],
 )
-def test_domain_result_types_remain_isolated(
-    question: str, operation: str, expected: str
-):
+def test_domain_result_types_remain_isolated(question: str, operation: str, expected: str):
     result = try_math(question)
     assert result is not None
     assert result.success
