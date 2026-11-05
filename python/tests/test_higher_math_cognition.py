@@ -6,7 +6,6 @@ import pytest
 from frontal_lobe.reasoning.math_reasoning import try_math
 from parietal_lobe.math.linear_algebra import solve_text
 
-
 @pytest.mark.parametrize(
     ("question", "expected"),
     [
@@ -71,7 +70,6 @@ def test_cognitive_entry_point_reaches_native_parietal_faculty(question: str, ex
     assert result.success
     assert expected in result.answer
 
-
 def test_cognitive_entry_point_preserves_domain_steps():
     result = try_math("determinant of [[1, 2], [3, 4]]")
     assert result is not None
@@ -79,11 +77,9 @@ def test_cognitive_entry_point_preserves_domain_steps():
     assert result.steps
     assert "linear algebra" in result.steps[0]
 
-
 def test_native_parietal_router_does_not_claim_ordinary_prose():
     result = try_math("tell me about the history of mathematics")
     assert result is None
-
 
 def test_existing_arithmetic_path_remains_available():
     result = try_math("what is 2 + 2")
@@ -91,14 +87,11 @@ def test_existing_arithmetic_path_remains_available():
     assert result.success
     assert result.answer == "4"
 
-
-
 def test_linear_algebra_rejects_singular_inverse():
     result = try_math("inverse of [[1, 2], [2, 4]]")
     assert result is not None
     assert not result.success
     assert "nonsingular square matrix" in result.answer
-
 
 def test_linear_algebra_rejects_dimension_mismatch():
     result = try_math("dot product of [1, 2] and [3, 4, 5]")
@@ -106,22 +99,17 @@ def test_linear_algebra_rejects_dimension_mismatch():
     assert not result.success
     assert "dimensions must agree" in result.answer
 
-
-
 def test_matrix_addition_rejects_dimension_mismatch():
     result = try_math("add matrices [[1, 2]] and [[1], [2]]")
     assert result is not None
     assert not result.success
     assert "dimensions must agree" in result.answer
 
-
 def test_cross_product_requires_three_dimensions():
     result = try_math("cross product of [1, 2] and [3, 4]")
     assert result is not None
     assert not result.success
     assert "3D vectors" in result.answer
-
-
 
 @pytest.mark.parametrize("right_hand_side", ["5", "[[5], [1]]", "{'x': 5}"])
 def test_linear_system_rejects_non_vector_right_hand_side(right_hand_side: str):
