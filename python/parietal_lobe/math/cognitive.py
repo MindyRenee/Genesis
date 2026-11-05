@@ -148,7 +148,9 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             return _answer(rank_text(matrix), "linear algebra")
 
     # Abstract algebra: cycle notation is the input language of this faculty.
-    if re.search(r"\b(permutation|cycle|cycles|order of)\b", lower) and re.search(r"\(\s*\d+(?:\s+\d+)+\s*\)", lower):
+    has_group_words = re.search(r"\b(permutation|cycle|cycles|order of)\b", lower)
+    has_cycle_literal = re.search(r"\(\s*\d+(?:\s+\d+)+\s*\)", lower)
+    if has_group_words and has_cycle_literal:
         from .abstract_algebra import describe_text, order_text
 
         if "order" in lower:
