@@ -2447,24 +2447,30 @@ def try_math(
     Returns None if the question is not a math question.
     """
     lower = question.lower().strip()
+    parietal_cues = re.search(
+        r"\\b(simplify|expand|factor|differentiate|derivative|integral|mean|average|median|"
+        r"variance|standard deviation|summarize|sin|cos|tan|determinant|matrix|rank|"
+        r"permutation|cycle|order of|limit|complex|roots? of unity|polar form|prime|"
+        r"primality|factorization|gcd|distance|polygon area|area of|convex hull|"
+        r"relation|reflexive|symmetric|antisymmetric|transitive|choose|combination|"
+        r"arrange|derangement|topology|euler characteristic|tautology|satisfiable|"
+        r"cayley table|algebraic axioms)\\b",
+        lower,
+    ) or "[[" in lower
+    if parietal_cues:
+        from parietal_lobe.math.cognitive import route_parietal_math
 
-    # Route domain-specific questions into the native parietal faculties
-    # before the narrower arithmetic/algebra parser. The normalized result
-    # rejoins this entry point so competence records and frontal deliberation
-    # observe one consistent MathResult contract.
-    from parietal_lobe.math.cognitive import route_parietal_math
-
-    parietal_result = route_parietal_math(question)
-    if parietal_result is not None:
-        result = MathResult(
-            parietal_result.answer,
-            parietal_result.operation,
-            parietal_result.steps,
-            parietal_result.success,
-        )
-        if task_competence is not None:
-            _record_math_episode(task_competence, question, result, salience)
-        return result
+        parietal_result = route_parietal_math(question)
+        if parietal_result is not None:
+            result = MathResult(
+                parietal_result.answer,
+                parietal_result.operation,
+                parietal_result.steps,
+                parietal_result.success,
+            )
+            if task_competence is not None:
+                _record_math_episode(task_competence, question, result, salience)
+            return result
 
     # Build rule registry from concept network if available
     enabled_rules: set[str] | None = None
