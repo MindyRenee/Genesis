@@ -59,6 +59,10 @@ def test_latent_encoding_is_fixed_width_and_keeps_graph_evidence():
     assert len(state.graph.nodes) == 3
     assert state.to_dict()["object_count"] == 3
     assert state.to_dict()["objects"]
+    typed = state.to_experiential_latent()
+    assert typed.domain.value == "experiential_outer"
+    assert typed.category == "arc_observation"
+    assert typed.values == state.vector
 
 
 def test_action_dynamics_are_learned_from_observed_transitions_only():
@@ -85,6 +89,15 @@ def test_repeated_consistent_transitions_reduce_epistemic_uncertainty():
     assert prediction is not None
     assert prediction.epistemic_variance == before.epistemic_variance
     assert decoder.action_evidence()["ACTION1"]["samples"] == 2
+
+
+def test_action_model_does_not_extrapolate_to_a_distant_latent_context():
+    decoder = ArcEnvironmentDecoder()
+    before = decoder.encode([[0, 9], [0, 0]])
+    after = decoder.encode([[0, 0], [0, 9]])
+    distant = decoder.encode([[1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1]])
+    decoder.observe_transition("ACTION1", before, after)
+    assert decoder.predict("ACTION1", distant) is None
 
 
 def test_transition_model_roundtrips_without_fabricating_samples():
