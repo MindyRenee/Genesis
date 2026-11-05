@@ -98,10 +98,10 @@ _MODEL_DIR = default_data_dir() / "models"
 _DETECTOR_MODEL = _MODEL_DIR / "face_detection_yunet.onnx"
 _RECOGNIZER_MODEL = _MODEL_DIR / "face_recognition_sface.onnx"
 
-# Recognition threshold — cosine similarity above this means "same person"
-# SFace: OpenCV recommends a cosine threshold of ~0.363.
-# Higher = stricter (fewer false positives, more false negatives).
-_RECOGNITION_THRESHOLD = 0.4
+# Recognition threshold — cosine similarity above this means "same person".
+# Use OpenCV's published SFace cosine threshold (0.363); a stricter
+# local threshold needlessly turns marginal genuine matches into unknowns.
+_RECOGNITION_THRESHOLD = 0.363
 
 # Cap on stored embeddings per name — each registration appends one,
 # so without a bound the JSON grows on every re-registration.
