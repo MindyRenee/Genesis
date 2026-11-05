@@ -2460,7 +2460,9 @@ def try_math(
         r"primality|factorization|gcd|distance|polygon area|area of|convex hull|"
         r"relation|reflexive|symmetric|antisymmetric|transitive|choose|combination|"
         r"arrange|derangement|topology|euler characteristic|tautology|satisfiable|"
-        r"cayley table|algebraic axioms)\b",
+        r"cayley table|algebraic axioms|triangle|degrees?|radians?|totient|euler.?s phi|"
+        r"congruence|modulo|chinese remainder|crt|graph|connected|polygon|inside|"
+        r"stirling|stars and bars)\b",
         lower,
     ) or "[[" in lower or "%" in lower
     if parietal_cues:
