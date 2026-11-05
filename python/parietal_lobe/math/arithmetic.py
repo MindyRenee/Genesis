@@ -153,8 +153,9 @@ def _words_to_number(words: list[str]) -> tuple[float | None, int]:
     Returns (value, words_consumed). Handles units, tens, and scales:
     ``seven`` → 7, ``twenty three`` → 23, ``two hundred`` → 200,
     ``a thousand`` → 1000, ``three point five`` → 3.5,
-    ``half`` → 0.5. A word that begins none of these stops the run
-    unconsumed, and a run that consumed nothing reports no value.
+    ``one half`` → 0.5, ``three quarters`` → 0.75, and
+    ``two and a half`` → 2.5. A word that begins none of these stops
+    the run unconsumed, and a run that consumed nothing reports no value.
     """
     total = 0.0
     current = 0.0
