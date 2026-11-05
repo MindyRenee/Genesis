@@ -16,6 +16,30 @@ from mind import Mind
 logger = logging.getLogger(__name__)
 
 
+def test_dormant_maintenance_preserves_memory_without_archive(caplog):
+    """A missing archive must not make lifecycle maintenance destructive."""
+    from types import SimpleNamespace
+
+    from brainstem.lifecycle import LifecycleMixin
+    from temporal_lobe.concepts import ConceptNetwork
+
+    network = ConceptNetwork()
+    network.add_concept("dormant_marker", confidence=0.8, origin="learned")
+    concept = network.get_concept("dormant_marker")
+    assert concept is not None
+    concept.activation = 0.0
+
+    lifecycle = object.__new__(LifecycleMixin)
+    lifecycle.brain = SimpleNamespace(frontal=SimpleNamespace(network=network))
+    caplog.set_level(logging.ERROR, logger="brainstem.lifecycle")
+
+    lifecycle._archive_dormant_concepts()
+
+    assert network.get_concept("dormant_marker") is not None
+    assert network.size == 1
+    assert "no concept archive is attached" in caplog.text
+
+
 # ======================================================================
 # From tests/test_mind_lifecycle.py
 # ======================================================================
