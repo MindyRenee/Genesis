@@ -101,15 +101,30 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             break
 
     arithmetic_cue = re.search(
-        r"\b(calculate|compute|evaluate|what is|what's|add|subtract|"
+        r"\b(calculate|compute|evaluate|add|subtract|"
         r"multiply|divide|plus|minus|times|divided by|square root|sqrt|"
         r"raised to|power of|percent|half|double|triple|square of|cube of)\b",
         lower,
     )
+    question_arithmetic = re.match(r"^(?:what is|what's)\\s+(.+)$", lower)
+    if question_arithmetic:
+        candidate = question_arithmetic.group(1)
+        domain_terms = (
+            "mean", "average", "median", "variance", "standard deviation", "matrix",
+            "determinant", "rank", "limit", "sin", "cos", "tan", "complex", "prime",
+            "factor", "topology", "permutation", "relation", "euler characteristic"
+        )
+        question_arithmetic = (
+            bool(re.search(r"\\d", candidate))
+            and bool(re.search(r"[+*/%^]|\\b(plus|minus|times|divided|percent|power|sqrt)\\b", candidate))
+            and not any(term in candidate for term in domain_terms)
+        )
+    else:
+        question_arithmetic = False
     arithmetic_expression = not re.search(r"[a-zA-Z]", lower) and re.search(
         r"\d\s*[+*/%^()]|[+*/%^()]\s*\d", lower
     )
-    if arithmetic_cue or arithmetic_expression:
+    if arithmetic_cue or arithmetic_expression or question_arithmetic:
         result = faculty.evaluate(arithmetic_text)
         if result.ok:
             return ParietalAnswer(
