@@ -4015,14 +4015,6 @@ class FrontalLobe:
             context={"recent_entities": self.comprehension.recent_entities},
         )
 
-        # Bind language arguments to the same persistent concepts used by
-        # reasoning. Grounding is read-only; unknown words remain visible
-        # to the learning system instead of becoming fabricated concepts.
-        comprehension_result.grounded = self.semantic_grounder.ground_all(
-            comprehension_result.propositions,
-            context=user_input,
-        )
-
         # If a metaphor was detected, interpret it so Genesis
         # understands what the metaphor means — not just that it
         # exists. The interpretation maps shared properties between
@@ -4038,6 +4030,15 @@ class FrontalLobe:
         # every conversation makes it smarter — if the user says
         # "X is a Y", it adds that to its concept network.
         learning_events = self.self_learner.learn_from_input(user_input)
+
+        # Ground after the turn's learning pass: concepts genuinely
+        # acquired from this utterance can participate in its own
+        # downstream attention and reasoning. Grounding remains
+        # read-only; unknown arguments still receive no fabricated ID.
+        comprehension_result.grounded = self.semantic_grounder.ground_all(
+            comprehension_result.propositions,
+            context=user_input,
+        )
 
         # ── 0.5 Language acquisition — statistical learning from input ──
         # Track transitional probabilities, segment words, and chunk
