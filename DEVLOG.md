@@ -671,3 +671,35 @@ back in the tree now — the revised edition covers the current schema.
 - Every claim above points at a commit, a file, or a state artifact
   you can open. If a number here ever stops being true, this file is
   stale — fix it.
+
+## 2026-11-04 — ARC latent geometry and operator algebra
+
+Extended the ARC environment decoder on `audit-fixes` rather than treating
+its structural feature vector as the entire latent-space implementation.
+
+- ARC scene decoding now follows the parietal parser's inferred
+  most-common-color background unless an environment supplies an explicit
+  background. Grid dimensions and palette cells reject booleans and malformed
+  input rather than silently accepting Python's bool-as-int behavior.
+- `LatentState.from_graph` provides the graph-to-latent construction path.
+  `geodesic_distance` supports a validated constant symmetric
+  positive-definite metric, using the exact quadratic form
+  `sqrt((y-x)^T G (y-x))`. It does not claim a spatially varying metric.
+- `GoalAttractorManifold` represents an explicitly supplied goal center and
+  metric neighborhood. It never invents a goal vector from reward or terminal
+  status.
+- `TransitionOperator` represents a declared affine vector field
+  `f(x)=Ax+b`. `DifferentiableOperatorSpace` applies operators, computes
+  their affine Lie brackets, and validates closure by checking bracket
+  coefficients against the declared linear span.
+- The official ARC action identifiers remain discrete and opaque. No
+  differentiable operator is inferred from an action name, and no benchmark
+  completion is inferred from latent distance.
+- Corrected the repeated-transition uncertainty test: two identical
+  observations produce zero empirical variance in the estimated mean
+  transition. One observation retains the prior uncertainty.
+
+Focused tests were added for nonzero background inference, metric geometry,
+goal-attractor membership, affine operator application, Lie brackets, and
+closure. **Verification is pending**: these remote source updates have not
+been executed in a Termux checkout. No test-pass claim is made.
