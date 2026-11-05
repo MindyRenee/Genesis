@@ -37,20 +37,37 @@ class GridState:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "data", tuple(self.data))
-        if self.width < 1 or self.height < 1:
-            raise ValueError("grid dimensions must be positive")
+        if (
+            isinstance(self.width, bool)
+            or isinstance(self.height, bool)
+            or not isinstance(self.width, int)
+            or not isinstance(self.height, int)
+            or self.width < 1
+            or self.height < 1
+        ):
+            raise ValueError("grid dimensions must be positive integers")
         if len(self.data) != self.width * self.height:
             raise ValueError("grid data length does not match dimensions")
-        if any(not isinstance(value, int) or not 0 <= value < ARC_COLORS for value in self.data):
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or not 0 <= value < ARC_COLORS
+            for value in self.data
+        ):
             raise ValueError("ARC cells must be integer palette values in [0, 15]")
 
     @classmethod
     def from_rows(cls, rows: list[list[int]]) -> GridState:
         """Validate and flatten a rectangular board."""
-        if not rows or not rows[0]:
+        if (
+            not isinstance(rows, (list, tuple))
+            or not rows
+            or not isinstance(rows[0], (list, tuple))
+            or not rows[0]
+        ):
             raise ValueError("grid must be non-empty")
         width = len(rows[0])
-        if any(len(row) != width for row in rows):
+        if any(not isinstance(row, (list, tuple)) or len(row) != width for row in rows):
             raise ValueError("grid rows must have equal width")
         return cls(width, len(rows), tuple(value for row in rows for value in row))
 
@@ -107,12 +124,17 @@ class SceneGraph:
     edges: tuple[SceneEdge, ...]
 
     @classmethod
-    def extract(cls, state: GridState, background: int = 0) -> SceneGraph:
-        """Use Genesis's scene parser, then enrich components with topology."""
-        if not 0 <= background < ARC_COLORS:
+    def extract(cls, state: GridState, background: int | None = None) -> SceneGraph:
+        """Use Genesis's scene parser and infer background by its canonical rule."""
+        if background is not None and (
+            isinstance(background, bool)
+            or not isinstance(background, int)
+            or not 0 <= background < ARC_COLORS
+        ):
             raise ValueError("background must be an ARC palette value in [0, 15]")
         grid = state.as_grid()
         scene = perceive(grid, background=background, compute_relations=False)
+        background = scene.background
         objects = sorted(
             scene.objects,
             key=lambda obj: (
