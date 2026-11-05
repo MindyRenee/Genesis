@@ -3472,6 +3472,7 @@ class FrontalLobe:
         user_input: str,
         perception,
         raw_input: str = "",
+        comprehension_result: ComprehensionResult | None = None,
     ) -> tuple[str, CognitiveState] | None:
         """Check for early-return routes before the full cognitive pipeline.
 
@@ -3521,6 +3522,7 @@ class FrontalLobe:
         # "what did we talk about?" on the next turn.
         if early is not None:
             self._record_early_turn(user_input, early)
+            self._update_comprehension_context(comprehension_result)
         return early
 
     def _record_early_turn(self, user_input: str, early: tuple[str, CognitiveState]) -> None:
@@ -6679,6 +6681,38 @@ class FrontalLobe:
             self.client.neuro_impulse(0, dopamine_signal)  # dopamine
         return td_rpe
 
+    def _update_comprehension_context(
+        self,
+        comprehension_result: ComprehensionResult | None,
+    ) -> None:
+        """Keep discourse references and the situation model aligned.
+
+        Both the full pipeline and fast specialist routes receive the
+        same temporal representation. A fast response must not leave
+        the conversation history updated while the discourse world
+        and the parser's referent context remain stale.
+        """
+        if comprehension_result is None:
+            return
+        if comprehension_result.propositions:
+            entities = [
+                proposition.subject
+                for proposition in comprehension_result.propositions
+                if proposition.subject
+            ]
+            self.comprehension.set_recent_entities(entities[-5:])
+
+        # SituationModel itself distinguishes assertions from requests:
+        # statements/commands update described state, questions record
+        # interlocutor intent without moving entities.
+        try:
+            self.situation_model.update(comprehension_result)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "frontal_lobe.prefrontal._update_comprehension_context",
+                e,
+            )
+
     def _think_self_directed_learning(
         self,
         learning_events: list,
@@ -6738,25 +6772,7 @@ class FrontalLobe:
                 self.self_assessment.invalidate_confidence(involved)
                 self.self_assessment.reconcile_gaps(involved)
 
-        # Update comprehension engine's recent entities for next turn
-        if comprehension_result.propositions:
-            entities = [p.subject for p in comprehension_result.propositions if p.subject]
-            self.comprehension.set_recent_entities(entities[-5:])
-
-        # ── Feed the discourse situation model ──────────────────
-        # Only statements and commands mutate the state being
-        # described; the model itself records questions as the
-        # interlocutor's intentions without moving anything. A
-        # failure here must not cost the turn — the model is an
-        # observer of comprehension, and losing it degrades
-        # mid-story question answering rather than breaking anything.
-        try:
-            self.situation_model.update(comprehension_result)
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "frontal_lobe.prefrontal._think_comprehend_and_predict",
-                e,
-            )
+        self._update_comprehension_context(comprehension_result)
 
     _INTRO_RE: ClassVar[re.Pattern[str]] = re.compile(
         r"\b(?:my name is|i'?m|i am)\s+([a-z][a-z'-]*)", re.IGNORECASE
