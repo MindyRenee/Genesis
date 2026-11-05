@@ -10,10 +10,12 @@ mismatches return explicit failures rather than guessed results.
 
 Corrected a malformed whitespace escape in the foundational arithmetic
 question recognizer. Added explicit spoken normalization for square roots
-and “to the power of” expressions, preserving the arithmetic parser's
+and “to the power of” expressions, and extended the number-word parser to
+represent halves, thirds, quarters, other common unit fractions, and mixed
+numbers such as “two and a half”. These retain the arithmetic parser's
 precedence and validation. Added cognitive-entry tests for signed arithmetic,
-fractions, precedence, powers, roots, matrix operations, vector operations,
-and invalid dimensions.
+numeric and spoken fractions, mixed numbers, precedence, powers, roots,
+matrix operations, vector operations, and invalid dimensions.
 
 **Verification boundary:** source and focused tests are committed to
 `audit-fixes`. They have not been executed in Termux or CI during this
