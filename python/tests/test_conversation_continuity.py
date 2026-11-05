@@ -182,13 +182,16 @@ def test_grounded_comprehension_reaches_downstream_perception(engine, monkeypatc
     from frontal_lobe import prefrontal as prefrontal_module
 
     eng, network, _memory = engine
-    network.add_concept("quantum mechanism", confidence=0.9)
     text = "The quantum mechanism is stable."
-    comprehension = eng.comprehension.comprehend(text)
-    comprehension.grounded = eng.semantic_grounder.ground_all(
-        comprehension.propositions,
-        context=text,
-    )
+
+    # Simulate the learner acquiring the concept from this same input.
+    # Grounding must run after this write, not one turn later.
+    def learn_current_concept(_text):
+        network.add_concept("quantum mechanism", confidence=0.9)
+        return []
+
+    monkeypatch.setattr(eng.self_learner, "learn_from_input", learn_current_concept)
+    comprehension, _events, prediction, _recent = eng._think_comprehend_and_predict(text)
     assert comprehension.grounded
     assert comprehension.grounded[0].subject.concept_id == "quantum mechanism"
 
@@ -202,7 +205,6 @@ def test_grounded_comprehension_reaches_downstream_perception(engine, monkeypatc
         return perception
 
     monkeypatch.setattr(prefrontal_module, "perceive", without_surface_topics)
-    prediction, _recent_turns = eng._pre_input_prediction()
     perception, _error = eng._think_perceive_and_error(
         text,
         prediction,
