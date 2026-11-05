@@ -112,7 +112,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     arithmetic_cue = re.search(
         r"\b(calculate|compute|evaluate|add|subtract|"
         r"multiply|divide|plus|minus|times|divided by|square root|sqrt|"
-        r"raised to|power of|percent|half|double|triple|square of|cube of)\b",
+        r"raised to|power of|percent|fraction|half|halves|thirds?|quarters?|"
+        r"double|triple|square of|cube of)\b",
         lower,
     )
     question_arithmetic = re.match(r"^(?:what is|what's)\s+(.+)$", lower)
