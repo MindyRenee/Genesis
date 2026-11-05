@@ -189,7 +189,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
     # Symbolic algebra and calculus retain their native expression trees.
     algebra_cue = re.search(r"\b(simplify|expand|factor(?:ize)?|solve)\b", lower)
-    symbolic_factor = "factor" not in lower and "factorize" not in lower or re.search(
+    symbolic_factor = ("factor" not in lower and "factorize" not in lower) or re.search(
         r"\b[a-zA-Z]\b", lower.split("factor", 1)[-1]
     )
     if (

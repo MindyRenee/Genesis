@@ -18,7 +18,8 @@ from dataclasses import dataclass, field
 from math import hypot, isfinite, sqrt
 from typing import Any
 
-from latent_spaces.boundaries import LatentDomain, LatentState as DomainLatentState
+from latent_spaces.boundaries import LatentDomain
+from latent_spaces.boundaries import LatentState as DomainLatentState
 from parietal_lobe.grid import Grid
 from parietal_lobe.scene import perceive
 
@@ -884,19 +885,19 @@ def _vector_distance(first: tuple[float, ...], second: tuple[float, ...]) -> flo
 
 
 __all__ = [
-    "ArcEnvironmentDecoder",
     "FEATURE_DIMENSIONS",
     "OBJECT_FEATURES",
-    "GoalEvidence",
+    "ArcEnvironmentDecoder",
+    "DifferentiableOperatorSpace",
     "GoalAttractorManifold",
+    "GoalEvidence",
     "GridState",
-    "LatentState",
     "LatentPrediction",
+    "LatentState",
     "SceneEdge",
     "SceneGraph",
     "SceneNode",
     "TransitionOperator",
-    "DifferentiableOperatorSpace",
     "compute_local_betti",
     "encode_graph",
     "validate_lie_bracket_closure",

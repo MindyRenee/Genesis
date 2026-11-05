@@ -1,18 +1,17 @@
 """Tests for ARC grid decoding, topology, and action-conditioned latent dynamics."""
 
 import pytest
-
 from worlds.games.latent import (
-    ArcEnvironmentDecoder,
-    compute_local_betti,
-    DifferentiableOperatorSpace,
     FEATURE_DIMENSIONS,
+    ArcEnvironmentDecoder,
+    DifferentiableOperatorSpace,
     GoalAttractorManifold,
     GoalEvidence,
     GridState,
     LatentState,
     SceneGraph,
     TransitionOperator,
+    compute_local_betti,
     validate_lie_bracket_closure,
 )
 
