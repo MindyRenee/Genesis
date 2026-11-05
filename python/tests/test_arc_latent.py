@@ -53,12 +53,12 @@ def test_scene_graph_uses_stable_object_ids_and_spatial_edges():
 
 def test_latent_encoding_is_fixed_width_and_keeps_graph_evidence():
     decoder = ArcEnvironmentDecoder()
-    state = decoder.encode([[0, 9, 0], [0, 9, 0], [8, 0, 8]])
+    state = decoder.encode([[0, 9, 8], [0, 9, 0], [8, 0, 8]])
     assert len(state.vector) == FEATURE_DIMENSIONS
     assert len(state.epistemic_variance) == FEATURE_DIMENSIONS
     assert state.graph.width == 3
-    assert len(state.graph.nodes) == 3
-    assert state.to_dict()["object_count"] == 3
+    assert len(state.graph.nodes) == 4
+    assert state.to_dict()["object_count"] == 4
     assert state.to_dict()["objects"]
     assert state.to_dict()["edges"]
     typed = state.to_experiential_latent()
