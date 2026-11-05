@@ -160,6 +160,7 @@ class SceneGraph:
         for index, obj in enumerate(objects):
             cells = obj.cells
             top, left, bottom, right = obj.bbox
+            betti_0, betti_1 = compute_local_betti(cells, top, left, bottom, right)
             nodes.append(
                 SceneNode(
                     id=index,
@@ -167,8 +168,8 @@ class SceneGraph:
                     centroid=(obj.centroid[1], obj.centroid[0]),
                     pixel_count=obj.size,
                     bbox=(left, top, right, bottom),
-                    betti_0=compute_local_betti(cells, top, left, bottom, right)[0],
-                    betti_1=compute_local_betti(cells, top, left, bottom, right)[1],
+                    betti_0=betti_0,
+                    betti_1=betti_1,
                     shape_signature=obj.shape_signature,
                 )
             )
