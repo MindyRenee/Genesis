@@ -22,6 +22,8 @@ from frontal_lobe.reasoning.math_reasoning import try_math
         ("is 91 prime", "not prime"),
         ("factor 360", "360 ="),
         ("Euler characteristic of a surface with 4 vertices, 6 edges, 4 faces", "2"),
+        ("topology on 2 points [[], [0], [1], [0, 1]]", "a topology"),
+        ("is this a tautology: ('imp', ('atom', 'P'), ('atom', 'P'))", "tautology"),
         ("distance between (0,0) and (3,4)", "5"),
         ("choose 3 from 10", "120"),
     ],
