@@ -261,11 +261,16 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     if "triangle" in lower and "side" in lower:
         from .trig import triangle_text
 
-        sides = [
-            float(value)
-            for value in re.findall(r"(?<![\w.])-?\d+(?:\.\d+)?", lower)
-        ]
-        return _answer(triangle_text(sides[-3:]), "trigonometry")
+        side_text = re.search(r"\bsides?\b(.*)$", lower)
+        sides = (
+            [
+                float(value)
+                for value in re.findall(r"(?<![\w.])-?\d+(?:\.\d+)?", side_text.group(1))
+            ]
+            if side_text
+            else []
+        )
+        return _answer(triangle_text(sides), "trigonometry")
 
     # Linear algebra: dispatch supported matrix operations through the
     # exact Fraction-based faculty. Each operand must be an explicit literal.
@@ -400,7 +405,6 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         )
     ):
         from .complex_analysis import describe_text, power_text, roots_unity_text
-
 
         root_match = re.search(
             r"\b(\d+)(?:st|nd|rd|th)\s+roots?\s+of\s+(.+?)[?.!]*$",
