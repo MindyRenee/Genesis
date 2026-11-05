@@ -227,8 +227,8 @@ tested points passed.
 The parietal faculty API. Its domain methods are reached from the
 frontal mathematical entry point through
 .I parietal_lobe.math.cognitive.route_parietal_math .
-Explicitly supported language forms dispatch to the native algebra,
-calculus, statistics, trigonometry, linear algebra, abstract algebra,
+Explicitly supported language forms dispatch to native number sense,
+arithmetic, algebra, calculus, statistics, trigonometry, linear algebra, abstract algebra,
 real analysis, complex analysis, number theory, geometry, discrete
 mathematics, combinatorics, topology, axiom-classification, and
 structured propositional tautology/satisfiability faculties.
@@ -272,6 +272,12 @@ The frontal reasoning entry point calls the parietal cognitive router
 before the narrower arithmetic/algebra solver. The router supports
 only explicit operation forms implemented in
 .I python/parietal_lobe/math/cognitive.py .
+Foundational arithmetic includes numeric and number-word expressions,
+spoken addition/subtraction/multiplication/division, percentages,
+squares, cubes, and magnitude comparisons. Linear algebra language
+currently supports explicit matrix literals for determinant, rank,
+matrix multiplication, and unique square-system solving; it does not
+automatically infer omitted matrices or vectors.
 This is not unrestricted mathematical language understanding: each
 domain still requires its documented operand syntax, and a missing
 operand produces an honest failure rather than an invented value.
