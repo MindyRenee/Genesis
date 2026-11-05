@@ -292,6 +292,8 @@ class LatentState:
     graph: SceneGraph = field(compare=False)
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "vector", tuple(self.vector))
+        object.__setattr__(self, "epistemic_variance", tuple(self.epistemic_variance))
         if not self.vector or len(self.vector) != len(self.epistemic_variance):
             raise ValueError("latent vector and uncertainty dimensions must agree")
         if not all(isfinite(value) for value in self.vector):
@@ -553,6 +555,10 @@ class GoalAttractorManifold:
     tolerance: float
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "center", tuple(self.center))
+        object.__setattr__(
+            self, "metric", tuple(tuple(row) for row in self.metric)
+        )
         if not self.center or not all(isfinite(value) for value in self.center):
             raise ValueError("goal center must contain finite coordinates")
         if not isfinite(self.tolerance) or self.tolerance < 0:
@@ -592,6 +598,10 @@ class TransitionOperator:
     bias: tuple[float, ...]
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "bias", tuple(self.bias))
+        object.__setattr__(
+            self, "matrix", tuple(tuple(row) for row in self.matrix)
+        )
         dimensions = len(self.bias)
         if dimensions == 0 or len(self.matrix) != dimensions:
             raise ValueError("operator output dimensions must match its bias")
