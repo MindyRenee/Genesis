@@ -2000,6 +2000,44 @@ def test_archive_persistence_across_network_restart() -> None:
         assert recalled.confidence == 0.7
         net2._archive.close()
 
+def test_restore_archive_keeps_durable_copy_until_deduplication() -> None:
+    """Reconstruction must not consume archive data before a save commits."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        net = _make_network_with_archive(tmpdir)
+        net.add_concept("archive_source", confidence=0.8, origin="learned")
+        net.add_concept("archive_target", confidence=0.8, origin="learned")
+        net.add_edge("archive_source", "archive_target", RelationType.RELATED_TO, weight=0.7)
+        for concept_id in ("archive_source", "archive_target"):
+            concept = net.get_concept(concept_id)
+            assert concept is not None
+            concept.activation = 0.0
+
+        net.spill_dormant(activation_threshold=0.01, max_in_memory=0)
+        assert net.size == 0
+        assert net.archive_size == 2
+
+        recalled = net.restore_archive_to_working_memory()
+
+        assert recalled == 2
+        assert net.get_concept("archive_source") is not None
+        assert net.get_concept("archive_target") is not None
+        assert net.archive_size == 2, "archive remains authoritative until save acknowledgement"
+        assert any(
+            edge.source == "archive_source" and edge.target == "archive_target"
+            for edge in net.edges
+        )
+
+        # This is the acknowledgement step used after a validated,
+        # durable working-memory restore.
+        assert net.dedupe_archive() == 2
+        assert net.archive_size == 0
+        assert net.get_concept("archive_source") is not None
+        assert any(
+            edge.source == "archive_source" and edge.target == "archive_target"
+            for edge in net.edges
+        )
+        net._archive.close()
+
 
 # ======================================================================
 # From tests/test_concept_quality_filter.py
