@@ -270,13 +270,19 @@ class ArchivalMixin:
                         edge_data["relation"],
                     )
                     return 0
+                origin = edge_data["origin"]
+                if self._edge_log is not None and is_derivable_edge(relation, origin):
+                    # Derivable edges are query-time geometry, not canonical
+                    # relationships. A live edge log must never materialize
+                    # them, including during archive recovery.
+                    continue
                 edge = Edge(
                     source=source,
                     target=target,
                     relation=relation,
                     weight=edge_data["weight"],
                     created_at=edge_data["created_at"],
-                    origin=edge_data["origin"],
+                    origin=origin,
                 )
                 parsed_edges.append(((source, target, relation), edge))
 
@@ -285,8 +291,6 @@ class ArchivalMixin:
             # idempotent under the edge-log fold (last write wins).
             if self._edge_log is not None:
                 for _key, edge in parsed_edges:
-                    if is_derivable_edge(edge.relation, edge.origin):
-                        continue
                     self._edge_log.assert_edge(
                         edge.source,
                         edge.target,
