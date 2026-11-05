@@ -390,8 +390,8 @@ def _validate_spd_metric(
         raise ValueError("metric dimensions must match the latent state")
     if not all(isfinite(value) for row in metric for value in row):
         raise ValueError("metric entries must be finite")
-    scale = max(1.0, max(abs(value) for row in metric for value in row))
-    tolerance = 1e-10 * scale
+    scale = max(abs(value) for row in metric for value in row)
+    tolerance = 1e-12 * scale
     for row in range(dimensions):
         for column in range(row):
             if abs(metric[row][column] - metric[column][row]) > tolerance:
