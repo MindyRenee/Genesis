@@ -8,6 +8,10 @@ from worlds.games.latent import (
     GoalEvidence,
     GridState,
     SceneGraph,
+    GoalAttractorManifold,
+    TransitionOperator,
+    DifferentiableOperatorSpace,
+    validate_lie_bracket_closure,
 )
 
 
@@ -18,6 +22,8 @@ def test_grid_state_rejects_ragged_and_invalid_arc_grids():
         GridState.from_rows([[0, 16]])
     with pytest.raises(ValueError, match="positive"):
         GridState(0, 1, ())
+    with pytest.raises(ValueError, match="integer"):
+        GridState(1, 1, (True,))
     assert GridState.from_rows([[2, 3]]).get(1, 0) == 3
     assert GridState(2, 1, [2, 3]).data == (2, 3)
 
@@ -91,7 +97,7 @@ def test_repeated_consistent_transitions_reduce_epistemic_uncertainty():
     decoder.observe_transition("ACTION1", before, after)
     prediction = decoder.predict("ACTION1", before)
     assert prediction is not None
-    assert prediction.epistemic_variance == before.epistemic_variance
+    assert prediction.epistemic_variance == pytest.approx((0.0,) * FEATURE_DIMENSIONS)
     assert decoder.action_evidence()["ACTION1"]["samples"] == 2
 
 
@@ -139,3 +145,47 @@ def test_malformed_saved_transition_context_is_ignored():
         {"ACTION1": [{"samples": "not-a-count", "reference_state": []}]}
     )
     assert decoder.action_evidence() == {}
+
+
+
+def test_scene_graph_infers_nonzero_background_using_parietal_rule():
+    grid = [[7, 7, 7], [7, 9, 7], [7, 7, 7]]
+    graph = SceneGraph.extract(GridState.from_rows(grid))
+    assert graph.background == 7
+    assert len(graph.nodes) == 1
+    assert graph.nodes[0].color == 9
+
+
+def test_constant_metric_geodesic_distance_and_goal_attractor():
+    from worlds.games.latent import LatentState
+
+    graph = SceneGraph(1, 1, 0, (), ())
+    first = LatentState((0.0, 0.0), (1.0, 1.0), graph)
+    second = LatentState((3.0, 4.0), (1.0, 1.0), graph)
+    metric = ((2.0, 0.0), (0.0, 1.0))
+    assert first.geodesic_distance(second, metric) == pytest.approx((34.0) ** 0.5)
+    goal = GoalAttractorManifold((3.0, 4.0), metric, 0.01)
+    assert goal.is_satisfied(second)
+    assert not goal.is_satisfied(first)
+    with pytest.raises(ValueError, match="positive definite"):
+        GoalAttractorManifold((0.0, 0.0), ((1.0, 2.0), (2.0, 1.0)), 1.0)
+
+
+def test_affine_transition_operator_applies_and_computes_lie_brackets():
+    scale = TransitionOperator(((2.0, 0.0), (0.0, 1.0)), (1.0, -1.0))
+    assert scale.apply((3.0, 4.0)) == pytest.approx((7.0, 3.0))
+    with pytest.raises(ValueError, match="dimensions"):
+        scale.apply((1.0,))
+    e = TransitionOperator(((0.0, 1.0), (0.0, 0.0)), (0.0, 0.0))
+    f = TransitionOperator(((0.0, 0.0), (1.0, 0.0)), (0.0, 0.0))
+    h = TransitionOperator(((1.0, 0.0), (0.0, -1.0)), (0.0, 0.0))
+    closed = DifferentiableOperatorSpace({"e": e, "f": f, "h": h})
+    assert closed.bracket("e", "f").matrix == ((-1.0, 0.0), (0.0, 1.0))
+    assert validate_lie_bracket_closure(closed)
+    assert not DifferentiableOperatorSpace({"e": e, "f": f}).validate_lie_bracket_closure()
+
+
+def test_operator_space_does_not_infer_operators_for_opaque_actions():
+    space = DifferentiableOperatorSpace()
+    with pytest.raises(KeyError, match="unknown transition operator"):
+        space.apply("ACTION1", (0.0,))
