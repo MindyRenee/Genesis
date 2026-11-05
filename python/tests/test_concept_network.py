@@ -3438,6 +3438,22 @@ def test_clean_noise_preserves_concepts_without_an_archive(caplog) -> None:
     assert "no concept archive is attached" in caplog.text
 
 
+def test_clean_noise_preserves_concepts_when_archive_is_closed(caplog) -> None:
+    """A closed archive returns zero instead of raising; zero is not a commit."""
+    import logging
+
+    net = _noise_network(5)
+    net._archive.close()
+    caplog.set_level(logging.ERROR, logger="temporal_lobe.concepts.network")
+
+    removed = net.clean_noise(min_confidence=0.4, min_edges=1)
+
+    assert removed == []
+    assert net.size == 5
+    assert all(net.get_concept(f"fragment_{i}") is not None for i in range(5))
+    assert "archived 0 of 5 noise concepts" in caplog.text
+
+
 def test_clean_noise_keeps_concepts_when_the_archive_write_fails(caplog) -> None:
     """A failed archive write must not escalate into deletion.
 
