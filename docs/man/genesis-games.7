@@ -97,8 +97,10 @@ Each ARC board is passed through
 alongside Genesis's existing parietal grid and scene parser. The decoder
 validates the 0–15 grid, extracts connected same-color components,
 canonicalizes object order, records centroids, bounding boxes, shape
-signatures and enclosed-hole topology, and constructs a sparse directed
-adjacency graph. It produces a fixed 51-coordinate structural feature
+signatures and local Betti numbers (beta-0 components and beta-1
+enclosed holes under the declared 4/8 connectivity convention), and
+constructs a sparse directed adjacency graph. It produces a fixed
+51-coordinate structural feature
 vector containing board dimensions, occupancy, object statistics,
 topological counts, spatial distribution, ranked object sizes/radii,
 and color frequencies.
@@ -130,8 +132,7 @@ per-game world memory.
 Goal evidence records observed level changes and the official terminal
 state. The
 .B GoalAttractorManifold
-represents an explicitly supplied goal center and constant positive-
-definite metric tensor. Its satisfaction test measures membership in a
+represents an explicitly supplied goal center and constant positive-definite metric tensor. Its satisfaction test measures membership in a
 specified metric neighborhood; it does not manufacture a target from
 reward or infer a win. The
 .B LatentState.geodesic_distance
