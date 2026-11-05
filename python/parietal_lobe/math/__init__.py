@@ -121,9 +121,14 @@ from .geometry import (
 from .linear_algebra import (
     LinearResult,
     determinant_text,
+    inverse_text,
     looks_like_linear_algebra,
     matmul_text,
     rank_text,
+    trace_text,
+    transpose_text,
+    vector_add_text,
+    vector_dot_text,
 )
 from .linear_algebra import (
     solve_text as solve_system_text,
@@ -455,6 +460,28 @@ class ParietalMath:
     def solve_system(self, a_text: str, b_text: str) -> LinearResult:
         """Solve Ax = b — exact fractions."""
         return solve_system_text(a_text, b_text)
+
+    def transpose(self, text: str) -> LinearResult:
+        """Transpose a rectangular matrix."""
+        return transpose_text(text)
+
+    def inverse(self, text: str) -> LinearResult:
+        """Invert a nonsingular square matrix exactly."""
+        return inverse_text(text)
+
+    def trace(self, text: str) -> LinearResult:
+        """Compute the diagonal sum of a square matrix."""
+        return trace_text(text)
+
+    def vector_dot(self, a_text: str, b_text: str) -> LinearResult:
+        """Compute the exact dot product of two vectors."""
+        return vector_dot_text(a_text, b_text)
+
+    def vector_add(
+        self, a_text: str, b_text: str, subtract: bool = False
+    ) -> LinearResult:
+        """Add or subtract vectors of equal dimension."""
+        return vector_add_text(a_text, b_text, subtract)
 
     # ── Abstract algebra — structure itself ─────────────────────
 
