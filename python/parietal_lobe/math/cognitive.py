@@ -115,7 +115,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         )
 
     # Symbolic algebra and calculus retain their native expression trees.
-    if re.search(r"\b(simplify|expand|factor(?:ize)?|solve)\b", lower) and re.search(r"[a-zA-Z]", lower):
+    if re.search(r"\b(simplify|expand|factor(?:ize)?|solve)\b", lower) and re.search(r"[a-zA-Z]", lower) and "[[" not in text:
         if re.search(r"\bsimplify\b", lower):
             return _answer(faculty.simplify(text), "algebra")
         if re.search(r"\bexpand\b", lower):
@@ -157,15 +157,29 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         result = ratio_text(trig.group(1), trig.group(2).strip(" ()"))
         return _answer(result, "trigonometry")
 
-    # Linear algebra: matrix literals are parsed with ast.literal_eval by the
-    # faculty; this router only selects the requested operation.
-    if any(word in lower for word in ("determinant", "matrix rank", "rank of", "matrix")):
-        from .linear_algebra import determinant_text, rank_text
+    # Linear algebra: dispatch supported matrix operations through the
+    # exact Fraction-based faculty. Each operand must be an explicit literal.
+    if any(word in lower for word in ("determinant", "matrix rank", "rank of", "matrix", "linear system", "solve the system")) or "[[" in text:
+        from .linear_algebra import determinant_text, matmul_text, rank_text, solve_text
 
-        literal = _literal_after(text)
-        if literal is None:
+        first = _literal_after(text)
+        if first is None:
             return ParietalAnswer("linear algebra", "A matrix literal is required.", success=False)
-        matrix, _ = literal
+        matrix, first_end = first
+        if "multiply" in lower or "matrix product" in lower:
+            second = _literal_after(text, first_end)
+            if second is None:
+                return ParietalAnswer(
+                    "linear algebra", "Two matrix literals are required for multiplication.", success=False
+                )
+            return _answer(matmul_text(matrix, second[0]), "linear algebra")
+        if "solve" in lower or "linear system" in lower:
+            second = _literal_after(text, first_end)
+            if second is None:
+                return ParietalAnswer(
+                    "linear algebra", "A right-hand-side vector literal is required.", success=False
+                )
+            return _answer(solve_text(matrix, second[0]), "linear algebra")
         if "determinant" in lower or re.search(r"\bdet\b", lower):
             return _answer(determinant_text(matrix), "linear algebra")
         if "rank" in lower:
