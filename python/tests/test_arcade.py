@@ -124,6 +124,8 @@ def test_memory_survives_the_world_save():
     world2, arcade2, *_ = _arcade()
     world2.restore_from_dict(saved)
     assert arcade2.memories["dot1"].best_level == 2
+    assert arcade2.memories["dot1"].environment_model == arcade.memories["dot1"].environment_model
+    assert arcade2._decoder("dot1").action_evidence()
     assert "dot1" in arcade2.status()
 
 
