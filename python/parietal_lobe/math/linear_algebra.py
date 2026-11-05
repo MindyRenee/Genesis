@@ -391,9 +391,8 @@ def solve_text(a_text: str, b_text: str) -> LinearResult:
     """ "solve [[2,1],[1,-1]] x = [5, 1]" -> x = (2, 1)."""
     try:
         a = parse_matrix(a_text)
-        lit = ast.literal_eval(b_text.strip())
-        b = [Fraction(str(x)) for x in lit]
-    except (ValueError, SyntaxError) as e:
+        b = _parse_vector(b_text)
+    except (ValueError, SyntaxError, ZeroDivisionError) as e:
         return LinearResult("solve", f"{a_text} x = {b_text}", "", False, str(e))
     x = solve(a, b)
     if x is None:
