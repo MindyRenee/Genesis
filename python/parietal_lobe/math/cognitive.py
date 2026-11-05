@@ -226,9 +226,16 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
                 answer = f"arithmetic mean = {faculty.mean(numeric):g}"
             return ParietalAnswer("statistics", answer, [f"Values: {numeric}"])
 
+    # Calculus: keep symbolic differentiation and antiderivatives in the
+    # native expression-tree faculty rather than sending them to arithmetic.
+    if re.search(r"\b(differentiate|derivative|integral|integrate|antiderivative)\b", lower):
+        if re.search(r"\b(differentiate|derivative)\b", lower):
+            return _answer(faculty.differentiate(text), "calculus")
+        return _answer(faculty.integrate(text), "calculus")
+
     # Trigonometry: explicit ratio and angle; angle parsing remains in trig.py.
     trig = re.search(r"\b(sin|cos|tan|asin|acos|atan)\s*(?:of\s*)?(.+?)\s*[?.!]*$", lower)
-    if trig and any(token in lower for token in ("sin", "cos", "tan")):
+    if trig and "limit" not in lower and any(token in lower for token in ("sin", "cos", "tan")):
         from .trig import ratio_text
 
         result = ratio_text(trig.group(1), trig.group(2).strip(" ()"))
