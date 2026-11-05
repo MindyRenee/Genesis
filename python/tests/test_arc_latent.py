@@ -38,14 +38,14 @@ def test_scene_graph_extracts_components_and_exact_enclosed_holes():
 
 def test_scene_graph_uses_stable_object_ids_and_spatial_edges():
     grid = [
-        [0, 9, 0, 8],
-        [0, 9, 0, 8],
-        [0, 0, 0, 0],
+        [0, 9, 8, 0, 9],
+        [0, 9, 8, 0, 9],
     ]
     first = SceneGraph.extract(GridState.from_rows(grid))
     second = SceneGraph.extract(GridState.from_rows(grid))
     assert first.nodes == second.nodes
     assert [node.id for node in first.nodes] == list(range(len(first.nodes)))
+    assert len(first.edges) == 2
     assert all(edge.adjacency for edge in first.edges)
     assert all(edge.source != edge.target for edge in first.edges)
 
