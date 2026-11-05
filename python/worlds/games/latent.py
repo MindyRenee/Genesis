@@ -227,7 +227,12 @@ def _touches(
 
 @dataclass(frozen=True, slots=True)
 class LatentState:
-    """Fixed-width structural feature vector and per-coordinate uncertainty."""
+    """Fixed-width structural features and diagonal dynamics uncertainty.
+
+    The feature vector is deterministically extracted from the observed grid.
+    Variance describes uncertainty in predicted transitions, not confidence
+    that the observed pixels or object coordinates were detected correctly.
+    """
 
     vector: tuple[float, ...]
     epistemic_variance: tuple[float, ...]
