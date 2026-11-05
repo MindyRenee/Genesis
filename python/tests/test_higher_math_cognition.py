@@ -27,6 +27,8 @@ from frontal_lobe.reasoning.math_reasoning import try_math
         ("differentiate x**3", "3*x**2"),
         ("integral of x**2", "1/3*x**3"),
         ("simplify x + x", "2*x"),
+        ("solve 2*x + 3 = 7", "x = 2"),
+        ("what is the mean of [2, 4, 6]", "4"),
         ("mean of [2, 4, 6]", "4"),
         ("determinant of [[1, 2], [3, 4]]", "-2"),
         ("order of permutation (1 2 3)", "3"),
