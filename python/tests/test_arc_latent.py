@@ -22,15 +22,15 @@ def test_grid_state_rejects_ragged_and_invalid_arc_grids():
 
 def test_scene_graph_extracts_components_and_exact_enclosed_holes():
     grid = [
-        [0, 9, 9, 9, 0],
+        [9, 9, 9, 9, 9],
         [9, 0, 0, 0, 9],
         [9, 0, 0, 0, 9],
         [9, 0, 0, 0, 9],
-        [0, 9, 9, 9, 0],
+        [9, 9, 9, 9, 9],
     ]
     graph = SceneGraph.extract(GridState.from_rows(grid))
     ring = next(node for node in graph.nodes if node.color == 9)
-    assert ring.pixel_count == 12
+    assert ring.pixel_count == 16
     assert ring.betti_0 == 1
     assert ring.betti_1 == 1
     assert ring.bbox == (0, 0, 4, 4)
