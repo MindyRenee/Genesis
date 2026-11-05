@@ -2448,26 +2448,30 @@ def try_math(
     Returns None if the question is not a math question.
     """
     lower = question.lower().strip()
-    parietal_cues = re.search(
-        r"\b(calculate|compute|evaluate|what is|what's|add|subtract|multiply|divide|"
-        r"plus|minus|times|divided by|square root|sqrt|raised to|power of|percent|fraction|"
-        r"half|halves|thirds?|quarters?|double|triple|square of|cube of|compare|"
-        r"greater than|less than|"
-        r"larger than|smaller than|which is larger|which is greater|"
-        r"which is smaller|which is less|transpose|inverse|trace|dot product|"
-        r"inner product|vector|cross product|"
-        r"simplify|expand|factor|solve|differentiate|"
-        r"derivative|integral|mean|average|median|variance|standard deviation|summarize|"
-        r"sin|cos|tan|determinant|matrix|matrices|matrix product|linear system|rank|"
-        r"permutation|cycle|order of|limit|complex|roots? of unity|polar form|prime|"
-        r"primality|factorization|gcd|distance|polygon area|area of|convex hull|"
-        r"relation|reflexive|symmetric|antisymmetric|transitive|choose|combination|"
-        r"arrange|derangement|topology|euler characteristic|tautology|satisfiable|"
-        r"cayley table|algebraic axioms|triangle|degrees?|radians?|totient|euler.?s phi|"
-        r"congruence|modulo|chinese remainder|crt|graph|connected|polygon|inside|"
-        r"stirling|stars and bars)\b",
-        lower,
-    ) or "[[" in lower or "%" in lower
+    parietal_cues = (
+        re.search(
+            r"\b(calculate|compute|evaluate|what is|what's|add|subtract|multiply|divide|"
+            r"plus|minus|times|divided by|square root|sqrt|raised to|power of|percent|fraction|"
+            r"half|halves|thirds?|quarters?|double|triple|square of|cube of|compare|"
+            r"greater than|less than|"
+            r"larger than|smaller than|which is larger|which is greater|"
+            r"which is smaller|which is less|transpose|inverse|trace|dot product|"
+            r"inner product|vector|cross product|"
+            r"simplify|expand|factor|solve|differentiate|"
+            r"derivative|integral|mean|average|median|variance|standard deviation|summarize|"
+            r"sin|cos|tan|determinant|matrix|matrices|matrix product|linear system|rank|"
+            r"permutation|cycle|order of|limit|complex|roots? of unity|polar form|prime|"
+            r"primality|factorization|gcd|distance|polygon area|area of|convex hull|"
+            r"relation|reflexive|symmetric|antisymmetric|transitive|choose|combination|"
+            r"arrange|derangement|topology|euler characteristic|tautology|satisfiable|"
+            r"cayley table|algebraic axioms|triangle|degrees?|radians?|totient|euler.?s phi|"
+            r"congruence|modulo|chinese remainder|crt|graph|connected|polygon|inside|"
+            r"stirling|stars and bars)\b",
+            lower,
+        )
+        or "[[" in lower
+        or "%" in lower
+    )
     if parietal_cues:
         from parietal_lobe.math.cognitive import route_parietal_math
 

@@ -460,9 +460,7 @@ class ParietalMath:
         """The product of two bracketed matrices."""
         return matmul_text(a_text, b_text)
 
-    def matrix_add(
-        self, a_text: str, b_text: str, subtract: bool = False
-    ) -> LinearResult:
+    def matrix_add(self, a_text: str, b_text: str, subtract: bool = False) -> LinearResult:
         """Add or subtract matrices with matching dimensions."""
         return matrix_add_text(a_text, b_text, subtract)
 
@@ -494,9 +492,7 @@ class ParietalMath:
         """Compute the exact cross product of two 3D vectors."""
         return vector_cross_text(a_text, b_text)
 
-    def vector_add(
-        self, a_text: str, b_text: str, subtract: bool = False
-    ) -> LinearResult:
+    def vector_add(self, a_text: str, b_text: str, subtract: bool = False) -> LinearResult:
         """Add or subtract vectors of equal dimension."""
         return vector_add_text(a_text, b_text, subtract)
 

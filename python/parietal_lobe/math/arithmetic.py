@@ -109,14 +109,22 @@ _POSTFIX_WORDS = {
 }
 
 _FRACTION_DENOMINATORS = {
-    "half": 2, "halves": 2,
-    "third": 3, "thirds": 3,
-    "quarter": 4, "quarters": 4,
-    "fourth": 4, "fourths": 4,
-    "fifth": 5, "fifths": 5,
-    "sixth": 6, "sixths": 6,
-    "eighth": 8, "eighths": 8,
-    "tenth": 10, "tenths": 10,
+    "half": 2,
+    "halves": 2,
+    "third": 3,
+    "thirds": 3,
+    "quarter": 4,
+    "quarters": 4,
+    "fourth": 4,
+    "fourths": 4,
+    "fifth": 5,
+    "fifths": 5,
+    "sixth": 6,
+    "sixths": 6,
+    "eighth": 8,
+    "eighths": 8,
+    "tenth": 10,
+    "tenths": 10,
 }
 _NUMBER_WORDS = (
     set(_UNITS) | set(_TENS) | set(_SCALES) | set(_FRACTION_DENOMINATORS) | {"a", "an", "and"}

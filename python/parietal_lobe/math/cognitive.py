@@ -105,8 +105,18 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     matrix_language = any(
         term in lower
         for term in (
-            "matrix", "matrices", "determinant", "matrix rank", "rank of", "linear system",
-            "transpose", "inverse", "trace", "dot product", "inner product", "vector",
+            "matrix",
+            "matrices",
+            "determinant",
+            "matrix rank",
+            "rank of",
+            "linear system",
+            "transpose",
+            "inverse",
+            "trace",
+            "dot product",
+            "inner product",
+            "vector",
             "cross product",
         )
     )
@@ -121,9 +131,25 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     if question_arithmetic:
         candidate = question_arithmetic.group(1)
         domain_terms = (
-            "mean", "average", "median", "variance", "standard deviation", "matrix",
-            "determinant", "rank", "limit", "sin", "cos", "tan", "complex", "prime",
-            "factor", "topology", "permutation", "relation", "euler characteristic"
+            "mean",
+            "average",
+            "median",
+            "variance",
+            "standard deviation",
+            "matrix",
+            "determinant",
+            "rank",
+            "limit",
+            "sin",
+            "cos",
+            "tan",
+            "complex",
+            "prime",
+            "factor",
+            "topology",
+            "permutation",
+            "relation",
+            "euler characteristic",
         )
         question_arithmetic = (
             bool(re.search(r"\d", candidate))
@@ -172,8 +198,11 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             left, _, right = ordered_comparison.groups()
             left_value, right_value = float(left), float(right)
             result_relation = (
-                "greater" if left_value > right_value else
-                "less" if left_value < right_value else "equal"
+                "greater"
+                if left_value > right_value
+                else "less"
+                if left_value < right_value
+                else "equal"
             )
             judgment = faculty.compare(left_value, right_value)
             answer = f"{left_value:g} is {result_relation} than {right_value:g}"
@@ -247,7 +276,6 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         result = ratio_text(trig.group(1), trig.group(2).strip(" ()"))
         return _answer(result, "trigonometry")
 
-
     # Angle conversion and triangle solving share the native trig faculty.
     conversion = re.search(
         r"\b(?:convert\s+)?(.+?)\s+to\s+(degrees?|deg|radians?|rad)\b[?.!]*$",
@@ -263,10 +291,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
         side_text = re.search(r"\bsides?\b(.*)$", lower)
         sides = (
-            [
-                float(value)
-                for value in re.findall(r"(?<![\w.])-?\d+(?:\.\d+)?", side_text.group(1))
-            ]
+            [float(value) for value in re.findall(r"(?<![\w.])-?\d+(?:\.\d+)?", side_text.group(1))]
             if side_text
             else []
         )
@@ -277,9 +302,20 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     matrix_cue = any(
         word in lower
         for word in (
-            "determinant", "matrix rank", "rank of", "matrix", "matrices", "linear system",
-            "solve the system", "transpose", "inverse", "trace", "dot product",
-            "inner product", "vector", "cross product",
+            "determinant",
+            "matrix rank",
+            "rank of",
+            "matrix",
+            "matrices",
+            "linear system",
+            "solve the system",
+            "transpose",
+            "inverse",
+            "trace",
+            "dot product",
+            "inner product",
+            "vector",
+            "cross product",
         )
     )
     if matrix_cue or "[[" in text:
@@ -312,7 +348,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             second = _literal_after(text, first_end)
             if second is None:
                 return ParietalAnswer(
-                    "linear algebra", "Two 3D vector literals are required for a cross product.",
+                    "linear algebra",
+                    "Two 3D vector literals are required for a cross product.",
                     success=False,
                 )
             return _answer(vector_cross_text(matrix, second[0]), "linear algebra")
@@ -320,7 +357,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             second = _literal_after(text, first_end)
             if second is None:
                 return ParietalAnswer(
-                    "linear algebra", "Two vector literals are required for a dot product.",
+                    "linear algebra",
+                    "Two vector literals are required for a dot product.",
                     success=False,
                 )
             return _answer(vector_dot_text(matrix, second[0]), "linear algebra")
@@ -328,7 +366,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             second = _literal_after(text, first_end)
             if second is None:
                 return ParietalAnswer(
-                    "linear algebra", "Two vector literals are required for vector addition.",
+                    "linear algebra",
+                    "Two vector literals are required for vector addition.",
                     success=False,
                 )
             return _answer(
@@ -339,7 +378,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             second = _literal_after(text, first_end)
             if second is None:
                 return ParietalAnswer(
-                    "linear algebra", "Two matrix literals are required for matrix addition.",
+                    "linear algebra",
+                    "Two matrix literals are required for matrix addition.",
                     success=False,
                 )
             return _answer(
@@ -373,7 +413,6 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             return _answer(determinant_text(matrix), "linear algebra")
         if "rank" in lower:
             return _answer(rank_text(matrix), "linear algebra")
-
 
     # Abstract algebra: cycle notation is the input language of this faculty.
     has_group_words = re.search(r"\b(permutation|cycle|cycles|order of)\b", lower)
@@ -441,7 +480,6 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             "A supported complex-number expression is required.",
             success=False,
         )
-
 
     # Modular arithmetic is distinct from polynomial equation solving.
     congruence = re.search(
@@ -516,7 +554,6 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             return _answer(factor_text(values[-1]), "number theory")
         return _answer(prime_text(values[-1]), "number theory")
 
-
     # Point-in-polygon uses two explicit coordinate literals: one point,
     # followed by the polygon vertices.
     if re.search(r"\b(inside|outside)\b", lower) and "polygon" in lower:
@@ -541,7 +578,6 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         if "hull" in lower:
             return _answer(hull_text(text), "geometry")
         return _answer(area_text(text), "geometry")
-
 
     # Graph connectivity consumes explicit edge pairs; omitted vertices are
     # not inferred from the surrounding prose.
@@ -569,7 +605,6 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
                 success=False,
             )
         return _answer(relation_text(literal[0]), "discrete mathematics")
-
 
     if re.search(r"\bstirling(?: number)?\b", lower):
         from .combinatorics import stirling2

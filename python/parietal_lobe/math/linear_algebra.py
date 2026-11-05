@@ -155,10 +155,7 @@ def inverse(m: Matrix) -> Matrix | None:
     n = len(m)
     if any(len(row) != n for row in m):
         return None
-    augmented = [
-        [*row[:], *(Fraction(int(i == j)) for j in range(n))]
-        for i, row in enumerate(m)
-    ]
+    augmented = [[*row[:], *(Fraction(int(i == j)) for j in range(n))] for i, row in enumerate(m)]
     for column in range(n):
         pivot = next(
             (row for row in range(column, n) if augmented[row][column] != 0),
@@ -175,8 +172,7 @@ def inverse(m: Matrix) -> Matrix | None:
             factor = augmented[row][column]
             if factor:
                 augmented[row] = [
-                    augmented[row][j] - factor * augmented[column][j]
-                    for j in range(2 * n)
+                    augmented[row][j] - factor * augmented[column][j] for j in range(2 * n)
                 ]
     return [row[n:] for row in augmented]
 
@@ -188,9 +184,7 @@ def vector_dot(a: list[Fraction], b: list[Fraction]) -> Fraction | None:
     return sum((x * y for x, y in zip(a, b, strict=True)), Fraction(0))
 
 
-def vector_add(
-    a: list[Fraction], b: list[Fraction], sign: int = 1
-) -> list[Fraction] | None:
+def vector_add(a: list[Fraction], b: list[Fraction], sign: int = 1) -> list[Fraction] | None:
     """Add vectors, or subtract when sign is -1."""
     if len(a) != len(b):
         return None

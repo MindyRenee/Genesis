@@ -50,9 +50,7 @@ class GridState:
         if len(self.data) != self.width * self.height:
             raise ValueError("grid data length does not match dimensions")
         if any(
-            isinstance(value, bool)
-            or not isinstance(value, int)
-            or not 0 <= value < ARC_COLORS
+            isinstance(value, bool) or not isinstance(value, int) or not 0 <= value < ARC_COLORS
             for value in self.data
         ):
             raise ValueError("ARC cells must be integer palette values in [0, 15]")
@@ -81,8 +79,7 @@ class GridState:
     def as_grid(self) -> Grid:
         """Return Genesis's canonical immutable parietal grid."""
         rows = tuple(
-            self.data[row * self.width : (row + 1) * self.width]
-            for row in range(self.height)
+            self.data[row * self.width : (row + 1) * self.width] for row in range(self.height)
         )
         return Grid(rows)
 
@@ -266,9 +263,7 @@ def compute_local_betti(
     return beta_0, beta_1
 
 
-def _touches(
-    first: frozenset[tuple[int, int]], second: frozenset[tuple[int, int]]
-) -> bool:
+def _touches(first: frozenset[tuple[int, int]], second: frozenset[tuple[int, int]]) -> bool:
     """True when two components share a four-neighbor boundary."""
     if len(first) > len(second):
         first, second = second, first
@@ -331,9 +326,7 @@ class LatentState:
             return self.distance(other)
         _validate_spd_metric(metric, len(delta))
         squared = sum(
-            delta[i] * metric[i][j] * delta[j]
-            for i in range(len(delta))
-            for j in range(len(delta))
+            delta[i] * metric[i][j] * delta[j] for i in range(len(delta)) for j in range(len(delta))
         )
         return sqrt(max(0.0, squared))
 
@@ -383,9 +376,7 @@ class LatentState:
         }
 
 
-def _validate_spd_metric(
-    metric: tuple[tuple[float, ...], ...], dimensions: int
-) -> None:
+def _validate_spd_metric(metric: tuple[tuple[float, ...], ...], dimensions: int) -> None:
     """Validate symmetry and positive definiteness by Cholesky factorization."""
     if len(metric) != dimensions or any(len(row) != dimensions for row in metric):
         raise ValueError("metric dimensions must match the latent state")
@@ -427,8 +418,7 @@ def encode_graph(graph: SceneGraph) -> LatentState:
         center_x = sum(node.centroid[0] for node in nodes) / len(nodes)
         center_y = sum(node.centroid[1] for node in nodes) / len(nodes)
         mean_radius = sum(
-            hypot(node.centroid[0] - center_x, node.centroid[1] - center_y)
-            for node in nodes
+            hypot(node.centroid[0] - center_x, node.centroid[1] - center_y) for node in nodes
         ) / len(nodes)
     pair_count = len(graph.edges)
     possible_pairs = len(nodes) * (len(nodes) - 1)
@@ -461,17 +451,21 @@ def encode_graph(graph: SceneGraph) -> LatentState:
         sum(node.pixel_count for node in nodes if node.betti_1 > 0) / max(1, len(nodes)),
     ]
     vector.extend(count / area for count in counts)
-    object_sizes = sorted(
-        (node.pixel_count / area for node in nodes), reverse=True
-    )[:OBJECT_FEATURES]
-    radii = sorted(
-        (
-            hypot(node.centroid[0] - center_x, node.centroid[1] - center_y)
-            / hypot(width, height)
-            for node in nodes
-        ),
-        reverse=True,
-    )[:OBJECT_FEATURES] if nodes else []
+    object_sizes = sorted((node.pixel_count / area for node in nodes), reverse=True)[
+        :OBJECT_FEATURES
+    ]
+    radii = (
+        sorted(
+            (
+                hypot(node.centroid[0] - center_x, node.centroid[1] - center_y)
+                / hypot(width, height)
+                for node in nodes
+            ),
+            reverse=True,
+        )[:OBJECT_FEATURES]
+        if nodes
+        else []
+    )
     vector.extend(object_sizes + [0.0] * (OBJECT_FEATURES - len(object_sizes)))
     vector.extend(radii + [0.0] * (OBJECT_FEATURES - len(radii)))
     if len(vector) != FEATURE_DIMENSIONS:
@@ -498,9 +492,7 @@ class _ActionStatistics:
         for index, value in enumerate(delta):
             difference = value - self.mean_delta[index]
             self.mean_delta[index] += difference / self.samples
-            self.squared_deviation[index] += difference * (
-                value - self.mean_delta[index]
-            )
+            self.squared_deviation[index] += difference * (value - self.mean_delta[index])
 
     def epistemic_variance(self) -> tuple[float, ...]:
         if self.samples < 2:
@@ -542,7 +534,6 @@ class GoalEvidence:
         return self.state.upper() == "WIN"
 
 
-
 @dataclass(frozen=True, slots=True)
 class GoalAttractorManifold:
     """A metric neighborhood around an explicitly supplied latent goal.
@@ -557,9 +548,7 @@ class GoalAttractorManifold:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "center", tuple(self.center))
-        object.__setattr__(
-            self, "metric", tuple(tuple(row) for row in self.metric)
-        )
+        object.__setattr__(self, "metric", tuple(tuple(row) for row in self.metric))
         if not self.center or not all(isfinite(value) for value in self.center):
             raise ValueError("goal center must contain finite coordinates")
         if not isfinite(self.tolerance) or self.tolerance < 0:
@@ -571,8 +560,7 @@ class GoalAttractorManifold:
         if len(state.vector) != len(self.center):
             raise ValueError("goal and state dimensions must agree")
         delta = tuple(
-            value - center
-            for value, center in zip(state.vector, self.center, strict=True)
+            value - center for value, center in zip(state.vector, self.center, strict=True)
         )
         squared = sum(
             delta[i] * self.metric[i][j] * delta[j]
@@ -600,9 +588,7 @@ class TransitionOperator:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "bias", tuple(self.bias))
-        object.__setattr__(
-            self, "matrix", tuple(tuple(row) for row in self.matrix)
-        )
+        object.__setattr__(self, "matrix", tuple(tuple(row) for row in self.matrix))
         dimensions = len(self.bias)
         if dimensions == 0 or len(self.matrix) != dimensions:
             raise ValueError("operator output dimensions must match its bias")
@@ -640,8 +626,7 @@ class TransitionOperator:
         matrix = tuple(
             tuple(
                 sum(
-                    other.matrix[i][k] * self.matrix[k][j]
-                    - self.matrix[i][k] * other.matrix[k][j]
+                    other.matrix[i][k] * self.matrix[k][j] - self.matrix[i][k] * other.matrix[k][j]
                     for k in range(n)
                 )
                 for j in range(n)
@@ -659,9 +644,7 @@ class TransitionOperator:
 class DifferentiableOperatorSpace:
     """Finite-dimensional space of explicitly defined affine vector fields."""
 
-    def __init__(
-        self, operators: dict[str, TransitionOperator] | None = None
-    ) -> None:
+    def __init__(self, operators: dict[str, TransitionOperator] | None = None) -> None:
         self.operators = dict(operators or {})
         dimensions = {operator.dimensions for operator in self.operators.values()}
         if len(dimensions) > 1:
@@ -716,24 +699,17 @@ def _operator_coordinates(operator: TransitionOperator) -> list[float]:
     return [value for row in operator.matrix for value in row] + list(operator.bias)
 
 
-def _operator_residual(
-    vector: list[float], basis: list[list[float]]
-) -> list[float]:
+def _operator_residual(vector: list[float], basis: list[list[float]]) -> list[float]:
     residual = vector[:]
     for direction in basis:
-        projection = sum(
-            value * axis for value, axis in zip(residual, direction, strict=True)
-        )
+        projection = sum(value * axis for value, axis in zip(residual, direction, strict=True))
         residual = [
-            value - projection * axis
-            for value, axis in zip(residual, direction, strict=True)
+            value - projection * axis for value, axis in zip(residual, direction, strict=True)
         ]
     return residual
 
 
-def _extend_operator_basis(
-    basis: list[list[float]], vector: list[float], tolerance: float
-) -> None:
+def _extend_operator_basis(basis: list[list[float]], vector: list[float], tolerance: float) -> None:
     residual = _operator_residual(vector, basis)
     norm = sqrt(sum(value * value for value in residual))
     if norm > tolerance:
@@ -801,9 +777,7 @@ class ArcEnvironmentDecoder:
         )
         return nearest, _vector_distance(nearest.reference_state, state.vector)
 
-    def observe_transition(
-        self, action: str, before: LatentState, after: LatentState
-    ) -> None:
+    def observe_transition(self, action: str, before: LatentState, after: LatentState) -> None:
         """Update a local action model from a real before/action/after observation."""
         if not action or not action.strip():
             raise ValueError("action name must be non-empty")
@@ -816,20 +790,13 @@ class ArcEnvironmentDecoder:
                 return
             statistics = _ActionStatistics(before.vector)
             contexts.append(statistics)
-        delta = tuple(
-            right - left
-            for left, right in zip(before.vector, after.vector, strict=True)
-        )
+        delta = tuple(right - left for left, right in zip(before.vector, after.vector, strict=True))
         statistics.update(delta)
 
     def predict(self, action: str, state: LatentState) -> LatentPrediction | None:
         """Predict only from a sufficiently nearby observed state/action context."""
         statistics, distance = self._nearest_context(action, state)
-        if (
-            statistics is None
-            or statistics.samples == 0
-            or distance > self.CONTEXT_RADIUS
-        ):
+        if statistics is None or statistics.samples == 0 or distance > self.CONTEXT_RADIUS:
             return None
         vector = tuple(
             value + change
@@ -855,9 +822,7 @@ class ArcEnvironmentDecoder:
             evidence[action] = {
                 "samples": sample_count,
                 "contexts": len(contexts),
-                "epistemic_variance_mean": (
-                    sum(variances) / len(variances) if variances else 1.0
-                ),
+                "epistemic_variance_mean": (sum(variances) / len(variances) if variances else 1.0),
             }
         return evidence
 

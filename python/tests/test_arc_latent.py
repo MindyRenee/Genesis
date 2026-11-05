@@ -140,7 +140,6 @@ def test_goal_evidence_uses_observed_level_and_terminal_state():
     assert win.terminal_success
 
 
-
 def test_empty_board_has_a_valid_zero_object_embedding():
     state = ArcEnvironmentDecoder().encode([[0, 0], [0, 0]])
     assert state.graph.nodes == ()
@@ -149,13 +148,11 @@ def test_empty_board_has_a_valid_zero_object_embedding():
     assert all(value == 0.0 for value in state.vector[3:])
 
 
-
 def test_malformed_saved_transition_context_is_ignored():
     decoder = ArcEnvironmentDecoder(
         {"ACTION1": [{"samples": "not-a-count", "reference_state": []}]}
     )
     assert decoder.action_evidence() == {}
-
 
 
 def test_scene_graph_infers_nonzero_background_using_parietal_rule():

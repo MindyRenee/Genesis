@@ -295,9 +295,7 @@ class Arcade:
             predicted_latent = decoder.predict(move, before_latent)
             after_latent = decoder.encode(after.grid)
             prediction_error = (
-                predicted_latent.distance_to(after_latent)
-                if predicted_latent is not None
-                else None
+                predicted_latent.distance_to(after_latent) if predicted_latent is not None else None
             )
             decoder.observe_transition(move, before_latent, after_latent)
             memory.environment_model = decoder.to_dict()

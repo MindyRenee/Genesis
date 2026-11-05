@@ -95,16 +95,12 @@ def test_play_feeds_world_chemistry_waves_and_learns_levels():
     assert memory.level_paths["1"]
     assert any(e.percept and "grid" in e.percept for e in events)
     latent_events = [
-        event for event in events
-        if event.metadata and "latent_state" in event.metadata
+        event for event in events if event.metadata and "latent_state" in event.metadata
     ]
     assert latent_events
     assert latent_events[-1].metadata["latent_domain"] == "experiential_outer"
     assert latent_events[-1].metadata["latent_state"]["object_count"] == 1
-    assert any(
-        event.metadata.get("latent_prediction_error") is not None
-        for event in latent_events
-    )
+    assert any(event.metadata.get("latent_prediction_error") is not None for event in latent_events)
     assert memory.environment_model
     assert any(e.content.startswith("pressed ACTION") for e in events)
     assert any(c == CHEM_DOPAMINE and a > 0 for c, a in impulses)
