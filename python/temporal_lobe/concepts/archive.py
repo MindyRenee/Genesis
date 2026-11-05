@@ -259,11 +259,39 @@ class ConceptArchive:
                 )
         return data
 
+    def peek_edges(self, concept_id: str) -> list[dict[str, Any]]:
+        """Read archived edges touching a concept without consuming them.
+
+        Use this while reconstructing working memory. The archive copy
+        remains the durable source until the reconstructed state has
+        been saved and the duplicate rows can be acknowledged safely.
+        """
+        with self._lock:
+            if self._closed:
+                return []
+            rows = self._conn.execute(
+                "SELECT source, target, relation, weight, created_at, origin "
+                "FROM edges WHERE source = ? OR target = ?",
+                (concept_id, concept_id),
+            ).fetchall()
+        return [
+            {
+                "source": r[0],
+                "target": r[1],
+                "relation": r[2],
+                "weight": r[3],
+                "created_at": r[4],
+                "origin": r[5],
+            }
+            for r in rows
+        ]
+
     def recall_edges(self, concept_id: str) -> list[dict[str, Any]]:
         """Remove and return archived edges touching a concept.
 
-        Called when a concept is recalled to working memory so its
-        relationships come back with it.
+        This is a destructive move. Call only after a durable working-
+        memory copy exists; use :meth:`peek_edges` for inspection or
+        reconstruction that has not yet been committed.
         """
         with self._lock:
             if self._closed:
