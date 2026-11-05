@@ -2449,7 +2449,7 @@ def try_math(
     lower = question.lower().strip()
     parietal_cues = re.search(
         r"\b(calculate|compute|evaluate|what is|what's|add|subtract|multiply|divide|"
-        r"plus|minus|times|divided by|square root|sqrt|raised to|power of|percent|%|fraction|"
+        r"plus|minus|times|divided by|square root|sqrt|raised to|power of|percent|fraction|"
         r"half|halves|thirds?|quarters?|double|triple|square of|cube of|compare|greater than|less than|"
         r"larger than|smaller than|which is larger|which is greater|"
         r"which is smaller|which is less|transpose|inverse|trace|dot product|inner product|vector|cross product|"
@@ -2462,7 +2462,7 @@ def try_math(
         r"arrange|derangement|topology|euler characteristic|tautology|satisfiable|"
         r"cayley table|algebraic axioms)\b",
         lower,
-    ) or "[[" in lower
+    ) or "[[" in lower or "%" in lower
     if parietal_cues:
         from parietal_lobe.math.cognitive import route_parietal_math
 
