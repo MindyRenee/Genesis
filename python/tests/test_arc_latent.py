@@ -4,13 +4,13 @@ import pytest
 
 from worlds.games.latent import (
     ArcEnvironmentDecoder,
+    DifferentiableOperatorSpace,
     FEATURE_DIMENSIONS,
+    GoalAttractorManifold,
     GoalEvidence,
     GridState,
     SceneGraph,
-    GoalAttractorManifold,
     TransitionOperator,
-    DifferentiableOperatorSpace,
     validate_lie_bracket_closure,
 )
 
