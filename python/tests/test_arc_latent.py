@@ -19,6 +19,7 @@ def test_grid_state_rejects_ragged_and_invalid_arc_grids():
     with pytest.raises(ValueError, match="positive"):
         GridState(0, 1, ())
     assert GridState.from_rows([[2, 3]]).get(1, 0) == 3
+    assert GridState(2, 1, [2, 3]).data == (2, 3)
 
 
 def test_scene_graph_extracts_components_and_exact_enclosed_holes():
@@ -130,3 +131,11 @@ def test_empty_board_has_a_valid_zero_object_embedding():
     assert state.graph.edges == ()
     assert len(state.vector) == FEATURE_DIMENSIONS
     assert all(value == 0.0 for value in state.vector[3:])
+
+
+
+def test_malformed_saved_transition_context_is_ignored():
+    decoder = ArcEnvironmentDecoder(
+        {"ACTION1": [{"samples": "not-a-count", "reference_state": []}]}
+    )
+    assert decoder.action_evidence() == {}
