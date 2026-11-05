@@ -13,6 +13,9 @@ she learned from each level to the next (see ``DIRECTIONS.md``).
 - ``official.OfficialGames`` — the doorway to the official ARC-AGI-3
   API (https://three.arcprize.org, ``ARC_API_KEY``).
 - ``sight`` — ways to see a board: text, picture, change, objects.
+- ``latent.ArcEnvironmentDecoder`` — graph-backed structural features
+  in the typed experiential latent domain, plus action-conditioned
+  transition evidence learned only from observed board changes.
 - ``memory.GameMemory`` — what she remembers of each game, carried
   from level to level and across sessions.
 """
