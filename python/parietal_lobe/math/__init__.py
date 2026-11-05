@@ -124,10 +124,13 @@ from .linear_algebra import (
     inverse_text,
     looks_like_linear_algebra,
     matmul_text,
+    matrix_add_text,
+    matrix_scale_text,
     rank_text,
     trace_text,
     transpose_text,
     vector_add_text,
+    vector_cross_text,
     vector_dot_text,
 )
 from .linear_algebra import (
@@ -457,6 +460,16 @@ class ParietalMath:
         """The product of two bracketed matrices."""
         return matmul_text(a_text, b_text)
 
+    def matrix_add(
+        self, a_text: str, b_text: str, subtract: bool = False
+    ) -> LinearResult:
+        """Add or subtract matrices with matching dimensions."""
+        return matrix_add_text(a_text, b_text, subtract)
+
+    def matrix_scale(self, matrix_text: str, scalar_text: str) -> LinearResult:
+        """Multiply every matrix entry by an exact rational scalar."""
+        return matrix_scale_text(matrix_text, scalar_text)
+
     def solve_system(self, a_text: str, b_text: str) -> LinearResult:
         """Solve Ax = b — exact fractions."""
         return solve_system_text(a_text, b_text)
@@ -476,6 +489,10 @@ class ParietalMath:
     def vector_dot(self, a_text: str, b_text: str) -> LinearResult:
         """Compute the exact dot product of two vectors."""
         return vector_dot_text(a_text, b_text)
+
+    def vector_cross(self, a_text: str, b_text: str) -> LinearResult:
+        """Compute the exact cross product of two 3D vectors."""
+        return vector_cross_text(a_text, b_text)
 
     def vector_add(
         self, a_text: str, b_text: str, subtract: bool = False
