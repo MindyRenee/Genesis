@@ -239,7 +239,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         for word in (
             "determinant", "matrix rank", "rank of", "matrix", "linear system",
             "solve the system", "transpose", "inverse", "trace", "dot product",
-            "inner product", "vector",
+            "inner product", "vector", "cross product",
         )
     )
     if matrix_cue or "[[" in text:
@@ -247,11 +247,14 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             determinant_text,
             inverse_text,
             matmul_text,
+            matrix_add_text,
+            matrix_scale_text,
             rank_text,
             solve_text,
             trace_text,
             transpose_text,
             vector_add_text,
+            vector_cross_text,
             vector_dot_text,
         )
 
@@ -265,6 +268,14 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             return _answer(inverse_text(matrix), "linear algebra")
         if "trace" in lower:
             return _answer(trace_text(matrix), "linear algebra")
+        if "cross product" in lower:
+            second = _literal_after(text, first_end)
+            if second is None:
+                return ParietalAnswer(
+                    "linear algebra", "Two 3D vector literals are required for a cross product.",
+                    success=False,
+                )
+            return _answer(vector_cross_text(matrix, second[0]), "linear algebra")
         if "dot product" in lower or "inner product" in lower:
             second = _literal_after(text, first_end)
             if second is None:
@@ -284,6 +295,24 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
                 vector_add_text(matrix, second[0], subtract="subtract" in lower),
                 "linear algebra",
             )
+        if "matrix" in lower and ("add" in lower or "subtract" in lower):
+            second = _literal_after(text, first_end)
+            if second is None:
+                return ParietalAnswer(
+                    "linear algebra", "Two matrix literals are required for matrix addition.",
+                    success=False,
+                )
+            return _answer(
+                matrix_add_text(matrix, second[0], subtract="subtract" in lower),
+                "linear algebra",
+            )
+        if ("scale" in lower or "scalar" in lower) and "matrix" in lower:
+            scalar = re.search(r"\\bby\\s+(-?\\d+(?:/\\d+)?(?:\\.\\d+)?)\\b", lower)
+            if scalar is None:
+                return ParietalAnswer(
+                    "linear algebra", "An explicit rational scalar is required.", success=False
+                )
+            return _answer(matrix_scale_text(matrix, scalar.group(1)), "linear algebra")
         if "multiply" in lower or "matrix product" in lower:
             second = _literal_after(text, first_end)
             if second is None:
