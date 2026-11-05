@@ -114,7 +114,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             elif "variance" in lower:
                 answer = f"population variance = {summary.variance:g}"
             elif "standard deviation" in lower:
-                answer = f"population standard deviation = {summary.stddev:g}"
+                answer = f"population standard deviation = {summary.standard_deviation:g}"
             elif "summarize" in lower:
                 answer = str(summary)
             else:
