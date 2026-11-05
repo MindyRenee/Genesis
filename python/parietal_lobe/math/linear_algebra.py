@@ -341,7 +341,13 @@ def vector_cross_text(a_text: str, b_text: str) -> LinearResult:
         return LinearResult("cross", f"{a_text} × {b_text}", "", False, str(error))
     result = vector_cross(a, b)
     if result is None:
-        return LinearResult("cross", f"{a_text} × {b_text}", "", False, "cross product requires two 3D vectors")
+        return LinearResult(
+            "cross",
+            f"{a_text} × {b_text}",
+            "",
+            False,
+            "cross product requires two 3D vectors",
+        )
     rendered = "(" + ", ".join(_fmt(value) for value in result) + ")"
     return LinearResult("cross", f"{a_text} × {b_text}", rendered, True)
 
