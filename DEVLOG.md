@@ -1,3 +1,23 @@
+## 2026-11-05 — Higher-math faculty reachability audit
+
+The end-to-end entry-point audit found that several implemented native
+faculties were only partially reachable through natural-language cognition.
+Added explicit routes for angle-unit conversion and three-side triangle
+solving; complex nth roots; linear congruences, Euler's totient, and Chinese
+remainder systems; point-in-polygon queries; graph connectivity; Stirling
+numbers of the second kind; and stars-and-bars counting. The frontal cue
+boundary now admits these operation families, and modular congruences are
+kept out of the polynomial-equation route.
+
+Added cognitive-entry regression cases for each newly routed operation.
+Inputs remain explicit and validated by the existing domain faculties;
+the router does not synthesize missing vertices, congruence pairs, or
+mathematical operands.
+
+**Verification boundary:** source and tests are committed to
+`audit-fixes`; they have not yet been executed in Termux or CI during this
+remote edit session. No Genesis runtime state was accessed or modified.
+
 ## 2026-11-05 — Math routing regression audit
 
 Termux execution of `test_higher_math_cognition.py` exposed dispatch gaps that
