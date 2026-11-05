@@ -11,6 +11,10 @@ from frontal_lobe.reasoning.math_reasoning import try_math
     ("question", "expected"),
     [
         ("sin of pi/6", "1/2"),
+        ("differentiate x**3", "3*x**2"),
+        ("integral of x**2", "1/3*x**3"),
+        ("simplify x + x", "2*x"),
+        ("mean of [2, 4, 6]", "4"),
         ("determinant of [[1, 2], [3, 4]]", "-2"),
         ("order of permutation (1 2 3)", "3"),
         ("limit of sin(x)/x at 0", "1"),
