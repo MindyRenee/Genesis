@@ -12,6 +12,7 @@ from worlds.games.latent import (
     SceneGraph,
     TransitionOperator,
     validate_lie_bracket_closure,
+    compute_local_betti,
 )
 
 
@@ -41,6 +42,14 @@ def test_scene_graph_extracts_components_and_exact_enclosed_holes():
     assert ring.pixel_count == 16
     assert ring.betti_0 == 1
     assert ring.betti_1 == 1
+    assert graph.betti_0 == 1
+    assert graph.betti_1 == 1
+    assert compute_local_betti(ring_cells := frozenset(
+        (row, col)
+        for row, values in enumerate(grid)
+        for col, value in enumerate(values)
+        if value == 9
+    ), 0, 0, 4, 4) == (1, 1)
     assert ring.bbox == (0, 0, 4, 4)
 
 
