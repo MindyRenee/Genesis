@@ -123,6 +123,8 @@ _OWNERSHIP_PINS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     ("ErrorMonitor", ("frontal_lobe",), ("limbic_system", "basal_ganglia", "temporal_lobe")),
     # Deliberate multi-claims — shared anatomy.
     ("MathResult", ("frontal_lobe", "parietal_lobe"), ()),
+    ("ParietalAnswer", ("parietal_lobe",), ()),
+    ("route_parietal_math", ("parietal_lobe",), ()),
     ("GlobalWorkspace", ("frontal_lobe", "thalamus"), ()),
     ("FaceRecognizer", ("temporal_lobe", "occipital_lobe"), ()),
     # Stress axis and neuroendocrine outputs are hypothalamic.
