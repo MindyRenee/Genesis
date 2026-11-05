@@ -2493,7 +2493,7 @@ def try_math(
         registry = MathRuleRegistry.from_concept_network(network)
         enabled_rules = registry.enabled_rules
 
-    result = (
+    fallback_result = (
         # ── Computation: "what is 2 + 2?" ──
         _try_compute(lower, enabled_rules)
         # ── Bare expression: "2 + 2", "sqrt(16)" ──
@@ -2505,9 +2505,9 @@ def try_math(
         # ── Discovery: "discover patterns in primes" ──
         or _try_discover(lower)
     )
-    if result is not None and task_competence is not None:
-        _record_math_episode(task_competence, question, result, salience)
-    return result
+    if fallback_result is not None and task_competence is not None:
+        _record_math_episode(task_competence, question, fallback_result, salience)
+    return fallback_result
 
 
 def _try_compute(lower: str, enabled_rules: set[str] | None) -> MathResult | None:

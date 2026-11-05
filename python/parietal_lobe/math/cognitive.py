@@ -127,9 +127,9 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         r"double|triple|square of|cube of)\b",
         lower,
     )
-    question_arithmetic = re.match(r"^(?:what is|what's)\s+(.+)$", lower)
-    if question_arithmetic:
-        candidate = question_arithmetic.group(1)
+    question_arithmetic_match = re.match(r"^(?:what is|what's)\s+(.+)$", lower)
+    if question_arithmetic_match is not None:
+        candidate = question_arithmetic_match.group(1)
         domain_terms = (
             "mean",
             "average",
@@ -151,7 +151,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             "relation",
             "euler characteristic",
         )
-        question_arithmetic = (
+        is_question_arithmetic = (
             bool(re.search(r"\d", candidate))
             and bool(
                 re.search(
@@ -162,13 +162,19 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             and not any(term in candidate for term in domain_terms)
         )
     else:
-        question_arithmetic = False
-    arithmetic_expression = not re.search(r"[a-zA-Z]", lower) and re.search(
-        r"\d\s*[+*/%^()]|[+*/%^()]\s*\d", lower
+        is_question_arithmetic = False
+    arithmetic_expression = (
+        not re.search(r"[a-zA-Z]", lower)
+        and bool(re.search(r"\d\s*[+*/%^()]|[+*/%^()]\s*\d", lower))
     )
     symbolic_input = re.search(r"\b(?:[t-z]|pi|e)\b", lower)
     if (
-        (arithmetic_cue or arithmetic_expression or question_arithmetic or arithmetic_text != text)
+        (
+            arithmetic_cue
+            or arithmetic_expression
+            or is_question_arithmetic
+            or arithmetic_text != text
+        )
         and not symbolic_input
         and not matrix_language
     ):
@@ -193,8 +199,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         r"\bis\s+(-?\d+(?:\.\d+)?)\s+(greater|larger|less|smaller)\s+than\s+(-?\d+(?:\.\d+)?)\b",
         lower,
     )
-    if comparison or ordered_comparison:
-        if ordered_comparison:
+    if comparison is not None or ordered_comparison is not None:
+        if ordered_comparison is not None:
             left, _, right = ordered_comparison.groups()
             left_value, right_value = float(left), float(right)
             result_relation = (
@@ -207,6 +213,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             judgment = faculty.compare(left_value, right_value)
             answer = f"{left_value:g} is {result_relation} than {right_value:g}"
         else:
+            assert comparison is not None
             left, right = map(float, comparison.groups())
             judgment = faculty.compare(left, right)
             answer = f"{judgment.a:g} is {judgment.relation} than {judgment.b:g}"
@@ -273,8 +280,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     if trig and "limit" not in lower and any(token in lower for token in ("sin", "cos", "tan")):
         from .trig import ratio_text
 
-        result = ratio_text(trig.group(1), trig.group(2).strip(" ()"))
-        return _answer(result, "trigonometry")
+        trig_result = ratio_text(trig.group(1), trig.group(2).strip(" ()"))
+        return _answer(trig_result, "trigonometry")
 
     # Angle conversion and triangle solving share the native trig faculty.
     conversion = re.search(
@@ -418,11 +425,12 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     has_group_words = re.search(r"\b(permutation|cycle|cycles|order of)\b", lower)
     has_cycle_literal = re.search(r"\(\s*\d+(?:\s+\d+)+\s*\)", lower)
     if has_group_words and has_cycle_literal:
-        from .abstract_algebra import describe_text, order_text
+        from .abstract_algebra import describe_text as describe_permutation_text
+        from .abstract_algebra import order_text
 
         if "order" in lower:
             return _answer(order_text(text), "abstract algebra")
-        return _answer(describe_text(text), "abstract algebra")
+        return _answer(describe_permutation_text(text), "abstract algebra")
 
     # Real analysis: explicit point of approach is required for a limit.
     limit = re.search(
@@ -443,7 +451,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             lower,
         )
     ):
-        from .complex_analysis import describe_text, power_text, roots_unity_text
+        from .complex_analysis import describe_text as describe_complex_text
+        from .complex_analysis import power_text, roots_unity_text
 
         root_match = re.search(
             r"\b(\d+)(?:st|nd|rd|th)\s+roots?\s+of\s+(.+?)[?.!]*$",
@@ -474,7 +483,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             return _answer(power_text(power.group(1), int(power.group(2))), "complex analysis")
         value = re.search(r"([+-]?\d+(?:\.\d+)?\s*[+-]\s*\d+(?:\.\d+)?i)", lower)
         if value:
-            return _answer(describe_text(value.group(1)), "complex analysis")
+            return _answer(describe_complex_text(value.group(1)), "complex analysis")
         return ParietalAnswer(
             "complex analysis",
             "A supported complex-number expression is required.",
@@ -507,8 +516,12 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             return ParietalAnswer(
                 "number theory", "Totient is defined here for positive integers.", success=False
             )
-        value = totient(n)
-        return ParietalAnswer("number theory", f"φ({n}) = {value}", [f"φ({n}) = {value}"])
+        totient_value = totient(n)
+        return ParietalAnswer(
+            "number theory",
+            f"φ({n}) = {totient_value}",
+            [f"φ({n}) = {totient_value}"],
+        )
     if "chinese remainder" in lower or re.search(r"\bcrt\b", lower):
         from .number_theory import crt_text
 
@@ -619,8 +632,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             return ParietalAnswer(
                 "combinatorics", "Require integers with 0 ≤ k ≤ n.", success=False
             )
-        value = stirling2(n, k)
-        return ParietalAnswer("combinatorics", f"S({n}, {k}) = {value}")
+        stirling_value = stirling2(n, k)
+        return ParietalAnswer("combinatorics", f"S({n}, {k}) = {stirling_value}")
     if "stars and bars" in lower:
         from .combinatorics import stars_bars
 
@@ -636,10 +649,10 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             return ParietalAnswer(
                 "combinatorics", "Require objects ≥ 0 and bins ≥ 1.", success=False
             )
-        value = stars_bars(objects, bins)
+        stars_bars_value = stars_bars(objects, bins)
         return ParietalAnswer(
             "combinatorics",
-            f"C({objects + bins - 1}, {bins - 1}) = {value}",
+            f"C({objects + bins - 1}, {bins - 1}) = {stars_bars_value}",
         )
 
     # Combinatorics: choose/arrange/derange are unambiguous operation names.

@@ -1,3 +1,24 @@
+## 2026-11-05 — Python mathematics routing type repair
+
+The latest CI run failed its mypy step with nine errors across the frontal
+math entry point and the parietal cognitive router. The failures came from
+reusing local names for values with different types, leaving a regex match
+insufficiently narrowed, and assigning an optional fallback result to a
+variable already inferred as a non-optional frontal result.
+
+Separated the fallback result from the parietal result, gave regex matches,
+boolean predicates, and domain-faculty outputs distinct names, explicitly
+narrowed the optional comparison match, and aliased the abstract-algebra and
+complex-analysis description functions. Added focused end-to-end regression
+coverage for number comparison, trigonometry, abstract algebra, complex
+analysis, number theory, and combinatorics. No faculty, mathematical
+operation, or static-analysis check was removed or weakened.
+
+**Verification boundary:** source corrections and regression tests are
+committed to `audit-fixes`. The previous CI failure is understood; the
+corrected code still requires a fresh mypy run and the full required workflow.
+No Genesis runtime state was accessed or modified.
+
 ## 2026-11-05 — Higher-math faculty reachability audit
 
 The end-to-end entry-point audit found that several implemented native
@@ -762,3 +783,21 @@ Focused tests were added for nonzero background inference, metric geometry,
 goal-attractor membership, affine operator application, Lie brackets, and
 closure. **Verification is pending**: these remote source updates have not
 been executed in a Termux checkout. No test-pass claim is made.
+
+
+## 2026-11-05 — Parietal math routing and ARC topology test corrections
+
+- Exported `ParietalAnswer` and `route_parietal_math` from the parietal
+  regional facade. The cognitive router is an actual parietal-owned entry
+  point, not an undocumented support module; regional wiring pins now
+  verify that ownership.
+- Made the ring-topology test declare its background color explicitly.
+  Its fixture uses color 9 for all 16 border cells and color 0 for the
+  nine enclosed cells, so the mode-based default correctly selects 9
+  under the parser's documented rule. The test's intended question is
+  whether color 9 has one component and one enclosed hole when color 0
+  is designated as background; the fixture now states that condition
+  rather than contradicting the default background contract.
+- No parser heuristic, mathematical faculty, or ARC latent feature was
+  removed or weakened.
+- Verification remains pending on the resulting `audit-fixes` head.

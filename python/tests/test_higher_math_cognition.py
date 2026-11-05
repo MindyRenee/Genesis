@@ -82,6 +82,29 @@ def test_cognitive_entry_point_reaches_native_parietal_faculty(question: str, ex
     assert expected in result.answer
 
 
+
+@pytest.mark.parametrize(
+    ("question", "operation", "expected"),
+    [
+        ("compare 3 and 9", "number sense", "3 is less than 9"),
+        ("is 5 greater than 3", "number sense", "5 is greater than 3"),
+        ("sin of pi/6", "trigonometry", "1/2"),
+        ("order of permutation (1 2 3)", "abstract algebra", "3"),
+        ("describe complex number 3+4i", "complex analysis", "|z| = 5"),
+        ("totient of 9", "number theory", "φ(9) = 6"),
+        ("Stirling number S(5,2)", "combinatorics", "S(5, 2) = 15"),
+    ],
+)
+def test_domain_result_types_remain_isolated(
+    question: str, operation: str, expected: str
+):
+    result = try_math(question)
+    assert result is not None
+    assert result.success
+    assert result.result_type == operation
+    assert expected in result.answer
+
+
 def test_triangle_route_rejects_extra_side_values():
     result = try_math("triangle with sides 3, 4, 5, 6")
     assert result is not None
