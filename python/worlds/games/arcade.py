@@ -18,9 +18,13 @@ rest of her world already uses:
   parser and grounded in her concept network, becomes an episodic
   memory when salient, and is queued for dream replay. Every move is
   recorded through ``OuterWorld.it_acted``.
-- **learning** — ``GameMemory`` keeps action effects, TD values and
-  the paths that opened each level, carried across levels and saved
-  with her world.
+- **structural latent decoding** — ``ArcEnvironmentDecoder`` turns each
+  board into a stable object graph and typed outer-`E` feature state.
+  It learns local action-conditioned transitions from observed
+  before/action/after triples and records prediction error.
+- **learning** — ``GameMemory`` keeps action effects, TD values, latent
+  transition statistics and the paths that opened each level, carried
+  across levels and saved with her world.
 - **emotion and chemicals** — progress, surprise and setbacks reach
   her neurochemistry through the world's impulse path (dopamine from
   the TD error and level-ups, endorphin on a win, norepinephrine and
