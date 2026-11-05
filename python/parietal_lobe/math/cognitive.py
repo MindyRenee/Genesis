@@ -91,6 +91,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         (r"\bhalf\s+of\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"\1 / 2"),
         (r"\bdouble\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"\1 * 2"),
         (r"\btriple\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"\1 * 3"),
+        (r"\bsquare\s+root\s+of\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"sqrt(\1)"),
+        (r"(-?\d+(?:\.\d+)?)\s+to\s+the\s+power\s+of\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"\1 ** \2"),
         (r"\bsquare\s+of\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"\1 ** 2"),
         (r"\bcube\s+of\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"\1 ** 3"),
     )
