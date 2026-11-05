@@ -108,6 +108,8 @@ class SceneGraph:
     @classmethod
     def extract(cls, state: GridState, background: int = 0) -> SceneGraph:
         """Use Genesis's scene parser, then enrich components with topology."""
+        if not 0 <= background < ARC_COLORS:
+            raise ValueError("background must be an ARC palette value in [0, 15]")
         grid = state.as_grid()
         scene = perceive(grid, background=background, compute_relations=False)
         objects = sorted(
@@ -469,10 +471,9 @@ class ArcEnvironmentDecoder:
             raise ValueError("transition latent dimensions must agree")
         contexts = self._actions.setdefault(action, [])
         statistics, distance = self._nearest_context(action, before)
-        if statistics is None or (
-            distance > self.CONTEXT_RADIUS
-            and len(contexts) < self.MAX_CONTEXTS_PER_ACTION
-        ):
+        if statistics is None or distance > self.CONTEXT_RADIUS:
+            if len(contexts) >= self.MAX_CONTEXTS_PER_ACTION:
+                return
             statistics = _ActionStatistics(before.vector)
             contexts.append(statistics)
         delta = tuple(
