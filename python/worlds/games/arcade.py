@@ -47,6 +47,7 @@ from typing import Any
 
 from worlds.games import sight
 from worlds.games.directions import RULES, directions
+from worlds.games.latent import ArcEnvironmentDecoder, GoalEvidence, LatentState
 from worlds.games.memory import (
     REWARD_GAME_OVER,
     REWARD_LEVEL,
@@ -144,6 +145,7 @@ class Arcade:
         self._offered_at = 0.0
         self.session: GameSession | None = None
         self.memories: dict[str, GameMemory] = {}
+        self._decoders: dict[str, ArcEnvironmentDecoder] = {}
         self.last_error = ""
         self.visits = 0
         world.arcade = self
@@ -284,6 +286,17 @@ class Arcade:
             if after is None:
                 return None
             change = sight.see_change(before.grid, after.grid)
+            decoder = self._decoder(session.game_id)
+            before_latent = decoder.encode(before.grid)
+            after_latent = decoder.encode(after.grid)
+            decoder.observe_transition(name, before_latent, after_latent)
+            memory.environment_model = decoder.to_dict()
+            goal_evidence = GoalEvidence(
+                after.state,
+                before.levels_completed,
+                after.levels_completed,
+                change.count,
+            )
             new = memory.see(sight.signature(after.grid))
             reward = REWARD_NEW_BOARD if new and change.count else REWARD_NOTHING
             levelled = after.levels_completed > before.levels_completed
@@ -304,7 +317,9 @@ class Arcade:
             self.world.it_acted(f"pressed {move} in {session.game_id}", detail=change.describe())
             self._wave("beta2", 0.05)
             self._impulse(CHEM_DOPAMINE, max(-0.05, min(0.05, 0.05 * rpe)))
-            self._perceive(after, change, new=new)
+            self._perceive(
+                after, change, new=new, latent=after_latent, goal_evidence=goal_evidence
+            )
             if levelled:
                 memory.level_up(after.levels_completed)
                 self._celebrate(session.game_id, after)
@@ -526,8 +541,28 @@ class Arcade:
             memory = self.memories[game_id] = GameMemory(game_id)
         return memory
 
-    def _perceive(self, board: Board, change: sight.Change, *, new: bool) -> None:
-        """Let the board reach her through the world, with its feeling."""
+    def _decoder(self, game_id: str) -> ArcEnvironmentDecoder:
+        """The graph encoder and empirical action model for one game."""
+        decoder = self._decoders.get(game_id)
+        if decoder is None:
+            decoder = ArcEnvironmentDecoder(self._memory(game_id).environment_model)
+            self._decoders[game_id] = decoder
+        return decoder
+
+    def _perceive(
+        self,
+        board: Board,
+        change: sight.Change,
+        *,
+        new: bool,
+        latent: LatentState | None = None,
+        goal_evidence: GoalEvidence | None = None,
+    ) -> None:
+        """Send the grid and its graph-backed latent representation into the world."""
+        decoder = self._decoder(board.game_id)
+        latent = latent or decoder.encode(board.grid)
+        memory = self._memory(board.game_id)
+        memory.environment_model = decoder.to_dict()
         salience = 0.45 + (0.15 if new else 0.0) + min(0.2, change.count / 400)
         if new:
             self._impulse(CHEM_NOREPINEPHRINE, 0.01)
@@ -544,6 +579,18 @@ class Arcade:
                 "win_levels": board.win_levels,
                 "changed_cells": change.count,
                 "new_board": new,
+                "latent_state": latent.to_dict(),
+                "action_dynamics": decoder.action_evidence(),
+                "goal_evidence": (
+                    {
+                        "state": goal_evidence.state,
+                        "level_progress": goal_evidence.level_progress,
+                        "terminal_success": goal_evidence.terminal_success,
+                        "changed_cells": goal_evidence.changed_cells,
+                    }
+                    if goal_evidence is not None
+                    else None
+                ),
             },
             percept={"grid": board.grid},
         )
