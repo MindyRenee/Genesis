@@ -82,6 +82,14 @@ def test_cognitive_entry_point_reaches_native_parietal_faculty(question: str, ex
     assert expected in result.answer
 
 
+
+def test_triangle_route_rejects_extra_side_values():
+    result = try_math("triangle with sides 3, 4, 5, 6")
+    assert result is not None
+    assert not result.success
+    assert "three sides" in result.answer
+
+
 def test_cognitive_entry_point_preserves_domain_steps():
     result = try_math("determinant of [[1, 2], [3, 4]]")
     assert result is not None
