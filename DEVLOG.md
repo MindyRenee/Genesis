@@ -1,3 +1,28 @@
+## 2026-11-05 — Temporal grounding enters the cognitive attention stream
+
+The comprehension stage already produced `GroundedProposition` bindings
+from utterance arguments to existing concept IDs, but the turn sequencer
+did not pass those bindings into perception. As a result, grounding was
+computed and retained on `ComprehensionResult` without influencing the
+topic stream consumed by memory retrieval, attention, and reasoning.
+
+The turn handoff now passes the same turn's comprehension result into
+the perception stage. The prefrontal integration adds only already-bound,
+non-structural concept IDs to `Perception.topics`, deduplicating against
+the surface-topic output. Unknown arguments remain unresolved and are not
+minted as concepts. This makes temporal semantic binding available to the
+downstream cognitive faculties without replacing independent perception.
+
+Added an integration regression test that suppresses the independent
+surface-topic extractor and verifies that a known multiword concept still
+reaches the downstream topic stream through semantic grounding.
+
+**Verification boundary:** source and test changes are committed to
+`audit-fixes`. The test has not been executed in this remote edit session;
+no CI result has been established. The test's parser and grounding
+preconditions were checked against the source, but runtime behavior remains
+to be verified by the required test suite.
+
 ## 2026-11-05 — Archive continuity and fail-closed maintenance audit
 
 A persistence-path audit found that two maintenance fallbacks could delete
