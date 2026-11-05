@@ -2962,6 +2962,14 @@ class ConceptNetwork(
                 e,
             )
             return []
+        if archived != len(items):
+            logger.error(
+                "clean_noise archived %d of %d noise concepts; "
+                "leaving them in working memory rather than deleting them",
+                archived,
+                len(items),
+            )
+            return []
 
         archived_ids = {cid for cid, _, _ in items}
         if not self._archive_spilled_edges(archived_ids):
