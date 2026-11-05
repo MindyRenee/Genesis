@@ -142,17 +142,27 @@ class SceneGraph:
             for target, second in enumerate(nodes):
                 if source == target:
                     continue
-                edges.append(
-                    SceneEdge(
-                        source=source,
-                        target=target,
-                        dx=second.centroid[0] - first.centroid[0],
-                        dy=second.centroid[1] - first.centroid[1],
-                        adjacency=_touches(object_cells[source], object_cells[target]),
-                        same_color=first.color == second.color,
-                        same_shape=first.shape_signature == second.shape_signature,
+                left_a, top_a, right_a, bottom_a = first.bbox
+                left_b, top_b, right_b, bottom_b = second.bbox
+                if (
+                    left_a > right_b + 1
+                    or left_b > right_a + 1
+                    or top_a > bottom_b + 1
+                    or top_b > bottom_a + 1
+                ):
+                    continue
+                if _touches(object_cells[source], object_cells[target]):
+                    edges.append(
+                        SceneEdge(
+                            source=source,
+                            target=target,
+                            dx=second.centroid[0] - first.centroid[0],
+                            dy=second.centroid[1] - first.centroid[1],
+                            adjacency=True,
+                            same_color=first.color == second.color,
+                            same_shape=first.shape_signature == second.shape_signature,
+                        )
                     )
-                )
         return cls(state.width, state.height, background, tuple(nodes), tuple(edges))
 
 
@@ -242,6 +252,18 @@ class LatentState:
             "relation_count": len(self.graph.edges),
             "width": self.graph.width,
             "height": self.graph.height,
+            "objects": [
+                {
+                    "id": node.id,
+                    "color": node.color,
+                    "centroid": node.centroid,
+                    "pixel_count": node.pixel_count,
+                    "bbox": node.bbox,
+                    "betti_0": node.betti_0,
+                    "betti_1": node.betti_1,
+                }
+                for node in self.graph.nodes[:128]
+            ],
         }
 
 
@@ -265,9 +287,8 @@ def encode_graph(graph: SceneGraph) -> LatentState:
             for node in nodes
         ) / len(nodes)
     pair_count = len(graph.edges)
-    adjacency_ratio = (
-        sum(edge.adjacency for edge in graph.edges) / pair_count if pair_count else 0.0
-    )
+    possible_pairs = len(nodes) * (len(nodes) - 1)
+    adjacency_ratio = len(graph.edges) / possible_pairs if possible_pairs else 0.0
     same_color_ratio = (
         sum(edge.same_color for edge in graph.edges) / pair_count if pair_count else 0.0
     )
