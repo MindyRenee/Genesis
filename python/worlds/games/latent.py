@@ -332,7 +332,7 @@ class LatentState:
             for i in range(len(delta))
             for j in range(len(delta))
         )
-        return sqrt(max(0.0, squared)))
+        return sqrt(max(0.0, squared))
 
     def to_experiential_latent(self) -> DomainLatentState:
         """Project the board features into Genesis's typed outer E domain."""
