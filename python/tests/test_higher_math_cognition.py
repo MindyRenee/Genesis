@@ -12,6 +12,8 @@ from frontal_lobe.reasoning.math_reasoning import try_math
     [
         ("sin of pi/6", "1/2"),
         ("what is 2 + 2", "4"),
+        ("seven plus five", "12"),
+        ("25% of 80", "20"),
         ("add 2 and 3", "5"),
         ("subtract 3 from 10", "7"),
         ("multiply 4 by 5", "20"),
