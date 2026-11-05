@@ -119,7 +119,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             "factor", "topology", "permutation", "relation", "euler characteristic"
         )
         question_arithmetic = (
-            bool(re.search(r"\\d", candidate))
+            bool(re.search(r"\d", candidate))
             and bool(
                 re.search(
                     r"[+*/%^]|\b(plus|minus|times|divided|percent|power|sqrt)\b",
