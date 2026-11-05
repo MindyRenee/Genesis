@@ -78,27 +78,51 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
     faculty = ParietalMath()
 
+    # Foundational arithmetic: only explicit calculation language or
+    # operator-bearing expressions enter the exact arithmetic faculty.
+    arithmetic_cue = re.search(
+        r"\b(calculate|compute|evaluate|what is|what's|add|subtract|"
+        r"multiply|divide|plus|minus|times|divided by|square root|sqrt|"
+        r"raised to|power of)\b",
+        lower,
+    )
+    arithmetic_expression = re.search(r"\d\s*[+*/%^()]|[+*/%^()]\s*\d", lower)
+    if arithmetic_cue or arithmetic_expression:
+        result = faculty.evaluate(text)
+        if result.ok:
+            return ParietalAnswer(
+                "arithmetic",
+                str(result.value),
+                [f"{result.expression} = {result.value}"],
+            )
+        if arithmetic_cue and result.error != "no arithmetic found":
+            return ParietalAnswer("arithmetic", result.error, [result.expression], success=False)
+
+    # Basic number sense compares magnitudes without pretending its
+    # approximate faculty is exact arithmetic outside the subitizing range.
+    comparison = re.search(
+        r"\b(?:compare|which is larger|which is greater|which is smaller|"
+        r"which is less)\b.*?(-?\d+(?:\.\d+)?).*?(-?\d+(?:\.\d+)?)",
+        lower,
+    )
+    if comparison:
+        left, right = map(float, comparison.groups())
+        judgment = faculty.compare(left, right)
+        return ParietalAnswer(
+            "number sense",
+            f"{judgment.a:g} is {judgment.relation} than {judgment.b:g}",
+            [f"confidence={judgment.confidence:.3f}", f"exact={judgment.exact}"],
+        )
+
     # Symbolic algebra and calculus retain their native expression trees.
-    if re.search(r"\b(simplify|expand|factor(?:ize)?)\b", lower) and re.search(r"[a-zA-Z]", lower):
+    if re.search(r"\b(simplify|expand|factor(?:ize)?|solve)\b", lower) and re.search(r"[a-zA-Z]", lower):
         if re.search(r"\bsimplify\b", lower):
             return _answer(faculty.simplify(text), "algebra")
         if re.search(r"\bexpand\b", lower):
             return _answer(faculty.expand(text), "algebra")
+        if re.search(r"\bsolve\b", lower):
+            return _answer(faculty.solve(text), "algebra")
         return _answer(faculty.factor(text), "algebra")
-
-    definite_integral = re.search(
-        r"\bintegral\s+of\s+(.+?)\s+from\s+(-?\d+(?:\.\d+)?)\s+to\s+(-?\d+(?:\.\d+)?)",
-        lower,
-    )
-    if definite_integral:
-        expression, lo, hi = definite_integral.groups()
-        return _answer(faculty.integrate_between(expression, float(lo), float(hi)), "calculus")
-    derivative = re.search(r"\b(?:differentiate|derivative\s+of)\s+(.+?)[?.!]*$", lower)
-    if derivative:
-        return _answer(faculty.differentiate(derivative.group(1)), "calculus")
-    integral = re.search(r"\bintegral\s+of\s+(.+?)[?.!]*$", lower)
-    if integral:
-        return _answer(faculty.integrate(integral.group(1)), "calculus")
 
     # Statistics accepts an explicit numeric collection; it never invents
     # a sample from surrounding prose.
