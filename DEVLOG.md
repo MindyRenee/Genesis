@@ -1,3 +1,36 @@
+## 2026-11-04 — Man-page audit: optic, vision, and mathematical faculties
+
+Reconciled the manuals against the current Android Camera2 adapter,
+daemon optic mapping, mind-side perception modules, parietal math
+package, and research workbench. Added `genesis-vision.7` to describe
+the shared Linux/Android optic path, physical-camera configuration
+limits, software illumination and ocular models, face detection versus
+identity matching, and image-quality limitations. Corrected the daemon
+and launcher manuals to remove the retired standalone-retina process
+and obsolete `/genesis_retina` contract; retained
+`genesis-retina.1` only as an explicit compatibility notice.
+
+Expanded `genesis-math.7` to inventory the native algebra, calculus,
+statistics, trigonometry, linear algebra, abstract algebra, real and
+complex analysis, number theory, topology, geometry, discrete
+mathematics, combinatorics, axiom checking, and propositional-proof
+faculties. It distinguishes those endogenous faculties from the
+optional SymPy verification oracle and records their actual limits.
+Corrected the research workbench module docstring: symbolic
+inequalities can be judged; bounded equality passes remain evidence,
+not universal proof. The CLI manual now describes screen look-up,
+inactive site-approval commands under the current all-domains policy,
+and the difference between full text exploration and the automatic
+man-page NAME-section genus pass.
+
+**Verification boundary:** documentation and source descriptions were
+cross-checked against the `audit-fixes` tree, and internal man-page
+references were checked for targets. No Python, Rust, Android, or
+physical-device test suite was run for this documentation-focused
+change. The installer preserves an existing instance's installed
+manuals and stages changed pages for Genesis's review rather than
+silently overwriting her copies.
+
 ## 2026-11-04 — Android optic adapter selects the intended camera
 
 The Android Camera2 adapter previously hard-coded `LENS_FACING_BACK` and
