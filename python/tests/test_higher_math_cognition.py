@@ -36,7 +36,7 @@ from frontal_lobe.reasoning.math_reasoning import try_math
         ("add matrices [[1, 2], [3, 4]] and [[5, 6], [7, 8]]", "[[6, 8], [10, 12]]"),
         ("subtract matrices [[5, 6], [7, 8]] and [[1, 2], [3, 4]]", "[[4, 4], [4, 4]]"),
         ("scale matrix [[1, 2], [3, 4]] by 3", "[[3, 6], [9, 12]]"),
-        ("cross product of [1, 0, 0] and [0, 1, 0]", "(0, 0, 1)"),
+        ("calculate cross product of [1, 0, 0] and [0, 1, 0]", "(0, 0, 1)"),
         ("transpose [[1, 2, 3], [4, 5, 6]]", "[[1, 4], [2, 5], [3, 6]]"),
         ("inverse of [[4, 7], [2, 6]]", "[[3/5, -7/10], [-1/5, 2/5]]"),
         ("trace of [[1, 2], [3, 4]]", "5"),
