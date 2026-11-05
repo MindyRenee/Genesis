@@ -224,11 +224,14 @@ tested points passed.
 .SH ENTRY POINTS
 .TP
 .B ParietalMath
-The facade for the parietal faculties. It exposes operation
-detectors and methods for arithmetic, algebra, calculus, statistics,
-trigonometry, linear algebra, abstract algebra, real analysis,
-complex analysis, number theory, topology, geometry, discrete
-mathematics, combinatorics, axioms, and propositional proof.
+The parietal faculty API. Its domain methods are reached from the
+frontal mathematical entry point through
+.I parietal_lobe.math.cognitive.route_parietal_math .
+Explicitly supported language forms dispatch to the native algebra,
+calculus, statistics, trigonometry, linear algebra, abstract algebra,
+real analysis, complex analysis, number theory, geometry, discrete
+mathematics, combinatorics, topology, and axiom-classification
+faculties. Unsupported or underspecified forms are not guessed.
 .TP
 .B parietal_lobe.math
 The package-level exports, result types, and domain detectors.
@@ -241,7 +244,7 @@ The persistent mathematical research workbench.
 .SH FILES
 .TP
 .I python/parietal_lobe/math/
-The native mathematical faculties and the optional symbolic oracle.
+The native mathematical faculties, their cognitive router, and the optional symbolic oracle.
 .TP
 .I src/math/
 Rust mathematical modules corresponding to the parietal domains.
@@ -254,17 +257,26 @@ verification.
 Tests for the native algebra, calculus, and higher mathematical
 faculties.
 .TP
+.I python/tests/test_higher_math_cognition.py
+End-to-end tests proving that the frontal math entry point reaches
+selected native parietal faculties.
+.TP
 .I python/tests/test_research_math.py
 Tests for symbolic verification and the research workbench.
 .TP
 .I python/tests/test_statistics.py
 Tests for statistical measures and sampling behavior.
 .SH LIMITATIONS
-A listed faculty or callable method establishes an implemented
-interface, not that every natural-language conversation
-automatically routes every problem to it. The facade exposes the
-domain methods; automatic cognitive dispatch must be assessed
-separately.
+The frontal reasoning entry point calls the parietal cognitive router
+before the narrower arithmetic/algebra solver. The router supports
+only explicit operation forms implemented in
+.I python/parietal_lobe/math/cognitive.py .
+This is not unrestricted mathematical language understanding: each
+domain still requires its documented operand syntax, and a missing
+operand produces an honest failure rather than an invented value.
+The propositional-proof faculty currently accepts structured
+proposition trees; it does not parse arbitrary natural-language
+proof statements.
 .PP
 Algebraic solving has supported closed-form cases and a numerical
 root-search fallback; a numerical root is an approximation.
