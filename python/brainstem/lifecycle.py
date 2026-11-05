@@ -806,13 +806,14 @@ class LifecycleMixin:
     def restore_archive(self) -> int:
         """Recall all archived concepts back into working memory.
 
-        The inverse of :meth:`_archive_dormant_concepts` — loads every
-        concept from the long-term archive back into the in-memory
-        network. After this call, the archive is empty and all
-        concepts are in working memory.
+        Loads every archived concept into the in-memory network while
+        retaining the archive's durable copy. The archive is deduplicated
+        only after a later cognitive-state restore has validated a saved
+        working-memory copy.
 
         Use this before a bulk analysis pass that needs the full
-        concept network, or to reset the working/archive split.
+        concept network. Retaining the archive copy protects against a
+        process failure before the reconstructed network is saved.
         """
         try:
             network = self.brain.frontal.network
