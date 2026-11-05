@@ -102,7 +102,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
     matrix_language = any(
         term in lower
-        for term in ("matrix", "determinant", "matrix rank", "rank of", "linear system")
+        for term in ("matrix", "determinant", "matrix rank", "rank of", "linear system", "transpose", "inverse", "trace", "dot product", "inner product", "vector")
     )
     arithmetic_cue = re.search(
         r"\b(calculate|compute|evaluate|add|subtract|"
@@ -110,7 +110,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
         r"raised to|power of|percent|half|double|triple|square of|cube of)\b",
         lower,
     )
-    question_arithmetic = re.match(r"^(?:what is|what's)\\s+(.+)$", lower)
+    question_arithmetic = re.match(r"^(?:what is|what's)\s+(.+)$", lower)
     if question_arithmetic:
         candidate = question_arithmetic.group(1)
         domain_terms = (
@@ -232,16 +232,53 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     matrix_cue = any(
         word in lower
         for word in (
-            "determinant", "matrix rank", "rank of", "matrix", "linear system", "solve the system"
+            "determinant", "matrix rank", "rank of", "matrix", "linear system",
+            "solve the system", "transpose", "inverse", "trace", "dot product",
+            "inner product", "vector",
         )
     )
     if matrix_cue or "[[" in text:
-        from .linear_algebra import determinant_text, matmul_text, rank_text, solve_text
+        from .linear_algebra import (
+            determinant_text,
+            inverse_text,
+            matmul_text,
+            rank_text,
+            solve_text,
+            trace_text,
+            transpose_text,
+            vector_add_text,
+            vector_dot_text,
+        )
 
         first = _literal_after(text)
         if first is None:
             return ParietalAnswer("linear algebra", "A matrix literal is required.", success=False)
         matrix, first_end = first
+        if "transpose" in lower:
+            return _answer(transpose_text(matrix), "linear algebra")
+        if "inverse" in lower:
+            return _answer(inverse_text(matrix), "linear algebra")
+        if "trace" in lower:
+            return _answer(trace_text(matrix), "linear algebra")
+        if "dot product" in lower or "inner product" in lower:
+            second = _literal_after(text, first_end)
+            if second is None:
+                return ParietalAnswer(
+                    "linear algebra", "Two vector literals are required for a dot product.",
+                    success=False,
+                )
+            return _answer(vector_dot_text(matrix, second[0]), "linear algebra")
+        if "vector" in lower and ("add" in lower or "subtract" in lower):
+            second = _literal_after(text, first_end)
+            if second is None:
+                return ParietalAnswer(
+                    "linear algebra", "Two vector literals are required for vector addition.",
+                    success=False,
+                )
+            return _answer(
+                vector_add_text(matrix, second[0], subtract="subtract" in lower),
+                "linear algebra",
+            )
         if "multiply" in lower or "matrix product" in lower:
             second = _literal_after(text, first_end)
             if second is None:
