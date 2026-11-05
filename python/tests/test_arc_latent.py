@@ -37,7 +37,9 @@ def test_scene_graph_extracts_components_and_exact_enclosed_holes():
         [9, 0, 0, 0, 9],
         [9, 9, 9, 9, 9],
     ]
-    graph = SceneGraph.extract(GridState.from_rows(grid))
+    # The enclosed zero-valued region is the background for this fixture;
+    # specify it explicitly because the ring color is the grid's mode.
+    graph = SceneGraph.extract(GridState.from_rows(grid), background=0)
     ring = next(node for node in graph.nodes if node.color == 9)
     assert ring.pixel_count == 16
     assert ring.betti_0 == 1
