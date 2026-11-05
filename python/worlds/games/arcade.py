@@ -613,7 +613,7 @@ class Arcade:
                     else None
                 ),
             },
-            percept={"grid": board.grid},
+            percept={"grid": board.grid, "latent": latent.to_dict()},
         )
 
     def _celebrate(self, game_id: str, board: Board) -> None:
