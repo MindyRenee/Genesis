@@ -214,6 +214,24 @@ def test_grounded_comprehension_reaches_downstream_perception(engine, monkeypatc
     assert perception.topics == ["quantum mechanism"]
 
 
+def test_early_route_updates_discourse_situation(engine):
+    """A fast answer must update the same discourse model as a full turn."""
+    eng, _network, _memory = engine
+    text = "Mary is in the kitchen."
+    comprehension = eng.comprehension.comprehend(text)
+    eng._pending_question_concepts["mary"] = "Where is Mary?"
+
+    early = eng._think_early_routes(
+        text,
+        perceive(text),
+        comprehension_result=comprehension,
+    )
+
+    assert early is not None
+    place, _candidates = eng.situation_model.where_is("Mary")
+    assert place == "kitchen"
+
+
 def test_non_routed_input_still_falls_through(engine):
     """A plain statement with no route keeps going to the full pipeline."""
     eng, _network, memory = engine
