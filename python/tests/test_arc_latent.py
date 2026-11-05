@@ -95,7 +95,7 @@ def test_action_model_does_not_extrapolate_to_a_distant_latent_context():
     decoder = ArcEnvironmentDecoder()
     before = decoder.encode([[0, 9], [0, 0]])
     after = decoder.encode([[0, 0], [0, 9]])
-    distant = decoder.encode([[1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1]])
+    distant = decoder.encode([[1] * 16 for _ in range(16)])
     decoder.observe_transition("ACTION1", before, after)
     assert decoder.predict("ACTION1", distant) is None
 
