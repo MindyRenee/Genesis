@@ -169,7 +169,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     )
     if comparison or ordered_comparison:
         if ordered_comparison:
-            left, relation, right = ordered_comparison.groups()
+            left, _, right = ordered_comparison.groups()
             left_value, right_value = float(left), float(right)
             result_relation = (
                 "greater" if left_value > right_value else

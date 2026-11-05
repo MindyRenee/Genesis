@@ -2432,7 +2432,8 @@ def try_math(
 
     This is the entry point for the cognition engine. It detects
     what kind of math question is being asked and routes it to
-    the appropriate native faculty (higher-math domain routing, computation, solving, proof, discovery).
+    the appropriate native faculty: higher-math routing, computation,
+    solving, proof, or discovery.
 
     If a concept network is provided, the simplification rules are
     gated by what Genesis has learned (see ``MathRuleRegistry``).
@@ -2450,9 +2451,11 @@ def try_math(
     parietal_cues = re.search(
         r"\b(calculate|compute|evaluate|what is|what's|add|subtract|multiply|divide|"
         r"plus|minus|times|divided by|square root|sqrt|raised to|power of|percent|fraction|"
-        r"half|halves|thirds?|quarters?|double|triple|square of|cube of|compare|greater than|less than|"
+        r"half|halves|thirds?|quarters?|double|triple|square of|cube of|compare|"
+        r"greater than|less than|"
         r"larger than|smaller than|which is larger|which is greater|"
-        r"which is smaller|which is less|transpose|inverse|trace|dot product|inner product|vector|cross product|"
+        r"which is smaller|which is less|transpose|inverse|trace|dot product|"
+        r"inner product|vector|cross product|"
         r"simplify|expand|factor|solve|differentiate|"
         r"derivative|integral|mean|average|median|variance|standard deviation|summarize|"
         r"sin|cos|tan|determinant|matrix|matrices|matrix product|linear system|rank|"
