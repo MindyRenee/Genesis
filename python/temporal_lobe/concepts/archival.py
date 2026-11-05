@@ -354,11 +354,19 @@ class ArchivalMixin:
                 )
         if edge_dicts:
             try:
-                self._archive.archive_edges_batch(edge_dicts)
+                archived_count = self._archive.archive_edges_batch(edge_dicts)
             except (sqlite3.Error, RuntimeError) as e:
                 _note_archive_error(
                     "temporal_lobe.concepts.archival._archive_spilled_edges",
                     e,
+                )
+                return False
+            if archived_count != len(edge_dicts):
+                logger.error(
+                    "Archived %d of %d spill edges; refusing to retract the "
+                    "canonical edge log",
+                    archived_count,
+                    len(edge_dicts),
                 )
                 return False
             # Retract from the canonical log. The archive now holds a
@@ -388,10 +396,14 @@ class ArchivalMixin:
                             edge.relation,
                         )
                     except (OSError, ValueError) as e:
-                        logger.warning(
-                            f"edge log retraction during spill failed for "
-                            f"{edge.source}->{edge.target}: {e}"
+                        logger.error(
+                            "Edge-log retraction during spill failed for "
+                            "%s->%s; leaving concepts in working memory: %s",
+                            edge.source,
+                            edge.target,
+                            e,
                         )
+                        return False
         return True
 
     def _remove_spilled_from_working_memory(self, to_spill: set[str]) -> None:
