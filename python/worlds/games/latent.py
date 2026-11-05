@@ -23,7 +23,8 @@ from parietal_lobe.scene import perceive
 from latent_spaces.boundaries import LatentDomain, LatentState as DomainLatentState
 
 ARC_COLORS = 16
-FEATURE_DIMENSIONS = 35
+OBJECT_FEATURES = 8
+FEATURE_DIMENSIONS = 19 + ARC_COLORS + 2 * OBJECT_FEATURES
 
 
 @dataclass(frozen=True, slots=True)
@@ -327,6 +328,19 @@ def encode_graph(graph: SceneGraph) -> LatentState:
         sum(node.pixel_count for node in nodes if node.betti_1 > 0) / max(1, len(nodes)),
     ]
     vector.extend(count / area for count in counts)
+    object_sizes = sorted(
+        (node.pixel_count / area for node in nodes), reverse=True
+    )[:OBJECT_FEATURES]
+    radii = sorted(
+        (
+            hypot(node.centroid[0] - center_x, node.centroid[1] - center_y)
+            / hypot(width, height)
+            for node in nodes
+        ),
+        reverse=True,
+    )[:OBJECT_FEATURES] if nodes else []
+    vector.extend(object_sizes + [0.0] * (OBJECT_FEATURES - len(object_sizes)))
+    vector.extend(radii + [0.0] * (OBJECT_FEATURES - len(radii)))
     if len(vector) != FEATURE_DIMENSIONS:
         raise RuntimeError("ARC latent feature schema dimension drifted")
     return LatentState(tuple(vector), (1.0,) * len(vector), graph)
@@ -528,6 +542,7 @@ def _vector_distance(first: tuple[float, ...], second: tuple[float, ...]) -> flo
 __all__ = [
     "ArcEnvironmentDecoder",
     "FEATURE_DIMENSIONS",
+    "OBJECT_FEATURES",
     "GoalEvidence",
     "GridState",
     "LatentState",
