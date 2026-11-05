@@ -33,6 +33,10 @@ from frontal_lobe.reasoning.math_reasoning import try_math
         ("compare 3 and 9", "3 is less than 9"),
         ("is 5 greater than 3", "5 is greater than 3"),
         ("matrix product [[1, 2], [3, 4]] and [[5, 6], [7, 8]]", "[[19, 22], [43, 50]]"),
+        ("add matrices [[1, 2], [3, 4]] and [[5, 6], [7, 8]]", "[[6, 8], [10, 12]]"),
+        ("subtract matrices [[5, 6], [7, 8]] and [[1, 2], [3, 4]]", "[[4, 4], [4, 4]]"),
+        ("scale matrix [[1, 2], [3, 4]] by 3", "[[3, 6], [9, 12]]"),
+        ("cross product of [1, 0, 0] and [0, 1, 0]", "(0, 0, 1)"),
         ("transpose [[1, 2, 3], [4, 5, 6]]", "[[1, 4], [2, 5], [3, 6]]"),
         ("inverse of [[4, 7], [2, 6]]", "[[3/5, -7/10], [-1/5, 2/5]]"),
         ("trace of [[1, 2], [3, 4]]", "5"),
@@ -100,3 +104,18 @@ def test_linear_algebra_rejects_dimension_mismatch():
     assert result is not None
     assert not result.success
     assert "dimensions must agree" in result.answer
+
+
+
+def test_matrix_addition_rejects_dimension_mismatch():
+    result = try_math("add matrices [[1, 2]] and [[1], [2]]")
+    assert result is not None
+    assert not result.success
+    assert "dimensions must agree" in result.answer
+
+
+def test_cross_product_requires_three_dimensions():
+    result = try_math("cross product of [1, 2] and [3, 4]")
+    assert result is not None
+    assert not result.success
+    assert "3D vectors" in result.answer
