@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
-
 from frontal_lobe.reasoning.math_reasoning import try_math
+
+import pytest
 
 
 @pytest.mark.parametrize(
