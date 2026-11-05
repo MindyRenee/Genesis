@@ -11,6 +11,9 @@ from frontal_lobe.reasoning.math_reasoning import try_math
     [
         ("sin of pi/6", "1/2"),
         ("what is 2 + 2", "4"),
+        ("what is 12 minus 5", "7"),
+        ("what is 3/4 + 1/4", "1"),
+        ("what is 2 to the power of 3", "8"),
         ("seven plus five", "12"),
         ("25% of 80", "20"),
         ("add 2 and 3", "5"),
@@ -23,6 +26,12 @@ from frontal_lobe.reasoning.math_reasoning import try_math
         ("compare 3 and 9", "3 is less than 9"),
         ("is 5 greater than 3", "5 is greater than 3"),
         ("matrix product [[1, 2], [3, 4]] and [[5, 6], [7, 8]]", "[[19, 22], [43, 50]]"),
+        ("transpose [[1, 2, 3], [4, 5, 6]]", "[[1, 4], [2, 5], [3, 6]]"),
+        ("inverse of [[4, 7], [2, 6]]", "[[3/5, -7/10], [-1/5, 2/5]]"),
+        ("trace of [[1, 2], [3, 4]]", "5"),
+        ("dot product of [1, 2, 3] and [4, 5, 6]", "32"),
+        ("add vectors [1, 2] and [3, 4]", "(4, 6)"),
+        ("subtract vectors [5, 7] and [2, 3]", "(3, 4)"),
         ("solve [[2, 1], [1, -1]] x = [5, 1]", "x = (2, 1)"),
         ("differentiate x**3", "3*x**2"),
         ("integral of x**2", "1/3*x**3"),
@@ -69,3 +78,18 @@ def test_existing_arithmetic_path_remains_available():
     assert result is not None
     assert result.success
     assert result.answer == "4"
+
+
+
+def test_linear_algebra_rejects_singular_inverse():
+    result = try_math("inverse of [[1, 2], [2, 4]]")
+    assert result is not None
+    assert not result.success
+    assert "nonsingular square matrix" in result.answer
+
+
+def test_linear_algebra_rejects_dimension_mismatch():
+    result = try_math("dot product of [1, 2] and [3, 4, 5]")
+    assert result is not None
+    assert not result.success
+    assert "dimensions must agree" in result.answer
