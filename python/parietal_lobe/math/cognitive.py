@@ -80,15 +80,34 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
 
     # Foundational arithmetic: only explicit calculation language or
     # operator-bearing expressions enter the exact arithmetic faculty.
+    arithmetic_text = text
+    spoken_operations = (
+        (r"\badd\s+(.+?)\s+and\s+(.+?)[?.!]*$", r"\1 + \2"),
+        (r"\bsubtract\s+(.+?)\s+from\s+(.+?)[?.!]*$", r"\2 - \1"),
+        (r"\bmultiply\s+(.+?)\s+by\s+(.+?)[?.!]*$", r"\1 * \2"),
+        (r"\bdivide\s+(.+?)\s+by\s+(.+?)[?.!]*$", r"\1 / \2"),
+        (r"\b(-?\d+(?:\.\d+)?)\s*percent\s+of\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"(\1 / 100) * \2"),
+        (r"\bhalf\s+of\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"\1 / 2"),
+        (r"\bdouble\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"\1 * 2"),
+        (r"\btriple\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"\1 * 3"),
+        (r"\bsquare\s+of\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"\1 ** 2"),
+        (r"\bcube\s+of\s+(-?\d+(?:\.\d+)?)[?.!]*$", r"\1 ** 3"),
+    )
+    for pattern, replacement in spoken_operations:
+        normalized = re.sub(pattern, replacement, lower)
+        if normalized != lower:
+            arithmetic_text = normalized
+            break
+
     arithmetic_cue = re.search(
         r"\b(calculate|compute|evaluate|what is|what's|add|subtract|"
         r"multiply|divide|plus|minus|times|divided by|square root|sqrt|"
-        r"raised to|power of)\b",
+        r"raised to|power of|percent|half|double|triple|square of|cube of)\b",
         lower,
     )
     arithmetic_expression = re.search(r"\d\s*[+*/%^()]|[+*/%^()]\s*\d", lower)
     if arithmetic_cue or arithmetic_expression:
-        result = faculty.evaluate(text)
+        result = faculty.evaluate(arithmetic_text)
         if result.ok:
             return ParietalAnswer(
                 "arithmetic",
@@ -102,7 +121,7 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     # approximate faculty is exact arithmetic outside the subitizing range.
     comparison = re.search(
         r"\b(?:compare|which is larger|which is greater|which is smaller|"
-        r"which is less)\b.*?(-?\d+(?:\.\d+)?).*?(-?\d+(?:\.\d+)?)",
+        r"which is less|is (?:\d+(?:\.\d+)?) greater than|is (?:\d+(?:\.\d+)?) less than)\b.*?(-?\d+(?:\.\d+)?).*?(-?\d+(?:\.\d+)?)",
         lower,
     )
     if comparison:
