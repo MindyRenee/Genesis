@@ -143,7 +143,12 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     )
     symbolic_input = re.search(r"\b(?:[t-z]|pi|e)\b", lower)
     if (
-        (arithmetic_cue or arithmetic_expression or is_question_arithmetic or arithmetic_text != text)
+        (
+            arithmetic_cue
+            or arithmetic_expression
+            or is_question_arithmetic
+            or arithmetic_text != text
+        )
         and not symbolic_input
         and not matrix_language
     ):
@@ -381,7 +386,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
     has_group_words = re.search(r"\b(permutation|cycle|cycles|order of)\b", lower)
     has_cycle_literal = re.search(r"\(\s*\d+(?:\s+\d+)+\s*\)", lower)
     if has_group_words and has_cycle_literal:
-        from .abstract_algebra import describe_text as describe_permutation_text, order_text
+        from .abstract_algebra import describe_text as describe_permutation_text
+        from .abstract_algebra import order_text
 
         if "order" in lower:
             return _answer(order_text(text), "abstract algebra")
@@ -406,11 +412,8 @@ def route_parietal_math(question: str) -> ParietalAnswer | None:
             lower,
         )
     ):
-        from .complex_analysis import (
-            describe_text as describe_complex_text,
-            power_text,
-            roots_unity_text,
-        )
+        from .complex_analysis import describe_text as describe_complex_text
+        from .complex_analysis import power_text, roots_unity_text
 
         root_match = re.search(
             r"\b(\d+)(?:st|nd|rd|th)\s+roots?\s+of\s+(.+?)[?.!]*$",
