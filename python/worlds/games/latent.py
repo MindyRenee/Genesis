@@ -18,9 +18,9 @@ from dataclasses import dataclass, field
 from math import hypot, isfinite, sqrt
 from typing import Any
 
+from latent_spaces.boundaries import LatentDomain, LatentState as DomainLatentState
 from parietal_lobe.grid import Grid
 from parietal_lobe.scene import perceive
-from latent_spaces.boundaries import LatentDomain, LatentState as DomainLatentState
 
 ARC_COLORS = 16
 OBJECT_FEATURES = 8
