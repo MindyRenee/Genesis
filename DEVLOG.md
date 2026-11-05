@@ -1,3 +1,24 @@
+## 2026-11-04 — Foundational arithmetic and linear algebra completion
+
+Expanded the existing parietal linear-algebra faculty without replacing its
+exact rational arithmetic. Added rectangular-matrix transpose, square-matrix
+inverse and trace, plus exact vector addition, subtraction, and dot product.
+Exposed the operations through `ParietalMath` and routed explicit matrix and
+vector literals from the frontal math entry point. Singular inverses,
+non-square trace/inverse requests, malformed literals, and dimension
+mismatches return explicit failures rather than guessed results.
+
+Corrected a malformed whitespace escape in the foundational arithmetic
+question recognizer. Added explicit spoken normalization for square roots
+and “to the power of” expressions, preserving the arithmetic parser's
+precedence and validation. Added cognitive-entry tests for signed arithmetic,
+fractions, precedence, powers, roots, matrix operations, vector operations,
+and invalid dimensions.
+
+**Verification boundary:** source and focused tests are committed to
+`audit-fixes`. They have not been executed in Termux or CI during this
+remote edit session. No persistent runtime state was accessed or changed.
+
 ## 2026-11-04 — Foundational arithmetic and linear algebra cognition
 
 Extended the frontal-to-parietal math pathway after review found that the initial router omitted basic number operations and exposed only determinant/rank for matrix questions. The router now delegates explicit arithmetic expressions and spoken addition, subtraction, multiplication, division, percentages, halves, doubles, triples, squares, and cubes to the native exact arithmetic faculty. It also routes number-magnitude comparisons through NumberSense while retaining its confidence and exactness metadata. Linear algebra routing now covers determinant, rank, matrix multiplication, and unique square-system solving using explicit matrix/vector literals and the existing Fraction-based faculty. Algebraic equation solving is also exposed through the native algebra facade.
