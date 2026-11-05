@@ -123,6 +123,16 @@ class SceneGraph:
     nodes: tuple[SceneNode, ...]
     edges: tuple[SceneEdge, ...]
 
+    @property
+    def betti_0(self) -> int:
+        """Total foreground component count in this scene graph."""
+        return sum(node.betti_0 for node in self.nodes)
+
+    @property
+    def betti_1(self) -> int:
+        """Total enclosed-hole count under the declared digital topology."""
+        return sum(node.betti_1 for node in self.nodes)
+
     @classmethod
     def extract(cls, state: GridState, background: int | None = None) -> SceneGraph:
         """Use Genesis's scene parser and infer background by its canonical rule."""
@@ -157,8 +167,8 @@ class SceneGraph:
                     centroid=(obj.centroid[1], obj.centroid[0]),
                     pixel_count=obj.size,
                     bbox=(left, top, right, bottom),
-                    betti_0=1,
-                    betti_1=_hole_count(cells, top, left, bottom, right),
+                    betti_0=compute_local_betti(cells, top, left, bottom, right)[0],
+                    betti_1=compute_local_betti(cells, top, left, bottom, right)[1],
                     shape_signature=obj.shape_signature,
                 )
             )
@@ -193,28 +203,47 @@ class SceneGraph:
         return cls(state.width, state.height, background, tuple(nodes), tuple(edges))
 
 
-def _hole_count(
+def compute_local_betti(
     cells: frozenset[tuple[int, int]], top: int, left: int, bottom: int, right: int
-) -> int:
-    """Count enclosed complement components inside an object's bounding box."""
+) -> tuple[int, int]:
+    """Return local (beta_0, beta_1) using 4/8 digital-topology duality.
+
+    beta_0 counts four-connected foreground components. beta_1 counts
+    eight-connected complement components enclosed by the foreground.
+    The bounding box is the local domain; its boundary is treated as open.
+    """
     if not cells:
-        return 0
-    visited: set[tuple[int, int]] = set()
-    holes = 0
+        return 0, 0
+
+    foreground_seen: set[tuple[int, int]] = set()
+    beta_0 = 0
+    for start in cells:
+        if start in foreground_seen:
+            continue
+        beta_0 += 1
+        queue = deque([start])
+        foreground_seen.add(start)
+        while queue:
+            row, col = queue.popleft()
+            for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                neighbor = (row + dr, col + dc)
+                if neighbor in cells and neighbor not in foreground_seen:
+                    foreground_seen.add(neighbor)
+                    queue.append(neighbor)
+
+    complement_seen: set[tuple[int, int]] = set()
+    beta_1 = 0
     for row in range(top, bottom + 1):
         for col in range(left, right + 1):
             start = (row, col)
-            if start in cells or start in visited:
+            if start in cells or start in complement_seen:
                 continue
             queue = deque([start])
-            visited.add(start)
+            complement_seen.add(start)
             reaches_boundary = False
             while queue:
                 current_row, current_col = queue.popleft()
-                if (
-                    current_row in (top, bottom)
-                    or current_col in (left, right)
-                ):
+                if current_row in (top, bottom) or current_col in (left, right):
                     reaches_boundary = True
                 for dr in (-1, 0, 1):
                     for dc in (-1, 0, 1):
@@ -226,13 +255,13 @@ def _hole_count(
                             top <= nr <= bottom
                             and left <= nc <= right
                             and neighbor not in cells
-                            and neighbor not in visited
+                            and neighbor not in complement_seen
                         ):
-                            visited.add(neighbor)
+                            complement_seen.add(neighbor)
                             queue.append(neighbor)
             if not reaches_boundary:
-                holes += 1
-    return holes
+                beta_1 += 1
+    return beta_0, beta_1
 
 
 def _touches(
@@ -856,6 +885,7 @@ __all__ = [
     "SceneNode",
     "TransitionOperator",
     "DifferentiableOperatorSpace",
+    "compute_local_betti",
     "encode_graph",
     "validate_lie_bracket_closure",
 ]
