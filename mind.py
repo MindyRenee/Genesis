@@ -55,6 +55,7 @@ from self import (
     EmergentIdentitySource,
     HeuristicExperiment,
     SelfImprovement,
+    SelfLatentSpaceArchitecture,
     SelfModel,
 )
 from sleep.inner_life import InnerLife
@@ -198,6 +199,10 @@ class Mind(
         # Self-model — who Genesis is
         self.self_model = SelfModel(born_at=int(time.time() * 1000))
         self.self_model.body_model.socket_path = socket_path
+        # Shared geometric self-state model. Real thought and world-event
+        # callbacks feed this same instance so transitions are measured
+        # across the inner/outer boundary rather than in isolated demos.
+        self.self_latent_space = SelfLatentSpaceArchitecture()
 
         # User profile — a structured, persistent model of the human.
         profile_path = Path(self.data_dir) / "user_profile.json"
@@ -226,6 +231,128 @@ class Mind(
         self._init_sleep_compression()
         self._wire_modules()
         self._init_runtime_state()
+        # Hardware adapters start only after lifecycle startup connects the daemon.
+        self.android_sensor_adapter = None
+        self.android_microphone_adapter = None
+        self.android_camera_adapter = None
+
+    def _start_android_adapters(self) -> None:
+        """Start only explicitly enabled Termux adapters after Mind startup."""
+        if os.environ.get("GENESIS_ANDROID_SENSORS", "0") == "1":
+            from brainstem.android_sensors import AndroidSensorAdapter, is_android_termux
+
+            if is_android_termux():
+                adapter = AndroidSensorAdapter(self._on_android_sensor_sample)
+                if adapter.start():
+                    self.android_sensor_adapter = adapter
+        if os.environ.get("GENESIS_ANDROID_MICROPHONE", "0") == "1":
+            from brainstem.android_media import (
+                AndroidMicrophoneAdapter,
+                is_android_termux_microphone,
+            )
+
+            if is_android_termux_microphone():
+                adapter = AndroidMicrophoneAdapter(self._on_android_audio_clip)
+                if adapter.start():
+                    self.android_microphone_adapter = adapter
+        if os.environ.get("GENESIS_ANDROID_CAMERA", "0") == "1":
+            from brainstem.android_media import AndroidCameraAdapter, is_android_termux_camera
+
+            camera_id_text = os.environ.get("GENESIS_ANDROID_CAMERA_ID", "0")
+            if is_android_termux_camera() and camera_id_text.isdigit():
+                adapter = AndroidCameraAdapter(
+                    self._on_android_camera_frame,
+                    camera_id=int(camera_id_text),
+                )
+                if adapter.start():
+                    self.android_camera_adapter = adapter
+            elif not camera_id_text.isdigit():
+                logger.warning("Ignoring invalid GENESIS_ANDROID_CAMERA_ID=%r", camera_id_text)
+
+    def _on_android_camera_frame(self, frame) -> None:
+        """Run a measured Android camera frame through Genesis's visual cortex."""
+        try:
+            scene = self.vision.see_frame(
+                frame,
+                client=self.client,
+                emotion=self.feel(),
+                network=self.brain.frontal.network,
+                nerve="android_camera",
+            )
+            if scene.status != "ok":
+                return
+            metadata = scene.as_metadata()
+            self.world.perceive(
+                "Android camera scene",
+                salience=scene.salience,
+                source="android_camera",
+                topics=[],
+                metadata=metadata,
+                percept=metadata,
+            )
+        except Exception:
+            logger.exception("Android camera frame processing failed")
+
+    def _on_android_audio_clip(self, samples, sample_rate: int) -> None:
+        """Classify a measured Android audio clip and publish the sound event."""
+        try:
+            from temporal_lobe.auditory import classify_audio_clip
+
+            event = classify_audio_clip(samples, sample_rate)
+            if event.is_silence:
+                return
+            self.world.perceive(
+                event.description,
+                salience=max(0.1, min(1.0, event.loudness * event.confidence)),
+                source="android_microphone",
+                topics=[event.sound_type],
+                metadata={
+                    "sound_type": event.sound_type,
+                    "confidence": event.confidence,
+                    "loudness": event.loudness,
+                    "brightness": event.brightness,
+                    "noisiness": event.noisiness,
+                    "duration": event.duration,
+                    "valence": event.emotional_valence,
+                    "sample_rate": sample_rate,
+                    "sample_count": len(samples),
+                },
+                percept={
+                    "sound_type": event.sound_type,
+                    "confidence": event.confidence,
+                    "loudness": event.loudness,
+                    "brightness": event.brightness,
+                    "noisiness": event.noisiness,
+                    "duration": event.duration,
+                },
+            )
+        except Exception:
+            logger.exception("Android microphone clip processing failed")
+
+    def _on_android_sensor_sample(self, reading: dict) -> None:
+        """Publish measured Android sensor data into the ordinary world event path."""
+        name = str(reading.get("name", "sensor"))
+        values = reading.get("values")
+        if not isinstance(values, list):
+            return
+        from brainstem.android_sensors import _SENSOR_UNITS
+
+        lowered = name.casefold()
+        sensor_type = next((item for item in _SENSOR_UNITS if item in lowered), "unknown")
+        self.world.perceive(
+            f"Android sensor reading: {name}",
+            salience=0.25,
+            source="android_sensor",
+            topics=[],
+            metadata={
+                "sensor": name,
+                "sensor_type": sensor_type,
+                "values": values,
+                "units": _SENSOR_UNITS.get(sensor_type, "unknown"),
+                "accuracy": reading.get("accuracy"),
+                "sensor_timestamp": reading.get("timestamp"),
+            },
+        )
 
     @property
     def regulator(self):
@@ -420,6 +547,7 @@ class Mind(
             frontal=self.brain.frontal,
             is_nap_mode=lambda: self._nap_mode,
             engagement=lambda: 0.0,
+            on_latent_signal=self._observe_self_latent_signal,
         )
 
         # Wire the emotional memory callback: when a high-emotion
@@ -576,13 +704,13 @@ class Mind(
         drives: dict[str, float] = {}
         try:
             drives["social"] = float(self.world.social_isolation())
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            logger.debug("social drive unavailable", exc_info=True)
         try:
             for name, urge in self.volition.urges.items():
                 drives[name] = float(getattr(urge, "value", 0.0))
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            logger.debug("volition drives unavailable", exc_info=True)
         return drives
 
     def _on_v1_gamma(self, gamma_power: float) -> None:
@@ -816,6 +944,12 @@ class Mind(
         # reach its global workspace, salient ones become memories,
         # and its sleep replays what happened in its world.
         self.world.on_external_event = self._on_world_event
+        # The unified E/I/S/language engine consumes the same live signals
+        # as the existing workspace and self-state systems.
+        from self.cognitive_topos_runtime import CognitiveToposRuntime
+
+        self.cognitive_topos = CognitiveToposRuntime()
+        self.add_live_thought_listener(self._on_cognitive_topos_thought)
         # Give cognition access to inner life so introspection can
         # report spontaneous thoughts when no conversation has happened.
         self.brain.frontal.inner_life = self.inner_life
@@ -826,6 +960,56 @@ class Mind(
         # gated by the chemistry her body reports (no worker thread).
         self.inner_life.set_sleep_stage_transition_callback(self._on_sleep_stage_transition)
         self.inner_life.set_sleep_tick_callback(self._on_sleep_tick)
+
+    def _on_cognitive_topos_thought(self, kind: str, content: str) -> None:
+        """Integrate actual inner-life/learning emissions into the four-domain engine."""
+        self._integrate_cognitive_topos("inner", kind, content)
+
+    def _integrate_cognitive_topos(
+        self,
+        domain: str,
+        kind: str,
+        content: str,
+        *,
+        outer_snapshot: dict | None = None,
+        self_snapshot: dict | None = None,
+    ) -> None:
+        """Bridge a live event into the cognitive topos engine without blocking cognition."""
+        try:
+            if self_snapshot is None:
+                self_snapshot = self.self_latent_space.observe_signal(
+                    content,
+                    kind=f"topos:{domain}:{kind}",
+                    salience=0.4,
+                    inbound=domain != "language",
+                )
+            if outer_snapshot is None and domain == "outer":
+                outer_snapshot = self.world.experiential_space.snapshot()
+            inner_snapshot = None
+            inner_life = getattr(self, "inner_life", None)
+            inner_world = getattr(inner_life, "inner_world", None)
+            if inner_world is not None and hasattr(inner_world, "snapshot"):
+                inner_snapshot = inner_world.snapshot()
+
+            language_snapshot = None
+            temporal = getattr(getattr(self, "brain", None), "temporal", None)
+            language_space = getattr(temporal, "language_latent_space", None)
+            if language_space is not None and hasattr(language_space, "snapshot"):
+                language_snapshot = language_space.snapshot()
+
+            self.cognitive_topos.observe(
+                domain,
+                kind=kind,
+                content=content,
+                self_snapshot=self_snapshot,
+                outer_snapshot=outer_snapshot,
+                inner_snapshot=inner_snapshot,
+                language_snapshot=language_snapshot,
+            )
+        except Exception:
+            # This is an observer: a geometry failure must not stop the
+            # event stream, response path, or inner-life thread.
+            logger.debug("cognitive topos integration failed", exc_info=True)
 
     def _journal_swallow_sink(
         self,

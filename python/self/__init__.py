@@ -56,6 +56,18 @@ _EXPORTS = {
     "CapabilityProfile": "self.assessment",
     "KnowledgeAssessment": "self.assessment",
     "SelfAssessment": "self.assessment",
+    # self.master_cognitive_topos — unified E/I/S/language state transport
+    "EhresmannConnectionTransport": "self.master_cognitive_topos",
+    "KuramotoRiemannianSynchronizer": "self.master_cognitive_topos",
+    "MasterCognitiveToposEngine": "self.master_cognitive_topos",
+    "MasterFreeEnergyOptimizer": "self.master_cognitive_topos",
+    # self.latent_geometry — geometric latent-state model of self
+    "AgencyOwnershipFiberBundle": "self.latent_geometry",
+    "AutopoieticSymplecticFlow": "self.latent_geometry",
+    "GrassmannianSubspaceModule": "self.latent_geometry",
+    "NarrativeAgencyBaseManifold": "self.latent_geometry",
+    "SelfConsistencyInformationGeometry": "self.latent_geometry",
+    "SelfLatentSpaceArchitecture": "self.latent_geometry",
     # self.cognitive_trajectory
     "CognitiveTrajectoryModel": "self.cognitive_trajectory",
     "CognitiveTrajectoryReading": "self.cognitive_trajectory",

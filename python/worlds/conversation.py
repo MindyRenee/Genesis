@@ -446,6 +446,49 @@ class ConversationMixin:
         except Exception as exc:  # noqa: BLE001
             # Experimental geometry must never interrupt established cognition.
             note_swallowed("mind.conversation._feed_light_cone_experience", exc)
+    def _observe_language_input(self, content: str) -> None:
+        """Record received language in the same temporal latent space as output."""
+        temporal = getattr(self.brain, "temporal", None)
+        frontal = getattr(self.brain, "frontal", None)
+        comprehension = getattr(frontal, "comprehension", None)
+        if temporal is None or comprehension is None or not isinstance(content, str):
+            return
+        try:
+            parsed = comprehension.comprehend(content)
+            temporal.observe_language(content, parsed, direction="inbound")
+            self._integrate_cognitive_topos("language", "inbound", content)
+        except (ArithmeticError, AttributeError, TypeError, ValueError, OverflowError):
+            # Language geometry is observational; malformed input must not
+            # interrupt the actual conversation pipeline.
+            logger.debug("language latent input observation failed", exc_info=True)
+
+    def _observe_language_output(self, content: str) -> None:
+        """Record Genesis's generated utterance in the temporal language space."""
+        temporal = getattr(self.brain, "temporal", None)
+        frontal = getattr(self.brain, "frontal", None)
+        comprehension = getattr(frontal, "comprehension", None)
+        if temporal is None or comprehension is None or not isinstance(content, str):
+            return
+        try:
+            parsed = comprehension.comprehend(content)
+            temporal.observe_language(content, parsed, direction="outbound")
+        except (ArithmeticError, AttributeError, TypeError, ValueError, OverflowError):
+            # Metrics are observational and must never suppress a valid reply.
+            logger.debug("language latent output observation failed", exc_info=True)
+
+    def _observe_self_latent_signal(
+        self, content: str, kind: str, metadata: dict[str, Any] | None = None
+    ) -> None:
+        """Integrate an internally recorded thought into the shared self state."""
+        details = metadata or {}
+        self.self_latent_space.observe_signal(
+            content,
+            kind=kind,
+            salience=float(details.get("salience", 0.4)),
+            inbound=False,
+            addressed=bool(details.get("addressed", False)),
+            metadata=details,
+        )
 
     def _on_world_event(self, event: ExternalEvent) -> None:
         """Route an external world event into its cognition.
@@ -468,6 +511,32 @@ class ConversationMixin:
         cognition engine's think() already stores addressed turns;
         recording them here would double-write every conversation.
         """
+        # Integrate every real world event, including Genesis's own
+        # actions, into the shared self-state before inbound routing.
+        # This observer is diagnostic/stateful and must never block the
+        # world's event stream if numerical integration fails.
+        try:
+            self.self_latent_space.observe_signal(
+                event.describe(),
+                kind=f"world:{event.kind.value}",
+                salience=event.salience,
+                inbound=event.inbound,
+                addressed=event.addressed,
+                metadata=event.metadata,
+            )
+        except Exception:
+            logger.debug("self latent world observation failed", exc_info=True)
+
+        # Feed the observed outer-world geometry and the just-updated self
+        # representation into the unified cross-domain engine.
+        self._integrate_cognitive_topos(
+            "outer",
+            event.kind.value,
+            event.describe(),
+            outer_snapshot=self.world.experiential_space.snapshot(),
+            self_snapshot=self.self_latent_space.snapshot(),
+        )
+
         if not event.inbound:
             return
         # Broadcast into its cognitive field. Best-effort — workspace
@@ -875,6 +944,8 @@ class ConversationMixin:
         if not self._running:
             raise RuntimeError("Mind is not started — call start() first")
 
+        self._observe_language_input(user_input)
+
         # Wake it if it's asleep or meditating — the user is talking
         # to it, so it should be present. This makes respond()
         # self-contained: callers don't need to check is_sleeping or
@@ -933,6 +1004,7 @@ class ConversationMixin:
 
         response, state = think_result
         self.brain.frontal.self_learner.resume()
+        self._observe_language_output(response)
         self._after_thought(user_input, response, state)
         return self._said(response)
 
@@ -1001,6 +1073,9 @@ class ConversationMixin:
                 "mind.conversation._said",
                 e,
             )
+        # Language state is updated at the actual outward utterance boundary,
+        # including fallbacks, so the engine sees what was emitted.
+        self._integrate_cognitive_topos("language", "utterance", text)
         return text
 
     def _note_faces_seen(self) -> None:
@@ -1286,6 +1361,22 @@ class ConversationMixin:
                 network=self.brain.frontal.network,
                 nerve=nerve,
             )
+            # Android's Termux:API exposes still-photo capture, not a V4L2
+            # stream. Fall back only when the camera nerve is unavailable;
+            # never bypass a closed thalamic gate or a mid-update frame.
+            if scene.status == "unavailable" and nerve == "optic":
+                from brainstem.android_media import capture_android_frame
+
+                camera_id = int(os.environ.get("GENESIS_ANDROID_CAMERA_ID", "0"))
+                frame = capture_android_frame(camera_id=camera_id)
+                if frame is not None:
+                    scene = self.vision.see_frame(
+                        frame,
+                        client=self.client,
+                        emotion=emotion,
+                        network=self.brain.frontal.network,
+                        nerve="android_camera",
+                    )
             self._note_faces_seen()
             if scene.status == "ok":
                 thought = Thought(

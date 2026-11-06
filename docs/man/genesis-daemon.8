@@ -82,16 +82,13 @@ neurochemistry:
 memory pressure, I/O wait, load average, battery) and feeds them as
 neurochemical impulses. She feels her body.
 .IP \(bu 2
-\fBBody control\fR reads neurochemistry and drives hardware: dopamine
-speeds the CPU up, GABA slows it down, melatonin selects powersave;
-ACh raises scheduling priority; the plasticity gate sets the I/O
-priority class; CPU temp caps the max frequency regardless of
-dopamine (autonomic fatigue). Privileged levers (governor, RTC wake
-alarm) route through root-owned helpers under
-.IR /usr/local/libexec/genesis/
-when installed by
-.BR scripts/install_sudoers.sh ;
-without them, sensing still works and only actuation stays read-only.
+\fBBody control\fR is platform-specific. On supported Linux hosts,
+optional actuators may adjust CPU policy and process priority. Genesis3
+disables privileged CPU-frequency control, RTC wake alarms, and RTKit
+priority requests on Android. The former sudoers example is preserved at
+.IR docs/archive/computer-specific/genesis-sudoers
+for historical reference only; do not install it on Android. Sensing
+continues where the kernel exposes readable measurements.
 .IP \(bu 2
 \fBAdaptive sync\fR modulates the LTM disk-sync rate by the plasticity
 gate (the sync AdaptiveGate above).

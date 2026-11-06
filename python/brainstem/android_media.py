@@ -1,9 +1,11 @@
-"""Android microphone capture through Termux:API.
+"""Opt-in Android camera and microphone capture through Termux:API.
 
-Visual input is owned by the daemon's optic nerve; this module contains only
-the separate audio-device adapter.
+The camera is sampled only when GENESIS_ANDROID_CAMERA=1. Every frame is a
+real JPEG returned by Termux:API and is passed to Genesis's existing visual
+pipeline. The microphone records opt-in clips through termux-microphone-record
+into Termux's shared Download directory. Missing commands, permissions, or
+hardware mean no frame or clip is emitted.
 """
-
 from __future__ import annotations
 
 import json
@@ -18,8 +20,121 @@ from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
+from PIL import Image
 
 logger = logging.getLogger(__name__)
+
+
+def is_android_termux_camera() -> bool:
+    """Detect Android plus the installed Termux camera command."""
+    return bool(os.environ.get("ANDROID_ROOT") or os.environ.get("ANDROID_DATA")) and (
+        shutil.which("termux-camera-photo") is not None
+    )
+
+
+def load_rgb_frame(path: str | Path) -> np.ndarray:
+    """Decode a captured image into a detached uint8 RGB array."""
+    with Image.open(path) as image:
+        return np.asarray(image.convert("RGB"), dtype=np.uint8).copy()
+
+
+def capture_android_frame(camera_id: int = 0, timeout: float = 15.0) -> np.ndarray | None:
+    """Capture one on-demand still frame through Termux:API, or return None."""
+    if isinstance(camera_id, bool) or not isinstance(camera_id, int) or camera_id < 0:
+        raise ValueError("camera_id must be a non-negative integer")
+    if timeout < 2.0:
+        raise ValueError("camera timeout must be at least 2 seconds")
+    if not is_android_termux_camera():
+        return None
+    try:
+        with tempfile.TemporaryDirectory(prefix="genesis-camera-once-") as directory:
+            image_path = Path(directory) / "frame.jpg"
+            result = subprocess.run(
+                ["termux-camera-photo", "-c", str(camera_id), str(image_path)],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            if result.returncode != 0 or not image_path.is_file():
+                return None
+            return load_rgb_frame(image_path)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+
+class AndroidCameraAdapter:
+    """Low-rate still-frame producer for Genesis's shared vision pipeline."""
+
+    def __init__(
+        self,
+        on_frame: Callable[[np.ndarray], None],
+        *,
+        interval_seconds: float = 10.0,
+        command_timeout: float = 15.0,
+        camera_id: int = 0,
+    ) -> None:
+        if not callable(on_frame):
+            raise TypeError("on_frame must be callable")
+        if interval_seconds < 2.0:
+            raise ValueError("camera interval must be at least 2 seconds")
+        if command_timeout < 2.0:
+            raise ValueError("camera command timeout must be at least 2 seconds")
+        if isinstance(camera_id, bool) or not isinstance(camera_id, int) or camera_id < 0:
+            raise ValueError("camera_id must be a non-negative integer")
+        self._on_frame = on_frame
+        self._interval = float(interval_seconds)
+        self._timeout = float(command_timeout)
+        self._camera_id = camera_id
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._last_error_log = 0.0
+
+    @property
+    def running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    def start(self) -> bool:
+        """Start only when the device and Termux camera command are present."""
+        if self.running:
+            return True
+        if not is_android_termux_camera():
+            return False
+        self._stop.clear()
+        self._thread = threading.Thread(
+            target=self._run,
+            name="genesis-android-camera",
+            daemon=True,
+        )
+        self._thread.start()
+        return True
+
+    def close(self, timeout: float = 3.0) -> None:
+        self._stop.set()
+        thread = self._thread
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=max(0.0, timeout))
+        self._thread = None
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            started = time.monotonic()
+            frame = capture_android_frame(
+                camera_id=self._camera_id,
+                timeout=self._timeout,
+            )
+            if frame is not None:
+                try:
+                    self._on_frame(frame)
+                except Exception:  # Camera callback failures must not stop capture.
+                    logger.exception("Android camera callback failed")
+            else:
+                now = time.monotonic()
+                if now - self._last_error_log >= 60.0:
+                    logger.warning("Termux camera capture unavailable; retrying")
+                    self._last_error_log = now
+            remaining = self._interval - (time.monotonic() - started)
+            self._stop.wait(max(0.0, remaining))
 
 
 def _shared_download_dir() -> Path | None:

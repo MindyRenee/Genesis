@@ -187,6 +187,9 @@ class LifecycleMixin:
         self._start_autonomous_subsystems()
         self._start_engage_restored_sleep()
         self._start_background_threads()
+        # Hardware adapters must start only after the daemon, restored state,
+        # and cognitive event pathways are live.
+        self._start_android_adapters()
 
     def _start_connect_and_register(self) -> None:
         """Connect to the daemon and register cognitive modules.
@@ -833,6 +836,19 @@ class LifecycleMixin:
         still runs in that case so a persistence error does not strand
         the daemon or leave registered modules marked running.
         """
+        for attribute, label in (
+            ("android_sensor_adapter", "sensor"),
+            ("android_camera_adapter", "camera"),
+            ("android_microphone_adapter", "microphone"),
+        ):
+            adapter = getattr(self, attribute, None)
+            if adapter is not None:
+                try:
+                    adapter.close()
+                except Exception as error:  # noqa: BLE001 — cleanup must continue
+                    logger.warning("Android %s adapter cleanup failed: %s", label, error)
+                setattr(self, attribute, None)
+
         if not self._running:
             return True
 
@@ -1619,6 +1635,36 @@ class LifecycleMixin:
                         note_swallowed("mind.lifecycle._stage_inner_life.inner_world", error)
                     else:
                         scalar_updates.append((self.inner_life, "inner_world", staged_world))
+                if ils.get("self_latent_space") is not None:
+                    try:
+                        from self.latent_geometry import SelfLatentSpaceArchitecture
+
+                        staged_self_latent = SelfLatentSpaceArchitecture()
+                        staged_self_latent.restore(ils["self_latent_space"])
+                    except (KeyError, TypeError, ValueError, OverflowError) as error:
+                        note_swallowed("mind.lifecycle._stage_inner_life.self_latent_space", error)
+                    else:
+                        scalar_updates.append((self, "self_latent_space", staged_self_latent))
+                if ils.get("language_latent_space") is not None:
+                    try:
+                        from temporal_lobe.language_latent_space import LanguageLatentSpace
+
+                        staged_language_latent = LanguageLatentSpace()
+                        staged_language_latent.restore(ils["language_latent_space"])
+                    except (
+                        KeyError, TypeError, ValueError, OverflowError, ArithmeticError
+                    ) as error:
+                        note_swallowed(
+                            "mind.lifecycle._stage_inner_life.language_latent_space", error
+                        )
+                    else:
+                        scalar_updates.append(
+                            (
+                                self.brain.temporal,
+                                "language_latent_space",
+                                staged_language_latent,
+                            )
+                        )
                 logger.info(
                     "Restored inner life state: thoughts=%d, dreams=%d, lucid=%d",
                     *counts,
@@ -1753,6 +1799,10 @@ class LifecycleMixin:
                         self.inner_life.inner_world.to_dict()
                         if hasattr(self.inner_life, "inner_world")
                         else None
+                    ),
+                    "self_latent_space": self.self_latent_space.to_dict(),
+                    "language_latent_space": (
+                        self.brain.temporal.language_latent_space.to_dict()
                     ),
                 },
                 world_state=self.world.to_dict(),

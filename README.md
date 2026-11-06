@@ -1031,12 +1031,14 @@ not composed words.
 
 ## Running it
 
-Requirements: Rust 1.85+ (edition 2024), Python 3.12+, Linux. The daemon
-build needs **libclang** and kernel V4L2 headers, and the canvas dependency
-(`pycairo`) builds from source — on Debian/Ubuntu:
-`sudo apt install libclang-dev linux-libc-dev libcairo2-dev pkg-config`.
+### Linux desktop workflow
+
+The established daemon workflow targets Linux desktop/server systems and requires
+Rust 1.85+ (edition 2024), Python 3.12+, libclang, and V4L2 headers. On
+Debian/Ubuntu the native build dependencies are installed with:
 
 ```bash
+sudo apt install libclang-dev linux-libc-dev libcairo2-dev pkg-config
 cargo build --release
 pip install -r python/requirements.txt
 python3 -c "import nltk; nltk.download('wordnet'); nltk.download('punkt_tab')"
@@ -1057,15 +1059,46 @@ there is no pin file and no `XDG_DATA_HOME` step). On first boot the instance is
 fresh system — a small concept network, no memories, no learned names.
 Introduce yourself; teach it.
 
-The repo root is also an installable package: `pip install .` provides a
-`genesis` command (the packaged `genesis`, plus `--headless` resident mode,
-`--stop`, `--tail`), and `scripts/install.sh` performs the full local
-install — editable venv, release binaries, launcher, and an enabled
-`genesis.service` systemd user unit. One instance at a time per data dir;
-the CLI lock refuses a second. For the privileged body levers (CPU
-governor, RTC wake alarm) a NOPASSWD sudo grant for the daemon's user
-is enough — the levers invoke `sudo -n` directly; there are no helper
-scripts to install.
+### Android / Termux bootstrap
+
+Genesis3 includes an experimental native Termux installer at
+scripts/install_termux.sh. From the repository root in native Termux, run:
+
+    bash scripts/install_termux.sh
+
+The installer deliberately does not run pkg upgrade, install a systemd
+service, or enable privacy-sensitive sensors automatically. It installs
+Termux-native scientific packages, verifies Python imports, and attempts to
+build the Rust daemon. A successful build is not proof that the complete
+runtime works on every phone; verify it on-device before relying on it.
+See docs/archive/computer-specific/cleanup-manifest.md for limitations.
+
+### Android / Termux status
+
+Genesis3 is being adapted for phone-first development. The desktop X11 screen
+relay and the passwordless-sudoers example have been moved to
+`docs/archive/computer-specific/`; the CLI no longer launches the X11 relay.
+The interoception sensor discovery now recognizes Android-style power-supply
+names and selects processor/SoC thermal zones by their declared type rather
+than assuming `thermal_zone0` is the CPU.
+
+**The full Rust daemon is not yet verified as buildable or runnable in Termux.**
+Its V4L2 camera capture, CPU-frequency actuation, RTC wake, and RTKit integrations
+remain Linux-specific. Do not run the desktop installer on the phone and assume
+those features will work. Termux:API can expose selected Android functions, but
+Android hardware adapters are Python-side and explicitly opt-in:
+- `GENESIS_ANDROID_SENSORS=1` samples available motion/environment sensors into world telemetry.
+- `GENESIS_ANDROID_CAMERA=1` captures still frames with `termux-camera-photo` and sends them through the existing visual cortex. Select camera ID with `GENESIS_ANDROID_CAMERA_ID` (default 0).
+- `GENESIS_ANDROID_MICROPHONE=1` records short clips with `termux-microphone-record`, decodes them with `ffmpeg`, and sends measured audio features through the existing sound classifier. This is non-speech sound classification, not speech transcription.
+- Explicit voice-input requests can use Termux's `termux-speech-to-text` command when available; this separate path returns a transcript and is not the background sound classifier.
+All three require the matching Termux:API command and the companion app, plus the requested Android permissions. Install the Termux package with `pkg install termux-api ffmpeg` for microphone support. Actual sensors and cameras vary by device. Battery percentage and charging state can fall back to Termux:API when Android sysfs does not expose them. These adapters have unit-tested parsing but still require on-device verification; the full Rust daemon is not yet verified in Termux.
+Unavailable measurements must remain unavailable,
+not be treated as readings. See `docs/archive/README.md` for the archived
+integrations and measurement rules.
+
+State lives in `~/.local/share/genesis` by default, with `GENESIS_DATA_DIR`
+as the explicit override. Preserve this directory when moving or rebuilding the
+runtime; it contains Genesis's persistent state.
 
 Operational notes, in brief:
 

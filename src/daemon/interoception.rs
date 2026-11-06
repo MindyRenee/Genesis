@@ -1638,10 +1638,15 @@ impl Interoceptor {
         if probe.max_freq_khz > 0 {
             mask |= sensor::MAX_FREQUENCY;
         }
-        if probe.battery_path.is_some() {
+        let termux_battery = if probe.battery_path.is_none() || probe.ac_path.is_none() {
+            read_termux_battery_status()
+        } else {
+            None
+        };
+        if probe.battery_path.is_some() || termux_battery.is_some() {
             mask |= sensor::BATTERY;
         }
-        if probe.ac_path.is_some() {
+        if probe.ac_path.is_some() || termux_battery.is_some_and(|(_, plugged)| plugged.is_some()) {
             mask |= sensor::AC_ADAPTER;
         }
         if probe.fan_path.is_some() {
@@ -2863,29 +2868,33 @@ impl Interoceptor {
 
     /// Read battery level and AC power status.
     fn read_power(&self) -> (f32, bool) {
-        let on_ac = self
+        // Termux:API is a fallback only when Android's sysfs interface is
+        // absent or unreadable. Its companion app and `termux-api` package
+        // must be installed; failures remain unavailable, never guessed.
+        let sysfs_on_ac = self
             .ac_path
             .as_ref()
-            .and_then(|p| fs::read_to_string(p).ok())
-            // The power_supply `online` attribute is strictly numeric:
-            // 0 = Offline, 1 = Online (fixed line), 2 = Online
-            // (programmable, e.g. USB-PD). Only 0 means unplugged, so
-            // compare against that. The previous test also accepted
-            // anything containing "on", which is a heuristic against a
-            // numeric ABI and can only misfire — "2" is online but
-            // failed both halves, reporting the machine as unplugged
-            // and un-gating the low-battery and low-supply-voltage CRH
-            // branches.
-            .map(|s| s.trim() != "0")
-            .unwrap_or(true); // default to AC if no sensor
-
-        let energy = self
+            .and_then(|path| fs::read_to_string(path).ok())
+            // Power-supply `online`: 0 means unplugged; nonzero means
+            // externally powered, including USB-PD's value 2.
+            .map(|value| value.trim() != "0");
+        let sysfs_energy = self
             .battery_path
             .as_ref()
-            .and_then(|p| fs::read_to_string(p).ok())
-            .and_then(|s| s.trim().parse::<u32>().ok())
-            .map(|v| crate::state::sanitize::finite_clamp((v as f32) / 100.0, 0.0, 1.0))
-            .unwrap_or(1.0); // default to full if no battery
+            .and_then(|path| fs::read_to_string(path).ok())
+            .and_then(|value| value.trim().parse::<u32>().ok())
+            .map(|value| crate::state::sanitize::finite_clamp((value as f32) / 100.0, 0.0, 1.0));
+        let termux = if sysfs_energy.is_none() || sysfs_on_ac.is_none() {
+            read_termux_battery_status()
+        } else {
+            None
+        };
+        let on_ac = sysfs_on_ac
+            .or_else(|| termux.and_then(|(_, plugged)| plugged))
+            .unwrap_or(true); // ignored when the AC-adapter presence bit is clear
+        let energy = sysfs_energy
+            .or_else(|| termux.map(|(level, _)| level))
+            .unwrap_or(1.0); // ignored when the battery presence bit is clear
 
         (energy, on_ac)
     }
@@ -2936,23 +2945,81 @@ fn hwmon_name(device: &str) -> Option<String> {
         .map(|name| name.trim().to_string())
 }
 
-/// Find the CPU die temperature sensor path (k10temp/coretemp/k8temp),
-/// falling back to the acpitz thermal zone if k10temp is not available.
+/// Find a processor/SoC thermal sensor without mistaking battery or skin
+/// temperature for CPU temperature.
+///
+/// Desktop Linux prefers a known CPU-die hwmon driver. Android devices often
+/// expose thermal zones through `/sys/class/thermal/thermal_zoneN`, with
+/// vendor-specific names such as `cpu-therm`, `soc-therm`, or `tsens_tz_sensor0`.
+/// Zone zero is not assumed to be the CPU: Android commonly numbers battery,
+/// skin, charger, and GPU zones too. If no processor/SoC zone is identifiable,
+/// return an empty path so the caller can report the measurement unavailable.
 fn find_temp_sensor() -> String {
-    // Look for k10temp (AMD) or coretemp (Intel) first — these
-    // are the actual CPU die temperatures.
+    // Prefer known CPU-die hwmon drivers on desktop Linux.
     for device in hwmon_devices() {
         if let Some(name) = hwmon_name(&device) {
             if name == "k10temp" || name == "coretemp" || name == "k8temp" {
                 let temp_path = format!("{device}/temp1_input");
-                if fs::metadata(&temp_path).is_ok() {
+                if readable_temp(&temp_path) {
                     return temp_path;
                 }
             }
         }
     }
-    // Fall back to ACPI thermal zone
-    "/sys/class/thermal/thermal_zone0/temp".to_string()
+
+    // Android/Linux thermal-zone names are vendor-specific. Select only a
+    // zone whose declared type explicitly identifies the processor or SoC;
+    // do not silently use zone0, which can represent skin or battery.
+    let mut zones: Vec<(u32, String, String)> = fs::read_dir("/sys/class/thermal")
+        .ok()
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let index = name.strip_prefix("thermal_zone")?.parse::<u32>().ok()?;
+            let path = entry.path();
+            let zone_type = fs::read_to_string(path.join("type"))
+                .ok()?
+                .trim()
+                .to_ascii_lowercase();
+            let temp = path.join("temp").to_string_lossy().into_owned();
+            readable_temp(&temp).then_some((index, zone_type, temp))
+        })
+        .collect();
+    zones.sort_by_key(|(index, _, _)| *index);
+
+    if let Some((_, _, path)) = zones
+        .iter()
+        .find(|(_, kind, _)| is_processor_thermal_zone(kind))
+    {
+        return path.clone();
+    }
+
+    // ACPI thermal zones are a useful desktop fallback, but not a generic
+    // Android fallback: an untyped thermal zone is not a trustworthy CPU
+    // temperature measurement.
+    if let Some((_, _, path)) = zones.iter().find(|(_, kind, _)| kind == "acpitz") {
+        return path.clone();
+    }
+    String::new()
+}
+
+fn readable_temp(path: &str) -> bool {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|value| value.trim().parse::<f32>().ok())
+        .is_some_and(|value| value.is_finite() && (0.0..=150_000.0).contains(&value))
+}
+
+fn is_processor_thermal_zone(kind: &str) -> bool {
+    let kind = kind.trim().to_ascii_lowercase();
+    kind.contains("cpu")
+        || kind.contains("soc")
+        || kind.contains("tsens")
+        || kind.contains("package")
+        || kind == "ap"
+        || kind.starts_with("ap_")
 }
 
 /// Find per-core CPU frequency sensor paths.
@@ -3019,15 +3086,128 @@ fn read_max_freq() -> Option<u64> {
     None
 }
 
-/// Find the battery capacity path.
-fn find_battery() -> Option<String> {
-    for supply in &["BAT0", "BAT1", "BATT"] {
-        let path = format!("/sys/class/power_supply/{supply}/capacity");
-        if fs::metadata(&path).is_ok() {
-            return Some(path);
+/// Query Android's Termux:API battery command when sysfs is unavailable.
+///
+/// Output is parsed narrowly for the documented `percentage` and `plugged`
+/// fields. This function returns None on desktop Linux, missing permissions,
+/// missing package, malformed output, or unknown charging state.
+fn read_termux_battery_status() -> Option<(f32, Option<bool>)> {
+    #[cfg(target_os = "android")]
+    {
+        // The daemon polls much faster than battery percentage changes.
+        // Cache successes and failures for 15 s to avoid spawning a Termux
+        // process on every body tick when sysfs is unavailable.
+        static CACHE: OnceLock<Mutex<Option<(Instant, Option<(f32, Option<bool>)>)>>> =
+            OnceLock::new();
+        let cache = CACHE.get_or_init(|| Mutex::new(None));
+        if let Ok(guard) = cache.lock() {
+            if let Some((updated, value)) = guard.as_ref() {
+                if updated.elapsed().as_secs_f32() < 15.0 {
+                    return *value;
+                }
+            }
         }
+        let value = std::process::Command::new("termux-battery-status")
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .and_then(|output| String::from_utf8(output.stdout).ok())
+            .and_then(|text| parse_termux_battery_status(&text));
+        if let Ok(mut guard) = cache.lock() {
+            *guard = Some((Instant::now(), value));
+        }
+        value
     }
-    None
+    #[cfg(not(target_os = "android"))]
+    {
+        None
+    }
+}
+
+#[cfg(any(target_os = "android", test))]
+fn parse_termux_battery_status(text: &str) -> Option<(f32, Option<bool>)> {
+    let percentage = json_number_field(text, "percentage")?;
+    if !percentage.is_finite() || !(0.0..=100.0).contains(&percentage) {
+        return None;
+    }
+    let external_power = match json_string_field(text, "plugged").as_deref() {
+        Some("UNPLUGGED") => Some(false),
+        Some("PLUGGED_AC" | "PLUGGED_USB" | "PLUGGED_WIRELESS" | "PLUGGED_DOCK") => Some(true),
+        _ => None,
+    };
+    Some((percentage / 100.0, external_power))
+}
+
+#[cfg(any(target_os = "android", test))]
+fn json_number_field(text: &str, key: &str) -> Option<f32> {
+    let key = format!("\"{key}\"");
+    let value = text
+        .split_once(&key)?
+        .1
+        .trim_start()
+        .strip_prefix(':')?
+        .trim_start();
+    let token: String = value
+        .chars()
+        .take_while(|ch| ch.is_ascii_digit() || matches!(ch, '.' | '-'))
+        .collect();
+    token.parse().ok()
+}
+
+#[cfg(any(target_os = "android", test))]
+fn json_string_field(text: &str, key: &str) -> Option<String> {
+    let key = format!("\"{key}\"");
+    let value = text
+        .split_once(&key)?
+        .1
+        .trim_start()
+        .strip_prefix(':')?
+        .trim_start();
+    let value = value.strip_prefix('"')?;
+    let end = value.find('"')?;
+    Some(value[..end].to_string())
+}
+
+/// Find a readable battery capacity path.
+///
+/// Desktop names such as BAT0 are preferred, but Android commonly names its
+/// power supply simply `battery`. Discovery uses the kernel's declared
+/// `type=Battery` rather than assuming laptop naming.
+fn find_battery() -> Option<String> {
+    let root = "/sys/class/power_supply";
+    let entries = fs::read_dir(root).ok()?;
+    let mut candidates: Vec<(u8, String)> = entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+            let supply_type = fs::read_to_string(path.join("type")).ok()?;
+            if supply_type.trim() != "Battery" {
+                return None;
+            }
+            let capacity = path.join("capacity");
+            let value = fs::read_to_string(&capacity).ok()?;
+            let percent = value.trim().parse::<u8>().ok()?;
+            if percent > 100 {
+                return None;
+            }
+            let priority = if matches!(name.as_str(), "bat0" | "bat1" | "batt") {
+                0
+            } else {
+                1
+            };
+            Some((priority, capacity.to_string_lossy().into_owned()))
+        })
+        .collect();
+    candidates.sort();
+    candidates.into_iter().next().map(|(_, path)| path)
+}
+
+fn is_external_power_type(kind: &str) -> bool {
+    matches!(
+        kind.trim(),
+        "Mains" | "USB" | "USB_C" | "USB_PD" | "USB_PD_DRP" | "Wireless" | "Dock"
+    )
 }
 
 /// Find the AC adapter online status path.
@@ -3047,8 +3227,9 @@ fn find_ac_adapter() -> Option<String> {
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            let is_mains = fs::read_to_string(path.join("type")).is_ok_and(|t| t.trim() == "Mains");
-            if !is_mains {
+            let is_external_power = fs::read_to_string(path.join("type"))
+                .is_ok_and(|kind| is_external_power_type(kind.trim()));
+            if !is_external_power {
                 return None;
             }
             let online = path.join("online");
@@ -5396,5 +5577,90 @@ mod sensor_presence_tests {
             0,
             "unreadable MemTotal must not claim MEMORY present"
         );
+    }
+}
+
+#[cfg(test)]
+mod android_power_discovery_tests {
+    use super::{is_external_power_type, is_processor_thermal_zone, parse_termux_battery_status};
+
+    #[test]
+    fn android_processor_thermal_zone_names_are_recognized() {
+        for name in [
+            "cpu-therm",
+            "cpu_thermal",
+            "soc-therm",
+            "tsens_tz_sensor0",
+            "package-0",
+        ] {
+            assert!(
+                is_processor_thermal_zone(name),
+                "expected processor zone: {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn non_processor_thermal_zones_are_not_mislabeled_as_cpu() {
+        for name in ["battery", "skin-therm", "charger", "gpu-therm", "ambient"] {
+            assert!(
+                !is_processor_thermal_zone(name),
+                "must not call {name} CPU temperature"
+            );
+        }
+    }
+
+    #[test]
+    fn termux_battery_status_parses_real_level_and_charging_state() {
+        let result = parse_termux_battery_status(r#"{"percentage": 42, "plugged": "PLUGGED_USB"}"#)
+            .expect("valid Termux battery response");
+        assert!((result.0 - 0.42).abs() < 1e-6);
+        assert_eq!(result.1, Some(true));
+
+        let unplugged = parse_termux_battery_status(r#"{"percentage": 7, "plugged": "UNPLUGGED"}"#)
+            .expect("valid unplugged response");
+        assert!((unplugged.0 - 0.07).abs() < 1e-6);
+        assert_eq!(unplugged.1, Some(false));
+    }
+
+    #[test]
+    fn termux_battery_status_rejects_missing_or_unknown_values() {
+        let missing_plug = parse_termux_battery_status(r#"{"percentage": 30}"#)
+            .expect("valid percentage remains available without a plugged field");
+        assert!((missing_plug.0 - 0.30).abs() < 1e-6);
+        assert_eq!(missing_plug.1, None);
+        assert!(
+            parse_termux_battery_status(r#"{"percentage": 140, "plugged": "UNPLUGGED"}"#,)
+                .is_none()
+        );
+        let unknown_plug =
+            parse_termux_battery_status(r#"{"percentage": 30, "plugged": "PLUGGED_UNKNOWN"}"#)
+                .expect("percentage remains useful when charging state is unknown");
+        assert!((unknown_plug.0 - 0.30).abs() < 1e-6);
+        assert_eq!(unknown_plug.1, None);
+    }
+
+    #[test]
+    fn android_external_power_types_are_supported() {
+        for kind in [
+            "Mains",
+            "USB",
+            "USB_C",
+            "USB_PD",
+            "USB_PD_DRP",
+            "Wireless",
+            "Dock",
+        ] {
+            assert!(
+                is_external_power_type(kind),
+                "expected external power type: {kind}"
+            );
+        }
+        for kind in ["Battery", "Unknown", ""] {
+            assert!(
+                !is_external_power_type(kind),
+                "must not treat {kind} as external power"
+            );
+        }
     }
 }

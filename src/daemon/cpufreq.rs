@@ -185,14 +185,21 @@ pub struct BodyControlState {
 pub const CPUFREQ_INTERVAL_TICKS: u64 = 50;
 
 /// Whether `sudo -n` runs without a password. Cached after first check.
+/// Android host-level CPU-frequency writes are intentionally disabled.
+#[cfg(not(target_os = "android"))]
 static SUDO_AVAILABLE: OnceLock<bool> = OnceLock::new();
 
-/// Check if passwordless sudo is available. Cached.
+/// Android/Termux is a sensing-only platform for host CPU policy.
+#[cfg(target_os = "android")]
+fn sudo_available() -> bool {
+    false
+}
+
+/// Check if passwordless sudo is available. Cached on desktop Linux.
 ///
-/// She IS the privilege channel: with the broad NOPASSWD grant on the
-/// host, `sudo -n` runs directly and the sysfs writes below go through
-/// it with no mediator script. Where the grant is absent the levers
-/// degrade off — a body that senses but cannot throttle.
+/// The host-level frequency controls are not enabled on Android: Termux
+/// does not own the Android kernel's CPU policy.
+#[cfg(not(target_os = "android"))]
 fn sudo_available() -> bool {
     *SUDO_AVAILABLE.get_or_init(|| {
         Command::new("sudo")

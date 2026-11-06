@@ -333,6 +333,18 @@ class Vision:
         # Lazily created on first use. Simulates the enzyme kinetics that
         # convert photon absorption into electrical signals.
         self._phototransduction: PhototransductionCascade | None = None
+        # Optional calibrated bridge to the shared self/inner/outer causal
+        # workspace. Disabled until the caller supplies a valid coordinate
+        # transform; raw camera pixels are never treated as world position.
+        self._visual_spacetime_bridge = None
+
+    def set_visual_spacetime_bridge(self, bridge) -> None:
+        """Connect a calibrated VisualSpacetimeBridge to this visual cortex."""
+        from occipital_lobe.visual_spacetime import VisualSpacetimeBridge
+
+        if not isinstance(bridge, VisualSpacetimeBridge):
+            raise TypeError("bridge must be a VisualSpacetimeBridge")
+        self._visual_spacetime_bridge = bridge
 
     def set_gamma_callback(self, callback: Callable[[float], None]) -> None:
         """Register a callback for V1 gamma power updates.
@@ -580,6 +592,58 @@ class Vision:
             rgb_small = rgb
         subsystem = self._get_occipital()
         return subsystem.process(rgb_small, learn=True)
+
+    def see_frame(
+        self,
+        frame: np.ndarray,
+        client=None,
+        emotion: EmotionalState | None = None,
+        network=None,
+        mirror: bool = False,
+        nerve: str = "android_camera",
+    ) -> VisionScene:
+        """Process a supplied RGB frame through the same visual cortex path as the optic nerve.
+
+        This is the ingestion seam for Android camera adapters that cannot
+        publish into the Linux V4L2 shared-memory producer. The frame is still
+        gated by the body's thalamic relay and passes through the same optics,
+        illumination, recognition, and scene-integration stages.
+        """
+        gate = self._optic_gate(client)
+        if isinstance(gate, VisionScene):
+            gate.nerve = nerve
+            return gate
+        relay_gate, pupil_mm, focus_m, lid = gate
+        rgb = np.asarray(frame)
+        if (
+            rgb.ndim != 3
+            or rgb.shape[2] != 3
+            or rgb.shape[0] < 1
+            or rgb.shape[1] < 1
+            or not np.issubdtype(rgb.dtype, np.number)
+            or not np.all(np.isfinite(rgb))
+        ):
+            return VisionScene(status="unprocessed", relay_gate=relay_gate, nerve=nerve)
+        if rgb.dtype != np.uint8:
+            rgb = np.clip(rgb, 0, 255).astype(np.uint8)
+        try:
+            scene = self._analyze_frame(
+                rgb,
+                pupil_mm,
+                focus_m,
+                lid,
+                relay_gate,
+                client,
+                emotion,
+                network,
+                mirror,
+                nerve,
+            )
+            scene.nerve = nerve
+            return scene
+        except Exception as error:  # noqa: BLE001 — bad frames cannot crash cognition
+            note_swallowed("occipital_lobe.perception.vision.see_frame", error)
+            return VisionScene(status="unprocessed", relay_gate=relay_gate, nerve=nerve)
 
     def see(
         self,
@@ -852,6 +916,14 @@ class Vision:
         # ── MSTd (dorsal stream): two-view geometry of this look
         # against the last — self-motion, heading, parallax depth
         two_view = self._two_view_geometry(rgb, nerve)
+        if two_view is not None and self._visual_spacetime_bridge is not None:
+            try:
+                # Camera report timestamps and the shared workspace use
+                # the same monotonic clock; coordinate conversion remains
+                # the responsibility of the explicitly calibrated bridge.
+                self._visual_spacetime_bridge.publish(two_view, time_s=time.monotonic())
+            except Exception as error:  # noqa: BLE001 — causal telemetry must not blind vision
+                note_swallowed("occipital_lobe.perception.vision.visual_spacetime", error)
 
         # ── Package the structured scene percept ────────────────
         scene = _build_scene(
