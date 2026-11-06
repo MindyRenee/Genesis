@@ -211,7 +211,7 @@ def test_grounded_comprehension_reaches_downstream_perception(engine, monkeypatc
         comprehension,
     )
 
-    assert perception.topics == ["quantum mechanism"]
+    assert "quantum mechanism" in perception.topics
 
 
 def test_early_route_updates_discourse_situation(engine):

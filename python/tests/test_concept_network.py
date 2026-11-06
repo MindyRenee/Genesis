@@ -3112,9 +3112,10 @@ def test_attach_orphans_connects_concepts_with_no_word_overlap() -> None:
 # ── Bug 2: clean_noise now prunes concepts at exactly the threshold ──
 
 
-def test_clean_noise_prunes_concept_at_exact_threshold() -> None:
+def test_clean_noise_prunes_concept_at_exact_threshold(tmpdir) -> None:
     """Concepts at exactly min_confidence with 0 edges should be pruned."""
     net = ConceptNetwork()
+    net.attach_archive(open_archive(tmpdir))
 
     # Concept at exactly 0.4 with no edges — the learner's default
     net.add_concept("orphan_at_threshold", confidence=0.4)
@@ -3128,7 +3129,9 @@ def test_clean_noise_prunes_concept_at_exact_threshold() -> None:
 
     assert "orphan_at_threshold" in removed
     assert "connected_at_threshold" not in removed
-    assert net.get_concept("orphan_at_threshold") is None
+    # Evicted from working memory but archived — recallable, not deleted.
+    assert "orphan_at_threshold" not in net._concepts
+    assert net.archive_size == 1
     assert net.get_concept("connected_at_threshold") is not None
 
 
@@ -3177,29 +3180,31 @@ def test_consolidate_connects_orphans_before_pruning() -> None:
     assert net.get_concept("hub_related_thing") is not None
 
 
-def test_consolidate_removes_truly_isolated_noise() -> None:
+def test_consolidate_removes_truly_isolated_noise(tmpdir) -> None:
     """After hub attachment, truly unconnectable noise is pruned."""
     net = _make_minimal_network()
+    net.attach_archive(open_archive(tmpdir))
 
     # Add noise at confidence 0.2 (below threshold, no edges)
     net.add_concept("noise_low_conf", confidence=0.2)
 
     result = net.consolidate_during_sleep()
     assert result["noise_removed"] >= 1
-    assert net.get_concept("noise_low_conf") is None
+    assert "noise_low_conf" not in net._concepts
 
 
 # ── Regression: existing clean_noise behavior preserved ──
 
 
-def test_clean_noise_still_removes_low_confidence() -> None:
+def test_clean_noise_still_removes_low_confidence(tmpdir) -> None:
     """Concepts below the threshold with no edges are still removed."""
     net = ConceptNetwork()
+    net.attach_archive(open_archive(tmpdir))
     net.add_concept("low_conf_orphan", confidence=0.3)
 
     removed = net.clean_noise(min_confidence=0.5, min_edges=1)
     assert "low_conf_orphan" in removed
-    assert net.get_concept("low_conf_orphan") is None
+    assert "low_conf_orphan" not in net._concepts
 
 
 def test_clean_noise_still_preserves_connected_low_conf() -> None:

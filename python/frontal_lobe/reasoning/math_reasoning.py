@@ -400,9 +400,12 @@ class Parser:
         if t.type == TokenType.NUMBER:
             self.advance()
             raw = t.value
-            if "." in raw or "e" in raw or "E" in raw:
-                return Num(float(raw))
-            return Num(int(raw))
+            try:
+                if "." in raw or "e" in raw or "E" in raw:
+                    return Num(float(raw))
+                return Num(int(raw))
+            except ValueError:
+                raise ParseError(f"malformed number literal: {raw!r}")
 
         if t.type == TokenType.IDENT:
             self.advance()
