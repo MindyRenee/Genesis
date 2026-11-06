@@ -571,6 +571,13 @@ def _get_browser():
         _browser = _Browser(headless=True, purpose="web")
         atexit.register(_close_browser)
         return _browser
+    except RuntimeError as e:
+        # A browser is optional on headless/mobile hosts. Its absence is
+        # the documented urllib/DDG fallback condition, not a runtime fault.
+        if str(e) != "no chrome-family browser installed":
+            note_swallowed("tools.web_search.browser_launch", e)
+        _browser_failed = True
+        return None
     except Exception as e:  # noqa: BLE001 — no browser → urllib fallback
         note_swallowed("tools.web_search.browser_launch", e)
         _browser_failed = True

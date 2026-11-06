@@ -2562,7 +2562,13 @@ def _try_bare_expression(lower: str) -> MathResult | None:
                         "computation",
                         [f"{_expr_to_str(parsed)} = {format_number(value)}"],
                     )
-            except (ParseError, EvalError) as e:
+            except ParseError:
+                # This is a heuristic probe: ordinary prose can match the
+                # broad candidate regex and then fail the strict grammar.
+                # A parse miss means "not a bare expression", not a system
+                # failure, so it must not pollute the cognitive error journal.
+                return None
+            except EvalError as e:
                 note_swallowed(
                     "reasoning.math_reasoning._try_bare_expression",
                     e,

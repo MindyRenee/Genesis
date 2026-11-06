@@ -348,3 +348,37 @@ def test_optic_availability_recovers_when_camera_connects_late(monkeypatch) -> N
     assert vis.is_available() is False
     current["frame"] = frame
     assert vis.is_available() is True
+
+
+def test_bare_expression_parse_miss_is_not_journaled() -> None:
+    """A heuristic parse miss is normal input rejection, not a runtime error."""
+    from frontal_lobe.reasoning.math_reasoning import _try_bare_expression
+    from genesis_client import swallow
+
+    site = "reasoning.math_reasoning._try_bare_expression"
+    before = swallow.swallow_count(site)
+    assert _try_bare_expression("2 + 3.0. note") is None
+    assert swallow.swallow_count(site) == before
+
+
+def test_missing_chrome_uses_fallback_without_journaling(monkeypatch) -> None:
+    """No installed browser is an expected mobile/headless fallback."""
+    import sys
+    from types import SimpleNamespace
+
+    import tools.web_search as web_search
+    from genesis_client import swallow
+
+    class _UnavailableBrowser:
+        def __init__(self, *, headless: bool, purpose: str) -> None:
+            raise RuntimeError("no chrome-family browser installed")
+
+    site = "tools.web_search.browser_launch"
+    before = swallow.swallow_count(site)
+    monkeypatch.setattr(web_search, "_browser", None)
+    monkeypatch.setattr(web_search, "_browser_failed", False)
+    monkeypatch.setitem(sys.modules, "tools.browser", SimpleNamespace(_Browser=_UnavailableBrowser))
+
+    assert web_search._get_browser() is None
+    assert web_search._browser_failed is True
+    assert swallow.swallow_count(site) == before
