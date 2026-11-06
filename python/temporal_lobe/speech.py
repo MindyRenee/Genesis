@@ -520,18 +520,31 @@ class Voice:
             # The crackling was specifically caused by the default
             # ~50ms buffer with the PipeWire backend — any scheduling
             # hiccup would underrun it. 200ms is 4x that, stable.
-            play_cmd = [
-                "aplay",
-                "-r",
-                str(self._sample_rate),
-                "-f",
-                "S16_LE",
-                "-c",
-                "1",
-                "-q",
-                "--buffer-time=200000",
-                "--period-time=50000",
-            ]
+            # Player selection: aplay on ALSA systems; paplay where
+            # PulseAudio/PipeWire is the only bridge (e.g. a proot
+            # distro on Android, which has no /dev/snd). paplay takes
+            # the same raw S16_LE stream Piper emits.
+            if shutil.which("aplay") is not None:
+                play_cmd = [
+                    "aplay",
+                    "-r",
+                    str(self._sample_rate),
+                    "-f",
+                    "S16_LE",
+                    "-c",
+                    "1",
+                    "-q",
+                    "--buffer-time=200000",
+                    "--period-time=50000",
+                ]
+            else:
+                play_cmd = [
+                    "paplay",
+                    "--raw",
+                    f"--rate={self._sample_rate}",
+                    "--format=s16le",
+                    "--channels=1",
+                ]
             self._piper_proc = proc
             try:
                 self._play_proc = subprocess.Popen(
