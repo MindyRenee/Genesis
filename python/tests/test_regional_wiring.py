@@ -243,6 +243,8 @@ _ALLOWLIST: dict[str, str] = {
     # ARC benchmark adapters — external task harness over parietal
     # spatial reasoning, not a brain function of their own.
     "parietal_lobe.arc_ascii": "ARC benchmark adapter — task I/O encoding",
+    "parietal_lobe.arc_braille": "ARC benchmark adapter — six-dot-cell record encoding",
+    "parietal_lobe.binary_language": "ARC record cell library — BitCell tissue used by arc_braille",
     "parietal_lobe.arc_genesis_observer": "ARC benchmark adapter — routes games into Genesis",
     "worlds.arc_arena": "ARC-AGI-3 games as a place in the outer world (benchmark adapter)",
     "parietal_lobe.arc_neuro": "ARC benchmark adapter — EM field, brain waves, chemicals in play",

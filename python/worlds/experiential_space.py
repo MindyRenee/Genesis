@@ -157,7 +157,7 @@ class ExperientialLatentSpace:
         values[15] = min(len(event.content), 300) / 300.0
         # Structured sensory payloads (e.g. ARC grids or numeric camera
         # features) are summarized deterministically; never stringify them.
-        payload = self._numeric_payload(event.percept)
+        payload = ExperientialLatentSpace._numeric_payload(event.percept)
         if payload.size:
             values[16] = math.tanh(float(np.mean(payload)))
             values[17] = math.tanh(float(np.std(payload)))

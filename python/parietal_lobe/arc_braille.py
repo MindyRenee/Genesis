@@ -56,7 +56,7 @@ def _plain(value: Any, depth: int = 0) -> Any:
             for key, item in sorted(vars(value).items())
             if not key.startswith("_")
         }
-    return type(value).__name__
+    raise TypeError(f"unsupported game record value: {type(value).__name__}")
 
 
 def _canonical_bytes(record: Mapping[str, Any]) -> bytes:

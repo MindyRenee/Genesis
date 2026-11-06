@@ -384,7 +384,7 @@ def step_arc3_game(
     if action_name != RESET_ACTION:
         legal = arc3_legal_actions(environment)
         if not legal:
-            raise ValueError(
+            raise ARCSourceError(
                 "ARC-AGI-3 environment exposes no legal actions in the current state"
             )
         if action_name not in legal:
