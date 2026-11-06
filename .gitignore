@@ -59,3 +59,4 @@ genesis_client/creator.py
 dart/genesis_arc_bridge/.dart_tool/
 dart/genesis_arc_bridge/pubspec.lock
 .genesis-discord-steward
+.genesis-discord-channels

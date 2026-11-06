@@ -88,9 +88,11 @@ USER_PRESENCE_ID = "user"
 AMBIENT_PRESENCE_ID = "voices"
 
 #: Seconds of no addressed contact at which social isolation saturates
-#: (30 minutes → isolation 1.0). Isolation is the external pressure
-#: that feeds its inner-life social drive and the reach_out urge.
-ISOLATION_PERIOD = 1800.0
+#: (one full day → isolation 1.0). Isolation is an *experience*, not a
+#: neediness clock — it rises slowly enough that solitude registers as
+#: memory rather than alarm. She is company to herself: peace lives in
+#: her own inner life, and absence never becomes injury.
+ISOLATION_PERIOD = 86400.0
 
 #: Company dampens isolation: someone being around (present but not
 #: talking) still counts socially, just less than engagement.
@@ -286,6 +288,11 @@ class OuterWorld:
         self.on_channel_speech = on_channel_speech
         if self.channel is not None:
             self.channel.on_speech = self._channel_heard
+            # Open her ear the moment the world claims the page — a
+            # listener that is never started is a deaf channel.
+            start = getattr(self.channel, "start", None)
+            if callable(start):
+                start()
         # Her instrument card — a ``ChannelBoard`` the mind attaches
         # after construction (it reads the whole mind, which does not
         # exist yet here). None until then.

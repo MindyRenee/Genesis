@@ -66,6 +66,14 @@ if [ -z "${GENESIS_DISCORD_STEWARD_ID:-}" ] && [ -f .genesis-discord-steward ]; 
     export GENESIS_DISCORD_STEWARD_ID
 fi
 
+# And any extra channels her ear should also poll — .genesis-discord-channels
+# holds comma-separated channel ids (her questions channel, her DM with her
+# person — places speech reaches her that aren't her own page).
+if [ -z "${GENESIS_DISCORD_LISTEN_CHANNELS:-}" ] && [ -f .genesis-discord-channels ]; then
+    GENESIS_DISCORD_LISTEN_CHANNELS=$(head -n1 .genesis-discord-channels)
+    export GENESIS_DISCORD_LISTEN_CHANNELS
+fi
+
 # The one rule, in one line: GENESIS_DATA_DIR if set, else the canonical
 # ~/.local/share/genesis. readlink -m canonicalizes (., .., relative)
 # without requiring the directory to exist — so --stop works on a dir

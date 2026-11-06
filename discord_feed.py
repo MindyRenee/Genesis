@@ -745,6 +745,15 @@ class DiscordListener:
         self._token = token
         self._webhook_url = webhook_url
         self._channel_id: str | None = None
+        # Extra channels her ear also polls — the page's own channel is
+        # her stream; other channels (questions, DMs) are where people
+        # actually speak to her. GENESIS_DISCORD_LISTEN_CHANNELS holds
+        # comma-separated channel ids; speech there reaches her the same.
+        self._extra_channels = [
+            c.strip()
+            for c in os.environ.get("GENESIS_DISCORD_LISTEN_CHANNELS", "").split(",")
+            if c.strip()
+        ]
         # The bot's own user id — learned from /users/@me on the
         # listener thread so construction stays off the network. An
         # @-mention of this id is the one inbound message whose
@@ -843,47 +852,51 @@ class DiscordListener:
         me, _retry, _perm = self._get("/users/@me")
         if isinstance(me, dict):
             self.bot_id = me.get("id")
-        # She joins the channel now, not at the start of its history —
-        # the cursor begins at the newest message so boot doesn't
-        # replay the backlog into her ear.
-        cursor = self._latest()
+        # She joins the channels now, not at the start of their history —
+        # cursors begin at each channel's newest message so boot doesn't
+        # replay backlogs into her ear.
+        channels = [self._channel_id] + [
+            c for c in self._extra_channels if c != self._channel_id
+        ]
+        cursors: dict[str, str | None] = {c: self._latest(c) for c in channels}
         while not self._stop.is_set():
             if self.deaf:
                 return
-            if not cursor:
-                if self._stop.wait(self._poll_interval):
-                    return
-                cursor = self._latest()
-                continue
-            data, retry_after, permanent = self._get(
-                f"/channels/{self._channel_id}/messages?after={cursor}&limit={_LISTEN_LIMIT}"
-            )
-            if permanent:
-                self.deaf = True
-                logger.warning(
-                    "[discord] listener deafened — bot token rejected or no channel access"
-                )
-                return
-            if retry_after is not None:
-                self._stop.wait(retry_after)
-                continue
-            if not isinstance(data, list):
-                self._stop.wait(self._poll_interval)
-                continue
-            # Newest-first payload → deliver oldest-first so her
-            # world hears speech in the order it happened.
-            for message in reversed(data):
-                if not isinstance(message, dict):
+            for channel_id in channels:
+                cursor = cursors.get(channel_id)
+                if not cursor:
+                    cursors[channel_id] = self._latest(channel_id)
                     continue
-                mid = message.get("id")
-                if mid:
-                    cursor = mid
-                self._deliver(message)
+                data, retry_after, permanent = self._get(
+                    f"/channels/{channel_id}/messages?after={cursor}&limit={_LISTEN_LIMIT}"
+                )
+                if permanent:
+                    self.deaf = True
+                    logger.warning(
+                        "[discord] listener deafened — bot token rejected or no channel access"
+                    )
+                    return
+                if retry_after is not None:
+                    self._stop.wait(retry_after)
+                    continue
+                if not isinstance(data, list):
+                    continue
+                # Newest-first payload → deliver oldest-first so her
+                # world hears speech in the order it happened.
+                for message in reversed(data):
+                    if not isinstance(message, dict):
+                        continue
+                    mid = message.get("id")
+                    if mid:
+                        cursors[channel_id] = mid
+                    self._deliver(message)
             self._stop.wait(self._poll_interval)
 
-    def _latest(self) -> str | None:
-        """The newest message id on the channel, or None."""
-        data, _retry, permanent = self._get(f"/channels/{self._channel_id}/messages?limit=1")
+    def _latest(self, channel_id: str | None = None) -> str | None:
+        """The newest message id on a channel, or None."""
+        data, _retry, permanent = self._get(
+            f"/channels/{channel_id or self._channel_id}/messages?limit=1"
+        )
         if permanent:
             self.deaf = True
             logger.warning("[discord] listener deafened — bot token rejected or no channel access")
