@@ -59,9 +59,9 @@
 //! `relay_gain`, and the meaning of the pixels lives entirely in the
 //! mind — the words side.
 
-#[cfg(target_os = "android")]
+#[cfg(unix)]
 use std::io::Read;
-#[cfg(target_os = "android")]
+#[cfg(unix)]
 use std::net::TcpStream;
 use std::sync::Arc;
 #[cfg(target_os = "android")]
@@ -1115,8 +1115,43 @@ impl Drop for OpticCapture {
 /// where the loss actually happens. Bounded: after the table's
 /// worth of un-lived lives the eye is accepted absent and the limb
 /// rests — the organism goes on without sight.
+
+/// True when the host kernel is Android's — Termux, or a glibc distro
+/// in proot (Andronix and friends). Compile-time target_os never fires
+/// for proot: those builds are plain Linux, so the Camera2 limb must be
+/// chosen at runtime. GENESIS_TCP_EYE=1 forces the TCP limb on any kernel.
+#[cfg(target_os = "linux")]
+fn on_android_kernel() -> bool {
+    use std::sync::OnceLock;
+    static DETECTED: OnceLock<bool> = OnceLock::new();
+    *DETECTED.get_or_init(|| {
+        if std::env::var_os("GENESIS_TCP_EYE").is_some() {
+            return true;
+        }
+        std::fs::read_to_string("/proc/version")
+            .map(|v| v.to_lowercase().contains("android"))
+            .unwrap_or(false)
+    })
+}
+
 #[cfg(target_os = "linux")]
 fn capture_limb(shm_name: &str, stop: &AtomicBool) {
+    // On an Android kernel there is no V4L2 to open — the only lens is
+    // the Camera2 app publishing over loopback, Termux or proot alike.
+    if on_android_kernel() {
+        capture_limb_android(shm_name, stop);
+    } else {
+        capture_limb_v4l2(shm_name, stop);
+    }
+}
+
+#[cfg(target_os = "android")]
+fn capture_limb(shm_name: &str, stop: &AtomicBool) {
+    capture_limb_android(shm_name, stop);
+}
+
+#[cfg(target_os = "linux")]
+fn capture_limb_v4l2(shm_name: &str, stop: &AtomicBool) {
     let configured =
         std::env::var("GENESIS_CAMERA").unwrap_or_else(|_| DEFAULT_CAMERA_PATH.to_string());
     for (i, camera_path) in camera_candidates(&configured).iter().enumerate() {
@@ -1166,19 +1201,19 @@ fn capture_limb(shm_name: &str, stop: &AtomicBool) {
 
 /// Maximum Android camera frame dimensions. The capture app negotiates
 /// within these bounds; the optic bus reserves one full RGB frame.
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(unix, test))]
 const ANDROID_MAX_WIDTH: u32 = 640;
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(unix, test))]
 const ANDROID_MAX_HEIGHT: u32 = 480;
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(unix, test))]
 const ANDROID_MAX_FRAME_BYTES: usize = ANDROID_MAX_WIDTH as usize * ANDROID_MAX_HEIGHT as usize * 3;
-#[cfg(target_os = "android")]
+#[cfg(unix)]
 const ANDROID_FRAME_MAGIC: &[u8; 4] = b"GOPT";
 
 /// Publish one packed RGB frame into the same seqlock segment used by
 /// the Linux camera limb. The Android capture adapter sends raw RGB;
 /// RGB3 denotes packed R,G,B byte order in the shared frame protocol.
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(unix, test))]
 fn publish_android_frame(
     base: *mut u8,
     mapping_len: usize,
@@ -1232,7 +1267,7 @@ fn publish_android_frame(
     Ok(())
 }
 
-#[cfg(target_os = "android")]
+#[cfg(unix)]
 fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, stop: &AtomicBool) {
     use std::io::ErrorKind;
 
@@ -1305,8 +1340,8 @@ fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, sto
 /// seqlock/header consumed on every platform. TCP is only the OS boundary
 /// between the separately sandboxed Android app and Termux — perception
 /// never branches around the optic nerve.
-#[cfg(target_os = "android")]
-fn capture_limb(shm_name: &str, stop: &AtomicBool) {
+#[cfg(unix)]
+fn capture_limb_android(shm_name: &str, stop: &AtomicBool) {
     // The Android Camera2 service owns the platform-facing listener.
     // The daemon connects outward, preserving the body's single inbound
     // IPC entrance while still publishing into its canonical optic map.
