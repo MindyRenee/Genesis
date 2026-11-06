@@ -37,6 +37,7 @@ from __future__ import annotations
 import gzip
 import json
 import logging
+import time
 import math
 import os
 import tempfile
@@ -2083,6 +2084,7 @@ def serialize_sleep_state(
             "cycles_completed": sleep_cycle.cycles_completed,
         }
     return {
+        "saved_at": time.time(),
         "is_sleeping": is_sleeping,
         "user_initiated_sleep": user_initiated_sleep,
         "sleep_cycle": cycle_data,

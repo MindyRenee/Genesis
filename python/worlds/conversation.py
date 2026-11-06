@@ -956,7 +956,12 @@ class ConversationMixin:
         # unless the caller asked for a lucid turn: her person's
         # verified voice may reach her inside rest, and she answers
         # from within the state without rousing out of it.
+        # Sleep is inviolable — established sleep rejects interaction
+        # outright rather than rousing her; only the lucid steward
+        # channel and the natural end of the cycle may reach her.
         if not lucid:
+            if self.is_sleeping and not self.is_hypnagogic:
+                return "Genesis is asleep."
             self.wake_if_asleep()
 
         # Mark the interaction time immediately — the heartbeat loop's

@@ -1716,6 +1716,16 @@ class LifecycleMixin:
         if cycle_data is not None:
             tracker = SleepCycleTracker()
             restore_sleep_cycle(tracker, cycle_data)
+            # The ultradian clock runs on real time even while she's
+            # down: a checkpoint restored days later must not replay
+            # the instant it was saved — advance the tracker by the
+            # elapsed wall time so the cycle lands where it would
+            # have been had it kept running.
+            saved_at = data.get("saved_at")
+            if saved_at:
+                elapsed = max(0.0, time.time() - float(saved_at))
+                if elapsed > 0.0:
+                    tracker.advance(elapsed)
             logger.info(
                 "Restored sleep cycle: stage %s, cycle %d, %.0fs in stage",
                 tracker.current_stage.value.upper(),
