@@ -592,6 +592,12 @@ pub mod cmd {
     /// Reply: [u8 ack]. Additive: PROTOCOL_VERSION unaffected.
     pub const SET_FIELD_PULSE: u8 = 63;
 
+    /// The body's actuator census — what she can DO right now.
+    /// Request: empty. Response: `[u8 count]` then per actuator
+    /// `[u8 name_len][name][u8 kind][u8 available][u8 reason_len]
+    /// [reason]`. See `daemon::actuators`.
+    pub const LIST_ACTUATORS: u8 = 64;
+
     // ─── Tensor slab ──────────────────────────────────────────
     // Named multidimensional tensors shared between the daemon and
     // the cognitive mind — world frames, salience fields, embeddings,
@@ -4143,6 +4149,8 @@ pub fn default_handler<L: LtmAccess>(
         },
 
         cmd::GET_MOTOR_TARGET => crate::field::motor::current_motor_target().encode(),
+
+        cmd::LIST_ACTUATORS => crate::daemon::actuators::encode_census(),
 
         cmd::ANALYZE_CODE => {
             // [u16 path_len][path][u32 src_len][src] — the mind sends

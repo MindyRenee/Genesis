@@ -103,6 +103,7 @@ from .protocol import (
     GET_ION_SUMMARY,
     GET_MEMORY_STATS,
     GET_MOTOR_TARGET,
+    LIST_ACTUATORS,
     GET_NEURO_SUMMARY,
     GET_OPTIC_STATE,
     GET_PHASE,
@@ -426,6 +427,8 @@ class GenesisClient:
             GET_INTERNALS,
             GET_ION_SUMMARY,
             GET_MOTOR_TARGET,
+            LIST_ACTUATORS,
+    LIST_ACTUATORS,
             GET_OPTIC_STATE,
             GET_PROCESS_HEALTH,
             GET_RECENT_EPISODES,
@@ -511,6 +514,7 @@ class GenesisClient:
             LIST_TENSORS,
             DROP_TENSOR,
             GET_MOTOR_TARGET,
+    LIST_ACTUATORS,
         }
     )
 
@@ -1123,6 +1127,32 @@ class GenesisClient:
         """
         resp = self._request(GET_MOTOR_TARGET, timeout=timeout)
         return unpack_motor_target(resp)
+
+
+    def get_actuators(self, *, timeout: float | None = None) -> list[tuple[str, int, bool, str]]:
+        """The body's actuator census — what she can DO right now.
+
+        Returns ``[(name, kind, available, absent_reason)]`` — kind 0
+        local, 1 relayed; absent_reason empty when the limb is present.
+        See ``src/daemon/actuators.rs``.
+        """
+        resp = self._request(LIST_ACTUATORS, timeout=timeout)
+        out = []
+        i = 0
+        if not resp:
+            return out
+        count = resp[0]
+        i = 1
+        for _ in range(count):
+            if i >= len(resp):
+                break
+            nl = resp[i]; i += 1
+            name = resp[i:i+nl].decode("utf-8", "replace"); i += nl
+            kind = resp[i]; avail = bool(resp[i+1]); i += 2
+            rl = resp[i]; i += 1
+            reason = resp[i:i+rl].decode("utf-8", "replace"); i += rl
+            out.append((name, kind, avail, reason))
+        return out
 
     def get_neuro_summary(self, *, timeout: float | None = None) -> NeuroSummary:
         """Get the compact neurochemical summary (32 bytes).

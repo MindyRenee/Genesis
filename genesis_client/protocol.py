@@ -75,6 +75,7 @@ __all__ = [
     "GET_ION_SUMMARY",
     "GET_MEMORY_STATS",
     "GET_MOTOR_TARGET",
+    "LIST_ACTUATORS",
     "GET_NEURO_SUMMARY",
     "GET_OPTIC_STATE",
     "GET_PHASE",
@@ -455,6 +456,7 @@ GET_FOLD_MARGINS = 62
 # body's time whether or not the mind ticks.
 # Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
 SET_FIELD_PULSE = 63
+LIST_ACTUATORS = 64
 
 # Which optional hardware sensors this machine actually has.
 # Response: [u16 mask] — a bitmask of SENSOR_* below. A set bit means

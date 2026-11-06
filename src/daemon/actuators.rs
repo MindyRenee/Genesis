@@ -229,6 +229,27 @@ impl F32Ext for f32 {
     }
 }
 
+/// Encode the census for ``LIST_ACTUATORS``: `[u8 count]` then per
+/// actuator `[u8 name_len][name utf8][u8 kind][u8 available]
+/// [u8 reason_len][reason utf8]` — reason_len 0 when the limb is
+/// present. Cold-path command; plain binary, same as the other
+/// census-style responses.
+pub fn encode_census() -> Vec<u8> {
+    let limbs = census();
+    let mut out = Vec::with_capacity(256);
+    out.push(limbs.len() as u8);
+    for a in &limbs {
+        out.push(a.name.len() as u8);
+        out.extend_from_slice(a.name.as_bytes());
+        out.push(a.kind as u8);
+        out.push(a.available as u8);
+        let reason = a.absent_reason.unwrap_or("");
+        out.push(reason.len() as u8);
+        out.extend_from_slice(reason.as_bytes());
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
