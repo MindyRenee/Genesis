@@ -255,6 +255,7 @@ _ALLOWLIST: dict[str, str] = {
     "parietal_lobe.arc_sources": "ARC benchmark adapter — toolkit and dataset access",
     "brainstem.android_media": "Termux platform adapter",
     "brainstem.android_sensors": "Termux platform adapter",
+    "brainstem.platform": "runtime platform detection — brainstem support tissue",
     # Spacetime geometry library used by the claimed self/workspace views.
     "temporal_lobe.light_cones": "spacetime geometry library tissue",
     "temporal_lobe.spacetime_workspace": "spacetime geometry library tissue",
