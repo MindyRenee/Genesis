@@ -65,6 +65,7 @@ pub mod maxwell;
 /// Optic nerve — the retinal afferent's subcortical branches (SCN,
 /// superior colliculus, pretectum, TRN relay gate).
 pub mod optic_nerve;
+pub mod gamma;
 /// RTC wake alarm — scheduling its own return from suspension.
 pub mod rtc_wake;
 pub mod rtkit;
