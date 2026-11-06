@@ -30,6 +30,7 @@ ANDROID_PROOT = "android-proot"
 
 @lru_cache(maxsize=1)
 def _kernel_release() -> str:
+    """The running kernel's release string, lowercased, read once."""
     return _platform.release().lower()
 
 
