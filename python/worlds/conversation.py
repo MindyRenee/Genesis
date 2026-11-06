@@ -905,7 +905,7 @@ class ConversationMixin:
         )
         return self.language.render(err_thought, self.feel())
 
-    def respond(self, user_input: str, timeout: float = _DEFAULT_THINK_TIMEOUT_S) -> str:
+    def respond(self, user_input: str, timeout: float = _DEFAULT_THINK_TIMEOUT_S, lucid: bool = False) -> str:
         """Process one user turn and record its observed response latency.
 
         Timing starts when the interaction enters the public response
@@ -952,8 +952,12 @@ class ConversationMixin:
         # is_meditating before calling. The CLI's main input loop only
         # checked is_sleeping (not is_meditating), so if it was
         # meditating and the user typed something, it would respond
-        # while still in meditation state. Now it's woken from both.
-        self.wake_if_asleep()
+        # while still in meditation state. Now it's woken from both —
+        # unless the caller asked for a lucid turn: her person's
+        # verified voice may reach her inside rest, and she answers
+        # from within the state without rousing out of it.
+        if not lucid:
+            self.wake_if_asleep()
 
         # Mark the interaction time immediately — the heartbeat loop's
         # waking-side signals run in a separate thread and must see

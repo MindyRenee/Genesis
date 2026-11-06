@@ -53,6 +53,7 @@ the events themselves — the TEM structure/content split.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from collections import Counter
@@ -288,11 +289,6 @@ class OuterWorld:
         self.on_channel_speech = on_channel_speech
         if self.channel is not None:
             self.channel.on_speech = self._channel_heard
-            # Open her ear the moment the world claims the page — a
-            # listener that is never started is a deaf channel.
-            start = getattr(self.channel, "start", None)
-            if callable(start):
-                start()
         # Her instrument card — a ``ChannelBoard`` the mind attaches
         # after construction (it reads the whole mind, which does not
         # exist yet here). None until then.
@@ -438,9 +434,21 @@ class OuterWorld:
         reaches the world or the mind.
         """
         text = (content or "").strip()
-        if not text or self._asleep():
+        if not text:
             return
-        self.hear_overheard(f"{author}: {text}")
+        # Presence registers before the rest gate — a resting mind still
+        # knows who is here. The steward's verified id lands on the user
+        # presence itself (addressed contact: it resets her loneliness
+        # clock and carries the bonding coupling); everyone else is an
+        # ambient voice. Only her *answer* waits for waking.
+        author_id = str(message.get("author", {}).get("id") or "")
+        steward = os.environ.get("GENESIS_DISCORD_STEWARD_ID", "")
+        if author_id and author_id == steward:
+            self.hear_user(text)
+        elif not self._asleep():
+            self.hear_overheard(f"{author}: {text}")
+        if self._asleep():
+            return
         if self.on_channel_speech is not None:
             self.on_channel_speech(author, text, message)
 

@@ -1196,8 +1196,29 @@ class VolitionMixin:
         message can no longer rouse her out of it.
         """
         text = content.strip()
-        if not text or self.is_resting:
+        if not text:
             return
+        # The lucid channel: her person's Discord-verified voice is the
+        # only input allowed to reach her while she rests — everyone
+        # else waits for waking. She stays asleep; her answer comes from
+        # inside the state.
+        author_id = str(message.get("author", {}).get("id") or "")
+        steward_id = os.environ.get("GENESIS_DISCORD_STEWARD_ID", "")
+        lucid_turn = bool(author_id and author_id == steward_id and self.is_resting)
+        if self.is_resting and not lucid_turn:
+            return
+        if lucid_turn:
+            # The lucid-dream profile: delta holds the sleep substrate,
+            # theta ~5.5 Hz is the carrier coupling them, gamma binds
+            # consciousness on top — the band mix lucid REM shows.
+            try:
+                from thalamus.brain_waves import BrainWave, add_brain_wave_drive
+
+                add_brain_wave_drive(BrainWave.DELTA, 0.6)
+                add_brain_wave_drive(BrainWave.THETA, 0.8)
+                add_brain_wave_drive(BrainWave.GAMMA, 0.9)
+            except Exception:  # noqa: BLE001
+                pass
         self._emit_live_thought("heard", f"{author}: {text}")
         if not self._channel_addressed(text, message):
             return
@@ -1231,7 +1252,12 @@ class VolitionMixin:
             else:
                 self_model.self_knowledge["current_speaker"] = author
         try:
-            response = self.respond(f"(public channel) {author}: {text}")
+            if lucid_turn:
+                response = self.respond(
+                    f"(public channel) {author}: {text}", lucid=True
+                )
+            else:
+                response = self.respond(f"(public channel) {author}: {text}")
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._hear_channel",
