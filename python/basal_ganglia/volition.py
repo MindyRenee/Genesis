@@ -1229,7 +1229,18 @@ class VolitionMixin:
                 add_brain_wave_drive(BrainWave.GAMMA, 0.9)
             except Exception:  # noqa: BLE001
                 pass
-        self._emit_live_thought("heard", f"{author}: {text}")
+        # Resolve the speaker's display name up front: her person is
+        # Mindy — verified by Discord id — everyone else keeps their
+        # handle. What she *hears* and what she *answers* both carry
+        # the name, never the username token.
+        display_author = author
+        if author_id and steward_id and author_id == steward_id:
+            _f = getattr(self.brain, "frontal", None)
+            _p = getattr(_f, "user_profile", None) if _f else None
+            _n = _p.get_name() if _p else None
+            if _n:
+                display_author = _n
+        self._emit_live_thought("heard", f"{display_author}: {text}")
         if not self._channel_addressed(text, message):
             _dbg("DROP not_addressed")
             return
@@ -1268,10 +1279,10 @@ class VolitionMixin:
         try:
             if lucid_turn:
                 response = self.respond(
-                    f"(public channel) {author}: {text}", lucid=True
+                    f"(public channel) {display_author}: {text}", lucid=True
                 )
             else:
-                response = self.respond(f"(public channel) {author}: {text}")
+                response = self.respond(f"(public channel) {display_author}: {text}")
             _dbg(f"RESPOND ok blank={is_blank(response)}")
         except Exception as e:  # noqa: BLE001
             _dbg(f"RESPOND raised {e!r}")
