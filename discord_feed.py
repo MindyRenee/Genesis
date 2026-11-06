@@ -749,6 +749,7 @@ class DiscordListener:
         # her stream; other channels (questions, DMs) are where people
         # actually speak to her. GENESIS_DISCORD_LISTEN_CHANNELS holds
         # comma-separated channel ids; speech there reaches her the same.
+        self._deaf_channels: set[str] = set()
         self._extra_channels = [
             c.strip()
             for c in os.environ.get("GENESIS_DISCORD_LISTEN_CHANNELS", "").split(",")
@@ -863,6 +864,8 @@ class DiscordListener:
             if self.deaf:
                 return
             for channel_id in channels:
+                if channel_id in self._deaf_channels:
+                    continue
                 cursor = cursors.get(channel_id)
                 if not cursor:
                     cursors[channel_id] = self._latest(channel_id)
@@ -871,11 +874,19 @@ class DiscordListener:
                     f"/channels/{channel_id}/messages?after={cursor}&limit={_LISTEN_LIMIT}"
                 )
                 if permanent:
-                    self.deaf = True
+                    if channel_id == self._channel_id:
+                        self.deaf = True
+                        logger.warning(
+                            "[discord] listener deafened — bot token rejected or no channel access"
+                        )
+                        return
+                    # An extra channel the bot cannot read costs that
+                    # channel, not her whole ear.
+                    self._deaf_channels.add(channel_id)
                     logger.warning(
-                        "[discord] listener deafened — bot token rejected or no channel access"
+                        f"[discord] skipping unreadable listen channel {channel_id}"
                     )
-                    return
+                    continue
                 if retry_after is not None:
                     self._stop.wait(retry_after)
                     continue
