@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from basal_ganglia.basal_ganglia import ActionBid, BasalGanglia
+from occipital_lobe.gamma import bind as _gamma_bind
 from parietal_lobe.arc_neuro import ArcNeuroLoop
 from parietal_lobe.arc_play import ARC3Decision
 from parietal_lobe.arc_sources import (
@@ -196,6 +197,22 @@ class _Graph:
             self.rewards[(prior, key)] = (total + float(reward), count + 1)
 
 
+def _object_targets(grid: list[list[int]] | None) -> list[tuple[int, int]]:
+    """Centroids of gamma-bound proto-objects, small objects first.
+
+    The occipital gamma field binds the grid into coherent assemblies;
+    their centroids are the most object-like click sites available —
+    buttons, pieces, and figures rather than a blind tile scan.
+    """
+    if not grid:
+        return []
+    objs = sorted(_gamma_bind(grid), key=lambda o: o.size)
+    return [
+        (min(63, max(0, round(o.centroid[1]))), min(63, max(0, round(o.centroid[0]))))
+        for o in objs
+    ]
+
+
 @dataclass
 class ARC3ExplorationPolicy:
     """State-graph explorer that learns which pixels are noise and which actions matter.
@@ -352,9 +369,16 @@ class ARC3ExplorationPolicy:
         for action in sorted(set(legal_actions)):
             if is_complex_action(action):
                 if targets is None:
-                    targets = click_targets(
-                        observation_grid(observation), limit=self.max_click_targets
-                    )
+                    grid0 = observation_grid(observation)
+                    seen: set[tuple[int, int]] = set()
+                    targets = []
+                    for pt in _object_targets(grid0) + click_targets(
+                        grid0, limit=self.max_click_targets
+                    ):
+                        if pt not in seen:
+                            seen.add(pt)
+                            targets.append(pt)
+                    targets = targets[: self.max_click_targets]
                 grid = observation_grid(observation)
                 for x, y in targets:
                     data = {"x": x, "y": y}
