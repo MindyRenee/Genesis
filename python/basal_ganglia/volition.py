@@ -1209,6 +1209,27 @@ class VolitionMixin:
         now = time.monotonic()
         if now - getattr(self, "_last_channel_reply", 0.0) < _CHANNEL_REPLY_MIN_S:
             return
+        # Attribution by verified identity, never a typed name: Discord
+        # stamps each author id on the message, so the steward's id binds
+        # the turn to her and any other verified speaker is attributed to
+        # *them* — a stranger's words can no longer ride her name.
+        author_id = str(message.get("author", {}).get("id") or "")
+        steward_id = os.environ.get("GENESIS_DISCORD_STEWARD_ID", "")
+        frontal = getattr(self.brain, "frontal", None)
+        self_model = getattr(frontal, "self_model", None) if frontal else None
+        if self_model is not None and author_id:
+            if steward_id and author_id == steward_id:
+                profile = getattr(frontal, "user_profile", None)
+                name = profile.get_name() if profile else None
+                if name:
+                    self_model.self_knowledge["current_speaker"] = name
+                    # The channel verified her steward — bind the Discord
+                    # identity to the person her bond grew with, so the
+                    # link survives without face or voice to check.
+                    profile.add_fact("discord_id", author_id)
+                    profile.add_fact("discord_username", author)
+            else:
+                self_model.self_knowledge["current_speaker"] = author
         try:
             response = self.respond(f"(public channel) {author}: {text}")
         except Exception as e:  # noqa: BLE001

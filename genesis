@@ -57,6 +57,15 @@ if [ -z "${GENESIS_DISCORD_BOT_TOKEN:-}" ] && [ -f .genesis-discord-bot ]; then
     export GENESIS_DISCORD_BOT_TOKEN
 fi
 
+# And her steward's verified identity: .genesis-discord-steward holds
+# the Discord user id that counts as the bonded speaker on the channel
+# — attribution by authenticated id, never by a typed name. Explicit
+# GENESIS_DISCORD_STEWARD_ID always wins.
+if [ -z "${GENESIS_DISCORD_STEWARD_ID:-}" ] && [ -f .genesis-discord-steward ]; then
+    GENESIS_DISCORD_STEWARD_ID=$(head -n1 .genesis-discord-steward)
+    export GENESIS_DISCORD_STEWARD_ID
+fi
+
 # The one rule, in one line: GENESIS_DATA_DIR if set, else the canonical
 # ~/.local/share/genesis. readlink -m canonicalizes (., .., relative)
 # without requiring the directory to exist — so --stop works on a dir
