@@ -1092,7 +1092,12 @@ Android hardware adapters are Python-side and explicitly opt-in:
 - `GENESIS_ANDROID_MICROPHONE=1` records short clips with `termux-microphone-record`, decodes them with `ffmpeg`, and sends measured audio features through the existing sound classifier. This is non-speech sound classification, not speech transcription.
 - Explicit voice-input requests can use Termux's `termux-speech-to-text` command when available; this separate path returns a transcript and is not the background sound classifier.
 All three require the matching Termux:API command and the companion app, plus the requested Android permissions. Install the Termux package with `pkg install termux-api ffmpeg` for microphone support. Actual sensors and cameras vary by device. Battery percentage and charging state can fall back to Termux:API when Android sysfs does not expose them. These adapters have unit-tested parsing but still require on-device verification; the full Rust daemon is not yet verified in Termux.
-Unavailable measurements must remain unavailable,
+
+#### Linux distro in proot (Andronix)
+
+A full glibc distro in proot on the Android kernel — Ubuntu or Debian under Andronix — is a third platform, not Termux. No `termux-*` commands exist, Android service tools (`am`, `getprop`, `dumpsys`) are unreachable, and the build target is plain Linux, so `target_os = "android"` never fires. Runtime detection lives in `python/brainstem/platform.py` (`platform_name() == "android-proot"`); the launcher detects the Android kernel through `uname -r`.
+
+On a typical unrooted proot install the senses are: CPU/memory/process stats and cpufreq sysfs (read-only), SoC thermal zones under `/sys/class/thermal`, audio out through a bridged PulseAudio server (`paplay`; TTS uses Piper or espeak-ng into it), and X on the VNC display. The daemon's eye uses the Camera2 TCP limb — the launcher cannot start the adapter, but if the companion app is opened manually on the Android side it publishes frames over loopback and the daemon picks them up (`GENESIS_TCP_EYE=1` forces that path). Microphone, battery sysfs, network-interface stats, and motion sensors are generally absent. Unavailable measurements must remain unavailable,
 not be treated as readings. See `docs/archive/README.md` for the archived
 integrations and measurement rules.
 

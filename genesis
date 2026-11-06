@@ -246,8 +246,18 @@ done
 # Stop the Android Camera2 service through its owning activity.
 # Termux cannot stop a non-exported Android service directly; this explicit
 # activity action keeps service ownership and Android's app boundary intact.
+# True on any Android host: native Termux (TERMUX_VERSION / the app
+# prefix) or a Linux distro in proot on an Android kernel (Andronix),
+# where uname still reports the vendor kernel's android signature.
+_on_android() {
+    [ -n "${TERMUX_VERSION:-}" ] && return 0
+    [ -d /data/data/com.termux ] && return 0
+    case "$(uname -r 2>/dev/null)" in *android*|*andronix*|*aospa*) return 0 ;; esac
+    return 1
+}
+
 _stop_android_camera() {
-    if [ -n "${TERMUX_VERSION:-}" ] || [ -d /data/data/com.termux ]; then
+    if _on_android; then
         if command -v am >/dev/null 2>&1; then
             if ! am start -W -n org.genesis.camerabridge/.MainActivity \
                 --ez org.genesis.camerabridge.STOP_CAMERA true >/dev/null 2>&1; then
@@ -385,7 +395,7 @@ fi
 # the foreground. The activity requests permission when needed and starts
 # the Camera2 service only after Android grants it. Missing adapter/app
 # access degrades sight only; it must not prevent cognition from starting.
-if [ -n "${TERMUX_VERSION:-}" ] || [ -d /data/data/com.termux ]; then
+if _on_android; then
     if command -v am >/dev/null 2>&1; then
         echo "[genesis] Requesting Android camera startup..."
         if am start -n org.genesis.camerabridge/.MainActivity >/dev/null 2>&1; then
