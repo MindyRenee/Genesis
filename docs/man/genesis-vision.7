@@ -123,6 +123,21 @@ features, and two-view motion/parallax information. Structured
 scene data is integrated with salience, memory, and other cognitive
 pathways; the pipeline does not reduce the full image to the
 daemon's scalar channels.
+.SS Gamma-field proto-object binding
+The occipital grouping layer forms proto-objects by synchrony rather
+than by lookup. Implemented twice to the same contract:
+.I src/daemon/gamma.rs
+(the body's daemon-side field) and
+.I python/occipital_lobe/gamma.py
+(the mind-side path used by structured percepts such as game frames).
+Each visible cell carries a Kuramoto phase oscillator seeded by
+colour; contiguity coupling binds same-colour neighbours and a weak
+similarity coupling lets separated same-colour fragments lock to a
+shared phase (the Gestalt capability a plain flood-fill lacks).
+Integrated phases read out as coherent assemblies: colour, size,
+member cells, bounding box, centroid, locked phase, and coherence.
+The layer forms objects and never recognizes them; a frame it cannot
+bind reports absence, not a fabricated object.
 .SS Brightness and image quality
 The scene reports a brightness measure derived from the HSV value
 channel. This is a measurement, not a camera brightness control.
