@@ -174,10 +174,20 @@ Named embeddings are stored in
 anonymous clusters are stored in
 .IR $DATA_DIR/face_clusters.json .
 The YuNet and SFace ONNX files must be present in
-.IR $DATA_DIR/models/ .
-Model availability proves only that the models can be loaded; it
-does not prove successful recognition on a particular live camera,
-face, or lighting condition.
+.IR $DATA_DIR/models/
+as
+.I face_detection_yunet.onnx
+and
+.IR face_recognition_sface.onnx .
+They are published by the OpenCV model zoo
+.RI ( https://github.com/opencv/opencv_zoo ,
+.IR models/face_detection_yunet
+and
+.IR models/face_recognition_sface )
+under filenames carrying a date suffix; rename them to the two
+canonical names above. Model availability proves only that the
+models can be loaded; it does not prove successful recognition on a
+particular live camera, face, or lighting condition.
 .SS Commands and diagnostics
 .TP
 .B /look
