@@ -67,6 +67,7 @@ if TYPE_CHECKING:
 from limbic_system.sentiment import analyze_sentiment
 from temporal_lobe.events import EventKind, EventStream, ExternalEvent, ground_topics
 from temporal_lobe.presence import Presence, PresenceKind
+from worlds.experiential_space import ExperientialLatentSpace
 
 from genesis_client.protocol import (
     CHEM_DOPAMINE,
@@ -305,6 +306,9 @@ class OuterWorld:
         # its source.
         self._kind_map = _SuccessorMap()
         self._presence_map = _SuccessorMap()
+        # Geometry is updated from every event recorded in the real outer-world
+        # stream; it is not a detached demo model or a Torch dependency.
+        self.experiential_space = ExperientialLatentSpace()
 
         # Listener notified for every recorded event — Mind registers
         # here to route events into cognition (workspace, memory,
@@ -365,7 +369,7 @@ class OuterWorld:
             addressed=True,
             topics=topics,
             timestamp=now,
-            metadata={"presence": presence.display_name},
+            metadata={"presence": presence.display_name, "valence": sentiment},
         )
         self._impulse(CHEM_OXYTOCIN, 0.03)
         self._impulse(CHEM_DOPAMINE, 0.02)
@@ -408,6 +412,7 @@ class OuterWorld:
             addressed=False,
             topics=topics,
             timestamp=now,
+            metadata={"valence": sentiment},
         )
         # Orienting — something happened nearby.
         self._impulse(CHEM_NOREPINEPHRINE, 0.01)
@@ -757,6 +762,20 @@ class OuterWorld:
             f"  social isolation: {isolation:.0%}   "
             f"activity: {self.activity_level():.1f} events/min"
         )
+        geometry = self.experiential_space.snapshot()
+        distances = geometry["global_geometry"].get("distances_from_reference", {})
+        if distances:
+            lines.append(
+                f"  experiential geometry: {geometry['observations']} observations; "
+                f"last-event valence {geometry['valence']:+.2f} "
+                f"({geometry['valence_sign']}); Fisher volume "
+                f"{geometry['fisher_volume']:.3g}; curvature distances H/S/E "
+                f"{distances['hyperbolic']:.3g}/"
+                f"{distances['spherical']:.3g}/"
+                f"{distances['euclidean']:.3g}"
+            )
+        else:
+            lines.append("  experiential geometry: awaiting first observation")
         expected = self.expected_events()
         if expected:
             top = sorted(expected.items(), key=lambda kv: -kv[1])[:3]
@@ -787,6 +806,7 @@ class OuterWorld:
                     "sources": self._presence_map.to_dict(str),
                 },
                 "arcade": self.arcade.to_dict() if self.arcade is not None else None,
+                "experiential_space": self.experiential_space.to_dict(),
             }
 
     def restore_from_dict(self, data: dict[str, Any]) -> None:
@@ -816,6 +836,14 @@ class OuterWorld:
         last_addressed = float(data.get("last_addressed_time", time.time()))
         bids = int(data.get("unanswered_bids", 0))
         maps = data.get("maps") or {}
+        experiential = ExperientialLatentSpace()
+        experiential_data = data.get("experiential_space")
+        if experiential_data is not None:
+            experiential.restore(experiential_data)
+        else:
+            # Backward compatibility: rebuild from available persisted events.
+            for event in events:
+                experiential.observe(event)
         with self._lock:
             self._presences = presences
             self._stream = EventStream(max_size=200)
@@ -831,6 +859,7 @@ class OuterWorld:
                 self._kind_map.restore(maps["kinds"], EventKind)
             if isinstance(maps.get("sources"), dict):
                 self._presence_map.restore(maps["sources"], str)
+            self.experiential_space = experiential
         if self.arcade is not None and isinstance(data.get("arcade"), dict):
             self.arcade.restore(data["arcade"])
 
@@ -841,6 +870,7 @@ class OuterWorld:
         with self._lock:
             self._kind_map.observe(event.kind)
             self._presence_map.observe(event.source)
+            self.experiential_space.observe(event)
         self._stream.append(event)
         listener = self.on_external_event
         if listener is not None:
