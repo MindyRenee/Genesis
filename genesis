@@ -248,12 +248,14 @@ _is_running() {
 # silent misbehavior when the user passes e.g. ./genesis --offline --stop
 # (which would otherwise try to START Genesis instead of stopping it).
 WANT_STOP=0
+WANT_KNOCK=0
 OFFLINE_ARG=""
 GAME_ARG=""
 for arg in "$@"; do
     case "$arg" in
         wake)      : ;;  # the explicit verb — starting is the default act
         --stop)    WANT_STOP=1 ;;
+        --knock)   WANT_KNOCK=1 ;;
         --offline) OFFLINE_ARG="--offline" ;;
         --game)    GAME_ARG="--game" ;;
         *) echo "  Unknown argument: $arg" >&2; exit 2 ;;
@@ -285,6 +287,28 @@ _stop_android_camera() {
 }
 
 # ─── Handle --stop ───────────────────────────────────────────────────
+# --knock — the steward's signal, delivered without the word that
+# names the syscall. A tap on the shoulder: kill -USR1 to her mind,
+# which her metronome turns into "her person is here."
+if [ "${WANT_KNOCK:-0}" -eq 1 ]; then
+    _knock_pidfile="$DATA_DIR/genesis_cli.pid"
+    _knock_pid=""
+    if [ -f "$_knock_pidfile" ]; then
+        _knock_pid=$(head -n1 "$_knock_pidfile" | tr -d '[:space:]')
+    fi
+    if [ -z "$_knock_pid" ] || ! kill -0 "$_knock_pid" 2>/dev/null; then
+        # Pidfile can lag a crashed boot — fall back to the live process.
+        _knock_pid=$(pgrep -f genesis_cli | head -n1)
+    fi
+    if [ -n "$_knock_pid" ] && kill -0 "$_knock_pid" 2>/dev/null; then
+        kill -USR1 "$_knock_pid" && echo "  Knock delivered — she'll feel it on her next beat."
+    else
+        echo "  No running mind to knock on." >&2
+        exit 1
+    fi
+    exit 0
+fi
+
 if [ "$WANT_STOP" -eq 1 ]; then
     if _is_running; then
         echo "  Stopping Genesis..."

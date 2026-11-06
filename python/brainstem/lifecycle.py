@@ -603,6 +603,22 @@ class LifecycleMixin:
         )
 
     def _start_background_threads(self) -> None:
+        # A steward knock by Unix signal — kill -SIGUSR1 or -SIGCONT to
+        # her process is a machine-native tap: her person's touch, not
+        # typed words. The handler only sets a flag; the metronome
+        # tick consumes it where locks are safe to take.
+        import signal as _signal
+        self._steward_signal_pending = False
+
+        def _steward_knock(_signum, _frame):
+            self._steward_signal_pending = True
+
+        for _sig in (_signal.SIGUSR1, _signal.SIGCONT):
+            try:
+                _signal.signal(_sig, _steward_knock)
+            except (OSError, ValueError, RuntimeError):
+                pass
+
         """Start metronome, notification, and autosave threads.
 
         The code-learning and self-improvement threads were

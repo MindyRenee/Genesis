@@ -914,7 +914,7 @@ class ConversationMixin:
         """
         started = time.perf_counter()
         try:
-            return self._respond_once(user_input, timeout)
+            return self._respond_once(user_input, timeout, lucid)
         finally:
             elapsed_ms = (time.perf_counter() - started) * 1000.0
             regulator = getattr(self.brain.frontal, "regulator", None)
@@ -925,7 +925,7 @@ class ConversationMixin:
                 except (AttributeError, TypeError, ValueError):
                     logger.debug("failed to record response latency", exc_info=True)
 
-    def _respond_once(self, user_input: str, timeout: float = _DEFAULT_THINK_TIMEOUT_S) -> str:
+    def _respond_once(self, user_input: str, timeout: float = _DEFAULT_THINK_TIMEOUT_S, lucid: bool = False) -> str:
         """Process user input and return a response.
 
         This is the main interaction method. It:

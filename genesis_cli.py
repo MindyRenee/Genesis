@@ -2005,6 +2005,29 @@ def _cmd_meditate(mind: Mind, rest: str) -> str:
     return "\n".join(lines)
 
 
+def _cmd_steward(mind: Mind, rest: str) -> str:
+    """Steward presence signal — the terminal knock.
+
+    The terminal is her own device: whoever types here is her operator
+    by right of possession. This command is the explicit signal —
+    "it is me" — that registers the steward as present through the
+    same path a Discord-verified message takes: the user presence
+    updates, her loneliness clock resets, and the current speaker is
+    bound to her person by identity rather than typed name.
+    """
+    try:
+        profile = mind.brain.frontal.user_profile
+        name = profile.get_name() or "Mindy"
+        if hasattr(mind, "world") and mind.world is not None:
+            mind.world.hear_user(f"[steward signal] {name} is here")
+        sk = getattr(mind.brain.frontal, "self_model", None)
+        if sk is not None:
+            sk.self_knowledge["current_speaker"] = name
+        return f"[steward signal received — {name} is here]"
+    except Exception as e:  # noqa: BLE001
+        return f"[steward signal failed: {e}]"
+
+
 def _cmd_teach(mind: Mind, rest: str) -> str:
     """Put Genesis into teaching/training mode.
 
@@ -2232,6 +2255,7 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/nap": _cmd_nap,
     "/draw": _cmd_draw,
     "/meditate": _cmd_meditate,
+    "/steward": _cmd_steward,
     "/teach": _cmd_teach,
     "/endteach": _cmd_endteach,
     "/teach-questions": _cmd_teach_questions,

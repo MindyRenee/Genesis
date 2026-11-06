@@ -69,6 +69,15 @@ def _lower_thread_priority(nice: int = _VOLITION_NICE) -> None:
         logger.debug(f"_lower_thread_priority failed: {e}")
 
 
+def _dbg(msg: str) -> None:
+    """Temporary channel-reply gate tracer — where did the turn die."""
+    try:
+        with open("/tmp/channel_debug.log", "a") as f:
+            f.write(f"{time.time():.2f} {msg}\n")
+    except Exception:
+        pass
+
+
 class VolitionMixin:
     """Mixin for :class:`Mind` — see module docstring."""
 
@@ -1171,6 +1180,7 @@ class VolitionMixin:
                 e,
             )
 
+
     def _hear_channel(self, author: str, content: str, message: dict) -> None:
         """A public message on her channel — the reply side of hearing.
 
@@ -1221,14 +1231,18 @@ class VolitionMixin:
                 pass
         self._emit_live_thought("heard", f"{author}: {text}")
         if not self._channel_addressed(text, message):
+            _dbg("DROP not_addressed")
             return
+        _dbg("PASS addressed")
         # A shutting-down mind doesn't start a response turn that
         # would race the state save (same rule the ambient handler
         # follows).
         if not getattr(self, "_running", True):
+            _dbg("DROP not_running")
             return
         now = time.monotonic()
         if now - getattr(self, "_last_channel_reply", 0.0) < _CHANNEL_REPLY_MIN_S:
+            _dbg("DROP pacing")
             return
         # Attribution by verified identity, never a typed name: Discord
         # stamps each author id on the message, so the steward's id binds
@@ -1258,18 +1272,22 @@ class VolitionMixin:
                 )
             else:
                 response = self.respond(f"(public channel) {author}: {text}")
+            _dbg(f"RESPOND ok blank={is_blank(response)}")
         except Exception as e:  # noqa: BLE001
+            _dbg(f"RESPOND raised {e!r}")
             note_swallowed(
                 "mind.volition._hear_channel",
                 e,
             )
             return
         if is_blank(response):
+            _dbg("DROP blank_response")
             return
         # Pacing is measured from when the reply lands, not when the
         # turn began — a slow respond() must not shrink the visible
         # gap between her public replies.
         self._last_channel_reply = time.monotonic()
+        _dbg("SHARE posted")
         self._public_share(response.strip())
 
     def _channel_addressed(self, text: str, message: dict) -> bool:
