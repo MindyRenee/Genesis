@@ -20,10 +20,15 @@ command reports available games and remembered play.
 .SH OFFICIAL TOOLKIT
 The toolkit's
 .B Arcade
-class discovers environments and opens game sessions. Genesis loads
-the toolkit lazily when the catalogue is first requested. If the
-package is unavailable or the service cannot be reached, the arcade
-records the error and the rest of Genesis can continue.
+class discovers environments and opens game sessions. Genesis announces
+the arcade at startup without initializing the toolkit. The toolkit is
+loaded lazily when she explicitly requests the catalogue or enters a
+game; this avoids creating an empty official scorecard on every Genesis
+startup. A scorecard is run-scoped, while Genesis's learned per-game
+memory is saved in her local world state and can survive restarts.
+These are separate records and must not be treated as the same score.
+If the package is unavailable or the service cannot be reached, the
+arcade records the error and the rest of Genesis can continue.
 .PP
 Install the official toolkit with:
 .nf

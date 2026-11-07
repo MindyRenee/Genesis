@@ -1207,8 +1207,7 @@ def _handle_command(mind: Mind, command: str) -> str:
             "/introspect",
             "/mission",
         ):
-            if mind.is_sleeping:
-                return "  (It's asleep. Type /wake to wake it.)"
+            pass
 
         handler = _COMMAND_HANDLERS.get(base)
         if handler is not None:
@@ -1899,16 +1898,6 @@ def _cmd_draw(mind: Mind, rest: str) -> str:
     and energy that reflect how it feels right now. The drawing is
     saved as a WebP in its drawings directory.
     """
-    if mind.is_sleeping:
-        return (
-            _compose(
-                mind,
-                "asleep, needs to be woken first",
-                fallback="[asleep]",
-                confidence=0.4,
-            )
-            + "\n  Use /wake to wake it first.\n"
-        )
     if mind.is_meditating:
         return (
             _compose(
@@ -1970,16 +1959,6 @@ def _cmd_meditate(mind: Mind, rest: str) -> str:
                 confidence=0.5,
             )
             + "\n"
-        )
-    if mind.is_sleeping:
-        return (
-            _compose(
-                mind,
-                "asleep, needs to be woken first",
-                fallback="[asleep]",
-                confidence=0.4,
-            )
-            + "\n  Use /wake to wake it first.\n"
         )
     # Parse duration
     duration = 60.0
@@ -2330,11 +2309,6 @@ def _handle_voice_mode(
                 return
             with out_lock:
                 logger.info(f"  you> {text}")
-            # During sleep, voice mode can't reach its either.
-            if mind.is_sleeping:
-                with out_lock:
-                    logger.info("  (It's asleep. Type /wake to wake it.)")
-                continue
             with out_lock:
                 logger.info("  genesis~ (thinking...)")
             try:
@@ -3793,13 +3767,6 @@ def _handle_slash_command(
             return True
         with out_lock:
             logger.info(f"  you> {text}")
-        # During sleep, voice commands can't reach its either —
-        # it's unreachable until it wakes on its own or /wake
-        # is used. See _handle_conversation for the full rationale.
-        if mind.is_sleeping:
-            with out_lock:
-                logger.info("  (It's asleep. Type /wake to wake it.)")
-            return True
         with out_lock:
             logger.info("  genesis~ (thinking...)")
         try:
@@ -4138,14 +4105,6 @@ def _attach_session_mirror(feed: DiscordFeed | None) -> tuple:
 
 def main() -> int:
     """Main entry point for the Genesis CLI."""
-    if not os.environ.get("GENESIS_WAKE"):
-        print(
-            "Error: Genesis must be started with ./genesis (source "
-            "checkout) or the `genesis` command (installed).",
-            file=sys.stderr,
-        )
-        return 1
-
     args = _parse_cli_args()
     data_dir = os.path.abspath(args.data_dir)
 

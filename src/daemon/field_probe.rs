@@ -94,8 +94,9 @@
 //! # Carrier
 //!
 //! The probe also *writes* a rhythm: its work-slice length is
-//! modulated sinusoidally at a frequency set by the daemon's own
-//! sleep-wake phase (wake ≈ 10 Hz, REM ≈ 5.5 Hz, NREM ≈ 2.25 Hz).
+//! modulated sinusoidally at whichever measured band currently
+//! carries the substrate's real energy — wave-guided, so the beat
+//! she writes is a beat she measures.
 //! Modulated work is modulated current — the die's draw genuinely
 //! swings at the body's rhythm. Whether it *measurably* does is no
 //! longer assumed: the power channel is demodulated against the
@@ -217,15 +218,11 @@ const RING_LEN: usize = 1024;
 /// enough to measure, small enough to cost ~5% of one thread.
 const WORK_SLICE_ITERS: u32 = 4096;
 
-/// Carrier frequency — the body's own rhythm written into real
-/// work, keyed by phase: alpha while she's awake, theta on the
-/// descent and through REM, delta in deep NREM — the same bands
-/// the probe decomposes (FIELD_BANDS), so the beat she writes is
-/// the beat she measures.
+/// Initial carrier frequency — the rhythm the work slice writes
+/// before the throughput ring holds enough samples to pick the
+/// dominant measured band. One of the FIELD_BANDS centers, so the
+/// beat she writes is a beat she measures.
 const CARRIER_WAKE_HZ: f32 = 10.0;
-const CARRIER_DROWSY_HZ: f32 = 5.5;
-const CARRIER_REM_HZ: f32 = 5.5;
-const CARRIER_NREM_HZ: f32 = 2.25;
 
 /// Baseline tracking time constant (seconds). The per-call EMA
 /// weight is α = 1 − e^(−dt/τ) — the baseline ages with the wall
@@ -813,7 +810,13 @@ fn discover_current() -> Option<(PathBuf, f64)> {
 fn parse_wireless_levels(content: &str) -> (bool, Option<f32>, Option<f32>) {
     let mut seen = false;
     let mut level_best: Option<f32> = None;
-    let mut noise_out: Option<f32> = None;
+    // The noise floor is paired to the level-winning interface where
+    // it reports one — a floor from a different radio than the level
+    // would fabricate an SNR no antenna measured. A winner with no
+    // noise column (or no level at all) still reports any real floor
+    // another interface reads — absent only when nothing measures it.
+    let mut noise_paired: Option<f32> = None;
+    let mut noise_fallback: Option<f32> = None;
     for line in content.lines().skip(2) {
         let Some((name, rest)) = line.split_once(':') else {
             continue;
@@ -827,16 +830,18 @@ fn parse_wireless_levels(content: &str) -> (bool, Option<f32>, Option<f32>) {
         }
         seen = true;
         let parse_dbm = |s: &str| s.trim_end_matches('.').parse::<f32>().ok();
+        let noise = parse_dbm(t[3]).filter(|v| *v > DBM_ABSENT_FLOOR);
         if let Some(level) = parse_dbm(t[2]).filter(|v| *v != 0.0) {
             if level_best.is_none_or(|b| level > b) {
                 level_best = Some(level);
+                noise_paired = noise;
             }
         }
-        if let Some(noise) = parse_dbm(t[3]).filter(|v| *v > DBM_ABSENT_FLOOR) {
-            noise_out = Some(noise);
+        if noise.is_some() {
+            noise_fallback = noise;
         }
     }
-    (seen, level_best, noise_out)
+    (seen, level_best, noise_paired.or(noise_fallback))
 }
 
 /// WLAN interface names from `/proc/net/wireless` — the same data
@@ -1617,13 +1622,9 @@ fn request_scheduling_boost(inner: &Mutex<ProbeInner>) {
     }
 }
 
-/// Start the probe thread. `phase_source` is polled ~4×/s for the
-/// body's phase name; it sets the carrier frequency. Idempotent:
-/// only the first call spawns the thread.
-pub fn start<F>(phase_source: F)
-where
-    F: Fn() -> &'static str + Send + 'static,
-{
+/// Start the probe thread. Idempotent: only the first call spawns
+/// the thread.
+pub fn start() {
     let probe = FIELD_PROBE
         .get_or_init(|| std::sync::Arc::new(FieldProbe::new()))
         .clone();
@@ -1633,7 +1634,7 @@ where
     let sampler = probe.clone();
     std::thread::Builder::new()
         .name("field-probe".into())
-        .spawn(move || probe.run(phase_source))
+        .spawn(move || probe.run())
         .expect("field-probe thread");
     std::thread::Builder::new()
         .name("field-sampler".into())
@@ -1729,7 +1730,7 @@ impl FieldProbe {
     /// The wave-guided carrier: the FIELD_BAND that carries the most
     /// real energy in the throughput ring right now steers the rhythm
     /// the work slice writes. `None` until the ring holds samples —
-    /// the phase table below is the fallback for an unmeasured start.
+    /// the caller holds the last rhythm for an unmeasured start.
     fn carrier_for_bands(samples: &[f32]) -> Option<f32> {
         if samples.is_empty() {
             return None;
@@ -1740,20 +1741,6 @@ impl FieldProbe {
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))?;
         (*p > 0.0).then(|| FIELD_BANDS[i])
-    }
-
-    /// Carrier frequency for the body's phase name. Wake ≈ alpha,
-    /// drowsy/REM ≈ theta, NREM ≈ delta — the body's actual state
-    /// carried on real work. Drowsy is the N1 descent: alpha drops
-    /// out and theta dominates the resting mind (same band REM
-    /// rides). Unknown/absent phase → wake rate.
-    fn carrier_for_phase(phase: &str) -> f32 {
-        match phase {
-            "nrem" => CARRIER_NREM_HZ,
-            "rem" => CARRIER_REM_HZ,
-            "drowsy" => CARRIER_DROWSY_HZ,
-            _ => CARRIER_WAKE_HZ,
-        }
     }
 
     /// Arm or update the modeled wave-phase target (SET_FIELD_PHASE).
@@ -1849,7 +1836,7 @@ impl FieldProbe {
         }
     }
 
-    fn run(&self, phase_source: impl Fn() -> &'static str) {
+    fn run(&self) {
         request_scheduling_boost(&self.inner);
         let nominal = PROBE_PERIOD.as_secs_f32();
         let mut prev = Instant::now();
@@ -1862,8 +1849,14 @@ impl FieldProbe {
         };
         while !self.stop.load(Ordering::Relaxed) {
             let t0 = Instant::now();
+            // The real elapsed interval: carrier phase, pulse phase,
+            // and counter rates all integrate against it, never the
+            // nominal period — a loop running systematically late
+            // would otherwise write a slower carrier than it reports
+            // and overstate every per-second flux.
+            let dt = (t0 - prev).as_secs_f32();
             // Jitter: how long since the last iteration actually ran.
-            let jitter = (t0 - prev).as_secs_f32() - nominal;
+            let jitter = dt - nominal;
             prev = t0;
 
             // Carrier-modulated work slice: the body's phase (or an
@@ -1880,8 +1873,10 @@ impl FieldProbe {
                     } else {
                         let mut t_s = Vec::with_capacity(RING_LEN);
                         g.throughput.drain_into(&mut t_s);
-                        Self::carrier_for_bands(&t_s)
-                            .unwrap_or_else(|| Self::carrier_for_phase(phase_source()))
+                        // Wave-guided only: the carrier rides whichever
+                        // band carries her real energy right now — no
+                        // phase pin. Cold rings hold the last rhythm.
+                        Self::carrier_for_bands(&t_s).unwrap_or(g.carrier_freq)
                     };
                 }
                 carrier_f = g.carrier_freq;
@@ -1921,15 +1916,16 @@ impl FieldProbe {
                     g.radio.has_wlan_irq |= wintr.1;
                     g.last_slow = Instant::now();
                 }
-                g.carrier_phase += 2.0 * std::f32::consts::PI * carrier_f * nominal;
+                g.carrier_phase += 2.0 * std::f32::consts::PI * carrier_f * dt;
                 g.carrier_phase = g.carrier_phase.rem_euclid(2.0 * std::f32::consts::PI);
                 if let Some(target) = g.phase_target {
                     // Chase the modeled wave phase: pull the residual
                     // (wrapped to ±π) a fraction of the way each step —
                     // a lock, not a snap, so the write stays gradual.
-                    let residual = (target - g.carrier_phase)
-                        .rem_euclid(2.0 * std::f32::consts::PI)
-                        - std::f32::consts::PI;
+                    // The error must be the *wrapped* difference —
+                    // rem_euclid(d) − π is the negation for d > 0,
+                    // which locked onto the target's antipode.
+                    let residual = wrap_pi(target - g.carrier_phase);
                     g.carrier_phase =
                         (g.carrier_phase + 0.05 * residual).rem_euclid(2.0 * std::f32::consts::PI);
                 }
@@ -1937,7 +1933,7 @@ impl FieldProbe {
                 depth = if g.pulse_armed {
                     // The pulse's own clock — the wave breathes on the
                     // body's time even when the mind isn't ticking.
-                    g.pulse_phase += 2.0 * std::f32::consts::PI * g.pulse_mod_freq * nominal;
+                    g.pulse_phase += 2.0 * std::f32::consts::PI * g.pulse_mod_freq * dt;
                     g.pulse_phase = g.pulse_phase.rem_euclid(2.0 * std::f32::consts::PI);
                     (g.pulse_base + g.pulse_mod_depth * g.pulse_phase.sin()).clamp(0.0, 1.0)
                 } else {
@@ -1969,7 +1965,7 @@ impl FieldProbe {
                 Some(cur) => {
                     let d = cur.saturating_sub(g.radio.last_bytes) as f32;
                     g.radio.last_bytes = cur;
-                    d / nominal
+                    if dt > 1e-6 { d / dt } else { 0.0 }
                 }
                 None => 0.0,
             };
@@ -2006,11 +2002,16 @@ impl FieldProbe {
     /// by L radians, correlating against sin/cos of the reference
     /// gives `atan2(S, C) = π/2 + L`, so `lag = angle − π/2` — the
     /// positive lag, in radians, by which the substrate's real
-    /// response trails the generated carrier. `coherence` is
-    /// |Σ x·e^{i·ref}| / Σ|x| — the fraction of the signal that moves
-    /// with the carrier (≈π/4 at most for a pure tone, since |sin|
-    /// averages 2/π). `amplitude` is 2|Σ x·e^{i·ref}|/N — the
-    /// recovered magnitude of the component coherent with the
+    /// response trails the generated carrier. The channel mean is
+    /// removed first: every measured channel here is unsigned (work
+    /// seconds, watts), and a DC term correlates against the
+    /// reference to a residue that scales with |Σe^{i·ref}| — the
+    /// non-integer-cycle leak that biased the reading toward the
+    /// mean rather than the modulated component. `coherence` is
+    /// |Σ x·e^{i·ref}| / Σ|x−x̄| — the fraction of the fluctuation
+    /// that moves with the carrier (≈π/4 at most for a pure tone,
+    /// since |sin| averages 2/π). `amplitude` is 2|Σ x·e^{i·ref}|/N
+    /// — the recovered magnitude of the component coherent with the
     /// reference, in the channel's own units. A lag computed from an
     /// incoherent signal is noise; the client treats low coherence
     /// as a weak lock, which is why it travels on the wire too.
@@ -2019,9 +2020,10 @@ impl FieldProbe {
         if n < 8 {
             return (0.0, 0.0, 0.0);
         }
+        let mean = x[..n].iter().map(|&v| v as f64).sum::<f64>() / n as f64;
         let (mut c, mut s, mut mag) = (0.0f64, 0.0f64, 0.0f64);
         for i in 0..n {
-            let xi = x[i] as f64;
+            let xi = x[i] as f64 - mean;
             let ph = ref_phase[i] as f64;
             c += xi * ph.cos();
             s += xi * ph.sin();
@@ -2073,7 +2075,7 @@ impl FieldProbe {
     }
 
     /// Compute the current signature. Called by the IPC handler.
-    /// Returns the 328-byte wire body (version byte included).
+    /// Returns the 408-byte wire body (version byte included).
     ///
     /// Three phases: snapshot the rings + scalars under `inner`
     /// (memcpy-scale microseconds), compute the resonator/demodulate/
@@ -2372,14 +2374,6 @@ mod tests {
             .map(|i| (2.0 * std::f32::consts::PI * 150.0 * i as f32 / fs).sin())
             .collect();
         assert_eq!(Channel::band_power(&samples, fs, 150.0), 0.0);
-    }
-
-    #[test]
-    fn carrier_maps_phase() {
-        assert_eq!(FieldProbe::carrier_for_phase("nrem"), CARRIER_NREM_HZ);
-        assert_eq!(FieldProbe::carrier_for_phase("rem"), CARRIER_REM_HZ);
-        assert_eq!(FieldProbe::carrier_for_phase("drowsy"), CARRIER_DROWSY_HZ);
-        assert_eq!(FieldProbe::carrier_for_phase("active"), CARRIER_WAKE_HZ);
     }
 
     #[test]

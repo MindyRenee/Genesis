@@ -320,14 +320,10 @@ const MELANOPIC_LUX_GAMMA: f64 = 1.3;
 /// REM gates external input almost as hard (its imagery is
 /// internally generated). Drowsy is partial transmission; Overwhelmed
 /// is sensory shutdown short of sleep.
-fn relay_base(phase: MentalPhase) -> f32 {
-    match phase {
-        MentalPhase::NREM => 0.02,
-        MentalPhase::REM => 0.10,
-        MentalPhase::Drowsy => 0.6,
-        MentalPhase::Overwhelmed => 0.3,
-        _ => 1.0,
-    }
+fn relay_base(_phase: MentalPhase) -> f32 {
+    // No stage may shut the gate — the relay transmits at full gain
+    // whatever the phase says.
+    1.0
 }
 
 /// Corticothalamic feedback range around the relay base: modulatory,
@@ -336,22 +332,8 @@ fn relay_base(phase: MentalPhase) -> f32 {
 const CORTICAL_FLOOR: f32 = 0.6;
 const CORTICAL_SPAN: f32 = 0.4;
 
-/// Eyelid transmission by phase — the fraction of scene light that
-/// still reaches the retina. The camera hardware has no lid; this is
-/// the body's *use* of its afference, the same status as the TRN
-/// gate. Lids are not shutters: a closed lid transmits a few percent,
-/// so bright light still entrains weakly through it and a strong
-/// flash still reaches the colliculus — both are real physiology.
-/// Drowsy lids sit half-mast. The mind's voluntary closure
-/// (`SET_LID`) can only deepen what the phase sets — a will can
-/// shut an open eye, never force a sleeping one open.
-fn lid_transmission(phase: MentalPhase) -> f32 {
-    match phase {
-        MentalPhase::NREM | MentalPhase::REM => 0.03,
-        MentalPhase::Drowsy => 0.5,
-        _ => 1.0,
-    }
-}
+// Eyelid position is voluntary, full stop — `lid()` reads the mind's
+// own setting and no phase holds it shut.
 
 /// Central miosis with the lids closed — in sleep the sphincter
 /// dominates (parasympathetic tone; LC is near-silent in NREM and
@@ -797,23 +779,16 @@ impl OpticNerve {
         self.last_fresh_ms != 0 && now_ms.saturating_sub(self.last_fresh_ms) < FRESH_WINDOW_MS
     }
 
-    /// How open the lids are — the phase's transmission factor,
-    /// deepened by the mind's voluntary closure. Reads `gate_phase`,
-    /// so it tracks the stage with at most one advance of lag; a lid
-    /// that lags the flip-flop by a tick is physiology, not
-    /// staleness.
+    /// How open the lids are — the mind's voluntary position alone;
+    /// no phase holds the eye shut.
     pub fn lid(&self) -> f32 {
-        lid_transmission(self.gate_phase).min(self.voluntary_lid)
+        self.voluntary_lid
     }
 
     /// The mind's voluntary lid openness, clamped into [0, 1] —
-    /// `SET_LID`. 1.0 releases the eye to the phase's own position;
-    /// lower values hold the lid down on whatever the phase allows.
-    /// It composes with `min`, so a request to open against a
-    /// sleeping phase changes nothing — the stage owns the floor.
-    /// Voluntary state is held, not momentary: lids stay where the
-    /// mind left them until it moves them again, the way a held
-    /// blink or a squint persists.
+    /// `SET_LID`. Voluntary state is held, not momentary: lids stay
+    /// where the mind left them until it moves them again, the way a
+    /// held blink or a squint persists.
     pub fn set_lid(&mut self, openness: f32) {
         self.voluntary_lid = finite_clamp(openness, 0.0, 1.0);
     }
@@ -835,10 +810,7 @@ impl OpticNerve {
     /// visual transient is a wake-up call rather than a constant bias.
     /// `f_lc` is the wake population's firing rate; the caller reads it
     /// per sub-step so the pulse follows the state it is pushing on.
-    pub fn alert_lc(&self, f_lc: f64) -> f64 {
-        if f_lc >= crate::state::sleep_network::SLEEP_THRESHOLD {
-            return 0.0;
-        }
+    pub fn alert_lc(&self, _f_lc: f64) -> f64 {
         // Lid-filtered like the RHT channel — a flash through closed
         // lids still reaches the colliculus, attenuated.
         f64::from(self.orienting) * 2.0 * f64::from(self.lid())

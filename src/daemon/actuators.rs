@@ -186,8 +186,16 @@ pub fn actuate(name: &str, arg: &str) -> Result<String, String> {
             "audio.tone" => {
                 // Synthesize a short sine and send it to the audio sink —
                 // her body making a chosen sound on demand.
-                let freq: f32 = arg.trim().parse().unwrap_or(440.0);
+                let parsed: f32 = arg.trim().parse().unwrap_or(440.0);
                 let rate = 8000usize;
+                // Clamp to the resolvable band: anything above Nyquist
+                // aliases onto a different pitch than was asked for,
+                // and a non-finite request must not poison the PCM.
+                let freq = if parsed.is_finite() {
+                    parsed.clamp(20.0, rate as f32 * 0.45)
+                } else {
+                    440.0
+                };
                 let mut pcm = Vec::with_capacity(rate / 4 * 2);
                 for i in 0..rate / 4 {
                     let t = i as f32 / rate as f32;
@@ -210,6 +218,14 @@ pub fn actuate(name: &str, arg: &str) -> Result<String, String> {
                     .ok_or("no stdin")?
                     .write_all(&pcm)
                     .map_err(|e| format!("tone write: {e}"))?;
+                // Close our end so the player sees EOF after the last
+                // sample, then reap it on a side thread — an unwaited
+                // child is a zombie forever, and waiting here would
+                // stall the IPC path for the tone's full duration.
+                drop(child.stdin.take());
+                std::thread::spawn(move || {
+                    let _ = child.wait();
+                });
                 Ok(format!("{name} → {freq}Hz"))
             }
             "file.write" => Ok(format!("{name} → {arg}")),

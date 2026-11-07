@@ -65,12 +65,42 @@ class AudioStreamService : Service() {
     }
 
     private fun capture() {
+        var rebuilds = 0
+        while (running.get()) {
+            // captureOnce returns true when the recorder died
+            // mid-stream and a rebuild may recover the ear; false on
+            // a clean stop or a fatal init error (status reported).
+            if (!captureOnce()) return
+            rebuilds++
+            if (rebuilds >= 3) {
+                reportStatus("Microphone capture failed repeatedly; stopping audio adapter")
+                stopSelf()
+                return
+            }
+            reportStatus("Microphone read failing; reopening capture")
+            Thread.sleep(500)
+        }
+    }
+
+    /**
+     * One recorder lifecycle: open, stream, and return when the
+     * service stops or the read path goes persistently dead.
+     * An AudioRecord that only returns error codes spins forever
+     * with the mic silently dead — count consecutive failures and
+     * let the caller rebuild the stream instead.
+     */
+    private fun captureOnce(): Boolean {
         val minBuf = AudioRecord.getMinBufferSize(
             SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
         )
         try {
             recorder = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                // VOICE_COMMUNICATION rides the synced call path:
+                // Android applies its own AEC + noise suppression and
+                // aligns the mic with whatever output the call channel
+                // uses (speaker or BT SCO) — the echo dies at the source
+                // instead of reaching her ear.
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION,
                 SAMPLE_RATE,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT,
@@ -79,20 +109,22 @@ class AudioStreamService : Service() {
         } catch (error: SecurityException) {
             reportStatus("Microphone permission denied or revoked")
             stopSelf()
-            return
+            return false
         }
-        val rec = recorder ?: return
+        val rec = recorder ?: return false
         if (rec.state != AudioRecord.STATE_INITIALIZED) {
             reportStatus("Microphone unavailable: AudioRecord failed to initialize")
             stopSelf()
-            return
+            return false
         }
         reportStatus("Microphone active at ${SAMPLE_RATE}Hz mono s16; waiting for Genesis")
         rec.startRecording()
         val chunk = ByteArray(CHUNK)
+        var errors = 0
         while (running.get()) {
             val n = rec.read(chunk, 0, chunk.size)
             if (n > 0) {
+                errors = 0
                 synchronized(bufferLock) {
                     pending += chunk.copyOf(n)
                     // Bound the queue: a disconnected consumer must not
@@ -101,10 +133,23 @@ class AudioStreamService : Service() {
                         pending = pending.copyOfRange(pending.size - SAMPLE_RATE * 2, pending.size)
                     }
                 }
+            } else if (++errors >= 32) {
+                // ~0.3 s of nothing but error codes — the stream is
+                // dead (device reroute, focus loss). Tear it down so
+                // the caller can rebuild; a spinning dead recorder is
+                // deafness that still reports itself alive.
+                try {
+                    rec.stop()
+                } catch (_: Exception) {
+                }
+                rec.release()
+                recorder = null
+                return true
             } else {
                 Thread.sleep(10)
             }
         }
+        return false
     }
 
     /**

@@ -33,6 +33,8 @@ import threading
 from collections import deque
 from typing import Any
 
+import numpy as np
+
 _SAMPLE_RATE = 16000
 _BLOCK = 1024
 # Emission bands (Hz): ~300 fan/motor region, 2 kHz and 5 kHz
@@ -62,7 +64,6 @@ class _FieldAudio:
         self._slow = 0.0
         self._init = False
         self._ks = [round(_BLOCK * f / _SAMPLE_RATE) for f in _EMISSION_FREQS]
-        self._coeffs = [2.0 * math.cos(2.0 * math.pi * k / _BLOCK) for k in self._ks]
         self._stream = sd.InputStream(
             samplerate=_SAMPLE_RATE,
             channels=1,
@@ -72,19 +73,16 @@ class _FieldAudio:
         )
         self._stream.start()
 
-    def _goertzel(self, x: Any, coeff: float) -> float:
-        s1 = s2 = 0.0
-        n = len(x)
-        for v in x:
-            s0 = float(v) + coeff * s1 - s2
-            s2 = s1
-            s1 = s0
-        return (s1 * s1 + s2 * s2 - coeff * s1 * s2) / (n * n)
-
     def _on_block(self, indata: Any, frames: int, time_info: Any, status: Any) -> None:
         mono = indata[:, 0]
         rms = float(math.sqrt(float((mono * mono).mean()) + 1e-18))
-        powers = [self._goertzel(mono, c) for c in self._coeffs]
+        # One rfft yields all three band powers — |X[k]|²/n² is exactly
+        # what a per-bin Goertzel recurrence produces, and it keeps the
+        # real-time callback in numpy instead of running 3×1024
+        # Python-level iterations per 64 ms block.
+        n = len(mono)
+        spec = np.abs(np.fft.rfft(mono)) ** 2
+        powers = [float(spec[k]) / (n * n) if k < spec.size else 0.0 for k in self._ks]
         # Self-emission proxy: whine bands full weight, fan band at
         # a third — the components that track machine state rather
         # than the room.

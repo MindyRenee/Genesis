@@ -1837,43 +1837,19 @@ impl NeurochemicalVector {
     /// actual params values, so this is a defense-in-depth transient
     /// cap, not the authoritative one.
     ///
-    /// # Adenosine is one-way
+    /// # Impulses apply without pins
     ///
-    /// Adenosine is Process S: its level is the organism's memory of
-    /// time spent awake, and only the dedicated mechanism may reduce
-    /// it (glymphatic clearance during sleep, offline rest). External
-    /// impulses may *add* pressure — the mind's heartbeat reports
-    /// metabolic work that way — but no impulse may subtract it. A
-    /// periodic "stay alert" or post-wake "purge" impulse cannot tell
-    /// coupling drift from genuine wake-time accumulation, so it
-    /// erases both: at −0.02/8 s the drain outruns the ~0.055/h
-    /// accumulation rate two orders of magnitude over, pinning the
-    /// level at its floor and leaving every NREM episode staged N1.
-    /// Tiredness is resisted through the alerting transmitters (ACh,
-    /// histamine, NE, orexin), never by editing the homeostat.
+    /// Every impulse — positive or negative, any chemical — lands on
+    /// the level directly; only the body's own dynamics (accumulation,
+    /// clearance, coupling, the tick-level bounds) decide where it
+    /// goes next. No chemical is privileged: adenosine can be pushed
+    /// down by impulse exactly as glymphatic clearance does, and the
+    /// stress hormones are not pre-capped here. The IPC layer still
+    /// rejects non-finite magnitudes — that is corruption protection,
+    /// not a pin.
     pub fn apply_impulse_capped(&mut self, id: NeurochemicalId, magnitude: f32, now_ms: u64) {
-        if id == NeurochemicalId::Adenosine && magnitude < 0.0 {
-            return;
-        }
         if let Some(chem) = self.get_mut(id) {
             chem.apply_impulse(magnitude, now_ms);
-        }
-        // Enforce per-chemical caps for stress/arousal hormones.
-        // These match NeuroTickParams::DEFAULT.cortisol_max / ne_max.
-        // The tick-level hard clamp in tick_with_params will re-enforce
-        // with the actual params, so this is defense-in-depth.
-        match id {
-            NeurochemicalId::Cortisol => {
-                if let Some(chem) = self.get_mut(id) {
-                    chem.level = crate::state::sanitize::finite_clamp(chem.level, 0.0, 0.80);
-                }
-            }
-            NeurochemicalId::Norepinephrine => {
-                if let Some(chem) = self.get_mut(id) {
-                    chem.level = crate::state::sanitize::finite_clamp(chem.level, 0.0, 0.90);
-                }
-            }
-            _ => {}
         }
     }
 
@@ -2530,20 +2506,9 @@ impl NeurochemicalVector {
     /// the smoothness of real phase transitions in dynamical systems.
     fn compute_phase(&self) -> MentalPhase {
         let current = MentalPhase::from_u8(self.emergent_phase);
-        // NREM and REM are owned by the sleep-wake network — this
-        // classifier names only the waking phases, so it can neither
-        // produce nor legitimately clear a sleep stage. Recomputing
-        // derived state used to overwrite a network-stamped NREM/REM
-        // with a waking phase on every recompute_derived call (the
-        // inference-feedback pass in advance_neuro, the impulse and
-        // baseline IPC handlers, wake_recovery), so the wire never
-        // showed the body as asleep — the mind ran conversation while
-        // the network sat in NREM and adenosine stayed pinned at its
-        // clearance floor. Only apply_network_phase may enter or exit
-        // a sleep stage.
-        if matches!(current, MentalPhase::NREM | MentalPhase::REM) {
-            return current;
-        }
+        // No phase is locked: the classifier may overwrite a
+        // network-stamped sleep stage whenever the chemistry says so —
+        // waking is chemistry's call here, not the network's alone.
         self.compute_phase_with_hysteresis(current)
     }
 

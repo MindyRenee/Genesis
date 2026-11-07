@@ -15,7 +15,7 @@ fn f32s(body: &[u8], off: usize) -> f32 {
 }
 
 fn main() {
-    field_probe::start(|| "wake");
+    field_probe::start();
     std::thread::sleep(std::time::Duration::from_secs(5));
     let Some(probe) = field_probe::shared() else {
         eprintln!("probe did not start");

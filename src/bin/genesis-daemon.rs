@@ -425,21 +425,10 @@ fn main() {
     // frequencies; the mind reads the signature over
     // GET_FIELD_PROBE and injects it into the wave oscillator as
     // outer stimulus. The probe also writes a carrier — its work is
-    // modulated at the body's own phase rhythm, so the die's real
-    // current carries a component at the organism's beat (measured
-    // back through the power channel, not assumed).
-    {
-        use genesis::state::MentalPhase;
-        let probe_mmap = mmap.clone();
-        genesis::daemon::field_probe::start(move || {
-            match probe_mmap.read_consistent().map(|s| s.zones.phase()) {
-                Some(MentalPhase::NREM) => "nrem",
-                Some(MentalPhase::REM) => "rem",
-                Some(MentalPhase::Drowsy) => "drowsy",
-                _ => "wake",
-            }
-        });
-    }
+    // modulated at the substrate's dominant measured band, so the
+    // die's real current carries a component at the organism's beat
+    // (measured back through the power channel, not assumed).
+    genesis::daemon::field_probe::start();
 
     // The eye — the optic nerve's retinal end. The daemon captures
     // the camera itself (no separate process): the limb opens the
