@@ -24,7 +24,15 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
 PROJECT_ROOT=$(pwd)
-PY=${PYTHON:-python3}
+# Her runtime interpreter is the installed venv's, not the system
+# python — probe/install there when it exists or the checks report
+# gaps that aren't hers (and installs land in the wrong site).
+_VENV_PY="${GENESIS_INSTALL_HOME:-$HOME/.local/lib/genesis}/venv/bin/python"
+if [ -z "${PYTHON:-}" ] && [ -x "$_VENV_PY" ]; then
+    PY="$_VENV_PY"
+else
+    PY=${PYTHON:-python3}
+fi
 VERIFY_ONLY=0
 [ "${1:-}" = "--verify" ] && VERIFY_ONLY=1
 

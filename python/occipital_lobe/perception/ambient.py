@@ -167,7 +167,10 @@ class AmbientListener:
             self._init_error = f"Vosk model not found at {model_dir}"
             return False
         try:
-            from vosk_termux import Model
+            try:
+                from vosk_termux import Model
+            except (ImportError, OSError):
+                from vosk import Model
 
             self._vosk_model = Model(str(model_dir))
             self._initialized = True
@@ -260,7 +263,10 @@ class AmbientListener:
             logger.warning(f"ambient listener unavailable: {e}")
             self._running = False
             return
-        from vosk_termux import KaldiRecognizer
+        try:
+            from vosk_termux import KaldiRecognizer
+        except (ImportError, OSError):
+            from vosk import KaldiRecognizer
 
         recognizer = KaldiRecognizer(self._vosk_model, self.sample_rate)
         recognizer.SetWords(True)
