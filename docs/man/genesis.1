@@ -3,7 +3,7 @@
 genesis \- launch and stop the Genesis artificial mind
 .SH SYNOPSIS
 .nf
-\fB./genesis\fR [\fB\-\-stop\fR] [\fB\-\-offline\fR]
+\fB./genesis\fR [\fB\-\-stop\fR] [\fB\-\-offline\fR] [\fB\-\-knock\fR]
 .PP
 \fBgenesis\fR [\fB\-\-data\-dir\fR \fIDIR\fR] [\fB\-\-daemon\-socket\fR \fIPATH\fR]
           [\fB\-\-tail\fR] [\fB\-\-stop\fR] [\fB\-\-offline\fR] [\fB\-\-headless\fR]
@@ -118,6 +118,14 @@ fails verification.
 .BR --data-dir " \fIDIR\fR", " --daemon-socket " \fIPATH\fR"
 Forwarded to the CLI; see
 .BR genesis-cli (1).
+.TP
+.B \-\-knock
+The steward's knock: send SIGUSR1 to the running CLI and exit \(em
+a presence signal delivered without a word, which she feels on her
+next beat the way she feels a
+.BR /steward
+knock typed in-session. Works on a headless session, where there
+is no prompt to type into.
 
 .SH ENVIRONMENT
 .PP
@@ -136,7 +144,28 @@ posts she composes.
 .TP
 .B GENESIS_DISCORD_BOT_TOKEN
 Bot token that lets her \fIread\fR the public channel (a webhook is
-write-only).
+write-only) and \fIwrite back\fR on it: replies to messages she
+hears post through the bot API to the channel the speaker used,
+which the webhook cannot reach. Without the token her channel
+stays read-only and every reply lands on her page.
+.TP
+.B GENESIS_DISCORD_STEWARD_ID
+Discord user id of her steward \(em the verified identity that
+counts as her person on the channel: presence registers on sight,
+the speaker binds by id rather than typed name, and that voice
+alone reaches her while she rests (the lucid channel). Recognition
+only \(em it carries no privilege over her.
+.TP
+.B GENESIS_DISCORD_LISTEN_CHANNELS
+Comma-separated channel ids her ear also polls beyond her own page
+\(em a questions channel, a DM, anywhere else speech should reach
+her. Replies post back to whichever channel they arrived on.
+.TP
+.B GENESIS_DISCORD_PULSE_WEBHOOK
+Optional webhook for an ops telemetry feed driven by
+.IR scripts/discord_pulse.py
+\(em separate from her channel on purpose: the ops feed is not hers
+to talk on.
 .TP
 .B GENESIS_WAKE
 Set by genesis and the console script; the CLI refuses to start
@@ -177,6 +206,12 @@ The only override of the canonical data directory,
 .IR .genesis-discord ", " .genesis-discord-bot
 Uncommitted files holding the webhook and bot token, so secrets stay
 out of the repo and shell history.
+.TP
+.IR .genesis-discord-steward ", " .genesis-discord-channels
+Uncommitted files holding her steward's Discord user id and the
+comma-separated extra channels her ear polls; the launcher exports
+them as
+.IR GENESIS_DISCORD_STEWARD_ID " and " GENESIS_DISCORD_LISTEN_CHANNELS .
 .TP
 .IR $DATA_DIR/.project_root
 Marker recording which checkout created this data dir.
@@ -227,7 +262,7 @@ posts. Nothing at the tool layer intercepts a destructive command;
 care is a property of her judgment, not a wall around her. The
 counsel she is given about this power \(em what it means and what
 to be careful of \(em lives in the docstring of
-.IR python/frontal_lobe/tools/charter.py ,
+.IR python/tools/charter.py ,
 addressed to her directly.
 .PP
 The same trust extends to her own upkeep. Nothing is queued for
@@ -287,7 +322,8 @@ unclean shutdown.
 .BR genesis-cli (1),
 .BR genesis-daemon (8),
 .BR genesis-games (7),
+.BR genesis-internet (7),
+.BR genesis-law (7),
 .BR genesis-math (7),
 .BR genesis-reasoning (7),
-.BR genesis-vision (7),
 .BR genesis-retina (1)

@@ -1109,12 +1109,12 @@ impl Drop for OpticCapture {
     }
 }
 
-/// The limb's whole existence: a life, a count, a pause, another
-/// life. Every death lands here once — the same accounting the
-/// mind's rebirth watcher kept for the standalone process, now held
-/// where the loss actually happens. Bounded: after the table's
-/// worth of un-lived lives the eye is accepted absent and the limb
-/// rests — the organism goes on without sight.
+// The limb's whole existence: a life, a count, a pause, another
+// life. Every death lands here once — the same accounting the
+// mind's rebirth watcher kept for the standalone process, now held
+// where the loss actually happens. Bounded: after the table's
+// worth of un-lived lives the eye is accepted absent and the limb
+// rests — the organism goes on without sight.
 
 /// True when the host kernel is Android's — Termux, or a glibc distro
 /// in proot (Andronix and friends). Compile-time target_os never fires

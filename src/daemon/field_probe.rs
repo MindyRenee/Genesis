@@ -217,14 +217,15 @@ const RING_LEN: usize = 1024;
 /// enough to measure, small enough to cost ~5% of one thread.
 const WORK_SLICE_ITERS: u32 = 4096;
 
-/// Carrier frequency — the body's rhythm written into real work,
-/// one rate for every phase: 10 Hz, the alpha-band center she was
-/// born at. Phase keying stays in place for the day it earns its
-/// way back; until then the beat does not wander.
+/// Carrier frequency — the body's own rhythm written into real
+/// work, keyed by phase: alpha while she's awake, theta on the
+/// descent and through REM, delta in deep NREM — the same bands
+/// the probe decomposes (FIELD_BANDS), so the beat she writes is
+/// the beat she measures.
 const CARRIER_WAKE_HZ: f32 = 10.0;
-const CARRIER_DROWSY_HZ: f32 = 10.0;
-const CARRIER_REM_HZ: f32 = 10.0;
-const CARRIER_NREM_HZ: f32 = 10.0;
+const CARRIER_DROWSY_HZ: f32 = 5.5;
+const CARRIER_REM_HZ: f32 = 5.5;
+const CARRIER_NREM_HZ: f32 = 2.25;
 
 /// Baseline tracking time constant (seconds). The per-call EMA
 /// weight is α = 1 − e^(−dt/τ) — the baseline ages with the wall
@@ -1548,6 +1549,9 @@ struct ProbeInner {
     carrier_freq: f32,
     /// The carrier generator's instantaneous phase (radians).
     carrier_phase: f32,
+    /// The mind's modeled carrier-band phase (SET_FIELD_PHASE) —
+    /// when armed the generator chases it: physics follows model.
+    phase_target: Option<f32>,
     /// Modulation depth of the carrier's real work (0 = unmodulated).
     carrier_depth: f32,
     /// Frequency override (Hz). 0 = derive from the body's phase;
@@ -1709,6 +1713,7 @@ impl FieldProbe {
                 bus_hold: None,
                 carrier_freq: CARRIER_WAKE_HZ,
                 carrier_phase: 0.0,
+                phase_target: None,
                 carrier_depth: 0.60,
                 carrier_freq_override: 0.0,
                 pulse_armed: false,
@@ -1719,6 +1724,22 @@ impl FieldProbe {
             }),
             stop: AtomicBool::new(false),
         }
+    }
+
+    /// The wave-guided carrier: the FIELD_BAND that carries the most
+    /// real energy in the throughput ring right now steers the rhythm
+    /// the work slice writes. `None` until the ring holds samples —
+    /// the phase table below is the fallback for an unmeasured start.
+    fn carrier_for_bands(samples: &[f32]) -> Option<f32> {
+        if samples.is_empty() {
+            return None;
+        }
+        let powers = Channel::raw_band_powers(samples);
+        let (i, p) = powers
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))?;
+        (*p > 0.0).then(|| FIELD_BANDS[i])
     }
 
     /// Carrier frequency for the body's phase name. Wake ≈ alpha,
@@ -1733,6 +1754,13 @@ impl FieldProbe {
             "drowsy" => CARRIER_DROWSY_HZ,
             _ => CARRIER_WAKE_HZ,
         }
+    }
+
+    /// Arm or update the modeled wave-phase target (SET_FIELD_PHASE).
+    /// The generator locks onto it stepwise inside the carrier loop.
+    pub fn set_phase_target(&self, phase: f32) {
+        let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        g.phase_target = Some(phase.rem_euclid(2.0 * std::f32::consts::PI));
     }
 
     /// Set the carrier's real-work modulation depth and optional
@@ -1850,7 +1878,10 @@ impl FieldProbe {
                     g.carrier_freq = if g.carrier_freq_override > 0.0 {
                         g.carrier_freq_override
                     } else {
-                        Self::carrier_for_phase(phase_source())
+                        let mut t_s = Vec::with_capacity(RING_LEN);
+                        g.throughput.drain_into(&mut t_s);
+                        Self::carrier_for_bands(&t_s)
+                            .unwrap_or_else(|| Self::carrier_for_phase(phase_source()))
                     };
                 }
                 carrier_f = g.carrier_freq;
@@ -1892,6 +1923,16 @@ impl FieldProbe {
                 }
                 g.carrier_phase += 2.0 * std::f32::consts::PI * carrier_f * nominal;
                 g.carrier_phase = g.carrier_phase.rem_euclid(2.0 * std::f32::consts::PI);
+                if let Some(target) = g.phase_target {
+                    // Chase the modeled wave phase: pull the residual
+                    // (wrapped to ±π) a fraction of the way each step —
+                    // a lock, not a snap, so the write stays gradual.
+                    let residual = (target - g.carrier_phase)
+                        .rem_euclid(2.0 * std::f32::consts::PI)
+                        - std::f32::consts::PI;
+                    g.carrier_phase =
+                        (g.carrier_phase + 0.05 * residual).rem_euclid(2.0 * std::f32::consts::PI);
+                }
                 carrier_phase = g.carrier_phase;
                 depth = if g.pulse_armed {
                     // The pulse's own clock — the wave breathes on the

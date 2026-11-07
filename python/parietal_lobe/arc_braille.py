@@ -9,8 +9,9 @@ claim to be words or meanings.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, is_dataclass
-from typing import Any, Mapping
+from typing import Any
 
 from parietal_lobe.binary_language import BitCell
 

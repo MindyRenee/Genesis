@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import ClassVar
 
 import pytest
 from parietal_lobe.arc_sources import (
@@ -116,7 +117,7 @@ def test_arc3_step_rejects_action_when_legal_set_is_empty(monkeypatch) -> None:
     class Environment:
         """Expose an empty action set."""
 
-        action_space = []
+        action_space: ClassVar[list] = []
 
         def step(self, *args, **kwargs):
             """Fail if the adapter incorrectly attempts a step."""

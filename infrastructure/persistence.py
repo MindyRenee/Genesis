@@ -37,10 +37,10 @@ from __future__ import annotations
 import gzip
 import json
 import logging
-import time
 import math
 import os
 import tempfile
+import time
 import zlib
 from collections import deque
 from collections.abc import Callable, Iterable

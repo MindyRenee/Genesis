@@ -1,6 +1,5 @@
 """Tests for lossless six-dot-cell ARC game encoding."""
 import pytest
-
 from parietal_lobe.arc_braille import (
     decode_game_record,
     encode_game_record,

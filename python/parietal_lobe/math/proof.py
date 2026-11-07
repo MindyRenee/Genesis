@@ -41,6 +41,7 @@ Prop = tuple
 
 
 def atom(name: str) -> Prop:
+    """A proposition that is just a named variable, true or false under an assignment."""
     return ("atom", name)
 
 

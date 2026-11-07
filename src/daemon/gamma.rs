@@ -58,7 +58,13 @@ impl GammaField {
     /// palette index treated as ground (no oscillators form there).
     /// `steps` is the Kuramoto integration horizon — ~40 iterations
     /// settles most fields.
-    pub fn bind(grid: &[u8], width: usize, height: usize, background: u8, steps: usize) -> Vec<ProtoObject> {
+    pub fn bind(
+        grid: &[u8],
+        width: usize,
+        height: usize,
+        background: u8,
+        steps: usize,
+    ) -> Vec<ProtoObject> {
         let n = width * height;
         if grid.len() != n || n == 0 {
             return Vec::new();
@@ -103,7 +109,12 @@ impl GammaField {
             }
             next_label += 1;
         }
-        Self { width, height, phases, labels }
+        Self {
+            width,
+            height,
+            phases,
+            labels,
+        }
     }
 
     /// Kuramoto integration — natural frequency seeded by colour, strong
@@ -147,7 +158,11 @@ impl GammaField {
                         }
                     }
                 }
-                let mut delta = if count > 0.0 { K_LOCAL * drive / count } else { 0.0 };
+                let mut delta = if count > 0.0 {
+                    K_LOCAL * drive / count
+                } else {
+                    0.0
+                };
                 // Weak: same-colour cells in a window (similarity Gestalt —
                 // remote fragments of one hue pull toward shared phase).
                 let mut sim = 0.0;
@@ -199,24 +214,29 @@ impl GammaField {
         // union — non-adjacent same-phase fragments form one assembly).
         let mut parent: Vec<usize> = (0..stats.len()).collect();
         fn find(p: &mut Vec<usize>, x: usize) -> usize {
-            if p[x] != x { p[x] = find(p, p[x]); }
+            if p[x] != x {
+                p[x] = find(p, p[x]);
+            }
             p[x]
         }
         for a in 0..stats.len() {
             for b in (a + 1)..stats.len() {
                 let d = (stats[a].1 - stats[b].1).abs();
                 let d = d.min(TWO_PI - d);
-                if d < PHASE_TOL
-                    && grid[comps[&stats[a].0][0]] == grid[comps[&stats[b].0][0]]
-                {
+                if d < PHASE_TOL && grid[comps[&stats[a].0][0]] == grid[comps[&stats[b].0][0]] {
                     let (ra, rb) = (find(&mut parent, a), find(&mut parent, b));
-                    if ra != rb { parent[rb] = ra; }
+                    if ra != rb {
+                        parent[rb] = ra;
+                    }
                 }
             }
         }
         let mut merged: std::collections::BTreeMap<usize, Vec<usize>> = Default::default();
         for (i, &(lab, phase, coh)) in stats.iter().enumerate() {
-            merged.entry(find(&mut parent, i)).or_default().extend(comps[&lab].iter().copied());
+            merged
+                .entry(find(&mut parent, i))
+                .or_default()
+                .extend(comps[&lab].iter().copied());
             let _ = (phase, coh);
         }
         let mut out = Vec::new();
@@ -227,10 +247,14 @@ impl GammaField {
             let (mut sx, mut sy) = (0.0, 0.0);
             for &i in &cells {
                 let (r, c) = (i / self.width, i % self.width);
-                rmin = rmin.min(r); rmax = rmax.max(r);
-                cmin = cmin.min(c); cmax = cmax.max(c);
-                sr += r as f64; sc += c as f64;
-                sx += self.phases[i].cos(); sy += self.phases[i].sin();
+                rmin = rmin.min(r);
+                rmax = rmax.max(r);
+                cmin = cmin.min(c);
+                cmax = cmax.max(c);
+                sr += r as f64;
+                sc += c as f64;
+                sx += self.phases[i].cos();
+                sy += self.phases[i].sin();
             }
             let first = cells[0];
             out.push(ProtoObject {

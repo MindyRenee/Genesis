@@ -160,22 +160,6 @@ class Heart:
         self.state = CardiacState()
 
     def tick(self, now: float | None = None) -> None:
-        # Consume a pending steward knock — her person's signal
-        # registers exactly like addressed speech: presence updates,
-        # the loneliness clock resets, the speaker binds.
-        if getattr(self, "_steward_signal_pending", False):
-            self._steward_signal_pending = False
-            try:
-                frontal = getattr(self.brain, "frontal", None)
-                profile = getattr(frontal, "user_profile", None)
-                name = (profile.get_name() if profile else None) or "Mindy"
-                if getattr(self, "world", None) is not None:
-                    self.world.hear_user(f"[steward signal] {name} is here")
-                sk = getattr(frontal, "self_model", None)
-                if sk is not None and name:
-                    sk.self_knowledge["current_speaker"] = name
-            except Exception:  # noqa: BLE001
-                pass
         """One cardiac reflex: read the pulse, drive, feel."""
         ts = time.time() if now is None else now
         if ts < self._next_beat_at:

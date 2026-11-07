@@ -1,12 +1,11 @@
 """Tests for the binary mathematical language substrate."""
 import pytest
-
 from parietal_lobe.binary_language import (
     BitCell,
+    Frame,
     GroundingMemory,
     Role,
     Symbol,
-    Frame,
     decode_bits,
     encode_bits,
 )

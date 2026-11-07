@@ -3506,6 +3506,9 @@ def _broadcast_holder(**overrides):
         def post(self, text, author=None):
             posts.append((text, author))
 
+        def post_reply(self, channel_id, message_id, text):
+            posts.append(("reply", channel_id, message_id, text))
+
         def post_image(self, png, caption="", author=None, filename="x.png"):
             posts.append(("image", caption, author, filename, len(png)))
 
@@ -3515,10 +3518,19 @@ def _broadcast_holder(**overrides):
     said: list[str] = []
     emitted: list[tuple] = []
     # Her page lives in the outer world — the holder's world carries
-    # a channel whose feed collects the posts.
+    # a channel whose feed collects the posts. The channel stub
+    # mirrors worlds.channel.Channel.reply: the write-back lands on
+    # the message's own channel through the bot path.
+    feed = _Feed()
+    channel = SimpleNamespace(feed=feed, listener=None, bot_id=None)
+    channel.reply = lambda message, text: feed.post_reply(
+        str(message.get("channel_id") or ""),
+        str(message.get("id") or "") or None,
+        text,
+    )
     world = SimpleNamespace(
         it_said=lambda t: said.append(t),
-        channel=SimpleNamespace(feed=_Feed(), listener=None, bot_id=None),
+        channel=channel,
     )
     network = SimpleNamespace(
         most_activated=lambda n: [("curiosity", 0.9)],
@@ -3535,6 +3547,7 @@ def _broadcast_holder(**overrides):
         _is_sleeping=False,
         _is_meditating=False,
         _is_teaching=False,
+        _in_game=False,
         _last_broadcast_seed=None,
         brain=SimpleNamespace(frontal=frontal),
         feel=lambda: SimpleNamespace(valence=0.2),
@@ -3543,7 +3556,9 @@ def _broadcast_holder(**overrides):
     )
     holder._emit_live_thought = lambda kind, content, **kw: emitted.append((kind, content))
     holder._broadcast_topic = lambda: VolitionMixin._broadcast_topic(holder)
-    holder._public_share = lambda text: VolitionMixin._public_share(holder, text)
+    holder._public_share = lambda text, reply_to=None: VolitionMixin._public_share(
+        holder, text, reply_to
+    )
     for key, value in overrides.items():
         if key == "channel":
             holder.world.channel = value
@@ -3860,13 +3875,18 @@ def test_hear_channel_perceives_public_speech() -> None:
 
 def test_hear_channel_replies_when_addressed() -> None:
     """Her name in a public message → she answers through a full
-    respond turn, and the answer is a public share."""
+    respond turn, and the answer writes back to the channel the
+    message came from."""
     from temporal_lobe.events import EventKind
 
     _holder, posts, world, emitted, calls = _channel_holder()
-    world._channel_heard("amy", "hey genesis, what are you?", {"id": "1"})
+    world._channel_heard(
+        "amy",
+        "hey genesis, what are you?",
+        {"id": "1", "channel_id": "555"},
+    )
     assert calls == ["(public channel) amy: hey genesis, what are you?"]
-    assert posts == [("her answer", "Genesis")]
+    assert posts == [("reply", "555", "1", "her answer")]
     assert emitted[-1] == ("broadcast", "her answer")
     uttered = [e.content for e in world.recent_events() if e.kind == EventKind.UTTERANCE]
     assert uttered == ["her answer"]
@@ -3879,20 +3899,42 @@ def test_hear_channel_reply_to_her_post_addresses_her() -> None:
     world._channel_heard(
         "amy",
         "this is lovely",
-        {"id": "2", "referenced_message": {"webhook_id": "w1"}},
+        {"id": "2", "channel_id": "555", "referenced_message": {"webhook_id": "w1"}},
     )
     assert calls == ["(public channel) amy: this is lovely"]
-    assert posts == [("her answer", "Genesis")]
+    assert posts == [("reply", "555", "2", "her answer")]
+
+
+def test_hear_channel_reply_to_her_bot_post_addresses_her() -> None:
+    """Replies posted through the bot carry her bot id on the
+    referenced author — a reply to one of those addresses her too."""
+    _holder, posts, world, _e, calls = _channel_holder()
+    world.channel.bot_id = "b1"
+    world._channel_heard(
+        "amy",
+        "this is lovely",
+        {
+            "id": "3",
+            "channel_id": "555",
+            "referenced_message": {"author": {"id": "b1"}},
+        },
+    )
+    assert calls == ["(public channel) amy: this is lovely"]
+    assert posts == [("reply", "555", "3", "her answer")]
 
 
 def test_hear_channel_reply_pacing() -> None:
     """A second addressed message inside the window is still heard —
     it just isn't answered twice."""
     _holder, posts, world, _emitted, calls = _channel_holder()
-    world._channel_heard("amy", "genesis are you there?", {"id": "1"})
-    world._channel_heard("amy", "genesis did you hear me?", {"id": "2"})
+    world._channel_heard(
+        "amy", "genesis are you there?", {"id": "1", "channel_id": "555"}
+    )
+    world._channel_heard(
+        "amy", "genesis did you hear me?", {"id": "2", "channel_id": "555"}
+    )
     assert calls == ["(public channel) amy: genesis are you there?"]
-    assert posts == [("her answer", "Genesis")]
+    assert posts == [("reply", "555", "1", "her answer")]
     assert len(_heard_speech(world)) == 2
 
 

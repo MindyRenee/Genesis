@@ -134,6 +134,12 @@ class ExternalEvent:
             return f"it acted: {self.content}"
         if self.kind == EventKind.PERCEPTION:
             return f"it perceived: {self.content}"
+        if self.kind == EventKind.ARRIVAL:
+            return f"arrived: {self.content}"
+        if self.kind == EventKind.DEPARTURE:
+            return f"left: {self.content}"
+        if self.kind == EventKind.NOTIFICATION:
+            return f"notice: {self.content}"
         return self.content
 
     def to_dict(self) -> dict:

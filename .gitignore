@@ -8,8 +8,8 @@ __pycache__/
 .ruff_cache/
 .venv*/
 python/venv/
-genesis_data/
-python/genesis_data/
+genesis_data
+python/genesis_data
 .genesis-discord
 .genesis-discord-bot
 python/voices/

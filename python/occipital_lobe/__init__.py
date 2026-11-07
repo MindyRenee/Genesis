@@ -474,6 +474,11 @@ _EXPORTS: dict[str, str] = {
     "PhototransductionCascade": "occipital_lobe.perception.phototransduction",
     "PhototransductionParams": "occipital_lobe.perception.phototransduction",
     "PhototransductionState": "occipital_lobe.perception.phototransduction",
+    # V2 grouping — proto-objects bound by gamma-band synchrony (the
+    # word-layer binding organ, paired with the body's
+    # src/daemon/gamma.rs on the optic nerve).
+    "ProtoObject": "occipital_lobe.gamma",
+    "bind": "occipital_lobe.gamma",
     # The region itself — the ventral visual stream as one object
     "OccipitalLobe": "occipital_lobe.occipital",
     # LGN — thalamic visual relay with M/P/K pathway separation
@@ -518,6 +523,7 @@ __all__ = [
     "PhototransductionCascade",
     "PhototransductionParams",
     "PhototransductionState",
+    "ProtoObject",
     "TrainingExample",
     "TwoViewReport",
     "V1Model",
@@ -531,6 +537,7 @@ __all__ = [
     "VisualPathway",
     "VisualPathwayOutput",
     "VisualPercept",
+    "bind",
     "chroma",
     "cone_opponent",
     "create_visual_pathway",

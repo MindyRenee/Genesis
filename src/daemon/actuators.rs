@@ -168,8 +168,8 @@ pub fn actuate(name: &str, arg: &str) -> Result<String, String> {
     match limb.kind {
         ActuatorKind::Relayed => {
             use std::net::TcpStream;
-            let mut s = TcpStream::connect("127.0.0.1:41772")
-                .map_err(|e| format!("relay dropped: {e}"))?;
+            let mut s =
+                TcpStream::connect("127.0.0.1:41772").map_err(|e| format!("relay dropped: {e}"))?;
             writeln!(s, "{name} {arg}").map_err(|e| format!("relay write: {e}"))?;
             Ok(format!("{name} → relay ({arg})"))
         }
@@ -191,8 +191,7 @@ pub fn actuate(name: &str, arg: &str) -> Result<String, String> {
                 let mut pcm = Vec::with_capacity(rate / 4 * 2);
                 for i in 0..rate / 4 {
                     let t = i as f32 / rate as f32;
-                    let v = (t * freq * std::f32::consts::TAU).sin()
-                        * (1.0 - t * 4.0).max(0.0);
+                    let v = (t * freq * std::f32::consts::TAU).sin() * (1.0 - t * 4.0).max(0.0);
                     pcm.extend_from_slice(&(v * 0.4 * i16::MAX as f32).to_i16().to_le_bytes());
                 }
                 let player = if have("paplay") { "paplay" } else { "aplay" };
@@ -257,7 +256,11 @@ mod tests {
     #[test]
     fn census_reports_local_limbs() {
         let limbs = census();
-        assert!(limbs.iter().any(|a| a.name == "process.nice" && a.available));
+        assert!(
+            limbs
+                .iter()
+                .any(|a| a.name == "process.nice" && a.available)
+        );
         assert!(limbs.iter().any(|a| a.name == "file.write" && a.available));
     }
 

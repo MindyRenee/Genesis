@@ -813,6 +813,13 @@ class AutonomousLearner:
         # emit an event when connectivity returns.
         self._was_offline = False
 
+        # Last gating-block reason emitted. The learner re-checks
+        # gating on a timer and on every state-change wake, so without
+        # dedupe an unchanged gate prints the same line every cycle —
+        # hours of "Skipping learning" through one sleep episode.
+        # Emitted once per reason; cleared when learning may proceed.
+        self._last_block_reason: str | None = None
+
         # Emotional gating — track how many cycles were skipped
         # due to negative emotional state
         self._emotion_skips = 0
@@ -2139,6 +2146,13 @@ class AutonomousLearner:
         }
     )
 
+    def _emit_skip(self, reason: str) -> None:
+        """Emit a gating-skip notice only when the reason changed."""
+        if reason == self._last_block_reason:
+            return
+        self._last_block_reason = reason
+        self._emit("learning", reason)
+
     def _should_learn(self) -> bool:
         """Check if Genesis is in an emotional state suitable for learning.
 
@@ -2170,28 +2184,30 @@ class AutonomousLearner:
         if self._current_posture == LEARNING_POSTURE_PROTECTIVE:
             self._posture_skips += 1
             cortisol = self._posture_profile.cortisol_tonic if self._posture_profile else 0.0
-            self._emit(
-                "learning",
+            self._emit_skip(
                 f"protective posture (cortisol={cortisol:.2f})",
             )
             return False
 
         # ── Emotion-label gating (existing) ────────────────────
         if not self._get_emotion:
+            self._last_block_reason = None
             return True  # no emotion callback → always allow (for testing)
 
         try:
             emotion = self._get_emotion()
         except (OSError, ConnectionError, RuntimeError):
+            self._last_block_reason = None
             return True  # can't read state → don't block on errors
 
         if not emotion:
+            self._last_block_reason = None
             return True
 
         # Block learning in negative states
         if emotion.label in self._BLOCKING_LABELS:
             self._emotion_skips += 1
-            self._emit("learning", f"Skipping learning — feeling {emotion.label}")
+            self._emit_skip(f"Skipping learning — feeling {emotion.label}")
             return False
 
         # ── Brain-wave gating ──────────────────────────────────
@@ -2208,9 +2224,10 @@ class AutonomousLearner:
                 waves = None
             if waves is not None:
                 if waves.dominant == BrainWave.DELTA:
-                    self._emit("learning", "delta-dominant — deep rest, not learning")
+                    self._emit_skip("delta-dominant — deep rest, not learning")
                     return False
 
+        self._last_block_reason = None
         return True
 
     def _next_topic(self) -> str | None:

@@ -103,7 +103,6 @@ from .protocol import (
     GET_ION_SUMMARY,
     GET_MEMORY_STATS,
     GET_MOTOR_TARGET,
-    LIST_ACTUATORS,
     GET_NEURO_SUMMARY,
     GET_OPTIC_STATE,
     GET_PHASE,
@@ -117,6 +116,7 @@ from .protocol import (
     GET_TENSOR,
     GET_ZONE_TRANSITIONS,
     HANDSHAKE,
+    LIST_ACTUATORS,
     LIST_TENSORS,
     # Module IDs (for validation and store_observation)
     MODULE_GUARDRAILS,
@@ -136,6 +136,7 @@ from .protocol import (
     SEARCH_EPISODES,
     SET_COGNITIVE_PID,
     SET_FIELD_CARRIER,
+    SET_FIELD_PHASE,
     SET_FIELD_PULSE,
     SET_FOCUS,
     SET_LID,
@@ -911,6 +912,23 @@ class GenesisClient:
             return False
         return bool(resp) and resp[0] == 1
 
+    def set_field_phase(self, phase: float, *, timeout: float | None = None) -> bool:
+        """Push the modeled carrier-band phase into the probe — model → physics.
+
+        The generator chases the pushed phase stepwise inside its
+        carrier loop (a lock, not a snap). The lock is bidirectional:
+        the probe's measured response phase still pulls the model's
+        band phase the other way.
+
+        Returns ``False`` when the probe isn't running or the daemon
+        predates the command.
+        """
+        try:
+            resp = self._request(SET_FIELD_PHASE, _F32.pack(phase), timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return False
+        return bool(resp) and resp[0] == 1
+
     def set_field_pulse(
         self,
         base: float,
@@ -1137,7 +1155,7 @@ class GenesisClient:
         See ``src/daemon/actuators.rs``.
         """
         resp = self._request(LIST_ACTUATORS, timeout=timeout)
-        out = []
+        out: list[tuple[str, int, bool, str]] = []
         i = 0
         if not resp:
             return out
@@ -1146,11 +1164,17 @@ class GenesisClient:
         for _ in range(count):
             if i >= len(resp):
                 break
-            nl = resp[i]; i += 1
-            name = resp[i:i+nl].decode("utf-8", "replace"); i += nl
-            kind = resp[i]; avail = bool(resp[i+1]); i += 2
-            rl = resp[i]; i += 1
-            reason = resp[i:i+rl].decode("utf-8", "replace"); i += rl
+            nl = resp[i]
+            i += 1
+            name = resp[i : i + nl].decode("utf-8", "replace")
+            i += nl
+            kind = resp[i]
+            avail = bool(resp[i + 1])
+            i += 2
+            rl = resp[i]
+            i += 1
+            reason = resp[i : i + rl].decode("utf-8", "replace")
+            i += rl
             out.append((name, kind, avail, reason))
         return out
 

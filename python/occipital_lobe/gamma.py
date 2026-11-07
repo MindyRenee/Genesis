@@ -18,8 +18,8 @@ cannot bind reports absence — an empty scene, never a fabricated object.
 from __future__ import annotations
 
 import math
-from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import cast
 
 TAU = math.tau
 _LOCAL_K = 0.7      # contiguity coupling — the dominant Gestalt term
@@ -148,11 +148,12 @@ def bind(
         fabricated object.
     """
     if width is None:  # 2-D input
-        height = len(grid)
-        width = len(grid[0]) if height else 0
-        flat = [c for row in grid for c in row]
+        rows = cast(list[list[int]], grid)
+        height = len(rows)
+        width = len(rows[0]) if height else 0
+        flat = [c for row in rows for c in row]
     else:
-        flat = list(grid)
+        flat = list(cast(list[int], grid))
         height = height or (len(flat) // width if width else 0)
     n = width * height
     if n == 0 or len(flat) != n:

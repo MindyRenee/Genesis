@@ -405,7 +405,7 @@ class Parser:
                     return Num(float(raw))
                 return Num(int(raw))
             except ValueError:
-                raise ParseError(f"malformed number literal: {raw!r}")
+                raise ParseError(f"malformed number literal: {raw!r}") from None
 
         if t.type == TokenType.IDENT:
             self.advance()

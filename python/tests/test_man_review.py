@@ -197,6 +197,7 @@ class _VolitionMind(ManReviewMixin, VolitionMixin):
         self.self_model = SimpleNamespace(self_knowledge={})
         self.is_resting = False
         self._is_teaching = False
+        self._in_game = False
         self.emitted: list[tuple[str, str]] = []
         # _emit_volition_thought composes through the concept network
         # — give it the seeds it looks up and a composer that answers.

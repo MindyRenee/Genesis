@@ -117,7 +117,7 @@ WAKE_DESYNC_GRACE_SECONDS = 90.0
 # (~0.28) re-crosses the urge threshold in under a minute of
 # undampened integration, recreating the narcolepsy-like brief-wake
 # phenotype the stabilization window exists to prevent.
-SLEEP_URGE_ADENOSINE_FLOOR = 0.45
+SLEEP_URGE_ADENOSINE_FLOOR = 0.30
 
 # ─── Commitment-boundary parameters ──────────────────────────────
 #

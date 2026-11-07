@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 from parietal_lobe.arc_sources import arc1_problem_view, load_arc1_task
 from parietal_lobe.grid import Grid

@@ -10,11 +10,9 @@ must be grounded in observations and tested against later evidence.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import IntEnum
-from math import log2
-from typing import Iterable
-
 
 CELL_BITS = 6
 CELL_COUNT = 1 << CELL_BITS
@@ -48,7 +46,7 @@ class BitCell:
             raise ValueError("six-bit cell must be in range 0..63")
 
     @classmethod
-    def from_dots(cls, raised: Iterable[int]) -> "BitCell":
+    def from_dots(cls, raised: Iterable[int]) -> BitCell:
         """Encode Braille-style dot positions numbered 1..6 into a bit cell."""
         value = 0
         for dot in raised:
@@ -68,7 +66,7 @@ class BitCell:
     @property
     def information_capacity_bits(self) -> int:
         """Maximum raw information per unconstrained six-bit cell."""
-        return log2(CELL_COUNT)
+        return CELL_BITS
 
 
 @dataclass(frozen=True, slots=True)

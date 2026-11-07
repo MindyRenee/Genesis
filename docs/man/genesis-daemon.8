@@ -264,10 +264,6 @@ allostatic load).
 .I $DATA_DIR/face_clusters.json
 Stable \fIface:N\fR cluster identities for unnamed presences.
 .TP
-.I $DATA_DIR/steward.json
-Provenance stamp for the steward channel (key fingerprint,
-principal, directives).
-.TP
 .I $DATA_DIR/daemon.log
 Daemon stdout/stderr (rotated at 5 MB by the launcher).
 .SH IPC
@@ -426,6 +422,38 @@ can shut an open eye but cannot open one the stage has closed.
 Held: lids stay where the mind left them until it moves them.
 Reply:
 .RI [ u8 " ack" ] .
+.TP
+.B 58\(en61
+FIND_SIMILAR_ARCHIVED, UNARCHIVE_EPISODE, SEARCH_ARCHIVED,
+DELETE_EPISODE \(em the dormant-knowledge archive. Deletion is a
+real removal, not a fade: the episode is gone, and only a name
+that recalls it can grow the knowledge back. Everything else in
+the store is physiological forgetting; these four are the
+scissors.
+.TP
+.B 62
+GET_FOLD_MARGINS \(em the LC–VLPO switch's saddle-node margins:
+the bistable geometry the homeostat sweeps through at sleep
+onset.
+.TP
+.B 63
+SET_FIELD_PULSE \(em arm or disarm the parasympathetic pulse, a
+slow autonomic wave riding the carrier's modulation depth (the
+RSA analog — contractility, not rate). Request:
+.RI [ f32 " base" ]
+.RI [ mod_freq_hz ]
+.RI [ mod_depth ] ;
+mod_freq \(<= 0 disarms. When armed the body integrates the
+envelope on its own clock \(em the wave runs whether or not the
+mind ticks.
+.TP
+.B 64
+LIST_ACTUATORS \(em the body's output census: which limbs exist
+(local tools vs relayed), which are live, and why the absent ones
+are absent. Relayed limbs wait on the Android motor relay at
+.IR 127.0.0.1:41772
+\(em until something listens there, they report
+honestly absent rather than pretending to move.
 .PP
 Notification pushes (daemon \(-> client, mirrored as
 .IR NOTIFY_* )
@@ -453,6 +481,8 @@ genesis-daemon --data-dir /tmp/genesis-debug --ltm-capacity 131072
 .BR genesis-browser (7),
 .BR genesis-cli (1),
 .BR genesis-games (7),
+.BR genesis-internet (7),
+.BR genesis-law (7),
 .BR genesis-math (7),
 .BR genesis-reasoning (7),
 .BR genesis-vision (7),

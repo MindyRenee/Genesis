@@ -353,6 +353,7 @@ def test_optic_availability_recovers_when_camera_connects_late(monkeypatch) -> N
 def test_bare_expression_parse_miss_is_not_journaled() -> None:
     """A heuristic parse miss is normal input rejection, not a runtime error."""
     from frontal_lobe.reasoning.math_reasoning import _try_bare_expression
+
     from genesis_client import swallow
 
     site = "reasoning.math_reasoning._try_bare_expression"
@@ -367,6 +368,7 @@ def test_missing_chrome_uses_fallback_without_journaling(monkeypatch) -> None:
     from types import SimpleNamespace
 
     import tools.web_search as web_search
+
     from genesis_client import swallow
 
     class _UnavailableBrowser:

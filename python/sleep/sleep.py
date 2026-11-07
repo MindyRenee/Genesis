@@ -36,6 +36,7 @@ from genesis_client.protocol import (
     CHEM_NOREPINEPHRINE,
     CHEM_OREXIN,
     CHEM_SEROTONIN,
+    PHASE_DROWSY,
     PHASE_NAMES,
     PHASE_NREM,
     PHASE_REM,
@@ -227,6 +228,7 @@ class SleepMixin:
         self._last_rest_time = time.time()
         self._last_concept_count = 0
         self._is_teaching = False
+        self._in_game = False
         self._teaching_topic: str = ""
         # A /teach-questions session — she asked, the user is
         # answering. While it holds, background stays paused and
@@ -1262,9 +1264,15 @@ class SleepMixin:
         target in the brain), dopamine for reward re-engagement, and
         melatonin suppressed to release the circadian brake. Without
         this, the daemon's phase stays asleep (adenosine is still high,
-        histamine still low) even though the mind's _is_sleeping flag
-        is cleared. Nothing is held — the impulses decay on their own
-        half-lives and the flip-flop's state decides the crossing.
+        histamine still low). Nothing is held — the impulses decay on
+        their own half-lives and the flip-flop's state decides the
+        crossing.
+
+        One organism, one state: while the body's phase still reports
+        sleep she IS asleep, so the request only pushes the cascade —
+        the flag, the zone, and every awake-side resume belong to a
+        body that actually woke. ``_check_wake_desync`` completes the
+        wake through this same method once the phase has crossed.
 
         ``user_initiated`` marks an explicit user wake request
         (/wake, or an interaction that rouses it). While the wake
@@ -1302,13 +1310,39 @@ class SleepMixin:
         # asleep through the final save.
         if self._stop_latched:
             return WakeOutcome.BLOCKED
+
+        # The mind does not wake ahead of the body — the two layers
+        # are one organism, never in opposite sleep states. A daemon
+        # phase still in NREM/REM makes this only a request: send the
+        # arousal cascade and stay under while the flip-flop crosses
+        # on LC's ~23-minute time constant. Declaring the flag awake
+        # first is what let volition urges, speech, and the learners
+        # run awake-side machinery on a body that had not risen.
+        try:
+            daemon_asleep = self.client.get_phase().phase in (
+                PHASE_NREM,
+                PHASE_REM,
+            )
+        except (OSError, ConnectionError, RuntimeError, AttributeError):
+            # Body unreadable — wake as before; the sync checks
+            # reconcile whatever the next readable state turns out to be.
+            daemon_asleep = False
+        if daemon_asleep:
+            logger.info("wake requested while daemon still asleep: sending arousal cascade")
+            self._send_wake_neuro_impulses()
+            record_event(
+                "wake_body_push",
+                "wake requested while daemon phase asleep",
+            )
+            return WakeOutcome.BODY_WAKE_PUSHED
+
         episode_secs, was_nap, was_user_initiated = self._clear_sleep_flags()
 
-        # Send neurochemical wake impulses to push the emergent phase
-        # out of NREM/REM. Without this, the daemon's phase stays
-        # asleep because adenosine is still high and histamine is low,
-        # even though the mind's _is_sleeping flag is cleared. This
-        # closes the desync between cognitive and subcognitive layers.
+        # The body's phase already reports awake — the crossing
+        # happened, whether the cascade drove it or the body rose on
+        # its own. Send the cascade anyway: the impulses hold the wake
+        # side against a re-descent and stamp the attempt window the
+        # sync checks bracket around the switch.
         self._send_wake_neuro_impulses()
 
         # Record the wake unconditionally. Waking previously produced no
@@ -1522,7 +1556,12 @@ class SleepMixin:
                 e,
             )
             return False
-        if phase not in (PHASE_NREM, PHASE_REM):
+        # Drowsy counts as heading-to-sleep, not just NREM/REM: a body
+        # resting at the threshold needs the mind's machinery paused
+        # (learners, inner life) for the latch to complete — requiring
+        # a fully-crossed phase first is a catch-22 that leaves a
+        # drowsy body and an awake mind fighting each other.
+        if phase not in (PHASE_NREM, PHASE_REM, PHASE_DROWSY):
             return False
         now = time.time()
         # Inside the wake-attempt window, an asleep phase is the
@@ -1637,8 +1676,11 @@ class SleepMixin:
         )
         # Reconcile in the body's direction: it is awake and the mind
         # wakes with it — the two are never in opposite sleep states.
+        # A wake the user asked for keeps its user-initiated marker
+        # through the join so the stabilization window still resists
+        # the circadian pull-back.
         try:
-            self.wake()
+            self.wake(user_initiated=self._last_wake_user_initiated)
         except Exception as e:  # noqa: BLE001
             logger.warning(f"desync wake failed: {e}")
             return False

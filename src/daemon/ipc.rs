@@ -445,13 +445,11 @@ pub mod cmd {
     /// a healthy zero.
     pub const GET_FIELD_PROBE: u8 = 47;
 
-    /// Retired — never reuse this wire number. The mind's modeled
-    /// carrier-band phase is no longer pushed into the probe's
-    /// generator: modeled state does not assert onto a physical
-    /// quantity. The phase lock is one-directional — the signature's
-    /// measured response phase pulls the model's band phase
-    /// (physics → model); nothing runs back.
-    #[allow(dead_code)]
+    /// The mind pushes its modeled carrier-band phase into the
+    /// probe's generator, which chases it stepwise — model → physics.
+    /// The lock is bidirectional: the signature's measured response
+    /// phase also pulls the model's band phase (physics → model).
+    /// Request: [f32 phase_rad]. Reply: [u8 ack].
     pub const SET_FIELD_PHASE: u8 = 48;
 
     /// Set the carrier's real-work modulation — the write side of the
@@ -3714,6 +3712,22 @@ pub fn default_handler<L: LtmAccess>(
             // a zero reading.
             match super::field_probe::shared() {
                 Some(probe) => probe.signature(),
+                None => vec![error::READ_FAILED],
+            }
+        }
+
+        cmd::SET_FIELD_PHASE => {
+            // The mind pushes its modeled carrier-band phase; the
+            // probe's generator chases it — physics follows model.
+            if payload.len() < 4 {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let phase = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
+            match super::field_probe::shared() {
+                Some(probe) => {
+                    probe.set_phase_target(phase);
+                    vec![1u8]
+                }
                 None => vec![error::READ_FAILED],
             }
         }

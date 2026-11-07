@@ -630,3 +630,97 @@ def test_clean_is_noop_on_plain_text(monkeypatch):
     finally:
         feed.close()
     assert _last_text(posts) == "a plain sentence · with a middot"
+
+
+# ---------------------------------------------------------------
+# post_reply — the bot-token write-back path
+# ---------------------------------------------------------------
+
+
+def _make_reply_feed(calls: list[dict], monkeypatch, **kwargs) -> DiscordFeed:
+    """A feed whose requests are captured as (url, headers, payload)."""
+
+    def fake_urlopen(req, timeout=0):
+        calls.append(
+            {
+                "url": req.full_url,
+                "auth": req.get_header("Authorization"),
+                "payload": json.loads(req.data.decode("utf-8")),
+            }
+        )
+        return _FakeResponse()
+
+    monkeypatch.setattr(discord_feed.urllib.request, "urlopen", fake_urlopen)
+    kwargs.setdefault("post_interval", 0.0)
+    return DiscordFeed(URL, **kwargs)
+
+
+def test_post_reply_posts_to_the_heard_channel(monkeypatch):
+    calls: list[dict] = []
+    feed = _make_reply_feed(calls, monkeypatch, bot_token="tok")
+    try:
+        feed.post_reply("555", "42", "yes, that one")
+        assert _wait_for(lambda: calls)
+    finally:
+        feed.close()
+    call = calls[0]
+    assert call["url"] == f"{discord_feed._API}/channels/555/messages"
+    assert call["auth"] == "Bot tok"
+    payload = call["payload"]
+    assert payload["content"] == "yes, that one"
+    # Threaded as a real reply, and it must never ping the speaker.
+    assert payload["message_reference"] == {
+        "message_id": "42",
+        "fail_if_not_exists": False,
+    }
+    assert payload["allowed_mentions"]["replied_user"] is False
+    assert "username" not in payload
+
+
+def test_post_reply_without_message_id_posts_plain(monkeypatch):
+    calls: list[dict] = []
+    feed = _make_reply_feed(calls, monkeypatch, bot_token="tok")
+    try:
+        feed.post_reply("555", None, "unthreaded answer")
+        assert _wait_for(lambda: calls)
+    finally:
+        feed.close()
+    assert "message_reference" not in calls[0]["payload"]
+
+
+def test_post_reply_falls_back_to_page_without_token(monkeypatch):
+    calls: list[dict] = []
+    feed = _make_reply_feed(calls, monkeypatch)  # no bot_token
+    try:
+        feed.post_reply("555", "42", "answer anyway")
+        assert _wait_for(lambda: calls)
+    finally:
+        feed.close()
+    call = calls[0]
+    assert call["url"] == URL  # webhook, her page
+    assert call["payload"]["username"] == "Genesis"
+    assert call["payload"]["content"] == "answer anyway"
+
+
+def test_post_reply_permanent_failure_degrades_to_page(monkeypatch):
+    posts: list[dict] = []
+
+    def fake_urlopen(req, timeout=0):
+        if "/channels/" in req.full_url:
+            raise urllib.error.HTTPError(
+                req.full_url, 403, "Forbidden", {}, io.BytesIO(b"")
+            )
+        posts.append(json.loads(req.data.decode("utf-8")))
+        return _FakeResponse()
+
+    monkeypatch.setattr(discord_feed.urllib.request, "urlopen", fake_urlopen)
+    feed = DiscordFeed(URL, bot_token="tok", post_interval=0.0)
+    try:
+        feed.post_reply("555", "42", "answer anyway")
+        assert _wait_for(lambda: posts)
+    finally:
+        feed.close()
+    # The channel refused the bot — the reply still lands on her
+    # page as an ordinary post rather than dying with the 403.
+    assert posts[0]["username"] == "Genesis"
+    assert posts[0]["content"] == "answer anyway"

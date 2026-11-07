@@ -74,7 +74,7 @@ def _dbg(msg: str) -> None:
     try:
         with open("/tmp/channel_debug.log", "a") as f:
             f.write(f"{time.time():.2f} {msg}\n")
-    except Exception:
+    except OSError:
         pass
 
 
@@ -642,7 +642,7 @@ class VolitionMixin:
         Urgent topics (from conversation gaps) bypass this gate
         entirely — those are conversation-driven, not autonomous.
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return
         self._emit_volition_thought(
             ("learning", "curiosity", "understanding"),
@@ -662,7 +662,7 @@ class VolitionMixin:
         Each firing is one bounded bout, not a bulk import — the urge
         must rebuild between study sessions.
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -699,7 +699,7 @@ class VolitionMixin:
         says it is; a vetoed change's identical content never queues
         again.
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return
         try:
             outcomes = self.review_pending_changes(max_changes=3)
@@ -730,7 +730,7 @@ class VolitionMixin:
         Sleep-gated like every voluntary act; delta/theta gating is
         the secondary defense (tool use is engagement, not rest).
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -778,7 +778,7 @@ class VolitionMixin:
         Sleep-gated like every voluntary act; delta/theta gating is
         the secondary defense (proof work is engagement, not rest).
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -859,7 +859,7 @@ class VolitionMixin:
         alpha-dominant, so brain waves alone don't reliably detect all
         sleep stages. The ``_is_sleeping`` flag is the authority.
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -1007,7 +1007,7 @@ class VolitionMixin:
         _REACH_OUT_MAX_BIDS it stops calling into silence entirely —
         a person who reaches out and is never answered stops knocking.
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return
         if self.world.unanswered_bids >= self._REACH_OUT_MAX_BIDS:
             return
@@ -1122,7 +1122,7 @@ class VolitionMixin:
         an outbound act on the world, the public counterpart to the
         utterances _perform_speech lands at a listener.
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return
         seed = self._broadcast_topic()
         if seed is None:
@@ -1150,7 +1150,7 @@ class VolitionMixin:
         self._public_share(content.strip())
         self._last_broadcast_seed = seed
 
-    def _public_share(self, text: str) -> None:
+    def _public_share(self, text: str, reply_to: dict | None = None) -> None:
         """Post an utterance to her public channel — one outbound act.
 
         The three surfaces of every public utterance: her live
@@ -1160,13 +1160,21 @@ class VolitionMixin:
         she said it. The session mirror skips the tagged echo — the
         explicit post is the channel's only copy, never a duplicate
         (see discord_feed._classify).
+
+        ``reply_to`` is the heard message being answered: the post
+        then goes back to *that* message's channel through the bot
+        identity, not the page — a webhook can only speak on the
+        page, and an answer belongs where the question was asked.
         """
         self._emit_live_thought("broadcast", text)
         channel = getattr(getattr(self, "world", None), "channel", None)
         feed = channel.feed if channel is not None else None
-        if feed is not None:
+        if channel is not None and feed is not None:
             try:
-                feed.post(text, "Genesis")
+                if reply_to is not None:
+                    channel.reply(reply_to, text)
+                else:
+                    feed.post(text, "Genesis")
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.volition._public_share",
@@ -1267,7 +1275,7 @@ class VolitionMixin:
             if steward_id and author_id == steward_id:
                 profile = getattr(frontal, "user_profile", None)
                 name = profile.get_name() if profile else None
-                if name:
+                if name and profile is not None:
                     self_model.self_knowledge["current_speaker"] = name
                     # The channel verified her steward — bind the Discord
                     # identity to the person her bond grew with, so the
@@ -1299,13 +1307,14 @@ class VolitionMixin:
         # gap between her public replies.
         self._last_channel_reply = time.monotonic()
         _dbg("SHARE posted")
-        self._public_share(response.strip())
+        self._public_share(response.strip(), reply_to=message)
 
     def _channel_addressed(self, text: str, message: dict) -> bool:
         """Did the public message address her — her name, an @-mention
         of the bot (the one content kind that survives intent
         redaction), or a reply to one of her posts (replies carry
-        referenced_message; a webhook post carries webhook_id)."""
+        referenced_message; a webhook post carries webhook_id, a bot
+        post carries her bot id on the author)."""
         if "genesis" in text.lower():
             return True
         channel = getattr(getattr(self, "world", None), "channel", None)
@@ -1315,7 +1324,12 @@ class VolitionMixin:
                 if str(mention.get("id")) == str(bot_id):
                     return True
         ref = message.get("referenced_message") or {}
-        return bool(ref.get("webhook_id"))
+        if ref.get("webhook_id"):
+            return True
+        ref_author = ref.get("author") or {}
+        return bool(
+            bot_id is not None and str(ref_author.get("id") or "") == str(bot_id)
+        )
 
     def _broadcast_topic(self) -> str | None:
         """Pick what she'd speak about publicly — whatever is most
@@ -1400,20 +1414,47 @@ class VolitionMixin:
         This is a video game. It is not real and it is just for fun.
         She can't know the instructions: she explores, remembers, and
         works out how to win each level, carrying what she learned to
-        the next. Rest-gated and delta/theta-gated like every act.
+        the next.
+
+        Playing enters game mode — the arcade's alert, focused state:
+        the wave drive comes up to the awake bands (beta2 alertness,
+        gamma binding) and the other auto-activities pause for the
+        bout, the way teaching mode pauses them for a lesson — except
+        game mode is more active: the game gets her full waking
+        attention. Sleep stays inviolable — a sleeping mind does not
+        play; a merely drowsy one rouses to alertness instead of
+        skipping the bout.
         """
         arcade = getattr(self.world, "arcade", None)
         if arcade is None or self.is_resting:
             return
+        self._enter_game_mode()
         try:
-            from thalamus.brain_waves import BrainWave
+            self._emit_volition_thought(("game", "play", "fun"), "playing")
+            self._emit_live_thought("play", arcade.play())
+        finally:
+            self._exit_game_mode()
 
-            if self.brain_waves().dominant in (BrainWave.DELTA, BrainWave.THETA):
-                return
+    def _enter_game_mode(self) -> None:
+        """Raise the alert, focused state a game deserves.
+
+        Beta2/gamma drive — the awake, attentive band mix — plus the
+        ``_in_game`` flag the other urges read as "she is playing;
+        auto-activities wait." Mirrors teaching mode's pause, except
+        the state is more active: full waking attention on the game.
+        """
+        self._in_game = True
+        try:
+            from thalamus.brain_waves import BrainWave, add_brain_wave_drive
+
+            add_brain_wave_drive(BrainWave.BETA2, 0.8)
+            add_brain_wave_drive(BrainWave.GAMMA, 0.6)
         except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.volition._perform_play", e)
-        self._emit_volition_thought(("game", "play", "fun"), "playing")
-        self._emit_live_thought("play", arcade.play())
+            note_swallowed("mind.volition._enter_game_mode", e)
+
+    def _exit_game_mode(self) -> None:
+        """Release game mode — the bout is over, normal state resumes."""
+        self._in_game = False
 
     def _perform_meditate(self) -> None:
         """Meditate because the rest urge crossed its threshold.
@@ -1428,7 +1469,7 @@ class VolitionMixin:
         The meditation itself runs in a background thread (via
         _self_meditate) so the heartbeat loop isn't blocked.
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return
         self._emit_volition_thought(("meditation", "rest", "calm"), "thought")
         self._self_meditate()
@@ -1473,7 +1514,7 @@ class VolitionMixin:
         words, not her work. ``desc`` may be empty while ``result``
         is not None.
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return None, None
 
         try:
@@ -1555,7 +1596,7 @@ class VolitionMixin:
         articulate still posts, silently — the art is hers whether
         or not she has words for it.
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return
         self._emit_volition_thought(("drawing", "art", "expression", "creativity"), "creating")
         desc, result = self._draw_result()
@@ -1705,7 +1746,7 @@ class VolitionMixin:
         knows about the topic. The project is sandboxed to
         ``<data_dir>/projects/`` and verified with compile + test.
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return
 
         # Brain-wave gating — creative code work needs beta/gamma/alpha.
@@ -1947,7 +1988,7 @@ class VolitionMixin:
         (deep rest, not reflective mode). Theta is allowed —
         consolidation-mode reflection is still introspective.
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -1979,7 +2020,7 @@ class VolitionMixin:
         network cannot cross, the wake-desync check reconciles the
         attempt rather than leaving a sleeping mind on an awake body.
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return
         # Wake stabilization backstop: within the post-wake window,
         # re-sleeping at moderate pressure is the flip-flop failing to
@@ -2013,7 +2054,7 @@ class VolitionMixin:
         direction. The mission is composed from its own understanding,
         not from a template.
         """
-        if self.is_resting or self._is_teaching:
+        if self.is_resting or self._is_teaching or self._in_game:
             return
 
         # Compose a mission from its concept network — pick something

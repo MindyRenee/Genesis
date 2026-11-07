@@ -47,6 +47,7 @@
 //! ```
 
 pub mod active_inference;
+pub mod actuators;
 pub mod adaptive;
 pub mod association;
 pub mod consolidation;
@@ -57,7 +58,7 @@ pub mod continuity;
 pub mod cpufreq;
 pub mod dyadic_model;
 pub mod field_probe;
-pub mod actuators;
+pub mod gamma;
 pub mod hpa_development;
 pub mod interoception;
 pub mod ipc;
@@ -66,7 +67,6 @@ pub mod maxwell;
 /// Optic nerve — the retinal afferent's subcortical branches (SCN,
 /// superior colliculus, pretectum, TRN relay gate).
 pub mod optic_nerve;
-pub mod gamma;
 /// RTC wake alarm — scheduling its own return from suspension.
 pub mod rtc_wake;
 pub mod rtkit;

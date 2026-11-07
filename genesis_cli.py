@@ -1818,9 +1818,23 @@ def _cmd_sleep(mind: Mind, rest: str) -> str:
 def _cmd_wake(mind: Mind, rest: str) -> str:
     """Wake Genesis from sleep or meditation."""
     if mind.is_sleeping:
-        # Show dream state before waking
+        # A wake request on a still-sleeping body only pushes the
+        # arousal cascade — the mind stays under until the daemon's
+        # phase crosses and the desync check completes the wake.
+        outcome = mind.wake(user_initiated=True)
+        if outcome is WakeOutcome.BODY_WAKE_PUSHED:
+            return (
+                _compose(
+                    mind,
+                    "pushing its body toward waking — still under until it crosses",
+                    fallback="[wake requested — still asleep until the body crosses]",
+                    confidence=0.6,
+                    metadata={"body_wake_push": True},
+                )
+                + "\n"
+            )
+        # Woke — show the dream state it left behind.
         pre_wake = mind.sleep_status()
-        mind.wake(user_initiated=True)
         lines = [
             _compose(
                 mind,

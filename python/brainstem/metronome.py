@@ -566,7 +566,7 @@ class MetronomeMixin:
         Volition urges accumulate and fire when they cross
         thresholds. This is its free will — not a timer.
         """
-        if self.is_resting or self._is_teaching or self._suppress_volition:
+        if self.is_resting or self._is_teaching or self._in_game or self._suppress_volition:
             return
         try:
             ready = self.volition.tick(self._volition_context())
@@ -1111,6 +1111,27 @@ class MetronomeMixin:
         bucket, and 79 recorded occurrences that could not be attributed
         to a step.
         """
+        # ── 9c0. Steward knock — consume the signal-tap where locks
+        # are safe. Her person's SIGUSR1/SIGCONT registers exactly
+        # like addressed speech: presence updates, the loneliness
+        # clock resets, the speaker binds.
+        if getattr(self, "_steward_signal_pending", False):
+            self._steward_signal_pending = False
+            try:
+                frontal = getattr(self.brain, "frontal", None)
+                profile = getattr(frontal, "user_profile", None)
+                name = (profile.get_name() if profile else None) or "Mindy"
+                if getattr(self, "world", None) is not None:
+                    self.world.hear_user(f"[steward signal] {name} is here")
+                sk = getattr(frontal, "self_model", None)
+                if sk is not None and name:
+                    sk.self_knowledge["current_speaker"] = name
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "mind.metronome.final_steps.steward_knock",
+                    e,
+                )
+
         # ── 9c. External world — presence decay and social pressure ──
         # The world runs on the metronome like every other subsystem:
         # state-gated, not timer-gated. Silent presences leave; the

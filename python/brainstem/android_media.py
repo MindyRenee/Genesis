@@ -110,6 +110,7 @@ class AndroidCameraAdapter:
         return True
 
     def close(self, timeout: float = 3.0) -> None:
+        """Stop the capture thread and wait up to ``timeout`` for it to join."""
         self._stop.set()
         thread = self._thread
         if thread is not None and thread.is_alive():
@@ -213,6 +214,7 @@ class AndroidMicrophoneAdapter:
         return True
 
     def close(self, timeout: float = 3.0) -> None:
+        """Stop the recording thread, then release the Termux microphone."""
         self._stop.set()
         thread = self._thread
         if thread is not None and thread.is_alive():

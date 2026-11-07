@@ -4,10 +4,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import numpy as np  # noqa: E402
-import pytest  # noqa: E402
-
-from sleep.inner_world import (  # noqa: E402
+import numpy as np
+import pytest
+from sleep.inner_world import (
     AffectiveFiberQualiaSpace,
     InnerWorldExperientialLatentSpace,
     InteroceptiveBaseManifold,
