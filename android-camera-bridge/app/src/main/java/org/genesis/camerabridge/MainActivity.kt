@@ -39,11 +39,16 @@ class MainActivity : Activity() {
             text = "Start / retry selected camera"
             setOnClickListener { requestCameraAndStart(selectedLensFacing) }
         }
+        val mic = Button(this).apply {
+            text = "Start microphone"
+            setOnClickListener { requestMicAndStart() }
+        }
         val stop = Button(this).apply {
-            text = "Stop camera stream"
+            text = "Stop streams"
             setOnClickListener {
                 stopService(Intent(this@MainActivity, CameraStreamService::class.java))
-                status.text = "Camera stream stopped."
+                stopService(Intent(this@MainActivity, AudioStreamService::class.java))
+                status.text = "Streams stopped."
             }
         }
         setContentView(LinearLayout(this).apply {
@@ -52,13 +57,15 @@ class MainActivity : Activity() {
             addView(front)
             addView(rear)
             addView(start)
+            addView(mic)
             addView(stop)
         })
         // The Genesis stop command enters through this explicit activity
         // action so the service is stopped inside its owning application.
         if (intent.getBooleanExtra(EXTRA_STOP_CAMERA, false)) {
             stopService(Intent(this, CameraStreamService::class.java))
-            status.text = "Camera stream stopped."
+            stopService(Intent(this, AudioStreamService::class.java))
+            status.text = "Streams stopped."
             finish()
             return
         }
@@ -76,11 +83,28 @@ class MainActivity : Activity() {
         selectedLensFacing = lensFacing
         val cameraName = if (lensFacing == FRONT_CAMERA) "front" else "rear"
         status.text = "Selected $cameraName camera."
+        val missing = mutableListOf<String>()
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.CAMERA), 41)
+            missing += Manifest.permission.CAMERA
+        }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            missing += Manifest.permission.RECORD_AUDIO
+        }
+        if (missing.isNotEmpty()) {
+            requestPermissions(missing.toTypedArray(), 41)
             return
         }
         startStreamService()
+        startAudioService()
+    }
+
+    private fun requestMicAndStart() {
+        status.text = "Selected microphone."
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 42)
+            return
+        }
+        startAudioService()
     }
 
     override fun onRequestPermissionsResult(
@@ -91,8 +115,13 @@ class MainActivity : Activity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 41 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
             startStreamService()
-        } else if (requestCode == 41) {
-            status.text = "Camera permission is required to stream frames."
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                startAudioService()
+            }
+        } else if (requestCode == 42 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            startAudioService()
+        } else {
+            status.text = "Camera and microphone permissions are required to stream senses."
         }
     }
 
@@ -108,6 +137,17 @@ class MainActivity : Activity() {
             status.text = "Android refused camera startup: ${error.message ?: "permission or foreground-service restriction"}"
         } catch (error: Exception) {
             status.text = "Could not start camera service: ${error.message ?: error.javaClass.simpleName}"
+        }
+    }
+
+    private fun startAudioService() {
+        try {
+            startForegroundService(Intent(this, AudioStreamService::class.java))
+            status.text = "Starting microphone. The notification reports audio and daemon connection state."
+        } catch (error: SecurityException) {
+            status.text = "Android refused microphone startup: ${error.message ?: "permission or foreground-service restriction"}"
+        } catch (error: Exception) {
+            status.text = "Could not start microphone service: ${error.message ?: error.javaClass.simpleName}"
         }
     }
 }

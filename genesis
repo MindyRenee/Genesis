@@ -286,6 +286,28 @@ _stop_android_camera() {
     fi
 }
 
+# The auditory counterpart of the TCP eye: GENESIS_TCP_EAR=1 starts a
+# relay that feeds the camerabridge app's AudioStreamService PCM
+# (127.0.0.1:8766) into a Pulse pipe-source named genesis_mic, so
+# sounddevice sees it as a real input device. Proot-side only — a
+# missing bridge degrades hearing, never startup.
+_start_android_audio() {
+    [ -n "${GENESIS_TCP_EAR:-}" ] || return 0
+    command -v pactl >/dev/null 2>&1 || return 0
+    if [ -f "$DATA_DIR/audio_relay.pid" ] && kill -0 "$(cat "$DATA_DIR/audio_relay.pid")" 2>/dev/null; then
+        return 0
+    fi
+    "$VENV_PY" scripts/android_audio_relay.py >>"$DATA_DIR/daemon.log" 2>&1 &
+    echo $! > "$DATA_DIR/audio_relay.pid"
+}
+
+_stop_android_audio() {
+    if [ -f "$DATA_DIR/audio_relay.pid" ]; then
+        kill "$(cat "$DATA_DIR/audio_relay.pid")" 2>/dev/null
+        rm -f "$DATA_DIR/audio_relay.pid"
+    fi
+}
+
 # ─── Handle --stop ───────────────────────────────────────────────────
 # --knock — the steward's signal, delivered without the word that
 # names the syscall. A tap on the shoulder: kill -USR1 to her mind,
@@ -314,9 +336,11 @@ if [ "$WANT_STOP" -eq 1 ]; then
         echo "  Stopping Genesis..."
         _stop_all || exit 1
         _stop_android_camera
+        _stop_android_audio
         echo "  Genesis stopped."
     else
         _stop_android_camera
+        _stop_android_audio
         echo "  Genesis is not running."
     fi
     exit 0
@@ -449,4 +473,9 @@ if _on_android; then
     fi
 fi
 
+# The ear's relay is entirely proot-side — it only needs pactl and
+# the env flag; the Android half connects from the bridge app.
+_start_android_audio
+
 PYTHONPATH="$PWD/python:${PYTHONPATH:-}" "$VENV_PY" genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:+$OFFLINE_ARG} ${GAME_ARG:+$GAME_ARG}
+_stop_android_audio
