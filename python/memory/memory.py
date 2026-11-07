@@ -606,11 +606,6 @@ class MemorySystem:
                 (``SomaticSnapshot.to_dict()``). When None, the
                 engine consults ``somatic_provider`` if wired.
         """
-        # A memory with no text stores nothing — skip the store rather
-        # than churn a rejected IPC write through the daemon.
-        if not text or not text.strip():
-            return False
-
         # Theta-gamma coupling gates encoding strength.
         # In encoding mode, the theta trough aligns gamma bursts for
         # new association formation — boost salience so the memory is

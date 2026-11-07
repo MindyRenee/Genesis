@@ -4018,7 +4018,14 @@ pub fn default_handler<L: LtmAccess>(
                     resp
                 }
                 Err(e) => {
-                    eprintln!("[ipc] STORE_EPISODE failed: {e}");
+                    // Name the producer — an empty-episode rejection
+                    // should say which module and event kind tried
+                    // to write it, or the leak stays anonymous.
+                    eprintln!(
+                        "[ipc] STORE_EPISODE failed: {e} \
+                         (source_module={source_module}, event_type={event_type}, \
+                         text_len={text_len}, ts={timestamp})"
+                    );
                     vec![0, 0, 0, 0, 0, 0, 0, 0, 0]
                 }
             }
