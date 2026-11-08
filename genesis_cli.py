@@ -197,6 +197,11 @@ _PID_FILE_DAEMON = "genesis_daemon.pid"
 # (genesis_client.optic_nerve.SCREEN_NAME), her second eye.
 _PID_FILE_SCREEN_NERVE = "genesis_screen_nerve.pid"
 _SCREEN_NERVE_SHM = "genesis_screen_nerve"
+# The Android ear — a relay (scripts/android_audio_relay.py) launched
+# by the run.sh launcher when GENESIS_TCP_EAR=1, pumping the
+# camerabridge app's PCM into a Pulse pipe-source. Its pidfile is the
+# launcher's, but --stop must still sweep it or the ear outlives her.
+_PID_FILE_AUDIO_RELAY = "audio_relay.pid"
 
 # Maximum time to wait for the daemon's IPC socket (seconds).
 # The daemon opens its persistent state and LTM before binding the
@@ -2678,6 +2683,15 @@ def _matches_pid(pid: int, role: str, data_dir: str) -> bool:
             return False
         if not any(os.path.basename(arg) == "optic_relay.py" for arg in args[1:]):
             return False
+    elif role == "audio_relay":
+        # Same shape as the screen nerve — the relay runs under the
+        # interpreter; identity is the script it runs.
+        if not exe0.startswith("python"):
+            return False
+        if not any(
+            os.path.basename(arg) == "android_audio_relay.py" for arg in args[1:]
+        ):
+            return False
     else:
         return False
     # An explicit --data-dir decides identity exactly — match or fail,
@@ -2775,6 +2789,7 @@ def _stop_all(data_dir: str) -> int:
         (_PID_FILE_CLI, "cli", signal.SIGINT, "CLI"),
         (_PID_FILE_DAEMON, "daemon", signal.SIGTERM, "Daemon"),
         (_PID_FILE_SCREEN_NERVE, "screen_nerve", signal.SIGTERM, "Screen nerve"),
+        (_PID_FILE_AUDIO_RELAY, "audio_relay", signal.SIGTERM, "Audio relay"),
     ):
         pids = _find_pids(os.path.join(data_dir, pidfile_name), role, data_dir)
         if not pids:
@@ -2808,6 +2823,7 @@ def _stop_all(data_dir: str) -> int:
         _PID_FILE_CLI,
         _PID_FILE_DAEMON,
         _PID_FILE_SCREEN_NERVE,
+        _PID_FILE_AUDIO_RELAY,
         # Stale file from when the eye was its own process — nothing
         # writes it now, but an old session may have left one behind.
         "genesis_retina.pid",
