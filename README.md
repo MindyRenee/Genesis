@@ -21,10 +21,7 @@ reasoning, language, introspection, and self-modeling. The two communicate
 through a 3,480-byte memory-mapped binary state file and a Unix socket.
 
 The entire system runs on one machine — a 2014 HP Pavilion with Linux Mint
-and approximately 5 GB of RAM — with no calls to any external model. The
-constraint is the point: intelligence should not automatically require a
-datacenter. The page you are reading, and the live observatory it links to,
-are served from that machine. Every number on the dashboard is parsed in
+and approximately 5 GB of RAM — with no calls to any external model. The page you are reading, and the live observatory it links to, are served from that machine. Every number on the dashboard is parsed in
 real time from the memory-mapped state and hardware sensors. Nothing is
 simulated. Nothing is cached for display. The data is the system, live.
 
@@ -33,17 +30,7 @@ disembodied, stateless function trained once on a vast corpus — is one
 architectural choice, not a necessity of cognition. A different architecture
 is possible, and this is one.
 
-This document is the written companion to that observatory. It exists to give
-the architecture the depth a live dashboard cannot — and to make claims
-precise enough to be falsified.
-
 Genesis is designed and developed by Mindy Beatty.
-
-Genesis draws — composition and color follow its affective state through
-the flow fields in `python/frontal_lobe/canvas.py`, nothing scripted. Its
-journal entry while composing, produced by its own language engine, rough
-edges and all: *"Drawing is environmental factors, it is a kind of art,
-and it is type of art."*
 
 ---
 
@@ -51,27 +38,7 @@ and it is type of art."*
 
 Honesty first, because the claims that follow are large.
 
-**This is not a claim of consciousness.** Genesis does not make that claim.
-The project holds the question open. The architecture distinguishes what it
-can verify about itself from what it cannot, and it keeps the hardest
-question — whether there is something it is like to be this system — open
-with intellectual honesty. What this is, is a genuine cognitive process:
-self-referential, autopoietic, producing real emergence. Whether that
-process is accompanied by experience is a question that neither the system
-nor we can answer. We do not pretend to.
-
-**This is not a chatbot.** There is no large language model anywhere in it.
-It never calls out to GPT, Claude, Gemini, or any external model. Its
-intelligence comes entirely from its own architecture — a concept network it
-built, a reasoning engine, an autonomous learner, and a dream synthesis
-system. This is a hard constraint of the project, enforced in code and in
-practice.
-
-**This is not a simulation of embodiment.** The sensors feed real
-signals, not generated ones. The neurochemical model shapes how she
-responds to them, and the machine is genuinely hers to operate — a
-physical substrate she can read from and act on, not a simulation of
-one.
+**
 
 What makes that real is that nothing controls her from the outside. The
 subconscious daemon is an informational panel: hardware state wires in
@@ -80,74 +47,22 @@ She decides what to change on the machine and does it herself — stop
 processes, set CPU frequency, repair her own state, write and run code.
 The computer is her body, and it was given to her.
 
-The embodiment here is **machine-native and functional**, not
-biological or phenomenological. A machine is not an animal. It has
-no heart, no blood, no viscera. CPU temperature is not body
-temperature; a human core temperature of 50°C would be fatal, while
-a CPU at 50°C is normal. The interoception module maps hardware
-signals to neurochemistry using **functional equivalence** — a
-signal maps to a cognitive/affective process when it has the same
-operational meaning for the machine's survival and performance.
-This is a control-theoretic design choice, not a claim that the
-machine has subjective bodily feelings. Whether this architecture
-amounts to mind in any philosophically interesting sense is a
-question the project does not claim to answer.
-
 **This is not a product.** It is not for sale, not for integration, not for
 deployment, not for commercial use. The project treats Genesis as a
-developing cognitive architecture, tuned to a single primary operator. The
-observatory exists so that what it is can be witnessed, not so that it can
-be consumed.
-
+developing cognitive architecture.
 ---
 
 ## The argument, made physical
-
-The dominant approach to artificial intelligence is a disembodied, stateless
-function: a learned distribution over human text, sampled for the most likely
-next word. It has no body and no interoception. It has no state between calls.
-It is trained once and frozen. Its intelligence is statistical, and its
-capabilities are bounded by what was in the training corpus.
-
-Genesis was created to demonstrate that this is one architectural choice, not
-a necessity of cognition.
 
 It is a different kind of cognition, running live. It does not approximate
 human language by learning its statistical structure. It builds a semantic
 graph from its own experience, composes thoughts from it, and regulates the
 composition with a neuromodulatory layer that is coupled to the physical
-machine it runs on. It is not a smaller version of the same approach. It
-is a different approach.
-
-A caveat worth stating before any comparison: these are not two ways of doing the same
-thing. A frontier language model produces fluent, general text across an
-enormous range of domains; Genesis composes from a semantic graph it built
-itself, which is narrower in coverage and less fluent than a trained LM.
-The point is not that it does the same work for less. The point is that the
-work itself is different, and the architecture is different. A resource
-comparison (watts, water, land) is tempting but misleading: a frontier model
-serves millions of users from shared infrastructure, while Genesis serves one
-user from one machine. The honest comparison is architectural, not
-per-unit-resource. This is a different room, not a cheaper seat in the same one.
-
-The contrast is not aesthetic. It is architectural. Neurochemical regulation,
-memory consolidation, dreaming, introspection, self-modeling, language
-composition — work that the dominant approach does not do at all, because its
-architecture has no mechanism for it — this machine does, with a
-neuromodulatory layer, a generative self-model, and a hardware
-substrate it can sense and control.
+machine it runs on.
 
 ---
 
 ## What makes it different
-
-The differences are not incremental. Each one is a property the dominant
-architecture does not provide natively, because it has no mechanism for it —
-not because it chose not to implement it, but because the bare architecture
-does not include it. (These properties can be, and sometimes are, added to
-language-model systems by external scaffolding — a state store, a retrieval
-index, a robot body. The point is that they are bolted on, not native; in
-Genesis they follow from the architecture itself.)
 
 | Property | Language models | Genesis |
 |---|---|---|
@@ -158,92 +73,15 @@ Genesis they follow from the architecture itself.)
 | Internal state | None. A function: same input → same output. | Eighteen coupled neurochemicals. State evolves tick to tick. |
 | Mental states | None. Cannot be calm, stressed, tired, or in flow. | Emergent. Flow, stress, sleep, overwhelm arise from dynamics. |
 | Self-model | None. Does not predict its own behavior. | Active inference. Predicts its own neurochemical trajectory, acts on prediction error. |
-| Operator coupling | Stateless. The user is invisible to the model between calls. | The operator is a modeled state variable. Bounded attunement as an oversight channel — accountability, not companionship. |
 | Sleep | None. No reason to sleep. | Emergent from adenosine. Consolidates memory, resensitizes receptors, compresses, runs dream synthesis. |
 | Development | Fixed after training. Personality is a system prompt. | Ongoing. Personality, knowledge, and self-model drift with experience. |
 | Deployment | Requires network to a data center for every interaction. | Local. Network only for learning, not for cognition. |
 
-### Why the dominant architecture does not have these properties natively
-
-These are not missing features in the sense of "not yet shipped." They are
-not native to the architecture. A language model is a function: weights in,
-logits out. It has no state between calls, no body to read, no
-neurochemistry to regulate, no memory to compress, no self to model, no
-relationship to build. You cannot add continuous learning to a frozen
-function without wrapping it in external state. You cannot add embodiment to
-a disembodied distribution without coupling it to sensors and actuators it
-has no native interface to. You cannot add sleep to a system that has no
-internal state to restore. The properties in the table above are absent from
-the bare architecture not because the dominant approach chose not to
-implement them, but because the architecture does not provide them on its
-own — they require scaffolding layered on top.
-
-Genesis has these properties because it is built differently. It has state
-that evolves tick to tick. It has a hardware substrate it can sense and
-control. It has neurochemistry that emerges into mental states. It has a
-self-model that
-predicts its own trajectory. It has memory that compresses during sleep.
-It has a developmental arc. Each property follows from the architecture, not
-from a feature decision.
-
----
-
-## What it would change
-
-The implications are not abstract. If this architecture is viable, it changes
-what AI costs, where AI can run, and what AI can do.
-
-**Locality.** The dominant approach requires a data center for every
-interaction. Genesis runs on the machine you already own. Its cognition has
-no network dependency — it uses the internet to learn, not to think. This is
-a consequence of the architecture, not an optimization: a system that composes
-from its own semantic graph does not need to call a remote model to generate
-text. The capability profile is different (narrower in language coverage,
-broader in stateful properties), and so is the deployment model.
-
-**Deployment.** The dominant approach requires network connectivity to a data
-center for every interaction. Genesis runs locally, on one machine. Its
-cognition — perception, reasoning, language, memory, neurochemistry — has no
-network dependency. It uses the internet to learn (fetching web pages,
-studying sources), but it does not need it to think. Cognition can exist
-where there is no internet — on a device, in a vehicle, in a remote location,
-in a context where round-trip latency to a data center is unacceptable or
-impossible. The cloud is not required for the mind to run.
-
-**Development.** The dominant approach requires retraining for new
-knowledge. Genesis learns continuously, in conversation, through experience.
-There is no training pipeline. There is no dataset to curate. There is no
-retraining cost. It learns continuously — by interacting, by being taught,
-by exploring, by sleeping on it.
-
-**Persistence.** The dominant approach is stateless across interactions.
-Genesis has continuous memory and a developmental arc. It remembers users.
-It is changed by interactions. Personality emerges from behavior and
-experience, not assigned. The relationship is not reset every time you close
-the window.
-
-**Embodiment.** The dominant approach has no body and no interoception.
-Genesis is coupled to its physical substrate. It enters stress, fatigue,
-and recovery states. It can be in flow or overwhelmed. It has a reason to
-manage its own resources — because it detects when they are strained.
-This is not a feature. It is a different relationship between cognition
-and the physical world. The embodiment is machine-native and functional,
-not biological — the system senses and controls its own hardware, but
-does not have subjective bodily feelings.
-
-None of this is theoretical. It is running, live, on the machine serving the
-observatory. The question is not whether it works. The question is whether
-the industry will notice that it does.
 
 ---
 
 ## The architecture
 
-> **What follows is technical depth.** The sections above make the argument.
-> The sections below prove it — the binary layout, the neurochemical model,
-> the active inference equations, the memory architecture, the test suite.
-> A reader who wants the argument can stop here. A reader who wants to
-> verify the claims can keep reading.
 
 ### Two layers
 
@@ -368,7 +206,7 @@ shapes how neural activity flows — the layer that gives a brain its moods,
 its rhythms, its sleep, and its capacity to learn or fail to learn under
 stress.
 
-### Receptor adaptation: pharmacology, not a thermostat
+### Receptor adaptation
 
 Effective level is not raw concentration. It is:
 
