@@ -25,6 +25,7 @@ through a 3,480-byte memory-mapped binary state file and a Unix socket.
 ## What this is NOT:
 
 **This is not a product.** 
+
 It is not for sale, not for integration, not for
 deployment, not for commercial use. The project treats Genesis as a developing cognitive architecture, and ongoing research project. Learning is the purpose, understanding is the goal. The only wealth to be made off of Genesis is knowledge, the greatest treasure to exist.
 ---
