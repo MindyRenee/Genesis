@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
 from basal_ganglia.volition import VolitionMixin
-from self.man_review import ManPageReview, ManReviewMixin
+from self.man_review import ManChange, ManPageReview, ManReviewMixin
 
 TROFF_V1 = ".TH genesis 1\n.SH NAME\ngenesis - launch the mind\n"
 TROFF_V2 = ".TH genesis 1\n.SH NAME\ngenesis - launch the artificial mind\n"
@@ -224,16 +226,54 @@ class _VolitionMind(ManReviewMixin, VolitionMixin):
         self.emitted.append((kind, text))
 
 
+def test_submit_supersedes_older_pending_same_page(tmp_path: Path) -> None:
+    r = _mk(tmp_path)
+    c1 = r.submit("genesis", "1", TROFF_V1, "t")
+    c2 = r.submit("genesis", "1", TROFF_V2, "t")
+    assert c1 is not None and c2 is not None and c1.id != c2.id
+    # A page carries one live question — the newest revision.
+    assert [c.id for c in r.pending()] == [c2.id]
+    # Superseded is withdrawn, not vetoed: the same content may return.
+    assert r.submit("genesis", "1", TROFF_V1, "t") is not None
+
+
 def test_review_pending_changes_applies_and_recounts(tmp_path: Path) -> None:
     r = _mk(tmp_path)
     for i in range(4):
-        r.submit("genesis", "1", TROFF_V1 + f".SH EXTRA{i}\nx\n", "t")
+        r.submit(f"genesis-p{i}", "1", TROFF_V1 + f".SH EXTRA{i}\nx\n", "t")
     mind = _ReviewMind(r)
     outcomes = mind.review_pending_changes(max_changes=2)
     assert [o["status"] for o in outcomes] == ["applied", "applied"]
     assert len(r.pending()) == 2
     # Her self-knowledge keeps the fact current.
     assert mind.self_model.self_knowledge["manual_pending_review"] == 2
+
+
+def test_review_pending_changes_applies_only_newest_per_page(tmp_path: Path) -> None:
+    # A queue built before supersede-on-submit may hold several
+    # revisions of one page. The drain must ratify only the newest —
+    # applying oldest-first writes stale text over her manual — and
+    # withdraw the superseded remainder without vetoing it.
+    r = _mk(tmp_path)
+    for i, text in enumerate((TROFF_V1, TROFF_V2)):
+        sha = hashlib.sha256(text.encode()).hexdigest()
+        mc = ManChange(
+            id=ManChange.make_id("genesis", "1", sha),
+            name="genesis",
+            section="1",
+            content=text,
+            current="",
+            proposed_by="drift-scan",
+            sha=sha,
+            created_ms=i,
+        )
+        (r.root / "pending" / f"{mc.id}.json").write_text(json.dumps(mc.to_dict()))
+    mind = _ReviewMind(r)
+    outcomes = mind.review_pending_changes(max_changes=3)
+    assert [o["status"] for o in outcomes] == ["applied"]
+    live = tmp_path / "man" / "man1" / "genesis.1"
+    assert live.read_text() == TROFF_V2
+    assert r.pending() == []
 
 
 def test_manual_urge_is_registered() -> None:

@@ -91,6 +91,58 @@ Game observations may contain multiple frames, the current state,
 available actions, completed-level count, and total win-level count.
 Genesis converts the latest frame to a grid for perception. The
 official environment remains authoritative for the actual game state.
+.SH STRUCTURAL LATENT DECODER
+Each ARC board is passed through
+.B worlds.games.latent.ArcEnvironmentDecoder
+alongside Genesis's existing parietal grid and scene parser. The decoder
+validates the 0–15 grid, extracts connected same-color components,
+canonicalizes object order, records centroids, bounding boxes, shape
+signatures and local Betti numbers (beta-0 components and beta-1
+enclosed holes under the declared 4/8 connectivity convention), and
+constructs a sparse directed adjacency graph. It produces a fixed
+51-coordinate structural feature
+vector containing board dimensions, occupancy, object statistics,
+topological counts, spatial distribution, ranked object sizes/radii,
+and color frequencies.
+.PP
+The vector is an interpretable feature embedding, not a pretrained or
+learned neural embedding. The attributed graph is retained alongside it;
+the vector does not replace object-level evidence. Background defaults
+to the most common grid color, using the parietal parser's canonical
+rule; callers may supply an explicit background when the environment
+establishes one. The feature state is projected into the typed
+experiential outer domain
+.BR E .
+Perception events carry the latent vector, uncertainty, object summary,
+and current action-model evidence into the world's normal perception
+path.
+.PP
+For each observed action, the decoder compares the before and after
+latent states and updates local action-conditioned transition statistics.
+Predictions are made only from a sufficiently nearby previously observed
+state/action context. Welford running statistics estimate diagonal transition
+uncertainty; uncertainty is not reduced merely because an action was
+attempted.
+When a prediction is available, its distance from the next observed
+state is reported as
+.B latent_prediction_error
+in the perception metadata. These empirical models are saved inside
+per-game world memory.
+.PP
+Goal evidence records observed level changes and the official terminal
+state. The
+.B GoalAttractorManifold
+represents an explicitly supplied goal center and constant positive-definite metric tensor. Its satisfaction test measures membership in a
+specified metric neighborhood; it does not manufacture a target from
+reward or infer a win. The
+.B LatentState.geodesic_distance
+uses the exact constant-metric expression
+.nf
+d(x,y) = sqrt((y-x)^T G (y-x))
+.fi
+This is a geodesic only for the declared constant metric on that
+coordinate chart; no varying Riemannian metric is claimed. The official
+toolkit remains authoritative for level completion and wins.
 .SH LEARNING AND MEMORY
 Genesis keeps per-game memory in her world state. It includes action
 effect counts, board visits, action-value estimates, moves and paths
@@ -119,6 +171,34 @@ The official toolkit separately supports JSONL game recordings and
 scorecard operations. Its recording directory and scorecard behavior
 are controlled by the toolkit configuration, not by Genesis's
 cognitive-journal path.
+.SH LIMITATIONS
+The structural feature coordinates are hand-designed, deterministic
+descriptors. Their diagonal variance describes transition-model
+uncertainty, not pixel-detection confidence or a full covariance matrix. They are not learned semantic concepts,
+persistent object identity tracking, or a complete physical simulator.
+Components use four-way same-color connectivity with the inferred or
+explicit background color; enclosed holes use the complementary
+eight-neighbor convention. The transition model is local empirical
+evidence, not a globally valid dynamics law. The current transition
+uncertainty is diagonal and does not represent a full covariance matrix.
+Unknown actions or distant latent contexts produce no prediction.
+.PP
+The
+.B TransitionOperator
+and
+.B DifferentiableOperatorSpace
+types implement explicitly declared affine vector fields
+.BR f(x)=Ax+b ,
+their application, and their Lie bracket. Closure validation checks
+whether pairwise brackets lie in the declared coefficient span. These
+operators are a mathematical facility, not a fabricated interpretation
+of ARC action identifiers: the official actions remain opaque discrete
+controls and are not automatically promoted to differentiable vector
+fields. Completion is grounded in the toolkit's terminal state, not a
+Euclidean target-vector threshold. No claim is made that this decoder
+alone solves ARC-AGI-3. It supplies structured observations and
+measurable transition hypotheses to the existing memory, reasoning,
+and action-selection faculties.
 .SH DIAGNOSTICS
 Use
 .B /arcade
@@ -138,6 +218,8 @@ rules can change independently of Genesis.
 .BR genesis-browser (7),
 .BR genesis-cli (1),
 .BR genesis-daemon (8),
+.BR genesis-internet (7),
+.BR genesis-law (7),
 .BR genesis-math (7),
 .BR genesis-reasoning (7),
 .BR genesis-retina (1)

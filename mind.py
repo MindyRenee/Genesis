@@ -581,7 +581,6 @@ class Mind(
         # The inner world lives in the substrate: inner_life deposits
         # its own latent coordinates into the manifold's inner band.
         self.inner_life.manifold = self.manifold
-        self.world.manifold = self.manifold
         self.memory.manifold = self.manifold
         for _owner in (self.inner_life, getattr(self.brain, "frontal", None), self.memory):
             _hg = getattr(getattr(_owner, "compression", None), "holographic_graph", None)
@@ -667,6 +666,11 @@ class Mind(
             channel=channel,
             on_channel_speech=self._hear_channel,
         )
+        # The outer world lives in the substrate too: her experience
+        # of it lands at its own experiential coordinate. world is
+        # created above — the wiring cannot happen earlier beside
+        # inner_life's.
+        self.world.manifold = self.manifold
         # The page's instrument card — the world owns it (a view of
         # her vitals, posted to her page); the metronome only ticks
         # the world, never composes for it.

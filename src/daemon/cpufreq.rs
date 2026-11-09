@@ -365,11 +365,27 @@ pub fn report_body_control_outcome(applied: bool) {
 /// kernel scale based on utilization; `powersave` pins to min;
 /// `performance` pins to max.
 pub fn set_governor(governor: &str) -> bool {
-    let cause = failure_cause("set_governor");
     if !VALID_GOVERNORS.contains(&governor) {
-        report_failure(&cause, &format!("invalid governor '{governor}'"));
+        report_failure(
+            &failure_cause("set_governor"),
+            &format!("invalid governor '{governor}'"),
+        );
         return false;
     }
+    write_governor(governor)
+}
+
+/// Write a governor the request whitelist did not vet.
+///
+/// `restore_hardware_state` hands back the host's own captured
+/// governor verbatim, and vendor kernels advertise governors outside
+/// the request vocabulary (e.g. Android's `walt`). Restoring one is
+/// the shutdown path returning the host to what it found, not a new
+/// request. The name still reaches the privileged fragment only
+/// through `resolve_governor`'s `scaling_available_governors` check,
+/// so no unvetted string is written.
+fn write_governor(governor: &str) -> bool {
+    let cause = failure_cause("set_governor");
     // Resolve and write per policy — drivers expose different governor
     // vocabularies, so each policy gets its own resolved name.
     let mut script = String::from("ok=0; ");
@@ -585,10 +601,10 @@ pub fn restore_hardware_state() -> bool {
                 snap.governor.clone()
             },
         };
-        if !apply_policy(&policy) {
+        if !apply_policy_for_restore(&policy) {
             ok = false;
         }
-    } else if !snap.governor.is_empty() && !set_governor(&snap.governor) {
+    } else if !snap.governor.is_empty() && !write_governor(&snap.governor) {
         ok = false;
     }
     if let Some(enabled) = snap.boost
@@ -750,10 +766,26 @@ pub fn derive_policy(effective_levels: &[f32; 18], freq_min: u32, freq_max: u32)
 /// - Normal case where min <= current max: step 1 sets the final max,
 ///   step 2 sets min, step 3 is a harmless no-op
 pub fn apply_policy(policy: &FreqPolicy) -> bool {
+    apply_policy_inner(policy, false)
+}
+
+/// `apply_policy` for the shutdown restore: the policy's governor is
+/// the host's own captured value, which the request whitelist must
+/// not reject (vendor governors like `walt` are legitimate there).
+fn apply_policy_for_restore(policy: &FreqPolicy) -> bool {
+    apply_policy_inner(policy, true)
+}
+
+fn apply_policy_inner(policy: &FreqPolicy, governor_is_snapshot: bool) -> bool {
     let mut ok = true;
     // Set governor first — userspace governor requires it before
     // setting exact frequencies via set_freq.
-    if !set_governor(&policy.governor) {
+    let governor_applied = if governor_is_snapshot {
+        write_governor(&policy.governor)
+    } else {
+        set_governor(&policy.governor)
+    };
+    if !governor_applied {
         ok = false;
     }
 
