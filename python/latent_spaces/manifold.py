@@ -21,6 +21,12 @@ Conventions:
   the counter-rotation shears the two strand families against each
   other (the braid the worlds think with). Both are isometries — the
   geometry survives the motion.
+- **Episodes are trajectories, not points.** Deposits belong to
+  rungs — exchanges that flow outer world -> inner -> outer world:
+  the world reaching in opens a rung, her inner legs ride it, and her
+  reaching back out (speech, acts) completes the arc. A lone deposit
+  is itself a segment — the stretch of fiber it has swept since its
+  birth. Recall of an episode is traversal of the arc.
 - **Self has a depth, not a point.** ``lean`` is where self-presence
   sits on the core-to-core axis; the verified exact-vesica layer at
   ``sqrt(3)/2`` is the resting position. It drifts: toward the inner
@@ -66,7 +72,7 @@ _DOMAIN_DEPTH = {
     "outer": (0.72, 0.98),
 }
 
-_FORMAT_VERSION = 1
+_FORMAT_VERSION = 2
 
 # Fresh deposits land sharp — high spectral modes alive, episodic
 # detail intact. Consolidation widens the bandwidth; detail diffuses
@@ -105,6 +111,12 @@ class LatentManifold:
         self._phase0 = np.empty(0, dtype=np.float64)
         self._shear0 = np.empty(0, dtype=np.float64)
         self._kinds: list[str] = []
+        # The rung (exchange) each deposit belongs to — episodes as
+        # trajectories between the strand families. -1 is unpaired
+        # (only images saved before rungs existed).
+        self._rung = np.empty(0, dtype=np.int64)
+        self._open_rung = -1
+        self._next_rung = 0
         # The medium's own state.
         self._phase = 0.0
         self._shear_phase = 0.0
@@ -140,6 +152,33 @@ class LatentManifold:
             point = g.unit(direction + 1e-6)
             return g.set_depth(point, target)
 
+    def _assign_rung(self, domain: str, inbound: bool, rung: int | None) -> int:
+        """Pick the exchange a deposit belongs to. Called with the lock held.
+
+        The arc flows outer -> inner -> outer: the world reaching in
+        (an inbound outer deposit) opens a new rung, inner and self
+        legs ride the open one, and her reaching back out (an outbound
+        outer deposit — speech, an act) completes the arc and stops it
+        from accreting. An explicit ``rung`` joins that exchange and
+        keeps it open.
+        """
+        if rung is not None:
+            rid = int(rung)
+            if rid < 0:
+                raise ValueError("rung id must be >= 0")
+            self._next_rung = max(self._next_rung, rid + 1)
+            self._open_rung = rid
+            return rid
+        if (domain == "outer" and inbound) or self._open_rung < 0:
+            rid = self._next_rung
+            self._next_rung += 1
+            self._open_rung = rid
+        else:
+            rid = self._open_rung
+        if domain == "outer" and not inbound:
+            self._open_rung = -1  # the arc arrived back in the world
+        return rid
+
     def observe(
         self,
         content: str,
@@ -148,11 +187,16 @@ class LatentManifold:
         salience: float = 0.4,
         inbound: bool = True,
         now_ms: int | None = None,
+        rung: int | None = None,
     ) -> int:
         """Deposit a trace; returns its index. Never mutates old deposits.
 
         ``inbound`` selects the strand family: the world's leg toward her
         rides the (1,1) fibers; her leg toward the world rides (1,-1).
+        ``rung`` overrides the exchange the deposit joins — left alone,
+        the flow assigns it: inbound outer legs open a new exchange,
+        everything else rides the open one until an outbound outer leg
+        completes the arc.
         """
         if not isinstance(content, str):
             raise TypeError("content must be a string")
@@ -163,6 +207,7 @@ class LatentManifold:
         born = int(time.time() * 1000) if now_ms is None else int(now_ms)
         strand = STRAND_HOPF if inbound else STRAND_ANTI
         with self._lock:
+            rid = self._assign_rung(domain, inbound, rung)
             idx = len(self._kinds)
             self._points = np.vstack([self._points, point[None, :]])
             self._salience = np.append(self._salience, float(salience))
@@ -172,6 +217,7 @@ class LatentManifold:
             self._bandwidth = np.append(self._bandwidth, _DETAIL_BANDWIDTH)
             self._phase0 = np.append(self._phase0, self._phase)
             self._shear0 = np.append(self._shear0, self._shear_phase)
+            self._rung = np.append(self._rung, rid)
             self._kinds.append(kind)
             self._dirty = True
             return idx
@@ -179,6 +225,17 @@ class LatentManifold:
     # ------------------------------------------------------------------
     # Resonance — retrieval by proximity in the medium
     # ------------------------------------------------------------------
+
+    def _epoch_points(self, rows: slice | list[int] | FloatArray) -> FloatArray:
+        """Deposit positions unwound to their birth epochs — lock held.
+
+        A trace deposited at medium phase (p0, s0) has since ridden
+        (phase - p0, shear - s0) of rotation. Comparing at a common
+        epoch keeps recall invariant while the medium turns.
+        """
+        d_frame = self._phase - self._phase0[rows]
+        d_shear = self._shear_phase - self._shear0[rows]
+        return g.rotate(self._points[rows], -d_frame - d_shear, -d_frame + d_shear)
 
     def resonate(
         self,
@@ -207,13 +264,9 @@ class LatentManifold:
         with self._lock:
             if len(self._kinds) == 0:
                 return []
-            # Unwind every deposit to the cue's epoch: a trace deposited
-            # at medium phase (p0, s0) has since ridden (phase - p0,
-            # shear - s0) of rotation. Comparing at a common epoch keeps
-            # recall invariant while the medium turns.
-            d_frame = self._phase - self._phase0
-            d_shear = self._shear_phase - self._shear0
-            unwound = g.rotate(self._points, -d_frame - d_shear, -d_frame + d_shear)
+            # Unwind every deposit to the cue's epoch — recall is
+            # invariant while the medium turns.
+            unwound = self._epoch_points(slice(None))
             d = g.geodesic_batch(unwound, cue_point)
             # Spectral score: each trace answers by its heat-kernel
             # field, normalized to its own peak. Sharp traces recall
@@ -230,6 +283,135 @@ class LatentManifold:
                 for i in order
                 if score[i] > 0.0
             ]
+
+    # ------------------------------------------------------------------
+    # Episodes — deposits are arcs, exchanges are trajectories
+    # ------------------------------------------------------------------
+
+    def _check_index(self, index: int) -> None:
+        if not 0 <= index < len(self._kinds):
+            raise IndexError(f"deposit index {index} out of range")
+
+    def _leg(self, index: int) -> dict[str, object]:
+        """One leg of an episode arc. Called with the lock held."""
+        return {
+            "index": int(index),
+            "kind": self._kinds[index],
+            "inbound": bool(self._strand[index] == STRAND_HOPF),
+            "born_ms": int(self._born_ms[index]),
+        }
+
+    def rung_of(self, index: int) -> int:
+        """The exchange a deposit belongs to, or -1 when unpaired."""
+        with self._lock:
+            self._check_index(index)
+            return int(self._rung[index])
+
+    def rung_legs(self, rung: int) -> list[int]:
+        """A rung's deposit indices in the order they landed."""
+        if rung < 0:
+            raise ValueError("rung id must be >= 0")
+        with self._lock:
+            return [int(i) for i in np.flatnonzero(self._rung == rung)]
+
+    def segment(self, index: int, n: int = 32) -> FloatArray:
+        """The arc a deposit has swept riding the medium since its birth.
+
+        A deposit is not a point: it was laid at a medium epoch and has
+        ridden the rotation ever since — its trace is the segment of
+        its orbit from where it was born to where it floats now.
+        """
+        if n < 2:
+            raise ValueError("n must be >= 2")
+        with self._lock:
+            self._check_index(index)
+            d_frame = self._phase - self._phase0[index]
+            d_shear = self._shear_phase - self._shear0[index]
+            d1 = d_frame + d_shear
+            d2 = d_frame - d_shear
+            birth = g.rotate(self._points[index], -d1, -d2)
+            s = np.linspace(0.0, 1.0, n)
+            return g.rotate(np.broadcast_to(birth, (n, 4)), s * d1, s * d2)
+
+    def traverse(self, rung: int, per_leg: int = 32) -> FloatArray:
+        """Walk a rung's arc — the episode as a path through the medium.
+
+        Legs are unwound to their own birth epochs (the recall-invariant
+        frame), then chained by geodesic arcs in deposit order: the
+        world reaching in, her inner legs, her reaching back out. A
+        lone leg's trajectory is the segment it has swept on its fiber.
+        """
+        if per_leg < 2:
+            raise ValueError("per_leg must be >= 2")
+        legs = self.rung_legs(rung)
+        with self._lock:
+            if not legs:
+                raise ValueError(f"rung {rung} has no deposits")
+            if len(legs) == 1:
+                return self.segment(legs[0], n=per_leg)
+            epoch = self._epoch_points(legs)
+            arcs = [
+                g.arc(epoch[i], epoch[i + 1], per_leg)
+                for i in range(len(legs) - 1)
+            ]
+            return np.vstack([a[:-1] for a in arcs] + [arcs[-1][-1:]])
+
+    def episode(self, rung: int, per_leg: int = 32) -> dict[str, object]:
+        """A rung as a recallable episode: ordered legs and the arc."""
+        legs = self.rung_legs(rung)
+        with self._lock:
+            return {
+                "rung": int(rung),
+                "legs": [self._leg(i) for i in legs],
+                "arc": self.traverse(rung, per_leg),
+            }
+
+    def episode_of(self, index: int, per_leg: int = 32) -> dict[str, object]:
+        """The episode a deposit belongs to — its rung's trajectory.
+
+        An unpaired deposit answers with its own swept segment: it is
+        still an arc, just one that never became an exchange.
+        """
+        with self._lock:
+            self._check_index(index)
+            rung = int(self._rung[index])
+        if rung >= 0:
+            return self.episode(rung, per_leg)
+        with self._lock:
+            return {
+                "rung": -1,
+                "legs": [self._leg(index)],
+                "arc": self.segment(index, n=per_leg),
+            }
+
+    def recall_episodes(
+        self,
+        cue: str | FloatArray,
+        *,
+        k: int = 5,
+        radius: float = 0.5,
+        kind: str = "query",
+        per_leg: int = 32,
+    ) -> list[dict[str, object]]:
+        """Cue-driven episode recall — the whole arc answers, not the point.
+
+        Resonance finds the strongest legs; each returns the rung it
+        belongs to, traversed as an arc, scored by the leg that was hit.
+        """
+        hits = self.resonate(cue, k=k, radius=radius, kind=kind)
+        seen: set[int] = set()
+        episodes: list[dict[str, object]] = []
+        for idx, _kind_name, score, _d in hits:
+            rung = self.rung_of(idx)
+            # Unpaired deposits are their own episode; key them apart.
+            key = rung if rung >= 0 else -2 - idx
+            if key in seen:
+                continue
+            seen.add(key)
+            ep = self.episode_of(idx, per_leg)
+            ep["score"] = score
+            episodes.append(ep)
+        return episodes
 
     # ------------------------------------------------------------------
     # Dynamics — the medium's own motion
@@ -326,6 +508,8 @@ class LatentManifold:
                 "anti_strand": int(np.sum(self._strand == STRAND_ANTI)),
                 "inner_world": int(np.sum(depths < g.CLIFFORD_DEPTH)),
                 "outer_world": int(np.sum(depths >= g.CLIFFORD_DEPTH)),
+                "rungs": int(np.unique(self._rung[self._rung >= 0]).size),
+                "open_rung": int(self._open_rung),
                 "phase": self._phase,
                 "lean": self._lean,
                 "lean_target": self._lean_target,
@@ -361,6 +545,7 @@ class LatentManifold:
                 bandwidth=self._bandwidth,
                 phase0=self._phase0,
                 shear0=self._shear0,
+                rung=self._rung,
                 kinds=str_array(self._kinds),
                 scalars=np.array(
                     [
@@ -369,6 +554,7 @@ class LatentManifold:
                         self._lean_target,
                         float(self._ticks),
                         self._shear_phase,
+                        float(self._next_rung),
                     ],
                     dtype=np.float64,
                 ),
@@ -382,7 +568,7 @@ class LatentManifold:
             return False
         data = load_npz(path)
         version = int(data["version"])
-        if version != _FORMAT_VERSION:
+        if version not in (1, _FORMAT_VERSION):
             raise ValueError(f"unsupported manifold image version {version}")
         points = np.asarray(data["points"], dtype=np.float64)
         n = points.shape[0]
@@ -398,13 +584,18 @@ class LatentManifold:
             or len(data["bandwidth"]) != n
             or len(data["phase0"]) != n
             or len(data["shear0"]) != n
+            or (version == 2 and len(data["rung"]) != n)
         ):
             raise ValueError("corrupt manifold image: shape mismatch")
         norms = np.linalg.norm(points, axis=1)
         if n and not np.allclose(norms, 1.0, atol=1e-6):
             raise ValueError("corrupt manifold image: point off S3")
         scalars = np.asarray(data["scalars"], dtype=np.float64)
-        if scalars.shape != (5,) or not np.isfinite(scalars).all():
+        # v1 images predate rungs: 5 scalars, no rung column — deposits
+        # load unpaired (-1) and the rung counter restarts.
+        if scalars.shape != (5 if version == 1 else 6,) or not np.isfinite(
+            scalars
+        ).all():
             raise ValueError("corrupt manifold image: bad scalars")
         with self._lock:
             self._points = points
@@ -415,6 +606,13 @@ class LatentManifold:
             self._bandwidth = np.asarray(data["bandwidth"], dtype=np.float64)
             self._phase0 = np.asarray(data["phase0"], dtype=np.float64)
             self._shear0 = np.asarray(data["shear0"], dtype=np.float64)
+            self._rung = (
+                np.asarray(data["rung"], dtype=np.int64)
+                if version == 2
+                else np.full(n, -1, dtype=np.int64)
+            )
+            self._next_rung = int(scalars[5]) if version == 2 else 0
+            self._open_rung = -1
             self._kinds = kinds
             self._phase = float(scalars[0]) % g.TWO_PI
             self._lean = float(np.clip(scalars[1], 0.0, 1.0))

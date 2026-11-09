@@ -285,7 +285,11 @@ def tumble(
     return out
 
 
-def heat_kernel(theta: FloatArray | float, bandwidth: float, n_max: int = 64) -> FloatArray:
+def heat_kernel(
+    theta: FloatArray | float,
+    bandwidth: float | FloatArray,
+    n_max: int = 64,
+) -> FloatArray:
     """The heat kernel on S3 — the spectral bump.
 
     K_t(theta) = (1/2 pi^2) * sum_{n>=1} n e^{-(n^2-1) t} sin(n theta)/sin(theta)
@@ -315,6 +319,34 @@ def heat_kernel(theta: FloatArray | float, bandwidth: float, n_max: int = 64) ->
     )
     out = (modes * (n * decay)).sum(axis=-1) / (2.0 * np.pi**2)
     return np.asarray(out, dtype=np.float64)
+
+
+def arc(a: FloatArray, b: FloatArray, n: int = 64) -> FloatArray:
+    """Sample the geodesic segment from a to b — the slerp arc.
+
+    Every geodesic on S3 is a great circle; this returns n points
+    along the arc from a to b inclusive. Coincident endpoints return
+    n copies of a; antipodal ones take an arbitrary tangent — every
+    direction from a pole closes through the antipode anyway.
+    """
+    a = unit(np.asarray(a, dtype=np.float64).reshape(1, -1))[0]
+    b = unit(np.asarray(b, dtype=np.float64).reshape(1, -1))[0]
+    theta = geodesic(a, b)
+    if theta < 1e-12:
+        return np.broadcast_to(a, (n, 4)).copy()
+    # The tangent at a toward b. Near the antipode the residual is
+    # ~1e-16 of noise with a random sign — a real direction it is not,
+    # so any well-conditioned tangent is used instead (every direction
+    # from a closes through the antipode anyway).
+    v = b - float(b @ a) * a
+    n_v = np.linalg.norm(v)
+    if n_v < 1e-9:
+        # The coordinate axis least aligned with a is never parallel.
+        v = tangent_at(a, np.eye(4)[int(np.argmin(np.abs(a)))])
+    else:
+        v = v / n_v
+    t = np.linspace(0.0, theta, n)
+    return np.cos(t)[:, None] * a + np.sin(t)[:, None] * v
 
 
 def fiber(point: FloatArray, n: int = 256) -> FloatArray:

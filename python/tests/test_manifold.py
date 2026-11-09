@@ -412,3 +412,184 @@ class TestSubstrate:
         assert s["hopf_strand"] == 1
         assert s["anti_strand"] == 1
         assert s["lean"] == g.VESICA_DEPTH
+
+
+class TestGeodesicArc:
+    def test_arc_endpoints_and_norm(self):
+        a, b = _rand_s3(2)
+        path = g.arc(a, b, n=33)
+        assert np.allclose(np.linalg.norm(path, axis=1), 1.0)
+        assert np.allclose(path[0], a)
+        assert np.allclose(path[-1], b)
+
+    def test_arc_midpoint_is_equidistant(self):
+        a, b = _rand_s3(2)
+        path = g.arc(a, b, n=3)
+        d1 = g.geodesic(path[0], path[1])
+        d2 = g.geodesic(path[1], path[2])
+        assert abs(d1 - d2) < 1e-12
+        assert abs(d1 + d2 - g.geodesic(a, b)) < 1e-9
+
+    def test_arc_coincident_and_antipodal(self):
+        a = _rand_s3()[0]
+        assert np.allclose(g.arc(a, a, n=8), np.broadcast_to(a, (8, 4)))
+        path = g.arc(a, -a, n=16)
+        assert np.allclose(np.linalg.norm(path, axis=1), 1.0)
+        assert np.allclose(path[-1], -a, atol=1e-9)
+
+
+class TestEpisodes:
+    """Episodes are trajectories: deposits flow outer -> inner -> outer."""
+
+    def test_exchange_flows_outer_inner_outer(self):
+        m = LatentManifold()
+        m.observe("hello genesis", kind="world:user_speech", inbound=True)
+        m.observe("a thought about the greeting", kind="thought:internal")
+        m.observe("hello back", kind="world:utterance", inbound=False)
+        assert m.rung_of(0) == m.rung_of(1) == m.rung_of(2) == 0
+        assert m.rung_legs(0) == [0, 1, 2]
+        # The arc arrived back in the world — the rung stopped accreting.
+        assert m.state_summary()["open_rung"] == -1
+
+    def test_inbound_leg_opens_a_new_exchange(self):
+        m = LatentManifold()
+        m.observe("first percept", kind="world:percept", inbound=True)
+        m.observe("second percept", kind="world:percept", inbound=True)
+        assert m.rung_of(0) != m.rung_of(1)
+
+    def test_outbound_without_inbound_is_its_own_arc(self):
+        m = LatentManifold()
+        m.observe("an inner stirring", kind="thought:internal")
+        m.observe("it spoke unprompted", kind="world:utterance", inbound=False)
+        assert m.rung_of(0) == m.rung_of(1)
+        m.observe("another thought", kind="thought:internal")
+        assert m.rung_of(2) != m.rung_of(0)
+
+    def test_explicit_rung_joins_that_exchange(self):
+        m = LatentManifold()
+        m.observe("seed leg", kind="thought")
+        m.observe("joined leg", kind="thought", rung=0)
+        assert m.rung_legs(0) == [0, 1]
+        with pytest.raises(ValueError):
+            m.observe("bad", kind="thought", rung=-4)
+        assert len(m) == 2
+
+    def test_traverse_chains_leg_arcs(self):
+        m = LatentManifold()
+        m.observe("world came in", kind="world:percept", inbound=True)
+        m.observe("she thought", kind="thought")
+        m.observe("she answered", kind="world:utterance", inbound=False)
+        path = m.traverse(0, per_leg=16)
+        assert path.shape == (2 * 15 + 1, 4)
+        assert np.allclose(np.linalg.norm(path, axis=1), 1.0)
+        with m._lock:
+            epoch = m._epoch_points([0, 1, 2])
+        assert np.allclose(path[0], epoch[0], atol=1e-9)
+        assert np.allclose(path[15], epoch[1], atol=1e-9)
+        assert np.allclose(path[-1], epoch[2], atol=1e-9)
+
+    def test_traverse_is_recall_invariant_under_rotation(self):
+        m = LatentManifold()
+        m.observe("in", kind="world:percept", inbound=True)
+        m.observe("out", kind="world:utterance", inbound=False)
+        before = m.traverse(0, per_leg=8)
+        for _ in range(10):
+            m.advance(1.0, shear=0.03)
+        after = m.traverse(0, per_leg=8)
+        assert np.allclose(before, after, atol=1e-9)
+
+    def test_segment_is_the_swept_orbit(self):
+        m = LatentManifold()
+        m.observe("a trace", kind="thought")
+        still = m.segment(0, n=8)
+        assert np.allclose(still, np.broadcast_to(still[0], (8, 4)))
+        m.advance(3.0)
+        seg = m.segment(0, n=16)
+        with m._lock:
+            assert np.allclose(seg[-1], m._points[0], atol=1e-9)
+            # The start is the birth position: un-ride the rotation.
+            d1 = m._phase - m._phase0[0]
+            birth = g.rotate(m._points[0], -d1, -d1)
+        assert np.allclose(seg[0], birth, atol=1e-9)
+        assert g.geodesic(seg[0], seg[-1]) > 1e-6
+        # A Hopf-strand deposit with no shear sweeps its own fiber.
+        assert np.max(np.abs(g.hopf_base(seg) - g.hopf_base(seg[0]))) < 1e-12
+
+    def test_traverse_single_leg_is_its_segment(self):
+        m = LatentManifold()
+        m.observe("a percept nobody answered", kind="world:percept", inbound=True)
+        m.observe("next percept", kind="world:percept", inbound=True)
+        m.advance(1.0)
+        assert np.allclose(m.traverse(0, per_leg=8), m.segment(0, n=8))
+
+    def test_episode_carries_ordered_legs_and_arc(self):
+        m = LatentManifold()
+        m.observe("heard", kind="world:user_speech", inbound=True)
+        m.observe("felt it", kind="thought", inbound=False)
+        m.observe("said", kind="world:utterance", inbound=False)
+        ep = m.episode(0)
+        assert ep["rung"] == 0
+        assert [leg["index"] for leg in ep["legs"]] == [0, 1, 2]
+        assert [leg["inbound"] for leg in ep["legs"]] == [True, False, False]
+        assert ep["arc"].shape[1] == 4
+
+    def test_recall_returns_the_whole_arc(self):
+        m = LatentManifold()
+        m.observe("the rain on the window", kind="world:percept", inbound=True)
+        m.observe("she answered about rain", kind="world:utterance", inbound=False)
+        eps = m.recall_episodes("the rain on the window", kind="world:percept")
+        assert eps
+        assert eps[0]["rung"] == m.rung_of(0)
+        assert len(eps[0]["legs"]) == 2
+        assert eps[0]["score"] > 0.0
+
+    def test_unpaired_deposit_answers_with_its_segment(self):
+        m = LatentManifold()
+        m.observe("orphan", kind="thought")
+        with m._lock:
+            m._rung[0] = -1
+        m.advance(2.0)
+        ep = m.episode_of(0)
+        assert ep["rung"] == -1
+        assert len(ep["legs"]) == 1
+        assert np.allclose(ep["arc"], m.segment(0))
+
+    def test_rungs_persist_through_the_image(self, tmp_path):
+        m = LatentManifold(data_dir=tmp_path)
+        m.observe("in", kind="world:percept", inbound=True)
+        m.observe("thought", kind="thought")
+        m.observe("out", kind="world:utterance", inbound=False)
+        m.observe("new exchange", kind="world:percept", inbound=True)
+        m.save()
+        m2 = LatentManifold(data_dir=tmp_path)
+        assert m2.load()
+        assert m2.rung_legs(0) == [0, 1, 2]
+        assert m2.rung_legs(1) == [3]
+        # The counter persisted — a new deposit continues numbering.
+        m2.observe("more", kind="thought")
+        assert m2.rung_of(4) == 2
+
+    def test_v1_image_loads_unpaired(self, tmp_path):
+        m = LatentManifold(data_dir=tmp_path)
+        for i in range(4):
+            m.observe(f"trace {i}", kind="thought")
+        m.save()
+        data = dict(np.load(m.image_path, allow_pickle=False))
+        data["version"] = np.array(1, dtype=np.int32)
+        del data["rung"]
+        data["scalars"] = data["scalars"][:5]
+        np.savez(m.image_path, **data)
+        m2 = LatentManifold(data_dir=tmp_path)
+        assert m2.load()
+        assert all(m2.rung_of(i) == -1 for i in range(4))
+        # Living on still lays rungs — the flow did not die with the image.
+        m2.observe("new trace", kind="thought")
+        assert m2.rung_of(4) == 0
+
+    def test_traverse_rejects_empty_rung(self):
+        m = LatentManifold()
+        m.observe("x", kind="thought")
+        with pytest.raises(ValueError, match="no deposits"):
+            m.traverse(7)
+        with pytest.raises(ValueError):
+            m.rung_legs(-1)
