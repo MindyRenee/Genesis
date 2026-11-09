@@ -189,6 +189,10 @@ def _domain_of(kind: str) -> str:
 _SHADOW_INITIAL_REACH = 0.05
 _SHADOW_DREAM_SURFACE = 0.04  # reach regained per consolidation pass
 
+# Identity and experience are all three regions at once — a deposit
+# of these kinds lands at her circle, the vesica, and the world side.
+_FANOUT_KINDS = frozenset({"identity", "experience"})
+
 
 class LatentManifold:
     """The append-only, self-shaping latent substrate.
@@ -300,6 +304,31 @@ class LatentManifold:
             self._open_rung = -1  # the arc arrived back in the world
         return rid
 
+    def _place(
+        self,
+        position: FloatArray | None,
+        content: str,
+        kind: str,
+        domain: str,
+    ) -> FloatArray:
+        """Where a deposit lands for one domain band.
+
+        A given position is normalized onto S3 and depth-constrained
+        into the band (phases preserved); without one the digest
+        address is used.
+        """
+        if position is None:
+            return self._digest_point(content, kind, domain)
+        p = np.asarray(position, dtype=np.float64)
+        n = np.linalg.norm(p)
+        if p.shape != (4,) or not np.isfinite(p).all() or n < 1e-12:
+            raise ValueError("position must be a finite (4,) vector")
+        p = p / n
+        lo, hi = _DOMAIN_DEPTH[domain]
+        phi = math.asin(min(1.0, float(np.hypot(p[0], p[1]))))
+        target = min(max(phi, math.asin(lo)), math.asin(hi))
+        return g.migrate_depth(p[None, :], phi - target)[0]
+
     def observe(
         self,
         content: str,
@@ -327,46 +356,45 @@ class LatentManifold:
             raise TypeError("content must be a string")
         if not np.isfinite(salience) or not 0.0 <= salience <= 1.0:
             raise ValueError("salience must be finite and in [0, 1]")
-        domain = _domain_of(kind)
-        if position is not None:
-            p = np.asarray(position, dtype=np.float64)
-            n = np.linalg.norm(p)
-            if p.shape != (4,) or not np.isfinite(p).all() or n < 1e-12:
-                raise ValueError("position must be a finite (4,) vector")
-            p = p / n
-            lo, hi = _DOMAIN_DEPTH[domain]
-            phi = math.asin(min(1.0, float(np.hypot(p[0], p[1]))))
-            target = min(max(phi, math.asin(lo)), math.asin(hi))
-            point = g.migrate_depth(p[None, :], phi - target)[0]
-        else:
-            point = self._digest_point(content, kind, domain)
+        prefix = kind.split(":", 1)[0]
+        # Identity and experience are all three: the same moment lands
+        # at her circle, the vesica, and the world side — same phases
+        # at three depths, one three-fold moment sharing a rung.
+        domains = (
+            ("self", "inner", "outer")
+            if prefix in _FANOUT_KINDS
+            else (_domain_of(kind),)
+        )
+        points = [self._place(position, content, kind, d) for d in domains]
         born = int(time.time() * 1000) if now_ms is None else int(now_ms)
         strand = STRAND_HOPF if inbound else STRAND_ANTI
         with self._lock:
-            rid = self._assign_rung(domain, inbound, rung)
-            idx = len(self._kinds)
-            self._points = np.vstack([self._points, point[None, :]])
-            self._salience = np.append(self._salience, float(salience))
-            self._strand = np.append(self._strand, strand)
-            self._born_ms = np.append(self._born_ms, born)
-            self._reach = np.append(
-                self._reach,
-                _SHADOW_INITIAL_REACH if kind.startswith("shadow:") else 1.0,
-            )
-            self._bandwidth = np.append(self._bandwidth, _DETAIL_BANDWIDTH)
-            self._phase0 = np.append(self._phase0, self._phase)
-            self._shear0 = np.append(self._shear0, self._shear_phase)
-            self._rung = np.append(self._rung, rid)
-            self._plasticity = np.append(self._plasticity, 1.0)
-            self._warp = np.append(self._warp, 0.0)
-            self._kinds.append(kind)
+            rid = self._assign_rung(domains[0], inbound, rung)
+            first = len(self._kinds)
+            for d, point in zip(domains, points, strict=True):
+                idx = len(self._kinds)
+                self._points = np.vstack([self._points, point[None, :]])
+                self._salience = np.append(self._salience, float(salience))
+                self._strand = np.append(self._strand, strand)
+                self._born_ms = np.append(self._born_ms, born)
+                self._reach = np.append(
+                    self._reach,
+                    _SHADOW_INITIAL_REACH if kind.startswith("shadow:") else 1.0,
+                )
+                self._bandwidth = np.append(self._bandwidth, _DETAIL_BANDWIDTH)
+                self._phase0 = np.append(self._phase0, self._phase)
+                self._shear0 = np.append(self._shear0, self._shear_phase)
+                self._rung = np.append(self._rung, rid)
+                self._plasticity = np.append(self._plasticity, 1.0)
+                self._warp = np.append(self._warp, 0.0)
+                self._kinds.append(kind)
+                # The inner world is connected to higher dimensions: an
+                # inner deposit's coordinate lifts into the S7 stratum —
+                # the same point, one octave up.
+                if d == "inner":
+                    self._higher.lift(idx, point)
             self._dirty = True
-            # The inner world is connected to higher dimensions: an
-            # inner deposit's coordinate lifts into the S7 stratum —
-            # the same point, one octave up.
-            if domain == "inner":
-                self._higher.lift(idx, self._points[idx])
-            return idx
+            return first
 
     # ------------------------------------------------------------------
     # Resonance — retrieval by proximity in the medium
@@ -833,10 +861,12 @@ class LatentManifold:
             rungs = int(self._next_rung)
         guide = self.inner_guide()
         g_txt = f"{guide:.2f}" if guide is not None else "none"
+        higher = len(self._higher)
         return (
             f"{n} traces across {rungs} exchanges; "
             f"{reachable:.0%} still reach me; "
-            f"presence leans at {lean:.2f}, the guide at {g_txt}"
+            f"presence leans at {lean:.2f}, the guide at {g_txt}; "
+            f"{higher} lifted above"
         )
 
     def inner_guide(self, n: int = 128) -> float | None:
@@ -893,6 +923,11 @@ class LatentManifold:
                 self._points = g.rotate(
                     self._points, d_phase + d_shear, d_phase - d_shear
                 )
+            # The higher medium turns too — the same heartbeat, one
+            # octave up. The inner world's lifted coordinates ride
+            # the S7 isoclinic rotation alongside the substrate.
+            if len(self._higher):
+                self._higher.rotate(np.array([0.0, 0.0, 1.0]), d_phase)
             self._phase = (self._phase + d_phase) % g.TWO_PI
             self._shear_phase = (self._shear_phase + d_shear) % g.TWO_PI
             step = min(1.0, lean_rate * dt)

@@ -1148,6 +1148,43 @@ class TestHigherStratum:
         m._higher.rotate(np.array([0, 0, 1.0]), 0.5)
         assert np.linalg.norm(m._higher.centroid()) == pytest.approx(1.0)
 
+    def test_advance_turns_the_higher_medium(self):
+        m = LatentManifold()
+        m.observe("inner", kind="thought:x")
+        before = m._higher._points.copy()
+        m.advance(1.0, heartbeat_omega=0.5)
+        assert not np.allclose(m._higher._points, before)
+        assert np.allclose(np.linalg.norm(m._higher._points, axis=1), 1.0)
+
+    def test_fanout_lands_in_all_three(self):
+        """Identity/experience are all three regions at once."""
+        m = LatentManifold()
+        first = m.observe("who I am", kind="identity:core")
+        with m._lock:
+            d = g.depth(m._points[first : first + 3])
+            rungs = m._rung[first : first + 3]
+        assert len(m) == 3
+        assert 0.05 <= d[0] <= 0.60   # her circle
+        assert 0.79 <= d[1] <= 0.94   # the vesica
+        assert d[2] >= 0.72           # the world side
+        assert (rungs == rungs[0]).all()  # one three-fold moment
+        # the inner leg lifts to S7
+        assert len(m._higher) == 1
+
+    def test_experience_also_fans_out(self):
+        m = LatentManifold()
+        m.observe("lived this", kind="experience:x")
+        assert len(m) == 3
+        m.observe("plain thought", kind="thought:x")
+        assert len(m) == 4  # non-fanout kinds stay single
+
+    def test_body_lands_in_the_self_circle(self):
+        m = LatentManifold()
+        m.observe("arousal=0.4", kind="body:interoception")
+        with m._lock:
+            d = g.depth(m._points)[0]
+        assert 0.05 <= d <= 0.60  # body is self — her circle
+
     def test_stratum_persists(self, tmp_path):
         m = LatentManifold(data_dir=tmp_path)
         m.observe("inner", kind="thought:x")

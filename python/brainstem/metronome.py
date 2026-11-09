@@ -606,6 +606,19 @@ class MetronomeMixin:
                 inbound=False,
                 rung=manifold._next_rung,
             )
+            # The body is self: interoceptive state is deposited on
+            # the same gate — her felt body lives at her circle, and
+            # every reflection carries what the body was doing.
+            emotion = self.feel()
+            felt = float(getattr(emotion, "arousal", 0.0) or 0.0)
+            stage_name = getattr(stage, "name", None) or "n3"
+            manifold.observe(
+                f"arousal={felt:.2f} stage={stage_name} weight={weight:.2f}",
+                kind="body:interoception",
+                salience=0.5,
+                inbound=False,
+                rung=manifold._next_rung,
+            )
             with manifold._lock:
                 manifold._open_rung = -1
         except Exception as e:  # noqa: BLE001
