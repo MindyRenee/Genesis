@@ -41,19 +41,27 @@ def seed_from_data_dir(manifold: LatentManifold) -> dict[str, int]:
     if manifold.data_dir is None or len(manifold) >= _SEED_MIN_DEPOSITS:
         return {}
     counts: dict[str, int] = {}
+    with manifold._lock:
+        rung_base = manifold._next_rung
     for name, fn in (
         ("concepts", _seed_concepts),
         ("journal", _seed_journal),
         ("ltm", _seed_ltm),
     ):
         try:
-            counts[name] = fn(manifold)
+            counts[name] = fn(manifold, rung_base)
+            rung_base += counts[name] if counts[name] > 0 else 0
         except Exception:  # noqa: BLE001
             counts[name] = -1
+    # Seeded records are independent strata, not one exchange: each
+    # gets its own rung, then the open exchange is left clean for
+    # living flow.
+    with manifold._lock:
+        manifold._open_rung = -1
     return counts
 
 
-def _seed_concepts(manifold: LatentManifold) -> int:
+def _seed_concepts(manifold: LatentManifold, rung_base: int) -> int:
     """Concept vocabulary at its own embedding coordinates."""
     path = os.path.join(manifold.data_dir or "", "concept_vectors.npz")
     if not os.path.exists(path):
@@ -69,6 +77,7 @@ def _seed_concepts(manifold: LatentManifold) -> int:
                 kind=f"concept:{names[i]}",
                 salience=0.5,
                 inbound=False,
+                rung=rung_base + i,
                 position=g.project_to_s3(vectors[i], seed=_CONCEPT_SEED),
             )
         except (ValueError, TypeError):
@@ -76,7 +85,7 @@ def _seed_concepts(manifold: LatentManifold) -> int:
     return n
 
 
-def _seed_journal(manifold: LatentManifold) -> int:
+def _seed_journal(manifold: LatentManifold, rung_base: int) -> int:
     """Her narrative journal — the last entries as memory deposits."""
     path = os.path.join(manifold.data_dir or "", "cognitive_journal.jsonl")
     if not os.path.exists(path):
@@ -96,6 +105,7 @@ def _seed_journal(manifold: LatentManifold) -> int:
                 salience=0.4,
                 inbound=False,
                 now_ms=int(row.get("ts", 0)) or None,
+                rung=rung_base + n,
             )
             n += 1
         except (ValueError, TypeError, json.JSONDecodeError):
@@ -103,7 +113,7 @@ def _seed_journal(manifold: LatentManifold) -> int:
     return n
 
 
-def _seed_ltm(manifold: LatentManifold) -> int:
+def _seed_ltm(manifold: LatentManifold, rung_base: int) -> int:
     """The LTM index — episodes she has lived, retrievable by id."""
     path = os.path.join(manifold.data_dir or "", "ltm_store.meta")
     if not os.path.exists(path):
@@ -123,6 +133,7 @@ def _seed_ltm(manifold: LatentManifold) -> int:
                 salience=max(0.0, min(1.0, float(entry.salience))),
                 inbound=False,
                 now_ms=int(entry.timestamp) or None,
+                rung=rung_base + n,
             )
             n += 1
         except (ValueError, TypeError):
