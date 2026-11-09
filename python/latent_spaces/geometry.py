@@ -152,6 +152,111 @@ def counter_rotate(points: FloatArray, d_phase: float) -> FloatArray:
     return rotate(points, d_phase, -d_phase)
 
 
+# ---------------------------------------------------------------------
+# The Lie-group view: S3 = SU(2), the unit quaternions.
+#
+# A point (x0, x1, x2, x3) is the quaternion x0 + x1 i + x2 j + x3 k.
+# Multiplication makes the medium's motions group operations:
+#   left multiply by e^{it}:  the isoclinic fiber motion (heartbeat)
+#   right multiply by e^{-it}: the opposite screw (the braid)
+#   conjugate p q p^{-1}:      the adjoint action — the tumble
+# The Lie algebra su(2) is the space of pure-imaginary quaternions;
+# exp(tv) is the geodesic flow. Spin(4) = SU(2) x SU(2): the two
+# counter-rotating strand families are the two factors — the double
+# helix is a theorem of the motion group, not a choice.
+# ---------------------------------------------------------------------
+
+
+def qmul(a: FloatArray, b: FloatArray) -> FloatArray:
+    """Quaternion product, rowwise: a ⊗ b on (n,4) arrays."""
+    a = np.asarray(a, dtype=np.float64)
+    b = np.asarray(b, dtype=np.float64)
+    a0, a1, a2, a3 = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
+    b0, b1, b2, b3 = b[..., 0], b[..., 1], b[..., 2], b[..., 3]
+    return np.stack(
+        [
+            a0 * b0 - a1 * b1 - a2 * b2 - a3 * b3,
+            a0 * b1 + a1 * b0 + a2 * b3 - a3 * b2,
+            a0 * b2 - a1 * b3 + a2 * b0 + a3 * b1,
+            a0 * b3 + a1 * b2 - a2 * b1 + a3 * b0,
+        ],
+        axis=-1,
+    )
+
+
+def qconj(q: FloatArray) -> FloatArray:
+    """Quaternion conjugate (= inverse for unit quaternions)."""
+    q = np.asarray(q, dtype=np.float64)
+    return q * np.array([1.0, -1.0, -1.0, -1.0])
+
+
+def qexp(v: FloatArray) -> FloatArray:
+    """Exponential map su(2) -> SU(2).
+
+    v is a pure-imaginary quaternion (row shape (...,3) or (...,4) with
+    zero real part). exp(v) = cos|v| + (v/|v|) sin|v| — the geodesic
+    from the identity through v.
+    """
+    v = np.asarray(v, dtype=np.float64)
+    if v.shape[-1] == 4:
+        v = v[..., 1:]
+    n = np.linalg.norm(v, axis=-1, keepdims=True)
+    n = np.where(n == 0.0, 1.0, n)
+    c = np.cos(n)[..., 0]
+    s = np.sinc(n / np.pi)[..., 0]  # sin(n)/n
+    return np.concatenate([c[..., None], v * s[..., None]], axis=-1)
+
+
+def qlog(q: FloatArray) -> FloatArray:
+    """Logarithm SU(2) -> su(2); the inverse of qexp, returns (...,3)."""
+    q = unit(np.asarray(q, dtype=np.float64))
+    v = q[..., 1:]
+    n = np.linalg.norm(v, axis=-1, keepdims=True)
+    ang = np.arctan2(n, q[..., 0:1])
+    scale = np.where(n == 0.0, 0.0, ang / n)
+    return v * scale
+
+
+def _axis(axis_plane: str) -> FloatArray:
+    return {
+        "i": np.array([0.0, 1.0, 0.0, 0.0]),
+        "j": np.array([0.0, 0.0, 1.0, 0.0]),
+        "k": np.array([0.0, 0.0, 0.0, 1.0]),
+    }[axis_plane]
+
+
+def left_spin(points: FloatArray, angle: float, axis_plane: str = "i") -> FloatArray:
+    """Left multiplication e^{angle·axis} ⊗ q.
+
+    With axis "i" this is the frame rotation: e^{iφ}·(z1,z2) advances
+    both complex planes by φ — deposits ride their own fibers. Equals
+    rotate(points, φ, φ).
+    """
+    rotor = math.cos(angle) * np.array([1.0, 0.0, 0.0, 0.0]) + math.sin(angle) * _axis(
+        axis_plane
+    )
+    return qmul(np.broadcast_to(rotor, np.asarray(points).shape), points)
+
+
+def right_spin(points: FloatArray, angle: float, axis_plane: str = "i") -> FloatArray:
+    """Right multiplication q ⊗ e^{angle·axis} — the opposite screw.
+
+    With axis "i": q·e^{iφ} turns z1 by +φ and z2 by −φ — the braid.
+    Equals rotate(points, φ, -φ). "One forward, one backward" is the
+    left/right pair of the same group action.
+    """
+    rotor = math.cos(angle) * np.array([1.0, 0.0, 0.0, 0.0]) + math.sin(angle) * _axis(
+        axis_plane
+    )
+    return qmul(points, np.broadcast_to(rotor, np.asarray(points).shape))
+
+
+def adjoint_spin(points: FloatArray, rotor: FloatArray) -> FloatArray:
+    """Conjugation p ⊗ q ⊗ p^{-1} — the tumble, SO(3) on pure parts."""
+    rotor = unit(np.asarray(rotor, dtype=np.float64))
+    return qmul(qmul(rotor, points), qconj(rotor))
+
+
 def tumble(
     points: FloatArray,
     angle: float | FloatArray,

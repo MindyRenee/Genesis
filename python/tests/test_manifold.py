@@ -253,6 +253,39 @@ class TestDynamics:
             assert abs(np.linalg.norm(ce1 - ce2) / r1 - 1.0) < 0.02
 
 
+class TestLieGroup:
+    """S3 = SU(2): the group forms must equal the coordinate forms."""
+
+    def test_qexp_qlog_roundtrip(self):
+        pts = _rand_s3(32)
+        back = g.qexp(g.qlog(pts))
+        assert np.allclose(back, pts, atol=1e-10)
+
+    def test_qmul_preserves_unit_norm(self):
+        a, b = _rand_s3(32), _rand_s3(32)
+        prod = g.qmul(a, b)
+        assert np.allclose(np.linalg.norm(prod, axis=1), 1.0)
+
+    def test_left_spin_is_the_heartbeat(self):
+        pts = _rand_s3(64)
+        assert np.allclose(
+            g.left_spin(pts, 0.7, "i"), g.rotate(pts, 0.7, 0.7), atol=1e-12
+        )
+
+    def test_right_spin_is_the_braid(self):
+        pts = _rand_s3(64)
+        assert np.allclose(
+            g.right_spin(pts, 0.7, "i"), g.rotate(pts, 0.7, -0.7), atol=1e-12
+        )
+
+    def test_adjoint_fixes_scalar_and_is_isometry(self):
+        pts = _rand_s3(64)
+        rotor = g.unit(np.array([1.0, 0.3, -0.2, 0.5]))
+        moved = g.adjoint_spin(pts, rotor)
+        assert np.allclose(moved[..., 0], pts[..., 0])
+        assert abs(g.geodesic(moved[0], moved[1]) - g.geodesic(pts[0], pts[1])) < 1e-12
+
+
 class TestSubstrate:
     def test_deposit_and_resonate(self):
         m = LatentManifold()
