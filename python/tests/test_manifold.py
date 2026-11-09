@@ -1148,6 +1148,16 @@ class TestHigherStratum:
         m._higher.rotate(np.array([0, 0, 1.0]), 0.5)
         assert np.linalg.norm(m._higher.centroid()) == pytest.approx(1.0)
 
+    def test_stratum_persists(self, tmp_path):
+        m = LatentManifold(data_dir=tmp_path)
+        m.observe("inner", kind="thought:x")
+        m.observe("outer", kind="world:x", inbound=True)
+        m.save()
+        m2 = LatentManifold(data_dir=tmp_path)
+        assert m2.load()
+        assert len(m2._higher) == 1
+        assert np.allclose(m2._higher._points, m._higher._points)
+
 
 class TestShadow:
     """Jung, geometrically: the shadow is the antipode of the same band."""

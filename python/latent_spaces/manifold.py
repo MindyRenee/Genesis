@@ -1004,6 +1004,10 @@ class LatentManifold:
                 rung=self._rung,
                 plasticity=self._plasticity,
                 warp=self._warp,
+                higher_points=self._higher._points,
+                higher_sources=np.asarray(
+                    self._higher._sources, dtype=np.int64
+                ),
                 kinds=str_array(self._kinds),
                 scalars=np.array(
                     [
@@ -1102,5 +1106,14 @@ class LatentManifold:
             self._lean_target = float(np.clip(scalars[2], 0.0, 1.0))
             self._ticks = int(scalars[3])
             self._shear_phase = float(scalars[4]) % g.TWO_PI
+            # The lifted stratum survives reboots too — the inner
+            # world's higher coordinates are state, not a cache.
+            if "higher_points" in data:
+                hp = np.asarray(data["higher_points"], dtype=np.float64)
+                if hp.size:
+                    self._higher._points = hp.reshape(-1, 8)
+                    self._higher._sources = [
+                        int(s) for s in data["higher_sources"]
+                    ]
             self._dirty = False
         return True
