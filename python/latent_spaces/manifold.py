@@ -177,7 +177,17 @@ def _domain_of(kind: str) -> str:
     if parts[0] == "topos" and len(parts) > 1:
         # topos:{domain}:{kind} — the signal names its own domain
         return _KIND_DOMAIN.get(parts[1], parts[1])
+    if parts[0] == "shadow" and len(parts) > 1:
+        # shadow:{kind} — the shadow lives at the same depth as its
+        # source territory, opposite phase (Jung: same self, dark side)
+        return _domain_of(":".join(parts[1:]))
     return _KIND_DOMAIN.get(parts[0], "inner")
+
+
+# The shadow is born repressed — a silent engram from the start.
+# It never deletes; it surfaces in dreams and integrates on contact.
+_SHADOW_INITIAL_REACH = 0.05
+_SHADOW_DREAM_SURFACE = 0.04  # reach regained per consolidation pass
 
 
 class LatentManifold:
@@ -339,7 +349,10 @@ class LatentManifold:
             self._salience = np.append(self._salience, float(salience))
             self._strand = np.append(self._strand, strand)
             self._born_ms = np.append(self._born_ms, born)
-            self._reach = np.append(self._reach, 1.0)
+            self._reach = np.append(
+                self._reach,
+                _SHADOW_INITIAL_REACH if kind.startswith("shadow:") else 1.0,
+            )
             self._bandwidth = np.append(self._bandwidth, _DETAIL_BANDWIDTH)
             self._phase0 = np.append(self._phase0, self._phase)
             self._shear0 = np.append(self._shear0, self._shear_phase)
@@ -794,6 +807,13 @@ class LatentManifold:
             self._warp = -_WARP_MAX * np.clip(
                 self._bandwidth / self._gist_bw, 0.0, 1.0
             )
+            # The shadow speaks in dreams: repressed traces regain
+            # reach in sleep, asymptotically toward full integration.
+            # Individuation is slow and homeostatic, never a switch.
+            shadow = np.array([k.startswith("shadow:") for k in self._kinds])
+            if shadow.any():
+                deficit = 1.0 - self._reach[shadow]
+                self._reach[shadow] += _SHADOW_DREAM_SURFACE * deficit
             self._dirty = True
 
     def summary_text(self) -> str:

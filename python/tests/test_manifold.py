@@ -1149,6 +1149,47 @@ class TestHigherStratum:
         assert np.linalg.norm(m._higher.centroid()) == pytest.approx(1.0)
 
 
+class TestShadow:
+    """Jung, geometrically: the shadow is the antipode of the same band."""
+
+    def test_antipode_same_depth(self):
+        from latent_spaces import geometry as g
+
+        p = np.array([0.5, 0.5, 0.5, 0.5])
+        s = g.antipode(p)
+        assert g.depth(p.reshape(1, 4))[0] == pytest.approx(
+            g.depth(s.reshape(1, 4))[0]
+        )
+        assert g.geodesic(p, s) == pytest.approx(np.pi)  # maximal distance
+
+    def test_shadow_born_repressed(self):
+        m = LatentManifold()
+        m.observe("dark feeling", kind="shadow:thought")
+        m.observe("light thought", kind="thought:x")
+        with m._lock:
+            assert m._reach[0] == pytest.approx(0.05)
+            assert m._reach[1] == pytest.approx(1.0)
+        # silent engram — scores below the floor
+        hits = m.resonate("dark feeling", kind="shadow:*")
+        assert hits == [] or hits[0][2] < 0.1
+
+    def test_shadow_surfaces_in_dreams(self):
+        m = LatentManifold()
+        m.observe("repressed", kind="shadow:thought")
+        for _ in range(10):
+            m.consolidate(growth=1.1, migrate=0.0)
+        with m._lock:
+            # asymptotic integration: 0.05 + 0.04*(1-0.05)*n steps
+            assert 0.3 < m._reach[0] < 0.6
+
+    def test_shadow_inherits_domain(self):
+        m = LatentManifold()
+        m.observe("dark memory", kind="shadow:memory:x")
+        with m._lock:
+            d = g.depth(m._points)[0]
+        assert 0.79 <= d <= 0.94  # memory band, shadow phase aside
+
+
 class TestInnerGuide:
     def test_inner_guide_weighted_depth(self):
         m = LatentManifold()

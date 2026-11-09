@@ -315,6 +315,17 @@ def project_to_s3(vector: FloatArray, seed: int = 0xC0FFEE) -> FloatArray:
     return p / n
 
 
+def antipode(p: FloatArray) -> FloatArray:
+    """The diametric opposite on S3 — the shadow point.
+
+    -p keeps the same torus depth (|-z1| = |z1|) and flips both
+    Hopf phases by pi: the furthest position *of the same band* —
+    the same territory, opposite orientation. Jung's shadow is
+    literally the antipodal image of her conscious content.
+    """
+    return -np.asarray(p, dtype=np.float64)
+
+
 def warp_field(
     points: FloatArray,
     centers: FloatArray,

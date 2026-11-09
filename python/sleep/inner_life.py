@@ -5087,6 +5087,8 @@ class InnerLife:
             float(is_dream), min(len(content), 1000) / 1000.0,
         ]
         try:
+            from latent_spaces import geometry as _g
+
             snapshot = self.inner_world.observe(
                 [valence, arousal, tone, plasticity],
                 signals,
@@ -5099,8 +5101,6 @@ class InnerLife:
             # about it.
             latent = (snapshot or {}).get("latent_mean")
             if latent is not None:
-                from latent_spaces import geometry as _g
-
                 self._manifold_deposit(
                     content or str(getattr(thought, "trigger", "")),
                     "dream:thought" if is_dream else "thought:spontaneous",
@@ -5116,6 +5116,20 @@ class InnerLife:
                     [valence, arousal, tone, plasticity], seed=0xAFE4
                 ),
             )
+            # Negative affect casts a shadow: the same territory,
+            # antipodal — her unintegrated dark side, born repressed
+            # (reach 0.05), surfacing in dreams, integrating on contact.
+            if valence < -0.2:
+                self._manifold_deposit(
+                    content or str(getattr(thought, "trigger", "")),
+                    f"shadow:{'dream' if is_dream else 'thought'}",
+                    salience=max(0.0, min(1.0, intensity)),
+                    position=_g.antipode(
+                        _g.project_to_s3(
+                            [valence, arousal, tone, plasticity], seed=0xAFE4
+                        )
+                    ),
+                )
         except (TypeError, ValueError, ArithmeticError):
             # The inner-world model is observational; it must never interrupt
             # the established thought, memory, or workspace pipeline.
