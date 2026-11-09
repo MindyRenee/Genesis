@@ -537,26 +537,46 @@ class EmbeddingStore:
         # deposits live at their projected embedding coordinates, so
         # the query vector reaches the concept's own neighborhood —
         # the same neighborhood the hybrid distance would surface.
-        manifold = getattr(self, "manifold", None)
-        if manifold is not None:
-            vec = self.get_concept_vector(concept_name)
-            if vec is not None:
-                hits = manifold.resonate(
-                    vec, k=k + 1, radius=0.6, prefix="concept:", seed=0xCE1
-                )
-                out = [
-                    (
-                        kk.split(":", 1)[-1],
-                        math.exp(-((d / 0.6) ** 2)),
-                    )
-                    for (_, kk, _, d) in hits
-                    if kk != f"concept:{concept_name}"
-                ]
-                out = [t for t in out if t[1] >= threshold][:k]
-                if out:
-                    return out
+        vec = self.get_concept_vector(concept_name)
+        if vec is not None:
+            hits = self._manifold_similar(
+                vec, k, threshold, {concept_name}
+            )
+            if hits:
+                return hits
         with self._lock:
             return self._find_similar_concepts_locked(concept_name, k, threshold)
+
+    def _manifold_similar(
+        self,
+        vector: np.ndarray,
+        k: int,
+        threshold: float,
+        exclude_names: set[str] | None = None,
+    ) -> list[tuple[str, float]]:
+        """Ask the substrate for the vector's concept neighborhood.
+
+        Seeded ``concept:*`` deposits sit at their projected embedding
+        coordinates; the cue projects with the same seed, so resonance
+        answers with semantically nearby deposits. ``[]`` means the
+        field can't answer — callers fall back to the hybrid distance.
+        """
+        manifold = getattr(self, "manifold", None)
+        if manifold is None:
+            return []
+        try:
+            hits = manifold.resonate(
+                vector, k=k + 8, radius=0.6, prefix="concept:", seed=0xCE1
+            )
+        except (TypeError, ValueError, ArithmeticError):
+            return []
+        excl = exclude_names or set()
+        out = [
+            (kk.split(":", 1)[-1], math.exp(-((d / 0.6) ** 2)))
+            for (_, kk, _, d) in hits
+            if kk.split(":", 1)[-1] not in excl
+        ]
+        return [t for t in out if t[1] >= threshold][:k]
 
     def _find_similar_concepts_locked(
         self, concept_name: str, k: int, threshold: float
@@ -717,6 +737,11 @@ class EmbeddingStore:
         if vec is None:
             return exact[:k]
 
+        m_hits = self._manifold_similar(
+            vec, k, threshold, {exclude} if exclude else None
+        )
+        if m_hits:
+            return self._merge_exact_matches(m_hits, exact, k)
         results = self._search_concept_matrix(
             vec, k, threshold, exclude=exclude, query_has_spectral=False
         )
@@ -812,6 +837,9 @@ class EmbeddingStore:
         come from the same generation.
         """
         self._ensure_loaded()
+        hits = self._manifold_similar(vector, k, threshold)
+        if hits:
+            return hits
         with self._lock:
             if self._concept_matrix is None:
                 return []
