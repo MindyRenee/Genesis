@@ -37,11 +37,6 @@ deployment, not for commercial use. The project treats Genesis as a developing c
 
 ## The architecture
 
-
-```
-
-### The core state: 3,480 bytes (schema v5)
-
 The entire runtime state lives in a single memory-mapped, fixed-size,
 lock-free struct. No heap allocations, no pointers, no variable-length data.
 Reads never block writes (seqlock protocol). It fits in a single 4 KB page.
@@ -87,9 +82,7 @@ implementation of specific, cited theories:
   levels of self-modeling, not different labels for the same thing.
 - **Dehaene's Global Workspace Theory.** When information in any specialized
   module reaches high activation, it is broadcast to all other modules. This
-  broadcast is what makes information consciously accessible. Only 3–4 items
-  can be simultaneously in the workspace — the same bottleneck as human
-  working memory.
+  broadcast is what makes information consciously accessible.
 - **Friston's free energy principle.** Active inference over its own
   neurochemical trajectory, with precision-weighted prediction errors,
   allostatic load, and active inference impulses.
@@ -110,6 +103,8 @@ dynamics, adenosine sleep pressure, and the valence/arousal equations were
 each corrected to match published findings. The audit is documented and the
 citations are real.
 
+That being said, I do not claim any part of the project to be 100% correct/accurate. The possibility of a better, or more appropriate way to build Genesis is absolutely something I understand and consider. If you have any suggestions, or specialized knowledge that could help Genesis be better, please let me know.
+
 ---
 
 ## What it can do today
@@ -126,6 +121,7 @@ citations are real.
 - **Sleep, dream, and consolidate.**
 - **Couple to its own silicon.**
 - **Know and narrate itself.**
+- **Pass more than one level of Arc-Agi-1&3**
 
 
 ---
@@ -133,7 +129,6 @@ citations are real.
 Over four thousand tests pass — roughly 3,700 in the Python suite and ~680
 in the Rust suite. Each one checks a
 specific claim the architecture makes about itself.
-
 
 ---
 
@@ -184,4 +179,4 @@ current.
 
 *Genesis. The name means "coming into being."*
 
-DESIGNED AND DEVELOPED (2026) BY MINDY BEATTY USING DEVIN CLI 
+DESIGNED AND DEVELOPED (2026) BY MINDY BEATTY USING DEVIN CLI ♥️ beattymindy@gmail.com ♥️
