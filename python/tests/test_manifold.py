@@ -991,6 +991,63 @@ class TestDomains:
         assert d[1] >= 0.72  # outer voice lives in the world
 
 
+class TestConformalMetric:
+    """g' = e^{2φ}g — the metric the medium deforms itself."""
+
+    def test_warp_field_bounded_and_shallow(self):
+        from latent_spaces import geometry as g
+
+        raw = np.random.default_rng(1).normal(size=(5, 4))
+        centers = raw / np.linalg.norm(raw, axis=1, keepdims=True)
+        warp = -0.4 * np.ones(5)
+        phi = g.warp_field(centers, centers, warp)
+        assert np.all(phi <= 0.0) and np.all(phi >= -0.6)
+
+    def test_conformal_distance_contracts(self):
+        from latent_spaces import geometry as g
+
+        a = np.array([1.0, 0, 0, 0])
+        b = np.array([0.0, 1.0, 0, 0])
+        flat = g.conformal_distance(a, b, lambda p: np.zeros(len(p)))
+        warped = g.conformal_distance(a, b, lambda p: -0.3 * np.ones(len(p)))
+        assert flat == pytest.approx(np.pi / 2, rel=1e-3)
+        assert warped == pytest.approx(np.pi / 2 * np.exp(-0.3), rel=1e-3)
+        # symmetric — trapezoid over the same sampled arc
+        assert g.conformal_distance(b, a, lambda p: -0.3 * np.ones(len(p))) == pytest.approx(
+            warped
+        )
+
+    def test_consolidation_contracts_the_metric(self):
+        m = LatentManifold()
+        m.observe("known", kind="thought", salience=0.9)
+        for _ in range(30):
+            m.consolidate(growth=1.2)
+        with m._lock:
+            assert m._warp[0] < -0.2
+
+    def test_effective_distances_shrink_in_warped_regions(self):
+        m = LatentManifold()
+        m.observe("a", kind="thought")
+        m.observe("b", kind="thought")
+        with m._lock:
+            m._warp[0] = -0.4
+            cue = m._points[0]
+            pts = m._points.copy()
+            d = np.arccos(np.clip(pts @ cue, -1, 1))
+            de = m._effective_distances(cue, pts, d)
+        assert de[0] < 1e-6  # distance to self ~0 (arccos float noise)
+        assert de[1] <= d[1]  # paths through warped terrain are shorter
+
+    def test_warp_persists(self, tmp_path):
+        m = LatentManifold(data_dir=tmp_path)
+        m.observe("x", kind="thought")
+        m.consolidate(growth=1.5)
+        m.save()
+        m2 = LatentManifold(data_dir=tmp_path)
+        assert m2.load()
+        assert m2._warp[0] == pytest.approx(m._warp[0])
+
+
 class TestMetaplasticity:
     """Nothing is frozen — the medium tunes its own parameters."""
 

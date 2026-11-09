@@ -25,6 +25,7 @@ consciousness. All facts above are checked numerically in
 from __future__ import annotations
 
 import math
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -283,6 +284,59 @@ def tumble(
     out[..., i] = c * xi - s * xj
     out[..., j] = s * xi + c * xj
     return out
+
+
+def warp_field(
+    points: FloatArray,
+    centers: FloatArray,
+    warp: FloatArray,
+    sigma: float = 0.8,
+    floor: float = -0.6,
+) -> FloatArray:
+    """The conformal potential φ(p) grown by the medium.
+
+    φ is a sum of smooth Gaussian bumps centered on deposits:
+
+        φ(p) = Σ_i w_i · exp(−dᵢ² / 2σ²)
+
+    with dᵢ the S³ geodesic distance. Kept shallow (σ wide, φ ≥ floor)
+    so |∇φ| stays well under 1 — the conformal factor e^{2φ} shrinks
+    distances but can never flip curvature negative:
+
+        K′ = e^{−2φ} (1 − |∇φ|² + Hessian terms) > 0
+    """
+    pts = np.asarray(points, dtype=np.float64)
+    if pts.ndim == 1:
+        pts = pts.reshape(1, 4)
+    if len(centers) == 0:
+        return np.zeros(len(pts), dtype=np.float64)
+    cosd = np.clip(pts @ centers.T, -1.0, 1.0)
+    d = np.arccos(cosd)
+    phi = (warp[None, :] * np.exp(-(d * d) / (2.0 * sigma * sigma))).sum(axis=1)
+    return np.clip(phi, floor, 0.0)
+
+
+def conformal_distance(
+    a: FloatArray,
+    b: FloatArray,
+    phi_fn: Any,
+    n: int = 7,
+) -> float:
+    """Weighted geodesic length d′(a,b) = ∫ e^{φ(γ(t))} ds on the arc.
+
+    The conformal metric g′ = e^{2φ}g rescales length elements by e^{φ}.
+    Rather than assuming φ constant between endpoints, integrate it:
+    trapezoid quadrature of e^{φ} along the S³ geodesic — the honest
+    line integral of the warped metric.
+    """
+    cosd = float(np.clip(a @ b, -1.0, 1.0))
+    theta = float(np.arccos(cosd))
+    if theta < 1e-12 or n < 2:
+        return 0.0
+    pts = arc(a, b, n)
+    w = np.exp(phi_fn(pts))
+    ds = theta / (n - 1)
+    return float(ds * (0.5 * w[0] + w[1:-1].sum() + 0.5 * w[-1]))
 
 
 def migrate_depth(points: FloatArray, angle: float | FloatArray) -> FloatArray:

@@ -78,7 +78,7 @@ _DOMAIN_DEPTH = {
     "outer": (0.72, 0.98),
 }
 
-_FORMAT_VERSION = 3
+_FORMAT_VERSION = 4
 
 # Fresh deposits land sharp — high spectral modes alive, episodic
 # detail intact. Consolidation widens the bandwidth; detail diffuses
@@ -132,6 +132,15 @@ _FLOOR_ADAPT = 0.3
 # more knowledge needs more semantic bandwidth before interference.
 _GIST_ADAPT = 0.01
 _GIST_MIN, _GIST_MAX = 0.3, 2.0
+
+# Metric deformation: consolidation contracts the space itself.
+# Each deposit's warp depth w_i seeds a bump in the conformal
+# potential φ; the warped metric is g' = e^{2φ} g. Deeply gisted
+# regions pull toward _WARP_MAX — familiar terrain is metrically
+# shorter (cognitive-map compression). The floor in g.warp_field
+# keeps K' > 0 structurally.
+_WARP_MAX = 0.4
+_WARP_REPLAY = 0.02
 
 
 # Where each kind family lives. inner world = thoughts, dreams,
@@ -191,6 +200,9 @@ class LatentManifold:
         # reactivation. Starts at 1 and grows with use — a trace that
         # keeps answering gets better at answering (LTP priming).
         self._plasticity = np.empty(0, dtype=np.float64)
+        # Per-trace warp depth — how much this region has contracted
+        # the metric. Grown by consolidation and replay, not set.
+        self._warp = np.empty(0, dtype=np.float64)
         # The medium's own state.
         self._phase = 0.0
         self._shear_phase = 0.0
@@ -298,6 +310,7 @@ class LatentManifold:
             self._shear0 = np.append(self._shear0, self._shear_phase)
             self._rung = np.append(self._rung, rid)
             self._plasticity = np.append(self._plasticity, 1.0)
+            self._warp = np.append(self._warp, 0.0)
             self._kinds.append(kind)
             self._dirty = True
             return idx
@@ -305,6 +318,31 @@ class LatentManifold:
     # ------------------------------------------------------------------
     # Resonance — retrieval by proximity in the medium
     # ------------------------------------------------------------------
+
+    def _effective_distances(
+        self, cue: FloatArray, epoch_points: FloatArray, d: FloatArray
+    ) -> FloatArray:
+        """Conformal distances d' — each arc integrated under g' = e^{2φ}g.
+
+        Vectorized over all deposits: sample the cue→deposit
+        geodesics on a shared t-grid, integrate e^{φ} by trapezoid.
+        The φ bumps are anchored to the deposits' epoch positions so
+        the field co-moves with the traces the medium carries.
+        """
+        n_samples = 7
+        t = np.linspace(0.0, 1.0, n_samples)
+        v = epoch_points - (epoch_points @ cue)[:, None] * cue[None, :]
+        nrm = np.linalg.norm(v, axis=1, keepdims=True)
+        v = np.divide(v, nrm, out=np.zeros_like(v), where=nrm > 1e-12)
+        ang = t[:, None, None] * d[None, :, None]
+        samples = np.cos(ang) * cue[None, None, :] + np.sin(ang) * v[None, :, :]
+        flat = samples.reshape(-1, 4)
+        phi = g.warp_field(flat, epoch_points, self._warp).reshape(
+            n_samples, len(d)
+        )
+        w = np.exp(phi)
+        factor = (0.5 * w[0] + w[1:-1].sum(axis=0) + 0.5 * w[-1]) / (n_samples - 1)
+        return d * factor
 
     def _epoch_points(self, rows: slice | list[int] | FloatArray) -> FloatArray:
         """Deposit positions unwound to their birth epochs — lock held.
@@ -352,6 +390,8 @@ class LatentManifold:
             # field, normalized to its own peak. Sharp traces recall
             # precisely; consolidated (broad) traces catch looser cues.
             peak = g.heat_kernel(0.0, self._bandwidth)
+            if np.any(self._warp < 0.0):
+                d = self._effective_distances(cue_point, unwound, d)
             score = (
                 self._reach
                 * self._salience
@@ -614,6 +654,11 @@ class LatentManifold:
             self._replay_fidelity = min(
                 1.0, self._replay_fidelity + _REPLAY_FIDELITY_RATE * fired
             )
+            # Paths she re-walks contract — the replayed region pulls
+            # tighter in the metric.
+            self._warp[mask] = np.maximum(
+                -_WARP_MAX, self._warp[mask] - _WARP_REPLAY
+            )
             if growth > 1.0:
                 self._bandwidth[mask] = np.minimum(
                     self._bandwidth[mask] * growth, self._gist_bw
@@ -668,6 +713,12 @@ class LatentManifold:
                 self._points = g.migrate_depth(self._points, migrate * gisted)
             self._bandwidth = np.minimum(
                 self._bandwidth * growth, self._gist_bw
+            )
+            # The metric deforms with consolidation: fully gisted
+            # regions contract toward _WARP_MAX — familiar terrain
+            # is metrically shorter, grown not set.
+            self._warp = -_WARP_MAX * np.clip(
+                self._bandwidth / self._gist_bw, 0.0, 1.0
             )
             self._dirty = True
 
@@ -812,6 +863,7 @@ class LatentManifold:
                 shear0=self._shear0,
                 rung=self._rung,
                 plasticity=self._plasticity,
+                warp=self._warp,
                 kinds=str_array(self._kinds),
                 scalars=np.array(
                     [
@@ -838,7 +890,7 @@ class LatentManifold:
             return False
         data = load_npz(path)
         version = int(data["version"])
-        if version not in (1, 2, _FORMAT_VERSION):
+        if version not in (1, 2, 3, _FORMAT_VERSION):
             raise ValueError(f"unsupported manifold image version {version}")
         points = np.asarray(data["points"], dtype=np.float64)
         n = points.shape[0]
@@ -855,7 +907,8 @@ class LatentManifold:
             or len(data["phase0"]) != n
             or len(data["shear0"]) != n
             or (version >= 2 and len(data["rung"]) != n)
-            or (version == 3 and len(data["plasticity"]) != n)
+            or (version >= 3 and len(data["plasticity"]) != n)
+            or (version == 4 and len(data["warp"]) != n)
         ):
             raise ValueError("corrupt manifold image: shape mismatch")
         norms = np.linalg.norm(points, axis=1)
@@ -865,7 +918,7 @@ class LatentManifold:
         # v1 images predate rungs (5 scalars); v2 predates plasticity
         # (6 scalars, no plasticity column). Both load with metaplastic
         # defaults — the substrate retunes itself from here anyway.
-        if scalars.shape != ({1: 5, 2: 6, 3: 10}[version],) or not np.isfinite(
+        if scalars.shape != ({1: 5, 2: 6, 3: 10, 4: 10}[version],) or not np.isfinite(
             scalars
         ).all():
             raise ValueError("corrupt manifold image: bad scalars")
@@ -885,16 +938,21 @@ class LatentManifold:
             )
             self._plasticity = (
                 np.asarray(data["plasticity"], dtype=np.float64)
-                if version == 3
+                if version >= 3
                 else np.ones(n, dtype=np.float64)
             )
+            self._warp = (
+                np.asarray(data["warp"], dtype=np.float64)
+                if version == 4
+                else np.zeros(n, dtype=np.float64)
+            )
             self._next_rung = int(scalars[5]) if version >= 2 else 0
-            self._floor_ema = float(scalars[6]) if version == 3 else 1.0
-            self._forget_gain = float(scalars[7]) if version == 3 else 1.0
-            self._replay_fidelity = float(scalars[8]) if version == 3 else 0.5
+            self._floor_ema = float(scalars[6]) if version >= 3 else 1.0
+            self._forget_gain = float(scalars[7]) if version >= 3 else 1.0
+            self._replay_fidelity = float(scalars[8]) if version >= 3 else 0.5
             self._gist_bw = (
                 float(np.clip(scalars[9], _GIST_MIN, _GIST_MAX))
-                if version == 3
+                if version >= 3
                 else _GIST_BANDWIDTH
             )
             self._open_rung = -1
