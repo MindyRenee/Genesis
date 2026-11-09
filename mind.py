@@ -217,6 +217,14 @@ class Mind(
             self.manifold.load()
         except Exception as e:  # noqa: BLE001
             logger.warning(f"manifold image failed to load; starting empty: {e}")
+        try:
+            from latent_spaces.seed import seed_from_data_dir
+
+            seeded = seed_from_data_dir(self.manifold)
+            if seeded:
+                logger.info(f"manifold seeded from data dir: {seeded}")
+        except Exception:
+            logger.debug("manifold seed skipped", exc_info=True)
 
         # User profile — a structured, persistent model of the human.
         profile_path = Path(self.data_dir) / "user_profile.json"
