@@ -443,13 +443,18 @@ class LatentManifold:
         k: int = 5,
         radius: float = 0.5,
         kind: str = "query",
+        prefix: str | None = None,
+        seed: int = 0xC0FFEE,
     ) -> list[tuple[int, str, float, float]]:
         """Recall the strongest traces near a cue.
 
         ``cue`` is raw content (digested like a deposit, at the domain
         its ``kind`` implies), a point on S3, or a latent vector of any
-        dimensionality (projected onto S3 — semantic cues reach the
-        semantically positioned deposits). Score is
+        dimensionality (projected onto S3 with ``seed`` — semantic cues
+        reach semantically positioned deposits only when the seeds
+        match the deposit family's). ``prefix`` restricts which
+        deposits may answer (e.g. ``"concept:"`` queries only the
+        concept field). Score is
         ``reach * salience * exp(-(d / radius)^2)`` — a resonance kernel:
         nearby traces answer strongly, distant ones fade smoothly.
         Returns ``(index, kind, score, geodesic_distance)`` rows sorted
@@ -463,7 +468,7 @@ class LatentManifold:
             cue_point = (
                 g.unit(v.reshape(1, -1))[0]
                 if v.size == 4
-                else g.project_to_s3(v)
+                else g.project_to_s3(v, seed=seed)
             )
         if radius <= 0 or not np.isfinite(radius):
             raise ValueError("radius must be positive and finite")
@@ -485,6 +490,10 @@ class LatentManifold:
                 * self._salience
                 * (g.heat_kernel(d, self._bandwidth) / np.maximum(peak, 1e-300))
             )
+            if prefix is not None:
+                score = score * np.array(
+                    [kk.startswith(prefix) for kk in self._kinds]
+                )
             order = np.argsort(score)[::-1][:k]
             floor = _SCORE_FLOOR * self._floor_ema
             hits = [

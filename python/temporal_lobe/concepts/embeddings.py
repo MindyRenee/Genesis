@@ -533,6 +533,28 @@ class EmbeddingStore:
         generation. `refresh()` (sleep thread) rebinds all three.
         """
         self._ensure_loaded()
+        # The substrate answers similarity when it's wired: concept
+        # deposits live at their projected embedding coordinates, so
+        # the query vector reaches the concept's own neighborhood —
+        # the same neighborhood the hybrid distance would surface.
+        manifold = getattr(self, "manifold", None)
+        if manifold is not None:
+            vec = self.get_concept_vector(concept_name)
+            if vec is not None:
+                hits = manifold.resonate(
+                    vec, k=k + 1, radius=0.6, prefix="concept:", seed=0xCE1
+                )
+                out = [
+                    (
+                        kk.split(":", 1)[-1],
+                        math.exp(-((d / 0.6) ** 2)),
+                    )
+                    for (_, kk, _, d) in hits
+                    if kk != f"concept:{concept_name}"
+                ]
+                out = [t for t in out if t[1] >= threshold][:k]
+                if out:
+                    return out
         with self._lock:
             return self._find_similar_concepts_locked(concept_name, k, threshold)
 

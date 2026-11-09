@@ -501,6 +501,9 @@ class Mind(
         # here after both are initialized.
         if hasattr(self.brain.frontal, "embeddings") and self.brain.frontal.embeddings is not None:
             self.language.set_embeddings(self.brain.frontal.embeddings)
+            # The store answers similarity from the substrate when it
+            # can — its concepts already live there as deposits.
+            self.brain.frontal.embeddings.manifold = self.manifold
             # Wire the embedding field as the network's virtual
             # similarity layer: derivable associations are computed
             # from the latent space at query time (get_associations),

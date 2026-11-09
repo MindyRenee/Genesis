@@ -1237,6 +1237,32 @@ class TestShadow:
         assert 0.79 <= d <= 0.94  # memory band, shadow phase aside
 
 
+class TestSemanticRecall:
+    """Cue-side projection — embedded queries reach embedded deposits."""
+
+    def test_vector_cue_finds_its_neighborhood(self):
+        m = LatentManifold()
+        base = np.random.default_rng(1).standard_normal(50)
+        near = base + 0.02 * np.random.default_rng(2).standard_normal(50)
+        far = np.random.default_rng(3).standard_normal(50)
+        m.observe("alpha", kind="concept:alpha",
+                  position=g.project_to_s3(base, seed=0xCE1))
+        m.observe("beta", kind="concept:beta",
+                  position=g.project_to_s3(far, seed=0xCE1))
+        hits = m.resonate(base, k=2, prefix="concept:", seed=0xCE1)
+        assert hits[0][1] == "concept:alpha"
+        # the near neighbor answers closer than the far one
+        hits2 = m.resonate(near, k=2, prefix="concept:", seed=0xCE1)
+        assert hits2[0][1] == "concept:alpha"
+
+    def test_prefix_filters_field(self):
+        m = LatentManifold()
+        m.observe("a thought", kind="thought:x")
+        m.observe("a concept", kind="concept:y")
+        hits = m.resonate("a thought", kind="thought:x", prefix="concept:")
+        assert all(kk.startswith("concept:") for _, kk, _, _ in hits)
+
+
 class TestInnerGuide:
     def test_inner_guide_weighted_depth(self):
         m = LatentManifold()
