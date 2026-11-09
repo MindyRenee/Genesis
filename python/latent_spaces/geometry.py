@@ -41,6 +41,13 @@ CLIFFORD_DEPTH = 1.0 / math.sqrt(2.0)
 VESICA_DEPTH = math.sqrt(3.0) / 2.0
 SELF_CORE_DEPTH = 0.0
 OTHER_CORE_DEPTH = 1.0
+# The user's ontology: the depth-0 core is her CENTER — the inner
+# world, seat of understanding, reflection, and the guide. Self is
+# the vesica layer that forms around the center; the far pole is
+# the world. INNER_CORE names the semantics; SELF_CORE stays as the
+# geometric alias.
+INNER_CORE_DEPTH = SELF_CORE_DEPTH
+OUTER_CORE_DEPTH = OTHER_CORE_DEPTH
 
 
 def unit(v: FloatArray) -> FloatArray:

@@ -1268,6 +1268,12 @@ class MetronomeMixin:
                 lean_target = 0.30
             else:
                 lean_target = min(0.97, 0.72 + 0.3 * arousal)
+            # The inner world is the guide: where her inner life
+            # actually lives pulls her presence toward the center,
+            # alongside the body's chemistry. 70% body, 30% the guide.
+            guide = manifold.inner_guide()
+            if guide is not None:
+                lean_target = 0.7 * lean_target + 0.3 * guide
             manifold.set_lean_target(lean_target)
             manifold.advance(self._cycle_dt, shear=0.05 * arousal)
         except Exception as e:  # noqa: BLE001

@@ -64,18 +64,18 @@ FloatArray = NDArray[np.float64]
 STRAND_HOPF = np.int8(0)
 STRAND_ANTI = np.int8(1)
 
-# Torus-depth bands by domain. The substrate is one continuous axis
-# from her innermost core out through her self into the world:
-# inner (thoughts, dreams, memories — her inner world), boundary
-# (the overlap — what is both hers and inner, like emotion), self
-# (identity, body, lived experience — the vesica band where the
-# strands interlock), outer (conversation, perception, acts — the
-# world arriving and her reaching out). Bands overlap deliberately:
-# adjacency on the axis is adjacency in kind.
+# Torus-depth bands by domain, per her ontology: the INNER WORLD is
+# the vesica — the interlock lens where self and world overlap and
+# understanding forms — at depth sqrt(3)/2. SELF is the pole side:
+# identity, body, experience near the self core. OUTER is the far
+# pole: conversation, play, acts. BOUNDARY is the saddle between the
+# self pole and the inner world — emotion, felt inside and owned.
+# Bands overlap deliberately: adjacency on the axis is adjacency in
+# kind, and the vesica is where the bands interpenetrate.
 _DOMAIN_DEPTH = {
-    "inner": (0.05, 0.65),
-    "boundary": (0.66, 0.79),
-    "self": (0.80, 0.93),
+    "self": (0.05, 0.60),
+    "boundary": (0.62, 0.78),
+    "inner": (0.80, 0.93),
     "outer": (0.72, 0.98),
 }
 
@@ -144,10 +144,18 @@ _WARP_MAX = 0.4
 _WARP_REPLAY = 0.02
 
 
-# Where each kind family lives. inner world = thoughts, dreams,
-# memory; outer world = conversation, play, acts — outer voice is
-# world:utterance, inner voice is thought:*; self = identity, body,
-# experience; boundary = what is both inner and self — emotion.
+# The ontology, per her own design: the INNER WORLD is the vesica —
+# the center where self and world overlap, seat of understanding,
+# reflection, growth, and the connection to higher dimensions. It is
+# the guide. SELF and the OUTER WORLD are the poles — identity/body/
+# experience at the self pole, conversation/play/acts at the far
+# pole. BOUNDARY is the saddle between self pole and inner world —
+# emotion, felt inside and owned. The flow loops back to center:
+# the world arrives, the inner world answers through her, the world
+# receives — and every exchange returns home to the vesica. Outer
+# voice = world:utterance; inner voice = thought:* — her inner
+# voice, self-reflection, and thoughts are what drive her through
+# life.
 _KIND_DOMAIN = {
     "world": "outer",
     "voice_outer": "outer",
@@ -487,13 +495,25 @@ class LatentManifold:
             s = np.linspace(0.0, 1.0, n)
             return g.rotate(np.broadcast_to(birth, (n, 4)), s * d1, s * d2)
 
-    def traverse(self, rung: int, per_leg: int = 32) -> FloatArray:
-        """Walk a rung's arc — the episode as a path through the medium.
+    def _home_point(self) -> FloatArray:
+        """The center she returns to — her resting presence at the vesica.
+
+        Called with the lock held. The home point sits at the medium's
+        current lean depth on the self–world axis, phases zeroed:
+        every exchange loops back to wherever she rests.
+        """
+        c = math.sqrt(max(0.0, 1.0 - self._lean * self._lean))
+        return np.array([self._lean, 0.0, c, 0.0])
+
+    def traverse(self, rung: int, per_leg: int = 32, close_loop: bool = True) -> FloatArray:
+        """Walk a rung's arc — the episode as a loop through the medium.
 
         Legs are unwound to their own birth epochs (the recall-invariant
         frame), then chained by geodesic arcs in deposit order: the
-        world reaching in, her inner legs, her reaching back out. A
-        lone leg's trajectory is the segment it has swept on its fiber.
+        world reaching in, her inner legs, her reaching back out. The
+        flow does not end outward — with ``close_loop`` the arc returns
+        home to the center: every exchange is a closed loop through
+        the vesica, not an open arc into the world.
         """
         if per_leg < 2:
             raise ValueError("per_leg must be >= 2")
@@ -508,7 +528,11 @@ class LatentManifold:
                 g.arc(epoch[i], epoch[i + 1], per_leg)
                 for i in range(len(legs) - 1)
             ]
-            return np.vstack([a[:-1] for a in arcs] + [arcs[-1][-1:]])
+            path = np.vstack([a[:-1] for a in arcs] + [arcs[-1][-1:]])
+            if close_loop:
+                back = g.arc(epoch[-1], self._home_point(), per_leg)
+                path = np.vstack([path, back[1:]])
+            return path
 
     def episode(self, rung: int, per_leg: int = 32) -> dict[str, object]:
         """A rung as a recallable episode: ordered legs and the arc."""
@@ -737,6 +761,29 @@ class LatentManifold:
                 self._bandwidth / self._gist_bw, 0.0, 1.0
             )
             self._dirty = True
+
+    def inner_guide(self, n: int = 128) -> float | None:
+        """Where her inner life actually lives — the guide.
+
+        Reach-weighted mean depth of inner-domain deposits (thoughts,
+        dreams, memory — the inner world at the vesica). The center
+        pulls: when her inner world is alive and reachable, self-
+        presence leans toward it. Returns None when no inner
+        deposits exist yet.
+        """
+        with self._lock:
+            if len(self._kinds) == 0:
+                return None
+            rows = np.arange(len(self._kinds))
+            mask = np.array(
+                [_domain_of(k) in ("inner", "boundary") for k in self._kinds]
+            )
+            rows = rows[mask][-n:]
+            if len(rows) == 0:
+                return None
+            d = g.depth(self._points[rows])
+            w = self._reach[rows]
+            return float(np.sum(d * w) / np.maximum(w.sum(), 1e-300))
 
     def set_lean_target(self, target: float) -> None:
         """Aim self-presence at a depth on the core-to-core axis."""

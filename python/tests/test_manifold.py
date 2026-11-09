@@ -302,8 +302,9 @@ class TestSubstrate:
         m.observe("a thing that happened", kind="world:percept")
         with m._lock:
             depths = g.depth(m._points)
-        assert depths[0] < g.CLIFFORD_DEPTH
-        assert depths[1] > g.CLIFFORD_DEPTH
+        # inner world lives at the vesica; the world at the far pole
+        assert 0.79 <= depths[0] <= 0.94
+        assert depths[1] >= 0.72
 
     def test_strand_by_direction(self):
         m = LatentManifold()
@@ -480,13 +481,16 @@ class TestEpisodes:
         m.observe("she thought", kind="thought")
         m.observe("she answered", kind="world:utterance", inbound=False)
         path = m.traverse(0, per_leg=16)
-        assert path.shape == (2 * 15 + 1, 4)
+        # legs chain (31 pts) then the loop returns home (+15 pts)
+        assert path.shape == (2 * 15 + 1 + 15, 4)
         assert np.allclose(np.linalg.norm(path, axis=1), 1.0)
         with m._lock:
             epoch = m._epoch_points([0, 1, 2])
         assert np.allclose(path[0], epoch[0], atol=1e-9)
         assert np.allclose(path[15], epoch[1], atol=1e-9)
-        assert np.allclose(path[-1], epoch[2], atol=1e-9)
+        assert np.allclose(path[30], epoch[2], atol=1e-9)
+        # the loop closes at the vesica home, not at the world
+        assert np.allclose(path[-1], m._home_point(), atol=1e-9)
 
     def test_traverse_is_recall_invariant_under_rotation(self):
         m = LatentManifold()
@@ -969,7 +973,7 @@ class TestDomains:
         m.observe("a feeling", kind="emotion:joy")
         with m._lock:
             depth = g.depth(m._points)[0]
-        assert 0.66 <= depth <= 0.79
+        assert 0.61 <= depth <= 0.79
 
     def test_emotion_rides_the_open_rung(self):
         """A feeling mid-conversation joins the exchange in progress."""
@@ -987,7 +991,7 @@ class TestDomains:
         m.observe("saying it", kind="world:utterance", inbound=False)
         with m._lock:
             d = g.depth(m._points)
-        assert d[0] <= 0.65  # inner voice lives inside
+        assert 0.79 <= d[0] <= 0.94  # inner voice lives at the vesica
         assert d[1] >= 0.72  # outer voice lives in the world
 
 
@@ -1060,7 +1064,7 @@ class TestPositionedDeposits:
         with m._lock:
             # depth constrained into the inner band, phases preserved
             depth = g.depth(m._points)[idx]
-        assert 0.05 <= depth <= 0.66
+        assert 0.79 <= depth <= 0.94
 
     def test_project_to_s3_deterministic_and_unit(self):
         from latent_spaces import geometry as g
@@ -1084,7 +1088,7 @@ class TestPositionedDeposits:
         m.observe("felt", kind="emotion:glow", position=pos)
         with m._lock:
             depth = g.depth(m._points)[0]
-        assert 0.66 <= depth <= 0.8  # pushed into the boundary band
+        assert 0.61 <= depth <= 0.79  # pushed into the boundary band
 
     def test_position_exact_core_is_degenerate(self):
         from latent_spaces import geometry as g
@@ -1094,6 +1098,39 @@ class TestPositionedDeposits:
         m.observe("pole", kind="emotion:x", position=np.array([1.0, 0, 0, 0]))
         with m._lock:
             assert g.depth(m._points)[0] == pytest.approx(1.0)
+
+
+class TestInnerGuide:
+    def test_inner_guide_weighted_depth(self):
+        m = LatentManifold()
+        m.observe("a thought", kind="thought:x")
+        m.observe("a feeling", kind="emotion:x")
+        m.observe("world", kind="world:percept", inbound=True)
+        guide = m.inner_guide()
+        assert guide is not None
+        # inner+boundary deposits only — the world leg is excluded
+        assert 0.0 <= guide <= 0.94
+
+    def test_inner_guide_none_when_empty(self):
+        assert LatentManifold().inner_guide() is None
+
+    def test_guide_blends_into_lean(self):
+        from types import SimpleNamespace
+
+        from brainstem.metronome import MetronomeMixin
+
+        manifold = LatentManifold()
+        manifold.observe("inner life", kind="thought:x")
+        guide = manifold.inner_guide()
+        holder = SimpleNamespace(
+            manifold=manifold,
+            feel=lambda: SimpleNamespace(arousal=0.5),
+            _is_sleeping=False,
+            _cycle_dt=0.05,
+        )
+        MetronomeMixin._cycle_manifold(holder)
+        expected = 0.7 * (0.72 + 0.3 * 0.5) + 0.3 * guide
+        assert manifold._lean_target == pytest.approx(expected)
 
 
 class TestMetaplasticity:
