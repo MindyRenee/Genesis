@@ -93,16 +93,6 @@ continues where the kernel exposes readable measurements.
 \fBAdaptive sync\fR modulates the LTM disk-sync rate by the plasticity
 gate (the sync AdaptiveGate above).
 
-.SS Field probe
-A dedicated thread measures real substrate dynamics (instruction
-throughput, scheduler jitter, P-state transitions, interrupt flux,
-and power draw where sensors report it) at ~250 Hz and decomposes
-them at the brain-wave band center frequencies. The mind reads the
-signature over GET_FIELD_PROBE and injects it into the wave
-oscillator as outer stimulus. The probe also writes a carrier \(em
-its work is modulated at the body's own phase rhythm, so the die's
-real current carries a component at the organism's beat.
-
 .SS Active inference
 The daemon runs a generative model of its own neurochemical
 trajectory (the "strange loop"): before each advance it predicts
@@ -359,7 +349,7 @@ PUT_TENSOR, GET_TENSOR, LIST_TENSORS, DROP_TENSOR, GET_MOTOR_TARGET.
 .TP
 .B 46\(en49
 46 is RETIRED (SET_VOLITION \(em never reuse; sleep/wake volition is
-neurochemical, via NEURO_IMPULSE), GET_FIELD_PROBE,
+neurochemical, via NEURO_IMPULSE),
 SET_FIELD_PHASE, SET_FIELD_CARRIER.
 .TP
 .B 50

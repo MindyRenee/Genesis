@@ -395,15 +395,15 @@ def test_learner_is_offline_property() -> None:
 
 
 def test_registry_probe_disabled_never_sockets(monkeypatch) -> None:
-    """connectivity_probe=False: is_offline and check_connectivity
-    answer from observed state — no socket is ever opened to ask."""
+    """is_offline and check_connectivity answer from observed state —
+    no socket is ever opened to ask."""
     import socket
 
     def _boom(*args, **kwargs):
         raise AssertionError("connectivity probe fired while disabled")
 
     monkeypatch.setattr(socket, "create_connection", _boom)
-    registry = SourceRegistry(connectivity_probe=False)
+    registry = SourceRegistry()
     assert registry.is_offline is False
     assert registry.check_connectivity() is True
 
@@ -420,7 +420,7 @@ def test_registry_probe_disabled_reports_observed_offline(monkeypatch) -> None:
         raise AssertionError("connectivity probe fired while disabled")
 
     monkeypatch.setattr(socket, "create_connection", _boom)
-    registry = SourceRegistry(connectivity_probe=False)
+    registry = SourceRegistry()
     registry._last_query_offline = True
     registry._last_query_offline_at = time.time()
     assert registry.is_offline is True
@@ -432,59 +432,6 @@ def test_registry_probe_disabled_reports_observed_offline(monkeypatch) -> None:
     assert registry.check_connectivity() is True
 
 
-def test_registry_probe_enabled_still_probes(monkeypatch) -> None:
-    """Default construction keeps the proactive probe — the flag is
-    what quiets it, not a behavior change."""
-    import socket
-    from unittest.mock import MagicMock
-
-    probe = MagicMock()
-    monkeypatch.setattr(socket, "create_connection", probe)
-    registry = SourceRegistry()
-    assert registry.is_offline is False
-    probe.assert_called()
 
 
-def test_learner_connectivity_probe_kwarg() -> None:
-    """AutonomousLearner passes connectivity_probe through to its registry."""
-    from frontal_lobe.autonomous import AutonomousLearner
-    from frontal_lobe.reasoning import Reasoner
-    from limbic_system.curiosity import Curiosity
-    from temporal_lobe.concepts import ConceptNetwork
 
-    net = ConceptNetwork()
-    reasoning = Reasoner(net)
-    curiosity = Curiosity(net, reasoning)
-    learner = AutonomousLearner(
-        network=net,
-        curiosity=curiosity,
-        connectivity_probe=False,
-    )
-    assert learner._sources._connectivity_probe is False
-
-
-def test_headless_mind_disables_probe() -> None:
-    """Mind(headless=True) builds its learner with the connectivity
-    probe off — a resident mind generates no synthetic socket traffic."""
-    import os
-    import tempfile
-
-    from mind import Mind
-
-    data_dir = tempfile.mkdtemp(prefix="headless_probe_test_")
-    mind = Mind(os.path.join(data_dir, "genesis.sock"), headless=True)
-    assert mind._headless is True
-    assert mind.learner._sources._connectivity_probe is False
-
-
-def test_interactive_mind_keeps_probe() -> None:
-    """A session mind still probes — the flag is headless's alone."""
-    import os
-    import tempfile
-
-    from mind import Mind
-
-    data_dir = tempfile.mkdtemp(prefix="interactive_probe_test_")
-    mind = Mind(os.path.join(data_dir, "genesis.sock"))
-    assert mind._headless is False
-    assert mind.learner._sources._connectivity_probe is True

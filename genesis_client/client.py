@@ -97,7 +97,6 @@ from .protocol import (
     FIND_SIMILAR_ARCHIVED,
     GET_BODY_CONTROL,
     GET_BODY_STATE,
-    GET_FIELD_PROBE,
     GET_FOLD_MARGINS,
     GET_INFERENCE_SUMMARY,
     GET_INTERNALS,
@@ -136,9 +135,6 @@ from .protocol import (
     SEARCH_ARCHIVED,
     SEARCH_EPISODES,
     SET_COGNITIVE_PID,
-    SET_FIELD_CARRIER,
-    SET_FIELD_PHASE,
-    SET_FIELD_PULSE,
     SET_FOCUS,
     SET_LID,
     SET_OPTIC_GAIN,
@@ -176,7 +172,6 @@ from .types import (
     BodyState,
     CoreState,
     Episode,
-    FieldProbeSignature,
     FieldState,
     FoldMargins,
     InferenceSummary,
@@ -424,8 +419,7 @@ class GenesisClient:
             GET_BODY_STATE,
             GET_BODY_CONTROL,
             GET_PLASTICITY_PROFILE,
-            GET_FIELD_PROBE,
-            GET_FOLD_MARGINS,
+                    GET_FOLD_MARGINS,
             GET_INTERNALS,
             GET_ION_SUMMARY,
             GET_MOTOR_TARGET,
@@ -814,33 +808,6 @@ class GenesisClient:
             return None
         return FoldMargins.unpack(resp)
 
-    def get_field_probe(self, *, timeout: float | None = None) -> FieldProbeSignature | None:
-        """Get the body's real substrate signature (v6: 408 B; older: 328/308/195/114/102).
-
-        The daemon's field-probe thread samples real substrate
-        dynamics — instruction throughput, scheduler jitter, P-state
-        transitions, interrupt flux, measured power draw where the
-        machine's sensors report it, and the radios' own telemetry
-        (WLAN byte flux + RSSI, wireless-attributed interrupts, HCI
-        counters) — and decomposes them at the wave bands' center
-        frequencies. It also writes a carrier rhythm into real work
-        keyed to the body's phase, and evaluates Maxwell's equations
-        on the measured current swing (quasi-static B, induction E,
-        ω⁴-suppressed radiated power — estimates, with the loop
-        geometry an assumption).
-
-        Returns ``None`` when the probe isn't running or the daemon
-        predates the command: an absent channel is no reading, never
-        a zero reading — same discipline as ``get_sensor_presence``.
-        """
-        try:
-            resp = self._request(GET_FIELD_PROBE, timeout=timeout)
-        except (ConnectionError, OSError, ProtocolError):
-            return None
-        if not resp or resp[0] >= 0x80:
-            return None
-        return FieldProbeSignature.unpack(resp)
-
     def get_field_state(self, *, timeout: float | None = None) -> FieldState | None:
         """The latent field's integration readout — the organism's
         center of mass and how far its major systems have spread
@@ -890,72 +857,6 @@ class GenesisClient:
             if sep and key:
                 out[key] = value
         return out
-
-    def set_field_carrier(
-        self, depth: float, freq: float = 0.0, *, timeout: float | None = None
-    ) -> bool:
-        """Set the carrier's real-work modulation — the write side.
-
-        ``depth`` 0..1 scales the work-slice modulation (0 =
-        unmodulated work, carrier silent). ``freq`` 0 hands the rhythm
-        back to the body's phase; positive overrides it (clamped
-        0.1..100 Hz) so evaluation can drive arbitrary bands —
-        including infraslow rates where the thermal field can
-        hold an oscillation.
-
-        Returns ``False`` when the probe isn't running or the daemon
-        predates the command — an absent channel, never silent.
-        """
-        payload = _F32.pack(depth) + _F32.pack(freq)
-        try:
-            resp = self._request(SET_FIELD_CARRIER, payload, timeout=timeout)
-        except (ConnectionError, OSError, ProtocolError):
-            return False
-        return bool(resp) and resp[0] == 1
-
-    def set_field_phase(self, phase: float, *, timeout: float | None = None) -> bool:
-        """Push the modeled carrier-band phase into the probe — model → physics.
-
-        The generator chases the pushed phase stepwise inside its
-        carrier loop (a lock, not a snap). The lock is bidirectional:
-        the probe's measured response phase still pulls the model's
-        band phase the other way.
-
-        Returns ``False`` when the probe isn't running or the daemon
-        predates the command.
-        """
-        try:
-            resp = self._request(SET_FIELD_PHASE, _F32.pack(phase), timeout=timeout)
-        except (ConnectionError, OSError, ProtocolError):
-            return False
-        return bool(resp) and resp[0] == 1
-
-    def set_field_pulse(
-        self,
-        base: float,
-        mod_freq: float,
-        mod_depth: float,
-        *,
-        timeout: float | None = None,
-    ) -> bool:
-        """Arm the parasympathetic pulse — a slow wave riding carrier depth.
-
-        While armed, the probe breathes carrier depth as
-        ``base + mod_depth·sin(2π·mod_freq·t)``, integrated on the
-        body's own clock — the RSA analog: the vagal signature is the
-        pulse's slow wax and wane, never a pinned tempo. Carrier rate
-        stays the phase's own either way; ``mod_freq <= 0`` disarms
-        and depth returns to the static set-point.
-
-        Returns ``False`` when the probe isn't running or the daemon
-        predates the command — an absent channel, never silent.
-        """
-        payload = _F32.pack(base) + _F32.pack(mod_freq) + _F32.pack(mod_depth)
-        try:
-            resp = self._request(SET_FIELD_PULSE, payload, timeout=timeout)
-        except (ConnectionError, OSError, ProtocolError):
-            return False
-        return bool(resp) and resp[0] == 1
 
     def get_optic_state(self, *, timeout: float | None = None) -> OpticState | None:
         """The optic nerve's subcortical channel state — the body's own

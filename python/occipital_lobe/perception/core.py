@@ -921,6 +921,10 @@ def is_plausible_name(name: str) -> bool:
 
 
 _ABOUT_GENESIS_RE = re.compile(r"\b(you|your|yourself|genesis)\b")
+# Her own provenance wrapper on channel turns — volition._hear_channel
+# hands respond() "(public channel) Author: text" so the record keeps
+# who spoke and where; perception peels it to read the utterance.
+_CHANNEL_SPEECH_RE = re.compile(r"^\(public channel\)\s+[^:]{1,80}:\s*(?P<body>.*)$", re.DOTALL)
 # Negation: only first-person subject/possessive ("I", "my") negates
 # "your" — not "me" which is often an indirect object ("tell me about
 # your code" is about Genesis, not the user)
@@ -1725,11 +1729,19 @@ def perceive(
     (enhanced processing) lowers it (more matches — it's more
     perceptive of remote associations).
     """
+    # Channel speech arrives inside her own provenance envelope —
+    # "(public channel) Author: utterance" — kept so the journal and
+    # world record who spoke and where. The envelope is metadata, not
+    # utterance: classify and extract on the bare words. Left wrapped,
+    # anchored intents (greeting, farewell) can never match a channel
+    # greeting, and the speaker's name lands in topics and entities.
+    channel = _CHANNEL_SPEECH_RE.match(text)
+    utterance = channel.group("body") if channel is not None else text
     # Canonical form once, at the boundary: invisible format
     # characters removed (a zero-width-space message is silence, not
     # a ghost perception), whitespace collapsed, then lowercased for
     # the downstream classifiers.
-    lower = collapse_ws(text).lower()
+    lower = collapse_ws(utterance).lower()
     word_count = len(lower.split())
 
     # Handle empty or whitespace-only input — including input whose
@@ -1758,7 +1770,7 @@ def perceive(
         intent_probabilities,
     ) = _extract_perception_signals(
         lower,
-        text,
+        utterance,
         intent,
         topics,
         question_type,
@@ -1767,7 +1779,7 @@ def perceive(
     )
 
     intent, intent_probabilities = _blend_semantic_evidence(
-        text,
+        utterance,
         intent,
         intent_probabilities,
         embeddings,

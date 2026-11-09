@@ -57,7 +57,6 @@ pub mod consolidation;
 pub mod continuity;
 pub mod cpufreq;
 pub mod dyadic_model;
-pub mod field_probe;
 pub mod gamma;
 pub mod hpa_development;
 pub mod interoception;

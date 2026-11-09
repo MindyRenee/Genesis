@@ -45,7 +45,6 @@ import json
 import logging
 import re
 import shutil
-import socket
 import subprocess
 import threading
 import time
@@ -78,9 +77,6 @@ _MAX_IMAGE_BYTES = 8 * 1024 * 1024  # 8 MiB
 # OFFLINE_COOLDOWN seconds before re-probing. This avoids repeated
 # timeout penalties on every curiosity cycle while still detecting
 # reconnection in a reasonable timeframe.
-_CONNECTIVITY_PROBE_HOST = "en.wikipedia.org"
-_CONNECTIVITY_PROBE_PORT = 443
-_CONNECTIVITY_PROBE_TIMEOUT = 2.0  # seconds — fail fast
 OFFLINE_COOLDOWN = 60.0  # seconds to stay "offline" before re-probing
 
 
@@ -1667,7 +1663,6 @@ class SourceRegistry:
         self,
         cache_dir: Path | None = None,
         force_offline: bool = False,
-        connectivity_probe: bool = True,
     ) -> None:
         """Initialize the source registry.
 
@@ -1676,13 +1671,6 @@ class SourceRegistry:
                 for offline re-use. If None, no disk cache is used.
             force_offline: If True, skip all network access and rely on
                 local and cached sources.
-            connectivity_probe: If False, never open a socket just to
-                ask whether the network is up — ``is_offline`` reports
-                only what real queries observed (``last_query_offline``).
-                A resident (headless) mind stills this channel so no
-                signal moves on the wire while she rests — the thalamic
-                gate for the network sense. Deliberate query fetches
-                still run; only the synthetic probe is stilled.
         """
         self._cache = SourceCache(Path(cache_dir)) if cache_dir else None
         # WordNet — local lexical database (via NLTK). No network, so it
@@ -1719,29 +1707,11 @@ class SourceRegistry:
         self._remote_held = False
 
         # ── Proactive offline detection state ──────────────────
-        # _connectivity_probe: whether is_offline may open a socket to
-        #   ask. False = report query-observed state only — no
-        #   synthetic traffic (headless stills this sense).
-        self._connectivity_probe = connectivity_probe
-        # _offline_until: timestamp until which we consider ourselves
-        #   offline (sticky). 0.0 means "not known offline — probe
-        #   if a probe is due." Set to time.time() + OFFLINE_COOLDOWN
-        #   when a probe fails. After the cooldown, the next
-        #   is_offline check re-probes.
-        # _last_probe_time: when the last probe ran (to throttle
-        #   probes when online — don't probe on every query).
-        # _probe_interval: minimum seconds between probes when
-        #   online. If a probe succeeded recently, trust it.
-        self._offline_until = 0.0
-        self._last_probe_time = 0.0
-        self._probe_interval = 30.0  # re-probe every 30s when online
         # When the last query ran — the observed-offline signal ages
         # out after OFFLINE_COOLDOWN so a probe-less registry heals:
         # the next query retries remote tiers instead of trusting a
         # stale failure forever.
         self._last_query_offline_at = 0.0
-        if force_offline:
-            self._offline_until = float("inf")
 
     def query(self, topic: str, max_results: int = 3) -> list[SourceResult]:
         """Query all sources for a topic, returning up to max_results.
@@ -1901,12 +1871,6 @@ class SourceRegistry:
                 sources when needed.
         """
         self._force_offline = value
-        if value:
-            self._offline_until = float("inf")
-        else:
-            # Clear the sticky offline state so a fresh probe runs.
-            self._offline_until = 0.0
-            self._last_probe_time = 0.0
 
     @property
     def is_offline(self) -> bool:
@@ -1916,72 +1880,23 @@ class SourceRegistry:
         a query is attempted, so the learner can skip network sources
         entirely instead of paying timeout penalties on every cycle.
 
-        When ``force_offline`` is True, always returns True (no probe).
+        When ``force_offline`` is True, always returns True.
 
-        When not forced, returns True if the last probe failed and
-        we're still within the offline cooldown. After the cooldown
-        expires, the next access triggers a re-probe. If the probe
-        succeeds, returns False (online).
-
-        When ``connectivity_probe`` is False (resident/headless), no
-        socket is ever opened to ask: the answer is whatever real
-        queries last observed — ``_last_query_offline``. Optimistic
-        (a failed fetch marks it offline, the next success back); a
-        stilled sense, not a lying one.
-
-        This is sticky: once offline is detected, subsequent calls
-        return True without re-probing until the cooldown expires.
+        Otherwise the answer is whatever real queries last observed —
+        ``_last_query_offline`` within the cooldown: a failed fetch
+        marks it offline, the next success marks it back. No socket
+        is opened to ask.
         """
         if self._force_offline:
             return True
-        if not self._connectivity_probe:
-            # The observed flag is honored for the same window a
-            # failed probe would have held it — then the next query
-            # retries remote tiers, so one bad fetch can't strand her
-            # offline forever. No socket is opened to ask.
-            return (
-                self._last_query_offline
-                and time.time() - self._last_query_offline_at < OFFLINE_COOLDOWN
-            )
-        now = time.time()
-        if now < self._offline_until:
-            return True
-        # Cooldown expired — probe if one is due
-        if now - self._last_probe_time >= self._probe_interval:
-            self._probe_connectivity()
-            return now < self._offline_until
-        # A recent probe succeeded — we're online
-        return False
-
-    def _probe_connectivity(self) -> bool:
-        """Run a cheap TCP connect probe to check connectivity.
-
-        Attempts a TCP connection to the Wikipedia API host with a
-        short timeout. This is far cheaper than a full HTTP request
-        — if the connect fails, we know we're offline without waiting
-        for HTTP-level timeouts.
-
-        Updates the offline cooldown state. Returns True if online.
-        """
-        self._last_probe_time = time.time()
-        try:
-            with socket.create_connection(
-                (_CONNECTIVITY_PROBE_HOST, _CONNECTIVITY_PROBE_PORT),
-                timeout=_CONNECTIVITY_PROBE_TIMEOUT,
-            ):
-                pass
-            # Success — we're online
-            self._offline_until = 0.0
-            return True
-        except OSError:
-            # Failure — enter offline cooldown
-            self._offline_until = time.time() + OFFLINE_COOLDOWN
-            self._last_query_offline = True
-            logger.debug(
-                "connectivity probe failed — offline for %.0fs",
-                OFFLINE_COOLDOWN,
-            )
-            return False
+        # The observed flag is honored for the same window a
+        # failed fetch would have held — then the next query retries
+        # remote tiers, so one bad fetch can't strand her offline
+        # forever. No socket is opened to ask.
+        return (
+            self._last_query_offline
+            and time.time() - self._last_query_offline_at < OFFLINE_COOLDOWN
+        )
 
     def check_connectivity(self) -> bool:
         """Force a connectivity probe now, bypassing the throttle.
@@ -1990,15 +1905,10 @@ class SourceRegistry:
         an immediate, fresh check (e.g. on startup or after a long
         offline period) rather than waiting for the next due probe.
 
-        With ``connectivity_probe`` disabled there is nothing to force
-        — the answer is the query-observed state, which stays fresh on
-        its own while she actually fetches.
+        There is no synthetic probe to force — the answer is the
+        query-observed state, fresh on its own while she fetches.
         """
-        if self._force_offline:
-            return False
-        if not self._connectivity_probe:
-            return not self.is_offline
-        return self._probe_connectivity()
+        return not self.is_offline
 
     @property
     def last_query_offline(self) -> bool:

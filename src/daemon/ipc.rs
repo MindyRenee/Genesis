@@ -433,35 +433,6 @@ pub mod cmd {
     #[allow(dead_code)]
     pub const SET_VOLITION: u8 = 46;
 
-    /// Physical field-probe signature — the body's real measured
-    /// substrate dynamics (throughput/jitter band energies, P-state
-    /// and interrupt rates, carrier frequency, electrical and radio
-    /// telemetry) decomposed at the wave bands' center frequencies.
-    /// Response: 408 bytes (v6; v5 was 328, v4 308, v3 195, v2 114, v1 102),
-    /// layout in `daemon::field_probe`.
-    /// Additive: PROTOCOL_VERSION is unaffected.
-    /// When the probe thread isn't running the reply is a single
-    /// `READ_FAILED` byte, so an unavailable channel never reads as
-    /// a healthy zero.
-    pub const GET_FIELD_PROBE: u8 = 47;
-
-    /// The mind pushes its modeled carrier-band phase into the
-    /// probe's generator, which chases it stepwise — model → physics.
-    /// The lock is bidirectional: the signature's measured response
-    /// phase also pulls the model's band phase (physics → model).
-    /// Request: [f32 phase_rad]. Reply: [u8 ack].
-    pub const SET_FIELD_PHASE: u8 = 48;
-
-    /// Set the carrier's real-work modulation — the write side of the
-    /// embodiment experiment. Request: [f32 depth][f32 freq_hz].
-    /// Depth 0..1 scales the work-slice modulation (0 = unmodulated
-    /// work, carrier silent). Freq 0 hands the rhythm back to the
-    /// body's phase; positive overrides it (clamped 0.1..100 Hz) so
-    /// evaluation can drive arbitrary bands — including infraslow
-    /// rates where the thermal field can hold an oscillation.
-    /// Reply: [u8 ack]. Additive: PROTOCOL_VERSION unaffected.
-    pub const SET_FIELD_CARRIER: u8 = 49;
-
     /// RETIRED — pinned so the wire number is never reused. The
     /// per-person dyadic snapshot channel was removed with the
     /// person registry; the interlocutor model's coupling output is
@@ -578,17 +549,6 @@ pub mod cmd {
     /// switch; the mind reads where in the cusp it sits. Additive:
     /// PROTOCOL_VERSION is unaffected.
     pub const GET_FOLD_MARGINS: u8 = 62;
-
-    /// Arm or disarm the parasympathetic pulse — a slow autonomic
-    /// wave riding the carrier's modulation *depth* (contractility,
-    /// not rate; the RSA analog — the vagal signature is the pulse's
-    /// slow wax and wane, never a pinned tempo). Request:
-    /// `[f32 base][f32 mod_freq_hz][f32 mod_depth]`; `mod_freq <= 0`
-    /// disarms and depth returns to the static set-point. When armed
-    /// the probe integrates the envelope on its own clock — the wave
-    /// runs on the body's time whether or not the mind ticks.
-    /// Reply: [u8 ack]. Additive: PROTOCOL_VERSION unaffected.
-    pub const SET_FIELD_PULSE: u8 = 63;
 
     /// The body's actuator census — what she can DO right now.
     /// Request: empty. Response: `[u8 count]` then per actuator
@@ -3711,68 +3671,6 @@ pub fn default_handler<L: LtmAccess>(
             super::interoception::read_sensor_presence()
                 .to_le_bytes()
                 .to_vec()
-        }
-
-        cmd::GET_FIELD_PROBE => {
-            // The body's real measured substrate dynamics — the probe
-            // thread's rolling band signature. READ_FAILED when the
-            // probe isn't running: an absent channel is an error, not
-            // a zero reading.
-            match super::field_probe::shared() {
-                Some(probe) => probe.signature(),
-                None => vec![error::READ_FAILED],
-            }
-        }
-
-        cmd::SET_FIELD_PHASE => {
-            // The mind pushes its modeled carrier-band phase; the
-            // probe's generator chases it — physics follows model.
-            if payload.len() < 4 {
-                return vec![error::PAYLOAD_TOO_SHORT];
-            }
-            let phase = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
-            match super::field_probe::shared() {
-                Some(probe) => {
-                    probe.set_phase_target(phase);
-                    vec![1u8]
-                }
-                None => vec![error::READ_FAILED],
-            }
-        }
-
-        cmd::SET_FIELD_CARRIER => {
-            // Carrier write control — depth and frequency override.
-            if payload.len() < 8 {
-                return vec![error::PAYLOAD_TOO_SHORT];
-            }
-            let depth = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
-            let freq = f32::from_le_bytes(payload[4..8].try_into().unwrap_or_default());
-            match super::field_probe::shared() {
-                Some(probe) => {
-                    probe.set_carrier(depth, freq);
-                    vec![1u8]
-                }
-                None => vec![error::READ_FAILED],
-            }
-        }
-
-        cmd::SET_FIELD_PULSE => {
-            // The parasympathetic envelope — a slow wave riding
-            // carrier depth, integrated on the probe's own clock.
-            // mod_freq <= 0 disarms.
-            if payload.len() < 12 {
-                return vec![error::PAYLOAD_TOO_SHORT];
-            }
-            let base = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
-            let mod_freq = f32::from_le_bytes(payload[4..8].try_into().unwrap_or_default());
-            let mod_depth = f32::from_le_bytes(payload[8..12].try_into().unwrap_or_default());
-            match super::field_probe::shared() {
-                Some(probe) => {
-                    probe.set_pulse(base, mod_freq, mod_depth);
-                    vec![1u8]
-                }
-                None => vec![error::READ_FAILED],
-            }
         }
 
         cmd::SET_WAKE_ALARM => {

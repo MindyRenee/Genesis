@@ -417,19 +417,6 @@ fn main() {
     let stm = Arc::new(stm);
     let mmap = Arc::new(mmap);
 
-    // Physical field probe — the body listening to its own substrate.
-    // A dedicated thread measures real substrate dynamics
-    // (instruction throughput, scheduler jitter, P-state transitions,
-    // interrupt flux, and real power draw where sensors report it)
-    // at ~250 Hz and decomposes them at the wave bands' center
-    // frequencies; the mind reads the signature over
-    // GET_FIELD_PROBE and injects it into the wave oscillator as
-    // outer stimulus. The probe also writes a carrier — its work is
-    // modulated at the substrate's dominant measured band, so the
-    // die's real current carries a component at the organism's beat
-    // (measured back through the power channel, not assumed).
-    genesis::daemon::field_probe::start();
-
     // The eye — the optic nerve's retinal end. The daemon captures
     // the camera itself (no separate process): the limb opens the
     // device on its own thread, publishes frames into the nerve

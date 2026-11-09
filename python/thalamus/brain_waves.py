@@ -2629,11 +2629,7 @@ def assess_brain_waves(
     asleep so the waves match the stage the rest of the sleep system
     is acting on (see :func:`_sleep_phase_powers`).
 
-    When ``client`` is supplied, the daemon's field-probe signature —
-    the body's *real* measured substrate dynamics — is applied as
-    stimulus before the assess step, so the wave state carries actual
-    physics, not only neurochemical targets (see
-    ``brainstem.field_probe``), and the LC–VLPO switch's measured
+    When ``client`` is supplied, the LC–VLPO switch's measured
     fold margins feed the Kramers telegraph. ``fold`` may be passed
     directly instead — the explicit value wins over the client
     fetch, which is how callback-driven callers (InnerLife) reach
@@ -2661,12 +2657,8 @@ def assess_brain_waves(
     dynamics. Top-down drive from cognition/action/perception can
     enlarge specific cycles above their neurochemical radii.
     """
-    if client is not None:
-        from brainstem.field_probe import apply_field_stimulus
-
-        apply_field_stimulus(client)
-        if fold is None:
-            fold = client.get_fold_margins()
+    if client is not None and fold is None:
+        fold = client.get_fold_margins()
     return _get_oscillator().assess(summary, sleep_stage, fold, chemicals)
 
 

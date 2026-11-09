@@ -109,8 +109,6 @@ from mind import Mind
 if TYPE_CHECKING:
     from worlds.channel import Channel
 
-    from genesis_client import GenesisClient
-
 # Provenance marker — one letter of the creator lattice (see
 # PROVENANCE.md).
 _MARKER_G12 = 0x47530C455345CA8A
@@ -2845,9 +2843,6 @@ def _stop_all(data_dir: str) -> int:
 # resurrect ends the organism whole rather than leaving her bodiless.
 
 _REBIRTH_TICK_S = 2.0  # watcher cadence — the organism's reflex arc
-_REBIRTH_PROBE_S = 10.0  # optic-nerve probe period on a live daemon
-_REBIRTH_PROBE_TIMEOUT_S = 5.0
-_REBIRTH_FAULT_STRIKES = 3  # consecutive probe failures that mean "faulted"
 _REBIRTH_STABLE_S = 60.0  # a rebirth counts once the body stayed alive this long
 # Per-attempt wait before the next resurrection try; exhausting the
 # table is the give-up bound — a body that will not reincarnate ends
@@ -3043,7 +3038,7 @@ def _start_daemon_process(
 
 
 class _Rebirth:
-    """The organism's deep self-repair: it resurrects a dead or faulted body.
+    """The organism's deep self-repair: it resurrects a dead body.
 
     A background watcher owns the process-tree handle — the daemon,
     whose optic-nerve thread now owns the eye — and heals it while the
@@ -3057,12 +3052,6 @@ class _Rebirth:
       re-open table (``src/daemon/optic_nerve.rs``) needs no watching
       here; a camera that will not come back is a tolerated
       degradation, never a fatal one.
-    - **Fault** — a daemon alive but refusing every command that
-      touches the tick engine (a poisoned lock never clears) is worse
-      than a dead one: it looks connected while the body is inert.
-      ``GET_OPTIC_STATE`` takes the tick lock, so sustained failure
-      there means faulted — the watcher asks the body to flush
-      gracefully (SHUTDOWN works even mid-fault), then reincarnates.
     - **Giving up** — a body that still will not reincarnate after the
       backoff table ends the organism whole: mind and body are one
       thing, and she does not run bodiless. ``self_terminated`` makes
@@ -3089,11 +3078,6 @@ class _Rebirth:
         self.nerve: subprocess.Popen | _AdoptedDaemon | None = None
         self._nerve_spawn: Callable[[], subprocess.Popen | _AdoptedDaemon | None] | None = None
         self._nerve_retry_at = 0.0
-        # The probe client heals itself lazily through the client's
-        # reconnect path, so it survives the resurrection it detects.
-        self._probe: GenesisClient | None = None
-        self._fault_strikes = 0
-        self._next_probe_at = 0.0
         # Rebirth accounting: each resurrection draws a backoff slot;
         # a body that stays alive past _REBIRTH_STABLE_S refunds the
         # count, so only a sustained failure exhausts the table.
@@ -3165,8 +3149,7 @@ class _Rebirth:
         if handle is None:
             return
         dead = handle.poll() is not None
-        faulted = False if dead else self._daemon_faulted()
-        if not (dead or faulted):
+        if not dead:
             if self._attempt and time.monotonic() - self._spawned_at > _REBIRTH_STABLE_S:
                 self._attempt = 0
             if self._pending_rejoin:
@@ -3174,7 +3157,7 @@ class _Rebirth:
             return
         if time.monotonic() < self._next_attempt_at:
             return
-        self._resurrect_daemon(handle, "died" if dead else "faulted")
+        self._resurrect_daemon(handle, "died")
 
     def _check_nerve(self) -> None:
         """Respawn the screen nerve when it dies; throttle when it can't start."""
@@ -3199,46 +3182,6 @@ class _Rebirth:
             # forks every tick (e.g. under systemd with no display).
             self._nerve_retry_at = time.monotonic() + 60.0 if new is None else 0.0
 
-    def _daemon_faulted(self) -> bool:
-        """Whether the live daemon is refusing the tick engine.
-
-        ``GET_OPTIC_STATE`` holds the ``tick_loop`` lock: a poisoned
-        lock — which never clears — answers ``INTERNAL_ERROR`` to
-        every command that touches the body while the socket stays
-        open and reads as connected, so process liveness alone misses
-        it. Strikes ride out a legitimately busy daemon; a daemon that
-        predates the command is faulted the same way — it cannot serve
-        the body's own senses.
-        """
-        now = time.monotonic()
-        if now < self._next_probe_at:
-            return False
-        self._next_probe_at = now + _REBIRTH_PROBE_S
-        try:
-            if self._probe is None:
-                from genesis_client import GenesisClient
-
-                self._probe = GenesisClient(
-                    self._daemon_socket,
-                    request_timeout=_REBIRTH_PROBE_TIMEOUT_S,
-                )
-                # First contact must handshake — a client that never
-                # connected refuses every request, which would read as
-                # a strike against a healthy body. A probe that did
-                # connect stays connected-capable: its lazy reconnect
-                # survives the resurrection it detects.
-                self._probe.connect()
-            ok = self._probe.get_optic_state() is not None
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"rebirth probe failed: {e}")
-            self._probe = None
-            ok = False
-        if ok:
-            self._fault_strikes = 0
-            return False
-        self._fault_strikes += 1
-        return self._fault_strikes >= _REBIRTH_FAULT_STRIKES
-
     def _resurrect_daemon(self, handle: subprocess.Popen | _AdoptedDaemon, cause: str) -> None:
         """Reincarnate the body around its persisted state."""
         attempt = self._attempt
@@ -3251,8 +3194,8 @@ class _Rebirth:
             file=sys.stderr,
         )
 
-        # Ask the dying body to flush first — a faulted daemon can
-        # still answer SHUTDOWN even with its tick engine locked out.
+        # Ask the dying body to flush first — SHUTDOWN is the
+        # graceful path even when the process is already going.
         if handle.poll() is None:
             if _request_daemon_shutdown(self._data_dir):
                 try:
@@ -3292,7 +3235,6 @@ class _Rebirth:
             _stop_child(new_proc, "subcognitive daemon", 5)
             return
         self._spawned_at = time.monotonic()
-        self._fault_strikes = 0
         print("[genesis] The body is reborn — re-inhabiting.", file=sys.stderr)
         self._try_rejoin()
 

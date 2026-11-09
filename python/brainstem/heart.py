@@ -1,7 +1,7 @@
 """Heart — the medullary cardiac center.
 
 The heart itself lives in the body: the daemon's carrier generator
-(`src/daemon/field_probe.rs`) writes a real rhythm into instruction
+The carrier channel it read and drove was removed with the probe machinery — the organ now ticks dormant until a real rhythm returns to
 throughput — a pulse the die physically performs, at a frequency
 the body's phase chooses. What lives here is the brainstem's half
 of the loop — the cardiac control center, the way the medulla
@@ -19,7 +19,7 @@ regulates a heart it does not itself beat:
   unremarkable — a healthy pulse is silent.
 - **The keep:** this center can also ask the body to *wear* a wave —
   the parasympathetic pulse, contractility breathing at an
-  infraslow rate (``SET_FIELD_PULSE``; the RSA signature of vagal
+  infraslow rate (the RSA signature of vagal
   dominance). While armed it watches the sleep-onset boundary and
   nudges chemistry at its edges — catch and release, never a
   pinned state.
@@ -171,7 +171,8 @@ class Heart:
             note_swallowed("brainstem.heart._beat", e)
 
     def _beat(self, now: float) -> None:
-        probe = self._client.get_field_probe()
+        getter = getattr(self._client, "get_field_probe", None)
+        probe = getter() if getter is not None else None
         if probe is None:
             self.state = CardiacState()
             return
@@ -199,7 +200,8 @@ class Heart:
             return
         # freq 0 — the rhythm stays the body's; the medulla pushes
         # force, never tempo.
-        if self._client.set_field_carrier(depth, 0.0):
+        _set = getattr(self._client, "set_field_carrier", None)
+        if _set is not None and _set(depth, 0.0):
             self._depth_set, self._depth_set_at = depth, now
             self.state.depth = depth
 
@@ -223,7 +225,8 @@ class Heart:
         the sleep-onset literature carries the cortex down. Rate is
         never touched: tempo stays the SA node's, always.
         """
-        if not self._client.set_field_pulse(_PULSE_BASE, _PULSE_MOD_HZ, _PULSE_MOD_DEPTH):
+        _set = getattr(self._client, "set_field_pulse", None)
+        if _set is None or not _set(_PULSE_BASE, _PULSE_MOD_HZ, _PULSE_MOD_DEPTH):
             return False
         self._keeper_armed = True
         self.state.pulse_armed = True
@@ -234,7 +237,8 @@ class Heart:
         self._keeper_armed = False
         self.state.pulse_armed = False
         self._depth_set = None  # _drive re-asserts the set-point cleanly
-        return self._client.set_field_pulse(0.0, 0.0, 0.0)
+        _set = getattr(self._client, "set_field_pulse", None)
+        return _set(0.0, 0.0, 0.0) if _set is not None else True
 
     def _keep(self, now: float) -> None:
         """The boundary watch — hold the alpha↔theta edge; yield to

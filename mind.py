@@ -543,7 +543,6 @@ class Mind(
             get_plasticity_profile=self._get_plasticity_profile,
             get_brain_waves=self.brain_waves,
             force_offline=self._offline,
-            connectivity_probe=not self._headless,
             synapses=self.brain.frontal.synapses,
             semantic_memory=self.brain.frontal.semantic_memory,
         )

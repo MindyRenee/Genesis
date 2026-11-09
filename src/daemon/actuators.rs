@@ -1,6 +1,6 @@
 //! Motor actuators — the body's output limbs.
 //!
-//! Sensing (field_probe, optic_nerve) tells the mind what the body
+//! Sensing (optic_nerve) tells the mind what the body
 //! feels; actuation is the other half of embodiment — what the body
 //! can DO. This module enumerates the real actuator surface on the
 //! current platform, the same honest rule the sensors follow: an

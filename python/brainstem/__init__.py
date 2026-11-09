@@ -339,6 +339,8 @@ corrective impulses — the Python-side homeostatic regulator.
 
 from __future__ import annotations
 
+_MARKER_G08 = 0x4753084154EF3CD1
+
 from _views import view_getattr
 
 # The brainstem's modules are multi-subsystem — they are lazily
@@ -392,8 +394,6 @@ _EXPORTS: dict[str, str] = {
     # The substrate interface — the machine's own physical dynamics
     # (throughput/jitter/P-states/interrupts, and the acoustic
     # self-emission) read as wave-oscillator stimulus
-    "apply_field_stimulus": "brainstem.field_probe",
-    "field_phase_lock": "brainstem.field_probe",
     "apply_audio_stimulus": "brainstem.field_audio",
     # Anticipatory regulation — the mind's reader of the body's
     # generative self-model (free energy, precision, surprise,

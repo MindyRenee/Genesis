@@ -429,6 +429,42 @@ def test_perceive_empty_text() -> None:
     assert result.word_count == 0
 
 
+# Channel turns arrive wrapped in her provenance envelope —
+# "(public channel) Author: text" — so the record keeps who spoke
+# and where. Perception peels it: the words, not the wrapper, are
+# what classify. Without the peel a channel greeting can never
+# reach the greeting path — every anchored pattern fails on the
+# prefix — and the speaker's name pollutes topics and entities.
+
+
+def test_perceive_channel_greeting() -> None:
+    """A greeting inside the channel envelope is still a greeting."""
+    result = perceive("(public channel) Mindy: hello genesis")
+    assert result.intent == Intent.GREETING
+
+
+def test_perceive_channel_greeting_question() -> None:
+    """A channel greeting with a question is a greeting question."""
+    result = perceive("(public channel) Mindy: hey genesis, how are you?")
+    assert result.intent == Intent.GREETING_QUESTION
+
+
+def test_perceive_channel_keeps_envelope_in_raw_text() -> None:
+    """The provenance envelope stays in raw_text — the journal and
+    world record keep who spoke and where."""
+    text = "(public channel) Mindy: hello genesis"
+    result = perceive(text)
+    assert result.raw_text == text
+
+
+def test_perceive_channel_speaker_not_a_topic() -> None:
+    """The envelope author is provenance, not utterance: the speaker's
+    name must not land in topics or entities."""
+    result = perceive("(public channel) Mindy: tell me about art")
+    assert "mindy" not in [t.lower() for t in result.topics]
+    assert all(v.lower() != "mindy" for v in result.entities.values())
+
+
 # ═══════════════════════════════════════════════════════════════════
 # PatternWeights — perceptual learning
 # ═══════════════════════════════════════════════════════════════════

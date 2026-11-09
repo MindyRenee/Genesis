@@ -668,25 +668,6 @@ def test_rebirth_respawns_a_dead_daemon_and_rejoins_the_mind(tmp_path):
     assert not rebirth.self_terminated
 
 
-def test_rebirth_flushes_a_faulted_daemon_before_respawn(tmp_path):
-    """A live-but-wedged body is asked to save first — SHUTDOWN still
-    works when the tick lock is poisoned; SIGKILL stays the last resort."""
-    rebirth = _make_rebirth(tmp_path)
-    wedged = Mock()
-    wedged.poll.return_value = None  # alive
-    newborn = Mock()
-    rebirth.set_children(daemon=wedged)
-    with (
-        patch.object(genesis_cli._Rebirth, "_daemon_faulted", return_value=True),
-        patch.object(genesis_cli, "_request_daemon_shutdown", return_value=False),
-        patch.object(genesis_cli, "_stop_child") as stop,
-        patch.object(genesis_cli, "_find_binary", return_value="/bin/d"),
-        patch.object(genesis_cli, "_start_daemon", return_value=newborn),
-    ):
-        rebirth._check_daemon()
-    stop.assert_called_once_with(wedged, "subcognitive daemon", 5)
-    assert rebirth.daemon is newborn
-
 
 def test_rebirth_gives_up_when_the_body_wont_reincarnate(tmp_path):
     """Exhausting the backoff table ends the organism whole — she does
@@ -711,8 +692,7 @@ def test_rebirth_stable_body_refunds_attempts(tmp_path):
     rebirth.set_children(daemon=live)
     rebirth._attempt = 2
     rebirth._spawned_at = time.monotonic() - genesis_cli._REBIRTH_STABLE_S - 1
-    with patch.object(genesis_cli._Rebirth, "_daemon_faulted", return_value=False):
-        rebirth._check_daemon()
+    rebirth._check_daemon()
     assert rebirth._attempt == 0
 
 
@@ -727,32 +707,10 @@ def test_rejoin_failure_retries_on_the_next_cycle(tmp_path):
     mind.rejoin_body.return_value = False
     rebirth.set_mind(mind)
     rebirth._pending_rejoin = True
-    with patch.object(genesis_cli._Rebirth, "_daemon_faulted", return_value=False):
-        rebirth._check_daemon()
+    rebirth._check_daemon()
     assert rebirth._pending_rejoin
     mind.rejoin_body.return_value = True
-    with patch.object(genesis_cli._Rebirth, "_daemon_faulted", return_value=False):
-        rebirth._check_daemon()
+    rebirth._check_daemon()
     assert not rebirth._pending_rejoin
 
 
-def test_daemon_fault_needs_sustained_probe_failure(tmp_path):
-    """One busy cycle is not a fault — three consecutive failures of
-    the tick-locking probe before the body is declared wedged."""
-    rebirth = _make_rebirth(tmp_path)
-    probe = Mock()
-    probe.get_optic_state.side_effect = ConnectionError("refused")
-    rebirth._probe = probe
-    assert not rebirth._daemon_faulted()
-    rebirth._next_probe_at = 0.0
-    assert not rebirth._daemon_faulted()
-    rebirth._next_probe_at = 0.0
-    assert rebirth._daemon_faulted()
-    # A failed probe drops its client so the next one reconnects;
-    # the recovered daemon answers the same probe object.
-    rebirth._probe = probe
-    probe.get_optic_state.side_effect = None
-    probe.get_optic_state.return_value = object()
-    rebirth._next_probe_at = 0.0
-    assert not rebirth._daemon_faulted()
-    assert rebirth._fault_strikes == 0

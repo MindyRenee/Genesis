@@ -8,7 +8,7 @@ How she uses it during an ARC game:
 1. ``field`` (optional) is the EM channel: a callable
    ``field(oscillator) -> bool`` that holds measured field levels on her
    ``thalamus.brain_waves.BrainWaveOscillator`` (e.g. a wrapper around
-   ``brainstem.field_probe``). Absent reads as absent, never as zero.
+   channel). Absent reads as absent, never as zero.
 2. Game events release chemicals: dopamine follows the TD reward
    prediction error, norepinephrine a never-seen board, GABA a move
    that changed nothing. Each relaxes to its baseline,

@@ -25,7 +25,6 @@ from genesis_client.protocol import (
     CHEM_NAMES,
     CHEM_SEROTONIN,
     DT_NOMINAL_STEP,
-    GET_FIELD_PROBE,
     GET_FOLD_MARGINS,
     GET_ION_SUMMARY,
     GET_NEURO_SUMMARY,
@@ -57,8 +56,6 @@ from genesis_client.protocol import (
     PHASE_STRESS,
     PING,
     PROTOCOL_VERSION,
-    SET_FIELD_CARRIER,
-    SET_FIELD_PHASE,
     SET_FOCUS,
     SET_OPTIC_GAIN,
     SET_WAKE_ALARM,
@@ -248,9 +245,6 @@ def test_command_ids():
     # The field probe is additive and continues past SET_VOLITION;
     # opcode 48 is retired (pinned, never reused) and the carrier
     # write control used by the ring-down experiment stays live.
-    assert GET_FIELD_PROBE == 47
-    assert SET_FIELD_PHASE == 48
-    assert SET_FIELD_CARRIER == 49
     # The optic pair is additive and continues past the field
     # commands: the optic-state read, the corticothalamic gain, and
     # the accommodation request must not collide with them.
@@ -1144,15 +1138,6 @@ def test_neuro_adjust_baseline_is_retired_opcode_23() -> None:
     assert not hasattr(protocol, "neuro_adjust_baseline")
 
 
-def test_set_field_phase_is_retired_opcode_48() -> None:
-    """The SET_FIELD_PHASE wire number is retired — modeled band phase is
-    no longer pushed into the probe's physical generator; the phase lock
-    runs physics → model only — but the constant is kept pinned at 48
-    so the number is never reused."""
-    from genesis_client import protocol
-
-    assert protocol.SET_FIELD_PHASE == 48
-    assert "SET_FIELD_PHASE" in protocol.__all__
     assert not hasattr(protocol, "set_field_phase")
 
 

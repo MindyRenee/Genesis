@@ -1612,15 +1612,10 @@ impl TickLoop {
         // topology. The core state remains authoritative; the field is the
         // shared substrate through which body, prediction, and agency can
         // disagree, converge, and later acquire learned transport laws.
-        // The bath is the substrate's own measured thermal level: the
-        // probe's RMS timing fluctuation, mapped onto the field's cap —
-        // the Langevin reservoir is real silicon noise, so a machine
-        // under physical stress literally heats her field.
+        // The bath holds at the quiescent reservoir — the measured
+        // thermal channel was removed with the field probe.
         if let Some(snapshot) = mmap.read_consistent() {
-            let bath = super::field_probe::shared()
-                .and_then(|probe| probe.bath_fluctuation())
-                .map(|fraction| fraction.clamp(0.0, 1.0) * crate::field::TEMPERATURE_CAP)
-                .unwrap_or(0.0);
+            let bath = 0.0;
             match self.field_runtime.observe(&snapshot, dt as f64, bath) {
                 Ok(integration) => self.last_field_integration = Some(integration),
                 Err(e) => eprintln!("[tick] field integration skipped: {e}"),

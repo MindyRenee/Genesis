@@ -2,10 +2,10 @@
 
 The causal chain this file closes:
 
-    EM field (field_probe) → brain waves → chemicals → body/behavior
+    brain waves → chemicals → body/behavior
 
 The probe's measured oscillations stimulate the thalamic oscillator
-(``brainstem.field_probe.apply_field_stimulus``); this module performs
+this module performs
 the next step — the oscillator's band powers drive the peptides that
 declared affinity for those bands. It is the wave half of the loop
 ``_cycle_advance_neuro`` documents ("brain waves drive

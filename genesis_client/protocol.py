@@ -69,7 +69,6 @@ __all__ = [
     "GET_BODY_CONTROL",
     "GET_BODY_STATE",
     "GET_DYADIC_STATE",
-    "GET_FIELD_PROBE",
     "GET_FOLD_MARGINS",
     "GET_INFERENCE_SUMMARY",
     "GET_INTERNALS",
@@ -151,9 +150,6 @@ __all__ = [
     "SENSOR_SUPPLY_VOLTAGE",
     "SENSOR_TEMPERATURE",
     "SET_COGNITIVE_PID",
-    "SET_FIELD_CARRIER",
-    "SET_FIELD_PHASE",
-    "SET_FIELD_PULSE",
     "SET_FOCUS",
     "SET_LID",
     "SET_OPTIC_GAIN",
@@ -311,29 +307,8 @@ SET_VOLITION = 46
 # iw station telemetry [5×f32] → 328 bytes; v6 appends the flux
 # phasors [10f rf_flux_phase][10f rf_flux_phase_coherence] →
 # 408 bytes.
-# Layout: `src/daemon/field_probe.rs`. Additive: no CoreState or
-# BodyState layout changes, so PROTOCOL_VERSION stays 3. A daemon
-# without a running probe returns a single error byte — an absent
-# channel, never a healthy zero.
-GET_FIELD_PROBE = 47
 
-# Push the mind's modeled carrier-band phase into the probe's
-# generator — the physics-follows-model leg of the mutual phase
-# lock. Request: [f32 phase_rad]. The probe extrapolates it at the
-# carrier rate and pulls its generator phase toward it each tick
-# (bounded first-order pull); a target not refreshed within 5 s is
-# dropped so a dead mind can't steer the body's rhythm. Reply:
-# [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
-SET_FIELD_PHASE = 48
 
-# Carrier write control — the modulation depth and frequency of the
-# probe's real-work carrier. Request: [f32 depth][f32 freq_hz].
-# Depth 0..1 (0 = unmodulated work); freq 0 hands the rhythm back to
-# the body's phase, positive overrides it (clamped 0.1..100 Hz) so
-# evaluation can drive arbitrary bands — including infraslow rates
-# where the thermal field can hold an oscillation.
-# Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
-SET_FIELD_CARRIER = 49
 
 # RETIRED — pinned so the wire number is never reused. The per-person
 # dyadic snapshot channel was removed with the person registry; the
@@ -447,16 +422,6 @@ DELETE_EPISODE = 61
 # moves, so PROTOCOL_VERSION is unaffected.
 GET_FOLD_MARGINS = 62
 
-# Arm or disarm the parasympathetic pulse — a slow autonomic wave
-# riding the carrier's modulation depth (contractility, not rate;
-# the RSA analog — the vagal signature is the pulse's slow wax and
-# wane, never a pinned tempo). Request:
-# [f32 base][f32 mod_freq_hz][f32 mod_depth]; mod_freq <= 0 disarms
-# and depth returns to the static set-point. When armed the probe
-# integrates the envelope on its own clock — the wave runs on the
-# body's time whether or not the mind ticks.
-# Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
-SET_FIELD_PULSE = 63
 LIST_ACTUATORS = 64
 
 # Fire one actuator by name — the efferent half of the census.
