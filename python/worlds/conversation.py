@@ -489,6 +489,17 @@ class ConversationMixin:
             addressed=bool(details.get("addressed", False)),
             metadata=details,
         )
+        manifold = getattr(self, "manifold", None)
+        if manifold is not None:
+            try:
+                manifold.observe(
+                    content,
+                    kind=kind,
+                    salience=float(details.get("salience", 0.4)),
+                    inbound=False,
+                )
+            except Exception:
+                logger.debug("manifold deposit failed", exc_info=True)
 
     def _on_world_event(self, event: ExternalEvent) -> None:
         """Route an external world event into its cognition.
@@ -524,6 +535,14 @@ class ConversationMixin:
                 addressed=event.addressed,
                 metadata=event.metadata,
             )
+            manifold = getattr(self, "manifold", None)
+            if manifold is not None:
+                manifold.observe(
+                    event.describe(),
+                    kind=f"world:{event.kind.value}",
+                    salience=event.salience,
+                    inbound=event.inbound,
+                )
         except Exception:
             logger.debug("self latent world observation failed", exc_info=True)
 

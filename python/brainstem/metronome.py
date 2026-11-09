@@ -785,6 +785,15 @@ class MetronomeMixin:
                     "mind.metronome._cycle_periodic_maintenance",
                     e,
                 )
+            manifold = getattr(self, "manifold", None)
+            if manifold is not None and manifold.dirty:
+                try:
+                    manifold.save()
+                except Exception as e:  # noqa: BLE001
+                    note_swallowed(
+                        "mind.metronome._cycle_periodic_maintenance.manifold",
+                        e,
+                    )
 
         # ── 9b. Emergent identity synthesis (experience-driven) ──
         self._cycle_identity(now)
@@ -1146,6 +1155,38 @@ class MetronomeMixin:
                 e,
             )
 
+    def _cycle_manifold(self) -> None:
+        """Advance the latent manifold — the substrate's own motion.
+
+        The medium turns whether or not anything is deposited: the
+        frame rotation is the heartbeat (every trace rides its fiber),
+        the counter-rotation is the braid between the worlds. The
+        lean — where self-presence sits on the core-to-core axis —
+        follows state: toward the inner core in sleep, toward the
+        outer world under arousal. Reads chemistry only; the manifold
+        never writes back to the body.
+        """
+        manifold = getattr(self, "manifold", None)
+        if manifold is None:
+            return
+        try:
+            arousal = 0.0
+            emotion = self.feel()
+            if emotion is not None:
+                arousal = max(0.0, min(1.0, float(getattr(emotion, "arousal", 0.0))))
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.metronome._cycle_manifold.feel", e)
+            arousal = 0.0
+        try:
+            if self._is_sleeping:
+                lean_target = 0.30
+            else:
+                lean_target = min(0.97, 0.72 + 0.3 * arousal)
+            manifold.set_lean_target(lean_target)
+            manifold.advance(self._cycle_dt, shear=0.05 * arousal)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.metronome._cycle_manifold", e)
+
     def _cycle_final_steps(self) -> None:
         """Run sleep-state sync, volition, warn, and cognition (cycle steps 10-13).
 
@@ -1427,6 +1468,9 @@ class MetronomeMixin:
 
                 # ── 5c. Continuous emotional regulation ──
                 self._cycle_emotion(now)
+
+                # ── 5d. The medium's own motion ──
+                self._cycle_manifold()
 
                 # ── 6. Consolidate (state-threshold-driven) ──
                 last_stm_count = self._cycle_consolidate(

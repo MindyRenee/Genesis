@@ -1859,6 +1859,12 @@ class LifecycleMixin:
                 curiosity=self.brain.frontal.curiosity,
                 cognitive_map=self.brain.temporal.cognitive_map,
             )
+            # The substrate's image persists beside the rest — a failed
+            # manifold save is real state loss, so it counts against the
+            # save result.
+            manifold = getattr(self, "manifold", None)
+            if manifold is not None and manifold.image_path is not None:
+                manifold.save()
             if not self.user_profile.save():
                 return False
         except Exception as e:  # noqa: BLE001

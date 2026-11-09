@@ -44,6 +44,7 @@ from frontal_lobe import FrontalLobe
 from frontal_lobe.autonomous import AutonomousLearner
 from frontal_lobe.canvas import Canvas
 from frontal_lobe.painting import Painter
+from latent_spaces import LatentManifold
 from limbic_system.limbic import LimbicSystem
 from occipital_lobe.occipital import OccipitalLobe
 from occipital_lobe.perception import FaceRecognizer
@@ -204,6 +205,18 @@ class Mind(
         # callbacks feed this same instance so transitions are measured
         # across the inner/outer boundary rather than in isolated demos.
         self.self_latent_space = SelfLatentSpaceArchitecture()
+
+        # The latent manifold — the closed, positively-curved substrate
+        # beneath the fragmented stores. It accretes the same thought and
+        # world-event stream the self-state pipeline observes, and its
+        # image persists beside the other learned artifacts. A corrupt
+        # image costs only this layer: the rest of her memory is intact
+        # and the substrate re-accretes from living.
+        self.manifold = LatentManifold(data_dir=self.data_dir)
+        try:
+            self.manifold.load()
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"manifold image failed to load; starting empty: {e}")
 
         # User profile — a structured, persistent model of the human.
         profile_path = Path(self.data_dir) / "user_profile.json"
