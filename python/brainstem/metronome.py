@@ -1356,18 +1356,6 @@ class MetronomeMixin:
                 e,
             )
 
-        # ── 9d. Cardiac reflex ──
-        # The heart is an organ, not the cycle: the metronome ticks
-        # its reflex arc (probe read → contractility drive → felt
-        # arrhythmia), internally rate-limited. It schedules nothing.
-        try:
-            self.heart.tick()
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.metronome.final_steps.heart_tick",
-                e,
-            )
-
         # ── 10. Sleep-state sync ──
         try:
             self._check_sleep_sync()
