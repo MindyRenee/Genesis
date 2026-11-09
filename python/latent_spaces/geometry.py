@@ -285,6 +285,38 @@ def tumble(
     return out
 
 
+def heat_kernel(theta: FloatArray | float, bandwidth: float, n_max: int = 64) -> FloatArray:
+    """The heat kernel on S3 — the spectral bump.
+
+    K_t(theta) = (1/2 pi^2) * sum_{n>=1} n e^{-(n^2-1) t} sin(n theta)/sin(theta)
+
+    This is the exact eigenfunction expansion of diffusion on the
+    sphere: the n-th hyperspherical-harmonic mode decays as
+    e^{-(n^2-1) t}, so high modes (episodic detail) die first and low
+    modes (semantic gist) persist. ``bandwidth`` is the diffusion time
+    t: small is a sharp, detailed trace; large is a broad, gist-like
+    one. Theta is geodesic distance(s); returns K_t(theta) values.
+    """
+    bw = np.asarray(bandwidth, dtype=np.float64)
+    if not np.isfinite(bw).all() or (bw <= 0).any():
+        raise ValueError("bandwidth must be positive and finite")
+    th = np.asarray(theta, dtype=np.float64)
+    n = np.arange(1, n_max + 1, dtype=np.float64)
+    decay = np.exp(-(n * n - 1.0) * bw[..., None])
+    sin_th = np.sin(th)
+    small = np.abs(sin_th) < 1e-9
+    safe = np.where(small, 1.0, sin_th)
+    # sin(n theta)/sin theta -> n as theta -> 0; apply the limit
+    # directly at the origin or every trace would score zero on itself.
+    modes = np.where(
+        small[..., None],
+        n[None, :],
+        np.sin(th[..., None] * n[None, :]) / safe[..., None],
+    )
+    out = (modes * (n * decay)).sum(axis=-1) / (2.0 * np.pi**2)
+    return np.asarray(out, dtype=np.float64)
+
+
 def fiber(point: FloatArray, n: int = 256) -> FloatArray:
     """Sample the Hopf fiber (1,1 orbit) through a point."""
     p = np.asarray(point, dtype=np.float64)

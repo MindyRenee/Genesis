@@ -68,6 +68,11 @@ _DOMAIN_DEPTH = {
 
 _FORMAT_VERSION = 1
 
+# Fresh deposits land sharp — high spectral modes alive, episodic
+# detail intact. Consolidation widens the bandwidth; detail diffuses
+# into gist while the trace itself is never removed.
+_DETAIL_BANDWIDTH = 0.02
+
 
 def _domain_of(kind: str) -> str:
     if kind.startswith("world:"):
@@ -93,6 +98,7 @@ class LatentManifold:
         self._strand = np.empty(0, dtype=np.int8)
         self._born_ms = np.empty(0, dtype=np.int64)
         self._reach = np.empty(0, dtype=np.float64)
+        self._bandwidth = np.empty(0, dtype=np.float64)
         # The medium phase at each deposit's birth — lets resonance
         # unwind every trace back to a common epoch, so the medium can
         # turn without carrying recall away with it.
@@ -163,6 +169,7 @@ class LatentManifold:
             self._strand = np.append(self._strand, strand)
             self._born_ms = np.append(self._born_ms, born)
             self._reach = np.append(self._reach, 1.0)
+            self._bandwidth = np.append(self._bandwidth, _DETAIL_BANDWIDTH)
             self._phase0 = np.append(self._phase0, self._phase)
             self._shear0 = np.append(self._shear0, self._shear_phase)
             self._kinds.append(kind)
@@ -208,7 +215,15 @@ class LatentManifold:
             d_shear = self._shear_phase - self._shear0
             unwound = g.rotate(self._points, -d_frame - d_shear, -d_frame + d_shear)
             d = g.geodesic_batch(unwound, cue_point)
-            score = self._reach * self._salience * np.exp(-((d / radius) ** 2))
+            # Spectral score: each trace answers by its heat-kernel
+            # field, normalized to its own peak. Sharp traces recall
+            # precisely; consolidated (broad) traces catch looser cues.
+            peak = g.heat_kernel(0.0, self._bandwidth)
+            score = (
+                self._reach
+                * self._salience
+                * (g.heat_kernel(d, self._bandwidth) / np.maximum(peak, 1e-300))
+            )
             order = np.argsort(score)[::-1][:k]
             return [
                 (int(i), self._kinds[i], float(score[i]), float(d[i]))
@@ -219,6 +234,20 @@ class LatentManifold:
     # ------------------------------------------------------------------
     # Dynamics — the medium's own motion
     # ------------------------------------------------------------------
+
+    def consolidate(self, growth: float = 1.5) -> None:
+        """Widen every trace's bandwidth — episodic detail diffuses to gist.
+
+        The spectral mechanism of consolidation: the heat-kernel bump
+        spreads, its high modes decaying faster than the low ones. The
+        memory is never removed — a broadened trace answers looser cues
+        and answers its exact source less sharply.
+        """
+        if not np.isfinite(growth) or growth <= 1.0:
+            raise ValueError("growth must exceed 1.0")
+        with self._lock:
+            self._bandwidth *= growth
+            self._dirty = True
 
     def set_lean_target(self, target: float) -> None:
         """Aim self-presence at a depth on the core-to-core axis."""
@@ -329,6 +358,7 @@ class LatentManifold:
                 strand=self._strand,
                 born_ms=self._born_ms,
                 reach=self._reach,
+                bandwidth=self._bandwidth,
                 phase0=self._phase0,
                 shear0=self._shear0,
                 kinds=str_array(self._kinds),
@@ -365,6 +395,7 @@ class LatentManifold:
             or len(data["strand"]) != n
             or len(data["born_ms"]) != n
             or len(data["reach"]) != n
+            or len(data["bandwidth"]) != n
             or len(data["phase0"]) != n
             or len(data["shear0"]) != n
         ):
@@ -381,6 +412,7 @@ class LatentManifold:
             self._strand = np.asarray(data["strand"], dtype=np.int8)
             self._born_ms = np.asarray(data["born_ms"], dtype=np.int64)
             self._reach = np.asarray(data["reach"], dtype=np.float64)
+            self._bandwidth = np.asarray(data["bandwidth"], dtype=np.float64)
             self._phase0 = np.asarray(data["phase0"], dtype=np.float64)
             self._shear0 = np.asarray(data["shear0"], dtype=np.float64)
             self._kinds = kinds
