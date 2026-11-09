@@ -564,11 +564,27 @@ class MetronomeMixin:
                 getattr(self.client.get_state(), "consolidation_weight", 0.5)
             )
             weight = max(0.0, min(1.0, weight))
-            # Replay first — the day's episodes re-fire along their
-            # fibers, which is what drives both the reach they keep
-            # and the consolidation depth they migrate toward.
+            # Replay rides the ripples: each SWR re-fires one sequence,
+            # newest exchanges first — the same trigger the
+            # hippocampal replay system uses (Wilson & McNaughton
+            # 1994). With no ripple machinery the day's window is the
+            # fallback. Replayed rungs then take the consolidation
+            # pass ahead of everything else.
+            inner_life = getattr(self, "inner_life", None)
+            swr_attr = getattr(inner_life, "swr_count", None)
+            if swr_attr is None:
+                # "The day" is a watermark, not a constant: everything
+                # since the last replay pass is the day she lived.
+                since = getattr(self, "_manifold_replay_watermark", 0)
+                rungs = manifold.rungs_since(since)
+                self._manifold_replay_watermark = int(time.time() * 1000)
+            else:
+                total = int(swr_attr() if callable(swr_attr) else swr_attr)
+                bursts = max(0, total - getattr(self, "_manifold_last_swr", 0))
+                self._manifold_last_swr = total
+                rungs = manifold.latest_rungs(min(bursts, 50)) if bursts else []
             manifold.replay(
-                manifold.recent_rungs(max_age_ms=_N3_REPLAY_WINDOW_MS),
+                rungs,
                 reach_boost=_N3_REACH_BOOST * weight,
                 growth=_N3_REPLAY_GROWTH,
                 migrate=_N3_MIGRATE * weight,

@@ -72,7 +72,7 @@ _DOMAIN_DEPTH = {
     "outer": (0.72, 0.98),
 }
 
-_FORMAT_VERSION = 2
+_FORMAT_VERSION = 3
 
 # Fresh deposits land sharp — high spectral modes alive, episodic
 # detail intact. Consolidation widens the bandwidth; detail diffuses
@@ -90,9 +90,42 @@ _GIST_BANDWIDTH = 0.5
 # reach climbs asymptotically back toward 1. A trace whose reach
 # decays below the score floor goes silent — unreachable, never
 # removed.
+# Everything below is metaplastic: these are initial conditions and
+# rates-of-change, not setpoints. The medium tunes its own
+# selectivity threshold, forgetting gain, per-trace plasticity,
+# replay fidelity, and gist ceiling from its own activity — BCM
+# sliding threshold (Bienenstock-Cooper-Munro), synaptic homeostasis
+# (Turrigiano), and LTP priming. Nothing is frozen; the substrate
+# adapts its parameters the way cortex adapts its own plasticity.
 _REACH_DECAY = 1.0 / 86400.0
 _REACH_BOOST = 0.3
 _SCORE_FLOOR = 1e-3
+
+# Amygdala modulation of forgetting (McGaugh): salient/emotional
+# traces resist decay — salience discounts the decay constant by up
+# to _EMOTIONAL_DURABILITY at salience 1.
+_EMOTIONAL_DURABILITY = 0.5
+# Sequential replay fidelity: a rung's legs reactivate in deposit
+# order with weight tapering geometrically down the sequence —
+# forward replay, which dominates reverse ~2:1 (Diba & Buzsaki 2007).
+# The taper is plastic: replay_fidelity in [0,1] sets rho = 0.5+0.5f.
+_REPLAY_FIDELITY_RATE = 0.001
+# Per-trace plasticity: each reactivation potentiates the next
+# (LTP priming). _PLASTICITY_MAX bounds the multiplier.
+_PLASTICITY_MAX = 2.0
+_POTENTIATION_RATE = 0.05
+# Homeostatic forgetting: the gain adapts so the reachable field
+# hovers near _REACH_LOAD_TARGET — crowded medium forgets faster.
+_REACH_LOAD_TARGET = 0.5
+_HOMEOSTASIS_RATE = 1e-4
+_FORGET_MIN, _FORGET_MAX = 0.2, 5.0
+# Adaptive selectivity: the cue floor slides with the EMA of hit
+# scores (BCM threshold) — strong recall raises the bar.
+_FLOOR_ADAPT = 0.3
+# Adaptive gist ceiling: broadens as the deposit field grows —
+# more knowledge needs more semantic bandwidth before interference.
+_GIST_ADAPT = 0.01
+_GIST_MIN, _GIST_MAX = 0.3, 2.0
 
 
 def _domain_of(kind: str) -> str:
@@ -132,6 +165,10 @@ class LatentManifold:
         self._rung = np.empty(0, dtype=np.int64)
         self._open_rung = -1
         self._next_rung = 0
+        # Per-trace plasticity: how strongly a trace potentiates on
+        # reactivation. Starts at 1 and grows with use — a trace that
+        # keeps answering gets better at answering (LTP priming).
+        self._plasticity = np.empty(0, dtype=np.float64)
         # The medium's own state.
         self._phase = 0.0
         self._shear_phase = 0.0
@@ -139,6 +176,11 @@ class LatentManifold:
         self._lean_target = g.VESICA_DEPTH
         self._ticks = 0
         self._dirty = False
+        # Metaplastic state — the substrate tunes itself.
+        self._floor_ema = 1.0  # BCM sliding selectivity threshold
+        self._forget_gain = 1.0  # homeostatic forgetting gain
+        self._replay_fidelity = 0.5  # sequence fidelity, grows with use
+        self._gist_bw = _GIST_BANDWIDTH  # adaptive gist ceiling
 
     # ------------------------------------------------------------------
     # Deposit — experiences laid down as points on fibers
@@ -233,6 +275,7 @@ class LatentManifold:
             self._phase0 = np.append(self._phase0, self._phase)
             self._shear0 = np.append(self._shear0, self._shear_phase)
             self._rung = np.append(self._rung, rid)
+            self._plasticity = np.append(self._plasticity, 1.0)
             self._kinds.append(kind)
             self._dirty = True
             return idx
@@ -293,16 +336,27 @@ class LatentManifold:
                 * (g.heat_kernel(d, self._bandwidth) / np.maximum(peak, 1e-300))
             )
             order = np.argsort(score)[::-1][:k]
+            floor = _SCORE_FLOOR * self._floor_ema
             hits = [
                 (int(i), self._kinds[i], float(score[i]), float(d[i]))
                 for i in order
-                if score[i] > _SCORE_FLOOR
+                if score[i] > floor
             ]
             # Retrieval is reconsolidation: the traces that answered
-            # climb asymptotically back toward full reach.
+            # climb asymptotically back toward full reach, faster the
+            # more they have been reactivated (plasticity potentiates).
             if hits:
                 idx = np.array([i for i, _, _, _ in hits])
-                self._reach[idx] += _REACH_BOOST * (1.0 - self._reach[idx])
+                self._reach[idx] += (
+                    _REACH_BOOST * self._plasticity[idx] * (1.0 - self._reach[idx])
+                )
+                self._plasticity[idx] += _POTENTIATION_RATE * (
+                    _PLASTICITY_MAX - self._plasticity[idx]
+                )
+                # BCM sliding threshold: the cue floor tracks the EMA
+                # of what answered — strong recall raises selectivity.
+                mean_hit = float(np.mean([h[2] for h in hits]))
+                self._floor_ema += _FLOOR_ADAPT * (mean_hit - self._floor_ema)
                 self._dirty = True
             return hits
 
@@ -461,6 +515,32 @@ class LatentManifold:
                 rows = rows[-limit:]
             return sorted(int(r) for r in np.unique(self._rung[rows]) if r >= 0)
 
+    def rungs_since(self, born_ms: int) -> list[int]:
+        """Rungs touched by deposits newer than the watermark."""
+        with self._lock:
+            rows = self._born_ms > born_ms
+            return sorted(int(r) for r in np.unique(self._rung[rows]) if r >= 0)
+
+    def latest_rungs(self, n: int) -> list[int]:
+        """The n most recently touched rungs, newest first.
+
+        The SWR replay queue works recency-first: each ripple replays
+        one sequence, and the freshest exchanges go first.
+        """
+        if n <= 0:
+            raise ValueError("n must be positive")
+        with self._lock:
+            seen: list[int] = []
+            have: set[int] = set()
+            for r in self._rung[::-1]:
+                ri = int(r)
+                if ri >= 0 and ri not in have:
+                    have.add(ri)
+                    seen.append(ri)
+                    if len(seen) >= n:
+                        break
+            return seen
+
     def replay(
         self,
         rungs: list[int],
@@ -471,9 +551,12 @@ class LatentManifold:
     ) -> None:
         """Re-fire episodes — the N3 replay pass over recent rungs.
 
-        Reactivation, not re-encoding: the same engrams answer again —
-        reach climbs back toward 1, and replayed traces consolidate a
-        step deeper (bandwidth widens a touch, slides inward a touch).
+        Reactivation, not re-encoding: the same engrams answer again.
+        Each rung's legs re-fire in deposit order — forward replay,
+        the dominant direction — with the reactivation weight
+        tapering geometrically down the sequence (fidelity degrades
+        with position). Replayed traces also consolidate a step
+        deeper: bandwidth widens a touch, slides inward a touch.
         Nothing new is deposited; the arc is walked again.
         """
         if not np.isfinite(reach_boost) or not 0.0 <= reach_boost <= 1.0:
@@ -485,16 +568,36 @@ class LatentManifold:
         with self._lock:
             if len(self._kinds) == 0 or not rungs:
                 return
+            # Sequential reactivation: legs fire in order, each weaker
+            # than the last — w_i = boost * plasticity_i * rho^i where
+            # rho is the practiced fidelity (improves with use).
+            taper = 0.5 + 0.5 * self._replay_fidelity
+            fired = 0
+            for rung in rungs:
+                legs = np.flatnonzero(self._rung == rung)
+                if len(legs):
+                    w = (
+                        reach_boost
+                        * self._plasticity[legs]
+                        * taper ** np.arange(len(legs))
+                    )
+                    self._reach[legs] += w * (1.0 - self._reach[legs])
+                    self._plasticity[legs] += _POTENTIATION_RATE * (
+                        _PLASTICITY_MAX - self._plasticity[legs]
+                    )
+                    fired += len(legs)
             mask = np.isin(self._rung, np.asarray(rungs, dtype=np.int64))
             if not mask.any():
                 return
-            self._reach[mask] += reach_boost * (1.0 - self._reach[mask])
+            self._replay_fidelity = min(
+                1.0, self._replay_fidelity + _REPLAY_FIDELITY_RATE * fired
+            )
             if growth > 1.0:
                 self._bandwidth[mask] = np.minimum(
-                    self._bandwidth[mask] * growth, _GIST_BANDWIDTH
+                    self._bandwidth[mask] * growth, self._gist_bw
                 )
             if migrate > 0.0:
-                gisted = np.clip(self._bandwidth / _GIST_BANDWIDTH, 0.0, 1.0)
+                gisted = np.clip(self._bandwidth / self._gist_bw, 0.0, 1.0)
                 self._points[mask] = g.migrate_depth(
                     self._points[mask], migrate * gisted[mask]
                 )
@@ -526,15 +629,23 @@ class LatentManifold:
         if not np.isfinite(migrate) or migrate < 0.0:
             raise ValueError("migrate must be >= 0")
         with self._lock:
+            # The gist ceiling adapts to capacity: a fuller medium
+            # needs broader gist before traces interfere. It drifts
+            # slowly toward the density target, bounded both ways.
+            n = len(self._kinds)
+            target = _GIST_BANDWIDTH * (1.0 + np.log1p(n / 500.0))
+            self._gist_bw = float(
+                np.clip(
+                    self._gist_bw + _GIST_ADAPT * (target - self._gist_bw),
+                    _GIST_MIN,
+                    _GIST_MAX,
+                )
+            )
             if migrate > 0.0 and len(self._points):
-                gisted = np.clip(
-                    self._bandwidth / _GIST_BANDWIDTH, 0.0, 1.0
-                )
-                self._points = g.migrate_depth(
-                    self._points, migrate * gisted
-                )
+                gisted = np.clip(self._bandwidth / self._gist_bw, 0.0, 1.0)
+                self._points = g.migrate_depth(self._points, migrate * gisted)
             self._bandwidth = np.minimum(
-                self._bandwidth * growth, _GIST_BANDWIDTH
+                self._bandwidth * growth, self._gist_bw
             )
             self._dirty = True
 
@@ -575,11 +686,29 @@ class LatentManifold:
             self._lean += (self._lean_target - self._lean) * step
             # Silence decays reach — a trace nobody reactivates fades
             # below the cue floor into a silent engram. Detail decays
-            # fastest; consolidated gist persists.
+            # fastest; consolidated gist persists; salient traces
+            # resist (amygdala modulation of the forgetting curve).
+            # The gain itself is homeostatic: it drifts to hold the
+            # reachable field near the load target — a crowded medium
+            # forgets faster, a sparse one holds on (Turrigiano).
             if len(self._reach):
-                self._reach *= np.exp(
-                    -dt * _REACH_DECAY * _DETAIL_BANDWIDTH / self._bandwidth
+                load = float(self._reach.mean())
+                self._forget_gain = float(
+                    np.clip(
+                        self._forget_gain
+                        + _HOMEOSTASIS_RATE * dt * (load - _REACH_LOAD_TARGET),
+                        _FORGET_MIN,
+                        _FORGET_MAX,
+                    )
                 )
+                rate = (
+                    _REACH_DECAY
+                    * self._forget_gain
+                    * _DETAIL_BANDWIDTH
+                    / self._bandwidth
+                    * (1.0 - _EMOTIONAL_DURABILITY * self._salience)
+                )
+                self._reach *= np.exp(-dt * rate)
             self._ticks += 1
             self._dirty = True
 
@@ -660,6 +789,7 @@ class LatentManifold:
                 phase0=self._phase0,
                 shear0=self._shear0,
                 rung=self._rung,
+                plasticity=self._plasticity,
                 kinds=str_array(self._kinds),
                 scalars=np.array(
                     [
@@ -669,6 +799,10 @@ class LatentManifold:
                         float(self._ticks),
                         self._shear_phase,
                         float(self._next_rung),
+                        self._floor_ema,
+                        self._forget_gain,
+                        self._replay_fidelity,
+                        self._gist_bw,
                     ],
                     dtype=np.float64,
                 ),
@@ -682,7 +816,7 @@ class LatentManifold:
             return False
         data = load_npz(path)
         version = int(data["version"])
-        if version not in (1, _FORMAT_VERSION):
+        if version not in (1, 2, _FORMAT_VERSION):
             raise ValueError(f"unsupported manifold image version {version}")
         points = np.asarray(data["points"], dtype=np.float64)
         n = points.shape[0]
@@ -698,16 +832,18 @@ class LatentManifold:
             or len(data["bandwidth"]) != n
             or len(data["phase0"]) != n
             or len(data["shear0"]) != n
-            or (version == 2 and len(data["rung"]) != n)
+            or (version >= 2 and len(data["rung"]) != n)
+            or (version == 3 and len(data["plasticity"]) != n)
         ):
             raise ValueError("corrupt manifold image: shape mismatch")
         norms = np.linalg.norm(points, axis=1)
         if n and not np.allclose(norms, 1.0, atol=1e-6):
             raise ValueError("corrupt manifold image: point off S3")
         scalars = np.asarray(data["scalars"], dtype=np.float64)
-        # v1 images predate rungs: 5 scalars, no rung column — deposits
-        # load unpaired (-1) and the rung counter restarts.
-        if scalars.shape != (5 if version == 1 else 6,) or not np.isfinite(
+        # v1 images predate rungs (5 scalars); v2 predates plasticity
+        # (6 scalars, no plasticity column). Both load with metaplastic
+        # defaults — the substrate retunes itself from here anyway.
+        if scalars.shape != ({1: 5, 2: 6, 3: 10}[version],) or not np.isfinite(
             scalars
         ).all():
             raise ValueError("corrupt manifold image: bad scalars")
@@ -722,10 +858,23 @@ class LatentManifold:
             self._shear0 = np.asarray(data["shear0"], dtype=np.float64)
             self._rung = (
                 np.asarray(data["rung"], dtype=np.int64)
-                if version == 2
+                if version >= 2
                 else np.full(n, -1, dtype=np.int64)
             )
-            self._next_rung = int(scalars[5]) if version == 2 else 0
+            self._plasticity = (
+                np.asarray(data["plasticity"], dtype=np.float64)
+                if version == 3
+                else np.ones(n, dtype=np.float64)
+            )
+            self._next_rung = int(scalars[5]) if version >= 2 else 0
+            self._floor_ema = float(scalars[6]) if version == 3 else 1.0
+            self._forget_gain = float(scalars[7]) if version == 3 else 1.0
+            self._replay_fidelity = float(scalars[8]) if version == 3 else 0.5
+            self._gist_bw = (
+                float(np.clip(scalars[9], _GIST_MIN, _GIST_MAX))
+                if version == 3
+                else _GIST_BANDWIDTH
+            )
             self._open_rung = -1
             self._kinds = kinds
             self._phase = float(scalars[0]) % g.TWO_PI

@@ -659,7 +659,7 @@ class TestDepthMigration:
 
 class TestConsolidation:
     def test_bandwidth_widens_and_saturates(self):
-        from latent_spaces.manifold import _DETAIL_BANDWIDTH, _GIST_BANDWIDTH
+        from latent_spaces.manifold import _DETAIL_BANDWIDTH
 
         m = LatentManifold()
         m.observe("a memory", kind="world:percept")
@@ -668,8 +668,8 @@ class TestConsolidation:
         for _ in range(50):
             m.consolidate(growth=1.2)
         with m._lock:
-            # saturates at the gist floor — never flattens away
-            assert m._bandwidth[0] == _GIST_BANDWIDTH
+            # saturates at the adaptive gist floor — never flattens away
+            assert m._bandwidth[0] == pytest.approx(m._gist_bw)
 
     def test_migrate_slides_consolidated_traces_inward(self):
         m = LatentManifold()
@@ -776,8 +776,10 @@ class TestReach:
         m.advance(3600.0)  # an hour of silence
         with m._lock:
             assert m._reach[0] < 1.0
+            # rate = salience discount (0.8) * the homeostatic gain,
+            # which rose toward the load target before decay applied
             assert m._reach[0] == pytest.approx(
-                np.exp(-3600.0 / 86400.0), rel=1e-3
+                np.exp(-3600.0 * m._forget_gain * 0.8 / 86400.0), rel=1e-3
             )
 
     def test_gist_decays_slower_than_detail(self):
@@ -790,20 +792,20 @@ class TestReach:
             m._bandwidth[1] = _GIST_BANDWIDTH
         m.advance(86400.0)
         with m._lock:
-            fresh_decay = 1.0 - m._reach[0]
-            gist_decay = 1.0 - m._reach[1]
-        assert gist_decay < fresh_decay / 10
-        # rate scales with detail/bandwidth: gist (25x) lasts ~25x longer
-        assert m._reach[0] == pytest.approx(np.exp(-1.0), rel=0.05)
+            # gist outlasts fresh — the rate ratio is ~detail/gist
+            assert m._reach[1] > m._reach[0]
+            gain = m._forget_gain
+        # rate = forget_gain * salience discount * detail/bandwidth
+        assert m._reach[0] == pytest.approx(np.exp(-gain * 0.8), rel=0.05)
         assert m._reach[1] == pytest.approx(
-            np.exp(-_DETAIL_BANDWIDTH / _GIST_BANDWIDTH), rel=0.05
+            np.exp(-gain * 0.8 * _DETAIL_BANDWIDTH / _GIST_BANDWIDTH), rel=0.05
         )
 
     def test_decayed_trace_goes_silent(self):
         m = LatentManifold()
         m.observe("quiet", kind="thought", salience=0.2)
-        for _ in range(200):
-            m.advance(3600.0)  # ~a month of silence
+        for _ in range(1000):
+            m.advance(3600.0)  # ~6 weeks of silence
         hits = m.resonate("quiet", kind="thought")
         assert hits == [] or hits[0][0] != 0
         with m._lock:
@@ -875,6 +877,155 @@ class TestReplay:
             m.replay([0])
         hits = m.resonate("the day", kind="world:percept")
         assert hits and hits[0][0] == 0
+
+    def test_replay_is_sequential_forward_order(self):
+        """Legs re-fire in order — earlier legs take the bigger boost."""
+        m = LatentManifold()
+        m.observe("in", kind="world:user_speech", inbound=True)
+        m.observe("thought", kind="thought:internal", inbound=False)
+        m.observe("out", kind="world:utterance", inbound=False)
+        m.advance(3600.0)
+        with m._lock:
+            faded = m._reach.copy()
+        m.replay([0], reach_boost=0.4)
+        with m._lock:
+            gains = m._reach - faded
+        # forward taper: leg i gets boost*rho^i — strictly decreasing
+        assert gains[0] > gains[1] > gains[2] > 0.0
+
+    def test_salience_resists_decay(self):
+        """Amygdala modulation: salient traces forget slower."""
+        m = LatentManifold()
+        m.observe("forgettable", kind="thought", salience=0.1)
+        m.observe("seared in", kind="thought", salience=0.9)
+        m.advance(86400.0)
+        with m._lock:
+            assert m._reach[1] > m._reach[0]
+            # rate = forget_gain * (1 - 0.5*salience): high = 0.55
+            assert m._reach[1] == pytest.approx(
+                np.exp(-m._forget_gain * 0.55), rel=0.02
+            )
+
+    def test_latest_rungs_newest_first(self):
+        m = LatentManifold()
+        for i in range(4):
+            m.observe(f"percept {i}", kind="world:percept", inbound=True)
+        assert m.latest_rungs(2) == [3, 2]
+        assert m.latest_rungs(10) == [3, 2, 1, 0]
+
+    def test_n3_replay_rides_swrs(self):
+        """Replay fires per new ripple — one sequence each, newest first."""
+        from types import SimpleNamespace
+
+        from brainstem.metronome import MetronomeMixin
+        from thalamus.brain_waves import SleepStage
+
+        manifold = LatentManifold()
+        for i in range(3):
+            manifold.observe(f"day event {i}", kind="world:percept", inbound=True)
+        manifold.advance(3600.0)
+        with manifold._lock:
+            faded = manifold._reach.copy()
+        swr_box = {"count": 2}
+        holder = SimpleNamespace(
+            manifold=manifold,
+            inner_life=SimpleNamespace(
+                sleep_cycle=SimpleNamespace(current_stage=SleepStage.N3),
+                swr_count=swr_box["count"],
+            ),
+            client=SimpleNamespace(
+                get_state=lambda: SimpleNamespace(consolidation_weight=0.8)
+            ),
+        )
+        MetronomeMixin._manifold_n3_consolidate(holder)
+        with manifold._lock:
+            # two ripples -> the two newest rungs replayed, oldest left cold
+            assert manifold._reach[2] > faded[2]
+            assert manifold._reach[1] > faded[1]
+            assert manifold._reach[0] == faded[0]
+            after_first = manifold._reach.copy()
+        # no new ripples -> no replay
+        MetronomeMixin._manifold_n3_consolidate(holder)
+        with manifold._lock:
+            assert np.allclose(manifold._reach, after_first)
+
+    def test_rungs_since_watermark(self):
+        import time as _t
+
+        m = LatentManifold()
+        now = int(_t.time() * 1000)
+        m.observe("old", kind="world:percept", inbound=True, now_ms=now - 5000)
+        m.observe("new", kind="world:percept", inbound=True)
+        assert m.rungs_since(now - 1000) == [1]
+        assert m.rungs_since(0) == [0, 1]
+
+
+class TestMetaplasticity:
+    """Nothing is frozen — the medium tunes its own parameters."""
+
+    def test_recall_potentiates_the_trace(self):
+        """LTP priming: each reactivation strengthens the next."""
+        m = LatentManifold()
+        m.observe("the question", kind="world:percept")
+        m.advance(7200.0)
+        with m._lock:
+            p0 = m._plasticity[0]
+        m.resonate("the question", kind="world:percept")
+        with m._lock:
+            assert m._plasticity[0] > p0
+            assert m._plasticity[0] <= 2.0
+
+    def test_floor_slides_with_recall(self):
+        """BCM threshold: strong hits raise selectivity."""
+        m = LatentManifold()
+        m.observe("strong trace", kind="thought", salience=0.6)
+        m.resonate("strong trace", kind="thought")
+        assert m._floor_ema != 1.0
+        # mean hit ~0.9 -> ema drifts toward it
+        for _ in range(10):
+            m.resonate("strong trace", kind="thought")
+        assert 0.5 < m._floor_ema <= 1.0
+
+    def test_forget_gain_is_homeostatic(self):
+        """Crowded field -> forgetting accelerates; never past bounds."""
+        m = LatentManifold()
+        for i in range(10):
+            m.observe(f"t{i}", kind="thought")
+        with m._lock:
+            g0 = m._forget_gain  # load = 1.0 > target 0.5
+        m.advance(100.0)
+        assert m._forget_gain > g0
+        for _ in range(50):
+            m.advance(100.0)
+        assert m._forget_gain <= 5.0
+
+    def test_replay_fidelity_improves_with_use(self):
+        m = LatentManifold()
+        m.observe("in", kind="world:user_speech", inbound=True)
+        m.observe("out", kind="world:utterance", inbound=False)
+        f0 = m._replay_fidelity
+        for _ in range(5):
+            m.replay([0])
+        assert m._replay_fidelity > f0
+
+    def test_gist_ceiling_adapts_to_capacity(self):
+        m = LatentManifold()
+        for i in range(1200):
+            m.observe(f"t{i}", kind="thought")
+        m.consolidate(growth=1.01)
+        assert m._gist_bw > 0.5
+
+    def test_metaplastic_state_persists(self, tmp_path):
+        m = LatentManifold(data_dir=tmp_path)
+        m.observe("x", kind="thought", salience=1.0)
+        m.resonate("x", kind="thought")
+        m.replay([0])
+        m.save()
+        m2 = LatentManifold(data_dir=tmp_path)
+        assert m2.load()
+        assert m2._plasticity[0] == pytest.approx(m._plasticity[0])
+        assert m2._floor_ema == pytest.approx(m._floor_ema)
+        assert m2._replay_fidelity == pytest.approx(m._replay_fidelity)
 
     def test_n3_replays_before_consolidating(self):
         from types import SimpleNamespace
