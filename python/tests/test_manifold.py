@@ -221,6 +221,37 @@ class TestDynamics:
         base_after = g.hopf_base(g.rotate(pts, 0.7, 0.0))
         assert np.max(np.abs(base_after - base_before)) > 0.1
 
+    def test_vertical_phase_is_isometry(self):
+        """Spinning one plane alone — the vertical-axis motion."""
+        pts = _rand_s3(64)
+        moved = g.rotate(pts, 0.9, 0.0)
+        assert abs(g.geodesic(moved[0], moved[1]) - g.geodesic(pts[0], pts[1])) < 1e-12
+
+    def test_tumble_is_isometry(self):
+        pts = _rand_s3(64)
+        moved = g.tumble(pts, 0.6, (0, 2))
+        assert abs(g.geodesic(moved[0], moved[1]) - g.geodesic(pts[0], pts[1])) < 1e-12
+
+    def test_tumble_migrates_across_the_membrane(self):
+        inner = np.array([0.3, 0.1, 0.9, 0.3])
+        inner /= np.linalg.norm(inner)
+        assert g.depth(inner) < g.CLIFFORD_DEPTH
+        mid = g.tumble(inner, np.pi / 2, (0, 2))
+        assert g.depth(mid) > g.CLIFFORD_DEPTH
+        back = g.tumble(inner, np.pi, (0, 2))
+        assert abs(g.depth(back) - g.depth(inner)) < 1e-12
+
+    def test_vesica_invariant_under_counter_tumble(self):
+        """The lens stays exact while the worlds tumble against each other."""
+        r = g.VESICA_DEPTH
+        p = np.array([r, 0.0, math.sqrt(1 - r * r), 0.0])
+        c1 = g.fiber(p)
+        c2 = g.anti_fiber(p)
+        for a in (0.0, 0.4, 0.8, 1.2):
+            ce1, r1, _ = g.fit_circle(g.stereo(g.tumble(c1, a, (0, 2))))
+            ce2, _r2, _ = g.fit_circle(g.stereo(g.tumble(c2, -a, (0, 2))))
+            assert abs(np.linalg.norm(ce1 - ce2) / r1 - 1.0) < 0.02
+
 
 class TestSubstrate:
     def test_deposit_and_resonate(self):

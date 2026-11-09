@@ -152,6 +152,34 @@ def counter_rotate(points: FloatArray, d_phase: float) -> FloatArray:
     return rotate(points, d_phase, -d_phase)
 
 
+def tumble(
+    points: FloatArray,
+    angle: float | FloatArray,
+    plane: tuple[int, int] = (0, 2),
+) -> FloatArray:
+    """Rotation in a mixed coordinate plane — the horizontal-axis motion.
+
+    Unlike ``rotate`` (which stays inside the z1/z2 planes and conserves
+    torus depth), a tumble mixes the planes: it carries points between
+    depths — across the Clifford membrane between the worlds. Still an
+    exact isometry: all pairwise distances are preserved.
+
+    The four mixed planes (0,2), (0,3), (1,2), (1,3) are the tumble
+    directions; with ``rotate``'s two fiber-plane phases they complete
+    the six generators of the rotation group of S3.
+    """
+    points = np.asarray(points, dtype=np.float64)
+    i, j = plane
+    a = np.asarray(angle, dtype=np.float64)
+    c, s = np.cos(a), np.sin(a)
+    out = points.copy()
+    xi = points[..., i]
+    xj = points[..., j]
+    out[..., i] = c * xi - s * xj
+    out[..., j] = s * xi + c * xj
+    return out
+
+
 def fiber(point: FloatArray, n: int = 256) -> FloatArray:
     """Sample the Hopf fiber (1,1 orbit) through a point."""
     p = np.asarray(point, dtype=np.float64)
