@@ -109,6 +109,9 @@ _TOOL_SCOPES: dict[str, frozenset[str]] = {
     "concept_lookup": frozenset({"any"}),
     "sense_cpu": frozenset({"any"}),
     "set_cpu_effort": frozenset({"any"}),
+    "list_actuators": frozenset({"any"}),
+    "actuate": frozenset({"any"}),
+    "delete_archived_project": frozenset({"any"}),
     "read_file": frozenset({"host", "repo", "data", "scratch", "config"}),
     "list_dir": frozenset({"host", "repo", "data", "scratch", "config"}),
     "analyze_python": frozenset({"host", "repo"}),
@@ -116,6 +119,7 @@ _TOOL_SCOPES: dict[str, frozenset[str]] = {
     "run_pytest": frozenset({"host", "repo"}),
     "web_search": frozenset({"net"}),
     "web_fetch": frozenset({"net"}),
+    "search_and_fetch": frozenset({"net"}),
     "write_file": frozenset({"host", "scratch"}),
     "make_dir": frozenset({"host", "scratch"}),
     "run_shell": frozenset({"host", "scratch"}),
@@ -160,6 +164,9 @@ _OBSERVE_CONFIG = "configdir"
 # The daemon-internals probe — GET_INTERNALS over IPC: the body's
 # process-local gears (adaptive gates, lease, tick) that no file shows.
 _OBSERVE_INTERNALS = "internals"
+# The actuator-census probe — LIST_ACTUATORS: which limbs the body
+# says she has right now, and which are absent and why.
+_OBSERVE_ACTUATORS = "actuators"
 
 
 @dataclass(slots=True)
@@ -276,6 +283,7 @@ class ActingLoop:
         config_dir: str | None = None,
         get_internals: Callable[[], dict[str, str] | None] | None = None,
         get_thermally_capped: Callable[[], bool] | None = None,
+        get_motor_target: Callable[[], object] | None = None,
     ) -> None:
         self.network = network
         self.curiosity = curiosity
@@ -306,6 +314,7 @@ class ActingLoop:
                 config_dir = str(_config_dir())
         self._config_root = config_dir
         self.get_internals = get_internals
+        self.get_motor_target = get_motor_target
         # The body's thermal-cap flag, read through whatever the host
         # mind exposes — the ActingLoop itself is detached from the
         # self-model, so the source is a callback like the rest.
@@ -503,6 +512,10 @@ class ActingLoop:
                 _OBSERVE, _OBSERVE_INTERNALS
             ):
                 return _OBSERVE_INTERNALS
+            if not self.offline and not self._recently_acted(
+                _OBSERVE, _OBSERVE_ACTUATORS
+            ):
+                return _OBSERVE_ACTUATORS
             if not self._recently_acted(_OBSERVE, _OBSERVE_CPU):
                 return _OBSERVE_CPU
             return None
@@ -566,24 +579,11 @@ class ActingLoop:
             result.success = bool(result.discoveries)
             return
 
-        search = self._use(result, "web_search", query=topic, limit=3)
-        if search is None or not search.success:
-            result.success = bool(result.discoveries)
-            return
-        pages = search.data.get("results", [])
-        if not pages:
-            result.success = bool(result.discoveries)
-            return
-        # Try each result until one fetches — a dead first hit (blocked
-        # domain, redirect, non-html body) used to sink the whole
-        # episode even when the next result was readable.
-        page = None
-        for hit in pages:
-            page = self._use(result, "web_fetch", url=hit["url"])
-            if page is not None and page.success:
-                break
-            page = None
-        if page is None:
+        # Search→fetch in one tool step — the helper itself walks the
+        # hits until one fetches, so a dead first result (blocked
+        # domain, redirect, non-html body) can't sink the episode.
+        page = self._use(result, "search_and_fetch", query=topic, limit=3)
+        if page is None or not page.success:
             result.success = bool(result.discoveries)
             return
         content = str(page.data.get("content", ""))[: self._LEARN_MAX_CHARS]
@@ -697,6 +697,9 @@ class ActingLoop:
         if name == _OBSERVE_INTERNALS:
             self._observe_internals(result)
             return
+        if name == _OBSERVE_ACTUATORS:
+            self._observe_actuators(result)
+            return
         listing = self._use(result, "list_dir", path=".", _scope="data")
         if listing is not None and listing.success:
             count = listing.data.get("count", 0)
@@ -792,6 +795,52 @@ class ActingLoop:
                 )
             )
         result.discoveries.append("daemon internals — " + "; ".join(shown))
+        result.success = True
+
+    def _observe_actuators(self, result: ActingResult) -> None:
+        """Sense the body's effector census — what she can DO.
+
+        The daemon owns the list: local limbs are always present,
+        relay limbs only while the Android bridge is live. The
+        discovery records each limb the way the body reports it —
+        present, or absent with its own reason — and flags any name
+        the census carries that the mind-side vocabulary
+        (``basal_ganglia.actuators.ALL_LIMBS``) doesn't know, so a
+        new body capability registers as new knowledge.
+        """
+        from basal_ganglia.actuators import ALL_LIMBS
+
+        census = self._use(result, "list_actuators")
+        if census is None or not census.success:
+            return
+        limbs = (census.data or {}).get("actuators", [])
+        present = [a["name"] for a in limbs if a.get("available")]
+        absent = [a for a in limbs if not a.get("available")]
+        unknown = [n for n in present + [a["name"] for a in absent] if n not in ALL_LIMBS]
+        result.discoveries.append(
+            f"{len(present)} limbs present ({', '.join(present) or 'none'})"
+        )
+        for a in absent:
+            result.discoveries.append(
+                f"{a['name']} absent — {a.get('reason') or 'unreported'}"
+            )
+        for n in unknown:
+            result.discoveries.append(f"{n} — a limb the vocabulary doesn't name")
+        # Efferent readback — GET_MOTOR_TARGET decodes which actuator
+        # the motor field currently selects. The census is what she
+        # can do; this is what the field is deciding.
+        if self.get_motor_target is not None:
+            try:
+                target = self.get_motor_target()
+            except Exception:  # noqa: BLE001
+                target = None
+            if target is not None:
+                name = (
+                    getattr(target, "name", None)
+                    or getattr(target, "tensor", None)
+                    or str(target)
+                )
+                result.discoveries.append(f"motor field points at {name}")
         result.success = True
 
     def _execute_measure(self, intention: Intention, result: ActingResult) -> None:

@@ -3040,8 +3040,11 @@ class Vocabulary:
         if concept is None:
             return None
         display = self._display_name(topic_clean)
-        # Build from definition
+        # Build from definition — her stored sense first, then the
+        # dictionary for a concept she knows by name but not meaning.
         definition = concept.properties.get("definition", "")
+        if not definition:
+            definition = self._dictionary_definition(topic_clean, concept)
         # Build from edges
         edges = net.get_edges(topic_clean, "out")
         if not edges:
@@ -3083,6 +3086,29 @@ class Vocabulary:
         if not parts:
             return None
         return ". ".join(parts) + ("." if not parts[-1].endswith(".") else "")
+
+    @staticmethod
+    def _dictionary_definition(topic: str, concept: Any) -> str:
+        """Consult the dictionary for a concept with no stored sense.
+
+        The definition comes back through the same channel the
+        learner's bulk WordNet enrichment uses — and the concept
+        keeps what the dictionary gave, so the lookup happens once.
+        Empty string when the dictionary can't help.
+        """
+        try:
+            from infrastructure.wordnet_dictionary import lookup_definition
+        except ImportError:
+            return ""
+        try:
+            found = lookup_definition(topic)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("temporal_lobe.vocabulary._dictionary_definition", e)
+            return ""
+        if found:
+            concept.properties["definition"] = found
+            return found
+        return ""
 
     @staticmethod
     def _relation_verb(rel: str, object_display: str = "") -> str:

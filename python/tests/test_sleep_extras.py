@@ -2005,9 +2005,10 @@ def test_echoed_placeholder_is_suppressed_despite_grammar_decoration():
     from frontal_lobe.thoughts import SpontaneousThought
     from self import PersonalityTraits, SelfModel
 
-    # No definition, no edges, noisy target: composition can only echo.
+    # No definition, no edges, noisy target — and a nonce concept the
+    # dictionary can't define either: composition can only echo.
     net = ConceptNetwork()
-    net.add_concept("cat", confidence=0.5)
+    net.add_concept("blorpt", confidence=0.5)
     net.add_concept("compiler for the rust language", confidence=0.5)
     engine = GenerativeLanguage(
         SelfModel(
@@ -2024,11 +2025,11 @@ def test_echoed_placeholder_is_suppressed_despite_grammar_decoration():
         network=net,
     )
     thought = SpontaneousThought(
-        content="cat",
+        content="blorpt",
         trigger="dream",
         is_dream=True,
         metadata={
-            "topic": "cat",
+            "topic": "blorpt",
             "knowledge": [("related_to", "compiler for the rust language", 0.5)],
             "dream": True,
         },

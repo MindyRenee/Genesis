@@ -2189,6 +2189,23 @@ class AutonomousLearner:
             )
             return False
 
+        # ── Ion-layer gating ─────────────────────────────────
+        # The electrochemical substrate says the same thing earlier:
+        # a strained membrane (low ATP, degraded gradients, high
+        # metabolic load) favors protective learning before the
+        # plasticity profile catches up. ``needs_physiological_recovery``
+        # is the ion context's own flag for it.
+        get_ion = getattr(self, "_get_ion_context", None)
+        if get_ion is not None:
+            try:
+                ctx = get_ion()
+            except Exception:  # noqa: BLE001
+                ctx = None
+            if ctx is not None and getattr(ctx, "needs_physiological_recovery", False):
+                self._posture_skips += 1
+                self._emit_skip("ion layer strained")
+                return False
+
         # ── Emotion-label gating (existing) ────────────────────
         if not self._get_emotion:
             self._last_block_reason = None

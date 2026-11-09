@@ -132,6 +132,11 @@ _OPTIC_ENGAGEMENT_HALF_LIFE_S = 20.0
 # mundane view is neither.
 _REENCODE_SALIENCE = 0.7
 
+# Nominal chin-to-crown face height (m) — the canonical metric size
+# that makes the attended face's angular size an accommodation
+# distance under the uncalibrated pinhole convention (f_px = max(h, w)).
+_FACE_HEIGHT_M = 0.22
+
 
 @dataclass
 class VisionScene:
@@ -314,6 +319,13 @@ class Vision:
         # "face:N" cluster ids for familiar strangers. This is what the
         # dyadic signature keys on; a name is optional, a person is not.
         self._last_person_keys: list[str] = []
+        # Accommodation bookkeeping — the largest detected face's bbox
+        # height in pixels (0 when no face is in the field), how many
+        # consecutive looks have been face-free, and the last focus
+        # distance pushed to the body's ciliary servo (metres).
+        self._last_face_px = 0
+        self._face_free_looks = 0
+        self._focus_last_m: float | None = None
         # Dorsal stream (MSTd): two-view epipolar geometry between
         # successive looks — self-motion and parallax depth. Lazily
         # created on first use, like the other sublayers.
@@ -551,6 +563,7 @@ class Vision:
         n_unknown_faces = 0
         person_keys: list[str] = []
         recognizer = self._get_face_recognizer()
+        self._last_face_px = 0
         if recognizer is not None:
             try:
                 faces = recognizer.detect_faces(rgb)
@@ -564,6 +577,11 @@ class Vision:
                     # stranger's presence registers like anyone's.
                     if f.person_key:
                         person_keys.append(f.person_key)
+                if faces:
+                    # The largest face's angular size is what the
+                    # ciliary servo accommodates to — the attended
+                    # social stimulus owns the focal plane.
+                    self._last_face_px = max(f.bbox[3] for f in faces)
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "occipital_lobe.perception.vision._recognize_faces",
@@ -904,7 +922,52 @@ class Vision:
             two_view,
         )
 
+        # Accommodation — the ciliary servo tracks what she attends
+        # to. The lens is powered for the largest detected face.
+        self._accommodate(client, rgb.shape[0], rgb.shape[1])
+
         return scene
+
+    def _accommodate(self, client, frame_h: int, frame_w: int) -> None:
+        """Drive the body's ciliary servo toward the attended face.
+
+        Accommodation follows the attended stimulus: the largest
+        detected face is the social stimulus that owns the focal
+        plane, and faces are the only object class with a canonical
+        metric size (~0.22 m chin-to-crown), so the distance estimate
+        is honest — a similar-triangles pinhole read using the same
+        ``f = max(h, w)`` uncalibrated intrinsics
+        ``epipolar.camera_matrix`` falls back to.
+
+        Pushes only on a material change (~15%) so the servo isn't
+        hunting every look; a run of face-free looks releases the
+        lens to its far rest rather than holding a near spasm. A
+        daemon that predates ``SET_FOCUS`` answers False — an absent
+        channel, skipped.
+        """
+        if client is None:
+            return
+        face_px = self._last_face_px
+        if face_px > 0:
+            self._face_free_looks = 0
+            focal_px = float(max(frame_h, frame_w))
+            dist = _FACE_HEIGHT_M * focal_px / face_px
+            dist = max(0.15, min(20.0, dist))
+            last = self._focus_last_m
+            if last is None or abs(dist - last) / max(last, 1e-6) > 0.15:
+                try:
+                    if client.set_focus(dist):
+                        self._focus_last_m = dist
+                except Exception:  # noqa: BLE001
+                    pass
+        else:
+            self._face_free_looks += 1
+            if self._face_free_looks >= 3 and self._focus_last_m is not None:
+                try:
+                    if client.set_focus(0.0):
+                        self._focus_last_m = None
+                except Exception:  # noqa: BLE001
+                    pass
 
     def _integrate_scene(
         self,

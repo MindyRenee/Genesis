@@ -52,6 +52,22 @@ _URGE_FLUCTUATION = 0.03
 # full-corpus pass the /learn-code command performs.
 _LEARN_CODE_BOUT = 25
 
+# Cholinergic encoding floor — Hasselmo's encoding/consolidation
+# switch (Hasselmo 1999, 2006): high acetylcholine suppresses
+# recurrent feedback so new material encodes without interference
+# from stored knowledge; low tone releases that suppression and the
+# same circuits consolidate. The body's own calibration puts wake
+# ACh ≈ 0.58 and NREM ≈ 0.34 (src/state/basal_forebrain.rs
+# release_target), so ~0.45 is the crossover — encoding below it
+# both degrades and displaces the consolidation the low tone is for.
+_ACH_ENCODING_FLOOR = 0.45
+
+# Mean sentiment of a presence's recent exchanges below which a bid
+# is pestering, not reaching out — approach–avoidance gating on the
+# partner's expressed affect, not her own chemistry. Empty history
+# reads 0.0, so a stranger is never written off.
+_REACH_OUT_SENTIMENT_FLOOR = -0.3
+
 
 def _lower_thread_priority(nice: int = _VOLITION_NICE) -> None:
     """Drop the calling thread's CPU priority (Linux per-thread nice).
@@ -149,6 +165,14 @@ class VolitionMixin:
                 return self.get_mission()
             if command == "/explore":
                 return self.explore_files(args.strip() or None)
+            if command == "/authority":
+                # How much of her policy she delegates to the body's
+                # inference engine — her own dial, not a held wire.
+                try:
+                    authority = float(args.strip())
+                except ValueError:
+                    return None
+                return self.client.set_policy_authority(authority)
             # Default: call the mapped method with no args
             method = getattr(self, method_name, None)
             if method is None:
@@ -188,8 +212,8 @@ class VolitionMixin:
           fatigue, Chaudhuri & Behan, 2000)
         - sustained_activity: time since last rest, normalized (BRAC,
           Kleitman 1963 — ~90 min activity cycles with mandatory rest)
-        - elevated_cortisol: subclinical stress (cortisol 0.20-0.50,
-          below stress phase but above resting)
+        - elevated_cortisol: subclinical stress (tonic cortisol above
+          resting ~0.02, below the 0.06 stress-phase gate)
         """
         idle = max(0.0, time.time() - self._last_interaction_time)
         drives = self._drive_signals()
@@ -659,7 +683,14 @@ class VolitionMixin:
         is the wanting — so she studies when her body is in a
         learning state, and the stress axis (cortisol/CRH) and sleep
         pressure (adenosine) suppress it before the urge can form.
-        Each firing is one bounded bout, not a bulk import — the urge
+
+        The bout itself stays under the same chemistry: which files
+        it picks is the hippocampus–VTA novelty computation
+        (``investigate_code``'s information-value ranking), and the
+        bout continues only while ACh holds the encoding range —
+        below it the body has switched to consolidation dynamics
+        (Hasselmo) and further encoding would displace it. Each
+        firing is one bounded bout, not a bulk import — the urge
         must rebuild between study sessions.
         """
         if self.is_resting or self._is_teaching or self._in_game:
@@ -679,9 +710,63 @@ class VolitionMixin:
             ("code", "self", "learning", "introspection"),
             "thinking",
         )
+
+        # The cholinergic gate is read at most every couple of
+        # seconds — muscarinic switching lasts seconds to minutes
+        # (Hasselmo's ERS), and should_stop is polled per AST node,
+        # so a fresh IPC read on every poll would be pure waste.
+        encoding_checked_at = 0.0
+        encoding_is_open = True
+
+        def encoding_open() -> bool:
+            """ACh holds the encoding range — else the body is consolidating."""
+            nonlocal encoding_checked_at, encoding_is_open
+            now = time.monotonic()
+            if now - encoding_checked_at < 2.0:
+                return encoding_is_open
+            try:
+                ach = float(self.client.get_state().chemicals.get("acetylcholine", 0.0))
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "mind.volition._perform_learn_code.encoding",
+                    e,
+                )
+                return True  # unreadable body adds no gate
+            encoding_checked_at = now
+            encoding_is_open = ach >= _ACH_ENCODING_FLOOR
+            return encoding_is_open
+
+        def should_stop() -> bool:
+            return (
+                self._cycle_stop.is_set()
+                or not self._running
+                or not encoding_open()
+            )
+
         try:
-            self.learn_code(max_files=_LEARN_CODE_BOUT)
-            self.world.it_acted("studied its own source")
+            goal = self.get_mission() or None
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition._perform_learn_code",
+                e,
+            )
+            goal = None
+        try:
+            result = self.study_code(
+                max_files=_LEARN_CODE_BOUT,
+                goal=goal,
+                should_stop=should_stop,
+            )
+            explored = len(self.code_learner.explored_files)
+            detail = f"{result.files_analyzed} files this bout; {explored} known"
+            nxt = self.code_learner.select_next_file(goal=goal)
+            if nxt:
+                try:
+                    nxt = str(Path(nxt).relative_to(self.code_learner.project_root))
+                except ValueError:
+                    nxt = Path(nxt).name
+                detail += f"; next {nxt}"
+            self.world.it_acted("studied its own source", detail=detail)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._perform_learn_code",
@@ -1028,6 +1113,10 @@ class VolitionMixin:
             if belief.unresponsive():
                 return
             if not target.present and not belief.likely_awake(time.time()):
+                return
+            # Reaching into a hostile stretch is pestering — the
+            # relationship record, not her chemistry, holds that.
+            if target.recent_sentiment() < _REACH_OUT_SENTIMENT_FLOOR:
                 return
         topic = self._reach_out_topic(target)
         if topic is None:

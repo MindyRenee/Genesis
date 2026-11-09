@@ -627,7 +627,10 @@ class CodeLearner:
         if not result.analyzed:
             return result
 
+        was_known = rel in self._analyzed_files
         self._analyzed_files.add(rel)
+        if was_known:
+            self._reconsolidate(rel)
 
         # Record complexity and schedule re-analysis
         self._record_file_complexity(rel, result.functions, result.classes, result.lines)
@@ -1254,6 +1257,32 @@ class CodeLearner:
         line_score = min(1.0, lines / 500.0)
         complexity = (func_score + class_score + line_score) / 3.0
         self._file_complexity[rel] = complexity
+
+    def _reconsolidate(self, rel: str) -> None:
+        """Strengthen a re-studied file's module concept — reconsolidation.
+
+        A retrieved memory returns to a labile state and restabilizes;
+        the restabilization is BDNF-dependent (Lee et al., 2004;
+        Radiske et al., 2015 — BDNF is necessary and sufficient to
+        maintain a reactivated engram). The spaced-review boost is
+        therefore scaled by the body's live BDNF level: a review under
+        low BDNF consolidates little. An unreadable body applies the
+        raw schedule — the spaced timing is real, just unmodulated.
+        """
+        concept = self._module_concept_for(rel)
+        if concept is None:
+            return
+        boost = self._spaced_repetition.strengthen_concept(rel, concept.id)
+        scale = 1.0
+        if self.client is not None:
+            try:
+                scale = min(
+                    1.0,
+                    max(0.0, self.client.get_plasticity_profile().bdnf_effective),
+                )
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("tools.code_learner._reconsolidate", e)
+        concept.confidence = min(1.0, concept.confidence + boost * scale)
 
     # ── Internal helpers ────────────────────────────────────────────
 

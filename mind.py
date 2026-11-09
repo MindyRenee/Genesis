@@ -163,6 +163,7 @@ class Mind(
         "/explore": "explore_files",
         "/world": "world_status",
         "/arcade": "arcade_status",
+        "/authority": "set_policy_authority",
     }
 
     def __init__(
@@ -522,6 +523,10 @@ class Mind(
             synapses=self.brain.frontal.synapses,
             semantic_memory=self.brain.frontal.semantic_memory,
         )
+        # The electrochemical layer's protective-learning flag gates
+        # acquisition alongside the plasticity posture — attached
+        # post-construction like visual_cortex (same pattern).
+        self.learner._get_ion_context = self.brain.frontal.ion_context
         # Wire the embedding store into the learner for semantic
         # similarity and deep expectation generation. STDP uses the
         # shared synaptic substrate supplied above, not embeddings.
@@ -578,6 +583,7 @@ class Mind(
             on_live_thought=self._emit_live_thought,
             executive=self.brain.frontal.executive,
             get_internals=self.client.get_internals,
+            get_motor_target=self.client.get_motor_target,
             get_thermally_capped=lambda: self.self_model.body_model.thermally_capped,
         )
 
@@ -619,6 +625,7 @@ class Mind(
             # a brain's, not at N2 like a session's.
             is_sleeping=lambda: self._is_sleeping or (self._headless and self.is_hypnagogic),
             get_user_name=self.user_profile.get_name,
+            get_user_facts=lambda: dict(self.user_profile.facts),
             channel=channel,
             on_channel_speech=self._hear_channel,
         )
@@ -1089,6 +1096,12 @@ class Mind(
         self._daemon_lost_since: float | None = None
         self._autosave_failures = 0
         self._last_threat_snapshot = 0.0
+        # Organ-loss bookkeeping for the safeguard urge: how many
+        # process deaths the body has reported so far, and when the
+        # most recent one registered — a resurrected organ leaves a
+        # scar that fades rather than latching.
+        self._organ_deaths_seen = 0
+        self._organ_loss_since: float | None = None
         self._think_recovery_active = False
         # Monotonic time at which a think() worker was found still
         # running after the recovery join expired, or None. Distinguishes

@@ -168,14 +168,6 @@ DEFAULT_RECENT_GRACE_MS = 2 * 24 * 3600 * 1000
 # is reached over consecutive nights instead of in a single sweep.
 DEFAULT_MAX_ARCHIVE_PER_SWEEP = 1000
 
-# Per-sweep release budget for the archived tier. True deletion is
-# the terminal act of forgetting — substrate death, in engram terms —
-# so a pass that somehow goes wrong can take at most this many
-# episodes before the next night's verdict. The backlog drains over
-# consecutive sleeps, not in one sweep.
-DEFAULT_MAX_DELETE_PER_SWEEP = 5000
-
-
 class SleepCompressor:
     """Algorithmic sleep compression pass.
 
@@ -198,7 +190,6 @@ class SleepCompressor:
         merge_threshold: float = DEFAULT_MERGE_THRESHOLD,
         recent_grace_ms: int = DEFAULT_RECENT_GRACE_MS,
         max_archive_per_sweep: int = DEFAULT_MAX_ARCHIVE_PER_SWEEP,
-        max_delete_per_sweep: int = DEFAULT_MAX_DELETE_PER_SWEEP,
     ) -> None:
         """Initialize the sleep compressor with persistent components.
 
@@ -216,7 +207,6 @@ class SleepCompressor:
         self.merge_threshold = merge_threshold
         self.recent_grace_ms = recent_grace_ms
         self.max_archive_per_sweep = max_archive_per_sweep
-        self.max_delete_per_sweep = max_delete_per_sweep
 
         # Persistent components
         self.vq_codebook = VQCodebook(k=vq_k)
@@ -319,9 +309,11 @@ class SleepCompressor:
           mid-queue exit never leaves migrated edges unsaved.
         - **compact_ltm** — archives episodes one at a time; each
           archived episode is already durable.
-        - **prune_ltm** — releases archived engrams the memory system
-          itself reports dead. Runs only when a ``release_fn`` is
-          supplied: forgetting is her verdict, not the compressor's.
+        - **census_ltm** — counts the archived engrams the memory
+          system itself reports dead. Runs only when a ``release_fn``
+          is supplied: forgetting is her verdict, not the
+          compressor's — and the verdict is measured, never carried
+          out; memories are never deleted.
         - **save** — VQ codebook + holographic graph, plus the
           periodic holographic rebuild.
 
@@ -348,8 +340,8 @@ class SleepCompressor:
             if release_fn is not None:
                 steps.append(
                     (
-                        "prune_ltm",
-                        lambda: self._phase_prune_ltm(ltm_client, release_fn),
+                        "census_ltm",
+                        lambda: self._phase_census_ltm(ltm_client, release_fn),
                     )
                 )
 
@@ -867,19 +859,23 @@ class SleepCompressor:
         stats["ltm_replayed"] += 1
         return associations
 
-    def _phase_prune_ltm(
+    def _phase_census_ltm(
         self,
         ltm_client: object,
         release_fn: Callable[[object], bool],
     ) -> dict[str, int | float]:
-        """Release archived engrams the memory system reports dead.
+        """Census the archived tier — verdicts are measured, never carried out.
 
-        The terminal tier of forgetting: active → archived → deleted.
-        Enumerates the cold store as metadata (id, timestamp, salience,
-        flags, source, emotional tag — the release verdict needs the
-        bookkeeping, never the payload), asks her own retention model
-        for a verdict on each entry, and deletes the dead ones —
-        oldest first, bounded per sweep.
+        Memories are never deleted. A dead engram's residence is its
+        position in latent space — the gist the compact phase already
+        folded into the embedding store — plus the verbatim record
+        itself; forgetting is loss of retrievability, not destruction
+        of the trace. What this phase still does is *know*: enumerate
+        the cold store as metadata (id, timestamp, salience, flags,
+        source, emotional tag — the verdict needs the bookkeeping,
+        never the payload) and ask her retention model for a verdict
+        on each entry, so the count of dead engrams stays visible to
+        introspection instead of going unmeasured.
 
         Two eligibility floors are the compressor's own, not the
         model's:
@@ -887,44 +883,36 @@ class SleepCompressor:
         - **Meta-memories are never release candidates.** They are
           the extracted semantic residue — the cortical copy whose
           existence is what makes the hippocampal verbatim redundant.
-          Deleting them would erase the gist that justifies the
-          forgetting.
         - **Dreams are never release candidates.** They sit outside
-          the retain/compact economy entirely (``_DREAM_MODULE``);
-          archiving one was already a policy violation, and deleting
-          it compounds the mistake instead of fixing it.
+          the retain/compact economy entirely (``_DREAM_MODULE``).
         """
         stats: dict[str, int | float] = {
             "ltm_archived_seen": 0,
             "ltm_meta_skipped": 0,
             "ltm_dreams_skipped": 0,
-            "ltm_pruned": 0,
-            "ltm_prune_failed": 0,
-            "ltm_release_deferred": 0,
+            "ltm_release_candidates": 0,
         }
 
         if not getattr(ltm_client, "is_connected", True):
-            logger.warning("LTM prune skipped: client not connected")
-            stats["ltm_prune_skipped"] = 1
+            logger.warning("LTM census skipped: client not connected")
+            stats["ltm_census_skipped"] = 1
             return stats
 
         search_archived = getattr(ltm_client, "search_archived", None)
-        delete_episode = getattr(ltm_client, "delete_episode", None)
-        if search_archived is None or delete_episode is None:
-            logger.warning("LTM prune skipped: client lacks archived-tier ops")
-            stats["ltm_prune_skipped"] = 1
+        if search_archived is None:
+            logger.warning("LTM census skipped: client lacks archived-tier ops")
+            stats["ltm_census_skipped"] = 1
             return stats
 
         try:
             entries = search_archived(limit=0xFFFFFFFF)
         except OSError as e:
-            logger.warning("LTM prune skipped: %s", e)
-            stats["ltm_prune_skipped"] = 1
+            logger.warning("LTM census skipped: %s", e)
+            stats["ltm_census_skipped"] = 1
             return stats
 
         stats["ltm_archived_seen"] = len(entries)
 
-        candidates = []
         for entry in entries:
             if getattr(entry, "flags", 0) & _EPISODE_FLAG_META:
                 stats["ltm_meta_skipped"] += 1
@@ -934,41 +922,20 @@ class SleepCompressor:
                 continue
             try:
                 if release_fn(entry):
-                    candidates.append(entry.episode_id)
+                    stats["ltm_release_candidates"] += 1
             except (AttributeError, TypeError, ValueError) as e:
                 note_swallowed(
-                    "sleep.compression._phase_prune_ltm",
-                    e,
-                )
-
-        if len(candidates) > self.max_delete_per_sweep:
-            stats["ltm_release_deferred"] = len(candidates) - self.max_delete_per_sweep
-            # Entries arrive oldest-first; the budget takes the
-            # longest-dead end of the list.
-            candidates = candidates[: self.max_delete_per_sweep]
-
-        for episode_id in candidates:
-            try:
-                if delete_episode(episode_id):
-                    stats["ltm_pruned"] += 1
-                else:
-                    stats["ltm_prune_failed"] += 1
-            except OSError as e:
-                stats["ltm_prune_failed"] += 1
-                note_swallowed(
-                    "sleep.compression._phase_prune_ltm",
+                    "sleep.compression._phase_census_ltm",
                     e,
                 )
 
         logger.info(
-            "LTM prune: seen %d archived, pruned %d, failed %d, "
-            "meta skipped %d, dreams skipped %d, deferred %d",
+            "LTM census: seen %d archived, %d dead-engram candidates, "
+            "meta skipped %d, dreams skipped %d",
             stats["ltm_archived_seen"],
-            stats["ltm_pruned"],
-            stats["ltm_prune_failed"],
+            stats["ltm_release_candidates"],
             stats["ltm_meta_skipped"],
             stats["ltm_dreams_skipped"],
-            stats["ltm_release_deferred"],
         )
         return stats
 

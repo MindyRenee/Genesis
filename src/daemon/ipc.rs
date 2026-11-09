@@ -596,6 +596,14 @@ pub mod cmd {
     /// [reason]`. See `daemon::actuators`.
     pub const LIST_ACTUATORS: u8 = 64;
 
+    /// Fire one actuator by name — the efferent half of the census.
+    /// Request: `[u8 name_len][name][u16 arg_len][arg]`. Response:
+    /// `[u8 ok][u16 msg_len][msg]` — ok=1 and the limb's own report
+    /// on success, ok=0 and the refusal reason when the limb is
+    /// unknown or unavailable. `PAYLOAD_TOO_SHORT` on truncation.
+    /// Additive: PROTOCOL_VERSION unaffected.
+    pub const ACTUATE: u8 = 65;
+
     // ─── Tensor slab ──────────────────────────────────────────
     // Named multidimensional tensors shared between the daemon and
     // the cognitive mind — world frames, salience fields, embeddings,
@@ -4172,6 +4180,38 @@ pub fn default_handler<L: LtmAccess>(
         cmd::GET_MOTOR_TARGET => crate::field::motor::current_motor_target().encode(),
 
         cmd::LIST_ACTUATORS => crate::daemon::actuators::encode_census(),
+
+        cmd::ACTUATE => {
+            // [u8 name_len][name utf8][u16 arg_len][arg utf8] — the
+            // mind names the limb; the body's own `actuate` owns the
+            // firing semantics (census lookup, availability, kind).
+            // ok=1 carries the limb's report; ok=0 its refusal.
+            if payload.is_empty() {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let nl = payload[0] as usize;
+            if payload.len() < 1 + nl + 2 {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let name = String::from_utf8_lossy(&payload[1..1 + nl]).into_owned();
+            let al = u16::from_le_bytes(payload[1 + nl..1 + nl + 2].try_into().unwrap_or_default())
+                as usize;
+            if payload.len() < 1 + nl + 2 + al {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let arg = String::from_utf8_lossy(&payload[1 + nl + 2..1 + nl + 2 + al]).into_owned();
+            let (ok, msg) = match crate::daemon::actuators::actuate(&name, &arg) {
+                Ok(report) => (1u8, report),
+                Err(reason) => (0u8, reason),
+            };
+            let msg = msg.as_bytes();
+            let ml = msg.len().min(u16::MAX as usize) as u16;
+            let mut out = Vec::with_capacity(3 + ml as usize);
+            out.push(ok);
+            out.extend_from_slice(&ml.to_le_bytes());
+            out.extend_from_slice(&msg[..ml as usize]);
+            out
+        }
 
         cmd::ANALYZE_CODE => {
             // [u16 path_len][path][u32 src_len][src] — the mind sends

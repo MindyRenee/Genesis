@@ -456,6 +456,7 @@ class VolitionConfig:
                 cooldown=300.0,  # at most one protective act per 5 min
                 stimuli={
                     "daemon_lost": 0.30,  # body unreachable
+                    "organ_loss": 0.20,  # a body process died
                     "save_failure": 0.25,  # continuity at risk
                     "telemetry_anomaly": 0.15,  # substrate abnormal
                     "body_distress": 0.10,  # hardware strained

@@ -72,6 +72,7 @@ from .protocol import (
     _U16,
     _U32,
     _U64,
+    ACTUATE,
     ADVANCE_NEURO,
     ADVANCE_PHYSICS,
     ANALYZE_CODE,
@@ -428,8 +429,8 @@ class GenesisClient:
             GET_INTERNALS,
             GET_ION_SUMMARY,
             GET_MOTOR_TARGET,
+            ACTUATE,
             LIST_ACTUATORS,
-    LIST_ACTUATORS,
             GET_OPTIC_STATE,
             GET_PROCESS_HEALTH,
             GET_RECENT_EPISODES,
@@ -1177,6 +1178,35 @@ class GenesisClient:
             i += rl
             out.append((name, kind, avail, reason))
         return out
+
+    def actuate(
+        self, name: str, arg: str = "", *, timeout: float | None = None
+    ) -> tuple[bool, str] | None:
+        """Fire one actuator by name — the efferent half of the census.
+
+        ``get_actuators()`` answers what the body can do; this does
+        it. The daemon's own ``actuate`` owns the firing semantics —
+        census lookup, availability, local vs relayed — and reports
+        back in the limb's own words.
+
+        Returns ``(True, report)`` on a fired limb, ``(False, reason)``
+        when the limb is unknown or unavailable, and ``None`` when the
+        daemon predates the command or can't be reached — an absent
+        channel, never silent.
+        """
+        try:
+            nb = name.encode("utf-8")
+            ab = arg.encode("utf-8")
+            payload = bytes([len(nb) & 0xFF]) + nb + len(ab).to_bytes(2, "little") + ab
+            resp = self._request(ACTUATE, payload, timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return None
+        if not resp or len(resp) < 3:
+            return None
+        ok = resp[0] != 0
+        ml = int.from_bytes(resp[1:3], "little")
+        msg = resp[3 : 3 + ml].decode("utf-8", "replace")
+        return (ok, msg)
 
     def get_neuro_summary(self, *, timeout: float | None = None) -> NeuroSummary:
         """Get the compact neurochemical summary (32 bytes).

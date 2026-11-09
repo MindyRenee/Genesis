@@ -257,6 +257,10 @@ class OuterWorld:
         get_user_name: Callback returning the user's name if its
             user profile has learned one. Synced lazily onto the user
             presence. Optional.
+        get_user_facts: Callback returning the user profile's learned
+            facts (key→value). Synced lazily onto the user presence —
+            the profile is the authoritative model of the person, the
+            presence is the relationship. Optional.
         channel: Her page — the public channel (``Channel``) that
             lives in this world. Optional; absent when no webhook is
             configured.
@@ -273,6 +277,7 @@ class OuterWorld:
         neuro_impulse: Callable[[int, float], None] | None = None,
         is_sleeping: Callable[[], bool] | None = None,
         get_user_name: Callable[[], str | None] | None = None,
+        get_user_facts: Callable[[], dict[str, str]] | None = None,
         channel: Channel | None = None,
         on_channel_speech: Callable[[str, str, dict], None] | None = None,
     ) -> None:
@@ -281,6 +286,7 @@ class OuterWorld:
         self._neuro_impulse = neuro_impulse
         self._is_sleeping = is_sleeping
         self._get_user_name = get_user_name
+        self._get_user_facts = get_user_facts
 
         # Her page — the place in this world where the public gathers.
         # The world owns the hearing: the channel's inbound speech is
@@ -346,6 +352,7 @@ class OuterWorld:
         with self._lock:
             presence = self._presence_locked(USER_PRESENCE_ID, PresenceKind.USER)
             self._sync_user_name(presence)
+            self._sync_user_facts(presence)
             was_present = presence.present
             presence.interacted(sentiment, topics, now=now)
             # Belief update — they were active, they carried sentiment,
@@ -970,6 +977,22 @@ class OuterWorld:
             return
         if name:
             presence.set_name(name)
+
+    def _sync_user_facts(self, presence: Presence) -> None:
+        """Sync the user profile's learned facts onto the presence.
+
+        Same lazy-propagation rule as the name: the profile is the
+        authoritative model of the person; the presence is the
+        relationship — what it knows about them belongs to both.
+        """
+        if self._get_user_facts is None:
+            return
+        try:
+            facts = self._get_user_facts()
+        except Exception:  # noqa: BLE001
+            return
+        for key, value in (facts or {}).items():
+            presence.learn_fact(key, value)
 
     def _impulse(self, chem: int, amount: float) -> None:
         """Apply a neurochemical impulse via the wiring callback."""

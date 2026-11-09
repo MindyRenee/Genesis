@@ -26,6 +26,7 @@ from .exceptions import ConnectionError
 _MARKER_G09 = 0x4753094544B80616
 
 __all__ = [
+    "ACTUATE",
     "ADVANCE_NEURO",
     "ADVANCE_PHYSICS",
     "ANALYZE_CODE",
@@ -457,6 +458,13 @@ GET_FOLD_MARGINS = 62
 # Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
 SET_FIELD_PULSE = 63
 LIST_ACTUATORS = 64
+
+# Fire one actuator by name — the efferent half of the census.
+# Request: [u8 name_len][name][u16 arg_len][arg]. Reply:
+# [u8 ok][u16 msg_len][msg] — ok=1 and the limb's own report on
+# success, ok=0 and the refusal reason when the limb is unknown or
+# unavailable. Additive: PROTOCOL_VERSION stays 3.
+ACTUATE = 65
 
 # Which optional hardware sensors this machine actually has.
 # Response: [u16 mask] — a bitmask of SENSOR_* below. A set bit means

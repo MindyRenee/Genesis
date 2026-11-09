@@ -139,13 +139,14 @@ class MetronomeMixin:
             )
 
         try:
-            summary = self.client.get_neuro_summary()
+            profile = self.client.get_plasticity_profile()
             # Elevated cortisol: above resting (~0.02) but below the
-            # 0.06 stress-phase gate is subclinical stress. We
-            # approximate using global_tone and valence since
-            # NeuroSummary doesn't expose cortisol directly.
-            if summary.global_tone > 0.35 and summary.valence < 0.1:
-                elevated_cortisol = min(1.0, (summary.global_tone - 0.35) * 3.0)
+            # 0.06 stress-phase gate is subclinical stress. The tonic
+            # (sustained) level is the channel — the same envelope the
+            # daemon's cortisol_stress_fraction uses; the fraction
+            # saturates at the gate, where the Stress phase takes over.
+            cort = getattr(profile, "cortisol_tonic", 0.0)
+            elevated_cortisol = min(1.0, max(0.0, (cort - 0.02) / (0.06 - 0.02)))
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.metronome._read_interoceptive_signals",
@@ -182,6 +183,12 @@ class MetronomeMixin:
           current snapshot (restricted cores, her own footprint,
           her persistence medium) — the machine's crowding is
           environmental awareness, not body distress.
+        - organ_loss: a body process (retina, a relay) that was seen
+          alive and then died — GET_PROCESS_HEALTH's death count is
+          what separates a loss from a never-started organ. While the
+          lost subsystem is still missing it saturates; once the
+          shepherd has resurrected it the felt event fades over
+          ~10 minutes rather than vanishing instantly.
 
         The snapshot is rate-limited to 60s — volition ticks every
         second but system metrics don't change meaningfully faster,
@@ -199,6 +206,34 @@ class MetronomeMixin:
                         1.0,
                         (time.monotonic() - self._daemon_lost_since) / 30.0,
                     )
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "mind.metronome._read_threat_signals",
+                    e,
+                )
+
+        organ_loss = 0.0
+        if not self._offline:
+            try:
+                health = self.client.get_process_health()
+                if health is not None:
+                    deaths = int(getattr(health, "deaths", 0) or 0)
+                    if deaths > getattr(self, "_organ_deaths_seen", 0):
+                        self._organ_deaths_seen = deaths
+                        self._organ_loss_since = time.monotonic()
+                    if (
+                        getattr(health, "has_lost_a_subsystem", False)
+                        and health.last_death_name in health.missing
+                    ):
+                        # The thing that died is still dead — the
+                        # organ is absent right now.
+                        organ_loss = 1.0
+                    elif self._organ_loss_since is not None:
+                        # It came back — the loss happened, so it
+                        # registers, but the scar fades rather than
+                        # latching a threat that has resolved.
+                        scar = 1.0 - (time.monotonic() - self._organ_loss_since) / 600.0
+                        organ_loss = max(0.0, scar)
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.metronome._read_threat_signals",
@@ -226,6 +261,7 @@ class MetronomeMixin:
 
         return {
             "daemon_lost": daemon_lost,
+            "organ_loss": organ_loss,
             "save_failure": save_failure,
             "telemetry_anomaly": telemetry_anomaly,
             "body_distress": body_distress,
@@ -899,6 +935,14 @@ class MetronomeMixin:
         except Exception as e:  # noqa: BLE001
             note_swallowed("mind.metronome.sensors.read_sensors", e)
             body_state = None
+        if body_state is None:
+            # A fresh read failed (tick lock busy, mid-restart) — the
+            # last published state still beats none at all.
+            try:
+                body_state = self.client.get_body_state()
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.metronome.sensors.get_body_state", e)
+                body_state = None
         if body_state is not None:
             # Which sensors this machine actually has. Fetched
             # with the body state rather than counted from it:

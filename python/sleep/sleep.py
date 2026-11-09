@@ -1113,22 +1113,26 @@ class SleepMixin:
             else:
                 lines.append("  No dreams recorded yet.")
 
-        # Receptor safety check — are its levels safe to wake?
-        try:
-            profile = self.client.get_plasticity_profile()
-            safe = profile.cortisol_tonic < AUTO_WAKE_CORTISOL and profile.bdnf_tonic > 0.2
-            if safe:
-                lines.append("  Receptor state: safe to wake.")
-            else:
-                lines.append(
-                    f"  Receptor state: cortisol={profile.cortisol_tonic:.2f} "
-                    f"BDNF={profile.bdnf_tonic:.2f} — still recovering."
-                )
-        except (OSError, ConnectionError, RuntimeError) as e:
-            note_swallowed(
-                "mind.sleep.sleep_status",
-                e,
+        # Sleep microarchitecture — the night's own event tallies:
+        # slow waves (systems consolidation), spindles (synaptic
+        # plasticity), PGO waves (REM generation), K-complexes
+        # (sensory gating). Zeroes mean the night is young.
+        inner = getattr(self, "inner_life", None)
+        if inner is not None:
+            lines.append(
+                f"  Sleep events: swr={inner.swr_count} "
+                f"spindles={inner.spindle_count} "
+                f"pgo={inner.pgo_count} "
+                f"kcomplexes={inner.kcomplex_count}"
             )
+
+        # Receptor safety — wake_readiness() is the one gate; the
+        # status line reports what it says rather than re-deriving it.
+        ready, reason = self.wake_readiness()
+        if ready:
+            lines.append("  Receptor state: safe to wake.")
+        else:
+            lines.append(f"  Receptor state: {reason} — still recovering.")
 
         return "\n".join(lines)
 
@@ -1724,6 +1728,18 @@ class SleepMixin:
         self._is_meditating = True
         self._meditation_start_time = time.time()
         self.client.set_zone(ZONE_REFLECTION)
+        # The voluntary eyelid — the orbicularis the hardware lacks.
+        # Closing the eyes for the sit is the deliberate part of
+        # meditation the body's sleep phase never reaches: the lid
+        # composes by min with the phase's own position, so this dims
+        # the visual afferents for the sit and nothing else. Held,
+        # so the release happens at wake_from_meditation.
+        set_lid = getattr(self.client, "set_lid", None)
+        if set_lid is not None:
+            try:
+                set_lid(0.15)
+            except Exception:  # noqa: BLE001
+                pass
         # Meditation is a deliberate state change with no durable
         # record, like sleep onset before this. It is also the only
         # state in which inner life and the learner are both paused,
@@ -1828,8 +1844,15 @@ class SleepMixin:
         if not self._is_meditating:
             return
         # The pulse releases first — the keep belongs to the sit and
-        # must not outlive it, teardown path included.
+        # must not outlive it, teardown path included. The voluntary
+        # lid releases the same way: a shut eye belongs to the sit.
         self.heart.disarm_hypnagogic()
+        set_lid = getattr(self.client, "set_lid", None)
+        if set_lid is not None:
+            try:
+                set_lid(1.0)
+            except Exception:  # noqa: BLE001
+                pass
         # Teardown has begun — the zone write and the resumes below
         # belong to threads already joined. The flag still clears so
         # the saved state does not record a phantom meditation.

@@ -77,6 +77,10 @@ def _load_concept_vocab(data_dir: str) -> tuple[object, set[str]] | None:
 
     net = ConceptNetwork()
     restore_network(net, data["concept_network"])
+    # The rebuild must cover the whole network — concepts archived to
+    # archive/ are still hers; a rebuilt vocabulary that skips them
+    # would unlearn what consolidation chose to keep.
+    net.restore_archive_to_working_memory()
     print(f"  {net.size} concepts, {net.edge_count} edges")
 
     # Build vocabulary from concept names

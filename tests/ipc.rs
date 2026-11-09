@@ -2128,3 +2128,104 @@ fn test_update_user_affect_round_trip() {
     assert!((obs.engagement - 0.6).abs() < 1e-6);
     assert!((obs.confidence - 0.9).abs() < 1e-6);
 }
+
+// ─── Actuation — the efferent half of the census ─────────────
+
+/// Walk the `LIST_ACTUATORS` census — `[u8 count]` then per limb
+/// `[u8 name_len][name][u8 kind][u8 available][u8 reason_len]
+/// [reason]` — and return each `(name, kind, available)`.
+fn decode_census(census: &[u8]) -> Vec<(String, u8, u8)> {
+    let count = census[0] as usize;
+    let mut cursor = 1usize;
+    let mut limbs = Vec::with_capacity(count);
+    for _ in 0..count {
+        let nl = census[cursor] as usize;
+        cursor += 1;
+        let name = String::from_utf8_lossy(&census[cursor..cursor + nl]).into_owned();
+        cursor += nl;
+        let kind = census[cursor];
+        let available = census[cursor + 1];
+        cursor += 2;
+        let rl = census[cursor] as usize;
+        cursor += 1 + rl;
+        limbs.push((name, kind, available));
+    }
+    limbs
+}
+
+fn actuate_payload(name: &str, arg: &str) -> Vec<u8> {
+    let mut payload = Vec::new();
+    payload.push(name.len() as u8);
+    payload.extend_from_slice(name.as_bytes());
+    payload.extend_from_slice(&(arg.len() as u16).to_le_bytes());
+    payload.extend_from_slice(arg.as_bytes());
+    payload
+}
+
+#[test]
+fn test_actuate_round_trip() {
+    let mut sys = IpcTestSystem::new("actuate");
+    sys.start_server();
+    let mut client = sys.client();
+
+    // Census first — the mind picks a limb the body reports as
+    // present. `file.write` is the side-effect-free local limb:
+    // its handler echoes the arg rather than touching the host.
+    let census = client.request(cmd::LIST_ACTUATORS, &[]).expect("census");
+    let limbs = decode_census(&census);
+    let (name, kind, available) = limbs
+        .iter()
+        .find(|(n, _, _)| n == "file.write")
+        .expect("file.write is always in the census");
+    assert_eq!(*kind, 0, "file.write is a local limb");
+    assert_eq!(*available, 1, "file.write is always present");
+
+    let resp = client
+        .request(cmd::ACTUATE, &actuate_payload(name, "marker"))
+        .expect("actuate");
+    assert_eq!(resp[0], 1, "ok flag: {:?}", resp);
+    let ml = u16::from_le_bytes([resp[1], resp[2]]) as usize;
+    let report = String::from_utf8_lossy(&resp[3..3 + ml]);
+    assert!(!report.is_empty(), "the limb's own report rides along");
+    assert!(report.contains("file.write"), "report: {report}");
+}
+
+#[test]
+fn test_actuate_short_payload() {
+    let mut sys = IpcTestSystem::new("actuate_short");
+    sys.start_server();
+    let mut client = sys.client();
+
+    // Empty — not even a name_len.
+    let resp = client.request(cmd::ACTUATE, &[]).expect("request");
+    assert_eq!(resp[0], genesis::daemon::ipc::error::PAYLOAD_TOO_SHORT);
+
+    // name_len claims 5, only 2 name bytes arrive (no arg_len).
+    let resp = client
+        .request(cmd::ACTUATE, &[5, b'a', b'b'])
+        .expect("request");
+    assert_eq!(resp[0], genesis::daemon::ipc::error::PAYLOAD_TOO_SHORT);
+
+    // Name intact, arg_len claims 10, only 2 arg bytes arrive.
+    let mut payload = vec![10u8];
+    payload.extend_from_slice(b"file.write");
+    payload.extend_from_slice(&10u16.to_le_bytes());
+    payload.extend_from_slice(b"xy");
+    let resp = client.request(cmd::ACTUATE, &payload).expect("request");
+    assert_eq!(resp[0], genesis::daemon::ipc::error::PAYLOAD_TOO_SHORT);
+}
+
+#[test]
+fn test_actuate_unknown_limb() {
+    let mut sys = IpcTestSystem::new("actuate_unknown");
+    sys.start_server();
+    let mut client = sys.client();
+
+    let resp = client
+        .request(cmd::ACTUATE, &actuate_payload("no.such.limb", ""))
+        .expect("actuate");
+    assert_eq!(resp[0], 0, "unknown limb refuses, not errors");
+    let ml = u16::from_le_bytes([resp[1], resp[2]]) as usize;
+    let reason = String::from_utf8_lossy(&resp[3..3 + ml]);
+    assert!(reason.contains("unknown actuator"), "reason: {reason}");
+}

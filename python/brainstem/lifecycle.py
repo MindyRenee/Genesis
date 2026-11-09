@@ -201,6 +201,7 @@ class LifecycleMixin:
         self.client.connect()
         self._running = True
         self._session_started_at = time.time()
+        self._release_eye_volition()
         # A start after a prior stop() clears the stop latch so resume
         # paths work again on the restarted mind.
         self._stop_latched = False
@@ -403,6 +404,7 @@ class LifecycleMixin:
         try:
             self.client.connect()
             self.client.set_cognitive_pid(os.getpid())
+            self._release_eye_volition()
             for module_id in self._registered_modules():
                 self.client.update_module_status(module_id, MODULE_STATUS_STARTING)
             self.client.set_zone(ZONE_SLEEPING if self._is_sleeping else ZONE_CONVERSATION)
@@ -423,6 +425,27 @@ class LifecycleMixin:
         # because this mind never died.
         self._note_discontinuity(mind_rejoin=True)
         return True
+
+    def _release_eye_volition(self) -> None:
+        """Hand the eye's voluntary controls back to the body.
+
+        The voluntary lid and the accommodation target are *held*
+        daemon-side — a mind that dies while meditating leaves the
+        lid shut and the lens powered on a body that survives it,
+        and the next mind would inherit an eye it never asked for.
+        Releasing is always safe: ``set_lid(1.0)`` yields the lid to
+        the phase's own position, ``set_focus(0)`` relaxes the lens
+        to infinity. Daemons that predate either wire answer False —
+        an absent channel, silently skipped.
+        """
+        try:
+            self.client.set_lid(1.0)
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            self.client.set_focus(0.0)
+        except Exception:  # noqa: BLE001
+            pass
 
     def _note_discontinuity(self, *, mind_rejoin: bool = False) -> None:
         """Acknowledge any interruption since she was last alive.
