@@ -228,6 +228,13 @@ class LatentManifold:
         self._forget_gain = 1.0  # homeostatic forgetting gain
         self._replay_fidelity = 0.5  # sequence fidelity, grows with use
         self._gist_bw = _GIST_BANDWIDTH  # adaptive gist ceiling
+        # The higher medium — inner deposits lifted one octave into
+        # S7 (the quaternionic Hopf level above ours). The inner
+        # world is connected to higher dimensions because its
+        # coordinates literally live there too.
+        from . import higher as _h
+
+        self._higher = _h.HigherStratum()
 
     # ------------------------------------------------------------------
     # Deposit — experiences laid down as points on fibers
@@ -341,6 +348,11 @@ class LatentManifold:
             self._warp = np.append(self._warp, 0.0)
             self._kinds.append(kind)
             self._dirty = True
+            # The inner world is connected to higher dimensions: an
+            # inner deposit's coordinate lifts into the S7 stratum —
+            # the same point, one octave up.
+            if domain == "inner":
+                self._higher.lift(idx, self._points[idx])
             return idx
 
     # ------------------------------------------------------------------

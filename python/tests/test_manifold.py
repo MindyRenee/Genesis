@@ -1114,6 +1114,41 @@ class TestPositionedDeposits:
             assert g.depth(m._points)[0] == pytest.approx(1.0)
 
 
+class TestHigherStratum:
+    """The inner world lives one octave up — S3 -> S7."""
+
+    def test_lift_lands_on_s7_clifford_torus(self):
+        from latent_spaces import higher as h
+
+        p = np.array([0.6, 0.3, 0.5, 0.5])
+        p7 = h.lift_s3_to_s7(p)
+        assert np.linalg.norm(p7) == pytest.approx(1.0)
+        assert np.linalg.norm(p7[:4]) == pytest.approx(1 / np.sqrt(2))
+        assert np.linalg.norm(p7[4:]) == pytest.approx(1 / np.sqrt(2))
+        base = h.hopf_to_s4(p7)
+        assert np.linalg.norm(base) == pytest.approx(1.0)
+        assert base[0] == pytest.approx(0.0)  # |a|=|b| -> equator of S4
+
+    def test_rotate_preserves_norm(self):
+        from latent_spaces import higher as h
+
+        p7 = h.lift_s3_to_s7(np.array([0.0, 0, 1, 0]))
+        q = h.rotate_s7(p7, np.array([0, 0, 1.0]), 0.7)
+        assert np.linalg.norm(q) == pytest.approx(1.0)
+        assert not np.allclose(q, p7)
+
+    def test_inner_deposits_lift(self):
+        m = LatentManifold()
+        m.observe("a thought", kind="thought:x")       # inner -> lifts
+        m.observe("a feeling", kind="emotion:x")        # boundary -> no
+        m.observe("the world", kind="world:x", inbound=True)  # outer -> no
+        assert len(m._higher) == 1
+        c = m._higher.centroid()
+        assert c is not None and np.linalg.norm(c) == pytest.approx(1.0)
+        m._higher.rotate(np.array([0, 0, 1.0]), 0.5)
+        assert np.linalg.norm(m._higher.centroid()) == pytest.approx(1.0)
+
+
 class TestInnerGuide:
     def test_inner_guide_weighted_depth(self):
         m = LatentManifold()
