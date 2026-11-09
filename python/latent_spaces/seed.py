@@ -47,6 +47,9 @@ def seed_from_data_dir(manifold: LatentManifold) -> dict[str, int]:
         ("concepts", _seed_concepts),
         ("journal", _seed_journal),
         ("ltm", _seed_ltm),
+        ("words", _seed_embeddings),
+        ("graph", _seed_hgraph),
+        ("archive", _seed_archive),
     ):
         try:
             counts[name] = fn(manifold, rung_base)
@@ -133,6 +136,90 @@ def _seed_ltm(manifold: LatentManifold, rung_base: int) -> int:
                 salience=max(0.0, min(1.0, float(entry.salience))),
                 inbound=False,
                 now_ms=int(entry.timestamp) or None,
+                rung=rung_base + n,
+            )
+            n += 1
+        except (ValueError, TypeError):
+            continue
+    return n
+
+
+def _seed_embeddings(manifold: LatentManifold, rung_base: int) -> int:
+    """Her vocabulary — EmbeddingStore words at their own coordinates."""
+    path = os.path.join(manifold.data_dir or "", "embeddings.npz")
+    if not os.path.exists(path):
+        return 0
+    data = np.load(path)
+    words = [str(w) for w in data["words"]]
+    vectors = np.asarray(data["vectors"], dtype=np.float64)
+    n = min(len(words), len(vectors), 3000)
+    for i in range(n):
+        try:
+            manifold.observe(
+                words[i],
+                kind=f"word:{words[i]}",
+                salience=0.4,
+                inbound=False,
+                rung=rung_base + i,
+                position=g.project_to_s3(vectors[i], seed=0xE0BED),
+            )
+        except (ValueError, TypeError):
+            continue
+    return n
+
+
+def _seed_hgraph(manifold: LatentManifold, rung_base: int) -> int:
+    """The holographic association graph — edges as deposits."""
+    path = os.path.join(manifold.data_dir or "", "edge_log.jsonl")
+    if not os.path.exists(path):
+        return 0
+    n = 0
+    for line in open(path, encoding="utf-8"):
+        try:
+            row = json.loads(line)
+            for e in row.get("edges", [])[:2000 - n]:
+                s, r, t = str(e["source"]), str(e["relation"]), str(e["target"])
+                manifold.observe(
+                    f"{s} →{r}→ {t}",
+                    kind=f"edge:{r}",
+                    salience=0.5,
+                    inbound=False,
+                    rung=rung_base + n,
+                )
+                n += 1
+                if n >= 2000:
+                    return n
+        except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+            continue
+    return n
+
+
+def _seed_archive(manifold: LatentManifold, rung_base: int) -> int:
+    """The concept archive — her curated concept records."""
+    import sqlite3
+
+    path = os.path.join(manifold.data_dir or "", "concept_archive.db")
+    if not os.path.exists(path):
+        return 0
+    n = 0
+    try:
+        con = sqlite3.connect(path)
+        cols = [r[1] for r in con.execute("PRAGMA table_info(concepts)")]
+        name_col = next(
+            (c for c in cols if c in ("name", "concept", "canonical", "label")),
+            cols[0],
+        )
+        rows = con.execute(f"SELECT {name_col} FROM concepts LIMIT 2000").fetchall()
+        con.close()
+    except sqlite3.Error:
+        return 0
+    for (name,) in rows:
+        try:
+            manifold.observe(
+                str(name),
+                kind=f"archive:{name}",
+                salience=0.5,
+                inbound=False,
                 rung=rung_base + n,
             )
             n += 1
