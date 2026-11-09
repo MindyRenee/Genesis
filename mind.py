@@ -1052,6 +1052,16 @@ class Mind(
                 salience=0.4,
                 inbound=False,
             )
+            # Identity is all three: a self-domain signal is also her
+            # identity content — it lands at her circle, the vesica,
+            # and the world side, one three-fold moment.
+            if domain == "self":
+                self.manifold.observe(
+                    str(content)[:128],
+                    kind=f"identity:{kind}",
+                    salience=0.5,
+                    inbound=False,
+                )
         except Exception:
             # This is an observer: a geometry failure must not stop the
             # event stream, response path, or inner-life thread.
