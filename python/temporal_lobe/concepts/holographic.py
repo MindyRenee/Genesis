@@ -444,6 +444,33 @@ class HolographicGraph:
             if isinstance(cached, list):
                 return list(cached)
 
+        # The substrate answers associations: edge deposits live at
+        # their source's own holographic address — the cue is the
+        # same SDR projected, prefix-filtered to this source+relation,
+        # so resonance returns the targets that belong to this source.
+        manifold = getattr(self, "manifold", None)
+        if (
+            manifold is not None
+            and candidate_ids is None
+            and source in self._addresses
+        ):
+            try:
+                from latent_spaces import geometry as _g
+
+                cue = _g.project_to_s3(
+                    np.asarray(self._addresses[source], dtype=np.float64),
+                    seed=0xA55E,
+                )
+                prefix = f"edge:{source}:{relation}:"
+                hits = manifold.resonate(cue, k=top_k, radius=0.6, prefix=prefix)
+                out = [(kk[len(prefix):], float(sc)) for (_, kk, sc, _) in hits]
+                if out:
+                    if cache_key is not None:
+                        self._cache_put(cache_key, list(out))
+                    return out[:top_k]
+            except (TypeError, ValueError, ArithmeticError):
+                pass
+
         if relation not in self._memory:
             return []
         if source not in self._addresses:

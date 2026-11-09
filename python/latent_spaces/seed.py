@@ -169,22 +169,40 @@ def _seed_embeddings(manifold: LatentManifold, rung_base: int) -> int:
 
 
 def _seed_hgraph(manifold: LatentManifold, rung_base: int) -> int:
-    """The holographic association graph — edges as deposits."""
+    """The holographic association graph — edges as deposits.
+
+    Each edge lands AT its source concept's holographic coordinate
+    (the SDR address projected to S3) with the full triple in the
+    kind — ``edge:{src}:{rel}:{tgt}`` — so a prefix-filtered
+    resonance at the source's own address answers "what does X
+    relate to" from the substrate directly.
+    """
     path = os.path.join(manifold.data_dir or "", "edge_log.jsonl")
     if not os.path.exists(path):
         return 0
+    addresses: dict[str, np.ndarray] = {}
+    try:
+        hg = np.load(os.path.join(manifold.data_dir or "", "holographic_graph.npz"))
+        for cid, row in zip(hg["concept_ids"], hg["addr_matrix"], strict=False):
+            addresses[str(cid)] = np.asarray(row, dtype=np.float64)
+    except (OSError, KeyError, ValueError):
+        pass
     n = 0
     for line in open(path, encoding="utf-8"):
         try:
             row = json.loads(line)
             for e in row.get("edges", [])[:2000 - n]:
                 s, r, t = str(e["source"]), str(e["relation"]), str(e["target"])
+                addr = addresses.get(s)
                 manifold.observe(
                     f"{s} →{r}→ {t}",
-                    kind=f"edge:{r}",
-                    salience=0.5,
+                    kind=f"edge:{s}:{r}:{t}",
+                    salience=max(0.0, min(1.0, float(e.get("weight", 0.5)))),
                     inbound=False,
                     rung=rung_base + n,
+                    position=(
+                        g.project_to_s3(addr, seed=0xA55E) if addr is not None else None
+                    ),
                 )
                 n += 1
                 if n >= 2000:

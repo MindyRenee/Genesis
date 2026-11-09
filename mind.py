@@ -583,6 +583,12 @@ class Mind(
         self.inner_life.manifold = self.manifold
         self.world.manifold = self.manifold
         self.memory.manifold = self.manifold
+        for _owner in (self.inner_life, getattr(self.brain, "frontal", None), self.memory):
+            _hg = getattr(getattr(_owner, "compression", None), "holographic_graph", None)
+            _hg = _hg if _hg is not None else getattr(_owner, "holographic_graph", None)
+            if _hg is not None:
+                _hg.manifold = self.manifold
+                break
         _ws = getattr(getattr(self.brain, "frontal", None), "global_workspace", None)
         if _ws is not None:
             _ws.manifold = self.manifold

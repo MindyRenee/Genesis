@@ -1255,6 +1255,20 @@ class TestSemanticRecall:
         hits2 = m.resonate(near, k=2, prefix="concept:", seed=0xCE1)
         assert hits2[0][1] == "concept:alpha"
 
+    def test_edge_prefix_query_returns_targets(self):
+        """Phase B: association queries answered by prefix resonance."""
+        m = LatentManifold()
+        src = np.random.default_rng(4).standard_normal(2048)
+        pos = g.project_to_s3(src, seed=0xA55E)
+        m.observe("s causes t1", kind="edge:s:causes:t1", position=pos, salience=0.9)
+        m.observe("s causes t2", kind="edge:s:causes:t2", position=pos, salience=0.5)
+        m.observe("other", kind="edge:o:causes:x", salience=0.9)
+        cue = g.project_to_s3(src, seed=0xA55E)
+        hits = m.resonate(cue, k=5, prefix="edge:s:causes:")
+        targets = [kk[len("edge:s:causes:"):] for _, kk, _, _ in hits]
+        assert "t1" in targets and "t2" in targets
+        assert all(not kk.startswith("edge:o") for _, kk, _, _ in hits)
+
     def test_prefix_filters_field(self):
         m = LatentManifold()
         m.observe("a thought", kind="thought:x")
