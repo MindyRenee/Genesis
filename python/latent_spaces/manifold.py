@@ -83,6 +83,17 @@ _FORMAT_VERSION = 2
 _DETAIL_BANDWIDTH = 0.02
 _GIST_BANDWIDTH = 0.5
 
+# Reach — how loudly a trace still answers. Fresh episodic detail
+# decays at _REACH_DECAY per second (a 1/e lifetime of a day); the
+# decay constant scales with 1/bandwidth, so gisted semantic traces
+# persist orders of magnitude longer. Recall and replay reactivate:
+# reach climbs asymptotically back toward 1. A trace whose reach
+# decays below the score floor goes silent — unreachable, never
+# removed.
+_REACH_DECAY = 1.0 / 86400.0
+_REACH_BOOST = 0.3
+_SCORE_FLOOR = 1e-3
+
 
 def _domain_of(kind: str) -> str:
     if kind.startswith("world:"):
@@ -282,11 +293,18 @@ class LatentManifold:
                 * (g.heat_kernel(d, self._bandwidth) / np.maximum(peak, 1e-300))
             )
             order = np.argsort(score)[::-1][:k]
-            return [
+            hits = [
                 (int(i), self._kinds[i], float(score[i]), float(d[i]))
                 for i in order
-                if score[i] > 0.0
+                if score[i] > _SCORE_FLOOR
             ]
+            # Retrieval is reconsolidation: the traces that answered
+            # climb asymptotically back toward full reach.
+            if hits:
+                idx = np.array([i for i, _, _, _ in hits])
+                self._reach[idx] += _REACH_BOOST * (1.0 - self._reach[idx])
+                self._dirty = True
+            return hits
 
     # ------------------------------------------------------------------
     # Episodes — deposits are arcs, exchanges are trajectories
@@ -417,6 +435,71 @@ class LatentManifold:
             episodes.append(ep)
         return episodes
 
+    def recent_rungs(
+        self,
+        *,
+        max_age_ms: int | None = None,
+        limit: int | None = None,
+    ) -> list[int]:
+        """Rungs touched by recent deposits — the replayable day.
+
+        ``max_age_ms`` selects rungs holding deposits younger than the
+        window; ``limit`` caps the count at the most recent. The N3
+        replay pass works over these — the waking stream replayed in
+        compressed time.
+        """
+        if max_age_ms is None and limit is None:
+            raise ValueError("pass max_age_ms or limit")
+        with self._lock:
+            if len(self._kinds) == 0:
+                return []
+            rows = np.arange(len(self._kinds))
+            if max_age_ms is not None:
+                cutoff = int(time.time() * 1000) - max_age_ms
+                rows = rows[self._born_ms >= cutoff]
+            if limit is not None:
+                rows = rows[-limit:]
+            return sorted(int(r) for r in np.unique(self._rung[rows]) if r >= 0)
+
+    def replay(
+        self,
+        rungs: list[int],
+        *,
+        reach_boost: float = _REACH_BOOST,
+        growth: float = 1.05,
+        migrate: float = 0.0,
+    ) -> None:
+        """Re-fire episodes — the N3 replay pass over recent rungs.
+
+        Reactivation, not re-encoding: the same engrams answer again —
+        reach climbs back toward 1, and replayed traces consolidate a
+        step deeper (bandwidth widens a touch, slides inward a touch).
+        Nothing new is deposited; the arc is walked again.
+        """
+        if not np.isfinite(reach_boost) or not 0.0 <= reach_boost <= 1.0:
+            raise ValueError("reach_boost must be in [0, 1]")
+        if not np.isfinite(growth) or growth < 1.0:
+            raise ValueError("growth must be >= 1.0")
+        if not np.isfinite(migrate) or migrate < 0.0:
+            raise ValueError("migrate must be >= 0")
+        with self._lock:
+            if len(self._kinds) == 0 or not rungs:
+                return
+            mask = np.isin(self._rung, np.asarray(rungs, dtype=np.int64))
+            if not mask.any():
+                return
+            self._reach[mask] += reach_boost * (1.0 - self._reach[mask])
+            if growth > 1.0:
+                self._bandwidth[mask] = np.minimum(
+                    self._bandwidth[mask] * growth, _GIST_BANDWIDTH
+                )
+            if migrate > 0.0:
+                gisted = np.clip(self._bandwidth / _GIST_BANDWIDTH, 0.0, 1.0)
+                self._points[mask] = g.migrate_depth(
+                    self._points[mask], migrate * gisted[mask]
+                )
+            self._dirty = True
+
     # ------------------------------------------------------------------
     # Dynamics — the medium's own motion
     # ------------------------------------------------------------------
@@ -490,6 +573,13 @@ class LatentManifold:
             self._shear_phase = (self._shear_phase + d_shear) % g.TWO_PI
             step = min(1.0, lean_rate * dt)
             self._lean += (self._lean_target - self._lean) * step
+            # Silence decays reach — a trace nobody reactivates fades
+            # below the cue floor into a silent engram. Detail decays
+            # fastest; consolidated gist persists.
+            if len(self._reach):
+                self._reach *= np.exp(
+                    -dt * _REACH_DECAY * _DETAIL_BANDWIDTH / self._bandwidth
+                )
             self._ticks += 1
             self._dirty = True
 

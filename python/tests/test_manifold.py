@@ -765,3 +765,139 @@ class TestN3Wiring:
 
         holder = SimpleNamespace(manifold=None, inner_life=None, client=None)
         MetronomeMixin._manifold_n3_consolidate(holder)
+
+
+class TestReach:
+    """Reach attenuation — silent engrams decay, never delete."""
+
+    def test_silence_decays_reach(self):
+        m = LatentManifold()
+        m.observe("a fading trace", kind="thought")
+        m.advance(3600.0)  # an hour of silence
+        with m._lock:
+            assert m._reach[0] < 1.0
+            assert m._reach[0] == pytest.approx(
+                np.exp(-3600.0 / 86400.0), rel=1e-3
+            )
+
+    def test_gist_decays_slower_than_detail(self):
+        from latent_spaces.manifold import _DETAIL_BANDWIDTH, _GIST_BANDWIDTH
+
+        m = LatentManifold()
+        m.observe("fresh", kind="thought")
+        m.observe("old gist", kind="thought")
+        with m._lock:
+            m._bandwidth[1] = _GIST_BANDWIDTH
+        m.advance(86400.0)
+        with m._lock:
+            fresh_decay = 1.0 - m._reach[0]
+            gist_decay = 1.0 - m._reach[1]
+        assert gist_decay < fresh_decay / 10
+        # rate scales with detail/bandwidth: gist (25x) lasts ~25x longer
+        assert m._reach[0] == pytest.approx(np.exp(-1.0), rel=0.05)
+        assert m._reach[1] == pytest.approx(
+            np.exp(-_DETAIL_BANDWIDTH / _GIST_BANDWIDTH), rel=0.05
+        )
+
+    def test_decayed_trace_goes_silent(self):
+        m = LatentManifold()
+        m.observe("quiet", kind="thought", salience=0.2)
+        for _ in range(200):
+            m.advance(3600.0)  # ~a month of silence
+        hits = m.resonate("quiet", kind="thought")
+        assert hits == [] or hits[0][0] != 0
+        with m._lock:
+            # never removed — the engram persists, unreachable
+            assert len(m._kinds) == 1
+
+    def test_recall_reinforces_reach(self):
+        m = LatentManifold()
+        m.observe("the question", kind="world:percept")
+        m.advance(7200.0)
+        with m._lock:
+            faded = m._reach[0]
+        m.resonate("the question", kind="world:percept")
+        with m._lock:
+            assert m._reach[0] > faded
+            # asymptotic toward 1, never past it
+            for _ in range(20):
+                m.resonate("the question", kind="world:percept")
+            assert m._reach[0] <= 1.0
+
+    def test_state_summary_counts_silent(self):
+        m = LatentManifold()
+        m.observe("x", kind="thought")
+        s = m.state_summary()
+        assert "deposits" in s
+
+
+class TestReplay:
+    def test_recent_rungs_selects_the_day(self):
+        m = LatentManifold()
+        import time as _t
+
+        old = int(_t.time() * 1000) - 30 * 3600 * 1000
+        m.observe("yesterday", kind="world:percept", inbound=True, now_ms=old)
+        m.observe("this morning", kind="world:percept", inbound=True)
+        rungs = m.recent_rungs(max_age_ms=12 * 3600 * 1000)
+        assert rungs == [m.rung_of(1)]
+        assert m.recent_rungs(limit=1) == [m.rung_of(1)]
+
+    def test_replay_reactivates_reach(self):
+        m = LatentManifold()
+        m.observe("in", kind="world:user_speech", inbound=True)
+        m.observe("out", kind="world:utterance", inbound=False)
+        m.advance(3600.0)
+        with m._lock:
+            faded = m._reach.copy()
+        m.replay([0])
+        with m._lock:
+            assert np.all(m._reach > faded)
+
+    def test_replay_consolidates_replayed_only(self):
+        m = LatentManifold()
+        m.observe("replayed", kind="world:percept", inbound=True)
+        m.observe("skipped", kind="world:percept", inbound=True)
+        with m._lock:
+            bw0 = m._bandwidth.copy()
+        m.replay([0], growth=1.5)
+        with m._lock:
+            assert m._bandwidth[0] > bw0[0]
+            assert m._bandwidth[1] == bw0[1]
+
+    def test_replay_keeps_silent_traces_reachable(self):
+        m = LatentManifold()
+        m.observe("the day", kind="world:percept", inbound=True, salience=0.9)
+        # simulate days: decay, replay each night
+        for _day in range(5):
+            for _ in range(24):
+                m.advance(3600.0)
+            m.replay([0])
+        hits = m.resonate("the day", kind="world:percept")
+        assert hits and hits[0][0] == 0
+
+    def test_n3_replays_before_consolidating(self):
+        from types import SimpleNamespace
+
+        from brainstem.metronome import MetronomeMixin
+        from thalamus.brain_waves import SleepStage
+
+        manifold = LatentManifold()
+        manifold.observe("the day", kind="world:percept", inbound=True, salience=0.9)
+        manifold.advance(7200.0)
+        with manifold._lock:
+            faded = manifold._reach[0]
+            bw0 = manifold._bandwidth[0]
+        holder = SimpleNamespace(
+            manifold=manifold,
+            inner_life=SimpleNamespace(
+                sleep_cycle=SimpleNamespace(current_stage=SleepStage.N3)
+            ),
+            client=SimpleNamespace(
+                get_state=lambda: SimpleNamespace(consolidation_weight=0.8)
+            ),
+        )
+        MetronomeMixin._manifold_n3_consolidate(holder)
+        with manifold._lock:
+            assert manifold._reach[0] > faded
+            assert manifold._bandwidth[0] > bw0

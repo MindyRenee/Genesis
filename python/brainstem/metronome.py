@@ -29,6 +29,14 @@ logger = logging.getLogger(__name__)
 # inward rather than a single stage dumping them at the core.
 _N3_GROWTH = 0.15
 _N3_MIGRATE = 0.002
+# N3 replay re-fires the recent day before the consolidation pass —
+# the theta-sequence analog: episodes replayed in compressed time
+# reactivate their reach and consolidate a step deeper. The window
+# is the waking day; replay grows bandwidth gently and slides
+# replayed traces inward ahead of the uniform pass.
+_N3_REPLAY_WINDOW_MS = 12 * 60 * 60 * 1000
+_N3_REPLAY_GROWTH = 1.05
+_N3_REACH_BOOST = 0.3
 
 
 class _AdaptiveInterval:
@@ -556,6 +564,15 @@ class MetronomeMixin:
                 getattr(self.client.get_state(), "consolidation_weight", 0.5)
             )
             weight = max(0.0, min(1.0, weight))
+            # Replay first — the day's episodes re-fire along their
+            # fibers, which is what drives both the reach they keep
+            # and the consolidation depth they migrate toward.
+            manifold.replay(
+                manifold.recent_rungs(max_age_ms=_N3_REPLAY_WINDOW_MS),
+                reach_boost=_N3_REACH_BOOST * weight,
+                growth=_N3_REPLAY_GROWTH,
+                migrate=_N3_MIGRATE * weight,
+            )
             manifold.consolidate(
                 growth=1.0 + _N3_GROWTH * weight,
                 migrate=_N3_MIGRATE * weight,
