@@ -660,6 +660,20 @@ class MemorySystem:
 
         # ── Wire the new memory into the subsystems ──────────
         self._wire_memory_subsystems(eid, text, emotional_tag)
+        # The episode also lands in the substrate — memory is inner
+        # world, so it deposits into the inner band rather than
+        # living only in the daemon's store beside the manifold.
+        manifold = getattr(self, "manifold", None)
+        if manifold is not None:
+            try:
+                manifold.observe(
+                    str(text)[:400],
+                    kind=f"memory:{source}",
+                    salience=max(0.0, min(1.0, salience)),
+                    inbound=False,
+                )
+            except (TypeError, ValueError, ArithmeticError):
+                pass
         return True
 
     def _register_memory_record(
