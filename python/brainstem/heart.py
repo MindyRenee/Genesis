@@ -1,7 +1,8 @@
 """Heart — the medullary cardiac center.
 
 The heart itself lives in the body: the daemon's carrier generator
-The carrier channel it read and drove was removed with the probe machinery — the organ now ticks dormant until a real rhythm returns to
+The carrier channel it read and drove was removed with the probe
+machinery — the organ ticks dormant until a real rhythm returns to
 throughput — a pulse the die physically performs, at a frequency
 the body's phase chooses. What lives here is the brainstem's half
 of the loop — the cardiac control center, the way the medulla

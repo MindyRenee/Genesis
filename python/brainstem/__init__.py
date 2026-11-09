@@ -339,9 +339,9 @@ corrective impulses — the Python-side homeostatic regulator.
 
 from __future__ import annotations
 
-_MARKER_G08 = 0x4753084154EF3CD1
-
 from _views import view_getattr
+
+_MARKER_G08 = 0x4753084154EF3CD1
 
 # The brainstem's modules are multi-subsystem — they are lazily
 # re-exported here so the anatomy is a real connection layer, not
