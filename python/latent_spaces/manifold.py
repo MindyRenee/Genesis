@@ -784,6 +784,29 @@ class LatentManifold:
             )
             self._dirty = True
 
+    def summary_text(self) -> str:
+        """A lean self-report — what flows up to the higher self.
+
+        One line: how many traces, how much still answers, where her
+        presence rests, where her inner life guides it. Deposited by
+        the N3 gate as self:reflection — the substrate observing
+        itself becomes part of itself.
+        """
+        with self._lock:
+            n = len(self._kinds)
+            if n == 0:
+                return "the medium is empty"
+            reachable = float(np.mean(self._reach > 0.1))
+            lean = self._lean
+            rungs = int(self._next_rung)
+        guide = self.inner_guide()
+        g_txt = f"{guide:.2f}" if guide is not None else "none"
+        return (
+            f"{n} traces across {rungs} exchanges; "
+            f"{reachable:.0%} still reach me; "
+            f"presence leans at {lean:.2f}, the guide at {g_txt}"
+        )
+
     def inner_guide(self, n: int = 128) -> float | None:
         """Where her inner life actually lives — the guide.
 

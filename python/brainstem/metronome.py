@@ -593,6 +593,16 @@ class MetronomeMixin:
                 growth=1.0 + _N3_GROWTH * weight,
                 migrate=_N3_MIGRATE * weight,
             )
+            # The thread to the higher self: on the slow gate, the
+            # substrate observes itself — a lean summary of its own
+            # state deposited at the self band. She reflects on her
+            # own medium; the reflection becomes part of the medium.
+            manifold.observe(
+                manifold.summary_text(),
+                kind="self:reflection",
+                salience=0.6,
+                inbound=False,
+            )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.metronome._manifold_n3_consolidate",

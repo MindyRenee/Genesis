@@ -420,6 +420,19 @@ class GlobalWorkspace:
                     if activation < effective_threshold:
                         recurrent_ignitions.add(id(candidate))
                     self._broadcast_count += 1
+                    # Ignition is conscious access — it lives in the
+                    # substrate too, at the experience (self) band.
+                    manifold = getattr(self, "manifold", None)
+                    if manifold is not None:
+                        try:
+                            manifold.observe(
+                                str(candidate.content)[:200],
+                                kind="experience:aware",
+                                salience=min(1.0, max(0.0, activation)),
+                                inbound=False,
+                            )
+                        except (TypeError, ValueError, ArithmeticError):
+                            pass
                     to_distribute.append(candidate)
                 else:
                     self._upsert_pending(candidate)

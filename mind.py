@@ -579,6 +579,9 @@ class Mind(
         # its own latent coordinates into the manifold's inner band.
         self.inner_life.manifold = self.manifold
         self.world.manifold = self.manifold
+        _ws = getattr(getattr(self.brain, "frontal", None), "global_workspace", None)
+        if _ws is not None:
+            _ws.manifold = self.manifold
 
         # Wire the emotional memory callback: when a high-emotion
         # memory is stored, it's queued for REM emotional processing
