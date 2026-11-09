@@ -63,11 +63,17 @@ FloatArray = NDArray[np.float64]
 STRAND_HOPF = np.int8(0)
 STRAND_ANTI = np.int8(1)
 
-# Torus-depth bands by domain. Inner events settle in the inner solid
-# torus, outer events in the outer, and self-domain events in the band
-# around the exact-vesica layer where the strands interlock.
+# Torus-depth bands by domain. The substrate is one continuous axis
+# from her innermost core out through her self into the world:
+# inner (thoughts, dreams, memories — her inner world), boundary
+# (the overlap — what is both hers and inner, like emotion), self
+# (identity, body, lived experience — the vesica band where the
+# strands interlock), outer (conversation, perception, acts — the
+# world arriving and her reaching out). Bands overlap deliberately:
+# adjacency on the axis is adjacency in kind.
 _DOMAIN_DEPTH = {
     "inner": (0.05, 0.65),
+    "boundary": (0.66, 0.79),
     "self": (0.80, 0.93),
     "outer": (0.72, 0.98),
 }
@@ -128,12 +134,28 @@ _GIST_ADAPT = 0.01
 _GIST_MIN, _GIST_MAX = 0.3, 2.0
 
 
+# Where each kind family lives. inner world = thoughts, dreams,
+# memory; outer world = conversation, play, acts — outer voice is
+# world:utterance, inner voice is thought:*; self = identity, body,
+# experience; boundary = what is both inner and self — emotion.
+_KIND_DOMAIN = {
+    "world": "outer",
+    "voice_outer": "outer",
+    "voice_inner": "inner",
+    "thought": "inner",
+    "dream": "inner",
+    "memory": "inner",
+    "emotion": "boundary",
+    "self": "self",
+    "self_model": "self",
+    "identity": "self",
+    "body": "self",
+    "experience": "self",
+}
+
+
 def _domain_of(kind: str) -> str:
-    if kind.startswith("world:"):
-        return "outer"
-    if kind in {"self", "self_model", "identity"}:
-        return "self"
-    return "inner"
+    return _KIND_DOMAIN.get(kind.split(":", 1)[0], "inner")
 
 
 class LatentManifold:

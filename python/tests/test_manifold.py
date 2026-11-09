@@ -960,6 +960,37 @@ class TestReplay:
         assert m.rungs_since(0) == [0, 1]
 
 
+class TestDomains:
+    def test_emotion_lands_in_the_overlap(self):
+        """Emotion is both inner and self — it settles in the overlap band."""
+        from latent_spaces import geometry as g
+
+        m = LatentManifold()
+        m.observe("a feeling", kind="emotion:joy")
+        with m._lock:
+            depth = g.depth(m._points)[0]
+        assert 0.66 <= depth <= 0.79
+
+    def test_emotion_rides_the_open_rung(self):
+        """A feeling mid-conversation joins the exchange in progress."""
+        m = LatentManifold()
+        m.observe("hello", kind="world:user_speech", inbound=True)
+        m.observe("warmth", kind="emotion:warmth", inbound=True)
+        m.observe("hi back", kind="world:utterance", inbound=False)
+        assert len({m.rung_of(i) for i in range(3)}) == 1
+
+    def test_inner_outer_voice_domains(self):
+        from latent_spaces import geometry as g
+
+        m = LatentManifold()
+        m.observe("thinking it", kind="thought:internal")
+        m.observe("saying it", kind="world:utterance", inbound=False)
+        with m._lock:
+            d = g.depth(m._points)
+        assert d[0] <= 0.65  # inner voice lives inside
+        assert d[1] >= 0.72  # outer voice lives in the world
+
+
 class TestMetaplasticity:
     """Nothing is frozen — the medium tunes its own parameters."""
 
