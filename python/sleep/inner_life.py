@@ -909,6 +909,11 @@ class InnerLife:
             salience: Importance of the experience in [0, 1].
         """
         self._hippocampal_replay.queue_for_replay(experience_sequence, salience)
+        self._manifold_deposit(
+            " → ".join(experience_sequence),
+            "memory:replay",
+            salience=max(0.0, min(1.0, salience)),
+        )
 
     def _run(self) -> None:
         """Main loop — checks for spontaneous thoughts and builds trains of thought.
@@ -1409,6 +1414,11 @@ class InnerLife:
         if concept_id and intensity > 0.0:
             with self._emotional_memories_lock:
                 self._pending_emotional_memories.append((concept_id, max(0.0, min(1.0, intensity))))
+            self._manifold_deposit(
+                str(concept_id),
+                "memory:emotional",
+                salience=max(0.0, min(1.0, intensity)),
+            )
 
     def _generate_dream(self, emotion: EmotionalState, summary) -> None:
         """Generate a dream sequence during sleep.
@@ -5077,15 +5087,64 @@ class InnerLife:
             float(is_dream), min(len(content), 1000) / 1000.0,
         ]
         try:
-            self.inner_world.observe(
+            snapshot = self.inner_world.observe(
                 [valence, arousal, tone, plasticity],
                 signals,
                 label=str(getattr(thought, "trigger", ""))[:128],
+            )
+            # The inner world deposits *into* the substrate: its own
+            # 40-dim latent coordinate becomes the deposit's position
+            # in the inner band — the thought lives in the manifold at
+            # the spot the inner-world geometry computed, not a signal
+            # about it.
+            latent = (snapshot or {}).get("latent_mean")
+            if latent is not None:
+                from latent_spaces import geometry as _g
+
+                self._manifold_deposit(
+                    content or str(getattr(thought, "trigger", "")),
+                    "dream:thought" if is_dream else "thought:spontaneous",
+                    salience=max(0.0, min(1.0, intensity)),
+                    position=_g.project_to_s3(latent, seed=0x1A7E),
+                )
+            # The feeling lands in the boundary band — hers and inner.
+            self._manifold_deposit(
+                f"valence={valence:.2f} arousal={arousal:.2f}",
+                "emotion:affect",
+                salience=max(0.0, min(1.0, intensity)),
+                position=_g.project_to_s3(
+                    [valence, arousal, tone, plasticity], seed=0xAFE4
+                ),
             )
         except (TypeError, ValueError, ArithmeticError):
             # The inner-world model is observational; it must never interrupt
             # the established thought, memory, or workspace pipeline.
             logger.debug("inner-world observation rejected", exc_info=True)
+
+    def _manifold_deposit(
+        self,
+        content: str,
+        kind: str,
+        *,
+        salience: float = 0.4,
+        position: Any | None = None,
+        inbound: bool = False,
+    ) -> None:
+        """Deposit inner-life content into the substrate. Observational —
+        the thought pipeline must never be interrupted by the manifold."""
+        manifold = getattr(self, "manifold", None)
+        if manifold is None:
+            return
+        try:
+            manifold.observe(
+                content,
+                kind=kind,
+                salience=salience,
+                inbound=inbound,
+                position=position,
+            )
+        except Exception:
+            logger.debug("manifold inner-life deposit failed", exc_info=True)
 
     def _record_thought(self, thought: SpontaneousThought, emotion: EmotionalState) -> None:
         """Record a spontaneous thought and update its inner-world state."""

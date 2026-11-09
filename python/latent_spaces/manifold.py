@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
 import os
 import threading
 import time
@@ -279,6 +280,7 @@ class LatentManifold:
         inbound: bool = True,
         now_ms: int | None = None,
         rung: int | None = None,
+        position: FloatArray | None = None,
     ) -> int:
         """Deposit a trace; returns its index. Never mutates old deposits.
 
@@ -287,14 +289,28 @@ class LatentManifold:
         ``rung`` overrides the exchange the deposit joins — left alone,
         the flow assigns it: inbound outer legs open a new exchange,
         everything else rides the open one until an outbound outer leg
-        completes the arc.
+        completes the arc. ``position`` overrides the digest address —
+        another latent space's own coordinate, projected onto S3 and
+        constrained into the kind's depth band: the source picks the
+        spot, the taxonomy owns the axis.
         """
         if not isinstance(content, str):
             raise TypeError("content must be a string")
         if not np.isfinite(salience) or not 0.0 <= salience <= 1.0:
             raise ValueError("salience must be finite and in [0, 1]")
         domain = _domain_of(kind)
-        point = self._digest_point(content, kind, domain)
+        if position is not None:
+            p = np.asarray(position, dtype=np.float64)
+            n = np.linalg.norm(p)
+            if p.shape != (4,) or not np.isfinite(p).all() or n < 1e-12:
+                raise ValueError("position must be a finite (4,) vector")
+            p = p / n
+            lo, hi = _DOMAIN_DEPTH[domain]
+            phi = math.asin(min(1.0, float(np.hypot(p[0], p[1]))))
+            target = min(max(phi, math.asin(lo)), math.asin(hi))
+            point = g.migrate_depth(p[None, :], phi - target)[0]
+        else:
+            point = self._digest_point(content, kind, domain)
         born = int(time.time() * 1000) if now_ms is None else int(now_ms)
         strand = STRAND_HOPF if inbound else STRAND_ANTI
         with self._lock:

@@ -567,6 +567,9 @@ class Mind(
             engagement=lambda: 0.0,
             on_latent_signal=self._observe_self_latent_signal,
         )
+        # The inner world lives in the substrate: inner_life deposits
+        # its own latent coordinates into the manifold's inner band.
+        self.inner_life.manifold = self.manifold
 
         # Wire the emotional memory callback: when a high-emotion
         # memory is stored, it's queued for REM emotional processing

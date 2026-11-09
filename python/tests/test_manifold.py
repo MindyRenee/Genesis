@@ -1048,6 +1048,54 @@ class TestConformalMetric:
         assert m2._warp[0] == pytest.approx(m._warp[0])
 
 
+class TestPositionedDeposits:
+    """Other latent spaces deposit *in* the substrate by coordinate."""
+
+    def test_position_overrides_digest(self):
+        from latent_spaces import geometry as g
+
+        m = LatentManifold()
+        pos = g.project_to_s3(np.arange(40.0), seed=0x1A7E)
+        idx = m.observe("a thought", kind="thought:spontaneous", position=pos)
+        with m._lock:
+            # depth constrained into the inner band, phases preserved
+            depth = g.depth(m._points)[idx]
+        assert 0.05 <= depth <= 0.66
+
+    def test_project_to_s3_deterministic_and_unit(self):
+        from latent_spaces import geometry as g
+
+        v = np.random.default_rng(3).normal(size=40)
+        p1 = g.project_to_s3(v, seed=7)
+        p2 = g.project_to_s3(v, seed=7)
+        assert np.allclose(p1, p2)
+        assert np.linalg.norm(p1) == pytest.approx(1.0)
+        # nearby latents land nearby — the source's geometry survives
+        p3 = g.project_to_s3(v + 1e-6, seed=7)
+        assert g.geodesic(p1, p3) < 0.01
+
+    def test_position_constrained_per_domain(self):
+        m = LatentManifold()
+        from latent_spaces import geometry as g
+
+        # a projected coordinate lands wherever it lands — the band
+        # constraint slides it into the domain's depth range
+        pos = g.project_to_s3(np.linspace(-3, 3, 40), seed=0xAFE4)
+        m.observe("felt", kind="emotion:glow", position=pos)
+        with m._lock:
+            depth = g.depth(m._points)[0]
+        assert 0.66 <= depth <= 0.8  # pushed into the boundary band
+
+    def test_position_exact_core_is_degenerate(self):
+        from latent_spaces import geometry as g
+
+        m = LatentManifold()
+        # an exact-core point has no phase to slide — stays put
+        m.observe("pole", kind="emotion:x", position=np.array([1.0, 0, 0, 0]))
+        with m._lock:
+            assert g.depth(m._points)[0] == pytest.approx(1.0)
+
+
 class TestMetaplasticity:
     """Nothing is frozen — the medium tunes its own parameters."""
 

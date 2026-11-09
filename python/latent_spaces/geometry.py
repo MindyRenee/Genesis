@@ -286,6 +286,28 @@ def tumble(
     return out
 
 
+def project_to_s3(vector: FloatArray, seed: int = 0xC0FFEE) -> FloatArray:
+    """Project a vector of any dimension onto S3 deterministically.
+
+    A fixed Gaussian projection matrix seeded once per caller — a
+    Johnson-Lindenstrauss-style embedding: nearby latent coordinates
+    land nearby on the sphere, so a source space's own geometry is
+    preserved, not hashed away. This is how other latent spaces
+    deposit *in* the substrate — their coordinates become manifold
+    positions rather than signals about them.
+    """
+    v = np.asarray(vector, dtype=np.float64).ravel()
+    if v.size == 0 or not np.isfinite(v).all():
+        raise ValueError("projection source must be finite and nonempty")
+    rng = np.random.default_rng(seed)
+    proj = rng.standard_normal((4, v.size)) / math.sqrt(v.size)
+    p = proj @ v
+    n = np.linalg.norm(p)
+    if n < 1e-12:  # degenerate latent — land on the identity pole
+        return np.array([1.0, 0.0, 0.0, 0.0])
+    return p / n
+
+
 def warp_field(
     points: FloatArray,
     centers: FloatArray,
