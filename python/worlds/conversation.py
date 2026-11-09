@@ -456,11 +456,29 @@ class ConversationMixin:
         try:
             parsed = comprehension.comprehend(content)
             temporal.observe_language(content, parsed, direction="inbound")
+            self._deposit_language(temporal, content, "thought:language")
             self._integrate_cognitive_topos("language", "inbound", content)
         except (ArithmeticError, AttributeError, TypeError, ValueError, OverflowError):
             # Language geometry is observational; malformed input must not
             # interrupt the actual conversation pipeline.
             logger.debug("language latent input observation failed", exc_info=True)
+
+    def _deposit_language(self, temporal: Any, content: str, kind: str) -> None:
+        """Deposit the language space's own latent coordinate into the
+        substrate — her language processing lives *in* the manifold."""
+        manifold = getattr(getattr(self.brain, "mind", None), "manifold", None)
+        state = getattr(temporal.language_latent_space, "_last_state", None)
+        if manifold is None or state is None:
+            return
+        from latent_spaces import geometry as _g
+
+        manifold.observe(
+            content[:200],
+            kind=kind,
+            salience=0.45,
+            inbound=False,
+            position=_g.project_to_s3(state, seed=0x1A46),
+        )
 
     def _observe_language_output(self, content: str) -> None:
         """Record Genesis's generated utterance in the temporal language space."""
@@ -472,6 +490,7 @@ class ConversationMixin:
         try:
             parsed = comprehension.comprehend(content)
             temporal.observe_language(content, parsed, direction="outbound")
+            self._deposit_language(temporal, content, "voice_inner:language")
         except (ArithmeticError, AttributeError, TypeError, ValueError, OverflowError):
             # Metrics are observational and must never suppress a valid reply.
             logger.debug("language latent output observation failed", exc_info=True)

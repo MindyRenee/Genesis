@@ -892,7 +892,22 @@ class OuterWorld:
         with self._lock:
             self._kind_map.observe(event.kind)
             self._presence_map.observe(event.source)
-            self.experiential_space.observe(event)
+            snap = self.experiential_space.observe(event)
+            # Her experience of the world lands at its own experiential
+            # coordinate — self-band, not beside the substrate.
+            manifold = getattr(self, "manifold", None)
+            if manifold is not None:
+                from latent_spaces import geometry as _g
+
+                state = (snap or {}).get("state")
+                if state is not None:
+                    manifold.observe(
+                        str(getattr(event, "text", event.kind.value))[:200],
+                        kind="experience:world",
+                        salience=0.5,
+                        inbound=False,
+                        position=_g.project_to_s3(state, seed=0xE2EE),
+                    )
         self._stream.append(event)
         listener = self.on_external_event
         if listener is not None:

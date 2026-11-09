@@ -173,7 +173,11 @@ _KIND_DOMAIN = {
 
 
 def _domain_of(kind: str) -> str:
-    return _KIND_DOMAIN.get(kind.split(":", 1)[0], "inner")
+    parts = kind.split(":", 2)
+    if parts[0] == "topos" and len(parts) > 1:
+        # topos:{domain}:{kind} — the signal names its own domain
+        return _KIND_DOMAIN.get(parts[1], parts[1])
+    return _KIND_DOMAIN.get(parts[0], "inner")
 
 
 class LatentManifold:
@@ -390,7 +394,9 @@ class LatentManifold:
         """Recall the strongest traces near a cue.
 
         ``cue`` is raw content (digested like a deposit, at the domain
-        its ``kind`` implies) or a point on S3. Score is
+        its ``kind`` implies), a point on S3, or a latent vector of any
+        dimensionality (projected onto S3 — semantic cues reach the
+        semantically positioned deposits). Score is
         ``reach * salience * exp(-(d / radius)^2)`` — a resonance kernel:
         nearby traces answer strongly, distant ones fade smoothly.
         Returns ``(index, kind, score, geodesic_distance)`` rows sorted
@@ -400,7 +406,12 @@ class LatentManifold:
             domain = _domain_of(kind)
             cue_point = self._digest_point(cue, kind, domain)
         else:
-            cue_point = g.unit(np.asarray(cue, dtype=np.float64).reshape(1, -1))[0]
+            v = np.asarray(cue, dtype=np.float64).ravel()
+            cue_point = (
+                g.unit(v.reshape(1, -1))[0]
+                if v.size == 4
+                else g.project_to_s3(v)
+            )
         if radius <= 0 or not np.isfinite(radius):
             raise ValueError("radius must be positive and finite")
         with self._lock:

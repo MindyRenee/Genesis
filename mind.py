@@ -578,6 +578,7 @@ class Mind(
         # The inner world lives in the substrate: inner_life deposits
         # its own latent coordinates into the manifold's inner band.
         self.inner_life.manifold = self.manifold
+        self.world.manifold = self.manifold
 
         # Wire the emotional memory callback: when a high-emotion
         # memory is stored, it's queued for REM emotional processing
@@ -1036,6 +1037,14 @@ class Mind(
                 outer_snapshot=outer_snapshot,
                 inner_snapshot=inner_snapshot,
                 language_snapshot=language_snapshot,
+            )
+            # The topos signal is also an event in the substrate —
+            # same content, the domain named in the kind.
+            self.manifold.observe(
+                str(content)[:128],
+                kind=f"topos:{domain}:{kind}",
+                salience=0.4,
+                inbound=False,
             )
         except Exception:
             # This is an observer: a geometry failure must not stop the
