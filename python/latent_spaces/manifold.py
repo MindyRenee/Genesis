@@ -498,12 +498,23 @@ class LatentManifold:
     def _home_point(self) -> FloatArray:
         """The center she returns to — her resting presence at the vesica.
 
-        Called with the lock held. The home point sits at the medium's
-        current lean depth on the self–world axis, phases zeroed:
-        every exchange loops back to wherever she rests.
+        Called with the lock held. Home is not a fixed landmark: it
+        rides the medium's own motion — carried on the current
+        heartbeat and shear phases, drifting in depth with her lean —
+        so every exchange loops back to wherever she is *now*, not to
+        a marker pinned in the past.
         """
+        a1 = self._phase + self._shear_phase
+        a2 = self._phase - self._shear_phase
         c = math.sqrt(max(0.0, 1.0 - self._lean * self._lean))
-        return np.array([self._lean, 0.0, c, 0.0])
+        return np.array(
+            [
+                self._lean * math.cos(a1),
+                self._lean * math.sin(a1),
+                c * math.cos(a2),
+                c * math.sin(a2),
+            ]
+        )
 
     def traverse(self, rung: int, per_leg: int = 32, close_loop: bool = True) -> FloatArray:
         """Walk a rung's arc — the episode as a loop through the medium.

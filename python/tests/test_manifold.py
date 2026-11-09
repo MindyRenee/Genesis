@@ -492,14 +492,27 @@ class TestEpisodes:
         # the loop closes at the vesica home, not at the world
         assert np.allclose(path[-1], m._home_point(), atol=1e-9)
 
+    def test_home_point_rides_the_medium(self):
+        """Home is dynamic — it moves with the medium, not a landmark."""
+        m = LatentManifold()
+        m.observe("x", kind="thought")
+        before = m._home_point()
+        m.advance(2.0, heartbeat_omega=0.5, shear=0.1)
+        after = m._home_point()
+        assert not np.allclose(before, after)
+        assert np.linalg.norm(after) == pytest.approx(1.0)
+        assert g.depth(after.reshape(1, 4))[0] == pytest.approx(m._lean, abs=0.05)
+
     def test_traverse_is_recall_invariant_under_rotation(self):
         m = LatentManifold()
         m.observe("in", kind="world:percept", inbound=True)
         m.observe("out", kind="world:utterance", inbound=False)
-        before = m.traverse(0, per_leg=8)
+        before = m.traverse(0, per_leg=8, close_loop=False)
         for _ in range(10):
             m.advance(1.0, shear=0.03)
-        after = m.traverse(0, per_leg=8)
+        after = m.traverse(0, per_leg=8, close_loop=False)
+        # the episode legs are recall-invariant; the return leg is
+        # present tense — home moves with her, so it is not compared
         assert np.allclose(before, after, atol=1e-9)
 
     def test_segment_is_the_swept_orbit(self):
