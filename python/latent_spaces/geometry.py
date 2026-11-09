@@ -285,6 +285,44 @@ def tumble(
     return out
 
 
+def migrate_depth(points: FloatArray, angle: float | FloatArray) -> FloatArray:
+    """Slide along the core-to-core geodesic — the phase-aligned tumble.
+
+    A rotation in the plane spanned by each point's own z1- and
+    z2-phase directions: torus depth |z1| changes while both phase
+    angles are preserved. In (r, s) = (|z1|, |z2|) space this is a
+    plain rotation of the latitude phi = atan2(r, s): phi -> phi -
+    angle. Positive angle moves inward toward the self core (|z1|
+    shrinks, |z2| grows); negative moves outward. It is ``tumble``
+    with each point's plane chosen by its own phases — an isometry
+    along a great circle through both cores. The slide clamps just
+    short of a core: migration is asymptotic — a trace approaches a
+    core but never passes through it into the anti-meridian.
+    Points exactly on a core have no phase to slide along and stay put.
+    """
+    p = np.asarray(points, dtype=np.float64)
+    r = np.hypot(p[..., 0], p[..., 1])
+    s = np.hypot(p[..., 2], p[..., 3])
+    # phi in (0, pi/2): 0 is the self core, pi/2 the other core.
+    phi = np.arctan2(r, s)
+    floor = 0.01
+    a = np.clip(
+        np.asarray(angle, dtype=np.float64),
+        phi - (math.pi / 2.0 - floor),  # outward bound
+        np.maximum(phi - floor, 0.0),  # inward bound
+    )
+    c, sn = np.cos(a), np.sin(a)
+    r2 = r * c - s * sn
+    s2 = s * c + r * sn
+    movable = (r > 1e-9) & (s > 1e-9)
+    scale1 = np.where(movable, r2 / np.maximum(r, 1e-9), 1.0)
+    scale2 = np.where(movable, s2 / np.maximum(s, 1e-9), 1.0)
+    out = p.copy()
+    out[..., 0:2] *= scale1[..., None]
+    out[..., 2:4] *= scale2[..., None]
+    return out
+
+
 def heat_kernel(
     theta: FloatArray | float,
     bandwidth: float | FloatArray,

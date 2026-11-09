@@ -76,8 +76,12 @@ _FORMAT_VERSION = 2
 
 # Fresh deposits land sharp — high spectral modes alive, episodic
 # detail intact. Consolidation widens the bandwidth; detail diffuses
-# into gist while the trace itself is never removed.
+# into gist while the trace itself is never removed. The gist floor
+# is a ceiling on that diffusion: consolidation saturates at a broad,
+# semantic bandwidth instead of flattening a trace into nothing —
+# repeated N3 passes approach it and stop mattering.
 _DETAIL_BANDWIDTH = 0.02
+_GIST_BANDWIDTH = 0.5
 
 
 def _domain_of(kind: str) -> str:
@@ -417,18 +421,38 @@ class LatentManifold:
     # Dynamics — the medium's own motion
     # ------------------------------------------------------------------
 
-    def consolidate(self, growth: float = 1.5) -> None:
+    def consolidate(self, growth: float = 1.5, migrate: float = 0.0) -> None:
         """Widen every trace's bandwidth — episodic detail diffuses to gist.
 
         The spectral mechanism of consolidation: the heat-kernel bump
         spreads, its high modes decaying faster than the low ones. The
         memory is never removed — a broadened trace answers looser cues
-        and answers its exact source less sharply.
+        and answers its exact source less sharply. The widening
+        saturates at ``_GIST_BANDWIDTH``: gist is a floor, not an
+        erasure.
+
+        ``migrate`` slides consolidated traces inward along the
+        core-to-core geodesic — the hippocampal -> cortical motion,
+        outer world becoming inner. Each trace slides by ``migrate``
+        scaled by how consolidated it already is (bandwidth over the
+        gist floor), so fresh detail barely moves and fully-gisted
+        traces take the whole step.
         """
         if not np.isfinite(growth) or growth <= 1.0:
             raise ValueError("growth must exceed 1.0")
+        if not np.isfinite(migrate) or migrate < 0.0:
+            raise ValueError("migrate must be >= 0")
         with self._lock:
-            self._bandwidth *= growth
+            if migrate > 0.0 and len(self._points):
+                gisted = np.clip(
+                    self._bandwidth / _GIST_BANDWIDTH, 0.0, 1.0
+                )
+                self._points = g.migrate_depth(
+                    self._points, migrate * gisted
+                )
+            self._bandwidth = np.minimum(
+                self._bandwidth * growth, _GIST_BANDWIDTH
+            )
             self._dirty = True
 
     def set_lean_target(self, target: float) -> None:

@@ -21,6 +21,15 @@ from genesis_client.swallow import note_swallowed
 
 logger = logging.getLogger(__name__)
 
+# N3 manifold consolidation — the substrate's own episodic->semantic
+# pass, scaled by the body's consolidation_weight each fired step.
+# Growth is the bandwidth multiplier per pass (the gist ceiling in
+# the manifold bounds it); migrate is the (r,s)-latitude slide per
+# pass at full weight — small, so a night of N3 carries traces
+# inward rather than a single stage dumping them at the core.
+_N3_GROWTH = 0.15
+_N3_MIGRATE = 0.002
+
 
 class _AdaptiveInterval:
     """A bounded adaptive period — the mind-side twin of the daemon's
@@ -505,6 +514,11 @@ class MetronomeMixin:
                     )
             elif not backlog_grew:
                 self._consolidate_gate.relax()
+            # The substrate's own consolidation rides the same step
+            # during slow-wave sleep — its own deposits, its own
+            # medium, independent of the daemon's STM backlog.
+            if self._is_sleeping and gate_due:
+                self._manifold_n3_consolidate()
             last_stm_count = stm_count
         except (OSError, ConnectionError, ValueError) as e:
             note_swallowed(
@@ -512,6 +526,45 @@ class MetronomeMixin:
                 e,
             )
         return last_stm_count
+
+    def _manifold_n3_consolidate(self) -> None:
+        """Slow-wave consolidation of the manifold's own deposits.
+
+        N3 is when episodic detail diffuses to gist: every trace's
+        bandwidth widens toward the gist ceiling (consolidation
+        saturates — nothing erases, nothing flattens away), and
+        consolidated traces slide inward along the core-to-core
+        geodesic — hippocampal -> cortical, the outer world's events
+        becoming part of her inner landscape. The body's
+        consolidation_weight (BDNF/serotonin/sleep-stage derived)
+        scales both rates; the substrate reads chemistry, never
+        writes it. Untracked sleep (no cycle stage) consolidates —
+        the same N3 fallback the sleep module uses.
+        """
+        manifold = getattr(self, "manifold", None)
+        if manifold is None:
+            return
+        cycle = getattr(getattr(self, "inner_life", None), "sleep_cycle", None)
+        stage = getattr(cycle, "current_stage", None)
+        if stage is not None:
+            from thalamus.brain_waves import SleepStage
+
+            if stage is not SleepStage.N3:
+                return
+        try:
+            weight = float(
+                getattr(self.client.get_state(), "consolidation_weight", 0.5)
+            )
+            weight = max(0.0, min(1.0, weight))
+            manifold.consolidate(
+                growth=1.0 + _N3_GROWTH * weight,
+                migrate=_N3_MIGRATE * weight,
+            )
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.metronome._manifold_n3_consolidate",
+                e,
+            )
 
     def _cycle_feed_executive(self) -> None:
         """Feed independent world and internal signals into the executive."""

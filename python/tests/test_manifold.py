@@ -593,3 +593,175 @@ class TestEpisodes:
             m.traverse(7)
         with pytest.raises(ValueError):
             m.rung_legs(-1)
+
+
+class TestDepthMigration:
+    """The phase-aligned tumble — hippocampal -> cortical = inward."""
+
+    def test_each_point_travels_its_geodesic(self):
+        pts = _rand_s3(64)
+        moved = g.migrate_depth(pts, 0.1)
+        assert np.allclose(np.linalg.norm(moved, axis=1), 1.0)
+        # every point slides arc-length |a| along its own core-to-core
+        # great circle — unless it clamped at the core floor.
+        traveled = np.array([g.geodesic(pts[i], moved[i]) for i in range(64)])
+        assert np.all(traveled <= 0.1 + 1e-9)
+        assert np.median(traveled) == pytest.approx(0.1, abs=1e-9)
+
+    def test_positive_angle_moves_inward(self):
+        r = 0.9
+        p = np.array([r, 0.0, math.sqrt(1 - r * r), 0.0])
+        moved = g.migrate_depth(p, 0.2)
+        assert g.depth(moved) < r
+        # the z2 phase complement grew to conserve the norm
+        assert math.hypot(moved[2], moved[3]) > math.sqrt(1 - r * r)
+
+    def test_phases_preserved(self):
+        p = np.array([0.5, 0.2, 0.3, 0.78])
+        p = p / np.linalg.norm(p)
+        moved = g.migrate_depth(p, 0.1)
+        a1 = math.atan2(moved[1], moved[0])
+        a2 = math.atan2(moved[3], moved[2])
+        assert abs(a1 - math.atan2(0.2, 0.5)) < 1e-9
+        assert abs(a2 - math.atan2(0.78, 0.3)) < 1e-9
+
+    def test_slide_crosses_the_membrane(self):
+        r = 0.9
+        p = np.array([r, 0.0, math.sqrt(1 - r * r), 0.0])
+        moved = g.migrate_depth(p, 0.6)
+        assert g.depth(moved) < g.CLIFFORD_DEPTH
+        # phi -> phi - a: |z1| = sin(atan2(r, s) - a)
+        expected = math.sin(math.atan2(r, math.sqrt(1 - r * r)) - 0.6)
+        assert abs(g.depth(moved) - expected) < 1e-12
+
+    def test_core_points_stay_put(self):
+        self_core = np.array([0.0, 0.0, 0.0, 1.0])  # |z1| = 0
+        other_core = np.array([1.0, 0.0, 0.0, 0.0])  # |z2| = 0
+        assert np.allclose(g.migrate_depth(self_core, 0.3), self_core)
+        assert np.allclose(g.migrate_depth(other_core, 0.3), other_core)
+
+    def test_slide_clamps_at_the_core(self):
+        r = 0.3
+        p = np.array([r, 0.0, math.sqrt(1 - r * r), 0.0])
+        moved = g.migrate_depth(p, 1.0)  # far more than phi has to give
+        assert g.depth(moved) > 0.0  # never lands on or past the core
+        # a second slide continues to approach, asymptotically
+        moved2 = g.migrate_depth(moved, 1.0)
+        assert g.depth(moved2) < g.depth(moved)
+
+    def test_per_point_angles(self):
+        pts = _rand_s3(8)
+        moved = g.migrate_depth(pts, np.linspace(0.0, 0.5, 8))
+        d0 = g.depth(moved)
+        assert d0[0] == pytest.approx(g.depth(pts)[0])
+        assert d0[7] < g.depth(pts)[7]
+
+
+class TestConsolidation:
+    def test_bandwidth_widens_and_saturates(self):
+        from latent_spaces.manifold import _DETAIL_BANDWIDTH, _GIST_BANDWIDTH
+
+        m = LatentManifold()
+        m.observe("a memory", kind="world:percept")
+        with m._lock:
+            assert m._bandwidth[0] == _DETAIL_BANDWIDTH
+        for _ in range(50):
+            m.consolidate(growth=1.2)
+        with m._lock:
+            # saturates at the gist floor — never flattens away
+            assert m._bandwidth[0] == _GIST_BANDWIDTH
+
+    def test_migrate_slides_consolidated_traces_inward(self):
+        m = LatentManifold()
+        m.observe("outer event", kind="world:percept", salience=0.8)
+        with m._lock:
+            before = g.depth(m._points)[0]
+        assert before > g.CLIFFORD_DEPTH
+        for _ in range(40):
+            m.consolidate(growth=1.2, migrate=0.05)
+        with m._lock:
+            after = g.depth(m._points)[0]
+        assert after < before
+        # still on S3 and still recallable
+        assert abs(np.linalg.norm(m._points[0]) - 1.0) < 1e-9
+        assert m.resonate("outer event", kind="world:percept")
+
+    def test_fresh_traces_barely_migrate(self):
+        m = LatentManifold()
+        m.observe("fresh", kind="thought")
+        with m._lock:
+            d0 = g.depth(m._points)[0]
+        # one pass, fresh bandwidth << gist floor -> tiny slide
+        m.consolidate(growth=1.05, migrate=0.5)
+        with m._lock:
+            d1 = g.depth(m._points)[0]
+        assert d0 - d1 < 0.02
+
+    def test_consolidate_validation(self):
+        m = LatentManifold()
+        m.observe("x", kind="thought")
+        with pytest.raises(ValueError):
+            m.consolidate(growth=1.0)
+        with pytest.raises(ValueError):
+            m.consolidate(migrate=-0.1)
+
+
+class TestN3Wiring:
+    """metronome._manifold_n3_consolidate — the sleep-stage call path."""
+
+    def _holder(self, stage, weight=0.8):
+        from types import SimpleNamespace
+
+        from brainstem.metronome import MetronomeMixin
+
+        manifold = LatentManifold()
+        manifold.observe("yesterday's rain", kind="world:percept", salience=0.8)
+        client = SimpleNamespace(
+            get_state=lambda: SimpleNamespace(consolidation_weight=weight)
+        )
+        holder = SimpleNamespace(
+            manifold=manifold,
+            inner_life=SimpleNamespace(
+                sleep_cycle=SimpleNamespace(current_stage=stage)
+            ),
+            client=client,
+        )
+        return holder, MetronomeMixin._manifold_n3_consolidate, manifold
+
+    def test_n3_consolidates_and_migrates(self):
+        from thalamus.brain_waves import SleepStage
+
+        holder, fn, manifold = self._holder(SleepStage.N3)
+        with manifold._lock:
+            bw0 = manifold._bandwidth[0]
+            d0 = g.depth(manifold._points)[0]
+        fn(holder)
+        with manifold._lock:
+            assert manifold._bandwidth[0] > bw0
+            assert g.depth(manifold._points)[0] <= d0
+
+    def test_n2_skips_consolidation(self):
+        from thalamus.brain_waves import SleepStage
+
+        holder, fn, manifold = self._holder(SleepStage.N2)
+        with manifold._lock:
+            bw0 = manifold._bandwidth.copy()
+        fn(holder)
+        with manifold._lock:
+            assert np.allclose(manifold._bandwidth, bw0)
+
+    def test_untracked_sleep_consolidates(self):
+        holder, fn, manifold = self._holder(None)
+        with manifold._lock:
+            bw0 = manifold._bandwidth[0]
+        fn(holder)
+        with manifold._lock:
+            assert manifold._bandwidth[0] > bw0
+
+    def test_missing_manifold_is_a_noop(self):
+        from types import SimpleNamespace
+
+        from brainstem.metronome import MetronomeMixin
+
+        holder = SimpleNamespace(manifold=None, inner_life=None, client=None)
+        MetronomeMixin._manifold_n3_consolidate(holder)
