@@ -339,9 +339,9 @@ corrective impulses — the Python-side homeostatic regulator.
 
 from __future__ import annotations
 
-from _views import view_getattr
-
 _MARKER_G08 = 0x4753084154EF3CD1
+
+from _views import view_getattr
 
 # The brainstem's modules are multi-subsystem — they are lazily
 # re-exported here so the anatomy is a real connection layer, not
@@ -370,6 +370,10 @@ _EXPORTS: dict[str, str] = {
     # publishes module activity to the manifest. A scheduler, not an
     # organ: the ticker is not her heart.
     "MetronomeMixin": "brainstem.metronome",
+    # The medullary cardiac center — reads the body's carrier pulse,
+    # drives contractility, feels arrhythmia
+    "Heart": "brainstem.heart",
+    "CardiacState": "brainstem.heart",
     # Arousal / coming-online — start, stop, save, restore
     "LifecycleMixin": "brainstem.lifecycle",
     # The VLPO flip-flop — sleep-wake switching and consolidation drive

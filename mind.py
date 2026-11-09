@@ -85,6 +85,7 @@ if TYPE_CHECKING:
 
     from worlds.channel import Channel
 from basal_ganglia.volition import VolitionMixin
+from brainstem.heart import Heart
 from brainstem.lifecycle import LifecycleMixin
 from brainstem.metronome import MetronomeMixin
 from frontal_lobe.projects import ProjectsMixin
@@ -686,6 +687,17 @@ class Mind(
         )
         arcade.register_tools(get_tools())
 
+        # The cardiac control center — the medullary organ that reads
+        # the body's carrier pulse (daemon field probe), drives
+        # contractility with demand, and feels arrhythmia. The heart
+        # muscle itself is the daemon's carrier; this is its center.
+        self.heart = Heart(
+            client=self.client,
+            neuro_impulse=self._learner_neuro_impulse,
+            arousal=lambda: getattr(self.client.get_state(), "arousal", 0.5),
+            phase=lambda: getattr(self.client.get_state(), "phase_name", ""),
+            wave_drive=lambda s: add_brain_wave_drive(BrainWave.BETA3, s),
+        )
 
         # The public channel's own state — the page itself lives in
         # the outer world (``self.world.channel``); None when the
