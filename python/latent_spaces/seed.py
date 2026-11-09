@@ -50,6 +50,7 @@ def seed_from_data_dir(manifold: LatentManifold) -> dict[str, int]:
         ("words", _seed_embeddings),
         ("graph", _seed_hgraph),
         ("archive", _seed_archive),
+        ("vq", _seed_vq),
     ):
         try:
             counts[name] = fn(manifold, rung_base)
@@ -208,6 +209,39 @@ def _seed_hgraph(manifold: LatentManifold, rung_base: int) -> int:
                 if n >= 2000:
                     return n
         except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+            continue
+    return n
+
+
+def _seed_vq(manifold: LatentManifold, rung_base: int) -> int:
+    """The VQ codebook — each concept at its prototype's coordinate.
+
+    Compressed vocabulary: the quantized address of a concept is its
+    prototype's own position — her learned discretization of meaning
+    deposited as regions in the substrate.
+    """
+    path = os.path.join(manifold.data_dir or "", "vq_codebook.npz")
+    if not os.path.exists(path):
+        return 0
+    data = np.load(path)
+    names = [str(c) for c in data["concept_names"]]
+    pids = np.asarray(data["prototype_ids"], dtype=np.int64)
+    protos = np.asarray(data["prototypes"], dtype=np.float64)
+    n = min(len(names), len(pids), 3000)
+    for i in range(n):
+        try:
+            pid = int(pids[i])
+            if not 0 <= pid < protos.shape[1]:
+                continue
+            manifold.observe(
+                names[i],
+                kind=f"vq:{names[i]}",
+                salience=0.4,
+                inbound=False,
+                rung=rung_base + i,
+                position=g.project_to_s3(protos[:, pid], seed=0x00BEE),
+            )
+        except (ValueError, TypeError, IndexError):
             continue
     return n
 
