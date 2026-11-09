@@ -961,10 +961,11 @@ class TestReplay:
             assert manifold._reach[1] > faded[1]
             assert manifold._reach[0] == faded[0]
             after_first = manifold._reach.copy()
-        # no new ripples -> no replay
+        # no new ripples -> no replay (N3 also deposits a reflection,
+        # so compare only the original rows)
         MetronomeMixin._manifold_n3_consolidate(holder)
         with manifold._lock:
-            assert np.allclose(manifold._reach, after_first)
+            assert np.allclose(manifold._reach[: len(after_first)], after_first)
 
     def test_rungs_since_watermark(self):
         import time as _t

@@ -597,12 +597,17 @@ class MetronomeMixin:
             # substrate observes itself — a lean summary of its own
             # state deposited at the self band. She reflects on her
             # own medium; the reflection becomes part of the medium.
+            # Its own rung — a reflection must not ride an open
+            # exchange and contaminate someone else's episode.
             manifold.observe(
                 manifold.summary_text(),
                 kind="self:reflection",
                 salience=0.6,
                 inbound=False,
+                rung=manifold._next_rung,
             )
+            with manifold._lock:
+                manifold._open_rung = -1
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.metronome._manifold_n3_consolidate",
