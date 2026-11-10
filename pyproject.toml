@@ -16,7 +16,7 @@ keywords = [
     "machine-learning",
     "neuromodulation",
 ]
-license = { text = "Proprietary — all rights reserved (see LICENSE)" }
+license = { text = "Proprietary — all rights reserved (see LICENSE) }
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -63,9 +63,8 @@ voice = [
 # symbolic.py imports it lazily and degrades gracefully without it;
 # the math tests skip when absent.
 math = [
-    "sympy==1.12",
-    # mpmath>=1.4 deprecated names sympy 1.12 still calls
-    # (ctx_mp.bitcount, mpnumeric) — keep it below the break.
+    "sympy>=1.13.1",
+    # Keep mpmath below 1.4 for compatibility with the supported SymPy range.
     "mpmath<1.4",
 ]
 # Differentiable light-cone geometry and adaptive complex fields.
