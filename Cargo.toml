@@ -33,7 +33,13 @@ shared_memory = "0.12.4"
 v4l = "0.14.0"
 
 [profile.release]
+# Keep optimized release builds diagnosable during active research and deployment.
+# Full DWARF information supports native backtraces, profilers, and post-mortem
+# analysis; stripping can be introduced later in a separate distribution profile.
 opt-level = 3
 lto = "thin"
-strip = "symbols"
+debug = true
+strip = "none"
+# Catch integer overflow in optimized builds instead of silently wrapping.
+overflow-checks = true
 codegen-units = 1
