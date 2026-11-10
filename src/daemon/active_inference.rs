@@ -198,9 +198,10 @@
 //! burden (a slow tracker, `rest_baseline`), and the dead-band keeps
 //! ordinary physiological variation from integrating without bound.
 //!
-//! Sustained load upregulates the cortisol baseline, modeling the
-//! chronic stress → HPA axis sensitization pathway (McEwen &
-//! Stellar, 1993).
+//! Sustained load is published as allostatic load; the cortisol
+//! set-point itself drifts inside the neurochemical baseline
+//! adaptation from sustained hormone elevation — the HPA axis has
+//! no fixed operating point (McEwen & Stellar, 1993).
 //!
 //! This engine's load is the **substrate-scoped** view. The cognitive
 //! mind keeps a whole-system view that also folds in endocrine and
@@ -985,8 +986,6 @@ pub struct InferenceResult {
     pub impulses: Vec<(u8, f32)>,
     /// Requested metaplasticity rate multiplier (1.0 = no change).
     pub metaplasticity_multiplier: f32,
-    /// Requested cortisol baseline adjustment (additive, per tick).
-    pub cortisol_baseline_adjustment: f32,
     /// Updated model maturity [0, 1].
     pub model_maturity: f32,
     /// The selected policy name (for observability).
@@ -1018,8 +1017,7 @@ pub struct InferenceResult {
 ///    expected free energy.
 /// 10. **Generate feedback**: dopamine PE impulse, NE orienting
 ///     impulse, metaplasticity boost, active inference impulses
-///     (policy selection with epistemic + pragmatic EFE),
-///     cortisol baseline adjustment.
+///     (policy selection with epistemic + pragmatic EFE).
 ///
 /// The engine is stateful — it carries the learned model (transition
 /// matrix, bias, precision, variational posterior) between ticks. It
@@ -1490,7 +1488,6 @@ impl ActiveInferenceEngine {
             srt_prediction_error: 0.0,
             impulses: Vec::new(),
             metaplasticity_multiplier: 1.0,
-            cortisol_baseline_adjustment: 0.0,
             model_maturity: self.model_maturity,
             selected_policy: "noop",
             selected_policy_efe: 0.0,
@@ -2235,32 +2232,17 @@ impl ActiveInferenceEngine {
             result.metaplasticity_multiplier = boost;
         }
 
-        // ── Allostatic cortisol baseline regulation ──
-        // Sustained allostatic load → gradual cortisol baseline increase
-        // (anticipatory stress, Sterling 2012). When load recovers, the
-        // baseline relaxes back toward zero — allostatic shifts are
-        // reversible, not a permanent ratchet. Without the recovery
-        // path, chronic stress would permanently elevate cortisol even
-        // after the stressor ends, contradicting the HPA-axis clearance
-        // modeled in neurochemical.rs.
+        // ── Allostatic load tracking ──
+        // The engine's contribution to allostasis is the load estimate
+        // itself, integrated above and published on inference_signals.
         //
-        // Recovery is 2× faster than accumulation, matching the
-        // allostatic load dynamics in step 8 (McEwen, 1998 — the body
-        // heals faster than it breaks down, given the chance).
-        //
-        // Scale by dt_scale for time-invariance: the allostasis load
-        // itself is accumulated/dissipated with dt_scale (step 8), so
-        // the baseline adjustment must be too — otherwise a 10s tick
-        // applies the same per-tick nudge as a 0.1s tick.
-        if self.allostasis_load > 0.3 {
-            let adjustment = (self.allostasis_load - 0.3) * 0.0001 * dt_scale;
-            result.cortisol_baseline_adjustment = adjustment;
-        } else {
-            // Recovery: decay the baseline toward zero 2× faster than
-            // it accumulated, proportional to how far below threshold
-            // the load has fallen.
-            result.cortisol_baseline_adjustment = -(0.3 - self.allostasis_load) * 0.0002 * dt_scale;
-        }
+        // Cortisol's allostatic set-point is NOT adjusted here. The
+        // HPA axis has no fixed operating point: sustained hormone
+        // elevation is itself the allostatic load, and the baseline
+        // machinery in neurochemical.rs drifts cortisol's set-point
+        // toward the slow integral of its own level — rising under
+        // sustained stress, recovering when the cascade lets the
+        // level fall. The chemistry owns the shift.
 
         // ── Active inference: policy selection ──
         //
@@ -3520,10 +3502,10 @@ impl Default for ActiveInferenceEngine {
 
 /// Apply the inference result's feedback to the neurochemical system.
 ///
-/// This applies the dopamine/NE impulses, the cortisol baseline
-/// adjustment, and the active inference impulses to the
-/// neurochemical vector. The metaplasticity boost is handled
-/// separately by the daemon (stored and applied on the next advance).
+/// This applies the dopamine/NE impulses and the active inference
+/// impulses to the neurochemical vector. The metaplasticity boost is
+/// handled separately by the daemon (stored and applied on the next
+/// advance).
 ///
 /// This is called by `advance_neuro` after the inference cycle.
 /// Convert an intended level displacement into the impulse rate that
@@ -3601,25 +3583,10 @@ pub fn apply_inference_feedback(
         neuro.apply_impulse_capped(id, magnitude * offset_to_rate, now_ms);
     }
 
-    // Apply cortisol baseline adjustment (allostatic regulation).
-    // Positive adjustment = upregulation under sustained load;
-    // negative adjustment = recovery toward zero when load recovers.
-    // The baseline is clamped to [0, 0.80] — cortisol has no
-    // homeostatic set-point above zero, so the floor is zero.
-    // Use finite_clamp: native clamp passes NaN through, which would
-    // write NaN into cort.baseline. The neurochemical tick-level
-    // circuit breaker resets baseline on the *next* tick, but a NaN
-    // here would propagate through the HPA axis cascade and could
-    // persist to disk if a crash happens before the next tick begins.
-    if result.cortisol_baseline_adjustment != 0.0
-        && let Some(cort) = neuro.get_mut(NeurochemicalId::Cortisol)
-    {
-        cort.baseline = crate::state::sanitize::finite_clamp(
-            cort.baseline + result.cortisol_baseline_adjustment,
-            0.0,
-            0.80,
-        );
-    }
+    // This function applies impulses only — chemicals are moved by
+    // the body's own dynamics. Cortisol's allostatic set-point shift
+    // is not commanded per cycle: it emerges inside the neurochemical
+    // baseline adaptation from sustained hormone elevation itself.
 
     // Recompute derived state after impulses
     neuro.recompute_derived();

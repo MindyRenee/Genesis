@@ -277,6 +277,62 @@ fn test_cortisol_hard_clamp_under_sustained_crh() {
     );
 }
 
+/// Cortisol's allostatic baseline is emergent, not commanded.
+///
+/// Sustained HPA drive holds the level up; the baseline machinery
+/// integrates that history and the operating point drifts toward it.
+/// When the drive stops and the cascade lets the level fall, the
+/// baseline follows down on the same slow timescale. Nothing writes
+/// the set-point per advance — the waves and the cascade decide the
+/// level, the chemistry decides where it learns to live.
+#[test]
+fn test_cortisol_baseline_emerges_from_sustained_load_and_recovers() {
+    let mut neuro = NeurochemicalVector::new(0);
+
+    let params = NeuroTickParams {
+        maturation_level: 1.0,
+        noise_amplitude: 0.0,
+        ..NeuroTickParams::DEFAULT
+    };
+
+    // Phase 1: sustained CRH drive — the cascade holds cortisol up
+    // long enough for the slow baseline integral to register the load.
+    let mut peak_baseline = 0.0f32;
+    let mut peak_level = 0.0f32;
+    for _ in 0..40_000u32 {
+        neuro.apply_impulse_capped(NeurochemicalId::CRH, 0.05, 0);
+        neuro.tick_with_params(&params);
+        let c = &neuro.chemicals[NeurochemicalId::Cortisol as usize];
+        peak_baseline = peak_baseline.max(c.baseline);
+        peak_level = peak_level.max(c.level);
+    }
+    assert!(
+        peak_level > 0.05,
+        "sustained CRH drive should hold cortisol up, peak level {peak_level}"
+    );
+    assert!(
+        peak_baseline > 0.01,
+        "baseline should drift up under sustained cortisol, got {peak_baseline}"
+    );
+
+    // Phase 2: drive stops — the level falls through clearance and
+    // the baseline recovers toward the resting operating point.
+    for _ in 0..80_000u32 {
+        neuro.tick_with_params(&params);
+    }
+    let after = &neuro.chemicals[NeurochemicalId::Cortisol as usize];
+    assert!(
+        after.baseline < peak_baseline - 0.005,
+        "baseline should recover after the load ends: peak={peak_baseline}, after={}",
+        after.baseline
+    );
+    assert!(
+        after.level < peak_level,
+        "cortisol level should fall after drive stops: peak={peak_level}, after={}",
+        after.level
+    );
+}
+
 // ─── Vesicular depletion must not invert the dose-response ──────
 
 /// Driving a chemical harder must not produce *less* of it.

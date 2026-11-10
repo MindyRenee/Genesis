@@ -131,25 +131,21 @@ fn test_apply_impulse_accepts_normal_magnitude() {
 
 #[test]
 fn test_apply_impulse_clamps_huge_magnitude_velocity() {
-    // A huge finite magnitude should not produce an unbounded velocity.
-    // Without velocity clamping, a magnitude of 1e20 would set velocity
-    // to ~3e19, which decays geometrically but keeps the chemical
-    // saturated for hundreds of ticks — a local DoS that distorts the
-    // entire neurochemical state.
+    // A huge finite magnitude should not produce an unbounded impulse.
+    // Quantal delivery saturates at the vesicular pool's content —
+    // `pool·(1−e^{−magnitude})` — so even a 1e20 request delivers at
+    // most one pool's worth, keeping velocity and the level write
+    // bounded by the synapse's own stores rather than by a clamp.
     let mut chem = Neurochemical::new(NeurochemicalId::Dopamine, 0);
     chem.apply_impulse(1e20, 0);
 
     assert!(
         chem.velocity.abs() <= 1.0,
-        "velocity must be clamped to [-1, 1] even for huge impulses, got {}",
+        "velocity must stay bounded by quantal delivery, got {}",
         chem.velocity
     );
     assert!(chem.level.is_finite());
-    assert!(
-        chem.level <= 1.0,
-        "level must be in [0, 1], got {}",
-        chem.level
-    );
+    assert!(chem.level >= 0.0, "level must stay non-negative");
 }
 
 // ─── effective_level returns finite values ──────────────────────

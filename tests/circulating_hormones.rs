@@ -412,8 +412,12 @@ fn hormone_pools_rest_at_baseline() {
     }
 }
 
-/// Sustained maximal stress must keep every pool finite and inside
-/// [0, 1] — the measured clearance channels bound the drives.
+/// Sustained maximal stress must keep every pool finite and
+/// non-negative. There is no concentration ceiling: hormone levels
+/// are unbounded concentrations whose *signals* saturate downstream
+/// (effective() → saturated_signal). Positivity is the theorem of the
+/// kinetics — first-order clearance `level·exp(−k·dt)` and
+/// secretion/restore fluxes through `flow_level` cannot cross zero.
 #[test]
 fn hormone_pools_bounded_under_sustained_stress() {
     let params = NeuroTickParams {
@@ -433,8 +437,8 @@ fn hormone_pools_bounded_under_sustained_stress() {
         let c = nv.get(id).unwrap();
         assert!(c.level.is_finite(), "{id:?} level not finite: {}", c.level);
         assert!(
-            (0.0..=1.0).contains(&c.level),
-            "{id:?} level {} out of bounds",
+            c.level >= 0.0,
+            "{id:?} level {} negative — positivity invariant violated",
             c.level
         );
     }
