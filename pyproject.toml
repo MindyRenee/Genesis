@@ -16,7 +16,7 @@ keywords = [
     "machine-learning",
     "neuromodulation",
 ]
-license = { text = "Proprietary — all rights reserved (see LICENSE) }
+license = { text = "Proprietary — all rights reserved (see LICENSE)" }
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
