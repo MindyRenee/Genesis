@@ -1075,7 +1075,7 @@ def test_pulse_survives_held_level_on_same_band():
     """Pulses and held levels are separate registers — a pulse on a
     band a continuous channel reports must not be clobbered by the
     next hold. This is what lets vision's alpha-blocking pulse
-    coexist with the field probe's held substrate level.
+    coexist with the acoustic channel's held emission level.
     """
     from thalamus.brain_waves import (
         _get_oscillator,
@@ -1122,9 +1122,9 @@ def test_negative_stimulus_suppresses_band():
 def test_held_stimulus_is_poll_rate_invariant():
     """A continuous channel's reading must not integrate per call.
 
-    The field probe reports the substrate's *current* energy on every
-    assess. If that level is integrated once per call, the standing
-    stimulus scales with the poll rate — the machine's slow-band
+    The acoustic channel reports the emission's *current* level on
+    every assess. If that level is integrated once per call, the
+    standing stimulus scales with the poll rate — the machine's slow-band
     (1/f) energy then swamps the modeled EEG until an alert body
     reads delta-dominant, which is what the live readiness gate was
     choking on. Hold semantics keep the stimulus at the reported

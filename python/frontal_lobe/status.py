@@ -838,6 +838,10 @@ class StatusMixin:
         """Generate an introspective report."""
         return self.brain.frontal.introspect()
 
+    def diagnostic_report(self) -> str:
+        """The raw subsystem diagnostic dump behind introspect()."""
+        return self.brain.frontal.diagnostic_report()
+
     def tell_story(self) -> str:
         """Return Genesis's self-narrative — its story."""
         return self.brain.frontal.tell_story()

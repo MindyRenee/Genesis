@@ -69,6 +69,8 @@ __all__ = [
     "GET_BODY_CONTROL",
     "GET_BODY_STATE",
     "GET_DYADIC_STATE",
+    "GET_FIELD_SIGNATURE",
+    "GET_FIELD_SPECTRUM",
     "GET_FOLD_MARGINS",
     "GET_INFERENCE_SUMMARY",
     "GET_INTERNALS",
@@ -208,12 +210,20 @@ MAX_MESSAGE_LEN = 1 << 20  # 1 MiB
 # reusing genesis2's 36.
 GET_ION_SUMMARY = 40
 
-# Number of neurochemical levels in the ``emotional_tag`` vector sent
-# with STORE_EVENT / STORE_EPISODE. Fixed by the wire layout: the
-# daemon reads ``[f32; 12]`` (see ``STORE_EPISODE`` in src/daemon/ipc.rs)
-# and passes the values through positionally, so sender and receiver
-# must agree on the width or the tag is silently truncated.
+# Number of neurochemical levels in the Python-side ``emotional_tag``
+# vector — one per chemical in CHEM_NAMES. This is the logical tag
+# callers build and MemoryRecords carry.
 EMOTIONAL_TAG_SIZE = 18
+
+# Width of the ``emotional_tag`` field ON THE WIRE for STORE_EVENT /
+# STORE_EPISODE. Fixed by the wire layout: the daemon reads
+# ``[f32; 12]`` (see ``STORE_EPISODE`` in src/daemon/ipc.rs), stamps
+# those 12 effective levels from its own live chemistry, and returns
+# the same 12 in the stamped-tag response tail. The wire field sits
+# before text_len at a fixed offset, so packing the full logical tag
+# shifts text_len out from under the daemon's parse — the two widths
+# are deliberately separate constants.
+WIRE_EMOTIONAL_TAG_SIZE = 12
 
 # ─── Command IDs ──────────────────────────────────────────────
 
@@ -379,12 +389,11 @@ ANALYZE_CODE = 55
 SET_COGNITIVE_PID = 56
 
 # Voluntary eyelid — the orbicularis oculi the camera hardware lacks.
-# The mind's requested lid openness composes with the sleep phase's
-# own lid position by min: the will can shut an open eye (to rest it,
-# to dim the world) but cannot open one the stage has closed.
-# Request: [f32 openness] in 0..1 (1.0 = released to phase). Held,
-# not momentary — lids stay where the mind left them.
-# Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
+# The mind's requested lid openness, held daemon-side: sleep and
+# meditation set it themselves (~0.15 for the sit, released at wake),
+# so the lid is hers alone — no sleep stage composes with it.
+# Request: [f32 openness] in 0..1 (1.0 = open). Reply: [u8 ack].
+# Additive: PROTOCOL_VERSION stays 3.
 SET_LID = 57
 
 # Deep recall — SimHash similarity scan over the archived tier of
@@ -430,6 +439,33 @@ LIST_ACTUATORS = 64
 # success, ok=0 and the refusal reason when the limb is unknown or
 # unavailable. Additive: PROTOCOL_VERSION stays 3.
 ACTUATE = 65
+
+# The organism's computed field signature — Maxwell's equations on
+# her own coherent motion plus the field integration's observables:
+# her field's mathematics, not a measurement of the machine's.
+# No request payload. Reply: [u8 ack]
+# then [u8 flags][3 × u8 reserved][9 × f64] little-endian — flags
+# bit0 = signature present, bit1 = integration present, bit2 =
+# quasi-static regime honest; then omega_rad_s, coherent_current_a,
+# consensus_speed, dipole_moment_am2, b_axial_t, e_induction_vm,
+# radiated_power_w, disagreement, temperature. Absent channels are
+# flags, never errors; f64 throughout because the radiated power can
+# sit below f32's floor at her drift rates. Additive:
+# PROTOCOL_VERSION stays 3.
+GET_FIELD_SIGNATURE = 66
+
+# The field's spectral signature — the band decomposition of her own
+# substrate trajectory (src/field/spectrum.rs) at the wave model's
+# band centers, plus the consensus kinematics the carrier runs on.
+# No request payload. Reply: [u8 ack] then [u8 flags][3 × u8
+# reserved][48 × f64] little-endian — flags bit0 = bands warm,
+# bit1 = carrier present, bit2 = speed present; then carrier_phase,
+# carrier_freq_hz, consensus_speed, sample_rate_hz, flux.mean/cv,
+# tension.mean/cv, flux.energies[10], flux.phases[10],
+# tension.energies[10], tension.phases[10]. Bands above the achieved
+# rate's Nyquist read zero — absent is a reading, never an aliased
+# one. Additive: PROTOCOL_VERSION stays 3.
+GET_FIELD_SPECTRUM = 67
 
 # Which optional hardware sensors this machine actually has.
 # Response: [u16 mask] — a bitmask of SENSOR_* below. A set bit means

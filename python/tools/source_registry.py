@@ -69,15 +69,17 @@ _MAX_RESPONSE_BYTES = 4 * 1024 * 1024  # 4 MiB
 # Image downloads (Wikipedia lead thumbnails) get a slightly higher cap.
 _MAX_IMAGE_BYTES = 8 * 1024 * 1024  # 8 MiB
 
-# ─── Proactive offline detection ─────────────────────────────────────
-# A cheap TCP connect probe to Wikipedia's API host. If it fails,
-# we know we're offline without waiting for a full HTTP request to
-# time out. The result is cached with a cooldown so we don't probe
-# on every query — once offline is detected, we stay "offline" for
-# OFFLINE_COOLDOWN seconds before re-probing. This avoids repeated
-# timeout penalties on every curiosity cycle while still detecting
-# reconnection in a reasonable timeframe.
-OFFLINE_COOLDOWN = 60.0  # seconds to stay "offline" before re-probing
+# ─── Query-observed offline detection ────────────────────────────────
+# Connectivity is never probed with a socket — a dedicated connect
+# just to ask "are you there" is an invasive instrument, not a
+# sense. The estimate runs on her own substrate instead: every
+# remote-tier query outcome (content returned or nothing) feeds an
+# exponential moving average of failure, which decays with time so
+# a stale failure loses predictive weight on its own. OFFLINE_COOLDOWN
+# is both the reactive observation window and the estimate's half-life.
+OFFLINE_COOLDOWN = 60.0  # seconds — observation window and estimate half-life
+_OFFLINE_EST_ALPHA = 0.25  # EMA rate per remote-tier outcome
+_OFFLINE_PREDICT = 0.6  # estimate level that holds her offline predictively
 
 
 @dataclass(slots=True)
@@ -1354,76 +1356,11 @@ class PackageDocSource:
         return ""
 
 
-# ─── DuckDuckGo Lite (discovery fallback) ───────────────────────────
-
-_DDG_LITE = "https://lite.duckduckgo.com/lite/"
-_URL_RE = re.compile(r'https?://[^\s<>"\']+')
-
-
-def _duckduckgo_search(topic: str, limit: int = 5) -> list[str]:
-    """Search DuckDuckGo Lite for URLs about a topic.
-
-    DuckDuckGo Lite is a lightweight, privacy-respecting search
-    interface that works well with automated requests. No API key
-    needed. Used as a fallback when Wikipedia doesn't cover a topic.
-
-    Returns URLs from trusted domains (.edu, .org, .gov).
-    """
-    data = urllib.parse.urlencode({"q": topic, "kl": "us-en"}).encode()
-    try:
-        req = urllib.request.Request(
-            _DDG_LITE,
-            data=data,
-            headers={
-                "User-Agent": USER_AGENT,
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            html = resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore")
-
-        urls = _URL_RE.findall(html)
-        # Filter to trusted domains and deduplicate
-        seen: set[str] = set()
-        trusted: list[str] = []
-        for url in urls:
-            url = url.split("&")[0]  # strip tracking params
-            if url in seen:
-                continue
-            domain = urllib.parse.urlparse(url).netloc.lower()
-            if any(domain.endswith(d) for d in (".edu", ".org", ".gov")):
-                # Skip non-content URLs
-                if not any(
-                    skip in url.lower()
-                    for skip in (
-                        ".pdf",
-                        ".jpg",
-                        ".png",
-                        ".gif",
-                        ".css",
-                        ".js",
-                        ".dtd",
-                        ".xml",
-                        ".rss",
-                        ".json",
-                        ".ico",
-                        ".svg",
-                        ".woff",
-                        ".woff2",
-                        "duckduckgo",
-                    )
-                ):
-                    seen.add(url)
-                    trusted.append(url)
-            if len(trusted) >= limit:
-                break
-        return trusted
-    except (OSError, ValueError, RuntimeError) as e:
-        note_swallowed(
-            "tools.source_registry._duckduckgo_search",
-            e,
-        )
-        return []
+# ─── Web discovery (browser-first search) ───────────────────────────
+# Topic discovery beyond Wikipedia goes through ``tools.web_search``
+# — her real browser (Google, then Bing; Firefox over BiDi, Chromium
+# over CDP) with its own content blocklist. This module never
+# scrapes a search engine itself.
 
 
 # ─── GitHub (read-only public code search) ──────────────────────────
@@ -1663,6 +1600,7 @@ class SourceRegistry:
         self,
         cache_dir: Path | None = None,
         force_offline: bool = False,
+        connectivity_probe: bool = True,
     ) -> None:
         """Initialize the source registry.
 
@@ -1671,6 +1609,14 @@ class SourceRegistry:
                 for offline re-use. If None, no disk cache is used.
             force_offline: If True, skip all network access and rely on
                 local and cached sources.
+            connectivity_probe: If True, ``is_offline`` answers
+                predictively from the EMA over her own remote-query
+                outcomes — she can hold herself offline before the
+                next failure is observed, and the estimate decays so
+                she retries on her own. If False, only what real
+                queries last observed counts — reactive, never
+                predictive. Either way no socket is ever opened to
+                ask.
         """
         self._cache = SourceCache(Path(cache_dir)) if cache_dir else None
         # WordNet — local lexical database (via NLTK). No network, so it
@@ -1706,12 +1652,23 @@ class SourceRegistry:
         # competition so nothing is fetched mid-run.
         self._remote_held = False
 
-        # ── Proactive offline detection state ──────────────────
-        # When the last query ran — the observed-offline signal ages
-        # out after OFFLINE_COOLDOWN so a probe-less registry heals:
-        # the next query retries remote tiers instead of trusting a
-        # stale failure forever.
+        # ── Query-observed offline state ───────────────────────
+        # When the last remote query ran and what it saw — the
+        # observed-offline signal ages out after OFFLINE_COOLDOWN so
+        # the registry heals: the next query retries remote tiers
+        # instead of trusting a stale failure forever. Only updated
+        # when remote tiers actually ran — a query that never reached
+        # the network is not an observation and must not refresh the
+        # window, or offline would hold itself open forever.
         self._last_query_offline_at = 0.0
+        self._connectivity_probe = connectivity_probe
+        # The connectivity estimate — EMA of remote-tier failure over
+        # her own query history (0 = always answers, 1 = always
+        # fails), decaying toward 0 with elapsed time. The
+        # mathematical replacement for a socket probe: her fetches
+        # are the instrument, their outcomes the signal.
+        self._offline_estimate = 0.0
+        self._offline_estimate_at = 0.0
 
     def query(self, topic: str, max_results: int = 3) -> list[SourceResult]:
         """Query all sources for a topic, returning up to max_results.
@@ -1751,7 +1708,13 @@ class SourceRegistry:
                 if self._cache:
                     self._cache.put(wn_result, topic)
 
-        if not self._force_offline and not self._remote_held and not self.is_offline:
+        remote_attempted = (
+            not self._force_offline
+            and not self._remote_held
+            and not self.is_offline
+            and len(results) < max_results
+        )
+        if remote_attempted:
             # 1. Wikipedia API — primary online source (structured content,
             #    broad coverage, no API key required)
             if len(results) < max_results and WIKIPEDIA_ENABLED:
@@ -1764,21 +1727,31 @@ class SourceRegistry:
                             if r.source_name == "wikipedia":
                                 self._cache.put(r, topic)
 
-            # 2. DuckDuckGo Lite — discovery fallback for topics that
-            #    Wikipedia didn't cover. Returns URLs that the learner
-            #    fetches and parses. This opens the wider web: any topic
-            #    it's curious about can be discovered, not just
-            #    encyclopedia articles.
+            # 2. Web discovery — her browser's search (Google/Bing
+            #    inside tools.web_search) for topics Wikipedia
+            #    didn't cover. This opens the wider web: any topic
+            #    she's curious about can be discovered, not just
+            #    encyclopedia articles. Snippets count as content —
+            #    the caller may still fetch the page itself.
             if len(results) < max_results:
-                self._query_duckduckgo(topic, max_results, results)
-                # DDG results have empty content (caller fetches), so
-                # they don't count as "got content" for offline tracking.
-                if any(r.source_name == "duckduckgo" for r in results):
+                self._query_web(topic, max_results, results)
+                if any(r.source_name == "web" for r in results):
                     online_got_content = True
 
-        # Track whether we're likely offline: no online content at all
-        self._last_query_offline = not online_got_content and self._force_offline is False
-        self._last_query_offline_at = time.time()
+        # The remote tiers' outcome is the connectivity observation —
+        # but only when they actually ran. A query held local (offline
+        # already, remote held, or local sources filled the result
+        # set) reached no network and is not evidence either way:
+        # recording it would let offline refresh its own window and
+        # never heal.
+        if remote_attempted:
+            outcome = 0.0 if online_got_content else 1.0
+            self._offline_estimate += _OFFLINE_EST_ALPHA * (
+                outcome - self._offline_estimate
+            )
+            self._offline_estimate_at = time.time()
+            self._last_query_offline = outcome > 0.5
+            self._last_query_offline_at = time.time()
         # If force_offline, we definitely are
         if self._force_offline:
             self._last_query_offline = True
@@ -1815,18 +1788,27 @@ class SourceRegistry:
                     self._cache.put(result, topic)
         return got_content
 
-    def _query_duckduckgo(self, topic: str, max_results: int, results: list[SourceResult]) -> None:
-        """Fallback DuckDuckGo Lite search for discovery."""
-        ddg_urls = _duckduckgo_search(topic, limit=max_results - len(results))
-        for url in ddg_urls:
+    def _query_web(self, topic: str, max_results: int, results: list[SourceResult]) -> None:
+        """Discovery fallback — her browser's search.
+
+        ``tools.web_search.search`` runs Google then Bing through her
+        real browser — Firefox over BiDi, Chromium over CDP — with its
+        content blocklist applied. Results
+        carry the snippet the engine returned; the caller may fetch
+        the page itself for the full text.
+        """
+        from tools import web_search
+
+        hits = web_search.search(topic, limit=max_results - len(results))
+        for hit in hits:
             if len(results) >= max_results:
                 break
             results.append(
                 SourceResult(
-                    url=url,
-                    title=f"discovered: {url}",
-                    content="",  # caller will fetch
-                    source_name="duckduckgo",
+                    url=hit.url,
+                    title=hit.title or f"discovered: {hit.url}",
+                    content=hit.snippet,
+                    source_name="web",
                 )
             )
 
@@ -1876,37 +1858,42 @@ class SourceRegistry:
     def is_offline(self) -> bool:
         """Whether the registry currently considers itself offline.
 
-        This is a *proactive* check — it probes connectivity before
-        a query is attempted, so the learner can skip network sources
-        entirely instead of paying timeout penalties on every cycle.
-
         When ``force_offline`` is True, always returns True.
 
-        Otherwise the answer is whatever real queries last observed —
-        ``_last_query_offline`` within the cooldown: a failed fetch
-        marks it offline, the next success marks it back. No socket
-        is opened to ask.
+        Otherwise the answer comes from her own substrate — no
+        socket is ever opened to ask:
+
+        - the *observed* flag: ``_last_query_offline`` within the
+          cooldown — a failed remote fetch marks it offline, the
+          next success marks it back (reactive, always on);
+        - the *estimate*: an EMA over remote-tier outcomes that
+          decays with time — when ``connectivity_probe`` is on it
+          can hold her offline before the next failure is observed
+          (predictive); when off, only the observation counts.
         """
         if self._force_offline:
             return True
-        # The observed flag is honored for the same window a
-        # failed fetch would have held — then the next query retries
-        # remote tiers, so one bad fetch can't strand her offline
-        # forever. No socket is opened to ask.
-        return (
+        now = time.time()
+        # The estimate decays toward online — a stale failure loses
+        # predictive weight with time, so she retries on her own
+        # rather than trusting a reading that keeps aging.
+        if self._offline_estimate_at:
+            dt = now - self._offline_estimate_at
+            self._offline_estimate *= 0.5 ** (dt / OFFLINE_COOLDOWN)
+        observed = (
             self._last_query_offline
-            and time.time() - self._last_query_offline_at < OFFLINE_COOLDOWN
+            and now - self._last_query_offline_at < OFFLINE_COOLDOWN
         )
+        if observed:
+            return True
+        return self._connectivity_probe and self._offline_estimate >= _OFFLINE_PREDICT
 
     def check_connectivity(self) -> bool:
-        """Force a connectivity probe now, bypassing the throttle.
+        """Read the connectivity state now — observation plus estimate.
 
-        Returns True if online. This is useful when the caller wants
-        an immediate, fresh check (e.g. on startup or after a long
-        offline period) rather than waiting for the next due probe.
-
-        There is no synthetic probe to force — the answer is the
-        query-observed state, fresh on its own while she fetches.
+        Returns True if online. There is no synthetic probe to force:
+        the answer is whatever her own query history currently
+        supports, fresh on its own while she fetches.
         """
         return not self.is_offline
 

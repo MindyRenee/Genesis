@@ -37,7 +37,7 @@ The baseline reflects tonic retrograde signaling.
 RECEPTOR ADAPTATION MULTIPLIER
 ════════════════════════════════════════════════════════════════════════
 
-    multiplier = 0.8
+    multiplier = 1.0
 
 CB1 receptor trafficking is moderate — slightly slower than the
 baseline reference (glutamate at 1.0×).
@@ -54,10 +54,10 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
     DA (reward), GABA/GLU (neural activity), and cortisol (stress
     dampening) all stimulate ECB release.
 
-    DA   -> ECB: +0.05  (weak volume transmission.)
-    GABA -> ECB: +0.05  (weak volume transmission.)
-    GLU  -> ECB: +0.05  (weak volume transmission.)
-    CORT -> ECB: +0.05  (weak volume transmission.)
+    DA  ->  ECB:  0.10  (weak volume transmission.)
+    GABA  ->  ECB:  0.10  (weak volume transmission.)
+    GLU  ->  ECB:  0.10  (weak volume transmission.)
+    CORT  ->  ECB:  0.10  (weak volume transmission.)
     SRT  -> ECB: 0.00   (no direct coupling)
     NE   -> ECB: 0.00   (no direct coupling)
     ACh  -> ECB: 0.00   (no direct coupling)
@@ -76,12 +76,12 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 COUPLING: HOW ENDOCANNABINOID AFFECTS OTHERS (matrix column 12)
 ════════════════════════════════════════════════════════════════════════
 
-    ECB -> DA :  +0.05  (weak volume transmission.)
-    ECB -> GABA:  -0.05  (depolarization-induced suppression of inhibition (DSI).)
-    ECB -> GLU:  -0.05  (depolarization-induced suppression of excitation (DSE).)
-    ECB -> CORT:  -0.05  (stress dampening — ECB suppresses cortisol.)
-    ECB -> CRH:  -0.05  (stress reduction — ECB suppresses CRH.)
-    ECB -> OX :  -0.05  (stress reduction — ECB suppresses orexin.)
+    ECB  ->  DA:  0.10  (weak volume transmission.)
+    ECB  ->  GABA:  -0.10  (depolarization-induced suppression of inhibition (DSI).)
+    ECB  ->  GLU:  -0.10  (depolarization-induced suppression of excitation (DSE).)
+    ECB  ->  CORT:  -0.10  (stress dampening — ECB suppresses cortisol.)
+    ECB  ->  CRH:  -0.10  (stress reduction — ECB suppresses CRH.)
+    ECB  ->  OX:  -0.10  (stress reduction — ECB suppresses orexin.)
     ECB -> SRT:  0.00   (no direct coupling)
     ECB -> NE :  0.00   (no direct coupling)
     ECB -> ACh:  0.00   (no direct coupling)

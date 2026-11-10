@@ -8641,6 +8641,31 @@ class FrontalLobe:
             return self.language.render(thought, meta_emotion)
 
         state = self._last_state
+        emotion = state.emotion
+        thought = Thought(
+            content="my current cognitive state",
+            intent="self_report",
+            emotion=emotion.label,
+            confidence=0.7,
+            self_reflection=True,
+            metadata={
+                "field": "cognition",
+                "self_fragments": self._introspection_fragments(state, emotion),
+            },
+        )
+        return self.language.render(thought, emotion)
+
+    def diagnostic_report(self) -> str:
+        """The full subsystem diagnostic dump behind ``introspect()``.
+
+        Operator surface — fixed-format lines covering every cognitive
+        subsystem. Not her voice: ``introspect()`` composes her
+        self-report through the language engine; this is the raw
+        instrumentation she (and we) can read.
+        """
+        if self._last_state is None:
+            return "no cognitive state recorded yet"
+        state = self._last_state
         parts = [
             f"Last input: {state.perception.intent.value}",
             f"Emotional state: {state.emotion.label}",
@@ -8690,6 +8715,79 @@ class FrontalLobe:
         self._introspect_cognitive_systems(state, parts)
 
         return ". ".join(parts) + "."
+
+    def _introspection_fragments(
+        self, state: CognitiveState, emotion: EmotionalState
+    ) -> list[tuple[str, str]]:
+        """Semantic material for the introspective self-report.
+
+        Speakable content is real generated material — what it knows,
+        has noticed, values, and feels (the same self-report inventory
+        the inquiry path uses, at full openness: this report is
+        addressed to itself), plus the question it is curious about,
+        the goal it is pursuing, and what holds the global workspace.
+        Numeric and enumerated diagnostics ride as ``[k:v]`` markers —
+        introspectable data the language engine never recites.
+        """
+        fragments: list[tuple[str, str]] = []
+
+        fragments.extend(
+            self.self_composer.self_reflection_fragments(
+                self.self_model, self.network, self.reflection, emotion
+            )
+        )
+
+        if state.brain_waves is not None:
+            wave_frag = self.self_composer.brain_wave_fragment(state.brain_waves)
+            if wave_frag is not None:
+                fragments.append(wave_frag)
+
+        # Its own generated content — the question it is curious
+        # about, the goal it is pursuing, what holds the spotlight.
+        if getattr(self, "_curiosity_questions", None):
+            top_q = self._curiosity_questions[0]
+            q_text = top_q.text or f"{top_q.question_type}:{top_q.target_concept}"
+            if q_text:
+                fragments.append(("clause", q_text[:80]))
+        if state.executive_goal:
+            fragments.append(("clause", state.executive_goal))
+        try:
+            dominant = self.global_workspace.get_dominant()
+            if dominant is not None and dominant.content:
+                fragments.append(("clause", dominant.content[:80]))
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("frontal_lobe.prefrontal._introspection_fragments", e)
+
+        # Diagnostics — data for introspection, never recited.
+        fragments.extend(
+            [
+                ("marker", f"[last_input:{state.perception.intent.value}]"),
+                ("marker", f"[response_intent:{state.thought.intent}]"),
+                ("marker", f"[confidence:{state.thought.confidence:.2f}]"),
+                ("marker", f"[style:{state.emotion.cognitive_style}]"),
+                ("marker", f"[concepts:{self.network.total_concept_count}]"),
+                ("marker", f"[edges:{self.network.edge_count}]"),
+            ]
+        )
+        if state.memory_context.retrieved:
+            fragments.append(("marker", f"[memories:{len(state.memory_context.retrieved)}]"))
+        if state.memory_context.user_facts:
+            fragments.append(("marker", f"[user_facts:{len(state.memory_context.user_facts)}]"))
+        if state.brain_waves is not None:
+            fragments.extend(
+                [
+                    ("marker", f"[wave:{state.brain_waves.label}]"),
+                    ("marker", f"[wave_focus:{state.brain_waves.focus:.2f}]"),
+                    ("marker", f"[wave_integration:{state.brain_waves.integration:.2f}]"),
+                    (
+                        "marker",
+                        f"[wave_consolidation:{state.brain_waves.consolidation:.2f}]",
+                    ),
+                ]
+            )
+        if state.prediction_error is not None:
+            fragments.append(("marker", f"[prediction_error:{state.prediction_error:.2f}]"))
+        return fragments
 
     def _introspect_cognitive_systems(self, state: CognitiveState, parts: list[str]) -> None:
         """Append cognitive system state lines to the introspection report."""

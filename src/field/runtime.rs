@@ -9,6 +9,7 @@ use crate::state::GenesisCoreState;
 use crate::state::MentalPhase;
 use crate::state::neurochemical::NeurochemicalId;
 
+use super::spectrum::{FieldSpectrum, SPECTRUM_STEP_HZ};
 use super::{
     FieldError, GaugeTransport, GlobalField, StereographicSphere, SubsystemLayer, SystemEngine,
     SystemFiber, Vector,
@@ -61,6 +62,10 @@ pub struct FieldIntegration {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FieldRuntime {
     field: GlobalField,
+    /// The substrate's own spectral observables — band decomposition
+    /// of the trajectory this runtime integrates, sampled at the
+    /// coupling's substep rate. The tick loop only reads it.
+    spectrum: FieldSpectrum,
 }
 
 impl FieldRuntime {
@@ -112,11 +117,38 @@ impl FieldRuntime {
             field.add_transport(GaugeTransport::new(from, to, matrix)?)?;
         }
 
-        Ok(Self { field })
+        Ok(Self {
+            field,
+            spectrum: FieldSpectrum::new(),
+        })
     }
 
     pub fn field(&self) -> &GlobalField {
         &self.field
+    }
+
+    /// The field's spectral signature — band decomposition of its
+    /// own trajectory plus the consensus kinematics. Read-only:
+    /// the ticker observes, the field integrates.
+    pub fn spectrum(&mut self) -> super::spectrum::SpectrumReading {
+        self.spectrum.signature()
+    }
+
+    /// The spectrum's carrier kinematics without consuming a
+    /// signature read — the tick's Maxwell inputs.
+    pub fn spectrum_kinematics(&self) -> (Option<f64>, Option<f64>) {
+        (
+            self.spectrum.last_consensus_speed,
+            self.spectrum.last_omega_rad_s,
+        )
+    }
+
+    /// Mutable spectrum access — the tick feeds each observation's
+    /// consensus through `observe_consensus` exactly as `observe`
+    /// does internally; tests use the same entry point.
+    #[cfg(test)]
+    pub(crate) fn spectrum_mut(&mut self) -> &mut super::spectrum::FieldSpectrum {
+        &mut self.spectrum
     }
 
     /// Predict → correct → integrate, transactionally on a clone:
@@ -124,10 +156,11 @@ impl FieldRuntime {
     /// half-observed.
     ///
     /// `bath` is the substrate's measured thermal level in latent²
-    /// units (the caller derives it from the physical probe — the
-    /// silicon's own timing fluctuation). It floors the field
-    /// temperature alongside internal disagreement: the reservoir
-    /// the Langevin kick samples is real, not only modeled.
+    /// units — the caller derives it from interoception's normalized
+    /// CPU temperature excess above the quiescent operating point
+    /// (`daemon::tick::field_bath`). It floors the field temperature
+    /// alongside internal disagreement: the reservoir the Langevin
+    /// kick samples is measured, not only modeled.
     pub fn observe(
         &mut self,
         state: &GenesisCoreState,
@@ -177,11 +210,26 @@ impl FieldRuntime {
         // than being held to agreement. Same measured consensus and
         // thermal bookkeeping either way; only the direction the
         // field moves changes with the phase its own carrier runs on.
-        let consensus = if state.zones.phase() == MentalPhase::REM {
-            next.diverge(dt, bath)?.ok_or(FieldError::EmptyState)?
-        } else {
-            next.synchronize(dt, bath)?.ok_or(FieldError::EmptyState)?
-        };
+        //
+        // The coupling integrates at the field's own substep rate —
+        // the same gain/sigma laws applied at finer dt, which is the
+        // more accurate quadrature of the identical dynamics, and it
+        // is what lets the spectrum resolve the trajectory's own
+        // frequencies rather than the tick's sample times.
+        let rem = state.zones.phase() == MentalPhase::REM;
+        let n = ((dt * SPECTRUM_STEP_HZ).round() as usize).clamp(1, 512);
+        let h = dt / n as f64;
+        let mut consensus = None;
+        for _ in 0..n {
+            consensus = if rem {
+                next.diverge(h, bath)?
+            } else {
+                next.synchronize(h, bath)?
+            };
+            self.spectrum.sample(&next, h);
+        }
+        let consensus = consensus.ok_or(FieldError::EmptyState)?;
+        self.spectrum.observe_consensus(&consensus, dt);
         let integration = FieldIntegration {
             consensus,
             disagreement: next.disagreement,

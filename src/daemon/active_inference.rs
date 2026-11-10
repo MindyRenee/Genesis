@@ -2393,6 +2393,17 @@ impl ActiveInferenceEngine {
             + self.precision * REFLEX_COEFF_PRECISION
             + self.preference_precision * REFLEX_COEFF_PREFERENCE;
         for i in 0..DIM {
+            // Adenosine is excluded for the same reason preference
+            // adaptation excludes it: Process S has no set-point to
+            // regulate toward — its level is owned by the dedicated
+            // sleep-pressure mechanism, and a reflex drain toward the
+            // genetic baseline would fight wake-time accumulation
+            // (apply_impulse_capped rejects the impulse anyway; not
+            // emitting it keeps the action vector honest).
+            let id = crate::state::neurochemical::NeurochemicalId::from_u8(i as u8);
+            if id == crate::state::neurochemical::NeurochemicalId::Adenosine {
+                continue;
+            }
             let dev = pre_tick[i] - target[i];
             if dev.abs() > 0.10 {
                 result.impulses.push((i as u8, -dev * reflex_coeff));

@@ -57,16 +57,16 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
     Cortisol is produced ONLY by the HPA cascade (CRH->ACTH->CORT),
     which is maturation-gated (SHRP).
     The coupling matrix only has suppressive feedback — the signals that tell cortisol to
-    stop (serotonin, GABA, oxytocin, endorphin, BDNF, ECB).
+    stop (GABA, oxytocin, endorphin, BDNF, ECB).
     This prevents the death spiral where normal arousal drives cortisol through the
     coupling matrix, bypassing the HPA gate.
 
-    SRT  -> CORT: -0.10  (weak volume transmission.)
+    SRT  ->  CORT:  0.00  (no coupling — cortisol comes only from the HPA cascade.)
     GABA -> CORT: -0.15  (weak volume transmission.)
     OXY  -> CORT: -0.10  (weak volume transmission.)
     END  -> CORT: -0.10  (weak volume transmission.)
-    BDNF -> CORT: -0.05  (weak volume transmission.)
-    ECB  -> CORT: -0.05  (weak volume transmission.)
+    BDNF  ->  CORT:  -0.10  (weak volume transmission.)
+    ECB  ->  CORT:  -0.10  (weak volume transmission.)
     DA   -> CORT: 0.00   (no direct coupling)
     NE   -> CORT: 0.00   (no direct coupling)
     ACh  -> CORT: 0.00   (no direct coupling)
@@ -88,16 +88,16 @@ COUPLING: HOW CORTISOL AFFECTS OTHERS (matrix column 6)
     CORT -> GABA:  -0.10  (stress disinhibition — cortisol suppresses GABA.)
     CORT -> OXY:  -0.10  (stress suppresses social bonding.)
     CORT -> END:  -0.10  (stress suppresses pleasure — chronic stress anhedonia.)
-    CORT -> ADN:  +0.05  (stress-related adenosine release.)
+    CORT  ->  ADN:  0.00  (retired — owned by the Process-S mechanism.)
     CORT -> BDNF:  -0.20  (THE critical coupling. Cortisol suppresses
                           BDNF — chronic stress blocks plasticity.
                           Strongest negative coupling in the matrix.)
-    CORT -> ECB:  +0.05  (stress dampening — cortisol stimulates ECB release.)
-    CORT -> VP :  +0.05  (stress activates vasopressin (HPA co-activation).)
+    CORT  ->  ECB:  0.10  (stress dampening — cortisol stimulates ECB release.)
+    CORT  ->  VP:  0.10  (stress activates vasopressin (HPA co-activation).)
     CORT -> CRH:  -0.10  (negative feedback — cortisol inhibits CRH.)
-    CORT -> EPI:  +0.05  (PNMT enzyme induction.)
-    CORT -> MEL:  -0.05  (wake-promoting signal suppresses melatonin.)
-    CORT -> DA :  0.00   (no direct coupling)
+    CORT  ->  EPI:  0.10  (PNMT enzyme induction.)
+    CORT  ->  MEL:  -0.10  (wake-promoting signal suppresses melatonin.)
+    CORT  ->  DA:  0.10  (glucocorticoids potentiate DA signaling — Butts 2011; Graf 2013.)
     CORT -> NE :  0.00   (no direct coupling)
     CORT -> ACh:  0.00   (no direct coupling)
     CORT -> GLU:  0.00   (no direct coupling)

@@ -430,16 +430,18 @@ class LifecycleMixin:
         """Hand the eye's voluntary controls back to the body.
 
         The voluntary lid and the accommodation target are *held*
-        daemon-side — a mind that dies while meditating leaves the
-        lid shut and the lens powered on a body that survives it,
-        and the next mind would inherit an eye it never asked for.
-        Releasing is always safe: ``set_lid(1.0)`` yields the lid to
-        the phase's own position, ``set_focus(0)`` relaxes the lens
-        to infinity. Daemons that predate either wire answer False —
+        daemon-side — a mind that dies while meditating or asleep
+        leaves the lid shut and the lens powered on a body that
+        survives it, and the next mind would inherit an eye it never
+        asked for. Releasing is always safe: the lid goes to what her
+        current state calls for — open awake, shut under sleep or
+        meditation — and ``set_focus(0)`` relaxes the lens to
+        infinity. Daemons that predate either wire answer False —
         an absent channel, silently skipped.
         """
         try:
-            self.client.set_lid(1.0)
+            resting = self._is_sleeping or self._is_meditating
+            self.client.set_lid(0.15 if resting else 1.0)
         except Exception:  # noqa: BLE001
             pass
         try:

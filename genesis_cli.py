@@ -2624,6 +2624,33 @@ def _remove_pid_file(data_dir: str, name: str) -> None:
         logger.debug(f"failed to remove PID file {path}")
 
 
+# The daemon's mind shepherd (src/daemon/mind_shepherd.rs) regrows a
+# mind that was present and then went silent — a death, not an
+# absence. A graceful teardown says goodbye instead: this sentinel is
+# the goodbye, and the next CLI start clears it. A mind that dies
+# without writing it (crash, SIGKILL, host fault) is a loss the body
+# is meant to repair.
+_MIND_SUPPRESS_FILE = "mind.suppress"
+
+
+def _write_mind_suppress(data_dir: str) -> None:
+    """Mark this mind's departure as intentional (graceful goodbye)."""
+    try:
+        Path(data_dir, _MIND_SUPPRESS_FILE).write_text("1\n")
+    except OSError as e:
+        logger.debug(f"failed to write {_MIND_SUPPRESS_FILE}: {e}")
+
+
+def _clear_mind_suppress(data_dir: str) -> None:
+    """A new mind is arriving — the last goodbye no longer applies."""
+    try:
+        os.unlink(os.path.join(data_dir, _MIND_SUPPRESS_FILE))
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        logger.debug(f"failed to clear {_MIND_SUPPRESS_FILE}: {e}")
+
+
 # ─── Stop (--stop, the installed equivalent of genesis --stop) ────────
 
 
@@ -2844,6 +2871,15 @@ def _stop_all(data_dir: str) -> int:
 
 _REBIRTH_TICK_S = 2.0  # watcher cadence — the organism's reflex arc
 _REBIRTH_STABLE_S = 60.0  # a rebirth counts once the body stayed alive this long
+# Liveness probe — the body's own published heartbeat, read through
+# the lock-free seqlock state path (GET_STATE takes no tick lock, so
+# the check adds zero load to the engine it watches). A live process
+# whose heartbeat stops advancing is a wedged body: the tick that
+# publishes it is dead even though the socket still answers. Three
+# frozen readings at this cadence — ~30 s of stillness — is fault,
+# not jitter.
+_FROZEN_PROBE_S = 10.0
+_FROZEN_STRIKES = 3
 # Per-attempt wait before the next resurrection try; exhausting the
 # table is the give-up bound — a body that will not reincarnate ends
 # the organism whole.
@@ -3087,6 +3123,13 @@ class _Rebirth:
         self._pending_rejoin = False
         self._thread: threading.Thread | None = None
         self.self_terminated = False
+        # Heartbeat-frozen accounting — the published tick counter is
+        # the body's own liveness signal; a stopped counter under a
+        # live process is a fault the process handle cannot see.
+        self._hb_client = None
+        self._last_heartbeat: int | None = None
+        self._hb_strikes = 0
+        self._hb_next_probe = 0.0
 
     def set_children(
         self,
@@ -3154,10 +3197,56 @@ class _Rebirth:
                 self._attempt = 0
             if self._pending_rejoin:
                 self._try_rejoin()
+            if (
+                self._heartbeat_faulted()
+                and time.monotonic() >= self._next_attempt_at
+            ):
+                self._resurrect_daemon(handle, "faulted — its heartbeat froze")
             return
         if time.monotonic() < self._next_attempt_at:
             return
         self._resurrect_daemon(handle, "died")
+
+    def _heartbeat_faulted(self) -> bool:
+        """Whether the live body's published heartbeat has frozen.
+
+        Reads ``CoreState.heartbeat`` through ``GET_STATE`` — the
+        seqlock snapshot the body republishes every tick, taken
+        without the tick lock. That is the whole check: no probe
+        command, no lock on the engine, just the vitals the body
+        already publishes. An unreadable state counts the same as a
+        frozen one — a body whose own numbers can't be reached is
+        faulted from the organism's side.
+        """
+        now = time.monotonic()
+        if now < self._hb_next_probe:
+            return False
+        self._hb_next_probe = now + _FROZEN_PROBE_S
+        hb = self._read_heartbeat()
+        if hb is None:
+            self._hb_strikes += 1
+        elif self._last_heartbeat is None or hb != self._last_heartbeat:
+            self._last_heartbeat = hb
+            self._hb_strikes = 0
+        else:
+            self._hb_strikes += 1
+        return self._hb_strikes >= _FROZEN_STRIKES
+
+    def _read_heartbeat(self) -> int | None:
+        """One lock-free read of the body's tick counter."""
+        if self._hb_client is None:
+            try:
+                from genesis_client import GenesisClient
+
+                self._hb_client = GenesisClient(self._daemon_socket)
+            except Exception:  # noqa: BLE001 — no client, no reading
+                return None
+        try:
+            state = self._hb_client.get_state(timeout=2.0)
+        except Exception:  # noqa: BLE001 — unreachable vitals
+            return None
+        hb = getattr(state, "heartbeat", None)
+        return int(hb) if hb is not None else None
 
     def _check_nerve(self) -> None:
         """Respawn the screen nerve when it dies; throttle when it can't start."""
@@ -3235,6 +3324,11 @@ class _Rebirth:
             _stop_child(new_proc, "subcognitive daemon", 5)
             return
         self._spawned_at = time.monotonic()
+        # A newborn body republishes its heartbeat from zero —
+        # re-arm the frozen check against the new incarnation.
+        self._last_heartbeat = None
+        self._hb_strikes = 0
+        self._hb_next_probe = 0.0
         print("[genesis] The body is reborn — re-inhabiting.", file=sys.stderr)
         self._try_rejoin()
 
@@ -3923,6 +4017,11 @@ def _shutdown(
     clean_shutdown = True
     if mind is not None:
         print("[genesis] Stopping cognitive mind...", file=sys.stderr)
+        # Say goodbye before the lease lapses: the daemon's shepherd
+        # regrows a mind that dies silent, but a mind that chose to
+        # leave must not be reincarnated against its own exit.
+        if data_dir:
+            _write_mind_suppress(data_dir)
     if auditory_cortex:
         auditory_cortex.stop()
     if ambient_listener:
@@ -4090,6 +4189,9 @@ def main() -> int:
     # Write the CLI PID file so genesis --stop can target this exact
     # process instead of using broad pkill patterns.
     _write_pid_file(data_dir, _PID_FILE_CLI, os.getpid())
+    # A mind is arriving — retire any goodbye the last one left, so
+    # the body's shepherd knows this absence was said, not lost.
+    _clear_mind_suppress(data_dir)
 
     # Install handlers and initialize handles before any child process
     # starts. Every initialization step after this point is covered by

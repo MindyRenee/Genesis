@@ -1837,19 +1837,54 @@ impl NeurochemicalVector {
     /// actual params values, so this is a defense-in-depth transient
     /// cap, not the authoritative one.
     ///
-    /// # Impulses apply without pins
+    /// # Adenosine is one-way
     ///
-    /// Every impulse — positive or negative, any chemical — lands on
-    /// the level directly; only the body's own dynamics (accumulation,
-    /// clearance, coupling, the tick-level bounds) decide where it
-    /// goes next. No chemical is privileged: adenosine can be pushed
-    /// down by impulse exactly as glymphatic clearance does, and the
-    /// stress hormones are not pre-capped here. The IPC layer still
-    /// rejects non-finite magnitudes — that is corruption protection,
-    /// not a pin.
+    /// Adenosine is Process S: its level is the organism's memory of
+    /// time spent awake, owned by the dedicated mechanism in the tick
+    /// (saturating exponential accumulation while awake, glymphatic
+    /// decay with chi_s = 4.2 h while asleep — Daan, Beersma &
+    /// Borbély 1984). External impulses may *add* pressure — the
+    /// mind's heartbeat reports metabolic work that way — but no
+    /// impulse may subtract it. Clearance belongs to sleep, not to
+    /// the event channel: a negative impulse cannot distinguish
+    /// coupling drift from genuine wake-time accumulation, and at any
+    /// plausible cadence it outruns the ~0.055/h accumulation rate by
+    /// orders of magnitude, pinning pressure at the floor (every NREM
+    /// episode staged N1). This is also why the homeostatic reflex
+    /// and preference adaptation in the inference engine exclude
+    /// adenosine — it has no set-point to regulate toward. Tiredness
+    /// is resisted through the alerting transmitters (ACh,
+    /// histamine, NE, orexin), never by editing the homeostat.
+    ///
+    /// Every other impulse — positive or negative, any chemical —
+    /// lands on the level directly; only the body's own dynamics
+    /// (accumulation, clearance, coupling, the tick-level bounds)
+    /// decide where it goes next. The IPC layer still rejects
+    /// non-finite magnitudes — that is corruption protection, not a
+    /// pin.
     pub fn apply_impulse_capped(&mut self, id: NeurochemicalId, magnitude: f32, now_ms: u64) {
+        if id == NeurochemicalId::Adenosine && magnitude < 0.0 {
+            return;
+        }
         if let Some(chem) = self.get_mut(id) {
             chem.apply_impulse(magnitude, now_ms);
+        }
+        // Enforce per-chemical caps for stress/arousal hormones.
+        // These match NeuroTickParams::DEFAULT.cortisol_max / ne_max.
+        // The tick-level hard clamp in tick_with_params will re-enforce
+        // with the actual params, so this is defense-in-depth.
+        match id {
+            NeurochemicalId::Cortisol => {
+                if let Some(chem) = self.get_mut(id) {
+                    chem.level = crate::state::sanitize::finite_clamp(chem.level, 0.0, 0.80);
+                }
+            }
+            NeurochemicalId::Norepinephrine => {
+                if let Some(chem) = self.get_mut(id) {
+                    chem.level = crate::state::sanitize::finite_clamp(chem.level, 0.0, 0.90);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -2506,9 +2541,22 @@ impl NeurochemicalVector {
     /// the smoothness of real phase transitions in dynamical systems.
     fn compute_phase(&self) -> MentalPhase {
         let current = MentalPhase::from_u8(self.emergent_phase);
-        // No phase is locked: the classifier may overwrite a
-        // network-stamped sleep stage whenever the chemistry says so —
-        // waking is chemistry's call here, not the network's alone.
+        // NREM and REM are owned by the sleep-wake network — this
+        // classifier names only the waking phases, so it can neither
+        // produce nor legitimately clear a sleep stage. Recomputing
+        // derived state used to overwrite a network-stamped NREM/REM
+        // with a waking phase on every recompute_derived call (the
+        // inference-feedback pass in advance_neuro, the impulse and
+        // baseline IPC handlers, wake_recovery), so the wire never
+        // showed the body as asleep — the mind ran conversation while
+        // the network sat in NREM and adenosine stayed pinned at its
+        // clearance floor. Only apply_network_phase may enter or exit
+        // a sleep stage: waking is the flip-flop's call, reached
+        // through the network's arousal populations, not the waking
+        // classifier's.
+        if matches!(current, MentalPhase::NREM | MentalPhase::REM) {
+            return current;
+        }
         self.compute_phase_with_hysteresis(current)
     }
 

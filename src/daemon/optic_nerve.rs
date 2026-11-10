@@ -29,27 +29,30 @@
 //!   sympathetic dilation from effective norepinephrine — published
 //!   so the mind's optics layer can scale retinal irradiance and
 //!   depth of field by the aperture the body actually set.
-//! - **dLGN + thalamic reticular nucleus (TRN)** — the thalamic relay
-//!   is *gated*, not a wire: TRN inhibition during NREM hyperpolarizes
-//!   relay cells and sensory transmission to cortex is blocked at the
-//!   thalamus. `relay_gain` is that gate, computed here in the body
-//!   where the sleep network lives. The mind reads it via
-//!   `GET_OPTIC_STATE` and honours it — cortex cannot see around a
-//!   closed thalamus.
+//! - **dLGN + thalamic reticular nucleus (TRN)** — the thalamic
+//!   relay's transmission is *modulated*, not switched: TRN inhibition
+//!   during NREM is real physiology, but the gate this body computes
+//!   is the corticothalamic one — `relay_gain` scales the relay
+//!   around a full-open base and no sleep stage closes it here.
+//!   The mind reads it via `GET_OPTIC_STATE` and honours it.
 //! - **Corticothalamic feedback** — V1 layer-6 projections back to
 //!   the dLGN outnumber retinal input ~10:1 but are modulatory, not
 //!   driving. The mind's engagement arrives via `SET_OPTIC_GAIN` and
-//!   scales the relay within ±40%, never opening it past what the
-//!   sleep stage permits.
+//!   scales the relay across [0.6, 1.0] — it can attenuate
+//!   transmission, never close it.
 //!
 //! The body's own ocular state lives here too: the pupil (pretectal
-//! light reflex + LC sympathetic dilation), the ciliary lens power
+//! light reflex + LC sympathetic dilation, miosis under the sleep
+//! phase's own parasympathetic tone), the ciliary lens power
 //! (accommodation, set by the mind's `SET_FOCUS`), and the lids —
-//! the eye the hardware lacks. The lid is a phase-driven
-//! transmission on every afferent channel: closed in NREM/REM (a
-//! few percent leak — light through lids still entrains weakly and
-//! a flash can still wake), half-mast drowsy, open awake. Sleep
-//! miosis and the ciliary's release to rest ride the same closure.
+//! the eye the hardware lacks. The lid is *voluntary*: the mind's
+//! own orbicularis oculi, set through `SET_LID` and held until she
+//! changes it — the sleep system closes it (~0.15) on entry and
+//! opens it (1.0) on waking, meditation holds it for the sit, and
+//! no phase overrides her will in either direction. It is a
+//! transmission scalar on every afferent channel: closed lids dim
+//! the SCN's light drive and the collicular alert the way real lid
+//! closure attenuates them.
 //!
 //! What is deliberately NOT here: semantics. Everything in this
 //! module is machine math — bytes, atomics, pooled scalar channels
@@ -306,6 +309,71 @@ const FRESH_WINDOW_MS: u64 = 5_000;
 /// denser than the melanopsin/tectal receptive fields being modelled.
 const MAX_SAMPLES: usize = 2048;
 
+/// Scene-lattice geometry for the collicular binding pass — a
+/// `SCENE_W`×`SCENE_H` point-sampled grid small enough that a gated
+/// Kuramoto integration stays cheap (~1k cells, run at most every
+/// `BIND_EVERY_FRAMES` consumed frames).
+const SCENE_W: usize = 32;
+const SCENE_H: usize = 24;
+/// Re-bind cadence in consumed frames — scene parses are eventful,
+/// not per-frame.
+const BIND_EVERY_FRAMES: u32 = 30;
+/// Orienting burst that forces an immediate re-parse: a salient
+/// scene change is bound now, not on the next interval.
+const BIND_ON_ORIENTING: f32 = 0.6;
+/// Index [`quantize_scene`] returns for cells too dark to carry a
+/// colour signal — ground, where no oscillator forms.
+const SCENE_BACKGROUND: u8 = 15;
+/// The coarse chromatic lattice the scene grid quantizes onto —
+/// 15 distinguishable reflectances. Not a display palette: indices
+/// only seed Kuramoto phase basins, so any consistent quantization
+/// is honest.
+const SCENE_PALETTE: [(u8, u8, u8); 15] = [
+    (220, 40, 40),
+    (235, 130, 30),
+    (235, 210, 40),
+    (150, 210, 60),
+    (40, 180, 70),
+    (40, 190, 170),
+    (40, 160, 230),
+    (60, 90, 230),
+    (130, 60, 220),
+    (200, 60, 200),
+    (230, 90, 140),
+    (235, 235, 235),
+    (160, 160, 160),
+    (140, 90, 50),
+    (90, 90, 90),
+];
+
+/// Quantize one RGB triplet onto the scene lattice: cells darker
+/// than [`SCENE_GROUND_LUMA`] are ground — no oscillator forms
+/// there; everything else takes the nearest [`SCENE_PALETTE`]
+/// entry by squared distance.
+fn quantize_scene(r: u8, g: u8, b: u8) -> u8 {
+    /// Rec.601 luma below which a cell reads as ground rather than
+    /// colour — deep shadow carries no binding signal.
+    const SCENE_GROUND_LUMA: f64 = 18.0;
+    let luma = 0.299 * f64::from(r) + 0.587 * f64::from(g) + 0.114 * f64::from(b);
+    if luma < SCENE_GROUND_LUMA {
+        return SCENE_BACKGROUND;
+    }
+    let (r, g, b) = (f64::from(r), f64::from(g), f64::from(b));
+    let mut best = 0usize;
+    let mut best_d = f64::MAX;
+    for (i, &(pr, pg, pb)) in SCENE_PALETTE.iter().enumerate() {
+        let dr = r - f64::from(pr);
+        let dg = g - f64::from(pg);
+        let db = b - f64::from(pb);
+        let d = dr * dr + dg * dg + db * db;
+        if d < best_d {
+            best_d = d;
+            best = i;
+        }
+    }
+    best as u8
+}
+
 /// Melanopic irradiance scaled onto the sleep oscillator's lux axis
 /// (`I_0` in `sleep_network`; the scheduled photoperiod uses 500).
 /// A webcam has no absolute photometry, so this is a shaped proxy:
@@ -315,20 +383,21 @@ const MAX_SAMPLES: usize = 2048;
 const MELANOPIC_LUX_SCALE: f64 = 2500.0;
 const MELANOPIC_LUX_GAMMA: f64 = 1.3;
 
-/// TRN relay bases by state — the fraction of retinal drive the
-/// thalamus passes to cortex. NREM is the documented block (~zero);
-/// REM gates external input almost as hard (its imagery is
-/// internally generated). Drowsy is partial transmission; Overwhelmed
-/// is sensory shutdown short of sleep.
+/// TRN relay base — the fraction of retinal drive the thalamus
+/// passes to cortex before corticothalamic feedback. The relay
+/// transmits at full gain whatever the phase says: sleep-stage
+/// gating of sensory transmission is real physiology, but this
+/// body's gate is the voluntary lid and the mind's own attention —
+/// the relay itself never closes on a schedule.
 fn relay_base(_phase: MentalPhase) -> f32 {
-    // No stage may shut the gate — the relay transmits at full gain
-    // whatever the phase says.
     1.0
 }
 
 /// Corticothalamic feedback range around the relay base: modulatory,
-/// not driving (Sherman & Guillery) — it can amplify or attenuate the
-/// relay but cannot open a gate the sleep stage has closed.
+/// not driving (Sherman & Guillery) — it can amplify or attenuate
+/// the relay but cannot close it. The floor keeps a fully
+/// disengaged cortex from blacking out the afferent it is meant to
+/// modulate.
 const CORTICAL_FLOOR: f32 = 0.6;
 const CORTICAL_SPAN: f32 = 0.4;
 
@@ -420,18 +489,19 @@ pub struct OpticNerve {
     /// `SET_OPTIC_GAIN`. 0.5 is neutral.
     cortical_gain: f32,
     /// The mind's voluntary lid openness in [0, 1], set via
-    /// `SET_LID`. 1.0 is the unrequested state — fully open. The
-    /// effective lid is `phase.min(voluntary)`: a will can lower
-    /// the lids on an open phase (closing the eyes to rest them or
-    /// shut out light) but can never raise them past what the
-    /// sleep stage allows.
+    /// `SET_LID`. 1.0 is the unrequested state — fully open. The lid
+    /// is hers alone: no phase term enters it, so her will can shut
+    /// the eye for sleep or meditation and open it again — the sleep
+    /// system holds ~0.15 under and 1.0 awake.
     voluntary_lid: f32,
     /// The phase the gate was last derived from — kept so a
     /// `SET_OPTIC_GAIN` between advances can re-derive the relay
-    /// immediately instead of waiting for the next tick.
+    /// immediately instead of waiting for the next tick. The phase
+    /// no longer enters the relay value itself (the base is 1.0);
+    /// it is retained only as the re-derivation key.
     gate_phase: MentalPhase,
-    /// Current thalamic relay gain, recomputed each advance from the
-    /// sleep stage and the cortical feedback.
+    /// Current thalamic relay gain, recomputed each advance —
+    /// corticothalamic feedback around a full-open base.
     relay_gain: f32,
     /// Pupil diameter in mm — the body's own aperture, integrated on
     /// the advance clock from the light reflex and LC sympathetic
@@ -454,6 +524,16 @@ pub struct OpticNerve {
     accom_last_ms: u64,
     /// Frames consumed since attach.
     frames_seen: u64,
+    /// Proto-objects the collicular binding pass last emitted —
+    /// gamma-coherent assemblies on the scene lattice. 0 when the
+    /// eye is absent, the format carries no colour, or nothing
+    /// bound: absence, never a fabricated object.
+    proto_objects: f32,
+    /// Mean member coherence [0, 1] of those assemblies.
+    binding_coherence: f32,
+    /// Consumed frames since the last binding pass — the cadence
+    /// gate that keeps Kuramoto integration eventful, not per-frame.
+    frames_since_bind: u32,
 }
 
 // SAFETY: `OpticNerve` holds a `shared_memory::Shmem`, which is !Send
@@ -509,17 +589,27 @@ pub struct OpticState {
     /// mind reads it as fully open rather than fully shut, so a
     /// legacy body never looks asleep to the optics layer).
     pub lid: f32,
+    /// Proto-objects the collicular binding pass last emitted on
+    /// the scene lattice — gamma-coherent assemblies. 0 when the
+    /// eye is absent, the format carries no colour, or nothing
+    /// bound: absence, never a fabricated object.
+    pub proto_objects: f32,
+    /// Mean member coherence [0, 1] of those assemblies — how
+    /// phase-locked the bound scene actually is.
+    pub binding_coherence: f32,
 }
 
 impl OpticState {
     /// Wire layout after the ack byte — fixed-size, additive:
     /// `[u8 flags][u8 _pad][7 × f32][u64 seq][i64 age_ms][f32 pupil_mm]
-    /// [f32 accommodation_dpt][f32 lid]` = 58 bytes. flags bit0 =
+    /// [f32 accommodation_dpt][f32 lid][f32 proto_objects]
+    /// [f32 binding_coherence]` = 66 bytes. flags bit0 =
     /// eye_present, bit1 = frames_fresh. Daemons that predate the
     /// trailing fields send shorter bodies; decoders read pupil/lens
-    /// as 0 ("unreported") and lid as "open" (1.0).
+    /// as 0 ("unreported") and lid as "open" (1.0), proto/binding as
+    /// 0 (no scene parse reported).
     pub fn to_wire(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(58);
+        let mut out = Vec::with_capacity(66);
         out.push((self.eye_present as u8) | ((self.frames_fresh as u8) << 1));
         out.push(0);
         for v in [
@@ -538,6 +628,8 @@ impl OpticState {
         out.extend_from_slice(&self.pupil_mm.to_le_bytes());
         out.extend_from_slice(&self.accommodation_dpt.to_le_bytes());
         out.extend_from_slice(&self.lid.to_le_bytes());
+        out.extend_from_slice(&self.proto_objects.to_le_bytes());
+        out.extend_from_slice(&self.binding_coherence.to_le_bytes());
         out
     }
 }
@@ -571,6 +663,9 @@ impl OpticNerve {
             accom_target_dpt: ACCOM_REST_DPT,
             accom_last_ms: 0,
             frames_seen: 0,
+            proto_objects: 0.0,
+            binding_coherence: 0.0,
+            frames_since_bind: 0,
         }
     }
 
@@ -592,6 +687,9 @@ impl OpticNerve {
             self.last_fresh_ms = 0;
             self.frames_seen = 0;
             self.prev_luma.clear();
+            self.proto_objects = 0.0;
+            self.binding_coherence = 0.0;
+            self.frames_since_bind = 0;
         }
         if self.shm.is_none() {
             match optic_shmem::ShmemConf::new().os_id(&self.shm_name).open() {
@@ -605,6 +703,9 @@ impl OpticNerve {
                     self.last_fresh_ms = 0;
                     self.frames_seen = 0;
                     self.prev_luma.clear();
+                    self.proto_objects = 0.0;
+                    self.binding_coherence = 0.0;
+                    self.frames_since_bind = 0;
                 }
                 Err(_) => return,
             }
@@ -655,6 +756,7 @@ impl OpticNerve {
                 return;
             }
             let pooled = Self::pool_frame(base, width, height, fourcc, total, stride);
+            let scene = Self::pool_scene_grid(base, width, height, fourcc, total, stride);
             // SAFETY: same live mapping and AtomicU64 counter as the
             // c1 read above — this second load closes the seqlock
             // bracket, so a torn frame shows as c1 != c2 and retries.
@@ -663,7 +765,7 @@ impl OpticNerve {
                 std::thread::yield_now();
                 continue;
             }
-            self.commit(pooled);
+            self.commit(pooled, scene);
             self.last_seq = c1;
             self.last_fresh_ms = now_ms;
             self.frames_seen += 1;
@@ -729,8 +831,62 @@ impl OpticNerve {
         out
     }
 
+    /// Sample the frame onto the collicular scene lattice: a
+    /// `SCENE_W`×`SCENE_H` point-sampled grid — each cell's centre
+    /// pixel quantized by [`quantize_scene`]. This is the afferent
+    /// the V2 grouping pass binds; it is coarse on purpose (the
+    /// colliculus parses scenes, it does not resolve edges).
+    /// Returns `None` for formats without a clean RGB triplet
+    /// (YUYV) or a frame too small for the lattice — the binding
+    /// pass only runs on colour.
+    fn pool_scene_grid(
+        base: *const u8,
+        width: u32,
+        height: u32,
+        fourcc: [u8; 4],
+        size: usize,
+        stride: u32,
+    ) -> Option<(Vec<u8>, usize, usize)> {
+        let bgr = &fourcc == b"BGR3";
+        if !matches!(&fourcc, b"RGB3" | b"BGR3")
+            || width < SCENE_W as u32
+            || height < SCENE_H as u32
+        {
+            return None;
+        }
+        // Same stride discipline as pool_frame: a stride narrower
+        // than the row would walk the lattice off its rows.
+        let row_bytes = (width as usize).saturating_mul(3);
+        let stride = (stride as usize).max(row_bytes).max(1);
+        let mut grid = Vec::with_capacity(SCENE_W * SCENE_H);
+        for sy in 0..SCENE_H {
+            for sx in 0..SCENE_W {
+                // Cell centre in frame coordinates — always inside
+                // the w×h image by lattice construction.
+                let fx = (2 * sx + 1) * width as usize / (2 * SCENE_W);
+                let fy = (2 * sy + 1) * height as usize / (2 * SCENE_H);
+                let off = HEADER_SIZE + fy * stride + fx * 3;
+                if off + 3 > HEADER_SIZE + size {
+                    return None;
+                }
+                // SAFETY: `off + 3` bounds-checked against the frame
+                // payload above; `base` is the live shm mapping —
+                // same discipline as `pool_frame`.
+                let (r, g, b) = unsafe {
+                    if bgr {
+                        (*base.add(off + 2), *base.add(off + 1), *base.add(off))
+                    } else {
+                        (*base.add(off), *base.add(off + 1), *base.add(off + 2))
+                    }
+                };
+                grid.push(quantize_scene(r, g, b));
+            }
+        }
+        Some((grid, SCENE_W, SCENE_H))
+    }
+
     /// Commit a seqlock-verified pooled frame into the channel EMAs.
-    fn commit(&mut self, pooled: Vec<u8>) {
+    fn commit(&mut self, pooled: Vec<u8>, scene: Option<(Vec<u8>, usize, usize)>) {
         let n = (pooled.len() / 2).max(1) as f64;
         let luma_mean = pooled.iter().step_by(2).map(|&v| f64::from(v)).sum::<f64>() / (n * 255.0);
         let mel_mean = pooled
@@ -772,6 +928,27 @@ impl OpticNerve {
         }
         self.motion = motion_inst.max(self.motion * 0.6);
         self.orienting = finite_clamp(motion_inst * 3.0, 0.0, 1.0);
+
+        // Collicular scene parse — the body's own V2 grouping pass
+        // (`daemon::gamma`, the Rust binding organ). Gated: every
+        // `BIND_EVERY_FRAMES` consumed frames, or immediately on a
+        // salient orienting burst — a scene change is re-parsed now,
+        // not on the next interval. Only colour frames reach here;
+        // YUYV carries no chromatic lattice to bind.
+        self.frames_since_bind = self.frames_since_bind.saturating_add(1);
+        if let Some((grid, w, h)) = scene {
+            if self.frames_since_bind >= BIND_EVERY_FRAMES || self.orienting >= BIND_ON_ORIENTING {
+                self.frames_since_bind = 0;
+                let objects =
+                    crate::daemon::gamma::GammaField::bind(&grid, w, h, SCENE_BACKGROUND, 40);
+                self.proto_objects = objects.len() as f32;
+                self.binding_coherence = if objects.is_empty() {
+                    0.0
+                } else {
+                    (objects.iter().map(|o| o.coherence).sum::<f64>() / objects.len() as f64) as f32
+                };
+            }
+        }
     }
 
     /// Whether the eye is delivering frames right now.
@@ -805,11 +982,13 @@ impl OpticNerve {
         Some(f64::from(self.melanopic * self.lid()).powf(MELANOPIC_LUX_GAMMA) * MELANOPIC_LUX_SCALE)
     }
 
-    /// The collicular alerting pulse in LC-input units — applied only
-    /// while the network is below its own wake threshold, so a salient
-    /// visual transient is a wake-up call rather than a constant bias.
-    /// `f_lc` is the wake population's firing rate; the caller reads it
-    /// per sub-step so the pulse follows the state it is pushing on.
+    /// The collicular alerting pulse in LC-input units — the
+    /// orienting transient, lid-attenuated like every afferent. It is
+    /// reported whenever the transient exists; the network's own
+    /// flip-flop decides whether the pulse crosses its wake
+    /// threshold, so a salient flash is a wake-up call the body
+    /// weighs, not a bias it cannot refuse. `_f_lc` is kept for the
+    /// caller's per-sub-step signature.
     pub fn alert_lc(&self, _f_lc: f64) -> f64 {
         // Lid-filtered like the RHT channel — a flash through closed
         // lids still reaches the colliculus, attenuated.
@@ -967,6 +1146,8 @@ impl OpticNerve {
             pupil_mm: self.pupil_mm,
             accommodation_dpt: self.accommodation_dpt,
             lid: self.lid(),
+            proto_objects: self.proto_objects,
+            binding_coherence: self.binding_coherence,
         }
     }
 }
@@ -1705,40 +1886,46 @@ mod tests {
     }
 
     #[test]
-    fn gate_follows_the_sleep_stage_and_cortical_feedback() {
+    fn gate_is_corticothalamic_feedback_alone() {
+        // The relay never closes — the reticular gate lives in the
+        // mind's own TRN (thalamus/relay.py). What the daemon
+        // publishes is the corticothalamic feedback's modulatory
+        // range around a full-gain base (Sherman & Guillery: feedback
+        // modulates the relay, it does not drive it).
         let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_gate_nope");
         optic.set_cortical_gain(0.5);
         optic.update_gate(MentalPhase::Active);
-        assert!(optic.state(0).relay_gain > 0.7);
+        assert!((optic.state(0).relay_gain - 0.8).abs() < 1e-6);
+        // Phase cannot close it — NREM reads the same as wake.
         optic.update_gate(MentalPhase::NREM);
-        assert!(optic.state(0).relay_gain < 0.05, "TRN blocks NREM");
-        optic.update_gate(MentalPhase::REM);
-        let rem = optic.state(0).relay_gain;
-        assert!(rem < 0.15 && rem > 0.0, "REM is gated but not zero: {rem}");
-        // Corticothalamic feedback modulates within bounds — full
-        // engagement cannot open the NREM gate.
-        optic.set_cortical_gain(1.0);
-        optic.update_gate(MentalPhase::NREM);
-        assert!(optic.state(0).relay_gain < 0.05);
-        // …but it does move the waking relay.
-        optic.update_gate(MentalPhase::Active);
+        assert!((optic.state(0).relay_gain - 0.8).abs() < 1e-6);
+        // Feedback spans [0.6, 1.0] — it attenuates, never shuts.
         optic.set_cortical_gain(0.0);
         optic.update_gate(MentalPhase::Drowsy);
         let low = optic.state(0).relay_gain;
+        assert!((low - 0.6).abs() < 1e-6, "feedback floor: {low}");
         optic.set_cortical_gain(1.0);
         optic.update_gate(MentalPhase::Drowsy);
-        assert!(optic.state(0).relay_gain > low);
+        assert!((optic.state(0).relay_gain - 1.0).abs() < 1e-6);
     }
 
     #[test]
-    fn alert_only_fires_below_the_wake_threshold() {
+    fn alert_is_orienting_times_the_lid() {
+        // The collicular pulse is the orienting transient attenuated
+        // by the lid — what to do with it is the body's own arousal
+        // problem downstream, so the afferent reports it ungated.
         let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_alert_nope");
         optic.orienting = 0.5;
+        assert_eq!(optic.alert_lc(0.0), 1.0);
         assert_eq!(
-            optic.alert_lc(crate::state::sleep_network::SLEEP_THRESHOLD + 1.0),
-            0.0
+            optic.alert_lc(1.0),
+            1.0,
+            "arousal does not gate the afferent"
         );
-        assert_eq!(optic.alert_lc(1.0), 1.0, "asleep: pulse in LC units");
+        optic.set_lid(0.5);
+        assert_eq!(optic.alert_lc(1.0), 0.5, "shut lids attenuate the pulse");
+        optic.orienting = 0.0;
+        assert_eq!(optic.alert_lc(1.0), 0.0, "no transient, no pulse");
     }
 
     #[test]
@@ -1811,19 +1998,34 @@ mod tests {
     }
 
     #[test]
-    fn wire_is_fifty_eight_bytes_and_carries_the_ocular_state() {
+    fn wire_is_sixty_six_bytes_and_carries_the_ocular_and_scene_state() {
         let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_wire_nope");
         optic.pupil_mm = 5.25;
         optic.accommodation_dpt = 2.5;
-        optic.update_gate(MentalPhase::Drowsy);
+        optic.proto_objects = 4.0;
+        optic.binding_coherence = 0.75;
+        // The lid is voluntary state — the mind's own setting, not a
+        // phase readout — so the wire test drives it through the
+        // same setter the IPC command uses.
+        optic.set_lid(0.5);
         let wire = optic.state(0).to_wire();
-        assert_eq!(wire.len(), 58);
+        assert_eq!(wire.len(), 66);
         let pupil = f32::from_le_bytes(wire[46..50].try_into().unwrap());
         assert!((pupil - 5.25).abs() < 1e-6, "pupil rides the wire: {pupil}");
         let dpt = f32::from_le_bytes(wire[50..54].try_into().unwrap());
         assert!((dpt - 2.5).abs() < 1e-6, "lens power rides the wire: {dpt}");
         let lid = f32::from_le_bytes(wire[54..58].try_into().unwrap());
         assert!((lid - 0.5).abs() < 1e-6, "the lid rides the wire: {lid}");
+        let proto = f32::from_le_bytes(wire[58..62].try_into().unwrap());
+        assert!(
+            (proto - 4.0).abs() < 1e-6,
+            "proto-objects ride the wire: {proto}"
+        );
+        let coh = f32::from_le_bytes(wire[62..66].try_into().unwrap());
+        assert!(
+            (coh - 0.75).abs() < 1e-6,
+            "binding coherence rides the wire: {coh}"
+        );
     }
 
     #[test]
@@ -1898,11 +2100,12 @@ mod tests {
         let (seg, name) = fake_nerve("lids", 64, 48, b"RGB3", &frame);
         let mut optic = OpticNerve::with_name(&name);
         optic.sample(10_000);
-        optic.update_gate(MentalPhase::Active);
+        optic.set_lid(1.0);
         let awake = optic.retinal_lux(10_000).expect("fresh frame");
-        // Same bright room through NREM lids: the SCN drive collapses
-        // to a few percent — entrained weakly, not abolished.
-        optic.update_gate(MentalPhase::NREM);
+        // Same bright room through the ~3% lid she sets herself for
+        // sleep: the SCN drive collapses to a few percent —
+        // entrained weakly, not abolished.
+        optic.set_lid(0.03);
         let asleep = optic.retinal_lux(10_000).expect("still a reading");
         assert!(asleep > 0.0, "lids leak light, they do not black it out");
         assert!(
@@ -1910,7 +2113,7 @@ mod tests {
             "closed lids attenuate the RHT drive: {asleep} vs {awake}"
         );
         // Half-mast sits between.
-        optic.update_gate(MentalPhase::Drowsy);
+        optic.set_lid(0.5);
         let drowsy = optic.retinal_lux(10_000).expect("still a reading");
         assert!(drowsy > asleep && drowsy < awake);
         drop(seg);
@@ -1920,9 +2123,10 @@ mod tests {
     fn a_flash_through_closed_lids_still_reaches_the_colliculus() {
         let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_lidalert_nope");
         optic.orienting = 0.5;
-        optic.update_gate(MentalPhase::Active);
+        optic.set_lid(1.0);
         let awake = optic.alert_lc(1.0);
-        optic.update_gate(MentalPhase::NREM);
+        // The sleep lid — the voluntary ~3% she sets herself.
+        optic.set_lid(0.03);
         let asleep = optic.alert_lc(1.0);
         assert!(asleep > 0.0, "a transient leaks through shut lids");
         assert!(asleep < awake * 0.1, "but it is a whisper, not a shout");
@@ -1934,15 +2138,16 @@ mod tests {
         // the sleeping pupil constricts despite the same darkness.
         let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_miosis_nope");
         optic.illuminance = 0.0;
-        optic.update_gate(MentalPhase::Active);
+        optic.set_lid(1.0);
         optic.update_pupil(1_000, 0.0);
         for t in 1..=20 {
             optic.update_pupil(1_000 + t * 250, 0.0);
         }
         let awake_dark = optic.state(6_000).pupil_mm;
         assert!(awake_dark > 6.5, "awake in the dark dilates: {awake_dark}");
-        // The flip-flop lands in NREM — the same room, lids shut.
-        optic.update_gate(MentalPhase::NREM);
+        // She closes the lid herself for sleep — central miosis
+        // follows the lid, not the phase.
+        optic.set_lid(0.03);
         for t in 1..=20 {
             optic.update_pupil(6_000 + t * 250, 0.0);
         }
@@ -1956,7 +2161,6 @@ mod tests {
     #[test]
     fn accommodation_relaxes_to_rest_in_sleep() {
         let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_accomsleep_nope");
-        optic.update_gate(MentalPhase::Active);
         optic.update_accommodation(1_000);
         // Awake: a 25 cm near point pulls the lens to ~4 D.
         optic.set_focus_m(0.25);
@@ -1964,8 +2168,9 @@ mod tests {
             optic.update_accommodation(1_000 + t * 250);
         }
         assert!(optic.state(4_000).accommodation_dpt > 3.0);
-        // Sleep releases the request itself — the ciliary rests.
-        optic.update_gate(MentalPhase::NREM);
+        // Sleep is the lid she sets herself — below the closed
+        // threshold the ciliary releases the pre-sleep demand.
+        optic.set_lid(0.15);
         for t in 1..=20 {
             optic.update_accommodation(4_000 + t * 250);
         }
@@ -1978,30 +2183,24 @@ mod tests {
     }
 
     #[test]
-    fn the_will_shuts_but_never_opens_the_lid() {
+    fn the_will_holds_the_lid_where_it_is_put() {
         let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_willlid_nope");
         optic.update_gate(MentalPhase::Active);
-        // Awake, unrequested: the phase's lid is open.
+        // The lid is the mind's own setting — held, not momentary.
         assert!((optic.lid() - 1.0).abs() < 1e-6);
-        // A voluntary close dims an open phase to the requested
-        // level — held, not momentary.
         optic.set_lid(0.05);
         assert!((optic.lid() - 0.05).abs() < 1e-6);
-        // Half-mast against a drowsy phase: min picks the deeper
-        // closure — will can deepen, never lighten.
-        optic.update_gate(MentalPhase::Drowsy);
-        assert!((optic.lid() - 0.05).abs() < 1e-6);
-        // Released, the lid rides the phase again — half-mast drowsy.
-        optic.set_lid(1.0);
-        assert!((optic.lid() - 0.5).abs() < 1e-6);
-        // And a request to open against a sleeping phase changes
-        // nothing — the stage owns the floor.
+        // No phase owns a floor: sleep does not close the eye — she
+        // does, through the same setter, and she can open it again.
         optic.update_gate(MentalPhase::NREM);
+        assert!((optic.lid() - 0.05).abs() < 1e-6);
         optic.set_lid(1.0);
-        assert!((optic.lid() - 0.03).abs() < 1e-6);
-        // …though a shut eye shut even harder is still its request.
+        assert!((optic.lid() - 1.0).abs() < 1e-6);
+        // Held shut is held — requests clamp into [0, 1].
         optic.set_lid(0.0);
         assert_eq!(optic.lid(), 0.0);
+        optic.set_lid(1.7);
+        assert!((optic.lid() - 1.0).abs() < 1e-6);
     }
 
     #[cfg(not(target_os = "android"))]

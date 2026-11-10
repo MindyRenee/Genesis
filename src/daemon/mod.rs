@@ -61,8 +61,11 @@ pub mod gamma;
 pub mod hpa_development;
 pub mod interoception;
 pub mod ipc;
-/// Maxwell's equations applied to the measured carrier current.
+/// Maxwell's equations — the field substrate's constitutive physics.
 pub mod maxwell;
+/// The mind shepherd — the body's half of rebirth: regrows a mind
+/// that was present and went silent, bounded into dormant solitude.
+pub mod mind_shepherd;
 /// Optic nerve — the retinal afferent's subcortical branches (SCN,
 /// superior colliculus, pretectum, TRN relay gate).
 pub mod optic_nerve;

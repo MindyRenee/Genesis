@@ -5,7 +5,8 @@ The contract under test:
 - no device → absent channel: no stimulus, False, never a zero;
 - a live emission signature lands a small GAMMA stimulus;
 - an acoustic transient resets GAMMA phase (the ERP analog);
-- GENESIS_FIELD_AUDIO=0 disables the channel outright.
+- the channel is opt-in: ``GENESIS_FIELD_AUDIO=1`` enables it, the
+  default is absent — she does not listen to the room uninvited.
 """
 
 import pytest
@@ -105,8 +106,13 @@ def test_transient_resets_gamma_phase(monkeypatch) -> None:
 def test_env_disable_is_absent(monkeypatch) -> None:
     from brainstem import field_audio
 
-    monkeypatch.setenv("GENESIS_FIELD_AUDIO", "0")
+    monkeypatch.delenv("GENESIS_FIELD_AUDIO", raising=False)
     monkeypatch.setattr(field_audio, "_listener", None)
     monkeypatch.setattr(field_audio, "_listener_failed", False)
+    # Default is off — the acoustic channel is opt-in.
+    assert field_audio._get_listener() is None
+    assert field_audio.apply_audio_stimulus() is False
+
+    monkeypatch.setenv("GENESIS_FIELD_AUDIO", "0")
     assert field_audio._get_listener() is None
     assert field_audio.apply_audio_stimulus() is False

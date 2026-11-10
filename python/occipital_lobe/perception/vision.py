@@ -12,9 +12,9 @@ The pipeline:
         |
         v
     thalamic relay gate     -> the body's GET_OPTIC_STATE relay_gain;
-        |                      NREM/REM blocks transmission at the
-        |                      thalamus — a look through a closed gate
-        |                      is a blind look (status "gated")
+        |                      the mind's corticothalamic gain around a
+        |                      full-open base — a deeply attenuated relay
+        |                      still means a blind look (status "gated")
         v
     Eye optics              -> the body's own aperture (pupil_mm):
         |                      retinal irradiance gain + depth-of-field
@@ -95,10 +95,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Below this relay gain the thalamus is blocking sensory transmission
-# (TRN inhibition in NREM; the near-block of REM). NREM sits near 0.02,
-# REM near 0.08, drowsy/overwhelmed and waking phases well above 0.15 —
-# so the gate is effectively the sleep boundary, not an arousal ramp.
+# Below this relay gain the thalamus is effectively blocking sensory
+# transmission. Current daemons never go this low — the relay is
+# corticothalamic feedback around a full-open base (floor 0.6) — but
+# a daemon from before the gate change reports the old stage-driven
+# values (NREM ~0.02, REM ~0.08), where this threshold is exactly the
+# sleep boundary it was written for.
 _THALAMIC_BLOCK = 0.15
 
 
@@ -767,13 +769,17 @@ class Vision:
             )
 
     def _optic_gate(self, client) -> tuple[float | None, float, float | None, float] | VisionScene:
-        """The thalamic gate — the body's own read of the optic nerve.
+        """The thalamic relay read — the body's own account of the
+        optic nerve's gate.
 
-        The TRN blocks transmission during NREM/REM upstream of
-        cortex, so the relay is consulted before the frame is: a
-        look through a closed gate is a blind look. A daemon that
-        predates the channel reports no gate and seeing proceeds
-        ungated — the gate is a body signal, not a mind construct.
+        ``relay_gain`` is the corticothalamic feedback the mind itself
+        pushes: attention gain around a full-open base, never a
+        sleep-stage switch. The threshold below still honours a daemon
+        from before the gate change, whose stage-driven relay did
+        close in NREM/REM — a look through a closed gate is a blind
+        look. A daemon that predates the channel reports no gate and
+        seeing proceeds ungated — the gate is a body signal, not a
+        mind construct.
 
         Returns the (relay_gate, pupil_mm, focus_m, lid) tuple, or a
         gated ``VisionScene`` when transmission is blocked.
@@ -1103,9 +1109,11 @@ class Vision:
         the layer-6 V1→dLGN feedback, decayed toward the last look.
 
         The heartbeat pushes this to the body via ``set_optic_gain``;
-        the body clamps it and scales the relay within what the sleep
-        stage permits. It decays with a 20 s half-life — attention
-        gain persists only while cortex keeps attending vision.
+        the body clamps it and scales the relay's gain around a
+        full-open base — the sleep-stage gate is the lid she sets
+        herself, not a phase floor in the nerve. It decays with a
+        20 s half-life — attention gain persists only while cortex
+        keeps attending vision.
         """
         if self._optic_engagement_at <= 0.0:
             return 0.0

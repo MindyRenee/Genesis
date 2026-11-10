@@ -55,9 +55,9 @@ Genesis's brain waves are produced by a bank of **driven phasor
 oscillators** (``BrainWaveOscillator``) — not a classifier. Each
 band is a real oscillation with persistent quadrature state, and its
 reported power is *measured*: the band emits its real-axis trace and
-a Goertzel meter — the same band math the body's field probe ran
-over the substrate before the two swapped places — reads the wave's
-band energy off the emitted signal, never off state.
+a Goertzel meter — the band math the field's own spectrum
+(``src/field/spectrum.rs``) applies to her substrate — reads the
+wave's band energy off the emitted signal, never off state.
 
 - **Waveform**: each band carries a complex state ``z`` rotating at
   the band's characteristic frequency (delta ~2.25 Hz, theta ~5.5 Hz,
@@ -546,15 +546,15 @@ _TURN_SNAP_EPS = 1e-9
 
 
 def _band_power(samples: deque[float] | list[float], fs: float, freq: float) -> float:
-    """Goertzel power of ``samples`` at ``freq`` — the field probe's
-    band meter, carried into the mind.
+    """Goertzel power of ``samples`` at ``freq`` — the band meter the
+    field's own spectrum applies to her substrate.
 
     Second-order recurrence over the emitted trace:
     ``s₀ = x + coeff·s₁ − s₂`` with ``coeff = 2·cos(2πk/n)`` at the
     exact bin nearest ``freq``; power ``= (s₁² + s₂² − coeff·s₁·s₂)
     / n²``. The wave's reported band energy is *measured* off the
-    emitted trace — the same arithmetic the body applies to the
-    substrate's real signals — not read from oscillator state.
+    emitted trace — the same arithmetic the spectrum applies to the
+    substrate's trajectory — not read from oscillator state.
 
     Bands above the metering rate's Nyquist bound return 0 — an
     absent channel, not a reading of zero.
@@ -1199,8 +1199,9 @@ def meditative_coherence(state: BrainWaveState) -> float:
 # drive-prescribed radius — with persistent quadrature state (the
 # oscillation is real state, not a phase counter plus a smoothed
 # scalar). The Stuart–Landau normal form this bank once ran moved
-# into the body: the field probe's channels now resonate with the
-# substrate on that math, while the mind's reported band power is
+# into the body: the field substrate's fibers resonate on that math,
+# and the Maxwell signature of their coherent motion is the body's
+# own computed read of it — while the mind's reported band power is
 # *measured* — Goertzel over each band's emitted trace, the meter
 # the body gave up in exchange. Cross-frequency coupling emerges
 # from actual phase-amplitude interaction: the slow band's measured
@@ -1445,7 +1446,7 @@ class BrainWaveOscillator:
     # at this fixed metering rate; reported band power is measured
     # off the emitted wave by Goertzel (the body's field math), not
     # read from state. 384 Hz keeps epsilon (150 Hz) inside Nyquist
-    # where the body's own ~250 Hz probe cannot follow it, and the
+    # with room for its sidebands, and the
     # 1536-sample window is four seconds — bin width 0.25 Hz, so
     # every band center (all multiples of 0.25 Hz) lands exactly on
     # a bin: k = 4f for all ten bands, no off-bin rolloff at all.
@@ -2380,9 +2381,10 @@ class BrainWaveOscillator:
     ) -> BrainWaveState:
         """Build BrainWaveState from the measured band powers."""
         # Band power is *measured*: Goertzel over each band's emitted
-        # real-axis trace — the field probe's own meter moved into the
-        # mind — not read from oscillator amplitude. The meter reports
-        # the single-bin amplitude estimate (2√P = A for an on-bin
+        # real-axis trace — the same meter the field's own spectrum
+        # applies to her substrate — not read from oscillator
+        # amplitude. The meter reports the single-bin amplitude
+        # estimate (2√P = A for an on-bin
         # tone), the same scale "powers" has always carried and every
         # downstream threshold is tuned to. A band's meter reports only
         # once the ring's bin nearest its center actually resolves it —
@@ -2639,6 +2641,11 @@ def assess_brain_waves(
     gains (E/I→gamma, 5-HT→gamma suppression, eCB→theta desync)
     on top of the phase-chosen distribution.
 
+    When ``client`` is supplied, her field's own spectral signature
+    also enters as stimulus — the substrate's band energies, carrier
+    phase lock, and per-band entrainment (``brainstem.field_probe``)
+    — the modeled waves perturbed by the very field they run on.
+
     The oscillator propagates each band's phasor state —
     rotating, relaxing toward the neurochemically-driven radius,
     wandering under its noise drive — then returns the measured
@@ -2659,6 +2666,13 @@ def assess_brain_waves(
     """
     if client is not None and fold is None:
         fold = client.get_fold_margins()
+    if client is not None:
+        try:
+            from brainstem.field_probe import apply_field_stimulus
+
+            apply_field_stimulus(client)
+        except Exception:  # noqa: BLE001 — absent channel, any cause
+            pass
     return _get_oscillator().assess(summary, sleep_stage, fold, chemicals)
 
 

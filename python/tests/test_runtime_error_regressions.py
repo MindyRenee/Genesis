@@ -362,8 +362,8 @@ def test_bare_expression_parse_miss_is_not_journaled() -> None:
     assert swallow.swallow_count(site) == before
 
 
-def test_missing_chrome_uses_fallback_without_journaling(monkeypatch) -> None:
-    """No installed browser is an expected mobile/headless fallback."""
+def test_missing_browser_uses_fallback_without_journaling(monkeypatch) -> None:
+    """No installed browser is an expected mobile/headless absence."""
     import sys
     from types import SimpleNamespace
 
@@ -373,7 +373,7 @@ def test_missing_chrome_uses_fallback_without_journaling(monkeypatch) -> None:
 
     class _UnavailableBrowser:
         def __init__(self, *, headless: bool, purpose: str) -> None:
-            raise RuntimeError("no chrome-family browser installed")
+            raise RuntimeError("no browser installed")
 
     site = "tools.web_search.browser_launch"
     before = swallow.swallow_count(site)

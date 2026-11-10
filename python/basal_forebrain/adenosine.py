@@ -53,12 +53,13 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 
     Adenosine's interactions with arousal systems are handled by the sleep pressure mechanism
     (level accumulation/clearance), NOT by the coupling matrix.
-    Only GABA (promotes sleep) and cortisol (stress-related adenosine release) have direct coupling.
-    Orexin mildly inhibits adenosine (wake promotion).
+    ALL couplings are zero: the dedicated Process-S mechanism owns the
+    adenosine level, and direct level coupling has no restoring force
+    to balance it.
 
-    GABA -> ADN: +0.10  (weak volume transmission.)
-    CORT -> ADN: +0.10  (stress-related adenosine release.)
-    OX   -> ADN: -0.10  (wake promotion — orexin mildly inhibits adenosine.)
+    GABA  ->  ADN:  0.00  (retired — owned by the Process-S mechanism.)
+    CORT  ->  ADN:  0.00  (retired — owned by the Process-S mechanism.)
+    OX  ->  ADN:  0.00  (retired — owned by the Process-S mechanism.)
     DA   -> ADN: 0.00   (no direct coupling)
     SRT  -> ADN: 0.00   (no direct coupling)
     NE   -> ADN: 0.00   (no direct coupling)
@@ -80,7 +81,7 @@ COUPLING: HOW ADENOSINE AFFECTS OTHERS (matrix column 10)
 
     ADN -> GABA:  +0.10  (sleep pressure promotes inhibition.)
     ADN -> OX :  -0.10  (sleep pressure inhibits orexin (the sleep switch).)
-    ADN -> DA :  0.00   (no direct coupling)
+    ADN  ->  DA:  -0.10  (A2A-D2 heteromer — A2A activation lowers D2 efficacy; Ferre, PNAS 2015.)
     ADN -> SRT:  0.00   (no direct coupling)
     ADN -> NE :  0.00   (no direct coupling)
     ADN -> ACh:  0.00   (no direct coupling)

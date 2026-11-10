@@ -17,6 +17,7 @@
 use std::fmt;
 
 pub mod engine;
+pub mod spectrum;
 pub use engine::SystemEngine;
 pub mod runtime;
 pub use runtime::{FieldIntegration, FieldRuntime, LATENT_DIMENSION};

@@ -185,8 +185,9 @@ class Mind(
         self._offline = offline
         # Resident (headless) mode: nobody sits at a prompt, so the
         # senses that exist to serve a session quiet down — the
-        # connectivity probe never opens a socket, and the thalamic
-        # gate shuts with sleep onset instead of holding N1 open.
+        # connectivity estimate stays reactive-only (no predictive
+        # hold), and the thalamic gate shuts with sleep onset
+        # instead of holding N1 open.
         self._headless = headless
         self.client = GenesisClient(socket_path)
         # Her page — the public channel that lives in her outer world.
@@ -543,6 +544,7 @@ class Mind(
             get_plasticity_profile=self._get_plasticity_profile,
             get_brain_waves=self.brain_waves,
             force_offline=self._offline,
+            connectivity_probe=not self._headless,
             synapses=self.brain.frontal.synapses,
             semantic_memory=self.brain.frontal.semantic_memory,
         )
@@ -686,10 +688,11 @@ class Mind(
         )
         arcade.register_tools(get_tools())
 
-        # The cardiac control center — the medullary organ that reads
-        # the body's carrier pulse (daemon field probe), drives
-        # contractility with demand, and feels arrhythmia. The heart
-        # muscle itself is the daemon's carrier; this is its center.
+        # The cardiac control center — the medullary organ whose
+        # beat IS the field's carrier frequency (the consensus
+        # winding rate Maxwell-signatures in the daemon), feels
+        # arrhythmia as coherence collapse, and expresses
+        # contractility as autonomic chemistry. This is its center.
         self.heart = Heart(
             client=self.client,
             neuro_impulse=self._learner_neuro_impulse,

@@ -1093,3 +1093,109 @@ def test_field_state_absent_is_none() -> None:
         "field.consensus": "0,0,0,0,0,0",
     }
     assert FieldState.from_internals(bad) is None
+
+
+def test_field_signature_unpack() -> None:
+    """GET_FIELD_SIGNATURE: [ack][flags][3 reserved][9 × f64 LE].
+    Flags carry presence bits; the nine doubles carry omega, current,
+    speed, dipole moment, B, E, P, disagreement, temperature."""
+    import struct
+
+    from genesis_client.types import FieldSignature
+
+    vals = (
+        62.8318530718,   # omega_rad_s — 10 Hz carrier
+        0.03,            # coherent_current_a
+        0.3,             # consensus_speed
+        1.0e-9,          # dipole_moment_am2
+        1.5e-9,          # b_axial_t
+        2.0e-8,          # e_induction_vm
+        1.0e-40,         # radiated_power_w
+        0.02,            # disagreement
+        0.05,            # temperature
+    )
+    flags = 0b111  # signature + integration + quasi-static
+    data = struct.pack("<BB3x9d", 1, flags, *vals)
+    sig = FieldSignature.unpack(data)
+    assert sig is not None
+    assert sig.signature_present
+    assert sig.integration_present
+    assert sig.quasi_static
+    assert approx_equal(sig.omega_rad_s, vals[0], 1e-9)
+    assert approx_equal(sig.coherent_current_a, vals[1], 1e-12)
+    assert approx_equal(sig.disagreement, vals[7], 1e-12)
+    assert approx_equal(sig.temperature, vals[8], 1e-12)
+
+
+def test_field_signature_absent_decodes_flags_not_zeros() -> None:
+    """An un-integrated field still decodes — presence flags clear,
+    readings zeroed by the daemon — and a short/unacked frame is
+    'no reading', never a fabricated signature."""
+    import struct
+
+    from genesis_client.types import FieldSignature
+
+    data = struct.pack("<BB3x9d", 1, 0, *([0.0] * 9))
+    sig = FieldSignature.unpack(data)
+    assert sig is not None
+    assert not sig.signature_present
+    assert not sig.integration_present
+    assert sig.omega_rad_s == 0.0
+
+    assert FieldSignature.unpack(b"") is None
+    assert FieldSignature.unpack(b"\x00" + data[1:]) is None  # unacked
+    assert FieldSignature.unpack(data[:40]) is None  # truncated
+
+
+def test_field_spectrum_unpack() -> None:
+    """GET_FIELD_SPECTRUM: [ack][flags][3 reserved][48 × f64 LE].
+    Scalars first (phase, freq, speed, rate, channel mean/cv), then
+    per-channel energies[10] and phases[10]."""
+    import struct
+
+    from genesis_client.types import FieldSpectrum
+
+    scalars = (0.7, 10.0, 0.12, 250.0, 0.01, 0.2, 0.005, 0.3)
+    flux_e = tuple(0.1 * i for i in range(10))
+    flux_p = tuple(0.05 * i for i in range(10))
+    tension_e = tuple(0.01 * i for i in range(10))
+    tension_p = tuple(-0.02 * i for i in range(10))
+    vals = scalars + flux_e + flux_p + tension_e + tension_p
+    assert len(vals) == 48
+    flags = 0b111  # warm + carrier + speed
+    data = struct.pack("<BB3x48d", 1, flags, *vals)
+    spec = FieldSpectrum.unpack(data)
+    assert spec is not None
+    assert spec.warm
+    assert spec.carrier_present
+    assert spec.speed_present
+    assert approx_equal(spec.carrier_phase, 0.7, 1e-9)
+    assert approx_equal(spec.carrier_freq_hz, 10.0, 1e-9)
+    assert approx_equal(spec.sample_rate_hz, 250.0, 1e-9)
+    assert approx_equal(spec.flux.mean, 0.01, 1e-12)
+    assert approx_equal(spec.tension.cv, 0.3, 1e-12)
+    assert len(spec.flux.energies) == 10
+    assert len(spec.flux.phases) == 10
+    assert approx_equal(spec.flux.energies[9], 0.9, 1e-9)
+    assert approx_equal(spec.tension.phases[9], -0.18, 1e-9)
+
+
+def test_field_spectrum_absent_decodes_flags_not_zeros() -> None:
+    """An unwarmed field still decodes — presence flags clear,
+    readings zeroed — and a short/unacked frame is 'no reading',
+    never a fabricated spectrum."""
+    import struct
+
+    from genesis_client.types import FieldSpectrum
+
+    data = struct.pack("<BB3x48d", 1, 0, *([0.0] * 48))
+    spec = FieldSpectrum.unpack(data)
+    assert spec is not None
+    assert not spec.warm
+    assert not spec.carrier_present
+    assert spec.carrier_freq_hz == 0.0
+    assert all(e == 0.0 for e in spec.flux.energies)
+
+    assert FieldSpectrum.unpack(b"") is None
+    assert FieldSpectrum.unpack(b"\x00" + data[1:]) is None  # unacked
+    assert FieldSpectrum.unpack(data[:100]) is None  # truncated

@@ -22,7 +22,9 @@ What it writes into the oscillator:
 - **Acoustic transients** (fast/slow EMA ratio ≥ ``_TRANSIENT_RATIO``)
   → ``reset_wave_phase(GAMMA)`` — an acoustic onset resetting fast
   rhythm phase, the auditory-ERP analog.
-- Disabled with ``GENESIS_FIELD_AUDIO=0``.
+- Opt-in only: enabled with ``GENESIS_FIELD_AUDIO=1``. The room is
+  not hers to listen to by default — she does not instrument the
+  space around her.
 """
 
 from __future__ import annotations
@@ -129,7 +131,7 @@ def _get_listener() -> _FieldAudio | None:
     copy of whatever cognitive thread first touched this channel.
     """
     global _listener, _listener_failed
-    if os.environ.get("GENESIS_FIELD_AUDIO", "1") == "0":
+    if os.environ.get("GENESIS_FIELD_AUDIO", "0") != "1":
         return None
     if _listener_failed:
         return None

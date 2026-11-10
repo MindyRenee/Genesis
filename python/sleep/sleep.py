@@ -1025,6 +1025,20 @@ class SleepMixin:
         # but calling it keeps the two paths identical.
         self.inner_life.resume()
 
+        # The voluntary eyelid — sleep closes the eye she means to
+        # sleep behind. The lid is hers alone now (no phase floor in
+        # the nerve), so the sleep system sets it: ~0.15 dims the
+        # retinal afferents the way lid closure does — the SCN's
+        # light drive and the collicular alert both read through it.
+        # Held daemon-side, so a mind that dies mid-sleep leaves the
+        # lid as she left it and wake() opens it again.
+        set_lid = getattr(self.client, "set_lid", None)
+        if set_lid is not None:
+            try:
+                set_lid(0.15)
+            except Exception:  # noqa: BLE001
+                pass
+
         # Reset discourse state — recent entities from the previous
         # conversation shouldn't persist across sleep. Just as humans
         # don't maintain pronoun referents across a sleep cycle, the
@@ -1403,6 +1417,17 @@ class SleepMixin:
         self._nap_mode = False
         self._sleep_start_time = 0.0
         self.client.set_zone(ZONE_CONVERSATION)
+        # The eye opens with her — the lid sleep shut in
+        # _engage_sleep_mechanism releases here, on the same funnel
+        # every real wake takes. A mind still meditating keeps hers
+        # shut: the sit's lid is its own, not sleep's to reopen.
+        if not self._is_meditating:
+            set_lid = getattr(self.client, "set_lid", None)
+            if set_lid is not None:
+                try:
+                    set_lid(1.0)
+                except Exception:  # noqa: BLE001
+                    pass
         return episode_secs, was_nap, was_user_initiated
 
     def _wake_epilogue(self) -> None:
@@ -1731,9 +1756,9 @@ class SleepMixin:
         # The voluntary eyelid — the orbicularis the hardware lacks.
         # Closing the eyes for the sit is the deliberate part of
         # meditation the body's sleep phase never reaches: the lid
-        # composes by min with the phase's own position, so this dims
-        # the visual afferents for the sit and nothing else. Held,
-        # so the release happens at wake_from_meditation.
+        # is hers alone, held daemon-side, so this dims the visual
+        # afferents for the sit and nothing else. Held, so the
+        # release happens at wake_from_meditation.
         set_lid = getattr(self.client, "set_lid", None)
         if set_lid is not None:
             try:

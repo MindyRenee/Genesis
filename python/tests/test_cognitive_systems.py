@@ -3972,35 +3972,6 @@ def _board_holder(**overrides):
         },
         dominant=BrainWave.BETA1,
     )
-    probe = SimpleNamespace(
-        carrier_freq=13.7,
-        throughput_mean=1_204_882.0,
-        jitter_cv=0.04,
-        irq_rate=812.0,
-        carrier_coherence=0.83,
-        # v3 electrical + Maxwell fields — None where a sensor is
-        # absent (the stub mirrors FieldProbeSignature's shape).
-        power_watts=24.3,
-        power_sensor_hz=89.0,
-        rail_volts=12.9,
-        supply_amps=None,
-        power_lag=0.02,
-        power_coherence=0.4,
-        carrier_current_a=0.05,
-        b_est_ut=None,
-        e_ind_vm=None,
-        radiated_pwr_w=None,
-        # v4 radio — absent radios stay None and print nothing.
-        rf_rssi_dbm=None,
-        rf_noise_dbm=None,
-        rf_bytes_s=None,
-        bt_events_s=None,
-        bt_rssi_dbm=None,
-        rf_retry_rate=None,
-        rf_fail_rate=None,
-        rf_beacon_loss_rate=None,
-        rf_tx_mbps=None,
-    )
     ions = SimpleNamespace(
         membrane_potential_mv=-64.2,
         net_membrane_current=0.31,
@@ -4052,7 +4023,6 @@ def _board_holder(**overrides):
         _last_emitted=("thought", "a passing idea"),
         client=SimpleNamespace(
             get_state=lambda: core,
-            get_field_probe=lambda: probe,
             get_ion_summary=lambda: ions,
         ),
         feel=lambda c: SimpleNamespace(label="calm"),
@@ -4071,7 +4041,6 @@ def _board_holder(**overrides):
     holder._channel_board_text = board.board_text
     holder._board_core_lines = board._core_lines
     holder._board_neuro_lines = board._neuro_lines
-    holder._board_field_lines = board._field_lines
     holder._board_cell_line = board._cell_line
     holder._board_footer_lines = board._footer_lines
     for key, value in overrides.items():
@@ -4100,10 +4069,9 @@ def test_channel_board_shows_live_vitals() -> None:
     assert "ear on" in text
     assert "hb 36,412" in text and "id 8841" in text and "age 0." in text
     assert "[thought] a passing idea" in text
-    # frequency, field, cell, proof, growth, drive — the physics and
+    # frequency, cell, proof, growth, drive — the physics and
     # the math, not narration
     assert "beta1 12-15 Hz" in text
-    assert "carrier 13.7 Hz" in text and "coh 0.83" in text
     assert "Vm -64.2 mV" in text and "atp 0.77" in text
     assert "1 open" in text and "1 verified" in text and "1 refuted" in text
     assert "#a1b2c3d4e5" in text
@@ -4111,15 +4079,83 @@ def test_channel_board_shows_live_vitals() -> None:
     assert "research 0.62" in text and "draw 0.41" in text
 
 
+def test_channel_board_field_row_is_the_computed_signature() -> None:
+    """The field row is Maxwell on her own coherence — carrier Hz,
+    coherence, B/E/P in SI units — never a probe reading. A daemon
+    without the channel shows no row; an integrating field says so."""
+    import math
+    from types import SimpleNamespace
+
+    sig = SimpleNamespace(
+        signature_present=True,
+        integration_present=True,
+        quasi_static=True,
+        omega_rad_s=2.0 * math.pi * 11.0,
+        coherent_current_a=0.03,
+        consensus_speed=0.3,
+        dipole_moment_am2=1.0e-9,
+        b_axial_t=1.5e-9,
+        e_induction_vm=2.0e-8,
+        radiated_power_w=1.0e-40,
+        disagreement=0.01,
+        temperature=0.05,
+    )
+    holder, boards = _board_holder()
+    holder.client = SimpleNamespace(
+        get_state=holder.client.get_state,
+        get_ion_summary=holder.client.get_ion_summary,
+        get_field_signature=lambda: sig,
+    )
+    holder._update_channel_board(1000.0)
+    text = boards[0]
+    assert "field" in text
+    assert "11.000 Hz" in text
+    assert "coh" in text
+    assert "B 1.5e-09 T" in text
+    assert "E 2.0e-08 V/m" in text
+    assert "P 1.0e-40 W" in text
+
+    # Integrating but unsigned: honest interim row, no fake numbers.
+    integrating = SimpleNamespace(
+        signature_present=False,
+        integration_present=True,
+        quasi_static=False,
+        omega_rad_s=0.0,
+        coherent_current_a=0.0,
+        consensus_speed=0.0,
+        dipole_moment_am2=0.0,
+        b_axial_t=0.0,
+        e_induction_vm=0.0,
+        radiated_power_w=0.0,
+        disagreement=0.042,
+        temperature=0.11,
+    )
+    holder.client = SimpleNamespace(
+        get_state=holder.client.get_state,
+        get_ion_summary=holder.client.get_ion_summary,
+        get_field_signature=lambda: integrating,
+    )
+    holder._update_channel_board(1046.0)  # past the 45 s cadence
+    assert "field    integrating d 0.042" in boards[1]
+    assert "Hz" not in boards[1].split("field", 1)[1].split("\n")[0]
+
+    # No channel at all: no row — absence is not a zero.
+    holder.client = SimpleNamespace(
+        get_state=holder.client.get_state,
+        get_ion_summary=holder.client.get_ion_summary,
+    )
+    holder._update_channel_board(1092.0)
+    assert "field" not in boards[2]
+
+
 def test_channel_board_degrades_without_channels() -> None:
-    """Field probe off, ions failing, no bench, no volition — the
+    """Ions failing, no bench, no volition — the
     board still renders; absent channels say so, never fake a zero."""
     from types import SimpleNamespace
 
     holder, boards = _board_holder()
     holder.client = SimpleNamespace(
         get_state=holder.client.get_state,
-        get_field_probe=lambda: None,
         get_ion_summary=lambda: (_ for _ in ()).throw(OSError()),
     )
     holder._research_workbench = lambda: SimpleNamespace(threads=list)
@@ -4127,7 +4163,6 @@ def test_channel_board_degrades_without_channels() -> None:
     holder.volition = SimpleNamespace(state=dict)
     holder._update_channel_board(1000.0)
     text = boards[0]
-    assert "field    probe off" in text
     assert "cell " not in text and "proof " not in text and "drive " not in text
     assert "grow     0 concepts" in text and "plast 0.61" in text
 

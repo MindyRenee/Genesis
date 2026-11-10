@@ -35,7 +35,7 @@ suppresses it below baseline, blocking learning.
 RECEPTOR ADAPTATION MULTIPLIER
 ════════════════════════════════════════════════════════════════════════
 
-    multiplier = 0.5
+    multiplier = 0.3
 
 TrkB receptor turnover is slow — neurotrophin receptors adapt
 much slower than the baseline reference (glutamate at 1.0×).
@@ -48,16 +48,16 @@ COUPLING: HOW OTHERS AFFECT BDNF (matrix row 11)
 Index order: DA, SRT, NE, ACh, GABA, GLU, CORT, OXY, END, HIST,
 ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 
-    DA   -> BDNF: +0.05  (weak volume transmission.)
+    DA  ->  BDNF:  0.10  (weak volume transmission.)
     SRT  -> BDNF: +0.10  (the antidepressant mechanism — serotonin is the strongest BDNF supporter.
                          SSRIs raise SRT -> raise BDNF -> neuroplasticity -> depression recovery.)
-    NE   -> BDNF: +0.05  (weak volume transmission.)
-    ACh  -> BDNF: +0.05  (weak volume transmission.)
-    GLU  -> BDNF: +0.05  (weak volume transmission.)
+    NE  ->  BDNF:  0.10  (weak volume transmission.)
+    ACh  ->  BDNF:  0.10  (weak volume transmission.)
+    GLU  ->  BDNF:  0.10  (weak volume transmission.)
     CORT -> BDNF: -0.20  (chronic stress suppresses BDNF — THE key mechanism by which stress
                          impairs learning and memory.)
-    OXY  -> BDNF: +0.05  (weak volume transmission.)
-    END  -> BDNF: +0.05  (weak volume transmission.)
+    OXY  ->  BDNF:  0.10  (weak volume transmission.)
+    END  ->  BDNF:  0.10  (weak volume transmission.)
     GABA -> BDNF: 0.00   (no direct coupling)
     HIST -> BDNF: 0.00   (no direct coupling)
     ADN  -> BDNF: 0.00   (no direct coupling)
@@ -72,16 +72,16 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 COUPLING: HOW BDNF AFFECTS OTHERS (matrix column 11)
 ════════════════════════════════════════════════════════════════════════
 
-    BDNF -> DA :  +0.05  (trophic support.)
+    BDNF  ->  DA:  0.10  (trophic support.)
     BDNF -> SRT:  +0.10  (the antidepressant positive feedback — SSRIs raise SRT -> raise BDNF -> .
                          raise SRT. Bounded by homeostatic forces.)
-    BDNF -> NE :  +0.05  (trophic support.)
-    BDNF -> ACh:  +0.05  (trophic support.)
-    BDNF -> GABA:  +0.05  (trophic support.)
-    BDNF -> GLU:  +0.05  (trophic support.)
-    BDNF -> CORT:  -0.05  (BDNF suppresses cortisol (weak).)
-    BDNF -> OXY:  +0.05  (trophic support.)
-    BDNF -> END:  +0.05  (trophic support.)
+    BDNF  ->  NE:  0.10  (trophic support.)
+    BDNF  ->  ACh:  0.10  (trophic support.)
+    BDNF  ->  GABA:  0.10  (trophic support.)
+    BDNF  ->  GLU:  0.10  (trophic support.)
+    BDNF  ->  CORT:  -0.10  (BDNF suppresses cortisol (weak).)
+    BDNF  ->  OXY:  0.10  (trophic support.)
+    BDNF  ->  END:  0.10  (trophic support.)
     BDNF -> HIST:  0.00   (no direct coupling)
     BDNF -> ADN:  0.00   (no direct coupling)
     BDNF -> ECB:  0.00   (no direct coupling)

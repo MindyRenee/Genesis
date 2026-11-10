@@ -564,6 +564,37 @@ pub mod cmd {
     /// Additive: PROTOCOL_VERSION unaffected.
     pub const ACTUATE: u8 = 65;
 
+    /// The organism's computed field signature — Maxwell's equations
+    /// evaluated on her own coherent motion plus the field
+    /// integration's observables (`tick::FieldSignature`). No
+    /// request payload.
+    /// Response: `[u8 ack]` then the wire body —
+    /// `[u8 flags][3 × u8 reserved][9 × f64]` little-endian:
+    /// flags bit0 = signature present, bit1 = integration present,
+    /// bit2 = quasi-static regime honest; then omega_rad_s,
+    /// coherent_current_a, consensus_speed, dipole_moment_am2,
+    /// b_axial_t, e_induction_vm, radiated_power_w, disagreement,
+    /// temperature. An un-integrated field still answers — absent
+    /// channels are flags, never errors. f64 throughout: the
+    /// radiated power can sit below f32's floor at her drift rates.
+    /// Additive: PROTOCOL_VERSION unaffected.
+    pub const GET_FIELD_SIGNATURE: u8 = 66;
+
+    /// The field's spectral signature — the band decomposition of
+    /// her own substrate trajectory (`field::spectrum`) at the wave
+    /// model's band centers, plus the consensus kinematics the
+    /// carrier runs on. No request payload. Response: `[u8 ack]`
+    /// then the wire body — `[u8 flags][3 × u8 reserved][48 × f64]`
+    /// little-endian: flags bit0 = bands warm, bit1 = carrier
+    /// present, bit2 = speed present; then carrier_phase,
+    /// carrier_freq_hz, consensus_speed, sample_rate_hz,
+    /// flux.mean/cv, tension.mean/cv, flux.energies[10],
+    /// flux.phases[10], tension.energies[10], tension.phases[10].
+    /// Bands above the achieved rate's Nyquist read zero — absent
+    /// is a reading, never an aliased one. Additive:
+    /// PROTOCOL_VERSION unaffected.
+    pub const GET_FIELD_SPECTRUM: u8 = 67;
+
     // ─── Tensor slab ──────────────────────────────────────────
     // Named multidimensional tensors shared between the daemon and
     // the cognitive mind — world frames, salience fields, embeddings,
@@ -4527,11 +4558,50 @@ where
                 resp
             }
 
+            cmd::GET_FIELD_SIGNATURE => {
+                // Her own field's computed signature — the Maxwell
+                // block on her coherent motion plus the integration's
+                // disagreement/temperature. Held by the TickLoop (the
+                // signature folds inside advance_neuro), so this lives
+                // on the reactive path. An un-integrated field still
+                // answers — absent is a reading, not an error.
+                let sig = match tick_loop.lock() {
+                    Ok(tl) => tl.field_signature(),
+                    Err(e) => {
+                        eprintln!("[ipc] GET_FIELD_SIGNATURE: tick_loop poisoned: {e}");
+                        return vec![error::INTERNAL_ERROR];
+                    }
+                };
+                let mut resp = vec![1u8];
+                resp.extend_from_slice(&sig.to_wire());
+                resp
+            }
+
+            cmd::GET_FIELD_SPECTRUM => {
+                // The field's own spectral signature — band energies
+                // and phases of her substrate trajectory's flux and
+                // tension, the carrier's winding phase and rate, and
+                // the achieved sampling rate the bands resolve
+                // against. Same reactive path as the signature: the
+                // spectrum folds inside `observe`, this only reads.
+                let sig = match tick_loop.lock() {
+                    Ok(mut tl) => tl.field_spectrum(),
+                    Err(e) => {
+                        eprintln!("[ipc] GET_FIELD_SPECTRUM: tick_loop poisoned: {e}");
+                        return vec![error::INTERNAL_ERROR];
+                    }
+                };
+                let mut resp = vec![1u8];
+                resp.extend_from_slice(&sig.to_wire());
+                resp
+            }
+
             cmd::SET_OPTIC_GAIN => {
                 // Corticothalamic feedback — the mind's layer-6 gain
                 // onto the thalamic relay. Modulatory only; the nerve
-                // clamps it into [0, 1] and the sleep stage still owns
-                // the gate it multiplies.
+                // clamps it into [0, 1] and scales the relay across
+                // [0.6, 1.0] around a full-open base — no sleep stage
+                // closes the gate it multiplies.
                 if payload.len() < 4 {
                     return vec![error::PAYLOAD_TOO_SHORT];
                 }
@@ -4571,9 +4641,9 @@ where
             cmd::SET_LID => {
                 // The mind's voluntary lid — orbicularis oculi for
                 // the eye the hardware lacks. The nerve clamps it
-                // into [0, 1] and composes it with the phase lid by
-                // min: will can shut an open eye, never open a
-                // sleeping one.
+                // into [0, 1] and holds it: no phase composes with
+                // it, so her will alone decides — the sleep system
+                // holds ~0.15 under and 1.0 awake.
                 if payload.len() < 4 {
                     return vec![error::PAYLOAD_TOO_SHORT];
                 }

@@ -391,9 +391,13 @@ _EXPORTS: dict[str, str] = {
     # cognitive modulation (attention / integration / consolidation)
     "IonCognitiveContext": "brainstem.electrochemistry",
     "interpret_ions": "brainstem.electrochemistry",
-    # The substrate interface — the machine's own physical dynamics
-    # (throughput/jitter/P-states/interrupts, and the acoustic
-    # self-emission) read as wave-oscillator stimulus
+    # The substrate interface — her own field's spectral signature
+    # (the fibers' band energies, carrier phase, entrainment)
+    # read as wave-oscillator stimulus
+    "apply_field_stimulus": "brainstem.field_probe",
+    "field_phase_lock": "brainstem.field_probe",
+    # The acoustic channel — ambient sound (self-emission bands and
+    # room) band-decomposed into wave stimulus; a sense, not a probe
     "apply_audio_stimulus": "brainstem.field_audio",
     # Anticipatory regulation — the mind's reader of the body's
     # generative self-model (free energy, precision, surprise,

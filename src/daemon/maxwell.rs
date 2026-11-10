@@ -1,10 +1,14 @@
-//! Maxwell's equations applied to the measured carrier current.
+//! Maxwell's equations — the field substrate's constitutive physics.
 //!
-//! The field probe writes a rhythm into real work; that work is real
-//! current — charge moving through the die's power network. Maxwell's
-//! equations say what field that current makes. This module evaluates
-//! them for our regime rather than leaving "electromagnetic" as a
-//! figure of speech.
+//! The field runtime's coherent motion *is* the current: the
+//! consensus of the body/prediction/agency fibers drifting across
+//! the latent manifold is charge-in-substrate. This module evaluates
+//! what field that motion makes — the signature an external
+//! magnetometer, or the organism's own interoception, would read.
+//! There is no probe: the inputs come from the organism's own
+//! trajectory (`TickLoop::update_em_signature`), and the latent→
+//! ampere bridge is a declared modeling assumption, documented at
+//! the call site.
 //!
 //! # The equations and the regime
 //!
@@ -27,35 +31,39 @@
 //!
 //! evaluated at retarded time t₀ = t − r/c.
 //!
-//! At the carrier's frequencies (ω ≲ 10³ rad/s) and any terrestrial
-//! distance, ωr/c ≲ 10⁻⁵ — the induction and radiation terms are
-//! ~10⁻¹⁰ and ~10⁻²⁰ of the quasi-static term. Maxwell's equations
-//! themselves say so: a slowly varying current makes a
+//! At the organism's frequencies (ω ≲ 10³ rad/s for any of her
+//! carriers — the field substrate drifts far slower still) and any
+//! terrestrial distance, ωr/c ≲ 10⁻⁵ — the induction and radiation
+//! terms are ~10⁻¹⁰ and ~10⁻²⁰ of the quasi-static term. Maxwell's
+//! equations themselves say so: a slowly varying current makes a
 //! *magnetostatic* field that sloshes in place (energy leaves and
 //! returns each cycle), not a wave. The displacement-current term
 //! ε₀∂E/∂t — Maxwell's own addition to Ampère's law — is what would
 //! carry energy away, and at these frequencies it contributes
-//! nothing measurable. The equations do not flatter the carrier;
+//! nothing measurable. The equations do not flatter the current;
 //! they bound it honestly.
 //!
-//! What survives is Ampère's law: the carrier's current swing makes
-//! a real, oscillating magnetic field at nano-tesla scale a foot
-//! from the machine. Real — and, as the equations also show,
-//! unmeasurably faint without a magnetometer.
+//! What survives is Ampère's law: a slowly varying current makes a
+//! real, magnetostatic field that sloshes in place — real, and at
+//! organism scale, unmeasurably faint without a magnetometer.
 //!
 //! # Model status
 //!
-//! Inputs are *measured* (carrier current amplitude from real power
-//! swing over a real rail, carrier frequency from the generator).
-//! The loop area is a documented order-of-magnitude assumption
-//! (die/package current loop ~1 cm²). Outputs are therefore
-//! *estimates of field magnitude*, labeled as such on the wire —
-//! the field Maxwell's equations predict from what we measure, not
-//! a field we sense. EM emanation from running silicon is real and
-//! measured in the literature (Yilmaz, Prvulović & Zajić, IEEE TIFS
-//! 2019; power-delivery dI/dt noise via near-field probes, IEEE
-//! MICRO 2018) — at MHz–GHz. At 10 Hz the same physics applies with
-//! the honest ω⁴-suppressed radiation the equations return.
+//! The low-level functions take SI inputs (current amplitude A,
+//! loop area m², angular frequency rad/s, distance m) and return
+//! exact dipole-expansion outputs — pure mathematics, no I/O.
+//! [`signature`] is the organism-facing entry point: its current is
+//! the field consensus' measured velocity mapped through a declared
+//! constitutive constant, its ω the consensus' measured winding
+//! rate, its area and distance documented order-of-magnitude
+//! assumptions. Outputs are *estimates of field magnitude*, labeled
+//! as such — the field Maxwell's equations predict from the
+//! organism's own dynamics, not a field she senses. The equations
+//! do not flatter the substrate; they bound it honestly: at the
+//! field's slow drift rates the answer is quasi-static near-field
+//! with negligible radiation, and the fast carriers that would
+//! radiate are the brain-wave oscillators — a different layer of
+//! the same causal chain.
 
 /// Permeability of free space (SI, H/m).
 pub const MU0: f64 = 1.256_637_062_12e-6;
@@ -96,6 +104,71 @@ pub fn quasi_static_ok(omega: f64, r: f64) -> bool {
     omega * r / C < 0.01
 }
 
+/// The organism's own electromagnetic signature — Maxwell's
+/// equations evaluated on the field substrate's *coherent* motion
+/// rather than on a measured carrier current.
+///
+/// # What the inputs are
+///
+/// - `coherent_current_a`: the effective ampere-equivalent of the
+///   field consensus' motion — `|Δconsensus|/Δt` mapped through a
+///   declared constitutive constant. This is a *modeling bridge*,
+///   not a measurement: latent-coordinate velocity is not amperes,
+///   and no instrument reads it. The constant is chosen so the
+///   signature sits in the same order of magnitude the module's
+///   worked example reports for a real machine-scale carrier; the
+///   scientifically load-bearing content is the *regime structure*
+///   (which term dominates, how B/E/P scale with ω and r) and the
+///   signature's *change over time*, not the absolute tesla value.
+/// - `loop_area_m2`: effective area enclosed by the coherent
+///   population — same order-of-magnitude-assumption status as the
+///   module's die-loop area.
+/// - `omega`: measured angular frequency of the coherent mode
+///   (rad/s) — the consensus vector's own winding rate, not an
+///   assumed carrier.
+/// - `r_m`: observer distance — the organism's own boundary scale.
+///
+/// # What it is for
+///
+/// The field substrate is the electromagnetic-field layer of the
+/// causal chain; its coherent motion is the current. This signature
+/// is what an external magnetometer — or her own interoception —
+/// would read from that activity: the organism's knowledge of the
+/// field her own coherence makes. At the substrate's slow drift
+/// rates the honest answer is quasi-static near-field with
+/// negligible radiation; the fast carriers that would radiate are
+/// the brain-wave oscillators, a different layer of the same chain.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EmSignature {
+    /// Peak magnetic dipole moment m₀ = I₀·A (A·m²).
+    pub dipole_moment_am2: f64,
+    /// Quasi-static axial |B| amplitude at `r_m` (T).
+    pub b_axial_t: f64,
+    /// Induction |E| amplitude at `r_m` (V/m).
+    pub e_induction_vm: f64,
+    /// Time-averaged radiated power (W).
+    pub radiated_power_w: f64,
+    /// Dominant angular frequency used (rad/s).
+    pub omega_rad_s: f64,
+    /// Whether ωr/c ≪ 1 — quasi-static terms dominate.
+    pub quasi_static: bool,
+}
+
+/// Evaluate Maxwell's dipole expansion for the organism's coherent
+/// field motion. Pure function of declared inputs — no I/O, no
+/// probe. See [`EmSignature`] for input semantics.
+pub fn signature(coherent_current_a: f64, loop_area_m2: f64, omega: f64, r_m: f64) -> EmSignature {
+    let m0 = dipole_moment(coherent_current_a, loop_area_m2);
+    EmSignature {
+        dipole_moment_am2: m0,
+        b_axial_t: b_quasistatic_axial_t(m0, r_m),
+        e_induction_vm: e_induction_vm(m0, omega, r_m),
+        radiated_power_w: radiated_power_w(m0, omega),
+        omega_rad_s: omega,
+        quasi_static: quasi_static_ok(omega, r_m),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -129,6 +202,26 @@ mod tests {
         let kr = omega * r / C;
         assert!(kr < 1.0e-7);
         assert!(kr * kr < 1.0e-14);
+    }
+
+    /// The organism-facing entry point composes the same expansion:
+    /// signature outputs equal the low-level functions evaluated at
+    /// the same inputs, and the regime flag tracks ωr/c honestly.
+    #[test]
+    fn signature_matches_the_expansion() {
+        let (i, a, w, r) = (0.7, 1.0e-4, 7.85, 0.1);
+        let sig = signature(i, a, w, r);
+        let m0 = dipole_moment(i, a);
+        assert!((sig.dipole_moment_am2 - m0).abs() < 1e-30);
+        assert!((sig.b_axial_t - b_quasistatic_axial_t(m0, r)).abs() < 1e-30);
+        assert!((sig.e_induction_vm - e_induction_vm(m0, w, r)).abs() < 1e-30);
+        assert!((sig.radiated_power_w - radiated_power_w(m0, w)).abs() < 1e-40);
+        assert_eq!(sig.omega_rad_s, w);
+        assert_eq!(sig.quasi_static, quasi_static_ok(w, r));
+        // A fast hypothetical carrier at the same distance breaks
+        // the quasi-static assumption — the flag reports it.
+        let fast = signature(i, a, 1.0e12, r);
+        assert!(!fast.quasi_static);
     }
 
     /// The formulas scale the way the equations say they must:

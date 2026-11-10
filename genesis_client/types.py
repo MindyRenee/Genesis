@@ -36,6 +36,8 @@ __all__ = [
     "BodyState",
     "CoreState",
     "Episode",
+    "FieldSignature",
+    "FieldSpectrum",
     "FoldMargins",
     "InferenceSummary",
     "IonSummary",
@@ -50,6 +52,7 @@ __all__ = [
     "RecentEpisode",
     "SensorPresence",
     "SimilarEpisode",
+    "SpectrumBandChannel",
     "StateDwell",
     "SubsystemReport",
     "SubsystemTelemetry",
@@ -2096,8 +2099,10 @@ class OpticState:
     ``retinal_lux`` is what currently entrains the circadian
     oscillator (0 while the scheduled photoperiod is in charge).
 
-    ``relay_gain`` is the thalamic gate the mind must honour — near
-    zero in NREM/REM, open while awake. ``eye_present`` distinguishes
+    ``relay_gain`` is the thalamic relay's corticothalamic gain —
+    the mind's own layer-6 feedback scaling transmission across
+    [0.6, 1.0] around a full-open base; no sleep stage closes it.
+    ``eye_present`` distinguishes
     "the eye exists but sees nothing" from "there is no eye":
     ``False`` means no frame was ever consumed this boot.
 
@@ -2111,10 +2116,19 @@ class OpticState:
     ``1/dpt`` metres (see the ``focus_m`` property).
 
     ``lid`` is the eyelid transmission — how much scene light the
-    phase's lid position still passes: 1.0 awake, ~0.5 drowsy, ~0.03
-    in NREM/REM. A daemon that predates the field reports nothing
-    and decodes as fully open (1.0), never fully shut — a legacy
-    body cannot look asleep to the optics layer.
+    voluntary lid position still passes: 1.0 open, ~0.15 while she
+    sleeps (the sleep system sets it), ~0.15 in meditation. It is
+    hers alone — no phase composes with it. A daemon that predates
+    the field reports nothing and decodes as fully open (1.0),
+    never fully shut — a legacy body cannot look asleep to the
+    optics layer.
+
+    ``proto_objects`` is the collicular scene parse's output — the
+    count of gamma-coherent assemblies the body's V2 binding pass
+    emitted on the colour lattice — and ``binding_coherence`` their
+    mean member coherence [0, 1]. Both decode as 0.0 from a daemon
+    that predates the fields, or when the eye sees no colour: an
+    absent parse is no objects, never fabricated ones.
     """
 
     eye_present: bool
@@ -2131,6 +2145,8 @@ class OpticState:
     pupil_mm: float = 0.0
     accommodation_dpt: float = 0.0
     lid: float = 1.0
+    proto_objects: float = 0.0
+    binding_coherence: float = 0.0
 
     @property
     def focus_m(self) -> float | None:
@@ -2145,7 +2161,8 @@ class OpticState:
     def unpack(cls, data: bytes) -> OpticState | None:
         """Unpack the GET_OPTIC_STATE body: ``[u8 ack][u8 flags][u8
         pad][7 × f32][u64 frame_seq][i64 frame_age_ms][f32 pupil_mm]
-        [f32 accommodation_dpt][f32 lid]``.
+        [f32 accommodation_dpt][f32 lid][f32 proto_objects]
+        [f32 binding_coherence]``.
 
         Returns ``None`` on a short or unacked response — an absent
         channel is no reading, never a zero reading. The trailing
@@ -2170,6 +2187,12 @@ class OpticState:
         (pupil_mm,) = struct.unpack_from("<f", data, 47) if len(data) >= 51 else (0.0,)
         (accommodation_dpt,) = struct.unpack_from("<f", data, 51) if len(data) >= 55 else (0.0,)
         (lid,) = struct.unpack_from("<f", data, 55) if len(data) >= 59 else (1.0,)
+        (proto_objects,) = (
+            struct.unpack_from("<f", data, 59) if len(data) >= 63 else (0.0,)
+        )
+        (binding_coherence,) = (
+            struct.unpack_from("<f", data, 63) if len(data) >= 67 else (0.0,)
+        )
         return cls(
             eye_present=bool(flags & 1),
             frames_fresh=bool(flags & 2),
@@ -2185,6 +2208,8 @@ class OpticState:
             pupil_mm=pupil_mm,
             accommodation_dpt=accommodation_dpt,
             lid=lid,
+            proto_objects=proto_objects,
+            binding_coherence=binding_coherence,
         )
 
 
@@ -2242,4 +2267,182 @@ class FieldState:
             temperature=temperature,
             consensus_norm=consensus_norm,
             fiber_count=fiber_count,
+        )
+
+
+@dataclass
+class FieldSignature:
+    """The organism's computed field signature — GET_FIELD_SIGNATURE.
+
+    Maxwell's equations evaluated on her own coherent motion
+    (``src/daemon/maxwell.rs``) plus the field integration's
+    observables — her field's mathematics, not a measurement of
+    the machine's field dressed as hers.
+
+    ``signature_present`` means two integrations gave a measurable
+    consensus velocity, so the Maxwell block is live; ``omega_rad_s``
+    is the consensus' winding rate — her field's tempo. The current
+    is the latent→ampere bridge's output — a declared modeling
+    assumption, not a measurement; ``consensus_speed`` is the raw
+    latent drift it was mapped from. ``b_axial_t``, ``e_induction_vm``,
+    and ``radiated_power_w`` are the dipole expansion's outputs at
+    the organism boundary — honest estimates in the units an
+    external magnetometer would read, quasi-static at her drift
+    rates (``quasi_static`` reports whether ωr/c ≪ 1 holds).
+
+    ``disagreement`` and ``temperature`` are the field integration's
+    own state — the fibers' Fréchet variance about consensus and
+    the thermal floor it heats — live whenever ``integration_present``,
+    even before the signature's first velocity sample.
+
+    Absent channels are flags, never errors: an un-integrated field
+    decodes with both presence flags clear and zeroed readings.
+    """
+
+    signature_present: bool
+    integration_present: bool
+    quasi_static: bool
+    omega_rad_s: float
+    coherent_current_a: float
+    consensus_speed: float
+    dipole_moment_am2: float
+    b_axial_t: float
+    e_induction_vm: float
+    radiated_power_w: float
+    disagreement: float
+    temperature: float
+
+    @classmethod
+    def unpack(cls, data: bytes) -> FieldSignature | None:
+        """Unpack the GET_FIELD_SIGNATURE response: ``[u8 ack]`` then
+        ``[u8 flags][3 × u8 reserved][9 × f64]`` little-endian.
+
+        Returns ``None`` on a short or unacked response — an absent
+        channel is no reading, never a zero reading.
+        """
+        if len(data) < 77 or data[0] != 1:
+            return None
+        flags = data[1]
+        (
+            omega_rad_s,
+            coherent_current_a,
+            consensus_speed,
+            dipole_moment_am2,
+            b_axial_t,
+            e_induction_vm,
+            radiated_power_w,
+            disagreement,
+            temperature,
+        ) = struct.unpack_from("<9d", data, 5)
+        return cls(
+            signature_present=bool(flags & 1),
+            integration_present=bool(flags & 2),
+            quasi_static=bool(flags & 4),
+            omega_rad_s=omega_rad_s,
+            coherent_current_a=coherent_current_a,
+            consensus_speed=consensus_speed,
+            dipole_moment_am2=dipole_moment_am2,
+            b_axial_t=b_axial_t,
+            e_induction_vm=e_induction_vm,
+            radiated_power_w=radiated_power_w,
+            disagreement=disagreement,
+            temperature=temperature,
+        )
+
+
+@dataclass(frozen=True)
+class SpectrumBandChannel:
+    """One spectral channel of the field's own trajectory —
+    GET_FIELD_SPECTRUM.
+
+    ``energies`` are baseline-relative band powers at the wave
+    model's band centers (infraslow, delta, theta, alpha, sigma,
+    beta1, beta2, beta3, gamma, epsilon) — ≈0.125 typical on a quiet
+    field, elevated where the substrate's motion actually lives.
+    ``phases`` are the per-band quadrature angles (rad) — the
+    rhythm's own timing, the reference entrainment pulls toward.
+    ``mean`` and ``cv`` are the channel's level and turbulence over
+    the window. Bands above the achieved sampling rate's Nyquist
+    read zero — unresolvable is absent, never aliased.
+    """
+
+    energies: tuple[float, ...]
+    phases: tuple[float, ...]
+    mean: float
+    cv: float
+
+
+@dataclass(frozen=True)
+class FieldSpectrum:
+    """The field's spectral signature — GET_FIELD_SPECTRUM.
+
+    The band decomposition of her own substrate trajectory
+    (``src/field/spectrum.rs``): ``flux`` is the fibers' centroid
+    motion energy per band, ``tension`` the fibers' spread — the
+    disagreement's spectral shadow. The carrier block is the
+    consensus' own kinematics — ``carrier_phase`` the accumulated
+    winding phase (the field's clock, rad mod 2π),
+    ``carrier_freq_hz`` the winding rate in Hz, ``consensus_speed``
+    the EMA-smoothed drift, ``sample_rate_hz`` the achieved sampling
+    rate the bands resolve against.
+
+    ``warm`` means the rings hold enough trajectory for band
+    readings; ``carrier_present``/``speed_present`` arm the
+    kinematics — two integrations minimum. Absent channels are
+    flags and zeroed readings, never errors.
+    """
+
+    warm: bool
+    carrier_present: bool
+    speed_present: bool
+    carrier_phase: float
+    carrier_freq_hz: float
+    consensus_speed: float
+    sample_rate_hz: float
+    flux: SpectrumBandChannel
+    tension: SpectrumBandChannel
+
+    @classmethod
+    def unpack(cls, data: bytes) -> FieldSpectrum | None:
+        """Unpack the GET_FIELD_SPECTRUM response: ``[u8 ack]`` then
+        ``[u8 flags][3 × u8 reserved][48 × f64]`` little-endian.
+
+        Returns ``None`` on a short or unacked response — an absent
+        channel is no reading, never a zero reading.
+        """
+        if len(data) < 389 or data[0] != 1:
+            return None
+        flags = data[1]
+        vals = struct.unpack_from("<48d", data, 5)
+        (
+            carrier_phase,
+            carrier_freq_hz,
+            consensus_speed,
+            sample_rate_hz,
+            flux_mean,
+            flux_cv,
+            tension_mean,
+            tension_cv,
+        ) = vals[:8]
+        flux_e = vals[8:18]
+        flux_p = vals[18:28]
+        tension_e = vals[28:38]
+        tension_p = vals[38:48]
+        return cls(
+            warm=bool(flags & 1),
+            carrier_present=bool(flags & 2),
+            speed_present=bool(flags & 4),
+            carrier_phase=carrier_phase,
+            carrier_freq_hz=carrier_freq_hz,
+            consensus_speed=consensus_speed,
+            sample_rate_hz=sample_rate_hz,
+            flux=SpectrumBandChannel(
+                energies=flux_e, phases=flux_p, mean=flux_mean, cv=flux_cv
+            ),
+            tension=SpectrumBandChannel(
+                energies=tension_e,
+                phases=tension_p,
+                mean=tension_mean,
+                cv=tension_cv,
+            ),
         )

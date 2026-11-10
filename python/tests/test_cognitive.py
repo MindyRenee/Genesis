@@ -937,9 +937,14 @@ def _run_mind_tests(mind) -> None:
     assert status["interactions"] == 4
     logger.info(f"  PASS  status: phase={status['phase']}, emotion={status['emotion']}")
 
-    # Test 6: Introspection
+    # Test 6: Introspection — her self-report is composed through the
+    # language engine (no recited diagnostic lines, no leaked markers);
+    # the raw subsystem dump remains on the diagnostic surface.
     introspection = mind.introspect()
-    assert "Intent" in introspection or "intent" in introspection.lower()
+    assert introspection.strip(), "introspection produced no words"
+    assert "[last_input:" not in introspection, "diagnostic markers leaked into speech"
+    diagnostic = mind.diagnostic_report()
+    assert "Intent" in diagnostic or "intent" in diagnostic.lower()
     logger.info(f"  PASS  introspection: '{introspection[:50]}...'")
 
     # Test 7: Emotional state changed

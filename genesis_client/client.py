@@ -97,6 +97,8 @@ from .protocol import (
     FIND_SIMILAR_ARCHIVED,
     GET_BODY_CONTROL,
     GET_BODY_STATE,
+    GET_FIELD_SIGNATURE,
+    GET_FIELD_SPECTRUM,
     GET_FOLD_MARGINS,
     GET_INFERENCE_SUMMARY,
     GET_INTERNALS,
@@ -148,6 +150,7 @@ from .protocol import (
     UNARCHIVE_EPISODE,
     UPDATE_MODULE_STATUS,
     UPDATE_USER_AFFECT,
+    WIRE_EMOTIONAL_TAG_SIZE,
     # Zone IDs (for validation)
     ZONE_SLEEPING,
     # Error detection
@@ -172,6 +175,8 @@ from .types import (
     BodyState,
     CoreState,
     Episode,
+    FieldSignature,
+    FieldSpectrum,
     FieldState,
     FoldMargins,
     InferenceSummary,
@@ -808,6 +813,64 @@ class GenesisClient:
             return None
         return FoldMargins.unpack(resp)
 
+    def get_field_signature(self, *, timeout: float | None = None) -> FieldSignature | None:
+        """The organism's computed field signature — her own field's
+        mathematics, not a probe of the machine's.
+
+        Maxwell's equations evaluated on the field substrate's
+        coherent motion (``src/daemon/maxwell.rs``): the consensus'
+        winding rate ``omega_rad_s`` is her field's tempo, the
+        coherent current is the latent→ampere bridge's declared
+        modeling assumption, and ``b_axial_t`` / ``e_induction_vm`` /
+        ``radiated_power_w`` are the dipole expansion's honest
+        outputs at her boundary — quasi-static at her drift rates.
+        ``disagreement`` and ``temperature`` are the integration's
+        own observables, live even before the signature's first
+        velocity sample.
+
+        Returns ``None`` on transport failure or when the daemon
+        predates the command — an absent channel is no reading,
+        never a zero reading. An un-integrated field still answers:
+        presence flags clear, readings zeroed.
+        """
+        try:
+            resp = self._request(GET_FIELD_SIGNATURE, timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return None
+        try:
+            return FieldSignature.unpack(resp)
+        except (IndexError, struct.error, ValueError):
+            return None
+
+    def get_field_spectrum(self, *, timeout: float | None = None) -> FieldSpectrum | None:
+        """The field's spectral signature — her own substrate's band
+        decomposition, not a probe of the machine's.
+
+        The field's fibers drift, couple, and fluctuate on the latent
+        manifold under gauge transport and a Langevin thermostat
+        (``src/field/spectrum.rs``); this returns that trajectory's
+        band energies and phases at the wave model's band centers —
+        ``flux`` the centroid's motion energy, ``tension`` the
+        fibers' spread — plus the consensus kinematics: the carrier's
+        winding phase (the field's own clock), its rate in Hz, and
+        the achieved sampling rate the bands resolve against. Bands
+        above Nyquist read zero — absent is a reading, never an
+        aliased one.
+
+        Returns ``None`` on transport failure or when the daemon
+        predates the command — an absent channel is no reading,
+        never a zero reading. An un-warmed field still answers:
+        presence flags clear, readings zeroed.
+        """
+        try:
+            resp = self._request(GET_FIELD_SPECTRUM, timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return None
+        try:
+            return FieldSpectrum.unpack(resp)
+        except (IndexError, struct.error, ValueError):
+            return None
+
     def get_field_state(self, *, timeout: float | None = None) -> FieldState | None:
         """The latent field's integration readout — the organism's
         center of mass and how far its major systems have spread
@@ -864,9 +927,9 @@ class GenesisClient:
 
         Photopic and melanopic irradiance, motion energy, the
         collicular orienting transient, the SCN light drive the body
-        feeds its circadian oscillator, and the thalamic relay gate
-        the mind must honour — near zero in NREM/REM, open while
-        awake. A look through a closed gate is a blind look.
+        feeds its circadian oscillator, the thalamic relay's
+        corticothalamic gain, and the voluntary lid — the eye's own
+        aperture state, lid-filtered on every afferent channel.
 
         ``eye_present`` distinguishes "the eye exists but sees nothing"
         from "there is no eye"; ``frame_seq``/``frame_age_ms`` let the
@@ -1309,7 +1372,7 @@ class GenesisClient:
         verbatim).
 
         Returns:
-            The 12 effective levels in canonical chemical order, or
+            The effective levels in canonical chemical order, or
             None if the state cannot be read.
         """
         try:
@@ -1373,7 +1436,10 @@ class GenesisClient:
         payload.append(event_type & 0xFF)
         payload.append(source_module & 0xFF)
         payload.extend(_F32.pack(salience))
-        for v in emotional_tag:
+        # The wire field is [f32; WIRE_EMOTIONAL_TAG_SIZE] — the
+        # daemon stamps those effective levels itself. The logical
+        # tag may be wider; only the first wire-width values cross.
+        for v in emotional_tag[:WIRE_EMOTIONAL_TAG_SIZE]:
             payload.extend(_F32.pack(v))
         payload.extend(_U16.pack(text_len))
         payload.extend(text_bytes)
@@ -1445,16 +1511,23 @@ class GenesisClient:
         payload.append(event_type & 0xFF)
         payload.append(source_module & 0xFF)
         payload.extend(_F32.pack(salience))
-        for v in emotional_tag:
+        # Same wire layout as store_event — [f32; WIRE_EMOTIONAL_TAG_SIZE].
+        for v in emotional_tag[:WIRE_EMOTIONAL_TAG_SIZE]:
             payload.extend(_F32.pack(v))
         payload.extend(_U16.pack(text_len))
         payload.extend(text_bytes)
 
         resp = self._request(STORE_EPISODE, bytes(payload), timeout=timeout)
         if len(resp) >= 9 and resp[0] == 1:
+            # The daemon returns its 12 stamped levels; pad back to the
+            # logical tag width so the caller's record stays uniform.
             stamped = (
-                [_F32.unpack(resp[9 + i * 4 : 13 + i * 4])[0] for i in range(EMOTIONAL_TAG_SIZE)]
-                if len(resp) >= 9 + EMOTIONAL_TAG_SIZE * 4
+                [
+                    _F32.unpack(resp[9 + i * 4 : 13 + i * 4])[0]
+                    for i in range(WIRE_EMOTIONAL_TAG_SIZE)
+                ]
+                + [0.0] * (EMOTIONAL_TAG_SIZE - WIRE_EMOTIONAL_TAG_SIZE)
+                if len(resp) >= 9 + WIRE_EMOTIONAL_TAG_SIZE * 4
                 else None
             )
             return _U64.unpack(resp[1:9])[0], stamped

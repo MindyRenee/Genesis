@@ -16,6 +16,7 @@ import pytest
 from genesis_client.client import GenesisClient
 from genesis_client.exceptions import ConnectionError, ProtocolError
 from genesis_client.protocol import (
+    ACTUATE,
     ADVANCE_NEURO,
     ADVANCE_PHYSICS,
     ANALYZE_CODE,
@@ -25,6 +26,8 @@ from genesis_client.protocol import (
     CHEM_NAMES,
     CHEM_SEROTONIN,
     DT_NOMINAL_STEP,
+    GET_FIELD_SIGNATURE,
+    GET_FIELD_SPECTRUM,
     GET_FOLD_MARGINS,
     GET_ION_SUMMARY,
     GET_NEURO_SUMMARY,
@@ -33,6 +36,7 @@ from genesis_client.protocol import (
     GET_SENSOR_PRESENCE,
     GET_STATE,
     HANDSHAKE,
+    LIST_ACTUATORS,
     MODULE_ATTENTION,
     MODULE_DREAMING,
     MODULE_EMOTION,
@@ -242,12 +246,10 @@ def test_command_ids():
     # GET_SENSOR_PRESENCE, so GET_ION_SUMMARY must not collide.
     assert GET_ION_SUMMARY == 40
     assert GET_SENSOR_PRESENCE == 36
-    # The field probe is additive and continues past SET_VOLITION;
-    # opcode 48 is retired (pinned, never reused) and the carrier
-    # write control used by the ring-down experiment stays live.
-    # The optic pair is additive and continues past the field
-    # commands: the optic-state read, the corticothalamic gain, and
-    # the accommodation request must not collide with them.
+    # The optic pair is additive and continues past the retired
+    # field-probe opcodes (48 pinned, never reused): the optic-state
+    # read, the corticothalamic gain, and the accommodation request
+    # must not collide with them or with the signature read.
     assert GET_OPTIC_STATE == 52
     assert SET_OPTIC_GAIN == 53
     assert SET_FOCUS == 54
@@ -255,7 +257,13 @@ def test_command_ids():
     # highest core command id — and must not collide with the
     # notification range (100+) or the tensor slab (41–45).
     assert GET_FOLD_MARGINS == 62
-    # The voluntary lid is additive past SET_COGNITIVE_PID.
+    # The actuator pair is additive past LIST_ACTUATORS, and the
+    # computed field reads are additive past ACTUATE — the Maxwell
+    # signature and its spectral companion, colliding with nothing.
+    assert LIST_ACTUATORS == 64
+    assert ACTUATE == 65
+    assert GET_FIELD_SIGNATURE == 66
+    assert GET_FIELD_SPECTRUM == 67
 
 
 def test_chemical_ids():

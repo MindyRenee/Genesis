@@ -159,7 +159,69 @@ class ChannelBoard:
     def _core_lines(self, core, lines: list[str]) -> None:
         """Board rows sourced from the daemon's CoreState."""
         self._neuro_lines(core, lines)
+        self._field_lines(lines)
         self._cell_line(lines)
+
+    _FIELD_BAND_NAMES = (
+        "infr", "del", "the", "alp", "sig", "b1", "b2", "b3", "gam", "eps",
+    )
+
+    def _field_lines(self, lines: list[str]) -> None:
+        """Rows for her own field's computed signatures — Maxwell's
+        equations on her coherent motion (GET_FIELD_SIGNATURE) and
+        the spectral decomposition of her substrate trajectory
+        (GET_FIELD_SPECTRUM). These are her field's own mathematics,
+        in the units an external observer of that field would read —
+        never a measurement of the machine's. A daemon that predates
+        a channel shows no row for it; an un-integrated field says
+        so."""
+        h = self._h
+        try:
+            sig = h.client.get_field_signature()
+        except Exception:  # noqa: BLE001 — absent channel, no row
+            sig = None
+        if sig is not None:
+            if not sig.signature_present:
+                if sig.integration_present:
+                    lines.append(f"field    integrating d {sig.disagreement:.3f}")
+            else:
+                from brainstem.maxwell import carrier_hz, coherence
+
+                bits = [f"{carrier_hz(sig):.3f} Hz"]
+                coh = coherence(sig)
+                if coh is not None:
+                    bits.append(f"coh {coh:.2f}")
+                bits += [
+                    f"B {sig.b_axial_t:.1e} T",
+                    f"E {sig.e_induction_vm:.1e} V/m",
+                    f"P {sig.radiated_power_w:.1e} W",
+                ]
+                if not sig.quasi_static:
+                    bits.append("out-of-regime")
+                lines.extend(_board_pack("field", bits))
+        try:
+            spec = h.client.get_field_spectrum()
+        except Exception:  # noqa: BLE001 — absent channel, no row
+            spec = None
+        if spec is None:
+            return
+        if not spec.warm:
+            lines.append("bands    warming…")
+            return
+        # The substrate's own spectrum — top flux bands by energy,
+        # the tension channel's turbulence, the carrier's phase.
+        top = sorted(
+            range(10), key=lambda i: spec.flux.energies[i], reverse=True
+        )[:3]
+        bits = [
+            f"{self._FIELD_BAND_NAMES[i]} {spec.flux.energies[i]:.2f}"
+            for i in top
+            if spec.flux.energies[i] > 0.05
+        ]
+        bits.append(f"tcv {spec.tension.cv:.2f}")
+        if spec.carrier_present:
+            bits.append(f"φ {spec.carrier_phase:.2f}")
+        lines.extend(_board_pack("bands", bits))
 
     def _neuro_lines(self, core, lines: list[str]) -> None:
         """Rows for the neurochemical and inference state."""
