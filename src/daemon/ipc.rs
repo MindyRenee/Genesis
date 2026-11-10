@@ -2801,6 +2801,7 @@ pub fn default_handler<L: LtmAccess>(
     ltm: &mut L,
     cmd: u8,
     payload: &[u8],
+    data_dir: &std::path::Path,
 ) -> Vec<u8> {
     match cmd {
         cmd::PING => {
@@ -4077,7 +4078,7 @@ pub fn default_handler<L: LtmAccess>(
 
         cmd::GET_MOTOR_TARGET => crate::field::motor::current_motor_target().encode(),
 
-        cmd::LIST_ACTUATORS => crate::daemon::actuators::encode_census(),
+        cmd::LIST_ACTUATORS => crate::daemon::actuators::encode_census(data_dir),
 
         cmd::ACTUATE => {
             // [u8 name_len][name utf8][u16 arg_len][arg utf8] — the
@@ -4098,7 +4099,7 @@ pub fn default_handler<L: LtmAccess>(
                 return vec![error::PAYLOAD_TOO_SHORT];
             }
             let arg = String::from_utf8_lossy(&payload[1 + nl + 2..1 + nl + 2 + al]).into_owned();
-            let (ok, msg) = match crate::daemon::actuators::actuate(&name, &arg) {
+            let (ok, msg) = match crate::daemon::actuators::actuate(&name, &arg, data_dir) {
                 Ok(report) => (1u8, report),
                 Err(reason) => (0u8, reason),
             };
@@ -4590,7 +4591,7 @@ where
             }
 
             // Delegate all other commands to the default handler.
-            _ => default_handler(mmap, stm, ltm, cmd, payload),
+            _ => default_handler(mmap, stm, ltm, cmd, payload, data_dir.as_path()),
         }
     }
 }

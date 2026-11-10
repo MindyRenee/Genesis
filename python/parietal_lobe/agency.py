@@ -282,7 +282,6 @@ class ActingLoop:
         executive: ExecutiveFunction | None = None,
         config_dir: str | None = None,
         get_internals: Callable[[], dict[str, str] | None] | None = None,
-        get_thermally_capped: Callable[[], bool] | None = None,
         get_motor_target: Callable[[], object] | None = None,
     ) -> None:
         self.network = network
@@ -315,10 +314,6 @@ class ActingLoop:
         self._config_root = config_dir
         self.get_internals = get_internals
         self.get_motor_target = get_motor_target
-        # The body's thermal-cap flag, read through whatever the host
-        # mind exposes — the ActingLoop itself is detached from the
-        # self-model, so the source is a callback like the rest.
-        self._get_thermally_capped = get_thermally_capped or (lambda: False)
 
         self._scratch = str(Path(data_dir) / "experiments")
         self._recent: deque[tuple[str, str]] = deque(maxlen=self._RECENT_MAX)
@@ -727,10 +722,7 @@ class ActingLoop:
         this plan corrects it — restoring full effort is reversible
         and confined to her own process. It never throttles
         unprompted: slowing down is a decision for a stronger reason
-        than a wander probe supplies. One stronger reason already
-        exists: while the body is thermally capped a restricted mask
-        is her own deliberate cooling, not an anomaly, and restoring
-        full effort would fight the reflex that put it there.
+        than a wander probe supplies.
         """
         sensed = self._use(result, "sense_cpu")
         if sensed is None or not sensed.success:
@@ -739,11 +731,21 @@ class ActingLoop:
         data = sensed.data or {}
         mine = data.get("cores_mine") or 0
         total = data.get("cores_total") or 0
-        capped = self._get_thermally_capped()
-        if total and mine and mine < total and not capped:
+        if total and mine and mine < total:
             restored = self._use(result, "set_cpu_effort", effort="fast")
             if restored is not None and restored.success:
-                result.discoveries.append(f"restricted affinity — {restored.output}")
+                # Re-sense before claiming the fix: on a host whose
+                # cgroup cpuset is narrower than the CPU count the
+                # mask cannot widen, and reporting a restore that
+                # changed nothing fabricates a correction.
+                again = self._use(result, "sense_cpu")
+                now = (again.data or {}).get("cores_mine") if again and again.success else None
+                if isinstance(now, int) and now > mine:
+                    result.discoveries.append(f"restricted affinity — {restored.output}")
+                else:
+                    result.discoveries.append(
+                        f"affinity held at {mine} of {total} cores — host cap, not hers to lift"
+                    )
         result.success = True
 
     def _observe_config(self, result: ActingResult) -> None:

@@ -606,6 +606,11 @@ class MemorySystem:
                 (``SomaticSnapshot.to_dict()``). When None, the
                 engine consults ``somatic_provider`` if wired.
         """
+        # An empty episode is unencodable — the daemon rejects it, so
+        # refuse here rather than spend the round-trip on a known no.
+        if not text or not text.strip():
+            return False
+
         # Theta-gamma coupling gates encoding strength.
         # In encoding mode, the theta trough aligns gamma bursts for
         # new association formation — boost salience so the memory is

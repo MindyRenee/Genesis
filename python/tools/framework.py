@@ -85,16 +85,18 @@ class ToolRegistry:
         """Return a list of dicts with each tool's name and description."""
         return [{"name": t.name, "description": t.description} for t in self._tools.values()]
 
-    def run(self, name: str, **kwargs: Any) -> ToolResult:
+    def run(self, tool_name: str, **kwargs: Any) -> ToolResult:
         """Look up and invoke a named tool, returning an error result if unknown."""
-        tool = self._tools.get(name)
+        tool = self._tools.get(tool_name)
         if tool is None:
-            return ToolResult(success=False, error=f"Unknown tool: {name}")
+            return ToolResult(success=False, error=f"Unknown tool: {tool_name}")
         if self.gate is not None:
             # Every act is a candidate intention — the gate reads the
             # act's own text ("run_shell rm -rf build") the way it
             # reads a goal's object; restraint is a veto, not advice.
-            intent = " ".join([name] + [str(v) for v in kwargs.values() if isinstance(v, str)])
+            intent = " ".join(
+                [tool_name] + [str(v) for v in kwargs.values() if isinstance(v, str)]
+            )
             try:
                 restraint = self.gate(intent)
             except Exception:  # noqa: BLE001 — a broken gate must not

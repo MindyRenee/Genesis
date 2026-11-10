@@ -97,7 +97,6 @@ class MetronomeMixin:
         _experience_since_identity: int
         _cycle_dt: float
         _last_cycle_at: float
-        _thermally_throttled: bool
 
         def __getattr__(self, name: str) -> Any: ...
 
@@ -418,19 +417,6 @@ class MetronomeMixin:
                     self._body_control_gate.demand()
                 else:
                     self._body_control_gate.relax()
-
-                # The loop's closing leg — the body reports hot, she
-                # slows herself. Affinity and I/O class on her own
-                # process are the only levers she keeps, so "slow" is
-                # one core and idle disk on her own pid; when the cap
-                # clears she takes the cores back. Flip-detection
-                # keeps the taskset/ionice subprocesses off the steady
-                # path.
-                if control.thermally_capped != self._thermally_throttled:
-                    self._thermally_throttled = control.thermally_capped
-                    from brainstem.cpufreq import CpuSpeed
-
-                    CpuSpeed().set_effort("slow" if self._thermally_throttled else "fast")
         except (OSError, ConnectionError, ValueError) as e:
             note_swallowed(
                 "mind.metronome._cycle_body_control",
@@ -1448,11 +1434,6 @@ class MetronomeMixin:
         # the same priority — spawning subprocesses every cycle wastes
         # CPU and I/O for no effect.
         last_self_priority: tuple[int, str] | None = None
-        # Whether she has throttled her own affinity/I-O for thermal
-        # relief — the flip-detector for the body's thermally_capped
-        # flag, so the slow-down/restoration each fires once per
-        # transition rather than every gate cycle.
-        self._thermally_throttled = False
         # Track the previous phase and brain-wave dominant for the
         # learner change-detection. The learner's gating depends on
         # the emotion label (derived from the daemon phase) and the

@@ -620,7 +620,6 @@ class Mind(
             executive=self.brain.frontal.executive,
             get_internals=self.client.get_internals,
             get_motor_target=self.client.get_motor_target,
-            get_thermally_capped=lambda: self.self_model.body_model.thermally_capped,
         )
 
         # Limbic system — the affect region: the emotional regulator

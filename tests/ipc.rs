@@ -76,12 +76,19 @@ impl IpcTestSystem {
         let ltm = LtmStore::open(&self.ltm_base).expect("open ltm");
         let ltm = std::sync::Arc::new(std::sync::Mutex::new(ltm));
         let socket_path = self.socket_path.clone();
+        let data_dir = self
+            .state_path
+            .parent()
+            .expect("state path has a parent dir")
+            .to_path_buf();
 
         let server = IpcServer::new(&socket_path);
         let shutdown_flag = server.shutdown_flag();
 
         let thread = std::thread::spawn(move || {
-            server.run(mmap, stm, ltm, default_handler);
+            server.run(mmap, stm, ltm, move |m, s, l, c, p| {
+                default_handler(m, s, l, c, p, &data_dir)
+            });
         });
 
         self.server_thread = Some(thread);
@@ -2169,8 +2176,9 @@ fn test_actuate_round_trip() {
     let mut client = sys.client();
 
     // Census first — the mind picks a limb the body reports as
-    // present. `file.write` is the side-effect-free local limb:
-    // its handler echoes the arg rather than touching the host.
+    // present. `file.write` is the safest real limb to fire: its
+    // arg is "<path> <content>", and a relative path lands inside
+    // the test system's own temp data dir.
     let census = client.request(cmd::LIST_ACTUATORS, &[]).expect("census");
     let limbs = decode_census(&census);
     let (name, kind, available) = limbs
@@ -2181,13 +2189,17 @@ fn test_actuate_round_trip() {
     assert_eq!(*available, 1, "file.write is always present");
 
     let resp = client
-        .request(cmd::ACTUATE, &actuate_payload(name, "marker"))
+        .request(cmd::ACTUATE, &actuate_payload(name, "probe.txt marker"))
         .expect("actuate");
     assert_eq!(resp[0], 1, "ok flag: {:?}", resp);
     let ml = u16::from_le_bytes([resp[1], resp[2]]) as usize;
     let report = String::from_utf8_lossy(&resp[3..3 + ml]);
     assert!(!report.is_empty(), "the limb's own report rides along");
     assert!(report.contains("file.write"), "report: {report}");
+    // The limb really wrote — the mark landed in the data dir.
+    let written = std::fs::read_to_string(sys.state_path.with_file_name("probe.txt"))
+        .expect("probe.txt written beside the state file");
+    assert_eq!(written, "marker");
 }
 
 #[test]
