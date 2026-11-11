@@ -2871,6 +2871,14 @@ def _stop_all(data_dir: str) -> int:
 
 _REBIRTH_TICK_S = 2.0  # watcher cadence — the organism's reflex arc
 _REBIRTH_STABLE_S = 60.0  # a rebirth counts once the body stayed alive this long
+# Boot grace — a newborn body spends its first stretch loading the
+# persisted state (LTM, concept network, sleep network) before the
+# tick loop publishes its first heartbeat, and the socket may not
+# even be listening yet. Frozen-heartbeat strikes must not count
+# during that window: init is not a wedge. Process death is still
+# caught immediately by the handle check — grace only delays the
+# freeze verdict on a live newborn, never the death verdict.
+_REBIRTH_BOOT_GRACE_S = 120.0
 # Liveness probe — the body's own published heartbeat, read through
 # the lock-free seqlock state path (GET_STATE takes no tick lock, so
 # the check adds zero load to the engine it watches). A live process
@@ -3130,6 +3138,9 @@ class _Rebirth:
         self._last_heartbeat: int | None = None
         self._hb_strikes = 0
         self._hb_next_probe = 0.0
+        # Monotonic deadline before which a live newborn's frozen
+        # heartbeat is boot, not fault (see _REBIRTH_BOOT_GRACE_S).
+        self._boot_grace_until = 0.0
 
     def set_children(
         self,
@@ -3138,6 +3149,14 @@ class _Rebirth:
         with self._lock:
             if daemon is not None:
                 self.daemon = daemon
+                if isinstance(daemon, subprocess.Popen):
+                    # A fresh spawn is a newborn — its init window
+                    # gets the boot grace. An adopted body has been
+                    # running already; its heartbeat is live or the
+                    # freeze check applies immediately.
+                    self._boot_grace_until = (
+                        time.monotonic() + _REBIRTH_BOOT_GRACE_S
+                    )
 
     def set_mind(self, mind: Mind) -> None:
         with self._lock:
@@ -3219,6 +3238,8 @@ class _Rebirth:
         faulted from the organism's side.
         """
         now = time.monotonic()
+        if now < self._boot_grace_until:
+            return False
         if now < self._hb_next_probe:
             return False
         self._hb_next_probe = now + _FROZEN_PROBE_S
@@ -3324,6 +3345,7 @@ class _Rebirth:
             _stop_child(new_proc, "subcognitive daemon", 5)
             return
         self._spawned_at = time.monotonic()
+        self._boot_grace_until = time.monotonic() + _REBIRTH_BOOT_GRACE_S
         # A newborn body republishes its heartbeat from zero —
         # re-arm the frozen check against the new incarnation.
         self._last_heartbeat = None

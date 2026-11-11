@@ -768,6 +768,32 @@ def test_rebirth_unreadable_vitals_count_as_fault(tmp_path):
     assert rebirth._hb_strikes == 3
 
 
+def test_rebirth_boot_grace_shields_newborn_from_freeze_verdict(tmp_path):
+    """A newborn body's frozen heartbeat is boot, not fault.
+
+    Init loads the persisted state before the tick loop publishes —
+    during the grace window frozen readings must not strike, or every
+    slow boot reincarnates the body mid-init. Once grace lapses the
+    same frozen reading faults normally.
+    """
+    rebirth = _make_rebirth(tmp_path)
+    live = Mock()
+    live.poll.return_value = None
+    rebirth.set_children(daemon=live)
+    rebirth._boot_grace_until = time.monotonic() + 60
+    with patch.object(rebirth, "_read_heartbeat", return_value=4242):
+        for _ in range(5):
+            rebirth._hb_next_probe = 0.0
+            assert rebirth._heartbeat_faulted() is False
+    assert rebirth._hb_strikes == 0
+
+    rebirth._boot_grace_until = 0.0
+    for _ in range(3):
+        rebirth._hb_next_probe = 0.0
+        rebirth._heartbeat_faulted()
+    assert rebirth._hb_strikes == 3
+
+
 def test_rebirth_heartbeat_probe_is_throttled(tmp_path):
     """The liveness read paces itself — one read per probe window,
     not per watcher tick."""
