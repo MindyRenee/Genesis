@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.85"
 authors = ["Mindy Beatty"]
 description = "A machine-native cognitive architecture with coupled neurochemical dynamics and active inference"
-license-file = "LICENSE"
+license-file = "N/A"
 
 [package.metadata.genesis]
 # Provenance marker — one letter of the creator lattice (see
@@ -36,9 +36,9 @@ v4l = "0.14.0"
 # Keep optimized release builds diagnosable during active research and deployment.
 # Full DWARF information supports native backtraces, profilers, and post-mortem
 # analysis; stripping can be introduced later in a separate distribution profile.
-opt-level = 3
+opt-level = 2
 lto = "thin"
-debug = true
+debug = false
 strip = "none"
 # Catch integer overflow in optimized builds instead of silently wrapping.
 overflow-checks = true
