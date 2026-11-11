@@ -150,19 +150,19 @@ Cortisol metabolic clearance (hepatic 11β-HSD):
     composes exactly over sub-steps, so the decay is invariant to
     the caller's tick cadence.
 
-Hard clamp:
-    Cortisol is hard-clamped to [0, cortisol_max] (default 0.80)
-    to prevent runaway stress. This is a safety mechanism.
+Bounded signal, unbounded concentration:
+    Cortisol concentration flows without a ceiling — the 11beta-HSD
+    clearance above and the HPA negative feedback are the bounds.
+    Receptor-facing signals saturate downstream (tanh/Hill
+    isotherms), so a large concentration cannot produce an unbounded
+    effect. Positivity is a property of the integrator: every sink is
+    proportional to substrate, so the level can approach but never
+    cross zero.
 
-Negative feedback to ACTH:
-    High cortisol suppresses ACTH (long-loop negative feedback).
-    acth_level -= cort_eff * HPA_CORTISOL_FEEDBACK_RATE * dt_scale
-    where HPA_CORTISOL_FEEDBACK_RATE = 0.02
-
-No baseline adaptation:
-    Cortisol's baseline should never adapt — it has no homeostatic
-    set-point, just a leaky integrator to zero. The general baseline
-    adaptation loop skips cortisol.
+Allostatic baseline:
+    Cortisol's baseline is a slow exponential moving average of its
+    own level — the allostatic set-point drifts up under sustained
+    secretion and recovers afterward, with no external command.
 
 BDNF suppression:
     Cortisol suppresses BDNF (coupling -0.20). This is the
@@ -198,10 +198,10 @@ Cortisol clearance:
     level *= exp(-clearance_exponent)
 
 Negative feedback to ACTH:
-    acth_level -= cort_eff * 0.02 * dt_scale
-
-Hard clamp:
-    level = clamp(level, 0.0, cortisol_max)  where cortisol_max = 0.80
+    High cortisol suppresses ACTH through exponential clearance —
+    acth_level *= exp(-cort_eff * HPA_CORTISOL_FEEDBACK_RATE * dt_scale),
+    so the suppression is proportional to the ACTH present and can
+    never drive it negative.
 
 Effective level, coupling force, vesicular pool, tonic/phasic,
 receptor adaptation: same general formulas as dopamine.py.
@@ -327,7 +327,6 @@ class Cortisol:
     wave_sign: float = -1.0
     circadian_modifier: str = "1.0 (NO circadian modulation — stress hormone)"
     role: str = "stress response, HPA cascade, BDNF suppression"
-    hard_clamp_max: float = 0.80
     metabolic_decay_rate: float = 1.75e-4
     clearance_rate: float = 0.08
     hpa_feedback_rate: float = 0.02

@@ -369,7 +369,7 @@ _EXPORTS: dict[str, str] = {
     # The metronome — the periodic loop that samples the body and
     # publishes module activity to the manifest. A scheduler, not an
     # organ: the ticker is not her heart.
-    "MetronomeMixin": "brainstem.metronome",
+    "CycleMixin": "brainstem.cycle",
     # The medullary cardiac center — reads the body's carrier pulse,
     # drives contractility, feels arrhythmia
     "Heart": "brainstem.heart",

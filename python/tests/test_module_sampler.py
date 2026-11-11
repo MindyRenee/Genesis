@@ -78,7 +78,7 @@ def test_region_directory_attribution():
         (("parietal_lobe", "agency.py"), MODULE_SENSORY),
         (("thalamus", "relay.py"), MODULE_ATTENTION),
         (("limbic_system", "amygdala.py"), MODULE_EMOTION),
-        (("brainstem", "metronome.py"), MODULE_EMOTION),
+        (("brainstem", "cycle.py"), MODULE_EMOTION),
         (("basal_ganglia", "basal_ganglia.py"), MODULE_INTENTION),
         (("cerebellum", "cerebellum.py"), MODULE_MOTOR),
         (("sleep", "inner_life.py"), MODULE_DREAMING),
@@ -234,7 +234,7 @@ def test_ipc_leaf_attributes_to_cognitive_caller():
     to the deepest cognitive frame — the module that initiated the
     call owns the wait."""
     frames = []
-    # A function "in" metronome.py that makes the IPC call; the leaf
+    # A function "in" cycle.py that makes the IPC call; the leaf
     # lands inside the client and must resolve to the caller's module.
     metronome_src = (
         "def ipc_caller():\n"
@@ -250,7 +250,7 @@ def test_ipc_leaf_attributes_to_cognitive_caller():
         "client_file": _sibling("genesis_client", "client.py"),
     }
     ns["ns"] = ns
-    exec(compile(metronome_src, _region("brainstem", "metronome.py"), "exec"), ns)
+    exec(compile(metronome_src, _region("brainstem", "cycle.py"), "exec"), ns)
     ns["ipc_caller"]()
     assert frames == [MODULE_EMOTION]
 

@@ -729,7 +729,7 @@ class TestN3Wiring:
     def _holder(self, stage, weight=0.8):
         from types import SimpleNamespace
 
-        from brainstem.metronome import MetronomeMixin
+        from brainstem.cycle import CycleMixin
 
         manifold = LatentManifold()
         manifold.observe("yesterday's rain", kind="world:percept", salience=0.8)
@@ -743,7 +743,7 @@ class TestN3Wiring:
             ),
             client=client,
         )
-        return holder, MetronomeMixin._manifold_n3_consolidate, manifold
+        return holder, CycleMixin._manifold_n3_consolidate, manifold
 
     def test_n3_consolidates_and_migrates(self):
         from thalamus.brain_waves import SleepStage
@@ -778,10 +778,10 @@ class TestN3Wiring:
     def test_missing_manifold_is_a_noop(self):
         from types import SimpleNamespace
 
-        from brainstem.metronome import MetronomeMixin
+        from brainstem.cycle import CycleMixin
 
         holder = SimpleNamespace(manifold=None, inner_life=None, client=None)
-        MetronomeMixin._manifold_n3_consolidate(holder)
+        CycleMixin._manifold_n3_consolidate(holder)
 
 
 class TestReach:
@@ -934,7 +934,7 @@ class TestReplay:
         """Replay fires per new ripple — one sequence each, newest first."""
         from types import SimpleNamespace
 
-        from brainstem.metronome import MetronomeMixin
+        from brainstem.cycle import CycleMixin
         from thalamus.brain_waves import SleepStage
 
         manifold = LatentManifold()
@@ -954,7 +954,7 @@ class TestReplay:
                 get_state=lambda: SimpleNamespace(consolidation_weight=0.8)
             ),
         )
-        MetronomeMixin._manifold_n3_consolidate(holder)
+        CycleMixin._manifold_n3_consolidate(holder)
         with manifold._lock:
             # two ripples -> the two newest rungs replayed, oldest left cold
             assert manifold._reach[2] > faded[2]
@@ -963,7 +963,7 @@ class TestReplay:
             after_first = manifold._reach.copy()
         # no new ripples -> no replay (N3 also deposits a reflection,
         # so compare only the original rows)
-        MetronomeMixin._manifold_n3_consolidate(holder)
+        CycleMixin._manifold_n3_consolidate(holder)
         with manifold._lock:
             assert np.allclose(manifold._reach[: len(after_first)], after_first)
 
@@ -1294,7 +1294,7 @@ class TestInnerGuide:
     def test_guide_blends_into_lean(self):
         from types import SimpleNamespace
 
-        from brainstem.metronome import MetronomeMixin
+        from brainstem.cycle import CycleMixin
 
         manifold = LatentManifold()
         manifold.observe("inner life", kind="thought:x")
@@ -1305,7 +1305,7 @@ class TestInnerGuide:
             _is_sleeping=False,
             _cycle_dt=0.05,
         )
-        MetronomeMixin._cycle_manifold(holder)
+        CycleMixin._cycle_manifold(holder)
         expected = 0.7 * (0.72 + 0.3 * 0.5) + 0.3 * guide
         assert manifold._lean_target == pytest.approx(expected)
 
@@ -1380,7 +1380,7 @@ class TestMetaplasticity:
     def test_n3_replays_before_consolidating(self):
         from types import SimpleNamespace
 
-        from brainstem.metronome import MetronomeMixin
+        from brainstem.cycle import CycleMixin
         from thalamus.brain_waves import SleepStage
 
         manifold = LatentManifold()
@@ -1398,7 +1398,7 @@ class TestMetaplasticity:
                 get_state=lambda: SimpleNamespace(consolidation_weight=0.8)
             ),
         )
-        MetronomeMixin._manifold_n3_consolidate(holder)
+        CycleMixin._manifold_n3_consolidate(holder)
         with manifold._lock:
             assert manifold._reach[0] > faded
             assert manifold._bandwidth[0] > bw0

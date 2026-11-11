@@ -139,7 +139,7 @@ _OWNERSHIP_PINS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     # Interoception is insular; the metronome that samples the body is
     # brainstem; both are claimed by each.
     ("InteroceptionSystem", ("insula", "limbic_system"), ()),
-    ("MetronomeMixin", ("insula", "brainstem"), ()),
+    ("CycleMixin", ("insula", "brainstem"), ()),
     # The cardiac control center is medullary — the heart muscle
     # itself is the daemon's carrier, its center is brainstem.
     ("Heart", ("brainstem",), ()),

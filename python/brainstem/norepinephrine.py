@@ -92,23 +92,23 @@ COUPLING: HOW NOREPINEPHRINE AFFECTS OTHERS (matrix column 2)
 SPECIAL DYNAMICS
 ════════════════════════════════════════════════════════════════════════
 
-Hard clamp:
-    NE is hard-clamped to [0, ne_max] (default 0.90) to prevent
-    runaway arousal. This is a safety mechanism in case the
-    emotional regulator fails or coupling forces push beyond safe
-    limits.
+Bounded signal, unbounded concentration:
+    NE concentration flows without a ceiling — substrate-proportional
+    clearance, quantal-release saturation, and autoreceptor feedback
+    are the bounds. Receptor-facing signals saturate downstream, so
+    a large concentration cannot produce an unbounded effect.
+    Positivity is a property of the integrator, not a post-write
+    floor.
 
-Network-driven release (sleep):
-    When the sleep-wake network is running, NE is driven toward the
-    release target NE_FROM_LC * lc - NE_FROM_REM * rem — it tracks
+Network-driven set-point:
+    When the sleep-wake network is running, NE's homeostatic
+    set-point is NE_FROM_LC * lc - NE_FROM_REM * rem — it tracks
     LC firing and is suppressed by the REM-on population, giving the
     measured profile: wake 0.30, NREM 0.05, REM ~0 (the LC is the
     canonical REM-off aminergic nucleus; Aston-Jones & Bloom 1981).
-    While network-driven, the standard homeostatic/coupling update
-    is skipped for NE.
-
-Without the network, NE follows the standard homeostatic
-and coupling force equations.
+    The level still arrives through the full integration —
+    homeostatic pull, coupling, autoreceptors, clearance — with the
+    network supplying only the operating point.
 
 
 ════════════════════════════════════════════════════════════════════════
@@ -118,9 +118,6 @@ MATHEMATICAL FORMULAS
 Homeostatic force, effective level, coupling force, vesicular pool,
 tonic/phasic, receptor adaptation, baseline adaptation: same
 general formulas as dopamine.py.
-
-Hard clamp:
-    level = clamp(level, 0.0, ne_max)  where ne_max = 0.90
 
 
 ════════════════════════════════════════════════════════════════════════
@@ -234,4 +231,3 @@ class Norepinephrine:
     brain_waves: tuple[str, ...] = ("beta",)
     circadian_modifier: str = "1.0 (no circadian modulation)"
     role: str = "arousal, vigilance, active data work"
-    hard_clamp_max: float = 0.90

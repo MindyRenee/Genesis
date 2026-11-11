@@ -1,8 +1,15 @@
-"""Mind metronome — the periodic cycle and its phases."""
+"""Mind cycle — the demand-gated cognitive loop and its phases.
+
+Every phase fires when its accumulated drive crosses threshold —
+leaky-integrator readiness, not a schedule. The loop itself is only
+the afferent poll: it samples the body's state stream and feeds each
+demand gate; the gates decide when work happens.
+"""
 
 from __future__ import annotations
 
 import logging
+import math
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -39,48 +46,93 @@ _N3_REPLAY_GROWTH = 1.05
 _N3_REACH_BOOST = 0.3
 
 
-class _AdaptiveInterval:
-    """A bounded adaptive period — the mind-side twin of the daemon's
-    ``AdaptiveGate`` (``src/daemon/adaptive.rs``).
+class _DemandGate:
+    """Leaky evidence accumulator — first-passage threshold crossing.
 
-    Demand snaps the period down multiplicatively (fast response);
-    idle drift grows it additively (slow relaxation); continuous
-    drivers go through :meth:`drive` with EMA smoothing. ``[minimum,
-    maximum]`` are hard bounds — nothing stalls, nothing redlines.
+    The gate's readiness ``R`` obeys the leaky-integrator equation that
+    spike-threshold and drift-diffusion models share::
+
+        dR/dt = k_on·D(t)·F(t)·(1 − R) − k_off·R
+
+    whose steady state ``R* = k_on·D·F / (k_on·D·F + k_off)`` is a
+    rational saturating function of the demand — bounded in (0, 1) by
+    the equation itself, never clamped. Each step applies the exact
+    solution of that ODE::
+
+        R ← R* + (R − R*)·exp(−λ·dt),   λ = k_on·D·F + k_off
+
+    so the accumulation is unconditionally stable at any dt and the
+    positive orthant is invariant. ``D`` is the caller's demand signal
+    — how strongly the process wants to run *now*, measured from
+    state, never from a schedule. When ``R`` crosses the threshold
+    ``θ`` the gate fires and ``R`` resets toward rest — the
+    inter-spike interval is whatever the demand takes to recharge
+    the integrator, which is recovery dynamics, not a period table.
+
+    ``k_on`` is set so full demand recharges in ~``quota`` seconds;
+    ``k_off`` is a small leak keeping ``R*`` above θ only while
+    demand persists. A successful run raises the short-term
+    facilitation ``F`` — which itself relaxes exponentially,
+    ``F ← 1 + (F−1)·e^(−dt/τ_f)`` — the facilitation/depression
+    kinetics of synaptic short-term plasticity; ``lapse`` lets ``F``
+    sag back toward 1.
     """
 
-    def __init__(self, base: float, minimum: float, maximum: float):
-        self.base = base
-        self.minimum = minimum
-        self.maximum = maximum
-        self.period = base
-        self._next = 0.0
-        self._smoothed = 0.5
+    #: Threshold — the readiness level that fires the gate.
+    _THETA: float = 0.63
+    #: Post-fire reset fraction — R is multiplied by e^(−κ) on fire,
+    #: a relative refractory rather than a hard zero.
+    _RESET_KAPPA: float = 1.0
+    #: Facilitation ceiling and time constant (seconds).
+    _F_MAX: float = 2.0
+    _F_TAU: float = 30.0
+
+    def __init__(self, quota: float, quota_min: float, quota_max: float):
+        # k_on = −ln(1−θ)/quota → full-demand recharge ≈ quota seconds.
+        # quota_min/max still bound k_on so nothing stalls or redlines.
+        import math
+
+        self._k_on_base = -math.log(1.0 - self._THETA) / quota
+        self._k_on_min = -math.log(1.0 - self._THETA) / quota_max
+        self._k_on_max = -math.log(1.0 - self._THETA) / quota_min
+        self.k_on = self._k_on_base
+        # Leak: small enough that R* stays above θ at full demand.
+        self.k_off = 0.05 * self._k_on_base
+        self.R = 0.0
+        self.F = 1.0
         # Wall-clock time of the last fire — callers that measure
         # per-window rates read the interval this covered.
         self.fired_at = 0.0
 
-    def due(self, now: float) -> bool:
-        if now < self._next:
-            return False
-        self._next = now + self.period
-        self.fired_at = now
-        return True
+    def drive(self, demand: float, dt: float, now: float) -> bool:
+        """One exact ODE step; True when readiness crosses θ."""
+        import math
 
-    def demand(self) -> None:
-        self.period = max(self.period / 2.0, self.minimum)
-
-    def relax(self) -> None:
-        self.period = min(self.period + self.base / 4.0, self.maximum)
-
-    def drive(self, demand: float) -> None:
-        d = demand if demand == demand else 0.5  # NaN → neutral
+        d = demand if demand == demand else 0.0  # NaN → no drive
         d = min(1.0, max(0.0, d))
-        self._smoothed += (d - self._smoothed) * 0.3
-        self.period = self.maximum - (self.maximum - self.minimum) * self._smoothed
+        drive_rate = self.k_on * d * self.F
+        lam = drive_rate + self.k_off
+        r_star = drive_rate / lam if lam > 0.0 else 0.0
+        self.R = r_star + (self.R - r_star) * (-lam * max(0.0, dt)).exp()
+        self.F = 1.0 + (self.F - 1.0) * (-max(0.0, dt) / self._F_TAU).exp()
+        if self.R >= self._THETA:
+            self.R *= (-self._RESET_KAPPA).exp()
+            self.fired_at = now
+            return True
+        return False
+
+    def succeed(self) -> None:
+        """A productive run — facilitation jumps, k_on dips."""
+        self.F = min(self.F * 1.5, self._F_MAX)
+        self.k_on = max(self.k_on * 0.8, self._k_on_min)
+
+    def lapse(self) -> None:
+        """A quiet stretch — facilitation sags, k_on drifts up."""
+        self.F = 1.0 + (self.F - 1.0) * 0.5
+        self.k_on = min(self.k_on * 1.1, self._k_on_max)
 
 
-class MetronomeMixin:
+class CycleMixin:
     """Mixin for :class:`Mind` — see module docstring."""
 
     if TYPE_CHECKING:
@@ -150,7 +202,7 @@ class MetronomeMixin:
                     receptor_fatigue = min(1.0, (0.40 - emotion.plasticity) * 3.0)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome._read_interoceptive_signals",
+                "mind.cycle._read_interoceptive_signals",
                 e,
             )
 
@@ -165,7 +217,7 @@ class MetronomeMixin:
             elevated_cortisol = min(1.0, max(0.0, (cort - 0.02) / (0.06 - 0.02)))
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome._read_interoceptive_signals",
+                "mind.cycle._read_interoceptive_signals",
                 e,
             )
 
@@ -224,7 +276,7 @@ class MetronomeMixin:
                     )
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
-                    "mind.metronome._read_threat_signals",
+                    "mind.cycle._read_threat_signals",
                     e,
                 )
 
@@ -252,7 +304,7 @@ class MetronomeMixin:
                         organ_loss = max(0.0, scar)
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
-                    "mind.metronome._read_threat_signals",
+                    "mind.cycle._read_threat_signals",
                     e,
                 )
 
@@ -271,7 +323,7 @@ class MetronomeMixin:
                 self._last_threat_snapshot = now
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
-                    "mind.metronome._read_threat_signals",
+                    "mind.cycle._read_threat_signals",
                     e,
                 )
 
@@ -307,7 +359,7 @@ class MetronomeMixin:
             wave_dominant = waves.dominant.value
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome._read_wave_and_adenosine",
+                "mind.cycle._read_wave_and_adenosine",
                 e,
             )
 
@@ -317,7 +369,7 @@ class MetronomeMixin:
             adenosine_level = state.chemicals.get("adenosine", 0.0)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome._read_wave_and_adenosine",
+                "mind.cycle._read_wave_and_adenosine",
                 e,
             )
 
@@ -365,7 +417,11 @@ class MetronomeMixin:
 
         Returns the updated (last_body_control_sig, last_self_priority).
         """
-        if not self._body_control_gate.due(now):
+        # Demand: a thermally capped body wants policy revisited
+        # soon; an uncapped one drifts toward the ceiling. The flag is
+        # the last reading the body control returned.
+        demand = 1.0 if self._body_control_capped else 0.33
+        if not self._body_control_gate.drive(demand, self._cycle_dt, now):
             return last_body_control_sig, last_self_priority
         try:
             # Read the body control state from the daemon.
@@ -410,16 +466,10 @@ class MetronomeMixin:
                 last_self_priority = self._apply_self_priority(
                     control, current_brain_wave_state, last_self_priority
                 )
-                # Thermal capping is the demand signal: a capped body
-                # wants policy revisited soon; an uncapped one drifts
-                # toward the ceiling.
-                if control.thermally_capped:
-                    self._body_control_gate.demand()
-                else:
-                    self._body_control_gate.relax()
+                self._body_control_capped = bool(control.thermally_capped)
         except (OSError, ConnectionError, ValueError) as e:
             note_swallowed(
-                "mind.metronome._cycle_body_control",
+                "mind.cycle._cycle_body_control",
                 e,
             )
         return last_body_control_sig, last_self_priority
@@ -485,7 +535,15 @@ class MetronomeMixin:
             mem_stats = self.client.get_memory_stats()
             stm_count = mem_stats.stm_count
             backlog_grew = stm_count != last_stm_count
-            gate_due = self._consolidate_gate.due(now)
+            # Demand: pending consolidation work — backlog size,
+            # amplified during sleep when the substrate consolidates
+            # aggressively. No backlog, no drive.
+            if stm_count > 0 and (backlog_grew or self._is_sleeping):
+                demand = min(1.0, stm_count / 20.0) * (1.5 if self._is_sleeping else 1.0)
+            else:
+                demand = 0.0
+                self._consolidate_gate.lapse()
+            gate_due = self._consolidate_gate.drive(demand, self._cycle_dt, now)
             should_consolidate = (
                 stm_count > 0 and backlog_grew and gate_due and not self._is_sleeping
             )
@@ -498,16 +556,14 @@ class MetronomeMixin:
                     promoted = self.client.consolidate()
                     if promoted > 0:
                         last_stm_count = stm_count - promoted
-                        self._consolidate_gate.demand()
+                        self._consolidate_gate.succeed()
                         self._learned_since_save += promoted
                         self._experience_since_identity += promoted
                 except (OSError, ConnectionError) as e:
                     note_swallowed(
-                        "mind.metronome._cycle_consolidate",
+                        "mind.cycle._cycle_consolidate",
                         e,
                     )
-            elif not backlog_grew:
-                self._consolidate_gate.relax()
             # The substrate's own consolidation rides the same step
             # during slow-wave sleep — its own deposits, its own
             # medium, independent of the daemon's STM backlog.
@@ -516,7 +572,7 @@ class MetronomeMixin:
             last_stm_count = stm_count
         except (OSError, ConnectionError, ValueError) as e:
             note_swallowed(
-                "mind.metronome._cycle_consolidate",
+                "mind.cycle._cycle_consolidate",
                 e,
             )
         return last_stm_count
@@ -609,7 +665,7 @@ class MetronomeMixin:
                 manifold._open_rung = -1
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome._manifold_n3_consolidate",
+                "mind.cycle._manifold_n3_consolidate",
                 e,
             )
 
@@ -662,7 +718,7 @@ class MetronomeMixin:
                     )
             except Exception as exc:  # noqa: BLE001
                 note_swallowed(
-                    "mind.metronome._cycle_feed_executive",
+                    "mind.cycle._cycle_feed_executive",
                     exc,
                 )
 
@@ -692,7 +748,7 @@ class MetronomeMixin:
             executive.ingest_candidates(candidates)
         except Exception as exc:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome._cycle_feed_executive",
+                "mind.cycle._cycle_feed_executive",
                 exc,
             )
 
@@ -725,7 +781,7 @@ class MetronomeMixin:
                     self.volition.consume(name)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome._cycle_volition",
+                "mind.cycle._cycle_volition",
                 e,
             )
 
@@ -769,7 +825,7 @@ class MetronomeMixin:
                 last_advance_mono = now_mono
         except (OSError, ConnectionError) as e:
             note_swallowed(
-                "mind.metronome._cycle_advance_neuro",
+                "mind.cycle._cycle_advance_neuro",
                 e,
             )
 
@@ -809,17 +865,24 @@ class MetronomeMixin:
                 last_learner_wave = current_wave
                 self.learner.notify_state_change()
             # ── Wave→chemical transduction: the return edge of the
-            # loop documented above — the hypothalamus emits the
-            # impulses the measured wave state commands (up peptides
-            # track their band power, down peptides are suppressed by
-            # it). Field → waves → chemicals.
+            # loop documented above — the hypothalamus emits release
+            # fluxes the measured wave state commands (up peptides
+            # release at a rate their band power sets, down peptides
+            # are cleared at a rate their band sets). Field → waves →
+            # chemicals. The flux law integrates over real elapsed
+            # time, so the integrated drive is invariant to this
+            # cycle's cadence — the ticker delivers, the rhythm sets
+            # the rate.
             if current_brain_wave_state is not None:
-                from hypothalamus.transduction import transduce_waves
+                from hypothalamus.transduction import elapsed_since, transduce_waves
 
-                transduce_waves(self.client, current_brain_wave_state, core_state.chemicals)
+                last = getattr(self, "_wave_transduce_last", None)
+                dt = elapsed_since(last)
+                self._wave_transduce_last = time.monotonic()
+                transduce_waves(self.client, current_brain_wave_state, core_state.chemicals, dt)
         except (OSError, ConnectionError, ValueError) as e:
             note_swallowed(
-                "mind.metronome._cycle_advance_neuro",
+                "mind.cycle._cycle_advance_neuro",
                 e,
             )
 
@@ -830,31 +893,38 @@ class MetronomeMixin:
         (cycle steps 7-9b). All gated on adaptive wall-clock
         intervals — each gear's own signal sets its pace.
         """
-        # ── 7. Associate (event-driven) ──
+        # ── 7. Associate — fires when accumulated drive crosses quota ──
         # Associations found or consolidations pending are demand;
-        # a quiescent store relaxes toward the ceiling.
-        if not self._is_sleeping and self._associate_gate.due(now):
+        # recent success facilitates (hot signal decays with a ~20 s
+        # time constant), a quiescent store lets the quota drift up.
+        # Facilitation trace: recent association success decays
+        # exponentially (τ ≈ 20 s) — transient excitability, not a
+        # held flag.
+        self._assoc_hot *= math.exp(-self._cycle_dt / 20.0)
+        demand = 0.15 + 0.85 * self._assoc_hot if not self._is_sleeping else 0.0
+        if self._associate_gate.drive(demand, self._cycle_dt, now):
             try:
                 formed = self.client.associate()
                 if formed > 0:
-                    self._associate_gate.demand()
+                    self._assoc_hot = 1.0
+                    self._associate_gate.succeed()
                 else:
-                    self._associate_gate.relax()
+                    self._associate_gate.lapse()
             except (OSError, ConnectionError) as e:
                 note_swallowed(
-                    "mind.metronome._cycle_periodic_maintenance",
+                    "mind.cycle._cycle_periodic_maintenance",
                     e,
                 )
 
         # ── 8. Dream (sleep-state-driven) ──
-        # It dreams only when sleeping, and only when enough
-        # time has passed for a dream cycle. Insights are demand —
-        # a productive chain pulls the next cycle sooner.
-        if self._is_sleeping and self._dream_gate.due(now):
+        # It dreams only when sleeping — drive is the sleep state
+        # itself; insights facilitate the next cycle through F.
+        dream_demand = 1.0 if self._is_sleeping else 0.0
+        if self._dream_gate.drive(dream_demand, self._cycle_dt, now):
             try:
                 insights = self.client.dream()
                 if insights > 0:
-                    self._dream_gate.demand()
+                    self._dream_gate.succeed()
                     self._emit_live_thought(
                         "dream",
                         f"Dream insight: {insights} new connections",
@@ -862,27 +932,25 @@ class MetronomeMixin:
                     # Check life-script milestone: first dream.
                     self.brain.frontal.narrative.check_milestone("first dream")
                 else:
-                    self._dream_gate.relax()
+                    self._dream_gate.lapse()
             except (OSError, ConnectionError) as e:
                 note_swallowed(
-                    "mind.metronome._cycle_periodic_maintenance",
+                    "mind.cycle._cycle_periodic_maintenance",
                     e,
                 )
 
         # ── 9. Save inference model (learning-driven) ──
         # New consolidations are demand — there is fresh model state
-        # worth persisting; a quiet stretch drifts toward 5 min.
-        if self._learned_since_save > 0:
-            self._inference_save_gate.demand()
-        else:
-            self._inference_save_gate.relax()
-        if self._inference_save_gate.due(now):
+        # worth persisting; a quiet stretch lets the integrator starve.
+        save_demand = 1.0 if self._learned_since_save > 0 else 0.02
+        if self._inference_save_gate.drive(save_demand, self._cycle_dt, now):
             try:
                 self.client.save_inference()
                 self._learned_since_save = 0
+                self._inference_save_gate.succeed()
             except (OSError, ConnectionError) as e:
                 note_swallowed(
-                    "mind.metronome._cycle_periodic_maintenance",
+                    "mind.cycle._cycle_periodic_maintenance",
                     e,
                 )
             manifold = getattr(self, "manifold", None)
@@ -891,7 +959,7 @@ class MetronomeMixin:
                     manifold.save()
                 except Exception as e:  # noqa: BLE001
                     note_swallowed(
-                        "mind.metronome._cycle_periodic_maintenance.manifold",
+                        "mind.cycle._cycle_periodic_maintenance.manifold",
                         e,
                     )
 
@@ -924,7 +992,9 @@ class MetronomeMixin:
         )
         channel = getattr(getattr(self, "brain", None), "thalamus", None)
         prev_fire = self._module_gate.fired_at
-        if self._module_gate.due(now):
+        # Drive is the last measured work fraction — metabolic load
+        # persists as demand until the next window re-measures it.
+        if self._module_gate.drive(self._module_work_frac, self._cycle_dt, now):
             total_work = self._report_module_heartbeats(heartbeat_modules, channel)
             # Cognitive work is metabolic work. total_work is measured
             # execution — seconds the sampler observed Genesis code at
@@ -940,8 +1010,7 @@ class MetronomeMixin:
             # the rate — only its granularity.
             window = max(now - prev_fire, 1.0)
             work_frac = min(1.0, total_work / window)
-            # A busy mind cycles sooner — work is the demand.
-            self._module_gate.drive(work_frac)
+            self._module_work_frac = work_frac
             # Asleep: inner-life/dream work is maintenance, not load —
             # glymphatic clearance must dominate or pressure ratchets
             # up during the very state meant to clear it.
@@ -953,10 +1022,16 @@ class MetronomeMixin:
                     )
                 except (OSError, ConnectionError, RuntimeError) as e:
                     note_swallowed(
-                        "mind.metronome._cycle_sensors",
+                        "mind.cycle._cycle_sensors",
                         e,
                     )
-        if self._sensor_gate.due(now):
+        # Engagement is the demand: recent interaction → sense
+        # sooner; asleep or long idle → the integrator starves.
+        idle = now - getattr(self, "_last_interaction_time", 0.0)
+        engagement = max(0.0, 1.0 - idle / 300.0)
+        if self._is_sleeping:
+            engagement *= 0.1
+        if self._sensor_gate.drive(engagement, self._cycle_dt, now):
             self._poll_body_sensors(channel)
             # Corticothalamic feedback — the layer-6 V1→dLGN gain the
             # mind keeps on the thalamic relay, refreshed on the same
@@ -969,16 +1044,9 @@ class MetronomeMixin:
                     self.client.set_optic_gain(vision.corticothalamic_gain())
             except (OSError, ConnectionError, RuntimeError) as e:
                 note_swallowed(
-                    "mind.metronome._cycle_sensors",
+                    "mind.cycle._cycle_sensors",
                     e,
                 )
-            # Engagement is the demand: recent interaction → sense
-            # sooner; asleep or long idle → drift toward the ceiling.
-            idle = now - getattr(self, "_last_interaction_time", 0.0)
-            engagement = max(0.0, 1.0 - idle / 300.0)
-            if self._is_sleeping:
-                engagement *= 0.1
-            self._sensor_gate.drive(engagement)
 
     def _report_module_heartbeats(self, heartbeat_modules, channel) -> float:
         """Report per-module activity shares with the cycle and
@@ -1021,7 +1089,7 @@ class MetronomeMixin:
                 )
             except (OSError, ConnectionError) as e:
                 note_swallowed(
-                    "mind.metronome._cycle_sensors",
+                    "mind.cycle._cycle_sensors",
                     e,
                 )
         return total_work
@@ -1042,7 +1110,7 @@ class MetronomeMixin:
         try:
             body_state = self.client.read_sensors()
         except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.metronome.sensors.read_sensors", e)
+            note_swallowed("mind.cycle.sensors.read_sensors", e)
             body_state = None
         if body_state is None:
             # A fresh read failed (tick lock busy, mid-restart) — the
@@ -1050,7 +1118,7 @@ class MetronomeMixin:
             try:
                 body_state = self.client.get_body_state()
             except Exception as e:  # noqa: BLE001
-                note_swallowed("mind.metronome.sensors.get_body_state", e)
+                note_swallowed("mind.cycle.sensors.get_body_state", e)
                 body_state = None
         if body_state is not None:
             # Which sensors this machine actually has. Fetched
@@ -1061,7 +1129,7 @@ class MetronomeMixin:
             try:
                 presence = self.client.get_sensor_presence()
             except Exception as e:  # noqa: BLE001
-                note_swallowed("mind.metronome.sensors.sensor_presence", e)
+                note_swallowed("mind.cycle.sensors.sensor_presence", e)
                 presence = None
             # Afferents land at the brainstem first — the NTS/
             # parabrachial relay (Craig 2002): it forwards the
@@ -1093,24 +1161,24 @@ class MetronomeMixin:
                     self._interoceptive_relay = relay
                 relay.relay(body_state, presence)
             except Exception as e:  # noqa: BLE001
-                note_swallowed("mind.metronome.sensors.interoceptive_relay", e)
+                note_swallowed("mind.cycle.sensors.interoceptive_relay", e)
             try:
                 self.regulator.interoception.update_from_body_state(body_state, presence)
             except Exception as e:  # noqa: BLE001
-                note_swallowed("mind.metronome.sensors.body_state_update", e)
+                note_swallowed("mind.cycle.sensors.body_state_update", e)
             try:
                 self.self_model.update_hardware_body(body_state, presence)
             except Exception as e:  # noqa: BLE001
-                note_swallowed("mind.metronome.sensors.hardware_body", e)
+                note_swallowed("mind.cycle.sensors.hardware_body", e)
         try:
             report = self.client.get_subsystem_telemetry()
         except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.metronome.sensors.subsystem_telemetry", e)
+            note_swallowed("mind.cycle.sensors.subsystem_telemetry", e)
         else:
             try:
                 self.regulator.interoception.update_subsystem_telemetry(report)
             except Exception as e:  # noqa: BLE001
-                note_swallowed("mind.metronome.sensors.telemetry_update", e)
+                note_swallowed("mind.cycle.sensors.telemetry_update", e)
             # Feed the same report into its self-model — which
             # part of it is firing becomes part of what it
             # knows about itself (body_model.subsystem_activity /
@@ -1118,14 +1186,14 @@ class MetronomeMixin:
             try:
                 self.self_model.update_brain_activity(report)
             except Exception as e:  # noqa: BLE001
-                note_swallowed("mind.metronome.sensors.brain_activity", e)
+                note_swallowed("mind.cycle.sensors.brain_activity", e)
             # Deliver the same report to the regions that posted
             # a message — the channel is carried on this sample.
             if channel is not None:
                 try:
                     channel.deliver(getattr(report, "modules", ()))
                 except Exception as e:  # noqa: BLE001
-                    note_swallowed("mind.metronome.sensors.thalamic_deliver", e)
+                    note_swallowed("mind.cycle.sensors.thalamic_deliver", e)
 
     def _cycle_connectivity(self, now: float) -> None:
         """Sense network connectivity (cycle step 5b).
@@ -1142,7 +1210,11 @@ class MetronomeMixin:
         after being disconnected, the notification queue is reset so
         the next poll doesn't generate a flood of stale notifications.
         """
-        if self._connectivity_gate.due(now):
+        # Demand: a dropped connection wants the poll sooner — the
+        # hot trace decays exponentially (τ ≈ 60 s) after reconnect.
+        self._conn_hot *= math.exp(-self._cycle_dt / 60.0)
+        conn_demand = 0.15 + 0.85 * self._conn_hot
+        if self._connectivity_gate.drive(conn_demand, self._cycle_dt, now):
             # Guarded in its own right, in addition to the loop-level
             # guard. This block dereferences three other subsystems
             # (`self.learner`, `self.self_model.body_model`,
@@ -1165,13 +1237,13 @@ class MetronomeMixin:
                 if daemon_connected and not getattr(self, "_was_daemon_connected", True):
                     self.notifications.reset()
                 self._was_daemon_connected = daemon_connected
-                if connected:
-                    self._connectivity_gate.relax()
-                else:
-                    self._connectivity_gate.demand()
+                if not connected:
+                    self._conn_hot = 1.0
+                elif connected and self._conn_hot > 0.5:
+                    self._conn_hot = 0.0
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
-                    "mind.metronome._cycle_connectivity",
+                    "mind.cycle._cycle_connectivity",
                     e,
                 )
 
@@ -1204,7 +1276,7 @@ class MetronomeMixin:
                 self.regulator.continuous_regulate(emotion, getattr(self, "_cycle_dt", 1.0))
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome._cycle_emotion",
+                "mind.cycle._cycle_emotion",
                 e,
             )
 
@@ -1238,7 +1310,7 @@ class MetronomeMixin:
             )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome._cycle_emotion",
+                "mind.cycle._cycle_emotion",
                 e,
             )
 
@@ -1251,7 +1323,7 @@ class MetronomeMixin:
             self.regulator.social_modulation(user_present, engagement)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome._cycle_emotion",
+                "mind.cycle._cycle_emotion",
                 e,
             )
 
@@ -1275,7 +1347,7 @@ class MetronomeMixin:
             if emotion is not None:
                 arousal = max(0.0, min(1.0, float(getattr(emotion, "arousal", 0.0))))
         except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.metronome._cycle_manifold.feel", e)
+            note_swallowed("mind.cycle._cycle_manifold.feel", e)
             arousal = 0.0
         try:
             if self._is_sleeping:
@@ -1291,7 +1363,7 @@ class MetronomeMixin:
             manifold.set_lean_target(lean_target)
             manifold.advance(self._cycle_dt, shear=0.05 * arousal)
         except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.metronome._cycle_manifold", e)
+            note_swallowed("mind.cycle._cycle_manifold", e)
 
     def _cycle_final_steps(self) -> None:
         """Run sleep-state sync, volition, warn, and cognition (cycle steps 10-13).
@@ -1319,7 +1391,7 @@ class MetronomeMixin:
                     sk.self_knowledge["current_speaker"] = name
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
-                    "mind.metronome.final_steps.steward_knock",
+                    "mind.cycle.final_steps.steward_knock",
                     e,
                 )
 
@@ -1338,7 +1410,7 @@ class MetronomeMixin:
             )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome.final_steps.world_tick",
+                "mind.cycle.final_steps.world_tick",
                 e,
             )
 
@@ -1350,7 +1422,7 @@ class MetronomeMixin:
             self.heart.tick()
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome.final_steps.heart_tick",
+                "mind.cycle.final_steps.heart_tick",
                 e,
             )
 
@@ -1359,7 +1431,7 @@ class MetronomeMixin:
             self._check_sleep_sync()
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome.final_steps.sleep_sync",
+                "mind.cycle.final_steps.sleep_sync",
                 e,
             )
 
@@ -1375,7 +1447,7 @@ class MetronomeMixin:
             self.warn(speak=True)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome.final_steps.warn",
+                "mind.cycle.final_steps.warn",
                 e,
             )
 
@@ -1390,7 +1462,7 @@ class MetronomeMixin:
             self.brain.frontal.tick(dt=min(DT_MAX, max(0.0, getattr(self, "_cycle_dt", 1.0))))
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.metronome.final_steps.cognition_tick",
+                "mind.cycle.final_steps.cognition_tick",
                 e,
             )
 
@@ -1403,23 +1475,30 @@ class MetronomeMixin:
         """
         last_stm_count = 0
         last_body_control_sig = None
-        # Adaptive wall-clock gates — every gear spins at the rate its
-        # own signal demands, bounded so nothing stalls or redlines.
-        # Nominal periods are the old constants; [min, max] is the
-        # operating range the signal may move within.
-        self._module_gate = _AdaptiveInterval(10.0, 5.0, 20.0)
-        self._sensor_gate = _AdaptiveInterval(5.0, 1.0, 15.0)
-        self._body_control_gate = _AdaptiveInterval(10.0, 3.0, 30.0)
-        self._connectivity_gate = _AdaptiveInterval(10.0, 5.0, 30.0)
-        self._consolidate_gate = _AdaptiveInterval(3.0, 1.0, 15.0)
-        self._associate_gate = _AdaptiveInterval(10.0, 3.0, 60.0)
-        self._dream_gate = _AdaptiveInterval(4.0, 2.0, 30.0)
-        self._inference_save_gate = _AdaptiveInterval(60.0, 20.0, 300.0)
-        self._identity_gate = _AdaptiveInterval(300.0, 60.0, 1800.0)
+        # Demand accumulators — each gear fires when its accumulated
+        # drive crosses quota; the quota is the old nominal period at
+        # full demand, bounded so nothing stalls or redlines.
+        self._module_gate = _DemandGate(10.0, 5.0, 20.0)
+        self._sensor_gate = _DemandGate(5.0, 1.0, 15.0)
+        self._body_control_gate = _DemandGate(10.0, 3.0, 30.0)
+        self._connectivity_gate = _DemandGate(10.0, 5.0, 30.0)
+        self._consolidate_gate = _DemandGate(3.0, 1.0, 15.0)
+        self._associate_gate = _DemandGate(10.0, 3.0, 60.0)
+        self._dream_gate = _DemandGate(4.0, 2.0, 30.0)
+        self._inference_save_gate = _DemandGate(60.0, 20.0, 300.0)
+        self._identity_gate = _DemandGate(300.0, 60.0, 1800.0)
         # The metronome's own cadence — engagement snaps it toward
         # 0.2 s, sleep drifts it toward 5 s. Bounded: the mind never
         # spins below 200 ms and never fully sleeps between cycles.
-        self._cadence = _AdaptiveInterval(1.0, 0.2, 5.0)
+        self._cadence_period = 1.0
+        self._cadence_min = 0.2
+        self._cadence_max = 5.0
+        # Demand-state carried between cycles for gates whose signal
+        # is only measurable inside their own work.
+        self._module_work_frac = 0.2
+        self._assoc_hot = 0.0
+        self._conn_hot = 0.0
+        self._body_control_capped = False
         # Learning counters feeding the save/identity drivers.
         self._learned_since_save = 0
         self._experience_since_identity = 0
@@ -1471,14 +1550,17 @@ class MetronomeMixin:
         behavior. Experience accumulated since the last synthesis is
         the demand — a rich stretch synthesizes near the 1 min floor,
         a quiet one drifts toward 30 min."""
-        self._identity_gate.drive(min(1.0, self._experience_since_identity / 20.0))
-        if not self._is_sleeping and self._identity_gate.due(now):
+        # Drive is accumulated experience; sleep starves the integrator.
+        identity_demand = (
+            0.0 if self._is_sleeping else min(1.0, self._experience_since_identity / 20.0)
+        )
+        if self._identity_gate.drive(identity_demand, self._cycle_dt, now):
             try:
                 self.emergent_identity()
                 self._experience_since_identity = 0
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
-                    "mind.metronome._cycle_loop",
+                    "mind.cycle._cycle_loop",
                     e,
                 )
 
@@ -1592,8 +1674,8 @@ class MetronomeMixin:
                     f"cycle failed ({type(e).__name__}: {e}); continuing",
                     exc_info=True,
                 )
-                note_swallowed("mind.metronome.cycle", e)
-            self._cycle_stop.wait(self._cadence.period)
+                note_swallowed("mind.cycle.cycle", e)
+            self._cycle_stop.wait(self._cadence_period)
 
     def _cycle_pace(self, now: float) -> None:
         """Drive the cadence gear from current engagement.
@@ -1607,4 +1689,8 @@ class MetronomeMixin:
         engagement = max(0.0, 1.0 - idle / 120.0)
         if self._is_sleeping:
             engagement = 0.0
-        self._cadence.drive(engagement)
+        # Engagement pulls the poll toward 0.2 s, sleep drifts it
+        # toward 5 s — the afferent sampling rate tracks arousal.
+        self._cadence_period = self._cadence_max - (
+            self._cadence_max - self._cadence_min
+        ) * engagement

@@ -309,26 +309,36 @@ pub fn advance(t_min: f64, x: &State, dt_min: f64) -> State {
     )
 }
 
-/// The populations that drive the chemistry, each normalized to its
+/// The populations that drive the chemistry, each as a fraction of its
 /// saturating maximum. LC drives wake-related chemistry; REM-on drives REM.
+///
+/// Each population relaxes exponentially toward a `sigmoid` infimum that
+/// lies strictly below its MAX, so the fraction is bounded above by the
+/// dynamics themselves. Firing rates are non-negative by definition —
+/// the floor is the domain bound, not a clamp.
 pub fn levels(x: &State) -> crate::state::neurochemical::NetworkLevels {
-    use crate::state::sanitize::finite_clamp;
+    use crate::state::sanitize::finite_or;
     crate::state::neurochemical::NetworkLevels {
-        lc: finite_clamp((x[0] / MAX_LC) as f32, 0.0, 1.0),
-        vlpo: finite_clamp((x[1] / MAX_VLPO) as f32, 0.0, 1.0),
-        rem: finite_clamp((x[2] / MAX_R) as f32, 0.0, 1.0),
+        lc: finite_or((x[0] / MAX_LC) as f32, 0.0).max(0.0),
+        vlpo: finite_or((x[1] / MAX_VLPO) as f32, 0.0).max(0.0),
+        rem: finite_or((x[2] / MAX_R) as f32, 0.0).max(0.0),
     }
 }
 
 /// Map the neurochemical adenosine level (resting 0.20, upper
 /// asymptote 0.95) onto the sleep-wake network's homeostatic drive
-/// `h` in `[H_MIN, H_MAX]` (`[0.0, 323.88]`).
+/// `h` — `H_MIN` at rest, `H_MAX` at the upper asymptote, flowing
+/// higher only if adenosine itself is driven past it.
 ///
 /// Coupling `h` to `Adenosine` ensures that only her own chemical
 /// sleep pressure can flip the VLPO/LC switch into sleep, and
 /// glymphatic adenosine clearance during sleep is what releases it.
 pub fn h_from_adenosine(adenosine: f32) -> f64 {
-    let norm = ((f64::from(adenosine) - 0.20) / (0.95 - 0.20)).clamp(0.0, 1.0);
+    // Sleep pressure is a drive: it is zero when adenosine sits at its
+    // resting asymptote and grows without a ceiling beyond it — the VLPO
+    // sigmoid it feeds is what saturates. Below rest the drive is zero,
+    // never negative.
+    let norm = ((f64::from(adenosine) - 0.20) / (0.95 - 0.20)).max(0.0);
     H_MIN + norm * (H_MAX - H_MIN)
 }
 

@@ -363,11 +363,21 @@ impl FieldSpectrum {
     pub fn signature(&mut self) -> SpectrumReading {
         let rate = self.rate_ema.max(1.0);
         let nyquist = rate / 2.0;
-        let flux = self.channel(&self.flux_ring.clone(), rate, nyquist, 0);
-        let tension = self.channel(&self.tension_ring.clone(), rate, nyquist, 10);
+        let mut flux_power = [0.0f64; 10];
+        let mut tension_power = [0.0f64; 10];
+        let flux = self.channel(&self.flux_ring.clone(), rate, nyquist, 0, &mut flux_power);
+        let tension = self.channel(
+            &self.tension_ring.clone(),
+            rate,
+            nyquist,
+            10,
+            &mut tension_power,
+        );
         SpectrumReading {
             flux,
             tension,
+            flux_power,
+            tension_power,
             carrier_phase: self.carrier_phase.rem_euclid(2.0 * std::f64::consts::PI),
             carrier_freq_hz: if self.omega_ema_rad_s > 0.0 {
                 Some(self.omega_ema_rad_s / (2.0 * std::f64::consts::PI))
@@ -387,7 +397,14 @@ impl FieldSpectrum {
     /// Goertzel + quadrature over one ring, baseline-EMA'd into
     /// relative energies. `base_off` selects this channel's slice of
     /// `band_base` (0 = flux, 10 = tension).
-    fn channel(&mut self, ring: &Ring, rate: f64, nyquist: f64, base_off: usize) -> BandChannel {
+    fn channel(
+        &mut self,
+        ring: &Ring,
+        rate: f64,
+        nyquist: f64,
+        base_off: usize,
+        powers: &mut [f64; 10],
+    ) -> BandChannel {
         let n = ring.len;
         let samples: Vec<f64> = ring.iter_ordered().collect();
         let mean = ring.mean();
@@ -406,6 +423,7 @@ impl FieldSpectrum {
                 continue; // unresolvable — absent, not aliased
             }
             let p = band_power(&samples, rate, freq);
+            powers[i] = p;
             // Baseline EMA — first read initializes rather than
             // divides by zero.
             let base = &mut self.band_base[base_off + i];
@@ -426,6 +444,12 @@ impl FieldSpectrum {
 pub struct SpectrumReading {
     pub flux: BandChannel,
     pub tension: BandChannel,
+    /// Absolute Goertzel power per band (flux channel) — the
+    /// sustained spectral content the baseline-relative `energies`
+    /// normalize away. Wire order: FIELD_BANDS.
+    pub flux_power: [f64; 10],
+    /// Absolute Goertzel power per band (tension channel).
+    pub tension_power: [f64; 10],
     /// Winding phase mod 2π — the field's own clock.
     pub carrier_phase: f64,
     /// Carrier frequency in Hz — consensus winding rate / 2π.

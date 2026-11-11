@@ -548,29 +548,29 @@ const ALLOSTASIS_RECOVERY_RATE: f32 = 0.00002;
 /// neither accrues nor drains, so ordinary physiological variation
 /// does not integrate without bound.
 fn integrate_allostasis(load: f32, burden: f32, rest: f32, dt_scale: f32) -> f32 {
-    let rest = crate::state::sanitize::finite_clamp(rest, 0.0, 1.0);
+    // Wear accumulates as an exponential approach to full load and
+    // recovers as exponential decay toward zero — both are positive
+    // systems, so the [0, 1] range is invariant by construction and
+    // no clamp is needed. A non-finite input leaves the load untouched.
+    if !load.is_finite() || !burden.is_finite() || !rest.is_finite() {
+        return crate::state::sanitize::finite_or(load, 0.0);
+    }
     let deadband = rest * REST_DEADBAND_FRACTION;
-    let next = if burden > rest + deadband {
-        // Wear rate is proportional to how far above rest she is, so
-        // a mild sustained elevation costs proportionally less than a
-        // severe one, and both scale with duration.
+    if burden > rest + deadband {
+        // Wear rate is proportional to how far above rest she is; the
+        // (1 - load) factor is vesicle-style depletion — accumulation
+        // slows as load saturates toward one rather than hitting a wall.
         let excess = burden - rest - deadband;
-        load + ALLOSTASIS_ACCUMULATION_RATE * excess * dt_scale
+        1.0 - (1.0 - load) * (-ALLOSTASIS_ACCUMULATION_RATE * excess * dt_scale).exp()
     } else if burden < rest - deadband {
-        // Recovery is proportional to depth below rest, mirroring
-        // accumulation. An earlier version used a fixed recovery rate,
-        // which made recovery up to 25x faster than accumulation at
-        // realistic signal amplitudes, so a single tick in the band
-        // erased twenty-five ticks of accrued wear and load could
-        // never build at all.
-        let depth = (rest - deadband - burden).max(0.0);
-        load - ALLOSTASIS_RECOVERY_RATE * depth * dt_scale
+        // Recovery mirrors accumulation: exponential decay toward zero,
+        // proportional to depth below rest, so it can never cross below.
+        let depth = rest - deadband - burden;
+        load * (-ALLOSTASIS_RECOVERY_RATE * depth * dt_scale).exp()
     } else {
-        // Inside the dead-band around rest: no change. This is the
-        // neutral region for ordinary physiological variation.
+        // Inside the dead-band around rest: no change.
         load
-    };
-    crate::state::sanitize::finite_clamp(next, 0.0, 1.0)
+    }
 }
 
 /// A slow-tracking estimate of her resting burden.
@@ -590,7 +590,7 @@ struct RestBaseline {
 impl RestBaseline {
     fn new(initial: f32) -> Self {
         Self {
-            level: crate::state::sanitize::finite_clamp(initial, 0.0, 1.0),
+            level: crate::state::sanitize::finite_or(initial, 0.5),
         }
     }
 
@@ -598,9 +598,14 @@ impl RestBaseline {
         if !burden.is_finite() {
             return;
         }
-        let alpha = crate::state::sanitize::finite_clamp(REST_TRACK_RATE * dt_scale, 0.0, 1.0);
-        self.level += alpha * (burden - self.level);
-        self.level = crate::state::sanitize::finite_clamp(self.level, 0.0, 1.0);
+        // The EMA coefficient for a continuous tracking rate is
+        // 1 - exp(-rate·dt): it lies in (0, 1) for every step size, so
+        // the update is a convex combination and cannot extrapolate.
+        let alpha = 1.0 - (-REST_TRACK_RATE * dt_scale).exp();
+        // A corrupted level settles to the current burden — rest is
+        // assumed to be where she currently is rather than imported NaN.
+        self.level =
+            crate::state::sanitize::finite_or(self.level + alpha * (burden - self.level), burden);
     }
 
     fn level(&self) -> f32 {
@@ -1526,8 +1531,13 @@ impl ActiveInferenceEngine {
         // Use finite_clamp: if error_sum_sq is NaN (shouldn't happen
         // after input sanitization, but defense-in-depth), the sqrt
         // would be NaN and native clamp would pass it through.
+        // Surprise: RMS prediction error passed through tanh — the
+        // same saturating isotherm neurons use for firing-rate
+        // compression. For non-negative error it lies in [0, 1),
+        // ≈ identity through the operating range, approaching one
+        // asymptotically instead of hitting a wall.
         let surprise = (error_sum_sq / DIM as f32).sqrt();
-        result.surprise = crate::state::sanitize::finite_clamp(surprise, 0.0, 1.0);
+        result.surprise = crate::state::sanitize::finite_or(surprise, 0.0).tanh();
 
         // Step 3: Update the generative model (delta rule).
         //
@@ -1556,13 +1566,15 @@ impl ActiveInferenceEngine {
         // pause) from destabilizing the model — the weights are
         // individually clamped to [-2, 2] anyway, but a huge step
         // wastes the gradient by saturating immediately.
-        // Use finite_clamp for the weight clamps: native clamp passes
-        // NaN through, which would permanently corrupt the matrix.
-        let effective_lr = crate::state::sanitize::finite_clamp(
-            MODEL_LEARNING_RATE * self.precision * dt_scale,
-            0.0,
-            MODEL_LEARNING_RATE * 10.0,
-        );
+        // A long tick must not let the gradient step run away: the
+        // effective rate saturates rationally — s(1+a)/(1+as) equals
+        // the linear rate at the nominal step and asymptotes at
+        // (1+a)/a × nominal, where a = 0.1 reproduces the old 10× cap
+        // as the asymptote rather than a wall.
+        let dt_s = dt_scale;
+        let lr_scale = dt_s * 1.1 / (1.0 + 0.1 * dt_s);
+        let effective_lr =
+            crate::state::sanitize::finite_or(MODEL_LEARNING_RATE * self.precision * lr_scale, 0.0);
         let action = self.last_action;
         //
         // Two defects in the naive rule made this model inert, and both
@@ -1737,41 +1749,36 @@ impl ActiveInferenceEngine {
         // the neurochemical tick-level circuit breaker, so a NaN here
         // would persist across ticks.
         // (dt_scale was computed above from the sanitized dt.)
-        let var_alpha =
-            crate::state::sanitize::finite_clamp(PRECISION_VAR_EMA_RATE * dt_scale, 0.0, 1.0);
-        self.surprise_var_ema = crate::state::sanitize::finite_clamp(
+        // The EMA coefficient for a continuous rate is 1 - exp(-rate·dt):
+        // it lies in (0, 1) for every step size, so the update stays a
+        // convex combination even after a long pause, with no clamp.
+        let var_alpha = 1.0 - (-PRECISION_VAR_EMA_RATE * dt_scale).exp();
+        self.surprise_var_ema = crate::state::sanitize::finite_or(
             self.surprise_var_ema * (1.0 - var_alpha) + surprise * surprise * var_alpha,
             0.0,
-            1.0,
         );
-        let precision_target = crate::state::sanitize::finite_clamp(
+        // 1/(1 + var/ref) is already in (0, 1); only non-finite input
+        // needs a fallback — neutral confidence.
+        let precision_target = crate::state::sanitize::finite_or(
             1.0 / (1.0 + self.surprise_var_ema / PRECISION_REFERENCE_VAR),
-            0.1,
-            1.0,
+            0.5,
         );
         if self.precision > precision_target {
             // Overconfident for the observed error variance — lose
             // confidence quickly. The step is capped at the target so
-            // the slew lands on it instead of overshooting: an
-            // uncapped step carries precision past a target that sits
-            // just under the 1.0 ceiling, which then re-triggers this
-            // branch every time the cap is touched — a period-4
-            // sawtooth parked at the ceiling rather than a settled
-            // confidence.
+            // the slew lands on it instead of overshooting.
             let step = (PRECISION_DECAY_RATE * dt_scale).min(0.1);
-            self.precision = crate::state::sanitize::finite_clamp(
+            self.precision = crate::state::sanitize::finite_or(
                 (self.precision - step).max(precision_target),
-                0.1,
-                1.0,
+                precision_target,
             );
         } else if self.precision < precision_target {
             // Underconfident — regain confidence slowly, landing on
             // the target rather than stepping past it.
             let step = (PRECISION_RECOVERY_RATE * dt_scale).min(0.1);
-            self.precision = crate::state::sanitize::finite_clamp(
+            self.precision = crate::state::sanitize::finite_or(
                 (self.precision + step).min(precision_target),
-                0.1,
-                1.0,
+                precision_target,
             );
         }
         result.precision = self.precision;
@@ -1783,14 +1790,11 @@ impl ActiveInferenceEngine {
         // exceed 1.0 and turning the EMA into wild extrapolation
         // (ema * (1-alpha) + val * alpha with alpha > 1 overshoots
         // past the new value instead of averaging toward it).
-        let surprise_alpha =
-            crate::state::sanitize::finite_clamp(SURPRISE_EMA_DECAY * dt_scale, 0.0, 1.0);
-        self.surprise_ema = self.surprise_ema * (1.0 - surprise_alpha) + surprise * surprise_alpha;
-        // Sanitize the EMA: a NaN here (from a future code change or
-        // corrupted state) would propagate into free_energy and
-        // allostatic load. finite_clamp returns 0.0 (the min) for NaN,
-        // meaning "no surprise" — a safe fallback.
-        self.surprise_ema = crate::state::sanitize::finite_clamp(self.surprise_ema, 0.0, 1.0);
+        let surprise_alpha = 1.0 - (-SURPRISE_EMA_DECAY * dt_scale).exp();
+        self.surprise_ema = crate::state::sanitize::finite_or(
+            self.surprise_ema * (1.0 - surprise_alpha) + surprise * surprise_alpha,
+            0.0,
+        );
         result.surprise = self.surprise_ema; // Report the EMA, not the instantaneous
 
         // Maturity error tracker: very slow EMA of the instantaneous
@@ -1799,12 +1803,10 @@ impl ActiveInferenceEngine {
         // through `exp(-err / MATURITY_ERROR_SCALE)`; it is serialized
         // (format v4) and reloaded, and the pre-v4 load path
         // reconstructs it by inverting that same mapping.
-        let mat_alpha =
-            crate::state::sanitize::finite_clamp(MATURITY_ERROR_EMA_RATE * dt_scale, 0.0, 1.0);
-        self.maturity_error_ema = crate::state::sanitize::finite_clamp(
+        let mat_alpha = 1.0 - (-MATURITY_ERROR_EMA_RATE * dt_scale).exp();
+        self.maturity_error_ema = crate::state::sanitize::finite_or(
             self.maturity_error_ema * (1.0 - mat_alpha) + surprise * mat_alpha,
             0.0,
-            1.0,
         );
 
         // Step 6: Update the variational posterior (Kalman filter) and
@@ -1916,11 +1918,11 @@ impl ActiveInferenceEngine {
                 .zip(self.belief_var.iter())
                 .map(|(weight, variance)| weight * weight * variance)
                 .sum::<f32>();
-            self.prior_var[i] = crate::state::sanitize::finite_clamp(
-                propagated_var + PROCESS_NOISE * dt_scale,
-                1e-8,
-                1.0,
-            );
+            // Posterior variance is a sum of squares — non-negative by
+            // construction. The Kalman gain prior/(prior+obs) is the
+            // saturating readout; no ceiling is imposed on the variance.
+            self.prior_var[i] =
+                crate::state::sanitize::finite_or(propagated_var + PROCESS_NOISE * dt_scale, 1e-8);
         }
 
         // Kalman update (per dimension, diagonal)
@@ -1928,13 +1930,11 @@ impl ActiveInferenceEngine {
             let prior_v = self.prior_var[i];
             let gain = prior_v / (prior_v + obs_var);
             let innovation = post[i] - predicted_belief[i];
-            self.belief_mean[i] = crate::state::sanitize::finite_clamp(
+            self.belief_mean[i] = crate::state::sanitize::finite_or(
                 predicted_belief[i] + gain * innovation,
-                0.0,
-                2.0,
+                predicted_belief[i],
             );
-            self.belief_var[i] =
-                crate::state::sanitize::finite_clamp((1.0 - gain) * prior_v, 1e-8, 1.0);
+            self.belief_var[i] = crate::state::sanitize::finite_or((1.0 - gain) * prior_v, 1e-8);
         }
 
         // Full Gaussian KL includes mean displacement and covariance change.
@@ -1969,11 +1969,8 @@ impl ActiveInferenceEngine {
         // A monotonic exponential maps per-dimension excess into [0, 1].
         let excess_free_energy =
             ((variational_free_energy_nats - predicted_nll_floor) / DIM as f32).max(0.0);
-        let free_energy = crate::state::sanitize::finite_clamp(
-            1.0 - (-excess_free_energy / KL_SCALE).exp(),
-            0.0,
-            1.0,
-        );
+        let free_energy =
+            crate::state::sanitize::finite_or(1.0 - (-excess_free_energy / KL_SCALE).exp(), 0.0);
         result.free_energy = free_energy;
         self.last_free_energy = free_energy;
 
@@ -1983,9 +1980,11 @@ impl ActiveInferenceEngine {
         // surprise). If surprise < expected_fe, the trend is downward.
         // Use dt_scale for time-invariance. Clamp alpha to [0, 1]
         // to prevent EMA extrapolation for large dt (see Step 5).
-        let fe_alpha = crate::state::sanitize::finite_clamp(EXPECTED_FE_DECAY * dt_scale, 0.0, 1.0);
-        self.expected_fe_ema = self.expected_fe_ema * (1.0 - fe_alpha) + free_energy * fe_alpha;
-        self.expected_fe_ema = crate::state::sanitize::finite_clamp(self.expected_fe_ema, 0.0, 1.0);
+        let fe_alpha = 1.0 - (-EXPECTED_FE_DECAY * dt_scale).exp();
+        self.expected_fe_ema = crate::state::sanitize::finite_or(
+            self.expected_fe_ema * (1.0 - fe_alpha) + free_energy * fe_alpha,
+            0.0,
+        );
         result.expected_free_energy = self.expected_fe_ema;
 
         // Step 8: Allostatic load — the price of adaptation.
@@ -2090,27 +2089,23 @@ impl ActiveInferenceEngine {
             let cort_elev = crate::state::neurochemical::cortisol_stress_fraction(post[cort]);
             let epi_elev = (post[epi] - epi_rest).max(0.0) / (1.0 - epi_rest);
             let nore_elev = (post[nore] - nore_rest).max(0.0) / (1.0 - nore_rest);
-            crate::state::sanitize::finite_clamp(
-                cort_elev * 2.0 + epi_elev + nore_elev * 0.5,
-                0.0,
-                1.0,
-            )
+            // Burden is a non-negative drive with no ceiling: the
+            // allostatic integrator it feeds saturates on its own.
+            crate::state::sanitize::finite_or(cort_elev * 2.0 + epi_elev + nore_elev * 0.5, 0.0)
         };
 
-        // Context amplifier, bounded to [1, CONTEXT_GAIN_MAX].
-        //
-        // Bounded on purpose: the amplifiers may increase the cost of
-        // stress that is already present, but must never manufacture
-        // burden from nothing. An unbounded term here would reintroduce
-        // exactly the failure measured above, where an unbounded
-        // demand signal could outscore real physiological wear.
+        // Context amplifier. Bounded on purpose: the amplifiers may
+        // increase the cost of stress that is already present, but must
+        // never manufacture burden from nothing — an unbounded term
+        // here would reintroduce exactly the failure measured above,
+        // where an unbounded demand signal could outscore real
+        // physiological wear.
         let context = 1.0
             + CONTEXT_GAIN_EXPECTED_FE
-                * crate::state::sanitize::finite_clamp(self.expected_fe_ema, 0.0, 1.0)
-            + CONTEXT_GAIN_SURPRISE
-                * crate::state::sanitize::finite_clamp(self.surprise_ema, 0.0, 1.0);
+                * crate::state::sanitize::finite_or(self.expected_fe_ema, 0.0)
+            + CONTEXT_GAIN_SURPRISE * crate::state::sanitize::finite_or(self.surprise_ema, 0.0);
         let context = context.min(CONTEXT_GAIN_MAX);
-        burden = crate::state::sanitize::finite_clamp(burden * context, 0.0, 1.0);
+        burden = crate::state::sanitize::finite_or(burden * context, 0.0);
 
         self.rest_baseline.update(burden, dt_scale);
         self.allostasis_load = integrate_allostasis(
@@ -2420,7 +2415,7 @@ impl ActiveInferenceEngine {
                 .zip(self.belief_var.iter())
                 .map(|(weight, variance)| weight * weight * variance)
                 .sum::<f32>();
-            crate::state::sanitize::finite_clamp(propagated + PROCESS_NOISE * dt_scale, 1e-8, 1.0)
+            crate::state::sanitize::finite_or(propagated + PROCESS_NOISE * dt_scale, 1e-8)
         })
     }
 
@@ -2589,9 +2584,11 @@ impl ActiveInferenceEngine {
             // uniform. The inference loop was inert in exactly the
             // regime it exists to run in. A wide symmetric bound
             // rejects non-finite values while preserving order.
-            let efe = crate::state::sanitize::finite_clamp(
+            // A non-finite score is rejected to the worst rank rather
+            // than clamped into the ordering — clamping a real EFE
+            // would destroy the argmin/softmax information it carries.
+            let efe = crate::state::sanitize::finite_or(
                 expected_surprise - epistemic_value,
-                -EFE_SCORE_LIMIT,
                 EFE_SCORE_LIMIT,
             );
 
@@ -2757,26 +2754,27 @@ impl ActiveInferenceEngine {
         // small value — a single-dimension 0.3 excursion is an RMS of
         // only ~0.07. A linear `1 - err` would read ~0.93 "fit" for a
         // failing model and barely separate good from bad.
-        let predictive_fit = crate::state::sanitize::finite_clamp(
+        // exp(-err/scale) already lies in (0, 1] — the exponential is
+        // the saturation; only non-finite input needs a fallback.
+        let predictive_fit = crate::state::sanitize::finite_or(
             (-self.maturity_error_ema / MATURITY_ERROR_SCALE).exp(),
             0.0,
-            1.0,
         );
 
         // A concentrated posterior is stronger evidence than one with
-        // large residual uncertainty.
+        // large residual uncertainty. Certainty decays exponentially
+        // with mean variance — bounded in (0, 1] by construction.
         let mean_belief_var = self.belief_var.iter().copied().sum::<f32>() / DIM as f32;
-        let posterior_certainty = crate::state::sanitize::finite_clamp(
-            1.0 - (mean_belief_var / MAX_BELIEF_VAR),
-            0.0,
-            1.0,
-        );
+        let posterior_certainty =
+            crate::state::sanitize::finite_or((-mean_belief_var / MAX_BELIEF_VAR).exp(), 0.0);
 
         // Uncertainty should temper, not erase, evidence of predictive
         // competence. Full maturity requires both good prediction and
-        // a sufficiently concentrated posterior.
+        // a sufficiently concentrated posterior. The product of two
+        // quantities each in (0, 1] is itself in (0, 1] — bounded by
+        // the math, not by a clamp.
         let quality = predictive_fit * (0.5 + 0.5 * posterior_certainty);
-        self.model_maturity = crate::state::sanitize::finite_clamp(quality, 0.0, 1.0);
+        self.model_maturity = crate::state::sanitize::finite_or(quality, 0.0);
     }
 
     /// Get the current inference signals for writing to the core state.
@@ -2974,8 +2972,12 @@ impl ActiveInferenceEngine {
     }
 
     fn adapt_preference(&mut self, levels: &[f32; DIM], dt_scale: f32) {
-        let adapt = PREFERENCE_ADAPT_RATE * dt_scale;
-        let restore = PREFERENCE_RESTORE_RATE * dt_scale;
+        // Continuous-rate coefficients: 1 - exp(-rate·dt) stays in
+        // (0, 1) for every step size, so neither channel can
+        // extrapolate. Preferences flow with the levels she actually
+        // experiences — no rail; a corrupted update settles to seed.
+        let adapt = 1.0 - (-PREFERENCE_ADAPT_RATE * dt_scale).exp();
+        let restore = 1.0 - (-PREFERENCE_RESTORE_RATE * dt_scale).exp();
         let seed = genetic_preference_seed();
         for i in 0..DIM {
             let id = crate::state::neurochemical::NeurochemicalId::from_u8(i as u8);
@@ -2987,12 +2989,11 @@ impl ActiveInferenceEngine {
             ) {
                 continue;
             }
-            let level = crate::state::sanitize::finite_clamp(levels[i], 0.0, 2.0);
+            let level = crate::state::sanitize::finite_or(levels[i], 0.0);
             let current = self.preferred[i];
-            self.preferred[i] = crate::state::sanitize::finite_clamp(
+            self.preferred[i] = crate::state::sanitize::finite_or(
                 current + (level - current) * adapt + (seed[i] - current) * restore,
-                0.05,
-                0.95,
+                seed[i],
             );
         }
     }
@@ -3400,11 +3401,8 @@ impl ActiveInferenceEngine {
                 .zip(self.belief_var.iter())
                 .map(|(weight, variance)| weight * weight * variance)
                 .sum::<f32>();
-            self.prior_var[i] = crate::state::sanitize::finite_clamp(
-                propagated_var + PROCESS_NOISE * dt_scale,
-                1e-8,
-                1.0,
-            );
+            self.prior_var[i] =
+                crate::state::sanitize::finite_or(propagated_var + PROCESS_NOISE * dt_scale, 1e-8);
         }
     }
 
@@ -4395,15 +4393,18 @@ mod tests {
             "precision should load clamped: {}",
             loaded.test_precision()
         );
-        // One perfect tick: derived variance implies target 0.1, so
-        // precision must not jump; derived maturity error implies
-        // maturity ~0, so it must not jump either.
+        // One tick: the derived variance tracker implies a precision
+        // target below the loaded 0.1, so precision slews toward it —
+        // it may fall under the old 0.1 floor because the target is a
+        // rational isotherm with no rail. What must hold is that the
+        // trackers kept integrating (no reset to the 0.5 default) and
+        // maturity stayed near zero.
         let rest = [0.5f32; DIM];
         loaded.cycle(&rest, &rest, 1.0, &rest);
+        let p = loaded.test_precision();
         assert!(
-            (loaded.test_precision() - 0.1).abs() < 1e-6,
-            "derived trackers must be self-consistent: precision {}",
-            loaded.test_precision()
+            p > 0.0 && p < 0.5,
+            "precision should keep tracking, not reset: {p}"
         );
         assert!(
             loaded.model_maturity() < 0.01,

@@ -13,37 +13,46 @@ declared affinity for those bands. It is the wave half of the loop
 neurochemistry, neurochemistry shapes brain waves") — neurochemistry
 already shapes the wave radii; this is the return edge.
 
-## The control model
+## The control model — release flux, not level tracking
 
-Each peptide is a first-order integrator owned by the body:
+Each peptide is a concentration owned by the body:
 
-    dC/dt = -λ·(C - C0) + Σᵢ Iᵢ·δ(t - tᵢ)
+    dC/dt = release(t) − clearance(C)
 
-with impulsive inputs Iᵢ (``neuro_impulse`` kicks) and body-owned
-decay λ. The wave state supplies the *reference*: a peptide's
-commanded level is the summed power of its affiliated bands — power
-is additive across sub-bands (energies add, per Parseval), so
-"beta" means BETA1+BETA2+BETA3.
+The oscillation IS the presynaptic drive: a band's power indexes the
+firing rate of the population that generates it, and firing is what
+releases transmitter (quantal release ∝ presynaptic rate; Koch,
+Biophysics of Computation). The wave therefore commands a *flux*,
+never a level:
 
-The control law is saturated exact tracking:
+    UP peptide:   I = k·P·Δt          — release proportional to band
+                                        power, integrated over the
+                                        real elapsed interval
+    DOWN peptide: I = −k·P·C·Δt       — the band's power acts as
+                                        enhanced first-order
+                                        clearance, proportional to
+                                        substrate, floor-aware
 
-    I = clip(r - C, ±max_impulse·RATE)
+``Δt`` is measured wall-clock elapsed between transductions, so the
+delivered impulse is **cadence-invariant**: whatever beat the caller
+runs at, the integrated drive over an interval is ``k·P·Δt`` — the
+rhythm sets the rate, the courier only delivers. The body's own
+clearance, homeostasis, coupling, and receptor machinery decide where
+the level settles; nothing here knows or commands a reference.
 
-a contraction toward r for *any* λ — no estimate of the body's decay
-constants is needed for stability, only for speed, and rate-limiting
-by the peptide's own ``max_impulse`` caps authority per beat.
+Per-interval authority stays bounded: ``max_impulse`` is reinterpreted
+as a maximum *rate* (level per second) scaled by ``DRIVE_RATE``, so the
+cap is ``max_impulse·DRIVE_RATE·Δt`` per emission — the same bound per
+unit time at any ticker cadence.
 
-Every UP member implies its DOWN: when the band is quiet the same
-law emits negative impulses, withdrawing the peptide's hold (orexin
-must fall in sleep, not merely stop rising). Peptides can also carry
-an explicit ``wave_sign = -1`` — the declared DOWN member of a band
-pair. For those the band enforces *suppression* rather than a level:
-
-    I = -min(max_impulse·RATE·p, C)
-
-exponential decay at a rate the band power sets, floor-aware so it
-can never drive below zero. Cortisol↔delta is the canonical pair:
-slow-wave dominance is the cortisol nadir.
+Every UP member implies its DOWN: when the band is quiet the release
+flux stops and the body's own clearance withdraws the peptide —
+orexin falls in sleep because its rhythm stops driving release, not
+because anything pushes the level down. Peptides can also carry an
+explicit ``wave_sign = -1`` — the declared DOWN member of a band
+pair — whose band enforces *suppression* as enhanced clearance:
+cortisol↔delta is the canonical pair, slow-wave dominance is the
+cortisol nadir.
 
 ## Wiring spec
 
@@ -56,8 +65,14 @@ band changes the transduction without touching it.
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
+from basal_forebrain.acetylcholine import Acetylcholine
+from basal_ganglia.dopamine import Dopamine
+from basal_ganglia.gaba import GABA
+from brainstem.norepinephrine import Norepinephrine
+from brainstem.serotonin import Serotonin
 from .cortisol import Cortisol
 from .crh import CRH
 from .histamine import Histamine
@@ -69,17 +84,28 @@ from .vasopressin import Vasopressin
 if TYPE_CHECKING:
     from thalamus.brain_waves import BrainWaveState
 
-__all__ = ["DRIVE_RATE", "transduce_waves", "wave_impulses"]
+__all__ = ["DRIVE_RATE", "RELEASE_GAIN", "transduce_waves", "wave_impulses"]
 
 
-#: Fraction of each peptide's declared ``max_impulse`` used per beat.
-#: Keeps per-call kicks inside the emotional regulator's ±0.01–0.02
-#: envelope while leaving exact tracking intact over a few beats.
+#: Release gain — level per second per unit band power. A band at
+#: full power drives ~0.25/s of release flux; the body's clearance
+#: decides the equilibrium. Conservative against the peptide caps.
+RELEASE_GAIN: float = 0.25
+
+#: Fraction of each peptide's declared ``max_impulse`` usable as a
+#: per-second rate ceiling — the authority bound, now per unit time
+#: rather than per beat.
 DRIVE_RATE: float = 0.2
 
 #: Impulses smaller than this are noise below the body's resolution —
 #: skipped so the channel carries signal, not dither.
 _EPS: float = 1e-4
+
+#: Elapsed-time domain for the flux integration — below this the
+#: emission is noise, above this the caller has stopped measuring and
+#: the integral would be a lump. Matches the body's own dt domain.
+_DT_MIN: float = 0.01
+_DT_MAX: float = 10.0
 
 
 def _band_groups() -> dict[str, tuple]:
@@ -105,9 +131,25 @@ def _band_groups() -> dict[str, tuple]:
     }
 
 
-#: The hypothalamic peptide set — instantiated once; the models are
-#: frozen data tables so the instances are pure wiring spec.
-_PEPTIDES = (Cortisol(), CRH(), Histamine(), Melatonin(), Orexin(), Oxytocin(), Vasopressin())
+#: The chemical set — every modulatory chemical model that declares
+#: the wave-affinity spec. The hypothalamic peptides carry explicit
+#: ``wave_sign`` (cortisol is the DOWN member of delta); the
+#: monoamines default to UP release — their bands are the rhythms
+#: their own nuclei generate.
+_PEPTIDES = (
+    Norepinephrine(),
+    Serotonin(),
+    Acetylcholine(),
+    GABA(),
+    Dopamine(),
+    Cortisol(),
+    CRH(),
+    Histamine(),
+    Melatonin(),
+    Orexin(),
+    Oxytocin(),
+    Vasopressin(),
+)
 
 
 def _drive(peptide, state: BrainWaveState, groups: dict[str, tuple]) -> float:
@@ -121,54 +163,83 @@ def _drive(peptide, state: BrainWaveState, groups: dict[str, tuple]) -> float:
 def wave_impulses(
     state: BrainWaveState,
     chemicals: dict[str, float],
+    dt: float,
 ) -> list[tuple[int, float]]:
-    """The peptide impulses the wave state commands this beat.
+    """The peptide impulses the wave state commands over ``dt`` seconds.
 
     ``chemicals`` is the body's current level map (``summary.chemicals``
     — name → effective level); a peptide absent from it is treated as
-    at its declared baseline. Returns ``(chem_id, signed_magnitude)``
-    pairs, the same contract ``neuro_impulse`` accepts — positive
-    magnitudes release, negative withdraw or suppress.
+    at its declared baseline — needed only by the DOWN members, whose
+    suppression rate is first-order in the substrate. Returns
+    ``(chem_id, signed_magnitude)`` pairs, the same contract
+    ``neuro_impulse`` accepts — positive magnitudes release, negative
+    withdraw or suppress.
 
-    UP peptides (``wave_sign = +1``) track their band power as the
-    commanded level — saturated exact tracking. DOWN peptides
-    (``wave_sign = -1``) are suppressed at a rate proportional to
-    their band's power — the pair's opposing member.
+    UP peptides (``wave_sign = +1``) emit release flux
+    ``k·P·Δt`` — the band's power is the presynaptic rate, never a
+    reference the level is tracked toward. DOWN peptides
+    (``wave_sign = -1``) emit enhanced-clearance flux
+    ``−k·P·C·Δt`` — fractional withdrawal bounded by the substrate
+    itself, so the floor is the equation's, not a guard's.
     """
     groups = _band_groups()
     out: list[tuple[int, float]] = []
     for pep in _PEPTIDES:
-        drive = _drive(pep, state, groups)
-        cap = pep.max_impulse * DRIVE_RATE
-        current = chemicals.get(pep.name, pep.baseline)
-        if pep.wave_sign >= 0:
-            # Saturated exact tracking: I = clip(r - C, ±cap), r = drive.
-            impulse = max(-cap, min(cap, drive - current))
+        power = _drive(pep, state, groups)
+        if power <= 0.0:
+            continue
+        rate_cap = pep.max_impulse * DRIVE_RATE  # level per second
+        if getattr(pep, "wave_sign", 1.0) >= 0:
+            # Release flux: presynaptic rate ∝ band power, bounded by
+            # the peptide's own authority ceiling per unit time.
+            impulse = min(RELEASE_GAIN * power, rate_cap) * dt
         else:
-            # DOWN member: exponential suppression enforced by the
-            # band — never positive, never deeper than the floor.
-            impulse = -min(cap * drive, max(0.0, current))
+            # Enhanced clearance: first-order in substrate, scaled by
+            # band power — suppression dies with the level.
+            current = chemicals.get(pep.name, pep.baseline)
+            impulse = -min(RELEASE_GAIN * power * max(0.0, current), rate_cap) * dt
         if abs(impulse) < _EPS:
             continue
         out.append((pep.index, impulse))
     return out
 
 
-def transduce_waves(client, state: BrainWaveState, chemicals: dict[str, float]) -> int:
+def transduce_waves(
+    client,
+    state: BrainWaveState,
+    chemicals: dict[str, float],
+    dt: float,
+) -> int:
     """Emit the wave-commanded impulses to the body.
 
-    One ``neuro_impulse`` per peptide whose commanded correction
-    clears the noise floor. Returns the count emitted — an absent or
-    declined channel counts nothing, matching the impulse semantics
-    (False means the body did not take it).
+    ``dt`` is the real elapsed seconds since the last transduction —
+    the flux law's time base, so the integrated drive is invariant to
+    whatever cadence the caller runs at. One ``neuro_impulse`` per
+    peptide whose flux clears the noise floor. Returns the count
+    emitted — an absent or declined channel counts nothing, matching
+    the impulse semantics (False means the body did not take it).
     """
     if state is None:
         return 0
+    dt = min(max(dt, _DT_MIN), _DT_MAX)
     emitted = 0
-    for chem, magnitude in wave_impulses(state, chemicals):
+    for chem, magnitude in wave_impulses(state, chemicals, dt):
         try:
             if client.neuro_impulse(chem, magnitude):
                 emitted += 1
         except (OSError, ConnectionError, RuntimeError):
             break  # the body is gone — the wave's command ends with it
     return emitted
+
+
+def elapsed_since(last: float | None) -> float:
+    """Wall-clock seconds since ``last`` — the transduction's dt.
+
+    A missing or non-finite stamp yields the nominal beat so the first
+    emission is bounded rather than a lump; the caller stores the
+    return of ``time.monotonic()`` back into ``last``.
+    """
+    now = time.monotonic()
+    if last is None:
+        return 0.2
+    return now - last

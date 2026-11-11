@@ -1630,9 +1630,13 @@ pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
     // GABA→HIST (-0.10): inhibition of histaminergic tuberomammillary
     //   nucleus.
     // MEL→HIST (-0.10): sleep suppression of wake center.
+    // ADN→HIST (-0.02): A1-receptor inhibition of tuberomammillary
+    //   neurons — the cellular arm of Process S. Sleep pressure does
+    //   not merely accumulate; it silences the wake center through
+    //   the same adenosine that gates the VLPO.
     // Arousal mutual excitation (NE, OX) kept weak (0.10).
     [
-        0.10, -0.10, 0.10, 0.10, -0.10, 0.10, 0.00, 0.00, -0.10, 0.00, 0.00, 0.00, 0.00, 0.00,
+        0.10, -0.10, 0.10, 0.10, -0.10, 0.10, 0.00, 0.00, -0.10, 0.00, -0.02, 0.00, 0.00, 0.00,
         0.00, 0.10, 0.00, -0.10,
     ],
     // ADN →  how others affect adenosine
@@ -3115,17 +3119,16 @@ impl NeurochemicalVector {
             params.expected_uncertainty,
         );
 
-        // Brainstem set-points: when the sleep-wake network is present,
-        // the populations that release these modulators own their
-        // operating point. The target replaces the chemical's
-        // homeostatic baseline for this step, so the generic kinetics —
-        // homeostatic pull, coupling, autoreceptors, the chemical's own
-        // clearance terms, impulse momentum — all still apply. The
-        // nucleus sets where the chemical settles; the chemistry owns
-        // how it gets there and what else moves it. An impulse lands
-        // as a phasic event on top of the tonic drive and decays
-        // through the chemical's own clearance, the way a transmitter
-        // bolus does, instead of being overwritten by a level write.
+        // Brainstem release drives: when the sleep-wake network is
+        // present, the four flip-flop nuclei — VLPO, LC, dorsal raphe,
+        // basal forebrain — release onto the chemical each one
+        // synthesizes. The population firing enters as a sustained
+        // force on that chemical's own kinetics — homeostatic pull,
+        // coupling, autoreceptors, the chemical's own clearance
+        // terms, and impulse momentum all still apply, and the level
+        // is whatever the balance produces. Histamine and orexin are
+        // NOT driven here: their wake/sleep profiles emerge through
+        // the coupling web like every other chemical's.
         //
         // Acetylcholine is high in waking and in REM and lowest in NREM:
         // basal forebrain microdialysis gives 0.34 pmol/10 min in NREM,
@@ -3140,20 +3143,66 @@ impl NeurochemicalVector {
         // Crochet, 2001). Its target tracks LC and is suppressed by
         // the REM-on population: steady states 0.39 waking, 0.22 NREM,
         // 0.07 REM.
-        let mut network_setpoints = circadian_baselines;
+        // The flip-flop nuclei do not write operating points — they
+        // release. Each population's firing is a sustained release
+        // drive on the chemical its nucleus synthesizes: a constant
+        // force added to that chemical's dynamics. The level then
+        // settles where the drive balances the chemical's own
+        // homeostatic clearance and coupling — an equilibrium the
+        // equations produce, not a value the network assigns.
+        //
+        // The drive magnitude is derived, not fitted: a constant
+        // force R shifts the spring equilibrium by R/(hr·nlf), so
+        // R = hr·nlf·(T−B) lands the equilibrium at T — the same
+        // calibrated stage profile the old set-point produced —
+        // while nlf is the autoreceptor factor evaluated at the
+        // known |B−T|, keeping the balance exact under the
+        // quadratic self-inhibition.
+        let mut network_force = [0.0f32; NEUROCHEMICAL_COUNT];
+        // The operating point a driven chemical settles around —
+        // baseline plus the release drive's equilibrium offset. This
+        // is the reference for "excess" terms (enzymatic degradation,
+        // noise taper): tonic population release is not excess. The
+        // homeostatic spring itself still centers on the chemical's
+        // own baseline — the drive is a force, not a set-point.
+        let mut operating_baselines = circadian_baselines;
         if let Some(net) = params.network_levels {
             let (lc, vlpo, rem) = (net.lc, net.vlpo, net.rem);
             let adn_raw = self.chemicals[NeurochemicalId::Adenosine as usize].level;
-            network_setpoints[NeurochemicalId::Acetylcholine as usize] =
-                basal_forebrain::release_target(lc, rem, adn_raw, params.expected_uncertainty);
-            network_setpoints[NeurochemicalId::Serotonin as usize] =
-                SRT_BASE + SRT_FROM_LC * lc - SRT_FROM_REM * rem;
-            network_setpoints[NeurochemicalId::Norepinephrine as usize] =
-                NE_FROM_LC * lc - NE_FROM_REM * rem;
-            network_setpoints[NeurochemicalId::GABA as usize] =
-                GABA_BASE + GABA_FROM_VLPO * vlpo * (1.0 - rem) - GABA_FROM_REM * rem;
-            network_setpoints[NeurochemicalId::Histamine as usize] = HIST_FROM_LC * lc;
-            network_setpoints[NeurochemicalId::Orexin as usize] = OX_FROM_LC * lc;
+            let targets = [
+                (
+                    NeurochemicalId::Acetylcholine as usize,
+                    basal_forebrain::release_target(lc, rem, adn_raw, params.expected_uncertainty),
+                ),
+                (
+                    NeurochemicalId::Serotonin as usize,
+                    SRT_BASE + SRT_FROM_LC * lc - SRT_FROM_REM * rem,
+                ),
+                (
+                    NeurochemicalId::Norepinephrine as usize,
+                    NE_FROM_LC * lc - NE_FROM_REM * rem,
+                ),
+                (
+                    NeurochemicalId::GABA as usize,
+                    GABA_BASE + GABA_FROM_VLPO * vlpo * (1.0 - rem) - GABA_FROM_REM * rem,
+                ),
+            ];
+            for (i, target) in targets {
+                let baseline = circadian_baselines[i];
+                let dev = (baseline - target).abs();
+                let excess = (dev - AUTORECEPTOR_THRESHOLD).max(0.0);
+                let nlf = 1.0 + AUTORECEPTOR_GAIN * excess * excess;
+                network_force[i] = params.homeostatic_rate * nlf * (target - baseline);
+                operating_baselines[i] =
+                    baseline + network_force[i] / (params.homeostatic_rate * nlf);
+            }
+            // Histamine and orexin get NO drive: their wake/sleep
+            // profiles must emerge through the coupling web —
+            // histamine from NE/ACh excitation and GABA/MEL
+            // inhibition, orexin from the same inhibitory sleep
+            // drive plus its own α2-adrenoceptor feedback. A
+            // nucleus releases onto the web; it does not write
+            // its neighbors' operating points.
         }
 
         // Recompute derived fields so the coupling snapshot reflects the
@@ -3294,12 +3343,13 @@ impl NeurochemicalVector {
                 self.chemicals[i].velocity = 0.0;
                 continue;
             }
-            // The homeostatic baseline is the chemical's operating
-            // point for this step: the circadian-modulated adapted
-            // baseline for most chemicals, and the sleep-wake
-            // network's release target for the six modulators its
-            // populations drive (see `network_setpoints` above).
-            let homeostatic_baseline = network_setpoints[i];
+            // The homeostatic baseline is always the chemical's own
+            // adapted, circadian-modulated operating point. The
+            // sleep-wake network contributes release force instead
+            // (see `network_force` above) — populations drive rates,
+            // never levels.
+            let homeostatic_baseline = circadian_baselines[i];
+            let operating_baseline = operating_baselines[i];
             let homeostatic_force = if is_melatonin {
                 0.0
             } else if is_stress_hormone {
@@ -3541,7 +3591,7 @@ impl NeurochemicalVector {
                 let hash = neuro_noise_hash(params.noise_seed, i as u64);
                 let r01 = (hash as f32) / (u32::MAX as f32); // [0, 1)
                 let r11 = r01 * 2.0 - 1.0; // [-1, 1)
-                let deviation = (self.chemicals[i].level - homeostatic_baseline).abs();
+                let deviation = (self.chemicals[i].level - operating_baseline).abs();
                 // Smooth proximity taper: exp(−2·|dev|) is 1 at the
                 // set-point and decays asymptotically — never negative,
                 // so no positive-part gate is needed.
@@ -3610,7 +3660,8 @@ impl NeurochemicalVector {
                 continue;
             }
 
-            self.chemicals[i].velocity += (homeostatic_force + coupling_force) * dt + noise;
+            self.chemicals[i].velocity +=
+                (homeostatic_force + coupling_force + network_force[i]) * dt + noise;
             self.chemicals[i].velocity *= damping.powf(dt_scale);
             // The level update is the positivity-preserving integrator:
             // a positive flux is release (molecules added); a negative
@@ -3644,7 +3695,7 @@ impl NeurochemicalVector {
             // (the biological intent) while the homeostatic force can
             // maintain ACh near baseline at rest.
             if i == NeurochemicalId::Acetylcholine as usize {
-                let ach_excess = (self.chemicals[i].level - homeostatic_baseline).max(0.0);
+                let ach_excess = (self.chemicals[i].level - operating_baseline).max(0.0);
                 let decay_factor = (1.0_f32 - ACH_DEGRADATION_RATE).powf(dt_scale);
                 self.chemicals[i].level =
                     flow_level(self.chemicals[i].level, -ach_excess * (1.0 - decay_factor));
@@ -4184,6 +4235,40 @@ impl NeurochemicalVector {
             chem.vesicular_pool += (1.0 - chem.vesicular_pool) * alpha;
         }
 
+        // VLPO GABAergic inhibition of the wake-active monoamines.
+        //
+        // The tuberomammillary histamine neurons and lateral
+        // hypothalamic orexin neurons are NOT sleep-wake network
+        // populations — they are their *targets*. The VLPO's GABAergic
+        // projection onto them is a synaptic input, not a set-point:
+        // GABA release onto TMN/LH neurons is inhibitory clearance —
+        // removal proportional to the presynaptic population's
+        // activity, integrated as first-order decay so it dies with
+        // the substrate and can never push a level below zero. In
+        // waking the VLPO is nearly silent, the clearance is
+        // negligible, and each chemical's own homeostatic pull holds
+        // it near its genetic baseline. In NREM and REM the VLPO
+        // fires strongly and the two arousal chemicals drain toward
+        // silence through their own kinetics — the level is where
+        // release meets inhibition, never assigned.
+        //
+        // (Saper et al., Neuron 2005; Scammell et al., Neuron 2004 —
+        // VLPO GABA/galanin → TMN and LH inhibition is the sleep
+        // switch's output arm.)
+        if let Some(net) = params.network_levels {
+            // GABA release is coincidence-gated by the population's
+            // firing: a near-silent VLPO (wake, ~0.02) releases
+            // essentially nothing, while the sleep-active VLPO
+            // (~0.8–0.9) drives strong clearance. Quadratic in the
+            // population level — the same threshold nonlinearity as
+            // vesicular release probability.
+            let inhibition = VLPO_GABA_INHIBIT * net.vlpo * net.vlpo;
+            for &id in &[NeurochemicalId::Histamine, NeurochemicalId::Orexin] {
+                let idx = id as usize;
+                self.chemicals[idx].level *= (-inhibition * dt).exp();
+            }
+        }
+
         // Narcolepsy modeling: when orexin is very low (<0.10), the
         // sleep-wake flip-flop becomes unstable — the system can
         // suddenly transition to sleep without sufficient adenosine
@@ -4719,16 +4804,23 @@ pub const NE_FROM_REM: f32 = 0.0425;
 /// GABA is released by VLPO in NREM and falls in REM even though VLPO is
 /// active then: the GABA-to-ACh ratio drops 68% in REM, always through GABA
 /// (SLEEP 2012). The REM term is the data, not the VLPO population.
-pub const GABA_BASE: f32 = 0.4631;
-pub const GABA_FROM_VLPO: f32 = 0.4617;
-pub const GABA_FROM_REM: f32 = 0.1896;
-/// Histamine (tuberomammillary nucleus) and orexin (lateral hypothalamus) are
-/// wake-active and silent in sleep (Saper et al. 2001; Mileykovskiy et al.
-/// 2005). Both follow LC, anchored to their waking baselines of 0.30 at the
-/// waking LC level of 0.963 (see tests/network_calibration.rs).
-pub const HIST_FROM_LC: f32 = 0.3115;
-pub const OX_FROM_LC: f32 = 0.3115;
+pub const GABA_BASE: f32 = 0.5250;
+pub const GABA_FROM_VLPO: f32 = 0.3977;
+pub const GABA_FROM_REM: f32 = 0.2146;
+/// First-order clearance rate (per second) applied to histamine and
+/// orexin by the VLPO's GABAergic projection, quadratic in VLPO
+/// activity. At the measured NREM VLPO level (~0.77) the drive is
+/// ~0.36/s — strong enough to drain the wake-active monoamines
+/// toward silence against their homeostatic pull — while the waking
+/// VLPO (~0.02) contributes ~0.0003/s, leaving the genetic baseline
+/// in charge.
+pub const VLPO_GABA_INHIBIT: f32 = 0.6;
 
+/// Histamine and orexin levels are NOT set by the sleep-wake network.
+/// Their wake-active/silent-in-sleep profiles emerge through the
+/// coupling web (HIST row: NE/ACh excitation, GABA/MEL inhibition; OX
+/// row: the same inhibitory sleep drive plus α2-adrenoceptor feedback)
+/// balanced against their own homeostatic baselines.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct NeuroTickParams {

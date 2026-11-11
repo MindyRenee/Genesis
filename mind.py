@@ -87,7 +87,7 @@ if TYPE_CHECKING:
 from basal_ganglia.volition import VolitionMixin
 from brainstem.heart import Heart
 from brainstem.lifecycle import LifecycleMixin
-from brainstem.metronome import MetronomeMixin
+from brainstem.cycle import CycleMixin
 from frontal_lobe.projects import ProjectsMixin
 from frontal_lobe.status import StatusMixin
 from self.man_review import ManReviewMixin
@@ -104,7 +104,7 @@ logger = logging.getLogger(__name__)
 
 class Mind(
     LifecycleMixin,
-    MetronomeMixin,
+    CycleMixin,
     VolitionMixin,
     SleepMixin,
     ProjectsMixin,

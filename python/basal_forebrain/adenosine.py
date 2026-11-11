@@ -248,7 +248,7 @@ One-way rule:
     episode staged N1).
 
 Python modules that send adenosine impulses:
-    - brainstem/metronome.py: metabolic work load (positive)
+    - brainstem/cycle.py: metabolic work load (positive)
 
 Python modules that read adenosine:
     - emotion.py: maps to EmotionalState (drowsiness)
