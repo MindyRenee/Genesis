@@ -367,43 +367,14 @@ def test_allowlist_entries_exist() -> None:
         assert found, f"allowlist entry {module} points at nothing"
 
 
-def test_volition_workers_run_below_foreground_priority() -> None:
-    """Urge worker threads renice themselves before acting.
+def test_volition_has_no_worker_dispatch() -> None:
+    """Volition acts are cycle-owned episodes — no worker wrapper exists.
 
-    The kernel-level half of foreground arbitration: a bug scan that
-    started before the user typed keeps losing scheduler/GIL handoffs
-    to think() instead of timing it out at 15 s.
+    Urges crystallize into executive intentions and each arbitration
+    win runs one bounded episode on the cycle itself, so there is no
+    detached ``volition-*`` thread to renice, join, or drop mid-act.
     """
-    import sys
-    from unittest.mock import MagicMock, patch
-
     import basal_ganglia.volition as vol
 
-    if not sys.platform.startswith("linux"):
-        pytest.skip("per-thread nice is linux-only")
-
-    with patch.object(vol.os, "setpriority") as sp:
-        vol._lower_thread_priority()
-        sp.assert_called_once()
-        assert sp.call_args[0][2] == vol._VOLITION_NICE
-
-    # Wrapped actions carry the priority — the renice runs inside the
-    # worker thread, not on the dispatcher.
-    seen = {}
-
-    def probe():
-        seen["nice"] = vol.os.getpriority(vol.os.PRIO_PROCESS, 0)
-
-    holder = MagicMock()
-    import threading
-
-    holder._volition_lock = threading.Lock()
-    holder._volition_active = {"probe"}
-    holder._volition_sem = threading.Semaphore(1)
-    holder._volition_sem.acquire()
-    # The wrapper drops work when the mind is suppressed or stopping —
-    # this probe must still run, so the holder reads as live.
-    holder._suppress_volition = False
-    holder._running = True
-    vol.VolitionMixin._run_volition_action(holder, "probe", probe)
-    assert seen["nice"] >= vol._VOLITION_NICE - 1
+    assert not hasattr(vol.VolitionMixin, "_run_volition_action")
+    assert not hasattr(vol.VolitionMixin, "_act_on_volition")

@@ -136,6 +136,32 @@ class ProposalsMixin:
             )
         return outcomes
 
+    def begin_proposal_experiment(self, proposal):
+        """Begin a proposal's verified experiment without blocking.
+
+        Returns a pollable handle dict while the verify gate runs as a
+        child process, or an ExperimentRecord when the experiment
+        resolves before the gate launches (guards, stale snippet,
+        compile failure). Poll with :meth:`poll_proposal_experiment`.
+        """
+        try:
+            return self.heuristic_experiment.begin_experiment(
+                file_path=proposal.file_path,
+                original_code=proposal.original_code,
+                proposed_code=proposal.proposed_code,
+                description=proposal.description,
+                line_hint=proposal.line_hint,
+            )
+        except Exception as e:
+            logger.warning(
+                f"heuristic experiment for proposal #{proposal.id} failed: {e}"
+            )
+            raise
+
+    def poll_proposal_experiment(self, handle):
+        """One poll of a running proposal experiment's verify gate."""
+        return self.heuristic_experiment.poll_experiment(handle)
+
     def _run_proposal_experiment(self, proposal: Proposal) -> dict[str, Any]:
         """Apply a proposal's edit to the live tree and verify it.
 

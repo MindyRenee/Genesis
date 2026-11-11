@@ -141,14 +141,6 @@ class LifecycleMixin:
     # listed joins with the default timeout.
     _SUBSYSTEM_STOP_TIMEOUTS: ClassVar[dict[str, float]] = {"InnerLife": 45.0}
 
-    # Budget for in-flight volition actions to finish once suppression
-    # and the abort hooks have made just-admitted work return early.
-    # What remains (a compile+test, a paint, a tool call) can't be
-    # checkpointed mid-call, so it gets a bounded window to wrap —
-    # beyond it the stores close anyway and the worker's late writes
-    # land on closed files. The old 5 s drained nothing real.
-    _VOLITION_DRAIN_TIMEOUT_S: ClassVar[float] = 30.0
-
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see mind.py).
@@ -1024,38 +1016,18 @@ class LifecycleMixin:
         return clean
 
     def _drain_shutdown_workers(self) -> bool:
-        """Wait out the tracked workers — volition bids, the
-        sleep-stage worker, and any in-flight think — before the state
-        save and archive close.
+        """Wait out the in-flight think worker before the state save
+        and archive close.
 
-        Volition workers are tracked only by name; suppression prevents
-        new urges from starting, and the wait for in-flight actions is
-        bounded so a worker that never clears cannot hang shutdown
-        forever. The sleep-stage worker drains whatever it already
-        accepted: an N3 pass writes the concept network, the canonical
-        edge log and the SQLite archive at once, and letting one run
-        into those being closed underneath it is exactly the torn
-        state this ordering exists to prevent.
+        Volition has no workers to drain — urges crystallize into
+        executive intentions and every act is a bounded episode on the
+        cycle itself, so teardown simply stops the cycle. What remains
+        is the in-flight think worker: an N3 consolidation or a long
+        deliberation must not still be writing when the state save and
+        archive close underneath it — the torn state this ordering
+        exists to prevent.
         """
         clean = True
-        _volition_deadline = time.monotonic() + self._VOLITION_DRAIN_TIMEOUT_S
-        announced = False
-        while True:
-            with self._volition_lock:
-                pending = sorted(self._volition_active)
-            if not pending or time.monotonic() >= _volition_deadline:
-                break
-            if not announced:
-                logger.info("waiting for volition workers: %s", ", ".join(pending))
-                announced = True
-            time.sleep(0.05)
-        if pending:
-            logger.warning(
-                "volition workers did not clear during shutdown; continuing: %s",
-                ", ".join(pending),
-            )
-            clean = False
-
         clean &= self._join_shutdown_thread(self._active_think_worker, "think")
         return clean
 

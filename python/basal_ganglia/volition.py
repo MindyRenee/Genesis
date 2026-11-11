@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
-import threading
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -27,11 +25,6 @@ from infrastructure.journal import record_error
 from infrastructure.text import is_blank
 
 logger = logging.getLogger(__name__)
-
-# Urge workers run below the interactive path's CPU priority — a
-# running bug scan or code-learning burst must lose every scheduler
-# handoff to a live think(), not coin-flip it for the core.
-_VOLITION_NICE = 10
 
 # Minimum seconds between public-channel replies. A channel can
 # storm mentions; she answers when addressed but not faster than
@@ -67,22 +60,6 @@ _ACH_ENCODING_FLOOR = 0.45
 # partner's expressed affect, not her own chemistry. Empty history
 # reads 0.0, so a stranger is never written off.
 _REACH_OUT_SENTIMENT_FLOOR = -0.3
-
-
-def _lower_thread_priority(nice: int = _VOLITION_NICE) -> None:
-    """Drop the calling thread's CPU priority (Linux per-thread nice).
-
-    ``os.setpriority`` with the native TID lowers only this thread —
-    lowering needs no privilege. Foreground cognition (think(),
-    respond()) keeps nice 0, so under load every GIL/scheduler handoff
-    favors the interactive turn over background urge work.
-    """
-    if not sys.platform.startswith("linux"):
-        return
-    try:
-        os.setpriority(os.PRIO_PROCESS, threading.get_native_id(), nice)
-    except OSError as e:
-        logger.debug(f"_lower_thread_priority failed: {e}")
 
 
 class VolitionMixin:
@@ -121,6 +98,13 @@ class VolitionMixin:
                 )
             )
 
+        # Engagement scratch state — one entry per live volition
+        # intention objective, holding where a sustained behavior
+        # currently is (which proposal, which game, which stage).
+        # Working memory of an occupation, not a pipeline: each entry
+        # is re-derived from the world every beat.
+        self._engagements: dict[str, dict] = {}
+        self._engagement_seq: dict[str, int] = {}
         return engine
 
     def self_invoke(self, command: str, args: str = "") -> str | None:
@@ -409,76 +393,204 @@ class VolitionMixin:
             )
             return 0.0
 
-    def _act_on_volition(self, ready: list[str]) -> list[str]:
-        """Run each ready urge action in its own background thread.
+    # ─── Volition as wanting, not dispatch ──────────────────────────
+    # There are no action threads. A ready urge crystallizes into a
+    # persistent executive intention — the accumulated drive becomes
+    # the objective's priority — and the intention then lives by
+    # executive arbitration: each cycle the Gumbel-softmax competition
+    # (NE-set gain, Beta-posterior reliability, UCB exploration) picks
+    # one winner and the cycle runs exactly one bounded episode of it.
+    # Long behaviors (an experiment waited on, a game played a move
+    # at a time) persist as engagement state and advance one beat per
+    # win; sleep and suppression stall the *expression*, never the
+    # wanting. Subprocesses she launches are ballistic arcs — the
+    # cycle polls them between episodes; their verdicts are events,
+    # not pipeline stages.
 
-        Uses a bounded semaphore so that at most
-        ``MAX_CONCURRENT_VOLITIONS`` actions run at once.
-
-        Heavy CPU activities (improve, create, learn_code) are
-        skipped under PROTECTIVE posture to avoid the self-sustaining
-        stress loop: CPU load → interoception → CRH → cortisol →
-        protective posture → (still running heavy CPU) → more cortisol.
-        """
-        # Suppression or a shutdown that landed after the urge
-        # evaluated must not still admit work — an action spawned
-        # now would run through the teardown and write into stores
-        # the save is closing.
-        if self._suppress_volition or not self._running:
-            return []
-        ready = self._filter_ready_urges(ready)
-        performers = {
-            "improve": self._perform_improve,
-            "speech": self._perform_speech,
-            "look": self._perform_look,
-            "play": self._perform_play,
-            "meditate": self._perform_meditate,
-            "draw": self._perform_draw,
-            "create": self._perform_create,
-            "introspect": self._perform_introspect,
-            "self_sleep": self._perform_self_sleep,
-            "self_mission": self._perform_self_mission,
-            "learn": self._perform_learn,
-            "learn_code": self._perform_learn_code,
-            "act": self._perform_act,
-            "reach_out": self._perform_reach_out,
-            "broadcast": self._perform_broadcast,
-            "research": self._perform_research,
-            "safeguard": self._perform_safeguard,
-            "manual": self._perform_manual_review,
+    _VOLITION_KINDS = frozenset(
+        {
+            "improve",
+            "speech",
+            "look",
+            "play",
+            "meditate",
+            "draw",
+            "create",
+            "introspect",
+            "self_sleep",
+            "self_mission",
+            "learn",
+            "learn_code",
+            "act",
+            "reach_out",
+            "broadcast",
+            "research",
+            "safeguard",
+            "manual",
         }
-        started: list[str] = []
-        for name in ready:
-            fn = performers.get(name)
-            if fn is None:
+    )
+
+    def _executive(self):
+        frontal = getattr(self.brain, "frontal", None)
+        return getattr(frontal, "executive", None)
+
+    def _ne_gain(self) -> float:
+        """Live norepinephrine read → arbitration inverse temperature.
+
+        Tonic NE tunes cortical signal-to-noise (Aston-Jones &
+        Cohen 2005): high NE sharpens selection toward the leader,
+        low NE diffuses it into exploration. Bounded so a saturated
+        or absent reading degrades to a sane gain, never zero.
+        """
+        try:
+            from genesis_client.protocol import CHEM_NAMES, CHEM_NOREPINEPHRINE
+
+            chem = self.client.get_state().chemicals
+            ne = float(chem.get(CHEM_NAMES[CHEM_NOREPINEPHRINE], 1.0))
+        except Exception:  # noqa: BLE001
+            return 1.0
+        return max(0.2, min(2.5, ne))
+
+    def _volition_objective(self, name: str, executive) -> str | None:
+        """The engagement's objective key — one live intention per urge.
+
+        A terminal intention (completed/abandoned) stays terminal, so a
+        fresh wanting opens a new engagement id rather than resurrecting
+        a closed goal. Any older pending same-kind objective is
+        superseded — two live engagements of one behavior is not a
+        thing a mind does.
+        """
+        base = f"{name}:volition"
+        intentions = getattr(executive, "_intentions", {})
+        current = intentions.get(base)
+        if current is None or current.status == "pending":
+            objective = base
+        else:
+            seq = self._engagement_seq.get(name, 0) + 1
+            self._engagement_seq[name] = seq
+            objective = f"{name}:volition-{seq}"
+        for other in intentions.values():
+            if (
+                other is not current
+                and other.kind == name
+                and other.status == "pending"
+                and other.objective != objective
+            ):
+                other.status = "abandoned"
+                other.revision = "superseded by a newer engagement"
+        return objective
+
+    def _crystallize_urges(self, ready: list[str]) -> list[str]:
+        """Spend ready urges into persistent executive intentions.
+
+        The threshold crossing is the wanting crystallizing: the
+        urge's overshoot sets the intention's priority, the urge is
+        consumed, and the goal now lives by arbitration — chemistry
+        decides what she wants, the executive decides what she does.
+        """
+        executive = self._executive()
+        if executive is None or self._suppress_volition or not self._running:
+            return []
+        formed: list[str] = []
+        for name in self._filter_ready_urges(ready):
+            if name not in self._VOLITION_KINDS:
                 continue
-            with self._volition_lock:
-                # The admission race: suppression/shutdown can land
-                # between the entry check and this lock. Recheck
-                # where admission is serialized.
-                if self._suppress_volition or not self._running:
-                    break
-                if name in self._volition_active:
-                    continue
-                if not self._volition_sem.acquire(blocking=False):
-                    break
-                self._volition_active.add(name)
-                started.append(name)
+            objective = self._volition_objective(name, executive)
+            if objective is None:
+                continue
+            urge = self.volition.urges.get(name)
+            overshoot = 0.0
+            if urge is not None:
+                span = max(1e-6, 1.0 - urge.threshold)
+                overshoot = min(1.0, max(0.0, (urge.value - urge.threshold) / span))
             try:
-                named_thread(
-                    f"volition-{name}",
-                    self._run_volition_action,
-                    args=(name, fn),
-                    comm="g-volition",
-                ).start()
+                executive.form_intention(
+                    objective,
+                    reason="urge",
+                    priority=0.55 + 0.4 * overshoot,
+                    confidence=0.6,
+                )
             except Exception as e:  # noqa: BLE001
-                with self._volition_lock:
-                    self._volition_active.discard(name)
-                self._volition_sem.release()
-                if name in started:
-                    started.remove(name)
-                logger.warning(f"failed to start volition action {name}: {e}")
-        return started
+                note_swallowed("mind.volition._crystallize_urges", e)
+                continue
+            self.volition.consume(name)
+            formed.append(name)
+        return formed
+
+    def _advance_volition_episode(self) -> None:
+        """One arbitration win = one bounded episode, on the cycle.
+
+        The executive's softmax competition picks the winning
+        volition intention; the cycle runs exactly one episode of it —
+        a quick act to completion, or one beat of a sustained
+        engagement. There is no queue and no worker: selection is
+        re-evaluated every cycle from live chemistry, so a fading
+        drive loses the behavior mid-stream and a rising one takes it.
+        """
+        if self._suppress_volition or not self._running or self.is_resting:
+            return
+        executive = self._executive()
+        if executive is None:
+            return
+        try:
+            candidates = [
+                i
+                for i in executive.actionable_intentions
+                if i.kind in self._VOLITION_KINDS
+            ]
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition._advance_volition_episode", e)
+            return
+        if not candidates:
+            return
+        try:
+            selected = executive.select_intention(candidates, gain=self._ne_gain())
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition._advance_volition_episode.select", e)
+            return
+        if selected is None:
+            return
+        status, summary = self._run_volition_episode(selected)
+        if status == "continue":
+            executive.defer_intention(selected)
+        elif status == "fail":
+            try:
+                executive.observe_intention(
+                    selected, actual_outcome=summary, success=False
+                )
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.volition._advance_volition_episode.observe", e)
+        else:
+            try:
+                executive.observe_intention(
+                    selected, actual_outcome=summary, success=True
+                )
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.volition._advance_volition_episode.observe", e)
+
+    def _run_volition_episode(self, intention) -> tuple[str, str]:
+        """Execute one bounded episode of the selected intention.
+
+        Returns ``("done", summary)`` for a completed act,
+        ``("continue", summary)`` when the engagement has more beats,
+        ``("fail", summary)`` when the act itself failed — the
+        executive records the outcome either way.
+        """
+        kind = intention.kind
+        try:
+            if kind == "improve":
+                return self._episode_improve(intention.objective)
+            if kind == "play":
+                return self._episode_play(intention.objective)
+            fn = getattr(self, f"_perform_{kind}", None)
+            if fn is None:
+                return ("done", f"{kind}: no episode")
+            fn()
+            return ("done", f"{kind} act")
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(f"mind.volition._run_volition_episode.{kind}", e)
+            record_error(f"volition.{kind}", e)
+            return ("fail", f"{kind} failed: {e}")
 
     def _filter_ready_urges(self, ready: list[str]) -> list[str]:
         """Apply the readiness gates to the evaluated urges, in order:
@@ -523,28 +635,194 @@ class VolitionMixin:
                 )
         return ready
 
-    def _run_volition_action(self, name: str, fn) -> None:
-        """Wrap a volition action so it clears the active flag when done."""
-        _lower_thread_priority()
+    def _episode_improve(self, objective: str) -> tuple[str, str]:
+        """One bounded beat of the self-improvement engagement.
+
+        Beats: propose → pick a pending proposal → begin its verified
+        experiment → poll the running gate → take the verdict. The
+        verify suite is a ballistic arc — launched once as a child
+        process, polled once per won arbitration; rest stalls the
+        engagement's *expression*, never the subprocess, and the
+        ``.in_flight`` marker still guards an unverified edit if she
+        reboots mid-gate.
+        """
+        if self.is_resting or self._is_teaching or self._in_game:
+            return ("continue", "improve held")
+        eng = self._engagements.setdefault(objective, {"stage": "propose"})
+        stage = eng["stage"]
         try:
-            # Admitted but not yet begun when suppression/shutdown
-            # arrived — drop the action rather than act through the
-            # teardown. The slot is still released in finally.
-            if not self._suppress_volition and self._running:
-                fn()
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition._run_volition_action",
-                e,
+            if stage == "propose":
+                from thalamus.brain_waves import BrainWave
+
+                waves = self.brain_waves()
+                if waves.dominant in (BrainWave.DELTA, BrainWave.THETA):
+                    return ("done", f"{waves.dominant.value}-dominant — not analytical")
+                self._emit_volition_thought(
+                    ("improvement", "progress", "better"), "thinking"
+                )
+                new = self.self_improvement.generate_proposals(max_proposals=3)
+                if new:
+                    self._emit_proposal_thoughts(new)
+                eng["stage"] = "drain"
+                return ("continue", "proposals generated")
+            if stage == "drain":
+                pending = self.self_improvement.get_pending_proposals()
+                proposal = next(
+                    (
+                        p
+                        for p in pending
+                        if self.self_improvement._proposal_can_apply(p)
+                    ),
+                    None,
+                )
+                if proposal is None:
+                    for p in pending:
+                        self.self_improvement.withdraw_proposal(
+                            p.id,
+                            "stale — the snippet no longer matches the file, "
+                            "re-scan and re-propose",
+                        )
+                    self._engagements.pop(objective, None)
+                    return ("done", "experiment queue drained")
+                eng.update(stage="experiment", proposal_id=proposal.id)
+                return ("continue", f"engaging proposal {proposal.id}")
+            # stage == "experiment"
+            proposal = self._proposal_by_id(eng.get("proposal_id"))
+            if proposal is None:
+                self._engagements.pop(objective, None)
+                return ("done", "proposal no longer pending")
+            if "handle" not in eng:
+                outcome = self.begin_proposal_experiment(proposal)
+                if isinstance(outcome, dict):
+                    eng["handle"] = outcome
+                    return ("continue", f"experiment launched for {proposal.title}")
+                self._engagements.pop(objective, None)
+                return self._improve_verdict(proposal, outcome)
+            record = self.poll_proposal_experiment(eng["handle"])
+            if record is None:
+                return ("continue", "verification gate running")
+            self._engagements.pop(objective, None)
+            return self._improve_verdict(proposal, record)
+        except Exception:
+            self._engagements.pop(objective, None)
+            raise
+
+    def _proposal_by_id(self, proposal_id):
+        for p in self.self_improvement.get_pending_proposals():
+            if p.id == proposal_id:
+                return p
+        return None
+
+    def _improve_verdict(self, proposal, record) -> tuple[str, str]:
+        """Close an experiment episode: mark or reject, then narrate."""
+        title = getattr(proposal, "title", "?")
+        if record.status == "applied":
+            self.self_improvement.mark_applied(proposal.id)
+            self._emit_live_thought(
+                "code",
+                f"applied my own change to {title} — verified, it stays",
             )
-            # This is the single boundary every voluntary action's
-            # failure lands on — record it durably so a crashed urge
-            # is not invisible outside debug logging.
-            record_error(f"volition.{name}", e)
-        finally:
-            with self._volition_lock:
-                self._volition_active.discard(name)
-            self._volition_sem.release()
+            self.brain.frontal.narrative.check_milestone(
+                "first self-modification"
+            )
+            return ("done", f"applied {title}")
+        notes = self._build_rejection_notes(proposal, record)
+        self.self_improvement.reject_proposal(proposal.id, notes)
+        self._emit_live_thought(
+            "code",
+            f"my change to {title} failed verification ({record.status})"
+            " — reverted, rethinking",
+        )
+        return ("done", f"{title} {record.status}")
+
+    def _episode_play(self, objective: str) -> tuple[str, str]:
+        """One move of the arcade bout per won arbitration.
+
+        A bout is an engagement, not a procedure: each episode makes
+        exactly one move through the same memory-guided chooser the
+        synchronous ``play()`` used, and the intention completes when
+        the board is won, the move budget is spent, or the arcade
+        closes. Game mode holds across beats — she is *playing*, not
+        replaying a script.
+        """
+        arcade = getattr(self.world, "arcade", None)
+        if arcade is None or self.is_resting:
+            return ("done", "arcade unavailable")
+        eng = self._engagements.setdefault(objective, {"stage": "open"})
+        stage = eng["stage"]
+        try:
+            if stage == "open":
+                self._enter_game_mode()
+                self._emit_volition_thought(("game", "play", "fun"), "playing")
+                game_id = arcade.pick()
+                if game_id is None:
+                    self._exit_game_mode()
+                    self._engagements.pop(objective, None)
+                    return ("done", f"arcade closed ({arcade.last_error or 'no games'})")
+                session = arcade.session
+                if session is None or session.game_id != game_id:
+                    if arcade.enter(game_id) is None:
+                        self._exit_game_mode()
+                        self._engagements.pop(objective, None)
+                        return ("done", f"couldn't open {game_id}")
+                board = arcade.session.board if arcade.session else None
+                eng.update(
+                    stage="play",
+                    game_id=game_id,
+                    made=0,
+                    start_level=board.levels_completed if board else 0,
+                )
+                return ("continue", f"entered {game_id}")
+            # stage == "play" — one move
+            from worlds.games import arcade as arcade_mod
+
+            session = arcade.session
+            board = session.board if session else None
+            game_id = eng["game_id"]
+            if board is None or board.won or eng["made"] >= arcade_mod.BOUT_MOVES:
+                return self._play_bout_done(objective, eng, arcade)
+            memory = arcade._memory(game_id)
+            choice, why = memory.choose(
+                arcade_mod.sight.signature(board.grid),
+                arcade.moves(board),
+                board.levels_completed,
+                arcade._rng,
+            )
+            if arcade.move(choice, why) is None:
+                return self._play_bout_done(objective, eng, arcade)
+            eng["made"] += 1
+            return ("continue", f"move {eng['made']} of {game_id}")
+        except Exception:
+            self._exit_game_mode()
+            self._engagements.pop(objective, None)
+            raise
+
+    def _play_bout_done(self, objective: str, eng: dict, arcade) -> tuple[str, str]:
+        """Close a bout: summary, telemetry event, release game mode."""
+        from worlds.games import arcade as arcade_mod
+
+        session = arcade.session
+        board = session.board if session else None
+        level = board.levels_completed if board else eng.get("start_level", 0)
+        goal = board.win_levels if board else "?"
+        summary = (
+            f"played {eng.get('made', 0)} moves of {eng.get('game_id', '?')}: "
+            f"level {level}/{goal}"
+        )
+        arcade_mod.record_event(
+            "arcade_bout",
+            summary,
+            game=eng.get("game_id"),
+            moves=eng.get("made", 0),
+            level=level,
+            best_level=arcade._memory(eng["game_id"]).best_level
+            if eng.get("game_id")
+            else 0,
+        )
+        self._emit_live_thought("play", summary)
+        self._exit_game_mode()
+        self._engagements.pop(objective, None)
+        return ("done", summary)
 
     def _emit_volition_thought(
         self,
@@ -914,83 +1192,6 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._perform_research",
-                e,
-            )
-
-    def _perform_improve(self) -> None:
-        """Generate self-improvement proposals because the urge crossed its threshold.
-
-        Two things happen here:
-
-        1. Proposal generation — everything becomes a proposal.
-
-        2. Experiments — pending proposals run the full verification
-           pipeline on their own: the edit lands on the live file,
-           pytest + cargo test verify it, and a failure reverts and
-           rejects with teaching notes. The verification gate, not a
-           review queue, decides what lands.
-
-        Sleep-gated: no improvement work during sleep. The brain-wave
-        gating (delta/theta) is a secondary defense — N1 sleep can be
-        alpha-dominant, so brain waves alone don't reliably detect all
-        sleep stages. The ``_is_sleeping`` flag is the authority.
-        """
-        if self.is_resting or self._is_teaching or self._in_game:
-            return
-        try:
-            from thalamus.brain_waves import BrainWave
-
-            waves = self.brain_waves()
-            if waves.dominant in (BrainWave.DELTA, BrainWave.THETA):
-                self._emit_live_thought(
-                    "code",
-                    f"{waves.dominant.value}-dominant — not in analytical mode, "
-                    "skipping improvement",
-                )
-                return
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition._perform_improve",
-                e,
-            )
-
-        self._emit_volition_thought(("improvement", "progress", "better"), "thinking")
-        try:
-            # 1. Generate proposals — each one is a potential
-            #    experiment. These include its own ideas and refactors.
-            #    It has opinions about its code.
-            new = self.self_improvement.generate_proposals(max_proposals=3)
-            if new:
-                self._emit_proposal_thoughts(new)
-            # When no new proposals are generated, stay silent — the
-            # urge drove the action (it tried), it just has nothing
-            # to propose. A hardcoded "nothing stood out" sentence
-            # would violate the no-hardcoding rule and add noise.
-
-            # 2. Drain the queue — pending proposals run the verified
-            #    experiment pipeline automatically. One per urge: each
-            #    run is a full test-gate pass. The gate decides what
-            #    lands; a failed edit reverts and the rejection notes
-            #    teach the next attempt.
-            for outcome in self.run_pending_experiments(max_experiments=1):
-                if outcome["status"] == "applied":
-                    self._emit_live_thought(
-                        "code",
-                        f"applied my own change to {outcome['title']} — verified, it stays",
-                    )
-                    # A verified self-edit is the same milestone the
-                    # autonomous fixer trips.
-                    self.brain.frontal.narrative.check_milestone("first self-modification")
-                else:
-                    self._emit_live_thought(
-                        "code",
-                        f"my change to {outcome['title']} failed "
-                        f"verification ({outcome['status']}) — reverted, "
-                        "rethinking",
-                    )
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition._perform_improve",
                 e,
             )
 
@@ -1479,33 +1680,6 @@ class VolitionMixin:
                 "mind.volition._perform_look",
                 e,
             )
-
-    def _perform_play(self) -> None:
-        """Play a bout in the arcade because the play urge crossed its threshold.
-
-        This is a video game. It is not real and it is just for fun.
-        She can't know the instructions: she explores, remembers, and
-        works out how to win each level, carrying what she learned to
-        the next.
-
-        Playing enters game mode — the arcade's alert, focused state:
-        the wave drive comes up to the awake bands (beta2 alertness,
-        gamma binding) and the other auto-activities pause for the
-        bout, the way teaching mode pauses them for a lesson — except
-        game mode is more active: the game gets her full waking
-        attention. Sleep stays inviolable — a sleeping mind does not
-        play; a merely drowsy one rouses to alertness instead of
-        skipping the bout.
-        """
-        arcade = getattr(self.world, "arcade", None)
-        if arcade is None or self.is_resting:
-            return
-        self._enter_game_mode()
-        try:
-            self._emit_volition_thought(("game", "play", "fun"), "playing")
-            self._emit_live_thought("play", arcade.play())
-        finally:
-            self._exit_game_mode()
 
     def _enter_game_mode(self) -> None:
         """Raise the alert, focused state a game deserves.

@@ -773,12 +773,13 @@ class CycleMixin:
                     name for name in ready if elapsed >= self.WAKE_VOLITION_DELAYS.get(name, 60.0)
                 ]
             if ready:
-                started = self._act_on_volition(ready)
-                # Consume only urges that were actually admitted to an
-                # action worker. Gating, an occupied worker slot, or an
-                # unknown performer must not erase a ready urge.
-                for name in started:
-                    self.volition.consume(name)
+                # Crystallize the wanting into persistent intentions —
+                # the urges are spent; the goals now live by executive
+                # arbitration. The episode advance below runs every
+                # cycle regardless, so formed intentions are eligible
+                # immediately.
+                self._crystallize_urges(ready)
+            self._advance_volition_episode()
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.cycle._cycle_volition",

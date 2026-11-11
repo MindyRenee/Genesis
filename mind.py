@@ -85,9 +85,9 @@ if TYPE_CHECKING:
 
     from worlds.channel import Channel
 from basal_ganglia.volition import VolitionMixin
+from brainstem.cycle import CycleMixin
 from brainstem.heart import Heart
 from brainstem.lifecycle import LifecycleMixin
-from brainstem.cycle import CycleMixin
 from frontal_lobe.projects import ProjectsMixin
 from frontal_lobe.status import StatusMixin
 from self.man_review import ManReviewMixin
@@ -1192,17 +1192,10 @@ class Mind(
         # sleep (N1→N2) without N3 deep consolidation or REM. Set by
         # sleep(nap=True), cleared on wake.
         self._nap_mode: bool = False
-        self._volition_active: set[str] = set()
-        self._volition_sem = threading.Semaphore(self.config.volition.max_concurrent_volitions)
-        # Protects _volition_active — the check-then-add in
-        # _act_on_volition (heartbeat thread) and the discard in
-        # _run_volition_action (volition worker threads) must be
-        # atomic to prevent double-firing of the same urge.
-        self._volition_lock = threading.Lock()
-        # When True, the heartbeat loop skips volition firing — used by
-        # the CLI to suppress autonomous actions (looking, speaking,
-        # scanning) during slash command execution so they don't bury
-        # the command output.
+        # When True, the cycle's volition path skips urge firing —
+        # used by the CLI to suppress autonomous actions (looking,
+        # speaking, scanning) during slash command execution so they
+        # don't bury the command output.
         self._suppress_volition = False
         # Distinct from _running: an unstarted mind reads _running=False
         # too, and paths like exit_teaching_mode legitimately resume
