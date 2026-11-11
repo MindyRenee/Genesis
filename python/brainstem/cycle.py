@@ -113,10 +113,10 @@ class _DemandGate:
         drive_rate = self.k_on * d * self.F
         lam = drive_rate + self.k_off
         r_star = drive_rate / lam if lam > 0.0 else 0.0
-        self.R = r_star + (self.R - r_star) * (-lam * max(0.0, dt)).exp()
-        self.F = 1.0 + (self.F - 1.0) * (-max(0.0, dt) / self._F_TAU).exp()
+        self.R = r_star + (self.R - r_star) * math.exp(-lam * max(0.0, dt))
+        self.F = 1.0 + (self.F - 1.0) * math.exp(-max(0.0, dt) / self._F_TAU)
         if self.R >= self._THETA:
-            self.R *= (-self._RESET_KAPPA).exp()
+            self.R *= math.exp(-self._RESET_KAPPA)
             self.fired_at = now
             return True
         return False

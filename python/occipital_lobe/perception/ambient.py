@@ -259,7 +259,13 @@ class AmbientListener:
         # down with it.
         try:
             import sounddevice as sd
-        except (ImportError, OSError) as e:
+        except ImportError as e:
+            logger.warning(f"ambient listener unavailable: {e}")
+            self._running = False
+            return
+        except Exception as e:
+            # PortAudioError and friends are not OSError — an audio
+            # stack that cannot initialize must degrade the same way.
             logger.warning(f"ambient listener unavailable: {e}")
             self._running = False
             return
