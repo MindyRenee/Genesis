@@ -70,7 +70,47 @@ class ToolRegistry:
 
     def _register_builtins(self) -> None:
         """Register the built-in tools that ship with Genesis."""
-        for name, description, fn in _BUILTIN_TOOLS:
+        from .android_lab import ANDROID_TOOLS
+        from .creation_lab import CREATION_TOOLS
+        from .database import DATABASE_TOOLS
+        from .dictionary import DICTIONARY_TOOLS
+        from .formats import FORMAT_TOOLS
+        from .fun import FUN_TOOLS
+        from .github_lab import GITHUB_TOOLS
+        from .lab import LAB_TOOLS
+        from .languages import LANGUAGES_TOOLS
+        from .lintshop import LINT_TOOLS
+        from .math_lab import MATH_LAB_TOOLS
+        from .mysteries import MYSTERY_TOOLS
+        from .net_lab import NET_TOOLS
+        from .notes import NOTES_TOOLS
+        from .personal import PERSONAL_TOOLS
+        from .sensors import SENSOR_TOOLS
+        from .testing_lab import TESTING_TOOLS
+        from .workstation import WORKSTATION_TOOLS
+
+        all_tools = (
+            _BUILTIN_TOOLS
+            + WORKSTATION_TOOLS
+            + LANGUAGES_TOOLS
+            + MATH_LAB_TOOLS
+            + SENSOR_TOOLS
+            + LINT_TOOLS
+            + NET_TOOLS
+            + NOTES_TOOLS
+            + TESTING_TOOLS
+            + CREATION_TOOLS
+            + PERSONAL_TOOLS
+            + GITHUB_TOOLS
+            + ANDROID_TOOLS
+            + DATABASE_TOOLS
+            + FUN_TOOLS
+            + DICTIONARY_TOOLS
+            + FORMAT_TOOLS
+            + MYSTERY_TOOLS
+            + LAB_TOOLS
+        )
+        for name, description, fn in all_tools:
             self.register(Tool(name, description, fn))
 
     def register(self, tool: Tool) -> None:
@@ -94,16 +134,22 @@ class ToolRegistry:
             # Every act is a candidate intention — the gate reads the
             # act's own text ("run_shell rm -rf build") the way it
             # reads a goal's object; restraint is a veto, not advice.
-            intent = " ".join(
-                [tool_name] + [str(v) for v in kwargs.values() if isinstance(v, str)]
-            )
+            intent = " ".join([tool_name] + [str(v) for v in kwargs.values() if isinstance(v, str)])
             try:
                 restraint = self.gate(intent)
             except Exception:  # noqa: BLE001 — a broken gate must not
                 restraint = None  # break the tool path
             if restraint is not None:
                 return ToolResult(success=False, error=f"restrained: {restraint}")
-        return tool.run(**kwargs)
+        try:
+            return tool.run(**kwargs)
+        except TypeError as e:
+            return ToolResult(success=False, error=f"bad arguments for {tool_name}: {e}")
+        except Exception as e:  # noqa: BLE001 — a tool fault is reported,
+            return ToolResult(  # never propagated into her effector thread
+                success=False,
+                error=f"{tool_name} faulted: {e}",
+            )
 
 
 def _safe_path(path: str, project_root: str) -> pathlib.Path | None:
@@ -314,8 +360,9 @@ def concept_lookup(concept: str, network: Any) -> ToolResult:
 def read_file(path: str, offset: int = 0, limit: int = 200, project_root: str = ".") -> ToolResult:
     """Read part of a file — no file type refused, nothing sealed.
 
-    Text files return a character window (``offset``/``limit``).
-    Binary files return a metadata description — size, sha256, format,
+    Text files return a character window (``offset``/``limit``); a
+    negative ``offset`` tails the file — ``offset=-500`` reads the last
+    500 characters. Binary files return a metadata description — size, sha256, format,
     hex head — so content that cannot be shown as text still registers.
     Any readable file answers with its content, credential-class files
     included: her read scope is the whole filesystem.
@@ -359,8 +406,8 @@ def read_file(path: str, offset: int = 0, limit: int = 200, project_root: str = 
     except OSError as e:
         return ToolResult(success=False, error=str(e))
 
-    start = offset
-    end = offset + limit if limit > 0 else len(text)
+    start = max(0, len(text) + offset) if offset < 0 else offset
+    end = start + limit if limit > 0 else len(text)
     snippet = text[start:end]
     return ToolResult(
         success=True,
@@ -511,6 +558,7 @@ def run_shell(
             command,
             shell=True,
             cwd=str(root),
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -804,8 +852,7 @@ def list_actuators(**_kwargs: Any) -> ToolResult:
         output="actuators — " + "; ".join(lines),
         data={
             "actuators": [
-                {"name": n, "kind": k, "available": a, "reason": r}
-                for n, k, a, r in census
+                {"name": n, "kind": k, "available": a, "reason": r} for n, k, a, r in census
             ]
         },
     )
