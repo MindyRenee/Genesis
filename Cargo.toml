@@ -19,8 +19,20 @@ marker-g13 = "0x47530D4953F3310A"
 [lints.rust]
 linker_messages = "allow"
 
+[lib]
+# rlib for the daemon/binaries; cdylib so the same crate builds the
+# `genesis_body` Python extension when the `python` feature is on.
+crate-type = ["rlib", "cdylib"]
+
+[features]
+default = []
+# Build the PyO3 extension module (cdylib artifact libgenesis.so,
+# installed as genesis_body.so beside the interpreter).
+python = ["dep:pyo3"]
+
 [dependencies]
 flate2 = "1.1.9"
+pyo3 = { version = "0.27", optional = true, features = ["extension-module"] }
 libc = "0.2.189"
 proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
 quote = "1.0.47"

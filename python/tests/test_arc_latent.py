@@ -81,7 +81,7 @@ def test_latent_encoding_is_fixed_width_and_keeps_graph_evidence():
     assert state.to_dict()["objects"]
     assert state.to_dict()["edges"]
     typed = state.to_experiential_latent()
-    assert typed.domain.value == "experiential_outer"
+    assert typed.domain == "outer"
     assert typed.category == "arc_observation"
     assert typed.values == state.vector
 

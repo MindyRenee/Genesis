@@ -8,7 +8,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from frontal_lobe import CognitiveState
 from limbic_system.emotion import (
     PLASTICITY_CLOSED,
     PLASTICITY_LOW,
@@ -20,6 +19,7 @@ from self import EmergentIdentity, IdentityStage
 from temporal_lobe.base import Thought
 from temporal_lobe.concepts import NetworkTopology
 
+from frontal_lobe import CognitiveState
 from genesis_client import NeuroSummary
 from genesis_client.protocol import PHASE_NREM, PHASE_REM, ZONE_SLEEPING
 from genesis_client.types import CoreState

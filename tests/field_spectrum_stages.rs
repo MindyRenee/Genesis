@@ -4,7 +4,7 @@
 //! integrates ~2 minutes of observations; the spectrum signature is
 //! read at the end.
 
-use genesis::field::FieldRuntime;
+use genesis::latent_spaces::FieldRuntime;
 use genesis::state::core_state::GenesisCoreState;
 use genesis::state::neurochemical::NeurochemicalId;
 use genesis::state::zones::MentalPhase;

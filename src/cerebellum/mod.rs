@@ -8,12 +8,12 @@
 //! Mirrors `python/cerebellum/`:
 //!
 //! - `motor` — spatial and action motor-field decoding, softmax centroids,
-//!   spread, and entropy (`field::motor`).
+//!   spread, and entropy (`latent_spaces::motor`).
 //! - `engine` — continuous-time local Jacobian, damping, saturation, and
-//!   skew-symmetric spiral dynamics (`field::engine`).
+//!   skew-symmetric spiral dynamics (`latent_spaces::engine`).
 //! - `adaptive` — adaptive interval gates driven by prediction/error demand
 //!   (`daemon::adaptive`).
 
 pub use crate::daemon::adaptive;
-pub use crate::field::engine;
-pub use crate::field::motor;
+pub use crate::latent_spaces::engine;
+pub use crate::latent_spaces::motor;

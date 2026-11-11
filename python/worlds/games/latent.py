@@ -18,13 +18,22 @@ from dataclasses import dataclass, field
 from math import hypot, isfinite, sqrt
 from typing import Any
 
-from latent_spaces.boundaries import LatentDomain
-from latent_spaces.boundaries import LatentState as DomainLatentState
 from parietal_lobe.grid import Grid
 from parietal_lobe.scene import perceive
 
 ARC_COLORS = 16
 OBJECT_FEATURES = 8
+
+
+@dataclass(frozen=True)
+class ExperientialLatent:
+    """Typed latent hand-off: which manifold domain a deposit belongs to."""
+
+    domain: str
+    values: tuple[float, ...]
+    category: str
+    confidence: float
+
 FEATURE_DIMENSIONS = 19 + ARC_COLORS + 2 * OBJECT_FEATURES
 
 
@@ -330,11 +339,11 @@ class LatentState:
         )
         return sqrt(max(0.0, squared))
 
-    def to_experiential_latent(self) -> DomainLatentState:
-        """Project the board features into Genesis's typed outer E domain."""
-        return DomainLatentState(
-            domain=LatentDomain.E,
-            values=self.vector,
+    def to_experiential_latent(self) -> ExperientialLatent:
+        """Project the board features into the manifold's outer domain."""
+        return ExperientialLatent(
+            domain="outer",
+            values=tuple(self.vector),
             category="arc_observation",
             confidence=1.0,
         )

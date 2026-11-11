@@ -16,13 +16,7 @@
 
 use std::fmt;
 
-pub mod engine;
-pub mod spectrum;
-pub use engine::SystemEngine;
-pub mod runtime;
-pub use runtime::{FieldIntegration, FieldRuntime, LATENT_DIMENSION};
-pub mod motor;
-pub use motor::MotorTarget;
+use super::engine::SystemEngine;
 
 const EPS: f64 = 1.0e-12;
 /// Upper bound on the field's thermal state — disagreement heats
@@ -57,9 +51,9 @@ pub(crate) const FIELD_NOISE_SEED: u64 = 0x9E37_79B9_7F4A_7C15;
 /// `scripts/provenance.py`.
 pub fn provenance_fingerprint() -> u64 {
     MARKER_G00
-        ^ runtime::MARKER_G01
-        ^ engine::MARKER_G02
-        ^ motor::MARKER_G03
+        ^ super::runtime::MARKER_G01
+        ^ super::engine::MARKER_G02
+        ^ super::motor::MARKER_G03
         ^ crate::daemon::ipc::MARKER_G04
         ^ crate::daemon::tick::MARKER_G05
         ^ crate::state::header::MARKER_G06
@@ -2187,9 +2181,9 @@ mod global_step_tests {
 
         let markers: [u64; 8] = [
             MARKER_G00,
-            runtime::MARKER_G01,
-            engine::MARKER_G02,
-            motor::MARKER_G03,
+            super::runtime::MARKER_G01,
+            super::engine::MARKER_G02,
+            super::motor::MARKER_G03,
             crate::daemon::ipc::MARKER_G04,
             crate::daemon::tick::MARKER_G05,
             crate::state::header::MARKER_G06,

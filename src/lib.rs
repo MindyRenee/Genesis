@@ -47,13 +47,14 @@ pub mod topology;
 pub mod cognition;
 pub mod daemon;
 pub mod data_dir;
-pub mod field;
 pub mod math;
+#[cfg(feature = "python")]
+pub mod python_ext;
 pub mod state;
 pub mod store;
 
 pub use data_dir::data_dir;
-pub use field::{
+pub use latent_spaces::{
     BraidTrajectory, FieldError, GaugeTransport, GlobalField, StereographicSphere, SubsystemLayer,
     SystemEngine, SystemFiber, Vector,
 };

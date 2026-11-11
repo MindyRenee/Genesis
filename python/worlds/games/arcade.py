@@ -596,7 +596,7 @@ class Arcade:
                 "changed_cells": change.count,
                 "new_board": new,
                 "latent_state": latent.to_dict(),
-                "latent_domain": typed_latent.domain.value,
+                "latent_domain": typed_latent.domain,
                 "latent_category": typed_latent.category,
                 "action_dynamics": decoder.action_evidence(),
                 "latent_prediction_error": prediction_error,

@@ -60,9 +60,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
-from occipital_lobe import V1Model, VisualField
 from occipital_lobe.v1 import name_color
-from temporal_lobe import DetectedObject, ObjectRecognizer
 from temporal_lobe.concepts import RelationType
 
 from genesis_client.optic_nerve import (
@@ -84,6 +82,8 @@ from genesis_client.protocol import (
 )
 from genesis_client.swallow import note_swallowed
 from infrastructure.config import default_data_dir
+from occipital_lobe import V1Model, VisualField
+from temporal_lobe import DetectedObject, ObjectRecognizer
 
 from ..epipolar import EpipolarProcessor, TwoViewReport
 from . import illumination, optics
@@ -170,6 +170,10 @@ class VisionScene:
     # Eyelid transmission during this look — 1.0 open, ~0.5 drowsy.
     # The retinal image was already dimmed by it.
     lid: float = 1.0
+    # The mathematical eye's observables for this look — ocular state,
+    # cortical orientation energy, fixation — from the Rust organ
+    # (`genesis_body.VisionSystem`). Empty when the extension is absent.
+    eye: dict = field(default_factory=dict)
     # Illumination decomposition — the light field this look was seen
     # under. ``illuminant`` names the light's colour; shadow_* the
     # share of the field reading as shadow and where its mass sits.
@@ -233,6 +237,7 @@ class VisionScene:
             "shadow_direction": self.shadow_direction,
             "focus_m": self.focus_m,
             "lid": self.lid,
+            "eye": dict(self.eye),
         }
 
     def memory_text(self) -> str:
@@ -295,6 +300,13 @@ class Vision:
         # Created lazily on first use so we don't pay the Gabor
         # dictionary construction cost if there's no camera.
         self._occipital: V1Model | None = occipital
+        # The mathematical eye (Rust `self_::vision` via `genesis_body`) —
+        # optics → phototransduction → ganglion → V1 fields stepped on real
+        # frames. Lazily built on the first frame; absent when the
+        # extension module is not installed.
+        self._eye = None
+        self._eye_dims: tuple[int, int] | None = None
+        self._eye_last_t: float | None = None
         self._on_gamma: Callable[[float], None] | None = None
         # Facing orientation — which handedness her reports carry.
         # False (default): looking out — the raw capture reads the
@@ -690,6 +702,7 @@ class Vision:
                 self.mirror if mirror is None else mirror,
                 nerve,
             )
+            scene.eye = self._step_eye(rgb)
             scene.nerve = nerve
             return scene
         except Exception as e:  # noqa: BLE001
@@ -698,6 +711,51 @@ class Vision:
                 e,
             )
             return VisionScene(status="unprocessed")
+
+    def _step_eye(self, rgb: np.ndarray) -> dict:
+        """Step the mathematical eye over this frame; report its observables.
+
+        The Rust organ (``genesis_body.VisionSystem`` — ``self_::vision``)
+        runs the phototransduction/cortical field dynamics; this returns a
+        compact observable summary, not the full planes. An absent
+        extension module or a stepping fault is an empty report — the
+        scene pipeline carries on without it.
+        """
+        try:
+            import genesis_body
+        except ImportError:
+            return {}
+        try:
+            h, w = rgb.shape[:2]
+            # Downsample stride so the field stays ≤64 loci per axis.
+            sy = max(1, -(-h // 64))
+            sx = max(1, -(-w // 64))
+            small = np.ascontiguousarray(rgb[::sy, ::sx])
+            dims = (small.shape[1], small.shape[0])
+            if self._eye is None or self._eye_dims != dims:
+                self._eye = genesis_body.VisionSystem(*dims)
+                self._eye_dims = dims
+                self._eye_last_t = None
+            now = time.monotonic()
+            dt = 0.05 if self._eye_last_t is None else min(0.25, max(0.005, now - self._eye_last_t))
+            self._eye_last_t = now
+            out = self._eye.step(small.tobytes(), dt)
+            cortical = out.get("cortical") or []
+            n = len(cortical[0]) if cortical else 0
+            return {
+                "mean_luminance": out.get("mean_luminance", 0.0),
+                "lid": out.get("lid", 0.0),
+                "pupil_mm": out.get("pupil_mm", 0.0),
+                "irradiance_gain": out.get("irradiance_gain", 0.0),
+                "gaze": out.get("gaze"),
+                "cortical_energy": [
+                    sum(plane) / n for plane in cortical
+                ] if n else [],
+                "grid": [small.shape[1], small.shape[0]],
+            }
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("occipital_lobe.perception.vision._step_eye", e)
+            return {}
 
     def see_frame(
         self,
@@ -755,6 +813,7 @@ class Vision:
                 self.mirror if mirror is None else mirror,
                 nerve,
             )
+            scene.eye = self._step_eye(rgb)
             scene.nerve = nerve
             return scene
         except Exception as e:  # noqa: BLE001

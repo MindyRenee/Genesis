@@ -612,8 +612,9 @@ def test_learn_emotion_word_from_labeling():
     """Emotion word learning associates words with categories."""
     from unittest.mock import MagicMock
 
-    from frontal_lobe import FrontalLobe
     from temporal_lobe.concepts import ConceptNetwork
+
+    from frontal_lobe import FrontalLobe
 
     # Create a minimal mock for the client
     client = MagicMock()
@@ -680,8 +681,9 @@ def test_learn_emotion_word_from_labeling():
 
 def test_learn_emotion_word_skips_non_emotion_words():
     """Emotion word learning skips common non-emotion words."""
-    from frontal_lobe import FrontalLobe
     from temporal_lobe.concepts import ConceptNetwork
+
+    from frontal_lobe import FrontalLobe
 
     cog = FrontalLobe.__new__(FrontalLobe)
     cog.network = ConceptNetwork()
@@ -704,8 +706,9 @@ def test_learn_emotion_word_skips_non_emotion_words():
 
 def test_learn_emotion_word_different_patterns():
     """Emotion word learning recognizes different labeling patterns."""
-    from frontal_lobe import FrontalLobe
     from temporal_lobe.concepts import ConceptNetwork
+
+    from frontal_lobe import FrontalLobe
 
     cog = FrontalLobe.__new__(FrontalLobe)
     cog.network = ConceptNetwork()

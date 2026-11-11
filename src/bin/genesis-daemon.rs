@@ -405,7 +405,7 @@ fn main() {
     eprintln!("[genesis] Subcognitive initialized.");
     eprintln!(
         "[genesis]   provenance: 0x{:012x}",
-        genesis::field::provenance_fingerprint()
+        genesis::latent_spaces::provenance_fingerprint()
     );
 
     // ── Wake recovery ──

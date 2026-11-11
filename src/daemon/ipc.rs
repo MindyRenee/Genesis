@@ -4107,7 +4107,7 @@ pub fn default_handler<L: LtmAccess>(
             }
         },
 
-        cmd::GET_MOTOR_TARGET => crate::field::motor::current_motor_target().encode(),
+        cmd::GET_MOTOR_TARGET => crate::latent_spaces::motor::current_motor_target().encode(),
 
         cmd::LIST_ACTUATORS => crate::daemon::actuators::encode_census(data_dir),
 

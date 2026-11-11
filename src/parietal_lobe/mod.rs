@@ -11,13 +11,13 @@
 //!   (`abstract_algebra`, `axioms`, `combinatorics`, `complex_analysis`,
 //!   `discrete`, `geometry`, `linear_algebra`, `number_theory`, `proof`,
 //!   `real_analysis`, `topology`, `trig`).
-//! - `motor` — distributed spatial and action motor fields (`field::motor`)
+//! - `motor` — distributed spatial and action motor fields (`latent_spaces::motor`)
 //!   decoded over the canonical 64×64 grid.
 //! - `tensor_slab` — the named multidimensional field store (`daemon::tensor_slab`)
 //!   through which spatial and motor fields are exchanged.
 
 pub use crate::daemon::tensor_slab;
-pub use crate::field::motor;
+pub use crate::latent_spaces::motor;
 pub use crate::math;
 pub use crate::math::{
     abstract_algebra, algebra, arithmetic, axioms, calculus, combinatorics, complex_analysis,

@@ -1650,7 +1650,7 @@ class LifecycleMixin:
                         scalar_updates.append((self.inner_life, "inner_world", staged_world))
                 if ils.get("self_latent_space") is not None:
                     try:
-                        from self.latent_geometry import SelfLatentSpaceArchitecture
+                        from latent_spaces.self_geometry import SelfLatentSpaceArchitecture
 
                         staged_self_latent = SelfLatentSpaceArchitecture()
                         staged_self_latent.restore(ils["self_latent_space"])

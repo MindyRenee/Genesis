@@ -43,10 +43,10 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from occipital_lobe import VisualCortex
     from temporal_lobe.concepts import EmbeddingStore
 
     from genesis_client.types import PlasticityProfile
+    from occipital_lobe import VisualCortex
 
 from basal_ganglia.td import TDLearner
 from limbic_system.curiosity import Curiosity
@@ -2811,8 +2811,9 @@ class AutonomousLearner:
         Runs in a background thread so it doesn't slow down text learning.
         """
         try:
-            from occipital_lobe import decode_image_bytes, resize_for_vision
             from tools.source_registry import wikipedia_lead_image
+
+            from occipital_lobe import decode_image_bytes, resize_for_vision
 
             # Fetch the article's lead image
             img_bytes = wikipedia_lead_image(article_title)

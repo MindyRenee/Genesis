@@ -93,7 +93,6 @@ from typing import TYPE_CHECKING
 
 from occipital_lobe.perception.ambient import AmbientListener, contains_wake_word, strip_wake_word
 from sleep.sleep import WakeOutcome
-from temporal_lobe import AuditoryCortex, SoundEvent
 from temporal_lobe.concepts import RelationType
 from temporal_lobe.speech import Voice, VoiceInput
 
@@ -105,6 +104,7 @@ from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
 from infrastructure.config import default_data_dir
 from mind import Mind
+from temporal_lobe import AuditoryCortex, SoundEvent
 
 if TYPE_CHECKING:
     from worlds.channel import Channel

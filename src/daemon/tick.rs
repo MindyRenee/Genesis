@@ -46,7 +46,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::cognition::{IntentionManager, SelfModel};
-use crate::field::{FieldIntegration, FieldRuntime};
+use crate::latent_spaces::{FieldIntegration, FieldRuntime};
 use crate::state::neurochemical::{NeuroTickParams, NeurochemicalId};
 use crate::state::{MentalPhase, ModuleId, ModuleStatus, subcognitive_flag};
 use crate::store::ring_buffer::EventType;
@@ -341,9 +341,9 @@ pub struct FieldSpectrumWire {
     /// Achieved sampling rate (Hz) — the bands' honest Nyquist.
     pub sample_rate_hz: f64,
     /// Flux channel — centroid motion energy per band.
-    pub flux: crate::field::spectrum::BandChannel,
+    pub flux: crate::latent_spaces::spectrum::BandChannel,
     /// Tension channel — fiber spread energy per band.
-    pub tension: crate::field::spectrum::BandChannel,
+    pub tension: crate::latent_spaces::spectrum::BandChannel,
 }
 
 impl FieldSpectrumWire {

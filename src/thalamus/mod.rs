@@ -21,7 +21,7 @@
 //!   them. The integrative substrate the tick loop drives.
 
 pub use crate::daemon::ipc;
-pub use crate::field::engine;
-pub use crate::field::runtime;
-pub use crate::field::spectrum;
+pub use crate::latent_spaces::engine;
+pub use crate::latent_spaces::runtime;
+pub use crate::latent_spaces::spectrum;
 pub use crate::state::manifest;

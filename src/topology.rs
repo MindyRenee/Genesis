@@ -25,7 +25,7 @@ pub struct Region {
     /// projections, as with the neuromodulator broadcast).
     pub projections: &'static [&'static str],
     /// The major-system fiber this region rides — one of the
-    /// `field::runtime` topology's three systems: `body` (somatic
+    /// `latent_spaces::runtime` topology's three systems: `body` (somatic
     /// state, slow), `prediction` (inference, fast), or `agency`
     /// (volitional and social). The anatomical map and the field
     /// map are one topology read at two scales.
@@ -87,7 +87,11 @@ pub const REGIONS: &[Region] = &[
     Region {
         name: "cerebellum",
         package: "cerebellum",
-        modules: &["field::motor", "field::engine", "daemon::adaptive"],
+        modules: &[
+            "latent_spaces::motor",
+            "latent_spaces::engine",
+            "daemon::adaptive",
+        ],
         projections: &["thalamus", "frontal_lobe"],
         fiber: "prediction",
     },
@@ -135,9 +139,9 @@ pub const REGIONS: &[Region] = &[
         package: "latent_spaces",
         modules: &[
             "field",
-            "field::engine",
-            "field::runtime",
-            "field::spectrum",
+            "latent_spaces::engine",
+            "latent_spaces::runtime",
+            "latent_spaces::spectrum",
             "state::phase_partition",
         ],
         projections: &["*"],
@@ -161,7 +165,7 @@ pub const REGIONS: &[Region] = &[
     Region {
         name: "parietal_lobe",
         package: "parietal_lobe",
-        modules: &["math", "field::motor", "daemon::tensor_slab"],
+        modules: &["math", "latent_spaces::motor", "daemon::tensor_slab"],
         projections: &["frontal_lobe", "cerebellum"],
         fiber: "prediction",
     },
@@ -183,9 +187,9 @@ pub const REGIONS: &[Region] = &[
         package: "thalamus",
         modules: &[
             "daemon::ipc",
-            "field::engine",
-            "field::runtime",
-            "field::spectrum",
+            "latent_spaces::engine",
+            "latent_spaces::runtime",
+            "latent_spaces::spectrum",
             "state::manifest",
         ],
         // The relay fans out to every region — these are the named
@@ -325,7 +329,7 @@ mod tests {
         // The anatomical map and the field map are one topology:
         // every region's fiber must be one of the major systems the
         // runtime actually builds.
-        let runtime = crate::field::runtime::FieldRuntime::new().unwrap();
+        let runtime = crate::latent_spaces::runtime::FieldRuntime::new().unwrap();
         let fibers: Vec<&str> = runtime
             .field()
             .fibers

@@ -62,17 +62,13 @@ _EXPORTS = {
     "KuramotoRiemannianSynchronizer": "self.master_cognitive_topos",
     "MasterCognitiveToposEngine": "self.master_cognitive_topos",
     "MasterFreeEnergyOptimizer": "self.master_cognitive_topos",
-    # self.personal_latent_spacetime — personal domain metrics & causal cones
-    "LatentConeRelation": "self.personal_latent_spacetime",
-    "LatentEvent": "self.personal_latent_spacetime",
-    "PersonalLatentSpacetime": "self.personal_latent_spacetime",
-    # self.latent_geometry — geometric latent-state model of self
-    "AgencyOwnershipFiberBundle": "self.latent_geometry",
-    "AutopoieticSymplecticFlow": "self.latent_geometry",
-    "GrassmannianSubspaceModule": "self.latent_geometry",
-    "NarrativeAgencyBaseManifold": "self.latent_geometry",
-    "SelfConsistencyInformationGeometry": "self.latent_geometry",
-    "SelfLatentSpaceArchitecture": "self.latent_geometry",
+    # latent_spaces.self_geometry — geometric latent-state model of self
+    "AgencyOwnershipFiberBundle": "latent_spaces.self_geometry",
+    "AutopoieticSymplecticFlow": "latent_spaces.self_geometry",
+    "GrassmannianSubspaceModule": "latent_spaces.self_geometry",
+    "NarrativeAgencyBaseManifold": "latent_spaces.self_geometry",
+    "SelfConsistencyInformationGeometry": "latent_spaces.self_geometry",
+    "SelfLatentSpaceArchitecture": "latent_spaces.self_geometry",
     # self.cognitive_trajectory
     "CognitiveTrajectoryModel": "self.cognitive_trajectory",
     "CognitiveTrajectoryReading": "self.cognitive_trajectory",
