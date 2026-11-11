@@ -226,3 +226,7 @@ def bind(
             )
         )
     return out
+
+
+# Regional alias so `from occipital_lobe import bind_proto_objects` is unambiguous.
+bind_proto_objects = bind

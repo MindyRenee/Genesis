@@ -341,8 +341,6 @@ from __future__ import annotations
 
 from _views import view_getattr
 
-_MARKER_G08 = 0x4753084154EF3CD1
-
 # The brainstem's modules are multi-subsystem — they are lazily
 # re-exported here so the anatomy is a real connection layer, not
 # just documentation.
@@ -396,6 +394,10 @@ _EXPORTS: dict[str, str] = {
     # read as wave-oscillator stimulus
     "apply_field_stimulus": "brainstem.field_probe",
     "field_phase_lock": "brainstem.field_probe",
+    # Maxwell's dipole signature on the substrate's coherent motion
+    "carrier_hz": "brainstem.maxwell",
+    "coherence": "brainstem.maxwell",
+    "field_signature": "brainstem.maxwell",
     # The acoustic channel — ambient sound (self-emission bands and
     # room) band-decomposed into wave stimulus; a sense, not a probe
     "apply_audio_stimulus": "brainstem.field_audio",

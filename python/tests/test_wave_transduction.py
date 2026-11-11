@@ -9,7 +9,7 @@ are never commanded; the body's own kinetics decide where they settle.
 from __future__ import annotations
 
 import pytest
-from hypothalamus.transduction import DRIVE_RATE, RELEASE_GAIN, transduce_waves, wave_impulses
+from hypothalamus.transduction import DRIVE_RATE, transduce_waves, wave_impulses
 from thalamus.brain_waves import BrainWave, BrainWaveState
 
 DT = 1.0

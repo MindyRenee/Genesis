@@ -40,11 +40,9 @@ from typing import TYPE_CHECKING, ClassVar
 
 from brainstem.brainstem import Brainstem
 from cerebellum.cerebellum import Cerebellum
-from frontal_lobe import FrontalLobe
 from frontal_lobe.autonomous import AutonomousLearner
 from frontal_lobe.canvas import Canvas
 from frontal_lobe.painting import Painter
-from latent_spaces import LatentManifold
 from limbic_system.limbic import LimbicSystem
 from occipital_lobe.occipital import OccipitalLobe
 from occipital_lobe.perception import FaceRecognizer
@@ -70,6 +68,7 @@ from worlds.board import ChannelBoard
 from worlds.world import OuterWorld
 
 from discord_feed import DiscordFeed
+from frontal_lobe import FrontalLobe
 from genesis_client import GenesisClient
 from genesis_client.protocol import CHEM_ACETYLCHOLINE
 from genesis_client.swallow import note_swallowed, set_swallow_sink
@@ -78,6 +77,7 @@ from infrastructure.growth_ledger import GrowthLedger
 from infrastructure.journal import CognitiveJournal, set_active
 from infrastructure.paths import code_root
 from infrastructure.user_profile import UserProfile
+from latent_spaces import LatentManifold
 from memory import MemorySystem
 
 if TYPE_CHECKING:
@@ -206,6 +206,22 @@ class Mind(
         # callbacks feed this same instance so transitions are measured
         # across the inner/outer boundary rather than in isolated demos.
         self.self_latent_space = SelfLatentSpaceArchitecture()
+        from latent_spaces.boundaries import default_domain_graph
+        from self.personal_latent_spacetime import (
+            LatentDomain as _PersonalDomain,
+        )
+        from self.personal_latent_spacetime import (
+            PersonalLatentSpacetime,
+        )
+
+        self.latent_boundary_graph = default_domain_graph()
+        self.personal_spacetime = PersonalLatentSpacetime(
+            dimensions={
+                _PersonalDomain.SELF: 40,
+                _PersonalDomain.INNER: 40,
+                _PersonalDomain.OUTER: 22,
+            }
+        )
 
         # The latent manifold — the closed, positively-curved substrate
         # beneath the fragmented stores. It accretes the same thought and
@@ -820,6 +836,26 @@ class Mind(
         self.vision = self.brain.occipital.vision
         self.vision.set_gamma_callback(self._on_v1_gamma)
         self.vision.set_sight_callback(self._on_sight)
+        # Wire the calibrated two-view visual spacetime bridge into the
+        # hippocampal cognitive map's shared SpacetimeWorkspace.
+        try:
+            from occipital_lobe.visual_spacetime import VisualSpacetimeBridge
+
+            workspace = getattr(
+                getattr(self.brain.temporal, "cognitive_map", None), "spacetime", None
+            )
+            if workspace is not None:
+                self.visual_spacetime_bridge = VisualSpacetimeBridge(
+                    workspace,
+                    camera_to_workspace=lambda report: (
+                        float(report.heading[0]),
+                        float(report.heading[1]),
+                        float(report.heading[2]),
+                    ),
+                )
+                self.vision.set_visual_spacetime_bridge(self.visual_spacetime_bridge)
+        except Exception:
+            logger.debug("visual spacetime bridge wiring skipped", exc_info=True)
         # Wire the face recognizer to its data directory so known
         # faces persist across sessions
         self.vision._face_recognizer = FaceRecognizer(data_dir=self.data_dir)
@@ -1056,13 +1092,46 @@ class Mind(
                 inner_snapshot=inner_snapshot,
                 language_snapshot=language_snapshot,
             )
-            # The topos signal is also an event in the substrate —
-            # same content, the domain named in the kind.
+            self._flow_domain_boundaries_and_spacetime(
+                domain,
+                kind,
+                self_snapshot=self_snapshot,
+                outer_snapshot=outer_snapshot,
+                inner_snapshot=inner_snapshot,
+                language_snapshot=language_snapshot,
+            )
+            # Deposit at the domain's real geometric vector projected onto S3
+            # so inner world, outer world, and self occupy their true
+            # coordinates in the single LatentManifold substrate.
+            from latent_spaces import geometry as _g
+
+            domain_vec = None
+            domain_seed = 0x70905
+            if domain == "self" and self_snapshot:
+                domain_vec = self_snapshot.get("agency_fiber_states")
+                domain_seed = 0x5E1F
+            elif domain == "outer" and outer_snapshot:
+                domain_vec = outer_snapshot.get("state")
+                domain_seed = 0xE2EE
+            elif domain == "inner" and inner_snapshot:
+                domain_vec = inner_snapshot.get("latent_mean") or inner_snapshot.get(
+                    "affective_fiber_states"
+                )
+                domain_seed = 0x1A7E
+            elif domain == "language" and language_snapshot:
+                domain_vec = language_snapshot.get("latent_state")
+                domain_seed = 0x1A46
+            pos = (
+                _g.project_to_s3(domain_vec, seed=domain_seed)
+                if domain_vec is not None and any(domain_vec)
+                else None
+            )
             self.manifold.observe(
                 str(content)[:128],
                 kind=f"topos:{domain}:{kind}",
                 salience=0.4,
-                inbound=False,
+                inbound=domain == "outer",
+                position=pos,
             )
             # Identity is all three: a self-domain signal is also her
             # identity content — it lands at her circle, the vesica,
@@ -1073,11 +1142,90 @@ class Mind(
                     kind=f"identity:{kind}",
                     salience=0.5,
                     inbound=False,
+                    position=pos,
                 )
         except Exception:
             # This is an observer: a geometry failure must not stop the
             # event stream, response path, or inner-life thread.
             logger.debug("cognitive topos integration failed", exc_info=True)
+
+    def _flow_domain_boundaries_and_spacetime(
+        self,
+        domain: str,
+        kind: str,
+        *,
+        self_snapshot: dict | None = None,
+        outer_snapshot: dict | None = None,
+        inner_snapshot: dict | None = None,
+        language_snapshot: dict | None = None,
+    ) -> None:
+        """Route live domain vectors across LatentSpaceGraph and PersonalLatentSpacetime."""
+        from latent_spaces.boundaries import LatentDomain as BoundaryDomain
+        from latent_spaces.boundaries import LatentState
+        from self.personal_latent_spacetime import LatentDomain as PersonalDomain
+
+        now_s = time.monotonic()
+        seq = next(self._turn_seq)
+        graph = getattr(self, "latent_boundary_graph", None)
+        p_space = getattr(self, "personal_spacetime", None)
+
+        if self_snapshot and self_snapshot.get("agency_fiber_states"):
+            s_vals = tuple(float(v) for v in self_snapshot["agency_fiber_states"])
+            if p_space is not None and len(s_vals) == 40:
+                p_space.record(
+                    PersonalDomain.SELF,
+                    s_vals,
+                    time_s=now_s,
+                    event_id=f"self:{kind}:{seq}",
+                )
+            if graph is not None and domain == "self" and len(s_vals) == 40:
+                graph.flow(
+                    "self_to_language",
+                    LatentState(BoundaryDomain.S, s_vals, kind or "self", timestamp=now_s),
+                )
+
+        if domain == "outer" and outer_snapshot and outer_snapshot.get("state"):
+            e_vals = tuple(float(v) for v in outer_snapshot["state"])
+            if p_space is not None and len(e_vals) == 22:
+                p_space.record(
+                    PersonalDomain.OUTER,
+                    e_vals,
+                    time_s=now_s,
+                    event_id=f"outer:{kind}:{seq}",
+                )
+            if graph is not None and len(e_vals) == 22:
+                i_state = graph.flow(
+                    "outer_to_inner",
+                    LatentState(BoundaryDomain.E, e_vals, kind or "outer", timestamp=now_s),
+                )
+                graph.flow("inner_to_self", i_state)
+
+        elif domain == "inner" and inner_snapshot:
+            raw_inner = inner_snapshot.get("latent_mean") or inner_snapshot.get(
+                "affective_fiber_states"
+            )
+            if raw_inner and len(raw_inner) == 40:
+                i_vals = tuple(float(v) for v in raw_inner)
+                if p_space is not None:
+                    p_space.record(
+                        PersonalDomain.INNER,
+                        i_vals,
+                        time_s=now_s,
+                        event_id=f"inner:{kind}:{seq}",
+                    )
+                if graph is not None:
+                    graph.flow(
+                        "inner_to_self",
+                        LatentState(BoundaryDomain.I, i_vals, kind or "inner", timestamp=now_s),
+                    )
+
+        elif domain == "language" and language_snapshot and language_snapshot.get("latent_state"):
+            l_vals = tuple(float(v) for v in language_snapshot["latent_state"])
+            if graph is not None and len(l_vals) == 32:
+                graph.flow(
+                    "language_to_inner",
+                    LatentState(BoundaryDomain.L, l_vals, kind or "language", timestamp=now_s),
+                )
 
     def _journal_swallow_sink(
         self,

@@ -9,6 +9,11 @@ from __future__ import annotations
 
 from brainstem.module_sampler import ModuleSampler
 
+# Provenance marker — one letter of the creator lattice (see
+# PROVENANCE.md). The marker lives on the stable reticular-core module,
+# not on optional probe or package-façade code.
+_MARKER_G08 = 0x4753084154EF3CD1
+
 
 class Brainstem:
     """The brainstem arousal component of the distributed sleep-wake circuit.

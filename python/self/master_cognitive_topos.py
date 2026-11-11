@@ -172,6 +172,7 @@ class KuramotoRiemannianSynchronizer:
         K: float = 1.5,
         dt: float = 0.01,
     ) -> FloatArray:
+        """Advance weighted Kuramoto phases by classic RK4 on T^N."""
         theta = _state(phases, "phases", self.num_oscillators)
         weights = _finite_array(metric_weights, "metric_weights", 3)
         expected = (theta.shape[0], self.num_oscillators, self.num_oscillators)
@@ -181,12 +182,19 @@ class KuramotoRiemannianSynchronizer:
             raise ValueError("K must be finite and non-negative")
         if not np.isfinite(dt) or dt <= 0:
             raise ValueError("dt must be finite and positive")
-        # diff[b, i, j] = theta_j - theta_i
-        phase_diffs = theta[:, None, :] - theta[:, :, None]
-        coupling = np.sum(weights * np.sin(phase_diffs), axis=-1)
         assert self.natural_frequencies is not None  # set in __post_init__
-        d_theta = self.natural_frequencies[None, :] + (K / self.num_oscillators) * coupling
-        return theta + d_theta * dt
+        omega = self.natural_frequencies[None, :]
+        gain = K / self.num_oscillators
+
+        def rhs(phi: FloatArray) -> FloatArray:
+            phase_diffs = phi[:, None, :] - phi[:, :, None]
+            return omega + gain * np.sum(weights * np.sin(phase_diffs), axis=-1)
+
+        k1 = rhs(theta)
+        k2 = rhs(theta + 0.5 * dt * k1)
+        k3 = rhs(theta + 0.5 * dt * k2)
+        k4 = rhs(theta + dt * k3)
+        return theta + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
 
 class MasterCognitiveToposEngine:

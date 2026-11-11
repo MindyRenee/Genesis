@@ -12,5 +12,8 @@
 //! - `rtc_wake` — the RTC wakealarm: the body's alarm clock, armed
 //!   via `SET_WAKE_ALARM` so a sleeping mind can be woken by
 //!   hardware, not by a process that has to stay awake to notice.
+//! - `sleep_network` — the Booth / Diniz Behn sleep-wake flip-flop
+//!   and Serkh–Forger circadian oscillator (`state::sleep_network`).
 
 pub use crate::daemon::rtc_wake;
+pub use crate::state::sleep_network;

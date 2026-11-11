@@ -18,14 +18,23 @@
 pub mod basal_forebrain;
 pub mod basal_ganglia;
 pub mod brainstem;
+pub mod cerebellum;
+pub mod frontal_lobe;
+pub mod hypothalamus;
 pub mod infrastructure;
+pub mod insula;
+pub mod latent_spaces;
 pub mod limbic_system;
 pub mod memory;
 pub mod neurochemical;
+pub mod occipital_lobe;
+pub mod parietal_lobe;
 pub mod self_;
 pub mod sleep;
+pub mod temporal_lobe;
 pub mod thalamus;
 pub mod tools;
+pub mod worlds;
 
 // ─── The spine ───────────────────────────────────────────────────
 // The map that holds the layout together — every region and the

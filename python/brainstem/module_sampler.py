@@ -132,6 +132,7 @@ _DIR_MODULE = {
     "sleep": MODULE_DREAMING,
     "tools": MODULE_INTENTION,
     "self": MODULE_METACOGNITION,
+    "latent_spaces": MODULE_MEMORY,  # unified S3/S7 manifold substrate
     "world": MODULE_REASONING,  # nested world-model packages
     "worlds": MODULE_REASONING,  # model of the world and other minds
     "eval": MODULE_METACOGNITION,  # measuring herself

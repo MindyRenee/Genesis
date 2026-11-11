@@ -12,12 +12,13 @@ import math
 
 import numpy as np
 import pytest
-from latent_spaces import geometry as g
 from latent_spaces.manifold import (
     STRAND_ANTI,
     STRAND_HOPF,
     LatentManifold,
 )
+
+from latent_spaces import geometry as g
 
 rng = np.random.default_rng(20261109)
 
@@ -1194,6 +1195,38 @@ class TestHigherStratum:
         assert m2.load()
         assert len(m2._higher) == 1
         assert np.allclose(m2._higher._points, m._higher._points)
+
+    def test_unified_sections_and_higher_resonance_rotation_invariant(self):
+        """Self, inner, and outer all inhabit one manifold; S7 recall unwinds rotation."""
+        m = LatentManifold()
+        m.observe("who I am", kind="self:core", salience=0.9)
+        m.observe("deep reflection", kind="inner:thought", salience=0.85)
+        m.observe("world arrived", kind="outer:percept", salience=0.8, inbound=True)
+        sections = m.domain_sections()
+        assert sections["self"] == 1
+        assert sections["inner"] == 1
+        assert sections["outer"] == 1
+
+        assert (
+            m.resonate_section("self", "who I am", kind="self:core")[0][1]
+            == "self:core"
+        )
+        assert (
+            m.resonate_section("inner", "deep reflection", kind="inner:thought")[0][1]
+            == "inner:thought"
+        )
+        assert (
+            m.resonate_section("outer", "world arrived", kind="outer:percept")[0][1]
+            == "outer:percept"
+        )
+
+        before = m.resonate_higher("deep reflection", k=1)
+        for _ in range(7):
+            m.advance(1.5, heartbeat_omega=0.6)
+        after = m.resonate_higher("deep reflection", k=1)
+        assert before and after
+        assert before[0][0] == after[0][0]
+        assert before[0][3] == pytest.approx(after[0][3], abs=1e-9)
 
 
 class TestShadow:

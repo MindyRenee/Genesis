@@ -823,14 +823,21 @@ _EXPORTS: dict[str, str] = {
     # counter-rotating projection, elastic/plastic holographic state, and Self feedback
     "AdaptiveLightConeManifold": "temporal_lobe.light_cones",
     "ElasticPlasticHologram": "temporal_lobe.light_cones",
+    "LightConeExperienceBridge": "temporal_lobe.light_cone_runtime",
     "LightConeModel": "temporal_lobe.light_cones",
     "SpacetimeEvent": "temporal_lobe.light_cones",
+    "SpacetimeWorkspace": "temporal_lobe.spacetime_workspace",
+    "WorkspaceSnapshot": "temporal_lobe.spacetime_workspace",
     "WorldDomain": "temporal_lobe.light_cones",
     "IntervalKind": "temporal_lobe.light_cones",
     "light_cone_coordinate": "temporal_lobe.light_cones",
     "double_cone_coordinate": "temporal_lobe.light_cones",
     "spine_point": "temporal_lobe.light_cones",
     "time_sunburst_ray": "temporal_lobe.light_cones",
+    # Machine-native language latent geometry (7-bit reversible ASCII + Sinkhorn OT)
+    "LanguageLatentSpace": "temporal_lobe.language_latent_space",
+    "decode_ascii": "temporal_lobe.language_latent_space",
+    "encode_ascii": "temporal_lobe.language_latent_space",
     # Optional differentiable implementation; importing the base package does not require PyTorch
     "TorchLightConeField": "temporal_lobe.light_cone_torch",
     # Social perception — the superior temporal sulcus detects people,

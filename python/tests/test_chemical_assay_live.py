@@ -34,14 +34,15 @@ pytestmark = pytest.mark.slow
 # asserts "at rest" before the system has rested.
 #
 # Scanning settle time against the gate:
-#   60 s -> fail (endocannabinoid +0.236)   500 s -> pass, no warnings
-#   200 s -> fail (endocannabinoid +0.139)  1000-2000 s -> pass, no warnings
-#   4000 s -> pass, but adenosine begins to warn as sleep pressure slowly
-#            accumulates, which is legitimate over long horizons
+#   60 s -> fail (endocannabinoid transient)   500 s -> stable
+#   200 s -> fail (endocannabinoid +0.139)     1000-2000 s -> stable
+#   4000 s -> adenosine begins to warn as sleep pressure accumulates
 #
-# 1000 s sits past the transient with margin and well before the slow
-# circadian and sleep-pressure drift, so it measures rest rather than
-# either startup or long-horizon state.
+# On hosts with CPU-idle telemetry, endocannabinoid also carries the
+# parasympathetic rest signal and legitimately rests above its genetic
+# default (see ``_SANITY_CIRCADIAN_TOL``). 1000 s sits past the startup
+# transient with margin and before the slower sleep-pressure drift, so
+# it measures physiological rest rather than either edge.
 SETTLE = 1000
 
 # Every chemical must move measurably in response to a direct impulse.

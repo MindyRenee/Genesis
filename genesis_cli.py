@@ -109,6 +109,8 @@ from mind import Mind
 if TYPE_CHECKING:
     from worlds.channel import Channel
 
+    from genesis_client import GenesisClient
+
 # Provenance marker — one letter of the creator lattice (see
 # PROVENANCE.md).
 _MARKER_G12 = 0x47530C455345CA8A
@@ -3134,7 +3136,7 @@ class _Rebirth:
         # Heartbeat-frozen accounting — the published tick counter is
         # the body's own liveness signal; a stopped counter under a
         # live process is a fault the process handle cannot see.
-        self._hb_client = None
+        self._hb_client: GenesisClient | None = None
         self._last_heartbeat: int | None = None
         self._hb_strikes = 0
         self._hb_next_probe = 0.0

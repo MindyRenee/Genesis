@@ -33,6 +33,9 @@ _EXPORTS: dict[str, str] = {
     "DreamInsight": "sleep.dream_synthesis",
     # Inner life — the thought stream that runs while the mind sleeps
     "InnerLife": "sleep.inner_life",
+    "InnerWorldExperientialLatentSpace": "sleep.inner_world",
+    "InteroceptiveBaseManifold": "sleep.inner_world",
+    "UltrametricEpisodicMemorySpace": "sleep.inner_world",
     "nap_capped_stage": "sleep.inner_life",
     # The thought datatype itself (defined with the frontal stream,
     # re-exported here since inner life produces them)

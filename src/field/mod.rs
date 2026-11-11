@@ -90,9 +90,6 @@ fn norm(a: &[f64]) -> f64 {
 fn scaled(a: &[f64], s: f64) -> Vector {
     a.iter().map(|x| x * s).collect()
 }
-fn add(a: &[f64], b: &[f64]) -> Vector {
-    a.iter().zip(b).map(|(x, y)| x + y).collect()
-}
 fn sub(a: &[f64], b: &[f64]) -> Vector {
     a.iter().zip(b).map(|(x, y)| x - y).collect()
 }
@@ -1170,21 +1167,21 @@ impl GlobalField {
         for i in 1..self.fibers.len() {
             let matrix = self.path_matrix(&self.fibers[i].id, &reference_id)?;
             let inv = matrix_inverse(&matrix)?;
-            let local_target_tangent = mat_vec(&inv, target_tangent)?;
-            let current = self.fibers[i].state()?;
-            let current_tangent = self.fibers[i].manifold.log_origin(&current)?;
-            let correction = scaled(&sub(&local_target_tangent, &current_tangent), signed_gain);
             let manifold = self.fibers[i].manifold.clone();
+            let local_target_tangent = mat_vec(&inv, target_tangent)?;
+            let local_target = manifold.project(&manifold.exp_origin(&local_target_tangent)?)?;
+            let current = self.fibers[i].state()?;
+            let geodesic_step = manifold.log_at(&current, &local_target)?;
+            let correction = scaled(&geodesic_step, signed_gain);
             let mut states_for_fiber = Vec::with_capacity(self.fibers[i].layers.len());
             for layer in &self.fibers[i].layers {
-                let tangent = manifold.log_origin(&layer.state)?;
-                let mut updated = add(&tangent, &correction);
+                let mut step_vec = correction.clone();
                 if sigma > 0.0 {
-                    for v in updated.iter_mut() {
+                    for v in step_vec.iter_mut() {
                         *v += sigma * gaussian(&mut rng);
                     }
                 }
-                let next = manifold.project(&manifold.exp_origin(&updated)?)?;
+                let next = manifold.project(&manifold.exp_at(&layer.state, &step_vec)?)?;
                 states_for_fiber.push(next);
             }
             next_states.push((i, states_for_fiber));

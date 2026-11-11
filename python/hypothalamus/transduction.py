@@ -73,6 +73,7 @@ from basal_ganglia.dopamine import Dopamine
 from basal_ganglia.gaba import GABA
 from brainstem.norepinephrine import Norepinephrine
 from brainstem.serotonin import Serotonin
+
 from .cortisol import Cortisol
 from .crh import CRH
 from .histamine import Histamine
@@ -84,7 +85,7 @@ from .vasopressin import Vasopressin
 if TYPE_CHECKING:
     from thalamus.brain_waves import BrainWaveState
 
-__all__ = ["DRIVE_RATE", "RELEASE_GAIN", "transduce_waves", "wave_impulses"]
+__all__ = ["DRIVE_RATE", "RELEASE_GAIN", "elapsed_since", "transduce_waves", "wave_impulses"]
 
 
 #: Release gain — level per second per unit band power. A band at

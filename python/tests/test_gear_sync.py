@@ -166,11 +166,11 @@ def test_constants_match_source() -> None:
     assert int(m.group(1)) == AUTONOMOUS_INTERVAL_MS
 
     heartbeat = (root / "python" / "brainstem" / "cycle.py").read_text(encoding="utf-8")
-    base = re.search(r"_cadence_period = ([\d.]+)", heartbeat)
-    lo = re.search(r"_cadence_min = ([\d.]+)", heartbeat)
-    hi = re.search(r"_cadence_max = ([\d.]+)", heartbeat)
-    assert base and lo and hi, "cadence bounds not found in cycle.py"
-    base, lo, hi = float(base.group(1)), float(lo.group(1)), float(hi.group(1))
+    base_m = re.search(r"_cadence_period = ([\d.]+)", heartbeat)
+    lo_m = re.search(r"_cadence_min = ([\d.]+)", heartbeat)
+    hi_m = re.search(r"_cadence_max = ([\d.]+)", heartbeat)
+    assert base_m and lo_m and hi_m, "cadence bounds not found in cycle.py"
+    base, lo, hi = float(base_m.group(1)), float(lo_m.group(1)), float(hi_m.group(1))
     assert base == MIND_HEARTBEAT_S, (
         "the mind's heartbeat base cadence changed; update MIND_HEARTBEAT_S"
     )

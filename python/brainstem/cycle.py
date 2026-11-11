@@ -149,6 +149,10 @@ class CycleMixin:
         _experience_since_identity: int
         _cycle_dt: float
         _last_cycle_at: float
+        _module_work_frac: float
+        _assoc_hot: float
+        _conn_hot: float
+        _body_control_capped: bool
 
         def __getattr__(self, name: str) -> Any: ...
 

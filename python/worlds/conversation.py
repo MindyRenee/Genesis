@@ -8,8 +8,6 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any
 
-from frontal_lobe import CognitiveState
-from occipital_lobe import load_image, resize_for_vision
 from parietal_lobe.grid import Grid
 from parietal_lobe.grounding import ground_scene
 from parietal_lobe.scene import Scene
@@ -20,6 +18,7 @@ from temporal_lobe.events import EventKind
 from temporal_lobe.presence import PresenceKind
 from thalamus.relay import KIND_HEARD
 
+from frontal_lobe import CognitiveState
 from genesis_client.protocol import (
     CHEM_DOPAMINE,
     CHEM_NOREPINEPHRINE,
@@ -29,6 +28,7 @@ from genesis_client.protocol import (
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
 from infrastructure.journal import record_event
+from occipital_lobe import load_image, resize_for_vision
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -466,7 +466,9 @@ class ConversationMixin:
     def _deposit_language(self, temporal: Any, content: str, kind: str) -> None:
         """Deposit the language space's own latent coordinate into the
         substrate — her language processing lives *in* the manifold."""
-        manifold = getattr(getattr(self.brain, "mind", None), "manifold", None)
+        manifold = getattr(self, "manifold", None)
+        if manifold is None:
+            manifold = getattr(getattr(self.brain, "mind", None), "manifold", None)
         state = getattr(temporal.language_latent_space, "_last_state", None)
         if manifold is None or state is None:
             return
@@ -500,7 +502,7 @@ class ConversationMixin:
     ) -> None:
         """Integrate an internally recorded thought into the shared self state."""
         details = metadata or {}
-        self.self_latent_space.observe_signal(
+        snap = self.self_latent_space.observe_signal(
             content,
             kind=kind,
             salience=float(details.get("salience", 0.4)),
@@ -511,11 +513,16 @@ class ConversationMixin:
         manifold = getattr(self, "manifold", None)
         if manifold is not None:
             try:
+                from latent_spaces import geometry as _g
+
+                fiber = (snap or {}).get("agency_fiber_states")
+                pos = _g.project_to_s3(fiber, seed=0x5E1F) if fiber else None
                 manifold.observe(
                     content,
-                    kind=kind,
+                    kind=f"self:{kind}" if not kind.startswith("self:") else kind,
                     salience=float(details.get("salience", 0.4)),
                     inbound=False,
+                    position=pos,
                 )
             except Exception:
                 logger.debug("manifold deposit failed", exc_info=True)
@@ -546,7 +553,7 @@ class ConversationMixin:
         # This observer is diagnostic/stateful and must never block the
         # world's event stream if numerical integration fails.
         try:
-            self.self_latent_space.observe_signal(
+            self_snap = self.self_latent_space.observe_signal(
                 event.describe(),
                 kind=f"world:{event.kind.value}",
                 salience=event.salience,
@@ -556,13 +563,23 @@ class ConversationMixin:
             )
             manifold = getattr(self, "manifold", None)
             if manifold is not None:
+                from latent_spaces import geometry as _g
+
+                world_state = (self.world.experiential_space.snapshot() or {}).get("state")
+                pos = (
+                    _g.project_to_s3(world_state, seed=0xE2EE)
+                    if world_state is not None and any(world_state)
+                    else None
+                )
                 manifold.observe(
                     event.describe(),
                     kind=f"world:{event.kind.value}",
                     salience=event.salience,
                     inbound=event.inbound,
+                    position=pos,
                 )
         except Exception:
+            self_snap = None
             logger.debug("self latent world observation failed", exc_info=True)
 
         # Feed the observed outer-world geometry and the just-updated self
@@ -572,7 +589,7 @@ class ConversationMixin:
             event.kind.value,
             event.describe(),
             outer_snapshot=self.world.experiential_space.snapshot(),
-            self_snapshot=self.self_latent_space.snapshot(),
+            self_snapshot=self_snap or self.self_latent_space.snapshot(),
         )
 
         if not event.inbound:

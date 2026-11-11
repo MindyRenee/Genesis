@@ -489,7 +489,21 @@ _EXPORTS: dict[str, str] = {
     "CalcResult": "parietal_lobe.math.arithmetic",
     "NumberSense": "parietal_lobe.math.number_sense",
     "ParietalAnswer": "parietal_lobe.math.cognitive",
+    "ParietalMath": "parietal_lobe.math",
     "route_parietal_math": "parietal_lobe.math.cognitive",
+    # Higher math domain faculties — paired 1:1 with src/math/*
+    "GroupResult": "parietal_lobe.math.abstract_algebra",
+    "AxiomResult": "parietal_lobe.math.axioms",
+    "CountResult": "parietal_lobe.math.combinatorics",
+    "ComplexResult": "parietal_lobe.math.complex_analysis",
+    "DiscreteResult": "parietal_lobe.math.discrete",
+    "GeoResult": "parietal_lobe.math.geometry",
+    "LinearResult": "parietal_lobe.math.linear_algebra",
+    "NumberResult": "parietal_lobe.math.number_theory",
+    "ProofResult": "parietal_lobe.math.proof",
+    "AnalysisResult": "parietal_lobe.math.real_analysis",
+    "TopoResult": "parietal_lobe.math.topology",
+    "TrigResult": "parietal_lobe.math.trig",
     # Descriptive statistics over collections — the same IPS
     # magnitude machinery asked about a sample rather than a
     # quantity.

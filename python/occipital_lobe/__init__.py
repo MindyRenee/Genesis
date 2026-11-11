@@ -474,11 +474,19 @@ _EXPORTS: dict[str, str] = {
     "PhototransductionCascade": "occipital_lobe.perception.phototransduction",
     "PhototransductionParams": "occipital_lobe.perception.phototransduction",
     "PhototransductionState": "occipital_lobe.perception.phototransduction",
+    # Ambient voice/wake-word ear — sensory organ gated by visual/thalamic state
+    "AmbientListener": "occipital_lobe.perception.ambient",
+    "contains_wake_word": "occipital_lobe.perception.ambient",
+    "strip_wake_word": "occipital_lobe.perception.ambient",
+    # Calibrated two-view visual spacetime bridge into the shared causal workspace
+    "VisualEventResult": "occipital_lobe.visual_spacetime",
+    "VisualSpacetimeBridge": "occipital_lobe.visual_spacetime",
     # V2 grouping — proto-objects bound by gamma-band synchrony (the
     # word-layer binding organ, paired with the body's
     # src/daemon/gamma.rs on the optic nerve).
     "ProtoObject": "occipital_lobe.gamma",
     "bind": "occipital_lobe.gamma",
+    "bind_proto_objects": "occipital_lobe.gamma",
     # The region itself — the ventral visual stream as one object
     "OccipitalLobe": "occipital_lobe.occipital",
     # LGN — thalamic visual relay with M/P/K pathway separation
@@ -504,6 +512,7 @@ _EXPORTS: dict[str, str] = {
 }
 
 __all__ = [
+    "AmbientListener",
     "DetectedFace",
     "EpipolarProcessor",
     "FaceRecognizer",
@@ -532,14 +541,18 @@ __all__ = [
     "Vision",
     "VisualContour",
     "VisualCortex",
+    "VisualEventResult",
     "VisualFeature",
     "VisualField",
     "VisualPathway",
     "VisualPathwayOutput",
     "VisualPercept",
+    "VisualSpacetimeBridge",
     "bind",
+    "bind_proto_objects",
     "chroma",
     "cone_opponent",
+    "contains_wake_word",
     "create_visual_pathway",
     "decode_image_bytes",
     "defocus_sigma",
@@ -552,6 +565,7 @@ __all__ = [
     "srgb_to_linear",
     "srgb_to_lms",
     "srgb_to_xyz",
+    "strip_wake_word",
     "xyz_to_lab",
     "xyz_to_lms",
 ]

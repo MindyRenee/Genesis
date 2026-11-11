@@ -159,11 +159,20 @@ _WARP_REPLAY = 0.02
 _KIND_DOMAIN = {
     "world": "outer",
     "voice_outer": "outer",
+    "outer": "outer",
     "voice_inner": "inner",
+    "inner": "inner",
     "thought": "inner",
     "dream": "inner",
     "memory": "inner",
+    "language": "inner",
+    "concept": "inner",
+    "word": "inner",
+    "edge": "inner",
+    "archive": "inner",
+    "vq": "inner",
     "emotion": "boundary",
+    "boundary": "boundary",
     "self": "self",
     "self_model": "self",
     "identity": "self",
@@ -995,6 +1004,68 @@ class LatentManifold:
         with self._lock:
             return len(self._kinds)
 
+    def domain_sections(self) -> dict[str, int]:
+        """Count deposits per section of the unified latent space.
+
+        Every trace lives in one section of the substrate — ``self``,
+        ``inner``, ``outer`` (plus ``boundary``, the affective saddle
+        between ``self`` and ``inner``).
+        """
+        with self._lock:
+            counts = {"self": 0, "boundary": 0, "inner": 0, "outer": 0}
+            for k in self._kinds:
+                d = _domain_of(k)
+                counts[d if d in counts else "inner"] += 1
+            return counts
+
+    def resonate_section(
+        self,
+        section: str,
+        cue: str | FloatArray,
+        *,
+        k: int = 5,
+        radius: float = 0.5,
+        kind: str | None = None,
+        seed: int = 0xC0FFEE,
+    ) -> list[tuple[int, str, float, float]]:
+        """Recall traces restricted to one latent-space section.
+
+        ``kind`` describes the cue's provenance for digest coding; the
+        section filter is applied to the answering deposits, not to the
+        cue's own kind.
+        """
+        if section not in _DOMAIN_DEPTH:
+            raise ValueError(f"unknown latent section: {section!r}")
+        hits = self.resonate(
+            cue,
+            k=max(k * 4, 16),
+            radius=radius,
+            kind=kind or section,
+            seed=seed,
+        )
+        return [h for h in hits if _domain_of(h[1]) == section][:k]
+
+    def resonate_higher(
+        self, cue: str | FloatArray, *, k: int = 5, seed: int = 0xC0FFEE
+    ) -> list[tuple[int, str, float, float]]:
+        """Recall inner-world deposits via S7 quaternionic Clifford resonance."""
+        if isinstance(cue, str):
+            cue_point = self._digest_point(cue, "inner", "inner")
+        else:
+            v = np.asarray(cue, dtype=np.float64).ravel()
+            cue_point = (
+                g.unit(v.reshape(1, -1))[0]
+                if v.size == 4
+                else g.project_to_s3(v, seed=seed)
+            )
+        with self._lock:
+            raw = self._higher.resonate(cue_point, k=k)
+            return [
+                (idx, self._kinds[idx], float(score * self._reach[idx]), dist)
+                for idx, score, dist in raw
+                if 0 <= idx < len(self._kinds)
+            ]
+
     def state_summary(self) -> dict[str, object]:
         """Concise diagnostics: deposit counts, domain mix, medium state."""
         with self._lock:
@@ -1002,12 +1073,15 @@ class LatentManifold:
                 depths = np.empty(0)
             else:
                 depths = g.depth(self._points)
+            sections = self.domain_sections()
             return {
                 "deposits": len(self._kinds),
                 "hopf_strand": int(np.sum(self._strand == STRAND_HOPF)),
                 "anti_strand": int(np.sum(self._strand == STRAND_ANTI)),
                 "inner_world": int(np.sum(depths < g.CLIFFORD_DEPTH)),
                 "outer_world": int(np.sum(depths >= g.CLIFFORD_DEPTH)),
+                "sections": sections,
+                "higher_lifted": len(self._higher),
                 "rungs": int(np.unique(self._rung[self._rung >= 0]).size),
                 "open_rung": int(self._open_rung),
                 "phase": self._phase,
@@ -1052,6 +1126,8 @@ class LatentManifold:
                 higher_sources=np.asarray(
                     self._higher._sources, dtype=np.int64
                 ),
+                higher_phase=np.array(self._higher._phase, dtype=np.float64),
+                higher_phase0=self._higher._phase0,
                 kinds=str_array(self._kinds),
                 scalars=np.array(
                     [
@@ -1159,5 +1235,19 @@ class LatentManifold:
                     self._higher._sources = [
                         int(s) for s in data["higher_sources"]
                     ]
+                    self._higher._phase = (
+                        float(data["higher_phase"])
+                        if "higher_phase" in data
+                        else 0.0
+                    )
+                    if "higher_phase0" in data:
+                        p0 = np.asarray(data["higher_phase0"], dtype=np.float64)
+                        self._higher._phase0 = (
+                            p0
+                            if p0.shape == (len(self._higher._sources),)
+                            else np.zeros(len(self._higher._sources))
+                        )
+                    else:
+                        self._higher._phase0 = np.zeros(len(self._higher._sources))
             self._dirty = False
         return True

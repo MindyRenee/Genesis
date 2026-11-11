@@ -23,4 +23,5 @@
 pub use crate::daemon::ipc;
 pub use crate::field::engine;
 pub use crate::field::runtime;
+pub use crate::field::spectrum;
 pub use crate::state::manifest;

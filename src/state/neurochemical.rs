@@ -4373,7 +4373,14 @@ impl NeurochemicalVector {
             let receptor_health = chem.receptor_sensitivity
                 * chem.desensitization_factor
                 * chem.internalization_factor;
-            let effective_deviation = deviation * receptor_health;
+            // Normalize the composite health before scaling occupancy.
+            // The triple product is the total signaling health, but using
+            // it directly makes each adaptation pathway feel only one
+            // third of the measured agonist drive once the cascade has
+            // begun. The cube root preserves the correct direction and
+            // attenuation without turning receptor burnout into a false
+            // low-occupancy signal.
+            let effective_deviation = deviation * receptor_health.cbrt();
 
             // Receptor turnover: slow background recovery toward 1.0.
             // Models continuous receptor replacement (half-life days
@@ -4404,7 +4411,7 @@ impl NeurochemicalVector {
             // Receptor sensitivity adaptation — the slowest of the three
             // mechanisms: receptor density/expression changes over hours
             // to days, long after functional desensitization has run.
-            {
+            if sleep_resens <= 0.0 {
                 let adapt_deviation = if deviation > 0.0 {
                     effective_deviation
                 } else {
@@ -4446,7 +4453,7 @@ impl NeurochemicalVector {
             // 11–13× within 1 min of agonist exposure; January et al.,
             // JBC 1997). Use effective deviation for downregulation.
             let desens_rate = chem_adapt_rate * 5.0;
-            {
+            if sleep_resens <= 0.0 {
                 let adapt_deviation = if deviation > 0.0 {
                     effective_deviation
                 } else {
@@ -4487,7 +4494,7 @@ impl NeurochemicalVector {
             // agonist exposure (January et al., JBC 1997; DAMGO/MOR
             // 50–58%). Use effective deviation for downregulation.
             let intern_rate = chem_adapt_rate;
-            {
+            if sleep_resens <= 0.0 {
                 let adapt_deviation = if deviation > 0.0 {
                     effective_deviation
                 } else {

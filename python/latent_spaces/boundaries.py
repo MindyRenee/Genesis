@@ -220,6 +220,67 @@ class LatentSpaceGraph:
         }
 
 
+def _deterministic_matrix(out_dim: int, in_dim: int) -> tuple[tuple[float, ...], ...]:
+    """Row-normalized deterministic frame map matching Ehresmann transport."""
+    rows: list[tuple[float, ...]] = []
+    root2 = math.sqrt(2.0)
+    for r in range(1, out_dim + 1):
+        raw = [math.sin(r * c * root2) for c in range(1, in_dim + 1)]
+        norm = math.sqrt(sum(v * v for v in raw)) or 1.0
+        rows.append(tuple(v / norm for v in raw))
+    return tuple(rows)
+
+
+def default_domain_graph(
+    *,
+    outer_dim: int = 22,
+    inner_dim: int = 40,
+    self_dim: int = 40,
+    language_dim: int = 32,
+) -> LatentSpaceGraph:
+    """Build the canonical E <-> I <-> S <-> L typed boundary graph for Mind."""
+    return LatentSpaceGraph(
+        (
+            Boundary(
+                "outer_to_inner",
+                LatentDomain.E,
+                LatentDomain.I,
+                _deterministic_matrix(inner_dim, outer_dim),
+            ),
+            Boundary(
+                "inner_to_self",
+                LatentDomain.I,
+                LatentDomain.S,
+                _deterministic_matrix(self_dim, inner_dim),
+            ),
+            Boundary(
+                "self_to_language",
+                LatentDomain.S,
+                LatentDomain.L,
+                _deterministic_matrix(language_dim, self_dim),
+            ),
+            Boundary(
+                "language_to_inner",
+                LatentDomain.L,
+                LatentDomain.I,
+                _deterministic_matrix(inner_dim, language_dim),
+            ),
+            Boundary(
+                "self_to_outer",
+                LatentDomain.S,
+                LatentDomain.E,
+                _deterministic_matrix(outer_dim, self_dim),
+            ),
+            Boundary(
+                "outer_to_self",
+                LatentDomain.E,
+                LatentDomain.S,
+                _deterministic_matrix(self_dim, outer_dim),
+            ),
+        )
+    )
+
+
 def energy_from_mass(mass_kg: float, *, c_m_per_s: float = 299_792_458.0) -> float:
     """Return physical rest energy E=mc² in joules for a physical mass.
 

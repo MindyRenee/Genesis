@@ -201,7 +201,12 @@ const CA_SIGNAL_FULL_MM: f32 = 0.005;
 
 /// ln(intra/extra) at the resting gradient, per ion (Ca, Cl, K, Na).
 /// The gradient-integrity kernel measures deviation from these.
-const REST_LOG_RATIO: [f32; ION_COUNT] = [-9.394, -2.909, 3.332, -2.674];
+const REST_LOG_RATIO: [f32; ION_COUNT] = [
+    -9.392_662, // ln(0.0001 / 1.2)
+    -2.908_721, // ln(6 / 110)
+    3.332_205,  // ln(140 / 5)
+    -2.674_149, // ln(10 / 145)
+];
 
 /// Nernst reversal potentials at the resting gradients (mV), per ion.
 /// Used only when a concentration gradient has collapsed (non-positive

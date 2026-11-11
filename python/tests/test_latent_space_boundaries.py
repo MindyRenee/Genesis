@@ -93,3 +93,12 @@ def test_e_equals_mc_squared_is_physical_and_separate_from_latent_flow() -> None
     assert energy_from_mass(0.0) == 0.0
     with pytest.raises(ValueError):
         energy_from_mass(-1.0)
+
+
+def test_default_domain_graph_connects_all_domains() -> None:
+    from latent_spaces.boundaries import default_domain_graph
+
+    graph = default_domain_graph()
+    for src in LatentDomain:
+        for dst in LatentDomain:
+            assert graph.reachable(src, dst)

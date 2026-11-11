@@ -66,10 +66,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from genesis_client import GenesisClient
     from genesis_client.types import FieldSpectrum
 
-# Provenance marker — one letter of the creator lattice (see
-# PROVENANCE.md).
-_MARKER_G08 = 0x4753084154EF3CD1
-
 # Stimulus scales — energies are baseline-relative (≈1.0 typical),
 # so the mapping reads *elevation above her own quiet*: half a
 # baseline unit of excess is already a strong drive.

@@ -86,6 +86,7 @@ class PersonalLatentSpacetime:
             domain: [] for domain in LatentDomain
         }
         self._event_ids: set[str] = set()
+        self._max_events_per_domain: int = 512
 
         for domain in LatentDomain:
             dimension = dims.get(domain)
@@ -149,6 +150,9 @@ class PersonalLatentSpacetime:
         )
         self._events[domain].append(event)
         self._event_ids.add(event_id)
+        if len(self._events[domain]) > self._max_events_per_domain:
+            evicted = self._events[domain].pop(0)
+            self._event_ids.discard(evicted.event_id)
         return event
 
     def self_apex(self) -> LatentEvent | None:

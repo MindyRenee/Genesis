@@ -27,11 +27,12 @@ from __future__ import annotations
 
 import math
 import random
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from hypothalamus.transduction import _PEPTIDES, wave_impulses
+from hypothalamus.transduction import _PEPTIDES, elapsed_since, wave_impulses
 from thalamus.brain_waves import BrainWaveOscillator, BrainWaveState
 
 from genesis_client import NeuroSummary
@@ -58,6 +59,7 @@ class ArcNeuroLoop:
     state: BrainWaveState | None = None
     field_live: bool = False
     _oscillator: BrainWaveOscillator = field(init=False, repr=False)
+    _last_beat_at: float | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         """Start every chemical at baseline and build her oscillator."""
@@ -74,8 +76,17 @@ class ArcNeuroLoop:
         """Her current attentional focus from the wave state (0.5 before any beat)."""
         return self.state.focus if self.state is not None else 0.5
 
-    def beat(self, *, dopamine_rpe: float, novel: bool, changed: bool) -> BrainWaveState:
+    def beat(
+        self,
+        *,
+        dopamine_rpe: float,
+        novel: bool,
+        changed: bool,
+        dt: float | None = None,
+    ) -> BrainWaveState:
         """Run one loop cycle after a move and return the new wave state."""
+        step_dt = elapsed_since(self._last_beat_at) if dt is None else max(0.01, min(10.0, dt))
+        self._last_beat_at = time.monotonic()
         decay = math.exp(-1.0 / TAU_BEATS)
         for name, level in self.chemicals.items():
             base = self._baseline[name]
@@ -100,7 +111,7 @@ class ArcNeuroLoop:
             dopamine_phasic=dopamine_rpe,
         )
         self.state = self._oscillator.assess(summary, chemicals=chem)
-        for index, impulse in wave_impulses(self.state, chem):
+        for index, impulse in wave_impulses(self.state, chem, step_dt):
             peptide = self._peptide.get(index)
             if peptide is not None:
                 chem[peptide] = _clip(chem[peptide] + impulse)

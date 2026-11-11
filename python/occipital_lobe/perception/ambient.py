@@ -263,7 +263,7 @@ class AmbientListener:
             logger.warning(f"ambient listener unavailable: {e}")
             self._running = False
             return
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # PortAudioError and friends are not OSError — an audio
             # stack that cannot initialize must degrade the same way.
             logger.warning(f"ambient listener unavailable: {e}")
