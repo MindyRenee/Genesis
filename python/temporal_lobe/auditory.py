@@ -445,8 +445,14 @@ class AuditoryCortex:
             # microphone — so it must degrade the same way instead of
             # propagating out of the audio thread.
             sounddevice.query_devices()
-        except (ImportError, OSError) as e:
+        except ImportError as e:
             logger.warning(f"Auditory cortex: sounddevice unavailable ({e})")
+            return False
+        except Exception as e:  # noqa: BLE001
+            # PortAudioError and friends are not OSError — a present
+            # but unusable audio stack (no server, no device) must
+            # degrade the same way, never propagate into startup.
+            logger.warning(f"Auditory cortex: audio probe failed ({e})")
             return False
         with self._lifecycle_lock:
             if self._running:
