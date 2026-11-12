@@ -488,3 +488,49 @@ def test_interactive_mind_keeps_probe() -> None:
     mind = Mind(os.path.join(data_dir, "genesis.sock"))
     assert mind._headless is False
     assert mind.learner._sources._connectivity_probe is True
+
+
+def test_headless_mind_quiesces_autonomous_subsystems() -> None:
+    """A resident mind just is: learner, inner life, and regulator
+    never start — the modules still mark Running since their IPC
+    services are live."""
+    import os
+    import tempfile
+    from unittest.mock import Mock
+
+    from mind import Mind
+
+    data_dir = tempfile.mkdtemp(prefix="headless_quiesce_test_")
+    mind = Mind(os.path.join(data_dir, "genesis.sock"), headless=True)
+    mind.learner = Mock()
+    mind.inner_life = Mock()
+    mind.brain.limbic.regulator = Mock()
+    mind.client = Mock()
+
+    mind._start_autonomous_subsystems()
+
+    mind.learner.start.assert_not_called()
+    mind.inner_life.start.assert_not_called()
+    mind.regulator.start.assert_not_called()
+
+
+def test_interactive_mind_starts_autonomous_subsystems() -> None:
+    """A session mind gets the full autonomous complement."""
+    import os
+    import tempfile
+    from unittest.mock import Mock
+
+    from mind import Mind
+
+    data_dir = tempfile.mkdtemp(prefix="interactive_subsys_test_")
+    mind = Mind(os.path.join(data_dir, "genesis.sock"))
+    mind.learner = Mock()
+    mind.inner_life = Mock()
+    mind.brain.limbic.regulator = Mock()
+    mind.client = Mock()
+
+    mind._start_autonomous_subsystems()
+
+    mind.learner.start.assert_called_once()
+    mind.inner_life.start.assert_called_once()
+    mind.regulator.start.assert_called_once()

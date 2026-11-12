@@ -338,6 +338,19 @@ class LifecycleMixin:
 
     def _start_autonomous_subsystems(self) -> None:
         """Start autonomous learning, inner life, and emotional regulation."""
+        if self._headless:
+            # A resident mind is a presence, not a session: nobody
+            # sits at a prompt, so nothing should act on its own —
+            # no self-directed learning, no spontaneous thought
+            # stream, no self-regulation. She just is. The modules
+            # still mark Running: their IPC services are live, only
+            # the autonomous threads are quiesced. Sleep still comes
+            # from the body's own staging, not these threads.
+            logger.info(
+                "Headless — autonomous subsystems quiesced; the mind just is"
+            )
+            self._mark_modules_running()
+            return
         # Start autonomous learning in the background
         self.learner.start()
         # Start inner life — spontaneous thoughts

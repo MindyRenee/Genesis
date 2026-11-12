@@ -233,12 +233,14 @@ _is_running() {
 WANT_STOP=0
 OFFLINE_ARG=""
 GAME_ARG=""
+HEADLESS_ARG=""
 for arg in "$@"; do
     case "$arg" in
         wake)      : ;;  # the explicit verb — starting is the default act
         --stop)    WANT_STOP=1 ;;
-        --offline) OFFLINE_ARG="--offline" ;;
-        --game)    GAME_ARG="--game" ;;
+        --offline)  OFFLINE_ARG="--offline" ;;
+        --game)     GAME_ARG="--game" ;;
+        --headless) HEADLESS_ARG="--headless" ;;
         *) echo "  Unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
@@ -362,4 +364,4 @@ if [ ! -x "$VENV_PY" ]; then
     echo "[genesis] $VENV_PY not found — run scripts/install.sh first"
     exit 1
 fi
-PYTHONPATH="$PWD/python:${PYTHONPATH:-}" "$VENV_PY" genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:+$OFFLINE_ARG} ${GAME_ARG:+$GAME_ARG}
+PYTHONPATH="$PWD/python:${PYTHONPATH:-}" "$VENV_PY" genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:+$OFFLINE_ARG} ${GAME_ARG:+$GAME_ARG} ${HEADLESS_ARG:+$HEADLESS_ARG}
