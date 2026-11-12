@@ -612,9 +612,8 @@ def test_learn_emotion_word_from_labeling():
     """Emotion word learning associates words with categories."""
     from unittest.mock import MagicMock
 
-    from temporal_lobe.concepts import ConceptNetwork
-
     from frontal_lobe import FrontalLobe
+    from temporal_lobe.concepts import ConceptNetwork
 
     # Create a minimal mock for the client
     client = MagicMock()
@@ -681,9 +680,8 @@ def test_learn_emotion_word_from_labeling():
 
 def test_learn_emotion_word_skips_non_emotion_words():
     """Emotion word learning skips common non-emotion words."""
-    from temporal_lobe.concepts import ConceptNetwork
-
     from frontal_lobe import FrontalLobe
+    from temporal_lobe.concepts import ConceptNetwork
 
     cog = FrontalLobe.__new__(FrontalLobe)
     cog.network = ConceptNetwork()
@@ -706,9 +704,8 @@ def test_learn_emotion_word_skips_non_emotion_words():
 
 def test_learn_emotion_word_different_patterns():
     """Emotion word learning recognizes different labeling patterns."""
-    from temporal_lobe.concepts import ConceptNetwork
-
     from frontal_lobe import FrontalLobe
+    from temporal_lobe.concepts import ConceptNetwork
 
     cog = FrontalLobe.__new__(FrontalLobe)
     cog.network = ConceptNetwork()
@@ -940,14 +937,9 @@ def _run_mind_tests(mind) -> None:
     assert status["interactions"] == 4
     logger.info(f"  PASS  status: phase={status['phase']}, emotion={status['emotion']}")
 
-    # Test 6: Introspection — her self-report is composed through the
-    # language engine (no recited diagnostic lines, no leaked markers);
-    # the raw subsystem dump remains on the diagnostic surface.
+    # Test 6: Introspection
     introspection = mind.introspect()
-    assert introspection.strip(), "introspection produced no words"
-    assert "[last_input:" not in introspection, "diagnostic markers leaked into speech"
-    diagnostic = mind.diagnostic_report()
-    assert "Intent" in diagnostic or "intent" in diagnostic.lower()
+    assert "Intent" in introspection or "intent" in introspection.lower()
     logger.info(f"  PASS  introspection: '{introspection[:50]}...'")
 
     # Test 7: Emotional state changed

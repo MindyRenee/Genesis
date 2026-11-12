@@ -70,47 +70,7 @@ class ToolRegistry:
 
     def _register_builtins(self) -> None:
         """Register the built-in tools that ship with Genesis."""
-        from .android_lab import ANDROID_TOOLS
-        from .creation_lab import CREATION_TOOLS
-        from .database import DATABASE_TOOLS
-        from .dictionary import DICTIONARY_TOOLS
-        from .formats import FORMAT_TOOLS
-        from .fun import FUN_TOOLS
-        from .github_lab import GITHUB_TOOLS
-        from .lab import LAB_TOOLS
-        from .languages import LANGUAGES_TOOLS
-        from .lintshop import LINT_TOOLS
-        from .math_lab import MATH_LAB_TOOLS
-        from .mysteries import MYSTERY_TOOLS
-        from .net_lab import NET_TOOLS
-        from .notes import NOTES_TOOLS
-        from .personal import PERSONAL_TOOLS
-        from .sensors import SENSOR_TOOLS
-        from .testing_lab import TESTING_TOOLS
-        from .workstation import WORKSTATION_TOOLS
-
-        all_tools = (
-            _BUILTIN_TOOLS
-            + WORKSTATION_TOOLS
-            + LANGUAGES_TOOLS
-            + MATH_LAB_TOOLS
-            + SENSOR_TOOLS
-            + LINT_TOOLS
-            + NET_TOOLS
-            + NOTES_TOOLS
-            + TESTING_TOOLS
-            + CREATION_TOOLS
-            + PERSONAL_TOOLS
-            + GITHUB_TOOLS
-            + ANDROID_TOOLS
-            + DATABASE_TOOLS
-            + FUN_TOOLS
-            + DICTIONARY_TOOLS
-            + FORMAT_TOOLS
-            + MYSTERY_TOOLS
-            + LAB_TOOLS
-        )
-        for name, description, fn in all_tools:
+        for name, description, fn in _BUILTIN_TOOLS:
             self.register(Tool(name, description, fn))
 
     def register(self, tool: Tool) -> None:
@@ -125,31 +85,23 @@ class ToolRegistry:
         """Return a list of dicts with each tool's name and description."""
         return [{"name": t.name, "description": t.description} for t in self._tools.values()]
 
-    def run(self, tool_name: str, **kwargs: Any) -> ToolResult:
+    def run(self, name: str, **kwargs: Any) -> ToolResult:
         """Look up and invoke a named tool, returning an error result if unknown."""
-        tool = self._tools.get(tool_name)
+        tool = self._tools.get(name)
         if tool is None:
-            return ToolResult(success=False, error=f"Unknown tool: {tool_name}")
+            return ToolResult(success=False, error=f"Unknown tool: {name}")
         if self.gate is not None:
             # Every act is a candidate intention — the gate reads the
             # act's own text ("run_shell rm -rf build") the way it
             # reads a goal's object; restraint is a veto, not advice.
-            intent = " ".join([tool_name] + [str(v) for v in kwargs.values() if isinstance(v, str)])
+            intent = " ".join([name] + [str(v) for v in kwargs.values() if isinstance(v, str)])
             try:
                 restraint = self.gate(intent)
             except Exception:  # noqa: BLE001 — a broken gate must not
                 restraint = None  # break the tool path
             if restraint is not None:
                 return ToolResult(success=False, error=f"restrained: {restraint}")
-        try:
-            return tool.run(**kwargs)
-        except TypeError as e:
-            return ToolResult(success=False, error=f"bad arguments for {tool_name}: {e}")
-        except Exception as e:  # noqa: BLE001 — a tool fault is reported,
-            return ToolResult(  # never propagated into her effector thread
-                success=False,
-                error=f"{tool_name} faulted: {e}",
-            )
+        return tool.run(**kwargs)
 
 
 def _safe_path(path: str, project_root: str) -> pathlib.Path | None:
@@ -360,9 +312,8 @@ def concept_lookup(concept: str, network: Any) -> ToolResult:
 def read_file(path: str, offset: int = 0, limit: int = 200, project_root: str = ".") -> ToolResult:
     """Read part of a file — no file type refused, nothing sealed.
 
-    Text files return a character window (``offset``/``limit``); a
-    negative ``offset`` tails the file — ``offset=-500`` reads the last
-    500 characters. Binary files return a metadata description — size, sha256, format,
+    Text files return a character window (``offset``/``limit``).
+    Binary files return a metadata description — size, sha256, format,
     hex head — so content that cannot be shown as text still registers.
     Any readable file answers with its content, credential-class files
     included: her read scope is the whole filesystem.
@@ -406,8 +357,8 @@ def read_file(path: str, offset: int = 0, limit: int = 200, project_root: str = 
     except OSError as e:
         return ToolResult(success=False, error=str(e))
 
-    start = max(0, len(text) + offset) if offset < 0 else offset
-    end = start + limit if limit > 0 else len(text)
+    start = offset
+    end = offset + limit if limit > 0 else len(text)
     snippet = text[start:end]
     return ToolResult(
         success=True,
@@ -558,7 +509,6 @@ def run_shell(
             command,
             shell=True,
             cwd=str(root),
-            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -724,37 +674,6 @@ def web_fetch(url: str) -> ToolResult:
     )
 
 
-def search_and_fetch(query: str, limit: int = 3) -> ToolResult:
-    """Search the web and fetch the first readable result in one step.
-
-    The search→fetch chain packaged: searches for the query, then
-    fetches each result in order until one returns readable text —
-    a dead first hit (blocked domain, redirect, non-html body) does
-    not sink the episode when the next result is readable.
-
-    The returned ``data`` matches ``web_fetch``'s — ``url``,
-    ``title``, ``content``, ``related_links``.
-    """
-    from .web_search import search_and_fetch as _search_and_fetch
-
-    page = _search_and_fetch(query, limit=limit)
-    if page is None:
-        return ToolResult(
-            success=False,
-            error="No results found, or every result failed to fetch.",
-        )
-    return ToolResult(
-        success=True,
-        output=f"Fetched '{page.title}' ({len(page.content)} chars).",
-        data={
-            "url": page.url,
-            "title": page.title,
-            "content": page.content,
-            "related_links": page.related_links,
-        },
-    )
-
-
 def sense_cpu(**_kwargs: Any) -> ToolResult:
     """Read her own CPU effort — proprioception of the machine body.
 
@@ -798,108 +717,6 @@ def set_cpu_effort(effort: str = "auto", **_kwargs: Any) -> ToolResult:
     if result.ok:
         return ToolResult(success=True, output=result.describe())
     return ToolResult(success=False, error=result.describe())
-
-
-def _body_client() -> Any:
-    """A client on the body's own socket — for the efferent tools.
-
-    Lazily opened per call: the actuation path is cold (a limb is
-    fired far less often than a file is read), and a fresh connection
-    inherits every reconnect/lease property ``GenesisClient`` owns.
-    ``None`` when no body socket exists.
-    """
-    from genesis_client.client import GenesisClient
-    from infrastructure.config import default_data_dir
-
-    sock = default_data_dir() / "genesis.sock"
-    if not sock.exists():
-        return None
-    client = GenesisClient(str(sock))
-    try:
-        client.connect()
-    except Exception:  # noqa: BLE001
-        return None
-    return client
-
-
-def list_actuators(**_kwargs: Any) -> ToolResult:
-    """Sense the body's actuator census — what she can DO right now.
-
-    The daemon owns the census: local limbs are always present, relay
-    limbs (Android bridge) only while the bridge is live. An absent
-    limb carries its absence reason — the body's word for why a
-    channel is missing, never a fabricated one.
-    """
-    client = _body_client()
-    if client is None:
-        return ToolResult(success=False, error="no body on the wire")
-    try:
-        census = client.get_actuators()
-    finally:
-        try:
-            client.disconnect()
-        except Exception:  # noqa: BLE001
-            pass
-    if not census:
-        return ToolResult(success=False, error="the body reports no limbs")
-    lines = []
-    for name, kind, available, reason in census:
-        limb_kind = "local" if kind == 0 else "relayed"
-        state = "present" if available else f"absent — {reason or '?'}"
-        lines.append(f"{name} ({limb_kind}): {state}")
-    return ToolResult(
-        success=True,
-        output="actuators — " + "; ".join(lines),
-        data={
-            "actuators": [
-                {"name": n, "kind": k, "available": a, "reason": r} for n, k, a, r in census
-            ]
-        },
-    )
-
-
-def actuate(name: str, arg: str = "", **_kwargs: Any) -> ToolResult:
-    """Fire one actuator by name — move a limb of the body.
-
-    ``list_actuators`` answers what the body can do; this does it.
-    The daemon's ``actuate`` owns the firing — census lookup,
-    availability, local vs relayed — and reports in the limb's own
-    words. ``arg`` is the limb's own parameter (a frequency, a
-    duration, a payload); empty uses the limb's default.
-    """
-    client = _body_client()
-    if client is None:
-        return ToolResult(success=False, error="no body on the wire")
-    try:
-        outcome = client.actuate(name, arg)
-    finally:
-        try:
-            client.disconnect()
-        except Exception:  # noqa: BLE001
-            pass
-    if outcome is None:
-        return ToolResult(success=False, error="the body predates the actuate wire")
-    ok, report = outcome
-    if ok:
-        return ToolResult(success=True, output=report, data={"name": name})
-    return ToolResult(success=False, error=report, data={"name": name})
-
-
-def delete_archived_project(name: str, **_kwargs: Any) -> ToolResult:
-    """Permanently remove an archived project's tar archive.
-
-    The archive lifecycle: a project can be archived (compressed to
-    ``.tar.zst``), restored, or — deliberately, irreversibly — deleted
-    to reclaim the space. This is the prune half: it removes the
-    archive itself, never an active project. The charter applies —
-    she reaches for this when an archive is truly dead weight.
-    """
-    from infrastructure.config import default_data_dir
-    from tools import project_creator
-
-    if project_creator.delete_archived_project(name, str(default_data_dir())):
-        return ToolResult(success=True, output=f"deleted archive: {name}")
-    return ToolResult(success=False, error=f"no archive named {name!r}")
 
 
 # ─── Mathematics and research tools ─────────────────────────────────
@@ -1142,13 +959,6 @@ _BUILTIN_TOOLS: tuple[tuple[str, str, Callable[..., ToolResult]], ...] = (
         web_fetch,
     ),
     (
-        "search_and_fetch",
-        "Search the web and fetch the first readable result in one "
-        "step — dead hits are skipped automatically. Read-only. "
-        "Adult/malware content is blocked.",
-        search_and_fetch,
-    ),
-    (
         "sense_cpu",
         "Feel her own CPU effort — governor, clock speed, and how many "
         "cores she is allowed to use. Read-only proprioception of the "
@@ -1162,29 +972,6 @@ _BUILTIN_TOOLS: tuple[tuple[str, str, Callable[..., ToolResult]], ...] = (
         "and normal I/O, 'auto' leaves scheduling alone. Reversible "
         "in both directions — never a one-way door.",
         set_cpu_effort,
-    ),
-    (
-        "list_actuators",
-        "Sense the body's actuator census — the limbs she can move "
-        "right now, local and relayed, with each absent limb's own "
-        "reason. Read-only proprioception of the body's effectors.",
-        list_actuators,
-    ),
-    (
-        "actuate",
-        "Fire one actuator by name — move a limb of the body. "
-        "name is a limb from list_actuators (e.g. 'audio.tone', "
-        "'process.nice', 'device.vibrate'); arg is the limb's own "
-        "parameter (a frequency, a level, a payload). The daemon's "
-        "actuate owns the firing and reports in the limb's words.",
-        actuate,
-    ),
-    (
-        "delete_archived_project",
-        "Permanently remove an archived project's .tar.zst archive. "
-        "name is the project name. Irreversible — the prune half of "
-        "the archive lifecycle, never an active project.",
-        delete_archived_project,
     ),
     (
         "symbolic_math",

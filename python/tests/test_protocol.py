@@ -16,7 +16,6 @@ import pytest
 from genesis_client.client import GenesisClient
 from genesis_client.exceptions import ConnectionError, ProtocolError
 from genesis_client.protocol import (
-    ACTUATE,
     ADVANCE_NEURO,
     ADVANCE_PHYSICS,
     ANALYZE_CODE,
@@ -26,8 +25,7 @@ from genesis_client.protocol import (
     CHEM_NAMES,
     CHEM_SEROTONIN,
     DT_NOMINAL_STEP,
-    GET_FIELD_SIGNATURE,
-    GET_FIELD_SPECTRUM,
+    GET_FIELD_PROBE,
     GET_FOLD_MARGINS,
     GET_ION_SUMMARY,
     GET_NEURO_SUMMARY,
@@ -36,7 +34,6 @@ from genesis_client.protocol import (
     GET_SENSOR_PRESENCE,
     GET_STATE,
     HANDSHAKE,
-    LIST_ACTUATORS,
     MODULE_ATTENTION,
     MODULE_DREAMING,
     MODULE_EMOTION,
@@ -60,7 +57,10 @@ from genesis_client.protocol import (
     PHASE_STRESS,
     PING,
     PROTOCOL_VERSION,
+    SET_FIELD_CARRIER,
+    SET_FIELD_PHASE,
     SET_FOCUS,
+    SET_LID,
     SET_OPTIC_GAIN,
     SET_WAKE_ALARM,
     SHUTDOWN,
@@ -246,10 +246,15 @@ def test_command_ids():
     # GET_SENSOR_PRESENCE, so GET_ION_SUMMARY must not collide.
     assert GET_ION_SUMMARY == 40
     assert GET_SENSOR_PRESENCE == 36
-    # The optic pair is additive and continues past the retired
-    # field-probe opcodes (48 pinned, never reused): the optic-state
-    # read, the corticothalamic gain, and the accommodation request
-    # must not collide with them or with the signature read.
+    # The field probe is additive and continues past SET_VOLITION;
+    # opcode 48 is retired (pinned, never reused) and the carrier
+    # write control used by the ring-down experiment stays live.
+    assert GET_FIELD_PROBE == 47
+    assert SET_FIELD_PHASE == 48
+    assert SET_FIELD_CARRIER == 49
+    # The optic pair is additive and continues past the field
+    # commands: the optic-state read, the corticothalamic gain, and
+    # the accommodation request must not collide with them.
     assert GET_OPTIC_STATE == 52
     assert SET_OPTIC_GAIN == 53
     assert SET_FOCUS == 54
@@ -257,13 +262,8 @@ def test_command_ids():
     # highest core command id — and must not collide with the
     # notification range (100+) or the tensor slab (41–45).
     assert GET_FOLD_MARGINS == 62
-    # The actuator pair is additive past LIST_ACTUATORS, and the
-    # computed field reads are additive past ACTUATE — the Maxwell
-    # signature and its spectral companion, colliding with nothing.
-    assert LIST_ACTUATORS == 64
-    assert ACTUATE == 65
-    assert GET_FIELD_SIGNATURE == 66
-    assert GET_FIELD_SPECTRUM == 67
+    # The voluntary lid is additive past SET_COGNITIVE_PID.
+    assert SET_LID == 57
 
 
 def test_chemical_ids():
@@ -959,6 +959,105 @@ def test_set_wake_alarm_returns_none_on_malformed_response():
         assert client.set_wake_alarm(1_800_000_000) is None
 
 
+def test_set_focus_packs_f32_meters_and_acks():
+    """set_focus sends [f32 meters] on the control channel and maps
+    the ack byte to True."""
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_FOCUS, b"\x01"),
+        ),
+    ):
+        assert client.set_focus(0.5) is True
+
+    assert send.call_args[0][1] == SET_FOCUS
+    assert send.call_args[0][2] == struct.pack("<f", 0.5)
+
+
+def test_set_focus_zero_relaxes_the_lens():
+    """A non-positive distance is the body's relax-to-infinity — the
+    client passes it through; the daemon clamps it to 0 D."""
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_FOCUS, b"\x01"),
+        ),
+    ):
+        assert client.set_focus(0.0) is True
+
+    assert send.call_args[0][2] == struct.pack("<f", 0.0)
+
+
+def test_set_focus_returns_false_when_the_daemon_predates_it():
+    """An unacked or missing response is an absent channel, not a
+    silent success."""
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_FOCUS, b"\x00"),
+        ),
+    ):
+        assert client.set_focus(2.0) is False
+
+    # A daemon that closes mid-request reads as unsupported too.
+    with (
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            side_effect=ConnectionError("gone"),
+        ),
+        patch.object(client, "connect"),
+    ):
+        assert client.set_focus(2.0) is False
+
+
+def test_set_lid_packs_f32_openness_and_acks():
+    """set_lid sends [f32 openness] on the control channel and maps
+    the ack byte to True — the voluntary lid is a held position."""
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_LID, b"\x01"),
+        ),
+    ):
+        assert client.set_lid(0.05) is True
+
+    assert send.call_args[0][1] == SET_LID
+    assert send.call_args[0][2] == struct.pack("<f", 0.05)
+
+
+def test_set_lid_returns_false_when_the_daemon_predates_it():
+    """A body without the command cannot hold the lid — False marks
+    the absent channel rather than a silent success."""
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_LID, b"\x00"),
+        ),
+    ):
+        assert client.set_lid(0.05) is False
+
+    with (
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            side_effect=ConnectionError("gone"),
+        ),
+        patch.object(client, "connect"),
+    ):
+        assert client.set_lid(0.05) is False
+
+
 def test_set_cognitive_pid_packs_u32_and_acks():
     """set_cognitive_pid sends [u32 pid] on the control channel so a
     re-inhabiting mind replaces the dead launcher's env-var PID."""
@@ -1146,6 +1245,15 @@ def test_neuro_adjust_baseline_is_retired_opcode_23() -> None:
     assert not hasattr(protocol, "neuro_adjust_baseline")
 
 
+def test_set_field_phase_is_retired_opcode_48() -> None:
+    """The SET_FIELD_PHASE wire number is retired — modeled band phase is
+    no longer pushed into the probe's physical generator; the phase lock
+    runs physics → model only — but the constant is kept pinned at 48
+    so the number is never reused."""
+    from genesis_client import protocol
+
+    assert protocol.SET_FIELD_PHASE == 48
+    assert "SET_FIELD_PHASE" in protocol.__all__
     assert not hasattr(protocol, "set_field_phase")
 
 

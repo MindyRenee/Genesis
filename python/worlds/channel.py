@@ -69,22 +69,6 @@ class Channel:
             return None
         return cls(feed)
 
-    def reply(self, message: dict, text: str) -> None:
-        """Answer a heard message in the channel it arrived on.
-
-        The page's webhook can only speak on the page. When a bot
-        token exists the reply posts through the bot API to the
-        message's own channel — threaded onto the heard message —
-        so speech on any channel her ear covers gets its answer
-        there. Without a token the feed degrades the reply to an
-        ordinary page post; the utterance is never lost.
-        """
-        self.feed.post_reply(
-            str(message.get("channel_id") or ""),
-            str(message.get("id") or "") or None,
-            text,
-        )
-
     def _deliver(self, author: str, content: str, message: dict) -> None:
         """The ear heard a public message — hand it to the world.
 

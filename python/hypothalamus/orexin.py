@@ -46,7 +46,7 @@ wakefulness. Loss of orexin neurons causes narcolepsy.
 RECEPTOR ADAPTATION MULTIPLIER
 ════════════════════════════════════════════════════════════════════════
 
-    multiplier = 0.9
+    multiplier = 0.8
 
 Orexin receptor trafficking is moderate — slightly slower than the
 baseline reference (glutamate at 1.0×).
@@ -59,18 +59,20 @@ COUPLING: HOW OTHERS AFFECT OREXIN (matrix row 15)
 Index order: DA, SRT, NE, ACh, GABA, GLU, CORT, OXY, END, HIST,
 ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 
-    SRT  ->  OX:  -0.10  (5-HT1A inhibits orexin neurons — Muraki et al., 2004.)
-    NE  ->  OX:  -0.10  (alpha2 hyperpolarizes orexin neurons — Li & van den Pol, 2005.)
-    ACh  ->  OX:  0.10  (weak volume transmission.)
+    SRT  -> OX : -0.05  (serotonin promotes sleep onset.)
+    NE   -> OX : +0.05  (weak volume transmission.)
+    ACh  -> OX : +0.05  (weak volume transmission.)
     GABA -> OX : -0.10  (VLPO sleep-promoting neurons inhibit orexin.)
-    GLU  ->  OX:  0.10  (weak volume transmission.)
-    HIST  ->  OX:  0.00  (no measurable TMN-to-orexin effect — orexin excites TMN via OX2R.)
+    GLU  -> OX : +0.05  (weak volume transmission.)
+    HIST -> OX : +0.05  (weak volume transmission.)
     ADN  -> OX : -0.10  (sleep pressure inhibits orexin (the sleep switch).)
-    ECB  ->  OX:  -0.10  (stress reduction.)
-    VP  ->  OX:  0.10  (weak volume transmission.)
-    EPI  ->  OX:  -0.10  (alpha2-adrenoceptor hyperpolarization — catecholamine brake on orexin.)
-    MEL  ->  OX:  -0.10  (melatonin pushes the sleep-wake switch toward sleep.)
-    DA  ->  OX:  -0.10  (alpha2-adrenoceptor hyperpolarization — catecholamine brake on orexin.)
+    ECB  -> OX : -0.05  (stress reduction.)
+    VP   -> OX : +0.05  (weak volume transmission.)
+    EPI  -> OX : +0.05  (weak volume transmission.)
+    MEL  -> OX : -0.05  (melatonin pushes the sleep-wake switch toward sleep.)
+    DA   -> OX : 0.00   (dopamine does not directly promote orexin
+    — the DA->OX->DA positive feedback loop caused runaway
+    overstimulation. Orexin is driven by metabolic state, not reward.)
     CORT -> OX : 0.00   (no direct coupling)
     OXY  -> OX : 0.00   (no direct coupling)
     END  -> OX : 0.00   (no direct coupling)
@@ -81,20 +83,21 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 COUPLING: HOW OREXIN AFFECTS OTHERS (matrix column 15)
 ════════════════════════════════════════════════════════════════════════
 
-    OX  ->  DA:  0.10  (weak volume transmission.)
-    OX  ->  NE:  0.10  (arousal mutual excitation.)
-    OX  ->  ACh:  0.10  (orexin-driven cortical activation.)
-    OX  ->  GABA:  -0.10  (weak volume transmission.)
-    OX  ->  GLU:  0.10  (weak volume transmission.)
-    OX  ->  HIST:  0.10  (orexin excites histamine — wake-stabilization circuit.)
+    OX  -> DA :  +0.05  (weak volume transmission.)
+    OX  -> NE :  +0.05  (arousal mutual excitation.)
+    OX  -> ACh:  +0.05  (orexin-driven cortical activation.)
+    OX  -> GABA:  -0.05  (weak volume transmission.)
+    OX  -> GLU:  +0.05  (weak volume transmission.)
+    OX  -> HIST:  +0.05  (orexin excites histamine — wake-stabilization circuit.)
     OX  -> ADN:  0.00   (no direct coupling — adenosine is a metabolic
                         byproduct of neural activity; orexin-driven
                         arousal *builds* it, it does not suppress it.
                         Orexin counteracts adenosine's *effect* at the
                         receiving arousal neurons — the flip-flop fight
                         is downstream, not on the metabolite.)
-    OX  ->  EPI:  0.10  (sympathetic activation.)
-    OX  ->  MEL:  -0.10  (orexin suppresses melatonin — the wake signal onto the sleep hormone.)
+    OX  -> EPI:  +0.05  (sympathetic activation.)
+    OX  -> MEL:  -0.05  (melatonin pushes the sleep-wake switch toward sleep (reciprocal: OX
+                        suppresses MEL).)
     OX  -> SRT:  0.00   (no direct coupling)
     OX  -> CORT:  0.00   (no direct coupling)
     OX  -> OXY:  0.00   (no direct coupling)

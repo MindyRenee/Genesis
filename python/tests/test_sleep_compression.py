@@ -628,7 +628,7 @@ class TestSleepCompressor:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Engram release — the census phase (verdicts measured, never carried out)
+# Engram release — the prune phase
 # ═══════════════════════════════════════════════════════════════════
 
 
@@ -656,7 +656,8 @@ class _PrunableLTMClient:
         return self._entries[offset : offset + min(limit, 1000)]
 
     def delete_episode(self, episode_id: int) -> bool:
-        raise AssertionError("memories are never deleted — census must not call this")
+        self.deleted_ids.append(episode_id)
+        return True
 
 
 def _entry(eid: int, age_ms: int, salience: float = 0.5, flags: int = 4, source: int = 1):
@@ -671,70 +672,88 @@ def _entry(eid: int, age_ms: int, salience: float = 0.5, flags: int = 4, source:
     )
 
 
-class TestCensusLtm:
-    """The census phase: the model judges, nothing is ever destroyed."""
+class TestPruneLtm:
+    """The prune phase: she decides, the compressor carries it out."""
 
-    def test_release_fn_true_counts_candidates(self, tmp_path):
-        """Entries the model reports dead are counted, not deleted."""
+    def test_release_fn_true_deletes(self, tmp_path):
+        """Entries the model reports dead are deleted."""
         sc = SleepCompressor(data_dir=str(tmp_path))
         client = _PrunableLTMClient([_entry(1, 100 * 86_400_000), _entry(2, 200 * 86_400_000)])
-        stats = sc._phase_census_ltm(client, lambda e: True)
-        assert client.deleted_ids == []
-        assert stats["ltm_release_candidates"] == 2
+        stats = sc._phase_prune_ltm(client, lambda e: True)
+        assert client.deleted_ids == [1, 2]
+        assert stats["ltm_pruned"] == 2
         assert stats["ltm_archived_seen"] == 2
 
-    def test_release_fn_false_counts_nothing(self, tmp_path):
-        """Entries the model keeps produce no candidates."""
+    def test_release_fn_false_keeps(self, tmp_path):
+        """Entries the model keeps are not touched."""
         sc = SleepCompressor(data_dir=str(tmp_path))
         client = _PrunableLTMClient([_entry(1, 100 * 86_400_000)])
-        stats = sc._phase_census_ltm(client, lambda e: False)
+        stats = sc._phase_prune_ltm(client, lambda e: False)
         assert client.deleted_ids == []
-        assert stats["ltm_release_candidates"] == 0
+        assert stats["ltm_pruned"] == 0
 
-    def test_meta_memories_never_judged(self, tmp_path):
+    def test_meta_memories_never_released(self, tmp_path):
         """Meta entries are skipped before the model is even asked —
         they are the cortical residue that justifies the forgetting."""
         sc = SleepCompressor(data_dir=str(tmp_path))
         # flags=6 → ARCHIVED|META
         client = _PrunableLTMClient([_entry(1, 400 * 86_400_000, flags=6)])
         called = []
-        stats = sc._phase_census_ltm(client, lambda e: called.append(e) or True)
+        stats = sc._phase_prune_ltm(client, lambda e: called.append(e) or True)
         assert called == []
         assert client.deleted_ids == []
         assert stats["ltm_meta_skipped"] == 1
 
-    def test_dreams_never_judged(self, tmp_path):
+    def test_dreams_never_released(self, tmp_path):
         """Dream-source episodes are never release candidates."""
         sc = SleepCompressor(data_dir=str(tmp_path))
         client = _PrunableLTMClient([_entry(1, 400 * 86_400_000, source=9)])
-        stats = sc._phase_census_ltm(client, lambda e: True)
+        stats = sc._phase_prune_ltm(client, lambda e: True)
         assert client.deleted_ids == []
         assert stats["ltm_dreams_skipped"] == 1
+
+    def test_budget_bounds_deletion(self, tmp_path):
+        """The per-sweep budget caps deletion; the rest defer."""
+        sc = SleepCompressor(data_dir=str(tmp_path), max_delete_per_sweep=2)
+        client = _PrunableLTMClient([_entry(i, 400 * 86_400_000) for i in range(1, 6)])
+        stats = sc._phase_prune_ltm(client, lambda e: True)
+        assert client.deleted_ids == [1, 2]  # oldest first
+        assert stats["ltm_pruned"] == 2
+        assert stats["ltm_release_deferred"] == 3
 
     def test_missing_ops_skips_gracefully(self, tmp_path):
         """A client without the archived-tier ops is skipped."""
         sc = SleepCompressor(data_dir=str(tmp_path))
-        stats = sc._phase_census_ltm(object(), lambda e: True)
-        assert stats["ltm_census_skipped"] == 1
+        stats = sc._phase_prune_ltm(object(), lambda e: True)
+        assert stats["ltm_prune_skipped"] == 1
 
     def test_disconnected_skips(self, tmp_path):
-        """A dead client can't be censused — skip rather than guess."""
+        """A dead client can't delete — skip rather than half-commit."""
         sc = SleepCompressor(data_dir=str(tmp_path))
         client = _PrunableLTMClient([_entry(1, 400 * 86_400_000)])
         client.is_connected = False
-        stats = sc._phase_census_ltm(client, lambda e: True)
+        stats = sc._phase_prune_ltm(client, lambda e: True)
         assert client.deleted_ids == []
-        assert stats["ltm_census_skipped"] == 1
+        assert stats["ltm_prune_skipped"] == 1
+
+    def test_failed_delete_counted(self, tmp_path):
+        """A refused delete is counted, not silently dropped."""
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        client = _PrunableLTMClient([_entry(1, 400 * 86_400_000)])
+        client.delete_episode = lambda eid: False
+        stats = sc._phase_prune_ltm(client, lambda e: True)
+        assert stats["ltm_prune_failed"] == 1
+        assert stats["ltm_pruned"] == 0
 
     def test_step_only_with_release_fn(self, tmp_path):
-        """The census step exists only when a verdict is supplied —
+        """The prune step exists only when a verdict is supplied —
         the compressor never forgets on its own authority."""
         sc = SleepCompressor(data_dir=str(tmp_path))
         net = ConceptNetwork()
         client = _PrunableLTMClient([])
 
         without = dict(sc.compress_steps(net, ltm_client=client)).keys()
-        assert "census_ltm" not in without
+        assert "prune_ltm" not in without
 
         with_fn = dict(sc.compress_steps(net, ltm_client=client, release_fn=lambda e: False))
-        assert "census_ltm" in with_fn
+        assert "prune_ltm" in with_fn

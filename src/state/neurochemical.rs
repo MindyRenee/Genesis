@@ -93,65 +93,6 @@ fn neuro_noise_hash(seed: u64, index: u64) -> u32 {
     (z & 0xFFFFFFFF) as u32
 }
 
-// ─── Kinetic primitives ─────────────────────────────────────────
-//
-// The bounds in this system are theorems of the equations, not
-// checks written afterward. Three mathematical forms carry them:
-//
-// - `flow_level`: positivity-preserving integration (exponential
-//   Euler / integrating factor). Biochemical ODEs are unconditionally
-//   positive systems — every sink is proportional to substrate, so
-//   the positive orthant is invariant. The exponential form makes
-//   that invariance exact at any step size: clearance is
-//   `C·exp(−k·dt)`, a factor in (0,1), and can never cross zero.
-//   (Bruggeling & Cuoco 2007; the Patankar positivity schemes.)
-//
-// - `logistic`: σ(x) = 1/(1+e^−x) ∈ (0,1) — receptor occupancy,
-//   threshold detection, and readout saturation. Bounded by
-//   construction; the same function neurons use for firing rate.
-//
-// - `saturated_signal`: 2·tanh(raw/2) — the Emax isotherm. ≈raw for
-//   raw ≪ 2 (the operating range is preserved within a few percent)
-//   and asymptotes to 2 as raw→∞, so effective signaling saturates
-//   the way receptor occupancy does instead of hitting a wall.
-
-/// Logistic sigmoid σ(x) ∈ (0,1).
-#[inline]
-fn logistic(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
-}
-
-/// Positivity-preserving concentration update.
-///
-/// `flux` is the signed concentration change over the step. A
-/// non-negative flux is production — molecules are added directly.
-/// A negative flux is clearance, integrated as first-order decay
-/// `dC/dt = −kC` with the rate held over the step:
-/// `C ← C·exp(flux/C)`. The factor is in (0,1), so clearance can
-/// never carry the level below zero — and as C→0 the removal flux
-/// dies with the substrate, exactly like reuptake transporters and
-/// degradative enzymes that cannot clear what is not there.
-#[inline]
-fn flow_level(level: f32, flux: f32) -> f32 {
-    if flux >= 0.0 {
-        level + flux
-    } else {
-        level * (flux / level).exp()
-    }
-}
-
-/// Effective signaling with receptor saturation.
-///
-/// `2·tanh(raw/2)`: within a few percent of `raw` throughout the
-/// operating range, asymptoting to 2 as raw→∞. The [0,2) bound is a
-/// property of the isotherm, not an imposed range. A non-finite raw
-/// (corrupted state) reads as silence — 0.0 — matching the tick-level
-/// circuit breaker's damage-containment role.
-#[inline]
-pub(crate) fn saturated_signal(raw: f32) -> f32 {
-    crate::state::sanitize::finite_or(2.0 * (raw * 0.5).tanh(), 0.0)
-}
-
 /// Time step for the dynamics integration (seconds).
 ///
 /// 0.1 = 100 ms integration step (10 Hz); the outer tick calls it
@@ -520,7 +461,7 @@ pub const GLUTAMATE_GAD_RATE: f32 = 0.10;
 /// Measured plasma clearance for the circulating endocrine chemicals,
 /// or `None` for everything else (neural transmitters keep the generic
 /// spring; adenosine, cortisol, CRH, melatonin, and the network-driven
-/// modulators have their own mechanisms).
+/// monoamines have their own mechanisms).
 const fn circulating_hormone_clearance(idx: usize) -> Option<f32> {
     if idx == NeurochemicalId::Epinephrine as usize {
         Some(EPINEPHRINE_METABOLIC_RATE)
@@ -581,11 +522,8 @@ pub const CORTISOL_PEAK_LEVEL: f32 = 0.08;
 /// scaling.
 #[inline]
 pub(crate) fn cortisol_stress_fraction(cort: f32) -> f32 {
-    // Logistic ramp across the measurable envelope: ≈0 at the resting
-    // floor, ≈1 at the reachable peak, smooth and bounded by
-    // construction — the same threshold nonlinearity a glucocorticoid
-    // receptor's response curve has, rather than a clipped ramp.
-    logistic((cort - 0.05) / 0.01)
+    ((cort - CORTISOL_RESTING_LEVEL) / (CORTISOL_PEAK_LEVEL - CORTISOL_RESTING_LEVEL))
+        .clamp(0.0, 1.0)
 }
 
 /// Norepinephrine level at which the stress phase engages.
@@ -1225,15 +1163,13 @@ impl Neurochemical {
     }
 
     /// The **effective level** — what consumers of neurochemical state
-    /// actually see: `level × receptor_sensitivity ×
-    /// desensitization_factor × internalization_factor`, passed through
-    /// the Emax saturation `2·tanh(raw/2)`.
+    /// actually see. This is `level × receptor_sensitivity ×
+    /// desensitization_factor × internalization_factor`, clamped to
+    /// [0.0, 2.0].
     ///
     /// This is the key insight from pharmacology: a chemical can be at
     /// high concentration but have low effect (tolerance/downregulation)
     /// or low concentration but high effect (sensitization/upregulation).
-    /// Receptor occupancy is what saturates — raw concentration flows
-    /// freely; the *signal* asymptotes, exactly as occupancy does.
     ///
     /// The effective level now incorporates two separate receptor
     /// adaptation mechanisms:
@@ -1242,16 +1178,19 @@ impl Neurochemical {
     /// - **Internalization** (slow, membrane removal): reduces effect over
     ///   hours of sustained high stimulation
     ///
-    /// The three factors are themselves bounded by their trafficking
-    /// kinetics (relaxation toward occupancy-set targets), and the
-    /// product saturates through `saturated_signal` — the bound is the
-    /// isotherm, not a clamp.
+    /// Both factors are in [0.2, 1.0] (desensitization) and [0.45, 1.0]
+    /// (internalization), and multiply together with
+    /// receptor_sensitivity [0.5, 2.0] to produce the final effective
+    /// level.
     pub fn effective_level(&self) -> f32 {
         let raw = self.level
             * self.receptor_sensitivity
             * self.desensitization_factor
             * self.internalization_factor;
-        saturated_signal(raw)
+        // Use finite_clamp instead of native clamp: if any factor
+        // is NaN (from corruption or a computation bug), the product
+        // is NaN, and native clamp would pass it through.
+        crate::state::sanitize::finite_clamp(raw, 0.0, 2.0)
     }
 
     /// The **subtype-weighted effective level** — considers receptor
@@ -1270,16 +1209,22 @@ impl Neurochemical {
             NeurochemicalId::Dopamine => {
                 // D1 (excitatory) increases effective signaling,
                 // D2 (inhibitory) decreases it. The net effect is
-                // weighted by subtype balance: `1 + (d1−d2)/(d1+d2)`
-                // is the net-excitation fraction — it lies in [0,2]
-                // *by construction* (the ratio is bounded by the
-                // weights themselves), so D2 dominance can only
-                // cancel excitation toward zero, never invert it.
+                // weighted by subtype balance.
+                //
+                // The formula `base * (d1 - d2) / total * 2.0 + base`
+                // can produce values up to ~6.0 when base=2.0 and
+                // d1=1, d2=0 (2.0 * 1.0 * 2.0 + 2.0 = 6.0). This
+                // breaks the [0, 2] effective-level contract and can
+                // produce inf when multiplied into the coupling
+                // matrix. Clamp the result to [0, 2] to match the
+                // serotonin branch (which already clamps) and the
+                // documented contract.
                 let d1 = self.receptor_subtypes[0];
                 let d2 = self.receptor_subtypes[1];
                 let total = d1 + d2;
                 if total > 0.0 {
-                    saturated_signal(base * (1.0 + (d1 - d2) / total))
+                    let raw = base * (d1 - d2) / total * 2.0 + base;
+                    crate::state::sanitize::finite_clamp(raw, 0.0, 2.0)
                 } else {
                     base
                 }
@@ -1294,7 +1239,9 @@ impl Neurochemical {
                 let total = ht1a + ht2a;
                 if total > 0.0 {
                     let balance = (ht1a - ht2a) / total;
-                    saturated_signal(base * (1.0 + 0.3 * balance))
+                    // Use finite_clamp instead of native clamp to
+                    // catch NaN from corrupted receptor_subtypes.
+                    crate::state::sanitize::finite_clamp(base * (1.0 + 0.3 * balance), 0.0, 2.0)
                 } else {
                     base
                 }
@@ -1374,58 +1321,45 @@ impl Neurochemical {
         // unreachable under any drive. Depletion is now charged on
         // delivered quantity, which is bounded by the pool, so an
         // empty pool stops depleting and can recover.
-        // A negative impulse is a clearance signal (reuptake, enzymatic
-        // degradation, diffusion away from the release site) — and
-        // clearance cannot remove more transmitter than is present.
-        // Mass conservation caps the delivered dose at the current
-        // level: the synaptic cleft empties and further "clearance"
-        // has nothing to act on. This is the same principle the
-        // hormone pools already use (`level *= exp(coupled·dt)` —
-        // proportional removal never crosses zero).
         let effective_magnitude = if magnitude > 0.0 {
-            let pool_factor = self.vesicular_pool;
-            // Quantal delivery saturates at the releasable pool's
-            // content: `delivered = pool·(1 − e^{−magnitude})`.
-            // However hard the request, a synapse cannot release more
-            // transmitter than its readily-releleasable pool holds —
-            // the bound is the pool's own content, an emergent
-            // property of the equation, not a written cap. For small
-            // magnitudes this reduces to the previous
-            // `magnitude·pool` to first order.
-            let delivered = pool_factor * (1.0 - (-magnitude).exp());
-            // First-order depletion of the releasable pool:
-            // `pool ← pool·exp(−k·delivered)`. Multiplicative
-            // kinetics can never take the fraction below zero or
-            // above one — the bound is the equation's own, and
-            // depletion slows asymptotically as the pool empties,
-            // matching the measured fast-then-slow replenishment
-            // of the readily-releasable pool.
-            self.vesicular_pool *= (-VESICULAR_DEPLETION * delivered).exp();
+            // Use finite_clamp for NaN safety: if vesicular_pool was
+            // corrupted to NaN, native .clamp returns NaN, which would
+            // then propagate to effective_magnitude and level.
+            let pool_factor = crate::state::sanitize::finite_clamp(self.vesicular_pool, 0.0, 1.0);
+            let delivered = magnitude * pool_factor;
+            self.vesicular_pool = crate::state::sanitize::finite_clamp(
+                self.vesicular_pool - delivered * VESICULAR_DEPLETION,
+                0.0,
+                1.0,
+            );
             delivered
         } else {
-            // First-order clearance: reuptake and enzymatic degradation
-            // are proportional to the substrate concentration, so the
-            // delivered removal scales with the level itself. As the
-            // cleft empties the flux dies with it — substrate
-            // exhaustion is the limit, not a cap written afterward.
-            magnitude * self.level
+            magnitude
         };
 
         self.velocity += effective_magnitude * 0.3;
-        // The level write goes through the positivity-preserving
-        // integrator: positive flux is release, negative flux is
-        // first-order clearance `level·exp(flux/level)` — the factor
-        // is in (0,1), so concentration can approach zero
-        // asymptotically but never cross it. Supraphysiological
-        // transients are real — vesicular depletion, autoreceptors,
-        // and the saturating effective() bound the *signal*, not the
-        // molecules.
-        self.level = flow_level(self.level, effective_magnitude);
+        // Clamp velocity to a bounded range. Without this, a large
+        // impulse (even after IPC-level clamping, internal callers like
+        // active_inference or dyadic_model could produce large values)
+        // would set velocity to an enormous value that decays
+        // geometrically over hundreds of ticks, keeping the chemical
+        // saturated and distorting downstream dynamics. The range
+        // [-1, 1] is generous — normal impulses produce velocity
+        // increments of ~0.3, and the damping factor (0.85^dt_scale)
+        // brings it back to zero within a few ticks.
+        self.velocity = crate::state::sanitize::finite_clamp(self.velocity, -1.0, 1.0);
+        // Use finite_clamp for NaN safety on level.
+        self.level =
+            crate::state::sanitize::finite_clamp(self.level + effective_magnitude, 0.0, 1.0);
 
         // Phasic burst: positive impulses trigger a transient burst
         // that activates low-affinity receptors (D1 for DA, 5-HT2A for SRT)
         if effective_magnitude > 0.0 {
-            self.phasic_level += effective_magnitude * 0.5;
+            self.phasic_level = crate::state::sanitize::finite_clamp(
+                self.phasic_level + effective_magnitude * 0.5,
+                0.0,
+                1.0,
+            );
         }
 
         if magnitude.abs() > 0.05 {
@@ -1630,13 +1564,9 @@ pub const DEFAULT_COUPLING_MATRIX: CouplingMatrix = [
     // GABA→HIST (-0.10): inhibition of histaminergic tuberomammillary
     //   nucleus.
     // MEL→HIST (-0.10): sleep suppression of wake center.
-    // ADN→HIST (-0.02): A1-receptor inhibition of tuberomammillary
-    //   neurons — the cellular arm of Process S. Sleep pressure does
-    //   not merely accumulate; it silences the wake center through
-    //   the same adenosine that gates the VLPO.
     // Arousal mutual excitation (NE, OX) kept weak (0.10).
     [
-        0.10, -0.10, 0.10, 0.10, -0.10, 0.10, 0.00, 0.00, -0.10, 0.00, -0.02, 0.00, 0.00, 0.00,
+        0.10, -0.10, 0.10, 0.10, -0.10, 0.10, 0.00, 0.00, -0.10, 0.00, 0.00, 0.00, 0.00, 0.00,
         0.00, 0.10, 0.00, -0.10,
     ],
     // ADN →  how others affect adenosine
@@ -1910,42 +1840,40 @@ impl NeurochemicalVector {
     /// # Adenosine is one-way
     ///
     /// Adenosine is Process S: its level is the organism's memory of
-    /// time spent awake, owned by the dedicated mechanism in the tick
-    /// (saturating exponential accumulation while awake, glymphatic
-    /// decay with chi_s = 4.2 h while asleep — Daan, Beersma &
-    /// Borbély 1984). External impulses may *add* pressure — the
-    /// mind's heartbeat reports metabolic work that way — but no
-    /// impulse may subtract it. Clearance belongs to sleep, not to
-    /// the event channel: a negative impulse cannot distinguish
-    /// coupling drift from genuine wake-time accumulation, and at any
-    /// plausible cadence it outruns the ~0.055/h accumulation rate by
-    /// orders of magnitude, pinning pressure at the floor (every NREM
-    /// episode staged N1). This is also why the homeostatic reflex
-    /// and preference adaptation in the inference engine exclude
-    /// adenosine — it has no set-point to regulate toward. Tiredness
-    /// is resisted through the alerting transmitters (ACh,
+    /// time spent awake, and only the dedicated mechanism may reduce
+    /// it (glymphatic clearance during sleep, offline rest). External
+    /// impulses may *add* pressure — the mind's heartbeat reports
+    /// metabolic work that way — but no impulse may subtract it. A
+    /// periodic "stay alert" or post-wake "purge" impulse cannot tell
+    /// coupling drift from genuine wake-time accumulation, so it
+    /// erases both: at −0.02/8 s the drain outruns the ~0.055/h
+    /// accumulation rate two orders of magnitude over, pinning the
+    /// level at its floor and leaving every NREM episode staged N1.
+    /// Tiredness is resisted through the alerting transmitters (ACh,
     /// histamine, NE, orexin), never by editing the homeostat.
-    ///
-    /// Every impulse — positive or negative, any chemical —
-    /// lands on the level directly; only the body's own dynamics
-    /// (accumulation, clearance, coupling, the tick-level bounds)
-    /// decide where it goes next. The IPC layer still rejects
-    /// non-finite magnitudes — that is corruption protection, not a
-    /// pin.
-    ///
-    /// There is no per-chemical ceiling here: cortisol's reachable
-    /// maximum is set by adrenal steroidogenic capacity (saturating
-    /// ACTH drive) opposed by 11β-HSD clearance and GR feedback;
-    /// norepinephrine's by LC-NE firing modes opposed by NET
-    /// reuptake, autoreceptors, and the homeostatic pull. A hard
-    /// post-impulse cap would pin the level at an arbitrary value
-    /// the kinetics never chose.
     pub fn apply_impulse_capped(&mut self, id: NeurochemicalId, magnitude: f32, now_ms: u64) {
         if id == NeurochemicalId::Adenosine && magnitude < 0.0 {
             return;
         }
         if let Some(chem) = self.get_mut(id) {
             chem.apply_impulse(magnitude, now_ms);
+        }
+        // Enforce per-chemical caps for stress/arousal hormones.
+        // These match NeuroTickParams::DEFAULT.cortisol_max / ne_max.
+        // The tick-level hard clamp in tick_with_params will re-enforce
+        // with the actual params, so this is defense-in-depth.
+        match id {
+            NeurochemicalId::Cortisol => {
+                if let Some(chem) = self.get_mut(id) {
+                    chem.level = crate::state::sanitize::finite_clamp(chem.level, 0.0, 0.80);
+                }
+            }
+            NeurochemicalId::Norepinephrine => {
+                if let Some(chem) = self.get_mut(id) {
+                    chem.level = crate::state::sanitize::finite_clamp(chem.level, 0.0, 0.90);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -1995,28 +1923,6 @@ impl NeurochemicalVector {
         }
     }
 
-    /// The reference baseline a chemical's deviation is measured
-    /// against for coupling and clearance feedback.
-    ///
-    /// For cortisol this is the fixed genetic floor, NOT the adapting
-    /// allostatic baseline: glucocorticoid feedback (GR occupancy on
-    /// hypothalamic/pituitary neurons) and hepatic 11β-HSD clearance
-    /// key on absolute concentration. If the drifting set-point were
-    /// the reference, sustained cortisol would read as "at baseline"
-    /// and the HPA negative feedback would silence itself exactly
-    /// when the load demands it — the allostatic trap. The adapting
-    /// `chem.baseline` remains the allostatic record, integrated by
-    /// baseline adaptation alone; every feedback consumer measures
-    /// deviation from where the axis rests, not from where it has
-    /// learned to live.
-    fn feedback_baseline(&self, idx: usize) -> f32 {
-        if idx == NeurochemicalId::Cortisol as usize {
-            NeurochemicalId::Cortisol.default_baseline()
-        } else {
-            self.chemicals[idx].baseline
-        }
-    }
-
     /// Get the effective level of a chemical (level × sensitivity ×
     /// desensitization × internalization), including phasic boosts for
     /// dopamine and serotonin and allosteric modulation for GABA.
@@ -2041,19 +1947,31 @@ impl NeurochemicalVector {
                 // Allosteric modulation: benzodiazepine-like enhancement
                 // of GABA-A sensitivity. When gaba_a_allosteric > 0,
                 // GABA's effective level is multiplied by (1 + allosteric * 0.5).
-                saturated_signal(base * (1.0 + self.gaba_a_allosteric * 0.5))
+                crate::state::sanitize::finite_clamp(
+                    base * (1.0 + self.gaba_a_allosteric * 0.5),
+                    0.0,
+                    2.0,
+                )
             }
             NeurochemicalId::Dopamine => {
                 // Phasic burst activates low-affinity D1 (excitatory)
                 // receptors, adding signaling beyond the tonic baseline.
                 let d1_weight = chem.receptor_subtypes[0];
-                saturated_signal(base + chem.phasic_level * d1_weight * 0.3)
+                crate::state::sanitize::finite_clamp(
+                    base + chem.phasic_level * d1_weight * 0.3,
+                    0.0,
+                    2.0,
+                )
             }
             NeurochemicalId::Serotonin => {
                 // Phasic burst activates low-affinity 5-HT2A (excitatory)
                 // receptors, adding signaling beyond the tonic baseline.
                 let ht2a_weight = chem.receptor_subtypes[1];
-                saturated_signal(base + chem.phasic_level * ht2a_weight * 0.2)
+                crate::state::sanitize::finite_clamp(
+                    base + chem.phasic_level * ht2a_weight * 0.2,
+                    0.0,
+                    2.0,
+                )
             }
             _ => base,
         }
@@ -2277,7 +2195,11 @@ impl NeurochemicalVector {
             let base = match id {
                 NeurochemicalId::GABA => {
                     let b = chem.subtype_effective_level();
-                    saturated_signal(b * (1.0 + self.gaba_a_allosteric * 0.5))
+                    crate::state::sanitize::finite_clamp(
+                        b * (1.0 + self.gaba_a_allosteric * 0.5),
+                        0.0,
+                        2.0,
+                    )
                 }
                 _ => chem.subtype_effective_level(),
             };
@@ -2287,11 +2209,19 @@ impl NeurochemicalVector {
             self.effective_levels[i] = match id {
                 NeurochemicalId::Dopamine => {
                     let d1_weight = chem.receptor_subtypes[0];
-                    saturated_signal(base + chem.phasic_level * d1_weight * 0.3)
+                    crate::state::sanitize::finite_clamp(
+                        base + chem.phasic_level * d1_weight * 0.3,
+                        0.0,
+                        2.0,
+                    )
                 }
                 NeurochemicalId::Serotonin => {
                     let ht2a_weight = chem.receptor_subtypes[1];
-                    saturated_signal(base + chem.phasic_level * ht2a_weight * 0.2)
+                    crate::state::sanitize::finite_clamp(
+                        base + chem.phasic_level * ht2a_weight * 0.2,
+                        0.0,
+                        2.0,
+                    )
                 }
                 _ => base,
             };
@@ -2405,14 +2335,29 @@ impl NeurochemicalVector {
         let total_input = (net_drive + self_excitation) * AROUSAL_GAIN;
         // Sigmoid with overflow protection: for |x| > 20, exp(-x) is
         // either ~0 or ~5e9, so we clamp to avoid NaN from overflow.
+        let sigmoid = |x: f32| -> f32 {
+            if x > 20.0 {
+                1.0
+            } else if x < -20.0 {
+                0.0
+            } else {
+                1.0 / (1.0 + (-x).exp())
+            }
+        };
+        // With the sleep-wake network present, cortical arousal is set by its
+        // populations: LC for waking activation, REM-on for the REM activation
+        // that the desynchronized EEG shows. The coefficients put NREM, REM and
+        // waking at about 0.21, 0.44 and 0.65 (the NREM and REM bands the
+        // scripted clamps used to enforce). Those bands were never sourced, so
+        // the REM level is open: it should be checked against an EEG reference.
+        // Without the network, the Wilson-Cowan equation is used, unchanged.
         let arousal_target = match network {
-            // lc/rem are population fractions ∈ [0,1], so the target
-            // lies in [0.12, 0.92] by construction — the network's own
-            // bounded output is the bound.
-            Some(net) => 0.12 + 0.55 * net.lc + 0.25 * net.rem,
-            // The sigmoid is bounded (0,1) by construction; the
-            // overflow branches are its exact limits.
-            None => logistic(total_input),
+            Some(net) => crate::state::sanitize::finite_clamp(
+                0.12 + 0.55 * net.lc + 0.25 * net.rem,
+                0.0,
+                1.0,
+            ),
+            None => crate::state::sanitize::finite_clamp(sigmoid(total_input), 0.0, 1.0),
         };
         // Exponential approach toward the target for time-invariance.
         // The previous `dt_scale.min(1.0)` factor was not
@@ -2423,12 +2368,10 @@ impl NeurochemicalVector {
         // regardless of tick rate. `lambda = 10` matches the original
         // 10 Hz behavior where `dt_scale = 1.0` → factor ≈ 0.632.
         // `dt = dt_scale * DT` (seconds per tick).
-        // The update is a convex combination of current arousal and a
-        // bounded target, so arousal stays inside (0,1) once there —
-        // no clamp needed.
         let dt_seconds = dt_scale * DT;
         let arousal_alpha = 1.0 - (-10.0_f32 * dt_seconds).exp();
         self.arousal += (arousal_target - self.arousal) * arousal_alpha;
+        self.arousal = crate::state::sanitize::finite_clamp(self.arousal, 0.0, 1.0);
 
         // Arousal is not clamped to a sleep-stage range. The sleep-wake
         // network drives the chemistry that sets arousal (LC and REM-on set
@@ -2471,28 +2414,21 @@ impl NeurochemicalVector {
         // the fraction of that envelope in use (see CORTISOL_PEAK_LEVEL).
         let cort_stress = cortisol_stress_fraction(cort);
 
-        // Valence is a bounded affect dimension — neurons encode it
-        // through saturating responses, so the readout goes through
-        // tanh rather than a clipped range. tanh(x) ≈ x through the
-        // operating range and asymptotes smoothly at ±1.
-        self.valence = (da * 0.25 + srt * 0.25 + oxy * 0.10 + end * 0.15 + ne * 0.10
+        self.valence = da * 0.25 + srt * 0.25 + oxy * 0.10 + end * 0.15 + ne * 0.10
             - cort_stress * 0.35
             - glu_excess * 0.15
-            + da_srt_synergy)
-            .tanh();
+            + da_srt_synergy;
+        self.valence = crate::state::sanitize::finite_clamp(self.valence, -1.0, 1.0);
 
-        // Global tone: mean of effective levels. Effective levels are
-        // saturated signals in [0,2), so the mean is in that range by
-        // construction.
+        // Global tone: mean of effective levels
         let sum: f32 = self.effective_levels.iter().sum();
-        self.global_tone = sum / NEUROCHEMICAL_COUNT as f32;
+        self.global_tone =
+            crate::state::sanitize::finite_clamp(sum / NEUROCHEMICAL_COUNT as f32, 0.0, 2.0);
 
-        // Plasticity gate: BDNF promotes, cortisol suppresses. The
-        // gate is a fraction of maximal plasticity — a logistic
-        // detection threshold centered at mid-range, smooth and
-        // bounded (0,1) by construction.
+        // Plasticity gate: BDNF promotes, cortisol suppresses
         let bdnf = eff(NeurochemicalId::BDNF);
-        self.plasticity_gate = logistic(4.0 * (bdnf * (1.0 - cort_stress * 0.5) - 0.5));
+        self.plasticity_gate =
+            crate::state::sanitize::finite_clamp(bdnf * (1.0 - cort_stress * 0.5), 0.0, 1.0);
 
         // Emergent phase
         self.emergent_phase = self.compute_phase() as u8;
@@ -2604,9 +2540,7 @@ impl NeurochemicalVector {
         // showed the body as asleep — the mind ran conversation while
         // the network sat in NREM and adenosine stayed pinned at its
         // clearance floor. Only apply_network_phase may enter or exit
-        // a sleep stage: waking is the flip-flop's call, reached
-        // through the network's arousal populations, not the waking
-        // classifier's.
+        // a sleep stage.
         if matches!(current, MentalPhase::NREM | MentalPhase::REM) {
             return current;
         }
@@ -3070,12 +3004,11 @@ impl NeurochemicalVector {
         // heartbeat, where f32 exp loses precision.
         let mel_decay = (-f64::from(MELATONIN_METABOLIC_RATE) * f64::from(dt)).exp() as f32;
         let mel_level = self.chemicals[mel_idx].level;
-        // Exact relaxation toward the secretion steady state:
-        // `M ← M_ss + (M − M_ss)·e^{−k·dt}` — a convex combination of
-        // the current level and a non-negative target, so the level
-        // stays positive and approaches M_ss monotonically with no
-        // bound written afterward.
-        self.chemicals[mel_idx].level = mel_ss + (mel_level - mel_ss) * mel_decay;
+        self.chemicals[mel_idx].level = crate::state::sanitize::finite_clamp(
+            mel_ss + (mel_level - mel_ss) * mel_decay,
+            0.0,
+            1.0,
+        );
 
         // Circadian baseline modulation: apply diurnal rhythm modifiers
         // to the homeostatic baselines of cortisol, dopamine, serotonin,
@@ -3101,7 +3034,11 @@ impl NeurochemicalVector {
             // Apply circadian modulation on top of the adapted baseline
             // (not the genetic default), so that sleep pressure accumulation
             // and emotional adaptation are preserved.
-            *cb = self.chemicals[i].baseline * modifier;
+            *cb = crate::state::sanitize::finite_clamp(
+                self.chemicals[i].baseline * modifier,
+                0.05,
+                0.95,
+            );
         }
 
         // Basal forebrain: when the sleep-wake network is not driving
@@ -3109,101 +3046,14 @@ impl NeurochemicalVector {
         // baseline shaped by its own two modulators — A1 occupancy on
         // the wake-active population (the somnogenic signal acting at
         // its site) and the expected-uncertainty drive. When the
-        // network IS driving, this entry is overwritten below: the
-        // basal-forebrain release target becomes ACh's set-point for
-        // the step instead.
+        // network IS driving, this entry is never read: ACh relaxes
+        // toward `basal_forebrain::release_target` below instead.
         let ach_idx = NeurochemicalId::Acetylcholine as usize;
         circadian_baselines[ach_idx] = basal_forebrain::wake_setpoint(
             circadian_baselines[ach_idx],
             self.chemicals[NeurochemicalId::Adenosine as usize].level,
             params.expected_uncertainty,
         );
-
-        // Brainstem release drives: when the sleep-wake network is
-        // present, the four flip-flop nuclei — VLPO, LC, dorsal raphe,
-        // basal forebrain — release onto the chemical each one
-        // synthesizes. The population firing enters as a sustained
-        // force on that chemical's own kinetics — homeostatic pull,
-        // coupling, autoreceptors, the chemical's own clearance
-        // terms, and impulse momentum all still apply, and the level
-        // is whatever the balance produces. Histamine and orexin are
-        // NOT driven here: their wake/sleep profiles emerge through
-        // the coupling web like every other chemical's.
-        //
-        // Acetylcholine is high in waking and in REM and lowest in NREM:
-        // basal forebrain microdialysis gives 0.34 pmol/10 min in NREM,
-        // 0.58 in waking, and 0.77 in REM (Vazquez & Baghdoyan, 2001;
-        // cortical ACh follows the same order, Marrosu et al., 1995).
-        // The target is a linear map of the two network populations
-        // that drive it, LC (wake) and REM-on, calibrated so NREM,
-        // waking, and REM sit at the measured 0.34, 0.58, and 0.77.
-        //
-        // Serotonin (dorsal raphe) is steady in waking, reduced in
-        // NREM, and near silent in REM (Monti & Jantos, 2008; Sakai &
-        // Crochet, 2001). Its target tracks LC and is suppressed by
-        // the REM-on population: steady states 0.39 waking, 0.22 NREM,
-        // 0.07 REM.
-        // The flip-flop nuclei do not write operating points — they
-        // release. Each population's firing is a sustained release
-        // drive on the chemical its nucleus synthesizes: a constant
-        // force added to that chemical's dynamics. The level then
-        // settles where the drive balances the chemical's own
-        // homeostatic clearance and coupling — an equilibrium the
-        // equations produce, not a value the network assigns.
-        //
-        // The drive magnitude is derived, not fitted: a constant
-        // force R shifts the spring equilibrium by R/(hr·nlf), so
-        // R = hr·nlf·(T−B) lands the equilibrium at T — the same
-        // calibrated stage profile the old set-point produced —
-        // while nlf is the autoreceptor factor evaluated at the
-        // known |B−T|, keeping the balance exact under the
-        // quadratic self-inhibition.
-        let mut network_force = [0.0f32; NEUROCHEMICAL_COUNT];
-        // The operating point a driven chemical settles around —
-        // baseline plus the release drive's equilibrium offset. This
-        // is the reference for "excess" terms (enzymatic degradation,
-        // noise taper): tonic population release is not excess. The
-        // homeostatic spring itself still centers on the chemical's
-        // own baseline — the drive is a force, not a set-point.
-        let mut operating_baselines = circadian_baselines;
-        if let Some(net) = params.network_levels {
-            let (lc, vlpo, rem) = (net.lc, net.vlpo, net.rem);
-            let adn_raw = self.chemicals[NeurochemicalId::Adenosine as usize].level;
-            let targets = [
-                (
-                    NeurochemicalId::Acetylcholine as usize,
-                    basal_forebrain::release_target(lc, rem, adn_raw, params.expected_uncertainty),
-                ),
-                (
-                    NeurochemicalId::Serotonin as usize,
-                    SRT_BASE + SRT_FROM_LC * lc - SRT_FROM_REM * rem,
-                ),
-                (
-                    NeurochemicalId::Norepinephrine as usize,
-                    NE_FROM_LC * lc - NE_FROM_REM * rem,
-                ),
-                (
-                    NeurochemicalId::GABA as usize,
-                    GABA_BASE + GABA_FROM_VLPO * vlpo * (1.0 - rem) - GABA_FROM_REM * rem,
-                ),
-            ];
-            for (i, target) in targets {
-                let baseline = circadian_baselines[i];
-                let dev = (baseline - target).abs();
-                let excess = (dev - AUTORECEPTOR_THRESHOLD).max(0.0);
-                let nlf = 1.0 + AUTORECEPTOR_GAIN * excess * excess;
-                network_force[i] = params.homeostatic_rate * nlf * (target - baseline);
-                operating_baselines[i] =
-                    baseline + network_force[i] / (params.homeostatic_rate * nlf);
-            }
-            // Histamine and orexin get NO drive: their wake/sleep
-            // profiles must emerge through the coupling web —
-            // histamine from NE/ACh excitation and GABA/MEL
-            // inhibition, orexin from the same inhibitory sleep
-            // drive plus its own α2-adrenoceptor feedback. A
-            // nucleus releases onto the web; it does not write
-            // its neighbors' operating points.
-        }
 
         // Recompute derived fields so the coupling snapshot reflects the
         // *current* chemical state, not the previous tick's cache. Between
@@ -3343,13 +3193,36 @@ impl NeurochemicalVector {
                 self.chemicals[i].velocity = 0.0;
                 continue;
             }
-            // The homeostatic baseline is always the chemical's own
-            // adapted, circadian-modulated operating point. The
-            // sleep-wake network contributes release force instead
-            // (see `network_force` above) — populations drive rates,
-            // never levels.
+            // When the sleep-wake network drives these chemicals, their
+            // level is set by the network's release target (see the
+            // network block after this loop), following each
+            // population's measured state profile: ACh high in waking
+            // and REM and lowest in NREM (Vazquez & Baghdoyan 2001);
+            // serotonin a REM-off dorsal raphe profile, high in wake,
+            // reduced in NREM, near-silent in REM (Monti & Jantos 2008;
+            // Sakai & Crochet 2001). They have no fixed setpoint to be
+            // restored to, so the generic update — homeostatic pull,
+            // autoreceptor, coupling — is skipped for them, as it
+            // already is for adenosine and the stress hormones. The
+            // scripted cholinergic rebound and the dedicated serotonin
+            // mechanism that used to live here are retired: the network
+            // owns REM staging now.
+            let network_driven = params.network_levels.is_some()
+                && [
+                    NeurochemicalId::Acetylcholine,
+                    NeurochemicalId::Serotonin,
+                    NeurochemicalId::Norepinephrine,
+                    NeurochemicalId::GABA,
+                    NeurochemicalId::Histamine,
+                    NeurochemicalId::Orexin,
+                ]
+                .iter()
+                .any(|id| i == *id as usize);
+            if network_driven {
+                self.chemicals[i].velocity = 0.0;
+                continue;
+            }
             let homeostatic_baseline = circadian_baselines[i];
-            let operating_baseline = operating_baselines[i];
             let homeostatic_force = if is_melatonin {
                 0.0
             } else if is_stress_hormone {
@@ -3453,7 +3326,7 @@ impl NeurochemicalVector {
             let mut coupling_force = 0.0f32;
             // Self-deviation for state-dependent gain modulation
             let self_eff = eff_snapshot[i];
-            let self_baseline = self.feedback_baseline(i);
+            let self_baseline = self.chemicals[i].baseline;
             let self_dev = self_eff - self_baseline;
 
             for (j, &eff) in eff_snapshot.iter().enumerate().take(NEUROCHEMICAL_COUNT) {
@@ -3466,21 +3339,11 @@ impl NeurochemicalVector {
                 // to other chemicals — the same DA level produces
                 // different coupling depending on receptor state.
                 let eff_j = if j == da_idx { da_subtype_eff } else { eff };
-                let j_baseline = self.feedback_baseline(j);
+                let j_baseline = self.chemicals[j].baseline;
                 let raw_deviation = eff_j - j_baseline;
-                // Depletion pull saturates smoothly instead of hitting
-                // a rail: for negative deviations the rational form
-                // `dev·T/(T−dev)` ≈ dev near baseline and asymptotes
-                // to −T as dev→−∞ — the same protective ceiling the
-                // hard cap enforced, reached as a limit of the
-                // function rather than a written bound. Positive
-                // deviations pass through unchanged.
-                let deviation = if raw_deviation < 0.0 {
-                    raw_deviation * AUTORECEPTOR_THRESHOLD
-                        / (AUTORECEPTOR_THRESHOLD - raw_deviation)
-                } else {
-                    raw_deviation
-                };
+                // Cap negative deviations at -AUTORECEPTOR_THRESHOLD.
+                // Positive deviations are not capped.
+                let deviation = raw_deviation.max(-AUTORECEPTOR_THRESHOLD);
                 // Suprathreshold recruitment: elevated sources couple
                 // superlinearly (volume transmission engages past the
                 // synaptic envelope). Resting wander multiplies by
@@ -3545,9 +3408,8 @@ impl NeurochemicalVector {
                 // be predicted from individual chemicals.
                 let j_dev = raw_deviation;
                 let coactivation = self_dev * j_dev; // positive if same direction
-                // tanh bounds the gain to (0.7, 1.3) by construction —
-                // the saturating nonlinearity IS the bound.
-                let coupling_gain = 1.0 + 0.3 * coactivation.tanh();
+                let gain_mod = 1.0 + 0.3 * coactivation.tanh();
+                let coupling_gain = crate::state::sanitize::finite_clamp(gain_mod, 0.7, 1.3);
 
                 // Region-specific SRT→DA coupling override
                 let coupling_val = if i == da_idx && j == srt_idx {
@@ -3591,11 +3453,8 @@ impl NeurochemicalVector {
                 let hash = neuro_noise_hash(params.noise_seed, i as u64);
                 let r01 = (hash as f32) / (u32::MAX as f32); // [0, 1)
                 let r11 = r01 * 2.0 - 1.0; // [-1, 1)
-                let deviation = (self.chemicals[i].level - operating_baseline).abs();
-                // Smooth proximity taper: exp(−2·|dev|) is 1 at the
-                // set-point and decays asymptotically — never negative,
-                // so no positive-part gate is needed.
-                let proximity = (-2.0 * deviation).exp();
+                let deviation = (self.chemicals[i].level - homeostatic_baseline).abs();
+                let proximity = (1.0 - deviation * 2.0).max(0.0); // 1 near baseline, 0 far
                 params.noise_amplitude * r11 * proximity * dt.sqrt()
             } else {
                 0.0
@@ -3638,12 +3497,7 @@ impl NeurochemicalVector {
                 // The noise is a level diffusion kick (√dt-scaled), not
                 // another rate term — adding it inside the rate would
                 // shrink it to dt^1.5 and make it invisible.
-                // The additive flux goes through flow_level: secretion
-                // adds molecules, while net removal is integrated as
-                // first-order clearance — positivity is the equation's
-                // own property, not a floor written afterward.
-                self.chemicals[i].level =
-                    flow_level(self.chemicals[i].level, (restore + drive) * dt + noise);
+                self.chemicals[i].level += (restore + drive) * dt + noise;
                 if coupled < 0.0 {
                     // Suppression of a circulating pool acts as enhanced
                     // clearance — inhibited secretion cannot pull hormone
@@ -3656,22 +3510,15 @@ impl NeurochemicalVector {
                 } else {
                     self.chemicals[i].level += coupled * dt;
                 }
+                self.chemicals[i].level =
+                    crate::state::sanitize::finite_clamp(self.chemicals[i].level, 0.0, 1.0);
                 self.chemicals[i].velocity = 0.0;
                 continue;
             }
 
-            self.chemicals[i].velocity +=
-                (homeostatic_force + coupling_force + network_force[i]) * dt + noise;
+            self.chemicals[i].velocity += (homeostatic_force + coupling_force) * dt + noise;
             self.chemicals[i].velocity *= damping.powf(dt_scale);
-            // The level update is the positivity-preserving integrator:
-            // a positive flux is release (molecules added); a negative
-            // flux is clearance integrated as first-order decay
-            // `C·exp(flux/C)` — the exponential factor is in (0,1), so
-            // the level can approach zero asymptotically but can never
-            // cross it, at any step size. Substrate exhaustion is the
-            // equation's own limit, not a guard.
-            self.chemicals[i].level =
-                flow_level(self.chemicals[i].level, self.chemicals[i].velocity * dt);
+            self.chemicals[i].level += self.chemicals[i].velocity * dt;
 
             // Acetylcholinesterase degradation: ACh is broken down by
             // AChE in the synaptic cleft. This is a fast enzymatic
@@ -3695,10 +3542,9 @@ impl NeurochemicalVector {
             // (the biological intent) while the homeostatic force can
             // maintain ACh near baseline at rest.
             if i == NeurochemicalId::Acetylcholine as usize {
-                let ach_excess = (self.chemicals[i].level - operating_baseline).max(0.0);
+                let ach_excess = (self.chemicals[i].level - homeostatic_baseline).max(0.0);
                 let decay_factor = (1.0_f32 - ACH_DEGRADATION_RATE).powf(dt_scale);
-                self.chemicals[i].level =
-                    flow_level(self.chemicals[i].level, -ach_excess * (1.0 - decay_factor));
+                self.chemicals[i].level -= ach_excess * (1.0 - decay_factor);
             }
 
             if is_glutamate {
@@ -3712,8 +3558,7 @@ impl NeurochemicalVector {
                 // set-point is removed.
                 let glu_excess = (self.chemicals[i].level - homeostatic_baseline).max(0.0);
                 let uptake_factor = (1.0_f32 - GLUTAMATE_EAAT_RATE).powf(dt_scale);
-                self.chemicals[i].level =
-                    flow_level(self.chemicals[i].level, -glu_excess * (1.0 - uptake_factor));
+                self.chemicals[i].level -= glu_excess * (1.0 - uptake_factor);
 
                 // GAD drain: GABA is synthesized stoichiometrically
                 // from glutamate by glutamic acid decarboxylase
@@ -3726,29 +3571,9 @@ impl NeurochemicalVector {
                 // desensitization without elevated signaling, and
                 // draining glutamate for that would punish excitation
                 // for what is actually compensatory overproduction.
-                //
-                // The drain is enzyme kinetics, not a fixed rate:
-                // GAD consumes glutamate as *substrate*, so the flux
-                // follows a Michaelis-Menten saturation in the
-                // available pool — v = V·S/(Km+S) with Km at the
-                // operating point. At level = baseline the factor is
-                // 0.5 and the drain matches the calibrated rate; as
-                // glutamate depletes the drain dies with it, so the
-                // sink can never push the level through the floor —
-                // the same reason reuptake transporters and AChE
-                // cannot clear what is not there.
                 let gaba_excess =
                     (eff_snapshot[gaba_idx] - self.chemicals[gaba_idx].baseline).max(0.0);
-                let glu_level = self.chemicals[i].level;
-                let substrate = if homeostatic_baseline > 0.0 {
-                    glu_level / (glu_level + homeostatic_baseline)
-                } else {
-                    0.0
-                };
-                self.chemicals[i].level = flow_level(
-                    self.chemicals[i].level,
-                    -GLUTAMATE_GAD_RATE * 2.0 * gaba_excess * substrate * dt,
-                );
+                self.chemicals[i].level -= GLUTAMATE_GAD_RATE * gaba_excess * dt;
             }
 
             // Stress hormone metabolic decay (leaky integrator).
@@ -3783,13 +3608,8 @@ impl NeurochemicalVector {
                 self.chemicals[i].level += synthesis;
             }
 
-            // No post-write guard: every update above is
-            // positivity-preserving by construction — the spring flux
-            // goes through flow_level, the excess degradations are
-            // excess-gated and flow_level-wrapped, the hormone pools
-            // use exponential clearance, and the metabolic decay is
-            // `level·exp(−k·dt)`. Concentration cannot go negative
-            // because the equations cannot produce it.
+            self.chemicals[i].level =
+                crate::state::sanitize::finite_clamp(self.chemicals[i].level, 0.0, 1.0);
         }
 
         // GABA disinhibition: in some circuits, GABA interneurons inhibit
@@ -3810,9 +3630,13 @@ impl NeurochemicalVector {
         let ach_eff = self.effective(NeurochemicalId::Acetylcholine);
         if gaba_eff > 0.8 && ach_eff > 0.6 {
             let disinhibition_force = (gaba_eff - 0.8) * (ach_eff - 0.6) * 0.5;
-            let glu_idx = NeurochemicalId::Glutamate as usize;
-            self.chemicals[glu_idx].level =
-                flow_level(self.chemicals[glu_idx].level, disinhibition_force * dt);
+            self.chemicals[NeurochemicalId::Glutamate as usize].level += disinhibition_force * dt;
+            self.chemicals[NeurochemicalId::Glutamate as usize].level =
+                crate::state::sanitize::finite_clamp(
+                    self.chemicals[NeurochemicalId::Glutamate as usize].level,
+                    0.0,
+                    1.0,
+                );
         }
 
         // Adenosine sleep pressure: adenosine accumulates as a byproduct
@@ -3919,10 +3743,8 @@ impl NeurochemicalVector {
             let current_level = f64::from(self.chemicals[adn_idx].level);
             let new_level =
                 lower_asymptote + (-dt_hours / chi_s).exp() * (current_level - lower_asymptote);
-            // Exact exponential relaxation toward the lower
-            // asymptote — the convex combination stays positive by
-            // construction; no floor is written afterward.
-            self.chemicals[adn_idx].level = new_level as f32;
+            self.chemicals[adn_idx].level =
+                crate::state::sanitize::finite_clamp(new_level as f32, 0.0, 1.0);
         } else {
             // Awake or drowsy: adenosine LEVEL rises as a saturating
             // exponential toward an upper asymptote, following the
@@ -3975,7 +3797,65 @@ impl NeurochemicalVector {
             let current_level = f64::from(self.chemicals[adn_idx].level);
             let new_level =
                 upper_asymptote - (-r_prime * dt_hours).exp() * (upper_asymptote - current_level);
-            self.chemicals[adn_idx].level = new_level as f32;
+            self.chemicals[adn_idx].level =
+                crate::state::sanitize::finite_clamp(new_level as f32, 0.0, 1.0);
+        }
+        self.chemicals[adn_idx].level =
+            crate::state::sanitize::finite_clamp(self.chemicals[adn_idx].level, 0.0, 1.0);
+
+        // Sleep-wake network drive on the monoaminergic and cholinergic
+        // targets. The network owns the sleep stages, so no latch, threshold,
+        // or phase gate lives here.
+        //
+        // Acetylcholine is high in waking and in REM and lowest in NREM:
+        // basal forebrain microdialysis gives 0.34 pmol/10 min in NREM,
+        // 0.58 in waking, and 0.77 in REM (Vazquez & Baghdoyan, 2001; cortical
+        // ACh follows the same order, Marrosu et al., 1995). The target is a
+        // linear map of the two network populations that drive it, LC (wake)
+        // and REM-on, calibrated so NREM, waking, and REM sit at the
+        // measured 0.34, 0.58, and 0.77.
+        //
+        // Serotonin (dorsal raphe) is steady in waking, reduced in NREM, and
+        // near silent in REM (Monti & Jantos, 2008; Sakai & Crochet, 2001).
+        // Its target tracks LC and is suppressed by the REM-on population:
+        // steady states 0.39 waking, 0.22 NREM, 0.07 REM.
+        if let Some(net) = params.network_levels {
+            let rate = 0.001_f64 * f64::from(dt_scale);
+            let relax = |chem: &mut Neurochemical, target: f32| {
+                let target = f64::from(target);
+                let cur = f64::from(chem.level);
+                chem.level = crate::state::sanitize::finite_clamp(
+                    (target - (-rate).exp() * (target - cur)) as f32,
+                    0.0,
+                    1.0,
+                );
+            };
+            let (lc, vlpo, rem) = (net.lc, net.vlpo, net.rem);
+            let adn_raw = self.chemicals[adn_idx].level;
+            relax(
+                &mut self.chemicals[NeurochemicalId::Acetylcholine as usize],
+                basal_forebrain::release_target(lc, rem, adn_raw, params.expected_uncertainty),
+            );
+            relax(
+                &mut self.chemicals[NeurochemicalId::Serotonin as usize],
+                (SRT_BASE + SRT_FROM_LC * lc - SRT_FROM_REM * rem).clamp(0.0, 1.0),
+            );
+            relax(
+                &mut self.chemicals[NeurochemicalId::Norepinephrine as usize],
+                (NE_FROM_LC * lc - NE_FROM_REM * rem).clamp(0.0, 1.0),
+            );
+            relax(
+                &mut self.chemicals[NeurochemicalId::GABA as usize],
+                GABA_BASE + GABA_FROM_VLPO * vlpo * (1.0 - rem) - GABA_FROM_REM * rem,
+            );
+            relax(
+                &mut self.chemicals[NeurochemicalId::Histamine as usize],
+                HIST_FROM_LC * lc,
+            );
+            relax(
+                &mut self.chemicals[NeurochemicalId::Orexin as usize],
+                OX_FROM_LC * lc,
+            );
         }
 
         // BDNF recovery after stress: once cortisol has cleared below
@@ -3997,10 +3877,13 @@ impl NeurochemicalVector {
         let bdnf_level = self.chemicals[NeurochemicalId::BDNF as usize].level;
         if cort_level < STRESS_CORTISOL_GATE && bdnf_level < bdnf_baseline {
             let recovery = srt_level * params.bdnf_recovery_rate * dt_scale;
-            self.chemicals[NeurochemicalId::BDNF as usize].level = flow_level(
-                self.chemicals[NeurochemicalId::BDNF as usize].level,
-                recovery,
-            );
+            self.chemicals[NeurochemicalId::BDNF as usize].level += recovery;
+            self.chemicals[NeurochemicalId::BDNF as usize].level =
+                crate::state::sanitize::finite_clamp(
+                    self.chemicals[NeurochemicalId::BDNF as usize].level,
+                    0.0,
+                    1.0,
+                );
         }
 
         // HPA axis cascade: CRH → ACTH → cortisol with time delays
@@ -4064,12 +3947,9 @@ impl NeurochemicalVector {
         let oxy_dev = (self.effective_levels[NeurochemicalId::Oxytocin as usize]
             - self.chemicals[NeurochemicalId::Oxytocin as usize].baseline)
             .max(0.0);
-        // Each peptide term saturates rationally — potentiation and
-        // attenuation are receptor-mediated gains, so each is an
-        // Emax isotherm `k·x/(1+x)` bounded by its own coefficient.
-        // The gain's range is the sum of bounded terms, not a rail.
-        let pituitary_gain = 1.0 + VASOPRESSIN_ACTH_POTENTIATION * vp_dev / (1.0 + vp_dev)
-            - OXYTOCIN_HPA_ATTENUATION * oxy_dev / (1.0 + oxy_dev);
+        let pituitary_gain = (1.0 + VASOPRESSIN_ACTH_POTENTIATION * vp_dev
+            - OXYTOCIN_HPA_ATTENUATION * oxy_dev)
+            .clamp(0.5, 1.8);
         // Basal drive: the SCN's tonic circadian secretion — the HPA
         // axis is never silent in a living body. Scaled by maturation
         // (SHRP blunts the whole axis) and the pituitary gain, exactly
@@ -4084,6 +3964,7 @@ impl NeurochemicalVector {
         // pituitary lag to a handful of integration steps.
         let acth_alpha = 1.0 - (-ACTH_APPROACH_RATE * dt).exp();
         self.acth_level += (acth_target - self.acth_level) * acth_alpha;
+        self.acth_level = crate::state::sanitize::finite_clamp(self.acth_level, 0.0, 1.0);
 
         // Step 2: ACTH drives cortisol release
         // ACTH stimulates cortisol production in the adrenal cortex.
@@ -4112,27 +3993,20 @@ impl NeurochemicalVector {
         self.chemicals[cort_idx].level += acth_drive_per_tick * dt_scale;
 
         // Compute cortisol excess once for the negative feedback
-        // steps and clearance below. The reference is the fixed
-        // genetic floor, not the adapting allostatic baseline —
-        // clearance keys on absolute concentration (see
-        // `feedback_baseline`).
-        let cort_baseline = self.feedback_baseline(cort_idx);
+        // steps and clearance below.
+        let cort_baseline = self.chemicals[cort_idx].baseline;
         let cort_excess = (self.chemicals[cort_idx].level - cort_baseline).max(0.0);
 
         // Step 3: Cortisol negative feedback to ACTH
         // High cortisol suppresses ACTH (long-loop negative feedback) —
-        // the primary brake on runaway cortisol. The suppression is
-        // written as enhanced *clearance* — a multiplicative decay of
-        // the ACTH level — not a constant-rate drain: glucocorticoid
-        // feedback inhibits POMC transcription and ACTH secretion
-        // proportionally to the hormone present, and proportional
-        // removal can never push ACTH below zero. The rate is written
+        // the primary brake on runaway cortisol. The drain is written
         // against ACTH_APPROACH_RATE so the feedback/feed-forward
         // balance (acth* = target − gain·cort_eff) is invariant to the
         // pituitary's speed: as an absolute per-tick rate it became
         // ~12× stronger than the approach once the approach was slowed
         // to the measured onset scale.
-        self.acth_level *= (-cort_eff * HPA_CORTISOL_FEEDBACK_GAIN * ACTH_APPROACH_RATE * dt).exp();
+        self.acth_level -= cort_eff * HPA_CORTISOL_FEEDBACK_GAIN * ACTH_APPROACH_RATE * dt;
+        self.acth_level = crate::state::sanitize::finite_clamp(self.acth_level, 0.0, 1.0);
 
         // Step 3b: Cortisol negative feedback to CRH
         // High cortisol inhibits hypothalamic CRH neurons, shutting
@@ -4176,6 +4050,8 @@ impl NeurochemicalVector {
         // the AChE clearance a few lines above.
         let clearance_exponent = CORTISOL_CLEARANCE_RATE * cort_excess * dt_scale;
         self.chemicals[cort_idx].level *= (-clearance_exponent).exp();
+        self.chemicals[cort_idx].level =
+            crate::state::sanitize::finite_clamp(self.chemicals[cort_idx].level, 0.0, 1.0);
 
         // Tonic/phasic dynamics: phasic decays quickly (seconds),
         // tonic changes slowly (minutes). The tonic level tracks
@@ -4193,23 +4069,19 @@ impl NeurochemicalVector {
             // timescale (PHASIC_DECAY_TAU_SECS = 1.5 s — FSCV phasic
             // transients decay with τ ≈ 1.4–1.7 s; Courtney & Ford
             // 2014). Halves in ~1 s, reaching near-zero in ~5 s.
-            // Phasic decay is a pure exponential — `level·e^{−dt/τ}`
-            // is a factor in (0,1), so a non-negative phasic level
-            // stays non-negative and decays toward zero asymptotically.
             chem.phasic_level *= (-dt / PHASIC_DECAY_TAU_SECS).exp();
+            chem.phasic_level = crate::state::sanitize::finite_clamp(chem.phasic_level, 0.0, 1.0);
 
             // Tonic approach: slowly tracks the current level.
             // Rate 0.002/step at 10 Hz = 0.02/sec → time constant ~50
             // seconds. This is the slow background level that changes
             // over minutes, distinct from the fast phasic bursts.
             // Use f64 arithmetic for the slow tonic accumulator.
-            // The update is a convex combination of tonic and level,
-            // so tonic tracks level's range without ever crossing it.
             let new_tonic = f64::from(chem.tonic_level)
                 + (f64::from(chem.level) - f64::from(chem.tonic_level))
                     * 0.002_f64
                     * f64::from(dt_scale);
-            chem.tonic_level = new_tonic as f32;
+            chem.tonic_level = crate::state::sanitize::finite_clamp(new_tonic as f32, 0.0, 1.0);
         }
 
         // Vesicular pool recovery: synthesis and reuptake slowly
@@ -4219,54 +4091,12 @@ impl NeurochemicalVector {
         // proportional to the current level (some neurotransmitter
         // is recycled back into vesicles).
         for chem in &mut self.chemicals {
-            // All replenishment is proportional to the remaining
-            // capacity and integrated as exact first-order relaxation
-            // toward full: `pool ← 1 + (pool−1)·e^{−k·dt}`. The
-            // exponential factor is in (0,1) for any positive rate,
-            // so the update is unconditionally stable — unlike the
-            // explicit Euler form, which diverged once `level·0.5`
-            // made the rate large (reuptake grows with extracellular
-            // transmitter, so a large level makes k huge; Euler
-            // overshoots and the pool oscillates to infinity). If the
-            // pool is ever above one, the same term pulls it back —
-            // the bound corrects itself in both directions.
-            let k = (0.001 + chem.level * 0.5) * dt_scale;
-            let alpha = 1.0 - (-k).exp();
-            chem.vesicular_pool += (1.0 - chem.vesicular_pool) * alpha;
-        }
-
-        // VLPO GABAergic inhibition of the wake-active monoamines.
-        //
-        // The tuberomammillary histamine neurons and lateral
-        // hypothalamic orexin neurons are NOT sleep-wake network
-        // populations — they are their *targets*. The VLPO's GABAergic
-        // projection onto them is a synaptic input, not a set-point:
-        // GABA release onto TMN/LH neurons is inhibitory clearance —
-        // removal proportional to the presynaptic population's
-        // activity, integrated as first-order decay so it dies with
-        // the substrate and can never push a level below zero. In
-        // waking the VLPO is nearly silent, the clearance is
-        // negligible, and each chemical's own homeostatic pull holds
-        // it near its genetic baseline. In NREM and REM the VLPO
-        // fires strongly and the two arousal chemicals drain toward
-        // silence through their own kinetics — the level is where
-        // release meets inhibition, never assigned.
-        //
-        // (Saper et al., Neuron 2005; Scammell et al., Neuron 2004 —
-        // VLPO GABA/galanin → TMN and LH inhibition is the sleep
-        // switch's output arm.)
-        if let Some(net) = params.network_levels {
-            // GABA release is coincidence-gated by the population's
-            // firing: a near-silent VLPO (wake, ~0.02) releases
-            // essentially nothing, while the sleep-active VLPO
-            // (~0.8–0.9) drives strong clearance. Quadratic in the
-            // population level — the same threshold nonlinearity as
-            // vesicular release probability.
-            let inhibition = VLPO_GABA_INHIBIT * net.vlpo * net.vlpo;
-            for &id in &[NeurochemicalId::Histamine, NeurochemicalId::Orexin] {
-                let idx = id as usize;
-                self.chemicals[idx].level *= (-inhibition * dt).exp();
-            }
+            // Synthesis: slow linear recovery toward full pool
+            chem.vesicular_pool += (1.0 - chem.vesicular_pool) * 0.001 * dt_scale;
+            // Reuptake: proportional to current level (recycling)
+            chem.vesicular_pool += chem.level * 0.0005 * dt_scale;
+            chem.vesicular_pool =
+                crate::state::sanitize::finite_clamp(chem.vesicular_pool, 0.0, 1.0);
         }
 
         // Narcolepsy modeling: when orexin is very low (<0.10), the
@@ -4281,14 +4111,33 @@ impl NeurochemicalVector {
         // not high enough to trigger normal sleep.
         let orexin_level = self.chemicals[NeurochemicalId::Orexin as usize].level;
         if orexin_level < 0.10 {
-            // Sudden histamine drop (cataplexy/sleep attack) —
-            // the orexin loss removes excitatory drive, so histamine
-            // clearance follows its level down as first-order decay.
+            // Sudden histamine drop (cataplexy/sleep attack)
             let narcolepsy_force = (0.10 - orexin_level) * 0.05 * dt_scale;
-            let hist_idx = NeurochemicalId::Histamine as usize;
-            self.chemicals[hist_idx].level =
-                flow_level(self.chemicals[hist_idx].level, -narcolepsy_force);
+            self.chemicals[NeurochemicalId::Histamine as usize].level -= narcolepsy_force;
+            self.chemicals[NeurochemicalId::Histamine as usize].level =
+                crate::state::sanitize::finite_clamp(
+                    self.chemicals[NeurochemicalId::Histamine as usize].level,
+                    0.0,
+                    1.0,
+                );
         }
+
+        // Hard clamps on cortisol and NE to prevent runaway stress/arousal.
+        // These are safety mechanisms in case the emotional regulator fails
+        // or coupling forces push beyond safe limits.
+        // Use finite_clamp for NaN safety: native clamp passes NaN through.
+        self.chemicals[NeurochemicalId::Cortisol as usize].level =
+            crate::state::sanitize::finite_clamp(
+                self.chemicals[NeurochemicalId::Cortisol as usize].level,
+                0.0,
+                params.cortisol_max,
+            );
+        self.chemicals[NeurochemicalId::Norepinephrine as usize].level =
+            crate::state::sanitize::finite_clamp(
+                self.chemicals[NeurochemicalId::Norepinephrine as usize].level,
+                0.0,
+                params.ne_max,
+            );
 
         // Receptor adaptation: split into three mechanisms ordered by
         // the biological cascade — the response to sustained agonist is
@@ -4332,17 +4181,7 @@ impl NeurochemicalVector {
             let chem_id = NeurochemicalId::from_u8(chem.id);
             let chem_adapt_rate = adaptation_rate * chem_id.receptor_adaptation_multiplier();
 
-            // Cortisol's deviation is measured from the fixed genetic
-            // floor, not the adapting allostatic baseline — sustained
-            // cortisol must keep driving GR downregulation (the
-            // glucocorticoid-resistance mechanism) instead of reading
-            // as "at baseline" once the set-point has drifted to it.
-            let deviation = chem.level
-                - if chem_id == NeurochemicalId::Cortisol {
-                    NeurochemicalId::Cortisol.default_baseline()
-                } else {
-                    chem.baseline
-                };
+            let deviation = chem.level - chem.baseline;
 
             // Receptor adaptation: each receptor factor adapts based on
             // the effective deviation (raw deviation scaled by receptor
@@ -4373,14 +4212,7 @@ impl NeurochemicalVector {
             let receptor_health = chem.receptor_sensitivity
                 * chem.desensitization_factor
                 * chem.internalization_factor;
-            // Normalize the composite health before scaling occupancy.
-            // The triple product is the total signaling health, but using
-            // it directly makes each adaptation pathway feel only one
-            // third of the measured agonist drive once the cascade has
-            // begun. The cube root preserves the correct direction and
-            // attenuation without turning receptor burnout into a false
-            // low-occupancy signal.
-            let effective_deviation = deviation * receptor_health.cbrt();
+            let effective_deviation = deviation * receptor_health;
 
             // Receptor turnover: slow background recovery toward 1.0.
             // Models continuous receptor replacement (half-life days
@@ -4411,32 +4243,21 @@ impl NeurochemicalVector {
             // Receptor sensitivity adaptation — the slowest of the three
             // mechanisms: receptor density/expression changes over hours
             // to days, long after functional desensitization has run.
-            if sleep_resens <= 0.0 {
+            {
+                let rate = if deviation > 0.0 {
+                    chem_adapt_rate * 0.2 // downregulation: slowest
+                } else {
+                    chem_adapt_rate * 0.06 // upregulation: ~3x slower still
+                };
+                // Use effective deviation for downregulation, raw
+                // deviation for upregulation (upregulation should
+                // respond to actual low levels, not effective levels).
                 let adapt_deviation = if deviation > 0.0 {
                     effective_deviation
                 } else {
                     deviation
                 };
-                // Occupancy-driven density: receptor number relaxes
-                // toward a set-point set by agonist occupancy
-                // θ = dev/(dev+K) — a Hill-Langmuir isotherm in (0,1).
-                // At chronic full occupancy density falls to the
-                // literature asymptote (50% for this factor); the
-                // bound is the isotherm's own range, not a written
-                // floor. Rate matched so small deviations reproduce
-                // the original linear drift.
-                let theta = adapt_deviation.abs() / (adapt_deviation.abs() + 0.5);
-                let target = if adapt_deviation > 0.0 {
-                    1.0 - 0.5 * theta
-                } else {
-                    1.0 + 0.5 * theta
-                };
-                let rate = if deviation > 0.0 {
-                    chem_adapt_rate * 0.2 * 0.3
-                } else {
-                    chem_adapt_rate * 0.06 * 0.3
-                };
-                chem.receptor_sensitivity += (target - chem.receptor_sensitivity) * rate * dt_scale;
+                chem.receptor_sensitivity -= adapt_deviation * rate * dt_scale;
             }
             // Sleep resensitization: unconditional recovery toward 1.0
             if sleep_resens > 0.0 {
@@ -4446,6 +4267,28 @@ impl NeurochemicalVector {
             // Receptor turnover (background recovery — synthesis is the
             // slowest replacement pathway)
             chem.receptor_sensitivity += (1.0 - chem.receptor_sensitivity) * sens_turnover;
+            // Floor at 0.5: maximum receptor density decrease is ~50%,
+            // the worst physiological case reported in the literature.
+            // Key data points:
+            // - D2/D3 (chronic stimulant abuse): 10-25% reduction
+            //   (Volkow et al.; meta-analysis effect size -0.76,
+            //    Bertoletti et al., JAMA Psychiatry 2017)
+            // - β2AR (chronic albuterol, 2 weeks): 22-42% pulmonary
+            //   reduction (Hayes et al., 1996)
+            // - Oxytocin receptor (10-day continuous infusion): ≥50%
+            //   in all target fields (Endocrinology 130:2602, 1992)
+            // - 5-HT2A (chronic SSRI): 11-38% decrease
+            // - MOR (chronic morphine): "small reduction in total
+            //   receptor number" — the 70-80% loss is functional
+            //   desensitization, not density (Chen et al., PNAS 1989)
+            // The previous 0.1 floor allowed 90% reduction, which
+            // combined with desensitization and internalization floors
+            // produced a 1000× effective level reduction — biologically
+            // absurd. 0.5 ensures graceful degradation: even at maximum
+            // burnout, effective levels retain enough signal for basic
+            // function and self-recovery.
+            chem.receptor_sensitivity =
+                crate::state::sanitize::finite_clamp(chem.receptor_sensitivity, 0.5, 2.0);
 
             // Desensitization (fastest, minutes): responds first to current
             // deviation — phosphorylation/arrestin uncoupling is the
@@ -4453,31 +4296,19 @@ impl NeurochemicalVector {
             // 11–13× within 1 min of agonist exposure; January et al.,
             // JBC 1997). Use effective deviation for downregulation.
             let desens_rate = chem_adapt_rate * 5.0;
-            if sleep_resens <= 0.0 {
+            {
                 let adapt_deviation = if deviation > 0.0 {
                     effective_deviation
                 } else {
                     deviation
                 };
-                // Same occupancy-isotherm structure as density: the
-                // functional coupling factor relaxes toward an
-                // agonist-occupancy target. Maximum desensitization
-                // is the ~80% functional loss reported for chronic
-                // full agonist exposure (PKC/arrestin uncoupling) —
-                // expressed as the isotherm's asymptote, not a rail.
-                let theta = adapt_deviation.abs() / (adapt_deviation.abs() + 0.5);
-                let target = if adapt_deviation > 0.0 {
-                    1.0 - 0.8 * theta
+                if deviation > 0.0 {
+                    chem.desensitization_factor -= adapt_deviation * desens_rate * dt_scale;
                 } else {
-                    1.0 + 0.8 * theta
-                };
-                let rate = if deviation > 0.0 {
-                    desens_rate * 0.25
-                } else {
-                    desens_rate * 0.125
-                };
-                chem.desensitization_factor +=
-                    (target - chem.desensitization_factor) * rate * dt_scale;
+                    // Recovery toward 1.0
+                    chem.desensitization_factor +=
+                        (-adapt_deviation) * desens_rate * 0.5 * dt_scale;
+                }
             }
             // Sleep resensitization: unconditional recovery toward 1.0
             if sleep_resens > 0.0 {
@@ -4487,6 +4318,21 @@ impl NeurochemicalVector {
             // Receptor turnover (background recovery — dephosphorylation/
             // resensitization is the fastest replacement pathway)
             chem.desensitization_factor += (1.0 - chem.desensitization_factor) * desens_turnover;
+            // Floor at 0.2: maximum functional desensitization is ~80%,
+            // per the literature on chronic agonist exposure:
+            // - MOR (chronic morphine, 3+ days): 70-80% loss of
+            //   receptor function via PKC-mediated uncoupling
+            //   (Bailey et al., PMC2695152)
+            // - β2AR (full agonist, epinephrine): ~70-80%
+            //   desensitization of adenylyl cyclase response
+            //   (January et al., JBC 1997)
+            // - 5-HT1A (chronic SSRI): desensitization at G-protein
+            //   coupling level, not receptor number (Blier et al.)
+            // Note: this is functional uncoupling (phosphorylation/
+            // arrestin), NOT receptor density loss — density is
+            // handled by receptor_sensitivity above.
+            chem.desensitization_factor =
+                crate::state::sanitize::finite_clamp(chem.desensitization_factor, 0.2, 1.0);
 
             // Internalization (intermediate, tens of minutes–hours):
             // endocytosis follows desensitization but precedes density
@@ -4494,29 +4340,19 @@ impl NeurochemicalVector {
             // agonist exposure (January et al., JBC 1997; DAMGO/MOR
             // 50–58%). Use effective deviation for downregulation.
             let intern_rate = chem_adapt_rate;
-            if sleep_resens <= 0.0 {
+            {
                 let adapt_deviation = if deviation > 0.0 {
                     effective_deviation
                 } else {
                     deviation
                 };
-                // Occupancy-isotherm relaxation, same form as the
-                // other two factors. The ~55% maximum internalization
-                // reported for sustained full agonist (β2AR 55% at
-                // 30 min; MOR 50–58%) is the isotherm's asymptote.
-                let theta = adapt_deviation.abs() / (adapt_deviation.abs() + 0.5);
-                let target = if adapt_deviation > 0.0 {
-                    1.0 - 0.55 * theta
+                if deviation > 0.0 {
+                    chem.internalization_factor -= adapt_deviation * intern_rate * dt_scale;
                 } else {
-                    1.0 + 0.55 * theta
-                };
-                let rate = if deviation > 0.0 {
-                    intern_rate * 0.55
-                } else {
-                    intern_rate * 0.11
-                };
-                chem.internalization_factor +=
-                    (target - chem.internalization_factor) * rate * dt_scale;
+                    // Very slow recovery toward 1.0
+                    chem.internalization_factor +=
+                        (-adapt_deviation) * intern_rate * 0.2 * dt_scale;
+                }
             }
             // Sleep resensitization: unconditional recovery toward 1.0
             if sleep_resens > 0.0 {
@@ -4526,6 +4362,21 @@ impl NeurochemicalVector {
             // Receptor turnover (background recovery — membrane recycling
             // is intermediate)
             chem.internalization_factor += (1.0 - chem.internalization_factor) * intern_turnover;
+            // Floor at 0.45: maximum internalization is ~55%, per
+            // the literature on agonist-induced receptor endocytosis:
+            // - β2AR (epinephrine, full agonist, 30 min): 55%
+            //   internalized (January et al., JBC 1997)
+            // - MOR (DAMGO, 30 min): 50-58% internalized
+            //   (Science Advances, 2025)
+            // - β2AR (weak agonists): 0-17% — internalization is
+            //   agonist-dependent
+            // - Cardiac β-AR (isoproterenol): ~50% lost in 10 min,
+            //   85% recycled in 20 min (rapid recovery)
+            //   (Lohse et al., Circ Res 1984)
+            // Previous 0.1 floor allowed 90% internalization, which
+            // is far beyond any reported physiological maximum.
+            chem.internalization_factor =
+                crate::state::sanitize::finite_clamp(chem.internalization_factor, 0.45, 1.0);
         }
 
         // Baseline adaptation: the set-point itself drifts toward the
@@ -4534,13 +4385,9 @@ impl NeurochemicalVector {
         // stress), chronic well-being raises the serotonin baseline.
         //
         // A restoring force toward the genetic default prevents permanent
-        // drift for the chemicals that have one. Without this, chronic
-        // states could permanently raise a baseline with no recovery —
-        // the system would "forget" its healthy set-point. Cortisol is
-        // the deliberate exception: the HPA axis has no fixed set-point,
-        // so its baseline is the slow integral of its own level and
-        // recovers only when the level itself falls (see the loop
-        // below).
+        // drift. Without this, chronic stress could permanently raise the
+        // cortisol baseline with no recovery — the system would "forget"
+        // its healthy set-point.
         //
         // The restoring force is equal to the adaptation rate (100%),
         // not 20% as in v2/v3. The previous 20% ratio was too weak: when
@@ -4567,52 +4414,27 @@ impl NeurochemicalVector {
             // handle baseline drift.
             //
             // Cortisol and CRH are stress hormones with zero baseline
-            // — their baselines should never take the deviation-driven
-            // adaptation the other chemicals get (they have no
+            // — their baselines should never adapt (they have no
             // homeostatic set-point, just a leaky integrator to zero).
-            // Adenosine is skipped for the same reason it always was:
-            // its dedicated sleep-pressure mechanism owns baseline
-            // drift.
-            //
-            // Cortisol's allostasis is different in kind: the HPA axis
-            // genuinely has no fixed set-point — sustained hormone
-            // elevation IS the allostatic load, and the operating
-            // point drifts to the slow integral of the level's own
-            // history. When stress ends and the cascade lets the level
-            // fall, the deviation goes negative and the baseline
-            // follows it back down: the set-point recovers on the same
-            // slow timescale it rose on, with no external signal —
-            // the waves and the cascade already decided the level.
-            // (Sterling & Eyer 1988 — allostasis as predictive
-            // regulation; McEwen 1998 — allostatic load.)
             let chem_id = NeurochemicalId::from_u8(chem.id);
-            if chem_id == NeurochemicalId::Adenosine || chem_id == NeurochemicalId::CRH {
+            if chem_id == NeurochemicalId::Adenosine
+                || chem_id == NeurochemicalId::Cortisol
+                || chem_id == NeurochemicalId::CRH
+            {
                 continue;
             }
-            let base_rate = baseline_adaptation_rate * dt_scale;
-            if chem_id == NeurochemicalId::Cortisol {
-                // No restoring pull toward the genetic zero: cortisol's
-                // healthy operating point is whatever the cascade has
-                // recently been holding, not literal zero. The baseline
-                // is an exponential moving average of the level —
-                // allostatic load as a leaky integrator of hormone
-                // exposure (Sterling & Eyer 1988). The EMA can never
-                // leave the convex hull of the level's own history.
-                chem.baseline += (chem.level - chem.baseline) * base_rate;
-                continue;
-            }
+            let deviation = chem.level - chem.baseline;
             let genetic_baseline = chem_id.default_baseline();
-            // The set-point relaxes toward a saturating blend of the
-            // genetic default and the current level: sustained
-            // deviation moves the operating point, but the response
-            // is a rational isotherm θ = |dev|/(|dev|+K) — allostatic
-            // shift saturates rather than drifting linearly forever.
-            // The EMA form keeps baseline inside the convex hull of
-            // its own history; no bound is written afterward.
-            let dev = chem.level - genetic_baseline;
-            let theta = dev.abs() / (dev.abs() + 0.5);
-            let blended = genetic_baseline + dev * theta;
-            chem.baseline += (blended - chem.baseline) * base_rate * 10.0;
+            let base_rate = baseline_adaptation_rate * dt_scale;
+            // Restoring force toward the genetic baseline. The rate is
+            // now 10x slower than the original, preventing the
+            // self-reinforcing trap where high levels push baselines up,
+            // weakening the homeostatic restoring force. The slower
+            // rate gives the homeostatic force time to pull levels
+            // toward genetic baselines before the baselines can adapt.
+            let restoring = (genetic_baseline - chem.baseline) * base_rate;
+            chem.baseline += deviation * base_rate + restoring;
+            chem.baseline = crate::state::sanitize::finite_clamp(chem.baseline, 0.05, 0.95);
         }
 
         // ─── Metaplasticity: the coupling matrix self-modifies ───
@@ -4661,10 +4483,7 @@ impl NeurochemicalVector {
             let srt_idx_m = NeurochemicalId::Serotonin as usize;
 
             let cort_tonic = self.chemicals[cort_idx].tonic_level;
-            // Fixed reference, not the adapting allostatic baseline:
-            // sustained cortisol must keep registering as load even
-            // after the set-point has drifted to meet it.
-            let cort_base = self.feedback_baseline(cort_idx);
+            let cort_base = self.chemicals[cort_idx].baseline;
             let da_tonic = self.chemicals[da_idx_m].tonic_level;
             let da_base = self.chemicals[da_idx_m].baseline;
             let srt_tonic = self.chemicals[srt_idx_m].tonic_level;
@@ -4673,15 +4492,22 @@ impl NeurochemicalVector {
             // Stress signal: cortisol tonic above baseline → stress
             // Wellbeing signal: DA + SRT tonic above baseline, cortisol at/below baseline
             //
-            // Stress/wellbeing signals are logistic readouts of tonic
-            // deviation — the same saturating nonlinearity neurons
-            // use, so each lands in (0,1) by construction and the
-            // dead zone is the sigmoid's own threshold region.
-            let dev_signal = |dev: f32| logistic(6.0 * (dev - 0.05));
-            let stress = dev_signal(cort_tonic - cort_base);
-            let wellbeing = 0.5
-                * (dev_signal(da_tonic - da_base) + dev_signal(srt_tonic - srt_base))
-                * (1.0 - stress);
+            // A small dead zone prevents sub-threshold tonic drift from
+            // producing spurious metaplasticity. Metaplasticity should
+            // respond to sustained, meaningful emotional deviations, not
+            // numerical noise or slow equilibrium drift.
+            let dead_zone = 0.05;
+            let stress =
+                crate::state::sanitize::finite_clamp(cort_tonic - cort_base - dead_zone, 0.0, 1.0);
+            let wellbeing =
+                (crate::state::sanitize::finite_clamp(da_tonic - da_base - dead_zone, 0.0, 1.0)
+                    + crate::state::sanitize::finite_clamp(
+                        srt_tonic - srt_base - dead_zone,
+                        0.0,
+                        1.0,
+                    ))
+                    * 0.5
+                    * (1.0 - stress);
 
             // Gate by plasticity (BDNF-dependent)
             let gate = self.plasticity_gate * meta_rate * dt_scale;
@@ -4694,33 +4520,53 @@ impl NeurochemicalVector {
                 for (j, (&default_val, current)) in
                     default_row.iter().zip(current_row.iter_mut()).enumerate()
                 {
-                    if i == j || default_val == 0.0 {
+                    if i == j {
+                        continue;
+                    }
+                    if default_val == 0.0 {
                         continue;
                     }
 
-                    // Each coupling relaxes toward a target: the
-                    // genetic default modulated by bounded emotional
-                    // gains. Stress weakens excitatory couplings
-                    // (factor < 1 for positive entries) and
-                    // strengthens inhibitory ones (factor > 1 for
-                    // negative entries — the brain becomes less
-                    // reactive but more stable); wellbeing amplifies
-                    // excitatory couplings only. Because stress and
-                    // wellbeing are logistic signals in (0,1), the
-                    // target is a bounded multiple of the default,
-                    // and the exponential approach keeps the entry
-                    // inside the convex hull of its own history —
-                    // the range is a theorem of the update, not a
-                    // written rail.
-                    let gain = (1.0 - 0.5 * stress * default_val.signum()
-                        + if default_val > 0.0 {
-                            0.5 * wellbeing
-                        } else {
-                            0.0
-                        })
-                    .max(0.25);
-                    let target = default_val * gain;
-                    *current += (target - *current) * gate;
+                    // Restoring force toward default (75% of adaptation).
+                    // Strengthened relative to the emotional stress/wellbeing
+                    // adjustments so that sub-threshold drift and feedback
+                    // loops cannot permanently lock the matrix away from
+                    // its homeostatic set-point.
+                    let restoring = (default_val - *current) * gate * 0.75;
+
+                    // Stress adaptation: weaken excitatory (positive)
+                    // couplings, strengthen inhibitory (negative) ones.
+                    // The brain becomes less reactive under chronic
+                    // stress — excitatory pathways are dampened, while
+                    // inhibitory pathways are reinforced to maintain
+                    // stability.
+                    //
+                    // Both adjustments are negative: excitatory couplings
+                    // are reduced (toward zero), and inhibitory couplings
+                    // are made more negative (away from zero). The
+                    // inhibitory strengthening is half the excitatory
+                    // weakening, matching the asymmetry in the original
+                    // design.
+                    let stress_adj = if *current > 0.0 {
+                        -stress * gate * current.abs()
+                    } else {
+                        -stress * gate * current.abs() * 0.5
+                    };
+
+                    // Wellbeing adaptation: strengthen excitatory
+                    // couplings slightly. The brain becomes more
+                    // responsive when things are going well.
+                    let wellbeing_adj = if *current > 0.0 {
+                        wellbeing * gate * 0.5
+                    } else {
+                        0.0
+                    };
+
+                    *current += restoring + stress_adj + wellbeing_adj;
+
+                    // Clamp to prevent extreme values
+                    let max = default_val.abs().max(0.5) * 2.0;
+                    *current = crate::state::sanitize::finite_clamp(*current, -max, max);
                 }
             }
         }
@@ -4811,23 +4657,16 @@ pub const NE_FROM_REM: f32 = 0.0425;
 /// GABA is released by VLPO in NREM and falls in REM even though VLPO is
 /// active then: the GABA-to-ACh ratio drops 68% in REM, always through GABA
 /// (SLEEP 2012). The REM term is the data, not the VLPO population.
-pub const GABA_BASE: f32 = 0.5250;
-pub const GABA_FROM_VLPO: f32 = 0.3977;
-pub const GABA_FROM_REM: f32 = 0.2146;
-/// First-order clearance rate (per second) applied to histamine and
-/// orexin by the VLPO's GABAergic projection, quadratic in VLPO
-/// activity. At the measured NREM VLPO level (~0.77) the drive is
-/// ~0.36/s — strong enough to drain the wake-active monoamines
-/// toward silence against their homeostatic pull — while the waking
-/// VLPO (~0.02) contributes ~0.0003/s, leaving the genetic baseline
-/// in charge.
-pub const VLPO_GABA_INHIBIT: f32 = 0.6;
+pub const GABA_BASE: f32 = 0.4909;
+pub const GABA_FROM_VLPO: f32 = 0.4341;
+pub const GABA_FROM_REM: f32 = 0.2018;
+/// Histamine (tuberomammillary nucleus) and orexin (lateral hypothalamus) are
+/// wake-active and silent in sleep (Saper et al. 2001; Mileykovskiy et al.
+/// 2005). Both follow LC, anchored to their waking baselines of 0.30 at the
+/// waking LC level of 0.963 (see tests/network_calibration.rs).
+pub const HIST_FROM_LC: f32 = 0.3115;
+pub const OX_FROM_LC: f32 = 0.3115;
 
-/// Histamine and orexin levels are NOT set by the sleep-wake network.
-/// Their wake-active/silent-in-sleep profiles emerge through the
-/// coupling web (HIST row: NE/ACh excitation, GABA/MEL inhibition; OX
-/// row: the same inhibitory sleep drive plus α2-adrenoceptor feedback)
-/// balanced against their own homeostatic baselines.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct NeuroTickParams {

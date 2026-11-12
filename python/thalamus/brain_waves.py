@@ -55,9 +55,9 @@ Genesis's brain waves are produced by a bank of **driven phasor
 oscillators** (``BrainWaveOscillator``) — not a classifier. Each
 band is a real oscillation with persistent quadrature state, and its
 reported power is *measured*: the band emits its real-axis trace and
-a Goertzel meter — the band math the field's own spectrum
-(``src/latent_spaces/spectrum.rs``) applies to her substrate — reads the
-wave's band energy off the emitted signal, never off state.
+a Goertzel meter — the same band math the body's field probe ran
+over the substrate before the two swapped places — reads the wave's
+band energy off the emitted signal, never off state.
 
 - **Waveform**: each band carries a complex state ``z`` rotating at
   the band's characteristic frequency (delta ~2.25 Hz, theta ~5.5 Hz,
@@ -463,11 +463,16 @@ def _sleep_stage_from_summary(summary: NeuroSummary) -> SleepStage | None:
     names (the Rust side distinguishes NREM from REM).
 
     For the legacy "sleeping" phase, arousal > 0.50 maps to REM
-    (since the old daemon didn't distinguish REM from NREM). For the
-    explicit "nrem" phase, arousal cannot establish sleep depth. The
-    daemon clamps NREM arousal into a narrow band, and arousal is not
-    an EEG staging signal, so this function conservatively returns N1
-    unless a live sleep-cycle tracker supplies an explicit stage.
+    (since the old daemon didn't distinguish NREM from REM). For the
+    explicit "nrem" phase, only N1/N2/N3 are produced — the daemon
+    said NREM, so it's NREM regardless of arousal. In practice the
+    daemon clamps NREM arousal into a narrow band, so while a sleep
+    cycle is active the ultradian tracker — not this mapping — is the
+    stage authority; this is the fallback when no tracker is running:
+
+        0.35 < arousal         → N1
+        0.20 < arousal ≤ 0.35  → N2
+        arousal ≤ 0.20         → N3
     """
     phase = summary.phase_name
     if phase == "rem":
@@ -484,12 +489,13 @@ def _sleep_stage_from_summary(summary: NeuroSummary) -> SleepStage | None:
         else:
             return SleepStage.N3
     if phase == "nrem":
-        # NREM identifies the broad sleep state, not its depth. Arousal
-        # is clamped into a narrow range by the daemon and is not an EEG
-        # staging signal. Without a live SleepCycleTracker, use N1 as a
-        # conservative unknown-depth fallback; callers with a tracker
-        # must pass its explicit N1/N2/N3 stage.
-        return SleepStage.N1
+        arousal = summary.arousal
+        if arousal > 0.35:
+            return SleepStage.N1
+        elif arousal > 0.20:
+            return SleepStage.N2
+        else:
+            return SleepStage.N3
     return None
 
 
@@ -546,15 +552,15 @@ _TURN_SNAP_EPS = 1e-9
 
 
 def _band_power(samples: deque[float] | list[float], fs: float, freq: float) -> float:
-    """Goertzel power of ``samples`` at ``freq`` — the band meter the
-    field's own spectrum applies to her substrate.
+    """Goertzel power of ``samples`` at ``freq`` — the field probe's
+    band meter, carried into the mind.
 
     Second-order recurrence over the emitted trace:
     ``s₀ = x + coeff·s₁ − s₂`` with ``coeff = 2·cos(2πk/n)`` at the
     exact bin nearest ``freq``; power ``= (s₁² + s₂² − coeff·s₁·s₂)
     / n²``. The wave's reported band energy is *measured* off the
-    emitted trace — the same arithmetic the spectrum applies to the
-    substrate's trajectory — not read from oscillator state.
+    emitted trace — the same arithmetic the body applies to the
+    substrate's real signals — not read from oscillator state.
 
     Bands above the metering rate's Nyquist bound return 0 — an
     absent channel, not a reading of zero.
@@ -1199,9 +1205,8 @@ def meditative_coherence(state: BrainWaveState) -> float:
 # drive-prescribed radius — with persistent quadrature state (the
 # oscillation is real state, not a phase counter plus a smoothed
 # scalar). The Stuart–Landau normal form this bank once ran moved
-# into the body: the field substrate's fibers resonate on that math,
-# and the Maxwell signature of their coherent motion is the body's
-# own computed read of it — while the mind's reported band power is
+# into the body: the field probe's channels now resonate with the
+# substrate on that math, while the mind's reported band power is
 # *measured* — Goertzel over each band's emitted trace, the meter
 # the body gave up in exchange. Cross-frequency coupling emerges
 # from actual phase-amplitude interaction: the slow band's measured
@@ -1446,7 +1451,7 @@ class BrainWaveOscillator:
     # at this fixed metering rate; reported band power is measured
     # off the emitted wave by Goertzel (the body's field math), not
     # read from state. 384 Hz keeps epsilon (150 Hz) inside Nyquist
-    # with room for its sidebands, and the
+    # where the body's own ~250 Hz probe cannot follow it, and the
     # 1536-sample window is four seconds — bin width 0.25 Hz, so
     # every band center (all multiples of 0.25 Hz) lands exactly on
     # a bin: k = 4f for all ten bands, no off-bin rolloff at all.
@@ -2381,10 +2386,9 @@ class BrainWaveOscillator:
     ) -> BrainWaveState:
         """Build BrainWaveState from the measured band powers."""
         # Band power is *measured*: Goertzel over each band's emitted
-        # real-axis trace — the same meter the field's own spectrum
-        # applies to her substrate — not read from oscillator
-        # amplitude. The meter reports the single-bin amplitude
-        # estimate (2√P = A for an on-bin
+        # real-axis trace — the field probe's own meter moved into the
+        # mind — not read from oscillator amplitude. The meter reports
+        # the single-bin amplitude estimate (2√P = A for an on-bin
         # tone), the same scale "powers" has always carried and every
         # downstream threshold is tuned to. A band's meter reports only
         # once the ring's bin nearest its center actually resolves it —
@@ -2631,7 +2635,11 @@ def assess_brain_waves(
     asleep so the waves match the stage the rest of the sleep system
     is acting on (see :func:`_sleep_phase_powers`).
 
-    When ``client`` is supplied, the LC–VLPO switch's measured
+    When ``client`` is supplied, the daemon's field-probe signature —
+    the body's *real* measured substrate dynamics — is applied as
+    stimulus before the assess step, so the wave state carries actual
+    physics, not only neurochemical targets (see
+    ``brainstem.field_probe``), and the LC–VLPO switch's measured
     fold margins feed the Kramers telegraph. ``fold`` may be passed
     directly instead — the explicit value wins over the client
     fetch, which is how callback-driven callers (InnerLife) reach
@@ -2640,11 +2648,6 @@ def assess_brain_waves(
     is the live effective-levels map; it feeds the modulator→band
     gains (E/I→gamma, 5-HT→gamma suppression, eCB→theta desync)
     on top of the phase-chosen distribution.
-
-    When ``client`` is supplied, her field's own spectral signature
-    also enters as stimulus — the substrate's band energies, carrier
-    phase lock, and per-band entrainment (``brainstem.field_stimulus``)
-    — the modeled waves perturbed by the very field they run on.
 
     The oscillator propagates each band's phasor state —
     rotating, relaxing toward the neurochemically-driven radius,
@@ -2664,15 +2667,12 @@ def assess_brain_waves(
     dynamics. Top-down drive from cognition/action/perception can
     enlarge specific cycles above their neurochemical radii.
     """
-    if client is not None and fold is None:
-        fold = client.get_fold_margins()
     if client is not None:
-        try:
-            from brainstem.field_stimulus import apply_field_stimulus
+        from brainstem.field_probe import apply_field_stimulus
 
-            apply_field_stimulus(client)
-        except Exception:  # noqa: BLE001 — absent channel, any cause
-            pass
+        apply_field_stimulus(client)
+        if fold is None:
+            fold = client.get_fold_margins()
     return _get_oscillator().assess(summary, sleep_stage, fold, chemicals)
 
 

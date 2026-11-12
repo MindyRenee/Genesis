@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-import pytest
 from limbic_system.curiosity import Question
 from parietal_lobe.agency import _TOOL_SCOPES, ActingLoop, ActingResult, Intention
 from temporal_lobe.concepts import ConceptNetwork
@@ -322,8 +321,6 @@ def test_observe_body_restores_restricted_affinity() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         loop = _make_loop(tmp)
         original = os.sched_getaffinity(0)
-        if len(original) < 2:
-            pytest.skip("restricting affinity needs at least two CPUs")
         one_core = {sorted(original)[0]}
         try:
             os.sched_setaffinity(0, one_core)

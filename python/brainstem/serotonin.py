@@ -60,16 +60,15 @@ COUPLING: HOW OTHERS AFFECT SEROTONIN (matrix row 1)
 Index order: DA, SRT, NE, ACh, GABA, GLU, CORT, OXY, END, HIST,
 ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 
-    DA  ->  SRT:  -0.10  (weak volume transmission.)
-    NE  ->  SRT:  0.10  (weak volume transmission.)
-    GABA  ->  SRT:  -0.10  (weak volume transmission.)
-    GLU  ->  SRT:  0.10  (weak volume transmission.)
+    DA   -> SRT: -0.05  (weak volume transmission.)
+    NE   -> SRT: +0.05  (weak volume transmission.)
+    GABA -> SRT: -0.05  (weak volume transmission.)
+    GLU  -> SRT: +0.05  (weak volume transmission.)
     CORT -> SRT: -0.10  (chronic stress depletes serotonin.)
-    OXY  ->  SRT:  0.10  (weak volume transmission.)
-    END  ->  SRT:  0.10  (weak volume transmission.)
-    BDNF -> SRT: +0.10  (the antidepressant positive feedback — SSRIs raise SRT,
-                        which raises BDNF, which raises SRT. Bounded by
-                        homeostatic forces.)
+    OXY  -> SRT: +0.05  (weak volume transmission.)
+    END  -> SRT: +0.05  (weak volume transmission.)
+    BDNF -> SRT: +0.10  (the antidepressant positive feedback — SSRIs raise SRT -> raise BDNF -> .
+                        raise SRT. Bounded by homeostatic forces.)
     ACh  -> SRT: 0.00   (no direct coupling)
     HIST -> SRT: 0.00   (no direct coupling)
     ADN  -> SRT: 0.00   (no direct coupling)
@@ -84,23 +83,23 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 COUPLING: HOW SEROTONIN AFFECTS OTHERS (matrix column 1)
 ════════════════════════════════════════════════════════════════════════
 
-    SRT  ->  DA:  -0.10  (weak volume transmission (default region); region-specific:
+    SRT -> DA :  -0.05  (weak volume transmission (default region); region-specific:
     -0.025 default, -0.20 striatum, +0.15 PFC.)
-    SRT  ->  NE:  -0.10  (weak volume transmission.)
-    SRT  ->  GABA:  0.10  (weak volume transmission.)
-    SRT  ->  GLU:  -0.10  (weak volume transmission.)
-    SRT  ->  CORT:  0.00  (no coupling — cortisol comes only from the HPA cascade.)
-    SRT  ->  OXY:  0.10  (weak volume transmission.)
-    SRT  ->  END:  0.10  (weak volume transmission.)
-    SRT  ->  HIST:  -0.10  (serotonin promotes sleep onset.)
+    SRT -> NE :  -0.05  (weak volume transmission.)
+    SRT -> GABA:  +0.05  (weak volume transmission.)
+    SRT -> GLU:  -0.05  (weak volume transmission.)
+    SRT -> CORT:  -0.10  (serotonin suppresses cortisol.)
+    SRT -> OXY:  +0.05  (weak volume transmission.)
+    SRT -> END:  +0.05  (weak volume transmission.)
+    SRT -> HIST:  -0.05  (serotonin promotes sleep onset.)
     SRT -> BDNF:  +0.10  (the antidepressant mechanism — SSRIs raise SRT -> raise BDNF -> .
                          neuroplasticity -> depression recovery.)
-    SRT  ->  OX:  -0.10  (serotonin promotes sleep onset.)
+    SRT -> OX :  -0.05  (serotonin promotes sleep onset.)
     SRT -> ACh:  0.00   (no direct coupling)
     SRT -> ADN:  0.00   (no direct coupling)
     SRT -> ECB:  0.00   (no direct coupling)
     SRT -> VP :  0.00   (no direct coupling)
-    SRT  ->  CRH:  0.10  (5-HT2C depolarizes PVN CRH neurons — Heisler et al., J Neurosci 2007.)
+    SRT -> CRH:  0.00   (no direct coupling)
     SRT -> EPI:  0.00   (no direct coupling)
     SRT -> MEL:  0.00   (no direct coupling)
 

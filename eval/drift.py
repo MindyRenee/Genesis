@@ -59,13 +59,6 @@ _SANITY_CIRCADIAN_TOL = {
     # a broken substrate. A ~0.14 sag over ~17 min of simulated waking
     # must not read as failure.
     "acetylcholine": 0.22,
-    # Endocannabinoid is the rest/recovery arm, not a fixed tonic
-    # set-point under measured deep rest. CPU-idle interoception emits
-    # a tonic eCB impulse (daemon::interoception), while glutamate/GABA
-    # activity adds retrograde synthesis (state::neurochemical). A
-    # settled quiet body can therefore sit near 0.45–0.50 without
-    # stress; above this band the gate still treats eCB as broken.
-    "endocannabinoid": 0.30,
 }
 _SANITY_ZERO_CAP = 0.25  # cortisol/CRH rest near zero; above this is stress, not rest
 

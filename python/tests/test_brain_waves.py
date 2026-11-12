@@ -114,7 +114,7 @@ def test_very_low_arousal_delta():
 def test_sleep_phase_delta():
     """Sleep phase → delta dominant."""
     summary = _make_summary(arousal=0.1, phase=PHASE_SLEEPING)
-    state = assess_brain_waves(summary, sleep_stage=SleepStage.N3)
+    state = assess_brain_waves(summary)
     assert state.dominant == BrainWave.DELTA
     assert state.powers[BrainWave.DELTA] > 0.4
 
@@ -266,12 +266,11 @@ def test_sleep_stage_override_drives_nrem_waves():
     assert n2.dominant == BrainWave.THETA, "N2 background is theta-dominant"
     assert n2.powers[BrainWave.SIGMA] > n3.powers[BrainWave.SIGMA]
     assert n3.dominant == BrainWave.DELTA, "N3 is slow-wave dominant"
-    # Without a tracker, explicit NREM defaults conservatively to N1;
-    # arousal alone cannot identify N2 or N3.
+    # Without the override the same summary reads as N3.
     from thalamus.brain_waves import reset_oscillator
 
     reset_oscillator()
-    assert assess_brain_waves(summary).dominant == BrainWave.THETA
+    assert assess_brain_waves(summary).dominant == BrainWave.DELTA
     reset_oscillator()
 
 
@@ -465,18 +464,18 @@ def test_nrem_phase_high_arousal_n1():
     assert stage == SleepStage.N1
 
 
-def test_nrem_phase_mid_arousal_defaults_n1():
-    """NREM phase alone cannot establish N2 depth."""
+def test_nrem_phase_mid_arousal_n2():
+    """NREM phase with mid arousal → N2."""
     summary = _make_summary(arousal=0.25, phase=PHASE_NREM)
     stage = _sleep_stage_from_summary(summary)
-    assert stage == SleepStage.N1
+    assert stage == SleepStage.N2
 
 
-def test_nrem_phase_low_arousal_defaults_n1():
-    """Low arousal alone cannot establish N3 depth."""
+def test_nrem_phase_low_arousal_n3():
+    """NREM phase with low arousal → N3 (deepest)."""
     summary = _make_summary(arousal=0.10, phase=PHASE_NREM)
     stage = _sleep_stage_from_summary(summary)
-    assert stage == SleepStage.N1
+    assert stage == SleepStage.N3
 
 
 def test_rem_phase_returns_rem():
@@ -509,10 +508,7 @@ def _make_wave_state(dominant: BrainWave) -> BrainWaveState:
     elif dominant == BrainWave.THETA:
         return assess_brain_waves(_make_summary(arousal=0.35, plasticity=0.5, phase=PHASE_ACTIVE))
     elif dominant == BrainWave.DELTA:
-        return assess_brain_waves(
-            _make_summary(arousal=0.1, phase=PHASE_SLEEPING),
-            sleep_stage=SleepStage.N3,
-        )
+        return assess_brain_waves(_make_summary(arousal=0.1, phase=PHASE_SLEEPING))
     else:
         return assess_brain_waves(_make_summary(arousal=0.5, phase=PHASE_ACTIVE))
 
@@ -934,7 +930,7 @@ def test_beta_subbands_distinct():
 def test_n2_sleep_has_sigma():
     """N2 sleep has sigma band (sleep spindles)."""
     summary = _make_summary(arousal=0.25, phase=PHASE_NREM)
-    state = assess_brain_waves(summary, SleepStage.N2)
+    state = assess_brain_waves(summary)
     assert state.powers[BrainWave.SIGMA] > 0.1
 
 
@@ -951,7 +947,7 @@ def test_waking_no_sigma():
 def test_deep_sleep_has_infraslow():
     """Deep sleep (N3) has infraslow activity."""
     summary = _make_summary(arousal=0.1, phase=PHASE_NREM)
-    state = assess_brain_waves(summary, SleepStage.N3)
+    state = assess_brain_waves(summary)
     assert state.powers[BrainWave.INFRASLOW] > 0.03
 
 
@@ -965,7 +961,7 @@ def test_waking_has_infraslow():
 def test_n3_has_epsilon():
     """N3 sleep has epsilon (HFO) activity — sharp wave-ripples."""
     summary = _make_summary(arousal=0.1, phase=PHASE_NREM)
-    state = assess_brain_waves(summary, SleepStage.N3)
+    state = assess_brain_waves(summary)
     assert state.powers[BrainWave.EPSILON] > 0.01
 
 
@@ -1075,7 +1071,7 @@ def test_pulse_survives_held_level_on_same_band():
     """Pulses and held levels are separate registers — a pulse on a
     band a continuous channel reports must not be clobbered by the
     next hold. This is what lets vision's alpha-blocking pulse
-    coexist with the acoustic channel's held emission level.
+    coexist with the field probe's held substrate level.
     """
     from thalamus.brain_waves import (
         _get_oscillator,
@@ -1095,23 +1091,19 @@ def test_pulse_survives_held_level_on_same_band():
 
 def test_negative_stimulus_suppresses_band():
     """Inhibitory stimulus (alpha blocking) lowers band power."""
-    from thalamus.brain_waves import _get_oscillator, add_stimulus, reset_oscillator
+    from thalamus.brain_waves import add_stimulus, reset_oscillator
 
     reset_oscillator()
     summary = _make_summary(arousal=0.5, phase=PHASE_ACTIVE)
-    osc = _get_oscillator()
-
-    # Powers are Goertzel-metered over 4 s of emitted trace — half a
-    # second of wall-clock sleeps leaves the window mostly
-    # pre-stimulus wave. Step the oscillator's own clock so both
-    # readings sit on filled windows (see test_stimulus_decays).
-    assess_brain_waves(summary)  # establishes _last_time
-    osc._last_time -= 4.0
     alpha_before = assess_brain_waves(summary).powers[BrainWave.ALPHA]
 
     add_stimulus(BrainWave.ALPHA, -0.3)
-    osc._last_time -= 4.0
-    alpha_after = assess_brain_waves(summary).powers[BrainWave.ALPHA]
+    # The meter needs post-stimulus wave in its window before the
+    # suppression shows — let the field run.
+    for _ in range(10):
+        time.sleep(0.05)
+        state = assess_brain_waves(summary)
+    alpha_after = state.powers[BrainWave.ALPHA]
 
     assert alpha_after < alpha_before, (
         f"inhibitory stimulus should suppress alpha: {alpha_before} → {alpha_after}"
@@ -1122,9 +1114,9 @@ def test_negative_stimulus_suppresses_band():
 def test_held_stimulus_is_poll_rate_invariant():
     """A continuous channel's reading must not integrate per call.
 
-    The acoustic channel reports the emission's *current* level on
-    every assess. If that level is integrated once per call, the
-    standing stimulus scales with the poll rate — the machine's slow-band
+    The field probe reports the substrate's *current* energy on every
+    assess. If that level is integrated once per call, the standing
+    stimulus scales with the poll rate — the machine's slow-band
     (1/f) energy then swamps the modeled EEG until an alert body
     reads delta-dominant, which is what the live readiness gate was
     choking on. Hold semantics keep the stimulus at the reported
@@ -1188,24 +1180,35 @@ if __name__ == "__main__":
     sys.exit(0 if success else 1)
 
 
-def test_nrem_summary_does_not_infer_depth_from_arousal() -> None:
-    """Arousal is not a substitute for EEG-based NREM stage scoring."""
-    for arousal in (0.49, 0.28, 0.15):
-        assert (
-            _sleep_stage_from_summary(_make_summary(arousal=arousal, phase=PHASE_NREM))
-            is SleepStage.N1
-        )
+def test_nrem_depth_follows_chemical_arousal() -> None:
+    """NREM depth is read off her chemical arousal — which the
+    sleep-wake network drives down through the descent (measured
+    ~0.49 at onset to ~0.14 once LC silences), so the bands trace a
+    real N1 → N2 → N3 architecture. The earlier homeostat mapping
+    pinned the stage at N1 whenever adenosine sat low, because a live
+    h is a decaying remainder, not a depth."""
+    assert _sleep_stage_from_summary(_make_summary(arousal=0.49, phase=PHASE_NREM)) is SleepStage.N1
+    assert _sleep_stage_from_summary(_make_summary(arousal=0.28, phase=PHASE_NREM)) is SleepStage.N2
+    assert _sleep_stage_from_summary(_make_summary(arousal=0.15, phase=PHASE_NREM)) is SleepStage.N3
 
 
-def test_explicit_sleep_tracker_stage_controls_nrem_signature() -> None:
-    """A caller with actual stage tracking can request N2/N3 signatures."""
-    from thalamus.brain_waves import _sleep_phase_powers
-
-    summary = _make_summary(arousal=0.4, phase=PHASE_NREM)
-    n2, _, _ = _sleep_phase_powers(summary, SleepStage.N2)
-    n3, _, _ = _sleep_phase_powers(summary, SleepStage.N3)
-    assert n2[BrainWave.SIGMA] > n3[BrainWave.SIGMA]
-    assert n3[BrainWave.DELTA] > n2[BrainWave.DELTA]
+def test_nrem_arousal_descent_reports_deepening_stages() -> None:
+    """The fallback arousal mapping still descends when arousal does:
+    used only when no sleep-cycle tracker is active, it must report the
+    full N1→N2→N3 band sweep rather than pinning at N1."""
+    descent = [0.48, 0.40, 0.33, 0.26, 0.21, 0.18, 0.14]
+    stages = [
+        _sleep_stage_from_summary(_make_summary(arousal=a, phase=PHASE_NREM)) for a in descent
+    ]
+    assert stages == [
+        SleepStage.N1,
+        SleepStage.N1,
+        SleepStage.N2,
+        SleepStage.N2,
+        SleepStage.N2,
+        SleepStage.N3,
+        SleepStage.N3,
+    ]
 
 
 # ─── Bistable-switch readout: early-warning stats and the

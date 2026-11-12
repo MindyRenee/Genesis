@@ -56,19 +56,6 @@ _EXPORTS = {
     "CapabilityProfile": "self.assessment",
     "KnowledgeAssessment": "self.assessment",
     "SelfAssessment": "self.assessment",
-    # self.master_cognitive_topos — unified E/I/S/language state transport
-    "CognitiveToposRuntime": "self.cognitive_topos_runtime",
-    "EhresmannConnectionTransport": "self.master_cognitive_topos",
-    "KuramotoRiemannianSynchronizer": "self.master_cognitive_topos",
-    "MasterCognitiveToposEngine": "self.master_cognitive_topos",
-    "MasterFreeEnergyOptimizer": "self.master_cognitive_topos",
-    # latent_spaces.self_geometry — geometric latent-state model of self
-    "AgencyOwnershipFiberBundle": "latent_spaces.self_geometry",
-    "AutopoieticSymplecticFlow": "latent_spaces.self_geometry",
-    "GrassmannianSubspaceModule": "latent_spaces.self_geometry",
-    "NarrativeAgencyBaseManifold": "latent_spaces.self_geometry",
-    "SelfConsistencyInformationGeometry": "latent_spaces.self_geometry",
-    "SelfLatentSpaceArchitecture": "latent_spaces.self_geometry",
     # self.cognitive_trajectory
     "CognitiveTrajectoryModel": "self.cognitive_trajectory",
     "CognitiveTrajectoryReading": "self.cognitive_trajectory",
@@ -124,13 +111,6 @@ _EXPORTS = {
     "DreamInterpretation": "self.psychoanalysis",
     "Psychoanalysis": "self.psychoanalysis",
     "RepressedTrace": "self.psychoanalysis",
-    # self.language_* — her language latent space, nested in self:
-    # a 3-D holographic plastic medium holding all learned language
-    "LanguageSpace": "self.language_space",
-    "open_language_space": "self.language_space",
-    "ingest_data_dir": "self.language_ingest",
-    # the language observation stream (moved out of sleep)
-    "LanguageLatentSpace": "self.language_latent_space",
 }
 
 __all__ = sorted(_EXPORTS)

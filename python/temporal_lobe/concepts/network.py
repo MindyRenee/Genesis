@@ -2902,11 +2902,12 @@ class ConceptNetwork(
         - Nothing reported the loss as a loss. It appeared as one number
           in a journal line.
 
-        If no archive is attached, candidates stay in working memory.
-        A missing or unavailable durable store is an infrastructure
-        failure, not permission to destroy developmental knowledge.
-        If the archive write fails, concepts likewise remain resident:
-        unbounded growth is recoverable, deleted knowledge is not.
+        So deletion is now reachable only when there is no archive, which
+        matches the rest of the design (``spill_dormant`` also no-ops
+        without one, and the destructive prune is its documented
+        fallback). If the archive write fails, the concepts stay in
+        working memory: unbounded growth is recoverable, deleted
+        knowledge is not.
 
         Returns the list of removed concept names.
         """
@@ -2934,12 +2935,11 @@ class ConceptNetwork(
             return []
 
         if self._archive is None:
-            logger.error(
-                "clean_noise found %d candidates but no concept archive is "
-                "attached; leaving them in working memory rather than deleting",
-                len(to_remove),
-            )
-            return []
+            # No store anywhere to put them: deletion is the only option.
+            self.remove_concepts_batch(set(to_remove))
+            # A concurrent thread may have removed some between the scan
+            # and here, so report only what actually went.
+            return [cid for cid in to_remove if cid not in self._concepts]
 
         # Archive first, evict second. The write is transactional and
         # raises on failure, so either every concept is on disk or none
@@ -2960,14 +2960,6 @@ class ConceptNetwork(
                 "leaving them in working memory rather than deleting them",
                 len(items),
                 e,
-            )
-            return []
-        if archived != len(items):
-            logger.error(
-                "clean_noise archived %d of %d noise concepts; "
-                "leaving them in working memory rather than deleting them",
-                archived,
-                len(items),
             )
             return []
 

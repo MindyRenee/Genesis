@@ -1,45 +1,38 @@
-"""Field-coupling assay — does her own substrate measurably move the
-wave model?
+"""Field-coupling assay — does real physics measurably move the wave model?
 
-Her field substrate (``src/latent_spaces/``) integrates body, prediction,
-and agency fibers on the latent manifold; ``src/latent_spaces/spectrum.rs``
-decomposes that trajectory at the wave model's band centers and
-``brainstem.field_stimulus`` maps it onto ``BrainWaveOscillator`` as
-stimulus, evoked resets, carrier phase lock, and per-band entrainment.
-This assay asks the falsifiable question: when her substrate is
-perturbed through her own chemistry, does the *coupled* wave state
-move where the *uncoupled* state does not?
+The field probe (`src/daemon/field_probe.rs`) injects the machine's
+real substrate dynamics into ``BrainWaveOscillator`` as stimulus and
+evoked phase resets. This assay asks the falsifiable question: when
+the physical substrate is perturbed by real load, does the *coupled*
+wave state move where the *uncoupled* state does not?
 
 Protocol:
 
-1. Spawn an isolated daemon (the field integrates with it).
-2. Warm the spectrum rings (~16 s for the full window).
-3. Three phases — idle, driven, recovery — ~10 samples each at
-   ~1 Hz. The drive is a norepinephrine surge through her own
-   ``neuro_impulse`` channel: real chemistry into the body state the
-   field's body fiber projects, not a load on the host. Per sample:
-   a. fetch the spectral signature (``get_field_spectrum``),
+1. Spawn an isolated daemon (the probe thread spawns with it).
+2. Warm the probe rings (~5 s).
+3. Three phases — idle, induced CPU load, recovery — ~10 samples each
+   at ~1 Hz. Per sample:
+   a. fetch the physical signature (``get_field_probe``),
    b. CONTROL — a private ``BrainWaveOscillator`` that never sees
       field stimulus, assessed on the same ``NeuroSummary``,
    c. COUPLED — the module singleton, assessed through
       ``assess_brain_waves(..., client=client)`` so the real
-      signature lands as stimulus and entrainment,
-   d. record per-band powers for both arms plus the substrate
-      channels (flux/tension band energies, tension cv, carrier
-      frequency and phase).
-4. Report per-band power deltas (driven − idle) for both arms and
-   the Pearson correlation between the substrate channels and the
+      signature lands as stimulus and evoked resets,
+   d. record per-band powers for both arms plus the physical
+      channels (jitter_cv, throughput mean, pstate rate).
+4. Report per-band power deltas (load − idle) for both arms and the
+   Pearson correlation between the physical channels and the
    coupled band powers across all samples.
 
 Honesty notes:
 
-- The control is *field-blind*, not chemistry-blind: the daemon's
-  own neurochemistry responds to the same impulses, so the control
-  arm can drift under drive. What it cannot see is the spectral
+- The control is *probe-blind*, not physics-blind: the daemon's own
+  neurochemistry responds to real sensors via interoception, so the
+  control arm can drift under load. What it cannot see is the probe
   signature — that is the contribution being measured.
-- The coupled arm includes the evoked-reset and phase-lock
-  pathways, which the control lacks. Their aggregate effect lands
-  in these band powers.
+- The coupled arm includes the evoked phase-reset pathway, which the
+  control lacks. Phase resets alter subsequent PAC interactions;
+  their aggregate effect lands in these band powers.
 - This is an engineering assay: it measures whether the coupling is
   causally effective, not whether it matters to experience.
 """
@@ -49,6 +42,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import signal
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -59,7 +54,6 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "python"))
 
 from eval.harness import isolated_daemon  # noqa: E402
-from genesis_client.protocol import CHEM_NOREPINEPHRINE  # noqa: E402
 
 
 def _out(*args: object) -> None:
@@ -81,6 +75,28 @@ BAND_NAMES = [
 ]
 
 
+def _busy_spinners(n: int) -> list[subprocess.Popen]:
+    """Induce real substrate load — n CPU-bound spinners."""
+    return [
+        subprocess.Popen(
+            [sys.executable, "-c", "x = 0\nwhile True: x += 1"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        for _ in range(n)
+    ]
+
+
+def _stop(procs: list[subprocess.Popen]) -> None:
+    for p in procs:
+        p.send_signal(signal.SIGTERM)
+    for p in procs:
+        try:
+            p.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            p.kill()
+
+
 def _powers(state) -> dict[str, float]:
     """Per-band powers from a BrainWaveState, keyed by name."""
     return {b.value: p for b, p in state.powers.items()}
@@ -99,16 +115,7 @@ def _pearson(xs: list[float], ys: list[float]) -> float:
     return cov / math.sqrt(vx * vy)
 
 
-def _drive(client, magnitude: float = 0.4) -> None:
-    """One noradrenergic surge — chemistry into the body the field
-    integrates, her own channel, no host instrumentation."""
-    try:
-        client.neuro_impulse(CHEM_NOREPINEPHRINE, magnitude)
-    except Exception:  # noqa: BLE001 — a dropped impulse is not assay failure
-        pass
-
-
-def run(samples_per_phase: int = 10, settle_s: float = 18.0) -> dict:
+def run(samples_per_phase: int = 10, settle_s: float = 5.0) -> dict:
     from thalamus.brain_waves import BrainWaveOscillator, assess_brain_waves
 
     rows: list[dict] = []
@@ -116,13 +123,16 @@ def run(samples_per_phase: int = 10, settle_s: float = 18.0) -> dict:
     # stimulus — the uncoupled trajectory on the same inputs.
     control = BrainWaveOscillator()
     with isolated_daemon() as client:
-        time.sleep(settle_s)  # warm the spectrum rings
+        time.sleep(settle_s)  # warm the probe rings
 
-        for phase in ("idle", "driven", "recovery"):
+        phases = [("idle", None), ("load", None), ("recovery", None)]
+        spinners: list[subprocess.Popen] = []
+        for phase, _ in phases:
+            if phase == "load":
+                spinners = _busy_spinners(3)
+                time.sleep(1.5)
             for _ in range(samples_per_phase):
-                if phase == "driven":
-                    _drive(client)
-                spec = client.get_field_spectrum()
+                sig = client.get_field_probe()
                 summary = client.get_neuro_summary()
                 ctrl_state = control.assess(summary)
                 # Coupled arm: the singleton, real signature applied.
@@ -130,24 +140,26 @@ def run(samples_per_phase: int = 10, settle_s: float = 18.0) -> dict:
                 rows.append(
                     {
                         "phase": phase,
-                        "spec": None
-                        if spec is None
+                        "sig": None
+                        if sig is None
                         else {
-                            "warm": spec.warm,
-                            "tension_cv": spec.tension.cv,
-                            "flux_mean": spec.flux.mean,
-                            "tension_mean": spec.tension.mean,
-                            "carrier_freq": spec.carrier_freq_hz,
-                            "carrier_phase": spec.carrier_phase,
-                            "flux_theta": spec.flux.energies[2],
-                            "flux_alpha": spec.flux.energies[3],
-                            "tension_theta": spec.tension.energies[2],
+                            "jitter_cv": sig.jitter_cv,
+                            "throughput_mean": sig.throughput_mean,
+                            "pstate_rate": sig.pstate_rate,
+                            "irq_rate": sig.irq_rate,
+                            "samples_ok": sig.samples_ok,
+                            "carrier_lag": sig.carrier_lag,
+                            "carrier_phase": sig.carrier_phase,
+                            "carrier_coherence": sig.carrier_coherence,
                         },
                         "control": _powers(ctrl_state),
                         "coupled": _powers(coupled_state),
                     }
                 )
                 time.sleep(1.0)
+            if phase == "load":
+                _stop(spinners)
+                spinners = []
             time.sleep(2.0)
 
     return _analyze(rows)
@@ -167,69 +179,55 @@ def _analyze(rows: list[dict]) -> dict:
         "verdict": [],
     }
     for band in BAND_NAMES:
-        c_delta = phase_mean("coupled", "driven", band) - phase_mean("coupled", "idle", band)
-        u_delta = phase_mean("control", "driven", band) - phase_mean("control", "idle", band)
-        # Correlate the tension channel's turbulence with the coupled
-        # band — the substrate's own argument against the model's rhythm.
-        xs = [
-            r["spec"]["tension_cv"]
-            for r in rows
-            if r["spec"] is not None and r["spec"]["warm"]
-        ]
-        ys = [
-            r["coupled"][band]
-            for r in rows
-            if r["spec"] is not None and r["spec"]["warm"]
-        ]
+        c_delta = phase_mean("coupled", "load", band) - phase_mean("coupled", "idle", band)
+        u_delta = phase_mean("control", "load", band) - phase_mean("control", "idle", band)
+        xs = [r["sig"]["jitter_cv"] for r in rows if r["sig"] is not None]
+        ys = [r["coupled"][band] for r in rows if r["sig"] is not None]
         n = min(len(xs), len(ys))
         report["bands"][band] = {
-            "control_drive_delta": round(u_delta, 4),
-            "coupled_drive_delta": round(c_delta, 4),
-            "tension_corr": round(_pearson(xs[:n], ys[:n]), 3),
+            "control_load_delta": round(u_delta, 4),
+            "coupled_load_delta": round(c_delta, 4),
+            "jitter_corr": round(_pearson(xs[:n], ys[:n]), 3),
         }
 
-    # Channel-level: did the substrate channels themselves move?
-    for ch in ("tension_cv", "flux_mean", "tension_mean", "carrier_freq"):
-        idle_v = [
-            r["spec"][ch] for r in rows if r["phase"] == "idle" and r["spec"] is not None
-        ]
-        drv_v = [
-            r["spec"][ch] for r in rows if r["phase"] == "driven" and r["spec"] is not None
-        ]
-        if idle_v and drv_v:
+    # Channel-level: did the physical channels themselves move?
+    for ch in ("jitter_cv", "throughput_mean", "pstate_rate", "irq_rate"):
+        idle_v = [r["sig"][ch] for r in rows if r["phase"] == "idle" and r["sig"] is not None]
+        load_v = [r["sig"][ch] for r in rows if r["phase"] == "load" and r["sig"] is not None]
+        if idle_v and load_v:
             report["channels"][ch] = {
                 "idle_mean": round(sum(idle_v) / len(idle_v), 4),
-                "drive_mean": round(sum(drv_v) / len(drv_v), 4),
+                "load_mean": round(sum(load_v) / len(load_v), 4),
             }
 
     moved = [
         b
         for b, d in report["bands"].items()
-        if abs(d["coupled_drive_delta"]) > abs(d["control_drive_delta"]) + 0.01
+        if abs(d["coupled_load_delta"]) > abs(d["control_load_delta"]) + 0.01
     ]
-    report["verdict"].append(
+    report["verdict"] = [
         f"{len(moved)} band(s) moved more when coupled than uncoupled: "
-        + (", ".join(moved) if moved else "none")
-    )
+        + (", ".join(moved) if moved else "none"),
+    ]
 
     # ─── Phase lock (the entrainment leg) ──────────────────────
-    from brainstem.field_stimulus import field_phase_lock
+    from brainstem.field_probe import field_phase_lock
 
     lock = field_phase_lock()
     report["phase_lock"] = lock
-    freqs = [
-        r["spec"]["carrier_freq"]
+    coh = [
+        r["sig"]["carrier_coherence"]
         for r in rows
-        if r["spec"] is not None and r["spec"]["warm"] and r["spec"]["carrier_freq"] > 0
+        if r["sig"] is not None and r["sig"]["carrier_coherence"] is not None
     ]
-    if freqs:
-        report["phase_lock"]["mean_carrier_hz"] = round(sum(freqs) / len(freqs), 3)
+    if coh:
+        report["phase_lock"]["mean_coherence"] = round(sum(coh) / len(coh), 3)
     report["verdict"].append(
         f"phase lock: PLV={lock['plv']:.3f} over {int(lock['n'])} samples"
         + (
-            f", carrier={report['phase_lock']['mean_carrier_hz']:.3f} Hz"
-            if "mean_carrier_hz" in report["phase_lock"]
-            else " (carrier absent)"
+            f", response coherence={report['phase_lock']['mean_coherence']:.3f}"
+            if "mean_coherence" in report["phase_lock"]
+            else " (v1 daemon — phase channel absent)"
         )
     )
     return report
@@ -238,7 +236,7 @@ def _analyze(rows: list[dict]) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--samples", type=int, default=10)
-    ap.add_argument("--settle", type=float, default=18.0)
+    ap.add_argument("--settle", type=float, default=5.0)
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
@@ -248,14 +246,14 @@ def main() -> None:
         return
 
     _out(f"\nfield-coupling assay — {report['n_samples']} samples\n")
-    _out("substrate channels (her field actually moved):")
+    _out("physical channels (the substrate actually moved):")
     for ch, d in report["channels"].items():
-        _out(f"  {ch:16s} idle={d['idle_mean']:<12} driven={d['drive_mean']}")
-    _out(f"\n{'band':9s} {'ctrl Δ':>9s} {'coupled Δ':>10s} {'tension r':>9s}")
+        _out(f"  {ch:16s} idle={d['idle_mean']:<12} load={d['load_mean']}")
+    _out(f"\n{'band':9s} {'ctrl Δ':>9s} {'coupled Δ':>10s} {'jitter r':>9s}")
     for band, d in report["bands"].items():
         _out(
-            f"{band:9s} {d['control_drive_delta']:>+9.4f} "
-            f"{d['coupled_drive_delta']:>+10.4f} {d['tension_corr']:>9.3f}"
+            f"{band:9s} {d['control_load_delta']:>+9.4f} "
+            f"{d['coupled_load_delta']:>+10.4f} {d['jitter_corr']:>9.3f}"
         )
     _out()
     for line in report["verdict"]:

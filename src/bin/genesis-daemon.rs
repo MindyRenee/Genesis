@@ -254,23 +254,6 @@ fn main() {
         std::process::exit(1);
     }
 
-    // Best-effort realtime scheduling grant for this thread — the
-    // autonomous fallback loop lives here, and the body's 200 ms
-    // cadence should not jitter under host load. rtkit revokes the
-    // elevation when the bus client disconnects, so the returned
-    // stream is held for the process lifetime; every failure path
-    // (no bus, no rtkit, denial) degrades to default scheduling.
-    // SAFETY: `SYS_gettid` has no memory-safety requirements.
-    let _rtkit_grant =
-        genesis::daemon::rtkit::grant_high_priority(std::process::id() as u64, unsafe {
-            libc::syscall(libc::SYS_gettid)
-        } as u64)
-        .ok()
-        .map(|(nice, stream)| {
-            eprintln!("[genesis] rtkit granted nice level {nice}.");
-            stream
-        });
-
     let state_path = config.data_dir.join("core_state.bin");
     let stm_path = config.data_dir.join("stm_ring.bin");
     let ltm_base = config.data_dir.join("ltm_store");
@@ -405,7 +388,7 @@ fn main() {
     eprintln!("[genesis] Subcognitive initialized.");
     eprintln!(
         "[genesis]   provenance: 0x{:012x}",
-        genesis::latent_spaces::provenance_fingerprint()
+        genesis::field::provenance_fingerprint()
     );
 
     // ── Wake recovery ──
@@ -433,6 +416,30 @@ fn main() {
     let ltm = Arc::new(Mutex::new(ltm));
     let stm = Arc::new(stm);
     let mmap = Arc::new(mmap);
+
+    // Physical field probe — the body listening to its own substrate.
+    // A dedicated thread measures real substrate dynamics
+    // (instruction throughput, scheduler jitter, P-state transitions,
+    // interrupt flux, and real power draw where sensors report it)
+    // at ~250 Hz and decomposes them at the wave bands' center
+    // frequencies; the mind reads the signature over
+    // GET_FIELD_PROBE and injects it into the wave oscillator as
+    // outer stimulus. The probe also writes a carrier — its work is
+    // modulated at the body's own phase rhythm, so the die's real
+    // current carries a component at the organism's beat (measured
+    // back through the power channel, not assumed).
+    {
+        use genesis::state::MentalPhase;
+        let probe_mmap = mmap.clone();
+        genesis::daemon::field_probe::start(move || {
+            match probe_mmap.read_consistent().map(|s| s.zones.phase()) {
+                Some(MentalPhase::NREM) => "nrem",
+                Some(MentalPhase::REM) => "rem",
+                Some(MentalPhase::Drowsy) => "drowsy",
+                _ => "wake",
+            }
+        });
+    }
 
     // The eye — the optic nerve's retinal end. The daemon captures
     // the camera itself (no separate process): the limb opens the
@@ -553,11 +560,6 @@ fn main() {
     // transaction plus a possible LTM trace.
     let mut zone_gate = AdaptiveGate::new(5_000, 2_000, 30_000);
     let mut model_save_gate = AdaptiveGate::new(60_000, 20_000, 300_000);
-    // The shepherd's own gear: watches the mind lease for loss and
-    // regrows a silent mind. A spawn in flight is watched closely;
-    // suppressed/dormant solitude drifts toward the ceiling.
-    let mut shepherd_gate = AdaptiveGate::new(5_000, 1_000, 30_000);
-    let mut shepherd = genesis::daemon::mind_shepherd::MindShepherd::new();
     let mut last_model_save_ticks = 0u32;
     // The fallback's own axle is adaptive too: deep NREM idles at
     // ~1 Hz, REM at 2 Hz, and anything else holds the 5 Hz reference
@@ -609,29 +611,6 @@ fn main() {
                         staleness_gate.relax();
                     } else {
                         staleness_gate.demand();
-                    }
-                }
-                Err(e) => {
-                    lock_refusal("tick_loop", e);
-                }
-            }
-        }
-
-        // Mind shepherd — the body's half of rebirth. Runs regardless
-        // of lease: a returning mind must be observed here to reset
-        // the attempt table for the next loss, and a lost one is
-        // regrown from the body's own entry point. `mind_idle_secs`
-        // is `None` for a mind that never attached (absence, not
-        // loss) and `Some` once one has driven.
-        if shepherd_gate.due(now_ms) {
-            match tick_loop.try_lock() {
-                Ok(tl) => {
-                    let outcome = shepherd.check(tl.mind_idle_secs(), &config.data_dir);
-                    use genesis::daemon::mind_shepherd::ShepherdOutcome as SO;
-                    match outcome {
-                        SO::Spawned | SO::PendingAlive => shepherd_gate.demand(),
-                        SO::Suppressed | SO::Dormant | SO::Absent => shepherd_gate.relax(),
-                        _ => {}
                     }
                 }
                 Err(e) => {

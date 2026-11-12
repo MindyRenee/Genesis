@@ -400,12 +400,9 @@ class Parser:
         if t.type == TokenType.NUMBER:
             self.advance()
             raw = t.value
-            try:
-                if "." in raw or "e" in raw or "E" in raw:
-                    return Num(float(raw))
-                return Num(int(raw))
-            except ValueError:
-                raise ParseError(f"malformed number literal: {raw!r}") from None
+            if "." in raw or "e" in raw or "E" in raw:
+                return Num(float(raw))
+            return Num(int(raw))
 
         if t.type == TokenType.IDENT:
             self.advance()
@@ -2435,8 +2432,7 @@ def try_math(
 
     This is the entry point for the cognition engine. It detects
     what kind of math question is being asked and routes it to
-    the appropriate native faculty: higher-math routing, computation,
-    solving, proof, or discovery.
+    the appropriate engine (computation, solving, proof, discovery).
 
     If a concept network is provided, the simplification rules are
     gated by what Genesis has learned (see ``MathRuleRegistry``).
@@ -2451,44 +2447,6 @@ def try_math(
     Returns None if the question is not a math question.
     """
     lower = question.lower().strip()
-    parietal_cues = (
-        re.search(
-            r"\b(calculate|compute|evaluate|what is|what's|add|subtract|multiply|divide|"
-            r"plus|minus|times|divided by|square root|sqrt|raised to|power of|percent|fraction|"
-            r"half|halves|thirds?|quarters?|double|triple|square of|cube of|compare|"
-            r"greater than|less than|"
-            r"larger than|smaller than|which is larger|which is greater|"
-            r"which is smaller|which is less|transpose|inverse|trace|dot product|"
-            r"inner product|vector|cross product|"
-            r"simplify|expand|factor|solve|differentiate|"
-            r"derivative|integral|mean|average|median|variance|standard deviation|summarize|"
-            r"sin|cos|tan|determinant|matrix|matrices|matrix product|linear system|rank|"
-            r"permutation|cycle|order of|limit|complex|roots? of unity|polar form|prime|"
-            r"primality|factorization|gcd|distance|polygon area|area of|convex hull|"
-            r"relation|reflexive|symmetric|antisymmetric|transitive|choose|combination|"
-            r"arrange|derangement|topology|euler characteristic|tautology|satisfiable|"
-            r"cayley table|algebraic axioms|triangle|degrees?|radians?|totient|euler.?s phi|"
-            r"congruence|modulo|chinese remainder|crt|graph|connected|polygon|inside|"
-            r"stirling|stars and bars)\b",
-            lower,
-        )
-        or "[[" in lower
-        or "%" in lower
-    )
-    if parietal_cues:
-        from parietal_lobe.math.cognitive import route_parietal_math
-
-        parietal_result = route_parietal_math(question)
-        if parietal_result is not None:
-            result = MathResult(
-                parietal_result.answer,
-                parietal_result.operation,
-                parietal_result.steps,
-                parietal_result.success,
-            )
-            if task_competence is not None:
-                _record_math_episode(task_competence, question, result, salience)
-            return result
 
     # Build rule registry from concept network if available
     enabled_rules: set[str] | None = None
@@ -2496,7 +2454,7 @@ def try_math(
         registry = MathRuleRegistry.from_concept_network(network)
         enabled_rules = registry.enabled_rules
 
-    fallback_result = (
+    result = (
         # ── Computation: "what is 2 + 2?" ──
         _try_compute(lower, enabled_rules)
         # ── Bare expression: "2 + 2", "sqrt(16)" ──
@@ -2508,9 +2466,9 @@ def try_math(
         # ── Discovery: "discover patterns in primes" ──
         or _try_discover(lower)
     )
-    if fallback_result is not None and task_competence is not None:
-        _record_math_episode(task_competence, question, fallback_result, salience)
-    return fallback_result
+    if result is not None and task_competence is not None:
+        _record_math_episode(task_competence, question, result, salience)
+    return result
 
 
 def _try_compute(lower: str, enabled_rules: set[str] | None) -> MathResult | None:
@@ -2565,13 +2523,7 @@ def _try_bare_expression(lower: str) -> MathResult | None:
                         "computation",
                         [f"{_expr_to_str(parsed)} = {format_number(value)}"],
                     )
-            except ParseError:
-                # This is a heuristic probe: ordinary prose can match the
-                # broad candidate regex and then fail the strict grammar.
-                # A parse miss means "not a bare expression", not a system
-                # failure, so it must not pollute the cognitive error journal.
-                return None
-            except EvalError as e:
+            except (ParseError, EvalError) as e:
                 note_swallowed(
                     "reasoning.math_reasoning._try_bare_expression",
                     e,

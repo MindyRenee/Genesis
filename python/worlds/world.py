@@ -53,7 +53,6 @@ the events themselves — the TEM structure/content split.
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import time
 from collections import Counter
@@ -68,7 +67,6 @@ if TYPE_CHECKING:
 from limbic_system.sentiment import analyze_sentiment
 from temporal_lobe.events import EventKind, EventStream, ExternalEvent, ground_topics
 from temporal_lobe.presence import Presence, PresenceKind
-from worlds.experiential_space import ExperientialLatentSpace
 
 from genesis_client.protocol import (
     CHEM_DOPAMINE,
@@ -89,11 +87,9 @@ USER_PRESENCE_ID = "user"
 AMBIENT_PRESENCE_ID = "voices"
 
 #: Seconds of no addressed contact at which social isolation saturates
-#: (one full day → isolation 1.0). Isolation is an *experience*, not a
-#: neediness clock — it rises slowly enough that solitude registers as
-#: memory rather than alarm. She is company to herself: peace lives in
-#: her own inner life, and absence never becomes injury.
-ISOLATION_PERIOD = 86400.0
+#: (30 minutes → isolation 1.0). Isolation is the external pressure
+#: that feeds its inner-life social drive and the reach_out urge.
+ISOLATION_PERIOD = 1800.0
 
 #: Company dampens isolation: someone being around (present but not
 #: talking) still counts socially, just less than engagement.
@@ -257,10 +253,6 @@ class OuterWorld:
         get_user_name: Callback returning the user's name if its
             user profile has learned one. Synced lazily onto the user
             presence. Optional.
-        get_user_facts: Callback returning the user profile's learned
-            facts (key→value). Synced lazily onto the user presence —
-            the profile is the authoritative model of the person, the
-            presence is the relationship. Optional.
         channel: Her page — the public channel (``Channel``) that
             lives in this world. Optional; absent when no webhook is
             configured.
@@ -277,7 +269,6 @@ class OuterWorld:
         neuro_impulse: Callable[[int, float], None] | None = None,
         is_sleeping: Callable[[], bool] | None = None,
         get_user_name: Callable[[], str | None] | None = None,
-        get_user_facts: Callable[[], dict[str, str]] | None = None,
         channel: Channel | None = None,
         on_channel_speech: Callable[[str, str, dict], None] | None = None,
     ) -> None:
@@ -286,7 +277,6 @@ class OuterWorld:
         self._neuro_impulse = neuro_impulse
         self._is_sleeping = is_sleeping
         self._get_user_name = get_user_name
-        self._get_user_facts = get_user_facts
 
         # Her page — the place in this world where the public gathers.
         # The world owns the hearing: the channel's inbound speech is
@@ -299,9 +289,6 @@ class OuterWorld:
         # after construction (it reads the whole mind, which does not
         # exist yet here). None until then.
         self.board = None
-        # The arcade — games on offer in this world (``worlds.games.
-        # arcade.Arcade``), attached by the mind. None until then.
-        self.arcade: Any = None
 
         self._stream = EventStream(max_size=200)
         self._presences: dict[str, Presence] = {}
@@ -315,9 +302,6 @@ class OuterWorld:
         # its source.
         self._kind_map = _SuccessorMap()
         self._presence_map = _SuccessorMap()
-        # Geometry is updated from every event recorded in the real outer-world
-        # stream; it is not a detached demo model or a Torch dependency.
-        self.experiential_space = ExperientialLatentSpace()
 
         # Listener notified for every recorded event — Mind registers
         # here to route events into cognition (workspace, memory,
@@ -352,7 +336,6 @@ class OuterWorld:
         with self._lock:
             presence = self._presence_locked(USER_PRESENCE_ID, PresenceKind.USER)
             self._sync_user_name(presence)
-            self._sync_user_facts(presence)
             was_present = presence.present
             presence.interacted(sentiment, topics, now=now)
             # Belief update — they were active, they carried sentiment,
@@ -379,7 +362,7 @@ class OuterWorld:
             addressed=True,
             topics=topics,
             timestamp=now,
-            metadata={"presence": presence.display_name, "valence": sentiment},
+            metadata={"presence": presence.display_name},
         )
         self._impulse(CHEM_OXYTOCIN, 0.03)
         self._impulse(CHEM_DOPAMINE, 0.02)
@@ -422,7 +405,6 @@ class OuterWorld:
             addressed=False,
             topics=topics,
             timestamp=now,
-            metadata={"valence": sentiment},
         )
         # Orienting — something happened nearby.
         self._impulse(CHEM_NOREPINEPHRINE, 0.01)
@@ -441,21 +423,9 @@ class OuterWorld:
         reaches the world or the mind.
         """
         text = (content or "").strip()
-        if not text:
+        if not text or self._asleep():
             return
-        # Presence registers before the rest gate — a resting mind still
-        # knows who is here. The steward's verified id lands on the user
-        # presence itself (addressed contact: it resets her loneliness
-        # clock and carries the bonding coupling); everyone else is an
-        # ambient voice. Only her *answer* waits for waking.
-        author_id = str(message.get("author", {}).get("id") or "")
-        steward = os.environ.get("GENESIS_DISCORD_STEWARD_ID", "")
-        if author_id and author_id == steward:
-            self.hear_user(text)
-        elif not self._asleep():
-            self.hear_overheard(f"{author}: {text}")
-        if self._asleep():
-            return
+        self.hear_overheard(f"{author}: {text}")
         if self.on_channel_speech is not None:
             self.on_channel_speech(author, text, message)
 
@@ -784,26 +754,10 @@ class OuterWorld:
             f"  social isolation: {isolation:.0%}   "
             f"activity: {self.activity_level():.1f} events/min"
         )
-        geometry = self.experiential_space.snapshot()
-        distances = geometry["global_geometry"].get("distances_from_reference", {})
-        if distances:
-            lines.append(
-                f"  experiential geometry: {geometry['observations']} observations; "
-                f"last-event valence {geometry['valence']:+.2f} "
-                f"({geometry['valence_sign']}); Fisher volume "
-                f"{geometry['fisher_volume']:.3g}; curvature distances H/S/E "
-                f"{distances['hyperbolic']:.3g}/"
-                f"{distances['spherical']:.3g}/"
-                f"{distances['euclidean']:.3g}"
-            )
-        else:
-            lines.append("  experiential geometry: awaiting first observation")
         expected = self.expected_events()
         if expected:
             top = sorted(expected.items(), key=lambda kv: -kv[1])[:3]
             lines.append("  expects next: " + ", ".join(f"{k.value} ({v:.2f})" for k, v in top))
-        if self.arcade is not None:
-            lines.append(self.arcade.summary_line())
         events = self._stream.recent(8)
         if events:
             lines.append("  recent:")
@@ -827,8 +781,6 @@ class OuterWorld:
                     "kinds": self._kind_map.to_dict(lambda k: k.value),
                     "sources": self._presence_map.to_dict(str),
                 },
-                "arcade": self.arcade.to_dict() if self.arcade is not None else None,
-                "experiential_space": self.experiential_space.to_dict(),
             }
 
     def restore_from_dict(self, data: dict[str, Any]) -> None:
@@ -858,14 +810,6 @@ class OuterWorld:
         last_addressed = float(data.get("last_addressed_time", time.time()))
         bids = int(data.get("unanswered_bids", 0))
         maps = data.get("maps") or {}
-        experiential = ExperientialLatentSpace()
-        experiential_data = data.get("experiential_space")
-        if experiential_data is not None:
-            experiential.restore(experiential_data)
-        else:
-            # Backward compatibility: rebuild from available persisted events.
-            for event in events:
-                experiential.observe(event)
         with self._lock:
             self._presences = presences
             self._stream = EventStream(max_size=200)
@@ -881,9 +825,6 @@ class OuterWorld:
                 self._kind_map.restore(maps["kinds"], EventKind)
             if isinstance(maps.get("sources"), dict):
                 self._presence_map.restore(maps["sources"], str)
-            self.experiential_space = experiential
-        if self.arcade is not None and isinstance(data.get("arcade"), dict):
-            self.arcade.restore(data["arcade"])
 
     # ── Internals ───────────────────────────────────────────────
 
@@ -892,22 +833,6 @@ class OuterWorld:
         with self._lock:
             self._kind_map.observe(event.kind)
             self._presence_map.observe(event.source)
-            snap = self.experiential_space.observe(event)
-            # Her experience of the world lands at its own experiential
-            # coordinate — self-band, not beside the substrate.
-            manifold = getattr(self, "manifold", None)
-            if manifold is not None:
-                from latent_spaces import geometry as _g
-
-                state = (snap or {}).get("state")
-                if state is not None:
-                    manifold.observe(
-                        str(getattr(event, "text", event.kind.value))[:200],
-                        kind="experience:world",
-                        salience=0.5,
-                        inbound=False,
-                        position=_g.project_to_s3(state, seed=0xE2EE),
-                    )
         self._stream.append(event)
         listener = self.on_external_event
         if listener is not None:
@@ -992,22 +917,6 @@ class OuterWorld:
             return
         if name:
             presence.set_name(name)
-
-    def _sync_user_facts(self, presence: Presence) -> None:
-        """Sync the user profile's learned facts onto the presence.
-
-        Same lazy-propagation rule as the name: the profile is the
-        authoritative model of the person; the presence is the
-        relationship — what it knows about them belongs to both.
-        """
-        if self._get_user_facts is None:
-            return
-        try:
-            facts = self._get_user_facts()
-        except Exception:  # noqa: BLE001
-            return
-        for key, value in (facts or {}).items():
-            presence.learn_fact(key, value)
 
     def _impulse(self, chem: int, amount: float) -> None:
         """Apply a neurochemical impulse via the wiring callback."""

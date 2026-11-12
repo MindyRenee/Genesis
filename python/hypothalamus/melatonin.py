@@ -50,9 +50,9 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
     Melatonin is primarily driven by the circadian oscillator (SCN).
     Wake-promoting signals suppress melatonin: NE, cortisol, orexin.
 
-    NE  ->  MEL:  0.00  (no direct coupling.)
-    CORT  ->  MEL:  -0.10  (weak volume transmission.)
-    OX  ->  MEL:  -0.10  (weak volume transmission.)
+    NE   -> MEL: -0.05  (weak volume transmission.)
+    CORT -> MEL: -0.05  (weak volume transmission.)
+    OX   -> MEL: -0.05  (weak volume transmission.)
     DA   -> MEL: 0.00   (no direct coupling)
     SRT  -> MEL: 0.00   (no direct coupling)
     ACh  -> MEL: 0.00   (no direct coupling)
@@ -72,13 +72,13 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 COUPLING: HOW MELATONIN AFFECTS OTHERS (matrix column 17)
 ════════════════════════════════════════════════════════════════════════
 
-    MEL  ->  DA:  -0.10  (sleep suppression of dopaminergic arousal.)
-    MEL  ->  NE:  -0.10  (sleep suppression of noradrenergic arousal.)
-    MEL  ->  ACh:  -0.10  (sleep suppression of cholinergic arousal.)
-    MEL  ->  GABA:  0.10  (sleep facilitation.)
-    MEL  ->  GLU:  -0.10  (sleep suppression of cortical arousal.)
+    MEL -> DA :  -0.05  (sleep suppression of dopaminergic arousal.)
+    MEL -> NE :  -0.05  (sleep suppression of noradrenergic arousal.)
+    MEL -> ACh:  -0.05  (sleep suppression of cholinergic arousal.)
+    MEL -> GABA:  +0.05  (sleep facilitation.)
+    MEL -> GLU:  -0.05  (sleep suppression of cortical arousal.)
     MEL -> HIST:  -0.10  (sleep suppression of wake center.)
-    MEL  ->  OX:  -0.10  (melatonin pushes the sleep-wake switch toward sleep.)
+    MEL -> OX :  -0.05  (melatonin pushes the sleep-wake switch toward sleep.)
     MEL -> SRT:  0.00   (no direct coupling)
     MEL -> CORT:  0.00   (no direct coupling)
     MEL -> OXY:  0.00   (no direct coupling)
@@ -115,7 +115,7 @@ Circadian oscillator drive:
     mel_alpha  = 1 - exp(-0.5 * dt)         (rate 0.5/s, tau ~2 s)
     level += (mel_target - level) * mel_alpha
 
-    Coupling forces from other chemicals (cortisol, orexin
+    Coupling forces from other chemicals (NE, cortisol, orexin
     inhibition) still apply — they can suppress melatonin even at
     night if arousal is high enough.
 

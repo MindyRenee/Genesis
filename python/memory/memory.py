@@ -606,11 +606,6 @@ class MemorySystem:
                 (``SomaticSnapshot.to_dict()``). When None, the
                 engine consults ``somatic_provider`` if wired.
         """
-        # An empty episode is unencodable — the daemon rejects it, so
-        # refuse here rather than spend the round-trip on a known no.
-        if not text or not text.strip():
-            return False
-
         # Theta-gamma coupling gates encoding strength.
         # In encoding mode, the theta trough aligns gamma bursts for
         # new association formation — boost salience so the memory is
@@ -665,22 +660,6 @@ class MemorySystem:
 
         # ── Wire the new memory into the subsystems ──────────
         self._wire_memory_subsystems(eid, text, emotional_tag)
-        # The episode also lands in the substrate — memory is inner
-        # world, so it deposits into the inner band rather than
-        # living only in the daemon's store beside the manifold.
-        # The kind carries the episode id so resonance can return
-        # which LTM episodes matter; the daemon still serves the text.
-        manifold = getattr(self, "manifold", None)
-        if manifold is not None:
-            try:
-                manifold.observe(
-                    str(text)[:400],
-                    kind=f"memory:{source}:{eid}",
-                    salience=max(0.0, min(1.0, salience)),
-                    inbound=False,
-                )
-            except (TypeError, ValueError, ArithmeticError):
-                pass
         return True
 
     def _register_memory_record(
@@ -812,35 +791,6 @@ class MemorySystem:
             logger.warning(f"find similar failed: {e}")
             results = []
         results = list(results)
-
-        # The substrate consults too: memory:* deposits carry their
-        # LTM episode id in the kind, so resonance returns which
-        # episodes matter geometrically — merged before the emotional
-        # re-rank so the body's own pipeline scores them uniformly.
-        manifold = getattr(self, "manifold", None)
-        if manifold is not None:
-            try:
-                seen = {r.episode_id for r in results}
-                for _, kk, score, dist in manifold.resonate(
-                    query, k=limit, prefix="memory:"
-                ):
-                    try:
-                        eid = int(kk.rsplit(":", 1)[-1])
-                    except ValueError:
-                        continue
-                    if eid in seen:
-                        continue
-                    seen.add(eid)
-                    results.append(
-                        SimilarEpisode(
-                            episode_id=eid,
-                            hamming_distance=min(64, int(64 * dist / math.pi)),
-                            timestamp=0,
-                            salience=min(1.0, score),
-                        )
-                    )
-            except (TypeError, ValueError, ArithmeticError):
-                pass
 
         results, deep_ids = self._deep_recall_merge(query, results, limit)
         _t_find = time.perf_counter() - _t0

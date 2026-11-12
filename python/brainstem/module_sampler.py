@@ -132,7 +132,6 @@ _DIR_MODULE = {
     "sleep": MODULE_DREAMING,
     "tools": MODULE_INTENTION,
     "self": MODULE_METACOGNITION,
-    "latent_spaces": MODULE_MEMORY,  # unified S3/S7 manifold substrate
     "world": MODULE_REASONING,  # nested world-model packages
     "worlds": MODULE_REASONING,  # model of the world and other minds
     "eval": MODULE_METACOGNITION,  # measuring herself
@@ -245,7 +244,9 @@ def _module_of_filename(filename: str) -> int | None:
         # the site root when installed, so they only reach this
         # branch in the checkout layout.
         if _INFRA_DIR and not os.path.relpath(filename, _INFRA_DIR).startswith(".."):
-            return _INFRA_FILE_MODULE.get(os.path.basename(filename), MODULE_METACOGNITION)
+            return _INFRA_FILE_MODULE.get(
+                os.path.basename(filename), MODULE_METACOGNITION
+            )
         if _EVAL_DIR and not os.path.relpath(filename, _EVAL_DIR).startswith(".."):
             return MODULE_METACOGNITION
         return _ROOT_FILE_MODULE.get(os.path.abspath(filename))

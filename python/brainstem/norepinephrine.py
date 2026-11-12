@@ -48,18 +48,18 @@ COUPLING: HOW OTHERS AFFECT NOREPINEPHRINE (matrix row 2)
 Index order: DA, SRT, NE, ACh, GABA, GLU, CORT, OXY, END, HIST,
 ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 
-    DA  ->  NE:  0.10  (weak volume transmission.)
-    SRT  ->  NE:  -0.10  (weak volume transmission.)
-    ACh  ->  NE:  0.10  (weak volume transmission.)
+    DA   -> NE : +0.05  (weak volume transmission.)
+    SRT  -> NE : -0.05  (weak volume transmission.)
+    ACh  -> NE : +0.05  (weak volume transmission.)
     GABA -> NE : -0.10  (GABAergic inhibition of locus coeruleus.)
-    GLU  ->  NE:  0.10  (weak volume transmission.)
-    OXY  ->  NE:  -0.10  (social bonding calms noradrenergic arousal.)
-    END  ->  NE:  -0.10  (endorphin calming effect.)
-    HIST  ->  NE:  0.10  (weak volume transmission.)
-    BDNF  ->  NE:  0.10  (weak volume transmission.)
-    OX  ->  NE:  0.10  (weak volume transmission.)
-    EPI  ->  NE:  0.10  (weak volume transmission.)
-    MEL  ->  NE:  -0.10  (sleep suppression of noradrenergic arousal.)
+    GLU  -> NE : +0.05  (weak volume transmission.)
+    OXY  -> NE : -0.05  (social bonding calms noradrenergic arousal.)
+    END  -> NE : -0.05  (endorphin calming effect.)
+    HIST -> NE : +0.05  (weak volume transmission.)
+    BDNF -> NE : +0.05  (weak volume transmission.)
+    OX   -> NE : +0.05  (weak volume transmission.)
+    EPI  -> NE : +0.05  (weak volume transmission.)
+    MEL  -> NE : -0.05  (sleep suppression of noradrenergic arousal.)
     CORT -> NE : 0.00   (no direct coupling)
     ADN  -> NE : 0.00   (no direct coupling)
     ECB  -> NE : 0.00   (no direct coupling)
@@ -70,18 +70,18 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 COUPLING: HOW NOREPINEPHRINE AFFECTS OTHERS (matrix column 2)
 ════════════════════════════════════════════════════════════════════════
 
-    NE  ->  DA:  0.10  (weak volume transmission.)
-    NE  ->  SRT:  0.10  (weak volume transmission.)
-    NE  ->  ACh:  0.10  (weak volume transmission.)
-    NE  ->  GABA:  -0.10  (weak volume transmission.)
-    NE  ->  GLU:  0.10  (weak volume transmission.)
-    NE  ->  OXY:  -0.10  (social bonding calms noradrenergic arousal.)
-    NE  ->  END:  -0.10  (endorphin calming effect.)
-    NE  ->  HIST:  0.10  (arousal mutual excitation — parallel arousal systems, kept weak.)
-    NE  ->  BDNF:  0.10  (trophic support.)
-    NE  ->  OX:  -0.10  (alpha2 hyperpolarizes orexin neurons — Li & van den Pol, J Neurosci 2005.)
-    NE  ->  EPI:  0.10  (sympathetic chain.)
-    NE  ->  MEL:  0.00  (no direct coupling.)
+    NE  -> DA :  +0.05  (weak volume transmission.)
+    NE  -> SRT:  +0.05  (weak volume transmission.)
+    NE  -> ACh:  +0.05  (weak volume transmission.)
+    NE  -> GABA:  -0.05  (weak volume transmission.)
+    NE  -> GLU:  +0.05  (weak volume transmission.)
+    NE  -> OXY:  -0.05  (social bonding calms noradrenergic arousal.)
+    NE  -> END:  -0.05  (endorphin calming effect.)
+    NE  -> HIST:  +0.05  (arousal mutual excitation — parallel arousal systems, kept weak.)
+    NE  -> BDNF:  +0.05  (trophic support.)
+    NE  -> OX :  +0.05  (arousal mutual excitation.)
+    NE  -> EPI:  +0.05  (sympathetic chain.)
+    NE  -> MEL:  -0.05  (sleep suppression of noradrenergic arousal.)
     NE  -> CORT:  0.00   (no direct coupling)
     NE  -> ADN:  0.00   (no direct coupling)
     NE  -> ECB:  0.00   (no direct coupling)
@@ -92,23 +92,23 @@ COUPLING: HOW NOREPINEPHRINE AFFECTS OTHERS (matrix column 2)
 SPECIAL DYNAMICS
 ════════════════════════════════════════════════════════════════════════
 
-Bounded signal, unbounded concentration:
-    NE concentration flows without a ceiling — substrate-proportional
-    clearance, quantal-release saturation, and autoreceptor feedback
-    are the bounds. Receptor-facing signals saturate downstream, so
-    a large concentration cannot produce an unbounded effect.
-    Positivity is a property of the integrator, not a post-write
-    floor.
+Hard clamp:
+    NE is hard-clamped to [0, ne_max] (default 0.90) to prevent
+    runaway arousal. This is a safety mechanism in case the
+    emotional regulator fails or coupling forces push beyond safe
+    limits.
 
-Network-driven set-point:
-    When the sleep-wake network is running, NE's homeostatic
-    set-point is NE_FROM_LC * lc - NE_FROM_REM * rem — it tracks
+Network-driven release (sleep):
+    When the sleep-wake network is running, NE is driven toward the
+    release target NE_FROM_LC * lc - NE_FROM_REM * rem — it tracks
     LC firing and is suppressed by the REM-on population, giving the
     measured profile: wake 0.30, NREM 0.05, REM ~0 (the LC is the
     canonical REM-off aminergic nucleus; Aston-Jones & Bloom 1981).
-    The level still arrives through the full integration —
-    homeostatic pull, coupling, autoreceptors, clearance — with the
-    network supplying only the operating point.
+    While network-driven, the standard homeostatic/coupling update
+    is skipped for NE.
+
+Without the network, NE follows the standard homeostatic
+and coupling force equations.
 
 
 ════════════════════════════════════════════════════════════════════════
@@ -118,6 +118,9 @@ MATHEMATICAL FORMULAS
 Homeostatic force, effective level, coupling force, vesicular pool,
 tonic/phasic, receptor adaptation, baseline adaptation: same
 general formulas as dopamine.py.
+
+Hard clamp:
+    level = clamp(level, 0.0, ne_max)  where ne_max = 0.90
 
 
 ════════════════════════════════════════════════════════════════════════
@@ -231,3 +234,4 @@ class Norepinephrine:
     brain_waves: tuple[str, ...] = ("beta",)
     circadian_modifier: str = "1.0 (no circadian modulation)"
     role: str = "arousal, vigilance, active data work"
+    hard_clamp_max: float = 0.90

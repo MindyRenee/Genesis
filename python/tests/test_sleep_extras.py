@@ -1504,56 +1504,6 @@ def test_drowsy_after_confirmed_sleep_is_not_a_wake():
         assert mind.is_sleeping
 
 
-def test_wake_request_stays_asleep_until_the_body_crosses():
-    """A /wake against a still-sleeping body only pushes the cascade.
-
-    One organism, one state: while the daemon's phase reports NREM the
-    mind stays under — the flag, zone, and learners belong to a body
-    that actually woke. Regression: wake() used to clear _is_sleeping
-    immediately, leaving the layers in opposite sleep states while the
-    flip-flop crossed — volition urges, speech, and the learners ran
-    awake-side machinery on a body that had not risen.
-    """
-    from sleep.sleep import WakeOutcome
-
-    with tempfile.TemporaryDirectory() as data_dir:
-        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, phase="nrem")
-        mind.sleep(user_initiated=False)
-
-        outcome = mind.wake(user_initiated=True)
-
-        assert outcome is WakeOutcome.BODY_WAKE_PUSHED
-        assert mind.is_sleeping, "the mind stays under while the body sleeps"
-        assert mind._last_wake_attempt > 0.0, "the arousal cascade was sent"
-
-
-def test_wake_completes_when_the_body_crosses():
-    """The desync join completes a pending wake through wake() itself.
-
-    Once the daemon's phase reports a persistent awake phase past the
-    flutter guard, the body's truth pulls the mind up — flag, zone,
-    and resumes run on the same path a direct wake would take.
-    """
-    import time as _time
-
-    from brainstem.thresholds import WAKE_DESYNC_GRACE_SECONDS
-    from sleep.sleep import WakeOutcome
-
-    with tempfile.TemporaryDirectory() as data_dir:
-        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, phase="nrem")
-        mind.sleep(user_initiated=False)
-        assert mind.wake(user_initiated=True) is WakeOutcome.BODY_WAKE_PUSHED
-
-        # The body crosses and the awake phase persists past the guard.
-        mind.client._phase = "active"
-        mind._body_sleep_confirmed = True
-        mind._body_awake_since = _time.time() - WAKE_DESYNC_GRACE_SECONDS - 1.0
-
-        mind._check_sleep_sync()
-
-        assert not mind.is_sleeping
-
-
 # ======================================================================
 # Restored sleep bookkeeping — a restart mid-episode must keep the
 # episode's own record. The journal showed every recorded wake with
@@ -2005,10 +1955,9 @@ def test_echoed_placeholder_is_suppressed_despite_grammar_decoration():
     from frontal_lobe.thoughts import SpontaneousThought
     from self import PersonalityTraits, SelfModel
 
-    # No definition, no edges, noisy target — and a nonce concept the
-    # dictionary can't define either: composition can only echo.
+    # No definition, no edges, noisy target: composition can only echo.
     net = ConceptNetwork()
-    net.add_concept("blorpt", confidence=0.5)
+    net.add_concept("cat", confidence=0.5)
     net.add_concept("compiler for the rust language", confidence=0.5)
     engine = GenerativeLanguage(
         SelfModel(
@@ -2025,11 +1974,11 @@ def test_echoed_placeholder_is_suppressed_despite_grammar_decoration():
         network=net,
     )
     thought = SpontaneousThought(
-        content="blorpt",
+        content="cat",
         trigger="dream",
         is_dream=True,
         metadata={
-            "topic": "blorpt",
+            "topic": "cat",
             "knowledge": [("related_to", "compiler for the rust language", 0.5)],
             "dream": True,
         },

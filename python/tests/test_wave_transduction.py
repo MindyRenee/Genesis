@@ -1,11 +1,14 @@
-"""Wave→chemical transduction — release flux, not level tracking.
+"""Wave→chemical transduction — the hypothalamic release channel.
 
-The band power is the presynaptic rate: UP chemicals get release
-flux ``Rmax·(1 − e^{−G·P/Rmax})·Δt`` — the depletion-limited
-saturating rate, ``G·P`` in the small signal — and DOWN chemicals get
-the same saturating magnitude on the substrate-weighted drive
-``G·P·C``. Levels are never commanded; the body's own kinetics decide
-where they settle.
+Covers the control law in ``hypothalamus.transduction``:
+
+- UP peptides (wave_sign +1) track their band power as the commanded
+  level — saturated exact tracking, rate-limited by max_impulse.
+- DOWN peptides (wave_sign -1, cortisol) are suppressed by their
+  band, never released — the cortisol regression guard.
+- Band aliases aggregate sub-band power (beta = BETA1+2+3).
+- The quiet-band half of the up/down rule: no power → the peptide's
+  hold is withdrawn (negative impulse), not merely un-driven.
 """
 
 from __future__ import annotations
@@ -13,8 +16,6 @@ from __future__ import annotations
 import pytest
 from hypothalamus.transduction import DRIVE_RATE, transduce_waves, wave_impulses
 from thalamus.brain_waves import BrainWave, BrainWaveState
-
-DT = 1.0
 
 
 def _state(**powers: float) -> BrainWaveState:
@@ -37,68 +38,49 @@ def _by_chem(impulses):
     return dict(impulses)
 
 
-class TestReleaseFlux:
-    def test_beta_releases_wake_chemicals(self):
-        """Sustained beta drive commands release flux on its affiliates."""
-        impulses = _by_chem(wave_impulses(_state(beta2=0.5), {}, DT))
+class TestUpTracking:
+    def test_beta_releases_wake_peptides(self):
+        """Sustained beta drive commands orexin/histamine/CRH release."""
+        impulses = _by_chem(wave_impulses(_state(beta2=0.5), {}))
+        # All three beta peptides get positive impulses when their
+        # command (0.5) exceeds the current level (baseline).
         from genesis_client.protocol import CHEM_CRH, CHEM_HISTAMINE, CHEM_OREXIN
 
         assert impulses[CHEM_OREXIN] > 0
         assert impulses[CHEM_HISTAMINE] > 0
         assert impulses[CHEM_CRH] > 0
 
-    def test_quiet_band_emits_nothing(self):
-        """No band power → no release flux. The body's own clearance
-        withdraws the hold — the wave never pushes a level down."""
-        impulses = _by_chem(wave_impulses(_state(delta=0.8), {}, DT))
+    def test_quiet_band_withdraws_hold(self):
+        """The down half of every up: no band power → negative impulse.
+
+        Orexin must fall in sleep, not merely stop rising — the wave
+        commands the level, so zero command means withdrawal.
+        """
+        impulses = _by_chem(wave_impulses(_state(delta=0.8), {}))
+        from genesis_client.protocol import CHEM_OREXIN
+
+        assert impulses[CHEM_OREXIN] < 0
+
+    def test_tracking_is_exact_within_budget(self):
+        """Within the rate cap the impulse is exactly r - C."""
+        from genesis_client.protocol import CHEM_OREXIN
+
+        impulses = _by_chem(wave_impulses(_state(beta2=0.4), {"orexin": 0.3}))
+        # r - C = 0.1 > cap (0.1 * 0.2 = 0.02) → saturated at cap.
+        assert impulses[CHEM_OREXIN] == pytest.approx(0.1 * DRIVE_RATE)
+
+    def test_already_at_command_is_silent(self):
+        impulses = _by_chem(wave_impulses(_state(beta2=0.3), {"orexin": 0.3}))
         from genesis_client.protocol import CHEM_OREXIN
 
         assert CHEM_OREXIN not in impulses
-
-    def test_flux_is_rate_times_dt(self):
-        """The impulse is release rate × elapsed — cadence-invariant."""
-        from genesis_client.protocol import CHEM_OREXIN
-
-        one = _by_chem(wave_impulses(_state(beta2=0.4), {}, 1.0))
-        half = _by_chem(wave_impulses(_state(beta2=0.4), {}, 0.5))
-        assert one[CHEM_OREXIN] == pytest.approx(2.0 * half[CHEM_OREXIN])
-
-    def test_flux_saturates_at_the_release_ceiling(self):
-        """Deep drive approaches the peptide's release ceiling —
-        asymptotically, never clamped onto it."""
-        from genesis_client.protocol import CHEM_OREXIN
-
-        # orexin ceiling = max_impulse(0.1) * DRIVE_RATE(0.2) = 0.02/s;
-        # G·P = 0.25·0.9 = 0.225 is 11 ceilings deep — saturated.
-        impulses = _by_chem(wave_impulses(_state(beta2=0.9), {}, DT))
-        ceiling = 0.1 * DRIVE_RATE * DT
-        assert impulses[CHEM_OREXIN] == pytest.approx(ceiling, rel=1e-3)
-        assert impulses[CHEM_OREXIN] <= ceiling
-
-    def test_weak_drive_stays_linear_in_power(self):
-        """Below the ceiling the law's small-signal slope is G·P."""
-        from genesis_client.protocol import CHEM_OREXIN
-
-        # G·P = 0.25·0.005 = 0.00125 → x = 0.06 of the 0.02 ceiling;
-        # the saturating sag is ~3%, the linear slope within 5%.
-        impulses = _by_chem(wave_impulses(_state(beta2=0.005), {}, DT))
-        assert impulses[CHEM_OREXIN] == pytest.approx(0.25 * 0.005 * DT, rel=0.05)
-
-    def test_release_ignores_current_level(self):
-        """Feedforward, not feedback: release flux does not read C —
-        the body owns the level, the wave owns the rate."""
-        from genesis_client.protocol import CHEM_OREXIN
-
-        low = _by_chem(wave_impulses(_state(beta2=0.3), {"orexin": 0.05}, DT))
-        high = _by_chem(wave_impulses(_state(beta2=0.3), {"orexin": 0.9}, DT))
-        assert low[CHEM_OREXIN] == pytest.approx(high[CHEM_OREXIN])
 
     def test_beta_aggregates_sub_bands(self):
         """Declared 'beta' affinity sums all three sub-band powers."""
         from genesis_client.protocol import CHEM_OREXIN
 
-        split = _by_chem(wave_impulses(_state(beta1=0.15, beta2=0.15, beta3=0.15), {}, DT))
-        joint = _by_chem(wave_impulses(_state(beta2=0.45), {}, DT))
+        split = _by_chem(wave_impulses(_state(beta1=0.15, beta2=0.15, beta3=0.15), {}))
+        joint = _by_chem(wave_impulses(_state(beta2=0.45), {}))
         assert split[CHEM_OREXIN] == pytest.approx(joint[CHEM_OREXIN])
 
 
@@ -107,34 +89,29 @@ class TestDownSuppression:
         """THE regression guard: delta dominance suppresses cortisol.
 
         Cortisol is the DOWN member of the delta pair — the wave can
-        only enhance its clearance, never pump it during sleep.
+        only push it toward its floor, never pump it during sleep.
         """
-        impulses = _by_chem(wave_impulses(_state(delta=0.9), {"cortisol": 0.3}, DT))
+        impulses = _by_chem(wave_impulses(_state(delta=0.9), {"cortisol": 0.3}))
         from genesis_client.protocol import CHEM_CORTISOL
 
         assert impulses[CHEM_CORTISOL] < 0
 
     def test_cortisol_suppression_is_floor_aware(self):
-        """Suppression is first-order in substrate — it dies with C."""
-        weak = _by_chem(wave_impulses(_state(delta=0.9), {"cortisol": 0.01}, DT))
-        strong = _by_chem(wave_impulses(_state(delta=0.9), {"cortisol": 0.1}, DT))
+        """Suppression can never drive below zero."""
+        impulses = _by_chem(wave_impulses(_state(delta=0.9), {"cortisol": 0.01}))
         from genesis_client.protocol import CHEM_CORTISOL
 
-        # drive = G·P·C — ten times the substrate, ten times the rate
-        # (small-signal; both deep under the ceiling).
-        assert strong[CHEM_CORTISOL] == pytest.approx(10 * weak[CHEM_CORTISOL], rel=0.05)
-        # magnitude ≈ G·P·C = 0.25·0.9·0.01 = 0.00225 near zero drive.
-        assert weak[CHEM_CORTISOL] == pytest.approx(-0.00225 * DT, rel=0.02)
+        assert impulses[CHEM_CORTISOL] >= -0.01
 
     def test_quiet_delta_leaves_cortisol_alone(self):
-        impulses = _by_chem(wave_impulses(_state(beta2=0.6), {"cortisol": 0.3}, DT))
+        impulses = _by_chem(wave_impulses(_state(beta2=0.6), {"cortisol": 0.3}))
         from genesis_client.protocol import CHEM_CORTISOL
 
         assert CHEM_CORTISOL not in impulses
 
     def test_melatonin_is_the_up_member(self):
         """Same band, opposite sign: delta releases melatonin."""
-        impulses = _by_chem(wave_impulses(_state(delta=0.5), {}, DT))
+        impulses = _by_chem(wave_impulses(_state(delta=0.5), {}))
         from genesis_client.protocol import CHEM_MELATONIN
 
         assert impulses[CHEM_MELATONIN] > 0
@@ -151,7 +128,7 @@ class TestChannel:
                 return True
 
         client = FakeClient()
-        n = transduce_waves(client, _state(beta2=0.6), {}, DT)
+        n = transduce_waves(client, _state(beta2=0.6), {})
         assert n == len(client.sent)
         assert all(abs(m) > 0 for _, m in client.sent)
 
@@ -160,4 +137,4 @@ class TestChannel:
             def neuro_impulse(self, chem, magnitude):
                 raise ConnectionError("gone")
 
-        assert transduce_waves(DeadClient(), _state(beta2=0.6), {}, DT) == 0
+        assert transduce_waves(DeadClient(), _state(beta2=0.6), {}) == 0

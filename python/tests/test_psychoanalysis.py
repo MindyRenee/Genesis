@@ -114,7 +114,7 @@ def test_ready_urges_empty_while_meditating():
 def test_ready_urges_empty_while_hypnagogic():
     """In theta the urges build but nothing discharges — held for waking."""
     mind = _volition_mind(hypnagogic=HypnagogicState(progress=0.6))
-    assert mind._filter_ready_urges(["learn", "look", "speech"]) == []
+    assert mind._filter_ready_urges(["learn", "look", "speech", "rest_eyes"]) == []
 
 
 def test_ready_urges_flow_when_awake():

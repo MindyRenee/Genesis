@@ -55,8 +55,8 @@ REGIONS: tuple[Region, ...] = (
     Region(
         name="basal_ganglia",
         package="basal_ganglia",
-        modules=("cognition::intention", "daemon::actuators"),
-        projections=("thalamus", "worlds"),
+        modules=("cognition::intention",),
+        projections=("thalamus",),
         fiber="agency",
     ),
     Region(
@@ -64,133 +64,28 @@ REGIONS: tuple[Region, ...] = (
         package="brainstem",
         modules=(
             "daemon::tick",
-            "daemon::adaptive",
-            "daemon::continuity",
             "daemon::interoception",
             "daemon::cpufreq",
             "daemon::active_inference",
-            "daemon::maxwell",
-            "daemon::mind_shepherd",
             "daemon::rtc_wake",
-            "daemon::rtkit",
             "state::core_state",
-            "state::header",
-            "state::sanitize",
             "state::zones",
         ),
-        projections=("thalamus", "insula", "limbic_system"),
+        projections=("thalamus", "limbic_system"),
         fiber="body",
-    ),
-    Region(
-        name="cerebellum",
-        package="cerebellum",
-        modules=("latent_spaces::motor", "latent_spaces::engine", "daemon::adaptive"),
-        projections=("thalamus", "frontal_lobe"),
-        fiber="prediction",
-    ),
-    Region(
-        name="frontal_lobe",
-        package="frontal_lobe",
-        modules=(
-            "cognition::intention",
-            "cognition::code_analysis",
-            "state::inference",
-            "state::zones",
-        ),
-        projections=("basal_ganglia", "parietal_lobe", "temporal_lobe", "thalamus"),
-        fiber="agency",
-    ),
-    Region(
-        name="hypothalamus",
-        package="hypothalamus",
-        modules=(
-            "daemon::hpa_development",
-            "state::neurochemical",
-            "state::sleep_network",
-        ),
-        projections=("brainstem", "sleep", "limbic_system"),
-        fiber="body",
-    ),
-    Region(
-        name="insula",
-        package="insula",
-        modules=(
-            "daemon::interoception",
-            "daemon::active_inference",
-            "state::ions",
-        ),
-        projections=("limbic_system", "self_", "frontal_lobe"),
-        fiber="body",
-    ),
-    Region(
-        name="latent_spaces",
-        package="latent_spaces",
-        modules=(
-            "latent_spaces::substrate",
-            "latent_spaces::engine",
-            "latent_spaces::runtime",
-            "latent_spaces::spectrum",
-            "latent_spaces::motor",
-            "state::phase_partition",
-        ),
-        projections=("*",),
-        fiber="prediction",
     ),
     Region(
         name="limbic_system",
         package="limbic_system",
         modules=("daemon::dyadic_model",),
-        projections=("brainstem", "hypothalamus"),
+        projections=("brainstem",),
         fiber="agency",
-    ),
-    Region(
-        name="occipital_lobe",
-        package="occipital_lobe",
-        modules=("daemon::optic_nerve", "daemon::gamma"),
-        projections=("parietal_lobe", "temporal_lobe"),
-        fiber="prediction",
-    ),
-    Region(
-        name="parietal_lobe",
-        package="parietal_lobe",
-        modules=("math", "latent_spaces::motor", "daemon::tensor_slab"),
-        projections=("frontal_lobe", "cerebellum"),
-        fiber="prediction",
-    ),
-    Region(
-        name="temporal_lobe",
-        package="temporal_lobe",
-        modules=(
-            "store::ltm",
-            "store::ring_buffer",
-            "store::sdr",
-            "daemon::consolidation",
-            "daemon::association",
-        ),
-        projections=("frontal_lobe", "memory", "limbic_system"),
-        fiber="prediction",
     ),
     Region(
         name="thalamus",
         package="thalamus",
-        modules=(
-            "daemon::ipc",
-            "latent_spaces::engine",
-            "latent_spaces::runtime",
-            "latent_spaces::spectrum",
-            "state::manifest",
-        ),
-        projections=(
-            "basal_ganglia",
-            "frontal_lobe",
-            "limbic_system",
-            "memory",
-            "occipital_lobe",
-            "parietal_lobe",
-            "self_",
-            "sleep",
-            "temporal_lobe",
-        ),
+        modules=("daemon::ipc", "field::engine", "field::runtime", "state::manifest"),
+        projections=("basal_ganglia", "limbic_system", "memory", "self_", "sleep"),
         fiber="prediction",
     ),
     Region(
@@ -231,7 +126,7 @@ REGIONS: tuple[Region, ...] = (
     Region(
         name="infrastructure",
         package="infrastructure",
-        modules=("data_dir", "store::mmap_state"),
+        modules=("data_dir", "store::mmap_state", "math"),
         projections=(),
         fiber="body",
     ),
@@ -242,22 +137,21 @@ REGIONS: tuple[Region, ...] = (
         projections=(),
         fiber="agency",
     ),
-    Region(
-        name="worlds",
-        package="worlds",
-        modules=(
-            "daemon::actuators",
-            "daemon::dyadic_model",
-            "daemon::optic_nerve",
-        ),
-        projections=("occipital_lobe", "limbic_system", "temporal_lobe"),
-        fiber="agency",
-    ),
 )
 
-# Every cortical and subcortical package now has its matching Rust body
-# region in REGIONS; MIND_ONLY remains empty for backward compatibility.
-MIND_ONLY: tuple[str, ...] = ()
+# The cortical tree beyond the body's edge — mind-only regions the
+# body's table never names (it ends at its own edge). Kept apart
+# from REGIONS: the join table must match the body's row for row.
+MIND_ONLY: tuple[str, ...] = (
+    "cerebellum",
+    "frontal_lobe",
+    "hypothalamus",
+    "insula",
+    "occipital_lobe",
+    "parietal_lobe",
+    "temporal_lobe",
+    "worlds",
+)
 
 
 def region(name: str) -> Region | None:

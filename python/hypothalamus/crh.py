@@ -49,17 +49,17 @@ COUPLING: HOW OTHERS AFFECT CRH (matrix row 14)
 Index order: DA, SRT, NE, ACh, GABA, GLU, CORT, OXY, END, HIST,
 ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 
-    One documented excitatory input survives: SRT->CRH (+0.10) —
-    serotonin depolarizes PVN CRH neurons via 5-HT2C.
-    Otherwise suppressive feedback: GABA, cortisol (negative
-    feedback), oxytocin, ECB.
+    ALL positive couplings removed.
+    CRH is produced only by the stress detection mechanism (emotional
+    regulator) and the HPA cascade.
+    Only suppressive feedback: GABA, cortisol (negative feedback), oxytocin, ECB.
 
-    GABA  ->  CRH:  -0.10  (weak volume transmission.)
+    GABA -> CRH: -0.05  (weak volume transmission.)
     CORT -> CRH: -0.10  (weak volume transmission.)
-    OXY  ->  CRH:  -0.10  (weak volume transmission.)
-    ECB  ->  CRH:  -0.10  (weak volume transmission.)
+    OXY  -> CRH: -0.05  (weak volume transmission.)
+    ECB  -> CRH: -0.05  (weak volume transmission.)
     DA   -> CRH: 0.00   (no direct coupling)
-    SRT  ->  CRH:  0.10  (5-HT2C depolarizes PVN CRH neurons — Heisler et al., J Neurosci 2007.)
+    SRT  -> CRH: 0.00   (no direct coupling)
     NE   -> CRH: 0.00   (no direct coupling)
     ACh  -> CRH: 0.00   (no direct coupling)
     GLU  -> CRH: 0.00   (no direct coupling)
@@ -76,7 +76,7 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 COUPLING: HOW CRH AFFECTS OTHERS (matrix column 14)
 ════════════════════════════════════════════════════════════════════════
 
-    CRH  ->  EPI:  0.10  (sympathetic stress pathway.)
+    CRH -> EPI:  +0.05  (sympathetic stress pathway.)
     CRH -> DA :  0.00   (no direct coupling)
     CRH -> SRT:  0.00   (no direct coupling)
     CRH -> NE :  0.00   (no direct coupling)

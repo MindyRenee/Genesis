@@ -97,8 +97,8 @@ def test_dream_derived_insight_reaches_the_dream_stream() -> None:
     attributes, because `_LiveEvent` had no `is_dream` to read. Only a live
     run caught that. Asserting on the sender asserts the wrong side.
     """
+    from frontal_lobe.conversation import stream_kind
     from sleep.inner_life import _LiveEvent
-    from worlds.conversation import stream_kind
 
     il = _inner_life()
     recorder = _Recorder()
@@ -121,8 +121,8 @@ def test_dream_derived_insight_reaches_the_dream_stream() -> None:
 
 def test_waking_derived_insight_stays_a_thought() -> None:
     """The other direction: waking insights must not be demoted."""
+    from frontal_lobe.conversation import stream_kind
     from sleep.inner_life import _LiveEvent
-    from worlds.conversation import stream_kind
 
     il = _inner_life()
     recorder = _Recorder()

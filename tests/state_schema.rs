@@ -983,13 +983,10 @@ fn test_gating_cortisol_boosts_consolidation() {
         high_cort.consolidation_weight,
         low_cort.consolidation_weight
     );
-    // The stress drive is a logistic across the physiological envelope:
-    // resting cortisol contributes a small nonzero basal term and the
-    // reachable peak approaches but does not exactly equal 1.
-    // ≈0.047*0.3 + 0.50*0.4 + 0.3 ≈ 0.514 at rest, and
-    // ≈0.953*0.3 + 0.50*0.4 + 0.3 ≈ 0.786 at peak.
-    assert!((low_cort.consolidation_weight - 0.514).abs() < 0.01);
-    assert!((high_cort.consolidation_weight - 0.786).abs() < 0.01);
+    // Verify the actual values on the normalized envelope:
+    // 0*0.3 + 0.50*0.4 + 0.3 = 0.50 vs: 1*0.3 + 0.50*0.4 + 0.3 = 0.80
+    assert!((low_cort.consolidation_weight - 0.50).abs() < 0.01);
+    assert!((high_cort.consolidation_weight - 0.80).abs() < 0.01);
 }
 
 // ─── Zone transitions with override ───────────────────────────
@@ -2113,13 +2110,13 @@ fn test_receptor_burnout_recovery_through_sleep() {
     };
     let da_health = da_sens * da_desens * da_intern;
     assert!(
-        da_desens < 0.9,
+        da_desens < 0.6,
         "dopamine desensitization should have engaged under sustained overstimulation: got {}",
         da_desens
     );
     assert!(
-        da_health < 0.75,
-        "dopamine signaling health should show chronic-agonist tolerance: got {}",
+        da_health < 0.40,
+        "dopamine signaling health should collapse under sustained overstimulation: got {}",
         da_health
     );
 
@@ -2338,10 +2335,12 @@ fn test_receptor_resensitization_zero_during_wake() {
         .desensitization_factor;
 
     // Without sleep resensitization, desensitization should NOT recover
-    // significantly — it must stay engaged under sustained drive. The
-    // occupancy isotherm balances functional desensitization near ~0.85
-    // in this regime — material tolerance, but far from the 1.0 that
-    // sleep resensitization restores.
+    // significantly — it must stay well below full function under
+    // sustained drive. A small bounded drift upward is expected: the
+    // functional-desensitization turnover (dephosphorylation, the
+    // fastest recovery pathway) balances a downregulation that weakens
+    // as internalization collapses the effective deviation, settling
+    // near ~0.45 — far from the 1.0 that sleep resensitization restores.
     assert!(
         da_desens_after <= da_desens_before + 0.15,
         "dopamine desensitization should NOT recover without sleep resensitization: was {}, now {}",
@@ -2349,7 +2348,7 @@ fn test_receptor_resensitization_zero_during_wake() {
         da_desens_after
     );
     assert!(
-        da_desens_after < 0.9,
+        da_desens_after < 0.7,
         "dopamine desensitization should stay engaged under sustained drive: got {}",
         da_desens_after
     );

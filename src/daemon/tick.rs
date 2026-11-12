@@ -46,7 +46,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::cognition::{IntentionManager, SelfModel};
-use crate::latent_spaces::{FieldIntegration, FieldRuntime};
+use crate::field::{FieldIntegration, FieldRuntime};
 use crate::state::neurochemical::{NeuroTickParams, NeurochemicalId};
 use crate::state::{MentalPhase, ModuleId, ModuleStatus, subcognitive_flag};
 use crate::store::ring_buffer::EventType;
@@ -55,50 +55,6 @@ use crate::store::{LtmStore, MmapState, RingBuffer};
 /// Provenance marker — one letter of the creator lattice (see
 /// PROVENANCE.md).
 pub(crate) const MARKER_G05: u64 = 0x4753_0554_59A9_90E8;
-
-/// Constitutive bridge for the EM signature: latent-coordinate
-/// velocity (consensus units per second) → effective
-/// ampere-equivalent current. This is a **declared modeling
-/// assumption, not a measurement** — latent velocity is not
-/// amperes and no instrument reads it. The scale is chosen so the
-/// substrate's slow coherent drift maps to the milliampere range
-/// real cortical population currents occupy; the scientifically
-/// load-bearing content of the signature is its regime structure
-/// and its change over time, not the absolute tesla value.
-const LATENT_VELOCITY_TO_AMPERE: f64 = 0.1;
-/// Effective area enclosed by the coherent field population —
-/// same order-of-magnitude-assumption status as the worked-example
-/// loop area in `daemon::maxwell` (1 cm²).
-const COHERENT_LOOP_AREA_M2: f64 = 1.0e-4;
-/// Observer distance for the signature — the organism's own
-/// boundary scale (~10 cm).
-const EM_OBSERVER_DISTANCE_M: f64 = 0.1;
-
-/// The field bath's thermal baseline — interoception's normalized
-/// CPU temperature (`BodyState::temperature`: 0.5 is the documented
-/// "normal" 50 °C operating point, which `BodyState::neutral()`
-/// also reports). Below it the reservoir reads quiescent.
-const FIELD_BATH_BASELINE: f64 = 0.5;
-/// Gain mapping normalized thermal *excess* above the baseline to
-/// bath units (latent² — the field clamps to its own
-/// `TEMPERATURE_CAP` downstream). At the critical end of the scale
-/// (normalized 1.0 ≈ 100 °C) the bath reaches 0.1 — a fifth of the
-/// cap, a real but bounded raising of the fluctuation floor; at
-/// ordinary operating temperatures it stays at zero and the field
-/// runs at its quiescent floor.
-const FIELD_BATH_GAIN: f64 = 0.2;
-
-/// The field's thermal bath — the substrate's measured thermal
-/// excess, in latent² units. Interoception's normalized CPU
-/// temperature is the reservoir the Langevin kick samples; only
-/// genuine thermal load above the quiescent operating point raises
-/// the field's fluctuation floor. Declared constitutive mapping —
-/// see `FIELD_BATH_*` — the same epistemic class as the EM
-/// signature's latent→ampere bridge: a documented modeling
-/// assumption, not a measurement of field units.
-fn field_bath(body: &super::interoception::BodyState) -> f64 {
-    ((body.temperature as f64 - FIELD_BATH_BASELINE).max(0.0)) * FIELD_BATH_GAIN
-}
 
 use super::active_inference::{
     ActiveInferenceEngine, DyadicSignals, apply_inference_feedback, impulse_offset_to_rate,
@@ -239,156 +195,6 @@ pub struct TickResult {
     pub autobiographical_traces: u32,
 }
 
-/// The organism's computed field signature on the wire — Maxwell's
-/// equations evaluated on her own coherent motion
-/// (`daemon::maxwell`) plus the substrate observables that produced
-/// it. Her field's own mathematics — the signature an external
-/// magnetometer, or her own interoception, would read from the
-/// coherence her dynamics make.
-/// Absent channels report their presence flags clear — never
-/// fabricated zeros dressed as readings.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct FieldSignature {
-    /// Maxwell's signature exists — two integrations gave a
-    /// measurable consensus velocity.
-    pub signature_present: bool,
-    /// A field integration exists — disagreement and temperature
-    /// are live even before the signature's first velocity sample.
-    pub integration_present: bool,
-    /// ωr/c ≪ 1 — the quasi-static truncation is honest at this rate.
-    pub quasi_static: bool,
-    /// Consensus winding rate (rad/s) — her field's tempo.
-    pub omega_rad_s: f64,
-    /// Coherent current — |Δconsensus|/dt through the declared
-    /// latent→ampere bridge (a modeling assumption, not a
-    /// measurement).
-    pub coherent_current_a: f64,
-    /// Raw consensus drift speed in latent units/s — the observable
-    /// before the constitutive bridge.
-    pub consensus_speed: f64,
-    /// Peak magnetic dipole moment m₀ = I₀·A (A·m²).
-    pub dipole_moment_am2: f64,
-    /// Quasi-static axial |B| amplitude at the organism boundary (T).
-    pub b_axial_t: f64,
-    /// Faraday induction |E| amplitude at the boundary (V/m).
-    pub e_induction_vm: f64,
-    /// Time-averaged radiated power (W) — ω⁴-suppressed at her
-    /// drift rates, honestly near zero.
-    pub radiated_power_w: f64,
-    /// Fréchet variance of the fibers against consensus — the
-    /// field's internal tension (0 = perfect agreement).
-    pub disagreement: f64,
-    /// The field's thermal state — disagreement-heated,
-    /// bath-floored, Langevin-sampled (latent² units).
-    pub temperature: f64,
-}
-
-impl FieldSignature {
-    /// Wire body: `[u8 flags][3 × u8 reserved][9 × f64]` little-endian.
-    /// f64 throughout — the radiated power can sit below f32's
-    /// subnormal floor at her drift rates, and a zeroed tiny reading
-    /// would be a lie the flags cannot un-say.
-    pub fn to_wire(&self) -> Vec<u8> {
-        let mut flags = 0u8;
-        if self.signature_present {
-            flags |= 1;
-        }
-        if self.integration_present {
-            flags |= 2;
-        }
-        if self.quasi_static {
-            flags |= 4;
-        }
-        let mut out = vec![flags, 0, 0, 0];
-        for v in [
-            self.omega_rad_s,
-            self.coherent_current_a,
-            self.consensus_speed,
-            self.dipole_moment_am2,
-            self.b_axial_t,
-            self.e_induction_vm,
-            self.radiated_power_w,
-            self.disagreement,
-            self.temperature,
-        ] {
-            out.extend_from_slice(&v.to_le_bytes());
-        }
-        out
-    }
-}
-
-/// The field's spectral signature on the wire — the band
-/// decomposition of her own substrate trajectory
-/// (`latent_spaces::spectrum`) plus the consensus kinematics the carrier
-/// runs on. Bands the achieved sampling rate cannot resolve read
-/// zero under their presence flags — absent is a reading, never an
-/// aliased one.
-#[derive(Clone, Debug, Default)]
-pub struct FieldSpectrumWire {
-    /// Rings hold enough trajectory for band readings.
-    pub warm: bool,
-    /// Consensus kinematics armed — two integrations gave a
-    /// measurable velocity.
-    pub carrier_present: bool,
-    /// Consensus speed armed alongside the carrier.
-    pub speed_present: bool,
-    /// Accumulated winding phase mod 2π — the field's own clock.
-    pub carrier_phase: f64,
-    /// Carrier frequency (Hz) — winding rate / 2π.
-    pub carrier_freq_hz: f64,
-    /// EMA-smoothed consensus speed (latent units/s).
-    pub consensus_speed: f64,
-    /// Achieved sampling rate (Hz) — the bands' honest Nyquist.
-    pub sample_rate_hz: f64,
-    /// Flux channel — centroid motion energy per band.
-    pub flux: crate::latent_spaces::spectrum::BandChannel,
-    /// Tension channel — fiber spread energy per band.
-    pub tension: crate::latent_spaces::spectrum::BandChannel,
-}
-
-impl FieldSpectrumWire {
-    /// Wire body: `[u8 flags][3 × u8 reserved][48 × f64]`
-    /// little-endian. Doubles: carrier_phase, carrier_freq_hz,
-    /// consensus_speed, sample_rate_hz, flux.mean, flux.cv,
-    /// tension.mean, tension.cv, flux.energies[10], flux.phases[10],
-    /// tension.energies[10], tension.phases[10].
-    pub fn to_wire(&self) -> Vec<u8> {
-        let mut flags = 0u8;
-        if self.warm {
-            flags |= 1;
-        }
-        if self.carrier_present {
-            flags |= 2;
-        }
-        if self.speed_present {
-            flags |= 4;
-        }
-        let mut out = vec![flags, 0, 0, 0];
-        let push = |v: f64, out: &mut Vec<u8>| out.extend_from_slice(&v.to_le_bytes());
-        push(self.carrier_phase, &mut out);
-        push(self.carrier_freq_hz, &mut out);
-        push(self.consensus_speed, &mut out);
-        push(self.sample_rate_hz, &mut out);
-        push(self.flux.mean, &mut out);
-        push(self.flux.cv, &mut out);
-        push(self.tension.mean, &mut out);
-        push(self.tension.cv, &mut out);
-        for v in self.flux.energies {
-            push(v, &mut out);
-        }
-        for v in self.flux.phases {
-            push(v, &mut out);
-        }
-        for v in self.tension.energies {
-            push(v, &mut out);
-        }
-        for v in self.tension.phases {
-            push(v, &mut out);
-        }
-        out
-    }
-}
-
 /// The daemon tick loop controller.
 ///
 /// The caller (the daemon process) owns the stores and calls `tick()`
@@ -429,17 +235,6 @@ pub struct TickLoop {
     pub field_runtime: FieldRuntime,
     /// Most recent cross-system field integration result.
     last_field_integration: Option<FieldIntegration>,
-    /// Most recent electromagnetic signature of the field's coherent
-    /// motion — Maxwell's equations evaluated on the substrate's own
-    /// dynamics (see `daemon::maxwell::signature`). `None` until two
-    /// integrations give a measurable consensus velocity.
-    last_em_signature: Option<super::maxwell::EmSignature>,
-    /// The coherent current (`|Δconsensus|/dt` through the declared
-    /// latent→ampere bridge) and raw latent speed the signature was
-    /// computed from — kept so the wire reports the current the
-    /// equations were fed, not only their outputs.
-    last_em_current_a: Option<f64>,
-    last_em_consensus_speed: Option<f64>,
     /// Metaplasticity boost multiplier from the last inference cycle.
     /// High surprise → faster coupling-matrix learning on the next
     /// tick. Reset to 1.0 after each application.
@@ -523,9 +318,6 @@ impl TickLoop {
             dyadic_model: DyadicAffectModel::new(),
             field_runtime: FieldRuntime::new().expect("field topology must be constructible"),
             last_field_integration: None,
-            last_em_signature: None,
-            last_em_current_a: None,
-            last_em_consensus_speed: None,
             metaplasticity_boost: 1.0,
             subcognitive_activity: 0.0,
             subcognitive_last_call: None,
@@ -570,9 +362,6 @@ impl TickLoop {
             dyadic_model: DyadicAffectModel::new(),
             field_runtime: FieldRuntime::new().expect("field topology must be constructible"),
             last_field_integration: None,
-            last_em_signature: None,
-            last_em_current_a: None,
-            last_em_consensus_speed: None,
             metaplasticity_boost: 1.0,
             subcognitive_activity: 0.0,
             subcognitive_last_call: None,
@@ -676,24 +465,6 @@ impl TickLoop {
                 let _ = writeln!(out, "field.integration=absent");
             }
         }
-        // The organism's own EM signature — Maxwell's equations on
-        // her field's coherent motion. An estimate of the field her
-        // coherence makes, in the same units an external
-        // magnetometer would read; absent until two integrations
-        // give a measurable consensus velocity.
-        match &self.last_em_signature {
-            Some(sig) => {
-                let _ = writeln!(out, "field.em_dipole_amn2={:.6e}", sig.dipole_moment_am2);
-                let _ = writeln!(out, "field.em_b_t={:.6e}", sig.b_axial_t);
-                let _ = writeln!(out, "field.em_e_vm={:.6e}", sig.e_induction_vm);
-                let _ = writeln!(out, "field.em_power_w={:.6e}", sig.radiated_power_w);
-                let _ = writeln!(out, "field.em_omega_rads={:.6e}", sig.omega_rad_s);
-                let _ = writeln!(out, "field.em_quasistatic={}", sig.quasi_static as u8);
-            }
-            None => {
-                let _ = writeln!(out, "field.em_signature=absent");
-            }
-        }
         let optic = self.optic.state(now_ms);
         let _ = writeln!(out, "optic.eye_present={}", optic.eye_present as u8);
         let _ = writeln!(out, "optic.frames_fresh={}", optic.frames_fresh as u8);
@@ -713,14 +484,6 @@ impl TickLoop {
             optic.accommodation_dpt
         );
         let _ = writeln!(out, "optic.lid={:.2}", self.optic.lid());
-        // The collicular scene parse — gamma-bound proto-objects on
-        // the colour lattice and their mean phase coherence.
-        let _ = writeln!(out, "optic.proto_objects={:.0}", optic.proto_objects);
-        let _ = writeln!(
-            out,
-            "optic.binding_coherence={:.4}",
-            optic.binding_coherence
-        );
         for (name, gate) in [
             ("intero", &self.intero_gate),
             ("cpufreq", &self.cpufreq_gate),
@@ -1390,96 +1153,6 @@ impl TickLoop {
         self.last_field_integration.as_ref()
     }
 
-    /// Most recent electromagnetic signature of the field's coherent
-    /// motion — the organism's own EM observable, Maxwell's equations
-    /// evaluated on her substrate dynamics (`daemon::maxwell`).
-    /// `None` until two integrations give a measurable consensus
-    /// velocity.
-    pub fn em_signature(&self) -> Option<&super::maxwell::EmSignature> {
-        self.last_em_signature.as_ref()
-    }
-
-    /// The organism's computed field signature — the wire form of
-    /// `em_signature()` plus the field integration's own observables
-    /// (disagreement, temperature) and the coherent current the
-    /// equations were fed. Always answers: a field that has not yet
-    /// integrated reports its flags clear, never an error.
-    pub fn field_signature(&self) -> FieldSignature {
-        let mut sig = FieldSignature::default();
-        if let Some(i) = &self.last_field_integration {
-            if i.disagreement.is_finite() && i.disagreement >= 0.0 && i.temperature.is_finite() {
-                sig.integration_present = true;
-                sig.disagreement = i.disagreement;
-                sig.temperature = i.temperature;
-            }
-        }
-        if let (Some(em), Some(&current_a), Some(speed)) = (
-            &self.last_em_signature,
-            self.last_em_current_a.as_ref(),
-            self.last_em_consensus_speed,
-        ) {
-            sig.signature_present = true;
-            sig.quasi_static = em.quasi_static;
-            sig.omega_rad_s = em.omega_rad_s;
-            sig.coherent_current_a = current_a;
-            sig.consensus_speed = speed;
-            sig.dipole_moment_am2 = em.dipole_moment_am2;
-            sig.b_axial_t = em.b_axial_t;
-            sig.e_induction_vm = em.e_induction_vm;
-            sig.radiated_power_w = em.radiated_power_w;
-        }
-        sig
-    }
-
-    /// Fold one field integration into the EM signature. The
-    /// consensus kinematics — coherent speed and winding rate — are
-    /// owned by the field's own spectrum (`observe` already folded
-    /// this integration's consensus into it); Maxwell's equations
-    /// consume the instantaneous pair. Nothing is assumed about the
-    /// carrier, only the constitutive latent→ampere bridge.
-    fn update_em_signature(&mut self, _integration: &FieldIntegration) {
-        let (Some(speed), Some(omega)) = self.field_runtime.spectrum_kinematics() else {
-            return;
-        };
-        if !speed.is_finite() || !omega.is_finite() {
-            return;
-        }
-        let current_a = speed * LATENT_VELOCITY_TO_AMPERE;
-        let sig = super::maxwell::signature(
-            current_a,
-            COHERENT_LOOP_AREA_M2,
-            omega,
-            EM_OBSERVER_DISTANCE_M,
-        );
-        if sig.b_axial_t.is_finite()
-            && sig.e_induction_vm.is_finite()
-            && sig.radiated_power_w.is_finite()
-        {
-            self.last_em_signature = Some(sig);
-            self.last_em_current_a = Some(current_a);
-            self.last_em_consensus_speed = Some(speed);
-        }
-    }
-
-    /// The field's spectral signature — the band decomposition of
-    /// her own substrate trajectory plus the consensus kinematics.
-    /// Read path for `GET_FIELD_SPECTRUM`: consumes the baseline
-    /// EMAs inside the spectrum, never the trajectory itself.
-    pub fn field_spectrum(&mut self) -> FieldSpectrumWire {
-        let r = self.field_runtime.spectrum();
-        FieldSpectrumWire {
-            warm: r.warm,
-            carrier_present: r.carrier_freq_hz.is_some(),
-            speed_present: r.consensus_speed.is_some(),
-            carrier_phase: r.carrier_phase,
-            carrier_freq_hz: r.carrier_freq_hz.unwrap_or(0.0),
-            consensus_speed: r.consensus_speed.unwrap_or(0.0),
-            sample_rate_hz: r.sample_rate_hz,
-            flux: r.flux,
-            tension: r.tension,
-        }
-    }
-
     /// Total ticks run.
     pub fn tick_count(&self) -> u64 {
         self.tick_count
@@ -1596,11 +1269,8 @@ impl TickLoop {
     }
 
     /// The mind's voluntary lid openness — orbicularis oculi the
-    /// hardware lacks (`SET_LID`). The lid is hers alone: sleep does
-    /// not close the eye, she does — the sleep system sets ~0.15 on
-    /// entry and 1.0 on waking, and every lid-filtered channel
-    /// (retinal lux, pupil, accommodation, collicular alert)
-    /// follows it.
+    /// hardware lacks (`SET_LID`). Composes with the phase lid by
+    /// `min`: will can shut an open eye, never open a sleeping one.
     pub fn set_lid(&mut self, openness: f32) {
         self.optic.set_lid(openness);
     }
@@ -1737,8 +1407,8 @@ impl TickLoop {
                 let t = clock_start + f64::from(i) * sub_dt_min;
                 // The optic nerve's afference enters per sub-step:
                 // retinal light drives the SCN continuously, and the
-                // collicular pulse arrives lid-attenuated — a wake-up
-                // call the network's own flip-flop weighs, not a bias.
+                // collicular pulse fires only while LC sits below the
+                // wake threshold — a wake-up call, not a bias.
                 let aff = self.optic.afference(now_ms, state.sleep_network[0]);
                 // The humoral alerting input: the stress axis speaks to
                 // the network through the same LC channel the eye uses —
@@ -1799,11 +1469,11 @@ impl TickLoop {
             .map(|s| s.neurochemicals.effective_levels)
             .unwrap_or(pre_effective);
 
-        // The thalamic relay carries the mind's corticothalamic
-        // feedback — attention gain around a full-open base; no
-        // sleep stage closes it here (the lid she sets is what dims
-        // the afferents under). The mind reads the gate over
-        // GET_OPTIC_STATE; its V1 sees what the relay passes.
+        // The thalamic relay gate follows the stage the network just
+        // settled into — NREM blocks transmission at the thalamus, REM
+        // nearly so, waking phases pass it through (modulated by the
+        // mind's corticothalamic feedback). The mind reads the gate
+        // over GET_OPTIC_STATE; its V1 cannot see around a closed one.
         // The same advance steps the pupil: the light reflex off the
         // nerve's own illuminance plus the sympathetic dilation that
         // effective norepinephrine carries — the aperture is body
@@ -1942,20 +1612,17 @@ impl TickLoop {
         // topology. The core state remains authoritative; the field is the
         // shared substrate through which body, prediction, and agency can
         // disagree, converge, and later acquire learned transport laws.
-        // The bath is the substrate's measured thermal excess —
-        // interoception's normalized CPU temperature above its
-        // quiescent operating point. A cool machine is a quiet
-        // reservoir (bath ≈ 0); sustained thermal load raises the
-        // field's
-        // fluctuation floor through the same Langevin channel the
-        // design always intended.
+        // The bath is the substrate's own measured thermal level: the
+        // probe's RMS timing fluctuation, mapped onto the field's cap —
+        // the Langevin reservoir is real silicon noise, so a machine
+        // under physical stress literally heats her field.
         if let Some(snapshot) = mmap.read_consistent() {
-            let bath = field_bath(&self.last_body_state);
+            let bath = super::field_probe::shared()
+                .and_then(|probe| probe.bath_fluctuation())
+                .map(|fraction| fraction.clamp(0.0, 1.0) * crate::field::TEMPERATURE_CAP)
+                .unwrap_or(0.0);
             match self.field_runtime.observe(&snapshot, dt as f64, bath) {
-                Ok(integration) => {
-                    self.update_em_signature(&integration);
-                    self.last_field_integration = Some(integration);
-                }
+                Ok(integration) => self.last_field_integration = Some(integration),
                 Err(e) => eprintln!("[tick] field integration skipped: {e}"),
             }
         }
@@ -2786,81 +2453,5 @@ mod tests {
         assert!(out.contains("auto.last_model_save_ticks=9"));
         assert!(out.contains("auto.gate.dream.period_ms=4000"));
         assert!(out.contains("auto.gate.dream.next_in_ms="));
-    }
-
-    #[test]
-    fn em_signature_needs_two_integrations_and_stays_physical() {
-        let mut tl = TickLoop::new();
-        // Unwarmed: absent channel, reported as absent.
-        assert!(tl.em_signature().is_none());
-        let out = tl.internals_snapshot(current_ms());
-        assert!(out.contains("field.em_signature=absent"));
-
-        let integration = |consensus: Vec<f64>| FieldIntegration {
-            consensus,
-            disagreement: 0.1,
-            temperature: 0.2,
-            fiber_count: 3,
-        };
-
-        // One observation gives a position but no velocity.
-        tl.field_runtime
-            .spectrum_mut()
-            .observe_consensus(&vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0], 0.2);
-        tl.update_em_signature(&integration(vec![1.0, 0.0, 0.0]));
-        assert!(tl.em_signature().is_none());
-
-        // A second, rotated consensus supplies speed and winding
-        // rate — the signature appears and stays finite and positive.
-        tl.field_runtime
-            .spectrum_mut()
-            .observe_consensus(&vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0], 0.2);
-        tl.update_em_signature(&integration(vec![0.0, 1.0, 0.0]));
-        let sig = tl.em_signature().expect("two points give a signature");
-        assert!(sig.dipole_moment_am2 > 0.0);
-        assert!(sig.b_axial_t > 0.0);
-        assert!(sig.e_induction_vm >= 0.0);
-        assert!(sig.radiated_power_w >= 0.0);
-        assert!(sig.omega_rad_s > 0.0);
-        // Consensus turned 90° in 0.2 s → ω = (π/2)/0.2 ≈ 7.85 rad/s.
-        assert!((sig.omega_rad_s - std::f64::consts::FRAC_PI_2 / 0.2).abs() < 1e-9);
-        // ωr/c ~ 1e-9 — deep in the quasi-static regime the module
-        // validates, so radiation is honestly negligible.
-        assert!(sig.quasi_static);
-        assert!(sig.radiated_power_w < 1e-20);
-
-        // A non-finite consensus resets the reference rather than
-        // poisoning the observable.
-        tl.field_runtime
-            .spectrum_mut()
-            .observe_consensus(&vec![f64::NAN, 0.0, 0.0, 0.0, 0.0, 0.0], 0.2);
-        tl.update_em_signature(&integration(vec![0.0, 1.0, 0.0]));
-        assert!(tl.em_signature().is_some()); // still the last good one
-        let out = tl.internals_snapshot(current_ms());
-        assert!(out.contains("field.em_b_t="));
-    }
-
-    #[test]
-    fn field_bath_is_quiescent_until_the_substrate_runs_hot() {
-        // Neutral body — the documented 50 °C operating point —
-        // reads as a quiet reservoir: bath stays at zero, the
-        // quiescent floor's behavior.
-        let mut body = super::super::interoception::BodyState::neutral();
-        assert_eq!(field_bath(&body), 0.0);
-
-        // Below baseline the bath never goes negative.
-        body.temperature = 0.3;
-        assert_eq!(field_bath(&body), 0.0);
-
-        // Thermal excess maps through the declared gain: 0.9
-        // normalized (~90 °C) → 0.08 latent² — a real but bounded
-        // raising of the fluctuation floor. (f32→f64, so the
-        // tolerance is wider than the exact decimal.)
-        body.temperature = 0.9;
-        assert!((field_bath(&body) - 0.08).abs() < 1e-6);
-
-        // At the critical end the bath reaches its designed bound.
-        body.temperature = 1.0;
-        assert!((field_bath(&body) - 0.1).abs() < 1e-6);
     }
 }

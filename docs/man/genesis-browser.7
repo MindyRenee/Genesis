@@ -5,6 +5,7 @@ genesis-browser \- Genesis's internet browser: Chrome over CDP
 .nf
 \fBparietal_lobe.arc_web._Browser\fR   the transport itself
 \fBweb_search\fR                      the tool that browses with it
+\fBArcWebPractice\fR                  ARC-AGI-3 on the human site
 .fi
 .SH DESCRIPTION
 Genesis's web browser is Google Chrome, launched per host by
@@ -27,11 +28,15 @@ desktop.
 The browser's user-data dir is persistent: it is
 \fI<data_dir>/browser/<purpose>\fR, not a tempdir. Cookies, site
 state, and history survive restarts — a browser that forgets every
-session is not one she learns from. The purpose is:
+session is not one she learns from. There are two purposes:
 .TP
 .B web
 The browsing her tools do — search and fetch through
 \fIfrontal_lobe.tools.web_search\fR.
+.TP
+.B arcade
+The sessions \fIArcWebPractice\fR plays on the public ARC task
+pages.
 .PP
 The separation is a Chrome requirement: two instances cannot share
 one user-data dir — a second launch forwards to the first and
@@ -60,6 +65,17 @@ two runs collide. The keyring is mocked because a persistent
 profile would else block on an unlock prompt no one can answer.
 \fB--disable-sync\fR keeps her profile from replicating outward to
 a Google account; site logins within it still work.
+.SH ARC PLAY
+\fIArcWebPractice\fR puts her on the public task page —
+\fIhttps://arcprize.org/tasks/<game>\fR — the same interface every
+human player gets. She presses the page's own START control; her
+moves are real input events, and the page's own
+\fB/api/cmd/ACTION<n>\fR responses are her frames. The site speaks
+the official ARC-AGI-3 REST contract, so perception needs no
+screen scraping. The SDK substrate (\fIparietal_lobe.arc\fR, the
+\fBarcengine\fR API with \fBARC_API_KEY\fR for competition mode)
+is the same entity on a different wire — she cannot tell from the
+inside which substrate her frames came from.
 .SH ENVIRONMENT
 .TP
 .B GENESIS_BROWSER
@@ -77,6 +93,9 @@ Only in headed mode: her nested screen, never the user's.
 .I <data_dir>/browser/web
 Her everyday browsing profile — persists.
 .TP
+.I <data_dir>/browser/arcade
+Her arcade profile — persists.
+.TP
 .I DevToolsActivePort
 Written by Chrome into the profile dir each launch; the port it
 actually bound.
@@ -86,10 +105,5 @@ The system's manual for the browser binary itself.
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-cli (1),
-.BR genesis-daemon (8),
-.BR genesis-games (7),
-.BR genesis-internet (7),
-.BR genesis-law (7),
 .BR genesis-math (7),
-.BR genesis-reasoning (7),
-.BR genesis-retina (1)
+.BR google-chrome (1)

@@ -26,7 +26,6 @@ from .exceptions import ConnectionError
 _MARKER_G09 = 0x4753094544B80616
 
 __all__ = [
-    "ACTUATE",
     "ADVANCE_NEURO",
     "ADVANCE_PHYSICS",
     "ANALYZE_CODE",
@@ -69,8 +68,7 @@ __all__ = [
     "GET_BODY_CONTROL",
     "GET_BODY_STATE",
     "GET_DYADIC_STATE",
-    "GET_FIELD_SIGNATURE",
-    "GET_FIELD_SPECTRUM",
+    "GET_FIELD_PROBE",
     "GET_FOLD_MARGINS",
     "GET_INFERENCE_SUMMARY",
     "GET_INTERNALS",
@@ -89,7 +87,6 @@ __all__ = [
     "GET_TENSOR",
     "GET_ZONE_TRANSITIONS",
     "HANDSHAKE",
-    "LIST_ACTUATORS",
     "LIST_TENSORS",
     "MAX_MESSAGE_LEN",
     "MODULE_ATTENTION",
@@ -152,6 +149,9 @@ __all__ = [
     "SENSOR_SUPPLY_VOLTAGE",
     "SENSOR_TEMPERATURE",
     "SET_COGNITIVE_PID",
+    "SET_FIELD_CARRIER",
+    "SET_FIELD_PHASE",
+    "SET_FIELD_PULSE",
     "SET_FOCUS",
     "SET_LID",
     "SET_OPTIC_GAIN",
@@ -210,20 +210,12 @@ MAX_MESSAGE_LEN = 1 << 20  # 1 MiB
 # reusing genesis2's 36.
 GET_ION_SUMMARY = 40
 
-# Number of neurochemical levels in the Python-side ``emotional_tag``
-# vector — one per chemical in CHEM_NAMES. This is the logical tag
-# callers build and MemoryRecords carry.
+# Number of neurochemical levels in the ``emotional_tag`` vector sent
+# with STORE_EVENT / STORE_EPISODE. Fixed by the wire layout: the
+# daemon reads ``[f32; 12]`` (see ``STORE_EPISODE`` in src/daemon/ipc.rs)
+# and passes the values through positionally, so sender and receiver
+# must agree on the width or the tag is silently truncated.
 EMOTIONAL_TAG_SIZE = 18
-
-# Width of the ``emotional_tag`` field ON THE WIRE for STORE_EVENT /
-# STORE_EPISODE. Fixed by the wire layout: the daemon reads
-# ``[f32; 12]`` (see ``STORE_EPISODE`` in src/daemon/ipc.rs), stamps
-# those 12 effective levels from its own live chemistry, and returns
-# the same 12 in the stamped-tag response tail. The wire field sits
-# before text_len at a fixed offset, so packing the full logical tag
-# shifts text_len out from under the daemon's parse — the two widths
-# are deliberately separate constants.
-WIRE_EMOTIONAL_TAG_SIZE = 12
 
 # ─── Command IDs ──────────────────────────────────────────────
 
@@ -317,8 +309,29 @@ SET_VOLITION = 46
 # iw station telemetry [5×f32] → 328 bytes; v6 appends the flux
 # phasors [10f rf_flux_phase][10f rf_flux_phase_coherence] →
 # 408 bytes.
+# Layout: `src/daemon/field_probe.rs`. Additive: no CoreState or
+# BodyState layout changes, so PROTOCOL_VERSION stays 3. A daemon
+# without a running probe returns a single error byte — an absent
+# channel, never a healthy zero.
+GET_FIELD_PROBE = 47
 
+# Push the mind's modeled carrier-band phase into the probe's
+# generator — the physics-follows-model leg of the mutual phase
+# lock. Request: [f32 phase_rad]. The probe extrapolates it at the
+# carrier rate and pulls its generator phase toward it each tick
+# (bounded first-order pull); a target not refreshed within 5 s is
+# dropped so a dead mind can't steer the body's rhythm. Reply:
+# [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
+SET_FIELD_PHASE = 48
 
+# Carrier write control — the modulation depth and frequency of the
+# probe's real-work carrier. Request: [f32 depth][f32 freq_hz].
+# Depth 0..1 (0 = unmodulated work); freq 0 hands the rhythm back to
+# the body's phase, positive overrides it (clamped 0.1..100 Hz) so
+# evaluation can drive arbitrary bands — including infraslow rates
+# where the thermal field can hold an oscillation.
+# Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
+SET_FIELD_CARRIER = 49
 
 # RETIRED — pinned so the wire number is never reused. The per-person
 # dyadic snapshot channel was removed with the person registry; the
@@ -389,11 +402,12 @@ ANALYZE_CODE = 55
 SET_COGNITIVE_PID = 56
 
 # Voluntary eyelid — the orbicularis oculi the camera hardware lacks.
-# The mind's requested lid openness, held daemon-side: sleep and
-# meditation set it themselves (~0.15 for the sit, released at wake),
-# so the lid is hers alone — no sleep stage composes with it.
-# Request: [f32 openness] in 0..1 (1.0 = open). Reply: [u8 ack].
-# Additive: PROTOCOL_VERSION stays 3.
+# The mind's requested lid openness composes with the sleep phase's
+# own lid position by min: the will can shut an open eye (to rest it,
+# to dim the world) but cannot open one the stage has closed.
+# Request: [f32 openness] in 0..1 (1.0 = released to phase). Held,
+# not momentary — lids stay where the mind left them.
+# Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
 SET_LID = 57
 
 # Deep recall — SimHash similarity scan over the archived tier of
@@ -431,41 +445,16 @@ DELETE_EPISODE = 61
 # moves, so PROTOCOL_VERSION is unaffected.
 GET_FOLD_MARGINS = 62
 
-LIST_ACTUATORS = 64
-
-# Fire one actuator by name — the efferent half of the census.
-# Request: [u8 name_len][name][u16 arg_len][arg]. Reply:
-# [u8 ok][u16 msg_len][msg] — ok=1 and the limb's own report on
-# success, ok=0 and the refusal reason when the limb is unknown or
-# unavailable. Additive: PROTOCOL_VERSION stays 3.
-ACTUATE = 65
-
-# The organism's computed field signature — Maxwell's equations on
-# her own coherent motion plus the field integration's observables:
-# her field's mathematics, not a measurement of the machine's.
-# No request payload. Reply: [u8 ack]
-# then [u8 flags][3 × u8 reserved][9 × f64] little-endian — flags
-# bit0 = signature present, bit1 = integration present, bit2 =
-# quasi-static regime honest; then omega_rad_s, coherent_current_a,
-# consensus_speed, dipole_moment_am2, b_axial_t, e_induction_vm,
-# radiated_power_w, disagreement, temperature. Absent channels are
-# flags, never errors; f64 throughout because the radiated power can
-# sit below f32's floor at her drift rates. Additive:
-# PROTOCOL_VERSION stays 3.
-GET_FIELD_SIGNATURE = 66
-
-# The field's spectral signature — the band decomposition of her own
-# substrate trajectory (src/latent_spaces/spectrum.rs) at the wave model's
-# band centers, plus the consensus kinematics the carrier runs on.
-# No request payload. Reply: [u8 ack] then [u8 flags][3 × u8
-# reserved][48 × f64] little-endian — flags bit0 = bands warm,
-# bit1 = carrier present, bit2 = speed present; then carrier_phase,
-# carrier_freq_hz, consensus_speed, sample_rate_hz, flux.mean/cv,
-# tension.mean/cv, flux.energies[10], flux.phases[10],
-# tension.energies[10], tension.phases[10]. Bands above the achieved
-# rate's Nyquist read zero — absent is a reading, never an aliased
-# one. Additive: PROTOCOL_VERSION stays 3.
-GET_FIELD_SPECTRUM = 67
+# Arm or disarm the parasympathetic pulse — a slow autonomic wave
+# riding the carrier's modulation depth (contractility, not rate;
+# the RSA analog — the vagal signature is the pulse's slow wax and
+# wane, never a pinned tempo). Request:
+# [f32 base][f32 mod_freq_hz][f32 mod_depth]; mod_freq <= 0 disarms
+# and depth returns to the static set-point. When armed the probe
+# integrates the envelope on its own clock — the wave runs on the
+# body's time whether or not the mind ticks.
+# Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
+SET_FIELD_PULSE = 63
 
 # Which optional hardware sensors this machine actually has.
 # Response: [u16 mask] — a bitmask of SENSOR_* below. A set bit means
@@ -512,7 +501,7 @@ LIST_TENSORS = 43
 DROP_TENSOR = 44
 # Decode the published motor fields (`motor.spatial` +
 # `motor.actions`) into a concrete action/grid target on the daemon's
-# canonical 64×64 coordinate grid (`src/latent_spaces/motor.rs`). Response is
+# canonical 64×64 coordinate grid (`src/field/motor.rs`). Response is
 # a 14-byte base plus an additive 16-byte distribution tail when the
 # daemon reports field shape — see `tensor.unpack_motor_target`.
 GET_MOTOR_TARGET = 45

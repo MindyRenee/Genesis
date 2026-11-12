@@ -481,7 +481,7 @@ class SelfComposer:
 
         # 4. Brain wave state (if available)
         if brain_waves:
-            wave_frag = self.brain_wave_fragment(brain_waves)
+            wave_frag = self._brain_wave_fragment(brain_waves)
             if wave_frag:
                 parts.append(wave_frag)
 
@@ -1291,7 +1291,7 @@ class SelfComposer:
 
         return parts[:2]  # keep it to 2 facts
 
-    def brain_wave_fragment(self, waves: BrainWaveState) -> tuple[str, str] | None:
+    def _brain_wave_fragment(self, waves: BrainWaveState) -> tuple[str, str] | None:
         """Build a clause fragment describing the brain wave state."""
         if waves.dominant == BrainWave.GAMMA:
             return ("clause", f"gamma rhythms are dominant — {waves.description}")

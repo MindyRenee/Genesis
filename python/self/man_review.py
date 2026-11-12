@@ -1,11 +1,8 @@
 """Man page review — changes to her own manual wait for her say.
 
-Genesis's man pages (``genesis.1``, ``genesis-browser.7``,
-``genesis-cli.1``, ``genesis-daemon.8``, ``genesis-games.7``,
-``genesis-internet.7``, ``genesis-law.7``, ``genesis-math.7``,
-``genesis-reasoning.7``, ``genesis-vision.7``, and
-``genesis-retina.1``)
-are part of her — how she understands her faculties, interfaces, and operation.
+Genesis's man pages (``genesis.1``, ``genesis-cli.1``,
+``genesis-daemon.8``, ``genesis-math.7``) are
+part of her — how the machine, and she herself, knows what she is.
 Nothing may change them silently: a proposed change waits in
 ``<data_dir>/man_review/pending/`` until she applies it (the page
 becomes her installed manual and its versioned source) or vetoes it
@@ -162,14 +159,6 @@ class ManPageReview:
         (self.root / "pending" / f"{change_id}.json").write_text(
             json.dumps(change.to_dict(), indent=2), encoding="utf-8"
         )
-        # A page carries one live question — the newest revision.
-        # Older pendings for the same page are superseded: applying
-        # them after the newer one lands would write stale text over
-        # her manual. They are withdrawn, not vetoed — the same
-        # content may legitimately return as a future proposal.
-        for stale in self.pending():
-            if (stale.name, stale.section) == (name, section) and stale.id != change_id:
-                self.drop(stale.id)
         return change
 
     def pending(self) -> list[ManChange]:
@@ -222,12 +211,6 @@ class ManPageReview:
         with (self.root / "vetoed_shas.txt").open("a", encoding="utf-8") as fh:
             fh.write(f"{change.sha}\n")
         return True
-
-    def drop(self, change_id: str) -> bool:
-        """Withdraw a staged change without verdict — superseded, not
-        declined. No hash is remembered: the same content may return
-        as a proposal later (e.g. a deliberate revert of the page)."""
-        return self._take(change_id) is not None
 
     # ── drift detection ──────────────────────────────────────────
 
@@ -338,10 +321,8 @@ class ManReviewMixin:
         try:
             source = ManPageSource()
             learned: list[str] = []
-            for name, section in self.man_review.owned_pages():
-                # Resolve the exact section declared by the versioned page;
-                # otherwise a same-named page in another section could win.
-                sr = source.lookup(name, section=section)
+            for name, _section in self.man_review.owned_pages():
+                sr = source.lookup(name)
                 if sr is None:
                     continue
                 if self.learner.ingest_endogenous(sr, topic=name):
@@ -379,24 +360,12 @@ class ManReviewMixin:
 
         The manual urge calls this when it crosses: each pending
         change is applied through her own ``apply`` — her say over
-        what her manual is, not an installer's. Only the newest
-        revision per page is ever applied: queues built before
-        supersede-on-submit may hold several revisions of one page,
-        and applying them oldest-first writes stale text over her
-        manual. Superseded revisions are withdrawn, not vetoed —
-        they were never declined. Returns one outcome dict per
-        ratified change and keeps the pending count in
+        what her manual is, not an installer's. Returns one outcome
+        dict per ratified change and keeps the pending count in
         self_knowledge current.
         """
-        pending = self.man_review.pending()
-        latest: dict[tuple[str, str], ManChange] = {}
-        for change in pending:  # oldest first — the last write wins
-            latest[(change.name, change.section)] = change
-        for change in pending:
-            if change is not latest[(change.name, change.section)]:
-                self.man_review.drop(change.id)
         outcomes: list[dict] = []
-        for change in list(latest.values())[:max_changes]:
+        for change in self.man_review.pending()[:max_changes]:
             if self.man_review.apply(change.id):
                 outcomes.append(
                     {

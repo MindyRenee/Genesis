@@ -603,63 +603,6 @@ class VQCodebook:
             ),
         )
 
-    def save_space(self, space) -> None:
-        """Persist the codebook inside her language latent space."""
-        from self.language_ingest import npz_bytes, put_bytes
-
-        if not self.is_trained:
-            raise RuntimeError("cannot save untrained codebook")
-        put_bytes(
-            space,
-            "vq_codebook.npz",
-            npz_bytes(
-                prototypes=self._prototypes,
-                prototype_ids=self._prototype_ids,
-                residuals=self._residuals,
-                concept_names=str_array(self._concept_names),
-                dim=np.array(self.dim, dtype=np.int32),
-                k=np.array(self.k, dtype=np.int32),
-                residual_scale=np.array(self.residual_scale, dtype=np.float32),
-                reconstruction_error=np.array(self._reconstruction_error, dtype=np.float64),
-                relative_reconstruction_error=np.array(
-                    self._relative_reconstruction_error, dtype=np.float64
-                ),
-                reconstruction_cosine=np.array(self._reconstruction_cosine, dtype=np.float64),
-                residual_saturation_fraction=np.array(
-                    self._residual_saturation_fraction, dtype=np.float64
-                ),
-            ),
-        )
-
-    def load_space(self, space) -> bool:
-        """Restore the codebook from her language latent space."""
-        from self.language_ingest import get_bytes, npz_from_bytes
-
-        raw = get_bytes(space, "vq_codebook.npz")
-        if raw is None:
-            return False
-        try:
-            data = npz_from_bytes(raw)
-            self._prototypes = data["prototypes"].astype(np.float32)
-            self._prototype_ids = data["prototype_ids"].astype(np.int32)
-            self._residuals = data["residuals"].astype(np.int8)
-            self._concept_names = list(data["concept_names"])
-            self.dim = int(data["dim"])
-            self.k = int(data["k"])
-            self.residual_scale = float(data["residual_scale"])
-            self._reconstruction_error = float(data["reconstruction_error"])
-            self._relative_reconstruction_error = float(
-                data.get("relative_reconstruction_error", 0.0)
-            )
-            self._reconstruction_cosine = float(data.get("reconstruction_cosine", 0.0))
-            self._residual_saturation_fraction = float(
-                data.get("residual_saturation_fraction", 0.0)
-            )
-            return True
-        except (KeyError, ValueError, OSError) as e:
-            logger.warning("Failed to load VQ codebook from space: %s", e)
-            return False
-
     def load(self, path: str) -> bool:
         """Load the codebook from an .npz file.
 

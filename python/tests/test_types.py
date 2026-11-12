@@ -14,6 +14,7 @@ from genesis_client.types import (
     BodyState,
     CoreState,
     Episode,
+    FieldProbeSignature,
     MemoryStats,
     NeuroSummary,
     PhaseInfo,
@@ -1036,14 +1037,200 @@ def test_core_state_reads_the_network_sleep_pressure() -> None:
     assert approx_equal(state.sleep_pressure, 0.5)
 
 
+def _v3_field_probe_body() -> bytearray:
+    """A v3 field-probe wire body (195 bytes) laid out per
+    `src/daemon/field_probe.rs`."""
+    body = bytearray(195)
+    body[0] = 3
+    struct.pack_into("<20f", body, 1, *[0.125] * 20)
+    struct.pack_into("<5f", body, 81, 1.0e6, 0.5, 100.0, 7000.0, 10.0)
+    body[101] = 1  # samples_ok
+    struct.pack_into("<3f", body, 102, 0.3, 1.0, 0.7)
+    struct.pack_into("<10f", body, 114, *[0.2] * 10)  # power bands
+    struct.pack_into("<6f", body, 154, 20.9, 89.0, 12.947, 1.5, 0.02, 0.4)
+    body[178] = 0b111  # power + volts + amps present
+    struct.pack_into("<4f", body, 179, 0.97, 7.17e-4, 6.76e-9, 1.81e-34)
+    return body
 
 
+def test_field_probe_v3_unpacks_electrical_and_maxwell() -> None:
+    """The v3 tail decodes real electrical channels and the Maxwell
+    estimates through the presence mask."""
+    sig = FieldProbeSignature.unpack(bytes(_v3_field_probe_body()))
+    assert sig.power_watts is not None
+    assert sig.power_sensor_hz is not None
+    assert sig.rail_volts is not None
+    assert sig.supply_amps is not None
+    assert sig.power_lag is not None
+    assert sig.power_coherence is not None
+    assert sig.carrier_current_a is not None
+    assert approx_equal(sig.power_watts, 20.9, 1e-2)
+    assert approx_equal(sig.power_sensor_hz, 89.0, 1e-2)
+    assert approx_equal(sig.rail_volts, 12.947, 1e-3)
+    assert approx_equal(sig.supply_amps, 1.5, 1e-6)
+    assert sig.power_bands is not None and len(sig.power_bands) == 10
+    assert approx_equal(sig.power_lag, 0.02, 1e-6)
+    assert approx_equal(sig.power_coherence, 0.4, 1e-6)
+    assert approx_equal(sig.carrier_current_a, 0.97, 1e-6)
+    assert sig.radiated_pwr_w is not None and sig.radiated_pwr_w < 1e-30
 
 
+def test_field_probe_v3_absent_sensors_decode_none() -> None:
+    """Mask bits clear → absent channels are None, never zero."""
+    body = _v3_field_probe_body()
+    body[178] = 0
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.power_watts is None
+    assert sig.power_bands is None
+    assert sig.rail_volts is None
+    assert sig.supply_amps is None
+    assert sig.power_lag is None
+    assert sig.b_est_ut is None
 
 
+def test_field_probe_v4_unpacks_radio_tail() -> None:
+    """The v4 tail decodes the radio sense through its presence mask:
+    WLAN flux + RSSI envelopes, wireless IRQ flux, HCI counters."""
+    body = _v3_field_probe_body()
+    body[0] = 4
+    body += struct.pack("<10f", *[0.3] * 10)  # rf flux bands
+    body += struct.pack("<10f", *[0.2] * 10)  # rf rssi bands
+    body += struct.pack("<8f", 4200.0, -71.0, -95.0, 33.0, 4.0, 120.0, 18.0, -3.0)
+    body.append(0x7F)  # all radio channels present
+    assert len(body) == 308
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.rf_flux_bands is not None and len(sig.rf_flux_bands) == 10
+    assert all(approx_equal(v, 0.3, 1e-6) for v in sig.rf_flux_bands)
+    assert sig.rf_rssi_bands is not None and len(sig.rf_rssi_bands) == 10
+    assert all(approx_equal(v, 0.2, 1e-6) for v in sig.rf_rssi_bands)
+    assert (
+        sig.rf_bytes_s is not None
+        and sig.rf_rssi_dbm is not None
+        and sig.rf_noise_dbm is not None
+        and sig.rf_irq_rate is not None
+        and sig.rf_sensor_hz is not None
+        and sig.bt_bytes_s is not None
+        and sig.bt_events_s is not None
+        and sig.bt_rssi_dbm is not None
+    )
+    assert approx_equal(sig.rf_bytes_s, 4200.0, 1e-2)
+    assert approx_equal(sig.rf_rssi_dbm, -71.0, 1e-6)
+    assert approx_equal(sig.rf_noise_dbm, -95.0, 1e-6)
+    assert approx_equal(sig.rf_irq_rate, 33.0, 1e-6)
+    assert approx_equal(sig.rf_sensor_hz, 4.0, 1e-6)
+    assert approx_equal(sig.bt_bytes_s, 120.0, 1e-6)
+    assert approx_equal(sig.bt_events_s, 18.0, 1e-6)
+    assert approx_equal(sig.bt_rssi_dbm, -3.0, 1e-6)
+    assert sig.rf_present == 0x7F
 
 
+def test_field_probe_v4_partial_presence_gates_fields() -> None:
+    """Only masked channels decode — an iface with no RSSI reports
+    flux but None for field strength."""
+    body = _v3_field_probe_body()
+    body[0] = 4
+    body += b"\x00" * 80
+    body += b"\x00" * 33
+    body[307] = 0x01  # wlan only
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.rf_flux_bands is not None
+    assert sig.rf_bytes_s is not None
+    assert sig.rf_rssi_bands is None
+    assert sig.rf_rssi_dbm is None
+    assert sig.bt_bytes_s is None
+
+
+def test_field_probe_v5_unpacks_station_tail() -> None:
+    """The v5 tail decodes iw station telemetry through presence
+    bit 7: link-strain rates and PHY link-adaptation bitrates."""
+    body = _v3_field_probe_body()
+    body[0] = 5
+    body += struct.pack("<10f", *[0.3] * 10)  # rf flux bands
+    body += struct.pack("<10f", *[0.2] * 10)  # rf rssi bands
+    body += struct.pack("<8f", 4200.0, -55.0, -95.0, 33.0, 1.0, 120.0, 18.0, -3.0)
+    body.append(0xFF)  # all channels present incl. iw station
+    body += struct.pack("<5f", 12.0, 0.4, 0.1, 72.2, 65.0)
+    assert len(body) == 328
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.rf_rssi_dbm is not None and approx_equal(sig.rf_rssi_dbm, -55.0, 1e-6)
+    assert sig.rf_retry_rate is not None
+    assert sig.rf_fail_rate is not None
+    assert sig.rf_beacon_loss_rate is not None
+    assert sig.rf_tx_mbps is not None
+    assert sig.rf_rx_mbps is not None
+    assert approx_equal(sig.rf_retry_rate, 12.0, 1e-6)
+    assert approx_equal(sig.rf_fail_rate, 0.4, 1e-6)
+    assert approx_equal(sig.rf_beacon_loss_rate, 0.1, 1e-6)
+    assert approx_equal(sig.rf_tx_mbps, 72.2, 1e-4)
+    assert approx_equal(sig.rf_rx_mbps, 65.0, 1e-6)
+
+
+def test_field_probe_v5_iw_absent_decodes_none() -> None:
+    """v5 with the iw bit clear → station fields are None, not 0."""
+    body = _v3_field_probe_body()
+    body[0] = 5
+    body += b"\x00" * 80  # band energies
+    body += b"\x00" * 32  # scalars
+    body.append(0x01)  # wlan only
+    body += struct.pack("<5f", 9.0, 9.0, 9.0, 9.0, 9.0)  # ignored tail
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.rf_retry_rate is None
+    assert sig.rf_fail_rate is None
+    assert sig.rf_beacon_loss_rate is None
+    assert sig.rf_tx_mbps is None
+    assert sig.rf_rx_mbps is None
+
+
+def test_field_probe_v6_unpacks_flux_phasors() -> None:
+    """The v6 tail decodes flux-envelope phase + coherence through
+    the wlan presence bit — the entrainment path's raw material."""
+    phases = [0.1 * i - 1.0 for i in range(10)]
+    coh = [0.05 * i for i in range(10)]
+    body = _v3_field_probe_body()
+    body[0] = 6
+    body += struct.pack("<10f", *[0.3] * 10)  # rf flux bands
+    body += struct.pack("<10f", *[0.2] * 10)  # rf rssi bands
+    body += struct.pack("<8f", 4200.0, -55.0, -95.0, 33.0, 1.0, 120.0, 18.0, -3.0)
+    body.append(0xFF)
+    body += struct.pack("<5f", 12.0, 0.4, 0.1, 72.2, 65.0)
+    body += struct.pack("<10f", *phases)
+    body += struct.pack("<10f", *coh)
+    assert len(body) == 408
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.rf_flux_phases is not None and len(sig.rf_flux_phases) == 10
+    assert sig.rf_flux_phase_coherence is not None
+    assert all(approx_equal(v, e, 1e-6) for v, e in zip(sig.rf_flux_phases, phases, strict=True))
+    assert all(
+        approx_equal(v, e, 1e-6) for v, e in zip(sig.rf_flux_phase_coherence, coh, strict=True)
+    )
+
+
+def test_field_probe_v6_no_wlan_decodes_no_phasors() -> None:
+    """v6 with the wlan bit clear → phasor fields are None."""
+    body = _v3_field_probe_body()
+    body[0] = 6
+    body += b"\x00" * 113  # v4 radio tail, all-zero
+    body += struct.pack("<5f", 0.0, 0.0, 0.0, 0.0, 0.0)
+    body += struct.pack("<10f", *[9.9] * 10)  # ignored phasor tail
+    body += struct.pack("<10f", *[9.9] * 10)
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.rf_flux_phases is None
+    assert sig.rf_flux_phase_coherence is None
+
+
+def test_field_probe_v2_still_decodes() -> None:
+    """A v2 (114-byte) body keeps working — electrical fields absent."""
+    body = bytearray(114)
+    body[0] = 2
+    struct.pack_into("<20f", body, 1, *[0.125] * 20)
+    struct.pack_into("<5f", body, 81, 1.0, 2.0, 3.0, 4.0, 5.0)
+    body[101] = 1
+    struct.pack_into("<3f", body, 102, 0.1, 0.2, 0.3)
+    sig = FieldProbeSignature.unpack(bytes(body))
+    assert sig.carrier_lag is not None
+    assert approx_equal(sig.carrier_lag, 0.1, 1e-6)
+    assert sig.power_watts is None
+    assert sig.power_bands is None
 
 
 def test_core_state_rejects_truncated_body() -> None:
@@ -1093,109 +1280,3 @@ def test_field_state_absent_is_none() -> None:
         "field.consensus": "0,0,0,0,0,0",
     }
     assert FieldState.from_internals(bad) is None
-
-
-def test_field_signature_unpack() -> None:
-    """GET_FIELD_SIGNATURE: [ack][flags][3 reserved][9 × f64 LE].
-    Flags carry presence bits; the nine doubles carry omega, current,
-    speed, dipole moment, B, E, P, disagreement, temperature."""
-    import struct
-
-    from genesis_client.types import FieldSignature
-
-    vals = (
-        62.8318530718,   # omega_rad_s — 10 Hz carrier
-        0.03,            # coherent_current_a
-        0.3,             # consensus_speed
-        1.0e-9,          # dipole_moment_am2
-        1.5e-9,          # b_axial_t
-        2.0e-8,          # e_induction_vm
-        1.0e-40,         # radiated_power_w
-        0.02,            # disagreement
-        0.05,            # temperature
-    )
-    flags = 0b111  # signature + integration + quasi-static
-    data = struct.pack("<BB3x9d", 1, flags, *vals)
-    sig = FieldSignature.unpack(data)
-    assert sig is not None
-    assert sig.signature_present
-    assert sig.integration_present
-    assert sig.quasi_static
-    assert approx_equal(sig.omega_rad_s, vals[0], 1e-9)
-    assert approx_equal(sig.coherent_current_a, vals[1], 1e-12)
-    assert approx_equal(sig.disagreement, vals[7], 1e-12)
-    assert approx_equal(sig.temperature, vals[8], 1e-12)
-
-
-def test_field_signature_absent_decodes_flags_not_zeros() -> None:
-    """An un-integrated field still decodes — presence flags clear,
-    readings zeroed by the daemon — and a short/unacked frame is
-    'no reading', never a fabricated signature."""
-    import struct
-
-    from genesis_client.types import FieldSignature
-
-    data = struct.pack("<BB3x9d", 1, 0, *([0.0] * 9))
-    sig = FieldSignature.unpack(data)
-    assert sig is not None
-    assert not sig.signature_present
-    assert not sig.integration_present
-    assert sig.omega_rad_s == 0.0
-
-    assert FieldSignature.unpack(b"") is None
-    assert FieldSignature.unpack(b"\x00" + data[1:]) is None  # unacked
-    assert FieldSignature.unpack(data[:40]) is None  # truncated
-
-
-def test_field_spectrum_unpack() -> None:
-    """GET_FIELD_SPECTRUM: [ack][flags][3 reserved][48 × f64 LE].
-    Scalars first (phase, freq, speed, rate, channel mean/cv), then
-    per-channel energies[10] and phases[10]."""
-    import struct
-
-    from genesis_client.types import FieldSpectrum
-
-    scalars = (0.7, 10.0, 0.12, 250.0, 0.01, 0.2, 0.005, 0.3)
-    flux_e = tuple(0.1 * i for i in range(10))
-    flux_p = tuple(0.05 * i for i in range(10))
-    tension_e = tuple(0.01 * i for i in range(10))
-    tension_p = tuple(-0.02 * i for i in range(10))
-    vals = scalars + flux_e + flux_p + tension_e + tension_p
-    assert len(vals) == 48
-    flags = 0b111  # warm + carrier + speed
-    data = struct.pack("<BB3x48d", 1, flags, *vals)
-    spec = FieldSpectrum.unpack(data)
-    assert spec is not None
-    assert spec.warm
-    assert spec.carrier_present
-    assert spec.speed_present
-    assert approx_equal(spec.carrier_phase, 0.7, 1e-9)
-    assert approx_equal(spec.carrier_freq_hz, 10.0, 1e-9)
-    assert approx_equal(spec.sample_rate_hz, 250.0, 1e-9)
-    assert approx_equal(spec.flux.mean, 0.01, 1e-12)
-    assert approx_equal(spec.tension.cv, 0.3, 1e-12)
-    assert len(spec.flux.energies) == 10
-    assert len(spec.flux.phases) == 10
-    assert approx_equal(spec.flux.energies[9], 0.9, 1e-9)
-    assert approx_equal(spec.tension.phases[9], -0.18, 1e-9)
-
-
-def test_field_spectrum_absent_decodes_flags_not_zeros() -> None:
-    """An unwarmed field still decodes — presence flags clear,
-    readings zeroed — and a short/unacked frame is 'no reading',
-    never a fabricated spectrum."""
-    import struct
-
-    from genesis_client.types import FieldSpectrum
-
-    data = struct.pack("<BB3x48d", 1, 0, *([0.0] * 48))
-    spec = FieldSpectrum.unpack(data)
-    assert spec is not None
-    assert not spec.warm
-    assert not spec.carrier_present
-    assert spec.carrier_freq_hz == 0.0
-    assert all(e == 0.0 for e in spec.flux.energies)
-
-    assert FieldSpectrum.unpack(b"") is None
-    assert FieldSpectrum.unpack(b"\x00" + data[1:]) is None  # unacked
-    assert FieldSpectrum.unpack(data[:100]) is None  # truncated

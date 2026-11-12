@@ -91,11 +91,6 @@ pub struct ShepherdConfig {
     /// Directory the daemon binary lives in — injectable for tests;
     /// production passes `current_exe`'s parent.
     pub exe_dir: PathBuf,
-    /// The registered-mind liveness consult — injectable so tests
-    /// never touch the process-global PID state (no locks, no races,
-    /// no environment sensitivity). Production reads the registered
-    /// PID and asks /proc whether that process is a living mind.
-    pub registered_alive: fn() -> bool,
 }
 
 impl Default for ShepherdConfig {
@@ -110,7 +105,6 @@ impl Default for ShepherdConfig {
                 .ok()
                 .and_then(|p| p.parent().map(|d| d.to_path_buf()))
                 .unwrap_or_default(),
-            registered_alive: registered_mind_alive,
         }
     }
 }
@@ -210,7 +204,7 @@ impl MindShepherd {
                 self.reported_unresolvable = false;
                 ShepherdOutcome::Attached
             }
-            Some(_) if (self.config.registered_alive)() => {
+            Some(_) if registered_mind_alive() => {
                 // The registered mind process is still running — the
                 // silence is workload, not loss: a deep-sleep
                 // consolidation pass, a slow boot, a long turn that
@@ -471,13 +465,9 @@ impl MindShepherd {
 /// regrowth the lock would refuse anyway — never toward swallowing
 /// a real loss.
 fn registered_mind_alive() -> bool {
-    super::cpufreq::cognitive_pid().is_some_and(mind_process_alive)
-}
-
-/// Whether a specific PID is a living mind process — pure given the
-/// pid, so tests exercise it directly without touching the
-/// process-global registration state.
-fn mind_process_alive(pid: u32) -> bool {
+    let Some(pid) = super::cpufreq::cognitive_pid() else {
+        return false;
+    };
     let stat = match std::fs::read_to_string(format!("/proc/{pid}/stat")) {
         Ok(s) => s,
         Err(_) => return false,
@@ -530,24 +520,18 @@ mod tests {
             retry_gaps_s: vec![0.0, 0.0, 0.0, 0.0],
             cmd_override: Some(cmd),
             exe_dir: PathBuf::new(),
-            // A dead registration by default — the tests that need a
-            // living one inject their own consult. No test touches
-            // the process-global PID state: the liveness source is a
-            // config field, so parallel tests cannot race each other
-            // or the host's own running organism.
-            registered_alive: || false,
         }
     }
 
     #[test]
     fn a_live_registered_mind_is_quiet_not_loss() {
         let dir = tmpdir("quiet-alive");
-        let mut cfg = fast_config(vec!["/bin/true".into()]);
-        // The registered mind is alive — a deep silence must read as
-        // quiet, never as a reason to regrow.
-        cfg.registered_alive = || true;
-        let mut s = MindShepherd::with_config(cfg);
+        let mut s = MindShepherd::with_config(fast_config(vec!["/bin/true".into()]));
+        // The registered PID is this test process — alive, so a deep
+        // silence must read as quiet, never as a reason to regrow.
+        crate::daemon::cpufreq::set_cognitive_pid(std::process::id());
         let out = s.check(Some(600.0), &dir);
+        crate::daemon::cpufreq::reset_cognitive_pid();
         assert_eq!(out, ShepherdOutcome::Attached);
         assert!(s.pending.is_none());
         assert_eq!(s.attempts, 0);
@@ -567,7 +551,9 @@ mod tests {
         // A registered PID that no longer exists is exactly the
         // loss the shepherd answers — the liveness consult must
         // fall through to a spawn, not swallow it.
+        crate::daemon::cpufreq::set_cognitive_pid(4_000_000);
         let out = s.check(Some(120.0), &dir);
+        crate::daemon::cpufreq::reset_cognitive_pid();
         assert_eq!(out, ShepherdOutcome::Spawned);
         let _ = fs::remove_dir_all(&dir);
     }
@@ -582,24 +568,13 @@ mod tests {
             format!("touch {}", proof.display()),
         ];
         let mut s = MindShepherd::with_config(fast_config(cmd));
-        // A registered PID that is alive but is not a mind (the /proc
-        // consult says so) must not count as attachment either.
+        // PID 1 lives but is not a mind — a reused slot must not
+        // count as attachment.
+        crate::daemon::cpufreq::set_cognitive_pid(1);
         let out = s.check(Some(120.0), &dir);
+        crate::daemon::cpufreq::reset_cognitive_pid();
         assert_eq!(out, ShepherdOutcome::Spawned);
         let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn the_proc_consult_reads_its_own_process_alive() {
-        // The pure consult: this test process's cmdline names the
-        // crate, so it is a living mind by the same rule the
-        // shepherd applies to a registered PID.
-        assert!(mind_process_alive(std::process::id()));
-    }
-
-    #[test]
-    fn the_proc_consult_reads_an_absent_pid_dead() {
-        assert!(!mind_process_alive(4_000_000));
     }
 
     #[test]
@@ -630,8 +605,7 @@ mod tests {
         fs::write(dir.join(MIND_SUPPRESS_FILE), "stopped").unwrap();
         let mut s = MindShepherd::with_config(fast_config(vec!["/bin/false".into()]));
         // Deep into a loss — without the sentinel this would spawn.
-        let out = s.check(Some(600.0), &dir);
-        assert_eq!(out, ShepherdOutcome::Suppressed);
+        assert_eq!(s.check(Some(600.0), &dir), ShepherdOutcome::Suppressed);
         assert!(s.pending.is_none());
         let _ = fs::remove_dir_all(&dir);
     }
@@ -647,8 +621,7 @@ mod tests {
             format!("touch {}", proof.display()),
         ];
         let mut s = MindShepherd::with_config(fast_config(cmd));
-        let out = s.check(Some(120.0), &dir);
-        assert_eq!(out, ShepherdOutcome::Spawned);
+        assert_eq!(s.check(Some(120.0), &dir), ShepherdOutcome::Spawned);
         // The child gets boot grace: pending until it exits and is
         // reaped by a later check.
         for _ in 0..50 {
@@ -669,8 +642,7 @@ mod tests {
         let mut cfg = fast_config(vec!["/bin/false".into()]);
         cfg.first_attempt_idle_s = 60.0;
         let mut s = MindShepherd::with_config(cfg);
-        let out = s.check(Some(30.0), &dir);
-        assert_eq!(out, ShepherdOutcome::Waiting);
+        assert_eq!(s.check(Some(30.0), &dir), ShepherdOutcome::Waiting);
         assert!(s.pending.is_none());
         let _ = fs::remove_dir_all(&dir);
     }
@@ -722,8 +694,7 @@ mod tests {
         cfg.cmd_override = None;
         cfg.exe_dir = PathBuf::from("/nonexistent");
         let mut s = MindShepherd::with_config(cfg);
-        let out = s.check(Some(600.0), &dir);
-        assert_eq!(out, ShepherdOutcome::Unresolvable);
+        assert_eq!(s.check(Some(600.0), &dir), ShepherdOutcome::Unresolvable);
         let _ = fs::remove_dir_all(&dir);
     }
 }

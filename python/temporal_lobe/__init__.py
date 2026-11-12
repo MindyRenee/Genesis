@@ -623,8 +623,6 @@ Modules claimed by this subsystem:
 
 from __future__ import annotations
 
-from importlib.util import find_spec as _find_spec
-
 from _views import view_getattr
 
 # Internal modules — the auditory cortex (A1) and inferotemporal
@@ -819,23 +817,6 @@ _EXPORTS: dict[str, str] = {
     "Place": "temporal_lobe.cognitive_map",
     "Anchor": "temporal_lobe.cognitive_map",
     "MapEvent": "temporal_lobe.cognitive_map",
-    # The open adaptive light-cone manifold — causal classification,
-    # counter-rotating projection, elastic/plastic holographic state, and Self feedback
-    "AdaptiveLightConeManifold": "temporal_lobe.light_cones",
-    "ElasticPlasticHologram": "temporal_lobe.light_cones",
-    "LightConeExperienceBridge": "temporal_lobe.light_cone_runtime",
-    "LightConeModel": "temporal_lobe.light_cones",
-    "SpacetimeEvent": "temporal_lobe.light_cones",
-    "SpacetimeWorkspace": "temporal_lobe.spacetime_workspace",
-    "WorkspaceSnapshot": "temporal_lobe.spacetime_workspace",
-    "WorldDomain": "temporal_lobe.light_cones",
-    "IntervalKind": "temporal_lobe.light_cones",
-    "light_cone_coordinate": "temporal_lobe.light_cones",
-    "double_cone_coordinate": "temporal_lobe.light_cones",
-    "spine_point": "temporal_lobe.light_cones",
-    "time_sunburst_ray": "temporal_lobe.light_cones",
-    # Optional differentiable implementation; importing the base package does not require PyTorch
-    "TorchLightConeField": "temporal_lobe.light_cone_torch",
     # Social perception — the superior temporal sulcus detects people,
     # their presence, and the events they produce (speech, arrival, departure)
     "Presence": "temporal_lobe.presence",
@@ -867,11 +848,6 @@ _EXPORTS: dict[str, str] = {
 
 # The five eager names stay in a literal list so static checkers
 # (pyflakes) recognize them as intentional re-exports.
-# Do not advertise the optional differentiable export when PyTorch is absent.
-# The pure-Python light-cone implementation remains available in all environments.
-if _find_spec("torch") is None:
-    _EXPORTS.pop("TorchLightConeField", None)
-
 __all__ = [
     "COCO_CLASSES",
     "AuditoryCortex",

@@ -453,7 +453,7 @@ BORED_NE = 0.27
 
 # ─── Latent-field coherence boundaries ───────────────────────────
 #
-# The daemon's own latent field (src/latent_spaces/) publishes the
+# The daemon's own latent field (src/field/) publishes the
 # organism's self-coherence: the Fréchet variance of the
 # body/prediction/agency fibers about their barycenter on the
 # shared sphere, and that center's displacement from nominal. Per

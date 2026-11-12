@@ -11,7 +11,7 @@
 //! excursion (sustained surprise) so both ends of the attenuation
 //! curve can be checked against the calibrated scale.
 
-use genesis::latent_spaces::FieldRuntime;
+use genesis::field::FieldRuntime;
 use genesis::state::{GenesisCoreState, NeurochemicalId};
 
 struct SplitMix64(u64);

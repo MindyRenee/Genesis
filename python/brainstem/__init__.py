@@ -367,7 +367,7 @@ _EXPORTS: dict[str, str] = {
     # The metronome — the periodic loop that samples the body and
     # publishes module activity to the manifest. A scheduler, not an
     # organ: the ticker is not her heart.
-    "CycleMixin": "brainstem.cycle",
+    "MetronomeMixin": "brainstem.metronome",
     # The medullary cardiac center — reads the body's carrier pulse,
     # drives contractility, feels arrhythmia
     "Heart": "brainstem.heart",
@@ -389,17 +389,11 @@ _EXPORTS: dict[str, str] = {
     # cognitive modulation (attention / integration / consolidation)
     "IonCognitiveContext": "brainstem.electrochemistry",
     "interpret_ions": "brainstem.electrochemistry",
-    # The substrate interface — her own field's spectral signature
-    # (the fibers' band energies, carrier phase, entrainment)
-    # read as wave-oscillator stimulus
-    "apply_field_stimulus": "brainstem.field_stimulus",
-    "field_phase_lock": "brainstem.field_stimulus",
-    # Maxwell's dipole signature on the substrate's coherent motion
-    "carrier_hz": "brainstem.maxwell",
-    "coherence": "brainstem.maxwell",
-    "field_signature": "brainstem.maxwell",
-    # The acoustic channel — ambient sound (self-emission bands and
-    # room) band-decomposed into wave stimulus; a sense, not a probe
+    # The substrate interface — the machine's own physical dynamics
+    # (throughput/jitter/P-states/interrupts, and the acoustic
+    # self-emission) read as wave-oscillator stimulus
+    "apply_field_stimulus": "brainstem.field_probe",
+    "field_phase_lock": "brainstem.field_probe",
     "apply_audio_stimulus": "brainstem.field_audio",
     # Anticipatory regulation — the mind's reader of the body's
     # generative self-model (free energy, precision, surprise,
@@ -422,9 +416,6 @@ _EXPORTS: dict[str, str] = {
     # limbic_system)
     "ProtoSelf": "insula.damasio",
     "ProtoSelfState": "insula.damasio",
-    # Android microphone input through Termux:API. Visual input belongs
-    # to the daemon-owned optic nerve, not a second Python camera path.
-    "AndroidMicrophoneAdapter": "brainstem.android_media",
     # The region itself — the reticular core
     "Brainstem": "brainstem.brainstem",
 }

@@ -72,7 +72,6 @@ from .protocol import (
     _U16,
     _U32,
     _U64,
-    ACTUATE,
     ADVANCE_NEURO,
     ADVANCE_PHYSICS,
     ANALYZE_CODE,
@@ -97,8 +96,7 @@ from .protocol import (
     FIND_SIMILAR_ARCHIVED,
     GET_BODY_CONTROL,
     GET_BODY_STATE,
-    GET_FIELD_SIGNATURE,
-    GET_FIELD_SPECTRUM,
+    GET_FIELD_PROBE,
     GET_FOLD_MARGINS,
     GET_INFERENCE_SUMMARY,
     GET_INTERNALS,
@@ -118,7 +116,6 @@ from .protocol import (
     GET_TENSOR,
     GET_ZONE_TRANSITIONS,
     HANDSHAKE,
-    LIST_ACTUATORS,
     LIST_TENSORS,
     # Module IDs (for validation and store_observation)
     MODULE_GUARDRAILS,
@@ -137,6 +134,8 @@ from .protocol import (
     SEARCH_ARCHIVED,
     SEARCH_EPISODES,
     SET_COGNITIVE_PID,
+    SET_FIELD_CARRIER,
+    SET_FIELD_PULSE,
     SET_FOCUS,
     SET_LID,
     SET_OPTIC_GAIN,
@@ -150,7 +149,6 @@ from .protocol import (
     UNARCHIVE_EPISODE,
     UPDATE_MODULE_STATUS,
     UPDATE_USER_AFFECT,
-    WIRE_EMOTIONAL_TAG_SIZE,
     # Zone IDs (for validation)
     ZONE_SLEEPING,
     # Error detection
@@ -175,8 +173,7 @@ from .types import (
     BodyState,
     CoreState,
     Episode,
-    FieldSignature,
-    FieldSpectrum,
+    FieldProbeSignature,
     FieldState,
     FoldMargins,
     InferenceSummary,
@@ -424,12 +421,11 @@ class GenesisClient:
             GET_BODY_STATE,
             GET_BODY_CONTROL,
             GET_PLASTICITY_PROFILE,
-                    GET_FOLD_MARGINS,
+            GET_FIELD_PROBE,
+            GET_FOLD_MARGINS,
             GET_INTERNALS,
             GET_ION_SUMMARY,
             GET_MOTOR_TARGET,
-            ACTUATE,
-            LIST_ACTUATORS,
             GET_OPTIC_STATE,
             GET_PROCESS_HEALTH,
             GET_RECENT_EPISODES,
@@ -515,7 +511,6 @@ class GenesisClient:
             LIST_TENSORS,
             DROP_TENSOR,
             GET_MOTOR_TARGET,
-    LIST_ACTUATORS,
         }
     )
 
@@ -813,63 +808,32 @@ class GenesisClient:
             return None
         return FoldMargins.unpack(resp)
 
-    def get_field_signature(self, *, timeout: float | None = None) -> FieldSignature | None:
-        """The organism's computed field signature — her own field's
-        mathematics, not a probe of the machine's.
+    def get_field_probe(self, *, timeout: float | None = None) -> FieldProbeSignature | None:
+        """Get the body's real substrate signature (v6: 408 B; older: 328/308/195/114/102).
 
-        Maxwell's equations evaluated on the field substrate's
-        coherent motion (``src/daemon/maxwell.rs``): the consensus'
-        winding rate ``omega_rad_s`` is her field's tempo, the
-        coherent current is the latent→ampere bridge's declared
-        modeling assumption, and ``b_axial_t`` / ``e_induction_vm`` /
-        ``radiated_power_w`` are the dipole expansion's honest
-        outputs at her boundary — quasi-static at her drift rates.
-        ``disagreement`` and ``temperature`` are the integration's
-        own observables, live even before the signature's first
-        velocity sample.
+        The daemon's field-probe thread samples real substrate
+        dynamics — instruction throughput, scheduler jitter, P-state
+        transitions, interrupt flux, measured power draw where the
+        machine's sensors report it, and the radios' own telemetry
+        (WLAN byte flux + RSSI, wireless-attributed interrupts, HCI
+        counters) — and decomposes them at the wave bands' center
+        frequencies. It also writes a carrier rhythm into real work
+        keyed to the body's phase, and evaluates Maxwell's equations
+        on the measured current swing (quasi-static B, induction E,
+        ω⁴-suppressed radiated power — estimates, with the loop
+        geometry an assumption).
 
-        Returns ``None`` on transport failure or when the daemon
-        predates the command — an absent channel is no reading,
-        never a zero reading. An un-integrated field still answers:
-        presence flags clear, readings zeroed.
+        Returns ``None`` when the probe isn't running or the daemon
+        predates the command: an absent channel is no reading, never
+        a zero reading — same discipline as ``get_sensor_presence``.
         """
         try:
-            resp = self._request(GET_FIELD_SIGNATURE, timeout=timeout)
+            resp = self._request(GET_FIELD_PROBE, timeout=timeout)
         except (ConnectionError, OSError, ProtocolError):
             return None
-        try:
-            return FieldSignature.unpack(resp)
-        except (IndexError, struct.error, ValueError):
+        if not resp or resp[0] >= 0x80:
             return None
-
-    def get_field_spectrum(self, *, timeout: float | None = None) -> FieldSpectrum | None:
-        """The field's spectral signature — her own substrate's band
-        decomposition, not a probe of the machine's.
-
-        The field's fibers drift, couple, and fluctuate on the latent
-        manifold under gauge transport and a Langevin thermostat
-        (``src/field/spectrum.rs``); this returns that trajectory's
-        band energies and phases at the wave model's band centers —
-        ``flux`` the centroid's motion energy, ``tension`` the
-        fibers' spread — plus the consensus kinematics: the carrier's
-        winding phase (the field's own clock), its rate in Hz, and
-        the achieved sampling rate the bands resolve against. Bands
-        above Nyquist read zero — absent is a reading, never an
-        aliased one.
-
-        Returns ``None`` on transport failure or when the daemon
-        predates the command — an absent channel is no reading,
-        never a zero reading. An un-warmed field still answers:
-        presence flags clear, readings zeroed.
-        """
-        try:
-            resp = self._request(GET_FIELD_SPECTRUM, timeout=timeout)
-        except (ConnectionError, OSError, ProtocolError):
-            return None
-        try:
-            return FieldSpectrum.unpack(resp)
-        except (IndexError, struct.error, ValueError):
-            return None
+        return FieldProbeSignature.unpack(resp)
 
     def get_field_state(self, *, timeout: float | None = None) -> FieldState | None:
         """The latent field's integration readout — the organism's
@@ -921,15 +885,64 @@ class GenesisClient:
                 out[key] = value
         return out
 
+    def set_field_carrier(
+        self, depth: float, freq: float = 0.0, *, timeout: float | None = None
+    ) -> bool:
+        """Set the carrier's real-work modulation — the write side.
+
+        ``depth`` 0..1 scales the work-slice modulation (0 =
+        unmodulated work, carrier silent). ``freq`` 0 hands the rhythm
+        back to the body's phase; positive overrides it (clamped
+        0.1..100 Hz) so evaluation can drive arbitrary bands —
+        including infraslow rates where the thermal field can
+        hold an oscillation.
+
+        Returns ``False`` when the probe isn't running or the daemon
+        predates the command — an absent channel, never silent.
+        """
+        payload = _F32.pack(depth) + _F32.pack(freq)
+        try:
+            resp = self._request(SET_FIELD_CARRIER, payload, timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return False
+        return bool(resp) and resp[0] == 1
+
+    def set_field_pulse(
+        self,
+        base: float,
+        mod_freq: float,
+        mod_depth: float,
+        *,
+        timeout: float | None = None,
+    ) -> bool:
+        """Arm the parasympathetic pulse — a slow wave riding carrier depth.
+
+        While armed, the probe breathes carrier depth as
+        ``base + mod_depth·sin(2π·mod_freq·t)``, integrated on the
+        body's own clock — the RSA analog: the vagal signature is the
+        pulse's slow wax and wane, never a pinned tempo. Carrier rate
+        stays the phase's own either way; ``mod_freq <= 0`` disarms
+        and depth returns to the static set-point.
+
+        Returns ``False`` when the probe isn't running or the daemon
+        predates the command — an absent channel, never silent.
+        """
+        payload = _F32.pack(base) + _F32.pack(mod_freq) + _F32.pack(mod_depth)
+        try:
+            resp = self._request(SET_FIELD_PULSE, payload, timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return False
+        return bool(resp) and resp[0] == 1
+
     def get_optic_state(self, *, timeout: float | None = None) -> OpticState | None:
         """The optic nerve's subcortical channel state — the body's own
         read of the eye.
 
         Photopic and melanopic irradiance, motion energy, the
         collicular orienting transient, the SCN light drive the body
-        feeds its circadian oscillator, the thalamic relay's
-        corticothalamic gain, and the voluntary lid — the eye's own
-        aperture state, lid-filtered on every afferent channel.
+        feeds its circadian oscillator, and the thalamic relay gate
+        the mind must honour — near zero in NREM/REM, open while
+        awake. A look through a closed gate is a blind look.
 
         ``eye_present`` distinguishes "the eye exists but sees nothing"
         from "there is no eye"; ``frame_seq``/``frame_age_ms`` let the
@@ -1110,67 +1123,6 @@ class GenesisClient:
         """
         resp = self._request(GET_MOTOR_TARGET, timeout=timeout)
         return unpack_motor_target(resp)
-
-
-    def get_actuators(self, *, timeout: float | None = None) -> list[tuple[str, int, bool, str]]:
-        """The body's actuator census — what she can DO right now.
-
-        Returns ``[(name, kind, available, absent_reason)]`` — kind 0
-        local, 1 relayed; absent_reason empty when the limb is present.
-        See ``src/daemon/actuators.rs``.
-        """
-        resp = self._request(LIST_ACTUATORS, timeout=timeout)
-        out: list[tuple[str, int, bool, str]] = []
-        i = 0
-        if not resp:
-            return out
-        count = resp[0]
-        i = 1
-        for _ in range(count):
-            if i >= len(resp):
-                break
-            nl = resp[i]
-            i += 1
-            name = resp[i : i + nl].decode("utf-8", "replace")
-            i += nl
-            kind = resp[i]
-            avail = bool(resp[i + 1])
-            i += 2
-            rl = resp[i]
-            i += 1
-            reason = resp[i : i + rl].decode("utf-8", "replace")
-            i += rl
-            out.append((name, kind, avail, reason))
-        return out
-
-    def actuate(
-        self, name: str, arg: str = "", *, timeout: float | None = None
-    ) -> tuple[bool, str] | None:
-        """Fire one actuator by name — the efferent half of the census.
-
-        ``get_actuators()`` answers what the body can do; this does
-        it. The daemon's own ``actuate`` owns the firing semantics —
-        census lookup, availability, local vs relayed — and reports
-        back in the limb's own words.
-
-        Returns ``(True, report)`` on a fired limb, ``(False, reason)``
-        when the limb is unknown or unavailable, and ``None`` when the
-        daemon predates the command or can't be reached — an absent
-        channel, never silent.
-        """
-        try:
-            nb = name.encode("utf-8")
-            ab = arg.encode("utf-8")
-            payload = bytes([len(nb) & 0xFF]) + nb + len(ab).to_bytes(2, "little") + ab
-            resp = self._request(ACTUATE, payload, timeout=timeout)
-        except (ConnectionError, OSError, ProtocolError):
-            return None
-        if not resp or len(resp) < 3:
-            return None
-        ok = resp[0] != 0
-        ml = int.from_bytes(resp[1:3], "little")
-        msg = resp[3 : 3 + ml].decode("utf-8", "replace")
-        return (ok, msg)
 
     def get_neuro_summary(self, *, timeout: float | None = None) -> NeuroSummary:
         """Get the compact neurochemical summary (32 bytes).
@@ -1372,7 +1324,7 @@ class GenesisClient:
         verbatim).
 
         Returns:
-            The effective levels in canonical chemical order, or
+            The 12 effective levels in canonical chemical order, or
             None if the state cannot be read.
         """
         try:
@@ -1436,10 +1388,7 @@ class GenesisClient:
         payload.append(event_type & 0xFF)
         payload.append(source_module & 0xFF)
         payload.extend(_F32.pack(salience))
-        # The wire field is [f32; WIRE_EMOTIONAL_TAG_SIZE] — the
-        # daemon stamps those effective levels itself. The logical
-        # tag may be wider; only the first wire-width values cross.
-        for v in emotional_tag[:WIRE_EMOTIONAL_TAG_SIZE]:
+        for v in emotional_tag:
             payload.extend(_F32.pack(v))
         payload.extend(_U16.pack(text_len))
         payload.extend(text_bytes)
@@ -1511,23 +1460,16 @@ class GenesisClient:
         payload.append(event_type & 0xFF)
         payload.append(source_module & 0xFF)
         payload.extend(_F32.pack(salience))
-        # Same wire layout as store_event — [f32; WIRE_EMOTIONAL_TAG_SIZE].
-        for v in emotional_tag[:WIRE_EMOTIONAL_TAG_SIZE]:
+        for v in emotional_tag:
             payload.extend(_F32.pack(v))
         payload.extend(_U16.pack(text_len))
         payload.extend(text_bytes)
 
         resp = self._request(STORE_EPISODE, bytes(payload), timeout=timeout)
         if len(resp) >= 9 and resp[0] == 1:
-            # The daemon returns its 12 stamped levels; pad back to the
-            # logical tag width so the caller's record stays uniform.
             stamped = (
-                [
-                    _F32.unpack(resp[9 + i * 4 : 13 + i * 4])[0]
-                    for i in range(WIRE_EMOTIONAL_TAG_SIZE)
-                ]
-                + [0.0] * (EMOTIONAL_TAG_SIZE - WIRE_EMOTIONAL_TAG_SIZE)
-                if len(resp) >= 9 + WIRE_EMOTIONAL_TAG_SIZE * 4
+                [_F32.unpack(resp[9 + i * 4 : 13 + i * 4])[0] for i in range(EMOTIONAL_TAG_SIZE)]
+                if len(resp) >= 9 + EMOTIONAL_TAG_SIZE * 4
                 else None
             )
             return _U64.unpack(resp[1:9])[0], stamped

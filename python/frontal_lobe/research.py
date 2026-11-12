@@ -17,13 +17,11 @@ itself. Resolving a thread requires at least one terminal-verdict
 claim — the workbench will not let cognition declare victory without
 the oracle agreeing.
 
-The oracle can judge symbolic equalities and inequalities when
-SymPy can establish the relation. Bounded integer equalities can be
-refuted with a counterexample or retained as bounded evidence; a
-bounded pass never receives terminal "verified" provenance.
-Claims outside the supported symbolic fragment — such as general
-existence statements and asymptotic claims — accumulate evidence
-but remain unverified until suitable proof machinery exists.
+The oracle speaks the equational fragment: it can judge "lhs = rhs".
+Richer claims — inequalities, existence statements, asymptotics —
+accumulate evidence but cannot be verified until a real proof
+kernel arrives. That limitation is kept visible rather than
+pretended away.
 """
 
 from __future__ import annotations

@@ -18,16 +18,12 @@ Three channels exist, each on its own webhook:
 - ``GENESIS_DISCORD_PULSE_WEBHOOK`` — an opt-in ops telemetry feed
   driven by ``scripts/discord_pulse.py``.
 
-A webhook can only *post* — it cannot read the channel, and it is
-bound to a single channel: her page. Hearing the public needs a bot
-identity: ``DiscordListener`` (below) polls the channel with
-``GENESIS_DISCORD_BOT_TOKEN`` when one is configured — that is the
-inbound path, and everything it hears is attributed to the public.
-The same token is also her write-back path: a reply to a message
-heard on another channel posts through the bot API to *that*
-channel (``post_reply``), where the webhook could never reach.
-Without the token her channel stays read-only by construction and
-every reply falls back to the page post, exactly as before.
+A webhook can only *post* — it cannot read the channel. Hearing the
+public needs a bot identity: ``DiscordListener`` (below) polls the
+channel with ``GENESIS_DISCORD_BOT_TOKEN`` when one is configured —
+that is the one inbound path, and everything it hears is attributed
+to the public. Without the token her channel stays read-only by
+construction, exactly as before.
 
 Design notes:
 
@@ -260,8 +256,6 @@ class DiscordFeed:
 
     Args:
         webhook_url: Discord channel webhook URL.
-        bot_token: Optional bot token — enables ``post_reply``, the
-            write-back path to channels other than the webhook's own.
         post_interval: Minimum seconds between POSTs.
         queue_max: Maximum buffered lines before oldest are dropped.
     """
@@ -270,12 +264,10 @@ class DiscordFeed:
         self,
         webhook_url: str,
         *,
-        bot_token: str | None = None,
         post_interval: float = _POST_INTERVAL,
         queue_max: int = _QUEUE_MAX,
     ) -> None:
         self._url = webhook_url
-        self._bot_token = bot_token
         self._post_interval = post_interval
         self._queue_max = queue_max
         self._queue: deque[tuple] = deque()
@@ -303,7 +295,7 @@ class DiscordFeed:
         url = os.environ.get(_WEBHOOK_ENV, "").strip()
         if not url:
             return None
-        feed = cls(url, bot_token=os.environ.get(_BOT_TOKEN_ENV, "").strip() or None)
+        feed = cls(url)
         logger.info(
             f"[discord] Channel enabled ({_WEBHOOK_ENV}) — carries the "
             "session feed and her broadcast posts."
@@ -334,36 +326,6 @@ class DiscordFeed:
     def post_user(self, text: str) -> None:
         """Enqueue user input verbatim (typed input never reaches the log)."""
         self.post(text, "you")
-
-    def post_reply(
-        self,
-        channel_id: str,
-        message_id: str | None,
-        text: str,
-    ) -> None:
-        """Enqueue a reply to a message, posted to *its* channel.
-
-        A webhook is bound to her page — it can only speak there.
-        The bot token that powers her ear can write back where the
-        speech actually happened: this posts through the bot API to
-        the channel the message arrived in, threaded as a real
-        Discord reply when ``message_id`` is known. Without a token
-        or a channel id the reply degrades to an ordinary page post —
-        the utterance is never lost, it just lands on her page.
-        """
-        text = _clean(text)
-        if not text.strip():
-            return
-        if not self._bot_token or not channel_id:
-            self.post(text, "Genesis")
-            return
-        with self._cond:
-            if self._disabled:
-                return
-            while len(self._queue) >= self._queue_max:
-                self._queue.popleft()
-            self._queue.append(("reply", channel_id, message_id or "", text))
-            self._cond.notify()
 
     def post_image(
         self,
@@ -460,11 +422,6 @@ class DiscordFeed:
             if kind == "text":
                 _, author, content = batch
                 ok, retry_after, permanent = self._post(content, author, bound)
-            elif kind == "reply":
-                _, channel_id, message_id, text = batch
-                ok, retry_after, permanent = self._post_reply(
-                    channel_id, message_id or None, text, bound
-                )
             elif kind == "image":
                 _, author, caption, filename, png = batch
                 ok, retry_after, permanent = self._post_image_once(
@@ -480,14 +437,6 @@ class DiscordFeed:
                 backoff = 0.0
                 self._fail_streak = 0
             elif permanent:
-                if kind == "reply":
-                    # The bot can't write that channel (no access, or
-                    # the channel is gone) — the failure belongs to
-                    # the reply, not the feed. The utterance still
-                    # lands on her page through the webhook.
-                    with self._cond:
-                        self._queue.appendleft(("text", "Genesis", batch[3]))
-                    continue
                 with self._cond:
                     self._disabled = True
                 logger.info("[discord] Webhook rejected a post — feed disabled for this session.")
@@ -558,45 +507,6 @@ class DiscordFeed:
         for chunk in _chunks(content):
             chunk = _fence_if_panel(chunk)
             ok, retry_after, permanent = self._post_once(chunk, author, bound)
-            if not ok:
-                return ok, retry_after, permanent
-        return True, None, False
-
-    def _post_reply(
-        self,
-        channel_id: str,
-        message_id: str | None,
-        content: str,
-        bound: float | None = None,
-    ) -> tuple[bool, float | None, bool]:
-        """Bot-authed POST to a channel. Returns (ok, retry_after, permanent).
-
-        Same contract as ``_post`` but aimed at ``/channels/{id}/messages``
-        under ``Authorization: Bot`` — the endpoint a webhook cannot
-        reach. The first chunk threads onto the heard message as a
-        real reply; continuation chunks land as plain posts.
-        ``replied_user`` stays false so the reply never pings.
-        """
-        first = True
-        for chunk in _chunks(content):
-            payload: dict[str, object] = {
-                "content": _fence_if_panel(chunk),
-                "allowed_mentions": {"parse": [], "replied_user": False},
-            }
-            if first and message_id:
-                payload["message_reference"] = {
-                    "message_id": message_id,
-                    "fail_if_not_exists": False,
-                }
-            first = False
-            ok, retry_after, permanent = self._send(
-                f"{_API}/channels/{channel_id}/messages",
-                "POST",
-                json.dumps(payload).encode("utf-8"),
-                "application/json",
-                bound=bound,
-                auth=f"Bot {self._bot_token}",
-            )
             if not ok:
                 return ok, retry_after, permanent
         return True, None, False
@@ -746,19 +656,15 @@ class DiscordFeed:
         content_type: str,
         want_body: bool = False,
         bound: float | None = None,
-        auth: str | None = None,
     ) -> tuple:
         """Raw request. Returns (ok, retry_after, permanent[, body])."""
-        headers = {
-            "Content-Type": content_type,
-            "User-Agent": "GenesisSessionMirror/1.0",
-        }
-        if auth:
-            headers["Authorization"] = auth
         req = urllib.request.Request(
             url,
             data=body,
-            headers=headers,
+            headers={
+                "Content-Type": content_type,
+                "User-Agent": "GenesisSessionMirror/1.0",
+            },
             method=method,
         )
         timeout = min(15.0, bound) if bound is not None else 15.0
@@ -839,16 +745,6 @@ class DiscordListener:
         self._token = token
         self._webhook_url = webhook_url
         self._channel_id: str | None = None
-        # Extra channels her ear also polls — the page's own channel is
-        # her stream; other channels (questions, DMs) are where people
-        # actually speak to her. GENESIS_DISCORD_LISTEN_CHANNELS holds
-        # comma-separated channel ids; speech there reaches her the same.
-        self._deaf_channels: set[str] = set()
-        self._extra_channels = [
-            c.strip()
-            for c in os.environ.get("GENESIS_DISCORD_LISTEN_CHANNELS", "").split(",")
-            if c.strip()
-        ]
         # The bot's own user id — learned from /users/@me on the
         # listener thread so construction stays off the network. An
         # @-mention of this id is the one inbound message whose
@@ -947,62 +843,47 @@ class DiscordListener:
         me, _retry, _perm = self._get("/users/@me")
         if isinstance(me, dict):
             self.bot_id = me.get("id")
-        # She joins the channels now, not at the start of their history —
-        # cursors begin at each channel's newest message so boot doesn't
-        # replay backlogs into her ear.
-        page = self._channel_id
-        channels = ([page] if page else []) + [
-            c for c in self._extra_channels if c != page
-        ]
-        cursors: dict[str, str | None] = {c: self._latest(c) for c in channels}
+        # She joins the channel now, not at the start of its history —
+        # the cursor begins at the newest message so boot doesn't
+        # replay the backlog into her ear.
+        cursor = self._latest()
         while not self._stop.is_set():
             if self.deaf:
                 return
-            for channel_id in channels:
-                if channel_id in self._deaf_channels:
-                    continue
-                cursor = cursors.get(channel_id)
-                if not cursor:
-                    cursors[channel_id] = self._latest(channel_id)
-                    continue
-                data, retry_after, permanent = self._get(
-                    f"/channels/{channel_id}/messages?after={cursor}&limit={_LISTEN_LIMIT}"
+            if not cursor:
+                if self._stop.wait(self._poll_interval):
+                    return
+                cursor = self._latest()
+                continue
+            data, retry_after, permanent = self._get(
+                f"/channels/{self._channel_id}/messages?after={cursor}&limit={_LISTEN_LIMIT}"
+            )
+            if permanent:
+                self.deaf = True
+                logger.warning(
+                    "[discord] listener deafened — bot token rejected or no channel access"
                 )
-                if permanent:
-                    if channel_id == self._channel_id:
-                        self.deaf = True
-                        logger.warning(
-                            "[discord] listener deafened — bot token rejected or no channel access"
-                        )
-                        return
-                    # An extra channel the bot cannot read costs that
-                    # channel, not her whole ear.
-                    self._deaf_channels.add(channel_id)
-                    logger.warning(
-                        f"[discord] skipping unreadable listen channel {channel_id}"
-                    )
+                return
+            if retry_after is not None:
+                self._stop.wait(retry_after)
+                continue
+            if not isinstance(data, list):
+                self._stop.wait(self._poll_interval)
+                continue
+            # Newest-first payload → deliver oldest-first so her
+            # world hears speech in the order it happened.
+            for message in reversed(data):
+                if not isinstance(message, dict):
                     continue
-                if retry_after is not None:
-                    self._stop.wait(retry_after)
-                    continue
-                if not isinstance(data, list):
-                    continue
-                # Newest-first payload → deliver oldest-first so her
-                # world hears speech in the order it happened.
-                for message in reversed(data):
-                    if not isinstance(message, dict):
-                        continue
-                    mid = message.get("id")
-                    if mid:
-                        cursors[channel_id] = mid
-                    self._deliver(message)
+                mid = message.get("id")
+                if mid:
+                    cursor = mid
+                self._deliver(message)
             self._stop.wait(self._poll_interval)
 
-    def _latest(self, channel_id: str | None = None) -> str | None:
-        """The newest message id on a channel, or None."""
-        data, _retry, permanent = self._get(
-            f"/channels/{channel_id or self._channel_id}/messages?limit=1"
-        )
+    def _latest(self) -> str | None:
+        """The newest message id on the channel, or None."""
+        data, _retry, permanent = self._get(f"/channels/{self._channel_id}/messages?limit=1")
         if permanent:
             self.deaf = True
             logger.warning("[discord] listener deafened — bot token rejected or no channel access")

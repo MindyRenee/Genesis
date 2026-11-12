@@ -180,7 +180,6 @@ def swallow_report() -> dict[str, object]:
         "total": sum(c for _, c in sites),
         "distinct_sites": len(sites),
         "busiest": sites[:5],
-        "sites": list(iter_sites()),
     }
 
 

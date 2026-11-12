@@ -65,7 +65,6 @@ from limbic_system.emotion import (
 )
 from self import Insight, Reflection
 from sleep.dream_synthesis import DreamSynthesis
-from sleep.inner_world import InnerWorldExperientialLatentSpace
 from temporal_lobe.concepts import ConceptNetwork, RelationType, strip_sense_suffix
 from temporal_lobe.concepts.types import Neighbor
 from thalamus.brain_waves import (  # canonical definition — avoids threshold drift
@@ -233,7 +232,6 @@ class InnerLife:
         engagement=None,
         get_fold_margins=None,
         seed: int | None = None,
-        on_latent_signal=None,
     ) -> None:
         """Initialize the inner life with its cognitive engines and callbacks.
 
@@ -283,7 +281,6 @@ class InnerLife:
         self.reflection = reflection
         self._get_emotion = get_emotion
         self._on_thought = on_thought
-        self._on_latent_signal = on_latent_signal
         self._on_neuro_impulse = on_neuro_impulse
         self._self_composer = self_composer
         self._self_model = self_model
@@ -326,8 +323,6 @@ class InnerLife:
         self._init_sleep_cycle()
         self._init_replay_systems()
         self._init_dream_synthesis()
-        # A persistent numerical state model, updated by every recorded thought.
-        self.inner_world = InnerWorldExperientialLatentSpace()
 
     def _init_awareness_agency(self) -> None:
         """Set up self-awareness module slots and curiosity-driven agency."""
@@ -909,11 +904,6 @@ class InnerLife:
             salience: Importance of the experience in [0, 1].
         """
         self._hippocampal_replay.queue_for_replay(experience_sequence, salience)
-        self._manifold_deposit(
-            " → ".join(experience_sequence),
-            "memory:replay",
-            salience=max(0.0, min(1.0, salience)),
-        )
 
     def _run(self) -> None:
         """Main loop — checks for spontaneous thoughts and builds trains of thought.
@@ -1363,16 +1353,22 @@ class InnerLife:
         return is_sleeping
 
     def _sleep_stage(self, summary) -> SleepStage:
-        """Resolve sleep stage without treating arousal as an EEG scorer.
+        """Determine the fine-grained sleep stage from the summary.
 
-        Explicit REM remains REM. For explicit NREM without an active
-        ultradian tracker, the canonical fallback is N1 because a broad
-        NREM phase and its arousal value do not establish N2 spindles or
-        N3 slow-wave activity. During normal tracked sleep, the tracker
-        supplies the stage progression used by sleep-event processing.
+        Maps the arousal level during sleep onto the NREM-REM cycle
+        stages (AASM scoring; Iber et al., 2007):
 
-        Preserve the existing N3 fallback for missing/non-sleeping
-        summaries; callers should invoke this only in the sleep path.
+            arousal > 0.50        → REM
+            0.35 < arousal ≤ 0.50 → N1
+            0.20 < arousal ≤ 0.35 → N2
+            arousal ≤ 0.20        → N3
+
+        If the phase name is explicitly "rem" (the split phase from
+        the Rust side), REM is returned directly regardless of arousal.
+
+        Returns ``SleepStage.N3`` (the deepest) as a safe default if
+        the summary is missing or not a sleeping phase, since the
+        deepest stage is where the most consolidation occurs.
         """
         if not InnerLife._is_sleeping(summary):
             return SleepStage.N3
@@ -1414,11 +1410,6 @@ class InnerLife:
         if concept_id and intensity > 0.0:
             with self._emotional_memories_lock:
                 self._pending_emotional_memories.append((concept_id, max(0.0, min(1.0, intensity))))
-            self._manifold_deposit(
-                str(concept_id),
-                "memory:emotional",
-                salience=max(0.0, min(1.0, intensity)),
-            )
 
     def _generate_dream(self, emotion: EmotionalState, summary) -> None:
         """Generate a dream sequence during sleep.
@@ -1484,10 +1475,7 @@ class InnerLife:
         if self._sleep_cycle is not None:
             dt = now - self._last_cycle_advance if self._last_cycle_advance > 0.0 else 0.0
             self._last_cycle_advance = now
-            # A newly attached tracker has no elapsed interval yet.
-            # Preserve its current stage until real time has accumulated;
-            # advance(0) must not reset the tracker's stage.
-            stage = self._sleep_cycle.current_stage if dt <= 0.0 else self._sleep_cycle.advance(dt)
+            stage = self._sleep_cycle.advance(dt)
         else:
             stage = self._sleep_stage(summary)
         # A nap is light sleep only: the network's N3 and REM are capped.
@@ -3935,7 +3923,7 @@ class InnerLife:
             self._last_env_sample = now
             try:
                 monitor.snapshot()
-            except Exception:
+            except Exception:  # env sensing must never kill the loop
                 logger.debug("environment snapshot failed", exc_info=True)
         snap = monitor.last_snapshot
         if snap is None:
@@ -5059,126 +5047,8 @@ class InnerLife:
                     facts.append(f"{rel_str} {target_display}")
         return ". ".join(facts), knowledge
 
-    def _observe_inner_world(self, thought: SpontaneousThought, emotion: EmotionalState) -> None:
-        """Map measured affect and this thought into the inner-world state."""
-        def bounded(name: str, default: float, low: float = -1.0, high: float = 1.0) -> float:
-            try:
-                value = float(getattr(emotion, name, default))
-            except (TypeError, ValueError):
-                value = default
-            return max(low, min(high, value)) if math.isfinite(value) else default
-
-        valence = bounded("valence", 0.0)
-        arousal = bounded("arousal", 0.5, 0.0, 1.0)
-        tone = bounded("tone", 0.0)
-        plasticity = bounded("plasticity", 0.5, 0.0, 1.0)
-        intensity = bounded("intensity", 0.0, 0.0, 1.0)
-        novelty = 0.0
-        metadata = getattr(thought, "metadata", None)
-        if isinstance(metadata, dict):
-            try:
-                novelty = max(0.0, min(1.0, float(metadata.get("novelty", 0.0))))
-            except (TypeError, ValueError):
-                novelty = 0.0
-        is_dream = bool(getattr(thought, "is_dream", False))
-        content = str(getattr(thought, "content", ""))
-        signals = [
-            valence, arousal, tone, plasticity, intensity, novelty,
-            float(is_dream), min(len(content), 1000) / 1000.0,
-        ]
-        try:
-            from latent_spaces import geometry as _g
-
-            snapshot = self.inner_world.observe(
-                [valence, arousal, tone, plasticity],
-                signals,
-                label=str(getattr(thought, "trigger", ""))[:128],
-            )
-            # The inner world deposits *into* the substrate: its own
-            # 40-dim latent coordinate becomes the deposit's position
-            # in the inner band — the thought lives in the manifold at
-            # the spot the inner-world geometry computed, not a signal
-            # about it.
-            latent = (snapshot or {}).get("latent_mean")
-            if latent is not None:
-                self._manifold_deposit(
-                    content or str(getattr(thought, "trigger", "")),
-                    "dream:thought" if is_dream else "thought:spontaneous",
-                    salience=max(0.0, min(1.0, intensity)),
-                    position=_g.project_to_s3(latent, seed=0x1A7E),
-                )
-            # The feeling lands in the boundary band — hers and inner.
-            self._manifold_deposit(
-                f"valence={valence:.2f} arousal={arousal:.2f}",
-                "emotion:affect",
-                salience=max(0.0, min(1.0, intensity)),
-                position=_g.project_to_s3(
-                    [valence, arousal, tone, plasticity], seed=0xAFE4
-                ),
-            )
-            # Negative affect casts a shadow: the same territory,
-            # antipodal — her unintegrated dark side, born repressed
-            # (reach 0.05), surfacing in dreams, integrating on contact.
-            if valence < -0.2:
-                self._manifold_deposit(
-                    content or str(getattr(thought, "trigger", "")),
-                    f"shadow:{'dream' if is_dream else 'thought'}",
-                    salience=max(0.0, min(1.0, intensity)),
-                    position=_g.antipode(
-                        _g.project_to_s3(
-                            [valence, arousal, tone, plasticity], seed=0xAFE4
-                        )
-                    ),
-                )
-        except (TypeError, ValueError, ArithmeticError):
-            # The inner-world model is observational; it must never interrupt
-            # the established thought, memory, or workspace pipeline.
-            logger.debug("inner-world observation rejected", exc_info=True)
-
-    def _manifold_deposit(
-        self,
-        content: str,
-        kind: str,
-        *,
-        salience: float = 0.4,
-        position: Any | None = None,
-        inbound: bool = False,
-    ) -> None:
-        """Deposit inner-life content into the substrate. Observational —
-        the thought pipeline must never be interrupted by the manifold."""
-        manifold = getattr(self, "manifold", None)
-        if manifold is None:
-            return
-        try:
-            manifold.observe(
-                content,
-                kind=kind,
-                salience=salience,
-                inbound=inbound,
-                position=position,
-            )
-        except Exception:
-            logger.debug("manifold inner-life deposit failed", exc_info=True)
-
     def _record_thought(self, thought: SpontaneousThought, emotion: EmotionalState) -> None:
-        """Record a spontaneous thought and update its inner-world state."""
-        self._observe_inner_world(thought, emotion)
-        # Every recorded thought enters the shared self latent space,
-        # including sub-verbal thoughts that are not surfaced to language.
-        if self._on_latent_signal is not None:
-            try:
-                self._on_latent_signal(
-                    thought.content,
-                    f"thought:{thought.trigger or 'internal'}",
-                    {
-                        "trigger": thought.trigger,
-                        "is_dream": bool(getattr(thought, "is_dream", False)),
-                        "salience": 0.4,
-                        "addressed": getattr(thought, "intent", "") == "question",
-                    },
-                )
-            except Exception:
-                logger.debug("self latent thought integration failed", exc_info=True)
+        """Record a spontaneous thought and its effects."""
         with self._thoughts_lock:
             self._thoughts.append(thought)
             self._thought_count += 1

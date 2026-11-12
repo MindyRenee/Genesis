@@ -110,16 +110,14 @@ class ArchivalMixin:
     def restore_archive_to_working_memory(self) -> int:
         """Recall ALL archived concepts back into working memory.
 
-        Copies every archived concept and its edges into the in-memory
-        network. The archive remains intact: this method cannot know
-        whether the caller has durably saved the reconstructed working
-        state. After that save succeeds, :meth:`dedupe_archive` can
-        remove the now-redundant archive rows.
+        Migrates every concept from the long-term archive back into
+        the in-memory network. This is the inverse of
+        :meth:`spill_dormant` — it loads the entire archive into RAM.
 
         Use this when you need the full concept network in working
-        memory (e.g., before a bulk analysis pass). Keeping the archive
-        copy until durable acknowledgement prevents a crash between
-        reconstruction and save from destroying the only persisted copy.
+        memory (e.g., before a bulk analysis pass, or to reset the
+        working/archive split). After this call, the archive will be
+        empty and all concepts will be in working memory.
 
         Returns:
             The number of concepts recalled from the archive.
@@ -146,11 +144,9 @@ class ArchivalMixin:
                 self._add_alias(alias, concept.id)
             for col in concept.columns or {_column_of(concept.origin, concept.id)}:
                 self._column_index.setdefault(col, set()).add(concept.id)
-            # Read archived edges without consuming the durable copy.
-            # The caller must persist this reconstructed network before
-            # dedupe_archive removes the archive rows.
+            # Recall archived edges for this concept.
             try:
-                archived_edges = self._archive.peek_edges(concept.id)
+                archived_edges = self._archive.recall_edges(concept.id)
             except (sqlite3.Error, RuntimeError) as e:
                 _note_archive_error(
                     "temporal_lobe.concepts.archival.restore_archive_to_working_memory",
@@ -190,9 +186,14 @@ class ArchivalMixin:
                         edge.origin,
                         edge.created_at,
                     )
-            # Keep the archive row until the reconstructed network has
-            # been durably saved. A crash before that point must leave
-            # the original concept and its relationships recoverable.
+            # Remove from the archive (concept + aliases).
+            try:
+                self._archive.recall_concept(concept_id)
+            except (sqlite3.Error, RuntimeError) as e:
+                _note_archive_error(
+                    "temporal_lobe.concepts.archival.restore_archive_to_working_memory",
+                    e,
+                )
             recalled += 1
         # Invalidate caches
         self._concept_ids_cache: list[str] | None = None
@@ -219,11 +220,9 @@ class ArchivalMixin:
         ``add_concept``'s archive check, and the stale archive row is
         never cleaned because every lookup finds the hot concept first.
 
-        Call after a validated state restore. Before dropping stale
-        concept rows, merge their archived edges into working memory and
-        reassert them into the canonical edge log. If an edge endpoint is
-        absent or a read/write fails, retain the archive rows. Returns
-        the number of stale rows removed.
+        Call after state restore. Working memory always wins — the
+        archived copy is by definition older. Returns the number of
+        stale rows removed.
         """
         if self._archive is None:
             return 0
@@ -232,91 +231,8 @@ class ArchivalMixin:
             dupes = [cid for cid in archived_ids if cid in self._concepts]
             if not dupes:
                 return 0
-
-            # A stale archive concept can still be the only durable copy
-            # of an edge: the edge log may have been partially retracted
-            # during an interrupted spill. Merge archived edges back into
-            # the live graph before removing any archive rows.
-            archived_edges: dict[tuple[str, str, str], dict[str, Any]] = {}
-            for concept_id in dupes:
-                for edge_data in self._archive.peek_edges(concept_id):
-                    key = (
-                        edge_data["source"],
-                        edge_data["target"],
-                        edge_data["relation"],
-                    )
-                    archived_edges[key] = edge_data
-
-            parsed_edges: list[tuple[tuple[str, str, RelationType], Edge]] = []
-            for edge_data in archived_edges.values():
-                source = edge_data["source"]
-                target = edge_data["target"]
-                if source not in self._concepts or target not in self._concepts:
-                    logger.warning(
-                        "Keeping %d archive concept rows: archived edge %s->%s "
-                        "has an endpoint outside working memory",
-                        len(dupes),
-                        source,
-                        target,
-                    )
-                    return 0
-                try:
-                    relation = RelationType(edge_data["relation"])
-                except ValueError:
-                    logger.error(
-                        "Keeping %d archive concept rows: unknown archived edge "
-                        "relation %r",
-                        len(dupes),
-                        edge_data["relation"],
-                    )
-                    return 0
-                origin = edge_data["origin"]
-                if self._edge_log is not None and is_derivable_edge(relation, origin):
-                    # Derivable edges are query-time geometry, not canonical
-                    # relationships. A live edge log must never materialize
-                    # them, including during archive recovery.
-                    continue
-                edge = Edge(
-                    source=source,
-                    target=target,
-                    relation=relation,
-                    weight=edge_data["weight"],
-                    created_at=edge_data["created_at"],
-                    origin=origin,
-                )
-                parsed_edges.append(((source, target, relation), edge))
-
-            # Reassert every archived edge into the canonical log before
-            # deleting its durable archive copy. Repeated assertions are
-            # idempotent under the edge-log fold (last write wins).
-            if self._edge_log is not None:
-                for _key, edge in parsed_edges:
-                    self._edge_log.assert_edge(
-                        edge.source,
-                        edge.target,
-                        edge.relation,
-                        edge.weight,
-                        edge.origin,
-                        edge.created_at,
-                    )
-
-            for key, edge in parsed_edges:
-                if key in self._edge_key_index:
-                    continue
-                self._edges.append(edge)
-                self._edge_index.setdefault(edge.source, []).append(edge)
-                self._reverse_index.setdefault(edge.target, []).append(edge)
-                self._edge_key_index[key] = edge
-
             removed = self._archive.remove_concepts_batch(dupes)
-            if removed != len(dupes):
-                logger.error(
-                    "Archive deduplication removed %d of %d rows; "
-                    "durable archive data may still contain duplicates",
-                    removed,
-                    len(dupes),
-                )
-        except (sqlite3.Error, OSError, RuntimeError, ValueError) as e:
+        except (sqlite3.Error, RuntimeError) as e:
             _note_archive_error(
                 "temporal_lobe.concepts.archival.dedupe_archive",
                 e,
@@ -358,19 +274,11 @@ class ArchivalMixin:
                 )
         if edge_dicts:
             try:
-                archived_count = self._archive.archive_edges_batch(edge_dicts)
+                self._archive.archive_edges_batch(edge_dicts)
             except (sqlite3.Error, RuntimeError) as e:
                 _note_archive_error(
                     "temporal_lobe.concepts.archival._archive_spilled_edges",
                     e,
-                )
-                return False
-            if archived_count != len(edge_dicts):
-                logger.error(
-                    "Archived %d of %d spill edges; refusing to retract the "
-                    "canonical edge log",
-                    archived_count,
-                    len(edge_dicts),
                 )
                 return False
             # Retract from the canonical log. The archive now holds a
@@ -400,14 +308,10 @@ class ArchivalMixin:
                             edge.relation,
                         )
                     except (OSError, ValueError) as e:
-                        logger.error(
-                            "Edge-log retraction during spill failed for "
-                            "%s->%s; leaving concepts in working memory: %s",
-                            edge.source,
-                            edge.target,
-                            e,
+                        logger.warning(
+                            f"edge log retraction during spill failed for "
+                            f"{edge.source}->{edge.target}: {e}"
                         )
-                        return False
         return True
 
     def _remove_spilled_from_working_memory(self, to_spill: set[str]) -> None:
@@ -562,14 +466,8 @@ class ArchivalMixin:
             logger.warning(f"archive batch spill failed: {e}")
             spilled = 0
 
-        if spilled != len(items):
-            logger.error(
-                "spill archived %d of %d concepts; leaving all candidates "
-                "in working memory",
-                spilled,
-                len(items),
-            )
-            return 0
+        if spilled <= 0:
+            return spilled
 
         to_spill = {cid for cid, _, _ in items}
         # Archive edges involving spilled concepts.

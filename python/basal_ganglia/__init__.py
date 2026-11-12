@@ -115,18 +115,11 @@ _EXPORTS: dict[str, str] = {
     # GABA — the striatum's own inhibitory currency: direct/indirect
     # pathway gating lives here, not in a general pool
     "GABA": "basal_ganglia.gaba",
-    # Canonical motor actuator vocabulary (matching src/daemon/actuators.rs)
-    "ALL_LIMBS": "basal_ganglia.actuators",
-    "LOCAL_LIMBS": "basal_ganglia.actuators",
-    "RELAY_LIMBS": "basal_ganglia.actuators",
 }
 
 __all__ = [
-    "ALL_LIMBS",
     "GABA",
     "HABIT_THRESHOLD",
-    "LOCAL_LIMBS",
-    "RELAY_LIMBS",
     "ActionBid",
     "ActionFeedback",
     "ActionPrediction",

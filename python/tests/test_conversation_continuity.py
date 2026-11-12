@@ -177,61 +177,6 @@ def test_comparison_normalizes_each_side(engine):
     assert "dog" in state.thought.topics
 
 
-def test_grounded_comprehension_reaches_downstream_perception(engine, monkeypatch):
-    """Known multiword arguments must reach attention and reasoning as concept IDs."""
-    from frontal_lobe import prefrontal as prefrontal_module
-
-    eng, network, _memory = engine
-    text = "The quantum mechanism is stable."
-
-    # Simulate the learner acquiring the concept from this same input.
-    # Grounding must run after this write, not one turn later.
-    def learn_current_concept(_text):
-        network.add_concept("quantum mechanism", confidence=0.9)
-        return []
-
-    monkeypatch.setattr(eng.self_learner, "learn_from_input", learn_current_concept)
-    comprehension, _events, prediction, _recent = eng._think_comprehend_and_predict(text)
-    assert comprehension.grounded
-    assert comprehension.grounded[0].subject.concept_id == "quantum mechanism"
-
-    # Isolate the handoff: prove the grounded topic is added even when
-    # the independent surface-topic extractor contributes no topic.
-    original_perceive = prefrontal_module.perceive
-
-    def without_surface_topics(*args, **kwargs):
-        perception = original_perceive(*args, **kwargs)
-        perception.topics.clear()
-        return perception
-
-    monkeypatch.setattr(prefrontal_module, "perceive", without_surface_topics)
-    perception, _error = eng._think_perceive_and_error(
-        text,
-        prediction,
-        comprehension,
-    )
-
-    assert "quantum mechanism" in perception.topics
-
-
-def test_early_route_updates_discourse_situation(engine):
-    """A fast answer must update the same discourse model as a full turn."""
-    eng, _network, _memory = engine
-    text = "Mary is in the kitchen."
-    comprehension = eng.comprehension.comprehend(text)
-    eng._pending_question_concepts["mary"] = "Where is Mary?"
-
-    early = eng._think_early_routes(
-        text,
-        perceive(text),
-        comprehension_result=comprehension,
-    )
-
-    assert early is not None
-    place, _candidates = eng.situation_model.where_is("Mary")
-    assert place == "kitchen"
-
-
 def test_non_routed_input_still_falls_through(engine):
     """A plain statement with no route keeps going to the full pipeline."""
     eng, _network, memory = engine

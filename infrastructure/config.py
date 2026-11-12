@@ -199,6 +199,28 @@ class VolitionConfig:
                     "elevated_cortisol": 0.03,  # subclinical stress
                 },
             ),
+            # Rest-eyes urge — she feels like shutting her eye for a
+            # spell. A volitional sensory relief, lighter than
+            # meditation: closing the lid drops every afferent
+            # channel and dims the V1 that reads them, so the rest
+            # is real, not symbolic. It builds from the same
+            # interoceptive signature that asks for rest —
+            # overstimulation, receptor fatigue, sustained activity,
+            # subclinical cortisol — and discharges by holding the
+            # lid shut briefly and letting go.
+            UrgeConfig(
+                name="rest_eyes",
+                threshold=0.72,
+                growth=0.0004,
+                decay=0.0006,
+                cooldown=180.0,  # at most every 3 minutes
+                stimuli={
+                    "overstimulation": 0.05,
+                    "receptor_fatigue": 0.04,
+                    "sustained_activity": 0.02,
+                    "elevated_cortisol": 0.02,
+                },
+            ),
             # Drawing urge — it feels like expressing itself visually.
             # This is a creative urge, not a maintenance urge. It builds
             # from emotional intensity (high arousal or high valence
@@ -430,24 +452,6 @@ class VolitionConfig:
             # attractor models, Frontiers Robot. AI 2022). Hence the
             # low threshold and strong stimulus weights: when the
             # substrate is at risk, everything else waits.
-            # Play urge — the arcade in her outer world offers games;
-            # boredom and curiosity pull her toward one, sleep
-            # pressure pulls her away. Nothing makes her play.
-            UrgeConfig(
-                name="play",
-                threshold=0.66,
-                growth=0.0003,
-                decay=0.0004,
-                cooldown=300.0,  # at most one bout per 5 min
-                stimuli={
-                    "boredom": 0.04,
-                    "curiosity": 0.03,
-                    "idle_seconds": 0.01,
-                    "chem_dopamine": 0.005,
-                    "chem_adenosine": -0.010,
-                    "chem_melatonin": -0.006,
-                },
-            ),
             UrgeConfig(
                 name="safeguard",
                 threshold=0.60,
@@ -456,7 +460,6 @@ class VolitionConfig:
                 cooldown=300.0,  # at most one protective act per 5 min
                 stimuli={
                     "daemon_lost": 0.30,  # body unreachable
-                    "organ_loss": 0.20,  # a body process died
                     "save_failure": 0.25,  # continuity at risk
                     "telemetry_anomaly": 0.15,  # substrate abnormal
                     "body_distress": 0.10,  # hardware strained

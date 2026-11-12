@@ -7,7 +7,7 @@ with Genesis as a cognitive being.
 The class is decomposed into mixins by anatomical owner — each
 mixin lives in the region whose function it implements:
 brainstem (heartbeat, lifecycle, sleep-wake), basal_ganglia
-(volition), worlds (conversation / outer-world interface), frontal_lobe (status, projects),
+(volition), frontal_lobe (conversation, status, projects),
 parietal_lobe (embodiment), and self (proposals). This module
 holds the class definition, the brain wiring, and the core
 respond() entry point.
@@ -40,6 +40,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from brainstem.brainstem import Brainstem
 from cerebellum.cerebellum import Cerebellum
+from frontal_lobe import FrontalLobe
 from frontal_lobe.autonomous import AutonomousLearner
 from frontal_lobe.canvas import Canvas
 from frontal_lobe.painting import Painter
@@ -54,7 +55,6 @@ from self import (
     EmergentIdentitySource,
     HeuristicExperiment,
     SelfImprovement,
-    SelfLatentSpaceArchitecture,
     SelfModel,
 )
 from sleep.inner_life import InnerLife
@@ -68,7 +68,6 @@ from worlds.board import ChannelBoard
 from worlds.world import OuterWorld
 
 from discord_feed import DiscordFeed
-from frontal_lobe import FrontalLobe
 from genesis_client import GenesisClient
 from genesis_client.protocol import CHEM_ACETYLCHOLINE
 from genesis_client.swallow import note_swallowed, set_swallow_sink
@@ -77,7 +76,6 @@ from infrastructure.growth_ledger import GrowthLedger
 from infrastructure.journal import CognitiveJournal, set_active
 from infrastructure.paths import code_root
 from infrastructure.user_profile import UserProfile
-from latent_spaces import LatentManifold
 from memory import MemorySystem
 
 if TYPE_CHECKING:
@@ -85,15 +83,15 @@ if TYPE_CHECKING:
 
     from worlds.channel import Channel
 from basal_ganglia.volition import VolitionMixin
-from brainstem.cycle import CycleMixin
 from brainstem.heart import Heart
 from brainstem.lifecycle import LifecycleMixin
+from brainstem.metronome import MetronomeMixin
+from frontal_lobe.conversation import ConversationMixin
 from frontal_lobe.projects import ProjectsMixin
 from frontal_lobe.status import StatusMixin
 from self.man_review import ManReviewMixin
 from self.proposals import ProposalsMixin
 from sleep.sleep import SleepMixin
-from worlds.conversation import ConversationMixin
 
 # Provenance marker — one letter of the creator lattice (see
 # PROVENANCE.md).
@@ -104,7 +102,7 @@ logger = logging.getLogger(__name__)
 
 class Mind(
     LifecycleMixin,
-    CycleMixin,
+    MetronomeMixin,
     VolitionMixin,
     SleepMixin,
     ProjectsMixin,
@@ -137,7 +135,6 @@ class Mind(
         "speech": 0.0,  # talking — immediate
         "meditate": 0.0,  # self-regulation — immediate
         "look": 20.0,  # vision — light creative
-        "play": 60.0,  # games — needs wake settling
         "draw": 30.0,  # art — moderate creative
         "improve": 90.0,  # self-improvement — heaviest CPU
         "create": 60.0,  # project creation — heavy CPU (compile + test)
@@ -163,8 +160,8 @@ class Mind(
         "/learn-code": "learn_code",
         "/explore": "explore_files",
         "/world": "world_status",
-        "/arcade": "arcade_status",
-        "/authority": "set_policy_authority",
+        "/close-eyes": "close_eyes",
+        "/open-eyes": "open_eyes",
     }
 
     def __init__(
@@ -185,9 +182,8 @@ class Mind(
         self._offline = offline
         # Resident (headless) mode: nobody sits at a prompt, so the
         # senses that exist to serve a session quiet down — the
-        # connectivity estimate stays reactive-only (no predictive
-        # hold), and the thalamic gate shuts with sleep onset
-        # instead of holding N1 open.
+        # connectivity probe never opens a socket, and the thalamic
+        # gate shuts with sleep onset instead of holding N1 open.
         self._headless = headless
         self.client = GenesisClient(socket_path)
         # Her page — the public channel that lives in her outer world.
@@ -202,22 +198,7 @@ class Mind(
         # Self-model — who Genesis is
         self.self_model = SelfModel(born_at=int(time.time() * 1000))
         self.self_model.body_model.socket_path = socket_path
-        # Shared geometric self-state model. Real thought and world-event
-        # callbacks feed this same instance so transitions are measured
-        # across the inner/outer boundary rather than in isolated demos.
-        self.self_latent_space = SelfLatentSpaceArchitecture()
 
-        # The latent manifold — the closed, positively-curved substrate
-        # beneath the fragmented stores. It accretes the same thought and
-        # world-event stream the self-state pipeline observes, and its
-        # image persists beside the other learned artifacts. A corrupt
-        # image costs only this layer: the rest of her memory is intact
-        # and the substrate re-accretes from living.
-        self.manifold = LatentManifold(data_dir=self.data_dir)
-        try:
-            self.manifold.load()
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"manifold image failed to load; starting empty: {e}")
         # User profile — a structured, persistent model of the human.
         profile_path = Path(self.data_dir) / "user_profile.json"
         self.user_profile = UserProfile(data_path=profile_path)
@@ -245,128 +226,6 @@ class Mind(
         self._init_sleep_compression()
         self._wire_modules()
         self._init_runtime_state()
-        # Hardware adapters start only after lifecycle startup connects the daemon.
-        self.android_sensor_adapter = None
-        self.android_microphone_adapter = None
-        self.android_camera_adapter = None
-
-    def _start_android_adapters(self) -> None:
-        """Start only explicitly enabled Termux adapters after Mind startup."""
-        if os.environ.get("GENESIS_ANDROID_SENSORS", "0") == "1":
-            from brainstem.android_sensors import AndroidSensorAdapter, is_android_termux
-
-            if is_android_termux():
-                adapter = AndroidSensorAdapter(self._on_android_sensor_sample)
-                if adapter.start():
-                    self.android_sensor_adapter = adapter
-        if os.environ.get("GENESIS_ANDROID_MICROPHONE", "0") == "1":
-            from brainstem.android_media import (
-                AndroidMicrophoneAdapter,
-                is_android_termux_microphone,
-            )
-
-            if is_android_termux_microphone():
-                adapter = AndroidMicrophoneAdapter(self._on_android_audio_clip)
-                if adapter.start():
-                    self.android_microphone_adapter = adapter
-        if os.environ.get("GENESIS_ANDROID_CAMERA", "0") == "1":
-            from brainstem.android_media import AndroidCameraAdapter, is_android_termux_camera
-
-            camera_id_text = os.environ.get("GENESIS_ANDROID_CAMERA_ID", "0")
-            if is_android_termux_camera() and camera_id_text.isdigit():
-                adapter = AndroidCameraAdapter(
-                    self._on_android_camera_frame,
-                    camera_id=int(camera_id_text),
-                )
-                if adapter.start():
-                    self.android_camera_adapter = adapter
-            elif not camera_id_text.isdigit():
-                logger.warning("Ignoring invalid GENESIS_ANDROID_CAMERA_ID=%r", camera_id_text)
-
-    def _on_android_camera_frame(self, frame) -> None:
-        """Run a measured Android camera frame through Genesis's visual cortex."""
-        try:
-            scene = self.vision.see_frame(
-                frame,
-                client=self.client,
-                emotion=self.feel(),
-                network=self.brain.frontal.network,
-                nerve="android_camera",
-            )
-            if scene.status != "ok":
-                return
-            metadata = scene.as_metadata()
-            self.world.perceive(
-                "Android camera scene",
-                salience=scene.salience,
-                source="android_camera",
-                topics=[],
-                metadata=metadata,
-                percept=metadata,
-            )
-        except Exception:
-            logger.exception("Android camera frame processing failed")
-
-    def _on_android_audio_clip(self, samples, sample_rate: int) -> None:
-        """Classify a measured Android audio clip and publish the sound event."""
-        try:
-            from temporal_lobe.auditory import classify_audio_clip
-
-            event = classify_audio_clip(samples, sample_rate)
-            if event.is_silence:
-                return
-            self.world.perceive(
-                event.description,
-                salience=max(0.1, min(1.0, event.loudness * event.confidence)),
-                source="android_microphone",
-                topics=[event.sound_type],
-                metadata={
-                    "sound_type": event.sound_type,
-                    "confidence": event.confidence,
-                    "loudness": event.loudness,
-                    "brightness": event.brightness,
-                    "noisiness": event.noisiness,
-                    "duration": event.duration,
-                    "valence": event.emotional_valence,
-                    "sample_rate": sample_rate,
-                    "sample_count": len(samples),
-                },
-                percept={
-                    "sound_type": event.sound_type,
-                    "confidence": event.confidence,
-                    "loudness": event.loudness,
-                    "brightness": event.brightness,
-                    "noisiness": event.noisiness,
-                    "duration": event.duration,
-                },
-            )
-        except Exception:
-            logger.exception("Android microphone clip processing failed")
-
-    def _on_android_sensor_sample(self, reading: dict) -> None:
-        """Publish measured Android sensor data into the ordinary world event path."""
-        name = str(reading.get("name", "sensor"))
-        values = reading.get("values")
-        if not isinstance(values, list):
-            return
-        from brainstem.android_sensors import _SENSOR_UNITS
-
-        lowered = name.casefold()
-        sensor_type = next((item for item in _SENSOR_UNITS if item in lowered), "unknown")
-        self.world.perceive(
-            f"Android sensor reading: {name}",
-            salience=0.25,
-            source="android_sensor",
-            topics=[],
-            metadata={
-                "sensor": name,
-                "sensor_type": sensor_type,
-                "values": values,
-                "units": _SENSOR_UNITS.get(sensor_type, "unknown"),
-                "accuracy": reading.get("accuracy"),
-                "sensor_timestamp": reading.get("timestamp"),
-            },
-        )
 
     @property
     def regulator(self):
@@ -493,9 +352,6 @@ class Mind(
         # here after both are initialized.
         if hasattr(self.brain.frontal, "embeddings") and self.brain.frontal.embeddings is not None:
             self.language.set_embeddings(self.brain.frontal.embeddings)
-            # The store answers similarity from the substrate when it
-            # can — its concepts already live there as deposits.
-            self.brain.frontal.embeddings.manifold = self.manifold
             # Wire the embedding field as the network's virtual
             # similarity layer: derivable associations are computed
             # from the latent space at query time (get_associations),
@@ -539,10 +395,6 @@ class Mind(
             synapses=self.brain.frontal.synapses,
             semantic_memory=self.brain.frontal.semantic_memory,
         )
-        # The electrochemical layer's protective-learning flag gates
-        # acquisition alongside the plasticity posture — attached
-        # post-construction like visual_cortex (same pattern).
-        self.learner._get_ion_context = self.brain.frontal.ion_context
         # Wire the embedding store into the learner for semantic
         # similarity and deep expectation generation. STDP uses the
         # shared synaptic substrate supplied above, not embeddings.
@@ -568,21 +420,7 @@ class Mind(
             frontal=self.brain.frontal,
             is_nap_mode=lambda: self._nap_mode,
             engagement=lambda: 0.0,
-            on_latent_signal=self._observe_self_latent_signal,
         )
-        # The inner world lives in the substrate: inner_life deposits
-        # its own latent coordinates into the manifold's inner band.
-        self.inner_life.manifold = self.manifold
-        self.memory.manifold = self.manifold
-        for _owner in (self.inner_life, getattr(self.brain, "frontal", None), self.memory):
-            _hg = getattr(getattr(_owner, "compression", None), "holographic_graph", None)
-            _hg = _hg if _hg is not None else getattr(_owner, "holographic_graph", None)
-            if _hg is not None:
-                _hg.manifold = self.manifold
-                break
-        _ws = getattr(getattr(self.brain, "frontal", None), "global_workspace", None)
-        if _ws is not None:
-            _ws.manifold = self.manifold
 
         # Wire the emotional memory callback: when a high-emotion
         # memory is stored, it's queued for REM emotional processing
@@ -612,7 +450,7 @@ class Mind(
             on_live_thought=self._emit_live_thought,
             executive=self.brain.frontal.executive,
             get_internals=self.client.get_internals,
-            get_motor_target=self.client.get_motor_target,
+            get_thermally_capped=lambda: self.self_model.body_model.thermally_capped,
         )
 
         # Limbic system — the affect region: the emotional regulator
@@ -653,37 +491,18 @@ class Mind(
             # a brain's, not at N2 like a session's.
             is_sleeping=lambda: self._is_sleeping or (self._headless and self.is_hypnagogic),
             get_user_name=self.user_profile.get_name,
-            get_user_facts=lambda: dict(self.user_profile.facts),
             channel=channel,
             on_channel_speech=self._hear_channel,
         )
-        # The outer world lives in the substrate too: her experience
-        # of it lands at its own experiential coordinate. world is
-        # created above — the wiring cannot happen earlier beside
-        # inner_life's.
-        self.world.manifold = self.manifold
         # The page's instrument card — the world owns it (a view of
         # her vitals, posted to her page); the metronome only ticks
         # the world, never composes for it.
         self.world.board = ChannelBoard(self)
-        # The arcade — games offered in her world (official ARC-AGI-3
-        # API). She chooses when to play; boards and moves flow back
-        # through the world into memory, cognition, chemistry, waves.
-        from tools.framework import get_tools
-        from worlds.games.arcade import Arcade
 
-        arcade = Arcade(
-            self.world,
-            voice=lambda text: self._emit_live_thought("play", text),
-            image_dir=os.path.join(self.data_dir, "arcade"),
-        )
-        arcade.register_tools(get_tools())
-
-        # The cardiac control center — the medullary organ whose
-        # beat IS the field's carrier frequency (the consensus
-        # winding rate Maxwell-signatures in the daemon), feels
-        # arrhythmia as coherence collapse, and expresses
-        # contractility as autonomic chemistry. This is its center.
+        # The cardiac control center — the medullary organ that reads
+        # the body's carrier pulse (daemon field probe), drives
+        # contractility with demand, and feels arrhythmia. The heart
+        # muscle itself is the daemon's carrier; this is its center.
         self.heart = Heart(
             client=self.client,
             neuro_impulse=self._learner_neuro_impulse,
@@ -745,13 +564,13 @@ class Mind(
         drives: dict[str, float] = {}
         try:
             drives["social"] = float(self.world.social_isolation())
-        except Exception:
-            logger.debug("social drive unavailable", exc_info=True)
+        except Exception:  # noqa: BLE001
+            pass
         try:
             for name, urge in self.volition.urges.items():
                 drives[name] = float(getattr(urge, "value", 0.0))
-        except Exception:
-            logger.debug("volition drives unavailable", exc_info=True)
+        except Exception:  # noqa: BLE001
+            pass
         return drives
 
     def _on_v1_gamma(self, gamma_power: float) -> None:
@@ -811,26 +630,6 @@ class Mind(
         self.vision = self.brain.occipital.vision
         self.vision.set_gamma_callback(self._on_v1_gamma)
         self.vision.set_sight_callback(self._on_sight)
-        # Wire the calibrated two-view visual spacetime bridge into the
-        # hippocampal cognitive map's shared SpacetimeWorkspace.
-        try:
-            from occipital_lobe.visual_spacetime import VisualSpacetimeBridge
-
-            workspace = getattr(
-                getattr(self.brain.temporal, "cognitive_map", None), "spacetime", None
-            )
-            if workspace is not None:
-                self.visual_spacetime_bridge = VisualSpacetimeBridge(
-                    workspace,
-                    camera_to_workspace=lambda report: (
-                        float(report.heading[0]),
-                        float(report.heading[1]),
-                        float(report.heading[2]),
-                    ),
-                )
-                self.vision.set_visual_spacetime_bridge(self.visual_spacetime_bridge)
-        except Exception:
-            logger.debug("visual spacetime bridge wiring skipped", exc_info=True)
         # Wire the face recognizer to its data directory so known
         # faces persist across sessions
         self.vision._face_recognizer = FaceRecognizer(data_dir=self.data_dir)
@@ -1005,12 +804,6 @@ class Mind(
         # reach its global workspace, salient ones become memories,
         # and its sleep replays what happened in its world.
         self.world.on_external_event = self._on_world_event
-        # The unified E/I/S/language engine consumes the same live signals
-        # as the existing workspace and self-state systems.
-        from self.cognitive_topos_runtime import CognitiveToposRuntime
-
-        self.cognitive_topos = CognitiveToposRuntime()
-        self.add_live_thought_listener(self._on_cognitive_topos_thought)
         # Give cognition access to inner life so introspection can
         # report spontaneous thoughts when no conversation has happened.
         self.brain.frontal.inner_life = self.inner_life
@@ -1021,99 +814,6 @@ class Mind(
         # gated by the chemistry her body reports (no worker thread).
         self.inner_life.set_sleep_stage_transition_callback(self._on_sleep_stage_transition)
         self.inner_life.set_sleep_tick_callback(self._on_sleep_tick)
-
-    def _on_cognitive_topos_thought(self, kind: str, content: str) -> None:
-        """Integrate actual inner-life/learning emissions into the four-domain engine."""
-        self._integrate_cognitive_topos("inner", kind, content)
-
-    def _integrate_cognitive_topos(
-        self,
-        domain: str,
-        kind: str,
-        content: str,
-        *,
-        outer_snapshot: dict | None = None,
-        self_snapshot: dict | None = None,
-    ) -> None:
-        """Bridge a live event into the cognitive topos engine without blocking cognition."""
-        try:
-            if self_snapshot is None:
-                self_snapshot = self.self_latent_space.observe_signal(
-                    content,
-                    kind=f"topos:{domain}:{kind}",
-                    salience=0.4,
-                    inbound=domain != "language",
-                )
-            if outer_snapshot is None and domain == "outer":
-                outer_snapshot = self.world.experiential_space.snapshot()
-            inner_snapshot = None
-            inner_life = getattr(self, "inner_life", None)
-            inner_world = getattr(inner_life, "inner_world", None)
-            if inner_world is not None and hasattr(inner_world, "snapshot"):
-                inner_snapshot = inner_world.snapshot()
-
-            language_snapshot = None
-            language_space = getattr(inner_world, "language_latent_space", None)
-            if language_space is not None and hasattr(language_space, "snapshot"):
-                language_snapshot = language_space.snapshot()
-
-            self.cognitive_topos.observe(
-                domain,
-                kind=kind,
-                content=content,
-                self_snapshot=self_snapshot,
-                outer_snapshot=outer_snapshot,
-                inner_snapshot=inner_snapshot,
-                language_snapshot=language_snapshot,
-            )
-            # Deposit at the domain's real geometric vector projected onto S3
-            # so inner world, outer world, and self occupy their true
-            # coordinates in the single LatentManifold substrate.
-            from latent_spaces import geometry as _g
-
-            domain_vec = None
-            domain_seed = 0x70905
-            if domain == "self" and self_snapshot:
-                domain_vec = self_snapshot.get("agency_fiber_states")
-                domain_seed = 0x5E1F
-            elif domain == "outer" and outer_snapshot:
-                domain_vec = outer_snapshot.get("state")
-                domain_seed = 0xE2EE
-            elif domain == "inner" and inner_snapshot:
-                domain_vec = inner_snapshot.get("latent_mean") or inner_snapshot.get(
-                    "affective_fiber_states"
-                )
-                domain_seed = 0x1A7E
-            elif domain == "language" and language_snapshot:
-                domain_vec = language_snapshot.get("latent_state")
-                domain_seed = 0x1A46
-            pos = (
-                _g.project_to_s3(domain_vec, seed=domain_seed)
-                if domain_vec is not None and any(domain_vec)
-                else None
-            )
-            self.manifold.observe(
-                str(content)[:128],
-                kind=f"topos:{domain}:{kind}",
-                salience=0.4,
-                inbound=domain == "outer",
-                position=pos,
-            )
-            # Identity is all three: a self-domain signal is also her
-            # identity content — it lands at her circle, the vesica,
-            # and the world side, one three-fold moment.
-            if domain == "self":
-                self.manifold.observe(
-                    str(content)[:128],
-                    kind=f"identity:{kind}",
-                    salience=0.5,
-                    inbound=False,
-                    position=pos,
-                )
-        except Exception:
-            # This is an observer: a geometry failure must not stop the
-            # event stream, response path, or inner-life thread.
-            logger.debug("cognitive topos integration failed", exc_info=True)
 
     def _journal_swallow_sink(
         self,
@@ -1193,12 +893,6 @@ class Mind(
         self._daemon_lost_since: float | None = None
         self._autosave_failures = 0
         self._last_threat_snapshot = 0.0
-        # Organ-loss bookkeeping for the safeguard urge: how many
-        # process deaths the body has reported so far, and when the
-        # most recent one registered — a resurrected organ leaves a
-        # scar that fades rather than latching.
-        self._organ_deaths_seen = 0
-        self._organ_loss_since: float | None = None
         self._think_recovery_active = False
         # Monotonic time at which a think() worker was found still
         # running after the recovery join expired, or None. Distinguishes
@@ -1228,10 +922,17 @@ class Mind(
         # sleep (N1→N2) without N3 deep consolidation or REM. Set by
         # sleep(nap=True), cleared on wake.
         self._nap_mode: bool = False
-        # When True, the cycle's volition path skips urge firing —
-        # used by the CLI to suppress autonomous actions (looking,
-        # speaking, scanning) during slash command execution so they
-        # don't bury the command output.
+        self._volition_active: set[str] = set()
+        self._volition_sem = threading.Semaphore(self.config.volition.max_concurrent_volitions)
+        # Protects _volition_active — the check-then-add in
+        # _act_on_volition (heartbeat thread) and the discard in
+        # _run_volition_action (volition worker threads) must be
+        # atomic to prevent double-firing of the same urge.
+        self._volition_lock = threading.Lock()
+        # When True, the heartbeat loop skips volition firing — used by
+        # the CLI to suppress autonomous actions (looking, speaking,
+        # scanning) during slash command execution so they don't bury
+        # the command output.
         self._suppress_volition = False
         # Distinct from _running: an unstarted mind reads _running=False
         # too, and paths like exit_teaching_mode legitimately resume

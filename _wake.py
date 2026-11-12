@@ -1,18 +1,10 @@
-"""Manual wake-cascade probe — drives the arousal side of the
-sleep-wake network against a live body and prints the phase as it
-crosses. Dev tool: run it while the organism is up.
-"""
-
 import sys
 import time
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
+sys.path.insert(0, "/home/mindy/Public/genesis")
 from genesis_client.client import GenesisClient
-from infrastructure.config import default_data_dir
 
-c = GenesisClient(str(default_data_dir() / "genesis.sock"))
+c = GenesisClient("/home/mindy/.local/share/genesis/genesis.sock")
 c.connect()
 
 
@@ -46,5 +38,5 @@ for i in range(400):  # up to ~27 min at 4s cadence
 if not flipped:
     print("--- still nrem after sustained drive ---", flush=True)
 for i in range(20):
-    time.sleep(4.0)
-    snap(f"post+{(i + 1) * 4:.0f}s")
+    time.sleep(3.0)
+    snap(f"settle+{i * 3:.0f}s")

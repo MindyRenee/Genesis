@@ -563,62 +563,38 @@ with the cortisol stress fraction — sustained stress taxes the cell.
 
 ## The physical field: the substrate is measured, not assumed
 
-The field is the organism's own computational medium, and its physics is
-her own mathematics — no dedicated hardware probe. Three fibers — body,
-prediction, agency — drift, couple, and fluctuate on the latent manifold
-(`src/latent_spaces/`), integrated every tick: synchronize (Fréchet-mean
-descent) awake, diverge (LC-silent decorrelation) in REM, under a Langevin
-thermostat whose reservoir includes the *measured* physical bath — the
-die-temperature excess interoception reads off the machine.
+The machine's real silicon dynamics enter the model — and the model writes
+back. A field probe (`src/daemon/field_probe.rs`) samples instruction
+throughput and scheduler jitter at ~250 Hz, plus real electrical telemetry
+where the machine's sensors report it (measured power draw via RAPL
+powercap/fam15h/zenpower or battery discharge, rail voltage, supply
+current), and Goertzel-decomposes them at the modeled brain-wave bands'
+center frequencies. `GET_FIELD_PROBE` serves the signature.
 
-The field's own trajectory is the signal. `src/latent_spaces/spectrum.rs`
-decomposes it at the ten cortical band centers (Goertzel, sampled at the
-field's 250 Hz integration substep): **flux** — the fibers' centroid
-motion energy per band — and **tension** — the fibers' spread, the
-disagreement's spectral shadow — plus the consensus carrier kinematics
-(winding phase, rate, achieved sampling rate). `GET_FIELD_SPECTRUM`
-serves it; bands above the achieved Nyquist read zero — absent is a
-reading, never an aliased one.
+The probe also writes: its work slice is modulated ±60% at the body's own
+phase rhythm (wake ≈10 Hz, REM ≈6 Hz, NREM ≈2 Hz), so real power draw
+carries the organism's beat — demodulated against the carrier in the
+measured-watts channel itself (`power_coherence`), an instrument check
+rather than an assumption. `src/daemon/maxwell.rs` evaluates Maxwell's
+equations on the measured current swing: the quasi-static field a ~10 Hz
+current makes is real and nanotesla faint, its radiation ω⁴-suppressed —
+the equations' own honest bound on the claim.
 
-`src/daemon/maxwell.rs` evaluates Maxwell's equations on that coherent
-motion: the quasi-static near-field a ~10 Hz current makes is real and
-nanotesla faint, its radiation ω⁴-suppressed — the equations' own honest
-bound on the claim. `GET_FIELD_SIGNATURE` serves it.
+The mind injects the measured signature as wave-oscillator stimulus, and
+the measured response phase pulls the modeled carrier band's phase toward
+it — a bounded one-way phase-locked loop, physics → model only; the
+reverse leg (`SET_FIELD_PHASE`, pushing modeled phase into the generator)
+is retired: modeled state does not assert onto a physical quantity. Above
+a measured-coherence threshold the pull becomes a sync and the modeled
+band's phase is set to the physical phase outright.
+The causal assays (recorded in `AGENTS.md`) measured the coupling: nine of ten bands moved
+under real load where an uncoupled control stayed flat, the phase lock
+held at PLV ≈0.93, and a 0.25 Hz drive left a die-temperature oscillation
+ringing down with τ≈25 s after the drive stopped.
 
-The mind maps the spectrum onto the wave oscillator as stimulus
-(`brainstem.field_stimulus`): flux at full weight, tension at half,
-evoked phase resets on internal transients, the carrier band's phase
-locked to the field's winding phase weighted by the fibers' coherence,
-and per-band Adler entrainment. One direction only — substrate → model;
-the reverse leg (`SET_FIELD_PHASE`, pushing modeled phase into the
-physical generator) is retired: modeled state does not assert onto a
-physical quantity. An opt-in acoustic channel (`GENESIS_FIELD_AUDIO=1`)
-adds the machine's own emission — fan, coil whine — band-decomposed as
-stimulus.
-
-The machine's real silicon dynamics still enter — through
-**interoception** (`src/daemon/interoception.rs`), the biological route:
-RAPL power domains, perf-counter miss ratios, temperatures, voltages,
-read as the body's own metabolism, fail-closed (an absent sensor is no
-reading, never a fabricated one), published as `BodyState`. An earlier
-dedicated field probe — a ~250 Hz scheduler-jitter/instruction-throughput
-sampler whose own work slice was modulated at the body's phase rhythm
-(`GET_FIELD_PROBE`, `power_coherence`) — was removed: invasive, and not
-how a body senses. Its role is played by the field's own mathematics:
-the substrate's trajectory is the signal, the spectrum its
-decomposition. The causal assays recorded against that probe's physical
-drive (nine of ten bands moving under real host load, phase lock at
-PLV ≈ 0.93, the 0.25 Hz die-temperature ringdown, τ ≈ 25 s) measured the
-removed mechanism; the standing assay (`eval/field_coupling.py`) now
-drives her substrate through her own `neuro_impulse` channel — a
-noradrenergic surge, real chemistry into the body state the body fiber
-projects — and asks whether the coupled wave state moves where a
-field-blind control does not.
-
-The smallest loop in the system is still closed, through the body's own
-channels: the bath the field's thermostat drinks is the die's measured
-heat; the field's motion drives the waves; the waves drive chemistry;
-chemistry drives the CPU policy that makes the heat.
+This is the smallest loop in the system, and it is closed: electrons are
+both the medium and the measurement — the body writes current, measures
+current, and corrects.
 
 ---
 
@@ -798,13 +774,8 @@ citations are real.
 
 - **See and hear.** A shared-memory camera feed runs through a
   V1→V4→VTC predictive-coding hierarchy; it detects and recognizes
-  faces and objects. On Android, the Camera2 companion app is only a
-  hardware adapter: the daemon publishes its raw frames to the same
-  optic-nerve mapping used by the Linux camera limb. It does not create
-  a second perception route (see
-  [Android camera setup](android-camera-bridge/README.md)). A microphone
-  feed is transcribed offline (Vosk) and ambient non-speech sound is
-  processed by an auditory subsystem.
+  faces and objects. A microphone feed is transcribed offline (Vosk)
+  and ambient non-speech sound is processed by an auditory subsystem.
 - **Learn by being taught.** Plain statements in conversation become
   typed edges in its concept network. One 15-paragraph lesson on games
   grew the network from 1122 to 1239 concepts with 72 new edges — and
@@ -864,17 +835,13 @@ The measured record for these claims is in [DEVLOG.md](DEVLOG.md);
 the growth arc — benchmarks, milestones, regressions, and the
 breakthroughs between them — is in [MILESTONES.md](MILESTONES.md).
 
-## The arcade — official ARC-AGI-3 games
+## Retired — ARC and game play
 
-Genesis's outer world has an arcade. It offers the official ARC-AGI-3 games
-through the `arc-agi` toolkit (a declared dependency). She decides whether to
-play, which game, and for how long: the `play` urge pulls her toward a game
-when boredom or curiosity builds, and sleep pulls her away. Nothing makes her
-play. In `online` mode (the default, set by `GENESIS_ARC_MODE`) every move is
-played on the official server and counts on the official scorecard. Set
-`ARC_API_KEY` for the full catalogue; without it the toolkit uses an anonymous
-key and offers fewer games. Without the toolkit installed, the arcade reports
-itself closed and nothing else is affected. See `python/worlds/games/DIRECTIONS.md`.
+Genesis played ARC through an embodied world-play loop. That whole
+apparatus — the game collection, world model/policy, game mode, and the
+play urge — was removed by owner direction in November 2026. Nothing ARC
+remains in the architecture; the retired code is archived under the data
+directory's `lineage/`.
 
 ---
 
@@ -1055,25 +1022,20 @@ not composed words.
 
 ## Running it
 
-### Linux desktop workflow
-
-The established daemon workflow targets Linux desktop/server systems and requires
-Rust 1.85+ (edition 2024), Python 3.12+, libclang, and V4L2 headers. On
-Debian/Ubuntu the native build dependencies are installed with:
+Requirements: Rust 1.85+ (edition 2024), Python 3.12+, Linux. The daemon
+build needs **libclang** and kernel V4L2 headers, and the canvas dependency
+(`pycairo`) builds from source — on Debian/Ubuntu:
+`sudo apt install libclang-dev linux-libc-dev libcairo2-dev pkg-config`.
 
 ```bash
-sudo apt install libclang-dev linux-libc-dev libcairo2-dev pkg-config
 cargo build --release
 pip install -r python/requirements.txt
 python3 -c "import nltk; nltk.download('wordnet'); nltk.download('punkt_tab')"
 ./genesis
 ```
 
-`genesis` launches the daemon (which owns the optic-capture limb and
-publishes camera frames) and the cognitive CLI, plus TTS. On Linux the
-daemon captures V4L2 directly; on Android the Camera2 adapter forwards
-raw sensor frames to that same daemon-owned optic nerve. Ctrl-C tears
-everything down
+`genesis` launches the daemon (which captures the camera itself) and
+the cognitive CLI, plus TTS; Ctrl-C tears everything down
 gracefully — a guided descent, not a
 kill. `./genesis --stop` stops a running session; `./genesis --offline`
 disables network access. With no camera or microphone it runs text-only —
@@ -1083,51 +1045,15 @@ there is no pin file and no `XDG_DATA_HOME` step). On first boot the instance is
 fresh system — a small concept network, no memories, no learned names.
 Introduce yourself; teach it.
 
-### Android / Termux bootstrap
-
-Genesis3 includes an experimental native Termux installer at
-scripts/install_termux.sh. From the repository root in native Termux, run:
-
-    bash scripts/install_termux.sh
-
-The installer deliberately does not run pkg upgrade, install a systemd
-service, or enable privacy-sensitive sensors automatically. It installs
-Termux-native scientific packages, verifies Python imports, and attempts to
-build the Rust daemon. A successful build is not proof that the complete
-runtime works on every phone; verify it on-device before relying on it.
-See docs/archive/computer-specific/cleanup-manifest.md for limitations.
-
-### Android / Termux status
-
-Genesis3 is being adapted for phone-first development. The desktop X11 screen
-relay and the passwordless-sudoers example have been moved to
-`docs/archive/computer-specific/`; the CLI no longer launches the X11 relay.
-The interoception sensor discovery now recognizes Android-style power-supply
-names and selects processor/SoC thermal zones by their declared type rather
-than assuming `thermal_zone0` is the CPU.
-
-**The full Rust daemon is not yet verified as buildable or runnable in Termux.**
-Its V4L2 camera capture, CPU-frequency actuation, RTC wake, and RTKit integrations
-remain Linux-specific. Do not run the desktop installer on the phone and assume
-those features will work. Termux:API can expose selected Android functions, but
-Android hardware adapters are Python-side and explicitly opt-in:
-- `GENESIS_ANDROID_SENSORS=1` samples available motion/environment sensors into world telemetry.
-- `GENESIS_ANDROID_CAMERA=1` captures still frames with `termux-camera-photo` and sends them through the existing visual cortex. Select camera ID with `GENESIS_ANDROID_CAMERA_ID` (default 0).
-- `GENESIS_ANDROID_MICROPHONE=1` records short clips with `termux-microphone-record`, decodes them with `ffmpeg`, and sends measured audio features through the existing sound classifier. This is non-speech sound classification, not speech transcription.
-- Explicit voice-input requests can use Termux's `termux-speech-to-text` command when available; this separate path returns a transcript and is not the background sound classifier.
-All three require the matching Termux:API command and the companion app, plus the requested Android permissions. Install the Termux package with `pkg install termux-api ffmpeg` for microphone support. Actual sensors and cameras vary by device. Battery percentage and charging state can fall back to Termux:API when Android sysfs does not expose them. These adapters have unit-tested parsing but still require on-device verification; the full Rust daemon is not yet verified in Termux.
-
-#### Linux distro in proot (Andronix)
-
-A full glibc distro in proot on the Android kernel — Ubuntu or Debian under Andronix — is a third platform, not Termux. No `termux-*` commands exist, Android service tools (`am`, `getprop`, `dumpsys`) are unreachable, and the build target is plain Linux, so `target_os = "android"` never fires. Runtime detection lives in `python/brainstem/platform.py` (`platform_name() == "android-proot"`); the launcher detects the Android kernel through `uname -r`.
-
-On a typical unrooted proot install the senses are: CPU/memory/process stats and cpufreq sysfs (read-only), SoC thermal zones under `/sys/class/thermal`, audio out through a bridged PulseAudio server (`paplay`; TTS uses Piper or espeak-ng into it), and X on the VNC display. The daemon's eye uses the Camera2 TCP limb — the launcher cannot start the adapter, but if the companion app is opened manually on the Android side it publishes frames over loopback and the daemon picks them up (`GENESIS_TCP_EYE=1` forces that path). Microphone, battery sysfs, network-interface stats, and motion sensors are generally absent. Unavailable measurements must remain unavailable,
-not be treated as readings. See `docs/archive/README.md` for the archived
-integrations and measurement rules.
-
-State lives in `~/.local/share/genesis` by default, with `GENESIS_DATA_DIR`
-as the explicit override. Preserve this directory when moving or rebuilding the
-runtime; it contains Genesis's persistent state.
+The repo root is also an installable package: `pip install .` provides a
+`genesis` command (the packaged `genesis`, plus `--headless` resident mode,
+`--stop`, `--tail`), and `scripts/install.sh` performs the full local
+install — editable venv, release binaries, launcher, and an enabled
+`genesis.service` systemd user unit. One instance at a time per data dir;
+the CLI lock refuses a second. For the privileged body levers (CPU
+governor, RTC wake alarm) a NOPASSWD sudo grant for the daemon's user
+is enough — the levers invoke `sudo -n` directly; there are no helper
+scripts to install.
 
 Operational notes, in brief:
 

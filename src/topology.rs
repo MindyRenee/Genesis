@@ -25,7 +25,7 @@ pub struct Region {
     /// projections, as with the neuromodulator broadcast).
     pub projections: &'static [&'static str],
     /// The major-system fiber this region rides — one of the
-    /// `latent_spaces::runtime` topology's three systems: `body` (somatic
+    /// `field::runtime` topology's three systems: `body` (somatic
     /// state, slow), `prediction` (inference, fast), or `agency`
     /// (volitional and social). The anatomical map and the field
     /// map are one topology read at two scales.
@@ -55,9 +55,9 @@ pub const REGIONS: &[Region] = &[
     Region {
         name: "basal_ganglia",
         package: "basal_ganglia",
-        modules: &["cognition::intention", "daemon::actuators"],
+        modules: &["cognition::intention"],
         // Action-selection output relays back through the thalamus.
-        projections: &["thalamus", "worlds"],
+        projections: &["thalamus"],
         fiber: "agency",
     },
     Region {
@@ -65,147 +65,38 @@ pub const REGIONS: &[Region] = &[
         package: "brainstem",
         modules: &[
             "daemon::tick",
-            "daemon::adaptive",
-            "daemon::continuity",
             "daemon::interoception",
             "daemon::cpufreq",
             "daemon::active_inference",
-            "daemon::maxwell",
-            "daemon::mind_shepherd",
             "daemon::rtc_wake",
-            "daemon::rtkit",
             "state::core_state",
-            "state::header",
-            "state::sanitize",
             "state::zones",
         ],
         // The reticular activating system ascends through thalamus;
-        // visceral afferents reach the insula and limbic evaluators.
-        projections: &["thalamus", "insula", "limbic_system"],
+        // visceral afferents reach the limbic evaluators.
+        projections: &["thalamus", "limbic_system"],
         fiber: "body",
-    },
-    Region {
-        name: "cerebellum",
-        package: "cerebellum",
-        modules: &[
-            "latent_spaces::motor",
-            "latent_spaces::engine",
-            "daemon::adaptive",
-        ],
-        projections: &["thalamus", "frontal_lobe"],
-        fiber: "prediction",
-    },
-    Region {
-        name: "frontal_lobe",
-        package: "frontal_lobe",
-        modules: &[
-            "cognition::intention",
-            "cognition::code_analysis",
-            "state::inference",
-            "state::zones",
-        ],
-        projections: &[
-            "basal_ganglia",
-            "parietal_lobe",
-            "temporal_lobe",
-            "thalamus",
-        ],
-        fiber: "agency",
-    },
-    Region {
-        name: "hypothalamus",
-        package: "hypothalamus",
-        modules: &[
-            "daemon::hpa_development",
-            "state::neurochemical",
-            "state::sleep_network",
-        ],
-        projections: &["brainstem", "sleep", "limbic_system"],
-        fiber: "body",
-    },
-    Region {
-        name: "insula",
-        package: "insula",
-        modules: &[
-            "daemon::interoception",
-            "daemon::active_inference",
-            "state::ions",
-        ],
-        projections: &["limbic_system", "self_", "frontal_lobe"],
-        fiber: "body",
-    },
-    Region {
-        name: "latent_spaces",
-        package: "latent_spaces",
-        modules: &[
-            "latent_spaces::substrate",
-            "latent_spaces::engine",
-            "latent_spaces::runtime",
-            "latent_spaces::spectrum",
-            "latent_spaces::motor",
-            "state::phase_partition",
-        ],
-        projections: &["*"],
-        fiber: "prediction",
     },
     Region {
         name: "limbic_system",
         package: "limbic_system",
         modules: &["daemon::dyadic_model"],
         // Affective appraisal drives autonomic/endocrine outflow.
-        projections: &["brainstem", "hypothalamus"],
+        projections: &["brainstem"],
         fiber: "agency",
-    },
-    Region {
-        name: "occipital_lobe",
-        package: "occipital_lobe",
-        modules: &["daemon::optic_nerve", "daemon::gamma"],
-        projections: &["parietal_lobe", "temporal_lobe"],
-        fiber: "prediction",
-    },
-    Region {
-        name: "parietal_lobe",
-        package: "parietal_lobe",
-        modules: &["math", "latent_spaces::motor", "daemon::tensor_slab"],
-        projections: &["frontal_lobe", "cerebellum"],
-        fiber: "prediction",
-    },
-    Region {
-        name: "temporal_lobe",
-        package: "temporal_lobe",
-        modules: &[
-            "store::ltm",
-            "store::ring_buffer",
-            "store::sdr",
-            "daemon::consolidation",
-            "daemon::association",
-        ],
-        projections: &["frontal_lobe", "memory", "limbic_system"],
-        fiber: "prediction",
     },
     Region {
         name: "thalamus",
         package: "thalamus",
         modules: &[
             "daemon::ipc",
-            "latent_spaces::engine",
-            "latent_spaces::runtime",
-            "latent_spaces::spectrum",
+            "field::engine",
+            "field::runtime",
             "state::manifest",
         ],
         // The relay fans out to every region — these are the named
         // targets of the documented loops, not the whole broadcast.
-        projections: &[
-            "basal_ganglia",
-            "frontal_lobe",
-            "limbic_system",
-            "memory",
-            "occipital_lobe",
-            "parietal_lobe",
-            "self_",
-            "sleep",
-            "temporal_lobe",
-        ],
+        projections: &["basal_ganglia", "limbic_system", "memory", "self_", "sleep"],
         fiber: "prediction",
     },
     Region {
@@ -255,7 +146,7 @@ pub const REGIONS: &[Region] = &[
     Region {
         name: "infrastructure",
         package: "infrastructure",
-        modules: &["data_dir", "store::mmap_state"],
+        modules: &["data_dir", "store::mmap_state", "math"],
         projections: &[],
         fiber: "body",
     },
@@ -264,17 +155,6 @@ pub const REGIONS: &[Region] = &[
         package: "tools",
         modules: &["cognition::code_analysis"],
         projections: &[],
-        fiber: "agency",
-    },
-    Region {
-        name: "worlds",
-        package: "worlds",
-        modules: &[
-            "daemon::actuators",
-            "daemon::dyadic_model",
-            "daemon::optic_nerve",
-        ],
-        projections: &["occipital_lobe", "limbic_system", "temporal_lobe"],
         fiber: "agency",
     },
 ];
@@ -330,7 +210,7 @@ mod tests {
         // The anatomical map and the field map are one topology:
         // every region's fiber must be one of the major systems the
         // runtime actually builds.
-        let runtime = crate::latent_spaces::runtime::FieldRuntime::new().unwrap();
+        let runtime = crate::field::runtime::FieldRuntime::new().unwrap();
         let fibers: Vec<&str> = runtime
             .field()
             .fibers

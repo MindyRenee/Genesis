@@ -1,12 +1,9 @@
 //! Optic nerve — the whole retinal afferent path, held inside the body.
 //!
-//! The nerve's retinal end is the body's own limb. On Linux the daemon
-//! opens the camera directly through V4L2; on Android a Camera2 adapter
-//! opens the sandboxed device and forwards raw frames to the daemon's
-//! capture limb. The daemon publishes both sources through the same
-//! `/genesis_optic_nerve` frame contract (POSIX shared memory on Linux,
-//! file-backed mmap on Android) — that mapping is the optic nerve.
-//! Anatomically the nerve does not reach cortex
+//! The nerve's retinal end is the body's own limb: the daemon opens
+//! the camera itself and writes raw frames into the POSIX
+//! shared-memory segment `/genesis_optic_nerve` — that segment is
+//! the optic nerve. Anatomically the nerve does not reach cortex
 //! directly: its ~10⁶ ganglion-cell axons fan out to roughly forty
 //! subcortical targets, and only the thalamocortical radiation
 //! carries what the thalamus relays onward. The subcortical
@@ -29,30 +26,27 @@
 //!   sympathetic dilation from effective norepinephrine — published
 //!   so the mind's optics layer can scale retinal irradiance and
 //!   depth of field by the aperture the body actually set.
-//! - **dLGN + thalamic reticular nucleus (TRN)** — the thalamic
-//!   relay's transmission is *modulated*, not switched: TRN inhibition
-//!   during NREM is real physiology, but the gate this body computes
-//!   is the corticothalamic one — `relay_gain` scales the relay
-//!   around a full-open base and no sleep stage closes it here.
-//!   The mind reads it via `GET_OPTIC_STATE` and honours it.
+//! - **dLGN + thalamic reticular nucleus (TRN)** — the thalamic relay
+//!   is *gated*, not a wire: TRN inhibition during NREM hyperpolarizes
+//!   relay cells and sensory transmission to cortex is blocked at the
+//!   thalamus. `relay_gain` is that gate, computed here in the body
+//!   where the sleep network lives. The mind reads it via
+//!   `GET_OPTIC_STATE` and honours it — cortex cannot see around a
+//!   closed thalamus.
 //! - **Corticothalamic feedback** — V1 layer-6 projections back to
 //!   the dLGN outnumber retinal input ~10:1 but are modulatory, not
 //!   driving. The mind's engagement arrives via `SET_OPTIC_GAIN` and
-//!   scales the relay across [0.6, 1.0] — it can attenuate
-//!   transmission, never close it.
+//!   scales the relay within ±40%, never opening it past what the
+//!   sleep stage permits.
 //!
 //! The body's own ocular state lives here too: the pupil (pretectal
-//! light reflex + LC sympathetic dilation, miosis under the sleep
-//! phase's own parasympathetic tone), the ciliary lens power
+//! light reflex + LC sympathetic dilation), the ciliary lens power
 //! (accommodation, set by the mind's `SET_FOCUS`), and the lids —
-//! the eye the hardware lacks. The lid is *voluntary*: the mind's
-//! own orbicularis oculi, set through `SET_LID` and held until she
-//! changes it — the sleep system closes it (~0.15) on entry and
-//! opens it (1.0) on waking, meditation holds it for the sit, and
-//! no phase overrides her will in either direction. It is a
-//! transmission scalar on every afferent channel: closed lids dim
-//! the SCN's light drive and the collicular alert the way real lid
-//! closure attenuates them.
+//! the eye the hardware lacks. The lid is a phase-driven
+//! transmission on every afferent channel: closed in NREM/REM (a
+//! few percent leak — light through lids still entrains weakly and
+//! a flash can still wake), half-mast drowsy, open awake. Sleep
+//! miosis and the ciliary's release to rest ride the same closure.
 //!
 //! What is deliberately NOT here: semantics. Everything in this
 //! module is machine math — bytes, atomics, pooled scalar channels
@@ -62,228 +56,17 @@
 //! `relay_gain`, and the meaning of the pixels lives entirely in the
 //! mind — the words side.
 
-#[cfg(unix)]
-use std::io::Read;
-#[cfg(unix)]
-use std::net::TcpStream;
+use std::ffi::CString;
 use std::sync::Arc;
-#[cfg(target_os = "android")]
-use std::time::Instant;
-#[cfg(not(target_os = "android"))]
-mod optic_shmem {
-    pub use shared_memory::{Shmem, ShmemConf};
-
-    /// Remove a POSIX segment name. Mappings already held keep the
-    /// data until they detach; a missing name is ENOENT, ignored.
-    pub fn unlink(name: &str) {
-        if let Ok(cname) = std::ffi::CString::new(name) {
-            // SAFETY: `cname` is a valid NUL-terminated CString.
-            unsafe {
-                let _ = libc::shm_unlink(cname.as_ptr());
-            }
-        }
-    }
-}
-
-#[cfg(target_os = "android")]
-mod optic_shmem {
-    use std::fs::File;
-    use std::io;
-    use std::os::fd::AsRawFd;
-    use std::path::PathBuf;
-    use std::ptr::NonNull;
-
-    /// Android/Termux file-backed mapping. Bionic does not implement
-    /// POSIX shm_open/shm_unlink, so the daemon owns a named mmap in
-    /// Termux's private temporary directory. The sandboxed Camera2 app
-    /// sends frames to the daemon over loopback; the Python mind attaches
-    /// read-only to this same file and consumes the ordinary optic protocol.
-    pub struct Shmem {
-        ptr: NonNull<u8>,
-        len: usize,
-        _file: File,
-    }
-
-    // SAFETY: moving the mapping handle between threads does not move
-    // or invalidate the mmap address. The handle is not Sync; concurrent
-    // frame access is coordinated through the shared seqlock protocol.
-    unsafe impl Send for Shmem {}
-
-    impl Shmem {
-        pub fn as_ptr(&self) -> *mut u8 {
-            self.ptr.as_ptr()
-        }
-
-        pub fn len(&self) -> usize {
-            self.len
-        }
-    }
-
-    impl Drop for Shmem {
-        fn drop(&mut self) {
-            unsafe {
-                libc::munmap(self.ptr.as_ptr().cast(), self.len);
-            }
-        }
-    }
-
-    pub struct ShmemConf {
-        name: Option<String>,
-        size: Option<usize>,
-    }
-
-    /// Frame file for a segment name: one path component under the
-    /// Termux temporary directory, shared by producer and reader.
-    fn frame_path(name: &str) -> io::Result<PathBuf> {
-        let leaf = name.trim_start_matches('/');
-        if leaf.is_empty() || leaf.contains('/') || leaf == "." || leaf == ".." {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "optic transport name must be a single path component",
-            ));
-        }
-        Ok(std::env::temp_dir().join(format!("{leaf}.frame")))
-    }
-
-    /// Remove a segment's frame file. Mappings already held keep the
-    /// data until they detach, matching POSIX shm_unlink semantics.
-    pub fn unlink(name: &str) {
-        if let Ok(path) = frame_path(name) {
-            let _ = std::fs::remove_file(path);
-        }
-    }
-
-    impl ShmemConf {
-        pub fn new() -> Self {
-            Self {
-                name: None,
-                size: None,
-            }
-        }
-
-        pub fn os_id(mut self, name: &str) -> Self {
-            self.name = Some(name.to_owned());
-            self
-        }
-
-        pub fn size(mut self, bytes: usize) -> Self {
-            self.size = Some(bytes);
-            self
-        }
-
-        /// Create a fresh frame file of `size` bytes and map it
-        /// read-write. The producer owns the file; readers attach with
-        /// `open`.
-        pub fn create(self) -> io::Result<Shmem> {
-            let name = self.name.ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "frame transport name is missing",
-                )
-            })?;
-            let size = self.size.ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "frame transport size is missing",
-                )
-            })?;
-            if size < 28 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "optic transport is smaller than its frame header",
-                ));
-            }
-            let path = frame_path(&name)?;
-            let file = std::fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(path)?;
-            file.set_len(size as u64)?;
-            let mapped = unsafe {
-                libc::mmap(
-                    std::ptr::null_mut(),
-                    size,
-                    libc::PROT_READ | libc::PROT_WRITE,
-                    libc::MAP_SHARED,
-                    file.as_raw_fd(),
-                    0,
-                )
-            };
-            if mapped == libc::MAP_FAILED {
-                return Err(io::Error::last_os_error());
-            }
-            let ptr = NonNull::new(mapped.cast::<u8>()).ok_or_else(|| {
-                io::Error::new(io::ErrorKind::Other, "mmap returned a null address")
-            })?;
-            Ok(Shmem {
-                ptr,
-                len: size,
-                _file: file,
-            })
-        }
-
-        pub fn open(self) -> io::Result<Shmem> {
-            let name = self.name.ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "frame transport name is missing",
-                )
-            })?;
-            let path = frame_path(&name)?;
-            let file = File::open(path)?;
-            let len = usize::try_from(file.metadata()?.len()).map_err(|_| {
-                io::Error::new(io::ErrorKind::InvalidData, "invalid optic transport size")
-            })?;
-            if len < 28 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "optic transport is smaller than its frame header",
-                ));
-            }
-            let mapped = unsafe {
-                libc::mmap(
-                    std::ptr::null_mut(),
-                    len,
-                    libc::PROT_READ,
-                    libc::MAP_SHARED,
-                    file.as_raw_fd(),
-                    0,
-                )
-            };
-            if mapped == libc::MAP_FAILED {
-                return Err(io::Error::last_os_error());
-            }
-            let ptr = NonNull::new(mapped.cast::<u8>()).ok_or_else(|| {
-                io::Error::new(io::ErrorKind::Other, "mmap returned a null address")
-            })?;
-            Ok(Shmem {
-                ptr,
-                len,
-                _file: file,
-            })
-        }
-    }
-}
-
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
-#[cfg(target_os = "linux")]
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
-#[cfg(target_os = "linux")]
 use v4l::Device;
-#[cfg(target_os = "linux")]
 use v4l::buffer::Type;
-#[cfg(target_os = "linux")]
 use v4l::format::FourCC;
-#[cfg(target_os = "linux")]
 use v4l::io::mmap::Stream as MmapStream;
-#[cfg(target_os = "linux")]
 use v4l::io::traits::CaptureStream;
-#[cfg(target_os = "linux")]
 use v4l::video::Capture;
 
 use crate::state::sanitize::finite_clamp;
@@ -309,71 +92,6 @@ const FRESH_WINDOW_MS: u64 = 5_000;
 /// denser than the melanopsin/tectal receptive fields being modelled.
 const MAX_SAMPLES: usize = 2048;
 
-/// Scene-lattice geometry for the collicular binding pass — a
-/// `SCENE_W`×`SCENE_H` point-sampled grid small enough that a gated
-/// Kuramoto integration stays cheap (~1k cells, run at most every
-/// `BIND_EVERY_FRAMES` consumed frames).
-const SCENE_W: usize = 32;
-const SCENE_H: usize = 24;
-/// Re-bind cadence in consumed frames — scene parses are eventful,
-/// not per-frame.
-const BIND_EVERY_FRAMES: u32 = 30;
-/// Orienting burst that forces an immediate re-parse: a salient
-/// scene change is bound now, not on the next interval.
-const BIND_ON_ORIENTING: f32 = 0.6;
-/// Index [`quantize_scene`] returns for cells too dark to carry a
-/// colour signal — ground, where no oscillator forms.
-const SCENE_BACKGROUND: u8 = 15;
-/// The coarse chromatic lattice the scene grid quantizes onto —
-/// 15 distinguishable reflectances. Not a display palette: indices
-/// only seed Kuramoto phase basins, so any consistent quantization
-/// is honest.
-const SCENE_PALETTE: [(u8, u8, u8); 15] = [
-    (220, 40, 40),
-    (235, 130, 30),
-    (235, 210, 40),
-    (150, 210, 60),
-    (40, 180, 70),
-    (40, 190, 170),
-    (40, 160, 230),
-    (60, 90, 230),
-    (130, 60, 220),
-    (200, 60, 200),
-    (230, 90, 140),
-    (235, 235, 235),
-    (160, 160, 160),
-    (140, 90, 50),
-    (90, 90, 90),
-];
-
-/// Quantize one RGB triplet onto the scene lattice: cells darker
-/// than [`SCENE_GROUND_LUMA`] are ground — no oscillator forms
-/// there; everything else takes the nearest [`SCENE_PALETTE`]
-/// entry by squared distance.
-fn quantize_scene(r: u8, g: u8, b: u8) -> u8 {
-    /// Rec.601 luma below which a cell reads as ground rather than
-    /// colour — deep shadow carries no binding signal.
-    const SCENE_GROUND_LUMA: f64 = 18.0;
-    let luma = 0.299 * f64::from(r) + 0.587 * f64::from(g) + 0.114 * f64::from(b);
-    if luma < SCENE_GROUND_LUMA {
-        return SCENE_BACKGROUND;
-    }
-    let (r, g, b) = (f64::from(r), f64::from(g), f64::from(b));
-    let mut best = 0usize;
-    let mut best_d = f64::MAX;
-    for (i, &(pr, pg, pb)) in SCENE_PALETTE.iter().enumerate() {
-        let dr = r - f64::from(pr);
-        let dg = g - f64::from(pg);
-        let db = b - f64::from(pb);
-        let d = dr * dr + dg * dg + db * db;
-        if d < best_d {
-            best_d = d;
-            best = i;
-        }
-    }
-    best as u8
-}
-
 /// Melanopic irradiance scaled onto the sleep oscillator's lux axis
 /// (`I_0` in `sleep_network`; the scheduled photoperiod uses 500).
 /// A webcam has no absolute photometry, so this is a shaped proxy:
@@ -383,26 +101,43 @@ fn quantize_scene(r: u8, g: u8, b: u8) -> u8 {
 const MELANOPIC_LUX_SCALE: f64 = 2500.0;
 const MELANOPIC_LUX_GAMMA: f64 = 1.3;
 
-/// TRN relay base — the fraction of retinal drive the thalamus
-/// passes to cortex before corticothalamic feedback. The relay
-/// transmits at full gain whatever the phase says: sleep-stage
-/// gating of sensory transmission is real physiology, but this
-/// body's gate is the voluntary lid and the mind's own attention —
-/// the relay itself never closes on a schedule.
-fn relay_base(_phase: MentalPhase) -> f32 {
-    1.0
+/// TRN relay bases by state — the fraction of retinal drive the
+/// thalamus passes to cortex. NREM is the documented block (~zero);
+/// REM gates external input almost as hard (its imagery is
+/// internally generated). Drowsy is partial transmission; Overwhelmed
+/// is sensory shutdown short of sleep.
+fn relay_base(phase: MentalPhase) -> f32 {
+    match phase {
+        MentalPhase::NREM => 0.02,
+        MentalPhase::REM => 0.10,
+        MentalPhase::Drowsy => 0.6,
+        MentalPhase::Overwhelmed => 0.3,
+        _ => 1.0,
+    }
 }
 
 /// Corticothalamic feedback range around the relay base: modulatory,
-/// not driving (Sherman & Guillery) — it can amplify or attenuate
-/// the relay but cannot close it. The floor keeps a fully
-/// disengaged cortex from blacking out the afferent it is meant to
-/// modulate.
+/// not driving (Sherman & Guillery) — it can amplify or attenuate the
+/// relay but cannot open a gate the sleep stage has closed.
 const CORTICAL_FLOOR: f32 = 0.6;
 const CORTICAL_SPAN: f32 = 0.4;
 
-// Eyelid position is voluntary, full stop — `lid()` reads the mind's
-// own setting and no phase holds it shut.
+/// Eyelid transmission by phase — the fraction of scene light that
+/// still reaches the retina. The camera hardware has no lid; this is
+/// the body's *use* of its afference, the same status as the TRN
+/// gate. Lids are not shutters: a closed lid transmits a few percent,
+/// so bright light still entrains weakly through it and a strong
+/// flash still reaches the colliculus — both are real physiology.
+/// Drowsy lids sit half-mast. The mind's voluntary closure
+/// (`SET_LID`) can only deepen what the phase sets — a will can
+/// shut an open eye, never force a sleeping one open.
+fn lid_transmission(phase: MentalPhase) -> f32 {
+    match phase {
+        MentalPhase::NREM | MentalPhase::REM => 0.03,
+        MentalPhase::Drowsy => 0.5,
+        _ => 1.0,
+    }
+}
 
 /// Central miosis with the lids closed — in sleep the sphincter
 /// dominates (parasympathetic tone; LC is near-silent in NREM and
@@ -463,13 +198,11 @@ pub struct OpticNerve {
     shm_name: String,
     /// The open shared-memory attachment; `None` until the capture
     /// limb creates the segment, re-tried every sample.
-    shm: Option<optic_shmem::Shmem>,
+    shm: Option<shared_memory::Shmem>,
     /// Last consumed seqlock value — a frame is consumed once, so an
     /// unchanged counter means the limb has not written since.
     last_seq: u64,
-    /// `current_ms` when the current mapping was attached.
-    last_attach_ms: u64,
-    /// `current_ms` of the last consumed frame (0 = none in this life).
+    /// `current_ms` of the last consumed frame (0 = never).
     last_fresh_ms: u64,
     /// Subsampled luma of the previous frame — the motion baseline.
     prev_luma: Vec<u8>,
@@ -489,19 +222,18 @@ pub struct OpticNerve {
     /// `SET_OPTIC_GAIN`. 0.5 is neutral.
     cortical_gain: f32,
     /// The mind's voluntary lid openness in [0, 1], set via
-    /// `SET_LID`. 1.0 is the unrequested state — fully open. The lid
-    /// is hers alone: no phase term enters it, so her will can shut
-    /// the eye for sleep or meditation and open it again — the sleep
-    /// system holds ~0.15 under and 1.0 awake.
+    /// `SET_LID`. 1.0 is the unrequested state — fully open. The
+    /// effective lid is `phase.min(voluntary)`: a will can lower
+    /// the lids on an open phase (closing the eyes to rest them or
+    /// shut out light) but can never raise them past what the
+    /// sleep stage allows.
     voluntary_lid: f32,
     /// The phase the gate was last derived from — kept so a
     /// `SET_OPTIC_GAIN` between advances can re-derive the relay
-    /// immediately instead of waiting for the next tick. The phase
-    /// no longer enters the relay value itself (the base is 1.0);
-    /// it is retained only as the re-derivation key.
+    /// immediately instead of waiting for the next tick.
     gate_phase: MentalPhase,
-    /// Current thalamic relay gain, recomputed each advance —
-    /// corticothalamic feedback around a full-open base.
+    /// Current thalamic relay gain, recomputed each advance from the
+    /// sleep stage and the cortical feedback.
     relay_gain: f32,
     /// Pupil diameter in mm — the body's own aperture, integrated on
     /// the advance clock from the light reflex and LC sympathetic
@@ -524,16 +256,6 @@ pub struct OpticNerve {
     accom_last_ms: u64,
     /// Frames consumed since attach.
     frames_seen: u64,
-    /// Proto-objects the collicular binding pass last emitted —
-    /// gamma-coherent assemblies on the scene lattice. 0 when the
-    /// eye is absent, the format carries no colour, or nothing
-    /// bound: absence, never a fabricated object.
-    proto_objects: f32,
-    /// Mean member coherence [0, 1] of those assemblies.
-    binding_coherence: f32,
-    /// Consumed frames since the last binding pass — the cadence
-    /// gate that keeps Kuramoto integration eventful, not per-frame.
-    frames_since_bind: u32,
 }
 
 // SAFETY: `OpticNerve` holds a `shared_memory::Shmem`, which is !Send
@@ -589,27 +311,17 @@ pub struct OpticState {
     /// mind reads it as fully open rather than fully shut, so a
     /// legacy body never looks asleep to the optics layer).
     pub lid: f32,
-    /// Proto-objects the collicular binding pass last emitted on
-    /// the scene lattice — gamma-coherent assemblies. 0 when the
-    /// eye is absent, the format carries no colour, or nothing
-    /// bound: absence, never a fabricated object.
-    pub proto_objects: f32,
-    /// Mean member coherence [0, 1] of those assemblies — how
-    /// phase-locked the bound scene actually is.
-    pub binding_coherence: f32,
 }
 
 impl OpticState {
     /// Wire layout after the ack byte — fixed-size, additive:
     /// `[u8 flags][u8 _pad][7 × f32][u64 seq][i64 age_ms][f32 pupil_mm]
-    /// [f32 accommodation_dpt][f32 lid][f32 proto_objects]
-    /// [f32 binding_coherence]` = 66 bytes. flags bit0 =
+    /// [f32 accommodation_dpt][f32 lid]` = 58 bytes. flags bit0 =
     /// eye_present, bit1 = frames_fresh. Daemons that predate the
     /// trailing fields send shorter bodies; decoders read pupil/lens
-    /// as 0 ("unreported") and lid as "open" (1.0), proto/binding as
-    /// 0 (no scene parse reported).
+    /// as 0 ("unreported") and lid as "open" (1.0).
     pub fn to_wire(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(66);
+        let mut out = Vec::with_capacity(58);
         out.push((self.eye_present as u8) | ((self.frames_fresh as u8) << 1));
         out.push(0);
         for v in [
@@ -628,8 +340,6 @@ impl OpticState {
         out.extend_from_slice(&self.pupil_mm.to_le_bytes());
         out.extend_from_slice(&self.accommodation_dpt.to_le_bytes());
         out.extend_from_slice(&self.lid.to_le_bytes());
-        out.extend_from_slice(&self.proto_objects.to_le_bytes());
-        out.extend_from_slice(&self.binding_coherence.to_le_bytes());
         out
     }
 }
@@ -646,7 +356,6 @@ impl OpticNerve {
             shm_name: name.to_string(),
             shm: None,
             last_seq: 0,
-            last_attach_ms: 0,
             last_fresh_ms: 0,
             prev_luma: Vec::new(),
             illuminance: 0.0,
@@ -663,9 +372,6 @@ impl OpticNerve {
             accom_target_dpt: ACCOM_REST_DPT,
             accom_last_ms: 0,
             frames_seen: 0,
-            proto_objects: 0.0,
-            binding_coherence: 0.0,
-            frames_since_bind: 0,
         }
     }
 
@@ -674,38 +380,27 @@ impl OpticNerve {
     /// stalled segments are the no-eye condition — the afference just
     /// reports no fresh input, it is never a fault.
     pub fn sample(&mut self, now_ms: u64) {
-        // A mapping can be stale even before its first frame: Android
-        // creates the segment while waiting for Camera2 to connect. Use
-        // the later of attachment and last-frame times so an empty or
-        // disconnected limb is eventually detached and a replacement
-        // mapping under the same name can be discovered.
-        let last_activity_ms = self.last_attach_ms.max(self.last_fresh_ms);
-        if self.shm.is_some() && now_ms.saturating_sub(last_activity_ms) > FRESH_WINDOW_MS {
+        // A stale feed can mean the mapping is a corpse: a dead limb
+        // unlinks the segment on its way out, and the next life
+        // creates a *new* object under the same name — this handle
+        // still points at the dead one, whose counter is frozen
+        // forever. Once frames have been seen, a feed that stays
+        // stale past the fresh window is dropped so the open below
+        // re-resolves the name to whatever segment exists now. A
+        // merely-paused writer re-opens the same object harmlessly.
+        if self.shm.is_some()
+            && self.frames_seen > 0
+            && now_ms.saturating_sub(self.last_fresh_ms) > FRESH_WINDOW_MS
+        {
             self.shm = None;
-            self.last_seq = 0;
-            self.last_attach_ms = 0;
-            self.last_fresh_ms = 0;
-            self.frames_seen = 0;
-            self.prev_luma.clear();
-            self.proto_objects = 0.0;
-            self.binding_coherence = 0.0;
-            self.frames_since_bind = 0;
         }
         if self.shm.is_none() {
-            match optic_shmem::ShmemConf::new().os_id(&self.shm_name).open() {
+            match shared_memory::ShmemConf::new().os_id(&self.shm_name).open() {
                 Ok(s) => {
                     // The capture limb owns the segment's lifetime;
                     // we are a recipient, so unlinking is never ours
-                    // to do. A new mapping begins a new retinal life.
+                    // to do.
                     self.shm = Some(s);
-                    self.last_seq = 0;
-                    self.last_attach_ms = now_ms;
-                    self.last_fresh_ms = 0;
-                    self.frames_seen = 0;
-                    self.prev_luma.clear();
-                    self.proto_objects = 0.0;
-                    self.binding_coherence = 0.0;
-                    self.frames_since_bind = 0;
                 }
                 Err(_) => return,
             }
@@ -756,7 +451,6 @@ impl OpticNerve {
                 return;
             }
             let pooled = Self::pool_frame(base, width, height, fourcc, total, stride);
-            let scene = Self::pool_scene_grid(base, width, height, fourcc, total, stride);
             // SAFETY: same live mapping and AtomicU64 counter as the
             // c1 read above — this second load closes the seqlock
             // bracket, so a torn frame shows as c1 != c2 and retries.
@@ -765,7 +459,7 @@ impl OpticNerve {
                 std::thread::yield_now();
                 continue;
             }
-            self.commit(pooled, scene);
+            self.commit(pooled);
             self.last_seq = c1;
             self.last_fresh_ms = now_ms;
             self.frames_seen += 1;
@@ -831,62 +525,8 @@ impl OpticNerve {
         out
     }
 
-    /// Sample the frame onto the collicular scene lattice: a
-    /// `SCENE_W`×`SCENE_H` point-sampled grid — each cell's centre
-    /// pixel quantized by [`quantize_scene`]. This is the afferent
-    /// the V2 grouping pass binds; it is coarse on purpose (the
-    /// colliculus parses scenes, it does not resolve edges).
-    /// Returns `None` for formats without a clean RGB triplet
-    /// (YUYV) or a frame too small for the lattice — the binding
-    /// pass only runs on colour.
-    fn pool_scene_grid(
-        base: *const u8,
-        width: u32,
-        height: u32,
-        fourcc: [u8; 4],
-        size: usize,
-        stride: u32,
-    ) -> Option<(Vec<u8>, usize, usize)> {
-        let bgr = &fourcc == b"BGR3";
-        if !matches!(&fourcc, b"RGB3" | b"BGR3")
-            || width < SCENE_W as u32
-            || height < SCENE_H as u32
-        {
-            return None;
-        }
-        // Same stride discipline as pool_frame: a stride narrower
-        // than the row would walk the lattice off its rows.
-        let row_bytes = (width as usize).saturating_mul(3);
-        let stride = (stride as usize).max(row_bytes).max(1);
-        let mut grid = Vec::with_capacity(SCENE_W * SCENE_H);
-        for sy in 0..SCENE_H {
-            for sx in 0..SCENE_W {
-                // Cell centre in frame coordinates — always inside
-                // the w×h image by lattice construction.
-                let fx = (2 * sx + 1) * width as usize / (2 * SCENE_W);
-                let fy = (2 * sy + 1) * height as usize / (2 * SCENE_H);
-                let off = HEADER_SIZE + fy * stride + fx * 3;
-                if off + 3 > HEADER_SIZE + size {
-                    return None;
-                }
-                // SAFETY: `off + 3` bounds-checked against the frame
-                // payload above; `base` is the live shm mapping —
-                // same discipline as `pool_frame`.
-                let (r, g, b) = unsafe {
-                    if bgr {
-                        (*base.add(off + 2), *base.add(off + 1), *base.add(off))
-                    } else {
-                        (*base.add(off), *base.add(off + 1), *base.add(off + 2))
-                    }
-                };
-                grid.push(quantize_scene(r, g, b));
-            }
-        }
-        Some((grid, SCENE_W, SCENE_H))
-    }
-
     /// Commit a seqlock-verified pooled frame into the channel EMAs.
-    fn commit(&mut self, pooled: Vec<u8>, scene: Option<(Vec<u8>, usize, usize)>) {
+    fn commit(&mut self, pooled: Vec<u8>) {
         let n = (pooled.len() / 2).max(1) as f64;
         let luma_mean = pooled.iter().step_by(2).map(|&v| f64::from(v)).sum::<f64>() / (n * 255.0);
         let mel_mean = pooled
@@ -928,27 +568,6 @@ impl OpticNerve {
         }
         self.motion = motion_inst.max(self.motion * 0.6);
         self.orienting = finite_clamp(motion_inst * 3.0, 0.0, 1.0);
-
-        // Collicular scene parse — the body's own V2 grouping pass
-        // (`daemon::gamma`, the Rust binding organ). Gated: every
-        // `BIND_EVERY_FRAMES` consumed frames, or immediately on a
-        // salient orienting burst — a scene change is re-parsed now,
-        // not on the next interval. Only colour frames reach here;
-        // YUYV carries no chromatic lattice to bind.
-        self.frames_since_bind = self.frames_since_bind.saturating_add(1);
-        if let Some((grid, w, h)) = scene {
-            if self.frames_since_bind >= BIND_EVERY_FRAMES || self.orienting >= BIND_ON_ORIENTING {
-                self.frames_since_bind = 0;
-                let objects =
-                    crate::daemon::gamma::GammaField::bind(&grid, w, h, SCENE_BACKGROUND, 40);
-                self.proto_objects = objects.len() as f32;
-                self.binding_coherence = if objects.is_empty() {
-                    0.0
-                } else {
-                    (objects.iter().map(|o| o.coherence).sum::<f64>() / objects.len() as f64) as f32
-                };
-            }
-        }
     }
 
     /// Whether the eye is delivering frames right now.
@@ -956,16 +575,23 @@ impl OpticNerve {
         self.last_fresh_ms != 0 && now_ms.saturating_sub(self.last_fresh_ms) < FRESH_WINDOW_MS
     }
 
-    /// How open the lids are — the mind's voluntary position alone;
-    /// no phase holds the eye shut.
+    /// How open the lids are — the phase's transmission factor,
+    /// deepened by the mind's voluntary closure. Reads `gate_phase`,
+    /// so it tracks the stage with at most one advance of lag; a lid
+    /// that lags the flip-flop by a tick is physiology, not
+    /// staleness.
     pub fn lid(&self) -> f32 {
-        self.voluntary_lid
+        lid_transmission(self.gate_phase).min(self.voluntary_lid)
     }
 
     /// The mind's voluntary lid openness, clamped into [0, 1] —
-    /// `SET_LID`. Voluntary state is held, not momentary: lids stay
-    /// where the mind left them until it moves them again, the way a
-    /// held blink or a squint persists.
+    /// `SET_LID`. 1.0 releases the eye to the phase's own position;
+    /// lower values hold the lid down on whatever the phase allows.
+    /// It composes with `min`, so a request to open against a
+    /// sleeping phase changes nothing — the stage owns the floor.
+    /// Voluntary state is held, not momentary: lids stay where the
+    /// mind left them until it moves them again, the way a held
+    /// blink or a squint persists.
     pub fn set_lid(&mut self, openness: f32) {
         self.voluntary_lid = finite_clamp(openness, 0.0, 1.0);
     }
@@ -982,14 +608,15 @@ impl OpticNerve {
         Some(f64::from(self.melanopic * self.lid()).powf(MELANOPIC_LUX_GAMMA) * MELANOPIC_LUX_SCALE)
     }
 
-    /// The collicular alerting pulse in LC-input units — the
-    /// orienting transient, lid-attenuated like every afferent. It is
-    /// reported whenever the transient exists; the network's own
-    /// flip-flop decides whether the pulse crosses its wake
-    /// threshold, so a salient flash is a wake-up call the body
-    /// weighs, not a bias it cannot refuse. `_f_lc` is kept for the
-    /// caller's per-sub-step signature.
-    pub fn alert_lc(&self, _f_lc: f64) -> f64 {
+    /// The collicular alerting pulse in LC-input units — applied only
+    /// while the network is below its own wake threshold, so a salient
+    /// visual transient is a wake-up call rather than a constant bias.
+    /// `f_lc` is the wake population's firing rate; the caller reads it
+    /// per sub-step so the pulse follows the state it is pushing on.
+    pub fn alert_lc(&self, f_lc: f64) -> f64 {
+        if f_lc >= crate::state::sleep_network::SLEEP_THRESHOLD {
+            return 0.0;
+        }
         // Lid-filtered like the RHT channel — a flash through closed
         // lids still reaches the colliculus, attenuated.
         f64::from(self.orienting) * 2.0 * f64::from(self.lid())
@@ -1146,8 +773,6 @@ impl OpticNerve {
             pupil_mm: self.pupil_mm,
             accommodation_dpt: self.accommodation_dpt,
             lid: self.lid(),
-            proto_objects: self.proto_objects,
-            binding_coherence: self.binding_coherence,
         }
     }
 }
@@ -1176,29 +801,24 @@ impl Default for OpticNerve {
 /// Bounded re-open table: after each un-lived life the limb waits
 /// this long before the next attempt — the same widening sequence
 /// the process-level rebirth used.
-#[cfg(target_os = "linux")]
 const EYE_BACKOFF_S: [u64; 5] = [2, 5, 15, 30, 60];
 
 /// A life at least this long counts the eye as having lived — the
 /// attempt count refunds, the same stability rule the watcher kept.
-#[cfg(target_os = "linux")]
 const EYE_STABLE_S: f64 = 60.0;
 
 /// Consecutive dequeue errors that declare the device lost; at the
 /// 500 ms error sleep this is ~15 s of a truly dead camera before
 /// the limb counts it a life ended and re-opens.
-#[cfg(target_os = "linux")]
 const EYE_ERR_LIMIT: u32 = 30;
 
 /// The socket the eye opens absent a `GENESIS_CAMERA` override —
 /// and the fallback when an exhausted override names another
 /// device: a working eye beats the preferred dead one.
-#[cfg(target_os = "linux")]
 const DEFAULT_CAMERA_PATH: &str = "/dev/video0";
 
 /// The sockets the limb will try, preferred first: the configured
 /// device, then the default when the override names another.
-#[cfg(target_os = "linux")]
 fn camera_candidates(configured: &str) -> Vec<String> {
     let mut candidates = vec![configured.to_string()];
     if configured != DEFAULT_CAMERA_PATH {
@@ -1252,7 +872,13 @@ impl OpticCapture {
     /// harmlessly, ENOENT.
     pub fn stop(&self) {
         self.stop.store(true, Ordering::Relaxed);
-        optic_shmem::unlink(&self.shm_name);
+        if let Ok(name) = CString::new(self.shm_name.as_str()) {
+            // SAFETY: `name` is a valid NUL-terminated CString;
+            // shm_unlink of a missing name returns ENOENT, ignored.
+            unsafe {
+                let _ = libc::shm_unlink(name.as_ptr());
+            }
+        }
     }
 }
 
@@ -1262,49 +888,13 @@ impl Drop for OpticCapture {
     }
 }
 
-// The limb's whole existence: a life, a count, a pause, another
-// life. Every death lands here once — the same accounting the
-// mind's rebirth watcher kept for the standalone process, now held
-// where the loss actually happens. Bounded: after the table's
-// worth of un-lived lives the eye is accepted absent and the limb
-// rests — the organism goes on without sight.
-
-/// True when the host kernel is Android's — Termux, or a glibc distro
-/// in proot (Andronix and friends). Compile-time target_os never fires
-/// for proot: those builds are plain Linux, so the Camera2 limb must be
-/// chosen at runtime. GENESIS_TCP_EYE=1 forces the TCP limb on any kernel.
-#[cfg(target_os = "linux")]
-fn on_android_kernel() -> bool {
-    use std::sync::OnceLock;
-    static DETECTED: OnceLock<bool> = OnceLock::new();
-    *DETECTED.get_or_init(|| {
-        if std::env::var_os("GENESIS_TCP_EYE").is_some() {
-            return true;
-        }
-        std::fs::read_to_string("/proc/version")
-            .map(|v| v.to_lowercase().contains("android"))
-            .unwrap_or(false)
-    })
-}
-
-#[cfg(target_os = "linux")]
+/// The limb's whole existence: a life, a count, a pause, another
+/// life. Every death lands here once — the same accounting the
+/// mind's rebirth watcher kept for the standalone process, now held
+/// where the loss actually happens. Bounded: after the table's
+/// worth of un-lived lives the eye is accepted absent and the limb
+/// rests — the organism goes on without sight.
 fn capture_limb(shm_name: &str, stop: &AtomicBool) {
-    // On an Android kernel there is no V4L2 to open — the only lens is
-    // the Camera2 app publishing over loopback, Termux or proot alike.
-    if on_android_kernel() {
-        capture_limb_android(shm_name, stop);
-    } else {
-        capture_limb_v4l2(shm_name, stop);
-    }
-}
-
-#[cfg(target_os = "android")]
-fn capture_limb(shm_name: &str, stop: &AtomicBool) {
-    capture_limb_android(shm_name, stop);
-}
-
-#[cfg(target_os = "linux")]
-fn capture_limb_v4l2(shm_name: &str, stop: &AtomicBool) {
     let configured =
         std::env::var("GENESIS_CAMERA").unwrap_or_else(|_| DEFAULT_CAMERA_PATH.to_string());
     for (i, camera_path) in camera_candidates(&configured).iter().enumerate() {
@@ -1352,212 +942,11 @@ fn capture_limb_v4l2(shm_name: &str, stop: &AtomicBool) {
     );
 }
 
-/// Maximum Android camera frame dimensions. The capture app negotiates
-/// within these bounds; the optic bus reserves one full RGB frame.
-#[cfg(any(unix, test))]
-const ANDROID_MAX_WIDTH: u32 = 640;
-#[cfg(any(unix, test))]
-const ANDROID_MAX_HEIGHT: u32 = 480;
-#[cfg(any(unix, test))]
-const ANDROID_MAX_FRAME_BYTES: usize = ANDROID_MAX_WIDTH as usize * ANDROID_MAX_HEIGHT as usize * 3;
-#[cfg(unix)]
-const ANDROID_FRAME_MAGIC: &[u8; 4] = b"GOPT";
-
-/// Publish one packed RGB frame into the same seqlock segment used by
-/// the Linux camera limb. The Android capture adapter sends raw RGB;
-/// RGB3 denotes packed R,G,B byte order in the shared frame protocol.
-#[cfg(any(unix, test))]
-fn publish_android_frame(
-    base: *mut u8,
-    mapping_len: usize,
-    width: u32,
-    height: u32,
-    rgb: &[u8],
-) -> std::io::Result<()> {
-    use std::io::{Error, ErrorKind};
-
-    if width == 0 || height == 0 || width > ANDROID_MAX_WIDTH || height > ANDROID_MAX_HEIGHT {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            "Android frame dimensions are invalid",
-        ));
-    }
-    let stride = width
-        .checked_mul(3)
-        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "Android frame stride overflow"))?;
-    let expected = (stride as usize)
-        .checked_mul(height as usize)
-        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "Android frame size overflow"))?;
-    if rgb.len() != expected || rgb.len() > ANDROID_MAX_FRAME_BYTES {
-        return Err(Error::new(
-            ErrorKind::InvalidData,
-            "Android RGB payload length does not match dimensions",
-        ));
-    }
-    if mapping_len < HEADER_SIZE.saturating_add(expected) {
-        return Err(Error::new(
-            ErrorKind::InvalidData,
-            "Android frame exceeds optic mapping",
-        ));
-    }
-
-    // SAFETY: the capture limb creates a page-aligned mapping whose
-    // length is checked above. Offset zero is an aligned AtomicU64;
-    // every header and payload write is within the mapped region.
-    unsafe {
-        let counter = &*(base as *const AtomicU64);
-        let sequence = counter.load(Ordering::Relaxed);
-        counter.store(sequence.wrapping_add(1), Ordering::Relaxed);
-        std::sync::atomic::fence(Ordering::SeqCst);
-        std::ptr::write_volatile(base.add(8) as *mut u32, width);
-        std::ptr::write_volatile(base.add(12) as *mut u32, height);
-        std::ptr::copy_nonoverlapping(b"RGB3".as_ptr(), base.add(16), 4);
-        std::ptr::write_volatile(base.add(20) as *mut u32, rgb.len() as u32);
-        std::ptr::write_volatile(base.add(24) as *mut u32, stride);
-        std::ptr::copy_nonoverlapping(rgb.as_ptr(), base.add(HEADER_SIZE), rgb.len());
-        counter.store(sequence.wrapping_add(2), Ordering::Release);
-    }
-    Ok(())
-}
-
-#[cfg(unix)]
-fn receive_android_frames(mut stream: TcpStream, shmem: &optic_shmem::Shmem, stop: &AtomicBool) {
-    use std::io::ErrorKind;
-
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
-    let mut first_frame = true;
-    loop {
-        if stop.load(Ordering::Relaxed) {
-            return;
-        }
-        // GOPT | width:u32 BE | height:u32 BE | payload_bytes:u32 BE.
-        let mut header = [0u8; 16];
-        if let Err(error) = stream.read_exact(&mut header) {
-            if error.kind() != ErrorKind::UnexpectedEof
-                && error.kind() != ErrorKind::ConnectionReset
-                && error.kind() != ErrorKind::TimedOut
-                && error.kind() != ErrorKind::WouldBlock
-            {
-                eprintln!("[genesis] eye: Android camera stream ended: {error}");
-            }
-            return;
-        }
-        if &header[..4] != ANDROID_FRAME_MAGIC {
-            eprintln!("[genesis] eye: rejected Android frame with invalid protocol magic");
-            return;
-        }
-        let width = u32::from_be_bytes(header[4..8].try_into().expect("four-byte width"));
-        let height = u32::from_be_bytes(header[8..12].try_into().expect("four-byte height"));
-        let payload_len =
-            u32::from_be_bytes(header[12..16].try_into().expect("four-byte payload length"))
-                as usize;
-        let expected = match (width as usize)
-            .checked_mul(height as usize)
-            .and_then(|pixels| pixels.checked_mul(3))
-        {
-            Some(size)
-                if width > 0
-                    && height > 0
-                    && width <= ANDROID_MAX_WIDTH
-                    && height <= ANDROID_MAX_HEIGHT
-                    && size == payload_len
-                    && size <= ANDROID_MAX_FRAME_BYTES =>
-            {
-                size
-            }
-            _ => {
-                eprintln!("[genesis] eye: rejected malformed Android frame dimensions or length");
-                return;
-            }
-        };
-        let mut frame = vec![0u8; expected];
-        if let Err(error) = stream.read_exact(&mut frame) {
-            eprintln!("[genesis] eye: incomplete Android camera frame: {error}");
-            return;
-        }
-        if let Err(error) =
-            publish_android_frame(shmem.as_ptr(), shmem.len(), width, height, &frame)
-        {
-            eprintln!("[genesis] eye: could not publish Android frame: {error}");
-            return;
-        }
-        if first_frame {
-            eprintln!("[genesis] eye: first Android frame published ({width}x{height})");
-            first_frame = false;
-        }
-    }
-}
-
-/// Android's Camera2 adapter is the physical sensor driver; this daemon
-/// limb owns the optic mapping and publishes its frames using the same
-/// seqlock/header consumed on every platform. TCP is only the OS boundary
-/// between the separately sandboxed Android app and Termux — perception
-/// never branches around the optic nerve.
-#[cfg(unix)]
-fn capture_limb_android(shm_name: &str, stop: &AtomicBool) {
-    // The Android Camera2 service owns the platform-facing listener.
-    // The daemon connects outward, preserving the body's single inbound
-    // IPC entrance while still publishing into its canonical optic map.
-    let mut last_connect_notice = Instant::now();
-    let mut waiting_notice_sent = false;
-    while !stop.load(Ordering::Relaxed) {
-        let stream = match TcpStream::connect(("127.0.0.1", 8765)) {
-            Ok(stream) => {
-                waiting_notice_sent = false;
-                stream
-            }
-            Err(error) => {
-                if !waiting_notice_sent || last_connect_notice.elapsed() >= Duration::from_secs(10)
-                {
-                    eprintln!(
-                        "[genesis] eye: waiting for Android Camera2 adapter at 127.0.0.1:8765: {error}"
-                    );
-                    last_connect_notice = Instant::now();
-                    waiting_notice_sent = true;
-                }
-                thread::sleep(Duration::from_millis(500));
-                continue;
-            }
-        };
-        if let Err(error) = stream.set_read_timeout(Some(Duration::from_secs(2))) {
-            eprintln!("[genesis] eye: cannot configure Android camera stream: {error}");
-            thread::sleep(Duration::from_millis(500));
-            continue;
-        }
-
-        optic_shmem::unlink(shm_name);
-        let mapping_size = HEADER_SIZE + ANDROID_MAX_FRAME_BYTES;
-        let shmem = match optic_shmem::ShmemConf::new()
-            .os_id(shm_name)
-            .size(mapping_size)
-            .create()
-        {
-            Ok(mapping) => mapping,
-            Err(error) => {
-                eprintln!("[genesis] eye: cannot create Android optic mapping {shm_name}: {error}");
-                thread::sleep(Duration::from_secs(1));
-                continue;
-            }
-        };
-
-        eprintln!("[genesis] eye: Android camera adapter connected");
-        receive_android_frames(stream, &shmem, stop);
-        optic_shmem::unlink(shm_name);
-        drop(shmem);
-        if !stop.load(Ordering::Relaxed) {
-            eprintln!("[genesis] eye: Android camera adapter disconnected; reconnecting");
-            thread::sleep(Duration::from_millis(250));
-        }
-    }
-    optic_shmem::unlink(shm_name);
-}
-
 /// One life of the eye: device open → format negotiate → segment
 /// create → frame loop, until the hardware fails or `stop` lands.
 /// Returns the seconds the eye stayed open — `EYE_STABLE_S` is the
 /// refund threshold. Every failure inside is quiet logging, never a
 /// panic: this thread dying must never cost the body.
-#[cfg(target_os = "linux")]
 fn eye_life(shm_name: &str, camera_index: usize, camera_path: &str, stop: &AtomicBool) -> f64 {
     let born = Instant::now();
 
@@ -1653,9 +1042,15 @@ fn eye_life(shm_name: &str, camera_index: usize, camera_path: &str, stop: &Atomi
     // Drop any stale segment so the create below succeeds. One life,
     // one segment — the handle stays the owner, so its drop unlinks
     // the name and the next life starts fresh.
-    optic_shmem::unlink(shm_name);
+    if let Ok(cname) = CString::new(shm_name) {
+        // SAFETY: `cname` is a valid NUL-terminated CString; ENOENT
+        // is expected and discarded.
+        unsafe {
+            let _ = libc::shm_unlink(cname.as_ptr());
+        }
+    }
     let shm_size = HEADER_SIZE + fmt.size as usize;
-    let shmem = match optic_shmem::ShmemConf::new()
+    let shmem = match shared_memory::ShmemConf::new()
         .os_id(shm_name)
         .size(shm_size)
         .create()
@@ -1798,18 +1193,17 @@ mod tests {
     /// Build a private nerve segment carrying `payload` bytes after a
     /// valid header, then hand back the segment (kept alive by the
     /// caller so the mapping persists) and its name.
-    #[cfg(not(target_os = "android"))]
     fn fake_nerve(
         tag: &str,
         width: u32,
         height: u32,
         fourcc: &[u8; 4],
         frame: &[u8],
-    ) -> (optic_shmem::Shmem, String) {
+    ) -> (shared_memory::Shmem, String) {
         let name = format!("/genesis_optic_nerve_test_{}_{}", std::process::id(), tag);
         let stride = width * 3;
         let size = (stride * height) as usize;
-        let shmem = optic_shmem::ShmemConf::new()
+        let shmem = shared_memory::ShmemConf::new()
             .os_id(&name)
             .size(HEADER_SIZE + size.max(frame.len()))
             .create()
@@ -1839,7 +1233,6 @@ mod tests {
         assert_eq!(optic.retinal_lux(1000), None);
     }
 
-    #[cfg(not(target_os = "android"))]
     #[test]
     fn rgb_frame_feeds_the_channels() {
         // 64x48 RGB3, mid-blue — melanopsin-weighted should read high.
@@ -1864,7 +1257,6 @@ mod tests {
         drop(seg);
     }
 
-    #[cfg(not(target_os = "android"))]
     #[test]
     fn a_changed_frame_is_motion_and_orienting() {
         let (seg, name) = fake_nerve("motion", 64, 48, b"RGB3", &[0u8].repeat(64 * 48 * 3));
@@ -1886,46 +1278,40 @@ mod tests {
     }
 
     #[test]
-    fn gate_is_corticothalamic_feedback_alone() {
-        // The relay never closes — the reticular gate lives in the
-        // mind's own TRN (thalamus/relay.py). What the daemon
-        // publishes is the corticothalamic feedback's modulatory
-        // range around a full-gain base (Sherman & Guillery: feedback
-        // modulates the relay, it does not drive it).
+    fn gate_follows_the_sleep_stage_and_cortical_feedback() {
         let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_gate_nope");
         optic.set_cortical_gain(0.5);
         optic.update_gate(MentalPhase::Active);
-        assert!((optic.state(0).relay_gain - 0.8).abs() < 1e-6);
-        // Phase cannot close it — NREM reads the same as wake.
+        assert!(optic.state(0).relay_gain > 0.7);
         optic.update_gate(MentalPhase::NREM);
-        assert!((optic.state(0).relay_gain - 0.8).abs() < 1e-6);
-        // Feedback spans [0.6, 1.0] — it attenuates, never shuts.
+        assert!(optic.state(0).relay_gain < 0.05, "TRN blocks NREM");
+        optic.update_gate(MentalPhase::REM);
+        let rem = optic.state(0).relay_gain;
+        assert!(rem < 0.15 && rem > 0.0, "REM is gated but not zero: {rem}");
+        // Corticothalamic feedback modulates within bounds — full
+        // engagement cannot open the NREM gate.
+        optic.set_cortical_gain(1.0);
+        optic.update_gate(MentalPhase::NREM);
+        assert!(optic.state(0).relay_gain < 0.05);
+        // …but it does move the waking relay.
+        optic.update_gate(MentalPhase::Active);
         optic.set_cortical_gain(0.0);
         optic.update_gate(MentalPhase::Drowsy);
         let low = optic.state(0).relay_gain;
-        assert!((low - 0.6).abs() < 1e-6, "feedback floor: {low}");
         optic.set_cortical_gain(1.0);
         optic.update_gate(MentalPhase::Drowsy);
-        assert!((optic.state(0).relay_gain - 1.0).abs() < 1e-6);
+        assert!(optic.state(0).relay_gain > low);
     }
 
     #[test]
-    fn alert_is_orienting_times_the_lid() {
-        // The collicular pulse is the orienting transient attenuated
-        // by the lid — what to do with it is the body's own arousal
-        // problem downstream, so the afferent reports it ungated.
+    fn alert_only_fires_below_the_wake_threshold() {
         let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_alert_nope");
         optic.orienting = 0.5;
-        assert_eq!(optic.alert_lc(0.0), 1.0);
         assert_eq!(
-            optic.alert_lc(1.0),
-            1.0,
-            "arousal does not gate the afferent"
+            optic.alert_lc(crate::state::sleep_network::SLEEP_THRESHOLD + 1.0),
+            0.0
         );
-        optic.set_lid(0.5);
-        assert_eq!(optic.alert_lc(1.0), 0.5, "shut lids attenuate the pulse");
-        optic.orienting = 0.0;
-        assert_eq!(optic.alert_lc(1.0), 0.0, "no transient, no pulse");
+        assert_eq!(optic.alert_lc(1.0), 1.0, "asleep: pulse in LC units");
     }
 
     #[test]
@@ -1998,34 +1384,19 @@ mod tests {
     }
 
     #[test]
-    fn wire_is_sixty_six_bytes_and_carries_the_ocular_and_scene_state() {
+    fn wire_is_fifty_eight_bytes_and_carries_the_ocular_state() {
         let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_wire_nope");
         optic.pupil_mm = 5.25;
         optic.accommodation_dpt = 2.5;
-        optic.proto_objects = 4.0;
-        optic.binding_coherence = 0.75;
-        // The lid is voluntary state — the mind's own setting, not a
-        // phase readout — so the wire test drives it through the
-        // same setter the IPC command uses.
-        optic.set_lid(0.5);
+        optic.update_gate(MentalPhase::Drowsy);
         let wire = optic.state(0).to_wire();
-        assert_eq!(wire.len(), 66);
+        assert_eq!(wire.len(), 58);
         let pupil = f32::from_le_bytes(wire[46..50].try_into().unwrap());
         assert!((pupil - 5.25).abs() < 1e-6, "pupil rides the wire: {pupil}");
         let dpt = f32::from_le_bytes(wire[50..54].try_into().unwrap());
         assert!((dpt - 2.5).abs() < 1e-6, "lens power rides the wire: {dpt}");
         let lid = f32::from_le_bytes(wire[54..58].try_into().unwrap());
         assert!((lid - 0.5).abs() < 1e-6, "the lid rides the wire: {lid}");
-        let proto = f32::from_le_bytes(wire[58..62].try_into().unwrap());
-        assert!(
-            (proto - 4.0).abs() < 1e-6,
-            "proto-objects ride the wire: {proto}"
-        );
-        let coh = f32::from_le_bytes(wire[62..66].try_into().unwrap());
-        assert!(
-            (coh - 0.75).abs() < 1e-6,
-            "binding coherence rides the wire: {coh}"
-        );
     }
 
     #[test]
@@ -2092,7 +1463,6 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "android"))]
     #[test]
     fn closed_lids_dim_the_oscillator_but_do_not_black_it_out() {
         // A bright blue frame — the melanopic channel reads high.
@@ -2100,12 +1470,11 @@ mod tests {
         let (seg, name) = fake_nerve("lids", 64, 48, b"RGB3", &frame);
         let mut optic = OpticNerve::with_name(&name);
         optic.sample(10_000);
-        optic.set_lid(1.0);
+        optic.update_gate(MentalPhase::Active);
         let awake = optic.retinal_lux(10_000).expect("fresh frame");
-        // Same bright room through the ~3% lid she sets herself for
-        // sleep: the SCN drive collapses to a few percent —
-        // entrained weakly, not abolished.
-        optic.set_lid(0.03);
+        // Same bright room through NREM lids: the SCN drive collapses
+        // to a few percent — entrained weakly, not abolished.
+        optic.update_gate(MentalPhase::NREM);
         let asleep = optic.retinal_lux(10_000).expect("still a reading");
         assert!(asleep > 0.0, "lids leak light, they do not black it out");
         assert!(
@@ -2113,7 +1482,7 @@ mod tests {
             "closed lids attenuate the RHT drive: {asleep} vs {awake}"
         );
         // Half-mast sits between.
-        optic.set_lid(0.5);
+        optic.update_gate(MentalPhase::Drowsy);
         let drowsy = optic.retinal_lux(10_000).expect("still a reading");
         assert!(drowsy > asleep && drowsy < awake);
         drop(seg);
@@ -2123,10 +1492,9 @@ mod tests {
     fn a_flash_through_closed_lids_still_reaches_the_colliculus() {
         let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_lidalert_nope");
         optic.orienting = 0.5;
-        optic.set_lid(1.0);
+        optic.update_gate(MentalPhase::Active);
         let awake = optic.alert_lc(1.0);
-        // The sleep lid — the voluntary ~3% she sets herself.
-        optic.set_lid(0.03);
+        optic.update_gate(MentalPhase::NREM);
         let asleep = optic.alert_lc(1.0);
         assert!(asleep > 0.0, "a transient leaks through shut lids");
         assert!(asleep < awake * 0.1, "but it is a whisper, not a shout");
@@ -2138,16 +1506,15 @@ mod tests {
         // the sleeping pupil constricts despite the same darkness.
         let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_miosis_nope");
         optic.illuminance = 0.0;
-        optic.set_lid(1.0);
+        optic.update_gate(MentalPhase::Active);
         optic.update_pupil(1_000, 0.0);
         for t in 1..=20 {
             optic.update_pupil(1_000 + t * 250, 0.0);
         }
         let awake_dark = optic.state(6_000).pupil_mm;
         assert!(awake_dark > 6.5, "awake in the dark dilates: {awake_dark}");
-        // She closes the lid herself for sleep — central miosis
-        // follows the lid, not the phase.
-        optic.set_lid(0.03);
+        // The flip-flop lands in NREM — the same room, lids shut.
+        optic.update_gate(MentalPhase::NREM);
         for t in 1..=20 {
             optic.update_pupil(6_000 + t * 250, 0.0);
         }
@@ -2161,6 +1528,7 @@ mod tests {
     #[test]
     fn accommodation_relaxes_to_rest_in_sleep() {
         let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_accomsleep_nope");
+        optic.update_gate(MentalPhase::Active);
         optic.update_accommodation(1_000);
         // Awake: a 25 cm near point pulls the lens to ~4 D.
         optic.set_focus_m(0.25);
@@ -2168,9 +1536,8 @@ mod tests {
             optic.update_accommodation(1_000 + t * 250);
         }
         assert!(optic.state(4_000).accommodation_dpt > 3.0);
-        // Sleep is the lid she sets herself — below the closed
-        // threshold the ciliary releases the pre-sleep demand.
-        optic.set_lid(0.15);
+        // Sleep releases the request itself — the ciliary rests.
+        optic.update_gate(MentalPhase::NREM);
         for t in 1..=20 {
             optic.update_accommodation(4_000 + t * 250);
         }
@@ -2183,27 +1550,32 @@ mod tests {
     }
 
     #[test]
-    fn the_will_holds_the_lid_where_it_is_put() {
+    fn the_will_shuts_but_never_opens_the_lid() {
         let mut optic = OpticNerve::with_name("/genesis_optic_nerve_test_willlid_nope");
         optic.update_gate(MentalPhase::Active);
-        // The lid is the mind's own setting — held, not momentary.
+        // Awake, unrequested: the phase's lid is open.
         assert!((optic.lid() - 1.0).abs() < 1e-6);
+        // A voluntary close dims an open phase to the requested
+        // level — held, not momentary.
         optic.set_lid(0.05);
         assert!((optic.lid() - 0.05).abs() < 1e-6);
-        // No phase owns a floor: sleep does not close the eye — she
-        // does, through the same setter, and she can open it again.
-        optic.update_gate(MentalPhase::NREM);
+        // Half-mast against a drowsy phase: min picks the deeper
+        // closure — will can deepen, never lighten.
+        optic.update_gate(MentalPhase::Drowsy);
         assert!((optic.lid() - 0.05).abs() < 1e-6);
+        // Released, the lid rides the phase again — half-mast drowsy.
         optic.set_lid(1.0);
-        assert!((optic.lid() - 1.0).abs() < 1e-6);
-        // Held shut is held — requests clamp into [0, 1].
+        assert!((optic.lid() - 0.5).abs() < 1e-6);
+        // And a request to open against a sleeping phase changes
+        // nothing — the stage owns the floor.
+        optic.update_gate(MentalPhase::NREM);
+        optic.set_lid(1.0);
+        assert!((optic.lid() - 0.03).abs() < 1e-6);
+        // …though a shut eye shut even harder is still its request.
         optic.set_lid(0.0);
         assert_eq!(optic.lid(), 0.0);
-        optic.set_lid(1.7);
-        assert!((optic.lid() - 1.0).abs() < 1e-6);
     }
 
-    #[cfg(not(target_os = "android"))]
     #[test]
     fn a_voluntary_close_dims_the_oscillator_too() {
         // The voluntary lid rides the same afference as the phase
@@ -2225,48 +1597,6 @@ mod tests {
         drop(seg);
     }
 
-    #[test]
-    fn android_rgb_publication_uses_the_shared_optic_frame_contract() {
-        // u64 storage gives the test buffer the alignment required by
-        // the atomic seqlock word at offset zero.
-        let mut storage = vec![0u64; (HEADER_SIZE + 8 * 6 * 3).div_ceil(8)];
-        let base = storage.as_mut_ptr().cast::<u8>();
-        let rgb: Vec<u8> = (0..8 * 6 * 3).map(|value| value as u8).collect();
-        publish_android_frame(base, storage.len() * 8, 8, 6, &rgb)
-            .expect("publish a valid Android RGB frame");
-
-        // SAFETY: the test buffer is aligned u64 storage and contains
-        // the full header and payload written by publish_android_frame.
-        unsafe {
-            let sequence = (*(base as *const AtomicU64)).load(Ordering::Acquire);
-            assert_eq!(sequence, 2);
-            assert_eq!(std::ptr::read_volatile(base.add(8) as *const u32), 8);
-            assert_eq!(std::ptr::read_volatile(base.add(12) as *const u32), 6);
-            let mut fourcc = [0u8; 4];
-            std::ptr::copy_nonoverlapping(base.add(16), fourcc.as_mut_ptr(), 4);
-            assert_eq!(&fourcc, b"RGB3");
-            assert_eq!(
-                std::ptr::read_volatile(base.add(20) as *const u32),
-                rgb.len() as u32
-            );
-            assert_eq!(std::ptr::read_volatile(base.add(24) as *const u32), 24);
-            assert_eq!(
-                std::slice::from_raw_parts(base.add(HEADER_SIZE), rgb.len()),
-                rgb.as_slice()
-            );
-        }
-    }
-
-    #[test]
-    fn android_rgb_publication_rejects_bad_dimensions_and_payloads() {
-        let mut storage = vec![0u64; (HEADER_SIZE + 64).div_ceil(8)];
-        let base = storage.as_mut_ptr().cast::<u8>();
-        assert!(publish_android_frame(base, storage.len() * 8, 0, 2, &[0; 12]).is_err());
-        assert!(publish_android_frame(base, storage.len() * 8, 2, 2, &[0; 11]).is_err());
-        assert!(publish_android_frame(base, HEADER_SIZE + 8, 2, 2, &[0; 12]).is_err());
-    }
-
-    #[cfg(target_os = "linux")]
     #[test]
     fn the_default_socket_is_the_only_candidate_unless_overridden() {
         // No override — one candidate, the default itself.

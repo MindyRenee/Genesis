@@ -40,7 +40,6 @@ import logging
 import math
 import os
 import tempfile
-import time
 import zlib
 from collections import deque
 from collections.abc import Callable, Iterable
@@ -2084,7 +2083,6 @@ def serialize_sleep_state(
             "cycles_completed": sleep_cycle.cycles_completed,
         }
     return {
-        "saved_at": time.time(),
         "is_sleeping": is_sleeping,
         "user_initiated_sleep": user_initiated_sleep,
         "sleep_cycle": cycle_data,

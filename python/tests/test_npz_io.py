@@ -103,13 +103,14 @@ def test_save_errors_propagate_rather_than_being_swallowed(tmp_path):
     truncated or unwritten artifact went unnoticed while the in-memory
     state carried on diverging from disk.
     """
-    # A regular file where the directory should be fails for every user,
-    # root included (root ignores permission bits, so a read-only
-    # directory would not fail under root).
-    not_a_dir = tmp_path / "file"
-    not_a_dir.write_text("")
-    with pytest.raises(OSError):
-        save_npz(str(not_a_dir / "x.npz"), x=np.array([1]))
+    unwritable = tmp_path / "ro"
+    unwritable.mkdir()
+    unwritable.chmod(0o500)  # read+execute: cannot create files
+    try:
+        with pytest.raises(OSError):
+            save_npz(str(unwritable / "x.npz"), x=np.array([1]))
+    finally:
+        unwritable.chmod(0o700)
 
 
 def test_legacy_pickled_file_requires_explicit_opt_in(tmp_path):

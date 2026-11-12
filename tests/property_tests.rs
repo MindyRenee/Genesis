@@ -102,10 +102,7 @@ fn prop_chemical_levels_stay_in_bounds_after_impulses() {
         vec.recompute_derived();
         vec.tick_default();
 
-        // After each tick, all levels must be finite and non-negative.
-        // Concentration has no ceiling — the kinetics (proportional
-        // clearance, saturating release, receptor isotherms) bound the
-        // *signal* downstream; the level itself flows.
+        // After each tick, all levels must stay in [0, 1]
         for chem in &vec.chemicals {
             assert!(
                 chem.level.is_finite(),
@@ -114,8 +111,8 @@ fn prop_chemical_levels_stay_in_bounds_after_impulses() {
                 chem.level
             );
             assert!(
-                chem.level >= 0.0,
-                "chemical {} level negative — positivity invariant violated: {}",
+                chem.level >= 0.0 && chem.level <= 1.0,
+                "chemical {} level out of bounds: {}",
                 chem.id,
                 chem.level
             );
@@ -291,13 +288,11 @@ fn prop_dynamics_stable_over_1000_ticks_from_random_starts() {
             );
         }
 
-        // After 1000 ticks, the system should have settled — finite,
-        // non-negative concentrations (no ceiling: signals saturate
-        // downstream through the receptor isotherms).
+        // After 1000 ticks, the system should have settled — no extreme values
         for chem in &vec.chemicals {
             assert!(
-                chem.level >= 0.0,
-                "chemical {} level negative after 1000 ticks: {}",
+                chem.level >= 0.0 && chem.level <= 1.0,
+                "chemical {} level out of bounds after 1000 ticks: {}",
                 chem.id,
                 chem.level
             );

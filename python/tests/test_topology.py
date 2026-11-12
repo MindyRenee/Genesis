@@ -55,7 +55,7 @@ def test_projection_targets_exist() -> None:
 def test_regions_ride_field_fibers() -> None:
     """Every region rides a real major system.
 
-    The three ids mirror ``src/latent_spaces/runtime.rs``'s fibers — body
+    The three ids mirror ``src/field/runtime.rs``'s fibers — body
     (somatic, slow), prediction (inference, fast), agency (volitional
     and social). The Rust side cross-checks its own table against the
     live FieldRuntime; this side pins the same three names.
@@ -63,31 +63,3 @@ def test_regions_ride_field_fibers() -> None:
     field_fibers = {"body", "prediction", "agency"}
     for r in topology.REGIONS:
         assert r.fiber in field_fibers, f"{r.name} rides unknown fiber {r.fiber}"
-
-
-def test_every_brain_package_has_matching_rust_region() -> None:
-    """Every brain-region package under python/ has a matching Rust region."""
-    assert topology.MIND_ONLY == ()
-    packages = {r.package for r in topology.REGIONS if r.package}
-    expected = {
-        "basal_forebrain",
-        "basal_ganglia",
-        "brainstem",
-        "cerebellum",
-        "frontal_lobe",
-        "hypothalamus",
-        "infrastructure",
-        "insula",
-        "latent_spaces",
-        "limbic_system",
-        "memory",
-        "occipital_lobe",
-        "parietal_lobe",
-        "self",
-        "sleep",
-        "temporal_lobe",
-        "thalamus",
-        "tools",
-        "worlds",
-    }
-    assert expected <= packages

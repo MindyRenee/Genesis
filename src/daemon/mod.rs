@@ -47,7 +47,6 @@
 //! ```
 
 pub mod active_inference;
-pub mod actuators;
 pub mod adaptive;
 pub mod association;
 pub mod consolidation;
@@ -57,15 +56,12 @@ pub mod consolidation;
 pub mod continuity;
 pub mod cpufreq;
 pub mod dyadic_model;
-pub mod gamma;
+pub mod field_probe;
 pub mod hpa_development;
 pub mod interoception;
 pub mod ipc;
-/// Maxwell's equations — the field substrate's constitutive physics.
+/// Maxwell's equations applied to the measured carrier current.
 pub mod maxwell;
-/// The mind shepherd — the body's half of rebirth: regrows a mind
-/// that was present and went silent, bounded into dormant solitude.
-pub mod mind_shepherd;
 /// Optic nerve — the retinal afferent's subcortical branches (SCN,
 /// superior colliculus, pretectum, TRN relay gate).
 pub mod optic_nerve;

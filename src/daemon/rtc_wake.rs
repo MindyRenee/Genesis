@@ -22,17 +22,9 @@
 //! whether the permission is installed.
 
 use std::process::Command;
-#[cfg(not(target_os = "android"))]
 use std::sync::OnceLock;
 
-/// RTC wake-alarm control is not exposed by the Termux runtime.
-#[cfg(target_os = "android")]
-fn sudo_available() -> bool {
-    false
-}
-
-/// Whether `sudo -n` runs without a password. Cached on desktop Linux.
-#[cfg(not(target_os = "android"))]
+/// Whether `sudo -n` runs without a password. Cached.
 fn sudo_available() -> bool {
     static SUDO_AVAILABLE: OnceLock<bool> = OnceLock::new();
     *SUDO_AVAILABLE.get_or_init(|| {

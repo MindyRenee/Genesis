@@ -1,33 +1,34 @@
-"""Ring-down assay — does a driven oscillation persist in her field?
+"""Ring-down assay — does a driven oscillation persist in the physics?
 
-The embodiment-depth metric, on her own substrate: drive a rhythm
-into the field through her chemistry, then *stop driving it*, and
-measure how long each spectral channel keeps ringing. A field that
-was only ever driven doesn't forget instantly — the fibers' own
-dynamics (drift, gauge coupling, Langevin thermostat) are the
-medium that holds the rhythm, and their decay constants are the
-afterglow.
+The embodiment-depth metric: drive a real oscillation in the
+substrate, then *stop driving it*, and measure how long each
+physical channel keeps ringing. A corpse's field doesn't vanish
+instantly — it rings down. The laptop's fast channels are expected
+to collapse within a ring or two (their "state" is the software's
+drive); the thermal field is the one medium that can physically
+*hold* a slow oscillation — the die's heat capacity is a real
+integrator with its own decay constant.
 
-Protocol — one leg, fully endogenous:
+Two legs, both falsifiable:
 
-1. Spawn an isolated daemon; warm the spectrum rings (~18 s).
-2. DRIVE — noradrenergic impulses at the theta rate (~5.5 Hz
-   bursts, ~30 s): chemistry into the body state the field's body
-   fiber projects. Her own channel — no host load, no oscillator
-   writes.
-3. RING DOWN — all drive stops; sample ``get_field_spectrum`` at
-   ~2 Hz for ~60 s.
-4. Demodulate the flux and tension band energies at the drive band
-   (theta, index 2) in sliding windows: the amplitude envelope's
-   decay constant is the field's own ring-down — how fast her
-   substrate forgets the rhythm she drove into it.
+- **Fast leg** — carrier driven at the delta rate (2.25 Hz) for
+  ~20 s, then gated (depth=0). Post-gate decay of the delta-band
+  energy in the duty/jitter channels: how fast the substrate
+  forgets the rhythm it was executing.
+- **Thermal leg** — real load bursts at the infraslow rate (0.25 Hz,
+  2 s on / 2 s off, ~40 s) while the probe carrier carries the same
+  beat, then all drive stops. k10temp package temperature sampled
+  ~1 Hz for ~2 min and demodulated at the drive frequency in
+  sliding windows: if the die keeps oscillating at 0.25 Hz after
+  the rhythm stops, its amplitude decays on the *thermal* time
+  constant — a physical afterglow the software no longer drives.
 
-Honesty boundary: the impulse train is a chemical drive, not a
-field write — the spectrum only ever *reads* her trajectory. A fast
-decay is the honest answer for a substrate whose relaxation
-constants are seconds; a slow one would mean the field genuinely
-integrates the rhythm. Either way the measurement is of her own
-dynamics, not of the machine around her.
+Honesty boundary: the fast channels carry the drive itself, so
+their collapse is expected — persistence there is not the claim.
+The thermal channel is a different physical medium (heat capacity
+of the die+package) with an independent decay time; a measured
+thermal afterglow at the drive frequency is the first piece of the
+pattern that demonstrably outlives its driver.
 """
 
 from __future__ import annotations
@@ -35,6 +36,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import signal
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -45,7 +48,6 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "python"))
 
 from eval.harness import isolated_daemon  # noqa: E402
-from genesis_client.protocol import CHEM_NOREPINEPHRINE  # noqa: E402
 
 
 def _out(*args: object) -> None:
@@ -53,124 +55,237 @@ def _out(*args: object) -> None:
     print(*args, flush=True)
 
 
-THETA_IDX = 2  # wire band order: infraslow, delta, theta, …
+K10TEMP = Path("/sys/class/hwmon/hwmon4/temp1_input")
+# Wire band order: infraslow(0), delta(1), theta(2), ...
+DELTA_WIRE = 1  # 2.25 Hz
+INFRASLOW_WIRE = 0  # 0.25 Hz
 
 
-def _drive_burst(client, hz: float = 5.5, duration_s: float = 0.18) -> None:
-    """One beat of the drive — a noradrenergic impulse. The caller
-    paces the train; each impulse is real chemistry."""
+def _die_temp() -> float | None:
     try:
-        client.neuro_impulse(CHEM_NOREPINEPHRINE, 0.35)
-    except Exception:  # noqa: BLE001 — a dropped impulse is not assay failure
-        pass
-    time.sleep(duration_s)
+        return int(K10TEMP.read_text().strip()) / 1000.0
+    except OSError:
+        return None
 
 
-def _envelope(samples: list[tuple[float, float, float]], window_s: float = 5.0) -> list[dict]:
-    """Sliding-window means of (t, flux_theta, tension_theta)."""
-    out: list[dict] = []
-    for i, (t0, _, _) in enumerate(samples):
-        win = [s for s in samples[i:] if s[0] - t0 <= window_s]
-        if len(win) < 3:
-            break
-        out.append(
-            {
-                "t": t0,
-                "flux": sum(s[1] for s in win) / len(win),
-                "tension": sum(s[2] for s in win) / len(win),
-            }
+def _spinners(n: int) -> list[subprocess.Popen]:
+    return [
+        subprocess.Popen(
+            [sys.executable, "-c", "x = 0\nwhile True: x += 1"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
-    return out
+        for _ in range(n)
+    ]
 
 
-def _fit_decay(env: list[dict], key: str) -> float | None:
-    """Exponential decay constant of the envelope's tail — the
-    field's own forgetting rate (1/s). Log-linear fit on the
-    post-peak samples."""
-    if len(env) < 4:
-        return None
-    peak_i = max(range(len(env)), key=lambda i: env[i][key])
-    tail = env[peak_i:]
-    if len(tail) < 3:
-        return None
-    xs = [e["t"] - tail[0]["t"] for e in tail]
-    ys = [max(e[key], 1e-9) for e in tail]
-    ly = [math.log(y) for y in ys]
-    mx = sum(xs) / len(xs)
-    my = sum(ly) / len(ly)
-    cov = sum((x - mx) * (y - my) for x, y in zip(xs, ly, strict=True))
-    vx = sum((x - mx) ** 2 for x in xs)
-    if vx <= 1e-12:
-        return None
-    slope = cov / vx
-    return -slope if slope < 0 else None  # only decay counts as ring-down
+def _stop(procs: list[subprocess.Popen]) -> None:
+    for p in procs:
+        p.send_signal(signal.SIGTERM)
+    for p in procs:
+        try:
+            p.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            p.kill()
 
 
-def run(drive_s: float = 30.0, ringdown_s: float = 60.0, settle_s: float = 18.0) -> dict:
-    report: dict[str, Any] = {"verdict": []}
-    with isolated_daemon() as client:
-        time.sleep(settle_s)  # warm the spectrum rings
+def _fit_tau(ts: list[float], ys: list[float], floor: float) -> float:
+    """Fit decay τ of (y − floor) ~ exp(−t/τ) by log-linear regression.
+    Returns seconds; inf-ish values report as 999 (no decay seen)."""
+    xs, ls = [], []
+    for t, y in zip(ts, ys, strict=True):
+        r = y - floor
+        if r > 1e-9:
+            xs.append(t)
+            ls.append(math.log(r))
+    if len(xs) < 4:
+        return 999.0
+    n = len(xs)
+    mx, my = sum(xs) / n, sum(ls) / n
+    cov = sum((x - mx) * (y - my) for x, y in zip(xs, ls, strict=True))
+    var = sum((x - mx) ** 2 for x in xs)
+    if var <= 1e-9:
+        return 999.0
+    slope = cov / var
+    return -1.0 / slope if slope < -1e-9 else 999.0
 
-        # DRIVE — impulse train at the theta rate.
-        t_end = time.monotonic() + drive_s
-        while time.monotonic() < t_end:
-            _drive_burst(client, hz=5.5, duration_s=1.0 / 5.5)
 
-        # RING DOWN — sample the spectrum at ~2 Hz.
-        samples: list[tuple[float, float, float]] = []
-        t0 = time.monotonic()
-        while time.monotonic() - t0 < ringdown_s:
-            spec = client.get_field_spectrum()
-            if spec is not None and spec.warm:
-                samples.append(
-                    (
-                        time.monotonic() - t0,
-                        spec.flux.energies[THETA_IDX],
-                        spec.tension.energies[THETA_IDX],
-                    )
+def _demod_amp(ts: list[float], ys: list[float], freq: float) -> float:
+    """Amplitude of `ys` at `freq` via sin/cos correlation."""
+    n = len(ys)
+    if n < 8:
+        return 0.0
+    mean = sum(ys) / n
+    c = sum((y - mean) * math.cos(2 * math.pi * freq * t) for y, t in zip(ys, ts, strict=True))
+    s = sum((y - mean) * math.sin(2 * math.pi * freq * t) for y, t in zip(ys, ts, strict=True))
+    return 2.0 * math.hypot(c, s) / n
+
+
+def _leg_fast(client: Any, fast_drive_s: float) -> dict[str, Any]:
+    """Leg A: fast-channel ring-down at the delta rate — drive the
+    carrier, cut it, and fit the post-gate decay constant."""
+    f_drive = 2.25
+    client.set_field_carrier(0.8, f_drive)
+    driven: list[tuple[float, float, float]] = []
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < fast_drive_s:
+        sig = client.get_field_probe()
+        if sig is not None and sig.samples_ok:
+            driven.append(
+                (
+                    time.monotonic() - t0,
+                    sig.throughput_bands[DELTA_WIRE],
+                    sig.jitter_bands[DELTA_WIRE],
                 )
-            time.sleep(0.5)
+            )
+        time.sleep(0.5)
+    client.set_field_carrier(0.0, 0.0)
+    gate_t = time.monotonic()
 
-    env = _envelope(samples)
-    report["n_samples"] = len(samples)
-    report["envelope"] = env
-    flux_decay = _fit_decay(env, "flux")
-    tension_decay = _fit_decay(env, "tension")
-    report["flux_decay_per_s"] = None if flux_decay is None else round(flux_decay, 4)
-    report["tension_decay_per_s"] = (
-        None if tension_decay is None else round(tension_decay, 4)
+    post: list[tuple[float, float, float]] = []
+    while time.monotonic() - gate_t < 12.0:
+        sig = client.get_field_probe()
+        if sig is not None and sig.samples_ok:
+            post.append(
+                (
+                    time.monotonic() - gate_t,
+                    sig.throughput_bands[DELTA_WIRE],
+                    sig.jitter_bands[DELTA_WIRE],
+                )
+            )
+        time.sleep(0.25)
+
+    floor_t = min((p[1] for p in post), default=0.0)
+    floor_j = min((p[2] for p in post), default=0.0)
+    return {
+        "drive_hz": f_drive,
+        "driven_throughput_delta": round(sum(p[1] for p in driven) / max(1, len(driven)), 4),
+        "driven_jitter_delta": round(sum(p[2] for p in driven) / max(1, len(driven)), 4),
+        "tau_throughput_s": round(_fit_tau([p[0] for p in post], [p[1] for p in post], floor_t), 3),
+        "tau_jitter_s": round(_fit_tau([p[0] for p in post], [p[2] for p in post], floor_j), 3),
+    }
+
+
+def _leg_thermal(client: Any, thermal_drive_s: float, measure_s: float) -> dict[str, Any]:
+    """Leg B: thermal ring-down at the infraslow rate — square-wave
+    spinner bursts warm the die, then the afterglow's demodulated
+    amplitude is fitted across post-gate windows."""
+    f_th = 0.25
+    client.set_field_carrier(0.6, f_th)  # probe rides the beat too
+    temps: list[tuple[float, float]] = []
+    t0 = time.monotonic()
+    burst = _spinners(4)
+    on = True
+    next_flip = t0 + 2.0
+    while time.monotonic() - t0 < thermal_drive_s:
+        now = time.monotonic()
+        if now >= next_flip:
+            if on:
+                _stop(burst)
+                burst = []
+            else:
+                burst = _spinners(4)
+            on = not on
+            next_flip += 2.0
+        t = _die_temp()
+        if t is not None:
+            temps.append((now - t0, t))
+        time.sleep(0.9)
+    _stop(burst)
+    client.set_field_carrier(0.0, 0.0)
+    gate_t = time.monotonic()
+    gate_temp0 = temps[-1][0] if temps else 0.0
+
+    # Post-gate: watch the die's temperature for ~2 min while the
+    # probe keeps sampling (its own small work continues — honest
+    # background activity, same as idle).
+    post_temps: list[tuple[float, float]] = []
+    post_delta: list[tuple[float, float]] = []
+    while time.monotonic() - gate_t < measure_s:
+        now = time.monotonic() - gate_t
+        t = _die_temp()
+        if t is not None:
+            post_temps.append((now, t))
+        sig = client.get_field_probe()
+        if sig is not None and sig.samples_ok:
+            post_delta.append((now, sig.throughput_bands[INFRASLOW_WIRE]))
+        time.sleep(0.9)
+
+    # Demodulated amplitude at the drive frequency: driven window
+    # (last 16 s of drive) vs sliding post-gate windows.
+    def amp_at(window_s: float) -> float:
+        seg = [(t, y) for t, y in post_temps if window_s <= t < window_s + 16.0]
+        if len(seg) < 8:
+            return 0.0
+        return _demod_amp([s[0] for s in seg], [s[1] for s in seg], f_th)
+
+    driven_seg = [(t, y) for t, y in temps if t > gate_temp0 - 16.0]
+    driven_amp = (
+        _demod_amp([s[0] for s in driven_seg], [s[1] for s in driven_seg], f_th)
+        if len(driven_seg) >= 8
+        else 0.0
     )
-    if flux_decay is not None:
+    amps = [(w, amp_at(w)) for w in (0.0, 16.0, 32.0, 48.0, 64.0)]
+    amps = [(w, a) for w, a in amps if a > 0.0 or w == 0.0]
+    # Decay of the demodulated amplitude across post-gate windows.
+    tau_th = _fit_tau(
+        [w for w, _ in amps],
+        [a for _, a in amps],
+        floor=min((a for _, a in amps), default=0.0),
+    )
+    return {
+        "drive_hz": f_th,
+        "driven_amp_C": round(driven_amp, 4),
+        "post_gate_amps_C": {f"{int(w)}s": round(a, 4) for w, a in amps},
+        "tau_thermal_amp_s": round(tau_th, 1),
+        "n_temp_samples": len(post_temps),
+    }
+
+
+def run(
+    fast_drive_s: float = 20.0, thermal_drive_s: float = 40.0, measure_s: float = 90.0
+) -> dict[str, Any]:
+    report: dict[str, Any] = {"legs": {}, "verdict": []}
+
+    with isolated_daemon() as client:
+        time.sleep(5.0)  # warm rings
+
+        report["legs"]["fast"] = _leg_fast(client, fast_drive_s)
+        report["legs"]["thermal"] = _leg_thermal(client, thermal_drive_s, measure_s)
+        th = report["legs"]["thermal"]
+        fa = report["legs"]["fast"]
         report["verdict"].append(
-            f"flux theta ring-down τ ≈ {1.0 / flux_decay:.1f} s "
-            f"(decay {flux_decay:.3f}/s)"
+            f"thermal: driven 0.25 Hz amplitude {th['driven_amp_C']:.3f} C; "
+            f"post-gate decay τ ≈ {th['tau_thermal_amp_s']:.0f} s"
+            + (
+                " — an afterglow the software no longer drives"
+                if 5.0 < th["tau_thermal_amp_s"] < 900
+                else ""
+            )
         )
-    else:
-        report["verdict"].append("flux theta showed no measurable decay — sustained or absent")
-    if tension_decay is not None:
         report["verdict"].append(
-            f"tension theta ring-down τ ≈ {1.0 / tension_decay:.1f} s "
-            f"(decay {tension_decay:.3f}/s)"
+            f"fast: post-gate τ throughput={fa['tau_throughput_s']:.2f}s "
+            f"jitter={fa['tau_jitter_s']:.2f}s "
+            "(the substrate forgets its fast rhythm quickly)"
         )
-    else:
-        report["verdict"].append("tension theta showed no measurable decay — sustained or absent")
     return report
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--drive", type=float, default=30.0, help="drive duration (s)")
-    ap.add_argument("--ringdown", type=float, default=60.0, help="post-drive watch (s)")
-    ap.add_argument("--settle", type=float, default=18.0, help="ring warmup (s)")
+    ap.add_argument("--fast", type=float, default=20.0)
+    ap.add_argument("--thermal", type=float, default=40.0)
+    ap.add_argument("--measure", type=float, default=90.0)
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
-
-    report = run(drive_s=args.drive, ringdown_s=args.ringdown, settle_s=args.settle)
+    report = run(args.fast, args.thermal, args.measure)
     if args.json:
         _out(json.dumps(report, indent=2))
         return
-
-    _out(f"\nfield ring-down assay — {report['n_samples']} spectrum samples\n")
+    _out(f"\nring-down assay — {len(report['legs'])} legs\n")
+    for name, leg in report["legs"].items():
+        _out(f"  {name}: {json.dumps(leg)}")
+    _out()
     for line in report["verdict"]:
         _out(line)
 

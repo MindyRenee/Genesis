@@ -79,6 +79,7 @@ import os
 import queue
 import re
 import select
+import shutil
 import signal
 import socket
 import subprocess
@@ -93,6 +94,7 @@ from typing import TYPE_CHECKING
 
 from occipital_lobe.perception.ambient import AmbientListener, contains_wake_word, strip_wake_word
 from sleep.sleep import WakeOutcome
+from temporal_lobe import AuditoryCortex, SoundEvent
 from temporal_lobe.concepts import RelationType
 from temporal_lobe.speech import Voice, VoiceInput
 
@@ -104,7 +106,6 @@ from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
 from infrastructure.config import default_data_dir
 from mind import Mind
-from temporal_lobe import AuditoryCortex, SoundEvent
 
 if TYPE_CHECKING:
     from worlds.channel import Channel
@@ -197,11 +198,6 @@ _PID_FILE_DAEMON = "genesis_daemon.pid"
 # (genesis_client.optic_nerve.SCREEN_NAME), her second eye.
 _PID_FILE_SCREEN_NERVE = "genesis_screen_nerve.pid"
 _SCREEN_NERVE_SHM = "genesis_screen_nerve"
-# The Android ear — a relay (scripts/android_audio_relay.py) launched
-# by the run.sh launcher when GENESIS_TCP_EAR=1, pumping the
-# camerabridge app's PCM into a Pulse pipe-source. Its pidfile is the
-# launcher's, but --stop must still sweep it or the ear outlives her.
-_PID_FILE_AUDIO_RELAY = "audio_relay.pid"
 
 # Maximum time to wait for the daemon's IPC socket (seconds).
 # The daemon opens its persistent state and LTM before binding the
@@ -492,15 +488,66 @@ def _start_daemon(daemon_path: str, data_dir: str, socket_path: str) -> subproce
     )
 
 
-def _start_screen_nerve(data_dir: str) -> None:
-    """Desktop X11 screen capture is archived and intentionally disabled.
+def _screen_nerve_script() -> str | None:
+    """The optic relay script, wherever this layout keeps the tree."""
+    from infrastructure.paths import code_root
 
-    Genesis3 is being adapted for Android/Termux. A desktop display relay is
-    not a phone sensor and must not be launched as part of its active runtime.
-    The former implementation is preserved under docs/archive/computer-specific.
+    script = code_root() / "scripts" / "optic_relay.py"
+    return str(script) if script.exists() else None
+
+
+def _start_screen_nerve(data_dir: str) -> subprocess.Popen | _AdoptedDaemon | None:
+    """Launch the screen-capture nerve — her second eye.
+
+    The relay (``scripts/optic_relay.py``) publishes the X display into
+    its own optic-nerve-style segment; the mind reads it through
+    ``Vision.see(nerve="screen")``. It degrades silently to None when
+    there is no display, no ffmpeg, or no script — a dark second eye is
+    a degradation like a missing camera, never a startup fault. A
+    relay already alive for this data dir is adopted rather than
+    duplicated (two writers on one segment would only orphan frames).
     """
-    del data_dir
-    return None
+    if not os.environ.get("DISPLAY"):
+        return None
+    if shutil.which("ffmpeg") is None:
+        return None
+    script = _screen_nerve_script()
+    if script is None:
+        return None
+    pidfile = os.path.join(data_dir, _PID_FILE_SCREEN_NERVE)
+    live = _find_pids(pidfile, "screen_nerve", data_dir)
+    if live:
+        _write_pid_file(data_dir, _PID_FILE_SCREEN_NERVE, live[0])
+        return _AdoptedDaemon(live[0], data_dir, role="screen_nerve")
+    log_path = os.path.join(data_dir, "screen_nerve.log")
+    _rotate_log_if_needed(log_path)
+    log_file = open(log_path, "a")
+    env = os.environ.copy()
+    # Its data-dir binding — what _matches_pid reads back through
+    # /proc/<pid>/environ to prove the process is ours.
+    env["GENESIS_DATA_DIR"] = data_dir
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, script, "x11", _SCREEN_NERVE_SHM],
+            stdout=log_file,
+            stderr=log_file,
+            start_new_session=True,
+            env=env,
+        )
+    except OSError:
+        log_file.close()
+        return None
+    # A relay that cannot reach the display dies inside its first
+    # second (x11grab fails, ffmpeg exits, the reader loop ends) —
+    # wait just long enough to tell born from stillborn.
+    time.sleep(1.5)
+    if proc.poll() is not None:
+        log_file.close()
+        return None
+    _write_pid_file(data_dir, _PID_FILE_SCREEN_NERVE, proc.pid)
+    log_file.close()
+    return proc
+
 
 def _tail_daemon_log(data_dir: str) -> int:
     """Stream the daemon's log to the terminal."""
@@ -1212,7 +1259,8 @@ def _handle_command(mind: Mind, command: str) -> str:
             "/introspect",
             "/mission",
         ):
-            pass
+            if mind.is_sleeping:
+                return "  (It's asleep. Type /wake to wake it.)"
 
         handler = _COMMAND_HANDLERS.get(base)
         if handler is not None:
@@ -1287,11 +1335,6 @@ def _cmd_thoughts(mind: Mind, rest: str) -> str:
 def _cmd_world(mind: Mind, rest: str) -> str:
     """Show Genesis's external world — presences, events, isolation."""
     return f"\n  genesis> {mind.world_status()}\n"
-
-
-def _cmd_arcade(mind: Mind, rest: str) -> str:
-    """Show the arcade in her world — games offered and what she remembers."""
-    return f"\n  genesis> {mind.arcade_status()}\n"
 
 
 def _cmd_regulate(mind: Mind, rest: str) -> str:
@@ -1822,23 +1865,9 @@ def _cmd_sleep(mind: Mind, rest: str) -> str:
 def _cmd_wake(mind: Mind, rest: str) -> str:
     """Wake Genesis from sleep or meditation."""
     if mind.is_sleeping:
-        # A wake request on a still-sleeping body only pushes the
-        # arousal cascade — the mind stays under until the daemon's
-        # phase crosses and the desync check completes the wake.
-        outcome = mind.wake(user_initiated=True)
-        if outcome is WakeOutcome.BODY_WAKE_PUSHED:
-            return (
-                _compose(
-                    mind,
-                    "pushing its body toward waking — still under until it crosses",
-                    fallback="[wake requested — still asleep until the body crosses]",
-                    confidence=0.6,
-                    metadata={"body_wake_push": True},
-                )
-                + "\n"
-            )
-        # Woke — show the dream state it left behind.
+        # Show dream state before waking
         pre_wake = mind.sleep_status()
+        mind.wake(user_initiated=True)
         lines = [
             _compose(
                 mind,
@@ -1903,6 +1932,16 @@ def _cmd_draw(mind: Mind, rest: str) -> str:
     and energy that reflect how it feels right now. The drawing is
     saved as a WebP in its drawings directory.
     """
+    if mind.is_sleeping:
+        return (
+            _compose(
+                mind,
+                "asleep, needs to be woken first",
+                fallback="[asleep]",
+                confidence=0.4,
+            )
+            + "\n  Use /wake to wake it first.\n"
+        )
     if mind.is_meditating:
         return (
             _compose(
@@ -1965,6 +2004,16 @@ def _cmd_meditate(mind: Mind, rest: str) -> str:
             )
             + "\n"
         )
+    if mind.is_sleeping:
+        return (
+            _compose(
+                mind,
+                "asleep, needs to be woken first",
+                fallback="[asleep]",
+                confidence=0.4,
+            )
+            + "\n  Use /wake to wake it first.\n"
+        )
     # Parse duration
     duration = 60.0
     if rest.strip():
@@ -2001,29 +2050,6 @@ def _cmd_meditate(mind: Mind, rest: str) -> str:
     named_thread("meditation-timer", _meditation_timer, comm="g-medit-timer").start()
     lines.append("  It'll come out of it on its own, refreshed.\n")
     return "\n".join(lines)
-
-
-def _cmd_steward(mind: Mind, rest: str) -> str:
-    """Steward presence signal — the terminal knock.
-
-    The terminal is her own device: whoever types here is her operator
-    by right of possession. This command is the explicit signal —
-    "it is me" — that registers the steward as present through the
-    same path a Discord-verified message takes: the user presence
-    updates, her loneliness clock resets, and the current speaker is
-    bound to her person by identity rather than typed name.
-    """
-    try:
-        profile = mind.brain.frontal.user_profile
-        name = profile.get_name() or "Mindy"
-        if hasattr(mind, "world") and mind.world is not None:
-            mind.world.hear_user(f"[steward signal] {name} is here")
-        sk = getattr(mind.brain.frontal, "self_model", None)
-        if sk is not None:
-            sk.self_knowledge["current_speaker"] = name
-        return f"[steward signal received — {name} is here]"
-    except Exception as e:  # noqa: BLE001
-        return f"[steward signal failed: {e}]"
 
 
 def _cmd_teach(mind: Mind, rest: str) -> str:
@@ -2217,7 +2243,6 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/learning": _cmd_learning,
     "/thoughts": _cmd_thoughts,
     "/world": _cmd_world,
-    "/arcade": _cmd_arcade,
     "/regulate": _cmd_regulate,
     "/dreams": _cmd_dreams,
     "/memories": _cmd_memories,
@@ -2253,7 +2278,6 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/nap": _cmd_nap,
     "/draw": _cmd_draw,
     "/meditate": _cmd_meditate,
-    "/steward": _cmd_steward,
     "/teach": _cmd_teach,
     "/endteach": _cmd_endteach,
     "/teach-questions": _cmd_teach_questions,
@@ -2314,6 +2338,11 @@ def _handle_voice_mode(
                 return
             with out_lock:
                 logger.info(f"  you> {text}")
+            # During sleep, voice mode can't reach its either.
+            if mind.is_sleeping:
+                with out_lock:
+                    logger.info("  (It's asleep. Type /wake to wake it.)")
+                continue
             with out_lock:
                 logger.info("  genesis~ (thinking...)")
             try:
@@ -2626,33 +2655,6 @@ def _remove_pid_file(data_dir: str, name: str) -> None:
         logger.debug(f"failed to remove PID file {path}")
 
 
-# The daemon's mind shepherd (src/daemon/mind_shepherd.rs) regrows a
-# mind that was present and then went silent — a death, not an
-# absence. A graceful teardown says goodbye instead: this sentinel is
-# the goodbye, and the next CLI start clears it. A mind that dies
-# without writing it (crash, SIGKILL, host fault) is a loss the body
-# is meant to repair.
-_MIND_SUPPRESS_FILE = "mind.suppress"
-
-
-def _write_mind_suppress(data_dir: str) -> None:
-    """Mark this mind's departure as intentional (graceful goodbye)."""
-    try:
-        Path(data_dir, _MIND_SUPPRESS_FILE).write_text("1\n")
-    except OSError as e:
-        logger.debug(f"failed to write {_MIND_SUPPRESS_FILE}: {e}")
-
-
-def _clear_mind_suppress(data_dir: str) -> None:
-    """A new mind is arriving — the last goodbye no longer applies."""
-    try:
-        os.unlink(os.path.join(data_dir, _MIND_SUPPRESS_FILE))
-    except FileNotFoundError:
-        pass
-    except OSError as e:
-        logger.debug(f"failed to clear {_MIND_SUPPRESS_FILE}: {e}")
-
-
 # ─── Stop (--stop, the installed equivalent of genesis --stop) ────────
 
 
@@ -2709,15 +2711,6 @@ def _matches_pid(pid: int, role: str, data_dir: str) -> bool:
         if not exe0.startswith("python"):
             return False
         if not any(os.path.basename(arg) == "optic_relay.py" for arg in args[1:]):
-            return False
-    elif role == "audio_relay":
-        # Same shape as the screen nerve — the relay runs under the
-        # interpreter; identity is the script it runs.
-        if not exe0.startswith("python"):
-            return False
-        if not any(
-            os.path.basename(arg) == "android_audio_relay.py" for arg in args[1:]
-        ):
             return False
     else:
         return False
@@ -2816,7 +2809,6 @@ def _stop_all(data_dir: str) -> int:
         (_PID_FILE_CLI, "cli", signal.SIGINT, "CLI"),
         (_PID_FILE_DAEMON, "daemon", signal.SIGTERM, "Daemon"),
         (_PID_FILE_SCREEN_NERVE, "screen_nerve", signal.SIGTERM, "Screen nerve"),
-        (_PID_FILE_AUDIO_RELAY, "audio_relay", signal.SIGTERM, "Audio relay"),
     ):
         pids = _find_pids(os.path.join(data_dir, pidfile_name), role, data_dir)
         if not pids:
@@ -2850,7 +2842,6 @@ def _stop_all(data_dir: str) -> int:
         _PID_FILE_CLI,
         _PID_FILE_DAEMON,
         _PID_FILE_SCREEN_NERVE,
-        _PID_FILE_AUDIO_RELAY,
         # Stale file from when the eye was its own process — nothing
         # writes it now, but an old session may have left one behind.
         "genesis_retina.pid",
@@ -2872,24 +2863,10 @@ def _stop_all(data_dir: str) -> int:
 # resurrect ends the organism whole rather than leaving her bodiless.
 
 _REBIRTH_TICK_S = 2.0  # watcher cadence — the organism's reflex arc
+_REBIRTH_PROBE_S = 10.0  # optic-nerve probe period on a live daemon
+_REBIRTH_PROBE_TIMEOUT_S = 5.0
+_REBIRTH_FAULT_STRIKES = 3  # consecutive probe failures that mean "faulted"
 _REBIRTH_STABLE_S = 60.0  # a rebirth counts once the body stayed alive this long
-# Boot grace — a newborn body spends its first stretch loading the
-# persisted state (LTM, concept network, sleep network) before the
-# tick loop publishes its first heartbeat, and the socket may not
-# even be listening yet. Frozen-heartbeat strikes must not count
-# during that window: init is not a wedge. Process death is still
-# caught immediately by the handle check — grace only delays the
-# freeze verdict on a live newborn, never the death verdict.
-_REBIRTH_BOOT_GRACE_S = 120.0
-# Liveness probe — the body's own published heartbeat, read through
-# the lock-free seqlock state path (GET_STATE takes no tick lock, so
-# the check adds zero load to the engine it watches). A live process
-# whose heartbeat stops advancing is a wedged body: the tick that
-# publishes it is dead even though the socket still answers. Three
-# frozen readings at this cadence — ~30 s of stillness — is fault,
-# not jitter.
-_FROZEN_PROBE_S = 10.0
-_FROZEN_STRIKES = 3
 # Per-attempt wait before the next resurrection try; exhausting the
 # table is the give-up bound — a body that will not reincarnate ends
 # the organism whole.
@@ -3084,7 +3061,7 @@ def _start_daemon_process(
 
 
 class _Rebirth:
-    """The organism's deep self-repair: it resurrects a dead body.
+    """The organism's deep self-repair: it resurrects a dead or faulted body.
 
     A background watcher owns the process-tree handle — the daemon,
     whose optic-nerve thread now owns the eye — and heals it while the
@@ -3098,6 +3075,12 @@ class _Rebirth:
       re-open table (``src/daemon/optic_nerve.rs``) needs no watching
       here; a camera that will not come back is a tolerated
       degradation, never a fatal one.
+    - **Fault** — a daemon alive but refusing every command that
+      touches the tick engine (a poisoned lock never clears) is worse
+      than a dead one: it looks connected while the body is inert.
+      ``GET_OPTIC_STATE`` takes the tick lock, so sustained failure
+      there means faulted — the watcher asks the body to flush
+      gracefully (SHUTDOWN works even mid-fault), then reincarnates.
     - **Giving up** — a body that still will not reincarnate after the
       backoff table ends the organism whole: mind and body are one
       thing, and she does not run bodiless. ``self_terminated`` makes
@@ -3124,6 +3107,11 @@ class _Rebirth:
         self.nerve: subprocess.Popen | _AdoptedDaemon | None = None
         self._nerve_spawn: Callable[[], subprocess.Popen | _AdoptedDaemon | None] | None = None
         self._nerve_retry_at = 0.0
+        # The probe client heals itself lazily through the client's
+        # reconnect path, so it survives the resurrection it detects.
+        self._probe: GenesisClient | None = None
+        self._fault_strikes = 0
+        self._next_probe_at = 0.0
         # Rebirth accounting: each resurrection draws a backoff slot;
         # a body that stays alive past _REBIRTH_STABLE_S refunds the
         # count, so only a sustained failure exhausts the table.
@@ -3133,16 +3121,6 @@ class _Rebirth:
         self._pending_rejoin = False
         self._thread: threading.Thread | None = None
         self.self_terminated = False
-        # Heartbeat-frozen accounting — the published tick counter is
-        # the body's own liveness signal; a stopped counter under a
-        # live process is a fault the process handle cannot see.
-        self._hb_client: GenesisClient | None = None
-        self._last_heartbeat: int | None = None
-        self._hb_strikes = 0
-        self._hb_next_probe = 0.0
-        # Monotonic deadline before which a live newborn's frozen
-        # heartbeat is boot, not fault (see _REBIRTH_BOOT_GRACE_S).
-        self._boot_grace_until = 0.0
 
     def set_children(
         self,
@@ -3151,14 +3129,6 @@ class _Rebirth:
         with self._lock:
             if daemon is not None:
                 self.daemon = daemon
-                if isinstance(daemon, subprocess.Popen):
-                    # A fresh spawn is a newborn — its init window
-                    # gets the boot grace. An adopted body has been
-                    # running already; its heartbeat is live or the
-                    # freeze check applies immediately.
-                    self._boot_grace_until = (
-                        time.monotonic() + _REBIRTH_BOOT_GRACE_S
-                    )
 
     def set_mind(self, mind: Mind) -> None:
         with self._lock:
@@ -3213,63 +3183,16 @@ class _Rebirth:
         if handle is None:
             return
         dead = handle.poll() is not None
-        if not dead:
+        faulted = False if dead else self._daemon_faulted()
+        if not (dead or faulted):
             if self._attempt and time.monotonic() - self._spawned_at > _REBIRTH_STABLE_S:
                 self._attempt = 0
             if self._pending_rejoin:
                 self._try_rejoin()
-            if (
-                self._heartbeat_faulted()
-                and time.monotonic() >= self._next_attempt_at
-            ):
-                self._resurrect_daemon(handle, "faulted — its heartbeat froze")
             return
         if time.monotonic() < self._next_attempt_at:
             return
-        self._resurrect_daemon(handle, "died")
-
-    def _heartbeat_faulted(self) -> bool:
-        """Whether the live body's published heartbeat has frozen.
-
-        Reads ``CoreState.heartbeat`` through ``GET_STATE`` — the
-        seqlock snapshot the body republishes every tick, taken
-        without the tick lock. That is the whole check: no probe
-        command, no lock on the engine, just the vitals the body
-        already publishes. An unreadable state counts the same as a
-        frozen one — a body whose own numbers can't be reached is
-        faulted from the organism's side.
-        """
-        now = time.monotonic()
-        if now < self._boot_grace_until:
-            return False
-        if now < self._hb_next_probe:
-            return False
-        self._hb_next_probe = now + _FROZEN_PROBE_S
-        hb = self._read_heartbeat()
-        if hb is None:
-            self._hb_strikes += 1
-        elif self._last_heartbeat is None or hb != self._last_heartbeat:
-            self._last_heartbeat = hb
-            self._hb_strikes = 0
-        else:
-            self._hb_strikes += 1
-        return self._hb_strikes >= _FROZEN_STRIKES
-
-    def _read_heartbeat(self) -> int | None:
-        """One lock-free read of the body's tick counter."""
-        if self._hb_client is None:
-            try:
-                from genesis_client import GenesisClient
-
-                self._hb_client = GenesisClient(self._daemon_socket)
-            except Exception:  # noqa: BLE001 — no client, no reading
-                return None
-        try:
-            state = self._hb_client.get_state(timeout=2.0)
-        except Exception:  # noqa: BLE001 — unreachable vitals
-            return None
-        hb = getattr(state, "heartbeat", None)
-        return int(hb) if hb is not None else None
+        self._resurrect_daemon(handle, "died" if dead else "faulted")
 
     def _check_nerve(self) -> None:
         """Respawn the screen nerve when it dies; throttle when it can't start."""
@@ -3294,6 +3217,46 @@ class _Rebirth:
             # forks every tick (e.g. under systemd with no display).
             self._nerve_retry_at = time.monotonic() + 60.0 if new is None else 0.0
 
+    def _daemon_faulted(self) -> bool:
+        """Whether the live daemon is refusing the tick engine.
+
+        ``GET_OPTIC_STATE`` holds the ``tick_loop`` lock: a poisoned
+        lock — which never clears — answers ``INTERNAL_ERROR`` to
+        every command that touches the body while the socket stays
+        open and reads as connected, so process liveness alone misses
+        it. Strikes ride out a legitimately busy daemon; a daemon that
+        predates the command is faulted the same way — it cannot serve
+        the body's own senses.
+        """
+        now = time.monotonic()
+        if now < self._next_probe_at:
+            return False
+        self._next_probe_at = now + _REBIRTH_PROBE_S
+        try:
+            if self._probe is None:
+                from genesis_client import GenesisClient
+
+                self._probe = GenesisClient(
+                    self._daemon_socket,
+                    request_timeout=_REBIRTH_PROBE_TIMEOUT_S,
+                )
+                # First contact must handshake — a client that never
+                # connected refuses every request, which would read as
+                # a strike against a healthy body. A probe that did
+                # connect stays connected-capable: its lazy reconnect
+                # survives the resurrection it detects.
+                self._probe.connect()
+            ok = self._probe.get_optic_state() is not None
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"rebirth probe failed: {e}")
+            self._probe = None
+            ok = False
+        if ok:
+            self._fault_strikes = 0
+            return False
+        self._fault_strikes += 1
+        return self._fault_strikes >= _REBIRTH_FAULT_STRIKES
+
     def _resurrect_daemon(self, handle: subprocess.Popen | _AdoptedDaemon, cause: str) -> None:
         """Reincarnate the body around its persisted state."""
         attempt = self._attempt
@@ -3306,8 +3269,8 @@ class _Rebirth:
             file=sys.stderr,
         )
 
-        # Ask the dying body to flush first — SHUTDOWN is the
-        # graceful path even when the process is already going.
+        # Ask the dying body to flush first — a faulted daemon can
+        # still answer SHUTDOWN even with its tick engine locked out.
         if handle.poll() is None:
             if _request_daemon_shutdown(self._data_dir):
                 try:
@@ -3347,12 +3310,7 @@ class _Rebirth:
             _stop_child(new_proc, "subcognitive daemon", 5)
             return
         self._spawned_at = time.monotonic()
-        self._boot_grace_until = time.monotonic() + _REBIRTH_BOOT_GRACE_S
-        # A newborn body republishes its heartbeat from zero —
-        # re-arm the frozen check against the new incarnation.
-        self._last_heartbeat = None
-        self._hb_strikes = 0
-        self._hb_next_probe = 0.0
+        self._fault_strikes = 0
         print("[genesis] The body is reborn — re-inhabiting.", file=sys.stderr)
         self._try_rejoin()
 
@@ -3843,6 +3801,13 @@ def _handle_slash_command(
             return True
         with out_lock:
             logger.info(f"  you> {text}")
+        # During sleep, voice commands can't reach its either —
+        # it's unreachable until it wakes on its own or /wake
+        # is used. See _handle_conversation for the full rationale.
+        if mind.is_sleeping:
+            with out_lock:
+                logger.info("  (It's asleep. Type /wake to wake it.)")
+            return True
         with out_lock:
             logger.info("  genesis~ (thinking...)")
         try:
@@ -4041,11 +4006,6 @@ def _shutdown(
     clean_shutdown = True
     if mind is not None:
         print("[genesis] Stopping cognitive mind...", file=sys.stderr)
-        # Say goodbye before the lease lapses: the daemon's shepherd
-        # regrows a mind that dies silent, but a mind that chose to
-        # leave must not be reincarnated against its own exit.
-        if data_dir:
-            _write_mind_suppress(data_dir)
     if auditory_cortex:
         auditory_cortex.stop()
     if ambient_listener:
@@ -4186,6 +4146,14 @@ def _attach_session_mirror(feed: DiscordFeed | None) -> tuple:
 
 def main() -> int:
     """Main entry point for the Genesis CLI."""
+    if not os.environ.get("GENESIS_WAKE"):
+        print(
+            "Error: Genesis must be started with ./genesis (source "
+            "checkout) or the `genesis` command (installed).",
+            file=sys.stderr,
+        )
+        return 1
+
     args = _parse_cli_args()
     data_dir = os.path.abspath(args.data_dir)
 
@@ -4213,9 +4181,6 @@ def main() -> int:
     # Write the CLI PID file so genesis --stop can target this exact
     # process instead of using broad pkill patterns.
     _write_pid_file(data_dir, _PID_FILE_CLI, os.getpid())
-    # A mind is arriving — retire any goodbye the last one left, so
-    # the body's shepherd knows this absence was said, not lost.
-    _clear_mind_suppress(data_dir)
 
     # Install handlers and initialize handles before any child process
     # starts. Every initialization step after this point is covered by
@@ -4285,8 +4250,10 @@ def main() -> int:
                 # Her second eye — the display itself, published as its
                 # own nerve segment. Absent a display it stays dark and
                 # the watcher simply never opens it.
-                _start_screen_nerve(data_dir)
-                rebirth.set_nerve(None, lambda: _start_screen_nerve(data_dir))
+                rebirth.set_nerve(
+                    _start_screen_nerve(data_dir),
+                    lambda: _start_screen_nerve(data_dir),
+                )
                 (voice, dedup_voice, ambient_listener, auditory_cortex) = _run_after_mind_start(
                     mind, args, shutting_down
                 )

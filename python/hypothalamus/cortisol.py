@@ -57,16 +57,16 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
     Cortisol is produced ONLY by the HPA cascade (CRH->ACTH->CORT),
     which is maturation-gated (SHRP).
     The coupling matrix only has suppressive feedback — the signals that tell cortisol to
-    stop (GABA, oxytocin, endorphin, BDNF, ECB).
+    stop (serotonin, GABA, oxytocin, endorphin, BDNF, ECB).
     This prevents the death spiral where normal arousal drives cortisol through the
     coupling matrix, bypassing the HPA gate.
 
-    SRT  ->  CORT:  0.00  (no coupling — cortisol comes only from the HPA cascade.)
+    SRT  -> CORT: -0.10  (weak volume transmission.)
     GABA -> CORT: -0.15  (weak volume transmission.)
     OXY  -> CORT: -0.10  (weak volume transmission.)
     END  -> CORT: -0.10  (weak volume transmission.)
-    BDNF  ->  CORT:  -0.10  (weak volume transmission.)
-    ECB  ->  CORT:  -0.10  (weak volume transmission.)
+    BDNF -> CORT: -0.05  (weak volume transmission.)
+    ECB  -> CORT: -0.05  (weak volume transmission.)
     DA   -> CORT: 0.00   (no direct coupling)
     NE   -> CORT: 0.00   (no direct coupling)
     ACh  -> CORT: 0.00   (no direct coupling)
@@ -88,16 +88,16 @@ COUPLING: HOW CORTISOL AFFECTS OTHERS (matrix column 6)
     CORT -> GABA:  -0.10  (stress disinhibition — cortisol suppresses GABA.)
     CORT -> OXY:  -0.10  (stress suppresses social bonding.)
     CORT -> END:  -0.10  (stress suppresses pleasure — chronic stress anhedonia.)
-    CORT  ->  ADN:  0.00  (retired — owned by the Process-S mechanism.)
+    CORT -> ADN:  +0.05  (stress-related adenosine release.)
     CORT -> BDNF:  -0.20  (THE critical coupling. Cortisol suppresses
                           BDNF — chronic stress blocks plasticity.
                           Strongest negative coupling in the matrix.)
-    CORT  ->  ECB:  0.10  (stress dampening — cortisol stimulates ECB release.)
-    CORT  ->  VP:  0.10  (stress activates vasopressin (HPA co-activation).)
+    CORT -> ECB:  +0.05  (stress dampening — cortisol stimulates ECB release.)
+    CORT -> VP :  +0.05  (stress activates vasopressin (HPA co-activation).)
     CORT -> CRH:  -0.10  (negative feedback — cortisol inhibits CRH.)
-    CORT  ->  EPI:  0.10  (PNMT enzyme induction.)
-    CORT  ->  MEL:  -0.10  (wake-promoting signal suppresses melatonin.)
-    CORT  ->  DA:  0.10  (glucocorticoids potentiate DA signaling — Butts 2011; Graf 2013.)
+    CORT -> EPI:  +0.05  (PNMT enzyme induction.)
+    CORT -> MEL:  -0.05  (wake-promoting signal suppresses melatonin.)
+    CORT -> DA :  0.00   (no direct coupling)
     CORT -> NE :  0.00   (no direct coupling)
     CORT -> ACh:  0.00   (no direct coupling)
     CORT -> GLU:  0.00   (no direct coupling)
@@ -150,19 +150,19 @@ Cortisol metabolic clearance (hepatic 11β-HSD):
     composes exactly over sub-steps, so the decay is invariant to
     the caller's tick cadence.
 
-Bounded signal, unbounded concentration:
-    Cortisol concentration flows without a ceiling — the 11beta-HSD
-    clearance above and the HPA negative feedback are the bounds.
-    Receptor-facing signals saturate downstream (tanh/Hill
-    isotherms), so a large concentration cannot produce an unbounded
-    effect. Positivity is a property of the integrator: every sink is
-    proportional to substrate, so the level can approach but never
-    cross zero.
+Hard clamp:
+    Cortisol is hard-clamped to [0, cortisol_max] (default 0.80)
+    to prevent runaway stress. This is a safety mechanism.
 
-Allostatic baseline:
-    Cortisol's baseline is a slow exponential moving average of its
-    own level — the allostatic set-point drifts up under sustained
-    secretion and recovers afterward, with no external command.
+Negative feedback to ACTH:
+    High cortisol suppresses ACTH (long-loop negative feedback).
+    acth_level -= cort_eff * HPA_CORTISOL_FEEDBACK_RATE * dt_scale
+    where HPA_CORTISOL_FEEDBACK_RATE = 0.02
+
+No baseline adaptation:
+    Cortisol's baseline should never adapt — it has no homeostatic
+    set-point, just a leaky integrator to zero. The general baseline
+    adaptation loop skips cortisol.
 
 BDNF suppression:
     Cortisol suppresses BDNF (coupling -0.20). This is the
@@ -198,10 +198,10 @@ Cortisol clearance:
     level *= exp(-clearance_exponent)
 
 Negative feedback to ACTH:
-    High cortisol suppresses ACTH through exponential clearance —
-    acth_level *= exp(-cort_eff * HPA_CORTISOL_FEEDBACK_RATE * dt_scale),
-    so the suppression is proportional to the ACTH present and can
-    never drive it negative.
+    acth_level -= cort_eff * 0.02 * dt_scale
+
+Hard clamp:
+    level = clamp(level, 0.0, cortisol_max)  where cortisol_max = 0.80
 
 Effective level, coupling force, vesicular pool, tonic/phasic,
 receptor adaptation: same general formulas as dopamine.py.
@@ -327,6 +327,7 @@ class Cortisol:
     wave_sign: float = -1.0
     circadian_modifier: str = "1.0 (NO circadian modulation — stress hormone)"
     role: str = "stress response, HPA cascade, BDNF suppression"
+    hard_clamp_max: float = 0.80
     metabolic_decay_rate: float = 1.75e-4
     clearance_rate: float = 0.08
     hpa_feedback_rate: float = 0.02

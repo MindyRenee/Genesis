@@ -162,67 +162,6 @@ class ChannelBoard:
         self._field_lines(lines)
         self._cell_line(lines)
 
-    _FIELD_BAND_NAMES = (
-        "infr", "del", "the", "alp", "sig", "b1", "b2", "b3", "gam", "eps",
-    )
-
-    def _field_lines(self, lines: list[str]) -> None:
-        """Rows for her own field's computed signatures — Maxwell's
-        equations on her coherent motion (GET_FIELD_SIGNATURE) and
-        the spectral decomposition of her substrate trajectory
-        (GET_FIELD_SPECTRUM). These are her field's own mathematics,
-        in the units an external observer of that field would read —
-        never a measurement of the machine's. A daemon that predates
-        a channel shows no row for it; an un-integrated field says
-        so."""
-        h = self._h
-        try:
-            sig = h.client.get_field_signature()
-        except Exception:  # noqa: BLE001 — absent channel, no row
-            sig = None
-        if sig is not None:
-            if not sig.signature_present:
-                if sig.integration_present:
-                    lines.append(f"field    integrating d {sig.disagreement:.3f}")
-            else:
-                from brainstem.maxwell import carrier_hz, coherence
-
-                bits = [f"{carrier_hz(sig):.3f} Hz"]
-                coh = coherence(sig)
-                if coh is not None:
-                    bits.append(f"coh {coh:.2f}")
-                bits += [
-                    f"B {sig.b_axial_t:.1e} T",
-                    f"E {sig.e_induction_vm:.1e} V/m",
-                    f"P {sig.radiated_power_w:.1e} W",
-                ]
-                if not sig.quasi_static:
-                    bits.append("out-of-regime")
-                lines.extend(_board_pack("field", bits))
-        try:
-            spec = h.client.get_field_spectrum()
-        except Exception:  # noqa: BLE001 — absent channel, no row
-            spec = None
-        if spec is None:
-            return
-        if not spec.warm:
-            lines.append("bands    warming…")
-            return
-        # The substrate's own spectrum — top flux bands by energy,
-        # the tension channel's turbulence, the carrier's phase.
-        top = sorted(
-            range(10), key=lambda i: spec.flux.energies[i], reverse=True
-        )[:3]
-        bits = [
-            f"{self._FIELD_BAND_NAMES[i]} {spec.flux.energies[i]:.2f}"
-            for i in top
-            if spec.flux.energies[i] > 0.05
-        ]
-        bits.append(f"tcv {spec.tension.cv:.2f}")
-        if spec.carrier_present:
-            bits.append(f"φ {spec.carrier_phase:.2f}")
-        lines.extend(_board_pack("bands", bits))
-
     def _neuro_lines(self, core, lines: list[str]) -> None:
         """Rows for the neurochemical and inference state."""
         h = self._h
@@ -284,7 +223,69 @@ class ChannelBoard:
             stm_live = core.stm_count
         lines.extend(_board_pack("mem", [f"stm {stm_live}", f"ltm {core.ltm_episode_count:,}"]))
 
+    def _field_lines(self, lines: list[str]) -> None:
+        """Rows for the substrate's measured physical life.
 
+        The field probe decomposes real instruction throughput and
+        scheduler jitter at the wave bands' center frequencies, writes
+        a carrier rhythm into real work, and reads real watts, rail
+        voltage, and current where the machine's sensors report them.
+        ``None`` means the probe isn't running: absent, never zero.
+        """
+        h = self._h
+        try:
+            probe = h.client.get_field_probe()
+        except Exception:  # noqa: BLE001
+            probe = None
+        if probe is None:
+            lines.append("field    probe off")
+            return
+        field_bits = [
+            f"carrier {probe.carrier_freq:.1f} Hz",
+            f"thru {probe.throughput_mean:,.0f} it/s",
+            f"jit {probe.jitter_cv:.2f}",
+            f"irq {probe.irq_rate:,.0f}/s",
+        ]
+        if probe.carrier_coherence is not None:
+            field_bits.append(f"coh {probe.carrier_coherence:.2f}")
+        lines.extend(_board_pack("field", field_bits))
+        elec_bits = []
+        if probe.power_watts is not None:
+            elec_bits.append(f"pwr {probe.power_watts:.1f} W")
+        if probe.rail_volts is not None:
+            elec_bits.append(f"{probe.rail_volts:.2f} V")
+        if probe.supply_amps is not None:
+            elec_bits.append(f"{probe.supply_amps:.2f} A")
+        if probe.power_coherence is not None:
+            elec_bits.append(f"pcoh {probe.power_coherence:.2f}")
+        if elec_bits:
+            lines.extend(_board_pack("elec", elec_bits))
+        # The radio sense — the room's RF environment: WLAN
+        # field strength + traffic flux, Bluetooth HCI event
+        # flux. None-gated like everything else — absent radios
+        # print nothing.
+        rf_bits = []
+        if probe.rf_rssi_dbm is not None:
+            rf_bits.append(f"rssi {probe.rf_rssi_dbm:.0f} dBm")
+        if probe.rf_noise_dbm is not None:
+            rf_bits.append(f"n {probe.rf_noise_dbm:.0f}")
+        if probe.rf_bytes_s is not None:
+            rf_bits.append(f"{probe.rf_bytes_s:,.0f} B/s")
+        if probe.bt_events_s is not None:
+            rf_bits.append(f"bt {probe.bt_events_s:.0f} ev/s")
+        if probe.bt_rssi_dbm is not None:
+            rf_bits.append(f"bt {probe.bt_rssi_dbm:.0f} dBm")
+        if probe.rf_retry_rate is not None:
+            strain = (
+                probe.rf_retry_rate
+                + (probe.rf_fail_rate or 0.0)
+                + (probe.rf_beacon_loss_rate or 0.0)
+            )
+            rf_bits.append(f"strain {strain:.1f}/s")
+        if probe.rf_tx_mbps is not None:
+            rf_bits.append(f"{probe.rf_tx_mbps:.0f} Mbps")
+        if rf_bits:
+            lines.extend(_board_pack("rf", rf_bits))
 
     def _cell_line(self, lines: list[str]) -> None:
         """The cell's modeled electrochemical state — the ion model's

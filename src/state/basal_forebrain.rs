@@ -63,6 +63,8 @@
 //! This module owns only the basal forebrain's own math — what reads
 //! those signals and what they do to its output.
 
+use crate::state::sanitize::finite_clamp;
+
 // ─── Release-map coefficients ────────────────────────────────────────
 // Release levels as linear functions of the network populations. The
 // coefficients are fit to the network's measured stage means (wake,
@@ -122,12 +124,7 @@ pub fn a1_occupancy(adenosine: f32) -> f32 {
 /// occupancy saturates toward one.
 pub fn a1_suppression(adenosine: f32) -> f32 {
     let rel = (a1_occupancy(adenosine) - A1_OCCUPANCY_AT_REST) / (1.0 - A1_OCCUPANCY_AT_REST);
-    // Occupancy is a Hill isotherm in (0, 1), so `rel` is bounded by
-    // the receptor's own range: it vanishes at rest occupancy, approaches
-    // 1 as occupancy saturates, and dips only mildly below zero when
-    // adenosine falls under its resting level — sub-rest adenosine
-    // disinhibits the wake population rather than clamping at zero.
-    A1_MAX_INHIBITION * rel
+    A1_MAX_INHIBITION * finite_clamp(rel, 0.0, 1.0)
 }
 
 // ─── Expected uncertainty (Yu & Dayan 2005) ──────────────────────────
@@ -154,11 +151,10 @@ pub const UNCERTAINTY_REFERENCE: f32 = 0.1;
 pub const UNCERTAINTY_GAIN: f32 = 0.15;
 
 /// Map tracked inference precision onto the expected-uncertainty
-/// signal the cholinergic equation consumes: α = 1 − precision.
-/// The signal flows with precision; only non-finite corruption falls
-/// back to the reference.
+/// signal the cholinergic equation consumes: α = 1 − precision,
+/// clamped to [0, 1].
 pub fn expected_uncertainty(precision: f32) -> f32 {
-    crate::state::sanitize::finite_or(1.0 - precision, UNCERTAINTY_REFERENCE)
+    finite_clamp(1.0 - precision, 0.0, 1.0)
 }
 
 /// The multiplicative drive expected uncertainty applies to the
@@ -195,13 +191,10 @@ pub fn wake_component(lc: f32, adenosine: f32, alpha: f32) -> f32 {
 /// At resting adenosine and reference uncertainty this reduces to the
 /// calibrated linear map: NREM 0.34, waking 0.58, REM 0.77.
 pub fn release_target(lc: f32, rem: f32, adenosine: f32, alpha: f32) -> f32 {
-    // A release target is a set-point the integrator flows toward — it
-    // has no hard ceiling of its own; the cholinergic level and its
-    // downstream saturation carry the bound. Non-finite corruption
-    // falls back to the basal component.
-    crate::state::sanitize::finite_or(
+    finite_clamp(
         ACH_BASE + wake_component(lc, adenosine, alpha) + ACH_FROM_REM * rem,
-        ACH_BASE,
+        0.0,
+        1.0,
     )
 }
 
@@ -210,9 +203,10 @@ pub fn release_target(lc: f32, rem: f32, adenosine: f32, alpha: f32) -> f32 {
 /// release target. The same two modulators act on the whole set-point
 /// (with no network there is no wake/REM decomposition).
 pub fn wake_setpoint(baseline: f32, adenosine: f32, alpha: f32) -> f32 {
-    crate::state::sanitize::finite_or(
+    finite_clamp(
         baseline * (1.0 - a1_suppression(adenosine)) * uncertainty_drive(alpha),
-        baseline,
+        0.05,
+        0.95,
     )
 }
 
@@ -227,23 +221,27 @@ pub fn wake_setpoint(baseline: f32, adenosine: f32, alpha: f32) -> f32 {
 
 /// Gain of ACh deviation-from-baseline on sensory precision.
 pub const ACH_PRECISION_GAIN: f32 = 0.5;
+/// Bounds on the precision multiplier. Attention shifts the weight of
+/// evidence; it does not open or close the channel.
+pub const SENSORY_PRECISION_GAIN_MIN: f32 = 0.7;
+pub const SENSORY_PRECISION_GAIN_MAX: f32 = 1.4;
 
 /// The multiplier on sensory (observation) precision for a given
 /// effective acetylcholine level:
 ///
-///   Π_ach = 1 + k·(ach_eff − ach_baseline), saturated by tanh
+///   Π_ach = clamp(1 + k·(ach_eff − ach_baseline), min, max)
 ///
 /// Anchored to the chemical's genetic baseline so tonic cholinergic
 /// tone is exactly neutral — elevated ACh raises the weight the
 /// generative model gives its observations; depressed ACh lowers it.
-/// The tanh keeps the local slope at the operating point (k = 0.5)
-/// while the gain asymptotes smoothly instead of hitting rails.
 pub fn sensory_precision_gain(ach_eff: f32) -> f32 {
     let ach_baseline =
         crate::state::neurochemical::NeurochemicalId::Acetylcholine.default_baseline();
-    // tanh slope at the origin is 1, so 0.4·1.25 = 0.5 preserves the
-    // original linear gain ACH_PRECISION_GAIN at the operating point.
-    1.0 + 0.4 * (1.25 * ACH_PRECISION_GAIN * (ach_eff - ach_baseline)).tanh()
+    finite_clamp(
+        1.0 + ACH_PRECISION_GAIN * (ach_eff - ach_baseline),
+        SENSORY_PRECISION_GAIN_MIN,
+        SENSORY_PRECISION_GAIN_MAX,
+    )
 }
 
 #[cfg(test)]
@@ -259,13 +257,11 @@ mod tests {
     }
 
     #[test]
-    fn a1_suppression_is_zero_at_rest_and_saturating() {
+    fn a1_suppression_is_zero_at_rest_and_capped() {
         assert_eq!(a1_suppression(ADENOSINE_REST), 0.0);
-        // Below rest adenosine the A1 drive is withdrawn — suppression
-        // goes negative (disinhibition) rather than flooring at zero.
-        assert!(a1_suppression(0.0) < 0.0);
+        assert!(a1_suppression(0.0) == 0.0);
         let deep = a1_suppression(0.95);
-        assert!(deep > 0.4 && deep < A1_MAX_INHIBITION);
+        assert!(deep > 0.4 && deep <= A1_MAX_INHIBITION);
         // The somnogenic signal bites through the Drowsy gate.
         assert!(a1_suppression(0.5) > 0.2);
     }
@@ -319,10 +315,8 @@ mod tests {
     #[test]
     fn expected_uncertainty_complements_precision() {
         assert!((expected_uncertainty(0.9) - 0.1).abs() < 1e-6);
-        // Precision is itself bounded [0, 1] by the inference engine, so
-        // the complement stays in [0, 1] on every real signal; only
-        // non-finite corruption falls back to the reference.
-        assert_eq!(expected_uncertainty(f32::NAN), UNCERTAINTY_REFERENCE);
+        assert_eq!(expected_uncertainty(1.5), 0.0);
+        assert_eq!(expected_uncertainty(-0.5), 1.0);
     }
 
     #[test]
@@ -332,9 +326,6 @@ mod tests {
         assert!((sensory_precision_gain(ach_baseline) - 1.0).abs() < 1e-6);
         assert!(sensory_precision_gain(0.9) > 1.0);
         assert!(sensory_precision_gain(0.0) < 1.0);
-        // The tanh saturates smoothly: the multiplier can never leave
-        // its asymptotic band no matter how far ACh deviates.
-        assert!(sensory_precision_gain(10.0) < 1.4);
-        assert!(sensory_precision_gain(-10.0) > 0.6);
+        assert!(sensory_precision_gain(0.0) >= SENSORY_PRECISION_GAIN_MIN);
     }
 }

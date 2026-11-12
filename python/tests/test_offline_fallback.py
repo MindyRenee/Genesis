@@ -395,15 +395,15 @@ def test_learner_is_offline_property() -> None:
 
 
 def test_registry_probe_disabled_never_sockets(monkeypatch) -> None:
-    """is_offline and check_connectivity answer from observed state —
-    no socket is ever opened to ask."""
+    """connectivity_probe=False: is_offline and check_connectivity
+    answer from observed state — no socket is ever opened to ask."""
     import socket
 
     def _boom(*args, **kwargs):
         raise AssertionError("connectivity probe fired while disabled")
 
     monkeypatch.setattr(socket, "create_connection", _boom)
-    registry = SourceRegistry()
+    registry = SourceRegistry(connectivity_probe=False)
     assert registry.is_offline is False
     assert registry.check_connectivity() is True
 
@@ -420,7 +420,7 @@ def test_registry_probe_disabled_reports_observed_offline(monkeypatch) -> None:
         raise AssertionError("connectivity probe fired while disabled")
 
     monkeypatch.setattr(socket, "create_connection", _boom)
-    registry = SourceRegistry()
+    registry = SourceRegistry(connectivity_probe=False)
     registry._last_query_offline = True
     registry._last_query_offline_at = time.time()
     assert registry.is_offline is True
@@ -432,111 +432,59 @@ def test_registry_probe_disabled_reports_observed_offline(monkeypatch) -> None:
     assert registry.check_connectivity() is True
 
 
-
-
-
-
-
-# ─── Query-observed connectivity estimate ─────────────────────────────
-
-
-def test_offline_estimate_predicts_only_when_probe_enabled() -> None:
-    """The EMA over her own remote-query outcomes is the predictive
-    signal: connectivity_probe on → estimate ≥ threshold holds her
-    offline before the next failure; off → only the observation
-    counts. No socket is opened either way."""
+def test_registry_probe_enabled_still_probes(monkeypatch) -> None:
+    """Default construction keeps the proactive probe — the flag is
+    what quiets it, not a behavior change."""
     import socket
+    from unittest.mock import MagicMock
 
-    def _boom(*args, **kwargs):
-        raise AssertionError("connectivity probe opened a socket")
-
-    orig = socket.create_connection
-    socket.create_connection = _boom
-    try:
-        predictive = SourceRegistry(connectivity_probe=True)
-        reactive = SourceRegistry(connectivity_probe=False)
-        for reg in (predictive, reactive):
-            reg._offline_estimate = 0.9
-            reg._offline_estimate_at = __import__("time").time()
-        assert predictive.is_offline is True
-        assert reactive.is_offline is False
-    finally:
-        socket.create_connection = orig
-
-
-def test_offline_estimate_decays_with_time() -> None:
-    """A stale failure loses predictive weight — she retries remote
-    tiers on her own rather than trusting an aging reading."""
-    import time
-
-    from tools.source_registry import OFFLINE_COOLDOWN
-
-    registry = SourceRegistry(connectivity_probe=True)
-    registry._offline_estimate = 0.9
-    registry._offline_estimate_at = time.time() - 3 * OFFLINE_COOLDOWN
-    # Three half-lives → 0.9 * 0.125 = 0.1125 < 0.6 → online again.
+    probe = MagicMock()
+    monkeypatch.setattr(socket, "create_connection", probe)
+    registry = SourceRegistry()
     assert registry.is_offline is False
+    probe.assert_called()
 
 
-def test_remote_outcomes_feed_the_estimate(monkeypatch) -> None:
-    """Real query outcomes are the only input: a remote tier that ran
-    and found nothing raises the estimate; one that returned content
-    lowers it. A query that never reached the network is not evidence
-    and must not refresh the observation window."""
-    import tools.source_registry as sr
+def test_learner_connectivity_probe_kwarg() -> None:
+    """AutonomousLearner passes connectivity_probe through to its registry."""
+    from frontal_lobe.autonomous import AutonomousLearner
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
+    from temporal_lobe.concepts import ConceptNetwork
 
-    registry = SourceRegistry(connectivity_probe=False)
-    # Simulate a remote attempt that found nothing.
-    monkeypatch.setattr(sr, "WIKIPEDIA_ENABLED", True)
-    monkeypatch.setattr(registry._man_pages, "lookup", lambda t: None)
-    monkeypatch.setattr(registry._wordnet, "lookup", lambda t: None)
-    monkeypatch.setattr(sr, "_wikipedia_search", lambda *a, **k: [])
-    monkeypatch.setattr(registry, "_query_web", lambda *a, **k: None)
-    registry.query("obscure topic xyzzy")
-    assert registry._offline_estimate > 0.0
-    assert registry._last_query_offline is True
-    # A second query while already offline never reaches the remote
-    # tiers — it must not refresh the observation timestamp.
-    first_at = registry._last_query_offline_at
-    est_before = registry._offline_estimate
-    registry.query("another obscure topic qwerty")
-    assert registry._last_query_offline_at == first_at
-    # No new outcome — the estimate can only decay, never jump.
-    assert registry._offline_estimate <= est_before
-
-
-def test_remote_success_heals_the_estimate(monkeypatch) -> None:
-    """A remote fetch that returns content is a success outcome —
-    the estimate falls and the observed flag clears. The observation
-    window must have expired for remote tiers to run at all — a live
-    offline reading correctly holds them."""
-    import time
-
-    import tools.source_registry as sr
-    from tools.source_registry import OFFLINE_COOLDOWN, SourceResult
-
-    registry = SourceRegistry(connectivity_probe=False)
-    registry._offline_estimate = 0.8
-    registry._offline_estimate_at = time.time()
-    registry._last_query_offline = True
-    # Expired observation — is_offline is False, remote tiers run.
-    registry._last_query_offline_at = time.time() - OFFLINE_COOLDOWN - 1
-
-    monkeypatch.setattr(sr, "WIKIPEDIA_ENABLED", True)
-    monkeypatch.setattr(registry._man_pages, "lookup", lambda t: None)
-    monkeypatch.setattr(registry._wordnet, "lookup", lambda t: None)
-    monkeypatch.setattr(sr, "_wikipedia_search", lambda *a, **k: ["Some Title"])
-    monkeypatch.setattr(
-        sr,
-        "_wikipedia_fetch",
-        lambda title: SourceResult(
-            url="https://en.wikipedia.org/wiki/X",
-            title=title,
-            content="x" * 300,
-            source_name="wikipedia",
-        ),
+    net = ConceptNetwork()
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
+    learner = AutonomousLearner(
+        network=net,
+        curiosity=curiosity,
+        connectivity_probe=False,
     )
-    monkeypatch.setattr(registry, "_query_web", lambda *a, **k: None)
-    registry.query("cognition")
-    assert registry._offline_estimate < 0.8
-    assert registry._last_query_offline is False
+    assert learner._sources._connectivity_probe is False
+
+
+def test_headless_mind_disables_probe() -> None:
+    """Mind(headless=True) builds its learner with the connectivity
+    probe off — a resident mind generates no synthetic socket traffic."""
+    import os
+    import tempfile
+
+    from mind import Mind
+
+    data_dir = tempfile.mkdtemp(prefix="headless_probe_test_")
+    mind = Mind(os.path.join(data_dir, "genesis.sock"), headless=True)
+    assert mind._headless is True
+    assert mind.learner._sources._connectivity_probe is False
+
+
+def test_interactive_mind_keeps_probe() -> None:
+    """A session mind still probes — the flag is headless's alone."""
+    import os
+    import tempfile
+
+    from mind import Mind
+
+    data_dir = tempfile.mkdtemp(prefix="interactive_probe_test_")
+    mind = Mind(os.path.join(data_dir, "genesis.sock"))
+    assert mind._headless is False
+    assert mind.learner._sources._connectivity_probe is True

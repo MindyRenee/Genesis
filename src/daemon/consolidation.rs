@@ -268,37 +268,23 @@ fn compute_compact_tag(full_tag: &[f32; LTM_TAG_SIZE]) -> [f32; 4] {
     // Indices match NeurochemicalId order:
     // 0=Dopamine, 1=Serotonin, 2=NE, 3=ACh, 4=GABA, 5=Glutamate,
     // 6=Cortisol, 7=Oxytocin, 8=Endorphin, 9=Histamine, 10=Adenosine, 11=BDNF
-    // The tag stores raw levels; recompute_derived's equations run on
-    // *effective* levels — the receptor-saturation transform
-    // `saturated_signal`. At the tag's default receptor state
-    // (sensitivity/desensitization/internalization = 1, balanced
-    // subtypes, no phasic), the effective pipeline reduces to:
-    //   most chemicals:        sat(level)
-    //   GABA:                  sat(sat(level))   (allosteric factor 1)
-    //   DA / SRT:              sat(sat(sat(level))) (subtype + phasic wraps)
-    // so the same transforms are applied here to keep the formulas
-    // identical.
-    let sat = crate::state::neurochemical::saturated_signal;
-    // Valence/arousal inputs are the effective (saturated) signals;
-    // the tag's cortisol/DA output slots stay raw levels.
-    let da = sat(sat(sat(full_tag[0])));
-    let srt = sat(sat(sat(full_tag[1])));
-    let ne = sat(full_tag[2]);
-    let ach = sat(full_tag[3]);
-    let gaba = sat(sat(full_tag[4]));
-    let glu = sat(full_tag[5]);
-    let cort = sat(full_tag[6]);
-    let oxy = sat(full_tag[7]);
-    let end = sat(full_tag[8]);
-    let hist = sat(full_tag[9]);
-    let adn = sat(full_tag[10]);
+    let da = full_tag[0];
+    let srt = full_tag[1];
+    let ne = full_tag[2];
+    let ach = full_tag[3];
+    let gaba = full_tag[4];
+    let glu = full_tag[5];
+    let cort = full_tag[6];
+    let oxy = full_tag[7];
+    let end = full_tag[8];
+    let hist = full_tag[9];
+    let adn = full_tag[10];
 
     // The 6 chemicals added in v3 are not in the 12-chemical tag.
-    // Use their genetic defaults as approximations, run through the
-    // same saturation the effective pipeline applies.
-    let orexin = sat(NeurochemicalId::Orexin.default_baseline());
-    let epi = sat(NeurochemicalId::Epinephrine.default_baseline());
-    let mel = sat(NeurochemicalId::Melatonin.default_baseline());
+    // Use their genetic defaults as approximations.
+    let orexin = NeurochemicalId::Orexin.default_baseline();
+    let epi = NeurochemicalId::Epinephrine.default_baseline();
+    let mel = NeurochemicalId::Melatonin.default_baseline();
 
     // Arousal: matches recompute_derived() exactly, minus the Wilson-Cowan
     // self-excitation (which requires the previous arousal state, unavailable
@@ -334,13 +320,17 @@ fn compute_compact_tag(full_tag: &[f32; LTM_TAG_SIZE]) -> [f32; 4] {
     // Synergy: DA × SRT × 0.10
     let glu_excess = (glu - 0.70).max(0.0);
     let da_srt_synergy = da * srt * 0.10;
-    let valence = (da * 0.25 + srt * 0.25 + oxy * 0.10 + end * 0.15 + ne * 0.10
+    let valence = da * 0.25 + srt * 0.25 + oxy * 0.10 + end * 0.15 + ne * 0.10
         - crate::state::neurochemical::cortisol_stress_fraction(cort) * 0.35
         - glu_excess * 0.15
-        + da_srt_synergy)
-        .tanh();
+        + da_srt_synergy;
 
-    [arousal, valence, full_tag[6], full_tag[0]]
+    [
+        arousal,
+        crate::state::sanitize::finite_clamp(valence, -1.0, 1.0),
+        cort,
+        da,
+    ]
 }
 
 #[cfg(test)]
@@ -469,16 +459,14 @@ mod tests {
         // cannot catch that regression (for this input the corrected
         // value lands within 0.01 of the deprecated one by
         // coincidence), so the gain is pinned directly instead.
-        let sat = crate::state::neurochemical::saturated_signal;
-        let arousal_promoters = sat(tag[2]) * 0.20
-            + sat(tag[9]) * 0.15
-            + sat(sat(sat(tag[0]))) * 0.15
-            + sat(tag[3]) * 0.15
-            + sat(NeurochemicalId::Orexin.default_baseline()) * 0.20
-            + sat(NeurochemicalId::Epinephrine.default_baseline()) * 0.10;
-        let sleep_promoters = sat(sat(tag[4])) * 0.25
-            + sat(tag[10]) * 0.65
-            + sat(NeurochemicalId::Melatonin.default_baseline()) * 0.35;
+        let arousal_promoters = tag[2] * 0.20
+            + tag[9] * 0.15
+            + tag[0] * 0.15
+            + tag[3] * 0.15
+            + NeurochemicalId::Orexin.default_baseline() * 0.20
+            + NeurochemicalId::Epinephrine.default_baseline() * 0.10;
+        let sleep_promoters =
+            tag[4] * 0.25 + tag[10] * 0.65 + NeurochemicalId::Melatonin.default_baseline() * 0.35;
         let net_drive = arousal_promoters - sleep_promoters;
         let with_arousal_gain =
             1.0 / (1.0 + (-net_drive * crate::state::neurochemical::AROUSAL_GAIN).exp());
@@ -544,17 +532,16 @@ mod tests {
         // difference should be the hysteresis gap (~0.4), NOT a weight
         // drift. We verify the compact tag's arousal is the neutral
         // (non-hysteretic) value by computing it directly.
-        let sat = crate::state::neurochemical::saturated_signal;
-        let gaba = sat(sat(0.80f32));
-        let adn = sat(0.10f32);
-        let mel = sat(NeurochemicalId::Melatonin.default_baseline());
+        let gaba = 0.80f32;
+        let adn = 0.10f32;
+        let mel = NeurochemicalId::Melatonin.default_baseline();
         let sleep_promoters = gaba * 0.25 + adn * 0.65 + mel * 0.35;
-        let ne = sat(0.50f32);
-        let hist = sat(0.50f32);
-        let da = sat(sat(sat(0.50f32)));
-        let ach = sat(0.50f32);
-        let orexin = sat(NeurochemicalId::Orexin.default_baseline());
-        let epi = sat(NeurochemicalId::Epinephrine.default_baseline());
+        let ne = 0.50f32;
+        let hist = 0.50f32;
+        let da = 0.50f32;
+        let ach = 0.50f32;
+        let orexin = NeurochemicalId::Orexin.default_baseline();
+        let epi = NeurochemicalId::Epinephrine.default_baseline();
         let arousal_promoters =
             ne * 0.20 + hist * 0.15 + da * 0.15 + ach * 0.15 + orexin * 0.20 + epi * 0.10;
         let net_drive = arousal_promoters - sleep_promoters;

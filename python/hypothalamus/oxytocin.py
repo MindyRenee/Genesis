@@ -32,7 +32,7 @@ clearance and narrow effective range.
 RECEPTOR ADAPTATION MULTIPLIER
 ════════════════════════════════════════════════════════════════════════
 
-    multiplier = 0.7
+    multiplier = 0.5
 
 Oxytocin receptor downregulates slowly under sustained exposure
 (10-day continuous infusion: >=50% reduction in all target
@@ -46,15 +46,15 @@ COUPLING: HOW OTHERS AFFECT OXYTOCIN (matrix row 7)
 Index order: DA, SRT, NE, ACh, GABA, GLU, CORT, OXY, END, HIST,
 ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 
-    DA  ->  OXY:  0.10  (weak volume transmission.)
-    SRT  ->  OXY:  0.10  (weak volume transmission.)
-    NE  ->  OXY:  -0.10  (weak volume transmission.)
-    GABA  ->  OXY:  0.10  (weak volume transmission.)
+    DA   -> OXY: +0.05  (weak volume transmission.)
+    SRT  -> OXY: +0.05  (weak volume transmission.)
+    NE   -> OXY: -0.05  (weak volume transmission.)
+    GABA -> OXY: +0.05  (weak volume transmission.)
     CORT -> OXY: -0.10  (stress suppresses social bonding.)
-    END  ->  OXY:  0.10  (opioid-oxytocin interaction (weak to prevent mutual collapse feedback
+    END  -> OXY: +0.05  (opioid-oxytocin interaction (weak to prevent mutual collapse feedback
                         loop).)
-    BDNF  ->  OXY:  0.10  (weak volume transmission.)
-    VP  ->  OXY:  0.10  (reciprocal social neuropeptide interaction.)
+    BDNF -> OXY: +0.05  (weak volume transmission.)
+    VP   -> OXY: +0.05  (reciprocal social neuropeptide interaction.)
     ACh  -> OXY: 0.00   (no direct coupling)
     GLU  -> OXY: 0.00   (no direct coupling)
     HIST -> OXY: 0.00   (no direct coupling)
@@ -69,16 +69,16 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 COUPLING: HOW OXYTOCIN AFFECTS OTHERS (matrix column 7)
 ════════════════════════════════════════════════════════════════════════
 
-    OXY  ->  DA:  0.10  (weak volume transmission.)
-    OXY  ->  SRT:  0.10  (weak volume transmission.)
-    OXY  ->  NE:  -0.10  (social bonding calms noradrenergic arousal.)
-    OXY  ->  GABA:  0.10  (weak volume transmission.)
-    OXY  ->  GLU:  -0.10  (weak volume transmission.)
+    OXY -> DA :  +0.05  (weak volume transmission.)
+    OXY -> SRT:  +0.05  (weak volume transmission.)
+    OXY -> NE :  -0.05  (social bonding calms noradrenergic arousal.)
+    OXY -> GABA:  +0.05  (weak volume transmission.)
+    OXY -> GLU:  -0.05  (weak volume transmission.)
     OXY -> CORT:  -0.10  (oxytocin suppresses cortisol — social stress buffering.)
-    OXY  ->  END:  0.10  (opioid-oxytocin interaction (weak).)
-    OXY  ->  BDNF:  0.10  (trophic support.)
+    OXY -> END:  +0.05  (opioid-oxytocin interaction (weak).)
+    OXY -> BDNF:  +0.05  (trophic support.)
     OXY -> VP :  +0.10  (reciprocal social neuropeptide bonding.)
-    OXY  ->  CRH:  -0.10  (oxytocin suppresses CRH.)
+    OXY -> CRH:  -0.05  (oxytocin suppresses CRH.)
     OXY -> ACh:  0.00   (no direct coupling)
     OXY -> HIST:  0.00   (no direct coupling)
     OXY -> ADN:  0.00   (no direct coupling)

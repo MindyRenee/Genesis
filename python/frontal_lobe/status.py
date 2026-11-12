@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from frontal_lobe import CognitiveState
 from limbic_system.emotion import (
     PLASTICITY_CLOSED,
     PLASTICITY_LOW,
@@ -19,7 +19,6 @@ from self import EmergentIdentity, IdentityStage
 from temporal_lobe.base import Thought
 from temporal_lobe.concepts import NetworkTopology
 
-from frontal_lobe import CognitiveState
 from genesis_client import NeuroSummary
 from genesis_client.protocol import PHASE_NREM, PHASE_REM, ZONE_SLEEPING
 from genesis_client.types import CoreState
@@ -27,7 +26,6 @@ from genesis_client.types import CoreState
 if TYPE_CHECKING:
     from limbic_system.curiosity import Question
     from thalamus.brain_waves import BrainWaveState
-    from tools.code_learner import CodeLearningResult
 from brainstem.thresholds import (
     READY_ALLOSTASIS_MAX,
     WARN_ADENOSINE,
@@ -270,11 +268,6 @@ class StatusMixin:
         event stream — its side of the world included.
         """
         return self.world.summarize()
-
-    def arcade_status(self) -> str:
-        """What the arcade in her world offers and what she remembers of each game."""
-        arcade = getattr(self.world, "arcade", None)
-        return arcade.status() if arcade is not None else "no arcade in her world"
 
     def regulation_status(self) -> str:
         """Get a description of its emotional self-regulation."""
@@ -838,10 +831,6 @@ class StatusMixin:
         """Generate an introspective report."""
         return self.brain.frontal.introspect()
 
-    def diagnostic_report(self) -> str:
-        """The raw subsystem diagnostic dump behind introspect()."""
-        return self.brain.frontal.diagnostic_report()
-
     def tell_story(self) -> str:
         """Return Genesis's self-narrative — its story."""
         return self.brain.frontal.tell_story()
@@ -948,48 +937,6 @@ class StatusMixin:
         Returns a human-readable summary of what it learned.
         """
         result = self.code_learner.learn_codebase(max_files=max_files)
-        formed = self._integrate_code_learning()
-        return (
-            f"Analyzed {result.files_analyzed} source files. "
-            f"Learned {result.concepts_added} code concepts and "
-            f"{result.relationships_added} relationships. "
-            f"Found {result.total_functions} functions and "
-            f"{result.total_classes} classes/structs across "
-            f"{result.total_lines} lines of code. "
-            f"Formed {formed} new connections."
-        )
-
-    def study_code(
-        self,
-        max_files: int = 25,
-        *,
-        goal: str | None = None,
-        should_stop: Callable[[], bool] | None = None,
-    ) -> CodeLearningResult:
-        """One bounded, self-chosen study bout — the learn_code urge's act.
-
-        Unlike ``learn_code`` — the full-corpus pass the /learn-code
-        command performs — a bout studies the source files whose
-        inspection buys the most knowledge right now: novelty,
-        uncertainty, dependency impact, and mission relevance rank
-        the candidates (the hippocampus–VTA loop's novelty
-        computation, Lisman & Grace 2005; curiosity's dopaminergic
-        enhancement of hippocampal learning, Gruber et al. 2014).
-        ``should_stop`` is polled between files, so the chemical gate
-        the caller installed and any teardown signal both end the
-        bout at a file boundary rather than mid-analysis.
-        """
-        result = self.code_learner.investigate_code(
-            max_files=max_files,
-            goal=goal,
-            should_stop=should_stop,
-        )
-        self._integrate_code_learning()
-        return result
-
-    def _integrate_code_learning(self) -> int:
-        """Bridge freshly learned code concepts into the network and
-        refresh the topology cache. Returns connections formed."""
         # Create bridges between the new code concepts and existing
         # dictionary/personal concepts — this is how it connects
         # what it learned from code to what it already knows.
@@ -998,7 +945,15 @@ class StatusMixin:
         hubs = self.brain.frontal.network._attach_orphans_to_hubs(max_new=2000)
         # Refresh topology — the network changed
         self.brain.frontal.topology = NetworkTopology(self.brain.frontal.network)
-        return bridges + assoc + hubs
+        return (
+            f"Analyzed {result.files_analyzed} source files. "
+            f"Learned {result.concepts_added} code concepts and "
+            f"{result.relationships_added} relationships. "
+            f"Found {result.total_functions} functions and "
+            f"{result.total_classes} classes/structs across "
+            f"{result.total_lines} lines of code. "
+            f"Formed {bridges + assoc + hubs} new connections."
+        )
 
     def explore_files(self, path: str | None = None, max_files: int = 50) -> str:
         """Explore local files and learn from them — nothing is skipped.
@@ -1324,15 +1279,6 @@ class StatusMixin:
             "archive_concepts": self.brain.frontal.network.archive_size,
             "total_concepts": self.brain.frontal.network.total_concept_count,
         }
-        # Zone/phase transition tallies — the daemon counts them so a
-        # mind oscillating between two states reads differently from
-        # one that settled. Process-local, so they read as a rate.
-        try:
-            zt = self.client.get_zone_transitions()
-            status["zone_transitions"] = zt.total_zone_transitions
-            status["phase_transitions"] = zt.total_phase_transitions
-        except Exception:  # noqa: BLE001
-            pass
         status.update(self._extended_status())
         return status
 
@@ -1353,18 +1299,6 @@ class StatusMixin:
             # number rather than as nothing at all. Read this before
             # concluding that a quiet subsystem is a healthy one.
             "swallowed_errors": swallow_report(),
-            # Android sensor manifest — which phone sensors the bridge
-            # is actually reporting. Empty outside Termux; the adapter
-            # exists only when the platform offers the sensors.
-            "android_sensors": (
-                sorted(self.android_sensor_adapter.available_sensors)
-                if getattr(self, "android_sensor_adapter", None) is not None
-                else []
-            ),
-            # The commands she can issue to herself — her own
-            # volitional vocabulary, reported as data so an
-            # introspection can see the full self-invocation surface.
-            "self_invocable_commands": sorted(self._SELF_COMMANDS),
             # Holographic graph — fixed-size associative memory stats.
             # Exposes the stats() API for introspection so the holographic
             # graph's state (edge count, storage, concepts/relations) is

@@ -7,7 +7,7 @@
 #
 # Layout:
 #   ~/.local/lib/genesis/venv/    python env, genesis-cognitive (editable)
-#   ~/.local/lib/genesis/venv/bin/genesis-daemon
+#   ~/.local/lib/genesis/venv/bin/{genesis-daemon,retina}
 #   ~/.local/bin/genesis          PATH-visible launcher
 #   ~/.config/genesis/agent.env   deployed environment (Discord webhook, etc.)
 #   ~/.config/systemd/user/genesis.service
@@ -32,7 +32,6 @@ say() { echo "[genesis-install] $*"; }
 
 want_service=1
 uninstall=0
-service_enabled=0
 for arg in "$@"; do
     case "$arg" in
         --no-service) want_service=0 ;;
@@ -99,7 +98,8 @@ fi
 # Ship the binaries next to the interpreter — the CLI's packaged-install
 # lookup (venv/bin). Editable installs also find target/release first;
 # these copies keep the venv self-contained.
-cp "$REPO/target/release/genesis-daemon" "$VENV/bin/"
+cp "$REPO/target/release/genesis-daemon" "$REPO/target/release/retina" \
+    "$VENV/bin/"
 
 mkdir -p "$USER_BIN"
 ln -sf "$VENV/bin/genesis" "$USER_BIN/genesis"
@@ -169,24 +169,13 @@ EnvironmentFile=-$AGENT_CONF/agent.env
 [Install]
 WantedBy=default.target
 EOF
-    # systemctl on PATH is not enough — proot/containers/WSL ship the
-    # binaries with no running init. /run/systemd/system is the
-    # sd_booted(3) check: absent means no manager to reach, and the
-    # --user calls below would fail outright under set -e.
-    if [ -d /run/systemd/system ]; then
-        systemctl --user daemon-reload
-        systemctl --user enable genesis.service
-        service_enabled=1
-        say "systemd user unit installed and enabled: $UNIT"
-        if ! loginctl show-user "$USER" -p Linger 2>/dev/null | grep -q "yes"; then
-            loginctl enable-linger "$USER" 2>/dev/null \
-                && say "linger enabled — she starts at boot, not just login" \
-                || say "NOTE: run 'loginctl enable-linger $USER' to start her at boot"
-        fi
-    else
-        say "systemd is installed but not running here — unit written to"
-        say "  $UNIT for a booted host, but it cannot be enabled now."
-        say "  Resident mode without systemd: $REPO/scripts/genesis-supervise.sh"
+    systemctl --user daemon-reload
+    systemctl --user enable genesis.service
+    say "systemd user unit installed and enabled: $UNIT"
+    if ! loginctl show-user "$USER" -p Linger 2>/dev/null | grep -q "yes"; then
+        loginctl enable-linger "$USER" 2>/dev/null \
+            && say "linger enabled — she starts at boot, not just login" \
+            || say "NOTE: run 'loginctl enable-linger $USER' to start her at boot"
     fi
 else
     say "Skipping systemd unit (--no-service or no systemctl)"
@@ -201,7 +190,7 @@ Genesis is installed.
   genesis --stop       stop the processes for this data dir
   genesis --tail       tail the daemon log
 EOF
-if [ "$service_enabled" -eq 1 ]; then
+if [ "$want_service" -eq 1 ]; then
     cat <<EOF
   systemctl --user start genesis    wake her now (resident)
   systemctl --user stop  genesis    put her down

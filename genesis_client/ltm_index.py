@@ -34,16 +34,6 @@ import struct
 from dataclasses import dataclass
 from pathlib import Path
 
-from genesis_client.types import (
-    EPISODE_FLAG_ARCHIVED as _FLAG_ARCHIVED,
-)
-from genesis_client.types import (
-    EPISODE_FLAG_DELETED as _FLAG_DELETED,
-)
-from genesis_client.types import (
-    EPISODE_FLAG_META as _FLAG_META_MEMORY,
-)
-
 _HEADER_SIZE = 64
 _ENTRY_SIZE = 64
 _MAGIC = b"LTMM"
@@ -51,6 +41,10 @@ _ENTRY_STRUCT = struct.Struct("<QQQQII f 4f BB2x".replace(" ", ""))
 # <QQQQII f 4f BB2x = episode_id, data_offset, timestamp, assoc_hash,
 # compressed_len, uncompressed_len, salience, emotional_tag[4],
 # flags, source_module, pad[2] → 64 bytes
+
+_FLAG_DELETED = 0x01
+_FLAG_META_MEMORY = 0x02
+_FLAG_ARCHIVED = 0x04
 
 
 @dataclass(frozen=True, slots=True)

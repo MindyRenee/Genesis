@@ -141,6 +141,14 @@ class LifecycleMixin:
     # listed joins with the default timeout.
     _SUBSYSTEM_STOP_TIMEOUTS: ClassVar[dict[str, float]] = {"InnerLife": 45.0}
 
+    # Budget for in-flight volition actions to finish once suppression
+    # and the abort hooks have made just-admitted work return early.
+    # What remains (a compile+test, a paint, a tool call) can't be
+    # checkpointed mid-call, so it gets a bounded window to wrap —
+    # beyond it the stores close anyway and the worker's late writes
+    # land on closed files. The old 5 s drained nothing real.
+    _VOLITION_DRAIN_TIMEOUT_S: ClassVar[float] = 30.0
+
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see mind.py).
@@ -179,9 +187,6 @@ class LifecycleMixin:
         self._start_autonomous_subsystems()
         self._start_engage_restored_sleep()
         self._start_background_threads()
-        # Hardware adapters must start only after the daemon, restored state,
-        # and cognitive event pathways are live.
-        self._start_android_adapters()
 
     def _start_connect_and_register(self) -> None:
         """Connect to the daemon and register cognitive modules.
@@ -193,7 +198,6 @@ class LifecycleMixin:
         self.client.connect()
         self._running = True
         self._session_started_at = time.time()
-        self._release_eye_volition()
         # A start after a prior stop() clears the stop latch so resume
         # paths work again on the restarted mind.
         self._stop_latched = False
@@ -396,7 +400,6 @@ class LifecycleMixin:
         try:
             self.client.connect()
             self.client.set_cognitive_pid(os.getpid())
-            self._release_eye_volition()
             for module_id in self._registered_modules():
                 self.client.update_module_status(module_id, MODULE_STATUS_STARTING)
             self.client.set_zone(ZONE_SLEEPING if self._is_sleeping else ZONE_CONVERSATION)
@@ -417,29 +420,6 @@ class LifecycleMixin:
         # because this mind never died.
         self._note_discontinuity(mind_rejoin=True)
         return True
-
-    def _release_eye_volition(self) -> None:
-        """Hand the eye's voluntary controls back to the body.
-
-        The voluntary lid and the accommodation target are *held*
-        daemon-side — a mind that dies while meditating or asleep
-        leaves the lid shut and the lens powered on a body that
-        survives it, and the next mind would inherit an eye it never
-        asked for. Releasing is always safe: the lid goes to what her
-        current state calls for — open awake, shut under sleep or
-        meditation — and ``set_focus(0)`` relaxes the lens to
-        infinity. Daemons that predate either wire answer False —
-        an absent channel, silently skipped.
-        """
-        try:
-            resting = self._is_sleeping or self._is_meditating
-            self.client.set_lid(0.15 if resting else 1.0)
-        except Exception:  # noqa: BLE001
-            pass
-        try:
-            self.client.set_focus(0.0)
-        except Exception:  # noqa: BLE001
-            pass
 
     def _note_discontinuity(self, *, mind_rejoin: bool = False) -> None:
         """Acknowledge any interruption since she was last alive.
@@ -620,22 +600,6 @@ class LifecycleMixin:
         )
 
     def _start_background_threads(self) -> None:
-        # A steward knock by Unix signal — kill -SIGUSR1 or -SIGCONT to
-        # her process is a machine-native tap: her person's touch, not
-        # typed words. The handler only sets a flag; the metronome
-        # tick consumes it where locks are safe to take.
-        import signal as _signal
-        self._steward_signal_pending = False
-
-        def _steward_knock(_signum, _frame):
-            self._steward_signal_pending = True
-
-        for _sig in (_signal.SIGUSR1, _signal.SIGCONT):
-            try:
-                _signal.signal(_sig, _steward_knock)
-            except (OSError, ValueError, RuntimeError):
-                pass
-
         """Start metronome, notification, and autosave threads.
 
         The code-learning and self-improvement threads were
@@ -671,14 +635,6 @@ class LifecycleMixin:
             comm="g-notify",
         )
         self._notification_thread.start()
-
-        # The arcade tells her it is there — games offered in her world.
-        arcade = getattr(getattr(self, "world", None), "arcade", None)
-        if arcade is not None:
-            try:
-                arcade.announce()
-            except Exception as e:  # noqa: BLE001
-                note_swallowed("mind.lifecycle.arcade_announce", e)
 
         # Start the autosave thread — periodically saves cognitive
         # state so a crash or kill doesn't lose learned knowledge.
@@ -793,32 +749,51 @@ class LifecycleMixin:
         knowledge (working + archive) grows unboundedly while RAM
         stays bounded.
 
-        If no archive is attached, maintenance fails closed and leaves
-        dormant concepts resident. A missing durable store is an
-        infrastructure failure, not permission to destroy knowledge.
+        If no archive is attached, falls back to the old pruning
+        behavior (``remove_concepts_batch``) to prevent unbounded
+        memory growth.
         """
         try:
             network = self.brain.frontal.network
-            if network._archive is None:
-                logger.error(
-                    "Cannot archive dormant concepts: no concept archive is "
-                    "attached; preserving %d working-memory concepts",
-                    network.size,
+            if network._archive is not None:
+                # Archive mode: spill to disk instead of deleting.
+                # The budget is hers — maintenance_policy.json is the
+                # knob she owns; the dormancy threshold is the
+                # definition of dormant, not a policy choice.
+                from infrastructure.maintenance_policy import load_policy
+
+                policy = load_policy(getattr(self.brain, "data_dir", None))
+                spilled = network.spill_dormant(
+                    activation_threshold=0.01,
+                    max_in_memory=policy.max_in_memory,
                 )
-                return
-
-            # The budget is hers — maintenance_policy.json is the
-            # knob she owns; the dormancy threshold is the
-            # definition of dormant, not a policy choice.
-            from infrastructure.maintenance_policy import load_policy
-
-            policy = load_policy(getattr(self.brain, "data_dir", None))
-            spilled = network.spill_dormant(
-                activation_threshold=0.01,
-                max_in_memory=policy.max_in_memory,
-            )
-            if spilled > 0:
-                logger.info(f"Archived {spilled} dormant concepts")
+                if spilled > 0:
+                    logger.info(f"Archived {spilled} dormant concepts")
+            else:
+                # Fallback: no archive attached, prune destructively
+                _DEAD_THRESHOLD = 0.01
+                _PROTECTED = frozenset(
+                    {
+                        "identity",
+                        "introspection",
+                        "foundational",
+                        "seeded",
+                        "structural",
+                    }
+                )
+                to_remove: set[str] = set()
+                for cid, concept in list(network._concepts.items()):
+                    if concept.origin in _PROTECTED:
+                        continue
+                    if (concept.activation or 0.0) >= _DEAD_THRESHOLD:
+                        continue
+                    if concept.review_count > 0:
+                        continue
+                    to_remove.add(cid)
+                if to_remove:
+                    pruned = network.remove_concepts_batch(to_remove)
+                    if pruned > 0:
+                        logger.info(f"Pruned {pruned} dormant concepts (no archive)")
         except Exception as e:
             # Log loudly as well as tallying. This runs from a background
             # autosave thread and the tally is only visible via
@@ -842,14 +817,13 @@ class LifecycleMixin:
     def restore_archive(self) -> int:
         """Recall all archived concepts back into working memory.
 
-        Loads every archived concept into the in-memory network while
-        retaining the archive's durable copy. The archive is deduplicated
-        only after a later cognitive-state restore has validated a saved
-        working-memory copy.
+        The inverse of :meth:`_archive_dormant_concepts` — loads every
+        concept from the long-term archive back into the in-memory
+        network. After this call, the archive is empty and all
+        concepts are in working memory.
 
         Use this before a bulk analysis pass that needs the full
-        concept network. Retaining the archive copy protects against a
-        process failure before the reconstructed network is saved.
+        concept network, or to reset the working/archive split.
         """
         try:
             network = self.brain.frontal.network
@@ -869,19 +843,6 @@ class LifecycleMixin:
         still runs in that case so a persistence error does not strand
         the daemon or leave registered modules marked running.
         """
-        for attribute, label in (
-            ("android_sensor_adapter", "sensor"),
-            ("android_camera_adapter", "camera"),
-            ("android_microphone_adapter", "microphone"),
-        ):
-            adapter = getattr(self, attribute, None)
-            if adapter is not None:
-                try:
-                    adapter.close()
-                except Exception as error:  # noqa: BLE001 — cleanup must continue
-                    logger.warning("Android %s adapter cleanup failed: %s", label, error)
-                setattr(self, attribute, None)
-
         if not self._running:
             return True
 
@@ -1016,18 +977,38 @@ class LifecycleMixin:
         return clean
 
     def _drain_shutdown_workers(self) -> bool:
-        """Wait out the in-flight think worker before the state save
-        and archive close.
+        """Wait out the tracked workers — volition bids, the
+        sleep-stage worker, and any in-flight think — before the state
+        save and archive close.
 
-        Volition has no workers to drain — urges crystallize into
-        executive intentions and every act is a bounded episode on the
-        cycle itself, so teardown simply stops the cycle. What remains
-        is the in-flight think worker: an N3 consolidation or a long
-        deliberation must not still be writing when the state save and
-        archive close underneath it — the torn state this ordering
-        exists to prevent.
+        Volition workers are tracked only by name; suppression prevents
+        new urges from starting, and the wait for in-flight actions is
+        bounded so a worker that never clears cannot hang shutdown
+        forever. The sleep-stage worker drains whatever it already
+        accepted: an N3 pass writes the concept network, the canonical
+        edge log and the SQLite archive at once, and letting one run
+        into those being closed underneath it is exactly the torn
+        state this ordering exists to prevent.
         """
         clean = True
+        _volition_deadline = time.monotonic() + self._VOLITION_DRAIN_TIMEOUT_S
+        announced = False
+        while True:
+            with self._volition_lock:
+                pending = sorted(self._volition_active)
+            if not pending or time.monotonic() >= _volition_deadline:
+                break
+            if not announced:
+                logger.info("waiting for volition workers: %s", ", ".join(pending))
+                announced = True
+            time.sleep(0.05)
+        if pending:
+            logger.warning(
+                "volition workers did not clear during shutdown; continuing: %s",
+                ", ".join(pending),
+            )
+            clean = False
+
         clean &= self._join_shutdown_thread(self._active_think_worker, "think")
         return clean
 
@@ -1636,60 +1617,6 @@ class LifecycleMixin:
                         (self.inner_life, "_lucid_dream_count", counts[2]),
                     )
                 )
-                # Validate into a detached instance during staging. The live
-                # inner world is replaced only when the state transaction commits.
-                staged_inner_world = None
-                if ils.get("inner_world") is not None:
-                    try:
-                        from sleep.inner_world import InnerWorldExperientialLatentSpace
-
-                        staged_inner_world = InnerWorldExperientialLatentSpace()
-                        staged_inner_world.restore(ils["inner_world"])
-                    except (KeyError, TypeError, ValueError, OverflowError) as error:
-                        note_swallowed("mind.lifecycle._stage_inner_life.inner_world", error)
-                        staged_inner_world = None
-                    else:
-                        scalar_updates.append((self.inner_life, "inner_world", staged_inner_world))
-                if ils.get("self_latent_space") is not None:
-                    try:
-                        from latent_spaces.self_geometry import SelfLatentSpaceArchitecture
-
-                        staged_self_latent = SelfLatentSpaceArchitecture()
-                        staged_self_latent.restore(ils["self_latent_space"])
-                    except (KeyError, TypeError, ValueError, OverflowError) as error:
-                        note_swallowed("mind.lifecycle._stage_inner_life.self_latent_space", error)
-                    else:
-                        scalar_updates.append((self, "self_latent_space", staged_self_latent))
-                if ils.get("language_latent_space") is not None:
-                    # Legacy sibling key (images saved before the language
-                    # organ nested inside the inner world's own checkpoint):
-                    # stage the organ onto its home — the staged inner world
-                    # when one restored cleanly, else the live one.
-                    try:
-                        from self.language_latent_space import LanguageLatentSpace
-
-                        staged_language_latent = LanguageLatentSpace()
-                        staged_language_latent.restore(ils["language_latent_space"])
-                    except (
-                        KeyError, TypeError, ValueError, OverflowError, ArithmeticError
-                    ) as error:
-                        note_swallowed(
-                            "mind.lifecycle._stage_inner_life.language_latent_space", error
-                        )
-                    else:
-                        language_home = staged_inner_world
-                        if language_home is None:
-                            language_home = getattr(
-                                self.inner_life, "inner_world", None
-                            )
-                        if language_home is not None:
-                            scalar_updates.append(
-                                (
-                                    language_home,
-                                    "language_latent_space",
-                                    staged_language_latent,
-                                )
-                            )
                 logger.info(
                     "Restored inner life state: thoughts=%d, dreams=%d, lucid=%d",
                     *counts,
@@ -1725,16 +1652,6 @@ class LifecycleMixin:
         if cycle_data is not None:
             tracker = SleepCycleTracker()
             restore_sleep_cycle(tracker, cycle_data)
-            # The ultradian clock runs on real time even while she's
-            # down: a checkpoint restored days later must not replay
-            # the instant it was saved — advance the tracker by the
-            # elapsed wall time so the cycle lands where it would
-            # have been had it kept running.
-            saved_at = data.get("saved_at")
-            if saved_at:
-                elapsed = max(0.0, time.time() - float(saved_at))
-                if elapsed > 0.0:
-                    tracker.advance(elapsed)
             logger.info(
                 "Restored sleep cycle: stage %s, cycle %d, %.0fs in stage",
                 tracker.current_stage.value.upper(),
@@ -1830,26 +1747,12 @@ class LifecycleMixin:
                     "thought_count": self.inner_life.thought_count,
                     "dream_count": self.inner_life.dream_count,
                     "lucid_dream_count": self.inner_life.lucid_dream_count,
-                    "inner_world": (
-                        self.inner_life.inner_world.to_dict()
-                        if hasattr(self.inner_life, "inner_world")
-                        else None
-                    ),
-                    "self_latent_space": self.self_latent_space.to_dict(),
-                    # The language organ's state travels nested inside the
-                    # inner world's own checkpoint (inner_world.to_dict()).
                 },
                 world_state=self.world.to_dict(),
                 executive=self.brain.frontal.executive,
                 curiosity=self.brain.frontal.curiosity,
                 cognitive_map=self.brain.temporal.cognitive_map,
             )
-            # The substrate's image persists beside the rest — a failed
-            # manifold save is real state loss, so it counts against the
-            # save result.
-            manifold = getattr(self, "manifold", None)
-            if manifold is not None and manifold.image_path is not None:
-                manifold.save()
             if not self.user_profile.save():
                 return False
         except Exception as e:  # noqa: BLE001

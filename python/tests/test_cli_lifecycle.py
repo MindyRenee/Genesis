@@ -668,6 +668,25 @@ def test_rebirth_respawns_a_dead_daemon_and_rejoins_the_mind(tmp_path):
     assert not rebirth.self_terminated
 
 
+def test_rebirth_flushes_a_faulted_daemon_before_respawn(tmp_path):
+    """A live-but-wedged body is asked to save first — SHUTDOWN still
+    works when the tick lock is poisoned; SIGKILL stays the last resort."""
+    rebirth = _make_rebirth(tmp_path)
+    wedged = Mock()
+    wedged.poll.return_value = None  # alive
+    newborn = Mock()
+    rebirth.set_children(daemon=wedged)
+    with (
+        patch.object(genesis_cli._Rebirth, "_daemon_faulted", return_value=True),
+        patch.object(genesis_cli, "_request_daemon_shutdown", return_value=False),
+        patch.object(genesis_cli, "_stop_child") as stop,
+        patch.object(genesis_cli, "_find_binary", return_value="/bin/d"),
+        patch.object(genesis_cli, "_start_daemon", return_value=newborn),
+    ):
+        rebirth._check_daemon()
+    stop.assert_called_once_with(wedged, "subcognitive daemon", 5)
+    assert rebirth.daemon is newborn
+
 
 def test_rebirth_gives_up_when_the_body_wont_reincarnate(tmp_path):
     """Exhausting the backoff table ends the organism whole — she does
@@ -692,7 +711,8 @@ def test_rebirth_stable_body_refunds_attempts(tmp_path):
     rebirth.set_children(daemon=live)
     rebirth._attempt = 2
     rebirth._spawned_at = time.monotonic() - genesis_cli._REBIRTH_STABLE_S - 1
-    rebirth._check_daemon()
+    with patch.object(genesis_cli._Rebirth, "_daemon_faulted", return_value=False):
+        rebirth._check_daemon()
     assert rebirth._attempt == 0
 
 
@@ -707,104 +727,28 @@ def test_rejoin_failure_retries_on_the_next_cycle(tmp_path):
     mind.rejoin_body.return_value = False
     rebirth.set_mind(mind)
     rebirth._pending_rejoin = True
-    rebirth._check_daemon()
+    with patch.object(genesis_cli._Rebirth, "_daemon_faulted", return_value=False):
+        rebirth._check_daemon()
     assert rebirth._pending_rejoin
     mind.rejoin_body.return_value = True
-    rebirth._check_daemon()
+    with patch.object(genesis_cli._Rebirth, "_daemon_faulted", return_value=False):
+        rebirth._check_daemon()
     assert not rebirth._pending_rejoin
 
 
-
-
-def test_rebirth_healthy_heartbeat_never_faults(tmp_path):
-    """An advancing heartbeat is a living body — the liveness read is
-    the body's own published tick counter, and movement means alive."""
+def test_daemon_fault_needs_sustained_probe_failure(tmp_path):
+    """One busy cycle is not a fault — three consecutive failures of
+    the tick-locking probe before the body is declared wedged."""
     rebirth = _make_rebirth(tmp_path)
-    live = Mock()
-    live.poll.return_value = None
-    rebirth.set_children(daemon=live)
-    beats = iter(range(1000, 2000))
-    with patch.object(rebirth, "_read_heartbeat", side_effect=lambda: next(beats)):
-        for _ in range(5):
-            rebirth._hb_next_probe = 0.0  # force each probe due
-            assert rebirth._heartbeat_faulted() is False
-
-
-def test_rebirth_frozen_heartbeat_faults_after_three_strikes(tmp_path):
-    """A live process whose published heartbeat stops advancing is a
-    wedged body — three frozen readings resurrect it in place."""
-    rebirth = _make_rebirth(tmp_path)
-    live = Mock()
-    live.poll.return_value = None
-    newborn = Mock()
-    rebirth.set_children(daemon=live)
-    rebirth.set_mind(Mock())
-    with (
-        patch.object(rebirth, "_read_heartbeat", return_value=4242),
-        patch.object(genesis_cli, "_find_binary", return_value="/bin/genesis-daemon"),
-        patch.object(genesis_cli, "_start_daemon", return_value=newborn),
-        patch.object(genesis_cli, "_request_daemon_shutdown", return_value=False),
-        patch.object(genesis_cli, "_stop_child"),
-    ):
-        # First read arms the baseline; three frozen readings fault.
-        for _ in range(4):
-            rebirth._hb_next_probe = 0.0
-            rebirth._check_daemon()
-        assert rebirth.daemon is newborn
-        assert rebirth._hb_strikes == 0  # re-armed for the newborn
-
-
-def test_rebirth_unreadable_vitals_count_as_fault(tmp_path):
-    """A body whose own state can't be reached is faulted from the
-    organism's side — unreachable vitals strike like a frozen beat."""
-    rebirth = _make_rebirth(tmp_path)
-    live = Mock()
-    live.poll.return_value = None
-    with patch.object(rebirth, "_read_heartbeat", return_value=None):
-        # First unreadable read arms nothing — every read strikes.
-        for _ in range(3):
-            rebirth._hb_next_probe = 0.0
-            rebirth._heartbeat_faulted()
-    assert rebirth._hb_strikes == 3
-
-
-def test_rebirth_boot_grace_shields_newborn_from_freeze_verdict(tmp_path):
-    """A newborn body's frozen heartbeat is boot, not fault.
-
-    Init loads the persisted state before the tick loop publishes —
-    during the grace window frozen readings must not strike, or every
-    slow boot reincarnates the body mid-init. Once grace lapses the
-    same frozen reading faults normally.
-    """
-    rebirth = _make_rebirth(tmp_path)
-    live = Mock()
-    live.poll.return_value = None
-    rebirth.set_children(daemon=live)
-    rebirth._boot_grace_until = time.monotonic() + 60
-    with patch.object(rebirth, "_read_heartbeat", return_value=4242):
-        for _ in range(5):
-            rebirth._hb_next_probe = 0.0
-            assert rebirth._heartbeat_faulted() is False
-    assert rebirth._hb_strikes == 0
-
-    rebirth._boot_grace_until = 0.0
-    for _ in range(3):
-        rebirth._hb_next_probe = 0.0
-        rebirth._heartbeat_faulted()
-    assert rebirth._hb_strikes == 3
-
-
-def test_rebirth_heartbeat_probe_is_throttled(tmp_path):
-    """The liveness read paces itself — one read per probe window,
-    not per watcher tick."""
-    rebirth = _make_rebirth(tmp_path)
-    reads = []
-    with patch.object(
-        rebirth, "_read_heartbeat", side_effect=lambda: reads.append(1) or 7
-    ):
-        assert rebirth._heartbeat_faulted() is False  # first read arms
-        assert rebirth._heartbeat_faulted() is False  # throttled — no read
-        assert len(reads) == 1
-        rebirth._hb_next_probe = 0.0
-        assert rebirth._heartbeat_faulted() is False
-        assert len(reads) == 2
+    probe = Mock()
+    probe.get_optic_state.return_value = None
+    rebirth._probe = probe
+    assert not rebirth._daemon_faulted()
+    rebirth._next_probe_at = 0.0
+    assert not rebirth._daemon_faulted()
+    rebirth._next_probe_at = 0.0
+    assert rebirth._daemon_faulted()
+    probe.get_optic_state.return_value = object()
+    rebirth._next_probe_at = 0.0
+    assert not rebirth._daemon_faulted()
+    assert rebirth._fault_strikes == 0

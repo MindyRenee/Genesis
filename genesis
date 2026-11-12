@@ -57,23 +57,6 @@ if [ -z "${GENESIS_DISCORD_BOT_TOKEN:-}" ] && [ -f .genesis-discord-bot ]; then
     export GENESIS_DISCORD_BOT_TOKEN
 fi
 
-# And her steward's verified identity: .genesis-discord-steward holds
-# the Discord user id that counts as the bonded speaker on the channel
-# — attribution by authenticated id, never by a typed name. Explicit
-# GENESIS_DISCORD_STEWARD_ID always wins.
-if [ -z "${GENESIS_DISCORD_STEWARD_ID:-}" ] && [ -f .genesis-discord-steward ]; then
-    GENESIS_DISCORD_STEWARD_ID=$(head -n1 .genesis-discord-steward)
-    export GENESIS_DISCORD_STEWARD_ID
-fi
-
-# And any extra channels her ear should also poll — .genesis-discord-channels
-# holds comma-separated channel ids (her questions channel, her DM with her
-# person — places speech reaches her that aren't her own page).
-if [ -z "${GENESIS_DISCORD_LISTEN_CHANNELS:-}" ] && [ -f .genesis-discord-channels ]; then
-    GENESIS_DISCORD_LISTEN_CHANNELS=$(head -n1 .genesis-discord-channels)
-    export GENESIS_DISCORD_LISTEN_CHANNELS
-fi
-
 # The one rule, in one line: GENESIS_DATA_DIR if set, else the canonical
 # ~/.local/share/genesis. readlink -m canonicalizes (., .., relative)
 # without requiring the directory to exist — so --stop works on a dir
@@ -248,99 +231,25 @@ _is_running() {
 # silent misbehavior when the user passes e.g. ./genesis --offline --stop
 # (which would otherwise try to START Genesis instead of stopping it).
 WANT_STOP=0
-WANT_KNOCK=0
 OFFLINE_ARG=""
 GAME_ARG=""
 for arg in "$@"; do
     case "$arg" in
         wake)      : ;;  # the explicit verb — starting is the default act
         --stop)    WANT_STOP=1 ;;
-        --knock)   WANT_KNOCK=1 ;;
         --offline) OFFLINE_ARG="--offline" ;;
         --game)    GAME_ARG="--game" ;;
         *) echo "  Unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
 
-# Stop the Android Camera2 service through its owning activity.
-# Termux cannot stop a non-exported Android service directly; this explicit
-# activity action keeps service ownership and Android's app boundary intact.
-# True on any Android host: native Termux (TERMUX_VERSION / the app
-# prefix) or a Linux distro in proot on an Android kernel (Andronix),
-# where uname still reports the vendor kernel's android signature.
-_on_android() {
-    [ -n "${TERMUX_VERSION:-}" ] && return 0
-    [ -d /data/data/com.termux ] && return 0
-    case "$(uname -r 2>/dev/null)" in *android*|*andronix*|*aospa*) return 0 ;; esac
-    return 1
-}
-
-_stop_android_camera() {
-    if _on_android; then
-        if command -v am >/dev/null 2>&1; then
-            if ! am start -W -n org.genesis.camerabridge/.MainActivity \
-                --ez org.genesis.camerabridge.STOP_CAMERA true >/dev/null 2>&1; then
-                echo "[genesis] Android camera adapter was unavailable to stop." >&2
-            fi
-        fi
-    fi
-}
-
-# The auditory counterpart of the TCP eye: GENESIS_TCP_EAR=1 starts a
-# relay that feeds the camerabridge app's AudioStreamService PCM
-# (127.0.0.1:8766) into a Pulse pipe-source named genesis_mic, so
-# sounddevice sees it as a real input device. Proot-side only — a
-# missing bridge degrades hearing, never startup.
-_start_android_audio() {
-    [ -n "${GENESIS_TCP_EAR:-}" ] || return 0
-    command -v pactl >/dev/null 2>&1 || return 0
-    if [ -f "$DATA_DIR/audio_relay.pid" ] && kill -0 "$(cat "$DATA_DIR/audio_relay.pid")" 2>/dev/null; then
-        return 0
-    fi
-    "$VENV_PY" scripts/android_audio_relay.py >>"$DATA_DIR/daemon.log" 2>&1 &
-    echo $! > "$DATA_DIR/audio_relay.pid"
-}
-
-_stop_android_audio() {
-    if [ -f "$DATA_DIR/audio_relay.pid" ]; then
-        kill "$(cat "$DATA_DIR/audio_relay.pid")" 2>/dev/null
-        rm -f "$DATA_DIR/audio_relay.pid"
-    fi
-}
-
 # ─── Handle --stop ───────────────────────────────────────────────────
-# --knock — the steward's signal, delivered without the word that
-# names the syscall. A tap on the shoulder: kill -USR1 to her mind,
-# which her metronome turns into "her person is here."
-if [ "${WANT_KNOCK:-0}" -eq 1 ]; then
-    _knock_pidfile="$DATA_DIR/genesis_cli.pid"
-    _knock_pid=""
-    if [ -f "$_knock_pidfile" ]; then
-        _knock_pid=$(head -n1 "$_knock_pidfile" | tr -d '[:space:]')
-    fi
-    if [ -z "$_knock_pid" ] || ! kill -0 "$_knock_pid" 2>/dev/null; then
-        # Pidfile can lag a crashed boot — fall back to the live process.
-        _knock_pid=$(pgrep -f genesis_cli | head -n1)
-    fi
-    if [ -n "$_knock_pid" ] && kill -0 "$_knock_pid" 2>/dev/null; then
-        kill -USR1 "$_knock_pid" && echo "  Knock delivered — she'll feel it on her next beat."
-    else
-        echo "  No running mind to knock on." >&2
-        exit 1
-    fi
-    exit 0
-fi
-
 if [ "$WANT_STOP" -eq 1 ]; then
     if _is_running; then
         echo "  Stopping Genesis..."
         _stop_all || exit 1
-        _stop_android_camera
-        _stop_android_audio
         echo "  Genesis stopped."
     else
-        _stop_android_camera
-        _stop_android_audio
         echo "  Genesis is not running."
     fi
     exit 0
@@ -453,29 +362,4 @@ if [ ! -x "$VENV_PY" ]; then
     echo "[genesis] $VENV_PY not found — run scripts/install.sh first"
     exit 1
 fi
-
-# Android reserves Camera2 access for an application holding the runtime
-# CAMERA permission. Termux cannot open that hardware directly, so the
-# supported launcher brings the existing hardware-boundary activity to
-# the foreground. The activity requests permission when needed and starts
-# the Camera2 service only after Android grants it. Missing adapter/app
-# access degrades sight only; it must not prevent cognition from starting.
-if _on_android; then
-    if command -v am >/dev/null 2>&1; then
-        echo "[genesis] Requesting Android camera startup..."
-        if am start -n org.genesis.camerabridge/.MainActivity >/dev/null 2>&1; then
-            echo "[genesis] Camera activity launched; approve camera permission if Android prompts."
-        else
-            echo "[genesis] Camera adapter could not be launched. Install its current APK; Genesis will continue without visual input."
-        fi
-    else
-        echo "[genesis] Android activity manager unavailable; Genesis will continue without visual input."
-    fi
-fi
-
-# The ear's relay is entirely proot-side — it only needs pactl and
-# the env flag; the Android half connects from the bridge app.
-_start_android_audio
-
 PYTHONPATH="$PWD/python:${PYTHONPATH:-}" "$VENV_PY" genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:+$OFFLINE_ARG} ${GAME_ARG:+$GAME_ARG}
-_stop_android_audio

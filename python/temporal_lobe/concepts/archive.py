@@ -21,14 +21,10 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sqlite3
 import threading
 from pathlib import Path
 from typing import Any
-
-from self.language_ingest import get_bytes, put_bytes
-from self.language_space import LanguageSpace
 
 from .classify import _normalize_id
 
@@ -263,39 +259,11 @@ class ConceptArchive:
                 )
         return data
 
-    def peek_edges(self, concept_id: str) -> list[dict[str, Any]]:
-        """Read archived edges touching a concept without consuming them.
-
-        Use this while reconstructing working memory. The archive copy
-        remains the durable source until the reconstructed state has
-        been saved and the duplicate rows can be acknowledged safely.
-        """
-        with self._lock:
-            if self._closed:
-                return []
-            rows = self._conn.execute(
-                "SELECT source, target, relation, weight, created_at, origin "
-                "FROM edges WHERE source = ? OR target = ?",
-                (concept_id, concept_id),
-            ).fetchall()
-        return [
-            {
-                "source": r[0],
-                "target": r[1],
-                "relation": r[2],
-                "weight": r[3],
-                "created_at": r[4],
-                "origin": r[5],
-            }
-            for r in rows
-        ]
-
     def recall_edges(self, concept_id: str) -> list[dict[str, Any]]:
         """Remove and return archived edges touching a concept.
 
-        This is a destructive move. Call only after a durable working-
-        memory copy exists; use :meth:`peek_edges` for inspection or
-        reconstruction that has not yet been committed.
+        Called when a concept is recalled to working memory so its
+        relationships come back with it.
         """
         with self._lock:
             if self._closed:
@@ -384,118 +352,11 @@ class ConceptArchive:
         self.close()
 
 
-class SpaceArchive(ConceptArchive):
-    """The concept archive, living inside her language latent space.
-
-    Identical SQL semantics — the SQLite store is deserialized out of
-    the space's blob deposit into an in-memory connection at open, and
-    serialized back into the space after every mutation. The on-disk
-    ``concept_archive.db`` box is gone; the space is the store.
-    """
-
-    BOX = "concept_archive.db"
-
-    def __init__(self, space: LanguageSpace) -> None:
-        self._space = space
-        img = space.image_path
-        self._db_path = Path(img) if img is not None else Path("language_space.npz")
-        self._lock = threading.Lock()
-        self._closed = False
-        # The db image lives in the space; materialize it to a scratch
-        # temp file for the connection (a work surface, not a box).
-        import tempfile
-
-        self._tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-        raw = get_bytes(space, self.BOX)
-        if raw:
-            self._tmp.write(raw)
-            self._tmp.flush()
-        self._conn = sqlite3.connect(
-            self._tmp.name, check_same_thread=False, timeout=30
-        )
-        self._conn.executescript(_SCHEMA)
-        self._conn.create_function("normalize_alias", 1, _normalize_id, deterministic=True)
-        with self._conn:
-            self._conn.execute(
-                "INSERT OR IGNORE INTO aliases (alias, concept_id) "
-                "SELECT normalize_alias(alias), concept_id FROM aliases "
-                "WHERE alias != normalize_alias(alias)",
-            )
-
-    def _persist(self) -> None:
-        """Serialize the database back into the space blob."""
-        if not self._closed:
-            put_bytes(self._space, self.BOX, self._conn.serialize())
-
-    def archive_concepts_batch(
-        self,
-        items: list[tuple[str, dict[str, Any], set[str]]],
-    ) -> int:
-        n = super().archive_concepts_batch(items)
-        if n:
-            self._persist()
-        return n
-
-    def archive_edges_batch(
-        self, edge_dicts: list[dict[str, Any]], *, overwrite: bool = True
-    ) -> int:
-        n = super().archive_edges_batch(edge_dicts, overwrite=overwrite)
-        if n:
-            self._persist()
-        return n
-
-    def recall_concept(self, concept_id: str) -> dict[str, Any] | None:
-        out = super().recall_concept(concept_id)
-        if out is not None:
-            self._persist()
-        return out
-
-    def recall_edges(self, concept_id: str) -> list[dict[str, Any]]:
-        out = super().recall_edges(concept_id)
-        if out:
-            self._persist()
-        return out
-
-    def remove_concepts_batch(self, concept_ids: list[str]) -> int:
-        n = super().remove_concepts_batch(concept_ids)
-        if n:
-            self._persist()
-        return n
-
-    def remove_edges_for_concept(self, concept_id: str) -> int:
-        n = super().remove_edges_for_concept(concept_id)
-        if n:
-            self._persist()
-        return n
-
-    def vacuum(self) -> None:
-        super().vacuum()
-        self._persist()
-
-    def close(self) -> None:
-        """Persist, then close. Idempotent."""
-        with self._lock:
-            if not self._closed:
-                put_bytes(self._space, self.BOX, self._conn.serialize())
-                self._space.save()
-        super().close()
-        try:
-            self._tmp.close()
-            os.unlink(self._tmp.name)
-        except OSError:
-            pass
-
-    def __enter__(self) -> SpaceArchive:
-        return self
-
-
 def open_archive(data_dir: str | Path) -> ConceptArchive:
-    """Open the concept archive — fed by the language latent space.
+    """Open (creating if needed) the concept archive under ``data_dir``.
 
-    The store used to live in ``concept_archive.db``; its tables now
-    live inside the space's image. The file-backed ``ConceptArchive``
-    remains for tooling that works on a path directly.
+    The database file is ``<data_dir>/concept_archive.db``.
     """
-    from self.language_space import open_language_space
-
-    return SpaceArchive(open_language_space(data_dir))
+    data_dir = Path(data_dir)
+    data_dir.mkdir(parents=True, mode=0o700, exist_ok=True)
+    return ConceptArchive(data_dir / "concept_archive.db")

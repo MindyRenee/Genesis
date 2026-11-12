@@ -615,10 +615,8 @@ fn test_engine_load_clamps_corrupted_matrix_weights() {
                     } else {
                         0.5
                     }
-                } else if i == j {
-                    1.0
                 } else {
-                    0.0
+                    if i == j { 1.0 } else { 0.0 }
                 };
                 file.write_all(&val.to_le_bytes()).unwrap();
             }

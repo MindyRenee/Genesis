@@ -1,4 +1,4 @@
-.TH GENESIS-DAEMON 8 "November 2026" "Genesis 0.2.0" "Genesis Manual"
+.TH GENESIS-DAEMON 8 "October 2026" "Genesis 0.2.0" "Genesis Manual"
 .SH NAME
 genesis-daemon \- Genesis subcognitive daemon (neurochemistry, memory, IPC)
 .SH SYNOPSIS
@@ -82,16 +82,29 @@ neurochemistry:
 memory pressure, I/O wait, load average, battery) and feeds them as
 neurochemical impulses. She feels her body.
 .IP \(bu 2
-\fBBody control\fR is platform-specific. On supported Linux hosts,
-optional actuators may adjust CPU policy and process priority. Genesis3
-disables privileged CPU-frequency control, RTC wake alarms, and RTKit
-priority requests on Android. The former sudoers example is preserved at
-.IR docs/archive/computer-specific/genesis-sudoers
-for historical reference only; do not install it on Android. Sensing
-continues where the kernel exposes readable measurements.
+\fBBody control\fR reads neurochemistry and drives hardware: dopamine
+speeds the CPU up, GABA slows it down, melatonin selects powersave;
+ACh raises scheduling priority; the plasticity gate sets the I/O
+priority class; CPU temp caps the max frequency regardless of
+dopamine (autonomic fatigue). Privileged levers (governor, RTC wake
+alarm) route through root-owned helpers under
+.IR /usr/local/libexec/genesis/
+when installed by
+.BR scripts/install_sudoers.sh ;
+without them, sensing still works and only actuation stays read-only.
 .IP \(bu 2
 \fBAdaptive sync\fR modulates the LTM disk-sync rate by the plasticity
 gate (the sync AdaptiveGate above).
+
+.SS Field probe
+A dedicated thread measures real substrate dynamics (instruction
+throughput, scheduler jitter, P-state transitions, interrupt flux,
+and power draw where sensors report it) at ~250 Hz and decomposes
+them at the brain-wave band center frequencies. The mind reads the
+signature over GET_FIELD_PROBE and injects it into the wave
+oscillator as outer stimulus. The probe also writes a carrier \(em
+its work is modulated at the body's own phase rhythm, so the die's
+real current carries a component at the organism's beat.
 
 .SS Active inference
 The daemon runs a generative model of its own neurochemical
@@ -125,54 +138,46 @@ is not a rejecting user, so a left-open channel cannot trickle
 rejection CRH forever.
 
 .SS Optic nerve
-The daemon owns the canonical optic frame mapping named
-.I /genesis_optic_nerve .
-On Linux the capture limb opens the V4L2 device selected by
-.I GENESIS_CAMERA
-(default
-.IR /dev/video0 ),
-requests 640x480 RGB24 and falls back to YUYV when RGB24 is
-unavailable. On Android, a separate Camera2 foreground service
-captures YUV_420_888 frames, converts them to packed RGB24, and
-hosts a loopback TCP stream at
-.IR 127.0.0.1:8765 ;
-the daemon connects outward, validates the bounded frame packets,
-and publishes them into the same optic mapping. Android frames are
-bounded to 640x480 and the adapter targets up to 10 frames per
-second. The mapping is POSIX shared memory on Linux and a
-file-backed mapping on Android. The transport protocol and platform
-details are documented in
-.BR genesis-vision (7).
+The daemon itself attaches to the retina's
+.I /genesis_retina
+segment \(em the optic nerve terminates in the body, not only the
+mind \(em and pools each frame into the subcortical channels the
+nerve actually carries. No pixels leave the module: the channels
+are scalar signals, the same thing the anatomical fibres carry.
+.IP \(bu 2
+\fBMelanopic illuminance\fR (the ipRGC channel) feeds
+.IR sleep_network::VisualAfference::light ,
+replacing the wall-clock photoperiod while frames are fresh \(em
+the dominant circadian zeitgeber.
+.IP \(bu 2
+\fBA collicular orienting transient\fR (motion/luminance) becomes a
+brief LC alerting pulse, but only below the sleep network's own
+wake threshold \(em sensory gaining during sleep, not a bypass.
+.IP \(bu 2
+\fBThe TRN relay gate\fR \(em
+.IR relay_base (phase):
+NREM 0.02, REM 0.10, drowsy 0.6, overwhelmed 0.3, else 1.0 \(em
+scaled by a bounded \(+-40% corticothalamic feedback set through
+\fBSET_OPTIC_GAIN\fR. The mind reads the gate over
+\fBGET_OPTIC_STATE\fR and honours it: a \fIsee\fR during NREM is a
+blind look.
 .PP
-The daemon has two outputs from each fresh frame. It pools sampled
-pixels into scalar subcortical channels, and it retains the full
-frame in the canonical mapping for the Python mind's cortical
-perception path. The scalar channels do not replace the image.
-.IP \\(bu 2
-\\fBPhotopic and melanopic irradiance\\fR feed the visual-afference
-and circadian pathways while frames are fresh.
-.IP \\(bu 2
-\\fBMotion energy and the collicular orienting transient\\fR provide
-a brief alerting signal, subject to the sleep network's wake
-threshold.
-.IP \\(bu 2
-\\fBThe thalamic relay gate\\fR modulates how much visual input reaches
-cortex. The mind reads the gate through
-.B GET_OPTIC_STATE
-and honours it; a look can be gated during sleep.
-.PP
-The body also owns a modeled pupil (2--8 mm), accommodation, and
-eyelid state. The mind can request focus through
-.B SET_FOCUS
-and voluntary eyelid openness through
-.BR SET_LID ;
-corticothalamic feedback adjusts relay gain through
-.BR SET_OPTIC_GAIN .
-These are internal ocular and relay models. They do not set Android
-sensor exposure, ISO, autofocus, or white balance. See
-.BR genesis-vision (7)
-for the distinction between physical capture controls and the
-software visual pathway.
+The nerve also owns the eye's body state. The \fBpupil\fR (2\(en8
+mm: a log-compressive light reflex on the photopic channel plus NE
+sympathetic dilation, constricting faster than it dilates; a
+central miosis term overrides the dark reflex in sleep).
+\fBAccommodation\fR (ciliary lens power 0\(en6 D, set by the mind's
+\fBSET_FOCUS\fR request in metres; near pull-in faster than far
+release, released to tonic rest when the lids shut). And the
+\fBeyelid\fR \(em a transmission on every afferent channel: open
+awake, ~0.5 drowsy, ~0.03 in NREM/REM, so light still entrains
+weakly through closed lids and a flash can still wake. The mind
+also holds a voluntary lid through \fBSET_LID\fR \(em the
+orbicularis oculi the camera hardware lacks. The requested
+openness composes with the phase's own position by \fBmin\fR: a
+will can shut an open eye (to rest it, to dim the world) but can
+never pry a sleeping one open. Held, not momentary \(em the lid
+stays where the mind left it until it moves it again.
 
 .SH OPTIONS
 .TP
@@ -216,13 +221,6 @@ variable.
 .TP
 .B GENESIS_DATA_DIR
 Overrides the resolved data directory.
-.TP
-.B GENESIS_CAMERA
-Linux V4L2 capture device used by the daemon's optic-capture limb.
-Default
-.IR /dev/video0 .
-Android uses the Camera2 adapter instead; see
-.BR genesis-vision (7).
 .SH FILES
 .TP
 .I $DATA_DIR/core_state.bin
@@ -253,6 +251,10 @@ allostatic load).
 .TP
 .I $DATA_DIR/face_clusters.json
 Stable \fIface:N\fR cluster identities for unnamed presences.
+.TP
+.I $DATA_DIR/steward.json
+Provenance stamp for the steward channel (key fingerprint,
+principal, directives).
 .TP
 .I $DATA_DIR/daemon.log
 Daemon stdout/stderr (rotated at 5 MB by the launcher).
@@ -349,7 +351,7 @@ PUT_TENSOR, GET_TENSOR, LIST_TENSORS, DROP_TENSOR, GET_MOTOR_TARGET.
 .TP
 .B 46\(en49
 46 is RETIRED (SET_VOLITION \(em never reuse; sleep/wake volition is
-neurochemical, via NEURO_IMPULSE),
+neurochemical, via NEURO_IMPULSE), GET_FIELD_PROBE,
 SET_FIELD_PHASE, SET_FIELD_CARRIER.
 .TP
 .B 50
@@ -412,38 +414,6 @@ can shut an open eye but cannot open one the stage has closed.
 Held: lids stay where the mind left them until it moves them.
 Reply:
 .RI [ u8 " ack" ] .
-.TP
-.B 58\(en61
-FIND_SIMILAR_ARCHIVED, UNARCHIVE_EPISODE, SEARCH_ARCHIVED,
-DELETE_EPISODE \(em the dormant-knowledge archive. Deletion is a
-real removal, not a fade: the episode is gone, and only a name
-that recalls it can grow the knowledge back. Everything else in
-the store is physiological forgetting; these four are the
-scissors.
-.TP
-.B 62
-GET_FOLD_MARGINS \(em the LC–VLPO switch's saddle-node margins:
-the bistable geometry the homeostat sweeps through at sleep
-onset.
-.TP
-.B 63
-SET_FIELD_PULSE \(em arm or disarm the parasympathetic pulse, a
-slow autonomic wave riding the carrier's modulation depth (the
-RSA analog — contractility, not rate). Request:
-.RI [ f32 " base" ]
-.RI [ mod_freq_hz ]
-.RI [ mod_depth ] ;
-mod_freq \(<= 0 disarms. When armed the body integrates the
-envelope on its own clock \(em the wave runs whether or not the
-mind ticks.
-.TP
-.B 64
-LIST_ACTUATORS \(em the body's output census: which limbs exist
-(local tools vs relayed), which are live, and why the absent ones
-are absent. Relayed limbs wait on the Android motor relay at
-.IR 127.0.0.1:41772
-\(em until something listens there, they report
-honestly absent rather than pretending to move.
 .PP
 Notification pushes (daemon \(-> client, mirrored as
 .IR NOTIFY_* )
@@ -468,12 +438,7 @@ genesis-daemon --data-dir /tmp/genesis-debug --ltm-capacity 131072
 .RE
 .SH SEE ALSO
 .BR genesis (1),
-.BR genesis-browser (7),
 .BR genesis-cli (1),
-.BR genesis-games (7),
-.BR genesis-internet (7),
-.BR genesis-law (7),
+.BR genesis-retina (1),
 .BR genesis-math (7),
-.BR genesis-reasoning (7),
-.BR genesis-vision (7),
-.BR genesis-retina (1)
+.BR genesis-reasoning (7)

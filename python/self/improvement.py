@@ -1848,43 +1848,13 @@ class HeuristicExperiment:
         original content is restored, so the tree never keeps an
         unverified edit.
         """
-        modified = self._resolve_edit(
-            source,
-            original_code,
-            proposed_code,
-            file_path,
-            description,
-            line_hint,
-        )
-        if isinstance(modified, ExperimentRecord):
-            return modified
-        return self._live_verify(
-            file_path,
-            source,
-            modified,
-            description,
-        )
-
-    def _resolve_edit(
-        self,
-        source: str,
-        original_code: str,
-        proposed_code: str,
-        file_path: str,
-        description: str,
-        line_hint: int | None = None,
-    ) -> ExperimentRecord | str:
-        """Resolve which occurrence the snippet targets and build the
-        edited source — or an ExperimentRecord for an early refusal.
-
-        ``str.replace(snippet, ..., 1)`` would edit the FIRST
-        occurrence — when a snippet like "    print(" matches several
-        sites, that silently rewrites the wrong code while the
-        reported bug remains. Resolve the intended site: a unique
-        occurrence always wins; an ambiguous one needs the reported
-        line to disambiguate, and without a match it is refused
-        outright rather than guessed.
-        """
+        # ``str.replace(snippet, ..., 1)`` would edit the FIRST
+        # occurrence — when a snippet like "    print(" matches several
+        # sites, that silently rewrites the wrong code while the
+        # reported bug remains. Resolve the intended site: a unique
+        # occurrence always wins; an ambiguous one needs the reported
+        # line to disambiguate, and without a match it is refused
+        # outright rather than guessed.
         occurrences: list[int] = []
         found = source.find(original_code)
         while found != -1:
@@ -1932,202 +1902,12 @@ class HeuristicExperiment:
                 status="reverted",
                 reason="replacement produced no change",
             )
-        return modified_source
-
-    def begin_experiment(
-        self,
-        file_path: str,
-        original_code: str,
-        proposed_code: str,
-        description: str,
-        line_hint: int | None = None,
-    ) -> ExperimentRecord | dict:
-        """Begin a verified experiment without blocking on the gate.
-
-        Runs every synchronous stage — guards, edit resolution, the
-        live-file write, the compile check — then launches the verify
-        suite as a child process and returns a pollable handle. The
-        gate itself is a ballistic arc: it runs to completion on the
-        OS while she lives; :meth:`poll_experiment` collects the
-        verdict on a later beat. Returns an ExperimentRecord instead
-        when the experiment resolves before the gate ever launches.
-        """
-        file_path = os.path.normpath(file_path).replace("\\", "/")
-        if os.path.isabs(file_path) or file_path.startswith(".."):
-            return ExperimentRecord(
-                file_path=file_path,
-                description=description,
-                status="reverted",
-                reason="path escapes the source tree",
-            )
-        skip = self._check_experiment_guardrails(file_path, description)
-        if skip:
-            return skip
-        abs_path = Path(self.project_root) / file_path
-        try:
-            source = abs_path.read_text(encoding="utf-8")
-        except OSError as e:
-            return ExperimentRecord(
-                file_path=file_path,
-                description=description,
-                status="reverted",
-                reason=f"could not read file: {e}",
-            )
-        if original_code not in source:
-            return ExperimentRecord(
-                file_path=file_path,
-                description=description,
-                status="reverted",
-                reason="original code snippet not found in file",
-            )
-        modified = self._resolve_edit(
-            source, original_code, proposed_code, file_path, description, line_hint
+        return self._live_verify(
+            file_path,
+            source,
+            modified_source,
+            description,
         )
-        if isinstance(modified, ExperimentRecord):
-            return modified
-        return self._live_verify_begin(file_path, source, modified, description)
-
-    def poll_experiment(self, handle: dict) -> ExperimentRecord | None:
-        """One poll of a running experiment's verify gate.
-
-        Returns None while the suite still runs; an ExperimentRecord
-        with the verdict once it exits — applied, reverted, or timed
-        out (the child is killed and the edit restored either way).
-        """
-        proc = handle["proc"]
-        if proc.poll() is None:
-            if time.monotonic() < handle["deadline"]:
-                return None
-            proc.kill()
-            proc.wait()
-            self._revert(handle["live_file"], handle["source"])
-            handle["marker"].unlink(missing_ok=True)
-            record = ExperimentRecord(
-                file_path=handle["file_path"],
-                description=handle["description"],
-                status="reverted",
-                reason="verification timed out",
-            )
-            self.engine.record_experiment(record)
-            return record
-        ok = proc.returncode == 0
-        self._revert_if_needed(handle, ok)
-        handle["marker"].unlink(missing_ok=True)
-        record = ExperimentRecord(
-            file_path=handle["file_path"],
-            description=handle["description"],
-            status="applied" if ok else "reverted",
-            reason=(
-                "all verification checks passed"
-                if ok
-                else f"verification gate failed (exit {proc.returncode})"
-            ),
-        )
-        self.engine.record_experiment(record)
-        if ok:
-            logger.info(
-                f"Heuristic experiment applied: {handle['description']} "
-                f"in {handle['file_path']}"
-            )
-        return record
-
-    def _revert_if_needed(self, handle: dict, ok: bool) -> None:
-        if not ok:
-            self._revert(handle["live_file"], handle["source"])
-
-    def _live_verify_begin(
-        self,
-        file_path: str,
-        source: str,
-        modified_source: str,
-        description: str,
-    ) -> ExperimentRecord | dict:
-        """Write the edit into the live tree and launch the gate.
-
-        Same staging as :meth:`_live_verify` — backup, in-flight
-        marker, live write, compile check — but the verify suite is
-        launched as a pollable child instead of blocking the caller.
-        """
-        live_file = Path(self.project_root) / file_path
-        backup = live_file.with_suffix(live_file.suffix + ".pre_experiment")
-        marker = live_file.with_suffix(live_file.suffix + ".in_flight")
-        try:
-            backup.write_text(source, encoding="utf-8")
-            marker.write_text(description, encoding="utf-8")
-            live_file.write_text(modified_source, encoding="utf-8")
-        except OSError as e:
-            self._revert(live_file, source)
-            marker.unlink(missing_ok=True)
-            return ExperimentRecord(
-                file_path=file_path,
-                description=description,
-                status="reverted",
-                reason=f"could not write live file: {e}",
-            )
-
-        is_rust = file_path.endswith(".rs")
-        if not is_rust:
-            compile_result = get_tools().run(
-                "compile_python",
-                path=str(live_file),
-                project_root=self.project_root,
-            )
-            if not compile_result.success:
-                self._revert(live_file, source)
-                marker.unlink(missing_ok=True)
-                record = ExperimentRecord(
-                    file_path=file_path,
-                    description=description,
-                    status="reverted",
-                    reason=f"py_compile failed: {compile_result.error}",
-                )
-                self.engine.record_experiment(record)
-                return record
-
-        if not os.path.exists(self._verify_script):
-            logger.warning(f"Verify script not found: {self._verify_script}")
-            self._revert(live_file, source)
-            marker.unlink(missing_ok=True)
-            record = ExperimentRecord(
-                file_path=file_path,
-                description=description,
-                status="reverted",
-                reason="verification script missing",
-            )
-            self.engine.record_experiment(record)
-            return record
-        timeout = self._RUST_VERIFY_TIMEOUT_S if is_rust else self._VERIFY_TIMEOUT_S
-        command = ["bash", self._verify_script]
-        command += [
-            os.path.join(self.project_root, "python"),
-            self.project_root,
-        ]
-        try:
-            proc = subprocess.Popen(
-                command,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        except OSError as e:
-            self._revert(live_file, source)
-            marker.unlink(missing_ok=True)
-            record = ExperimentRecord(
-                file_path=file_path,
-                description=description,
-                status="reverted",
-                reason=f"could not launch verification: {e}",
-            )
-            self.engine.record_experiment(record)
-            return record
-        return {
-            "proc": proc,
-            "live_file": live_file,
-            "source": source,
-            "file_path": file_path,
-            "description": description,
-            "marker": marker,
-            "deadline": time.monotonic() + timeout,
-        }
 
     def _live_verify(
         self,

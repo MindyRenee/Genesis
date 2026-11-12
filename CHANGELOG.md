@@ -54,12 +54,6 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
 
 ### Restored
 
-- **The arcade is back, on the official ARC-AGI-3 API**: `worlds/games/`
-  offers the official games through `arc-agi` (now a declared dependency,
-  with `arcengine`, matching `uv.lock`). The play urge and `/arcade` are
-  wired again. The README's "retired" wording and the man pages' ARC
-  commands were stale: `/play`, `/game`, `/endgame`, `/arc`, and the
-  browser's ARC web practice are not in the tree and are no longer documented.
 - **The steward channel is back — as `creator.py`**: a removal in this
   cycle was reversed; the custodial credential now lives in
   `genesis_client/creator.py` (class still `Stewardship`), a local-only

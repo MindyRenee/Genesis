@@ -357,35 +357,6 @@ def _describe_sound(event: SoundEvent) -> str:
     )
 
 
-def classify_audio_clip(samples: np.ndarray, sample_rate: int = 16000) -> SoundEvent:
-    """Classify one measured audio clip with the auditory cortex's feature model.
-
-    Used by platform adapters that cannot provide a PortAudio callback. This
-    preserves the same feature extraction and rule-based sound categories; it
-    does not transcribe speech or infer semantic content.
-    """
-    values = np.asarray(samples, dtype=np.float32).reshape(-1)
-    if isinstance(sample_rate, bool) or not isinstance(sample_rate, int) or sample_rate < 1000:
-        raise ValueError("sample_rate must be an integer >= 1000 Hz")
-    if values.size == 0 or not np.all(np.isfinite(values)):
-        raise ValueError("audio clip must contain finite samples")
-    values = np.clip(values, -1.0, 1.0)
-    features = _compute_features(values, sample_rate)
-    duration = values.size / sample_rate
-    sound_type, confidence = _classify_sound(features, duration, None)
-    event = SoundEvent(
-        sound_type=sound_type,
-        confidence=confidence,
-        loudness=float(np.clip(features["rms"] * 4.0, 0.0, 1.0)),
-        brightness=float(np.clip(features["spectral_centroid"], 0.0, 1.0)),
-        noisiness=float(np.clip(features["flatness"], 0.0, 1.0)),
-        duration=duration,
-        timestamp=time.time(),
-    )
-    event.description = _describe_sound(event)
-    return event
-
-
 # ─── Auditory cortex ──────────────────────────────────────────────────
 
 
@@ -474,14 +445,8 @@ class AuditoryCortex:
             # microphone — so it must degrade the same way instead of
             # propagating out of the audio thread.
             sounddevice.query_devices()
-        except ImportError as e:
+        except (ImportError, OSError) as e:
             logger.warning(f"Auditory cortex: sounddevice unavailable ({e})")
-            return False
-        except Exception as e:  # noqa: BLE001
-            # PortAudioError and friends are not OSError — a present
-            # but unusable audio stack (no server, no device) must
-            # degrade the same way, never propagate into startup.
-            logger.warning(f"Auditory cortex: audio probe failed ({e})")
             return False
         with self._lifecycle_lock:
             if self._running:

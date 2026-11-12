@@ -444,33 +444,6 @@ class HolographicGraph:
             if isinstance(cached, list):
                 return list(cached)
 
-        # The substrate answers associations: edge deposits live at
-        # their source's own holographic address — the cue is the
-        # same SDR projected, prefix-filtered to this source+relation,
-        # so resonance returns the targets that belong to this source.
-        manifold = getattr(self, "manifold", None)
-        if (
-            manifold is not None
-            and candidate_ids is None
-            and source in self._addresses
-        ):
-            try:
-                from latent_spaces import geometry as _g
-
-                cue = _g.project_to_s3(
-                    np.asarray(self._addresses[source], dtype=np.float64),
-                    seed=0xA55E,
-                )
-                prefix = f"edge:{source}:{relation}:"
-                hits = manifold.resonate(cue, k=top_k, radius=0.6, prefix=prefix)
-                out = [(kk[len(prefix):], float(sc)) for (_, kk, sc, _) in hits]
-                if out:
-                    if cache_key is not None:
-                        self._cache_put(cache_key, list(out))
-                    return out[:top_k]
-            except (TypeError, ValueError, ArithmeticError):
-                pass
-
         if relation not in self._memory:
             return []
         if source not in self._addresses:
@@ -826,85 +799,6 @@ class HolographicGraph:
             j_target=str_array(j_targets),
             j_weight=j_weights,
         )
-
-    def save_space(self, space) -> None:
-        """Persist the graph inside her language latent space."""
-        from self.language_ingest import npz_bytes, put_bytes
-
-        concept_ids = sorted(self._addresses.keys())
-        addr_matrix = (
-            np.stack([self._addresses[c] for c in concept_ids])
-            if concept_ids
-            else np.zeros((0, self.dim), dtype=np.float32)
-        )
-        relation_names = sorted(self._memory.keys())
-        mem_matrix = (
-            np.stack([self._memory[r] for r in relation_names])
-            if relation_names
-            else np.zeros((0, self.n_buckets, self.dim), dtype=np.float32)
-        )
-        role_matrix = (
-            np.stack([self._roles[r] for r in relation_names])
-            if relation_names
-            else np.zeros((0, self.dim), dtype=np.float32)
-        )
-        put_bytes(
-            space,
-            "holographic_graph.npz",
-            npz_bytes(
-                dim=np.array(self.dim, dtype=np.int32),
-                n_buckets=np.array(self.n_buckets, dtype=np.int32),
-                edge_count=np.array(self._edge_count, dtype=np.int64),
-                encoding=np.array(self._encoding, dtype=np.int32),
-                concept_ids=str_array(concept_ids),
-                addr_matrix=addr_matrix,
-                relation_names=str_array(relation_names),
-                mem_matrix=mem_matrix,
-                role_matrix=role_matrix,
-                j_source=str_array([k[0] for k in self._journal]),
-                j_relation=str_array([k[1] for k in self._journal]),
-                j_target=str_array([k[2] for k in self._journal]),
-                j_weight=np.array(list(self._journal.values()), dtype=np.float32),
-            ),
-        )
-
-    def load_space(self, space) -> bool:
-        """Restore the graph from her language latent space."""
-        from self.language_ingest import get_bytes, npz_from_bytes
-
-        raw = get_bytes(space, "holographic_graph.npz")
-        if raw is None:
-            return False
-        data = npz_from_bytes(raw)
-        self.dim = int(data["dim"])
-        self.n_buckets = int(data["n_buckets"])
-        self._edge_count = int(data["edge_count"])
-        self._encoding = int(data["encoding"]) if "encoding" in data else 1
-        concept_ids = list(data["concept_ids"])
-        self._addresses = {
-            str(cid): data["addr_matrix"][i].astype(np.float32)
-            for i, cid in enumerate(concept_ids)
-        }
-        self._registered_concepts = set(self._addresses)
-        self._memory = {}
-        self._roles = {}
-        for i, rname in enumerate(data["relation_names"]):
-            self._memory[str(rname)] = data["mem_matrix"][i].astype(np.float32)
-            self._roles[str(rname)] = data["role_matrix"][i].astype(np.float32)
-        self._registered_relations = set(self._memory)
-        self._journal = {}
-        if "j_source" in data:
-            for i in range(len(data["j_source"])):
-                key = (
-                    str(data["j_source"][i]),
-                    str(data["j_relation"][i]),
-                    str(data["j_target"][i]),
-                )
-                self._journal[key] = float(data["j_weight"][i])
-            if len(self._journal) > self.journal_cap:
-                self._evict_journal()
-        self._invalidate_cache()
-        return True
 
     def load(self, path: str) -> bool:
         """Load the holographic graph from an .npz file.

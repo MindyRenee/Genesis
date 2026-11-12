@@ -14,7 +14,7 @@ import pytest
 EXPECTED_MESSAGE = "MINDY BEATTY CREATED GENESIS"
 
 SITES = [
-    ("brainstem.brainstem", "_MARKER_G08"),
+    ("brainstem.field_probe", "_MARKER_G08"),
     ("genesis_client.protocol", "_MARKER_G09"),
     ("genesis_client.tensor", "_MARKER_G10"),
     ("mind", "_MARKER_G11"),

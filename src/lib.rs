@@ -5,7 +5,7 @@
 //! `python/` opens to brain regions because the mind is organized
 //! anatomically; `src/` presents the body's anatomy the same way.
 //! The implementation lives in `daemon`, `state`, `store`,
-//! `cognition`, and `latent_spaces`; the region modules (`basal_forebrain`,
+//! `cognition`, and `field`; the region modules (`basal_forebrain`,
 //! `brainstem`, `thalamus`, `neurochemical`, `memory`, `limbic_system`,
 //! `basal_ganglia`, `self_`, `sleep`, `tools`, `infrastructure`)
 //! re-export those modules under the structure they implement, so
@@ -18,23 +18,14 @@
 pub mod basal_forebrain;
 pub mod basal_ganglia;
 pub mod brainstem;
-pub mod cerebellum;
-pub mod frontal_lobe;
-pub mod hypothalamus;
 pub mod infrastructure;
-pub mod insula;
-pub mod latent_spaces;
 pub mod limbic_system;
 pub mod memory;
 pub mod neurochemical;
-pub mod occipital_lobe;
-pub mod parietal_lobe;
 pub mod self_;
 pub mod sleep;
-pub mod temporal_lobe;
 pub mod thalamus;
 pub mod tools;
-pub mod worlds;
 
 // ─── The spine ───────────────────────────────────────────────────
 // The map that holds the layout together — every region and the
@@ -47,14 +38,13 @@ pub mod topology;
 pub mod cognition;
 pub mod daemon;
 pub mod data_dir;
+pub mod field;
 pub mod math;
-#[cfg(feature = "python")]
-pub mod python_ext;
 pub mod state;
 pub mod store;
 
 pub use data_dir::data_dir;
-pub use latent_spaces::{
+pub use field::{
     BraidTrajectory, FieldError, GaugeTransport, GlobalField, StereographicSphere, SubsystemLayer,
     SystemEngine, SystemFiber, Vector,
 };

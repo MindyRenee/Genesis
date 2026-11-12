@@ -433,6 +433,37 @@ pub mod cmd {
     #[allow(dead_code)]
     pub const SET_VOLITION: u8 = 46;
 
+    /// Physical field-probe signature — the body's real measured
+    /// substrate dynamics (throughput/jitter band energies, P-state
+    /// and interrupt rates, carrier frequency, electrical and radio
+    /// telemetry) decomposed at the wave bands' center frequencies.
+    /// Response: 408 bytes (v6; v5 was 328, v4 308, v3 195, v2 114, v1 102),
+    /// layout in `daemon::field_probe`.
+    /// Additive: PROTOCOL_VERSION is unaffected.
+    /// When the probe thread isn't running the reply is a single
+    /// `READ_FAILED` byte, so an unavailable channel never reads as
+    /// a healthy zero.
+    pub const GET_FIELD_PROBE: u8 = 47;
+
+    /// Retired — never reuse this wire number. The mind's modeled
+    /// carrier-band phase is no longer pushed into the probe's
+    /// generator: modeled state does not assert onto a physical
+    /// quantity. The phase lock is one-directional — the signature's
+    /// measured response phase pulls the model's band phase
+    /// (physics → model); nothing runs back.
+    #[allow(dead_code)]
+    pub const SET_FIELD_PHASE: u8 = 48;
+
+    /// Set the carrier's real-work modulation — the write side of the
+    /// embodiment experiment. Request: [f32 depth][f32 freq_hz].
+    /// Depth 0..1 scales the work-slice modulation (0 = unmodulated
+    /// work, carrier silent). Freq 0 hands the rhythm back to the
+    /// body's phase; positive overrides it (clamped 0.1..100 Hz) so
+    /// evaluation can drive arbitrary bands — including infraslow
+    /// rates where the thermal field can hold an oscillation.
+    /// Reply: [u8 ack]. Additive: PROTOCOL_VERSION unaffected.
+    pub const SET_FIELD_CARRIER: u8 = 49;
+
     /// RETIRED — pinned so the wire number is never reused. The
     /// per-person dyadic snapshot channel was removed with the
     /// person registry; the interlocutor model's coupling output is
@@ -550,50 +581,16 @@ pub mod cmd {
     /// PROTOCOL_VERSION is unaffected.
     pub const GET_FOLD_MARGINS: u8 = 62;
 
-    /// The body's actuator census — what she can DO right now.
-    /// Request: empty. Response: `[u8 count]` then per actuator
-    /// `[u8 name_len][name][u8 kind][u8 available][u8 reason_len]
-    /// [reason]`. See `daemon::actuators`.
-    pub const LIST_ACTUATORS: u8 = 64;
-
-    /// Fire one actuator by name — the efferent half of the census.
-    /// Request: `[u8 name_len][name][u16 arg_len][arg]`. Response:
-    /// `[u8 ok][u16 msg_len][msg]` — ok=1 and the limb's own report
-    /// on success, ok=0 and the refusal reason when the limb is
-    /// unknown or unavailable. `PAYLOAD_TOO_SHORT` on truncation.
-    /// Additive: PROTOCOL_VERSION unaffected.
-    pub const ACTUATE: u8 = 65;
-
-    /// The organism's computed field signature — Maxwell's equations
-    /// evaluated on her own coherent motion plus the field
-    /// integration's observables (`tick::FieldSignature`). No
-    /// request payload.
-    /// Response: `[u8 ack]` then the wire body —
-    /// `[u8 flags][3 × u8 reserved][9 × f64]` little-endian:
-    /// flags bit0 = signature present, bit1 = integration present,
-    /// bit2 = quasi-static regime honest; then omega_rad_s,
-    /// coherent_current_a, consensus_speed, dipole_moment_am2,
-    /// b_axial_t, e_induction_vm, radiated_power_w, disagreement,
-    /// temperature. An un-integrated field still answers — absent
-    /// channels are flags, never errors. f64 throughout: the
-    /// radiated power can sit below f32's floor at her drift rates.
-    /// Additive: PROTOCOL_VERSION unaffected.
-    pub const GET_FIELD_SIGNATURE: u8 = 66;
-
-    /// The field's spectral signature — the band decomposition of
-    /// her own substrate trajectory (`latent_spaces::spectrum`) at the wave
-    /// model's band centers, plus the consensus kinematics the
-    /// carrier runs on. No request payload. Response: `[u8 ack]`
-    /// then the wire body — `[u8 flags][3 × u8 reserved][48 × f64]`
-    /// little-endian: flags bit0 = bands warm, bit1 = carrier
-    /// present, bit2 = speed present; then carrier_phase,
-    /// carrier_freq_hz, consensus_speed, sample_rate_hz,
-    /// flux.mean/cv, tension.mean/cv, flux.energies[10],
-    /// flux.phases[10], tension.energies[10], tension.phases[10].
-    /// Bands above the achieved rate's Nyquist read zero — absent
-    /// is a reading, never an aliased one. Additive:
-    /// PROTOCOL_VERSION unaffected.
-    pub const GET_FIELD_SPECTRUM: u8 = 67;
+    /// Arm or disarm the parasympathetic pulse — a slow autonomic
+    /// wave riding the carrier's modulation *depth* (contractility,
+    /// not rate; the RSA analog — the vagal signature is the pulse's
+    /// slow wax and wane, never a pinned tempo). Request:
+    /// `[f32 base][f32 mod_freq_hz][f32 mod_depth]`; `mod_freq <= 0`
+    /// disarms and depth returns to the static set-point. When armed
+    /// the probe integrates the envelope on its own clock — the wave
+    /// runs on the body's time whether or not the mind ticks.
+    /// Reply: [u8 ack]. Additive: PROTOCOL_VERSION unaffected.
+    pub const SET_FIELD_PULSE: u8 = 63;
 
     // ─── Tensor slab ──────────────────────────────────────────
     // Named multidimensional tensors shared between the daemon and
@@ -2832,7 +2829,6 @@ pub fn default_handler<L: LtmAccess>(
     ltm: &mut L,
     cmd: u8,
     payload: &[u8],
-    data_dir: &std::path::Path,
 ) -> Vec<u8> {
     match cmd {
         cmd::PING => {
@@ -3705,6 +3701,52 @@ pub fn default_handler<L: LtmAccess>(
                 .to_vec()
         }
 
+        cmd::GET_FIELD_PROBE => {
+            // The body's real measured substrate dynamics — the probe
+            // thread's rolling band signature. READ_FAILED when the
+            // probe isn't running: an absent channel is an error, not
+            // a zero reading.
+            match super::field_probe::shared() {
+                Some(probe) => probe.signature(),
+                None => vec![error::READ_FAILED],
+            }
+        }
+
+        cmd::SET_FIELD_CARRIER => {
+            // Carrier write control — depth and frequency override.
+            if payload.len() < 8 {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let depth = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
+            let freq = f32::from_le_bytes(payload[4..8].try_into().unwrap_or_default());
+            match super::field_probe::shared() {
+                Some(probe) => {
+                    probe.set_carrier(depth, freq);
+                    vec![1u8]
+                }
+                None => vec![error::READ_FAILED],
+            }
+        }
+
+        cmd::SET_FIELD_PULSE => {
+            // The parasympathetic envelope — a slow wave riding
+            // carrier depth, integrated on the probe's own clock.
+            // mod_freq <= 0 disarms.
+            if payload.len() < 12 {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let base = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
+            let mod_freq = f32::from_le_bytes(payload[4..8].try_into().unwrap_or_default());
+            let mod_depth = f32::from_le_bytes(payload[8..12].try_into().unwrap_or_default());
+            match super::field_probe::shared() {
+                Some(probe) => {
+                    probe.set_pulse(base, mod_freq, mod_depth);
+                    vec![1u8]
+                }
+                None => vec![error::READ_FAILED],
+            }
+        }
+
         cmd::SET_WAKE_ALARM => {
             // Arm or disarm the RTC wake alarm — the machine choosing
             // when to exist next. Payload: [u64 epoch_secs]
@@ -3956,14 +3998,7 @@ pub fn default_handler<L: LtmAccess>(
                     resp
                 }
                 Err(e) => {
-                    // Name the producer — an empty-episode rejection
-                    // should say which module and event kind tried
-                    // to write it, or the leak stays anonymous.
-                    eprintln!(
-                        "[ipc] STORE_EPISODE failed: {e} \
-                         (source_module={source_module}, event_type={event_type}, \
-                         text_len={text_len}, ts={timestamp})"
-                    );
+                    eprintln!("[ipc] STORE_EPISODE failed: {e}");
                     vec![0, 0, 0, 0, 0, 0, 0, 0, 0]
                 }
             }
@@ -4041,7 +4076,7 @@ pub fn default_handler<L: LtmAccess>(
         // ─── Tensor slab ─────────────────────────────────────
         // Named tensors are daemon-process state — no mmap, no
         // TickLoop. See `daemon::tensor_slab` for the wire codec and
-        // `latent_spaces::motor` for the field decode.
+        // `field::motor` for the field decode.
         cmd::PUT_TENSOR => {
             use super::tensor_slab::{self, Tensor, TensorError};
             let resp = (|| -> Result<(), TensorError> {
@@ -4107,41 +4142,7 @@ pub fn default_handler<L: LtmAccess>(
             }
         },
 
-        cmd::GET_MOTOR_TARGET => crate::latent_spaces::motor::current_motor_target().encode(),
-
-        cmd::LIST_ACTUATORS => crate::daemon::actuators::encode_census(data_dir),
-
-        cmd::ACTUATE => {
-            // [u8 name_len][name utf8][u16 arg_len][arg utf8] — the
-            // mind names the limb; the body's own `actuate` owns the
-            // firing semantics (census lookup, availability, kind).
-            // ok=1 carries the limb's report; ok=0 its refusal.
-            if payload.is_empty() {
-                return vec![error::PAYLOAD_TOO_SHORT];
-            }
-            let nl = payload[0] as usize;
-            if payload.len() < 1 + nl + 2 {
-                return vec![error::PAYLOAD_TOO_SHORT];
-            }
-            let name = String::from_utf8_lossy(&payload[1..1 + nl]).into_owned();
-            let al = u16::from_le_bytes(payload[1 + nl..1 + nl + 2].try_into().unwrap_or_default())
-                as usize;
-            if payload.len() < 1 + nl + 2 + al {
-                return vec![error::PAYLOAD_TOO_SHORT];
-            }
-            let arg = String::from_utf8_lossy(&payload[1 + nl + 2..1 + nl + 2 + al]).into_owned();
-            let (ok, msg) = match crate::daemon::actuators::actuate(&name, &arg, data_dir) {
-                Ok(report) => (1u8, report),
-                Err(reason) => (0u8, reason),
-            };
-            let msg = msg.as_bytes();
-            let ml = msg.len().min(u16::MAX as usize) as u16;
-            let mut out = Vec::with_capacity(3 + ml as usize);
-            out.push(ok);
-            out.extend_from_slice(&ml.to_le_bytes());
-            out.extend_from_slice(&msg[..ml as usize]);
-            out
-        }
+        cmd::GET_MOTOR_TARGET => crate::field::motor::current_motor_target().encode(),
 
         cmd::ANALYZE_CODE => {
             // [u16 path_len][path][u32 src_len][src] — the mind sends
@@ -4558,50 +4559,11 @@ where
                 resp
             }
 
-            cmd::GET_FIELD_SIGNATURE => {
-                // Her own field's computed signature — the Maxwell
-                // block on her coherent motion plus the integration's
-                // disagreement/temperature. Held by the TickLoop (the
-                // signature folds inside advance_neuro), so this lives
-                // on the reactive path. An un-integrated field still
-                // answers — absent is a reading, not an error.
-                let sig = match tick_loop.lock() {
-                    Ok(tl) => tl.field_signature(),
-                    Err(e) => {
-                        eprintln!("[ipc] GET_FIELD_SIGNATURE: tick_loop poisoned: {e}");
-                        return vec![error::INTERNAL_ERROR];
-                    }
-                };
-                let mut resp = vec![1u8];
-                resp.extend_from_slice(&sig.to_wire());
-                resp
-            }
-
-            cmd::GET_FIELD_SPECTRUM => {
-                // The field's own spectral signature — band energies
-                // and phases of her substrate trajectory's flux and
-                // tension, the carrier's winding phase and rate, and
-                // the achieved sampling rate the bands resolve
-                // against. Same reactive path as the signature: the
-                // spectrum folds inside `observe`, this only reads.
-                let sig = match tick_loop.lock() {
-                    Ok(mut tl) => tl.field_spectrum(),
-                    Err(e) => {
-                        eprintln!("[ipc] GET_FIELD_SPECTRUM: tick_loop poisoned: {e}");
-                        return vec![error::INTERNAL_ERROR];
-                    }
-                };
-                let mut resp = vec![1u8];
-                resp.extend_from_slice(&sig.to_wire());
-                resp
-            }
-
             cmd::SET_OPTIC_GAIN => {
                 // Corticothalamic feedback — the mind's layer-6 gain
                 // onto the thalamic relay. Modulatory only; the nerve
-                // clamps it into [0, 1] and scales the relay across
-                // [0.6, 1.0] around a full-open base — no sleep stage
-                // closes the gate it multiplies.
+                // clamps it into [0, 1] and the sleep stage still owns
+                // the gate it multiplies.
                 if payload.len() < 4 {
                     return vec![error::PAYLOAD_TOO_SHORT];
                 }
@@ -4641,9 +4603,9 @@ where
             cmd::SET_LID => {
                 // The mind's voluntary lid — orbicularis oculi for
                 // the eye the hardware lacks. The nerve clamps it
-                // into [0, 1] and holds it: no phase composes with
-                // it, so her will alone decides — the sleep system
-                // holds ~0.15 under and 1.0 awake.
+                // into [0, 1] and composes it with the phase lid by
+                // min: will can shut an open eye, never open a
+                // sleeping one.
                 if payload.len() < 4 {
                     return vec![error::PAYLOAD_TOO_SHORT];
                 }
@@ -4661,7 +4623,7 @@ where
             }
 
             // Delegate all other commands to the default handler.
-            _ => default_handler(mmap, stm, ltm, cmd, payload, data_dir.as_path()),
+            _ => default_handler(mmap, stm, ltm, cmd, payload),
         }
     }
 }

@@ -53,7 +53,6 @@ connected, each doing what it's good at.
 
 from __future__ import annotations
 
-import io
 import logging
 import math
 import os
@@ -65,7 +64,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from genesis_client.swallow import note_swallowed
-from infrastructure._npz_io import str_array
+from infrastructure._npz_io import load_npz, save_npz, str_array
 
 from .classify import _normalize_id
 
@@ -534,50 +533,8 @@ class EmbeddingStore:
         generation. `refresh()` (sleep thread) rebinds all three.
         """
         self._ensure_loaded()
-        # The substrate answers similarity when it's wired: concept
-        # deposits live at their projected embedding coordinates, so
-        # the query vector reaches the concept's own neighborhood —
-        # the same neighborhood the hybrid distance would surface.
-        vec = self.get_concept_vector(concept_name)
-        if vec is not None:
-            hits = self._manifold_similar(
-                vec, k, threshold, {concept_name}
-            )
-            if hits:
-                return hits
         with self._lock:
             return self._find_similar_concepts_locked(concept_name, k, threshold)
-
-    def _manifold_similar(
-        self,
-        vector: np.ndarray,
-        k: int,
-        threshold: float,
-        exclude_names: set[str] | None = None,
-    ) -> list[tuple[str, float]]:
-        """Ask the substrate for the vector's concept neighborhood.
-
-        Seeded ``concept:*`` deposits sit at their projected embedding
-        coordinates; the cue projects with the same seed, so resonance
-        answers with semantically nearby deposits. ``[]`` means the
-        field can't answer — callers fall back to the hybrid distance.
-        """
-        manifold = getattr(self, "manifold", None)
-        if manifold is None:
-            return []
-        try:
-            hits = manifold.resonate(
-                vector, k=k + 8, radius=0.6, prefix="concept:", seed=0xCE1
-            )
-        except (TypeError, ValueError, ArithmeticError):
-            return []
-        excl = exclude_names or set()
-        out = [
-            (kk.split(":", 1)[-1], math.exp(-((d / 0.6) ** 2)))
-            for (_, kk, _, d) in hits
-            if kk.split(":", 1)[-1] not in excl
-        ]
-        return [t for t in out if t[1] >= threshold][:k]
 
     def _find_similar_concepts_locked(
         self, concept_name: str, k: int, threshold: float
@@ -738,11 +695,6 @@ class EmbeddingStore:
         if vec is None:
             return exact[:k]
 
-        m_hits = self._manifold_similar(
-            vec, k, threshold, {exclude} if exclude else None
-        )
-        if m_hits:
-            return self._merge_exact_matches(m_hits, exact, k)
         results = self._search_concept_matrix(
             vec, k, threshold, exclude=exclude, query_has_spectral=False
         )
@@ -838,9 +790,6 @@ class EmbeddingStore:
         come from the same generation.
         """
         self._ensure_loaded()
-        hits = self._manifold_similar(vector, k, threshold)
-        if hits:
-            return hits
         with self._lock:
             if self._concept_matrix is None:
                 return []
@@ -1198,6 +1147,7 @@ class EmbeddingStore:
             return
 
         ddir = data_dir or os.path.dirname(self._path)
+        path = os.path.join(ddir, "concept_vectors.npz")
 
         # Extract only the TF-IDF + GloVe portion (skip spectral AND
         # experiential — the experiential layer is rebuilt from the
@@ -1220,23 +1170,15 @@ class EmbeddingStore:
         # which is how a truncated or failed write of a large learned
         # artifact went unnoticed — the in-memory state and the disk
         # state simply diverged, silently, for the life of the process.
-        from self.language_ingest import npz_bytes, put_bytes
-        from self.language_space import open_language_space
-
-        space = open_language_space(ddir)
-        put_bytes(
-            space,
-            "concept_vectors.npz",
-            npz_bytes(
-                concepts=str_array(self._concept_names),
-                vectors=exp_matrix.astype(np.float32),
-                spectral_dim=np.array(self._spectral_dim),
-                tfidf_dim=np.array(self._tfidf_dim),
-                tfidf_words=tfidf_words,
-                tfidf_indices=tfidf_indices,
-            ),
+        save_npz(
+            path,
+            concepts=str_array(self._concept_names),
+            vectors=exp_matrix.astype(np.float32),
+            spectral_dim=np.array(self._spectral_dim),
+            tfidf_dim=np.array(self._tfidf_dim),
+            tfidf_words=tfidf_words,
+            tfidf_indices=tfidf_indices,
         )
-        space.save()
 
     def load_experiential(self, data_dir: str | None = None) -> bool:
         """Load persisted Hebbian-adapted experiential vectors from disk.
@@ -1271,16 +1213,13 @@ class EmbeddingStore:
             return False
 
         ddir = data_dir or os.path.dirname(self._path)
+        path = os.path.join(ddir, "concept_vectors.npz")
 
-        from self.language_ingest import get_bytes, npz_from_bytes
-        from self.language_space import open_language_space
-
-        raw = get_bytes(open_language_space(ddir), "concept_vectors.npz")
-        if raw is None:
+        if not os.path.exists(path):
             return False
 
         try:
-            data = npz_from_bytes(raw)
+            data = load_npz(path)
             saved_concepts = [str(c) for c in data["concepts"]]
             saved_vectors = data["vectors"]
         except (KeyError, ValueError, OSError):
@@ -1417,16 +1356,12 @@ class EmbeddingStore:
         self.load_experiential()
 
     def _load_glove(self) -> None:
-        """Load pre-trained word vectors out of the language latent space."""
-        from self.language_ingest import get_bytes
-        from self.language_space import open_language_space
-
-        raw = get_bytes(open_language_space(os.path.dirname(self._path)), "embeddings.npz")
-        if raw is None:
+        """Load pre-trained GloVe vectors from .npz file if it exists."""
+        if not os.path.exists(self._path):
             return
 
         try:
-            data = np.load(io.BytesIO(raw), allow_pickle=False)
+            data = np.load(self._path, allow_pickle=False)
             self._word_list = data["words"]
             self._word_vectors = data["vectors"].astype(np.float32)
             self._word_to_idx = {str(w): i for i, w in enumerate(self._word_list)}

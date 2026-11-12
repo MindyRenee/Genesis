@@ -18,10 +18,8 @@
 
 use std::io::{self, Read, Write};
 use std::os::unix::net::UnixStream;
-#[cfg(not(target_os = "android"))]
 use std::time::Duration;
 
-#[cfg(not(target_os = "android"))]
 const SYSTEM_BUS_PATH: &str = "/run/dbus/system_bus_socket";
 
 /// Levels tried strictest-first — rtkit clamps or denies a request
@@ -272,15 +270,6 @@ fn sasl_auth(s: &mut UnixStream) -> io::Result<()> {
     s.write_all(b"BEGIN\r\n")
 }
 
-#[cfg(target_os = "android")]
-fn connect() -> io::Result<UnixStream> {
-    Err(io::Error::new(
-        io::ErrorKind::Unsupported,
-        "RealtimeKit system-bus scheduling is unavailable on Android",
-    ))
-}
-
-#[cfg(not(target_os = "android"))]
 fn connect() -> io::Result<UnixStream> {
     let addr = std::env::var("DBUS_SYSTEM_BUS_ADDRESS").unwrap_or_default();
     let path = addr.strip_prefix("unix:path=").unwrap_or(SYSTEM_BUS_PATH);

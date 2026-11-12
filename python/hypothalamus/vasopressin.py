@@ -34,7 +34,7 @@ clearance and narrow effective range.
 RECEPTOR ADAPTATION MULTIPLIER
 ════════════════════════════════════════════════════════════════════════
 
-    multiplier = 0.6
+    multiplier = 0.5
 
 Vasopressin receptors adapt slowly — neuropeptide receptors have
 slow turnover.
@@ -47,10 +47,10 @@ COUPLING: HOW OTHERS AFFECT VASOPRESSIN (matrix row 13)
 Index order: DA, SRT, NE, ACh, GABA, GLU, CORT, OXY, END, HIST,
 ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 
-    DA  ->  VP:  0.10  (weak volume transmission.)
-    CORT  ->  VP:  0.10  (stress activates vasopressin (HPA co-activation).)
+    DA   -> VP : +0.05  (weak volume transmission.)
+    CORT -> VP : +0.05  (stress activates vasopressin (HPA co-activation).)
     OXY  -> VP : +0.10  (reciprocal social neuropeptide bonding.)
-    EPI  ->  VP:  0.10  (sympathetic co-activation.)
+    EPI  -> VP : +0.05  (sympathetic co-activation.)
     SRT  -> VP : 0.00   (no direct coupling)
     NE   -> VP : 0.00   (no direct coupling)
     ACh  -> VP : 0.00   (no direct coupling)
@@ -69,9 +69,9 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 COUPLING: HOW VASOPRESSIN AFFECTS OTHERS (matrix column 13)
 ════════════════════════════════════════════════════════════════════════
 
-    VP  ->  OXY:  0.10  (reciprocal social neuropeptide bonding.)
-    VP  ->  OX:  0.10  (weak volume transmission.)
-    VP  ->  EPI:  0.10  (sympathetic co-activation.)
+    VP  -> OXY:  +0.05  (reciprocal social neuropeptide bonding.)
+    VP  -> OX :  +0.05  (weak volume transmission.)
+    VP  -> EPI:  +0.05  (sympathetic co-activation.)
     VP  -> DA :  0.00   (no direct coupling)
     VP  -> SRT:  0.00   (no direct coupling)
     VP  -> NE :  0.00   (no direct coupling)

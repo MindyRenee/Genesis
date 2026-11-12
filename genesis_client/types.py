@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 import struct
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
 from .protocol import (
     _F32,
@@ -36,8 +36,6 @@ __all__ = [
     "BodyState",
     "CoreState",
     "Episode",
-    "FieldSignature",
-    "FieldSpectrum",
     "FoldMargins",
     "InferenceSummary",
     "IonSummary",
@@ -52,7 +50,6 @@ __all__ = [
     "RecentEpisode",
     "SensorPresence",
     "SimilarEpisode",
-    "SpectrumBandChannel",
     "StateDwell",
     "SubsystemReport",
     "SubsystemTelemetry",
@@ -149,38 +146,6 @@ class IonSummary:
             gradient_integrity=values[24],
             energy_load=values[25],
             net_membrane_current=values[26],
-        )
-
-    @classmethod
-    def from_state(cls, data: bytes, offset: int = 3288) -> IonSummary:
-        """Decode the ion block straight out of a core-state snapshot.
-
-        ``IonState`` is 124 bytes inside the struct at ``offset``: the
-        four per-ion arrays (64 bytes), then ``current_density`` (16
-        bytes, not part of the wire summary), then the 11 scalar
-        fields. Same fields the daemon serializes for GET_ION_SUMMARY,
-        read here with no round trip — ions travel with the chemicals.
-        """
-        if len(data) < offset + 124:
-            raise ValueError(f"IonSummary state needs {offset + 124} bytes")
-        head = struct.unpack_from("<16f", data, offset)
-        tail = struct.unpack_from("<11f", data, offset + 80)
-        return cls(
-            intracellular_mm=head[0:4],
-            extracellular_mm=head[4:8],
-            reversal_potential_mv=head[8:12],
-            conductance=head[12:16],
-            membrane_potential_mv=tail[0],
-            nak_pump_rate=tail[1],
-            kcl_cotransporter_flux=tail[2],
-            ncx_flux=tail[3],
-            atp_availability=tail[4],
-            calcium_signal=tail[5],
-            chloride_efficacy=tail[6],
-            excitability=tail[7],
-            gradient_integrity=tail[8],
-            energy_load=tail[9],
-            net_membrane_current=tail[10],
         )
 
 
@@ -964,10 +929,6 @@ class CoreState:
     # to know what the body was doing. That is the coupling that let the
     # mind's 1 Hz cadence dictate the body's integration rate.
     inference: InferenceSummary | None
-    # The electrochemical ion layer (offset 3288, 124 bytes) — the
-    # biophysical substrate the chemicals act on: membrane potential,
-    # gradients, pump fluxes, ATP availability.
-    ions: IonSummary | None = None
     # The sleep-wake network's homeostatic sleep pressure, as a fraction of
     # its maximum (0 = none, 1 = the source's hmax). In a live daemon h is
     # slaved to chemical adenosine, so it reads the remaining need — it
@@ -1038,7 +999,6 @@ class CoreState:
             stm_count=stm_count,
             ltm_episode_count=ltm_episode_count,
             inference=_unpack_inference_signals(data),
-            ions=IonSummary.from_state(data),
             sleep_pressure=_unpack_sleep_pressure(data),
         )
 
@@ -2122,6 +2082,229 @@ class BodyControlState:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class FieldProbeSignature:
+    """The body's real measured substrate dynamics (v5: 328 B; v4: 308;
+    v3: 195; v2: 114; v1: 102).
+
+    Produced by the daemon's field-probe thread: band energies of real
+    fast channels — instruction throughput, scheduler jitter, and
+    (v3) measured power draw — decomposed at the wave bands' center
+    frequencies, plus slow counters and the carrier rhythm the probe
+    writes into real work. ``band_energy`` values are
+    baseline-relative: ≈0.125 is typical for that band on this
+    machine, higher means elevated vs. its own history. ``epsilon``
+    (150 Hz) is above the probe's Nyquist bound and always reads 0 —
+    an absent channel, not a measured silence.
+
+    The v3 tail adds the electrical sense — real watts, rail volts,
+    supply amps where the machine's own sensors report them — and
+    the Maxwell estimates: the quasi-static field the measured
+    carrier current makes at 0.3 m and its ω⁴-suppressed radiated
+    power (src/daemon/maxwell.rs). Estimates: the current is
+    measured, the loop geometry is an assumption.
+
+    The v4 tail adds the radio sense — the first *exteroceptive*
+    physical channel: WLAN byte-flux and RSSI envelopes decomposed
+    at the same bands, wireless-attributed interrupt flux, and
+    Bluetooth HCI counters where bluez answers. RSSI is the literal
+    field-strength measurement (P_mW = 10^(dBm/10)); what a 2.4 GHz
+    carrier's *phase* would be is unreachable at ~250 Hz sampling —
+    the envelope is the honest RF content at this rate.
+    """
+
+    throughput_bands: tuple[float, ...]  # 10 band energies
+    jitter_bands: tuple[float, ...]  # 10 band energies
+    throughput_mean: float  # iters/s, EMA
+    jitter_cv: float  # coefficient of variation
+    pstate_rate: float  # frequency transitions/s
+    irq_rate: float  # interrupts/s
+    carrier_freq: float  # Hz; 0 = carrier off
+    samples_ok: bool  # rings warmed
+    # v2 phase-lock fields — None on a v1 daemon (absent channel,
+    # never a zero reading):
+    carrier_lag: float | None = None  # rad: substrate response lag
+    carrier_phase: float | None = None  # rad: generator phase mod 2π
+    carrier_coherence: float | None = None  # 0..1 lock-strength
+    # v3 electrical + Maxwell fields — None on older daemons or when
+    # the sensor is absent (the presence mask decides):
+    power_bands: tuple[float, ...] | None = None  # real watts, baseline-relative
+    power_watts: float | None = None  # mean measured draw
+    power_sensor_hz: float | None = None  # fresh-sample rate
+    rail_volts: float | None = None  # lowest discovered rail
+    supply_amps: float | None = None  # measured current
+    power_lag: float | None = None  # rad, vs carrier
+    power_coherence: float | None = None  # 0..1
+    carrier_current_a: float | None = None  # measured carrier ΔP/V, amps
+    b_est_ut: float | None = None  # quasi-static B @0.3 m, µT (est.)
+    e_ind_vm: float | None = None  # induction E @0.3 m, V/m (est.)
+    radiated_pwr_w: float | None = None  # dipole radiation, W (est.)
+    # v4 radio fields — None on older daemons or when the channel
+    # is absent (the presence mask decides):
+    rf_flux_bands: tuple[float, ...] | None = None  # wlan byte-rate envelope
+    rf_rssi_bands: tuple[float, ...] | None = None  # RSSI envelope, dBm
+    rf_bytes_s: float | None = None  # wlan rx+tx flux
+    rf_rssi_dbm: float | None = None  # received signal level, dBm
+    rf_noise_dbm: float | None = None  # radio noise floor, dBm
+    rf_irq_rate: float | None = None  # wireless-attributed IRQs/s
+    rf_sensor_hz: float | None = None  # wireless telemetry read rate
+    bt_bytes_s: float | None = None  # HCI rx+tx byte flux
+    bt_events_s: float | None = None  # HCI event flux
+    bt_rssi_dbm: float | None = None  # mean ACL-link RSSI where links exist
+    rf_present: int | None = None  # presence mask byte
+    rf_retry_rate: float | None = None  # TX retransmission flux /s (iw)
+    rf_fail_rate: float | None = None  # TX failed-frame flux /s (iw)
+    rf_beacon_loss_rate: float | None = None  # AP beacons lost /s (iw)
+    rf_tx_mbps: float | None = None  # PHY tx link-adaptation bitrate
+    rf_rx_mbps: float | None = None  # PHY rx link-adaptation bitrate
+    # v6 flux-envelope phasors — the radio rhythm's own timing, for
+    # the entrainment path: None on older daemons or with no wlan.
+    rf_flux_phases: tuple[float, ...] | None = None  # ring-frame phase, rad
+    rf_flux_phase_coherence: tuple[float, ...] | None = None  # 0..1
+
+    WIRE_LEN: ClassVar[int] = 102
+    WIRE_LEN_V2: ClassVar[int] = 114
+    WIRE_LEN_V3: ClassVar[int] = 195
+    WIRE_LEN_V4: ClassVar[int] = 308
+    WIRE_LEN_V5: ClassVar[int] = 328
+    WIRE_LEN_V6: ClassVar[int] = 408
+
+    @classmethod
+    def unpack(cls, data: bytes) -> FieldProbeSignature:
+        """Unpack a v1–v6 signature (102, 114, 195, 308, 328, or 408 bytes)."""
+        if len(data) < cls.WIRE_LEN:
+            raise ValueError(f"FieldProbeSignature needs {cls.WIRE_LEN} bytes, got {len(data)}")
+        if data[0] not in (1, 2, 3, 4, 5, 6):
+            raise ValueError(f"unknown field-probe version {data[0]}")
+        vals = struct.unpack_from("<20f", data, 1)
+        scalars = struct.unpack_from("<5f", data, 81)
+        fields: dict[str, Any] = {
+            "throughput_bands": vals[0:10],
+            "jitter_bands": vals[10:20],
+            "throughput_mean": scalars[0],
+            "jitter_cv": scalars[1],
+            "pstate_rate": scalars[2],
+            "irq_rate": scalars[3],
+            "carrier_freq": scalars[4],
+            "samples_ok": bool(data[101]),
+        }
+        if data[0] >= 2:
+            fields.update(cls._unpack_v2_dynamics(data))
+        if data[0] >= 3:
+            fields.update(cls._unpack_v3_electrical(data))
+        present: int | None = None
+        if data[0] >= 4:
+            radio, present = cls._unpack_v4_radio(data)
+            fields.update(radio)
+        fields["rf_present"] = present
+        if data[0] >= 5:
+            fields.update(cls._unpack_v5_station(data, present))
+        if data[0] >= 6:
+            fields.update(cls._unpack_v6_phasors(data, present))
+        return cls(**fields)
+
+    @classmethod
+    def _unpack_v2_dynamics(cls, data: bytes) -> dict[str, Any]:
+        """v2 carrier-dynamics tail: lag, phase, and coherence."""
+        if len(data) < cls.WIRE_LEN_V2:
+            raise ValueError(f"v2 signature needs {cls.WIRE_LEN_V2} bytes, got {len(data)}")
+        lag, phase, coherence = struct.unpack_from("<3f", data, 102)
+        return {
+            "carrier_lag": lag,
+            "carrier_phase": phase,
+            "carrier_coherence": coherence,
+        }
+
+    @classmethod
+    def _unpack_v3_electrical(cls, data: bytes) -> dict[str, Any]:
+        """v3 electrical + Maxwell tail — gated by the presence mask so
+        an absent sensor is None, never a zero reading."""
+        if len(data) < cls.WIRE_LEN_V3:
+            raise ValueError(f"v3 signature needs {cls.WIRE_LEN_V3} bytes, got {len(data)}")
+        bands = struct.unpack_from("<10f", data, 114)
+        elec = struct.unpack_from("<6f", data, 154)
+        mask = data[178]
+        est = struct.unpack_from("<4f", data, 179)
+        fields: dict[str, Any] = {}
+        if mask & 0x01:
+            fields.update(
+                power_bands=bands,
+                power_watts=elec[0],
+                power_sensor_hz=elec[1],
+                power_lag=elec[4],
+                power_coherence=elec[5],
+            )
+            (
+                fields["carrier_current_a"],
+                fields["b_est_ut"],
+                fields["e_ind_vm"],
+                fields["radiated_pwr_w"],
+            ) = est
+        if mask & 0x02:
+            fields["rail_volts"] = elec[2]
+        if mask & 0x04:
+            fields["supply_amps"] = elec[3]
+        return fields
+
+    @classmethod
+    def _unpack_v4_radio(cls, data: bytes) -> tuple[dict[str, Any], int]:
+        """v4 radio tail — gated by the presence mask so an absent
+        radio is None, never a zero reading.
+
+        Returns the decoded fields plus the presence mask itself:
+        v5/v6 gate on its bits, so the mask travels with the parse.
+        """
+        if len(data) < cls.WIRE_LEN_V4:
+            raise ValueError(f"v4 signature needs {cls.WIRE_LEN_V4} bytes, got {len(data)}")
+        fbands = struct.unpack_from("<10f", data, 195)
+        rbands = struct.unpack_from("<10f", data, 235)
+        scal = struct.unpack_from("<8f", data, 275)
+        present = data[307]
+        fields: dict[str, Any] = {}
+        if present & 0x01:
+            fields.update(rf_flux_bands=fbands, rf_bytes_s=scal[0], rf_sensor_hz=scal[4])
+        if present & 0x02:
+            fields.update(rf_rssi_bands=rbands, rf_rssi_dbm=scal[1])
+        if present & 0x04:
+            fields["rf_noise_dbm"] = scal[2]
+        if present & 0x08:
+            fields["rf_irq_rate"] = scal[3]
+        if present & 0x20:
+            fields.update(bt_bytes_s=scal[5], bt_events_s=scal[6])
+        if present & 0x40:
+            fields["bt_rssi_dbm"] = scal[7]
+        return fields, present
+
+    @classmethod
+    def _unpack_v5_station(cls, data: bytes, present: int | None) -> dict[str, Any]:
+        """v5 nl80211 station tail (iw) — link strain counters and PHY
+        adaptation, gated on the same presence mask's bit 7."""
+        if len(data) < cls.WIRE_LEN_V5:
+            raise ValueError(f"v5 signature needs {cls.WIRE_LEN_V5} bytes, got {len(data)}")
+        if present is None or not present & 0x80:
+            return {}
+        retry, fail, beacon_loss, tx_mbps, rx_mbps = struct.unpack_from("<5f", data, 308)
+        return {
+            "rf_retry_rate": retry,
+            "rf_fail_rate": fail,
+            "rf_beacon_loss_rate": beacon_loss,
+            "rf_tx_mbps": tx_mbps,
+            "rf_rx_mbps": rx_mbps,
+        }
+
+    @classmethod
+    def _unpack_v6_phasors(cls, data: bytes, present: int | None) -> dict[str, Any]:
+        """v6 flux-envelope phasors — the radio rhythm's timing, gated
+        on the wlan presence bit like the flux energies themselves."""
+        if len(data) < cls.WIRE_LEN_V6:
+            raise ValueError(f"v6 signature needs {cls.WIRE_LEN_V6} bytes, got {len(data)}")
+        if present is None or not present & 0x01:
+            return {}
+        return {
+            "rf_flux_phases": struct.unpack_from("<10f", data, 328),
+            "rf_flux_phase_coherence": struct.unpack_from("<10f", data, 368),
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class OpticState:
@@ -2136,10 +2319,8 @@ class OpticState:
     ``retinal_lux`` is what currently entrains the circadian
     oscillator (0 while the scheduled photoperiod is in charge).
 
-    ``relay_gain`` is the thalamic relay's corticothalamic gain —
-    the mind's own layer-6 feedback scaling transmission across
-    [0.6, 1.0] around a full-open base; no sleep stage closes it.
-    ``eye_present`` distinguishes
+    ``relay_gain`` is the thalamic gate the mind must honour — near
+    zero in NREM/REM, open while awake. ``eye_present`` distinguishes
     "the eye exists but sees nothing" from "there is no eye":
     ``False`` means no frame was ever consumed this boot.
 
@@ -2153,19 +2334,10 @@ class OpticState:
     ``1/dpt`` metres (see the ``focus_m`` property).
 
     ``lid`` is the eyelid transmission — how much scene light the
-    voluntary lid position still passes: 1.0 open, ~0.15 while she
-    sleeps (the sleep system sets it), ~0.15 in meditation. It is
-    hers alone — no phase composes with it. A daemon that predates
-    the field reports nothing and decodes as fully open (1.0),
-    never fully shut — a legacy body cannot look asleep to the
-    optics layer.
-
-    ``proto_objects`` is the collicular scene parse's output — the
-    count of gamma-coherent assemblies the body's V2 binding pass
-    emitted on the colour lattice — and ``binding_coherence`` their
-    mean member coherence [0, 1]. Both decode as 0.0 from a daemon
-    that predates the fields, or when the eye sees no colour: an
-    absent parse is no objects, never fabricated ones.
+    phase's lid position still passes: 1.0 awake, ~0.5 drowsy, ~0.03
+    in NREM/REM. A daemon that predates the field reports nothing
+    and decodes as fully open (1.0), never fully shut — a legacy
+    body cannot look asleep to the optics layer.
     """
 
     eye_present: bool
@@ -2182,8 +2354,6 @@ class OpticState:
     pupil_mm: float = 0.0
     accommodation_dpt: float = 0.0
     lid: float = 1.0
-    proto_objects: float = 0.0
-    binding_coherence: float = 0.0
 
     @property
     def focus_m(self) -> float | None:
@@ -2198,8 +2368,7 @@ class OpticState:
     def unpack(cls, data: bytes) -> OpticState | None:
         """Unpack the GET_OPTIC_STATE body: ``[u8 ack][u8 flags][u8
         pad][7 × f32][u64 frame_seq][i64 frame_age_ms][f32 pupil_mm]
-        [f32 accommodation_dpt][f32 lid][f32 proto_objects]
-        [f32 binding_coherence]``.
+        [f32 accommodation_dpt][f32 lid]``.
 
         Returns ``None`` on a short or unacked response — an absent
         channel is no reading, never a zero reading. The trailing
@@ -2224,12 +2393,6 @@ class OpticState:
         (pupil_mm,) = struct.unpack_from("<f", data, 47) if len(data) >= 51 else (0.0,)
         (accommodation_dpt,) = struct.unpack_from("<f", data, 51) if len(data) >= 55 else (0.0,)
         (lid,) = struct.unpack_from("<f", data, 55) if len(data) >= 59 else (1.0,)
-        (proto_objects,) = (
-            struct.unpack_from("<f", data, 59) if len(data) >= 63 else (0.0,)
-        )
-        (binding_coherence,) = (
-            struct.unpack_from("<f", data, 63) if len(data) >= 67 else (0.0,)
-        )
         return cls(
             eye_present=bool(flags & 1),
             frames_fresh=bool(flags & 2),
@@ -2245,8 +2408,6 @@ class OpticState:
             pupil_mm=pupil_mm,
             accommodation_dpt=accommodation_dpt,
             lid=lid,
-            proto_objects=proto_objects,
-            binding_coherence=binding_coherence,
         )
 
 
@@ -2257,7 +2418,7 @@ class FieldState:
     from it.
 
     Parsed from the daemon's ``GET_INTERNALS`` map (``field.*``
-    keys). The body runs this field itself (src/latent_spaces/): the fibers
+    keys). The body runs this field itself (src/field/): the fibers
     — body, prediction, agency — each project their measured state
     into a shared 6-D latent space on a stereographic sphere
     (positive curvature; they live inside the hemisphere cap around
@@ -2304,182 +2465,4 @@ class FieldState:
             temperature=temperature,
             consensus_norm=consensus_norm,
             fiber_count=fiber_count,
-        )
-
-
-@dataclass
-class FieldSignature:
-    """The organism's computed field signature — GET_FIELD_SIGNATURE.
-
-    Maxwell's equations evaluated on her own coherent motion
-    (``src/daemon/maxwell.rs``) plus the field integration's
-    observables — her field's mathematics, not a measurement of
-    the machine's field dressed as hers.
-
-    ``signature_present`` means two integrations gave a measurable
-    consensus velocity, so the Maxwell block is live; ``omega_rad_s``
-    is the consensus' winding rate — her field's tempo. The current
-    is the latent→ampere bridge's output — a declared modeling
-    assumption, not a measurement; ``consensus_speed`` is the raw
-    latent drift it was mapped from. ``b_axial_t``, ``e_induction_vm``,
-    and ``radiated_power_w`` are the dipole expansion's outputs at
-    the organism boundary — honest estimates in the units an
-    external magnetometer would read, quasi-static at her drift
-    rates (``quasi_static`` reports whether ωr/c ≪ 1 holds).
-
-    ``disagreement`` and ``temperature`` are the field integration's
-    own state — the fibers' Fréchet variance about consensus and
-    the thermal floor it heats — live whenever ``integration_present``,
-    even before the signature's first velocity sample.
-
-    Absent channels are flags, never errors: an un-integrated field
-    decodes with both presence flags clear and zeroed readings.
-    """
-
-    signature_present: bool
-    integration_present: bool
-    quasi_static: bool
-    omega_rad_s: float
-    coherent_current_a: float
-    consensus_speed: float
-    dipole_moment_am2: float
-    b_axial_t: float
-    e_induction_vm: float
-    radiated_power_w: float
-    disagreement: float
-    temperature: float
-
-    @classmethod
-    def unpack(cls, data: bytes) -> FieldSignature | None:
-        """Unpack the GET_FIELD_SIGNATURE response: ``[u8 ack]`` then
-        ``[u8 flags][3 × u8 reserved][9 × f64]`` little-endian.
-
-        Returns ``None`` on a short or unacked response — an absent
-        channel is no reading, never a zero reading.
-        """
-        if len(data) < 77 or data[0] != 1:
-            return None
-        flags = data[1]
-        (
-            omega_rad_s,
-            coherent_current_a,
-            consensus_speed,
-            dipole_moment_am2,
-            b_axial_t,
-            e_induction_vm,
-            radiated_power_w,
-            disagreement,
-            temperature,
-        ) = struct.unpack_from("<9d", data, 5)
-        return cls(
-            signature_present=bool(flags & 1),
-            integration_present=bool(flags & 2),
-            quasi_static=bool(flags & 4),
-            omega_rad_s=omega_rad_s,
-            coherent_current_a=coherent_current_a,
-            consensus_speed=consensus_speed,
-            dipole_moment_am2=dipole_moment_am2,
-            b_axial_t=b_axial_t,
-            e_induction_vm=e_induction_vm,
-            radiated_power_w=radiated_power_w,
-            disagreement=disagreement,
-            temperature=temperature,
-        )
-
-
-@dataclass(frozen=True)
-class SpectrumBandChannel:
-    """One spectral channel of the field's own trajectory —
-    GET_FIELD_SPECTRUM.
-
-    ``energies`` are baseline-relative band powers at the wave
-    model's band centers (infraslow, delta, theta, alpha, sigma,
-    beta1, beta2, beta3, gamma, epsilon) — ≈0.125 typical on a quiet
-    field, elevated where the substrate's motion actually lives.
-    ``phases`` are the per-band quadrature angles (rad) — the
-    rhythm's own timing, the reference entrainment pulls toward.
-    ``mean`` and ``cv`` are the channel's level and turbulence over
-    the window. Bands above the achieved sampling rate's Nyquist
-    read zero — unresolvable is absent, never aliased.
-    """
-
-    energies: tuple[float, ...]
-    phases: tuple[float, ...]
-    mean: float
-    cv: float
-
-
-@dataclass(frozen=True)
-class FieldSpectrum:
-    """The field's spectral signature — GET_FIELD_SPECTRUM.
-
-    The band decomposition of her own substrate trajectory
-    (``src/latent_spaces/spectrum.rs``): ``flux`` is the fibers' centroid
-    motion energy per band, ``tension`` the fibers' spread — the
-    disagreement's spectral shadow. The carrier block is the
-    consensus' own kinematics — ``carrier_phase`` the accumulated
-    winding phase (the field's clock, rad mod 2π),
-    ``carrier_freq_hz`` the winding rate in Hz, ``consensus_speed``
-    the EMA-smoothed drift, ``sample_rate_hz`` the achieved sampling
-    rate the bands resolve against.
-
-    ``warm`` means the rings hold enough trajectory for band
-    readings; ``carrier_present``/``speed_present`` arm the
-    kinematics — two integrations minimum. Absent channels are
-    flags and zeroed readings, never errors.
-    """
-
-    warm: bool
-    carrier_present: bool
-    speed_present: bool
-    carrier_phase: float
-    carrier_freq_hz: float
-    consensus_speed: float
-    sample_rate_hz: float
-    flux: SpectrumBandChannel
-    tension: SpectrumBandChannel
-
-    @classmethod
-    def unpack(cls, data: bytes) -> FieldSpectrum | None:
-        """Unpack the GET_FIELD_SPECTRUM response: ``[u8 ack]`` then
-        ``[u8 flags][3 × u8 reserved][48 × f64]`` little-endian.
-
-        Returns ``None`` on a short or unacked response — an absent
-        channel is no reading, never a zero reading.
-        """
-        if len(data) < 389 or data[0] != 1:
-            return None
-        flags = data[1]
-        vals = struct.unpack_from("<48d", data, 5)
-        (
-            carrier_phase,
-            carrier_freq_hz,
-            consensus_speed,
-            sample_rate_hz,
-            flux_mean,
-            flux_cv,
-            tension_mean,
-            tension_cv,
-        ) = vals[:8]
-        flux_e = vals[8:18]
-        flux_p = vals[18:28]
-        tension_e = vals[28:38]
-        tension_p = vals[38:48]
-        return cls(
-            warm=bool(flags & 1),
-            carrier_present=bool(flags & 2),
-            speed_present=bool(flags & 4),
-            carrier_phase=carrier_phase,
-            carrier_freq_hz=carrier_freq_hz,
-            consensus_speed=consensus_speed,
-            sample_rate_hz=sample_rate_hz,
-            flux=SpectrumBandChannel(
-                energies=flux_e, phases=flux_p, mean=flux_mean, cv=flux_cv
-            ),
-            tension=SpectrumBandChannel(
-                energies=tension_e,
-                phases=tension_p,
-                mean=tension_mean,
-                cv=tension_cv,
-            ),
         )

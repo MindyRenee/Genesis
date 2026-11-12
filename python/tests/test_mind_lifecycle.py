@@ -16,30 +16,6 @@ from mind import Mind
 logger = logging.getLogger(__name__)
 
 
-def test_dormant_maintenance_preserves_memory_without_archive(caplog):
-    """A missing archive must not make lifecycle maintenance destructive."""
-    from types import SimpleNamespace
-
-    from brainstem.lifecycle import LifecycleMixin
-    from temporal_lobe.concepts import ConceptNetwork
-
-    network = ConceptNetwork()
-    network.add_concept("dormant_marker", confidence=0.8, origin="learned")
-    concept = network.get_concept("dormant_marker")
-    assert concept is not None
-    concept.activation = 0.0
-
-    lifecycle = object.__new__(LifecycleMixin)
-    lifecycle.brain = SimpleNamespace(frontal=SimpleNamespace(network=network))
-    caplog.set_level(logging.ERROR, logger="brainstem.lifecycle")
-
-    lifecycle._archive_dormant_concepts()
-
-    assert network.get_concept("dormant_marker") is not None
-    assert network.size == 1
-    assert "no concept archive is attached" in caplog.text
-
-
 # ======================================================================
 # From tests/test_mind_lifecycle.py
 # ======================================================================
@@ -1037,59 +1013,73 @@ def test_shutdown_warning_reports_how_long_it_waited() -> None:
     assert "did not exit within" in src, "the warning must name the budget it exceeded"
 
 
-def test_crystallize_urges_refuses_when_stopping(tmp_path):
-    """No urge crystallizes into an intention once stop() latches.
+def test_act_on_volition_refuses_when_stopping(tmp_path):
+    """No new volition action is admitted once stop() latches.
 
-    The cycle can evaluate an urge just before Ctrl+C; crystallization
-    must not let that wanting reach the executive during teardown,
-    where a formed intention would outlive the stores being closed.
+    The heartbeat can evaluate an urge just before Ctrl+C; the dispatch
+    gate must not let that urge reach a worker during teardown, where it
+    would write into the stores the save is closing.
     """
     mind = Mind(str(tmp_path / "genesis.sock"))
     mind._running = False
-    assert mind._crystallize_urges(["speech"]) == []
+    assert mind._act_on_volition(["speech"]) == []
 
 
-def test_crystallize_urges_refuses_when_suppressed(tmp_path):
+def test_act_on_volition_refuses_when_suppressed(tmp_path):
     """Suppression without shutdown closes the gate just the same."""
     mind = Mind(str(tmp_path / "genesis.sock"))
     mind._suppress_volition = True
-    assert mind._crystallize_urges(["speech"]) == []
+    assert mind._act_on_volition(["speech"]) == []
 
 
-def test_advance_volition_episode_refuses_when_stopping(tmp_path):
-    """No episode runs once stop() latches — selection never fires."""
-    mind = Mind(str(tmp_path / "genesis.sock"))
-    mind._running = False
-    calls = []
-    executive = mind._executive()
-    if executive is not None:
-        original = executive.select_intention
-        executive.select_intention = lambda *a, **k: calls.append(1) or original(*a, **k)
-    mind._advance_volition_episode()
-    assert calls == []
+def test_run_volition_action_dropped_when_stopping(tmp_path):
+    """A worker admitted as stop() began drops its action, not the slot.
 
-
-def test_advance_volition_episode_refuses_when_suppressed(tmp_path):
-    mind = Mind(str(tmp_path / "genesis.sock"))
-    mind._suppress_volition = True
-    calls = []
-    executive = mind._executive()
-    if executive is not None:
-        original = executive.select_intention
-        executive.select_intention = lambda *a, **k: calls.append(1) or original(*a, **k)
-    mind._advance_volition_episode()
-    assert calls == []
-
-
-def test_drain_shutdown_workers_quiet_when_idle(tmp_path):
-    """With no think worker in flight the drain is a no-op.
-
-    Volition has no workers to wait on — every act is a bounded
-    episode on the cycle itself — so shutdown only joins the think
-    worker before the state save.
+    The action must not run (it would act through teardown), but the
+    semaphore and the active-set bookkeeping must still be released or
+    the drain in stop() waits on a slot nobody holds.
     """
     mind = Mind(str(tmp_path / "genesis.sock"))
-    assert mind._drain_shutdown_workers()
+    assert mind._volition_sem.acquire(blocking=False)
+    mind._volition_active.add("probe")
+    mind._running = False  # stop() in progress
+
+    ran = []
+    mind._run_volition_action("probe", lambda: ran.append(True))
+
+    assert ran == []
+    assert "probe" not in mind._volition_active
+    assert mind._volition_sem.acquire(blocking=False)  # slot released
+
+
+def test_run_volition_action_dropped_when_suppressed(tmp_path):
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    assert mind._volition_sem.acquire(blocking=False)
+    mind._volition_active.add("probe")
+    mind._suppress_volition = True
+
+    ran = []
+    mind._run_volition_action("probe", lambda: ran.append(True))
+
+    assert ran == []
+    assert "probe" not in mind._volition_active
+
+
+def test_drain_shutdown_workers_names_pending_volition(tmp_path, caplog):
+    """A volition worker that never clears is reported, not hidden.
+
+    The drain used to give up after 5 s and say only "did not clear" —
+    during a Ctrl+C teardown that reads as a hang. It must wait its real
+    budget and name what it was waiting for.
+    """
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    mind._VOLITION_DRAIN_TIMEOUT_S = 0.2
+    mind._volition_active.add("stuck-probe")
+
+    with caplog.at_level(logging.WARNING):
+        assert not mind._drain_shutdown_workers()
+
+    assert "stuck-probe" in caplog.text
 
 
 def test_introduction_claims_empty_profile_name(tmp_path):

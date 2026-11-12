@@ -36,7 +36,7 @@ released in bursts during exercise, social bonding, and pain.
 RECEPTOR ADAPTATION MULTIPLIER
 ════════════════════════════════════════════════════════════════════════
 
-    multiplier = 0.9
+    multiplier = 0.7
 
 MOR downregulates slowly under sustained agonist exposure (chronic
 morphine: "small reduction in total receptor number" — the 70-80%
@@ -51,14 +51,14 @@ COUPLING: HOW OTHERS AFFECT ENDORPHIN (matrix row 8)
 Index order: DA, SRT, NE, ACh, GABA, GLU, CORT, OXY, END, HIST,
 ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 
-    DA  ->  END:  0.10  (weak volume transmission.)
-    SRT  ->  END:  0.10  (weak volume transmission.)
-    NE  ->  END:  -0.10  (weak volume transmission.)
-    GABA  ->  END:  0.10  (relaxation promotes endorphin.)
-    GLU  ->  END:  -0.10  (excitatory drive reduces endorphin.)
+    DA   -> END: +0.05  (weak volume transmission.)
+    SRT  -> END: +0.05  (weak volume transmission.)
+    NE   -> END: -0.05  (weak volume transmission.)
+    GABA -> END: +0.05  (relaxation promotes endorphin.)
+    GLU  -> END: -0.05  (excitatory drive reduces endorphin.)
     CORT -> END: -0.10  (stress suppresses endogenous opioids.)
-    OXY  ->  END:  0.10  (opioid-oxytocin interaction (weak).)
-    BDNF  ->  END:  0.10  (weak volume transmission.)
+    OXY  -> END: +0.05  (opioid-oxytocin interaction (weak).)
+    BDNF -> END: +0.05  (weak volume transmission.)
     ACh  -> END: 0.00   (no direct coupling)
     HIST -> END: 0.00   (no direct coupling)
     ADN  -> END: 0.00   (no direct coupling)
@@ -76,14 +76,14 @@ COUPLING: HOW ENDORPHIN AFFECTS OTHERS (matrix column 8)
     END -> DA :  +0.10  (endorphin disinhibition of DA — mu-opioid
     -> GABA interneuron -> DA disinhibition. Strongest positive
     coupling for DA, appropriate for runner's high.)
-    END  ->  SRT:  0.10  (weak volume transmission.)
-    END  ->  NE:  -0.10  (endorphin calming effect.)
+    END -> SRT:  +0.05  (weak volume transmission.)
+    END -> NE :  -0.05  (endorphin calming effect.)
     END -> GABA:  +0.10  (endorphin promotes GABA — analgesic relaxation.)
-    END  ->  GLU:  -0.10  (excitatory drive reduces endorphin.)
+    END -> GLU:  -0.05  (excitatory drive reduces endorphin.)
     END -> CORT:  -0.10  (endorphin suppresses cortisol — stress analgesia.)
-    END  ->  OXY:  0.10  (opioid-oxytocin interaction (weak).)
-    END  ->  HIST:  -0.10  (weak volume transmission.)
-    END  ->  BDNF:  0.10  (trophic support.)
+    END -> OXY:  +0.05  (opioid-oxytocin interaction (weak).)
+    END -> HIST:  -0.05  (weak volume transmission.)
+    END -> BDNF:  +0.05  (trophic support.)
     END -> ACh:  0.00   (no direct coupling)
     END -> ADN:  0.00   (no direct coupling)
     END -> ECB:  0.00   (no direct coupling)

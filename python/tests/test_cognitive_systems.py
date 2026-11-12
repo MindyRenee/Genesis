@@ -3506,9 +3506,6 @@ def _broadcast_holder(**overrides):
         def post(self, text, author=None):
             posts.append((text, author))
 
-        def post_reply(self, channel_id, message_id, text):
-            posts.append(("reply", channel_id, message_id, text))
-
         def post_image(self, png, caption="", author=None, filename="x.png"):
             posts.append(("image", caption, author, filename, len(png)))
 
@@ -3518,19 +3515,10 @@ def _broadcast_holder(**overrides):
     said: list[str] = []
     emitted: list[tuple] = []
     # Her page lives in the outer world — the holder's world carries
-    # a channel whose feed collects the posts. The channel stub
-    # mirrors worlds.channel.Channel.reply: the write-back lands on
-    # the message's own channel through the bot path.
-    feed = _Feed()
-    channel = SimpleNamespace(feed=feed, listener=None, bot_id=None)
-    channel.reply = lambda message, text: feed.post_reply(
-        str(message.get("channel_id") or ""),
-        str(message.get("id") or "") or None,
-        text,
-    )
+    # a channel whose feed collects the posts.
     world = SimpleNamespace(
         it_said=lambda t: said.append(t),
-        channel=channel,
+        channel=SimpleNamespace(feed=_Feed(), listener=None, bot_id=None),
     )
     network = SimpleNamespace(
         most_activated=lambda n: [("curiosity", 0.9)],
@@ -3547,7 +3535,6 @@ def _broadcast_holder(**overrides):
         _is_sleeping=False,
         _is_meditating=False,
         _is_teaching=False,
-        _in_game=False,
         _last_broadcast_seed=None,
         brain=SimpleNamespace(frontal=frontal),
         feel=lambda: SimpleNamespace(valence=0.2),
@@ -3556,9 +3543,7 @@ def _broadcast_holder(**overrides):
     )
     holder._emit_live_thought = lambda kind, content, **kw: emitted.append((kind, content))
     holder._broadcast_topic = lambda: VolitionMixin._broadcast_topic(holder)
-    holder._public_share = lambda text, reply_to=None: VolitionMixin._public_share(
-        holder, text, reply_to
-    )
+    holder._public_share = lambda text: VolitionMixin._public_share(holder, text)
     for key, value in overrides.items():
         if key == "channel":
             holder.world.channel = value
@@ -3875,18 +3860,13 @@ def test_hear_channel_perceives_public_speech() -> None:
 
 def test_hear_channel_replies_when_addressed() -> None:
     """Her name in a public message → she answers through a full
-    respond turn, and the answer writes back to the channel the
-    message came from."""
+    respond turn, and the answer is a public share."""
     from temporal_lobe.events import EventKind
 
     _holder, posts, world, emitted, calls = _channel_holder()
-    world._channel_heard(
-        "amy",
-        "hey genesis, what are you?",
-        {"id": "1", "channel_id": "555"},
-    )
+    world._channel_heard("amy", "hey genesis, what are you?", {"id": "1"})
     assert calls == ["(public channel) amy: hey genesis, what are you?"]
-    assert posts == [("reply", "555", "1", "her answer")]
+    assert posts == [("her answer", "Genesis")]
     assert emitted[-1] == ("broadcast", "her answer")
     uttered = [e.content for e in world.recent_events() if e.kind == EventKind.UTTERANCE]
     assert uttered == ["her answer"]
@@ -3899,42 +3879,20 @@ def test_hear_channel_reply_to_her_post_addresses_her() -> None:
     world._channel_heard(
         "amy",
         "this is lovely",
-        {"id": "2", "channel_id": "555", "referenced_message": {"webhook_id": "w1"}},
+        {"id": "2", "referenced_message": {"webhook_id": "w1"}},
     )
     assert calls == ["(public channel) amy: this is lovely"]
-    assert posts == [("reply", "555", "2", "her answer")]
-
-
-def test_hear_channel_reply_to_her_bot_post_addresses_her() -> None:
-    """Replies posted through the bot carry her bot id on the
-    referenced author — a reply to one of those addresses her too."""
-    _holder, posts, world, _e, calls = _channel_holder()
-    world.channel.bot_id = "b1"
-    world._channel_heard(
-        "amy",
-        "this is lovely",
-        {
-            "id": "3",
-            "channel_id": "555",
-            "referenced_message": {"author": {"id": "b1"}},
-        },
-    )
-    assert calls == ["(public channel) amy: this is lovely"]
-    assert posts == [("reply", "555", "3", "her answer")]
+    assert posts == [("her answer", "Genesis")]
 
 
 def test_hear_channel_reply_pacing() -> None:
     """A second addressed message inside the window is still heard —
     it just isn't answered twice."""
     _holder, posts, world, _emitted, calls = _channel_holder()
-    world._channel_heard(
-        "amy", "genesis are you there?", {"id": "1", "channel_id": "555"}
-    )
-    world._channel_heard(
-        "amy", "genesis did you hear me?", {"id": "2", "channel_id": "555"}
-    )
+    world._channel_heard("amy", "genesis are you there?", {"id": "1"})
+    world._channel_heard("amy", "genesis did you hear me?", {"id": "2"})
     assert calls == ["(public channel) amy: genesis are you there?"]
-    assert posts == [("reply", "555", "1", "her answer")]
+    assert posts == [("her answer", "Genesis")]
     assert len(_heard_speech(world)) == 2
 
 
@@ -3971,6 +3929,35 @@ def _board_holder(**overrides):
             BrainWave.BETA1: 0.40,
         },
         dominant=BrainWave.BETA1,
+    )
+    probe = SimpleNamespace(
+        carrier_freq=13.7,
+        throughput_mean=1_204_882.0,
+        jitter_cv=0.04,
+        irq_rate=812.0,
+        carrier_coherence=0.83,
+        # v3 electrical + Maxwell fields — None where a sensor is
+        # absent (the stub mirrors FieldProbeSignature's shape).
+        power_watts=24.3,
+        power_sensor_hz=89.0,
+        rail_volts=12.9,
+        supply_amps=None,
+        power_lag=0.02,
+        power_coherence=0.4,
+        carrier_current_a=0.05,
+        b_est_ut=None,
+        e_ind_vm=None,
+        radiated_pwr_w=None,
+        # v4 radio — absent radios stay None and print nothing.
+        rf_rssi_dbm=None,
+        rf_noise_dbm=None,
+        rf_bytes_s=None,
+        bt_events_s=None,
+        bt_rssi_dbm=None,
+        rf_retry_rate=None,
+        rf_fail_rate=None,
+        rf_beacon_loss_rate=None,
+        rf_tx_mbps=None,
     )
     ions = SimpleNamespace(
         membrane_potential_mv=-64.2,
@@ -4023,6 +4010,7 @@ def _board_holder(**overrides):
         _last_emitted=("thought", "a passing idea"),
         client=SimpleNamespace(
             get_state=lambda: core,
+            get_field_probe=lambda: probe,
             get_ion_summary=lambda: ions,
         ),
         feel=lambda c: SimpleNamespace(label="calm"),
@@ -4041,6 +4029,7 @@ def _board_holder(**overrides):
     holder._channel_board_text = board.board_text
     holder._board_core_lines = board._core_lines
     holder._board_neuro_lines = board._neuro_lines
+    holder._board_field_lines = board._field_lines
     holder._board_cell_line = board._cell_line
     holder._board_footer_lines = board._footer_lines
     for key, value in overrides.items():
@@ -4069,9 +4058,10 @@ def test_channel_board_shows_live_vitals() -> None:
     assert "ear on" in text
     assert "hb 36,412" in text and "id 8841" in text and "age 0." in text
     assert "[thought] a passing idea" in text
-    # frequency, cell, proof, growth, drive — the physics and
+    # frequency, field, cell, proof, growth, drive — the physics and
     # the math, not narration
     assert "beta1 12-15 Hz" in text
+    assert "carrier 13.7 Hz" in text and "coh 0.83" in text
     assert "Vm -64.2 mV" in text and "atp 0.77" in text
     assert "1 open" in text and "1 verified" in text and "1 refuted" in text
     assert "#a1b2c3d4e5" in text
@@ -4079,83 +4069,15 @@ def test_channel_board_shows_live_vitals() -> None:
     assert "research 0.62" in text and "draw 0.41" in text
 
 
-def test_channel_board_field_row_is_the_computed_signature() -> None:
-    """The field row is Maxwell on her own coherence — carrier Hz,
-    coherence, B/E/P in SI units — never a probe reading. A daemon
-    without the channel shows no row; an integrating field says so."""
-    import math
-    from types import SimpleNamespace
-
-    sig = SimpleNamespace(
-        signature_present=True,
-        integration_present=True,
-        quasi_static=True,
-        omega_rad_s=2.0 * math.pi * 11.0,
-        coherent_current_a=0.03,
-        consensus_speed=0.3,
-        dipole_moment_am2=1.0e-9,
-        b_axial_t=1.5e-9,
-        e_induction_vm=2.0e-8,
-        radiated_power_w=1.0e-40,
-        disagreement=0.01,
-        temperature=0.05,
-    )
-    holder, boards = _board_holder()
-    holder.client = SimpleNamespace(
-        get_state=holder.client.get_state,
-        get_ion_summary=holder.client.get_ion_summary,
-        get_field_signature=lambda: sig,
-    )
-    holder._update_channel_board(1000.0)
-    text = boards[0]
-    assert "field" in text
-    assert "11.000 Hz" in text
-    assert "coh" in text
-    assert "B 1.5e-09 T" in text
-    assert "E 2.0e-08 V/m" in text
-    assert "P 1.0e-40 W" in text
-
-    # Integrating but unsigned: honest interim row, no fake numbers.
-    integrating = SimpleNamespace(
-        signature_present=False,
-        integration_present=True,
-        quasi_static=False,
-        omega_rad_s=0.0,
-        coherent_current_a=0.0,
-        consensus_speed=0.0,
-        dipole_moment_am2=0.0,
-        b_axial_t=0.0,
-        e_induction_vm=0.0,
-        radiated_power_w=0.0,
-        disagreement=0.042,
-        temperature=0.11,
-    )
-    holder.client = SimpleNamespace(
-        get_state=holder.client.get_state,
-        get_ion_summary=holder.client.get_ion_summary,
-        get_field_signature=lambda: integrating,
-    )
-    holder._update_channel_board(1046.0)  # past the 45 s cadence
-    assert "field    integrating d 0.042" in boards[1]
-    assert "Hz" not in boards[1].split("field", 1)[1].split("\n")[0]
-
-    # No channel at all: no row — absence is not a zero.
-    holder.client = SimpleNamespace(
-        get_state=holder.client.get_state,
-        get_ion_summary=holder.client.get_ion_summary,
-    )
-    holder._update_channel_board(1092.0)
-    assert "field" not in boards[2]
-
-
 def test_channel_board_degrades_without_channels() -> None:
-    """Ions failing, no bench, no volition — the
+    """Field probe off, ions failing, no bench, no volition — the
     board still renders; absent channels say so, never fake a zero."""
     from types import SimpleNamespace
 
     holder, boards = _board_holder()
     holder.client = SimpleNamespace(
         get_state=holder.client.get_state,
+        get_field_probe=lambda: None,
         get_ion_summary=lambda: (_ for _ in ()).throw(OSError()),
     )
     holder._research_workbench = lambda: SimpleNamespace(threads=list)
@@ -4163,6 +4085,7 @@ def test_channel_board_degrades_without_channels() -> None:
     holder.volition = SimpleNamespace(state=dict)
     holder._update_channel_board(1000.0)
     text = boards[0]
+    assert "field    probe off" in text
     assert "cell " not in text and "proof " not in text and "drive " not in text
     assert "grow     0 concepts" in text and "plast 0.61" in text
 

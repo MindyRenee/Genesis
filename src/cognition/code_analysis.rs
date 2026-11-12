@@ -695,11 +695,11 @@ impl UnitVisitor {
 
     fn extract_references(&self, ty: &syn::Type) -> Vec<String> {
         let mut refs = Vec::new();
-        Self::collect_type_refs(ty, &mut refs);
+        self.collect_type_refs(ty, &mut refs);
         refs
     }
 
-    fn collect_type_refs(ty: &syn::Type, refs: &mut Vec<String>) {
+    fn collect_type_refs(&self, ty: &syn::Type, refs: &mut Vec<String>) {
         match ty {
             syn::Type::Path(p) => {
                 let name = p
@@ -715,24 +715,24 @@ impl UnitVisitor {
                     if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
                         for arg in &args.args {
                             if let syn::GenericArgument::Type(t) = arg {
-                                Self::collect_type_refs(t, refs);
+                                self.collect_type_refs(t, refs);
                             }
                         }
                     }
                 }
             }
             syn::Type::Reference(r) => {
-                Self::collect_type_refs(&r.elem, refs);
+                self.collect_type_refs(&r.elem, refs);
             }
             syn::Type::Array(a) => {
-                Self::collect_type_refs(&a.elem, refs);
+                self.collect_type_refs(&a.elem, refs);
             }
             syn::Type::Slice(s) => {
-                Self::collect_type_refs(&s.elem, refs);
+                self.collect_type_refs(&s.elem, refs);
             }
             syn::Type::Tuple(t) => {
                 for e in &t.elems {
-                    Self::collect_type_refs(e, refs);
+                    self.collect_type_refs(e, refs);
                 }
             }
             _ => {}

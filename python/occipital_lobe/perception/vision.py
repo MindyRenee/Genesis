@@ -12,9 +12,9 @@ The pipeline:
         |
         v
     thalamic relay gate     -> the body's GET_OPTIC_STATE relay_gain;
-        |                      the mind's corticothalamic gain around a
-        |                      full-open base — a deeply attenuated relay
-        |                      still means a blind look (status "gated")
+        |                      NREM/REM blocks transmission at the
+        |                      thalamus — a look through a closed gate
+        |                      is a blind look (status "gated")
         v
     Eye optics              -> the body's own aperture (pupil_mm):
         |                      retinal irradiance gain + depth-of-field
@@ -57,10 +57,12 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
+from occipital_lobe import V1Model, VisualField
 from occipital_lobe.v1 import name_color
+from temporal_lobe import DetectedObject, ObjectRecognizer
 from temporal_lobe.concepts import RelationType
 
 from genesis_client.optic_nerve import (
@@ -81,9 +83,6 @@ from genesis_client.protocol import (
     EMOTIONAL_TAG_SIZE,
 )
 from genesis_client.swallow import note_swallowed
-from infrastructure.config import default_data_dir
-from occipital_lobe import V1Model, VisualField
-from temporal_lobe import DetectedObject, ObjectRecognizer
 
 from ..epipolar import EpipolarProcessor, TwoViewReport
 from . import illumination, optics
@@ -95,26 +94,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Below this relay gain the thalamus is effectively blocking sensory
-# transmission. Current daemons never go this low — the relay is
-# corticothalamic feedback around a full-open base (floor 0.6) — but
-# a daemon from before the gate change reports the old stage-driven
-# values (NREM ~0.02, REM ~0.08), where this threshold is exactly the
-# sleep boundary it was written for.
+# Below this relay gain the thalamus is blocking sensory transmission
+# (TRN inhibition in NREM; the near-block of REM). NREM sits near 0.02,
+# REM near 0.08, drowsy/overwhelmed and waking phases well above 0.15 —
+# so the gate is effectively the sleep boundary, not an arousal ramp.
 _THALAMIC_BLOCK = 0.15
-
-
-def _face_recognition_input(sensor_rgb: np.ndarray, mirror: bool) -> np.ndarray:
-    """Return the captured sensor image in the canonical outward view.
-
-    Face models are trained on ordinary photographs. Feed them the
-    captured image, not the later synthetic pupil/defocus or Retinex
-    transforms used to model other cortical stages: those transforms
-    can distort the embedding and turn a detectable face into an
-    unmatchable one. The camera has already applied its physical optics.
-    """
-    return optics.mirror_view(sensor_rgb) if mirror else sensor_rgb
-
 
 # The afferent nerves cortex can look through: the body's own eye and
 # the screen-capture nerve a relay feeds (``genesis_optic_nerve`` and
@@ -133,11 +117,6 @@ _OPTIC_ENGAGEMENT_HALF_LIFE_S = 20.0
 # the hippocampus stores what is new or what is attended; a static
 # mundane view is neither.
 _REENCODE_SALIENCE = 0.7
-
-# Nominal chin-to-crown face height (m) — the canonical metric size
-# that makes the attended face's angular size an accommodation
-# distance under the uncalibrated pinhole convention (f_px = max(h, w)).
-_FACE_HEIGHT_M = 0.22
 
 
 @dataclass
@@ -170,10 +149,6 @@ class VisionScene:
     # Eyelid transmission during this look — 1.0 open, ~0.5 drowsy.
     # The retinal image was already dimmed by it.
     lid: float = 1.0
-    # The mathematical eye's observables for this look — ocular state,
-    # cortical orientation energy, fixation — from the Rust organ
-    # (`genesis_body.VisionSystem`). Empty when the extension is absent.
-    eye: dict = field(default_factory=dict)
     # Illumination decomposition — the light field this look was seen
     # under. ``illuminant`` names the light's colour; shadow_* the
     # share of the field reading as shadow and where its mass sits.
@@ -237,7 +212,6 @@ class VisionScene:
             "shadow_direction": self.shadow_direction,
             "focus_m": self.focus_m,
             "lid": self.lid,
-            "eye": dict(self.eye),
         }
 
     def memory_text(self) -> str:
@@ -300,14 +274,6 @@ class Vision:
         # Created lazily on first use so we don't pay the Gabor
         # dictionary construction cost if there's no camera.
         self._occipital: V1Model | None = occipital
-        # The mathematical eye (Rust `self_::vision` via `genesis_body`) —
-        # optics → phototransduction → ganglion → V1 fields stepped on real
-        # frames. Lazily built on the first frame; absent when the
-        # extension module is not installed. The extension object is
-        # untyped (Any) — the Rust class's own interface.
-        self._eye: Any = None
-        self._eye_dims: tuple[int, int] | None = None
-        self._eye_last_t: float | None = None
         self._on_gamma: Callable[[float], None] | None = None
         # Facing orientation — which handedness her reports carry.
         # False (default): looking out — the raw capture reads the
@@ -334,13 +300,6 @@ class Vision:
         # "face:N" cluster ids for familiar strangers. This is what the
         # dyadic signature keys on; a name is optional, a person is not.
         self._last_person_keys: list[str] = []
-        # Accommodation bookkeeping — the largest detected face's bbox
-        # height in pixels (0 when no face is in the field), how many
-        # consecutive looks have been face-free, and the last focus
-        # distance pushed to the body's ciliary servo (metres).
-        self._last_face_px = 0
-        self._face_free_looks = 0
-        self._focus_last_m: float | None = None
         # Dorsal stream (MSTd): two-view epipolar geometry between
         # successive looks — self-motion and parallax depth. Lazily
         # created on first use, like the other sublayers.
@@ -360,18 +319,6 @@ class Vision:
         # Lazily created on first use. Simulates the enzyme kinetics that
         # convert photon absorption into electrical signals.
         self._phototransduction: PhototransductionCascade | None = None
-        # Optional calibrated bridge to the shared self/inner/outer causal
-        # workspace. Disabled until the caller supplies a valid coordinate
-        # transform; raw camera pixels are never treated as world position.
-        self._visual_spacetime_bridge = None
-
-    def set_visual_spacetime_bridge(self, bridge) -> None:
-        """Connect a calibrated VisualSpacetimeBridge to this visual cortex."""
-        from occipital_lobe.visual_spacetime import VisualSpacetimeBridge
-
-        if not isinstance(bridge, VisualSpacetimeBridge):
-            raise TypeError("bridge must be a VisualSpacetimeBridge")
-        self._visual_spacetime_bridge = bridge
 
     def set_gamma_callback(self, callback: Callable[[float], None]) -> None:
         """Register a callback for V1 gamma power updates.
@@ -396,8 +343,7 @@ class Vision:
         """Return whether a live optic-nerve feed can be read.
 
         ``nerve`` selects the afferent: ``"optic"`` is the body's own
-        eye (a found feed is cached; absence is probed again, since the
-        companion app may connect after the first look); any other
+        eye (its availability is probed once and cached); any other
         entry in ``NERVE_SEGMENTS`` — or a bare segment name — is
         probed live by attach, since a relay comes and goes.
         """
@@ -407,20 +353,16 @@ class Vision:
             except OSError:
                 return False
             return True
-        # Every physical camera frame arrives through the daemon-owned
-        # optic segment. Android's Camera2 adapter is only a sensor
-        # driver; it does not bypass this shared afferent.
-        if self._available is not True:
+        if self._available is None:
             try:
-                try:
-                    img = latest_frame(copy=True)
-                except (OSError, FileNotFoundError) as e:
-                    # No shared-memory eye segment means the physical eye
-                    # has not published a frame. This is an ordinary absent-eye
-                    # condition, not a swallowed runtime fault.
-                    logger.debug("no optic-nerve segment: %s", e)
-                    img = None
+                img = latest_frame(copy=True)
                 self._available = img is not None and img.size > 0
+            except (OSError, FileNotFoundError) as e:
+                # No frame on disk — no camera, or the body's eye is
+                # dark. That is the documented text-only degradation,
+                # so it must not be tallied beside genuine faults.
+                logger.debug("no vision frame available: %s", e)
+                self._available = False
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "occipital_lobe.perception.vision.is_available",
@@ -441,7 +383,7 @@ class Vision:
         Returns None if face recognition models aren't available.
         """
         if self._face_recognizer is None:
-            self._face_recognizer = FaceRecognizer(data_dir=default_data_dir())
+            self._face_recognizer = FaceRecognizer()
         if not self._face_recognizer.is_available():
             return None
         return self._face_recognizer
@@ -578,7 +520,6 @@ class Vision:
         n_unknown_faces = 0
         person_keys: list[str] = []
         recognizer = self._get_face_recognizer()
-        self._last_face_px = 0
         if recognizer is not None:
             try:
                 faces = recognizer.detect_faces(rgb)
@@ -592,11 +533,6 @@ class Vision:
                     # stranger's presence registers like anyone's.
                     if f.person_key:
                         person_keys.append(f.person_key)
-                if faces:
-                    # The largest face's angular size is what the
-                    # ciliary servo accommodates to — the attended
-                    # social stimulus owns the focal plane.
-                    self._last_face_px = max(f.bbox[3] for f in faces)
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "occipital_lobe.perception.vision._recognize_faces",
@@ -668,15 +604,7 @@ class Vision:
         if not self.is_available(nerve):
             return VisionScene(status="unavailable", relay_gate=relay_gate, nerve=nerve)
         try:
-            try:
-                frame = latest_frame(copy=True, name=NERVE_SEGMENTS.get(nerve, nerve))
-            except (OSError, FileNotFoundError) as e:
-                # No shared-memory segment means no current retinal frame.
-                # The Android sensor adapter must publish through this bus too.
-                logger.debug("no optic-nerve segment for see(): %s", e)
-                frame = None
-            if frame is None and nerve == "optic":
-                return VisionScene(status="unavailable", relay_gate=relay_gate, nerve=nerve)
+            frame = latest_frame(copy=True, name=NERVE_SEGMENTS.get(nerve, nerve))
             if frame is None:
                 return VisionScene(status="mid_update", nerve=nerve)
 
@@ -703,7 +631,6 @@ class Vision:
                 self.mirror if mirror is None else mirror,
                 nerve,
             )
-            scene.eye = self._step_eye(rgb)
             scene.nerve = nerve
             return scene
         except Exception as e:  # noqa: BLE001
@@ -713,133 +640,14 @@ class Vision:
             )
             return VisionScene(status="unprocessed")
 
-    def _step_eye(self, rgb: np.ndarray) -> dict:
-        """Step the mathematical eye over this frame; report its observables.
-
-        The Rust organ (``genesis_body.VisionSystem`` — ``self_::vision``)
-        runs the phototransduction/cortical field dynamics; this returns a
-        compact observable summary, not the full planes. An absent
-        extension module or a stepping fault is an empty report — the
-        scene pipeline carries on without it.
-        """
-        try:
-            import genesis_body
-        except ImportError:
-            return {}
-        try:
-            h, w = rgb.shape[:2]
-            # Downsample stride so the field stays ≤64 loci per axis.
-            sy = max(1, -(-h // 64))
-            sx = max(1, -(-w // 64))
-            small = np.ascontiguousarray(rgb[::sy, ::sx])
-            dims = (small.shape[1], small.shape[0])
-            if self._eye is None or self._eye_dims != dims:
-                self._eye = genesis_body.VisionSystem(*dims)
-                self._eye_dims = dims
-                self._eye_last_t = None
-            now = time.monotonic()
-            dt = 0.05 if self._eye_last_t is None else min(0.25, max(0.005, now - self._eye_last_t))
-            self._eye_last_t = now
-            out = self._eye.step(small.tobytes(), dt)
-            cortical = out.get("cortical") or []
-            n = len(cortical[0]) if cortical else 0
-            return {
-                "mean_luminance": out.get("mean_luminance", 0.0),
-                "lid": out.get("lid", 0.0),
-                "pupil_mm": out.get("pupil_mm", 0.0),
-                "irradiance_gain": out.get("irradiance_gain", 0.0),
-                "gaze": out.get("gaze"),
-                "cortical_energy": [
-                    sum(plane) / n for plane in cortical
-                ] if n else [],
-                "grid": [small.shape[1], small.shape[0]],
-            }
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("occipital_lobe.perception.vision._step_eye", e)
-            return {}
-
-    def see_frame(
-        self,
-        rgb: np.ndarray,
-        client=None,
-        emotion: EmotionalState | None = None,
-        network=None,
-        mirror: bool | None = None,
-        nerve: str = "android",
-    ) -> VisionScene:
-        """Process an externally captured RGB frame through the full vision pipeline.
-
-        This is the frame-injection counterpart to :meth:`see`: Android or
-        another camera adapter can supply pixels without taking ownership of
-        Genesis's shared-memory optic nerve. The same thalamic gate, optical
-        stages, recognition, scene integration, and callbacks still apply.
-
-        Args:
-            rgb: RGB image with shape (height, width, 3) and dtype uint8.
-            client: Optional body client used for relay state, chemistry, and memory.
-            emotion: Optional current emotional state for episodic tagging.
-            network: Optional semantic concept network.
-            mirror: Facing orientation; defaults to this instance's setting.
-            nerve: Provenance label for this frame source.
-
-        Returns:
-            A structured VisionScene. Invalid input returns status "unprocessed".
-        """
-        gate = self._optic_gate(client)
-        if isinstance(gate, VisionScene):
-            gate.nerve = nerve
-            return gate
-
-        relay_gate, pupil_mm, focus_m, lid = gate
-        if (
-            not isinstance(rgb, np.ndarray)
-            or rgb.ndim != 3
-            or rgb.shape[2] != 3
-            or rgb.shape[0] < 2
-            or rgb.shape[1] < 2
-            or rgb.dtype != np.uint8
-        ):
-            return VisionScene(status="unprocessed", relay_gate=relay_gate, nerve=nerve)
-
-        try:
-            scene = self._analyze_frame(
-                rgb,
-                pupil_mm,
-                focus_m,
-                lid,
-                relay_gate,
-                client,
-                emotion,
-                network,
-                self.mirror if mirror is None else mirror,
-                nerve,
-            )
-            scene.eye = self._step_eye(rgb)
-            scene.nerve = nerve
-            return scene
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "occipital_lobe.perception.vision.see_frame",
-                e,
-            )
-            return VisionScene(
-                status="unprocessed",
-                relay_gate=relay_gate,
-                nerve=nerve,
-            )
-
     def _optic_gate(self, client) -> tuple[float | None, float, float | None, float] | VisionScene:
-        """The thalamic relay read — the body's own account of the
-        optic nerve's gate.
+        """The thalamic gate — the body's own read of the optic nerve.
 
-        ``relay_gain`` is the corticothalamic feedback the mind itself
-        pushes: attention gain around a full-open base, never a
-        sleep-stage switch. The threshold below still honours a daemon
-        from before the gate change, whose stage-driven relay did
-        close in NREM/REM — a look through a closed gate is a blind
-        look. A daemon that predates the channel reports no gate and
-        seeing proceeds ungated — the gate is a body signal, not a
-        mind construct.
+        The TRN blocks transmission during NREM/REM upstream of
+        cortex, so the relay is consulted before the frame is: a
+        look through a closed gate is a blind look. A daemon that
+        predates the channel reports no gate and seeing proceeds
+        ungated — the gate is a body signal, not a mind construct.
 
         Returns the (relay_gate, pupil_mm, focus_m, lid) tuple, or a
         gated ``VisionScene`` when transmission is blocked.
@@ -890,10 +698,6 @@ class Vision:
         # report reads the way they experience the scene. Whatever
         # orientation this look takes holds for everything
         # downstream: regions, directions and motion share it.
-        # Keep the captured sensor image for the face models. Synthetic
-        # eye optics and Retinex are useful for cortical scene analysis,
-        # but should not alter the photographic input used for identity.
-        sensor_rgb = rgb
         if mirror:
             rgb = optics.mirror_view(rgb)
 
@@ -936,10 +740,15 @@ class Vision:
         objects, object_colors = self._recognize_objects(rgb)
 
         # ── Face recognition (FFA) ─────────────────────────────
-        # Identity is handedness-independent. Use the captured sensor
-        # image in the canonical outward view, before synthetic optics
-        # and Retinex alter facial texture and colour statistics.
-        faces_rgb = _face_recognition_input(sensor_rgb, mirror)
+        # Identity is handedness-independent, but the detector and
+        # SFace embeddings are trained on standard photographs —
+        # the looking-out frame is the canonical view. Registration
+        # and matching always run on it so a mirrored look can't
+        # flip who she knows; only her *report* carries the facing
+        # orientation. (Un-mirroring the adapted frame is exact:
+        # von Kries gain is per-pixel and the illuminant map
+        # mirrors with its input.)
+        faces_rgb = optics.mirror_view(rgb) if mirror else rgb
         face_names, n_unknown_faces = self._recognize_faces(faces_rgb)
 
         # ── V1 sparse coding (sublayer: edges, gamma) ──────────
@@ -948,14 +757,6 @@ class Vision:
         # ── MSTd (dorsal stream): two-view geometry of this look
         # against the last — self-motion, heading, parallax depth
         two_view = self._two_view_geometry(rgb, nerve)
-        if two_view is not None and self._visual_spacetime_bridge is not None:
-            try:
-                # Camera report timestamps and the shared workspace use
-                # the same monotonic clock; coordinate conversion remains
-                # the responsibility of the explicitly calibrated bridge.
-                self._visual_spacetime_bridge.publish(two_view, time_s=time.monotonic())
-            except Exception as error:  # noqa: BLE001 — causal telemetry must not blind vision
-                note_swallowed("occipital_lobe.perception.vision.visual_spacetime", error)
 
         # ── Package the structured scene percept ────────────────
         scene = _build_scene(
@@ -988,52 +789,7 @@ class Vision:
             two_view,
         )
 
-        # Accommodation — the ciliary servo tracks what she attends
-        # to. The lens is powered for the largest detected face.
-        self._accommodate(client, rgb.shape[0], rgb.shape[1])
-
         return scene
-
-    def _accommodate(self, client, frame_h: int, frame_w: int) -> None:
-        """Drive the body's ciliary servo toward the attended face.
-
-        Accommodation follows the attended stimulus: the largest
-        detected face is the social stimulus that owns the focal
-        plane, and faces are the only object class with a canonical
-        metric size (~0.22 m chin-to-crown), so the distance estimate
-        is honest — a similar-triangles pinhole read using the same
-        ``f = max(h, w)`` uncalibrated intrinsics
-        ``epipolar.camera_matrix`` falls back to.
-
-        Pushes only on a material change (~15%) so the servo isn't
-        hunting every look; a run of face-free looks releases the
-        lens to its far rest rather than holding a near spasm. A
-        daemon that predates ``SET_FOCUS`` answers False — an absent
-        channel, skipped.
-        """
-        if client is None:
-            return
-        face_px = self._last_face_px
-        if face_px > 0:
-            self._face_free_looks = 0
-            focal_px = float(max(frame_h, frame_w))
-            dist = _FACE_HEIGHT_M * focal_px / face_px
-            dist = max(0.15, min(20.0, dist))
-            last = self._focus_last_m
-            if last is None or abs(dist - last) / max(last, 1e-6) > 0.15:
-                try:
-                    if client.set_focus(dist):
-                        self._focus_last_m = dist
-                except Exception:  # noqa: BLE001
-                    pass
-        else:
-            self._face_free_looks += 1
-            if self._face_free_looks >= 3 and self._focus_last_m is not None:
-                try:
-                    if client.set_focus(0.0):
-                        self._focus_last_m = None
-                except Exception:  # noqa: BLE001
-                    pass
 
     def _integrate_scene(
         self,
@@ -1169,11 +925,9 @@ class Vision:
         the layer-6 V1→dLGN feedback, decayed toward the last look.
 
         The heartbeat pushes this to the body via ``set_optic_gain``;
-        the body clamps it and scales the relay's gain around a
-        full-open base — the sleep-stage gate is the lid she sets
-        herself, not a phase floor in the nerve. It decays with a
-        20 s half-life — attention gain persists only while cortex
-        keeps attending vision.
+        the body clamps it and scales the relay within what the sleep
+        stage permits. It decays with a 20 s half-life — attention
+        gain persists only while cortex keeps attending vision.
         """
         if self._optic_engagement_at <= 0.0:
             return 0.0

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
+import threading
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -26,11 +28,27 @@ from infrastructure.text import is_blank
 
 logger = logging.getLogger(__name__)
 
+# Urge workers run below the interactive path's CPU priority — a
+# running bug scan or code-learning burst must lose every scheduler
+# handoff to a live think(), not coin-flip it for the core.
+_VOLITION_NICE = 10
+
 # Minimum seconds between public-channel replies. A channel can
 # storm mentions; she answers when addressed but not faster than
 # this — the message is still heard even when the reply gate is
 # closed.
 _CHANNEL_REPLY_MIN_S = 45.0
+
+# The voluntary lid's held positions — openness [0, 1] over SET_LID.
+# _LID_REST is a shut eye, not a shutter: a few percent of light
+# still leaks, matching the phase-closed transmission the body
+# already models for sleep.
+_LID_OPEN = 1.0
+_LID_REST = 0.05
+
+# Seconds a self-chosen eye-rest holds the lid down before
+# releasing it back to the phase's own position.
+_REST_EYES_HOLD_S = 20.0
 
 # Accumulator noise σ per √s on every registered urge — the
 # stochastic fluctuation that makes near-threshold crossings arrive
@@ -45,21 +63,21 @@ _URGE_FLUCTUATION = 0.03
 # full-corpus pass the /learn-code command performs.
 _LEARN_CODE_BOUT = 25
 
-# Cholinergic encoding floor — Hasselmo's encoding/consolidation
-# switch (Hasselmo 1999, 2006): high acetylcholine suppresses
-# recurrent feedback so new material encodes without interference
-# from stored knowledge; low tone releases that suppression and the
-# same circuits consolidate. The body's own calibration puts wake
-# ACh ≈ 0.58 and NREM ≈ 0.34 (src/state/basal_forebrain.rs
-# release_target), so ~0.45 is the crossover — encoding below it
-# both degrades and displaces the consolidation the low tone is for.
-_ACH_ENCODING_FLOOR = 0.45
 
-# Mean sentiment of a presence's recent exchanges below which a bid
-# is pestering, not reaching out — approach–avoidance gating on the
-# partner's expressed affect, not her own chemistry. Empty history
-# reads 0.0, so a stranger is never written off.
-_REACH_OUT_SENTIMENT_FLOOR = -0.3
+def _lower_thread_priority(nice: int = _VOLITION_NICE) -> None:
+    """Drop the calling thread's CPU priority (Linux per-thread nice).
+
+    ``os.setpriority`` with the native TID lowers only this thread —
+    lowering needs no privilege. Foreground cognition (think(),
+    respond()) keeps nice 0, so under load every GIL/scheduler handoff
+    favors the interactive turn over background urge work.
+    """
+    if not sys.platform.startswith("linux"):
+        return
+    try:
+        os.setpriority(os.PRIO_PROCESS, threading.get_native_id(), nice)
+    except OSError as e:
+        logger.debug(f"_lower_thread_priority failed: {e}")
 
 
 class VolitionMixin:
@@ -98,13 +116,6 @@ class VolitionMixin:
                 )
             )
 
-        # Engagement scratch state — one entry per live volition
-        # intention objective, holding where a sustained behavior
-        # currently is (which proposal, which game, which stage).
-        # Working memory of an occupation, not a pipeline: each entry
-        # is re-derived from the world every beat.
-        self._engagements: dict[str, dict] = {}
-        self._engagement_seq: dict[str, int] = {}
         return engine
 
     def self_invoke(self, command: str, args: str = "") -> str | None:
@@ -140,14 +151,6 @@ class VolitionMixin:
                 return self.get_mission()
             if command == "/explore":
                 return self.explore_files(args.strip() or None)
-            if command == "/authority":
-                # How much of her policy she delegates to the body's
-                # inference engine — her own dial, not a held wire.
-                try:
-                    authority = float(args.strip())
-                except ValueError:
-                    return None
-                return self.client.set_policy_authority(authority)
             # Default: call the mapped method with no args
             method = getattr(self, method_name, None)
             if method is None:
@@ -187,8 +190,8 @@ class VolitionMixin:
           fatigue, Chaudhuri & Behan, 2000)
         - sustained_activity: time since last rest, normalized (BRAC,
           Kleitman 1963 — ~90 min activity cycles with mandatory rest)
-        - elevated_cortisol: subclinical stress (tonic cortisol above
-          resting ~0.02, below the 0.06 stress-phase gate)
+        - elevated_cortisol: subclinical stress (cortisol 0.20-0.50,
+          below stress phase but above resting)
         """
         idle = max(0.0, time.time() - self._last_interaction_time)
         drives = self._drive_signals()
@@ -393,204 +396,76 @@ class VolitionMixin:
             )
             return 0.0
 
-    # ─── Volition as wanting, not dispatch ──────────────────────────
-    # There are no action threads. A ready urge crystallizes into a
-    # persistent executive intention — the accumulated drive becomes
-    # the objective's priority — and the intention then lives by
-    # executive arbitration: each cycle the Gumbel-softmax competition
-    # (NE-set gain, Beta-posterior reliability, UCB exploration) picks
-    # one winner and the cycle runs exactly one bounded episode of it.
-    # Long behaviors (an experiment waited on, a game played a move
-    # at a time) persist as engagement state and advance one beat per
-    # win; sleep and suppression stall the *expression*, never the
-    # wanting. Subprocesses she launches are ballistic arcs — the
-    # cycle polls them between episodes; their verdicts are events,
-    # not pipeline stages.
+    def _act_on_volition(self, ready: list[str]) -> list[str]:
+        """Run each ready urge action in its own background thread.
 
-    _VOLITION_KINDS = frozenset(
-        {
-            "improve",
-            "speech",
-            "look",
-            "play",
-            "meditate",
-            "draw",
-            "create",
-            "introspect",
-            "self_sleep",
-            "self_mission",
-            "learn",
-            "learn_code",
-            "act",
-            "reach_out",
-            "broadcast",
-            "research",
-            "safeguard",
-            "manual",
-        }
-    )
+        Uses a bounded semaphore so that at most
+        ``MAX_CONCURRENT_VOLITIONS`` actions run at once.
 
-    def _executive(self):
-        frontal = getattr(self.brain, "frontal", None)
-        return getattr(frontal, "executive", None)
-
-    def _ne_gain(self) -> float:
-        """Live norepinephrine read → arbitration inverse temperature.
-
-        Tonic NE tunes cortical signal-to-noise (Aston-Jones &
-        Cohen 2005): high NE sharpens selection toward the leader,
-        low NE diffuses it into exploration. Bounded so a saturated
-        or absent reading degrades to a sane gain, never zero.
+        Heavy CPU activities (improve, create, learn_code) are
+        skipped under PROTECTIVE posture to avoid the self-sustaining
+        stress loop: CPU load → interoception → CRH → cortisol →
+        protective posture → (still running heavy CPU) → more cortisol.
         """
-        try:
-            from genesis_client.protocol import CHEM_NAMES, CHEM_NOREPINEPHRINE
-
-            chem = self.client.get_state().chemicals
-            ne = float(chem.get(CHEM_NAMES[CHEM_NOREPINEPHRINE], 1.0))
-        except Exception:  # noqa: BLE001
-            return 1.0
-        return max(0.2, min(2.5, ne))
-
-    def _volition_objective(self, name: str, executive) -> str | None:
-        """The engagement's objective key — one live intention per urge.
-
-        A terminal intention (completed/abandoned) stays terminal, so a
-        fresh wanting opens a new engagement id rather than resurrecting
-        a closed goal. Any older pending same-kind objective is
-        superseded — two live engagements of one behavior is not a
-        thing a mind does.
-        """
-        base = f"{name}:volition"
-        intentions = getattr(executive, "_intentions", {})
-        current = intentions.get(base)
-        if current is None or current.status == "pending":
-            objective = base
-        else:
-            seq = self._engagement_seq.get(name, 0) + 1
-            self._engagement_seq[name] = seq
-            objective = f"{name}:volition-{seq}"
-        for other in intentions.values():
-            if (
-                other is not current
-                and other.kind == name
-                and other.status == "pending"
-                and other.objective != objective
-            ):
-                other.status = "abandoned"
-                other.revision = "superseded by a newer engagement"
-        return objective
-
-    def _crystallize_urges(self, ready: list[str]) -> list[str]:
-        """Spend ready urges into persistent executive intentions.
-
-        The threshold crossing is the wanting crystallizing: the
-        urge's overshoot sets the intention's priority, the urge is
-        consumed, and the goal now lives by arbitration — chemistry
-        decides what she wants, the executive decides what she does.
-        """
-        executive = self._executive()
-        if executive is None or self._suppress_volition or not self._running:
+        # Suppression or a shutdown that landed after the urge
+        # evaluated must not still admit work — an action spawned
+        # now would run through the teardown and write into stores
+        # the save is closing.
+        if self._suppress_volition or not self._running:
             return []
-        formed: list[str] = []
-        for name in self._filter_ready_urges(ready):
-            if name not in self._VOLITION_KINDS:
-                continue
-            objective = self._volition_objective(name, executive)
-            if objective is None:
-                continue
-            urge = self.volition.urges.get(name)
-            overshoot = 0.0
-            if urge is not None:
-                span = max(1e-6, 1.0 - urge.threshold)
-                overshoot = min(1.0, max(0.0, (urge.value - urge.threshold) / span))
-            try:
-                executive.form_intention(
-                    objective,
-                    reason="urge",
-                    priority=0.55 + 0.4 * overshoot,
-                    confidence=0.6,
-                )
-            except Exception as e:  # noqa: BLE001
-                note_swallowed("mind.volition._crystallize_urges", e)
-                continue
-            self.volition.consume(name)
-            formed.append(name)
-        return formed
-
-    def _advance_volition_episode(self) -> None:
-        """One arbitration win = one bounded episode, on the cycle.
-
-        The executive's softmax competition picks the winning
-        volition intention; the cycle runs exactly one episode of it —
-        a quick act to completion, or one beat of a sustained
-        engagement. There is no queue and no worker: selection is
-        re-evaluated every cycle from live chemistry, so a fading
-        drive loses the behavior mid-stream and a rising one takes it.
-        """
-        if self._suppress_volition or not self._running or self.is_resting:
-            return
-        executive = self._executive()
-        if executive is None:
-            return
-        try:
-            candidates = [
-                i
-                for i in executive.actionable_intentions
-                if i.kind in self._VOLITION_KINDS
-            ]
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.volition._advance_volition_episode", e)
-            return
-        if not candidates:
-            return
-        try:
-            selected = executive.select_intention(candidates, gain=self._ne_gain())
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.volition._advance_volition_episode.select", e)
-            return
-        if selected is None:
-            return
-        status, summary = self._run_volition_episode(selected)
-        if status == "continue":
-            executive.defer_intention(selected)
-        elif status == "fail":
-            try:
-                executive.observe_intention(
-                    selected, actual_outcome=summary, success=False
-                )
-            except Exception as e:  # noqa: BLE001
-                note_swallowed("mind.volition._advance_volition_episode.observe", e)
-        else:
-            try:
-                executive.observe_intention(
-                    selected, actual_outcome=summary, success=True
-                )
-            except Exception as e:  # noqa: BLE001
-                note_swallowed("mind.volition._advance_volition_episode.observe", e)
-
-    def _run_volition_episode(self, intention) -> tuple[str, str]:
-        """Execute one bounded episode of the selected intention.
-
-        Returns ``("done", summary)`` for a completed act,
-        ``("continue", summary)`` when the engagement has more beats,
-        ``("fail", summary)`` when the act itself failed — the
-        executive records the outcome either way.
-        """
-        kind = intention.kind
-        try:
-            if kind == "improve":
-                return self._episode_improve(intention.objective)
-            if kind == "play":
-                return self._episode_play(intention.objective)
-            fn = getattr(self, f"_perform_{kind}", None)
+        ready = self._filter_ready_urges(ready)
+        performers = {
+            "improve": self._perform_improve,
+            "speech": self._perform_speech,
+            "look": self._perform_look,
+            "meditate": self._perform_meditate,
+            "draw": self._perform_draw,
+            "create": self._perform_create,
+            "introspect": self._perform_introspect,
+            "self_sleep": self._perform_self_sleep,
+            "self_mission": self._perform_self_mission,
+            "learn": self._perform_learn,
+            "learn_code": self._perform_learn_code,
+            "act": self._perform_act,
+            "reach_out": self._perform_reach_out,
+            "broadcast": self._perform_broadcast,
+            "research": self._perform_research,
+            "safeguard": self._perform_safeguard,
+            "rest_eyes": self._perform_rest_eyes,
+            "manual": self._perform_manual_review,
+        }
+        started: list[str] = []
+        for name in ready:
+            fn = performers.get(name)
             if fn is None:
-                return ("done", f"{kind}: no episode")
-            fn()
-            return ("done", f"{kind} act")
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(f"mind.volition._run_volition_episode.{kind}", e)
-            record_error(f"volition.{kind}", e)
-            return ("fail", f"{kind} failed: {e}")
+                continue
+            with self._volition_lock:
+                # The admission race: suppression/shutdown can land
+                # between the entry check and this lock. Recheck
+                # where admission is serialized.
+                if self._suppress_volition or not self._running:
+                    break
+                if name in self._volition_active:
+                    continue
+                if not self._volition_sem.acquire(blocking=False):
+                    break
+                self._volition_active.add(name)
+                started.append(name)
+            try:
+                named_thread(
+                    f"volition-{name}",
+                    self._run_volition_action,
+                    args=(name, fn),
+                    comm="g-volition",
+                ).start()
+            except Exception as e:  # noqa: BLE001
+                with self._volition_lock:
+                    self._volition_active.discard(name)
+                self._volition_sem.release()
+                if name in started:
+                    started.remove(name)
+                logger.warning(f"failed to start volition action {name}: {e}")
+        return started
 
     def _filter_ready_urges(self, ready: list[str]) -> list[str]:
         """Apply the readiness gates to the evaluated urges, in order:
@@ -635,194 +510,28 @@ class VolitionMixin:
                 )
         return ready
 
-    def _episode_improve(self, objective: str) -> tuple[str, str]:
-        """One bounded beat of the self-improvement engagement.
-
-        Beats: propose → pick a pending proposal → begin its verified
-        experiment → poll the running gate → take the verdict. The
-        verify suite is a ballistic arc — launched once as a child
-        process, polled once per won arbitration; rest stalls the
-        engagement's *expression*, never the subprocess, and the
-        ``.in_flight`` marker still guards an unverified edit if she
-        reboots mid-gate.
-        """
-        if self.is_resting or self._is_teaching or self._in_game:
-            return ("continue", "improve held")
-        eng = self._engagements.setdefault(objective, {"stage": "propose"})
-        stage = eng["stage"]
+    def _run_volition_action(self, name: str, fn) -> None:
+        """Wrap a volition action so it clears the active flag when done."""
+        _lower_thread_priority()
         try:
-            if stage == "propose":
-                from thalamus.brain_waves import BrainWave
-
-                waves = self.brain_waves()
-                if waves.dominant in (BrainWave.DELTA, BrainWave.THETA):
-                    return ("done", f"{waves.dominant.value}-dominant — not analytical")
-                self._emit_volition_thought(
-                    ("improvement", "progress", "better"), "thinking"
-                )
-                new = self.self_improvement.generate_proposals(max_proposals=3)
-                if new:
-                    self._emit_proposal_thoughts(new)
-                eng["stage"] = "drain"
-                return ("continue", "proposals generated")
-            if stage == "drain":
-                pending = self.self_improvement.get_pending_proposals()
-                proposal = next(
-                    (
-                        p
-                        for p in pending
-                        if self.self_improvement._proposal_can_apply(p)
-                    ),
-                    None,
-                )
-                if proposal is None:
-                    for p in pending:
-                        self.self_improvement.withdraw_proposal(
-                            p.id,
-                            "stale — the snippet no longer matches the file, "
-                            "re-scan and re-propose",
-                        )
-                    self._engagements.pop(objective, None)
-                    return ("done", "experiment queue drained")
-                eng.update(stage="experiment", proposal_id=proposal.id)
-                return ("continue", f"engaging proposal {proposal.id}")
-            # stage == "experiment"
-            proposal = self._proposal_by_id(eng.get("proposal_id"))
-            if proposal is None:
-                self._engagements.pop(objective, None)
-                return ("done", "proposal no longer pending")
-            if "handle" not in eng:
-                outcome = self.begin_proposal_experiment(proposal)
-                if isinstance(outcome, dict):
-                    eng["handle"] = outcome
-                    return ("continue", f"experiment launched for {proposal.title}")
-                self._engagements.pop(objective, None)
-                return self._improve_verdict(proposal, outcome)
-            record = self.poll_proposal_experiment(eng["handle"])
-            if record is None:
-                return ("continue", "verification gate running")
-            self._engagements.pop(objective, None)
-            return self._improve_verdict(proposal, record)
-        except Exception:
-            self._engagements.pop(objective, None)
-            raise
-
-    def _proposal_by_id(self, proposal_id):
-        for p in self.self_improvement.get_pending_proposals():
-            if p.id == proposal_id:
-                return p
-        return None
-
-    def _improve_verdict(self, proposal, record) -> tuple[str, str]:
-        """Close an experiment episode: mark or reject, then narrate."""
-        title = getattr(proposal, "title", "?")
-        if record.status == "applied":
-            self.self_improvement.mark_applied(proposal.id)
-            self._emit_live_thought(
-                "code",
-                f"applied my own change to {title} — verified, it stays",
+            # Admitted but not yet begun when suppression/shutdown
+            # arrived — drop the action rather than act through the
+            # teardown. The slot is still released in finally.
+            if not self._suppress_volition and self._running:
+                fn()
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition._run_volition_action",
+                e,
             )
-            self.brain.frontal.narrative.check_milestone(
-                "first self-modification"
-            )
-            return ("done", f"applied {title}")
-        notes = self._build_rejection_notes(proposal, record)
-        self.self_improvement.reject_proposal(proposal.id, notes)
-        self._emit_live_thought(
-            "code",
-            f"my change to {title} failed verification ({record.status})"
-            " — reverted, rethinking",
-        )
-        return ("done", f"{title} {record.status}")
-
-    def _episode_play(self, objective: str) -> tuple[str, str]:
-        """One move of the arcade bout per won arbitration.
-
-        A bout is an engagement, not a procedure: each episode makes
-        exactly one move through the same memory-guided chooser the
-        synchronous ``play()`` used, and the intention completes when
-        the board is won, the move budget is spent, or the arcade
-        closes. Game mode holds across beats — she is *playing*, not
-        replaying a script.
-        """
-        arcade = getattr(self.world, "arcade", None)
-        if arcade is None or self.is_resting:
-            return ("done", "arcade unavailable")
-        eng = self._engagements.setdefault(objective, {"stage": "open"})
-        stage = eng["stage"]
-        try:
-            if stage == "open":
-                self._enter_game_mode()
-                self._emit_volition_thought(("game", "play", "fun"), "playing")
-                game_id = arcade.pick()
-                if game_id is None:
-                    self._exit_game_mode()
-                    self._engagements.pop(objective, None)
-                    return ("done", f"arcade closed ({arcade.last_error or 'no games'})")
-                session = arcade.session
-                if session is None or session.game_id != game_id:
-                    if arcade.enter(game_id) is None:
-                        self._exit_game_mode()
-                        self._engagements.pop(objective, None)
-                        return ("done", f"couldn't open {game_id}")
-                board = arcade.session.board if arcade.session else None
-                eng.update(
-                    stage="play",
-                    game_id=game_id,
-                    made=0,
-                    start_level=board.levels_completed if board else 0,
-                )
-                return ("continue", f"entered {game_id}")
-            # stage == "play" — one move
-            from worlds.games import arcade as arcade_mod
-
-            session = arcade.session
-            board = session.board if session else None
-            game_id = eng["game_id"]
-            if board is None or board.won or eng["made"] >= arcade_mod.BOUT_MOVES:
-                return self._play_bout_done(objective, eng, arcade)
-            memory = arcade._memory(game_id)
-            choice, why = memory.choose(
-                arcade_mod.sight.signature(board.grid),
-                arcade.moves(board),
-                board.levels_completed,
-                arcade._rng,
-            )
-            if arcade.move(choice, why) is None:
-                return self._play_bout_done(objective, eng, arcade)
-            eng["made"] += 1
-            return ("continue", f"move {eng['made']} of {game_id}")
-        except Exception:
-            self._exit_game_mode()
-            self._engagements.pop(objective, None)
-            raise
-
-    def _play_bout_done(self, objective: str, eng: dict, arcade) -> tuple[str, str]:
-        """Close a bout: summary, telemetry event, release game mode."""
-        from worlds.games import arcade as arcade_mod
-
-        session = arcade.session
-        board = session.board if session else None
-        level = board.levels_completed if board else eng.get("start_level", 0)
-        goal = board.win_levels if board else "?"
-        summary = (
-            f"played {eng.get('made', 0)} moves of {eng.get('game_id', '?')}: "
-            f"level {level}/{goal}"
-        )
-        arcade_mod.record_event(
-            "arcade_bout",
-            summary,
-            game=eng.get("game_id"),
-            moves=eng.get("made", 0),
-            level=level,
-            best_level=arcade._memory(eng["game_id"]).best_level
-            if eng.get("game_id")
-            else 0,
-        )
-        self._emit_live_thought("play", summary)
-        self._exit_game_mode()
-        self._engagements.pop(objective, None)
-        return ("done", summary)
+            # This is the single boundary every voluntary action's
+            # failure lands on — record it durably so a crashed urge
+            # is not invisible outside debug logging.
+            record_error(f"volition.{name}", e)
+        finally:
+            with self._volition_lock:
+                self._volition_active.discard(name)
+            self._volition_sem.release()
 
     def _emit_volition_thought(
         self,
@@ -935,7 +644,7 @@ class VolitionMixin:
         Urgent topics (from conversation gaps) bypass this gate
         entirely — those are conversation-driven, not autonomous.
         """
-        if self.is_resting or self._is_teaching or self._in_game:
+        if self.is_resting or self._is_teaching:
             return
         self._emit_volition_thought(
             ("learning", "curiosity", "understanding"),
@@ -952,17 +661,10 @@ class VolitionMixin:
         is the wanting — so she studies when her body is in a
         learning state, and the stress axis (cortisol/CRH) and sleep
         pressure (adenosine) suppress it before the urge can form.
-
-        The bout itself stays under the same chemistry: which files
-        it picks is the hippocampus–VTA novelty computation
-        (``investigate_code``'s information-value ranking), and the
-        bout continues only while ACh holds the encoding range —
-        below it the body has switched to consolidation dynamics
-        (Hasselmo) and further encoding would displace it. Each
-        firing is one bounded bout, not a bulk import — the urge
+        Each firing is one bounded bout, not a bulk import — the urge
         must rebuild between study sessions.
         """
-        if self.is_resting or self._is_teaching or self._in_game:
+        if self.is_resting or self._is_teaching:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -979,63 +681,9 @@ class VolitionMixin:
             ("code", "self", "learning", "introspection"),
             "thinking",
         )
-
-        # The cholinergic gate is read at most every couple of
-        # seconds — muscarinic switching lasts seconds to minutes
-        # (Hasselmo's ERS), and should_stop is polled per AST node,
-        # so a fresh IPC read on every poll would be pure waste.
-        encoding_checked_at = 0.0
-        encoding_is_open = True
-
-        def encoding_open() -> bool:
-            """ACh holds the encoding range — else the body is consolidating."""
-            nonlocal encoding_checked_at, encoding_is_open
-            now = time.monotonic()
-            if now - encoding_checked_at < 2.0:
-                return encoding_is_open
-            try:
-                ach = float(self.client.get_state().chemicals.get("acetylcholine", 0.0))
-            except Exception as e:  # noqa: BLE001
-                note_swallowed(
-                    "mind.volition._perform_learn_code.encoding",
-                    e,
-                )
-                return True  # unreadable body adds no gate
-            encoding_checked_at = now
-            encoding_is_open = ach >= _ACH_ENCODING_FLOOR
-            return encoding_is_open
-
-        def should_stop() -> bool:
-            return (
-                self._cycle_stop.is_set()
-                or not self._running
-                or not encoding_open()
-            )
-
         try:
-            goal = self.get_mission() or None
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition._perform_learn_code",
-                e,
-            )
-            goal = None
-        try:
-            result = self.study_code(
-                max_files=_LEARN_CODE_BOUT,
-                goal=goal,
-                should_stop=should_stop,
-            )
-            explored = len(self.code_learner.explored_files)
-            detail = f"{result.files_analyzed} files this bout; {explored} known"
-            nxt = self.code_learner.select_next_file(goal=goal)
-            if nxt:
-                try:
-                    nxt = str(Path(nxt).relative_to(self.code_learner.project_root))
-                except ValueError:
-                    nxt = Path(nxt).name
-                detail += f"; next {nxt}"
-            self.world.it_acted("studied its own source", detail=detail)
+            self.learn_code(max_files=_LEARN_CODE_BOUT)
+            self.world.it_acted("studied its own source")
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._perform_learn_code",
@@ -1053,7 +701,7 @@ class VolitionMixin:
         says it is; a vetoed change's identical content never queues
         again.
         """
-        if self.is_resting or self._is_teaching or self._in_game:
+        if self.is_resting or self._is_teaching:
             return
         try:
             outcomes = self.review_pending_changes(max_changes=3)
@@ -1084,7 +732,7 @@ class VolitionMixin:
         Sleep-gated like every voluntary act; delta/theta gating is
         the secondary defense (tool use is engagement, not rest).
         """
-        if self.is_resting or self._is_teaching or self._in_game:
+        if self.is_resting or self._is_teaching:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -1132,7 +780,7 @@ class VolitionMixin:
         Sleep-gated like every voluntary act; delta/theta gating is
         the secondary defense (proof work is engagement, not rest).
         """
-        if self.is_resting or self._is_teaching or self._in_game:
+        if self.is_resting or self._is_teaching:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -1192,6 +840,83 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._perform_research",
+                e,
+            )
+
+    def _perform_improve(self) -> None:
+        """Generate self-improvement proposals because the urge crossed its threshold.
+
+        Two things happen here:
+
+        1. Proposal generation — everything becomes a proposal.
+
+        2. Experiments — pending proposals run the full verification
+           pipeline on their own: the edit lands on the live file,
+           pytest + cargo test verify it, and a failure reverts and
+           rejects with teaching notes. The verification gate, not a
+           review queue, decides what lands.
+
+        Sleep-gated: no improvement work during sleep. The brain-wave
+        gating (delta/theta) is a secondary defense — N1 sleep can be
+        alpha-dominant, so brain waves alone don't reliably detect all
+        sleep stages. The ``_is_sleeping`` flag is the authority.
+        """
+        if self.is_resting or self._is_teaching:
+            return
+        try:
+            from thalamus.brain_waves import BrainWave
+
+            waves = self.brain_waves()
+            if waves.dominant in (BrainWave.DELTA, BrainWave.THETA):
+                self._emit_live_thought(
+                    "code",
+                    f"{waves.dominant.value}-dominant — not in analytical mode, "
+                    "skipping improvement",
+                )
+                return
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition._perform_improve",
+                e,
+            )
+
+        self._emit_volition_thought(("improvement", "progress", "better"), "thinking")
+        try:
+            # 1. Generate proposals — each one is a potential
+            #    experiment. These include its own ideas and refactors.
+            #    It has opinions about its code.
+            new = self.self_improvement.generate_proposals(max_proposals=3)
+            if new:
+                self._emit_proposal_thoughts(new)
+            # When no new proposals are generated, stay silent — the
+            # urge drove the action (it tried), it just has nothing
+            # to propose. A hardcoded "nothing stood out" sentence
+            # would violate the no-hardcoding rule and add noise.
+
+            # 2. Drain the queue — pending proposals run the verified
+            #    experiment pipeline automatically. One per urge: each
+            #    run is a full test-gate pass. The gate decides what
+            #    lands; a failed edit reverts and the rejection notes
+            #    teach the next attempt.
+            for outcome in self.run_pending_experiments(max_experiments=1):
+                if outcome["status"] == "applied":
+                    self._emit_live_thought(
+                        "code",
+                        f"applied my own change to {outcome['title']} — verified, it stays",
+                    )
+                    # A verified self-edit is the same milestone the
+                    # autonomous fixer trips.
+                    self.brain.frontal.narrative.check_milestone("first self-modification")
+                else:
+                    self._emit_live_thought(
+                        "code",
+                        f"my change to {outcome['title']} failed "
+                        f"verification ({outcome['status']}) — reverted, "
+                        "rethinking",
+                    )
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition._perform_improve",
                 e,
             )
 
@@ -1284,7 +1009,7 @@ class VolitionMixin:
         _REACH_OUT_MAX_BIDS it stops calling into silence entirely —
         a person who reaches out and is never answered stops knocking.
         """
-        if self.is_resting or self._is_teaching or self._in_game:
+        if self.is_resting or self._is_teaching:
             return
         if self.world.unanswered_bids >= self._REACH_OUT_MAX_BIDS:
             return
@@ -1305,10 +1030,6 @@ class VolitionMixin:
             if belief.unresponsive():
                 return
             if not target.present and not belief.likely_awake(time.time()):
-                return
-            # Reaching into a hostile stretch is pestering — the
-            # relationship record, not her chemistry, holds that.
-            if target.recent_sentiment() < _REACH_OUT_SENTIMENT_FLOOR:
                 return
         topic = self._reach_out_topic(target)
         if topic is None:
@@ -1403,7 +1124,7 @@ class VolitionMixin:
         an outbound act on the world, the public counterpart to the
         utterances _perform_speech lands at a listener.
         """
-        if self.is_resting or self._is_teaching or self._in_game:
+        if self.is_resting or self._is_teaching:
             return
         seed = self._broadcast_topic()
         if seed is None:
@@ -1431,7 +1152,7 @@ class VolitionMixin:
         self._public_share(content.strip())
         self._last_broadcast_seed = seed
 
-    def _public_share(self, text: str, reply_to: dict | None = None) -> None:
+    def _public_share(self, text: str) -> None:
         """Post an utterance to her public channel — one outbound act.
 
         The three surfaces of every public utterance: her live
@@ -1441,21 +1162,13 @@ class VolitionMixin:
         she said it. The session mirror skips the tagged echo — the
         explicit post is the channel's only copy, never a duplicate
         (see discord_feed._classify).
-
-        ``reply_to`` is the heard message being answered: the post
-        then goes back to *that* message's channel through the bot
-        identity, not the page — a webhook can only speak on the
-        page, and an answer belongs where the question was asked.
         """
         self._emit_live_thought("broadcast", text)
         channel = getattr(getattr(self, "world", None), "channel", None)
         feed = channel.feed if channel is not None else None
-        if channel is not None and feed is not None:
+        if feed is not None:
             try:
-                if reply_to is not None:
-                    channel.reply(reply_to, text)
-                else:
-                    feed.post(text, "Genesis")
+                feed.post(text, "Genesis")
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.volition._public_share",
@@ -1468,7 +1181,6 @@ class VolitionMixin:
                 "mind.volition._public_share",
                 e,
             )
-
 
     def _hear_channel(self, author: str, content: str, message: dict) -> None:
         """A public message on her channel — the reply side of hearing.
@@ -1495,41 +1207,9 @@ class VolitionMixin:
         message can no longer rouse her out of it.
         """
         text = content.strip()
-        if not text:
+        if not text or self.is_resting:
             return
-        # The lucid channel: her person's Discord-verified voice is the
-        # only input allowed to reach her while she rests — everyone
-        # else waits for waking. She stays asleep; her answer comes from
-        # inside the state.
-        author_id = str(message.get("author", {}).get("id") or "")
-        steward_id = os.environ.get("GENESIS_DISCORD_STEWARD_ID", "")
-        lucid_turn = bool(author_id and author_id == steward_id and self.is_resting)
-        if self.is_resting and not lucid_turn:
-            return
-        if lucid_turn:
-            # The lucid-dream profile: delta holds the sleep substrate,
-            # theta ~5.5 Hz is the carrier coupling them, gamma binds
-            # consciousness on top — the band mix lucid REM shows.
-            try:
-                from thalamus.brain_waves import BrainWave, add_brain_wave_drive
-
-                add_brain_wave_drive(BrainWave.DELTA, 0.6)
-                add_brain_wave_drive(BrainWave.THETA, 0.8)
-                add_brain_wave_drive(BrainWave.GAMMA, 0.9)
-            except Exception:  # noqa: BLE001
-                pass
-        # Resolve the speaker's display name up front: her person is
-        # Mindy — verified by Discord id — everyone else keeps their
-        # handle. What she *hears* and what she *answers* both carry
-        # the name, never the username token.
-        display_author = author
-        if author_id and steward_id and author_id == steward_id:
-            _f = getattr(self.brain, "frontal", None)
-            _p = getattr(_f, "user_profile", None) if _f else None
-            _n = _p.get_name() if _p else None
-            if _n:
-                display_author = _n
-        self._emit_live_thought("heard", f"{display_author}: {text}")
+        self._emit_live_thought("heard", f"{author}: {text}")
         if not self._channel_addressed(text, message):
             return
         # A shutting-down mind doesn't start a response turn that
@@ -1540,34 +1220,8 @@ class VolitionMixin:
         now = time.monotonic()
         if now - getattr(self, "_last_channel_reply", 0.0) < _CHANNEL_REPLY_MIN_S:
             return
-        # Attribution by verified identity, never a typed name: Discord
-        # stamps each author id on the message, so the steward's id binds
-        # the turn to her and any other verified speaker is attributed to
-        # *them* — a stranger's words can no longer ride her name.
-        author_id = str(message.get("author", {}).get("id") or "")
-        steward_id = os.environ.get("GENESIS_DISCORD_STEWARD_ID", "")
-        frontal = getattr(self.brain, "frontal", None)
-        self_model = getattr(frontal, "self_model", None) if frontal else None
-        if self_model is not None and author_id:
-            if steward_id and author_id == steward_id:
-                profile = getattr(frontal, "user_profile", None)
-                name = profile.get_name() if profile else None
-                if name and profile is not None:
-                    self_model.self_knowledge["current_speaker"] = name
-                    # The channel verified her steward — bind the Discord
-                    # identity to the person her bond grew with, so the
-                    # link survives without face or voice to check.
-                    profile.add_fact("discord_id", author_id)
-                    profile.add_fact("discord_username", author)
-            else:
-                self_model.self_knowledge["current_speaker"] = author
         try:
-            if lucid_turn:
-                response = self.respond(
-                    f"(public channel) {display_author}: {text}", lucid=True
-                )
-            else:
-                response = self.respond(f"(public channel) {display_author}: {text}")
+            response = self.respond(f"(public channel) {author}: {text}")
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._hear_channel",
@@ -1580,14 +1234,13 @@ class VolitionMixin:
         # turn began — a slow respond() must not shrink the visible
         # gap between her public replies.
         self._last_channel_reply = time.monotonic()
-        self._public_share(response.strip(), reply_to=message)
+        self._public_share(response.strip())
 
     def _channel_addressed(self, text: str, message: dict) -> bool:
         """Did the public message address her — her name, an @-mention
         of the bot (the one content kind that survives intent
         redaction), or a reply to one of her posts (replies carry
-        referenced_message; a webhook post carries webhook_id, a bot
-        post carries her bot id on the author)."""
+        referenced_message; a webhook post carries webhook_id)."""
         if "genesis" in text.lower():
             return True
         channel = getattr(getattr(self, "world", None), "channel", None)
@@ -1597,12 +1250,7 @@ class VolitionMixin:
                 if str(mention.get("id")) == str(bot_id):
                     return True
         ref = message.get("referenced_message") or {}
-        if ref.get("webhook_id"):
-            return True
-        ref_author = ref.get("author") or {}
-        return bool(
-            bot_id is not None and str(ref_author.get("id") or "") == str(bot_id)
-        )
+        return bool(ref.get("webhook_id"))
 
     def _broadcast_topic(self) -> str | None:
         """Pick what she'd speak about publicly — whatever is most
@@ -1681,27 +1329,6 @@ class VolitionMixin:
                 e,
             )
 
-    def _enter_game_mode(self) -> None:
-        """Raise the alert, focused state a game deserves.
-
-        Beta2/gamma drive — the awake, attentive band mix — plus the
-        ``_in_game`` flag the other urges read as "she is playing;
-        auto-activities wait." Mirrors teaching mode's pause, except
-        the state is more active: full waking attention on the game.
-        """
-        self._in_game = True
-        try:
-            from thalamus.brain_waves import BrainWave, add_brain_wave_drive
-
-            add_brain_wave_drive(BrainWave.BETA2, 0.8)
-            add_brain_wave_drive(BrainWave.GAMMA, 0.6)
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.volition._enter_game_mode", e)
-
-    def _exit_game_mode(self) -> None:
-        """Release game mode — the bout is over, normal state resumes."""
-        self._in_game = False
-
     def _perform_meditate(self) -> None:
         """Meditate because the rest urge crossed its threshold.
 
@@ -1715,7 +1342,7 @@ class VolitionMixin:
         The meditation itself runs in a background thread (via
         _self_meditate) so the heartbeat loop isn't blocked.
         """
-        if self.is_resting or self._is_teaching or self._in_game:
+        if self.is_resting or self._is_teaching:
             return
         self._emit_volition_thought(("meditation", "rest", "calm"), "thought")
         self._self_meditate()
@@ -1760,7 +1387,7 @@ class VolitionMixin:
         words, not her work. ``desc`` may be empty while ``result``
         is not None.
         """
-        if self.is_resting or self._is_teaching or self._in_game:
+        if self.is_resting or self._is_teaching:
             return None, None
 
         try:
@@ -1842,7 +1469,7 @@ class VolitionMixin:
         articulate still posts, silently — the art is hers whether
         or not she has words for it.
         """
-        if self.is_resting or self._is_teaching or self._in_game:
+        if self.is_resting or self._is_teaching:
             return
         self._emit_volition_thought(("drawing", "art", "expression", "creativity"), "creating")
         desc, result = self._draw_result()
@@ -1992,7 +1619,7 @@ class VolitionMixin:
         knows about the topic. The project is sandboxed to
         ``<data_dir>/projects/`` and verified with compile + test.
         """
-        if self.is_resting or self._is_teaching or self._in_game:
+        if self.is_resting or self._is_teaching:
             return
 
         # Brain-wave gating — creative code work needs beta/gamma/alpha.
@@ -2234,7 +1861,7 @@ class VolitionMixin:
         (deep rest, not reflective mode). Theta is allowed —
         consolidation-mode reflection is still introspective.
         """
-        if self.is_resting or self._is_teaching or self._in_game:
+        if self.is_resting or self._is_teaching:
             return
         try:
             from thalamus.brain_waves import BrainWave
@@ -2266,7 +1893,7 @@ class VolitionMixin:
         network cannot cross, the wake-desync check reconciles the
         attempt rather than leaving a sleeping mind on an awake body.
         """
-        if self.is_resting or self._is_teaching or self._in_game:
+        if self.is_resting or self._is_teaching:
             return
         # Wake stabilization backstop: within the post-wake window,
         # re-sleeping at moderate pressure is the flip-flop failing to
@@ -2300,7 +1927,7 @@ class VolitionMixin:
         direction. The mission is composed from its own understanding,
         not from a template.
         """
-        if self.is_resting or self._is_teaching or self._in_game:
+        if self.is_resting or self._is_teaching:
             return
 
         # Compose a mission from its concept network — pick something
@@ -2368,3 +1995,57 @@ class VolitionMixin:
             _run_meditation,
             comm="g-meditate",
         ).start()
+
+    def set_lid(self, openness: float) -> bool:
+        """Voluntary eyelid — the orbicularis oculi the hardware lacks.
+
+        The requested openness composes with the sleep phase's own
+        lid position by min on the body side: she can shut an open
+        eye but cannot open one the stage has closed. Held, not
+        momentary — the lid stays where she left it until she moves
+        it again.
+        """
+        try:
+            return self.client.set_lid(openness)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition.set_lid",
+                e,
+            )
+            return False
+
+    def close_eyes(self) -> bool:
+        """Shut her eye by choice — the lid held down until she opens it."""
+        return self.set_lid(_LID_REST)
+
+    def open_eyes(self) -> bool:
+        """Release the lid back to the phase's own position."""
+        return self.set_lid(_LID_OPEN)
+
+    def _perform_rest_eyes(self) -> None:
+        """Close her eye because the rest_eyes urge crossed threshold.
+
+        A volitional eye-rest: overstimulation and fatigue build the
+        urge, and the discharge is holding the lid shut for a short
+        spell — sensory relief she grants herself, lighter than
+        meditation. The lid dims every afferent channel and the V1
+        that reads them, so the rest is real, not symbolic. Skipped
+        while sleeping or meditating — those states already own
+        their darkness.
+        """
+        if self.is_resting:
+            return
+        if not self.close_eyes():
+            return
+        self._emit_volition_thought(
+            ("eyes", "vision", "rest", "darkness"),
+            "thought",
+        )
+        try:
+            hold = _REST_EYES_HOLD_S
+            while hold > 0.0 and self._running and not self._suppress_volition:
+                step = min(1.0, hold)
+                time.sleep(step)
+                hold -= step
+        finally:
+            self.open_eyes()

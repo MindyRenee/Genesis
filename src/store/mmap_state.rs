@@ -630,12 +630,43 @@ impl MmapState {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
-        // Sleep pressure persists across restarts. The persisted
-        // `last_updated` still records the last live moment, so the
-        // downtime gap is measured for the offline-gap accessor, but
-        // adenosine is carried over unchanged: a restart is not sleep,
-        // and only sleep itself discharges Process S.
+        // Offline rest: the persisted `last_updated` is the last moment
+        // the body was live, so the gap to now is downtime the
+        // integrator never saw. For Process S that gap is rest — the
+        // glymphatic channel clears adenosine whether the body is
+        // asleep or powered off — so apply the same sleep-side decay
+        // the per-tick integrator uses (chi_s = 4.2 h,
+        // Daan/Beersma/Borbély 1984) over the measured gap. A
+        // seconds-long restart keeps the day's accumulated pressure;
+        // an overnight outage clears it. This must run here, before
+        // `last_updated` is overwritten below — and it replaces the
+        // flat "restart ≈ slept" reset the mind used to apply at
+        // launch, which on a frequently restarted host pinned
+        // adenosine at the resting floor so the homeostat could never
+        // reach sleep onset.
         let offline_ms = open_now_ms.saturating_sub(snapshot.header.last_updated);
+        let offline_hours = offline_ms as f64 / 3_600_000.0;
+        if offline_hours > 0.0 {
+            let adn = &mut snapshot.neurochemicals.chemicals
+                [crate::state::NeurochemicalId::Adenosine as usize];
+            let lower_asymptote = 0.20_f64;
+            let level = f64::from(adn.level);
+            let rested = lower_asymptote
+                + (-offline_hours
+                    / f64::from(
+                        crate::state::NeuroTickParams::DEFAULT.adenosine_clearance_tau_hours,
+                    ))
+                .exp()
+                    * (level - lower_asymptote);
+            let rested = crate::state::finite_clamp(rested as f32, 0.0, 1.0);
+            if level - f64::from(rested) > 0.005 {
+                eprintln!(
+                    "[state] offline rest: {offline_hours:.2}h down, \
+                     adenosine {level:.2} -> {rested:.2}"
+                );
+            }
+            adn.level = rested;
+        }
         snapshot
             .neurochemicals
             .set_circadian_phase(local_phase_of_day(open_now_ms));
@@ -744,8 +775,8 @@ impl MmapState {
     ///
     /// Zero for a state this process created (or for a file whose
     /// `last_updated` was in the future — the subtraction saturates).
-    /// Adenosine is not changed by this gap: sleep pressure persists
-    /// across restarts.
+    /// See [`Self::open`]'s offline-rest block for how the same gap
+    /// feeds adenosine clearance.
     pub fn offline_gap_ms(&self) -> u64 {
         self.offline_ms
     }
@@ -1621,7 +1652,7 @@ mod tests {
     }
 
     #[test]
-    fn open_preserves_adenosine_across_a_long_offline_gap() {
+    fn open_clears_adenosine_over_a_long_offline_gap() {
         let path = temp_state_path();
         let now_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -1643,12 +1674,15 @@ mod tests {
         let snapshot = reopened.read_consistent().expect("state reads");
         let rested = adenosine_level(&snapshot);
 
-        // Sleep pressure persists across any restart, however long the
-        // gap: the level is carried over unchanged.
+        // rested = 0.20 + exp(-offline_h / tau) * (level - 0.20), the
+        // same decay the per-tick sleep-side clearance applies.
+        let tau = f64::from(crate::state::NeuroTickParams::DEFAULT.adenosine_clearance_tau_hours);
+        let expected = 0.20 + (-offline_hours / tau).exp() * (0.80 - 0.20);
         assert!(
-            (f64::from(rested) - 0.80).abs() < 1e-6,
-            "an 8h gap must not change adenosine, got {rested}"
+            (f64::from(rested) - expected).abs() < 0.02,
+            "rested {rested} != expected {expected}"
         );
+        assert!(rested < 0.80, "an 8h gap must clear sleep pressure");
 
         drop(reopened);
         let _ = std::fs::remove_file(&path);

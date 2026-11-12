@@ -38,8 +38,8 @@ use std::os::unix::io::AsRawFd;
 use std::path::Path;
 
 use libc::{
-    EEXIST, MAP_FAILED, MAP_SHARED, MS_SYNC, PROT_READ, PROT_WRITE, c_void, close, fdatasync,
-    ftruncate, mmap, msync, munmap,
+    EEXIST, LOCK_EX, LOCK_NB, MAP_FAILED, MAP_SHARED, MS_SYNC, PROT_READ, PROT_WRITE, c_void,
+    close, fdatasync, flock, ftruncate, mmap, msync, munmap,
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -361,6 +361,11 @@ pub enum RingBufferError {
         /// The capacity the other fields were checked against.
         capacity: u32,
     },
+    /// The sole-mapper flock could not be acquired: another process
+    /// holds a live mapping of this file. Returned instead of blocking
+    /// so the caller can retry or degrade rather than silently racing
+    /// a second writer into the same `MAP_SHARED` pages.
+    LockBusy,
 }
 
 impl std::fmt::Display for RingBufferError {
@@ -397,6 +402,10 @@ impl std::fmt::Display for RingBufferError {
                      outside capacity {capacity}"
                 )
             }
+            Self::LockBusy => write!(
+                f,
+                "STM file is locked by another process (sole-mapper invariant)"
+            ),
         }
     }
 }
@@ -452,12 +461,10 @@ pub struct RingBuffer {
 
 // SAFETY (Send/Sync): all access to the mapped region goes through
 // `access_lock`, and every public method returns owned copies rather
-// than references into `MAP_SHARED` memory. The buffer is the body's
-// own tissue: it is opened exactly once, inside the single daemon
-// that is this organism — one body, one writer, the way a cell's
-// interior is written only by its own machinery. Single-mapping is
-// an identity property, not a defended one: no code path opens a
-// second mapping, and nothing outside the organism is a writer.
+// than references into `MAP_SHARED` memory. Cross-process exclusion
+// is enforced at open/create time by the sole-mapper `flock` — the
+// lock is held for the life of the fd and released when Drop closes
+// it, so no second process can map the file while a RingBuffer lives.
 unsafe impl Send for RingBuffer {}
 unsafe impl Sync for RingBuffer {}
 
@@ -510,10 +517,11 @@ impl RingBuffer {
         let path = path.as_ref();
         let mmap_len = mmap_size(capacity);
 
-        // No `truncate` on open: an existing buffer keeps its bytes —
-        // `ftruncate(mmap_len)` below sizes the file once, to the
-        // canonical length. The buffer has one writer by identity —
-        // the body that owns the data dir — so no mapping races.
+        // No `truncate` on open: the sole-mapper flock must be held
+        // *before* the file is resized, or a racing create would
+        // truncate the file under another process's live mapping.
+        // `ftruncate(mmap_len)` below performs the sizing once the
+        // lock is held.
         let file = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -523,6 +531,7 @@ impl RingBuffer {
             .map_err(RingBufferError::Io)?;
 
         let fd = file.as_raw_fd();
+        Self::acquire_sole_mapper_lock(fd)?;
 
         // Set the file size to the page-aligned mmap length so the
         // entire mapping is backed by the file. Without this, the tail
@@ -600,6 +609,7 @@ impl RingBuffer {
             .map_err(RingBufferError::Io)?;
 
         let fd = file.as_raw_fd();
+        Self::acquire_sole_mapper_lock(fd)?;
         let metadata = file.metadata().map_err(RingBufferError::Io)?;
 
         // Read the header to get capacity
@@ -1049,6 +1059,28 @@ impl RingBuffer {
     }
 
     // ─── Internal ────────────────────────────────────────────────
+
+    /// Take the sole-mapper advisory lock on the backing file.
+    ///
+    /// `RingBuffer` forms `&`/`&mut` references into `MAP_SHARED`
+    /// memory, which is only sound when no second process can map and
+    /// write the same file concurrently. `flock(LOCK_EX | LOCK_NB)` is
+    /// held for the life of the file descriptor — released implicitly
+    /// when `Drop` closes `fd` — so any other `open`/`create` (in this
+    /// process or another) fails fast with [`RingBufferError::LockBusy`]
+    /// instead of silently violating the aliasing contract.
+    ///
+    /// Callers must hold the lock *before* resizing or mapping the
+    /// file; that is why `create_inner` does not pass `.truncate()` to
+    /// `OpenOptions`.
+    fn acquire_sole_mapper_lock(fd: i32) -> Result<(), RingBufferError> {
+        // SAFETY: `fd` is a valid open file descriptor. flock is
+        // advisory and a failed call changes no state.
+        if unsafe { flock(fd, LOCK_EX | LOCK_NB) } != 0 {
+            return Err(RingBufferError::LockBusy);
+        }
+        Ok(())
+    }
 
     fn do_mmap(fd: i32, len: usize) -> Result<*mut u8, RingBufferError> {
         // SAFETY: `fd` is a valid open file descriptor with read+write

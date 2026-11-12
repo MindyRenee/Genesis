@@ -29,19 +29,12 @@
 //!   its integrity checks, and the frozen prior schema.
 
 pub use crate::daemon::active_inference;
-pub use crate::daemon::adaptive;
-pub use crate::daemon::continuity;
 pub use crate::daemon::cpufreq;
 pub use crate::daemon::interoception;
-pub use crate::daemon::maxwell;
-pub use crate::daemon::mind_shepherd;
-pub use crate::daemon::rtc_wake;
-pub use crate::daemon::rtkit;
 pub use crate::daemon::tick;
 pub use crate::state::core_state;
 pub use crate::state::header;
 pub use crate::state::inference;
 pub use crate::state::legacy_v3;
-pub use crate::state::legacy_v4;
 pub use crate::state::sanitize;
 pub use crate::state::zones;

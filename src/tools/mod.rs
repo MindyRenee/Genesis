@@ -11,12 +11,5 @@
 //!
 //! - `code_analysis` — AST parsing, dependency graphs, semantic
 //!   units, refactoring-target detection over Rust/Python source.
-//!
-//! The mind side carries the full workstation (`python/tools/`):
-//! the persistent terminal, file surgery, discovery, languages,
-//! math, sensors, lint, net, notebook, personal toolchain, git,
-//! archive, github, android, sqlite, dictionary, formats, and the
-//! fun bench — instruments are description, and description is her
-//! side of the anatomy.
 
 pub use crate::cognition::code_analysis;

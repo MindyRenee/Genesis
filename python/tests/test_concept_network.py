@@ -1653,77 +1653,6 @@ def test_spill_dormant_with_edge_log_retracts_edges() -> None:
         net._archive.close()
 
 
-def test_spill_does_not_retract_edges_when_archive_write_reports_zero() -> None:
-    """A closed archive must not be treated as a successful edge commit."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        net = ConceptNetwork()
-        archive = open_archive(tmpdir)
-        net.attach_archive(archive)
-        log = open_edge_log(tmpdir)
-        net.attach_edge_log(log)
-
-        net.add_concept("edge_source", confidence=0.8, origin="learned")
-        net.add_concept("edge_target", confidence=0.8, origin="learned")
-        net.add_edge("edge_source", "edge_target", RelationType.RELATED_TO)
-        for concept_id in ("edge_source", "edge_target"):
-            concept = net.get_concept(concept_id)
-            assert concept is not None
-            concept.activation = 0.0
-
-        archive.archive_edges_batch = lambda items: 0  # type: ignore[method-assign]
-        spilled = net.spill_dormant(activation_threshold=0.01, max_in_memory=0)
-
-        assert spilled == 0
-        assert net.size == 2, "concepts remain resident until their edges are durable"
-        assert len(log.fold()) == 1, "canonical edge must not be retracted"
-        log.close()
-        archive.close()
-
-
-def test_dedupe_archive_restores_missing_edges_before_removal() -> None:
-    """An interrupted spill's archived edges must survive stale-row cleanup."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        original = ConceptNetwork()
-        archive = open_archive(tmpdir)
-        original.attach_archive(archive)
-        original_log = open_edge_log(tmpdir)
-        original.attach_edge_log(original_log)
-        original.add_concept("edge_source", confidence=0.8, origin="learned")
-        original.add_concept("edge_target", confidence=0.8, origin="learned")
-        original.add_edge("edge_source", "edge_target", RelationType.RELATED_TO, weight=0.7)
-        for concept_id in ("edge_source", "edge_target"):
-            concept = original.get_concept(concept_id)
-            assert concept is not None
-            concept.activation = 0.0
-
-        assert original.spill_dormant(activation_threshold=0.01, max_in_memory=0) == 2
-        assert len(original_log.fold()) == 0
-        original_log.close()
-        archive.close()
-
-        # Simulate a save that restored the concepts but not the archived
-        # relationship. Startup deduplication must repair the edge first.
-        restored = ConceptNetwork()
-        restored.add_concept("edge_source", confidence=0.8, origin="learned")
-        restored.add_concept("edge_target", confidence=0.8, origin="learned")
-        restored_archive = open_archive(tmpdir)
-        restored.attach_archive(restored_archive)
-        restored_log = open_edge_log(tmpdir)
-        restored.attach_edge_log(restored_log)
-
-        assert restored.dedupe_archive() == 2
-        edges = restored.get_edges("edge_source", "out")
-        assert any(
-            edge.target == "edge_target" and edge.relation == RelationType.RELATED_TO
-            for edge in edges
-        )
-        assert len(restored_log.fold()) == 1
-        assert restored.archive_size == 0
-
-        restored_log.close()
-        restored_archive.close()
-
-
 def test_spill_reports_when_it_trims_nothing(caplog) -> None:
     """A no-op spill explains itself instead of silently returning 0.
 
@@ -2070,44 +1999,6 @@ def test_archive_persistence_across_network_restart() -> None:
         assert recalled.id == "persistent_concept"
         assert recalled.confidence == 0.7
         net2._archive.close()
-
-def test_restore_archive_keeps_durable_copy_until_deduplication() -> None:
-    """Reconstruction must not consume archive data before a save commits."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        net = _make_network_with_archive(tmpdir)
-        net.add_concept("archive_source", confidence=0.8, origin="learned")
-        net.add_concept("archive_target", confidence=0.8, origin="learned")
-        net.add_edge("archive_source", "archive_target", RelationType.RELATED_TO, weight=0.7)
-        for concept_id in ("archive_source", "archive_target"):
-            concept = net.get_concept(concept_id)
-            assert concept is not None
-            concept.activation = 0.0
-
-        net.spill_dormant(activation_threshold=0.01, max_in_memory=0)
-        assert net.size == 0
-        assert net.archive_size == 2
-
-        recalled = net.restore_archive_to_working_memory()
-
-        assert recalled == 2
-        assert net.get_concept("archive_source") is not None
-        assert net.get_concept("archive_target") is not None
-        assert net.archive_size == 2, "archive remains authoritative until save acknowledgement"
-        assert any(
-            edge.source == "archive_source" and edge.target == "archive_target"
-            for edge in net.edges
-        )
-
-        # This is the acknowledgement step used after a validated,
-        # durable working-memory restore.
-        assert net.dedupe_archive() == 2
-        assert net.archive_size == 0
-        assert net.get_concept("archive_source") is not None
-        assert any(
-            edge.source == "archive_source" and edge.target == "archive_target"
-            for edge in net.edges
-        )
-        net._archive.close()
 
 
 # ======================================================================
@@ -3112,10 +3003,9 @@ def test_attach_orphans_connects_concepts_with_no_word_overlap() -> None:
 # ── Bug 2: clean_noise now prunes concepts at exactly the threshold ──
 
 
-def test_clean_noise_prunes_concept_at_exact_threshold(tmpdir) -> None:
+def test_clean_noise_prunes_concept_at_exact_threshold() -> None:
     """Concepts at exactly min_confidence with 0 edges should be pruned."""
     net = ConceptNetwork()
-    net.attach_archive(open_archive(tmpdir))
 
     # Concept at exactly 0.4 with no edges — the learner's default
     net.add_concept("orphan_at_threshold", confidence=0.4)
@@ -3129,9 +3019,7 @@ def test_clean_noise_prunes_concept_at_exact_threshold(tmpdir) -> None:
 
     assert "orphan_at_threshold" in removed
     assert "connected_at_threshold" not in removed
-    # Evicted from working memory but archived — recallable, not deleted.
-    assert "orphan_at_threshold" not in net._concepts
-    assert net.archive_size == 1
+    assert net.get_concept("orphan_at_threshold") is None
     assert net.get_concept("connected_at_threshold") is not None
 
 
@@ -3180,31 +3068,29 @@ def test_consolidate_connects_orphans_before_pruning() -> None:
     assert net.get_concept("hub_related_thing") is not None
 
 
-def test_consolidate_removes_truly_isolated_noise(tmpdir) -> None:
+def test_consolidate_removes_truly_isolated_noise() -> None:
     """After hub attachment, truly unconnectable noise is pruned."""
     net = _make_minimal_network()
-    net.attach_archive(open_archive(tmpdir))
 
     # Add noise at confidence 0.2 (below threshold, no edges)
     net.add_concept("noise_low_conf", confidence=0.2)
 
     result = net.consolidate_during_sleep()
     assert result["noise_removed"] >= 1
-    assert "noise_low_conf" not in net._concepts
+    assert net.get_concept("noise_low_conf") is None
 
 
 # ── Regression: existing clean_noise behavior preserved ──
 
 
-def test_clean_noise_still_removes_low_confidence(tmpdir) -> None:
+def test_clean_noise_still_removes_low_confidence() -> None:
     """Concepts below the threshold with no edges are still removed."""
     net = ConceptNetwork()
-    net.attach_archive(open_archive(tmpdir))
     net.add_concept("low_conf_orphan", confidence=0.3)
 
     removed = net.clean_noise(min_confidence=0.5, min_edges=1)
     assert "low_conf_orphan" in removed
-    assert "low_conf_orphan" not in net._concepts
+    assert net.get_concept("low_conf_orphan") is None
 
 
 def test_clean_noise_still_preserves_connected_low_conf() -> None:
@@ -3427,36 +3313,15 @@ def test_clean_noise_archives_instead_of_deleting() -> None:
     net._archive.close()
 
 
-def test_clean_noise_preserves_concepts_without_an_archive(caplog) -> None:
-    """A missing archive must never turn maintenance into data loss."""
-    import logging
-
+def test_clean_noise_deletes_only_without_an_archive() -> None:
+    """No store anywhere means deletion is the only option left."""
     net = _noise_network(5, archive=False)
-    caplog.set_level(logging.ERROR, logger="temporal_lobe.concepts.network")
 
     removed = net.clean_noise(min_confidence=0.4, min_edges=1)
 
-    assert removed == [], "unarchived concepts must not be reported as removed"
-    assert net.size == 5
-    assert all(net.get_concept(f"fragment_{i}") is not None for i in range(5))
+    assert len(removed) == 5
+    assert net.size == 0
     assert net.archive_size == 0, "no archive was ever attached"
-    assert "no concept archive is attached" in caplog.text
-
-
-def test_clean_noise_preserves_concepts_when_archive_is_closed(caplog) -> None:
-    """A closed archive returns zero instead of raising; zero is not a commit."""
-    import logging
-
-    net = _noise_network(5)
-    net._archive.close()
-    caplog.set_level(logging.ERROR, logger="temporal_lobe.concepts.network")
-
-    removed = net.clean_noise(min_confidence=0.4, min_edges=1)
-
-    assert removed == []
-    assert net.size == 5
-    assert all(net.get_concept(f"fragment_{i}") is not None for i in range(5))
-    assert "archived 0 of 5 noise concepts" in caplog.text
 
 
 def test_clean_noise_keeps_concepts_when_the_archive_write_fails(caplog) -> None:

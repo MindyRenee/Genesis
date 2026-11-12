@@ -48,9 +48,7 @@ class Turn:
         # words — anaphora resolution rewrites "you" and would mark
         # every second-person question as being about Genesis.
         t1 = _time.perf_counter()
-        perception, prediction_error = engine._think_perceive_and_error(
-            raw_input, prediction, comprehension
-        )
+        perception, prediction_error = engine._think_perceive_and_error(raw_input, prediction)
         timing["perceive"] = _time.perf_counter() - t1
         logger.debug(
             "perceive done in %.3fs, topics=%s",
@@ -63,12 +61,7 @@ class Turn:
         # Frontal: route before the full pipeline. An early route is
         # a complete answer and ends the turn here.
         t1 = _time.perf_counter()
-        early = engine._think_early_routes(
-            resolved,
-            perception,
-            raw_input,
-            comprehension,
-        )
+        early = engine._think_early_routes(resolved, perception, raw_input)
         timing["early_routes"] = _time.perf_counter() - t1
         if early is not None:
             timing["total"] = _time.perf_counter() - t0

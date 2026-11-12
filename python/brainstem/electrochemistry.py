@@ -95,14 +95,11 @@ def interpret_ions(summary: IonSummary | None) -> IonCognitiveContext:
     if not isinstance(summary, IonSummary):
         return IonCognitiveContext.neutral()
 
-    # Physical quantities flow unclamped — the Rust IonState produces
-    # them without rails (Nernst/chord-conductance bounds are emergent).
-    # Only non-finite corruption falls back to the resting value.
-    membrane = _finite(summary.membrane_potential_mv, -75.0)
-    nak = _finite(summary.nak_pump_rate, 0.018)
-    kcl = _finite(summary.kcl_cotransporter_flux, 0.010)
-    ncx = _finite(summary.ncx_flux, 0.0002)
-    net_current = _finite(summary.net_membrane_current, 0.0)
+    membrane = _finite_clamp(summary.membrane_potential_mv, -120.0, 80.0, -75.0)
+    nak = _finite_clamp(summary.nak_pump_rate, 0.0, 0.042, 0.018)
+    kcl = _finite_clamp(summary.kcl_cotransporter_flux, -0.08, 0.12, 0.010)
+    ncx = _finite_clamp(summary.ncx_flux, -0.002, 0.02, 0.0002)
+    net_current = _finite_clamp(summary.net_membrane_current, -1000.0, 1000.0, 0.0)
 
     atp = _unit(summary.atp_availability, 0.9)
     calcium = _unit(summary.calcium_signal, 0.0)
@@ -114,38 +111,39 @@ def interpret_ions(summary: IonSummary | None) -> IonCognitiveContext:
     # Resting values are centered rather than absolute: load=0.25 and
     # atp=0.9 are physiological baseline, not strain. This keeps the
     # interpretation neutral when the daemon reports a healthy rest state.
-    # The composites are convex combinations of unit signals — bounded
-    # in [0, 1] by construction, no clamp needed.
-    metabolic_strain = (
+    metabolic_strain = _clamp(
         0.70 * max(0.0, (load - 0.25) / 0.75) + 0.30 * max(0.0, (0.9 - atp) / 0.9)
     )
-    physiological_balance = (
+    physiological_balance = _clamp(
         0.45 * integrity + 0.25 * atp + 0.20 * (1.0 - load) + 0.10 * chloride
     )
 
-    # Cognitive gains saturate smoothly: 1 + A·tanh(x/A) has unit slope
-    # at the operating point and asymptotes at 1 ± A, so a gain can
-    # never run away but is never pinned at a rail either.
-    attention_gain = _gain(
-        0.20 * excitability
+    attention_gain = _clamp(
+        1.0
+        + 0.20 * excitability
         + 0.12 * (chloride - 0.5)
         - 0.20 * metabolic_strain
         - 0.10 * (1.0 - integrity),
-        0.35,
+        0.55,
+        1.25,
     )
-    workspace_gain = _gain(
-        0.20 * excitability
+    workspace_gain = _clamp(
+        1.0
+        + 0.20 * excitability
         + 0.15 * (physiological_balance - 0.875)
         - 0.10 * metabolic_strain,
-        0.35,
+        0.50,
+        1.20,
     )
-    memory_consolidation_gain = _gain(
-        0.15 * (atp - 0.9) + 0.20 * (integrity - 1.0) - 0.15 * (load - 0.25),
-        0.35,
+    memory_consolidation_gain = _clamp(
+        1.0 + 0.15 * (atp - 0.9) + 0.20 * (integrity - 1.0) - 0.15 * (load - 0.25),
+        0.50,
+        1.20,
     )
-    synaptic_plasticity_gain = _gain(
-        0.45 * calcium + 0.20 * (atp - 0.9) + 0.20 * (integrity - 1.0) - 0.20 * (load - 0.25),
-        0.45,
+    synaptic_plasticity_gain = _clamp(
+        1.0 + 0.45 * calcium + 0.20 * (atp - 0.9) + 0.20 * (integrity - 1.0) - 0.20 * (load - 0.25),
+        0.35,
+        1.30,
     )
 
     return IonCognitiveContext(
@@ -172,29 +170,6 @@ def interpret_ions(summary: IonSummary | None) -> IonCognitiveContext:
 def _clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
     """Clamp a finite value to a closed interval."""
     return max(lower, min(upper, value))
-
-
-def _finite(value: float, default: float) -> float:
-    """Pass a physical quantity through; only non-finite input is replaced."""
-    try:
-        return value if math.isfinite(value) else default
-    except (TypeError, ValueError, OverflowError):
-        return default
-
-
-def _gain(deviation: float, amplitude: float) -> float:
-    """Saturating gain around unity: 1 + A·tanh(x/A).
-
-    Unit slope at the origin preserves the linear response near the
-    operating point; the tanh asymptotes at 1 ± A so the gain stays
-    bounded without a hard rail.
-    """
-    try:
-        if not math.isfinite(deviation):
-            return 1.0
-        return 1.0 + amplitude * math.tanh(deviation / amplitude)
-    except (TypeError, ValueError, OverflowError):
-        return 1.0
 
 
 def _unit(value: float, default: float) -> float:

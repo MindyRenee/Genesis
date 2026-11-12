@@ -43,10 +43,10 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from occipital_lobe import VisualCortex
     from temporal_lobe.concepts import EmbeddingStore
 
     from genesis_client.types import PlasticityProfile
-    from occipital_lobe import VisualCortex
 
 from basal_ganglia.td import TDLearner
 from limbic_system.curiosity import Curiosity
@@ -812,13 +812,6 @@ class AutonomousLearner:
         # offline so we can detect the offline→online transition and
         # emit an event when connectivity returns.
         self._was_offline = False
-
-        # Last gating-block reason emitted. The learner re-checks
-        # gating on a timer and on every state-change wake, so without
-        # dedupe an unchanged gate prints the same line every cycle —
-        # hours of "Skipping learning" through one sleep episode.
-        # Emitted once per reason; cleared when learning may proceed.
-        self._last_block_reason: str | None = None
 
         # Emotional gating — track how many cycles were skipped
         # due to negative emotional state
@@ -2146,13 +2139,6 @@ class AutonomousLearner:
         }
     )
 
-    def _emit_skip(self, reason: str) -> None:
-        """Emit a gating-skip notice only when the reason changed."""
-        if reason == self._last_block_reason:
-            return
-        self._last_block_reason = reason
-        self._emit("learning", reason)
-
     def _should_learn(self) -> bool:
         """Check if Genesis is in an emotional state suitable for learning.
 
@@ -2184,47 +2170,28 @@ class AutonomousLearner:
         if self._current_posture == LEARNING_POSTURE_PROTECTIVE:
             self._posture_skips += 1
             cortisol = self._posture_profile.cortisol_tonic if self._posture_profile else 0.0
-            self._emit_skip(
+            self._emit(
+                "learning",
                 f"protective posture (cortisol={cortisol:.2f})",
             )
             return False
 
-        # ── Ion-layer gating ─────────────────────────────────
-        # The electrochemical substrate says the same thing earlier:
-        # a strained membrane (low ATP, degraded gradients, high
-        # metabolic load) favors protective learning before the
-        # plasticity profile catches up. ``needs_physiological_recovery``
-        # is the ion context's own flag for it.
-        get_ion = getattr(self, "_get_ion_context", None)
-        if get_ion is not None:
-            try:
-                ctx = get_ion()
-            except Exception:  # noqa: BLE001
-                ctx = None
-            if ctx is not None and getattr(ctx, "needs_physiological_recovery", False):
-                self._posture_skips += 1
-                self._emit_skip("ion layer strained")
-                return False
-
         # ── Emotion-label gating (existing) ────────────────────
         if not self._get_emotion:
-            self._last_block_reason = None
             return True  # no emotion callback → always allow (for testing)
 
         try:
             emotion = self._get_emotion()
         except (OSError, ConnectionError, RuntimeError):
-            self._last_block_reason = None
             return True  # can't read state → don't block on errors
 
         if not emotion:
-            self._last_block_reason = None
             return True
 
         # Block learning in negative states
         if emotion.label in self._BLOCKING_LABELS:
             self._emotion_skips += 1
-            self._emit_skip(f"Skipping learning — feeling {emotion.label}")
+            self._emit("learning", f"Skipping learning — feeling {emotion.label}")
             return False
 
         # ── Brain-wave gating ──────────────────────────────────
@@ -2241,10 +2208,9 @@ class AutonomousLearner:
                 waves = None
             if waves is not None:
                 if waves.dominant == BrainWave.DELTA:
-                    self._emit_skip("delta-dominant — deep rest, not learning")
+                    self._emit("learning", "delta-dominant — deep rest, not learning")
                     return False
 
-        self._last_block_reason = None
         return True
 
     def _next_topic(self) -> str | None:
@@ -2811,9 +2777,8 @@ class AutonomousLearner:
         Runs in a background thread so it doesn't slow down text learning.
         """
         try:
-            from tools.source_registry import wikipedia_lead_image
-
             from occipital_lobe import decode_image_bytes, resize_for_vision
+            from tools.source_registry import wikipedia_lead_image
 
             # Fetch the article's lead image
             img_bytes = wikipedia_lead_image(article_title)

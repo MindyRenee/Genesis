@@ -49,14 +49,14 @@ COUPLING: HOW OTHERS AFFECT ACETYLCHOLINE (matrix row 3)
 Index order: DA, SRT, NE, ACh, GABA, GLU, CORT, OXY, END, HIST,
 ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 
-    DA  ->  ACh:  0.10  (co-fluctuation at ~2 Hz (Howe et al., 2023).)
-    NE  ->  ACh:  0.10  (weak volume transmission.)
+    DA   -> ACh: +0.05  (co-fluctuation at ~2 Hz (Howe et al., 2023).)
+    NE   -> ACh: +0.05  (weak volume transmission.)
     GABA -> ACh: -0.10  (inhibition of cholinergic basal forebrain.)
-    GLU  ->  ACh:  0.10  (weak volume transmission.)
-    HIST  ->  ACh:  0.10  (weak volume transmission.)
-    BDNF  ->  ACh:  0.10  (weak volume transmission.)
-    OX  ->  ACh:  0.10  (orexin-driven cortical activation.)
-    MEL  ->  ACh:  -0.10  (sleep suppression of cholinergic arousal.)
+    GLU  -> ACh: +0.05  (weak volume transmission.)
+    HIST -> ACh: +0.05  (weak volume transmission.)
+    BDNF -> ACh: +0.05  (weak volume transmission.)
+    OX   -> ACh: +0.05  (orexin-driven cortical activation.)
+    MEL  -> ACh: -0.05  (sleep suppression of cholinergic arousal.)
     SRT  -> ACh: 0.00   (no direct coupling)
     CORT -> ACh: 0.00   (no direct coupling)
     OXY  -> ACh: 0.00   (no direct coupling)
@@ -71,13 +71,13 @@ ADN, BDNF, ECB, VP, CRH, OX, EPI, MEL
 COUPLING: HOW ACETYLCHOLINE AFFECTS OTHERS (matrix column 3)
 ════════════════════════════════════════════════════════════════════════
 
-    ACh  ->  DA:  0.10  (co-fluctuation at ~2 Hz (Howe et al., 2023).)
-    ACh  ->  NE:  0.10  (weak volume transmission.)
-    ACh  ->  GABA:  -0.10  (weak volume transmission.)
-    ACh  ->  GLU:  0.10  (weak volume transmission.)
-    ACh  ->  HIST:  0.10  (weak volume transmission.)
-    ACh  ->  BDNF:  0.10  (trophic support.)
-    ACh  ->  OX:  0.10  (weak volume transmission.)
+    ACh -> DA :  +0.05  (co-fluctuation at ~2 Hz (Howe et al., 2023).)
+    ACh -> NE :  +0.05  (weak volume transmission.)
+    ACh -> GABA:  -0.05  (weak volume transmission.)
+    ACh -> GLU:  +0.05  (weak volume transmission.)
+    ACh -> HIST:  +0.05  (weak volume transmission.)
+    ACh -> BDNF:  +0.05  (trophic support.)
+    ACh -> OX :  +0.05  (weak volume transmission.)
     ACh -> EPI:  +0.10  (preganglionic cholinergic stimulation of adrenal medulla — the strongest
                         coupling for EPI.)
     ACh -> SRT:  0.00   (no direct coupling)
@@ -117,18 +117,15 @@ Acetylcholinesterase (AChE) degradation:
     but preserves the key property: ACh is the fastest-degrading
     neurotransmitter in the model.
 
-Network-driven set-point (sleep):
+Network-driven release (sleep):
     The scripted cholinergic rebound is retired. When the sleep-wake
-    network is running, its populations (LC for waking, REM-on for
-    REM) supply ACh's homeostatic set-point — the network, not a
-    threshold latch, produces the cholinergic rebound into REM. The
-    release target is modulated by adenosine A1 suppression and
-    expected uncertainty (see MATHEMATICAL FORMULAS):
+    network is running, ACh is driven directly by the network's
+    populations (LC for waking, REM-on for REM) toward a linear
+    release target — the network, not a threshold latch, produces
+    the cholinergic rebound into REM:
 
-        ach_target = ACH_BASE
-                   + ACH_FROM_LC * lc * (1 - A1(adn)) * D(alpha)
-                   + ACH_FROM_REM * rem
-        level relaxes toward target through the full integrator.
+        ach_target = ACH_BASE + ACH_FROM_LC * lc + ACH_FROM_REM * rem
+        level relaxes toward target: level -> target - exp(-rate) * (target - level)
 
     Steady states follow the microdialysis profile (Vazquez &
     Baghdoyan, 2001): NREM 0.34, waking 0.58, REM 0.77 — the
@@ -136,11 +133,8 @@ Network-driven set-point (sleep):
     REM-on cells (cholinergic) are active while REM-off cells
     (noradrenergic, serotonergic) are silenced.
 
-    The network supplies the set-point; the level still arrives
-    through the full integration — homeostatic pull, coupling,
-    autoreceptors, clearance — so the coupling web can shift the
-    equilibrium away from the target exactly as it does for every
-    other chemical.
+    While network-driven, the main loop skips ACh entirely (continue)
+    so the homeostatic/coupling forces don't fight the release target.
 
 GABA disinhibition:
     When GABA is very high (>0.8) AND ACh is high (>0.6), GABA
@@ -168,14 +162,9 @@ AChE degradation (excess-only):
     where ACH_DEGRADATION_RATE = 0.03
 
 Network release target (network-driven states):
-    ach_target = ACH_BASE
-              + ACH_FROM_LC * lc * (1 - A1(adenosine)) * D(alpha)
-              + ACH_FROM_REM * rem
-    where A1 is the adenosine A1-receptor suppression (a Hill
-    occupancy isotherm, zero at rest adenosine) and D is the
-    expected-uncertainty drive from inference precision.
-    The level relaxes toward the target through the standard
-    integrator; steady states: NREM 0.34, waking 0.58, REM 0.77
+    ach_target = ACH_BASE + ACH_FROM_LC * lc + ACH_FROM_REM * rem
+    level -> ach_target - exp(-rate * dt_scale) * (ach_target - level)
+    steady states: NREM 0.34, waking 0.58, REM 0.77
 
 
 ════════════════════════════════════════════════════════════════════════

@@ -36,7 +36,6 @@ from genesis_client.protocol import (
     CHEM_NOREPINEPHRINE,
     CHEM_OREXIN,
     CHEM_SEROTONIN,
-    PHASE_DROWSY,
     PHASE_NAMES,
     PHASE_NREM,
     PHASE_REM,
@@ -228,7 +227,6 @@ class SleepMixin:
         self._last_rest_time = time.time()
         self._last_concept_count = 0
         self._is_teaching = False
-        self._in_game = False
         self._teaching_topic: str = ""
         # A /teach-questions session — she asked, the user is
         # answering. While it holds, background stays paused and
@@ -1025,20 +1023,6 @@ class SleepMixin:
         # but calling it keeps the two paths identical.
         self.inner_life.resume()
 
-        # The voluntary eyelid — sleep closes the eye she means to
-        # sleep behind. The lid is hers alone now (no phase floor in
-        # the nerve), so the sleep system sets it: ~0.15 dims the
-        # retinal afferents the way lid closure does — the SCN's
-        # light drive and the collicular alert both read through it.
-        # Held daemon-side, so a mind that dies mid-sleep leaves the
-        # lid as she left it and wake() opens it again.
-        set_lid = getattr(self.client, "set_lid", None)
-        if set_lid is not None:
-            try:
-                set_lid(0.15)
-            except Exception:  # noqa: BLE001
-                pass
-
         # Reset discourse state — recent entities from the previous
         # conversation shouldn't persist across sleep. Just as humans
         # don't maintain pronoun referents across a sleep cycle, the
@@ -1127,26 +1111,22 @@ class SleepMixin:
             else:
                 lines.append("  No dreams recorded yet.")
 
-        # Sleep microarchitecture — the night's own event tallies:
-        # slow waves (systems consolidation), spindles (synaptic
-        # plasticity), PGO waves (REM generation), K-complexes
-        # (sensory gating). Zeroes mean the night is young.
-        inner = getattr(self, "inner_life", None)
-        if inner is not None:
-            lines.append(
-                f"  Sleep events: swr={inner.swr_count} "
-                f"spindles={inner.spindle_count} "
-                f"pgo={inner.pgo_count} "
-                f"kcomplexes={inner.kcomplex_count}"
+        # Receptor safety check — are its levels safe to wake?
+        try:
+            profile = self.client.get_plasticity_profile()
+            safe = profile.cortisol_tonic < AUTO_WAKE_CORTISOL and profile.bdnf_tonic > 0.2
+            if safe:
+                lines.append("  Receptor state: safe to wake.")
+            else:
+                lines.append(
+                    f"  Receptor state: cortisol={profile.cortisol_tonic:.2f} "
+                    f"BDNF={profile.bdnf_tonic:.2f} — still recovering."
+                )
+        except (OSError, ConnectionError, RuntimeError) as e:
+            note_swallowed(
+                "mind.sleep.sleep_status",
+                e,
             )
-
-        # Receptor safety — wake_readiness() is the one gate; the
-        # status line reports what it says rather than re-deriving it.
-        ready, reason = self.wake_readiness()
-        if ready:
-            lines.append("  Receptor state: safe to wake.")
-        else:
-            lines.append(f"  Receptor state: {reason} — still recovering.")
 
         return "\n".join(lines)
 
@@ -1282,15 +1262,9 @@ class SleepMixin:
         target in the brain), dopamine for reward re-engagement, and
         melatonin suppressed to release the circadian brake. Without
         this, the daemon's phase stays asleep (adenosine is still high,
-        histamine still low). Nothing is held — the impulses decay on
-        their own half-lives and the flip-flop's state decides the
-        crossing.
-
-        One organism, one state: while the body's phase still reports
-        sleep she IS asleep, so the request only pushes the cascade —
-        the flag, the zone, and every awake-side resume belong to a
-        body that actually woke. ``_check_wake_desync`` completes the
-        wake through this same method once the phase has crossed.
+        histamine still low) even though the mind's _is_sleeping flag
+        is cleared. Nothing is held — the impulses decay on their own
+        half-lives and the flip-flop's state decides the crossing.
 
         ``user_initiated`` marks an explicit user wake request
         (/wake, or an interaction that rouses it). While the wake
@@ -1328,39 +1302,13 @@ class SleepMixin:
         # asleep through the final save.
         if self._stop_latched:
             return WakeOutcome.BLOCKED
-
-        # The mind does not wake ahead of the body — the two layers
-        # are one organism, never in opposite sleep states. A daemon
-        # phase still in NREM/REM makes this only a request: send the
-        # arousal cascade and stay under while the flip-flop crosses
-        # on LC's ~23-minute time constant. Declaring the flag awake
-        # first is what let volition urges, speech, and the learners
-        # run awake-side machinery on a body that had not risen.
-        try:
-            daemon_asleep = self.client.get_phase().phase in (
-                PHASE_NREM,
-                PHASE_REM,
-            )
-        except (OSError, ConnectionError, RuntimeError, AttributeError):
-            # Body unreadable — wake as before; the sync checks
-            # reconcile whatever the next readable state turns out to be.
-            daemon_asleep = False
-        if daemon_asleep:
-            logger.info("wake requested while daemon still asleep: sending arousal cascade")
-            self._send_wake_neuro_impulses()
-            record_event(
-                "wake_body_push",
-                "wake requested while daemon phase asleep",
-            )
-            return WakeOutcome.BODY_WAKE_PUSHED
-
         episode_secs, was_nap, was_user_initiated = self._clear_sleep_flags()
 
-        # The body's phase already reports awake — the crossing
-        # happened, whether the cascade drove it or the body rose on
-        # its own. Send the cascade anyway: the impulses hold the wake
-        # side against a re-descent and stamp the attempt window the
-        # sync checks bracket around the switch.
+        # Send neurochemical wake impulses to push the emergent phase
+        # out of NREM/REM. Without this, the daemon's phase stays
+        # asleep because adenosine is still high and histamine is low,
+        # even though the mind's _is_sleeping flag is cleared. This
+        # closes the desync between cognitive and subcognitive layers.
         self._send_wake_neuro_impulses()
 
         # Record the wake unconditionally. Waking previously produced no
@@ -1417,17 +1365,6 @@ class SleepMixin:
         self._nap_mode = False
         self._sleep_start_time = 0.0
         self.client.set_zone(ZONE_CONVERSATION)
-        # The eye opens with her — the lid sleep shut in
-        # _engage_sleep_mechanism releases here, on the same funnel
-        # every real wake takes. A mind still meditating keeps hers
-        # shut: the sit's lid is its own, not sleep's to reopen.
-        if not self._is_meditating:
-            set_lid = getattr(self.client, "set_lid", None)
-            if set_lid is not None:
-                try:
-                    set_lid(1.0)
-                except Exception:  # noqa: BLE001
-                    pass
         return episode_secs, was_nap, was_user_initiated
 
     def _wake_epilogue(self) -> None:
@@ -1585,12 +1522,7 @@ class SleepMixin:
                 e,
             )
             return False
-        # Drowsy counts as heading-to-sleep, not just NREM/REM: a body
-        # resting at the threshold needs the mind's machinery paused
-        # (learners, inner life) for the latch to complete — requiring
-        # a fully-crossed phase first is a catch-22 that leaves a
-        # drowsy body and an awake mind fighting each other.
-        if phase not in (PHASE_NREM, PHASE_REM, PHASE_DROWSY):
+        if phase not in (PHASE_NREM, PHASE_REM):
             return False
         now = time.time()
         # Inside the wake-attempt window, an asleep phase is the
@@ -1705,11 +1637,8 @@ class SleepMixin:
         )
         # Reconcile in the body's direction: it is awake and the mind
         # wakes with it — the two are never in opposite sleep states.
-        # A wake the user asked for keeps its user-initiated marker
-        # through the join so the stabilization window still resists
-        # the circadian pull-back.
         try:
-            self.wake(user_initiated=self._last_wake_user_initiated)
+            self.wake()
         except Exception as e:  # noqa: BLE001
             logger.warning(f"desync wake failed: {e}")
             return False
@@ -1753,18 +1682,6 @@ class SleepMixin:
         self._is_meditating = True
         self._meditation_start_time = time.time()
         self.client.set_zone(ZONE_REFLECTION)
-        # The voluntary eyelid — the orbicularis the hardware lacks.
-        # Closing the eyes for the sit is the deliberate part of
-        # meditation the body's sleep phase never reaches: the lid
-        # is hers alone, held daemon-side, so this dims the visual
-        # afferents for the sit and nothing else. Held, so the
-        # release happens at wake_from_meditation.
-        set_lid = getattr(self.client, "set_lid", None)
-        if set_lid is not None:
-            try:
-                set_lid(0.15)
-            except Exception:  # noqa: BLE001
-                pass
         # Meditation is a deliberate state change with no durable
         # record, like sleep onset before this. It is also the only
         # state in which inner life and the learner are both paused,
@@ -1869,15 +1786,8 @@ class SleepMixin:
         if not self._is_meditating:
             return
         # The pulse releases first — the keep belongs to the sit and
-        # must not outlive it, teardown path included. The voluntary
-        # lid releases the same way: a shut eye belongs to the sit.
+        # must not outlive it, teardown path included.
         self.heart.disarm_hypnagogic()
-        set_lid = getattr(self.client, "set_lid", None)
-        if set_lid is not None:
-            try:
-                set_lid(1.0)
-            except Exception:  # noqa: BLE001
-                pass
         # Teardown has begun — the zone write and the resumes below
         # belong to threads already joined. The flag still clears so
         # the saved state does not record a phantom meditation.

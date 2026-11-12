@@ -193,25 +193,8 @@ const CA_EXTRUSION_BASE_MM_PER_S: f32 = 0.00016;
 const CA_EXTRUSION_GAIN_PER_S: f32 = 2.0;
 /// High intracellular Na⁺ weakens/reverses Na⁺/Ca²⁺ exchange.
 const NCX_REVERSE_GAIN_MM_PER_S: f32 = 0.0004;
-/// Intracellular Ca²⁺ half-saturation for NCX forward-mode exchange
-/// (mM scale of the free Ca²⁺ pool the exchanger reports on).
-const NCX_CA_KM_MM: f32 = 0.0001;
 /// Ca²⁺ level treated as a full-strength normalized signal.
 const CA_SIGNAL_FULL_MM: f32 = 0.005;
-
-/// ln(intra/extra) at the resting gradient, per ion (Ca, Cl, K, Na).
-/// The gradient-integrity kernel measures deviation from these.
-const REST_LOG_RATIO: [f32; ION_COUNT] = [
-    -9.392_662, // ln(0.0001 / 1.2)
-    -2.908_721, // ln(6 / 110)
-    3.332_205,  // ln(140 / 5)
-    -2.674_149, // ln(10 / 145)
-];
-
-/// Nernst reversal potentials at the resting gradients (mV), per ion.
-/// Used only when a concentration gradient has collapsed (non-positive
-/// substrate) — the channel then sees no chemical driving force.
-const REST_REVERSAL_POTENTIAL_MV: [f32; ION_COUNT] = [125.5, -77.7, -89.0, 71.4];
 
 /// Persistent electrochemical ion state.
 ///
@@ -321,11 +304,11 @@ impl IonState {
     /// Calcium-dependent plasticity modulation for the memory gating layer.
     ///
     /// Resting Ca²⁺ leaves the neurochemical plasticity gate at ~70% of its
-    /// neurotransmitter-derived value; strong Ca²⁺ transients restore full
-    /// plasticity. The readout is a tanh isotherm — it asymptotes to 1
-    /// rather than hitting a rail.
+    /// neurotransmitter-derived value; strong but bounded Ca²⁺ transients
+    /// restore full plasticity. Extreme Ca²⁺ is clamped rather than allowed
+    /// to amplify plasticity without bound.
     pub fn plasticity_modulator(&self) -> f32 {
-        0.70 + 0.30 * (self.calcium_signal * 2.0).tanh()
+        finite_clamp(0.70 + 0.60 * self.calcium_signal, 0.0, 1.0)
     }
 
     /// Advance ion electrochemistry by `dt` seconds, driven by the current
@@ -344,17 +327,15 @@ impl IonState {
     }
 
     fn tick_step(&mut self, neuro: &NeurochemicalVector, dt: f32) {
-        self.sanitize_finite();
+        self.sanitize();
         self.recompute_derived();
         let dt = finite_clamp(finite_or(dt, super::neurochemical::DT), 0.001, 1.0);
 
-        // effective() is already a saturated signal in [0,2) — the
-        // receptor isotherm is the bound; no range is written here.
-        let glutamate = neuro.effective(NeurochemicalId::Glutamate);
-        let gaba = neuro.effective(NeurochemicalId::GABA);
-        let acetylcholine = neuro.effective(NeurochemicalId::Acetylcholine);
-        let adenosine = neuro.effective(NeurochemicalId::Adenosine);
-        let cortisol = neuro.effective(NeurochemicalId::Cortisol);
+        let glutamate = finite_clamp(neuro.effective(NeurochemicalId::Glutamate), 0.0, 2.0);
+        let gaba = finite_clamp(neuro.effective(NeurochemicalId::GABA), 0.0, 2.0);
+        let acetylcholine = finite_clamp(neuro.effective(NeurochemicalId::Acetylcholine), 0.0, 2.0);
+        let adenosine = finite_clamp(neuro.effective(NeurochemicalId::Adenosine), 0.0, 1.0);
+        let cortisol = finite_clamp(neuro.effective(NeurochemicalId::Cortisol), 0.0, 1.0);
 
         let voltage = self.membrane_potential_mv;
         let sodium_gate = sigmoid((voltage + 35.0) / 6.0);
@@ -393,10 +374,7 @@ impl IonState {
         for i in 0..ION_COUNT {
             let alpha = 1.0 - (-dt / CONDUCTANCE_TAU_S[i]).exp();
             self.conductance[i] += (target[i] - self.conductance[i]) * alpha;
-            // No range written: every target above is a sum of
-            // non-negative saturating terms (~≤2), and the exponential
-            // relaxation is a convex combination — conductance stays
-            // inside the hull of {state, target} by construction.
+            self.conductance[i] = finite_clamp(self.conductance[i], 0.0, 4.0);
         }
 
         // Na⁺/K⁺-ATPase — Luo & Rudy (1994) forward rate:
@@ -409,39 +387,28 @@ impl IonState {
         // ionic influx it exists to reverse. ATP gates through a
         // saturating Michaelis term; the previous linear factor made
         // the pump stall far earlier than its real Km allows.
-        // Hill form of the Na⁺ drive: `Na_i^1.5/(Na_i^1.5 + Km^1.5)`.
-        // Identical to `1/(1+(Km/Na_i)^1.5)` for positive substrate but
-        // well-defined at Na_i = 0 (drive → 0) — substrate exhaustion
-        // is the pump's own limit, not a floor written before the
-        // division.
-        let na_i_conc = self.intracellular_mm[na_i];
+        let na_i_conc = self.intracellular_mm[na_i].max(0.01);
         let k_o_conc = self.extracellular_mm[k_i];
         let na_o_conc = self.extracellular_mm[na_i];
-        let na_i_hill = na_i_conc.abs().powf(NAK_NA_HILL);
-        let km_hill = NAK_KM_NA_I_MM.powf(NAK_NA_HILL);
-        let na_drive = na_i_hill / (na_i_hill + km_hill);
+        let na_drive = 1.0 / (1.0 + (NAK_KM_NA_I_MM / na_i_conc).powf(NAK_NA_HILL));
         let ko_drive = k_o_conc / (k_o_conc + NAK_KM_K_O_MM);
         let v_over_rt_f = self.membrane_potential_mv / NERNST_FACTOR_MV;
         let sigma = ((na_o_conc / NAK_NA_O_SCALE_MM).exp() - 1.0) / 7.0;
         let f_nak = 1.0
             / (1.0 + 0.1245 * (-0.1 * v_over_rt_f).exp() + 0.0365 * sigma * (-v_over_rt_f).exp());
         let atp_drive = self.atp_availability / (self.atp_availability + NAK_KM_ATP);
-        self.nak_pump_rate = NAK_MAX_RATE_MM_PER_S * na_drive * ko_drive * f_nak * atp_drive;
+        self.nak_pump_rate = finite_clamp(
+            NAK_MAX_RATE_MM_PER_S * na_drive * ko_drive * f_nak * atp_drive,
+            0.0,
+            NAK_MAX_RATE_MM_PER_S,
+        );
 
         // Chord-conductance voltage target. The Na⁺/K⁺ pump contributes a
         // small net outward (hyperpolarizing) current due to its 3:2 ratio.
         let ca_i = IonId::Calcium as usize;
         let ncx_reversal =
             3.0 * self.reversal_potential_mv[na_i] - 2.0 * self.reversal_potential_mv[ca_i];
-        // NCX forward-mode Ca²⁺ extrusion requires intracellular Ca²⁺:
-        // the exchange current saturates with Ca_i occupancy
-        // (`Ca_i/(Ca_i+Km)`) — as the store empties the exchanger
-        // stalls instead of driving the concentration through zero.
-        // Substrate exhaustion is the mechanism's own limit.
-        let ca_i_conc = self.intracellular_mm[ca_i];
-        let ncx_ca_drive = ca_i_conc / (ca_i_conc + NCX_CA_KM_MM);
         let ncx = (NCX_REVERSE_GAIN_MM_PER_S / CALCIUM_FREE_FRACTION)
-            * ncx_ca_drive
             * ((ncx_reversal - voltage) / (2.0 * NERNST_FACTOR_MV)).tanh();
         self.ncx_flux = ncx;
         let pmca_max = 2.0 * CA_EXTRUSION_BASE_MM_PER_S;
@@ -468,10 +435,7 @@ impl IonState {
         let mean_voltage = voltage_target
             + (voltage - voltage_target) * voltage_alpha / voltage_decay.max(f32::MIN_POSITIVE);
         self.membrane_potential_mv += (voltage_target - self.membrane_potential_mv) * voltage_alpha;
-        // No voltage rail: the chord-conductance target is a weighted
-        // mean of the Nernst reversal potentials, so the membrane
-        // potential is confined to their convex hull — the bound is
-        // the ionic gradients' own, not a written range.
+        self.membrane_potential_mv = finite_clamp(self.membrane_potential_mv, -120.0, 80.0);
 
         // Channel currents and concentration changes. Positive current is
         // outward conventional current. For cations, outward current removes
@@ -563,27 +527,21 @@ impl IonState {
         // ~0.08 peak) — the raw level could never move this term.
         let atp_consumption = nak + pmca;
         let pump_capacity = NAK_MAX_RATE_MM_PER_S + pmca_max / CALCIUM_FREE_FRACTION;
-        // Pump load as a saturating occupancy: `S/(S+K)` with K = pump
-        // capacity — a Hill isotherm in (0,1) instead of a clipped
-        // ratio. At half-capacity load it reads 0.5; it can never
-        // exceed 1 because the fraction's denominator contains the
-        // numerator.
-        let load_target = atp_consumption / (atp_consumption + pump_capacity);
+        let load_target = finite_clamp(atp_consumption / pump_capacity, 0.0, 1.0);
         let load_alpha = 1.0 - (-dt / 5.0).exp();
         self.energy_load += (load_target - self.energy_load) * load_alpha;
-        // ATP availability is a product of survival factors — each a
-        // decaying exponential in its stressor, so the target lies in
-        // (0,1] by construction and depletion compounds the way
-        // metabolic failure actually does.
-        let atp_target = (-0.35 * adenosine
-            - 0.35 * self.energy_load
-            - 0.10 * crate::state::neurochemical::cortisol_stress_fraction(cortisol))
-        .exp();
+        let atp_target = finite_clamp(
+            1.0 - 0.35 * adenosine
+                - 0.35 * self.energy_load
+                - 0.10 * crate::state::neurochemical::cortisol_stress_fraction(cortisol),
+            0.0,
+            1.0,
+        );
         let atp_alpha = 1.0 - (-dt / 2.0).exp();
         self.atp_availability += (atp_target - self.atp_availability) * atp_alpha;
 
         self.recompute_derived();
-        self.sanitize_finite();
+        self.sanitize();
     }
 
     /// Recompute reversal potentials, currents, and normalized summaries.
@@ -593,96 +551,59 @@ impl IonState {
         let mut net_current = PUMP_CURRENT_EQUIV_MV * (self.nak_pump_rate / NAK_MAX_RATE_MM_PER_S)
             - self.ncx_flux / CURRENT_TO_MM_PER_S[IonId::Sodium as usize];
         for (i, ion) in IonId::all().into_iter().enumerate() {
-            // Nernst reversal is defined only for positive
-            // concentrations — the logarithm's domain. Where a
-            // gradient has collapsed (either side ≤ 0) there is no
-            // chemical driving force, so the reversal falls back to
-            // the resting potential: the channel sees no gradient.
-            let inside_raw = finite_or(self.intracellular_mm[i], REST_INTRACELLULAR_MM[i]);
-            let outside_raw = finite_or(self.extracellular_mm[i], REST_EXTRACELLULAR_MM[i]);
-            self.reversal_potential_mv[i] = if inside_raw > 0.0 && outside_raw > 0.0 {
-                (NERNST_FACTOR_MV / ion.valence()) * (outside_raw / inside_raw).ln()
-            } else {
-                REST_REVERSAL_POTENTIAL_MV[i]
-            };
+            let inside = finite_clamp(
+                finite_or(self.intracellular_mm[i], REST_INTRACELLULAR_MM[i]),
+                MIN_INTRACELLULAR_MM[i],
+                MAX_INTRACELLULAR_MM[i],
+            );
+            let outside = finite_clamp(
+                finite_or(self.extracellular_mm[i], REST_EXTRACELLULAR_MM[i]),
+                MIN_EXTRACELLULAR_MM[i],
+                MAX_EXTRACELLULAR_MM[i],
+            );
+            self.reversal_potential_mv[i] =
+                (NERNST_FACTOR_MV / ion.valence()) * (outside / inside).ln();
             self.current_density[i] =
                 self.conductance[i] * (self.membrane_potential_mv - self.reversal_potential_mv[i]);
             conductance_sum += self.conductance[i];
             net_current += self.current_density[i];
 
-            // Gradient integrity as a Gaussian kernel on the log-ratio
-            // deviation from rest — 1.0 at the resting gradient,
-            // decaying smoothly to 0 as the gradient erodes. Bounded
-            // by the exponential's own range.
-            if inside_raw > 0.0 && outside_raw > 0.0 {
-                let deviation = ((inside_raw / outside_raw).ln() - REST_LOG_RATIO[i]).abs();
-                gradient_sum += (-deviation).exp();
-            }
+            let gradient_ratio = (inside / outside).ln();
+            let rest_ratio = (REST_INTRACELLULAR_MM[i] / REST_EXTRACELLULAR_MM[i]).ln();
+            gradient_sum += finite_clamp(gradient_ratio / rest_ratio, 0.0, 1.0);
         }
-        self.net_membrane_current = net_current;
-        self.gradient_integrity = gradient_sum / ION_COUNT as f32;
+        self.net_membrane_current = finite_clamp(net_current, -1000.0, 1000.0);
+        self.gradient_integrity = finite_clamp(gradient_sum / ION_COUNT as f32, 0.0, 1.0);
 
         let ca_i = IonId::Calcium as usize;
-        // Ca²⁺ signal: log-ratio of free Ca_i to rest, normalized by
-        // the full-scale log-ratio, passed through a logistic — 0 at
-        // rest, asymptoting to 1 under load, defined even where the
-        // raw ratio is degenerate.
-        let ca_inside = self.intracellular_mm[ca_i];
-        let ca_log_ratio = if ca_inside > 0.0 {
-            (ca_inside / REST_INTRACELLULAR_MM[ca_i]).ln()
-        } else {
-            f32::NEG_INFINITY
-        };
-        let ca_full_log = (CA_SIGNAL_FULL_MM / REST_INTRACELLULAR_MM[ca_i]).ln();
-        self.calcium_signal = sigmoid(6.0 * (ca_log_ratio / ca_full_log - 0.5));
+        let ca_ratio = finite_clamp(
+            self.intracellular_mm[ca_i] / REST_INTRACELLULAR_MM[ca_i],
+            1.0,
+            CA_SIGNAL_FULL_MM / REST_INTRACELLULAR_MM[ca_i],
+        );
+        self.calcium_signal = finite_clamp(
+            ca_ratio.ln() / (CA_SIGNAL_FULL_MM / REST_INTRACELLULAR_MM[ca_i]).ln(),
+            0.0,
+            1.0,
+        );
 
         let cl_i = IonId::Chloride as usize;
         let cl_drive = self.membrane_potential_mv - self.reversal_potential_mv[cl_i];
-        // Efficacy centered at 0.5 for zero driving force, tanh-saturated.
-        self.chloride_efficacy = 0.5 + 0.5 * (cl_drive / 20.0).tanh();
-        // Excitability: sigmoid readout of depolarization — near 0 at
-        // rest, asymptoting to 1 on strong depolarization.
-        self.excitability =
-            sigmoid((self.membrane_potential_mv - RESTING_MEMBRANE_MV - 20.0) / 12.0);
+        self.chloride_efficacy = finite_clamp(0.5 + cl_drive / 20.0, 0.0, 1.0);
+        self.excitability = finite_clamp(
+            (self.membrane_potential_mv - RESTING_MEMBRANE_MV) / 60.0,
+            0.0,
+            1.0,
+        );
 
         if !conductance_sum.is_finite() {
             self.conductance = [0.0055, 0.475, 0.945, 0.11];
         }
     }
 
-    /// Per-tick damage containment: replace non-finite fields with
-    /// their resting values. Unlike [`sanitize`](Self::sanitize), this
-    /// writes NO ranges — every bound in the live dynamics is now a
-    /// property of the equations (Nernst domains, saturating MM/Hill
-    /// factors, convex relaxations, exponential clearance), so the
-    /// only thing a tick must guard against is corrupted arithmetic.
-    fn sanitize_finite(&mut self) {
-        for i in 0..ION_COUNT {
-            self.intracellular_mm[i] =
-                finite_or(self.intracellular_mm[i], REST_INTRACELLULAR_MM[i]);
-            self.extracellular_mm[i] =
-                finite_or(self.extracellular_mm[i], REST_EXTRACELLULAR_MM[i]);
-            self.reversal_potential_mv[i] = finite_or(self.reversal_potential_mv[i], 0.0);
-            self.conductance[i] = finite_or(self.conductance[i], 0.0);
-            self.current_density[i] = finite_or(self.current_density[i], 0.0);
-        }
-        self.membrane_potential_mv = finite_or(self.membrane_potential_mv, RESTING_MEMBRANE_MV);
-        self.nak_pump_rate = finite_or(self.nak_pump_rate, 0.0);
-        self.kcl_cotransporter_flux = finite_or(self.kcl_cotransporter_flux, 0.0);
-        self.ncx_flux = finite_or(self.ncx_flux, 0.0);
-        self.atp_availability = finite_or(self.atp_availability, 1.0);
-        self.calcium_signal = finite_or(self.calcium_signal, 0.0);
-        self.chloride_efficacy = finite_or(self.chloride_efficacy, 0.5);
-        self.excitability = finite_or(self.excitability, 0.0);
-        self.gradient_integrity = finite_or(self.gradient_integrity, 1.0);
-        self.energy_load = finite_or(self.energy_load, 0.0);
-        self.net_membrane_current = finite_or(self.net_membrane_current, 0.0);
-    }
-
     /// Clamp/replace all persisted fields into physiologically bounded,
-    /// finite ranges. This is the explicit damage-containment pass for
-    /// state loaded from mmap or perturbed by malformed inputs — it is
-    /// NOT run per tick; the live dynamics bound themselves.
+    /// finite ranges. This is the NaN/∞ circuit breaker for state loaded
+    /// from mmap or perturbed by malformed inputs.
     pub fn sanitize(&mut self) {
         for i in 0..ION_COUNT {
             self.intracellular_mm[i] = finite_clamp(

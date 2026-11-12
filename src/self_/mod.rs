@@ -13,11 +13,5 @@
 //!
 //! - `self_model` — the structured first-person summary of the
 //!   system's own state.
-//! - `vision` — the body organs as mathematics: the eye's whole
-//!   afferent chain (optics → retinal transduction → V1 → gaze
-//!   plant) lives in the self region, because it is tissue the
-//!   body owns, not a sensor plugged into it.
-
-pub mod vision;
 
 pub use crate::cognition::self_model;

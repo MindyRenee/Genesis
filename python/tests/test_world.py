@@ -434,10 +434,9 @@ def test_tick_rate_limited():
 
 
 def test_social_isolation_rises_over_time():
-    """Isolation grows toward 1.0 over the isolation period — slowly,
-    as experience rather than alarm: half a day alone is halfway felt."""
+    """Isolation grows toward 1.0 over the isolation period."""
     world = _make_world()
-    world._last_addressed_time = time.time() - 43200.0
+    world._last_addressed_time = time.time() - 900.0
     iso = world.social_isolation()
     assert 0.4 < iso < 0.6
 
@@ -445,7 +444,7 @@ def test_social_isolation_rises_over_time():
 def test_company_dampens_isolation():
     """Someone present-but-silent counts socially, just less."""
     world = _make_world()
-    world._last_addressed_time = time.time() - 43200.0
+    world._last_addressed_time = time.time() - 900.0
     alone = world.social_isolation()
     world.hear_overheard("a voice nearby")
     with_company = world.social_isolation()

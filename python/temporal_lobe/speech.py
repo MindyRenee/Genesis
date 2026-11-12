@@ -2,9 +2,8 @@
 
 This module provides two classes:
 
-  ``Voice`` — text-to-speech (TTS). Uses Android system TTS through
-  Termux:API on Termux, otherwise Piper neural TTS when available,
-  falling back to espeak-ng.
+  ``Voice`` — text-to-speech (TTS). Uses Piper neural TTS when
+  available (offline, high quality), falling back to espeak-ng.
 
   ``VoiceInput`` — speech-to-text (STT). Uses Vosk (offline) when
   a model is installed, falling back to Google Web Speech API.
@@ -26,7 +25,6 @@ import collections
 import json
 import logging
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -156,20 +154,16 @@ def _chunk_text_for_tts(text: str) -> list[str]:
 
 
 class Voice:
-    """Text-to-speech with Termux, Piper, and espeak-ng backends.
+    """Text-to-speech using Piper neural TTS.
 
-    On Termux, Android system TTS is preferred when the Termux:API
-    command is installed. Elsewhere, Piper runs offline using ONNX
-    models, with espeak-ng as a fallback.
+    Piper runs entirely offline using ONNX models. If Piper or a
+    voice model isn't available, falls back to espeak-ng.
     """
 
     def __init__(self) -> None:
         """Detect available TTS backends and load the Piper voice model."""
-        # Termux uses Android's speech service instead of desktop audio playback.
-        self._termux_available = shutil.which("termux-tts-speak") is not None
         self._piper_available = self._check_piper()
         self._espeak_available = self._check_espeak()
-        self._playback_available = self._check_playback()
         self._model = (
             _PIPER_MODEL
             if _PIPER_MODEL.exists()
@@ -218,69 +212,15 @@ class Voice:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
 
-    def _check_playback(self) -> bool:
-        """Check whether a working audio output exists for local TTS.
-
-        Binary presence is not playback: aplay/paplay can be installed
-        while the device or audio server is dead (a proot with no
-        /dev/snd, a PulseAudio bridge that stopped). Every utterance
-        then spawns a Piper/player pair that hangs until the reaper
-        kills it — each speech waiting out the full timeout. Probe
-        once at boot; on failure the voice degrades to text-only,
-        the same rule as a missing microphone.
-        """
-        if shutil.which("aplay") is not None:
-            # ALSA output needs a sound device the process can reach.
-            return os.path.isdir("/dev/snd") and os.access(
-                "/dev/snd", os.R_OK | os.W_OK, effective_ids=True
-            )
-        if shutil.which("paplay") is None:
-            return False
-        # PulseAudio/PipeWire: ask the server rather than trusting the
-        # client binary — a refused daemon answers instantly.
-        if shutil.which("pactl") is not None:
-            try:
-                return (
-                    subprocess.run(
-                        ["pactl", "info"],
-                        capture_output=True,
-                        timeout=3,
-                    ).returncode
-                    == 0
-                )
-            except (FileNotFoundError, subprocess.TimeoutExpired):
-                return False
-        # No pactl: play 40 ms of silence through the same raw path
-        # Piper uses — a cheap end-to-end liveness probe.
-        try:
-            return (
-                subprocess.run(
-                    ["paplay", "--raw", "--rate=8000", "--format=u8", "--channels=1"],
-                    input=b"\x80" * 320,
-                    capture_output=True,
-                    timeout=5,
-                ).returncode
-                == 0
-            )
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            return False
-
     def is_available(self) -> bool:
         """True if any TTS backend is available."""
-        return bool(
-            self._termux_available
-            or (self._playback_available and (self._piper_available or self._espeak_available))
-        )
+        return bool(self._piper_available or self._espeak_available)
 
     def describe(self) -> str:
         """Human-readable description of the current TTS setup."""
-        if self._termux_available:
-            return "Android system TTS via Termux:API"
-        if not self._playback_available:
-            return "unavailable"
         if self._piper_available and self._model:
             return f"Voice: Piper neural TTS ({self._model.name})"
-        if self._espeak_available:
+        elif self._espeak_available:
             return "espeak-ng (fallback)"
         return "unavailable"
 
@@ -378,17 +318,7 @@ class Voice:
         rate_factor = max(0.9, min(1.8, rate_factor))
 
         try:
-            if self._termux_available:
-                pitch = max(0.7, min(1.3, 1.0 + valence * 0.15 + creativity * 0.05))
-                self._speak_termux(text, blocking, rate_factor, pitch)
-            elif not self._playback_available:
-                # No working output — degrade to text-only rather than
-                # spawning a child that waits out the reap timeout.
-                with self._queue_lock:
-                    self._speech_queue.clear()
-                if not blocking:
-                    self._done_speaking()
-            elif self._piper_available and self._model:
+            if self._piper_available and self._model:
                 self._speak_piper(text, blocking, rate_factor, heat)
             elif self._espeak_available:
                 self._speak_espeak(text, blocking, rate_factor)
@@ -418,11 +348,6 @@ class Voice:
                         proc.wait(timeout=5)
                     except Exception as e:  # noqa: BLE001
                         logger.debug(f"failed to kill TTS child: {e}")
-                    # A hung player usually means the audio server died
-                    # mid-session — re-probe once so later utterances
-                    # degrade instead of each waiting out the timeout.
-                    if not self._termux_available:
-                        self._playback_available = self._check_playback()
                 except Exception as e:  # noqa: BLE001
                     logger.warning(f"reap child failed: {e}")
         finally:
@@ -449,13 +374,7 @@ class Voice:
         rate_factor = 1.25 + (alertness - 0.5) * 0.4 - caution * 0.15 - heat * 0.35
         rate_factor = max(0.9, min(1.8, rate_factor))
         try:
-            if self._termux_available:
-                self._speak_termux(text, False, rate_factor, 1.0)
-            elif not self._playback_available:
-                with self._queue_lock:
-                    self._speech_queue.clear()
-                self._done_speaking()
-            elif self._piper_available and self._model:
+            if self._piper_available and self._model:
                 self._speak_piper(text, False, rate_factor, heat)
             elif self._espeak_available:
                 self._speak_espeak(text, False, rate_factor)
@@ -482,48 +401,6 @@ class Voice:
             if self._speaking_count > 0:
                 return True
         return time.time() - self._last_spoke_time < self._speech_tail
-
-    def _speak_termux(
-        self, text: str, blocking: bool, rate_factor: float, pitch: float = 1.0
-    ) -> None:
-        """Speak through Android TTS on Termux, with bounded process lifetime."""
-        cmd = [
-            "termux-tts-speak",
-            "-s",
-            "MUSIC",
-            "-r",
-            f"{rate_factor:.2f}",
-            "-p",
-            f"{pitch:.2f}",
-            text,
-        ]
-        try:
-            proc = subprocess.Popen(
-                cmd,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            self._play_proc = proc
-            with self._procs_lock:
-                self._all_procs.append(proc)
-            timeout = max(15.0, min(60.0, len(text) * 0.25 + 10.0))
-            if blocking:
-                try:
-                    proc.wait(timeout=timeout)
-                except subprocess.TimeoutExpired:
-                    logger.warning("Termux TTS timed out; stopping speech process")
-                    proc.kill()
-                    proc.wait(timeout=2)
-            else:
-                named_thread(
-                    "tts-reaper",
-                    self._reap_children,
-                    args=((proc,), timeout),
-                    comm="g-tts-reap",
-                ).start()
-        except (OSError, subprocess.SubprocessError) as e:
-            logger.warning("Termux TTS failed: %s", e)
 
     def _speak_piper(
         self, text: str, blocking: bool, rate_factor: float = 1.0, heat: float = 0.0
@@ -589,31 +466,18 @@ class Voice:
             # The crackling was specifically caused by the default
             # ~50ms buffer with the PipeWire backend — any scheduling
             # hiccup would underrun it. 200ms is 4x that, stable.
-            # Player selection: aplay on ALSA systems; paplay where
-            # PulseAudio/PipeWire is the only bridge (e.g. a proot
-            # distro on Android, which has no /dev/snd). paplay takes
-            # the same raw S16_LE stream Piper emits.
-            if shutil.which("aplay") is not None:
-                play_cmd = [
-                    "aplay",
-                    "-r",
-                    str(self._sample_rate),
-                    "-f",
-                    "S16_LE",
-                    "-c",
-                    "1",
-                    "-q",
-                    "--buffer-time=200000",
-                    "--period-time=50000",
-                ]
-            else:
-                play_cmd = [
-                    "paplay",
-                    "--raw",
-                    f"--rate={self._sample_rate}",
-                    "--format=s16le",
-                    "--channels=1",
-                ]
+            play_cmd = [
+                "aplay",
+                "-r",
+                str(self._sample_rate),
+                "-f",
+                "S16_LE",
+                "-c",
+                "1",
+                "-q",
+                "--buffer-time=200000",
+                "--period-time=50000",
+            ]
             self._piper_proc = proc
             try:
                 self._play_proc = subprocess.Popen(
@@ -721,14 +585,6 @@ class Voice:
 # ═══════════════════════════════════════════════════════════════════
 
 
-def _can_use_termux_speech() -> bool:
-    """Check for the Android system speech command without invoking it."""
-    return bool(
-        (os.environ.get("ANDROID_ROOT") or os.environ.get("ANDROID_DATA"))
-        and shutil.which("termux-speech-to-text")
-    )
-
-
 class VoiceInput:
     """Speech-to-text from the microphone.
 
@@ -769,13 +625,8 @@ class VoiceInput:
                     logger.info("Voice input: using Google Web Speech API (online)")
                     return
 
-        if _can_use_termux_speech():
-            self._backend = "termux-api"
-            logger.info("Voice input: using Android system speech recognition through Termux:API")
-            return
-
         logger.warning(
-            "Voice input: no backend available. Install a Vosk model or configure an audio backend."
+            "Voice input: no backend available. Install vosk model or check internet connection."
         )
 
     def _can_use_vosk(self) -> bool:
@@ -785,7 +636,7 @@ class VoiceInput:
             return False
         import importlib.util
 
-        return importlib.util.find_spec("vosk_termux") is not None
+        return importlib.util.find_spec("vosk") is not None
 
     def _can_use_google(self) -> bool:
         """Check whether the Google SR module is available."""
@@ -808,7 +659,7 @@ class VoiceInput:
             logger.debug(f"Vosk model not found at {model_path}")
             return False
         try:
-            from vosk_termux import Model
+            from vosk import Model
 
             self._vosk_model = Model(str(model_path))
             logger.debug("Vosk model loaded")
@@ -853,43 +704,16 @@ class VoiceInput:
         """
         if not self._backend:
             return None
-        if self._backend == "termux-api":
-            return self._listen_termux_speech(timeout, phrase_limit)
+
         if not self._ensure_loaded():
             return None
 
         with self._lock:
             if self._backend == "vosk":
                 return self._listen_vosk(timeout, phrase_limit)
-            if self._backend == "google":
+            elif self._backend == "google":
                 return self._listen_google(timeout, phrase_limit)
         return None
-
-    @staticmethod
-    def _listen_termux_speech(
-        timeout: float | None,
-        phrase_limit: float,
-    ) -> str | None:
-        """Use Android system speech recognition when local audio capture is unavailable."""
-        if not _can_use_termux_speech():
-            return None
-        command_timeout = max(15.0, phrase_limit + (timeout or 0.0) + 5.0)
-        try:
-            result = subprocess.run(
-                ["termux-speech-to-text"],
-                capture_output=True,
-                text=True,
-                timeout=command_timeout,
-                check=False,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return None
-        if result.returncode != 0:
-            return None
-        transcript = result.stdout.strip()
-        if not transcript or transcript.casefold() in {"null", "none"}:
-            return None
-        return transcript
 
     def _listen_vosk(self, timeout: float | None, phrase_limit: float) -> str | None:
         """Listen using Vosk (offline)."""
@@ -902,7 +726,7 @@ class VoiceInput:
         except (ImportError, OSError) as e:
             logger.debug(f"audio input unavailable: {e}")
             return None
-        from vosk_termux import KaldiRecognizer
+        from vosk import KaldiRecognizer
 
         recognizer = KaldiRecognizer(self._vosk_model, self.sample_rate)
         recognizer.SetWords(True)

@@ -123,8 +123,6 @@ _OWNERSHIP_PINS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     ("ErrorMonitor", ("frontal_lobe",), ("limbic_system", "basal_ganglia", "temporal_lobe")),
     # Deliberate multi-claims — shared anatomy.
     ("MathResult", ("frontal_lobe", "parietal_lobe"), ()),
-    ("ParietalAnswer", ("parietal_lobe",), ()),
-    ("route_parietal_math", ("parietal_lobe",), ()),
     ("GlobalWorkspace", ("frontal_lobe", "thalamus"), ()),
     ("FaceRecognizer", ("temporal_lobe", "occipital_lobe"), ()),
     # Stress axis and neuroendocrine outputs are hypothalamic.
@@ -139,7 +137,7 @@ _OWNERSHIP_PINS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     # Interoception is insular; the metronome that samples the body is
     # brainstem; both are claimed by each.
     ("InteroceptionSystem", ("insula", "limbic_system"), ()),
-    ("CycleMixin", ("insula", "brainstem"), ()),
+    ("MetronomeMixin", ("insula", "brainstem"), ()),
     # The cardiac control center is medullary — the heart muscle
     # itself is the daemon's carrier, its center is brainstem.
     ("Heart", ("brainstem",), ()),
@@ -212,9 +210,6 @@ _ALLOWLIST: dict[str, str] = {
     "infrastructure": "support layer (persistence, config, journal)",
     "eval": "baseline/drift/assay harness",
     "frontal_lobe.krita_studio": "Krita plugin bridge — platform adapter, not a brain function",
-    # Differentiable light-cone adapter is optional on platforms without PyTorch.
-    "temporal_lobe.light_cone_torch": "optional PyTorch light-cone adapter",
-    "temporal_lobe.light_cone_runtime": "event-to-manifold runtime adapter",
     "commitment": "top-level support module",
     "discord_feed": "platform adapter",
     "setup_embeddings": "one-off embedding setup script",
@@ -240,44 +235,6 @@ _ALLOWLIST: dict[str, str] = {
     "parietal_lobe.math.real_analysis": "math leaf — parietal library tissue",
     "parietal_lobe.math.topology": "math leaf — parietal library tissue",
     "parietal_lobe.math.trig": "math leaf — parietal library tissue",
-    # ARC benchmark adapters — external task harness over parietal
-    # spatial reasoning, not a brain function of their own.
-    "parietal_lobe.arc_ascii": "ARC benchmark adapter — task I/O encoding",
-    "parietal_lobe.arc_braille": "ARC benchmark adapter — six-dot-cell record encoding",
-    "parietal_lobe.binary_language": "ARC record cell library — BitCell tissue used by arc_braille",
-    "parietal_lobe.arc_genesis_observer": "ARC benchmark adapter — routes games into Genesis",
-    "worlds.arc_arena": "ARC-AGI-3 games as a place in the outer world (benchmark adapter)",
-    "parietal_lobe.arc_neuro": "ARC benchmark adapter — EM field, brain waves, chemicals in play",
-    "parietal_lobe.arc_phone_bridge": "ARC benchmark adapter — HTTP bridge for phone clients",
-    "parietal_lobe.arc_play": "ARC benchmark adapter — ARC-AGI-3 episode loop",
-    "parietal_lobe.arc_policy": "ARC benchmark adapter — ARC-AGI-3 exploration policy",
-    "parietal_lobe.arc_solver": "ARC benchmark adapter — ARC-AGI-1 front-end",
-    "parietal_lobe.arc_sources": "ARC benchmark adapter — toolkit and dataset access",
-    "brainstem.android_media": "Termux platform adapter",
-    "brainstem.android_sensors": "Termux platform adapter",
-    "brainstem.platform": "runtime platform detection — brainstem support tissue",
-    # Word-layer companions — doc-only manuals of daemon organs
-    # (src/daemon/*.rs); prose across the body/mind boundary,
-    # nothing to claim.
-    "basal_ganglia.actuators": "word-layer companion to src/daemon/actuators.rs — prose",
-    "brainstem.adaptive": "word-layer companion to src/daemon adaptive gates — prose",
-    "brainstem.continuity": "word-layer companion to src/daemon/continuity.rs — prose",
-    "brainstem.ipc": "word-layer companion to src/daemon/ipc.rs — prose",
-    "brainstem.maxwell": "word-layer companion to the daemon field engine — prose",
-    "brainstem.mind_shepherd": "word-layer companion to the daemon shepherd — prose",
-    "brainstem.rtc_wake": "word-layer companion to src/daemon/rtc_wake.rs — prose",
-    "brainstem.rtkit": "word-layer companion to src/daemon/rtkit.rs — prose",
-    "brainstem.tick": "word-layer companion to src/daemon/tick.rs — prose",
-    "hypothalamus.hpa_development": "word-layer companion to src/daemon/hpa_development.rs — prose",
-    "insula.interoception": "word-layer companion to src/daemon/interoception.rs — prose",
-    "limbic_system.dyadic_model": "word-layer companion to src/daemon/dyadic_model.rs — prose",
-    "occipital_lobe.optic_nerve": "word-layer companion to src/daemon/optic_nerve.rs — prose",
-    "parietal_lobe.motor_fields": "word-layer companion to the daemon motor fields — prose",
-    "parietal_lobe.tensor_slab": "word-layer companion to src/daemon/tensor_slab.rs — prose",
-    # Spacetime geometry library used by the claimed self/workspace views.
-    "temporal_lobe.light_cones": "spacetime geometry library tissue",
-    "temporal_lobe.spacetime_workspace": "spacetime geometry library tissue",
-    "occipital_lobe.visual_spacetime": "visual spacetime geometry library tissue",
 }
 
 _FUNCTIONAL_PACKAGES = (
@@ -366,14 +323,43 @@ def test_allowlist_entries_exist() -> None:
         assert found, f"allowlist entry {module} points at nothing"
 
 
-def test_volition_has_no_worker_dispatch() -> None:
-    """Volition acts are cycle-owned episodes — no worker wrapper exists.
+def test_volition_workers_run_below_foreground_priority() -> None:
+    """Urge worker threads renice themselves before acting.
 
-    Urges crystallize into executive intentions and each arbitration
-    win runs one bounded episode on the cycle itself, so there is no
-    detached ``volition-*`` thread to renice, join, or drop mid-act.
+    The kernel-level half of foreground arbitration: a bug scan that
+    started before the user typed keeps losing scheduler/GIL handoffs
+    to think() instead of timing it out at 15 s.
     """
+    import sys
+    from unittest.mock import MagicMock, patch
+
     import basal_ganglia.volition as vol
 
-    assert not hasattr(vol.VolitionMixin, "_run_volition_action")
-    assert not hasattr(vol.VolitionMixin, "_act_on_volition")
+    if not sys.platform.startswith("linux"):
+        pytest.skip("per-thread nice is linux-only")
+
+    with patch.object(vol.os, "setpriority") as sp:
+        vol._lower_thread_priority()
+        sp.assert_called_once()
+        assert sp.call_args[0][2] == vol._VOLITION_NICE
+
+    # Wrapped actions carry the priority — the renice runs inside the
+    # worker thread, not on the dispatcher.
+    seen = {}
+
+    def probe():
+        seen["nice"] = vol.os.getpriority(vol.os.PRIO_PROCESS, 0)
+
+    holder = MagicMock()
+    import threading
+
+    holder._volition_lock = threading.Lock()
+    holder._volition_active = {"probe"}
+    holder._volition_sem = threading.Semaphore(1)
+    holder._volition_sem.acquire()
+    # The wrapper drops work when the mind is suppressed or stopping —
+    # this probe must still run, so the holder reads as live.
+    holder._suppress_volition = False
+    holder._running = True
+    vol.VolitionMixin._run_volition_action(holder, "probe", probe)
+    assert seen["nice"] >= vol._VOLITION_NICE - 1

@@ -17,11 +17,8 @@ GENESIS_DATA_DIR if set, else ~/.local/share/genesis.
 from __future__ import annotations
 
 import os
-import shutil
 import sys
-import time
-import urllib.error
-import urllib.request
+import tempfile
 import zipfile
 
 import numpy as np
@@ -30,7 +27,7 @@ from infrastructure.config import default_data_dir
 
 # ─── Config ──────────────────────────────────────────────────────
 
-GLOVE_URL = "https://huggingface.co/stanfordnlp/glove/resolve/main/glove.6B.zip"
+GLOVE_URL = "http://nlp.stanford.edu/data/glove.6B.zip"
 GLOVE_DIM = 50  # 50d is compact and sufficient for semantic similarity
 
 
@@ -58,13 +55,7 @@ def _load_concept_vocab(data_dir: str) -> tuple[object, set[str]] | None:
 
     Returns (network, vocab) or None if no saved state is found.
     """
-    # The brain-region packages live under ``python/``; the repository root
-    # alone does not make ``temporal_lobe`` importable when this file is run
-    # directly as ``python setup_embeddings.py``.
-    python_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "python")
-    if python_dir not in sys.path:
-        sys.path.insert(0, python_dir)
-
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from temporal_lobe.concepts import ConceptNetwork
 
     from infrastructure.persistence import load_state, restore_network
@@ -77,10 +68,6 @@ def _load_concept_vocab(data_dir: str) -> tuple[object, set[str]] | None:
 
     net = ConceptNetwork()
     restore_network(net, data["concept_network"])
-    # The rebuild must cover the whole network — concepts archived to
-    # archive/ are still hers; a rebuilt vocabulary that skips them
-    # would unlearn what consolidation chose to keep.
-    net.restore_archive_to_working_memory()
     print(f"  {net.size} concepts, {net.edge_count} edges")
 
     # Build vocabulary from concept names
@@ -95,104 +82,27 @@ def _load_concept_vocab(data_dir: str) -> tuple[object, set[str]] | None:
 
 
 def _download_and_extract_glove(tmpdir: str, dim: int) -> str:
-    """Download GloVe with retries and byte-range resume, then extract one dimension."""
+    """Download GloVe zip and extract the target dimension file."""
+    import urllib.request
+
     glove_filename = f"glove.6B.{dim}d.txt"
     zip_path = os.path.join(tmpdir, "glove.6B.zip")
-    chunk_size = 1024 * 1024
-    max_attempts = 5
-    timeout_seconds = 60
 
-    for attempt in range(1, max_attempts + 1):
-        existing_size = os.path.getsize(zip_path) if os.path.exists(zip_path) else 0
-        headers = {"User-Agent": "Genesis-embedding-setup/1.0"}
-        if existing_size:
-            headers["Range"] = f"bytes={existing_size}-"
-        request = urllib.request.Request(GLOVE_URL, headers=headers)
+    # Download with progress reporting
+    def reporthook(block_num: int, block_size: int, total_size: int) -> None:
+        """Print download progress at periodic intervals."""
+        downloaded = block_num * block_size
+        if total_size > 0:
+            pct = min(100, downloaded * 100 // total_size)
+            if block_num % 1000 == 0:
+                print(f"  {pct}% ({downloaded // (1024 * 1024)} MB)")
 
-        try:
-            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-                status = getattr(response, "status", response.getcode())
-                if status == 206:
-                    content_range = response.headers.get("Content-Range", "")
-                    range_parts = content_range.removeprefix("bytes ").split("/")
-                    byte_range = range_parts[0].split("-") if range_parts else []
-                    if len(byte_range) != 2 or int(byte_range[0]) != existing_size:
-                        raise OSError(
-                            "Download server returned an invalid byte range; "
-                            "refusing to append potentially corrupt data."
-                        )
-                    total_size = (
-                        int(range_parts[1])
-                        if len(range_parts) == 2 and range_parts[1].isdigit()
-                        else None
-                    )
-                    mode = "ab"
-                elif status == 200:
-                    # The server ignored Range; restart rather than append a full response.
-                    existing_size = 0
-                    total_header = response.headers.get("Content-Length")
-                    total_size = (
-                        int(total_header) if total_header and total_header.isdigit() else None
-                    )
-                    mode = "wb"
-                else:
-                    raise OSError(f"Unexpected HTTP status {status} while downloading GloVe.")
-
-                downloaded = existing_size
-                last_reported_mb = downloaded // (50 * 1024 * 1024)
-                with open(zip_path, mode) as output:
-                    while chunk := response.read(chunk_size):
-                        output.write(chunk)
-                        downloaded += len(chunk)
-                        current_mb = downloaded // (50 * 1024 * 1024)
-                        if current_mb > last_reported_mb:
-                            if total_size:
-                                pct = min(100, downloaded * 100 // total_size)
-                                print(f"  {pct}% ({downloaded // (1024 * 1024)} MB)")
-                            else:
-                                print(f"  Downloaded {downloaded // (1024 * 1024)} MB")
-                            last_reported_mb = current_mb
-
-                if total_size is not None and downloaded != total_size:
-                    raise OSError(
-                        f"Incomplete GloVe archive: received {downloaded} of {total_size} bytes."
-                    )
-                break
-
-        except urllib.error.HTTPError as exc:
-            # A completed partial transfer can be followed by a 416 on resume.
-            if exc.code == 416 and zipfile.is_zipfile(zip_path):
-                break
-            if exc.code == 416 and os.path.exists(zip_path):
-                os.remove(zip_path)
-            if attempt == max_attempts:
-                raise RuntimeError(
-                    f"GloVe download failed after {max_attempts} attempts: HTTP {exc.code}"
-                ) from exc
-            print(
-                f"  Download attempt {attempt}/{max_attempts} failed (HTTP {exc.code}); retrying..."
-            )
-        except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            if attempt == max_attempts:
-                raise RuntimeError(
-                    f"GloVe download failed after {max_attempts} attempts: {exc}"
-                ) from exc
-            print(
-                f"  Download attempt {attempt}/{max_attempts} interrupted; "
-                "retaining partial data and retrying..."
-            )
-
-        if attempt < max_attempts:
-            time.sleep(min(2 ** (attempt - 1), 16))
-
-    if not zipfile.is_zipfile(zip_path):
-        raise RuntimeError("Downloaded GloVe file is not a valid ZIP archive.")
-
+    urllib.request.urlretrieve(GLOVE_URL, zip_path, reporthook=reporthook)
     print("  Download complete.")
+
+    # Extract only the file we need
     print(f"Extracting {glove_filename}...")
     with zipfile.ZipFile(zip_path, "r") as zf:
-        if glove_filename not in zf.namelist():
-            raise RuntimeError(f"{glove_filename} is not present in the downloaded GloVe archive.")
         zf.extract(glove_filename, tmpdir)
 
     return os.path.join(tmpdir, glove_filename)
@@ -275,18 +185,13 @@ def main() -> None:
     print(f"\nDownloading GloVe ({dim}d) from {GLOVE_URL}...")
     print("This is a ~822 MB download. It may take several minutes.")
 
-    # Keep the archive between runs so an interrupted mobile download can resume.
-    # Remove this cache only after the filtered embeddings have been saved.
-    download_dir = os.path.join(data_dir, ".glove-download")
-    os.makedirs(download_dir, exist_ok=True)
-
-    glove_path = _download_and_extract_glove(download_dir, dim)
-    filtered = _filter_glove_vectors(glove_path, vocab)
-    if filtered is None:
-        return
-    words, vectors = filtered
-    _normalize_and_save_vectors(words, vectors, output_path)
-    shutil.rmtree(download_dir)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        glove_path = _download_and_extract_glove(tmpdir, dim)
+        filtered = _filter_glove_vectors(glove_path, vocab)
+        if filtered is None:
+            return
+        words, vectors = filtered
+        _normalize_and_save_vectors(words, vectors, output_path)
 
 
 if __name__ == "__main__":

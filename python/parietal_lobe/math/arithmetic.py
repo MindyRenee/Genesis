@@ -108,27 +108,7 @@ _POSTFIX_WORDS = {
     "cube": "** 3",
 }
 
-_FRACTION_DENOMINATORS = {
-    "half": 2,
-    "halves": 2,
-    "third": 3,
-    "thirds": 3,
-    "quarter": 4,
-    "quarters": 4,
-    "fourth": 4,
-    "fourths": 4,
-    "fifth": 5,
-    "fifths": 5,
-    "sixth": 6,
-    "sixths": 6,
-    "eighth": 8,
-    "eighths": 8,
-    "tenth": 10,
-    "tenths": 10,
-}
-_NUMBER_WORDS = (
-    set(_UNITS) | set(_TENS) | set(_SCALES) | set(_FRACTION_DENOMINATORS) | {"a", "an", "and"}
-)
+_NUMBER_WORDS = set(_UNITS) | set(_TENS) | set(_SCALES) | {"a", "an"}
 
 # The scan grammar — numbers first, the two multi-char operators
 # ahead of single-char symbols, parens, words, punctuation. Anything
@@ -163,9 +143,8 @@ def _words_to_number(words: list[str]) -> tuple[float | None, int]:
     Returns (value, words_consumed). Handles units, tens, and scales:
     ``seven`` → 7, ``twenty three`` → 23, ``two hundred`` → 200,
     ``a thousand`` → 1000, ``three point five`` → 3.5,
-    ``one half`` → 0.5, ``three quarters`` → 0.75, and
-    ``two and a half`` → 2.5. A word that begins none of these stops
-    the run unconsumed, and a run that consumed nothing reports no value.
+    ``half`` → 0.5. A word that begins none of these stops the run
+    unconsumed, and a run that consumed nothing reports no value.
     """
     total = 0.0
     current = 0.0
@@ -189,26 +168,9 @@ def _words_to_number(words: list[str]) -> tuple[float | None, int]:
             total += max(1.0, current) * _SCALES[w]
             current = 0.0
             saw = True
-        elif w in _FRACTION_DENOMINATORS:
-            denominator = _FRACTION_DENOMINATORS[w]
-            numerator = current if current else 1.0
-            current = numerator / denominator
+        elif w == "half":
+            current += 0.5
             saw = True
-        elif w == "and":
-            # Mixed numbers: "two and a half", "one and three quarters".
-            if (
-                saw
-                and i + 2 < len(words)
-                and words[i + 1] in {"a", "an", *_UNITS}
-                and words[i + 2] in _FRACTION_DENOMINATORS
-            ):
-                numerator = 1.0 if words[i + 1] in {"a", "an"} else float(_UNITS[words[i + 1]])
-                total += current
-                current = numerator / _FRACTION_DENOMINATORS[words[i + 2]]
-                i += 3
-                continue
-            if not saw:
-                break
         elif w == "point":
             # Decimal tail: consume digit words after "point".
             i += 1

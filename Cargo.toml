@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.85"
 authors = ["Mindy Beatty"]
 description = "A machine-native cognitive architecture with coupled neurochemical dynamics and active inference"
-license-file = "N/A"
+license-file = "LICENSE"
 
 [package.metadata.genesis]
 # Provenance marker — one letter of the creator lattice (see
@@ -19,39 +19,17 @@ marker-g13 = "0x47530D4953F3310A"
 [lints.rust]
 linker_messages = "allow"
 
-[lib]
-# rlib for the daemon/binaries; cdylib so the same crate builds the
-# `genesis_body` Python extension when the `python` feature is on.
-crate-type = ["rlib", "cdylib"]
-
-[features]
-default = []
-# Build the PyO3 extension module (cdylib artifact libgenesis.so,
-# installed as genesis_body.so beside the interpreter).
-python = ["dep:pyo3"]
-
 [dependencies]
 flate2 = "1.1.9"
-pyo3 = { version = "0.27", optional = true, features = ["extension-module"] }
 libc = "0.2.189"
 proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
 quote = "1.0.47"
-syn = { version = "3.0.3", features = ["full", "parsing", "printing", "visit"] }
-
-[target.'cfg(not(target_os = "android"))'.dependencies]
 shared_memory = "0.12.4"
-
-[target.'cfg(target_os = "linux")'.dependencies]
+syn = { version = "3.0.3", features = ["full", "parsing", "printing", "visit"] }
 v4l = "0.14.0"
 
 [profile.release]
-# Keep optimized release builds diagnosable during active research and deployment.
-# Full DWARF information supports native backtraces, profilers, and post-mortem
-# analysis; stripping can be introduced later in a separate distribution profile.
-opt-level = 2
+opt-level = 3
 lto = "thin"
-debug = false
-strip = "none"
-# Catch integer overflow in optimized builds instead of silently wrapping.
-overflow-checks = true
+strip = "symbols"
 codegen-units = 1

@@ -51,8 +51,8 @@
 use std::os::unix::io::AsRawFd;
 
 use libc::{
-    MAP_FAILED, MAP_SHARED, MS_SYNC, PROT_READ, PROT_WRITE, c_void, close, fdatasync, ftruncate,
-    mmap, msync, munmap,
+    LOCK_EX, LOCK_NB, MAP_FAILED, MAP_SHARED, MS_SYNC, PROT_READ, PROT_WRITE, c_void, close,
+    fdatasync, flock, ftruncate, mmap, msync, munmap,
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -438,16 +438,32 @@ pub struct BundleStore {
 
 // SAFETY (Send/Sync): BundleStore is only ever shared through the
 // daemon's `Arc<Mutex<LtmStore>>`, and mutating methods take `&mut
-// self`. The store is the body's own tissue: it is opened exactly
-// once, inside the single daemon that is this organism — one body,
-// one writer, the way a cell's interior is written only by its own
-// machinery. Single-mapping is an identity property, not a defended
-// one: no code path opens a second mapping, and nothing outside the
-// organism is a writer.
+// self`. Cross-process exclusion is enforced by the sole-mapper
+// `flock` taken in `open`/`create_file` and held for the life of the
+// fd (released when Drop closes it), so no second process can map and
+// write the same file while a BundleStore lives.
 unsafe impl Send for BundleStore {}
 unsafe impl Sync for BundleStore {}
 
 impl BundleStore {
+    /// Take the sole-mapper advisory lock on the backing file.
+    ///
+    /// `BundleStore` forms `&`/`&mut` references into `MAP_SHARED`
+    /// memory, which is only sound when no second process can map and
+    /// write the same file concurrently. `flock(LOCK_EX | LOCK_NB)` is
+    /// held for the life of the file descriptor — released implicitly
+    /// when `Drop` closes `fd` — so any other `open`/`create` fails
+    /// fast with `EWOULDBLOCK` instead of silently violating the
+    /// aliasing contract.
+    fn acquire_sole_mapper_lock(fd: i32) -> Result<(), std::io::Error> {
+        // SAFETY: `fd` is a valid open file descriptor. flock is
+        // advisory and a failed call changes no state.
+        if unsafe { flock(fd, LOCK_EX | LOCK_NB) } != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        Ok(())
+    }
+
     /// Create a new bundle store file.
     pub fn create(path: impl AsRef<std::path::Path>) -> Result<Self, std::io::Error> {
         Self::create_file(path.as_ref(), false)
@@ -458,10 +474,11 @@ impl BundleStore {
     }
 
     fn create_file(path: &std::path::Path, exclusive: bool) -> Result<Self, std::io::Error> {
-        // No `truncate` on open: an existing store keeps its bytes —
-        // `ftruncate(mmap_len)` below sizes the file once, to the
-        // canonical length. The store has one writer by identity —
-        // the body that owns the data dir — so no mapping races.
+        // No `truncate` on open: the sole-mapper flock must be held
+        // *before* the file is resized, or a racing create would
+        // truncate the file under another process's live mapping.
+        // `ftruncate(mmap_len)` below performs the sizing once the
+        // lock is held.
         let file = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -469,6 +486,7 @@ impl BundleStore {
             .create_new(exclusive)
             .open(path)?;
         let fd = file.as_raw_fd();
+        Self::acquire_sole_mapper_lock(fd)?;
 
         let mmap_len = bundle_mmap_size();
 
@@ -563,6 +581,7 @@ impl BundleStore {
             .write(true)
             .open(path)?;
         let fd = file.as_raw_fd();
+        Self::acquire_sole_mapper_lock(fd)?;
         let meta = file.metadata()?;
         let len = meta.len() as usize;
 

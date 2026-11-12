@@ -45,8 +45,6 @@ References:
 
 from __future__ import annotations
 
-import math
-import random
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -57,54 +55,6 @@ _INTENTION_PRIOR = 0.5  # reliability assumed for an untried kind
 # revise_intention kept failed objectives pending with ever-rising
 # priority, so the same unachievable act ran forever.
 _INTENTION_MAX_ATTEMPTS = 5
-
-# ─── Arbitration mathematics ────────────────────────────────────────
-# Action selection is a stochastic competition, not an argmax (the
-# basal ganglia's center-surround disinhibition has a smooth form:
-# choice probabilities are softmax over channel drives — Luce's
-# choice axiom). Sampling is exact via the Gumbel-max trick:
-#   i* = argmax_i ( β·a_i + g_i ),   g_i ~ Gumbel(0,1)
-# gives P(i) ∝ exp(β·a_i) with no approximation — the same
-# accumulator-fluctuation mechanism as the readiness potential
-# (Schurger et al. 2012) her urge gates already cite.
-#
-# β is neuromodulated: tonic norepinephrine tunes cortical
-# signal-to-noise (Aston-Jones & Cohen 2005) — high NE sharpens
-# selection (exploit), low NE diffuses it (explore). ``gain`` is the
-# caller's live NE read; β = _ARBITRATION_BETA · gain.
-_ARBITRATION_BETA = 4.0
-# Per-kind reliability is a Beta posterior, not a raw frequency:
-#   prior Beta(1,1) → mean 0.5 (=_INTENTION_PRIOR),
-#   after s successes in n attempts → mu=(1+s)/(2+n),
-#   sigma² = mu(1-mu)/(n+3).
-# Arbitration adds a UCB bonus c·sigma — optimistic exploration
-# under uncertainty (the knowledge-gradient term): she reaches for
-# what she knows least about, which is what curiosity IS
-# (Daw/Dayan/Hasselmo uncertainty arbitration, in closed form).
-_ARBITRATION_UCB = 1.0
-# Small penalty per past attempt — a goal that keeps failing loses
-# arbitration weight before it hits the hard abandon cap.
-_ATTEMPT_PENALTY = 0.01
-
-
-def _beta_posterior(attempts: int, successes: int) -> tuple[float, float]:
-    """Posterior (mean, std) of a kind's success probability.
-
-    Beta(1,1) prior conjugate-updated by binomial outcomes — the
-    closed form of "what do I actually know about this kind of act."
-    """
-    n = attempts + 2.0  # prior pseudo-counts
-    mu = (1.0 + successes) / n
-    var = mu * (1.0 - mu) / (n + 1.0)
-    return mu, math.sqrt(var)
-
-
-def _gumbel(rng: random.Random) -> float:
-    """Standard Gumbel(0,1) variate via inverse CDF."""
-    u = rng.random()
-    while u <= 0.0:
-        u = rng.random()
-    return -math.log(-math.log(u))
 
 
 class TaskState(Enum):
@@ -333,10 +283,6 @@ class ExecutiveFunction:
         # Learned success rate per action kind, so arbitration is biased
         # by observed outcomes rather than declared confidence alone.
         self._kind_reliability: dict[str, tuple[int, int]] = {}
-        # Stochastic arbitration — the Gumbel perturbations that make
-        # selection a softmax sample rather than an argmax. Seedable
-        # for tests; unseeded is fine — the choice IS the noise.
-        self._rng = random.Random()
         # Optional restraint hook. Given a proposed objective it
         # returns a reason it must not proceed, or None. A declined
         # objective is recorded (it stays legible) but never
@@ -519,23 +465,8 @@ class ExecutiveFunction:
         self,
         candidates: list[ExecutiveIntention],
         allowed_kinds: set[str] | None = None,
-        gain: float = 1.0,
     ) -> ExecutiveIntention | None:
-        """Select the strongest executable intention — stochastically.
-
-        Arbitration is a softmax competition over channel drives
-        (Gumbel-max sampling), not a deterministic argmax: near-tied
-        intentions genuinely compete, and ``gain`` — the caller's live
-        norepinephrine read — sets the inverse temperature. High NE
-        sharpens selection toward the leader; low NE lets weaker
-        channels win, which is exploration.
-
-        Each channel's drive ``a_i`` is
-            priority · confidence · (mu_kind + c·sigma_kind) − attempt_penalty
-        where (mu, sigma) is the Beta posterior of that intention
-        kind's observed reliability — uncertainty raises the score
-        (UCB), so untried kinds get explored before proven-bad ones
-        are retried and proven-good ones are exploited.
+        """Select the strongest executable intention.
 
         The executive may retain advisory objectives that no current
         actuator can execute. An actuator can restrict arbitration to its
@@ -551,43 +482,16 @@ class ExecutiveFunction:
         ]
         if not actionable:
             return None
-        beta = _ARBITRATION_BETA * max(0.0, gain)
-        best: ExecutiveIntention | None = None
-        best_key = -math.inf
-        for c in actionable:
-            attempts_k, successes_k = self._kind_reliability.get(c.kind, (0, 0))
-            mu, sigma = _beta_posterior(attempts_k, successes_k)
-            drive = (
-                max(0.0, c.priority)
-                * max(c.confidence, 0.05)
-                * (mu + _ARBITRATION_UCB * sigma)
-                - _ATTEMPT_PENALTY * min(c.attempts, _INTENTION_MAX_ATTEMPTS)
-            )
-            key = beta * drive + _gumbel(self._rng)
-            if key > best_key:
-                best_key = key
-                best = c
-        selected = best
-        assert selected is not None
+        selected = max(
+            actionable,
+            key=lambda c: (
+                c.priority * max(c.confidence, 0.05),
+                -c.attempts,
+            ),
+        )
         self._active_intention = selected.objective.strip().lower()
         selected.status = "active"
         return selected
-
-    def defer_intention(self, intention: ExecutiveIntention) -> None:
-        """Return an active intention to pending without an outcome.
-
-        A behavior expressed over many episodes (an experiment waited
-        on across cycles, a game played a move at a time) is not
-        finished and not failed — the episode ended, the engagement
-        continues. Counting each episode as an attempt would abandon
-        long behaviors at the cap; deferring keeps the objective
-        eligible for the next arbitration without touching its
-        reliability record.
-        """
-        if intention.status == "active":
-            intention.status = "pending"
-        if self._active_intention == intention.objective.strip().lower():
-            self._active_intention = None
 
     def observe_intention(
         self,
@@ -623,15 +527,11 @@ class ExecutiveFunction:
         return error
 
     def intention_reliability(self, kind: str) -> float:
-        """Posterior mean success rate for an action kind.
-
-        Beta(1,1)-smoothed — an untried kind reads 0.5 rather than a
-        bare 0/0, and thin evidence stays close to the prior instead
-        of whipsawing on a single outcome.
-        """
+        """Learned success rate for an action kind (prior when untried)."""
         attempts, successes = self._kind_reliability.get(kind, (0, 0))
-        mu, _ = _beta_posterior(attempts, successes)
-        return mu
+        if attempts <= 0:
+            return _INTENTION_PRIOR
+        return successes / attempts
 
     def revise_intention(
         self, intention: ExecutiveIntention, *, reason: str = ""

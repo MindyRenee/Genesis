@@ -11,7 +11,5 @@
 //! - `intention` — the intention manager: scoring active goals
 //!   against the self-model and deciding which cognitive zone to
 //!   enter next.
-//! - `actuators` — the body's output limbs (`daemon::actuators`).
 
 pub use crate::cognition::intention;
-pub use crate::daemon::actuators;

@@ -88,7 +88,7 @@ _EXPORTS: dict[str, str] = {
     "SystemMonitor": "parietal_lobe.system_monitor",
     "SystemSnapshot": "parietal_lobe.system_monitor",
     # The autonomic sampling loop that reads the body each cycle
-    "CycleMixin": "brainstem.cycle",
+    "MetronomeMixin": "brainstem.metronome",
     # The body map the self is built on
     "ProtoSelf": "insula.damasio",
     "ProtoSelfState": "insula.damasio",

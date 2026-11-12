@@ -1,11 +1,11 @@
 """Optic nerve — the mind's end of the afferent path.
 
-The body's optic nerve (``src/daemon/optic_nerve.rs``) owns the camera
-capture limb and writes raw frames into the canonical
-``/genesis_optic_nerve`` mapping. Linux uses POSIX shared memory;
-Android uses a file-backed mmap because Bionic lacks the POSIX namespace.
-This module attaches to that same frame contract and wraps the live frame
-directly into a NumPy array without serialization or JSON.
+The body's optic nerve (``src/daemon/optic_nerve.rs`` — the daemon owns
+the camera now, a capture thread inside the body rather than a separate
+process) writes raw frames into the POSIX shared-memory segment
+``/genesis_optic_nerve``. This module attaches to that segment and wraps
+the live frame directly into a NumPy array without any serialization,
+JSON, or socket round-trips.
 
 The frame counter uses a seqlock protocol: the writer increments it to an
 odd value before writing the frame, then to an even value when the write
@@ -19,8 +19,6 @@ which is the words side.
 
 from __future__ import annotations
 
-import mmap
-import os
 import struct
 from multiprocessing import resource_tracker, shared_memory
 
@@ -47,53 +45,12 @@ _HEADER_FMT = "<QII4sII"
 _MAX_RETRIES = 64
 
 
-class _FrameFile:
-    """Read-only attach to a file-backed frame segment.
-
-    Android (Termux) has no POSIX shared-memory namespace, so the native
-    producer publishes the same frame protocol as a file named
-    ``<name>.frame`` in the temporary directory. This mirrors its
-    ``.buf`` / ``close()`` surface so the reader needs no other change.
-    """
-
-    def __init__(self, path: str) -> None:
-        self._file = open(path, "rb")
-        try:
-            self._mmap = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
-        except (OSError, ValueError):
-            self._file.close()
-            raise
-        self.buf = memoryview(self._mmap)
-        # Not a POSIX segment, so nothing for the resource tracker to own.
-        self._name = None
-        self.name = None
-
-    def close(self) -> None:
-        self.buf.release()
-        self._mmap.close()
-        self._file.close()
-
-
-def _attach_segment(name: str):
-    """Attach to the POSIX segment, or to the Termux frame file if that is all there is."""
-    try:
-        return shared_memory.SharedMemory(name=name, create=False)
-    except OSError:
-        # The Rust producer's frame file: the name's leaf, plus ".frame",
-        # under $TMPDIR (or /tmp), exactly as std::env::temp_dir() resolves it.
-        leaf = name.lstrip("/")
-        path = os.path.join(os.environ.get("TMPDIR") or "/tmp", leaf + ".frame")
-        if os.path.isfile(path):
-            return _FrameFile(path)
-        raise
-
-
 class OpticNerve:
     """Attach to the live optic-nerve segment and expose frames as numpy arrays."""
 
     def __init__(self, name: str = NAME) -> None:
-        """Attach to the named optic-nerve segment without creating it."""
-        self._shmem = _attach_segment(name)
+        """Attach to the named optic-nerve shared-memory segment without creating it."""
+        self._shmem = shared_memory.SharedMemory(name=name, create=False)
         # Prevent the multiprocessing resource tracker from unlinking the
         # persistent shared memory when this Python process exits. The
         # tracker was registered with the POSIX name (leading slash);
@@ -181,10 +138,11 @@ class OpticNerve:
                 else:
                     frame = frame[: stride * height].reshape((height, stride))
                     frame = frame[:, :row_bytes].reshape((height, width, bpp))
-                if fourcc == b"BGR3":
-                    # FourCC names the byte order: BGR3 stores blue,
-                    # green, red. Normalize it so downstream perception
-                    # always receives RGB channel order.
+                if fourcc == b"RGB3":
+                    # V4L2's RGB3 stores B,G,R in memory (the fourcc
+                    # names word order, not byte order); BGR3 is the
+                    # one already in R,G,B byte order. Flip RGB3's
+                    # memory order so downstream sees RGB.
                     frame = frame[..., ::-1]
             elif fourcc == b"YUYV":
                 # YUYV is 2 bytes per pixel, uncompressed.
