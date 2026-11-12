@@ -5,7 +5,7 @@ reachable over four IPC commands — ``PUT_TENSOR``, ``GET_TENSOR``,
 ``LIST_TENSORS``, ``DROP_TENSOR`` — plus ``GET_MOTOR_TARGET``, which
 decodes the published motor fields into a concrete action/grid target
 on the daemon's canonical 64×64 coordinate grid
-(``src/field/motor.rs``).
+(``src/latent_spaces/motor.rs``).
 
 Wire layout (little-endian, C row-major payload)::
 

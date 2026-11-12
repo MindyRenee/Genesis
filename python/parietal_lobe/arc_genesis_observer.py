@@ -47,10 +47,10 @@ def _event_text(event: str, payload: dict[str, Any]) -> str:
 
 
 class GenesisArcObserver:
-    """Route ARC events to OuterWorld and the actual temporal language space."""
+    """Route ARC events to OuterWorld and the inner world's language organ."""
 
     def __init__(self, mind: Any) -> None:
-        """Bind to the mind's OuterWorld and, if present, its temporal language latent."""
+        """Bind to the mind's OuterWorld and, if present, its inner-world language organ."""
         world = getattr(mind, "world", None)
         if world is None or not callable(getattr(world, "perceive", None)):
             raise TypeError("mind must expose world.perceive")
@@ -58,7 +58,10 @@ class GenesisArcObserver:
             raise TypeError("mind.world must expose it_acted")
         brain = getattr(mind, "brain", None)
         temporal = getattr(brain, "temporal", None)
-        self._language_observer = getattr(temporal, "observe_language", None)
+        inner_world = getattr(getattr(mind, "inner_life", None), "inner_world", None)
+        language = getattr(inner_world, "language_latent_space", None)
+        language_observe = getattr(language, "observe", None)
+        self._language_observer = language_observe if callable(language_observe) else None
         self._comprehension = getattr(temporal, "comprehension", None)
         if callable(self._language_observer) and not callable(
             getattr(self._comprehension, "comprehend", None)
@@ -71,7 +74,7 @@ class GenesisArcObserver:
         self.last_transition_residual = 0.0
 
     def _update_language_latent(self, event: str, payload: dict[str, Any]) -> None:
-        """Feed the event's text surface into the temporal language latent space."""
+        """Feed the event's text surface into the inner world's language organ."""
         if self._language_observer is None or self._comprehension is None:
             return
         text = _event_text(event, payload)

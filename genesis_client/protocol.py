@@ -455,7 +455,7 @@ ACTUATE = 65
 GET_FIELD_SIGNATURE = 66
 
 # The field's spectral signature — the band decomposition of her own
-# substrate trajectory (src/field/spectrum.rs) at the wave model's
+# substrate trajectory (src/latent_spaces/spectrum.rs) at the wave model's
 # band centers, plus the consensus kinematics the carrier runs on.
 # No request payload. Reply: [u8 ack] then [u8 flags][3 × u8
 # reserved][48 × f64] little-endian — flags bit0 = bands warm,
@@ -512,7 +512,7 @@ LIST_TENSORS = 43
 DROP_TENSOR = 44
 # Decode the published motor fields (`motor.spatial` +
 # `motor.actions`) into a concrete action/grid target on the daemon's
-# canonical 64×64 coordinate grid (`src/field/motor.rs`). Response is
+# canonical 64×64 coordinate grid (`src/latent_spaces/motor.rs`). Response is
 # a 14-byte base plus an additive 16-byte distribution tail when the
 # daemon reports field shape — see `tensor.unpack_motor_target`.
 GET_MOTOR_TARGET = 45

@@ -1,4 +1,4 @@
-"""Tests for brainstem.field_probe — her field's spectral signature
+"""Tests for brainstem.field_stimulus — her field's spectral signature
 as wave-oscillator stimulus.
 
 The contract under test: the substrate's own band decomposition
@@ -22,7 +22,7 @@ from genesis_client.types import FieldSignature, FieldSpectrum, SpectrumBandChan
 @pytest.fixture(autouse=True)
 def _reset_module_state(monkeypatch):
     """Isolate the module's carried state between tests."""
-    import brainstem.field_probe as fp
+    import brainstem.field_stimulus as fp
 
     fp._phase_errs.clear()
     fp._prev_spectrum = None
@@ -114,7 +114,7 @@ def wave_recorder(monkeypatch):
 
 def test_absent_channel_applies_nothing(wave_recorder):
     """No spectrum → no stimulus, no phase work — absent is absent."""
-    import brainstem.field_probe as fp
+    import brainstem.field_stimulus as fp
 
     assert fp.apply_field_stimulus(_client(None)) is False
     assert wave_recorder["stimulus"] == []
@@ -124,7 +124,7 @@ def test_absent_channel_applies_nothing(wave_recorder):
 def test_unwarmed_spectrum_applies_nothing(wave_recorder):
     """warm=False is an unwarmed ring — a channel still integrating,
     not a healthy zero."""
-    import brainstem.field_probe as fp
+    import brainstem.field_stimulus as fp
 
     spec = _spec(warm=False, flux_e=[2.0] * 10)
     assert fp.apply_field_stimulus(_client(spec)) is False
@@ -134,7 +134,7 @@ def test_unwarmed_spectrum_applies_nothing(wave_recorder):
 def test_flux_energies_drive_stimulus_above_own_quiet(wave_recorder):
     """Baseline-relative ≈1.0 is her quiet; elevation above the floor
     maps to held stimulus — the field's motion energy at that rhythm."""
-    import brainstem.field_probe as fp
+    import brainstem.field_stimulus as fp
     from thalamus.brain_waves import BrainWave
 
     # Wire order: infraslow, delta, theta, alpha, sigma, beta1..3,
@@ -154,7 +154,7 @@ def test_flux_energies_drive_stimulus_above_own_quiet(wave_recorder):
 def test_tension_adds_half_weight_stimulus(wave_recorder):
     """The disagreement's spectral shadow enters at half weight,
     summed with the flux line on the same band."""
-    import brainstem.field_probe as fp
+    import brainstem.field_stimulus as fp
     from thalamus.brain_waves import BrainWave
 
     flux_e = [0.0] * 10
@@ -170,7 +170,7 @@ def test_tension_adds_half_weight_stimulus(wave_recorder):
 def test_nyquist_gate_drops_unresolvable_bands(wave_recorder):
     """Bands at/above the achieved rate's Nyquist are absent — the
     wire zeroes them, and the word layer double-gates."""
-    import brainstem.field_probe as fp
+    import brainstem.field_stimulus as fp
     from thalamus.brain_waves import BrainWave
 
     # rate 20 Hz → Nyquist 10 Hz: alpha (10 Hz) is AT Nyquist —
@@ -188,7 +188,7 @@ def test_nyquist_gate_drops_unresolvable_bands(wave_recorder):
 def test_evoked_reset_fires_on_tension_step(wave_recorder):
     """A per-band tension-energy step ≥3× is an internal transient —
     a π/2 phase nudge on that band, once per signature pair."""
-    import brainstem.field_probe as fp
+    import brainstem.field_stimulus as fp
     from thalamus.brain_waves import BrainWave
 
     low = _spec(tension_e=[0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -205,7 +205,7 @@ def test_evoked_reset_fires_on_tension_step(wave_recorder):
 def test_shudder_resets_alert_band_once(wave_recorder):
     """A tension-cv shudder resets BETA3 on the rising edge and stays
     latched until cv falls back — an event, not a level."""
-    import brainstem.field_probe as fp
+    import brainstem.field_stimulus as fp
     from thalamus.brain_waves import BrainWave
 
     storm = _spec(cv=2.0)
@@ -225,7 +225,7 @@ def test_phase_lock_pulls_carrier_band_toward_field_phase(wave_recorder, monkeyp
     """The modeled carrier band is pulled toward the field's winding
     phase; coherence is the pull's weight — full coherence → the
     band becomes the field's phase."""
-    import brainstem.field_probe as fp
+    import brainstem.field_stimulus as fp
     from thalamus.brain_waves import BrainWave
 
     phases = []
@@ -254,7 +254,7 @@ def test_phase_lock_pulls_carrier_band_toward_field_phase(wave_recorder, monkeyp
 
 def test_phase_lock_absent_without_carrier(wave_recorder):
     """carrier_present False → no band to lock — absent channel."""
-    import brainstem.field_probe as fp
+    import brainstem.field_stimulus as fp
 
     spec = _spec(carrier_freq=0.0)  # carrier_present=False
     assert spec.carrier_present is False
@@ -268,7 +268,7 @@ def test_phase_lock_absent_without_carrier(wave_recorder):
 def test_band_entrainment_uses_flux_phases(wave_recorder, monkeypatch):
     """Each elevated flux band's phasor pulls its modeled band by an
     Adler step — energy-weighted, sine of the phase error."""
-    import brainstem.field_probe as fp
+    import brainstem.field_stimulus as fp
     import thalamus.brain_waves as bw
     from thalamus.brain_waves import BrainWave
 
@@ -290,7 +290,7 @@ def test_no_machine_telemetry_reaches_the_waves(wave_recorder):
     must never read host counters, sockets, or sensors. Guard the
     contract by asserting the only client reads are the two field
     signature commands."""
-    import brainstem.field_probe as fp
+    import brainstem.field_stimulus as fp
 
     calls = []
 

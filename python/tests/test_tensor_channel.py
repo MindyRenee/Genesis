@@ -142,7 +142,7 @@ def _fake_daemon(sock: socket.socket) -> None:
 
 
 def _motor_target(slab: dict[str, Tensor]) -> bytes:
-    """Mirror of `src/field/motor.rs::current_motor_target`'s decode —
+    """Mirror of `src/latent_spaces/motor.rs::current_motor_target`'s decode —
     14 bytes: `[flags][action_id][f32][u16 x][u16 y][f32]`."""
     action_id, a_strength = 0xFF, 0.0
     scores = slab.get("motor.actions")

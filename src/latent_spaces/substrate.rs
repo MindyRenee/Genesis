@@ -2181,9 +2181,9 @@ mod global_step_tests {
 
         let markers: [u64; 8] = [
             MARKER_G00,
-            super::runtime::MARKER_G01,
-            super::engine::MARKER_G02,
-            super::motor::MARKER_G03,
+            crate::latent_spaces::runtime::MARKER_G01,
+            crate::latent_spaces::engine::MARKER_G02,
+            crate::latent_spaces::motor::MARKER_G03,
             crate::daemon::ipc::MARKER_G04,
             crate::daemon::tick::MARKER_G05,
             crate::state::header::MARKER_G06,

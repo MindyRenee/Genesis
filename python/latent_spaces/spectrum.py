@@ -1,4 +1,4 @@
-"""Field spectrum — word-layer companion to ``src/field/spectrum.rs``.
+"""Field spectrum — word-layer companion to ``src/latent_spaces/spectrum.rs``.
 
 The band-resolved spectral decomposition of Genesis's own field
 trajectory: flux (centroid speed) and tension (fiber spread) evaluated

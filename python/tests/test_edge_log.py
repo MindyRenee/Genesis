@@ -10,9 +10,9 @@ import contextlib
 import json
 
 from temporal_lobe.concepts.edge_log import (
+    EdgeLog,
     is_derivable_edge,
     is_web_origin,
-    open_edge_log,
     web_domain_of,
     web_origin,
 )
@@ -96,7 +96,7 @@ class TestClassification:
 
 class TestEdgeLog:
     def test_assert_fold_roundtrip(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1000)
         live = log.fold()
         log.close()
@@ -106,7 +106,7 @@ class TestEdgeLog:
         assert e.weight == 0.7 and e.origin == "stated"
 
     def test_last_write_wins(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         log.assert_edge("a", "b", RelationType.IS_A, 0.5, "stated", 1)
         log.assert_edge("a", "b", RelationType.IS_A, 0.9, "stated", 2)
         live = log.fold()
@@ -114,14 +114,14 @@ class TestEdgeLog:
         assert next(iter(live.values())).weight == 0.9
 
     def test_retract_tombstones(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1)
         log.retract_edge("a", "b", RelationType.IS_A)
         assert log.fold() == {}
         log.close()
 
     def test_snapshot_resets_fold_base(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         log.assert_edge("old", "edge", RelationType.IS_A, 0.5, "stated", 1)
         log.snapshot([_edge("x", "y"), _edge("y", "z", RelationType.CAUSES)])
         live = log.fold()
@@ -130,13 +130,13 @@ class TestEdgeLog:
         assert all(e.source in ("x", "y") for e in live.values())
 
     def test_derivable_rejected_at_boundary(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         assert not log.assert_edge("a", "b", RelationType.RELATED_TO, 0.5, "hub_attachment", 1)
         assert log.fold() == {}
         log.close()
 
     def test_snapshot_filters_derivables(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         log.snapshot(
             [
                 _edge("a", "b", RelationType.IS_A),
@@ -148,7 +148,7 @@ class TestEdgeLog:
         assert len(live) == 1
 
     def test_compaction_is_deterministic_for_same_edges(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         log.assert_edge("b", "c", RelationType.IS_A, 0.4, "stated", 2)
         log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1)
         log.compact()
@@ -159,7 +159,7 @@ class TestEdgeLog:
         assert first == second
 
     def test_malformed_json_events_do_not_break_fold(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1)
         log.close()
         with open(log.path, "a", encoding="utf-8") as f:
@@ -170,14 +170,14 @@ class TestEdgeLog:
                 '{"op":"assert","source":"bad2","target":"x","relation":"is_a","created_at":{}}\n'
             )
             f.write('{"op":"snapshot","edges":"not-a-list"}\n')
-        reopened = open_edge_log(tmp_path)
+        reopened = EdgeLog(tmp_path / "edge_log.jsonl")
         live = reopened.fold()
         reopened.close()
         assert len(live) == 1
         assert next(iter(live.values())).source == "a"
 
     def test_torn_tail_skipped(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1)
         log.close()
         with open(log.path, "a") as f:
@@ -186,7 +186,7 @@ class TestEdgeLog:
         assert len(live) == 1
 
     def test_compact_single_line_same_fold(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         for i in range(50):
             log.assert_edge(f"c{i}", "hub", RelationType.RELATED_TO, 0.5, "stated", i)
         log.retract_edge("c0", "hub", RelationType.RELATED_TO)
@@ -200,24 +200,24 @@ class TestEdgeLog:
         assert json.loads(lines[0])["op"] == "snapshot"
 
     def test_is_empty_semantics(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         assert log.is_empty  # file created but holds no events
         log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1)
         assert not log.is_empty
         log.close()
 
     def test_reopen_preserves_events(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1)
         log.close()
-        log2 = open_edge_log(tmp_path)
+        log2 = EdgeLog(tmp_path / "edge_log.jsonl")
         assert len(log2.fold()) == 1
         log2.close()
 
 
 class TestNetworkWiring:
     def test_attach_loads_existing_log(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1)
         net = ConceptNetwork()
         net.add_concept("a")
@@ -228,7 +228,7 @@ class TestNetworkWiring:
         log.close()
 
     def test_empty_log_does_not_wipe(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         net.add_edge("a", "b", RelationType.IS_A, 0.7, "stated")
         net.attach_edge_log(log)
@@ -239,7 +239,7 @@ class TestNetworkWiring:
         log.close()
 
     def test_add_edge_writes_through(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         net.attach_edge_log(log)
         net.add_edge("a", "b", RelationType.IS_A, 0.7, "stated")
@@ -250,7 +250,7 @@ class TestNetworkWiring:
         assert abs(e.weight - 0.9) < 1e-6  # 0.7 + 0.2 bump
 
     def test_derivable_never_materializes(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         net.attach_edge_log(log)
         result = net.add_edge("a", "b", RelationType.RELATED_TO, 0.5, "hub_attachment")
@@ -260,7 +260,7 @@ class TestNetworkWiring:
         log.close()
 
     def test_remove_edge_retracts(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         net.attach_edge_log(log)
         net.add_edge("a", "b", RelationType.IS_A, 0.7, "stated")
@@ -269,7 +269,7 @@ class TestNetworkWiring:
         log.close()
 
     def test_replace_edges_snapshots(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         net.attach_edge_log(log)
         net.add_edge("old", "gone", RelationType.IS_A, 0.7, "stated")
@@ -280,7 +280,7 @@ class TestNetworkWiring:
         assert next(iter(live.values())).source == "x"
 
     def test_replace_contents_seeds_empty_log(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         shared = ConceptNetwork()
         shared.attach_edge_log(log)
         staged = ConceptNetwork()
@@ -295,7 +295,7 @@ class TestNetworkWiring:
         log.close()
 
     def test_replace_contents_log_overrides_transplant(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1)
         shared = ConceptNetwork()
         shared.attach_edge_log(log)
@@ -309,7 +309,7 @@ class TestNetworkWiring:
         log.close()
 
     def test_get_associations_tags_provenance(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         net.attach_edge_log(log)
         net.add_edge("a", "b", RelationType.IS_A, 0.7, "stated")
@@ -323,7 +323,7 @@ class TestNetworkWiring:
         assert all(n.relation is None for n in virtual)
 
     def test_get_associations_respects_relation_filter(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         net.attach_edge_log(log)
         net.add_edge("a", "b", RelationType.IS_A, 0.7, "stated")
@@ -427,7 +427,7 @@ class TestLegacyJsonMigration:
         memory second, leaving the log holding edges the network had
         already discarded.
         """
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         for n in ("a", "b", "c", "d"):
             net.add_concept(n, confidence=0.8)
@@ -462,7 +462,7 @@ class TestWeightWriteThrough:
     """
 
     def test_taught_confidence_reaches_the_log(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         net.attach_edge_log(log)
         edge = net.teach("dog", RelationType.IS_A, "animal", confidence=0.9)
@@ -470,7 +470,7 @@ class TestWeightWriteThrough:
         log.close()
         assert edge.weight == 0.9
         # The log must agree, not just the returned object.
-        reloaded = open_edge_log(tmp_path).fold()
+        reloaded = EdgeLog(tmp_path / "edge_log.jsonl").fold()
         assert len(reloaded) == 1
         assert next(iter(reloaded.values())).weight == 0.9
 
@@ -481,30 +481,30 @@ class TestWeightWriteThrough:
         `sync_edge_log` snapshot. Reopening the log without one shows
         the difference.
         """
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         net.attach_edge_log(log)
         net.teach("dog", RelationType.IS_A, "animal", confidence=0.9)
         log.close()
 
         net2 = ConceptNetwork()
-        net2.attach_edge_log(open_edge_log(tmp_path))
+        net2.attach_edge_log(EdgeLog(tmp_path / "edge_log.jsonl"))
         assert net2.edge_count == 1
         assert next(iter(net2._edges)).weight == 0.9
 
     def test_taught_edge_with_existing_weak_edge(self, tmp_path):
         """Teaching over a weak pre-existing edge must still write through."""
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         net.attach_edge_log(log)
         net.add_edge("dog", "animal", RelationType.IS_A, weight=0.2, origin="stated")
         net.teach("dog", RelationType.IS_A, "animal", confidence=0.9)
         log.close()
-        reloaded = open_edge_log(tmp_path).fold()
+        reloaded = EdgeLog(tmp_path / "edge_log.jsonl").fold()
         assert next(iter(reloaded.values())).weight >= 0.9
 
     def test_set_edge_weight_on_missing_edge_is_none(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         net.attach_edge_log(log)
         net.add_concept("dog", confidence=0.8)
@@ -514,13 +514,13 @@ class TestWeightWriteThrough:
 
     def test_add_edge_reinforcement_reaches_the_log(self, tmp_path):
         """Re-adding an edge raises it by 0.2 — and the log must see that."""
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         net.attach_edge_log(log)
         net.add_edge("dog", "animal", RelationType.IS_A, weight=0.5, origin="stated")
         net.add_edge("dog", "animal", RelationType.IS_A, origin="stated")
         log.close()
-        reloaded = open_edge_log(tmp_path).fold()
+        reloaded = EdgeLog(tmp_path / "edge_log.jsonl").fold()
         assert next(iter(reloaded.values())).weight == 0.7
 
 
@@ -534,7 +534,7 @@ class TestCompactionFailureIsReported:
     """
 
     def test_compaction_failure_is_logged_not_swallowed(self, tmp_path, caplog):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         net.attach_edge_log(log)
         net.add_edge("a", "b", RelationType.IS_A, 0.5, "stated")
@@ -563,7 +563,7 @@ class TestCompactionFailureIsReported:
         )
 
     def test_failure_counter_resets_on_success(self, tmp_path):
-        log = open_edge_log(tmp_path)
+        log = EdgeLog(tmp_path / "edge_log.jsonl")
         net = ConceptNetwork()
         net.attach_edge_log(log)
         net.add_edge("a", "b", RelationType.IS_A, 0.5, "stated")

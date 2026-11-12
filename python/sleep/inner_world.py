@@ -14,6 +14,7 @@ from copy import deepcopy
 from typing import Any
 
 import numpy as np
+from self.language_latent_space import LanguageLatentSpace
 
 _BASE_DIM = 4
 _INTERO_DIM = 8
@@ -245,6 +246,11 @@ class InnerWorldExperientialLatentSpace:
         self.ultrametric_memory = UltrametricEpisodicMemorySpace(capacity=memory_capacity)
         self.free_energy_geometry = VariationalFreeEnergyGeometry()
         self.recursive_symplectic_flow = RecursiveMetaCognitiveSymplecticFlow()
+        # The inner world's language organ — her voice's own geometry,
+        # nested here: language is inner-world territory (the manifold's
+        # kind map sends language kinds to the inner band), and this is
+        # the organ that computes and holds its state.
+        self.language_latent_space = LanguageLatentSpace()
         self._observations = 0
         self._last: dict[str, Any] = {}
         self._lock = threading.RLock()
@@ -314,6 +320,9 @@ class InnerWorldExperientialLatentSpace:
                 "last": self.snapshot(),
                 "base_manifold": self.base_manifold.to_dict(),
                 "memory": self.ultrametric_memory.to_dict(),
+                # The language organ's state travels nested inside the
+                # inner world's own checkpoint — one home, one image.
+                "language": self.language_latent_space.to_dict(),
             }
 
     def restore(self, data: dict[str, Any]) -> None:
@@ -326,6 +335,12 @@ class InnerWorldExperientialLatentSpace:
         base.restore(data["base_manifold"])
         memory = UltrametricEpisodicMemorySpace()
         memory.restore(data["memory"])
+        # The nested language organ restores with its home. Absent (an
+        # older image) leaves the fresh organ — the legacy sibling key
+        # in the inner-life state still stages it below.
+        language = data.get("language")
+        if language is not None:
+            self.language_latent_space.restore(language)
         last = data.get("last", {})
         if not isinstance(last, dict):
             raise ValueError("invalid inner-world snapshot")

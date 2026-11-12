@@ -581,7 +581,7 @@ pub mod cmd {
     pub const GET_FIELD_SIGNATURE: u8 = 66;
 
     /// The field's spectral signature — the band decomposition of
-    /// her own substrate trajectory (`field::spectrum`) at the wave
+    /// her own substrate trajectory (`latent_spaces::spectrum`) at the wave
     /// model's band centers, plus the consensus kinematics the
     /// carrier runs on. No request payload. Response: `[u8 ack]`
     /// then the wire body — `[u8 flags][3 × u8 reserved][48 × f64]`
@@ -4041,7 +4041,7 @@ pub fn default_handler<L: LtmAccess>(
         // ─── Tensor slab ─────────────────────────────────────
         // Named tensors are daemon-process state — no mmap, no
         // TickLoop. See `daemon::tensor_slab` for the wire codec and
-        // `field::motor` for the field decode.
+        // `latent_spaces::motor` for the field decode.
         cmd::PUT_TENSOR => {
             use super::tensor_slab::{self, Tensor, TensorError};
             let resp = (|| -> Result<(), TensorError> {

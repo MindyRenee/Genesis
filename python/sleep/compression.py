@@ -94,7 +94,6 @@ from __future__ import annotations
 
 import copy
 import logging
-import os
 import re
 import time
 from collections.abc import Callable
@@ -212,9 +211,11 @@ class SleepCompressor:
         self.vq_codebook = VQCodebook(k=vq_k)
         self.holographic_graph = HolographicGraph()
 
-        # Paths
-        self._vq_path = os.path.join(data_dir, "vq_codebook.npz")
-        self._hgraph_path = os.path.join(data_dir, "holographic_graph.npz")
+        # The compressed language lives in her language latent space,
+        # not in boxes — the space is the store.
+        from self.language_space import open_language_space
+
+        self._language_space = open_language_space(data_dir)
 
         # Load existing state if available
         self._load()
@@ -942,18 +943,19 @@ class SleepCompressor:
     # ─── Persistence ────────────────────────────────────────────
 
     def _save(self) -> None:
-        """Save VQ codebook and holographic graph to disk."""
+        """Deposit VQ codebook and holographic graph into the space."""
         try:
             if self.vq_codebook.is_trained:
-                self.vq_codebook.save(self._vq_path)
-            self.holographic_graph.save(self._hgraph_path)
+                self.vq_codebook.save_space(self._language_space)
+            self.holographic_graph.save_space(self._language_space)
+            self._language_space.save()
         except OSError as e:
             logger.warning("Failed to save sleep compression state: %s", e)
 
     def _load(self) -> None:
-        """Load VQ codebook and holographic graph from disk."""
-        vq_loaded = self.vq_codebook.load(self._vq_path)
-        hg_loaded = self.holographic_graph.load(self._hgraph_path)
+        """Recall VQ codebook and holographic graph from the space."""
+        vq_loaded = self.vq_codebook.load_space(self._language_space)
+        hg_loaded = self.holographic_graph.load_space(self._language_space)
         if vq_loaded:
             s = self.vq_codebook.stats()
             logger.info(

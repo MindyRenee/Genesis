@@ -77,6 +77,9 @@ _DOMAIN_DEPTH = {
     "boundary": (0.62, 0.78),
     "inner": (0.80, 0.93),
     "outer": (0.72, 0.98),
+    # Language is nested inside self — her learned language is her own,
+    # deposited inside the self band, not out in the inner world.
+    "language": (0.10, 0.55),
 }
 
 _FORMAT_VERSION = 4
@@ -165,12 +168,12 @@ _KIND_DOMAIN = {
     "thought": "inner",
     "dream": "inner",
     "memory": "inner",
-    "language": "inner",
-    "concept": "inner",
-    "word": "inner",
-    "edge": "inner",
-    "archive": "inner",
-    "vq": "inner",
+    "language": "language",
+    "concept": "language",
+    "word": "language",
+    "edge": "language",
+    "archive": "language",
+    "vq": "language",
     "emotion": "boundary",
     "boundary": "boundary",
     "self": "self",

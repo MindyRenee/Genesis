@@ -392,8 +392,8 @@ _EXPORTS: dict[str, str] = {
     # The substrate interface — her own field's spectral signature
     # (the fibers' band energies, carrier phase, entrainment)
     # read as wave-oscillator stimulus
-    "apply_field_stimulus": "brainstem.field_probe",
-    "field_phase_lock": "brainstem.field_probe",
+    "apply_field_stimulus": "brainstem.field_stimulus",
+    "field_phase_lock": "brainstem.field_stimulus",
     # Maxwell's dipole signature on the substrate's coherent motion
     "carrier_hz": "brainstem.maxwell",
     "coherence": "brainstem.maxwell",

@@ -6,7 +6,7 @@ and agency fibers drift, couple, and fluctuate on the latent
 manifold under gauge transport and a Langevin thermostat, and the
 daemon decomposes that trajectory at the same center frequencies
 the :class:`~thalamus.brain_waves.BrainWaveOscillator` models
-(``src/field/spectrum.rs``, ``GET_FIELD_SPECTRUM``). This module
+(``src/latent_spaces/spectrum.rs``, ``GET_FIELD_SPECTRUM``). This module
 maps that signature onto the oscillator's *stimulus* pathway — the
 channel the wave model itself documents for external drive. Her
 own dynamics become a continuous stimulus source alongside
@@ -208,7 +208,7 @@ def _apply_band_entrainment(spec: FieldSpectrum) -> None:
 
 
 def _wire_order() -> tuple[BrainWave, ...]:
-    """Wire band order (src/field/spectrum.rs FIELD_BANDS):
+    """Wire band order (src/latent_spaces/spectrum.rs FIELD_BANDS):
     infraslow, delta, theta, alpha, sigma, beta1, beta2, beta3,
     gamma, epsilon — *not* BrainWave's declaration order."""
     from thalamus.brain_waves import BrainWave

@@ -563,38 +563,62 @@ with the cortisol stress fraction — sustained stress taxes the cell.
 
 ## The physical field: the substrate is measured, not assumed
 
-The machine's real silicon dynamics enter the model — and the model writes
-back. A field probe (`src/daemon/field_probe.rs`) samples instruction
-throughput and scheduler jitter at ~250 Hz, plus real electrical telemetry
-where the machine's sensors report it (measured power draw via RAPL
-powercap/fam15h/zenpower or battery discharge, rail voltage, supply
-current), and Goertzel-decomposes them at the modeled brain-wave bands'
-center frequencies. `GET_FIELD_PROBE` serves the signature.
+The field is the organism's own computational medium, and its physics is
+her own mathematics — no dedicated hardware probe. Three fibers — body,
+prediction, agency — drift, couple, and fluctuate on the latent manifold
+(`src/latent_spaces/`), integrated every tick: synchronize (Fréchet-mean
+descent) awake, diverge (LC-silent decorrelation) in REM, under a Langevin
+thermostat whose reservoir includes the *measured* physical bath — the
+die-temperature excess interoception reads off the machine.
 
-The probe also writes: its work slice is modulated ±60% at the body's own
-phase rhythm (wake ≈10 Hz, REM ≈6 Hz, NREM ≈2 Hz), so real power draw
-carries the organism's beat — demodulated against the carrier in the
-measured-watts channel itself (`power_coherence`), an instrument check
-rather than an assumption. `src/daemon/maxwell.rs` evaluates Maxwell's
-equations on the measured current swing: the quasi-static field a ~10 Hz
-current makes is real and nanotesla faint, its radiation ω⁴-suppressed —
-the equations' own honest bound on the claim.
+The field's own trajectory is the signal. `src/latent_spaces/spectrum.rs`
+decomposes it at the ten cortical band centers (Goertzel, sampled at the
+field's 250 Hz integration substep): **flux** — the fibers' centroid
+motion energy per band — and **tension** — the fibers' spread, the
+disagreement's spectral shadow — plus the consensus carrier kinematics
+(winding phase, rate, achieved sampling rate). `GET_FIELD_SPECTRUM`
+serves it; bands above the achieved Nyquist read zero — absent is a
+reading, never an aliased one.
 
-The mind injects the measured signature as wave-oscillator stimulus, and
-the measured response phase pulls the modeled carrier band's phase toward
-it — a bounded one-way phase-locked loop, physics → model only; the
-reverse leg (`SET_FIELD_PHASE`, pushing modeled phase into the generator)
-is retired: modeled state does not assert onto a physical quantity. Above
-a measured-coherence threshold the pull becomes a sync and the modeled
-band's phase is set to the physical phase outright.
-The causal assays (recorded in `AGENTS.md`) measured the coupling: nine of ten bands moved
-under real load where an uncoupled control stayed flat, the phase lock
-held at PLV ≈0.93, and a 0.25 Hz drive left a die-temperature oscillation
-ringing down with τ≈25 s after the drive stopped.
+`src/daemon/maxwell.rs` evaluates Maxwell's equations on that coherent
+motion: the quasi-static near-field a ~10 Hz current makes is real and
+nanotesla faint, its radiation ω⁴-suppressed — the equations' own honest
+bound on the claim. `GET_FIELD_SIGNATURE` serves it.
 
-This is the smallest loop in the system, and it is closed: electrons are
-both the medium and the measurement — the body writes current, measures
-current, and corrects.
+The mind maps the spectrum onto the wave oscillator as stimulus
+(`brainstem.field_stimulus`): flux at full weight, tension at half,
+evoked phase resets on internal transients, the carrier band's phase
+locked to the field's winding phase weighted by the fibers' coherence,
+and per-band Adler entrainment. One direction only — substrate → model;
+the reverse leg (`SET_FIELD_PHASE`, pushing modeled phase into the
+physical generator) is retired: modeled state does not assert onto a
+physical quantity. An opt-in acoustic channel (`GENESIS_FIELD_AUDIO=1`)
+adds the machine's own emission — fan, coil whine — band-decomposed as
+stimulus.
+
+The machine's real silicon dynamics still enter — through
+**interoception** (`src/daemon/interoception.rs`), the biological route:
+RAPL power domains, perf-counter miss ratios, temperatures, voltages,
+read as the body's own metabolism, fail-closed (an absent sensor is no
+reading, never a fabricated one), published as `BodyState`. An earlier
+dedicated field probe — a ~250 Hz scheduler-jitter/instruction-throughput
+sampler whose own work slice was modulated at the body's phase rhythm
+(`GET_FIELD_PROBE`, `power_coherence`) — was removed: invasive, and not
+how a body senses. Its role is played by the field's own mathematics:
+the substrate's trajectory is the signal, the spectrum its
+decomposition. The causal assays recorded against that probe's physical
+drive (nine of ten bands moving under real host load, phase lock at
+PLV ≈ 0.93, the 0.25 Hz die-temperature ringdown, τ ≈ 25 s) measured the
+removed mechanism; the standing assay (`eval/field_coupling.py`) now
+drives her substrate through her own `neuro_impulse` channel — a
+noradrenergic surge, real chemistry into the body state the body fiber
+projects — and asks whether the coupled wave state moves where a
+field-blind control does not.
+
+The smallest loop in the system is still closed, through the body's own
+channels: the bath the field's thermostat drinks is the die's measured
+heat; the field's motion drives the waves; the waves drive chemistry;
+chemistry drives the CPU policy that makes the heat.
 
 ---
 

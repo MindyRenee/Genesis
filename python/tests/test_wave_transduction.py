@@ -1,9 +1,11 @@
 """Wave→chemical transduction — release flux, not level tracking.
 
 The band power is the presynaptic rate: UP chemicals get release
-flux ``k·P·Δt`` (cadence-invariant — the ticker only delivers), DOWN
-chemicals get enhanced first-order clearance ``−k·P·C·Δt``. Levels
-are never commanded; the body's own kinetics decide where they settle.
+flux ``Rmax·(1 − e^{−G·P/Rmax})·Δt`` — the depletion-limited
+saturating rate, ``G·P`` in the small signal — and DOWN chemicals get
+the same saturating magnitude on the substrate-weighted drive
+``G·P·C``. Levels are never commanded; the body's own kinetics decide
+where they settle.
 """
 
 from __future__ import annotations
@@ -61,14 +63,26 @@ class TestReleaseFlux:
         half = _by_chem(wave_impulses(_state(beta2=0.4), {}, 0.5))
         assert one[CHEM_OREXIN] == pytest.approx(2.0 * half[CHEM_OREXIN])
 
-    def test_flux_is_capped_by_authority_rate(self):
-        """Beyond the peptide's rate ceiling the flux saturates."""
+    def test_flux_saturates_at_the_release_ceiling(self):
+        """Deep drive approaches the peptide's release ceiling —
+        asymptotically, never clamped onto it."""
         from genesis_client.protocol import CHEM_OREXIN
 
-        # orexin cap = max_impulse(0.1) * DRIVE_RATE(0.2) = 0.02/s;
-        # RELEASE_GAIN·P = 0.25·0.9 = 0.225 → capped at 0.02·dt.
+        # orexin ceiling = max_impulse(0.1) * DRIVE_RATE(0.2) = 0.02/s;
+        # G·P = 0.25·0.9 = 0.225 is 11 ceilings deep — saturated.
         impulses = _by_chem(wave_impulses(_state(beta2=0.9), {}, DT))
-        assert impulses[CHEM_OREXIN] == pytest.approx(0.1 * DRIVE_RATE * DT)
+        ceiling = 0.1 * DRIVE_RATE * DT
+        assert impulses[CHEM_OREXIN] == pytest.approx(ceiling, rel=1e-3)
+        assert impulses[CHEM_OREXIN] <= ceiling
+
+    def test_weak_drive_stays_linear_in_power(self):
+        """Below the ceiling the law's small-signal slope is G·P."""
+        from genesis_client.protocol import CHEM_OREXIN
+
+        # G·P = 0.25·0.005 = 0.00125 → x = 0.06 of the 0.02 ceiling;
+        # the saturating sag is ~3%, the linear slope within 5%.
+        impulses = _by_chem(wave_impulses(_state(beta2=0.005), {}, DT))
+        assert impulses[CHEM_OREXIN] == pytest.approx(0.25 * 0.005 * DT, rel=0.05)
 
     def test_release_ignores_current_level(self):
         """Feedforward, not feedback: release flux does not read C —
@@ -102,11 +116,15 @@ class TestDownSuppression:
 
     def test_cortisol_suppression_is_floor_aware(self):
         """Suppression is first-order in substrate — it dies with C."""
-        impulses = _by_chem(wave_impulses(_state(delta=0.9), {"cortisol": 0.01}, DT))
+        weak = _by_chem(wave_impulses(_state(delta=0.9), {"cortisol": 0.01}, DT))
+        strong = _by_chem(wave_impulses(_state(delta=0.9), {"cortisol": 0.1}, DT))
         from genesis_client.protocol import CHEM_CORTISOL
 
-        # rate = RELEASE_GAIN·P·C = 0.25·0.9·0.01 = 0.00225, under cap.
-        assert impulses[CHEM_CORTISOL] == pytest.approx(-0.00225 * DT)
+        # drive = G·P·C — ten times the substrate, ten times the rate
+        # (small-signal; both deep under the ceiling).
+        assert strong[CHEM_CORTISOL] == pytest.approx(10 * weak[CHEM_CORTISOL], rel=0.05)
+        # magnitude ≈ G·P·C = 0.25·0.9·0.01 = 0.00225 near zero drive.
+        assert weak[CHEM_CORTISOL] == pytest.approx(-0.00225 * DT, rel=0.02)
 
     def test_quiet_delta_leaves_cortisol_alone(self):
         impulses = _by_chem(wave_impulses(_state(beta2=0.6), {"cortisol": 0.3}, DT))

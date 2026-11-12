@@ -84,7 +84,7 @@ REGIONS: tuple[Region, ...] = (
     Region(
         name="cerebellum",
         package="cerebellum",
-        modules=("field::motor", "field::engine", "daemon::adaptive"),
+        modules=("latent_spaces::motor", "latent_spaces::engine", "daemon::adaptive"),
         projections=("thalamus", "frontal_lobe"),
         fiber="prediction",
     ),
@@ -126,10 +126,11 @@ REGIONS: tuple[Region, ...] = (
         name="latent_spaces",
         package="latent_spaces",
         modules=(
-            "field",
-            "field::engine",
-            "field::runtime",
-            "field::spectrum",
+            "latent_spaces::substrate",
+            "latent_spaces::engine",
+            "latent_spaces::runtime",
+            "latent_spaces::spectrum",
+            "latent_spaces::motor",
             "state::phase_partition",
         ),
         projections=("*",),
@@ -152,7 +153,7 @@ REGIONS: tuple[Region, ...] = (
     Region(
         name="parietal_lobe",
         package="parietal_lobe",
-        modules=("math", "field::motor", "daemon::tensor_slab"),
+        modules=("math", "latent_spaces::motor", "daemon::tensor_slab"),
         projections=("frontal_lobe", "cerebellum"),
         fiber="prediction",
     ),
@@ -174,9 +175,9 @@ REGIONS: tuple[Region, ...] = (
         package="thalamus",
         modules=(
             "daemon::ipc",
-            "field::engine",
-            "field::runtime",
-            "field::spectrum",
+            "latent_spaces::engine",
+            "latent_spaces::runtime",
+            "latent_spaces::spectrum",
             "state::manifest",
         ),
         projections=(

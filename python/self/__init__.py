@@ -124,6 +124,13 @@ _EXPORTS = {
     "DreamInterpretation": "self.psychoanalysis",
     "Psychoanalysis": "self.psychoanalysis",
     "RepressedTrace": "self.psychoanalysis",
+    # self.language_* — her language latent space, nested in self:
+    # a 3-D holographic plastic medium holding all learned language
+    "LanguageSpace": "self.language_space",
+    "open_language_space": "self.language_space",
+    "ingest_data_dir": "self.language_ingest",
+    # the language observation stream (moved out of sleep)
+    "LanguageLatentSpace": "self.language_latent_space",
 }
 
 __all__ = sorted(_EXPORTS)

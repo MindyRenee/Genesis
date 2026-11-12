@@ -138,10 +138,11 @@ pub const REGIONS: &[Region] = &[
         name: "latent_spaces",
         package: "latent_spaces",
         modules: &[
-            "field",
+            "latent_spaces::substrate",
             "latent_spaces::engine",
             "latent_spaces::runtime",
             "latent_spaces::spectrum",
+            "latent_spaces::motor",
             "state::phase_partition",
         ],
         projections: &["*"],

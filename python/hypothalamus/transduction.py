@@ -25,25 +25,29 @@ releases transmitter (quantal release ∝ presynaptic rate; Koch,
 Biophysics of Computation). The wave therefore commands a *flux*,
 never a level:
 
-    UP peptide:   I = k·P·Δt          — release proportional to band
-                                        power, integrated over the
-                                        real elapsed interval
-    DOWN peptide: I = −k·P·C·Δt       — the band's power acts as
+    UP peptide:   I = Rmax·(1 − e^{−G·P/Rmax})·Δt
+                              — depletion-limited release: presynaptic
+                                        rate ∝ band power near zero,
+                                        saturating at the peptide's
+                                        own release ceiling
+    DOWN peptide: I = −Rmax·(1 − e^{−G·P·C/Rmax})·Δt
+                              — the same saturating magnitude on the
+                                        substrate-weighted drive:
                                         enhanced first-order
-                                        clearance, proportional to
-                                        substrate, floor-aware
+                                        clearance, floor-aware
 
 ``Δt`` is measured wall-clock elapsed between transductions, so the
 delivered impulse is **cadence-invariant**: whatever beat the caller
-runs at, the integrated drive over an interval is ``k·P·Δt`` — the
-rhythm sets the rate, the courier only delivers. The body's own
-clearance, homeostasis, coupling, and receptor machinery decide where
-the level settles; nothing here knows or commands a reference.
+runs at, the integrated drive over an interval is the rate law's own
+evaluation — the rhythm sets the rate, the courier only delivers. The
+body's own clearance, homeostasis, coupling, and receptor machinery
+decide where the level settles; nothing here knows or commands a
+reference.
 
-Per-interval authority stays bounded: ``max_impulse`` is reinterpreted
-as a maximum *rate* (level per second) scaled by ``DRIVE_RATE``, so the
-cap is ``max_impulse·DRIVE_RATE·Δt`` per emission — the same bound per
-unit time at any ticker cadence.
+``Rmax = max_impulse·DRIVE_RATE`` is the peptide's own release
+ceiling in level per second — a physical property of its pool and
+machinery the saturating form approaches, not an artificial bound the
+flux is clipped to.
 
 Every UP member implies its DOWN: when the band is quiet the release
 flux stops and the body's own clearance withdraws the peptide —
@@ -65,6 +69,7 @@ band changes the transduction without touching it.
 
 from __future__ import annotations
 
+import math
 import time
 from typing import TYPE_CHECKING
 
@@ -88,19 +93,16 @@ if TYPE_CHECKING:
 __all__ = ["DRIVE_RATE", "RELEASE_GAIN", "elapsed_since", "transduce_waves", "wave_impulses"]
 
 
-#: Release gain — level per second per unit band power. A band at
-#: full power drives ~0.25/s of release flux; the body's clearance
-#: decides the equilibrium. Conservative against the peptide caps.
+#: Release gain — the release law's small-signal slope, level per
+#: second per unit band power. A weak band drives ~G·P of flux; the
+#: saturating form carries it toward the peptide's own ceiling. The
+#: body's clearance decides the equilibrium.
 RELEASE_GAIN: float = 0.25
 
-#: Fraction of each peptide's declared ``max_impulse`` usable as a
-#: per-second rate ceiling — the authority bound, now per unit time
-#: rather than per beat.
+#: Fraction of each peptide's declared ``max_impulse`` that sets the
+#: per-second release ceiling — the Rmax the saturating law
+#: approaches, a property of the peptide's pool and machinery.
 DRIVE_RATE: float = 0.2
-
-#: Impulses smaller than this are noise below the body's resolution —
-#: skipped so the channel carries signal, not dither.
-_EPS: float = 1e-4
 
 #: Elapsed-time domain for the flux integration — below this the
 #: emission is noise, above this the caller has stopped measuring and
@@ -154,11 +156,17 @@ _PEPTIDES = (
 
 
 def _drive(peptide, state: BrainWaveState, groups: dict[str, tuple]) -> float:
-    """Summed power of the peptide's affiliated bands, clamped [0, 1]."""
+    """Summed power of the peptide's affiliated bands.
+
+    ``powers`` is a normalized distribution, so affiliated shares
+    aggregate arithmetically — the three beta sub-bands' shares sum
+    to the beta share. Nothing bounds it here; the release law's own
+    saturation is the ceiling.
+    """
     total = 0.0
     for name in peptide.brain_waves:
         total += sum(state.powers.get(b, 0.0) for b in groups.get(name, ()))
-    return max(0.0, min(1.0, total))
+    return total
 
 
 def wave_impulses(
@@ -177,11 +185,17 @@ def wave_impulses(
     withdraw or suppress.
 
     UP peptides (``wave_sign = +1``) emit release flux
-    ``k·P·Δt`` — the band's power is the presynaptic rate, never a
-    reference the level is tracked toward. DOWN peptides
-    (``wave_sign = -1``) emit enhanced-clearance flux
-    ``−k·P·C·Δt`` — fractional withdrawal bounded by the substrate
-    itself, so the floor is the equation's, not a guard's.
+    ``R·Δt`` with ``R = Rmax·(1 − e^{−G·P/Rmax})`` — the
+    depletion-limited rate law. Near zero drive the presynaptic rate
+    is proportional to band power (``R ≈ G·P``, the same slope the
+    linear form carried); as drive rises the rate approaches the
+    peptide's own release ceiling asymptotically, the way a finite
+    vesicle pool saturates — the ceiling is approached, never clamped
+    onto. DOWN peptides (``wave_sign = -1``) emit enhanced-clearance
+    flux of the same saturating magnitude on the substrate-weighted
+    drive ``G·P·C`` — first-order in ``C``, so suppression dies with
+    the level and a negative level releases (the first-order form's
+    own restoring direction).
     """
     groups = _band_groups()
     out: list[tuple[int, float]] = []
@@ -189,18 +203,16 @@ def wave_impulses(
         power = _drive(pep, state, groups)
         if power <= 0.0:
             continue
-        rate_cap = pep.max_impulse * DRIVE_RATE  # level per second
+        # The peptide's own release ceiling — a physical property of
+        # its pool and machinery, the Rmax the saturating law
+        # approaches. expm1 keeps the small-signal slope exact.
+        ceiling = pep.max_impulse * DRIVE_RATE  # level per second
+        drive = RELEASE_GAIN * power
         if getattr(pep, "wave_sign", 1.0) >= 0:
-            # Release flux: presynaptic rate ∝ band power, bounded by
-            # the peptide's own authority ceiling per unit time.
-            impulse = min(RELEASE_GAIN * power, rate_cap) * dt
+            impulse = -ceiling * math.expm1(-drive / ceiling) * dt
         else:
-            # Enhanced clearance: first-order in substrate, scaled by
-            # band power — suppression dies with the level.
-            current = chemicals.get(pep.name, pep.baseline)
-            impulse = -min(RELEASE_GAIN * power * max(0.0, current), rate_cap) * dt
-        if abs(impulse) < _EPS:
-            continue
+            drive *= chemicals.get(pep.name, pep.baseline)
+            impulse = ceiling * math.expm1(-drive / ceiling) * dt
         out.append((pep.index, impulse))
     return out
 

@@ -277,7 +277,6 @@ _ALLOWLIST: dict[str, str] = {
     # Spacetime geometry library used by the claimed self/workspace views.
     "temporal_lobe.light_cones": "spacetime geometry library tissue",
     "temporal_lobe.spacetime_workspace": "spacetime geometry library tissue",
-    "temporal_lobe.language_latent_space": "language latent geometry library tissue",
     "occipital_lobe.visual_spacetime": "visual spacetime geometry library tissue",
 }
 

@@ -56,7 +56,7 @@ oscillators** (``BrainWaveOscillator``) — not a classifier. Each
 band is a real oscillation with persistent quadrature state, and its
 reported power is *measured*: the band emits its real-axis trace and
 a Goertzel meter — the band math the field's own spectrum
-(``src/field/spectrum.rs``) applies to her substrate — reads the
+(``src/latent_spaces/spectrum.rs``) applies to her substrate — reads the
 wave's band energy off the emitted signal, never off state.
 
 - **Waveform**: each band carries a complex state ``z`` rotating at
@@ -2643,7 +2643,7 @@ def assess_brain_waves(
 
     When ``client`` is supplied, her field's own spectral signature
     also enters as stimulus — the substrate's band energies, carrier
-    phase lock, and per-band entrainment (``brainstem.field_probe``)
+    phase lock, and per-band entrainment (``brainstem.field_stimulus``)
     — the modeled waves perturbed by the very field they run on.
 
     The oscillator propagates each band's phasor state —
@@ -2668,7 +2668,7 @@ def assess_brain_waves(
         fold = client.get_fold_margins()
     if client is not None:
         try:
-            from brainstem.field_probe import apply_field_stimulus
+            from brainstem.field_stimulus import apply_field_stimulus
 
             apply_field_stimulus(client)
         except Exception:  # noqa: BLE001 — absent channel, any cause

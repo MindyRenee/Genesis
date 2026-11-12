@@ -169,6 +169,7 @@ class Voice:
         self._termux_available = shutil.which("termux-tts-speak") is not None
         self._piper_available = self._check_piper()
         self._espeak_available = self._check_espeak()
+        self._playback_available = self._check_playback()
         self._model = (
             _PIPER_MODEL
             if _PIPER_MODEL.exists()
@@ -217,14 +218,66 @@ class Voice:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
 
+    def _check_playback(self) -> bool:
+        """Check whether a working audio output exists for local TTS.
+
+        Binary presence is not playback: aplay/paplay can be installed
+        while the device or audio server is dead (a proot with no
+        /dev/snd, a PulseAudio bridge that stopped). Every utterance
+        then spawns a Piper/player pair that hangs until the reaper
+        kills it — each speech waiting out the full timeout. Probe
+        once at boot; on failure the voice degrades to text-only,
+        the same rule as a missing microphone.
+        """
+        if shutil.which("aplay") is not None:
+            # ALSA output needs a sound device the process can reach.
+            return os.path.isdir("/dev/snd") and os.access(
+                "/dev/snd", os.R_OK | os.W_OK, effective_ids=True
+            )
+        if shutil.which("paplay") is None:
+            return False
+        # PulseAudio/PipeWire: ask the server rather than trusting the
+        # client binary — a refused daemon answers instantly.
+        if shutil.which("pactl") is not None:
+            try:
+                return (
+                    subprocess.run(
+                        ["pactl", "info"],
+                        capture_output=True,
+                        timeout=3,
+                    ).returncode
+                    == 0
+                )
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                return False
+        # No pactl: play 40 ms of silence through the same raw path
+        # Piper uses — a cheap end-to-end liveness probe.
+        try:
+            return (
+                subprocess.run(
+                    ["paplay", "--raw", "--rate=8000", "--format=u8", "--channels=1"],
+                    input=b"\x80" * 320,
+                    capture_output=True,
+                    timeout=5,
+                ).returncode
+                == 0
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return False
+
     def is_available(self) -> bool:
         """True if any TTS backend is available."""
-        return bool(self._termux_available or self._piper_available or self._espeak_available)
+        return bool(
+            self._termux_available
+            or (self._playback_available and (self._piper_available or self._espeak_available))
+        )
 
     def describe(self) -> str:
         """Human-readable description of the current TTS setup."""
         if self._termux_available:
             return "Android system TTS via Termux:API"
+        if not self._playback_available:
+            return "unavailable"
         if self._piper_available and self._model:
             return f"Voice: Piper neural TTS ({self._model.name})"
         if self._espeak_available:
@@ -328,6 +381,13 @@ class Voice:
             if self._termux_available:
                 pitch = max(0.7, min(1.3, 1.0 + valence * 0.15 + creativity * 0.05))
                 self._speak_termux(text, blocking, rate_factor, pitch)
+            elif not self._playback_available:
+                # No working output — degrade to text-only rather than
+                # spawning a child that waits out the reap timeout.
+                with self._queue_lock:
+                    self._speech_queue.clear()
+                if not blocking:
+                    self._done_speaking()
             elif self._piper_available and self._model:
                 self._speak_piper(text, blocking, rate_factor, heat)
             elif self._espeak_available:
@@ -358,6 +418,11 @@ class Voice:
                         proc.wait(timeout=5)
                     except Exception as e:  # noqa: BLE001
                         logger.debug(f"failed to kill TTS child: {e}")
+                    # A hung player usually means the audio server died
+                    # mid-session — re-probe once so later utterances
+                    # degrade instead of each waiting out the timeout.
+                    if not self._termux_available:
+                        self._playback_available = self._check_playback()
                 except Exception as e:  # noqa: BLE001
                     logger.warning(f"reap child failed: {e}")
         finally:
@@ -386,6 +451,10 @@ class Voice:
         try:
             if self._termux_available:
                 self._speak_termux(text, False, rate_factor, 1.0)
+            elif not self._playback_available:
+                with self._queue_lock:
+                    self._speech_queue.clear()
+                self._done_speaking()
             elif self._piper_available and self._model:
                 self._speak_piper(text, False, rate_factor, heat)
             elif self._espeak_available:

@@ -319,7 +319,7 @@ impl FieldSignature {
 
 /// The field's spectral signature on the wire — the band
 /// decomposition of her own substrate trajectory
-/// (`field::spectrum`) plus the consensus kinematics the carrier
+/// (`latent_spaces::spectrum`) plus the consensus kinematics the carrier
 /// runs on. Bands the achieved sampling rate cannot resolve read
 /// zero under their presence flags — absent is a reading, never an
 /// aliased one.

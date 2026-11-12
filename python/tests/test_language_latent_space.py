@@ -1,14 +1,14 @@
-"""Tests for Genesis's machine-native language latent geometry."""
+"""Tests for the inner world's language organ — machine-native language latent geometry."""
 from __future__ import annotations
 
 import numpy as np
 import pytest
-from temporal_lobe.comprehension import Comprehension
-from temporal_lobe.language_latent_space import (
+from self.language_latent_space import (
     LanguageLatentSpace,
     decode_ascii,
     encode_ascii,
 )
+from temporal_lobe.comprehension import Comprehension
 
 
 def test_ascii_encoding_is_lossless_for_ascii() -> None:
@@ -95,7 +95,7 @@ def test_bad_language_latent_restore_is_atomic() -> None:
 
 
 def test_sinkhorn_rejects_invalid_marginals() -> None:
-    from temporal_lobe.language_latent_space import _sinkhorn
+    from self.language_latent_space import _sinkhorn
 
     with pytest.raises(ValueError):
         _sinkhorn(np.array([0.4, 0.4]), np.array([1.0]), np.zeros((2, 1)))
@@ -125,7 +125,7 @@ def test_language_latent_handles_empty_text_with_explicit_blank_cell() -> None:
 
 
 def test_sinkhorn_rejects_negative_or_nonfinite_marginals() -> None:
-    from temporal_lobe.language_latent_space import _sinkhorn
+    from self.language_latent_space import _sinkhorn
 
     cost = np.zeros((2, 2))
     with pytest.raises(ValueError):
@@ -136,7 +136,7 @@ def test_sinkhorn_rejects_negative_or_nonfinite_marginals() -> None:
 
 
 def test_ascii_hamming_cost_is_seven_bit_metric() -> None:
-    from temporal_lobe.language_latent_space import _sinkhorn
+    from self.language_latent_space import _sinkhorn
 
     left, right = ord("A"), ord("C")
     assert (left ^ right).bit_count() == 1

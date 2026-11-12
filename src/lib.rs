@@ -5,7 +5,7 @@
 //! `python/` opens to brain regions because the mind is organized
 //! anatomically; `src/` presents the body's anatomy the same way.
 //! The implementation lives in `daemon`, `state`, `store`,
-//! `cognition`, and `field`; the region modules (`basal_forebrain`,
+//! `cognition`, and `latent_spaces`; the region modules (`basal_forebrain`,
 //! `brainstem`, `thalamus`, `neurochemical`, `memory`, `limbic_system`,
 //! `basal_ganglia`, `self_`, `sleep`, `tools`, `infrastructure`)
 //! re-export those modules under the structure they implement, so

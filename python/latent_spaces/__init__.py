@@ -5,7 +5,7 @@ manifold in ``manifold.py`` — the holographic, rotating substrate the
 daemon's fields are projections of and the mind's deposits live on.
 Everything in this package is a facet of that one space: its
 stereographic ``geometry``, the ``higher`` S^4/S^7 lifts, the
-``spectrum`` band constants, the ``seed`` used to populate an empty
+``spectrum`` band constants
 image, and ``self_geometry`` — the self-region's own geometric state
 model (agency fibers, consistency, autopoietic flow) that encodes the
 signals deposited at the manifold's self domain.

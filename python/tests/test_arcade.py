@@ -98,7 +98,9 @@ def test_play_feeds_world_chemistry_waves_and_learns_levels():
         event for event in events if event.metadata and "latent_state" in event.metadata
     ]
     assert latent_events
-    assert latent_events[-1].metadata["latent_domain"] == "experiential_outer"
+    # The typed latent hand-off names the manifold's own domain — the
+    # ontology's "outer" (the far pole), not a prefixed variant.
+    assert latent_events[-1].metadata["latent_domain"] == "outer"
     assert latent_events[-1].metadata["latent_state"]["object_count"] == 1
     assert any(event.metadata.get("latent_prediction_error") is not None for event in latent_events)
     assert memory.environment_model

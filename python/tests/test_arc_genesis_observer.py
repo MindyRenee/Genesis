@@ -4,8 +4,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from parietal_lobe.arc_genesis_observer import GenesisArcObserver
+from self.language_latent_space import LanguageLatentSpace
 from temporal_lobe.comprehension import Comprehension
-from temporal_lobe.language_latent_space import LanguageLatentSpace
 
 
 class FakeWorld:
@@ -26,16 +26,15 @@ class FakeWorld:
 
 
 class FakeMind:
-    """Mind stand-in exposing a world and temporal language hooks."""
+    """Mind stand-in exposing a world and the inner world's language organ."""
     def __init__(self):
         """Initialize the fake's recorded state."""
         self.world = FakeWorld()
-        self.language_latent_space = LanguageLatentSpace()
+        self.inner_life = SimpleNamespace(
+            inner_world=SimpleNamespace(language_latent_space=LanguageLatentSpace())
+        )
         self.brain = SimpleNamespace(
-            temporal=SimpleNamespace(
-                comprehension=Comprehension(),
-                observe_language=self.language_latent_space.observe,
-            )
+            temporal=SimpleNamespace(comprehension=Comprehension())
         )
 
 
@@ -59,7 +58,7 @@ def test_observer_routes_observation_into_world_and_language_latent():
     assert kwargs["source"] == "arc3:demo"
     assert kwargs["metadata"]["legal_actions"] == ["ACTION1"]
     assert kwargs["percept"]["grid"] == [[1, 0]]
-    assert mind.language_latent_space.observations == 1
+    assert mind.inner_life.inner_world.language_latent_space.observations == 1
     assert observer.snapshot()["latent_observations"] == 1
 
 
@@ -93,7 +92,7 @@ def test_observer_routes_action_and_updates_transition_geometry():
     assert kind == "action"
     assert "ACTION1" in content
     assert '"state_after":"WIN"' in detail
-    assert mind.language_latent_space.observations == 2
+    assert mind.inner_life.inner_world.language_latent_space.observations == 2
     snapshot = observer.snapshot()
     assert snapshot["events_seen"] == 2
     assert snapshot["events_failed"] == 0

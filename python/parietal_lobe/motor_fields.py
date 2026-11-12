@@ -1,4 +1,4 @@
-"""Motor fields — word-layer companion to ``src/field/motor.rs``.
+"""Motor fields — word-layer companion to ``src/latent_spaces/motor.rs``.
 
 The mind's decisions laid out over a coordinate grid instead of
 collapsed to a symbol: when cognition decides "act there" or "press

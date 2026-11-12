@@ -1638,16 +1638,18 @@ class LifecycleMixin:
                 )
                 # Validate into a detached instance during staging. The live
                 # inner world is replaced only when the state transaction commits.
+                staged_inner_world = None
                 if ils.get("inner_world") is not None:
                     try:
                         from sleep.inner_world import InnerWorldExperientialLatentSpace
 
-                        staged_world = InnerWorldExperientialLatentSpace()
-                        staged_world.restore(ils["inner_world"])
+                        staged_inner_world = InnerWorldExperientialLatentSpace()
+                        staged_inner_world.restore(ils["inner_world"])
                     except (KeyError, TypeError, ValueError, OverflowError) as error:
                         note_swallowed("mind.lifecycle._stage_inner_life.inner_world", error)
+                        staged_inner_world = None
                     else:
-                        scalar_updates.append((self.inner_life, "inner_world", staged_world))
+                        scalar_updates.append((self.inner_life, "inner_world", staged_inner_world))
                 if ils.get("self_latent_space") is not None:
                     try:
                         from latent_spaces.self_geometry import SelfLatentSpaceArchitecture
@@ -1659,8 +1661,12 @@ class LifecycleMixin:
                     else:
                         scalar_updates.append((self, "self_latent_space", staged_self_latent))
                 if ils.get("language_latent_space") is not None:
+                    # Legacy sibling key (images saved before the language
+                    # organ nested inside the inner world's own checkpoint):
+                    # stage the organ onto its home — the staged inner world
+                    # when one restored cleanly, else the live one.
                     try:
-                        from temporal_lobe.language_latent_space import LanguageLatentSpace
+                        from self.language_latent_space import LanguageLatentSpace
 
                         staged_language_latent = LanguageLatentSpace()
                         staged_language_latent.restore(ils["language_latent_space"])
@@ -1671,13 +1677,19 @@ class LifecycleMixin:
                             "mind.lifecycle._stage_inner_life.language_latent_space", error
                         )
                     else:
-                        scalar_updates.append(
-                            (
-                                self.brain.temporal,
-                                "language_latent_space",
-                                staged_language_latent,
+                        language_home = staged_inner_world
+                        if language_home is None:
+                            language_home = getattr(
+                                self.inner_life, "inner_world", None
                             )
-                        )
+                        if language_home is not None:
+                            scalar_updates.append(
+                                (
+                                    language_home,
+                                    "language_latent_space",
+                                    staged_language_latent,
+                                )
+                            )
                 logger.info(
                     "Restored inner life state: thoughts=%d, dreams=%d, lucid=%d",
                     *counts,
@@ -1824,9 +1836,8 @@ class LifecycleMixin:
                         else None
                     ),
                     "self_latent_space": self.self_latent_space.to_dict(),
-                    "language_latent_space": (
-                        self.brain.temporal.language_latent_space.to_dict()
-                    ),
+                    # The language organ's state travels nested inside the
+                    # inner world's own checkpoint (inner_world.to_dict()).
                 },
                 world_state=self.world.to_dict(),
                 executive=self.brain.frontal.executive,

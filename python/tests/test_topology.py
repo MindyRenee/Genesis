@@ -55,7 +55,7 @@ def test_projection_targets_exist() -> None:
 def test_regions_ride_field_fibers() -> None:
     """Every region rides a real major system.
 
-    The three ids mirror ``src/field/runtime.rs``'s fibers — body
+    The three ids mirror ``src/latent_spaces/runtime.rs``'s fibers — body
     (somatic, slow), prediction (inference, fast), agency (volitional
     and social). The Rust side cross-checks its own table against the
     live FieldRuntime; this side pins the same three names.

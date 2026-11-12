@@ -16,6 +16,12 @@ while the body is down:
     - ``compression`` — the algorithmic sleep-compaction pass: VQ
       codebook retraining, edge migration into the holographic
       graph, episode summarization, synaptic homeostasis.
+    - ``language_latent_space`` — the language observation stream
+      (lives in ``self``; re-exported here):
+      her voice's own geometry (reversible 7-bit ASCII notation,
+      Sinkhorn optimal transport, categorical Fisher information),
+      owned by ``inner_world`` and deposited into the one manifold's
+      inner band.
 """
 
 from __future__ import annotations
@@ -36,6 +42,11 @@ _EXPORTS: dict[str, str] = {
     "InnerWorldExperientialLatentSpace": "sleep.inner_world",
     "InteroceptiveBaseManifold": "sleep.inner_world",
     "UltrametricEpisodicMemorySpace": "sleep.inner_world",
+    # Her language observation stream — it lives in the self section
+    # now (self.language_latent_space); re-exported here for compat.
+    "LanguageLatentSpace": "self.language_latent_space",
+    "decode_ascii": "self.language_latent_space",
+    "encode_ascii": "self.language_latent_space",
     "nap_capped_stage": "sleep.inner_life",
     # The thought datatype itself (defined with the frontal stream,
     # re-exported here since inner life produces them)

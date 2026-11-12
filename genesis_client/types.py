@@ -151,6 +151,38 @@ class IonSummary:
             net_membrane_current=values[26],
         )
 
+    @classmethod
+    def from_state(cls, data: bytes, offset: int = 3288) -> IonSummary:
+        """Decode the ion block straight out of a core-state snapshot.
+
+        ``IonState`` is 124 bytes inside the struct at ``offset``: the
+        four per-ion arrays (64 bytes), then ``current_density`` (16
+        bytes, not part of the wire summary), then the 11 scalar
+        fields. Same fields the daemon serializes for GET_ION_SUMMARY,
+        read here with no round trip — ions travel with the chemicals.
+        """
+        if len(data) < offset + 124:
+            raise ValueError(f"IonSummary state needs {offset + 124} bytes")
+        head = struct.unpack_from("<16f", data, offset)
+        tail = struct.unpack_from("<11f", data, offset + 80)
+        return cls(
+            intracellular_mm=head[0:4],
+            extracellular_mm=head[4:8],
+            reversal_potential_mv=head[8:12],
+            conductance=head[12:16],
+            membrane_potential_mv=tail[0],
+            nak_pump_rate=tail[1],
+            kcl_cotransporter_flux=tail[2],
+            ncx_flux=tail[3],
+            atp_availability=tail[4],
+            calcium_signal=tail[5],
+            chloride_efficacy=tail[6],
+            excitability=tail[7],
+            gradient_integrity=tail[8],
+            energy_load=tail[9],
+            net_membrane_current=tail[10],
+        )
+
 
 @dataclass(frozen=True)
 class FoldMargins:
@@ -932,6 +964,10 @@ class CoreState:
     # to know what the body was doing. That is the coupling that let the
     # mind's 1 Hz cadence dictate the body's integration rate.
     inference: InferenceSummary | None
+    # The electrochemical ion layer (offset 3288, 124 bytes) — the
+    # biophysical substrate the chemicals act on: membrane potential,
+    # gradients, pump fluxes, ATP availability.
+    ions: IonSummary | None = None
     # The sleep-wake network's homeostatic sleep pressure, as a fraction of
     # its maximum (0 = none, 1 = the source's hmax). In a live daemon h is
     # slaved to chemical adenosine, so it reads the remaining need — it
@@ -1002,6 +1038,7 @@ class CoreState:
             stm_count=stm_count,
             ltm_episode_count=ltm_episode_count,
             inference=_unpack_inference_signals(data),
+            ions=IonSummary.from_state(data),
             sleep_pressure=_unpack_sleep_pressure(data),
         )
 
@@ -2220,7 +2257,7 @@ class FieldState:
     from it.
 
     Parsed from the daemon's ``GET_INTERNALS`` map (``field.*``
-    keys). The body runs this field itself (src/field/): the fibers
+    keys). The body runs this field itself (src/latent_spaces/): the fibers
     — body, prediction, agency — each project their measured state
     into a shared 6-D latent space on a stereographic sphere
     (positive curvature; they live inside the hemisphere cap around
@@ -2377,7 +2414,7 @@ class FieldSpectrum:
     """The field's spectral signature — GET_FIELD_SPECTRUM.
 
     The band decomposition of her own substrate trajectory
-    (``src/field/spectrum.rs``): ``flux`` is the fibers' centroid
+    (``src/latent_spaces/spectrum.rs``): ``flux`` is the fibers' centroid
     motion energy per band, ``tension`` the fibers' spread — the
     disagreement's spectral shadow. The carrier block is the
     consensus' own kinematics — ``carrier_phase`` the accumulated

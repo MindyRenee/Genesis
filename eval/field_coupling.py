@@ -1,10 +1,10 @@
 """Field-coupling assay — does her own substrate measurably move the
 wave model?
 
-Her field substrate (``src/field/``) integrates body, prediction,
-and agency fibers on the latent manifold; ``src/field/spectrum.rs``
+Her field substrate (``src/latent_spaces/``) integrates body, prediction,
+and agency fibers on the latent manifold; ``src/latent_spaces/spectrum.rs``
 decomposes that trajectory at the wave model's band centers and
-``brainstem.field_probe`` maps it onto ``BrainWaveOscillator`` as
+``brainstem.field_stimulus`` maps it onto ``BrainWaveOscillator`` as
 stimulus, evoked resets, carrier phase lock, and per-band entrainment.
 This assay asks the falsifiable question: when her substrate is
 perturbed through her own chemistry, does the *coupled* wave state
@@ -213,7 +213,7 @@ def _analyze(rows: list[dict]) -> dict:
     )
 
     # ─── Phase lock (the entrainment leg) ──────────────────────
-    from brainstem.field_probe import field_phase_lock
+    from brainstem.field_stimulus import field_phase_lock
 
     lock = field_phase_lock()
     report["phase_lock"] = lock

@@ -57,7 +57,7 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from occipital_lobe.v1 import name_color
@@ -303,8 +303,9 @@ class Vision:
         # The mathematical eye (Rust `self_::vision` via `genesis_body`) —
         # optics → phototransduction → ganglion → V1 fields stepped on real
         # frames. Lazily built on the first frame; absent when the
-        # extension module is not installed.
-        self._eye = None
+        # extension module is not installed. The extension object is
+        # untyped (Any) — the Rust class's own interface.
+        self._eye: Any = None
         self._eye_dims: tuple[int, int] | None = None
         self._eye_last_t: float | None = None
         self._on_gamma: Callable[[float], None] | None = None
