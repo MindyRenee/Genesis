@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from temporal_lobe.concepts import (
     ConceptNetwork,
@@ -23,13 +24,15 @@ from temporal_lobe.concepts import (
     SchemaInducer,
 )
 
+from infrastructure.config import default_data_dir
+
 
 def _out(*args: object) -> None:
     """Report channel — for these assay tools, stdout IS the product."""
     print(*args, flush=True)
 
 
-EDGE_LOG = Path.home() / ".local" / "share" / "genesis" / "edge_log.jsonl"
+EDGE_LOG = default_data_dir() / "edge_log.jsonl"
 
 
 def load_network() -> ConceptNetwork:

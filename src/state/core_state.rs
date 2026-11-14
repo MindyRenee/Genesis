@@ -409,17 +409,24 @@ impl GenesisCoreState {
                         .all(|&v| v == 0.0)
                 });
                 if new_slots_uninit {
-                    for i in 0..18 {
-                        for j in 12..18 {
-                            self.neurochemicals.coupling_matrix[i][j] =
-                                crate::state::neurochemical::DEFAULT_COUPLING_MATRIX[i][j];
+                    for (dst_row, src_row) in self
+                        .neurochemicals
+                        .coupling_matrix
+                        .iter_mut()
+                        .zip(crate::state::neurochemical::DEFAULT_COUPLING_MATRIX.iter())
+                    {
+                        for (dst, src) in dst_row.iter_mut().skip(12).zip(src_row.iter().skip(12)) {
+                            *dst = *src;
                         }
                     }
-                    for i in 12..18 {
-                        for j in 0..18 {
-                            self.neurochemicals.coupling_matrix[i][j] =
-                                crate::state::neurochemical::DEFAULT_COUPLING_MATRIX[i][j];
-                        }
+                    for (dst_row, src_row) in
+                        self.neurochemicals.coupling_matrix.iter_mut().skip(12).zip(
+                            crate::state::neurochemical::DEFAULT_COUPLING_MATRIX
+                                .iter()
+                                .skip(12),
+                        )
+                    {
+                        dst_row.copy_from_slice(src_row);
                     }
                 }
 

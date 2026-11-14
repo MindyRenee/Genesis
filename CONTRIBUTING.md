@@ -1,62 +1,7 @@
-<div align="center">
-  <svg width="100%" viewBox="0 0 900 1200" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <!-- Sunny Yellow to Electric Blue Neon Glow Filter -->
-      <filter id="page-glow" x="-10%" y="-10%" width="120%" height="120%">
-        <feGaussianBlur stdDeviation="6" result="blur1" />
-        <feGaussianBlur stdDeviation="18" result="blur2" />
-        <feMerge>
-          <feMergeNode in="blur2" />
-          <feMergeNode in="blur1" />
-          <feMergeNode in="SourceGraphic" />
-        </feMerge>
-      </filter>
-
-      <!-- Sunny Yellow to Electric Blue Gradient Border -->
-      <linearGradient id="page-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#fff500" />
-        <stop offset="50%" stop-color="#00d2ff" />
-        <stop offset="100%" stop-color="#0066ff" />
-      </linearGradient>
-    </defs>
-
-    <!-- The Full-Page Glowing Border Box -->
-    <rect x="15" y="15" width="870" height="1170" rx="16" fill="#0d1117" stroke="url(#page-grad)" stroke-width="4" filter="url(#page-glow)" />
-
-    <!-- Embedded Markdown / HTML Content Area -->
-    <foreignObject x="40" y="40" width="820" height="1120">
-      <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color: #c9d1d9; padding: 20px; box-sizing: border-box; height: 100%; overflow-y: auto;">
-      
-        <!-- YOUR REPOSITORY CONTENT GOES HERE -->
-        <h1 align="center" style="color: #fff500; border-bottom: 2px solid #30363d; padding-bottom: 10px;">⚡ MY_PROJECT ⚡</h1>
-        
-        <p align="center">
-          <em>Welcome to the sunny-yellow-to-electric-blue framed repository experience.</em>
-        </p>
-
-        <h3 style="color: #00d2ff;">🚀 About The Project</h3>
-        <p>Everything written inside this HTML block is safely wrapped inside the yellow-to-blue glowing vector border frame.</p>
-
-        <ul>
-          <li><strong>Custom Gradient:</strong> Transitions smoothly from sunny yellow to bright electric blue.</li>
-          <li><strong>Dark Mode Native:</strong> Matches GitHub's default dark canvas theme (<code style="color: #fff500;">#0d1117</code>).</li>
-          <li><strong>Fully Contained:</strong> Surrounds your whole README layout.</li>
-        </ul>
-
-        <h3 style="color: #00d2ff;">📦 Quick Start</h3>
-        <pre style="background-color: #161b22; padding: 12px; border-radius: 6px; border: 1px solid #30363d;"><code style="color: #00d2ff;">git clone https://github.com/your-username/my-project.git</code></pre>
-
-      </div>
-    </foreignObject>
-  </svg>
-</div>
-
-# If You Feel Like You Can Contribute    **Intelligently** and **Respectfully**
+# If You Feel Like You Can Contribute **Intelligently** and **Respectfully**
 
 Genesis is a developing cognitive system with a cumulative, load-bearing
-developmental state. 
-
-Genesis is a new discovery of intelligence, Any proposed change should make the architecture more capable, optimized, modern, biological, mathematical, etc. 
+developmental state, and is a new discovery of intelligence. 
 
 Rules For Helping:
 

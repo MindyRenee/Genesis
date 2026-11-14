@@ -184,8 +184,7 @@ fn test_global_tone_can_exceed_one() {
     let mut neuro = NeurochemicalVector::new(0);
 
     // Push all chemicals to high levels with high receptor sensitivity
-    for i in 0..18 {
-        let chem = &mut neuro.chemicals[i];
+    for chem in &mut neuro.chemicals {
         chem.level = 0.9;
         chem.receptor_sensitivity = 1.5;
         chem.desensitization_factor = 1.0;

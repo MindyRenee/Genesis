@@ -311,9 +311,13 @@ fn prop_coupling_matrix_stays_bounded() {
     }
 
     // Check all coupling matrix values are bounded
-    for i in 0..NEUROCHEMICAL_COUNT {
-        for j in 0..NEUROCHEMICAL_COUNT {
-            let val = vec.coupling_matrix[i][j];
+    for (i, row) in vec
+        .coupling_matrix
+        .iter()
+        .enumerate()
+        .take(NEUROCHEMICAL_COUNT)
+    {
+        for (j, &val) in row.iter().enumerate().take(NEUROCHEMICAL_COUNT) {
             assert!(
                 val.is_finite(),
                 "coupling_matrix[{}][{}] is not finite: {}",

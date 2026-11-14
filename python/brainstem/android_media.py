@@ -4,6 +4,7 @@ The camera is sampled only when GENESIS_ANDROID_CAMERA=1. Every frame is a
 real JPEG returned by Termux:API and is passed to Genesis's existing visual
 pipeline. Missing commands, permissions, or hardware mean no frame is emitted.
 """
+
 from __future__ import annotations
 
 import json
@@ -55,9 +56,7 @@ def capture_android_frame(camera_id: int = 0, timeout: float = 15.0) -> np.ndarr
     shared_dir = _shared_download_dir()
     if shared_dir is None:
         return None
-    descriptor, filename = tempfile.mkstemp(
-        prefix="genesis-camera-", suffix=".jpg", dir=shared_dir
-    )
+    descriptor, filename = tempfile.mkstemp(prefix="genesis-camera-", suffix=".jpg", dir=shared_dir)
     os.close(descriptor)
     image_path = Path(filename)
     image_path.unlink(missing_ok=True)
@@ -150,7 +149,6 @@ class AndroidCameraAdapter:
                     self._last_error_log = now
             remaining = self._interval - (time.monotonic() - started)
             self._stop.wait(max(0.0, remaining))
-
 
 
 def decode_float32_audio(data: bytes) -> np.ndarray:

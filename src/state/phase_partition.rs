@@ -423,11 +423,11 @@ fn align_labels(new: &mut PhaseModel, old: &PhaseModel) {
     let k = new.k();
     let mut used = vec![false; k];
     let mut order = Vec::with_capacity(k);
-    for o in 0..old.k().min(k) {
+    for old_mean in old.mean.iter().take(old.k().min(k)) {
         let best = (0..k)
             .filter(|&j| !used[j])
             .min_by(|&a, &b| {
-                sq_dist(&new.mean[a], &old.mean[o]).total_cmp(&sq_dist(&new.mean[b], &old.mean[o]))
+                sq_dist(&new.mean[a], old_mean).total_cmp(&sq_dist(&new.mean[b], old_mean))
             })
             .expect("an unclaimed regime exists while o < k");
         used[best] = true;

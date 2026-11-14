@@ -3020,15 +3020,15 @@ impl ActiveInferenceEngine {
         file.write_all(&5u32.to_le_bytes())?;
 
         // Transition matrix (row-major)
-        for i in 0..DIM {
-            for j in 0..DIM {
-                file.write_all(&self.transition_matrix[i][j].to_le_bytes())?;
+        for row in self.transition_matrix.iter().take(DIM) {
+            for value in row.iter().take(DIM) {
+                file.write_all(&value.to_le_bytes())?;
             }
         }
 
         // Bias vector
-        for i in 0..DIM {
-            file.write_all(&self.bias[i].to_le_bytes())?;
+        for value in self.bias.iter().take(DIM) {
+            file.write_all(&value.to_le_bytes())?;
         }
 
         // Scalar state
@@ -3040,27 +3040,27 @@ impl ActiveInferenceEngine {
         file.write_all(&self.tick_count.to_le_bytes())?;
 
         // Variational posterior (v2)
-        for i in 0..DIM {
-            file.write_all(&self.belief_mean[i].to_le_bytes())?;
+        for value in self.belief_mean.iter().take(DIM) {
+            file.write_all(&value.to_le_bytes())?;
         }
-        for i in 0..DIM {
-            file.write_all(&self.belief_var[i].to_le_bytes())?;
+        for value in self.belief_var.iter().take(DIM) {
+            file.write_all(&value.to_le_bytes())?;
         }
-        for i in 0..DIM {
-            file.write_all(&self.prior_var[i].to_le_bytes())?;
+        for value in self.prior_var.iter().take(DIM) {
+            file.write_all(&value.to_le_bytes())?;
         }
         file.write_all(&self.last_free_energy.to_le_bytes())?;
 
         // Action-conditioned model (v3)
         // Action matrix B (row-major)
-        for i in 0..DIM {
-            for j in 0..DIM {
-                file.write_all(&self.action_matrix[i][j].to_le_bytes())?;
+        for row in self.action_matrix.iter().take(DIM) {
+            for value in row.iter().take(DIM) {
+                file.write_all(&value.to_le_bytes())?;
             }
         }
         // Last action vector
-        for i in 0..DIM {
-            file.write_all(&self.last_action[i].to_le_bytes())?;
+        for value in self.last_action.iter().take(DIM) {
+            file.write_all(&value.to_le_bytes())?;
         }
 
         // Slow error trackers (v4) — the state behind the precision
@@ -3074,8 +3074,8 @@ impl ActiveInferenceEngine {
 
         // Preference (v5) — appended last so an older reader that
         // stops early still gets a complete, valid prefix.
-        for i in 0..DIM {
-            file.write_all(&self.preferred[i].to_le_bytes())?;
+        for value in self.preferred.iter().take(DIM) {
+            file.write_all(&value.to_le_bytes())?;
         }
         file.write_all(&self.preference_precision.to_le_bytes())?;
 
@@ -3148,14 +3148,13 @@ impl ActiveInferenceEngine {
         // corrupted model file poisons the system until the tick loop
         // eventually clamps the values — but in reactive mode (no
         // tick loop), the corruption persists indefinitely.
-        for i in 0..DIM {
-            for j in 0..DIM {
+        for row in engine.transition_matrix.iter_mut().take(DIM) {
+            for cell in row.iter_mut().take(DIM) {
                 let mut bytes = [0u8; 4];
                 if file.read_exact(&mut bytes).is_err() {
                     return Self::new();
                 }
-                engine.transition_matrix[i][j] =
-                    crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), -2.0, 2.0);
+                *cell = crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), -2.0, 2.0);
             }
         }
 
@@ -3163,13 +3162,12 @@ impl ActiveInferenceEngine {
         // and clamp to [-0.5, 0.5] (the same bounds enforced during
         // the tick). A large bias would shift all predictions, causing
         // sustained prediction errors even with a correct matrix.
-        for i in 0..DIM {
+        for cell in engine.bias.iter_mut().take(DIM) {
             let mut bytes = [0u8; 4];
             if file.read_exact(&mut bytes).is_err() {
                 return Self::new();
             }
-            engine.bias[i] =
-                crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), -0.5, 0.5);
+            *cell = crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), -0.5, 0.5);
         }
 
         // Scalar state
@@ -3213,7 +3211,7 @@ impl ActiveInferenceEngine {
         // The engine will update them on the next cycle.
         if version >= 2 {
             // belief_mean
-            for i in 0..DIM {
+            for cell in engine.belief_mean.iter_mut().take(DIM) {
                 let mut bytes = [0u8; 4];
                 if file.read_exact(&mut bytes).is_err() {
                     // A versioned model is only valid when its complete
@@ -3222,26 +3220,23 @@ impl ActiveInferenceEngine {
                     // causing later fields to be decoded from the wrong bytes.
                     return Self::new();
                 }
-                engine.belief_mean[i] =
-                    crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 0.0, 2.0);
+                *cell = crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 0.0, 2.0);
             }
             // belief_var
-            for i in 0..DIM {
+            for cell in engine.belief_var.iter_mut().take(DIM) {
                 let mut bytes = [0u8; 4];
                 if file.read_exact(&mut bytes).is_err() {
                     return Self::new();
                 }
-                engine.belief_var[i] =
-                    crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 1e-8, 1.0);
+                *cell = crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 1e-8, 1.0);
             }
             // prior_var
-            for i in 0..DIM {
+            for cell in engine.prior_var.iter_mut().take(DIM) {
                 let mut bytes = [0u8; 4];
                 if file.read_exact(&mut bytes).is_err() {
                     return Self::new();
                 }
-                engine.prior_var[i] =
-                    crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 1e-8, 1.0);
+                *cell = crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 1e-8, 1.0);
             }
             // last_free_energy
             let mut fe_bytes = [0u8; 4];
@@ -3271,24 +3266,23 @@ impl ActiveInferenceEngine {
             // Action matrix B (row-major) — same sanitization as A.
             // Clamped to [-1, 1] (tighter than A's [-2, 2]) because
             // action effects are bounded by impulse magnitudes.
-            for i in 0..DIM {
-                for j in 0..DIM {
+            for row in engine.action_matrix.iter_mut().take(DIM) {
+                for cell in row.iter_mut().take(DIM) {
                     let mut bytes = [0u8; 4];
                     if file.read_exact(&mut bytes).is_err() {
                         return Self::new();
                     }
-                    engine.action_matrix[i][j] =
+                    *cell =
                         crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), -1.0, 1.0);
                 }
             }
             // Last action vector
-            for i in 0..DIM {
+            for cell in engine.last_action.iter_mut().take(DIM) {
                 let mut bytes = [0u8; 4];
                 if file.read_exact(&mut bytes).is_err() {
                     return Self::new();
                 }
-                engine.last_action[i] =
-                    crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), -2.0, 2.0);
+                *cell = crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), -2.0, 2.0);
             }
         }
 
@@ -3341,7 +3335,7 @@ impl ActiveInferenceEngine {
         // what she wanted on every restart, which would be a silent
         // version of the very not-knowing this is meant to fix.
         if version >= 5 {
-            for i in 0..DIM {
+            for cell in engine.preferred.iter_mut().take(DIM) {
                 let mut bytes = [0u8; 4];
                 if file.read_exact(&mut bytes).is_err() {
                     return Self::new();
@@ -3351,8 +3345,7 @@ impl ActiveInferenceEngine {
                 // a floor of 0.05 meant every restart quietly rewrote
                 // her preference for them — a value she could never
                 // return to, so the axis could not be shut off.
-                engine.preferred[i] =
-                    crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 0.0, 1.0);
+                *cell = crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 0.0, 1.0);
             }
             let mut bytes = [0u8; 4];
             if file.read_exact(&mut bytes).is_err() {

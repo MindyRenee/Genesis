@@ -107,13 +107,9 @@ def test_nested_subsystem_directories():
     the immediate directory names the module's home."""
     assert _module_of_filename(_region("frontal_lobe", "reasoning", "logic.py")) == MODULE_REASONING
     assert (
-        _module_of_filename(_region("occipital_lobe", "perception", "vision.py"))
-        == MODULE_SENSORY
+        _module_of_filename(_region("occipital_lobe", "perception", "vision.py")) == MODULE_SENSORY
     )
-    assert (
-        _module_of_filename(_region("temporal_lobe", "concepts", "network.py"))
-        == MODULE_MEMORY
-    )
+    assert _module_of_filename(_region("temporal_lobe", "concepts", "network.py")) == MODULE_MEMORY
 
 
 def test_region_root_topology():
@@ -121,10 +117,7 @@ def test_region_root_topology():
     metacognition, while the same basename inside a region keeps the
     region's own attribution."""
     assert _module_of_filename(_region("topology.py")) == MODULE_METACOGNITION
-    assert (
-        _module_of_filename(_region("temporal_lobe", "concepts", "topology.py"))
-        == MODULE_MEMORY
-    )
+    assert _module_of_filename(_region("temporal_lobe", "concepts", "topology.py")) == MODULE_MEMORY
 
 
 def test_file_pins_override_region():

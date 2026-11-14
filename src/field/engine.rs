@@ -292,8 +292,8 @@ impl SystemEngine {
                         return Err(FieldError::NonFiniteState);
                     }
                 }
-                for source in 0..n {
-                    let row = &self.couplings[target][source][coordinate];
+                for coupling in self.couplings[target].iter().take(n) {
+                    let row = &coupling[coordinate];
                     if row.len() != d {
                         return Err(FieldError::DimensionMismatch);
                     }

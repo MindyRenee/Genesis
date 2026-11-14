@@ -1,10 +1,12 @@
 import sys
 import time
+from pathlib import Path
 
-sys.path.insert(0, "/home/mindy/Public/genesis")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from genesis_client.client import GenesisClient
+from infrastructure.config import default_data_dir
 
-c = GenesisClient("/home/mindy/.local/share/genesis/genesis.sock")
+c = GenesisClient(str(default_data_dir() / "genesis.sock"))
 c.connect()
 
 

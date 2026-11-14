@@ -72,6 +72,7 @@ from genesis_client.protocol import (
     CHEM_NOREPINEPHRINE,
     CHEM_SEROTONIN,
 )
+from infrastructure.config import default_data_dir
 from infrastructure.journal import record_event
 
 logger = logging.getLogger(__name__)
@@ -135,9 +136,7 @@ class Arcade:
         self.games = games if games is not None else OfficialGames()
         self._wave = wave_drive if wave_drive is not None else _wave_drive()
         self._voice = voice
-        self.image_dir = (
-            Path(image_dir) if image_dir else Path.home() / ".local/share/genesis/arcade"
-        )
+        self.image_dir = Path(image_dir) if image_dir else default_data_dir() / "arcade"
         self._rng = rng or random.Random()
         self._lock = threading.RLock()
         self._offers: list[GameOffer] = []
