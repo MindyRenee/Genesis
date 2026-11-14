@@ -3,7 +3,7 @@
 
 # Core
 numpy==2.5.3
-nltk==3.10.3
+nltk==3.10.4
 # nltk's import chain pulls scipy.stats (collocations → metrics.
 # association → fisher_exact), so scipy is a hard runtime dep — a
 # stale system-site scipy built for numpy 1.x cannot substitute.
@@ -15,7 +15,7 @@ psutil==7.2.2
 # sympy lazily and degrades without it. Pinned in requirements-dev.txt
 # so dev/CI still exercises it, or install the "math" extra.
 # Image processing (visual cortex + canvas)
-Pillow==12.3.0
+Pillow==13.0.0
 opencv-python-headless==5.0.0.93
 pycairo==1.29.1
 
