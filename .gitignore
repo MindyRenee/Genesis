@@ -7,12 +7,10 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .venv*/
-python/venv/
 genesis_data/
-python/genesis_data/
 .genesis-discord
 .genesis-discord-bot
-python/voices/
+Self_World/voices/
 launch/
 
 # Per-instance project notes — documents this machine's setup.
@@ -46,4 +44,4 @@ AGENTS.md
 # The authority channel is a local module — present on her host,
 # never shipped. Callers import it guarded; without the file the
 # channel exists only as a sealed stand-in.
-genesis_client/creator.py
+Self_World/genesis_client/creator.py

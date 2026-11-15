@@ -43,7 +43,7 @@ fi
 # These invocations mirror the toolchain documented in AGENTS.md.
 # A missing tool warns loudly instead of silently passing — a skipped
 # check is a false pass.
-PY_DEPS="python/ genesis_client/ infrastructure/ eval/"
+PY_DEPS="Self_World/ Inner_Non_Physical_World/ Outer_Physical_World/"
 
 if command -v ruff >/dev/null 2>&1; then
     if ! ruff_out="$(ruff check 2>&1)"; then
@@ -52,7 +52,7 @@ if command -v ruff >/dev/null 2>&1; then
         exit 1
     fi
 else
-    echo "❌ ruff not found — lint check cannot be verified. Install: pip install -r python/requirements-dev.txt"
+    echo "❌ ruff not found — lint check cannot be verified. Install: pip install -r requirements-dev.txt"
     SKIPPED=1
 fi
 
@@ -63,7 +63,7 @@ if python3 -m pyflakes --version >/dev/null 2>&1; then
         exit 1
     fi
 else
-    echo "❌ pyflakes not found — check cannot be verified. Install: pip install -r python/requirements-dev.txt"
+    echo "❌ pyflakes not found — check cannot be verified. Install: pip install -r requirements-dev.txt"
     SKIPPED=1
 fi
 
@@ -74,7 +74,7 @@ if python3 -m mypy --version >/dev/null 2>&1; then
         exit 1
     fi
 else
-    echo "❌ mypy not found — check cannot be verified. Install: pip install -r python/requirements-dev.txt"
+    echo "❌ mypy not found — check cannot be verified. Install: pip install -r requirements-dev.txt"
     SKIPPED=1
 fi
 

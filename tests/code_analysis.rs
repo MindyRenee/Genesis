@@ -429,7 +429,7 @@ pub fn create_user(name: String, age: u32) -> User {
 #[test]
 fn test_self_analysis_neurochemical() {
     // Parse the neurochemical module — Genesis understanding itself
-    let source = include_str!("../src/state/neurochemical.rs");
+    let source = include_str!("../Self_World/src/state/neurochemical.rs");
     let analysis = analyze_file(source, "neurochemical.rs").expect("parse");
 
     assert!(
@@ -448,7 +448,7 @@ fn test_self_analysis_neurochemical() {
 
 #[test]
 fn test_self_analysis_core_state() {
-    let source = include_str!("../src/state/core_state.rs");
+    let source = include_str!("../Self_World/src/state/core_state.rs");
     let analysis = analyze_file(source, "core_state.rs").expect("parse");
 
     assert!(analysis.total_functions > 0);
@@ -464,7 +464,7 @@ fn test_self_analysis_core_state() {
 
 #[test]
 fn test_self_analysis_ltm() {
-    let source = include_str!("../src/store/ltm.rs");
+    let source = include_str!("../Self_World/src/store/ltm.rs");
     let analysis = analyze_file(source, "ltm.rs").expect("parse");
 
     assert!(
@@ -490,7 +490,7 @@ fn test_self_analysis_ltm() {
 
 #[test]
 fn test_self_analysis_summary() {
-    let source = include_str!("../src/state/neurochemical.rs");
+    let source = include_str!("../Self_World/src/state/neurochemical.rs");
     let analysis = analyze_file(source, "neurochemical.rs").expect("parse");
 
     let summary = analysis.summary();

@@ -1,0 +1,119 @@
+{
+  "benchmark": "bifurcation_analysis",
+  "methodology": "parameter sweep (homeostatic rate) with perturbation recovery",
+  "control_parameter": "homeostatic_rate",
+  "data_points": [
+    {
+      "homeostatic_rate": 0.001000,
+      "steady_state_variance": 0.00000331,
+      "recovery_ticks": 1000,
+      "oscillation_amplitude": 0.06739992,
+      "max_chemical_deviation": 0.53788948
+    },
+    {
+      "homeostatic_rate": 0.006000,
+      "steady_state_variance": 0.00000203,
+      "recovery_ticks": 1000,
+      "oscillation_amplitude": 0.08569014,
+      "max_chemical_deviation": 0.34812495
+    },
+    {
+      "homeostatic_rate": 0.011000,
+      "steady_state_variance": 0.00000129,
+      "recovery_ticks": 1000,
+      "oscillation_amplitude": 0.09622851,
+      "max_chemical_deviation": 0.30218977
+    },
+    {
+      "homeostatic_rate": 0.016000,
+      "steady_state_variance": 0.00000084,
+      "recovery_ticks": 1000,
+      "oscillation_amplitude": 0.11111596,
+      "max_chemical_deviation": 0.27737322
+    },
+    {
+      "homeostatic_rate": 0.021000,
+      "steady_state_variance": 0.00000056,
+      "recovery_ticks": 1000,
+      "oscillation_amplitude": 0.12462649,
+      "max_chemical_deviation": 0.26075935
+    },
+    {
+      "homeostatic_rate": 0.026000,
+      "steady_state_variance": 0.00000040,
+      "recovery_ticks": 1000,
+      "oscillation_amplitude": 0.13544154,
+      "max_chemical_deviation": 0.24835065
+    },
+    {
+      "homeostatic_rate": 0.031000,
+      "steady_state_variance": 0.00000030,
+      "recovery_ticks": 1000,
+      "oscillation_amplitude": 0.14380395,
+      "max_chemical_deviation": 0.23847747
+    },
+    {
+      "homeostatic_rate": 0.036000,
+      "steady_state_variance": 0.00000023,
+      "recovery_ticks": 1000,
+      "oscillation_amplitude": 0.15015638,
+      "max_chemical_deviation": 0.23028308
+    },
+    {
+      "homeostatic_rate": 0.041000,
+      "steady_state_variance": 0.00000019,
+      "recovery_ticks": 985,
+      "oscillation_amplitude": 0.15488899,
+      "max_chemical_deviation": 0.22327346
+    },
+    {
+      "homeostatic_rate": 0.046000,
+      "steady_state_variance": 0.00000016,
+      "recovery_ticks": 900,
+      "oscillation_amplitude": 0.15837294,
+      "max_chemical_deviation": 0.21713769
+    },
+    {
+      "homeostatic_rate": 0.051000,
+      "steady_state_variance": 0.00000015,
+      "recovery_ticks": 827,
+      "oscillation_amplitude": 0.16087961,
+      "max_chemical_deviation": 0.21166304
+    },
+    {
+      "homeostatic_rate": 0.056000,
+      "steady_state_variance": 0.00000013,
+      "recovery_ticks": 762,
+      "oscillation_amplitude": 0.16265696,
+      "max_chemical_deviation": 0.20670044
+    },
+    {
+      "homeostatic_rate": 0.061000,
+      "steady_state_variance": 0.00000012,
+      "recovery_ticks": 706,
+      "oscillation_amplitude": 0.16386139,
+      "max_chemical_deviation": 0.20213777
+    },
+    {
+      "homeostatic_rate": 0.066000,
+      "steady_state_variance": 0.00000011,
+      "recovery_ticks": 656,
+      "oscillation_amplitude": 0.16466942,
+      "max_chemical_deviation": 0.19789076
+    },
+    {
+      "homeostatic_rate": 0.071000,
+      "steady_state_variance": 0.00000011,
+      "recovery_ticks": 612,
+      "oscillation_amplitude": 0.16515747,
+      "max_chemical_deviation": 0.19389123
+    },
+    {
+      "homeostatic_rate": 0.076000,
+      "steady_state_variance": 0.00000010,
+      "recovery_ticks": 573,
+      "oscillation_amplitude": 0.16540816,
+      "max_chemical_deviation": 0.19008538
+    }
+  ]
+}

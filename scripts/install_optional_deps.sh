@@ -54,7 +54,7 @@ VOSK_URL="https://alphacephei.com/vosk/models/${VOSK_NAME}.zip"
 # Report where the model would be installed and exit. Resolving the data
 # dir is the part with a history of being wrong, so it must be
 # inspectable without running an install; see
-# python/tests/test_data_dir_conformance.py.
+# tests/python/test_data_dir_conformance.py.
 if [ "${1:-}" = "--data-dir" ]; then
     printf '%s\n' "$VOSK_DIR"
     exit 0
@@ -247,7 +247,7 @@ fi
 
 # Piper: the code looks for the binary next to the voice models.
 head_ "Piper (text to speech)"
-VOICES_DIR="${PROJECT_ROOT}/python/voices"
+VOICES_DIR="${PROJECT_ROOT}/Self_World/voices"
 if [ -x "${VOICES_DIR}/piper" ] || command -v piper >/dev/null; then
     ok "piper available"
 elif [ "$VERIFY_ONLY" -eq 0 ]; then
@@ -268,15 +268,15 @@ fi
 # 4. Verify — prove each capability, don't assume it
 # ─────────────────────────────────────────────────────────────────
 head_ "Verification"
-cd "${PROJECT_ROOT}/python" || exit 1
+cd "${PROJECT_ROOT}" || exit 1
 "$PY" - <<'PYEOF'
 import sys
-# The repo layout needs both roots: python/ holds the brain-region
-# packages, the repo root holds genesis_client/infrastructure —
-# importing one without the other turns a working install into
-# false "capability unavailable" reports.
-sys.path.insert(0, ".")
-sys.path.insert(0, "..")
+# The repo layout needs the three world roots — each holds the
+# packages that belong to it (Self_World, Inner_Non_Physical_World,
+# Outer_Physical_World). Importing one without the others turns a
+# working install into false "capability unavailable" reports.
+for _w in ("Self_World", "Inner_Non_Physical_World", "Outer_Physical_World"):
+    sys.path.insert(0, _w)
 
 rows = []
 
@@ -347,7 +347,7 @@ def ions():
     return f"opcode {GET_ION_SUMMARY}, neutral ctx ok"
 
 def arcade():
-    from worlds.games.arena import ArenaGames
+    from outer_world.games.arena import ArenaGames
     offers = ArenaGames().offers()   # proves pyspiel loads and serves
     import arc_agi, arcengine        # noqa: F401 — prove the toolkit too
     return f"{len(offers)} arena games, ARC-AGI-3 toolkit imports"

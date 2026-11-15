@@ -16,16 +16,20 @@
 # self-improvement engine reverts the change.
 #
 # Usage:
-#   scripts/verify_change.sh [python_dir] [rust_dir]
+#   scripts/verify_change.sh [project_root] [rust_dir]
 #
 # Arguments:
-#   python_dir   — path to the Python source (default: python)
-#   rust_dir     — path to the Rust crate root (default: .)
+#   project_root — the repository root holding the three worlds
+#                  (Self_World, Inner_Non_Physical_World,
+#                  Outer_Physical_World). Defaults to the directory
+#                  containing this script's parent.
+#   rust_dir      — path to the Rust crate root (default: project_root)
 
 set -euo pipefail
 
-PYTHON_DIR="${1:-python}"
-RUST_DIR="${2:-.}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${1:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+RUST_DIR="${2:-$ROOT}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -36,24 +40,46 @@ log()  { echo -e "${YELLOW}[verify]${NC} $*"; }
 pass() { echo -e "${GREEN}[verify] ✓${NC} $*"; }
 fail() { echo -e "${RED}[verify] ✗${NC} $*" >&2; }
 
+# The three worlds are the package roots — every importable package
+# lives inside one of them. A layout without world dirs (an installed
+# tree, an older checkout) falls back to treating ROOT itself as the
+# single package root.
+WORLDS=()
+for w in Self_World Inner_Non_Physical_World Outer_Physical_World; do
+    [ -d "$ROOT/$w" ] && WORLDS+=("$ROOT/$w")
+done
+if [ "${#WORLDS[@]}" -eq 0 ]; then
+    WORLDS=("$ROOT")
+fi
+
+# PYTHONPATH for every python3 invocation below: the worlds first so
+# their packages resolve, then the root for loose root modules.
+PYTHONPATH_JOINED="$(IFS=:; echo "${WORLDS[*]}"):$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$PYTHONPATH_JOINED"
+
 # ─── 1. Python compile check ─────────────────────────────────────
 log "Step 1: py_compile check"
-# Compile all Python source — the region packages, genesis_client,
+# Compile all Python source — the world packages, genesis_client,
 # the CLI, and the test suite. A syntax error in any of these can
 # break Genesis at runtime even if the tests happen to pass.
 #
-# Run find from inside PYTHON_DIR: the '*/.*' exclusion is meant to
-# skip hidden dirs inside the tree (.git, caches), but when
-# PYTHON_DIR is absolute and itself lives under a dotfile parent —
-# e.g. ~/.local/share/genesis/workspace/python — every emitted path
+# Run find inside each world dir: the '*/.*' exclusion is meant to
+# skip hidden dirs inside the tree (.git, caches), but when a dir is
+# absolute and itself lives under a dotfile parent — e.g.
+# ~/.local/share/genesis/workspace/Self_World — every emitted path
 # contains '/.' and the filter silently drops ALL files. py_compile
 # then ran with no filenames and failed every experiment. The -r
 # keeps an empty list from invoking py_compile bare, which exits
 # non-zero with only a usage error.
-if ! (cd "$PYTHON_DIR" && find . -name '*.py' -not -path '*__pycache__*' -not -path '*/.*' -print0 \
-    | xargs -0 -r python3 -m py_compile); then
-    fail "py_compile failed"
-    exit 1
+PY_FILES=()
+while IFS= read -r -d '' f; do
+    PY_FILES+=("$f")
+done < <(find "${WORLDS[@]}" -name '*.py' -not -path '*__pycache__*' -not -path '*/.*' -print0)
+if [ "${#PY_FILES[@]}" -gt 0 ]; then
+    if ! python3 -m py_compile "${PY_FILES[@]}"; then
+        fail "py_compile failed"
+        exit 1
+    fi
 fi
 pass "py_compile OK"
 
@@ -67,48 +93,51 @@ log "Step 1b: import check"
 # (vosk, sounddevice) are lazily imported inside functions, so a
 # blanket import here cannot fail on machines without them.
 #
-# The support packages (genesis_client, infrastructure, eval) live
-# BESIDE python/ in the tree, so the tree root must be on PYTHONPATH —
-# python/tests/conftest.py arranges the same thing for the pytest gate.
-# Without it, every module that imports a sibling package fails here.
-TREE_ROOT="$(cd "$(dirname "$PYTHON_DIR")" && pwd)"
-if ! (
-    cd "$PYTHON_DIR" && PYTHONPATH="$TREE_ROOT${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PYEOF'
+# The worlds are the package roots, so every package inside them is
+# walked; genesis_cli is a loose module inside Self_World, not part
+# of a package.
+if ! python3 - "$ROOT" "${WORLDS[@]}" <<'PYEOF'
 import importlib
+import pathlib
 import pkgutil
 import sys
 import traceback
 
+root = pathlib.Path(sys.argv[1])
+worlds = [pathlib.Path(p) for p in sys.argv[2:]]
+
 failed = []
-import pathlib
-for pkg_name in sorted(
-    d.name
-    for d in pathlib.Path(".").iterdir()
-    if d.is_dir() and (d / "__init__.py").exists()
-):
-    try:
-        pkg = importlib.import_module(pkg_name)
-    except Exception:
-        traceback.print_exc()
-        failed.append(pkg_name)
-        continue
-    for mod_info in pkgutil.walk_packages(pkg.__path__, prefix=pkg_name + "."):
+for world in worlds:
+    for d in sorted(world.iterdir()):
+        if not (d.is_dir() and (d / "__init__.py").exists()):
+            continue
+        pkg_name = d.name
         try:
-            importlib.import_module(mod_info.name)
+            pkg = importlib.import_module(pkg_name)
         except Exception:
             traceback.print_exc()
-            failed.append(mod_info.name)
-# The CLI is a top-level module, not part of a package.
-try:
-    importlib.import_module("genesis_cli")
-except Exception:
-    traceback.print_exc()
-    failed.append("genesis_cli")
+            failed.append(pkg_name)
+            continue
+        for mod_info in pkgutil.walk_packages(pkg.__path__, prefix=pkg_name + "."):
+            try:
+                importlib.import_module(mod_info.name)
+            except Exception:
+                traceback.print_exc()
+                failed.append(mod_info.name)
+# The CLI is a loose module at a world's root, not part of a package.
+for candidate in (root / "Self_World" / "genesis_cli.py", root / "genesis_cli.py"):
+    if candidate.exists():
+        try:
+            importlib.import_module("genesis_cli")
+        except Exception:
+            traceback.print_exc()
+            failed.append("genesis_cli")
+        break
 if failed:
     print(f"IMPORT FAILURES: {', '.join(failed)}")
     sys.exit(1)
 PYEOF
-); then
+then
     fail "import check failed — a module raises at import time"
     exit 1
 fi
@@ -116,7 +145,7 @@ pass "import check OK"
 
 # ─── 2. Python test suite ────────────────────────────────────────
 log "Step 2: Python test suite (pytest)"
-if ! (cd "$PYTHON_DIR" && python3 -m pytest tests/ -q -o addopts=''); then
+if ! (cd "$ROOT" && python3 -m pytest tests/python -q -o addopts=''); then
     fail "pytest failed"
     exit 2
 fi

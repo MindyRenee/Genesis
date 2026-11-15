@@ -49,11 +49,10 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parent.parent),
 ]
 
-from temporal_lobe.concepts import ConceptNetwork, open_archive  # noqa: E402
-from temporal_lobe.concepts.edge_log import open_edge_log  # noqa: E402
-
 from infrastructure.config import default_data_dir  # noqa: E402
 from infrastructure.persistence import restore_network  # noqa: E402
+from temporal_lobe.concepts import ConceptNetwork, open_archive  # noqa: E402
+from temporal_lobe.concepts.edge_log import open_edge_log  # noqa: E402
 
 
 def _load_state(path: Path) -> dict[str, Any]:

@@ -1,0 +1,68 @@
+{
+  "benchmark": "dopamine_rpe_pattern",
+  "reference": "Schultz (1998, J Neurophysiol; 2015, Physiol Rev)",
+  "pattern": "positive for better-than-predicted, zero for as-predicted, negative for worse-than-predicted",
+  "semantic_note": "state prediction error, not reward prediction error — pattern matches, semantics differ",
+  "summary": {
+    "pearson_correlation": 1.000000,
+    "sign_accuracy": 1.0000,
+    "zero_trial_pe": 0.000040
+  },
+  "trials": [
+    {
+      "impulse": 0.3000,
+      "da_deviation": 0.327488,
+      "da_prediction_error": 0.327472
+    },
+    {
+      "impulse": 0.2500,
+      "da_deviation": 0.273144,
+      "da_prediction_error": 0.273129
+    },
+    {
+      "impulse": 0.2000,
+      "da_deviation": 0.218644,
+      "da_prediction_error": 0.218628
+    },
+    {
+      "impulse": 0.1500,
+      "da_deviation": 0.164038,
+      "da_prediction_error": 0.164022
+    },
+    {
+      "impulse": 0.1000,
+      "da_deviation": 0.109397,
+      "da_prediction_error": 0.109381
+    },
+    {
+      "impulse": 0.0500,
+      "da_deviation": 0.054736,
+      "da_prediction_error": 0.054720
+    },
+    {
+      "impulse": 0.0000,
+      "da_deviation": 0.000056,
+      "da_prediction_error": 0.000040
+    },
+    {
+      "impulse": -0.0500,
+      "da_deviation": -0.051167,
+      "da_prediction_error": -0.051183
+    },
+    {
+      "impulse": -0.1000,
+      "da_deviation": -0.102404,
+      "da_prediction_error": -0.102420
+    },
+    {
+      "impulse": -0.1500,
+      "da_deviation": -0.153657,
+      "da_prediction_error": -0.153673
+    },
+    {
+      "impulse": -0.2000,
+      "da_deviation": -0.204856,
+      "da_prediction_error": -0.204872
+    }
+  ]
+}

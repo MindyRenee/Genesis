@@ -1,0 +1,2252 @@
+"""Sleep extras — dream synthesis, dream concept parsing, sleep aid."""
+
+import logging
+import os
+import tempfile
+from collections import deque
+from dataclasses import dataclass
+
+import pytest
+from frontal_lobe.reasoning import Reasoner, ReasoningType
+from genesis_client.types import NeuroSummary, RecentEpisode
+from limbic_system.emotion import EmotionalState
+from mind import Mind
+from sleep.dream_synthesis import DreamInsight, DreamProposal, DreamSynthesis
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+
+logger = logging.getLogger(__name__)
+
+
+# ======================================================================
+# From tests/test_dream_synthesis.py
+# ======================================================================
+
+
+@pytest.fixture
+def network() -> ConceptNetwork:
+    """A small network with structural similarity but unconnected pairs."""
+    net = ConceptNetwork()
+    # Two IS_A hierarchies: animals and machines
+    # dog is_a animal, cat is_a animal (structurally similar: both leaves of animal)
+    net.add_edge("dog", "animal", RelationType.IS_A, weight=0.9)
+    net.add_edge("cat", "animal", RelationType.IS_A, weight=0.9)
+    # car is_a vehicle, truck is_a vehicle (structurally similar: both leaves of vehicle)
+    net.add_edge("car", "vehicle", RelationType.IS_A, weight=0.9)
+    net.add_edge("truck", "vehicle", RelationType.IS_A, weight=0.9)
+    # dog and cat are not connected to each other (no SIMILAR_TO edge)
+    # car and truck are not connected to each other
+    return net
+
+
+@pytest.fixture
+def causal_network() -> ConceptNetwork:
+    """A network with CAUSES chains for transitive validation."""
+    net = ConceptNetwork()
+    # A causes B, B causes C (transitive chain)
+    net.add_edge("fire", "heat", RelationType.CAUSES, weight=0.9)
+    net.add_edge("heat", "burn", RelationType.CAUSES, weight=0.9)
+    # D causes E, E causes F (another chain)
+    net.add_edge("friction", "heat", RelationType.CAUSES, weight=0.8)
+    # fire and friction are structurally similar (both cause heat)
+    # but not connected to each other
+    return net
+
+
+@pytest.fixture
+def contradiction_network() -> ConceptNetwork:
+    """A network with a contradiction edge."""
+    net = ConceptNetwork()
+    net.add_edge("hot", "temperature", RelationType.IS_A, weight=0.9)
+    net.add_edge("cold", "temperature", RelationType.IS_A, weight=0.9)
+    # hot and cold are opposites
+    net.add_edge("hot", "cold", RelationType.OPPOSITE_OF, weight=1.0)
+    return net
+
+
+class TestDreamSynthesis:
+    """Tests for the DreamSynthesis.synthesize method."""
+
+    def test_finds_structurally_similar_unconnected_pairs(self, network) -> None:
+        """Synthesis should find unconnected pairs with similar structure."""
+        # Before synthesis, dog-cat should have no direct edge
+        assert not _has_direct_edge(network, "dog", "cat", RelationType.SIMILAR_TO)
+
+        engine = DreamSynthesis(network)
+        proposals = engine.synthesize(max_proposals=10)
+
+        # Should find at least some proposals (dog-cat, car-truck)
+        assert len(proposals) > 0
+
+        # All proposed edges should now exist as dream-synthesis edges
+        for p in proposals:
+            assert _has_direct_edge_with_origin(
+                network, p.source, p.target, p.relation, "dream-synthesis"
+            )
+
+    def test_proposes_similar_to_for_is_a_leaves(self, network):
+        """IS_A leaves should get SIMILAR_TO proposals."""
+        engine = DreamSynthesis(network)
+        proposals = engine.synthesize(max_proposals=10)
+
+        # At least one proposal should be SIMILAR_TO
+        similar_proposals = [p for p in proposals if p.relation == RelationType.SIMILAR_TO]
+        assert len(similar_proposals) > 0
+
+    def test_stores_hypothetical_edges_in_network(self, network):
+        """Synthesis should add hypothetical edges to the network."""
+        engine = DreamSynthesis(network)
+        proposals = engine.synthesize(max_proposals=10)
+
+        # The network should now have dream-synthesis edges
+        dream_edges = [e for e in network.edges if e.origin == "dream-synthesis"]
+        assert len(dream_edges) == len(proposals)
+
+        # All dream edges should have low weight
+        for edge in dream_edges:
+            assert edge.weight <= 0.2
+
+    def test_empty_network_returns_no_proposals(self):
+        """An empty network should produce no proposals."""
+        net = ConceptNetwork()
+        engine = DreamSynthesis(net)
+        proposals = engine.synthesize()
+        assert proposals == []
+
+    def test_single_concept_returns_no_proposals(self):
+        """A network with one concept should produce no proposals."""
+        net = ConceptNetwork()
+        net.add_edge("dog", "animal", RelationType.IS_A, weight=0.9)
+        engine = DreamSynthesis(net)
+        proposals = engine.synthesize()
+        assert proposals == []
+
+    def test_connected_pairs_are_skipped(self, network):
+        """Pairs that already have an edge should not be proposed."""
+        # Connect dog and cat with a non-dream edge
+        network.add_edge("dog", "cat", RelationType.SIMILAR_TO, weight=0.8, origin="stated")
+        engine = DreamSynthesis(network)
+        proposals = engine.synthesize(max_proposals=10)
+
+        # No proposal should be between dog and cat (already connected)
+        for p in proposals:
+            assert not (p.source == "dog" and p.target == "cat")
+            assert not (p.source == "cat" and p.target == "dog")
+
+    def test_low_similarity_pairs_are_skipped(self):
+        """Pairs with very different structural signatures should not be proposed."""
+        net = ConceptNetwork()
+        # dog is_a animal (outgoing IS_A only)
+        net.add_edge("dog", "animal", RelationType.IS_A, weight=0.9)
+        # fire causes smoke (outgoing CAUSES only) — completely different signature
+        net.add_edge("fire", "smoke", RelationType.CAUSES, weight=0.9)
+        engine = DreamSynthesis(net)
+        proposals = engine.synthesize(max_proposals=10)
+        # dog and fire have no shared structural signature → no proposal
+        for p in proposals:
+            assert not (p.source == "dog" and p.target == "fire")
+            assert not (p.source == "fire" and p.target == "dog")
+
+    def test_max_proposals_limit(self, network):
+        """Synthesis should respect the max_proposals limit."""
+        engine = DreamSynthesis(network)
+        proposals = engine.synthesize(max_proposals=2)
+        assert len(proposals) <= 2
+
+
+class TestDreamValidation:
+    """Tests for the DreamSynthesis.validate method."""
+
+    def test_promotes_edge_with_sufficient_corroborations(self, network):
+        """An edge with >= 2 corroborating paths should be promoted."""
+        # Add corroborating evidence for dog SIMILAR_TO cat:
+        # 1. Analogical transfer: dog similar_to wolf, wolf similar_to cat
+        network.add_edge("dog", "wolf", RelationType.SIMILAR_TO, weight=0.8)
+        network.add_edge("wolf", "cat", RelationType.SIMILAR_TO, weight=0.7)
+        # 2. Shared hub: both dog and cat have SIMILAR_TO edges to "pet"
+        network.add_edge("dog", "pet", RelationType.SIMILAR_TO, weight=0.6)
+        network.add_edge("cat", "pet", RelationType.SIMILAR_TO, weight=0.6)
+
+        engine = DreamSynthesis(network)
+        proposal = DreamProposal(
+            source="dog",
+            target="cat",
+            relation=RelationType.SIMILAR_TO,
+            structural_similarity=0.5,
+            predicted_from="test",
+        )
+        results = engine.validate([proposal])
+
+        assert len(results) == 1
+        assert results[0].promoted
+        assert results[0].corroborations >= 2
+
+    def test_drops_contradicted_edge(self, contradiction_network):
+        """An edge contradicted by OPPOSITE_OF should be dropped."""
+        engine = DreamSynthesis(contradiction_network)
+        proposal = DreamProposal(
+            source="hot",
+            target="cold",
+            relation=RelationType.IS_A,
+            structural_similarity=0.5,
+            predicted_from="test",
+        )
+        results = engine.validate([proposal])
+
+        assert len(results) == 1
+        assert results[0].contradicted
+        assert not results[0].promoted
+
+    def test_insufficient_evidence_remains_hypothetical(self, network):
+        """An edge with < 2 corroborations should remain hypothetical."""
+        engine = DreamSynthesis(network)
+        proposal = DreamProposal(
+            source="dog",
+            target="cat",
+            relation=RelationType.SIMILAR_TO,
+            structural_similarity=0.5,
+            predicted_from="test",
+        )
+        results = engine.validate([proposal])
+
+        assert len(results) == 1
+        assert not results[0].promoted
+        assert not results[0].contradicted
+        assert results[0].corroborations < 2
+
+    def test_transitive_chain_provides_corroboration(self, causal_network):
+        """A transitive CAUSES chain should count as corroboration."""
+        engine = DreamSynthesis(causal_network)
+        # Propose fire CAUSES burn (supported by fire→heat→burn chain)
+        proposal = DreamProposal(
+            source="fire",
+            target="burn",
+            relation=RelationType.CAUSES,
+            structural_similarity=0.5,
+            predicted_from="test",
+        )
+        results = engine.validate([proposal])
+
+        # Should have at least 1 corroboration from the transitive chain
+        # (fire→heat→burn). May also have shared hub corroboration.
+        assert results[0].corroborations >= 1
+
+    def test_promoted_edge_gets_higher_weight(self, network):
+        """A promoted edge should have higher weight than hypothetical."""
+        # Add corroborating evidence
+        network.add_edge("dog", "wolf", RelationType.SIMILAR_TO, weight=0.8)
+        network.add_edge("wolf", "cat", RelationType.SIMILAR_TO, weight=0.7)
+        network.add_edge("dog", "pet", RelationType.SIMILAR_TO, weight=0.6)
+        network.add_edge("cat", "pet", RelationType.SIMILAR_TO, weight=0.6)
+
+        engine = DreamSynthesis(network)
+        # First synthesize to create the hypothetical edge
+        engine.synthesize(max_proposals=10)
+        # Then validate
+        results = engine.review_pending_proposals()
+
+        # At least one should be promoted
+        promoted = [r for r in results if r.promoted]
+        if promoted:
+            # Check the edge weight was increased
+            for r in promoted:
+                edge = _find_edge(
+                    network, r.proposal.source, r.proposal.target, r.proposal.relation
+                )
+                assert edge is not None
+                assert edge.weight >= 0.4  # promoted weight
+
+    def test_validated_insights_are_tracked(self, network):
+        """Validated edges should be tracked as DreamInsights."""
+        # Add corroborating evidence
+        network.add_edge("dog", "wolf", RelationType.SIMILAR_TO, weight=0.8)
+        network.add_edge("wolf", "cat", RelationType.SIMILAR_TO, weight=0.7)
+        network.add_edge("dog", "pet", RelationType.SIMILAR_TO, weight=0.6)
+        network.add_edge("cat", "pet", RelationType.SIMILAR_TO, weight=0.6)
+
+        engine = DreamSynthesis(network)
+        proposal = DreamProposal(
+            source="dog",
+            target="cat",
+            relation=RelationType.SIMILAR_TO,
+            structural_similarity=0.5,
+            predicted_from="test",
+        )
+        engine.validate([proposal])
+
+        assert engine.insight_count >= 1
+        insights = engine.insights
+        assert all(isinstance(i, DreamInsight) for i in insights)
+
+
+class TestDreamReview:
+    """Tests for the review_pending_proposals method."""
+
+    def test_review_finds_pending_edges(self, network):
+        """Review should find and validate all dream-synthesis edges."""
+        engine = DreamSynthesis(network)
+        engine.synthesize(max_proposals=10)
+
+        results = engine.review_pending_proposals()
+        # Should have results for all pending proposals
+        assert len(results) > 0
+
+    def test_review_no_pending_returns_empty(self, network):
+        """Review with no pending edges should return empty list."""
+        engine = DreamSynthesis(network)
+        results = engine.review_pending_proposals()
+        assert results == []
+
+
+class TestDreamPersistence:
+    """Tests for serialization and restoration."""
+
+    def test_to_dict_and_restore(self, network):
+        """State should survive a to_dict/restore_from_dict round-trip."""
+        engine = DreamSynthesis(network)
+        # Add a fake insight
+        engine._validated_insights.append(
+            DreamInsight(
+                source="dog",
+                target="cat",
+                relation=RelationType.SIMILAR_TO,
+                corroborations=3,
+                insight_text="test insight",
+            )
+        )
+        engine._proposed_count = 5
+        engine._rejected_count = 2
+
+        data = engine.to_dict()
+        engine2 = DreamSynthesis(network)
+        engine2.restore_from_dict(data)
+
+        assert engine2.insight_count == 1
+        assert engine2.insights[0].source == "dog"
+        assert engine2.insights[0].target == "cat"
+        assert engine2.insights[0].corroborations == 3
+        assert engine2.proposed_count == 5
+        assert engine2.rejected_count == 2
+
+    def test_restore_empty_data(self, network):
+        """Restoring from empty data should not crash."""
+        engine = DreamSynthesis(network)
+        engine.restore_from_dict({})
+        assert engine.insight_count == 0
+        assert engine.proposed_count == 0
+
+
+class TestDreamIntegration:
+    """Integration tests for the full synthesis -> validation loop."""
+
+    def test_full_synthesis_validation_loop(self, network):
+        """The full loop: synthesize -> validate -> check insights."""
+        # Add corroborating evidence for dog-cat SIMILAR_TO
+        network.add_edge("dog", "wolf", RelationType.SIMILAR_TO, weight=0.8)
+        network.add_edge("wolf", "cat", RelationType.SIMILAR_TO, weight=0.7)
+        network.add_edge("dog", "pet", RelationType.SIMILAR_TO, weight=0.6)
+        network.add_edge("cat", "pet", RelationType.SIMILAR_TO, weight=0.6)
+
+        engine = DreamSynthesis(network)
+        # Synthesize
+        proposals = engine.synthesize(max_proposals=10)
+        assert len(proposals) > 0
+
+        # Validate
+        results = engine.validate(proposals)
+
+        # The dog-cat edge should have analogical transfer + shared hub
+        dog_cat_results = [
+            r for r in results if r.proposal.source == "dog" and r.proposal.target == "cat"
+        ]
+        if dog_cat_results:
+            assert dog_cat_results[0].corroborations >= 1
+
+    def test_stats_tracking(self, network):
+        """Stats should track proposed, validated, and rejected counts."""
+        engine = DreamSynthesis(network)
+        engine.synthesize(max_proposals=10)
+        initial_proposed = engine.proposed_count
+        assert initial_proposed > 0
+
+        engine.review_pending_proposals()
+        # proposed_count should not change after review
+        assert engine.proposed_count == initial_proposed
+
+
+# ─── Helpers ─────────────────────────────────────────────────────
+
+
+def _has_direct_edge(
+    network: ConceptNetwork, source: str, target: str, relation: RelationType
+) -> bool:
+    """Check if a specific edge exists in the network."""
+    for edge in network.get_edges(source, "out"):
+        if edge.target == target and edge.relation == relation:
+            return True
+    return False
+
+
+def _has_direct_edge_with_origin(
+    network: ConceptNetwork, source: str, target: str, relation: RelationType, origin: str
+) -> bool:
+    """Check if a specific edge with a given origin exists in the network."""
+    for edge in network.get_edges(source, "out"):
+        if edge.target == target and edge.relation == relation and edge.origin == origin:
+            return True
+    return False
+
+
+def _find_edge(
+    network: ConceptNetwork, source: str, target: str, relation: RelationType
+) -> object | None:
+    """Find a specific edge in the network."""
+    for edge in network.get_edges(source, "out"):
+        if edge.target == target and edge.relation == relation:
+            return edge
+    return None
+
+
+# ─── End-to-end: dream synthesis improves reasoning ──────────────
+
+
+def _build_base_network() -> ConceptNetwork:
+    """Build a network with structural similarity but a missing connection.
+
+    fire and star have identical structural signatures:
+    - Both are IS_A leaves of "phenomenon"
+    - Both have outgoing CAUSES edges
+    - But there's NO edge between them
+
+    This means reason_about("star") cannot use analogical transfer
+    to infer that star might cause heat (it would need
+    star similar_to fire, fire causes heat).
+    """
+    net = ConceptNetwork()
+
+    # Structural: both are IS_A leaves of the same hub
+    net.add_edge("fire", "phenomenon", RelationType.IS_A, weight=0.9)
+    net.add_edge("star", "phenomenon", RelationType.IS_A, weight=0.9)
+
+    # Causal: both have outgoing CAUSES edges
+    net.add_edge("fire", "heat", RelationType.CAUSES, weight=0.9)
+    net.add_edge("fire", "light", RelationType.CAUSES, weight=0.9)
+    net.add_edge("star", "light", RelationType.CAUSES, weight=0.9)
+
+    # No edge between fire and star — they're unconnected
+    return net
+
+
+def _add_corroborating_evidence(net: ConceptNetwork) -> None:
+    """Add evidence that corroborates the star-fire SIMILAR_TO edge.
+
+    This represents knowledge encountered during waking hours that
+    provides independent support for the dream-synthesized connection.
+    The evidence is added AFTER synthesis (during "wake") so it doesn't
+    change the structural signatures that synthesis relies on.
+
+    Two corroborating paths (works for either edge direction):
+    1. Analogical transfer: fire similar_to sun, sun similar_to star
+       (and star similar_to sun, sun similar_to fire)
+    2. Shared hub: both star and fire have SIMILAR_TO edges to sun
+    """
+    net.add_edge("star", "sun", RelationType.SIMILAR_TO, weight=0.8)
+    net.add_edge("sun", "star", RelationType.SIMILAR_TO, weight=0.7)
+    net.add_edge("sun", "fire", RelationType.SIMILAR_TO, weight=0.7)
+    net.add_edge("fire", "sun", RelationType.SIMILAR_TO, weight=0.6)
+
+
+def _has_analogical_heat_insight(engine: Reasoner) -> bool:
+    """Check if the reasoning engine can infer 'star might cause heat'.
+
+    This requires analogical transfer: star similar_to X, X causes heat.
+    Without a SIMILAR_TO edge from star to something that causes heat,
+    this inference is impossible.
+    """
+    results = engine.reason_about("star")
+    for r in results:
+        if r.reasoning_type == ReasoningType.ANALOGICAL:
+            if "heat" in r.conclusion.lower():
+                return True
+    return False
+
+
+class TestDreamSynthesisImprovesReasoning:
+    """The end-to-end test: dream synthesis → validated edge → better reasoning."""
+
+    def test_reasoning_fails_before_dream_synthesis(self):
+        """Before dream synthesis, the reasoning engine cannot infer
+        that star might cause heat (no SIMILAR_TO edge to transfer through)."""
+        net = _build_base_network()
+        engine = Reasoner(net)
+
+        assert not _has_analogical_heat_insight(engine), (
+            "Reasoning engine should NOT be able to infer 'star causes heat' "
+            "before dream synthesis — there's no SIMILAR_TO edge to transfer through"
+        )
+
+    def test_dream_synthesis_proposes_the_missing_edge(self):
+        """Dream synthesis should find that star and fire are structurally
+        similar (same signature: IS_A + CAUSES) and propose a SIMILAR_TO edge."""
+        net = _build_base_network()
+        dream = DreamSynthesis(net)
+
+        proposals = dream.synthesize(max_proposals=10)
+
+        # Should propose a SIMILAR_TO edge between star and fire
+        star_fire_proposals = [
+            p
+            for p in proposals
+            if {p.source, p.target} == {"star", "fire"} and p.relation == RelationType.SIMILAR_TO
+        ]
+        assert len(star_fire_proposals) >= 1, (
+            "Dream synthesis should propose a SIMILAR_TO edge between "
+            "star and fire (they have identical structural signatures)"
+        )
+
+    def test_validation_promotes_edge_with_corroborating_evidence(self):
+        """With enough corroborating evidence (encountered during wake),
+        the dream-synthesized edge should be promoted to a real edge."""
+        net = _build_base_network()
+
+        # Sleep: synthesize proposals
+        dream = DreamSynthesis(net)
+        dream.synthesize(max_proposals=10)
+
+        # Wake: encounter corroborating evidence
+        _add_corroborating_evidence(net)
+
+        # Validate — should find ≥2 corroborations and promote
+        results = dream.review_pending_proposals()
+
+        promoted = [r for r in results if r.promoted]
+        assert len(promoted) >= 1, (
+            "At least one dream edge should be promoted with ≥2 corroborating paths"
+        )
+
+    def test_reasoning_succeeds_after_dream_synthesis(self):
+        """After dream synthesis + validation, the reasoning engine CAN
+        infer that star might cause heat via analogical transfer through
+        the dream-synthesized SIMILAR_TO edge."""
+        net = _build_base_network()
+
+        # Before dream synthesis: no analogical heat insight
+        engine_before = Reasoner(net)
+        assert not _has_analogical_heat_insight(engine_before), (
+            "Before dream synthesis, reasoning should NOT produce "
+            "an analogical insight about star and heat"
+        )
+
+        # Sleep: run dream synthesis
+        dream = DreamSynthesis(net)
+        dream.synthesize(max_proposals=10)
+
+        # Wake: encounter corroborating evidence
+        _add_corroborating_evidence(net)
+
+        # Validate dream proposals
+        dream.review_pending_proposals()
+
+        # After dream synthesis: the analogical heat insight should exist
+        engine_after = Reasoner(net)
+        assert _has_analogical_heat_insight(engine_after), (
+            "After dream synthesis, reasoning SHOULD produce an analogical "
+            "insight: 'star might cause heat, by analogy with fire' — "
+            "the dream-synthesized SIMILAR_TO edge enables this transfer"
+        )
+
+    def test_the_full_loop_end_to_end(self):
+        """The complete end-to-end loop:
+
+        1. Build network with a knowledge gap
+        2. Confirm reasoning can't bridge the gap
+        3. Sleep: dream synthesis proposes a novel connection
+        4. Wake: new evidence corroborates the proposal
+        5. Validation promotes it (≥2 corroborating paths)
+        6. Confirm reasoning can now bridge the gap
+        7. The insight is tracked as a DreamInsight
+
+        This is the causal chain that makes the upgrade plan's thesis
+        testable: sleep → synthesis → novel connection → validation →
+        measurable reasoning improvement.
+        """
+        # ── 1. Build network with a knowledge gap ──────────────────
+        net = _build_base_network()
+
+        # ── 2. Confirm reasoning can't bridge the gap ──────────────
+        engine_before = Reasoner(net)
+        results_before = engine_before.reason_about("star")
+        analogical_before = [
+            r
+            for r in results_before
+            if r.reasoning_type == ReasoningType.ANALOGICAL and "heat" in r.conclusion.lower()
+        ]
+        assert len(analogical_before) == 0, (
+            "Before dream synthesis: no analogical insight about star→heat"
+        )
+
+        # ── 3. Sleep: dream synthesis proposes a novel connection ──
+        dream = DreamSynthesis(net)
+        proposals = dream.synthesize(max_proposals=10)
+        assert len(proposals) > 0, "Dream synthesis should produce proposals"
+
+        star_fire = [p for p in proposals if {p.source, p.target} == {"star", "fire"}]
+        assert len(star_fire) >= 1, "Dream synthesis should propose a star-fire connection"
+
+        # ── 4. Wake: new evidence corroborates the proposal ────────
+        _add_corroborating_evidence(net)
+
+        # ── 5. Validation promotes it ──────────────────────────────
+        validation_results = dream.review_pending_proposals()
+        promoted = [r for r in validation_results if r.promoted]
+        assert len(promoted) >= 1, "At least one dream edge should be validated and promoted"
+
+        star_fire_promoted = [
+            r for r in promoted if {r.proposal.source, r.proposal.target} == {"star", "fire"}
+        ]
+        assert len(star_fire_promoted) >= 1, "The star-fire SIMILAR_TO edge should be promoted"
+
+        # ── 6. Confirm reasoning can now bridge the gap ────────────
+        engine_after = Reasoner(net)
+        results_after = engine_after.reason_about("star")
+        analogical_after = [
+            r
+            for r in results_after
+            if r.reasoning_type == ReasoningType.ANALOGICAL and "heat" in r.conclusion.lower()
+        ]
+        assert len(analogical_after) > 0, (
+            "After dream synthesis: analogical insight about star→heat "
+            "should exist — 'star might cause heat, by analogy with fire'"
+        )
+
+        the_insight = analogical_after[0]
+        assert "fire" in the_insight.conclusion.lower(), (
+            f"The analogical insight should reference fire as the "
+            f"analogical source: {the_insight.conclusion}"
+        )
+
+        # ── 7. The insight is tracked as a DreamInsight ────────────
+        insights = dream.insights
+        star_fire_insights = [i for i in insights if {i.source, i.target} == {"star", "fire"}]
+        assert len(star_fire_insights) >= 1, (
+            "The star-fire edge should be tracked as a DreamInsight"
+        )
+        assert star_fire_insights[0].corroborations >= 2, (
+            "The insight should have ≥2 corroborating paths"
+        )
+
+    def test_analogical_reasoning_count_increases(self):
+        """The number of analogical reasoning results should increase
+        after dream synthesis, proving that the dream edge created
+        new reasoning paths that didn't exist before."""
+        net = _build_base_network()
+
+        # Before: count analogical results
+        engine_before = Reasoner(net)
+        before_results = engine_before.reason_about("star")
+        before_analogical = [
+            r for r in before_results if r.reasoning_type == ReasoningType.ANALOGICAL
+        ]
+
+        # Sleep + wake + validate
+        dream = DreamSynthesis(net)
+        dream.synthesize(max_proposals=10)
+        _add_corroborating_evidence(net)
+        dream.review_pending_proposals()
+
+        # After: count analogical results
+        engine_after = Reasoner(net)
+        after_results = engine_after.reason_about("star")
+        after_analogical = [
+            r for r in after_results if r.reasoning_type == ReasoningType.ANALOGICAL
+        ]
+
+        assert len(after_analogical) > len(before_analogical), (
+            f"Analogical reasoning results should increase after dream "
+            f"synthesis: before={len(before_analogical)}, "
+            f"after={len(after_analogical)}"
+        )
+
+
+# ======================================================================
+# From tests/test_dream_concept_parsing.py
+# ======================================================================
+
+
+@dataclass
+class _MockEpisode:
+    """Tests for mock episode."""
+
+    episode_id: int
+    text: str
+
+
+class _MockDreamClient:
+    """Mock client that returns episode text for known IDs.
+
+    Simulates deleted episodes by raising EpisodeNotFound for unknown IDs.
+    """
+
+    def __init__(self, episodes: dict[int, str]) -> None:
+        """Initialize the mock dream client."""
+        self._episodes = episodes
+
+    def retrieve_episode(self, ep_id: int, **kwargs):
+        """Retrieve episode."""
+        if ep_id in self._episodes:
+            return _MockEpisode(episode_id=ep_id, text=self._episodes[ep_id])
+        from genesis_client.exceptions import EpisodeNotFound
+
+        raise EpisodeNotFound(f"episode {ep_id} not found")
+
+
+class _MockDreamNetwork:
+    """Mock concept network with a known set of world concept IDs."""
+
+    def __init__(self, concepts: list[str]) -> None:
+        """Initialize the mock dream network."""
+        self.world_concept_ids = concepts
+
+
+class _MockDreamCognition:
+    """Mock cognition with a network."""
+
+    def __init__(self, concepts: list[str]) -> None:
+        """Initialize the mock dream cognition."""
+        self.network = _MockDreamNetwork(concepts)
+
+
+def _make_mind(episodes: dict[int, str], concepts: list[str]) -> Mind:
+    """Create a Mind with mock dependencies for dream concept testing."""
+    import tempfile
+
+    data_dir = tempfile.mkdtemp(prefix="dream_test_")
+    socket_path = os.path.join(data_dir, "genesis.sock")
+    mind = Mind(socket_path)
+    mind.client = _MockDreamClient(episodes)  # type: ignore[assignment]
+    mind.brain.frontal = _MockDreamCognition(concepts)  # type: ignore[assignment]
+    return mind
+
+
+# ─── Test cases ───────────────────────────────────────────────
+
+
+def test_new_format_extracts_concepts_from_embedded_text():
+    """Dream insights with embedded text should extract concepts without
+    retrieving episodes by ID."""
+    # The dream insight embeds episode text directly (tab-delimited).
+    # No episode retrieval should be needed.
+    episodes: dict[int, str] = {}  # empty — no episodes to retrieve
+    concepts = ["dopamine", "memory", "learning"]
+
+    mind = _make_mind(episodes, concepts)
+
+    dream = RecentEpisode(
+        episode_id=100,
+        timestamp=1000,
+        salience=0.7,
+        event_type=2,
+        source_module=9,
+        text=(
+            "[dream-insight] episode 1 connects to episode 2 "
+            "through 3 hops (direct distance: 42)\t"
+            "Learning about dopamine and memory formation\t"
+            "Studying learning and dopamine pathways"
+        ),
+    )
+
+    result = mind._collect_dream_concepts([dream])
+    assert "dopamine" in result, f"should extract 'dopamine' from embedded text: {result}"
+    assert "memory" in result, f"should extract 'memory' from embedded text: {result}"
+    assert "learning" in result, f"should extract 'learning' from embedded text: {result}"
+
+
+def test_old_format_falls_back_to_episode_retrieval():
+    """Old-format dream insights (no tab) should fall back to ID retrieval."""
+    episodes = {
+        1: "Learning about dopamine and memory formation",
+        2: "Studying learning and dopamine pathways",
+    }
+    concepts = ["dopamine", "memory", "learning"]
+
+    mind = _make_mind(episodes, concepts)
+
+    dream = RecentEpisode(
+        episode_id=100,
+        timestamp=1000,
+        salience=0.7,
+        event_type=2,
+        source_module=9,
+        text=(
+            "[dream-insight] episode 1 connects to episode 2 through 3 hops (direct distance: 42)"
+        ),
+    )
+
+    result = mind._collect_dream_concepts([dream])
+    assert "dopamine" in result, f"should extract 'dopamine' via retrieval: {result}"
+    assert "memory" in result, f"should extract 'memory' via retrieval: {result}"
+
+
+def test_deleted_episodes_do_not_crash():
+    """When episodes are deleted (pruned by sleep compression),
+    _collect_dream_concepts should not crash or log warnings."""
+    # Old-format insight referencing deleted episodes
+    episodes: dict[int, str] = {}  # all deleted
+    concepts = ["dopamine"]
+
+    mind = _make_mind(episodes, concepts)
+
+    dream = RecentEpisode(
+        episode_id=100,
+        timestamp=1000,
+        salience=0.7,
+        event_type=2,
+        source_module=9,
+        text=(
+            "[dream-insight] episode 999 connects to episode 998 "
+            "through 3 hops (direct distance: 42)"
+        ),
+    )
+
+    # Should return empty list, not crash
+    result = mind._collect_dream_concepts([dream])
+    assert result == [], f"should return empty list for deleted episodes: {result}"
+
+
+def test_new_format_no_retrieval_needed_for_deleted_episodes():
+    """New-format insights should work even when the referenced episodes
+    have been deleted — the embedded text is self-contained."""
+    episodes: dict[int, str] = {}  # episodes deleted
+    concepts = ["quantum", "physics", "energy"]
+
+    mind = _make_mind(episodes, concepts)
+
+    dream = RecentEpisode(
+        episode_id=100,
+        timestamp=1000,
+        salience=0.7,
+        event_type=2,
+        source_module=9,
+        text=(
+            "[dream-insight] episode 1 connects to episode 2 "
+            "through 3 hops (direct distance: 42)\t"
+            "Learning about quantum physics\t"
+            "Studying energy and quantum mechanics"
+        ),
+    )
+
+    result = mind._collect_dream_concepts([dream])
+    assert "quantum" in result, (
+        f"should extract from embedded text even if episodes deleted: {result}"
+    )
+    assert "physics" in result, f"should extract 'physics': {result}"
+    assert "energy" in result, f"should extract 'energy': {result}"
+
+
+def test_association_chain_with_embedded_text():
+    """When a dream insight endpoint is itself an association trace with
+    embedded text, the parser should extract concepts from the embedded
+    text directly — the Rust side replaces tabs in embedded text with
+    spaces, so the association trace's own embedded texts are part of
+    the flat text and concept words are found by scanning it.
+    """
+    episodes: dict[int, str] = {}  # all deleted
+    concepts = ["salt", "lake", "water", "drought"]
+
+    mind = _make_mind(episodes, concepts)
+
+    # Dream insight where one endpoint is an association trace.
+    # The Rust side replaces tabs in embedded text with spaces, so
+    # the association trace embedded as a dream insight endpoint has
+    # its own tabs replaced. The concept words from the association's
+    # endpoints are in the flat text.
+    dream = RecentEpisode(
+        episode_id=100,
+        timestamp=1000,
+        salience=0.7,
+        event_type=2,
+        source_module=9,
+        text=(
+            "[dream-insight] episode 1 connects to episode 2 "
+            "through 3 hops (direct distance: 42)\t"
+            "Direct memory about salt lake water\t"
+            "[association] episode 3 ↔ episode 4 (distance: 15)  "
+            "Learning about drought and water scarcity  "
+            "Studying salt lake drying up"
+        ),
+    )
+
+    result = mind._collect_dream_concepts([dream])
+    assert "salt" in result, f"should find 'salt' in embedded text: {result}"
+    assert "lake" in result, f"should find 'lake' in embedded text: {result}"
+    assert "water" in result, f"should find 'water': {result}"
+    assert "drought" in result, f"should find 'drought' in association text: {result}"
+
+
+def test_mixed_old_and_new_format_insights():
+    """A mix of old and new format insights should work correctly."""
+    episodes = {
+        10: "Learning about dopamine research",
+    }
+    concepts = ["dopamine", "quantum", "physics"]
+
+    mind = _make_mind(episodes, concepts)
+
+    dreams = [
+        # New format — self-contained
+        RecentEpisode(
+            episode_id=100,
+            timestamp=1000,
+            salience=0.7,
+            event_type=2,
+            source_module=9,
+            text=(
+                "[dream-insight] episode 1 connects to episode 2 "
+                "through 2 hops (direct distance: 30)\t"
+                "Studying quantum physics\t"
+                "Learning about physics and quantum mechanics"
+            ),
+        ),
+        # Old format — needs retrieval (episode 10 exists, 11 doesn't)
+        RecentEpisode(
+            episode_id=101,
+            timestamp=2000,
+            salience=0.7,
+            event_type=2,
+            source_module=9,
+            text=(
+                "[dream-insight] episode 10 connects to episode 11 "
+                "through 2 hops (direct distance: 35)"
+            ),
+        ),
+    ]
+
+    result = mind._collect_dream_concepts(dreams)
+    assert "quantum" in result, f"should extract from new format: {result}"
+    assert "physics" in result, f"should extract from new format: {result}"
+    assert "dopamine" in result, f"should extract from old format (retrieved): {result}"
+
+
+# ======================================================================
+# From tests/test_sleep_aid.py
+# ======================================================================
+
+logger = logging.getLogger(__name__)
+
+
+class _MockClient:
+    """Mock GenesisClient that records neuro_impulse and set_zone calls.
+
+    This lets us verify that sleep_aid() emits the correct
+    neurochemical impulses without a running daemon.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the mock client."""
+        self.impulses: list[tuple[int, float]] = []
+        self.zones: list[int] = []
+
+    def neuro_impulse(self, chem: int, magnitude: float, **kwargs) -> bool:
+        """Neuro impulse."""
+        self.impulses.append((chem, magnitude))
+        return True
+
+    def set_zone(self, zone: int, **kwargs) -> bool:
+        """Set zone."""
+        self.zones.append(zone)
+        return True
+
+
+def _make_mind_sleep_aid(data_dir: str) -> Mind:
+    """Create a Mind with a mock client for testing sleep_aid."""
+    socket_path = os.path.join(data_dir, "genesis.sock")
+    mind = Mind(socket_path)
+    # Replace the real client with a mock so we can record impulses
+    # without needing a running daemon.
+    mind.client = _MockClient()  # type: ignore[assignment]
+    return mind
+
+
+def test_sleep_aid_enters_sleep_state():
+    """sleep_aid() should set _is_sleeping to True."""
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_mind_sleep_aid(data_dir)
+        assert not mind.is_sleeping
+        mind.sleep_aid()
+        assert mind.is_sleeping
+
+
+def test_sleep_aid_emits_correct_impulses():
+    """sleep_aid() sends the endogenous sleep cascade — the circadian
+    signal up, the wake side's stabilizers withdrawn — and relieves the
+    HPA drive (cortisol). No held drive reaches the network; the
+    chemistry crosses it on the body's own time constant."""
+    from genesis_client.protocol import (
+        CHEM_CORTISOL,
+        CHEM_GABA,
+        CHEM_HISTAMINE,
+        CHEM_MELATONIN,
+        CHEM_NOREPINEPHRINE,
+        CHEM_OREXIN,
+    )
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_mind_sleep_aid(data_dir)
+        mind.sleep_aid()
+        mock = mind.client  # type: ignore[assignment]
+        impulses = dict(mock.impulses)
+
+        assert impulses.get(CHEM_CORTISOL, 0.0) < 0.0, "cortisol must be suppressed"
+        assert impulses.get(CHEM_MELATONIN, 0.0) > 0.0, "circadian sleep signal missing"
+        assert impulses.get(CHEM_GABA, 0.0) > 0.0, "VLPO-transmitter support missing"
+        for chem in (CHEM_OREXIN, CHEM_HISTAMINE, CHEM_NOREPINEPHRINE):
+            assert impulses.get(chem, 0.0) < 0.0, (
+                f"wake-side chem {chem} must be withdrawn for sleep"
+            )
+
+
+def test_sleep_aid_pushes_strongly_toward_sleep():
+    """The cascade must withdraw the switch's stabilizer: orexin is
+    the wake side's latch (its loss is the narcolepsy signature), so a
+    sleep attempt pulls it below baseline, not nudges it."""
+    from genesis_client.protocol import CHEM_OREXIN
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_mind_sleep_aid(data_dir)
+        mind.sleep_aid()
+        mock = mind.client  # type: ignore[assignment]
+        impulses = dict(mock.impulses)
+        assert impulses.get(CHEM_OREXIN, 0.0) <= -0.10, (
+            f"orexin withdrawal {impulses.get(CHEM_OREXIN)} too weak to unlatch the switch"
+        )
+
+
+def test_sleep_aid_idempotent_when_sleeping():
+    """If already sleeping, sleep_aid() should be a no-op."""
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_mind_sleep_aid(data_dir)
+        mind.sleep_aid()
+        assert mind.is_sleeping
+        mock1 = mind.client  # type: ignore[assignment]
+        count_after_first = len(mock1.impulses)
+
+        # Call again — should not emit more impulses
+        mind.sleep_aid()
+        assert len(mock1.impulses) == count_after_first, (
+            "sleep_aid() should not emit impulses when already sleeping"
+        )
+
+
+def test_sleep_aid_wakes_from_meditation():
+    """If meditating, sleep_aid() should wake from meditation first,
+    then enter sleep."""
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_mind_sleep_aid(data_dir)
+        # Enter meditation first
+        mind.meditate()
+        assert mind.is_meditating
+        assert not mind.is_sleeping
+
+        # Now apply sleep aid
+        mind.sleep_aid()
+        assert not mind.is_meditating, "should have woken from meditation"
+        assert mind.is_sleeping, "should be sleeping after sleep aid"
+
+
+def test_sleep_aid_sets_sleeping_zone():
+    """sleep_aid() should set the zone to SLEEPING."""
+    from genesis_client.protocol import ZONE_SLEEPING
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_mind_sleep_aid(data_dir)
+        mind.sleep_aid()
+        mock = mind.client  # type: ignore[assignment]
+        assert ZONE_SLEEPING in mock.zones, (
+            f"zone SLEEPING ({ZONE_SLEEPING}) not set, zones set: {mock.zones}"
+        )
+
+
+# ======================================================================
+# Wake readiness — the nap timer should wait for it to be ready
+# instead of forcing it awake mid-cycle.
+# ======================================================================
+
+
+@dataclass
+class _MockPlasticityProfile:
+    """Mock plasticity profile for wake_readiness receptor checks."""
+
+    cortisol_tonic: float = 0.03
+    bdnf_tonic: float = 0.5
+
+
+class _WakeReadinessMockClient(_MockClient):
+    """Mock client that supports get_state and get_plasticity_profile
+    so wake_readiness() can check adenosine and receptor state.
+    """
+
+    def __init__(
+        self,
+        adenosine: float = 0.1,
+        cortisol: float = 0.03,
+        bdnf: float = 0.5,
+        melatonin: float = 0.0,
+        phase: str = "active",
+    ) -> None:
+        super().__init__()
+        self._adenosine = adenosine
+        self._melatonin = melatonin
+        self._phase = phase
+        self._profile = _MockPlasticityProfile(cortisol_tonic=cortisol, bdnf_tonic=bdnf)
+
+    def get_state(self):
+        """Return a mock core state with the configured adenosine."""
+        from dataclasses import dataclass as _dc_dataclass
+
+        @_dc_dataclass
+        class _MockState:
+            chemicals: dict[str, float]
+            phase_name: str = "active"
+            sleep_pressure: float = 0.0
+
+        return _MockState(
+            chemicals={
+                "adenosine": self._adenosine,
+                "melatonin": self._melatonin,
+            },
+            phase_name=self._phase,
+        )
+
+    def get_phase(self):
+        """Return a mock PhaseInfo — the desync check reads this."""
+        from genesis_client.protocol import PHASE_ACTIVE, PHASE_NREM, PHASE_REM
+        from genesis_client.types import PhaseInfo
+
+        return PhaseInfo(
+            phase={"nrem": PHASE_NREM, "rem": PHASE_REM}.get(self._phase, PHASE_ACTIVE),
+            arousal=0.2,
+            valence=0.0,
+        )
+
+    def get_recent_episodes(self, **kwargs) -> list:
+        """No persisted dreams — wake() queries this for residues."""
+        return []
+
+    def get_plasticity_profile(self) -> _MockPlasticityProfile:
+        """Return the configured plasticity profile."""
+        return self._profile
+
+
+def _make_wake_readiness_mind(
+    data_dir: str,
+    adenosine: float = 0.1,
+    cortisol: float = 0.03,
+    bdnf: float = 0.5,
+    melatonin: float = 0.0,
+    phase: str = "active",
+) -> Mind:
+    """Create a Mind with a mock client configured for wake_readiness tests."""
+    socket_path = os.path.join(data_dir, "genesis.sock")
+    mind = Mind(socket_path)
+    mind.client = _WakeReadinessMockClient(  # type: ignore[assignment]
+        adenosine=adenosine,
+        cortisol=cortisol,
+        bdnf=bdnf,
+        melatonin=melatonin,
+        phase=phase,
+    )
+    return mind
+
+
+def test_wake_readiness_returns_ready_when_awake():
+    """wake_readiness() should return (True, ...) when not sleeping."""
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir)
+        ready, reason = mind.wake_readiness()
+        assert ready is True
+        assert "already awake" in reason
+
+
+def test_wake_readiness_blocks_on_n3():
+    """wake_readiness() should return False when in N3 deep sleep."""
+    from brain_waves import SleepStage
+    from brainstem.architecture import SleepCycleTracker
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir)
+        mind._is_sleeping = True
+
+        # Force the sleep cycle into N3
+        cycle = SleepCycleTracker()
+        cycle.current_stage = SleepStage.N3
+        cycle._stage_slot = 2  # N3 is index 2 in _CYCLE_STAGES
+        mind.inner_life._sleep_cycle = cycle  # type: ignore[attr-defined]
+
+        ready, reason = mind.wake_readiness()
+        assert ready is False
+        assert "N3" in reason
+
+
+def test_wake_readiness_blocks_on_high_adenosine():
+    """wake_readiness() should return False when adenosine is still high."""
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(
+            data_dir,
+            adenosine=0.5,  # well above AUTO_WAKE_ADENOSINE (0.20)
+        )
+        mind._is_sleeping = True
+
+        ready, reason = mind.wake_readiness()
+        assert ready is False
+        assert "adenosine" in reason.lower()
+
+
+def test_wake_readiness_blocks_on_high_cortisol():
+    """wake_readiness() should return False when cortisol is still high."""
+    with tempfile.TemporaryDirectory() as data_dir:
+        # 0.07 is above the 0.05 wake gate and inside the substrate's
+        # reachable envelope (resting ~0.02, sustained-drive peak ~0.08).
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, cortisol=0.07, bdnf=0.5)
+        mind._is_sleeping = True
+
+        ready, reason = mind.wake_readiness()
+        assert ready is False
+        assert "cortisol" in reason.lower()
+
+
+def test_wake_readiness_blocks_on_low_bdnf():
+    """wake_readiness() should return False when BDNF is still low."""
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, cortisol=0.03, bdnf=0.1)
+        mind._is_sleeping = True
+
+        ready, reason = mind.wake_readiness()
+        assert ready is False
+        assert "bdnf" in reason.lower()
+
+
+def test_wake_readiness_ready_when_all_signals_pass():
+    """wake_readiness() should return True when all signals indicate readiness."""
+    from brain_waves import SleepStage
+    from brainstem.architecture import SleepCycleTracker
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, cortisol=0.03, bdnf=0.5)
+        mind._is_sleeping = True
+
+        # Sleep cycle in REM (not N3)
+        cycle = SleepCycleTracker()
+        cycle.current_stage = SleepStage.REM
+        cycle._stage_slot = 4  # REM is index 4
+        mind.inner_life._sleep_cycle = cycle  # type: ignore[attr-defined]
+
+        ready, reason = mind.wake_readiness()
+        assert ready is True
+        assert reason == "ready"
+
+
+def test_wake_readiness_ready_with_no_sleep_cycle():
+    """wake_readiness() should pass the stage check if no cycle is active."""
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, cortisol=0.03, bdnf=0.5)
+        mind._is_sleeping = True
+        # No sleep cycle set — inner_life.sleep_cycle is None
+        mind.inner_life._sleep_cycle = None  # type: ignore[attr-defined]
+
+        ready, reason = mind.wake_readiness()
+        assert ready is True
+        assert reason == "ready"
+
+
+# ======================================================================
+# Sleep-onset window — while the sleep cascade is still switching, a
+# still-awake daemon phase is the in-progress transition, not a desync.
+# ======================================================================
+
+
+def test_sleep_onset_holds_while_drive_is_working():
+    """A fresh sleep stays asleep while the onset is still switching.
+
+    /sleep sends the endogenous sleep cascade; the flip-flop crosses on
+    LC's own ~23-min time constant. While the attempt is still inside
+    its switch window, a still-awake daemon phase is the in-progress
+    transition — the wake-desync check must not pull the mind back up.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1)
+        mind.sleep(user_initiated=False)
+        assert mind.is_sleeping
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping, (
+            "wake-desync fired inside the onset window — "
+            "the cascade means the body is still crossing"
+        )
+
+
+def test_failed_onset_wakes_after_drive_expires():
+    """A body that never crossed past the onset window wakes the mind.
+
+    If the daemon's phase still reads awake after the attempt window
+    has closed, and the phase persists past the flutter guard, the
+    onset failed — the body could not sleep — and the mind follows the
+    body rather than staying in a desynced pretend sleep.
+    """
+    import time as _time
+
+    from brainstem.thresholds import (
+        WAKE_DESYNC_GRACE_SECONDS,
+        WAKE_DESYNC_SETTLE_SECONDS,
+    )
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1)
+        mind.sleep(user_initiated=False)
+        # The attempt window closed long ago and the phase has been
+        # persistently awake past the flutter guard.
+        mind._last_sleep_attempt = _time.time() - WAKE_DESYNC_SETTLE_SECONDS - 1.0
+        mind._body_awake_since = _time.time() - WAKE_DESYNC_GRACE_SECONDS - 1.0
+
+        mind._check_sleep_sync()
+
+        assert not mind.is_sleeping, (
+            "a body that never reached sleep must wake the mind — "
+            "the two are never in opposite sleep states"
+        )
+
+
+def test_onset_window_holds_for_user_initiated_sleep():
+    """User-initiated sleep sits in the same onset window."""
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1)
+        mind.sleep(user_initiated=True)
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping
+
+
+# ======================================================================
+# Wake stabilization — an explicit /wake must hold through circadian
+# pressure, or it can never keep her up at night.
+# ======================================================================
+
+
+def _wake_stabilization_mind(data_dir: str, *, user_initiated: bool):
+    """A just-woken mind under circadian night, cascade freshly sent.
+
+    Reproduces the observed state: adenosine cleared (~0.01) after a
+    long sleep, melatonin deep in the night range (0.7), the daemon's
+    phase still NREM while the flip-flop transitions, a wake cascade
+    freshly sent, and the post-wake guards all elapsed except the
+    stabilization window.
+    """
+    import time as _time
+
+    mind = _make_wake_readiness_mind(data_dir, adenosine=0.01, melatonin=0.7, phase="nrem")
+    now = _time.time()
+    mind._last_wake_time = now - 400.0  # past AUTO_SLEEP_MIN_AWAKE
+    mind._last_interaction_time = now - 300.0  # past AUTO_SLEEP_MIN_IDLE
+    mind._last_wake_attempt = now  # wake attempt inside its switch window
+    mind._last_wake_user_initiated = user_initiated
+    # Wake() ran before the flutter grace began — the post-wake grace
+    # measures from _wake_time, and 0 would read as "just woke".
+    from brainstem.thresholds import WAKE_DESYNC_GRACE_SECONDS
+
+    mind._wake_time = now - WAKE_DESYNC_GRACE_SECONDS - 1.0
+    return mind
+
+
+def test_user_wake_resists_circadian_re_sleep():
+    """An explicit /wake holds through circadian night.
+
+    The desync check honors a sleeping daemon phase only once the wake
+    attempt has expired — and a user-initiated wake treats melatonin as
+    grogginess, not a knockout, so deep circadian night alone cannot
+    pull a user-woken mind back under.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _wake_stabilization_mind(data_dir, user_initiated=True)
+
+        mind._check_sleep_sync()
+
+        assert not mind.is_sleeping, (
+            "a user-initiated wake re-slept on melatonin alone — "
+            "the circadian veto must not undo a wake the user asked for"
+        )
+
+
+def test_non_user_wake_yields_to_circadian_re_sleep():
+    """A wake nobody asked for still falls back asleep at night.
+
+    The melatonin exemption covers user-initiated wakes only: a wake
+    with no one behind it, under genuine circadian drive and a daemon
+    phase already asleep, is a body that went back under — the mind
+    joins it.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _wake_stabilization_mind(data_dir, user_initiated=False)
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping, (
+            "a non-user wake under circadian drive should join the "
+            "sleeping body — the exemption covers user wakes only"
+        )
+
+
+def test_user_wake_still_sleeps_on_genuine_exhaustion():
+    """Adenosine >= WAKE_RESCUE_ADENOSINE sleeps even a user wake.
+
+    The exemption covers circadian pressure only — real residual sleep
+    pressure overrides any wake request.
+    """
+    from brainstem.thresholds import WAKE_RESCUE_ADENOSINE
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _wake_stabilization_mind(data_dir, user_initiated=True)
+        mock = mind.client  # type: ignore[assignment]
+        mock._adenosine = WAKE_RESCUE_ADENOSINE + 0.1
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping
+
+
+def test_self_sleep_urge_respects_user_wake():
+    """The volition self_sleep urge declines for a user-woken mind.
+
+    Same backstop, other gate: _perform_self_sleep must not undo an
+    explicit /wake inside the stabilization window under circadian
+    pressure.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _wake_stabilization_mind(data_dir, user_initiated=True)
+        mock = mind.client  # type: ignore[assignment]
+
+        from genesis_client.protocol import CHEM_MELATONIN
+
+        mind._perform_self_sleep()
+
+        assert not mind.is_sleeping
+        mock = mind.client  # type: ignore[assignment]
+        impulses = getattr(mock, "impulses", [])
+        assert all(m <= 0.0 for c, m in impulses if c == CHEM_MELATONIN), (
+            "the self-sleep urge sent sleep chemistry to a user-woken mind"
+        )
+
+
+# ======================================================================
+# Sleeping-side sync — while the mind sleeps, only the body's phase
+# moves it. Sleep phases keep it under; a persistent awake phase
+# (after the body was seen asleep this episode) pulls it up. There is
+# no adenosine/cycle auto-wake: drained pressure is "ready to wake",
+# never a trigger, so REM is never cut by a threshold.
+# ======================================================================
+
+
+def test_mind_stays_asleep_while_body_sleeps():
+    """A sleeping mind does not wake on drained adenosine alone.
+
+    Regression test: the retired auto-wake fired wake() the moment
+    adenosine cleared its threshold — ~30–60 min into a well-rested
+    sleep, mid-N2, before the first REM leg. Now the body's phase is
+    the only exit: while the daemon reads NREM the mind stays under.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, phase="nrem")
+        mind.sleep(user_initiated=False)
+        assert not mind._body_sleep_confirmed
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping, "a body in NREM must keep the mind asleep"
+        assert mind._body_sleep_confirmed, "the body's sleep crossing goes unrecorded"
+
+
+def test_mind_wakes_when_body_persistently_awake():
+    """A body seen asleep then persistently awake pulls the mind up.
+
+    The wake-desync path: the daemon's phase crossed into sleep this
+    episode, then genuinely woke — the body owns the transition in
+    both directions, so once the awake phase persists past the flutter
+    guard the mind follows it up.
+    """
+    import time as _time
+
+    from brainstem.thresholds import WAKE_DESYNC_GRACE_SECONDS
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, phase="active")
+        mind.sleep(user_initiated=False)
+        # The body crossed into sleep, then woke — and the awake phase
+        # has held past the flutter guard.
+        mind._body_sleep_confirmed = True
+        mind._last_sleep_attempt = 0.0
+        mind._body_awake_since = _time.time() - WAKE_DESYNC_GRACE_SECONDS - 1.0
+
+        mind._check_sleep_sync()
+
+        assert not mind.is_sleeping, "the mind must follow a genuinely woken body"
+
+
+def test_drowsy_after_confirmed_sleep_is_not_a_wake():
+    """Drowsy after the body crossed is heading back down — not a wake."""
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.3, phase="drowsy")
+        mind.sleep(user_initiated=False)
+        mind._body_sleep_confirmed = True
+        mind._last_sleep_attempt = 0.0
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping
+
+
+# ======================================================================
+# Restored sleep bookkeeping — a restart mid-episode must keep the
+# episode's own record. The journal showed every recorded wake with
+# duration_secs=0: a resumed sleep had _sleep_start_time=0 and
+# _sleep_start_cycles=0 while the tracker kept its cumulative counts,
+# so the episode's length and stage position were both lost. The
+# fields are bookkeeping now — nothing gates on them — but they keep
+# the journal honest.
+# ======================================================================
+
+
+def _legacy_sleep_save(cycles_completed: int = 1) -> dict:
+    """A pre-bookkeeping save shape: mid-cycle-2 N3, no episode fields."""
+    return {
+        "is_sleeping": True,
+        "user_initiated_sleep": False,
+        "sleep_cycle": {
+            "cycle_number": 2,
+            "current_stage": "n3",
+            "stage_slot": 2,
+            "time_in_stage": 400.0,
+            "time_in_cycle": 1660.0,
+            "cycles_completed": cycles_completed,
+        },
+    }
+
+
+def test_stage_sleep_state_legacy_save_resumes_as_first_cycle():
+    """Saves without the episode fields get conservative defaults.
+
+    An unknown-age episode is treated as fresh (the wake journal gets
+    an honest duration floor) and its in-flight cycle counted as the
+    first — the bookkeeping errs toward continuity, never toward a
+    phantom completed cycle.
+    """
+    import time as _time
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir)
+        before = _time.time()
+        is_sleeping, user_sleep, cycle, start_time, start_cycles = mind._stage_sleep_state(
+            _legacy_sleep_save()
+        )
+
+        assert is_sleeping is True
+        assert user_sleep is False
+        assert cycle.cycles_completed == 1
+        assert before <= start_time <= _time.time()
+        assert start_cycles == 1
+
+
+def test_stage_sleep_state_roundtrips_episode_bookkeeping():
+    """Saves carrying the episode fields restore them unchanged."""
+    import time as _time
+
+    onset = _time.time() - 3600.0
+    data = _legacy_sleep_save()
+    data["sleep_start_time"] = onset
+    data["sleep_start_cycles"] = 0
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir)
+        _, _, _, start_time, start_cycles = mind._stage_sleep_state(data)
+
+        assert start_time == onset
+        assert start_cycles == 0
+
+
+def test_restored_sleep_stays_asleep_while_body_sleeps():
+    """A restored mid-cycle sleep with a still-sleeping body stays under.
+
+    Regression test for the journal signature (every wake with
+    duration_secs=0): after a restart the restored episode resumes
+    with a daemon phase already in NREM — the body's crossing is
+    confirmed on the first sync and the mind remains asleep. There is
+    no restart-time wake anymore: adenosine cleared across the offline
+    gap is the daemon's to account for, and a body that is still
+    asleep is the only signal that matters.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.3, phase="nrem")
+        (
+            mind._is_sleeping,
+            mind._user_initiated_sleep,
+            cycle,
+            mind._sleep_start_time,
+            mind._sleep_start_cycles,
+        ) = mind._stage_sleep_state(_legacy_sleep_save())
+        mind.inner_life._sleep_cycle = cycle  # type: ignore[attr-defined]
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping, "restored mid-cycle sleep woke with the body still in NREM"
+        assert mind._body_sleep_confirmed
+
+
+def test_restored_sleep_follows_a_woken_body():
+    """A restored sleep whose body woke during downtime follows it up.
+
+    The daemon's state-open path clears adenosine across the offline
+    gap and the body wakes on its own physics; when the mind comes up
+    still flagged asleep and the daemon's phase has been persistently
+    awake, the wake-desync check pulls the mind up to join it — the
+    two are never in opposite sleep states.
+    """
+    import time as _time
+
+    from brainstem.thresholds import WAKE_DESYNC_GRACE_SECONDS
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.3, phase="active")
+        (
+            mind._is_sleeping,
+            mind._user_initiated_sleep,
+            cycle,
+            mind._sleep_start_time,
+            mind._sleep_start_cycles,
+        ) = mind._stage_sleep_state(_legacy_sleep_save())
+        mind.inner_life._sleep_cycle = cycle  # type: ignore[attr-defined]
+        # The body's awake phase has already persisted past the guard.
+        mind._body_awake_since = _time.time() - WAKE_DESYNC_GRACE_SECONDS - 1.0
+
+        mind._check_sleep_sync()
+
+        assert not mind.is_sleeping, (
+            "restored sleep stayed asleep while the body was awake — "
+            "the two are never in opposite sleep states"
+        )
+
+
+def test_restored_sleep_first_awake_observation_starts_grace():
+    """A body's first awake report after restore arms, not fires.
+
+    The wake-desync persistence guard starts the clock on the first
+    awake-phase observation — a single transitional report cannot wake
+    a freshly restored sleep.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.3, phase="active")
+        (
+            mind._is_sleeping,
+            mind._user_initiated_sleep,
+            cycle,
+            mind._sleep_start_time,
+            mind._sleep_start_cycles,
+        ) = mind._stage_sleep_state(_legacy_sleep_save())
+        mind.inner_life._sleep_cycle = cycle  # type: ignore[attr-defined]
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping, "first awake report woke a restored sleep immediately"
+        assert mind._body_awake_since > 0.0, "the grace clock did not arm"
+
+
+# ======================================================================
+# Lucid dream probability — REM stage from the ultradian cycle tracker
+# ======================================================================
+
+
+def _make_inner_life_for_lucid(seed: int = 42):
+    """Build an InnerLife with a small network for lucid dream tests."""
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
+    from self.reflection import Reflection
+    from sleep.inner_life import InnerLife
+    from temporal_lobe.concepts import ConceptNetwork, RelationType
+
+    net = ConceptNetwork()
+    for name in ("alpha", "beta", "gamma", "delta", "epsilon"):
+        net.add_concept(name, confidence=0.5)
+    net.add_edge("alpha", "beta", RelationType.RELATED_TO, 0.8)
+    net.add_edge("beta", "gamma", RelationType.RELATED_TO, 0.5)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
+    reflection = Reflection(net)
+    return InnerLife(net, curiosity, reflection, seed=seed)
+
+
+def _nrem_summary(arousal: float = 0.15) -> NeuroSummary:
+    """A NeuroSummary simulating NREM sleep (low arousal)."""
+    from genesis_client.protocol import PHASE_NREM
+
+    return NeuroSummary(
+        arousal=arousal,
+        valence=0.0,
+        global_tone=0.4,
+        plasticity_gate=0.3,
+        encoding_weight=0.3,
+        consolidation_weight=0.8,
+        retrieval_weight=0.3,
+        phase=PHASE_NREM,
+    )
+
+
+def test_lucid_probability_rem_boost_from_tracker():
+    """The tracker's is_rem should boost lucid probability even when the
+    daemon arousal is low (NREM clamp 0.10-0.25).
+
+    Before the fix, lucid_dream_probability used summary.arousal as the
+    sole REM marker. During NREM, arousal is clamped to 0.10-0.25, so
+    the probability was ~0.05 + 0.025 = 0.075 — too low for lucid
+    dreaming to occur in practice. With the fix, the tracker's is_rem
+    provides a +0.10 boost, giving ~0.15+ even with low daemon arousal.
+    """
+    il = _make_inner_life_for_lucid()
+    summary = _nrem_summary(arousal=0.15)
+
+    # Without the tracker's REM signal (old behavior)
+    prob_no_rem = il.lucid_dream_probability(summary, is_rem=False)
+
+    # With the tracker's REM signal (new behavior)
+    prob_with_rem = il.lucid_dream_probability(summary, is_rem=True)
+
+    assert prob_with_rem > prob_no_rem, (
+        f"REM stage should boost lucid probability: "
+        f"no_rem={prob_no_rem:.3f}, with_rem={prob_with_rem:.3f}"
+    )
+    # The REM boost should be at least 0.08 (the +0.10 base boost
+    # minus the small arousal contribution from the fallback path)
+    assert prob_with_rem - prob_no_rem >= 0.08, (
+        f"REM boost too small: {prob_with_rem - prob_no_rem:.3f}"
+    )
+    # The probability with REM should be at least 0.12 (base 0.02
+    # + REM 0.10 + minimal self-awareness)
+    assert prob_with_rem >= 0.12, f"Lucid probability with REM too low: {prob_with_rem:.3f}"
+
+
+def test_lucid_probability_rem_with_low_arousal():
+    """Even with NREM-clamped arousal (0.10), the tracker's is_rem
+    should give a meaningful lucid probability.
+
+    This is the core regression: before the fix, the daemon's arousal
+    was the only REM marker, and during NREM it's 0.10-0.25, making
+    lucid dreaming nearly impossible. The tracker's is_rem should
+    override this limitation.
+    """
+    il = _make_inner_life_for_lucid()
+    summary = _nrem_summary(arousal=0.10)  # deep NREM
+
+    prob = il.lucid_dream_probability(summary, is_rem=True)
+
+    assert prob >= 0.12, (
+        f"Lucid probability during tracker-REM with low arousal should be >= 0.12, got {prob:.3f}"
+    )
+
+
+def test_lucid_probability_practice_effect():
+    """Prior lucid dreams should increase the probability (practice effect)."""
+    il = _make_inner_life_for_lucid()
+    summary = _nrem_summary(arousal=0.15)
+
+    # First lucid dream — no practice
+    prob_first = il.lucid_dream_probability(summary, is_rem=True)
+
+    # After 10 prior lucid dreams — practice effect
+    il._lucid_dream_count = 10  # type: ignore[attr-defined]
+    prob_practiced = il.lucid_dream_probability(summary, is_rem=True)
+
+    assert prob_practiced > prob_first, (
+        f"Practice should increase probability: "
+        f"first={prob_first:.3f}, practiced={prob_practiced:.3f}"
+    )
+
+
+def test_lucid_probability_nrem_without_tracker_rem():
+    """Without the tracker's REM signal, NREM arousal should give a
+    low probability (the old behavior, preserved as fallback)."""
+    il = _make_inner_life_for_lucid()
+    summary = _nrem_summary(arousal=0.15)
+
+    prob = il.lucid_dream_probability(summary, is_rem=False)
+
+    # Without REM, the probability should be low (base + self-awareness)
+    assert prob < 0.12, f"Lucid probability without REM should be low, got {prob:.3f}"
+
+
+# ─── Dream thoughts must not recite a concept pair ────────────────
+#
+# The dream generators used to build their own utterance:
+#     content=f"{display1} and {display2}"
+# That string is what Genesis said — a pre-written sentence, which is the
+# CRITICAL RULE violation in AGENTS.md. Worse, when the paired concept
+# was one the language engine filters as noise (a long scraped name
+# like "compiler for the rust language"), composition produced nothing
+# usable and the fallback spoke the placeholder verbatim:
+#     "Cat and compiler for the rust language."
+# Two unrelated concepts, no verb, indistinguishable from a complaint
+# about the Rust compiler.
+
+
+def _make_emotion() -> EmotionalState:
+    """A neutral emotional state for baseline dream generation."""
+    return EmotionalState(
+        label="neutral",
+        cognitive_style="balanced",
+        alertness=0.5,
+        valence=0.0,
+        plasticity=0.5,
+        creativity=0.5,
+        openness_to_engage=0.5,
+        caution=0.3,
+    )
+
+
+def _make_inner_life_for_dream_composition():
+    """InnerLife over a network holding a speakable/unspeakable pair."""
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
+    from self.reflection import Reflection
+    from sleep.inner_life import InnerLife
+    from temporal_lobe.concepts import ConceptNetwork, RelationType
+
+    net = ConceptNetwork()
+    net.add_concept(
+        "cat",
+        confidence=0.9,
+        properties={"definition": "a small domesticated feline"},
+    )
+    # Long scraped concept name — the engine filters this as noise.
+    net.add_concept(
+        "compiler for the rust language",
+        confidence=0.6,
+        properties={"definition": "a program that turns source into a binary"},
+    )
+    net.add_concept("feline", confidence=0.9)
+    net.add_edge("cat", "feline", RelationType.IS_A, 0.9, origin="stated")
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
+    reflection = Reflection(net)
+    return InnerLife(net, curiosity, reflection, seed=42)
+
+
+_UNSEEDED_GENERATORS = ["_dream_thought", "_rem_dream_thought", "_nrem_dream_thought"]
+_SEEDED_GENERATORS = [
+    "_rem_seeded_dream_thought",
+    "_nrem_seeded_dream_thought",
+]
+
+
+@pytest.mark.parametrize("method", _UNSEEDED_GENERATORS + _SEEDED_GENERATORS)
+def test_dream_thought_content_is_an_anchor_not_a_sentence(method):
+    """Every dream generator hands the language engine a topic anchor.
+
+    The paired concept belongs in the knowledge metadata, where the
+    engine decides whether it can actually voice it. It must never be
+    joined into `content` — that is the pre-written utterance.
+    """
+    il = _make_inner_life_for_dream_composition()
+    emotion = _make_emotion()
+
+    if method in _SEEDED_GENERATORS:
+        thought = getattr(il, method)(emotion, ["cat"])
+    else:
+        thought = getattr(il, method)(emotion)
+
+    assert thought is not None, f"{method} produced no thought"
+    assert " and " not in thought.content, (
+        f"{method} pre-joined its utterance: {thought.content!r} — the "
+        "language engine owns the surface form, not the dream generator"
+    )
+    # The association must survive as data, or the next link of the
+    # chain has nothing to follow.
+    assert thought.metadata is not None
+    assert thought.metadata.get("knowledge"), f"{method} dropped the association from its metadata"
+
+
+def test_dream_thought_chain_seeds_survive_anchor_only_content():
+    """Chain seeding reads metadata targets now that content is an anchor.
+
+    `_extract_concepts_from_thought` used to scan `content` for the
+    "X and Y" pair. With content reduced to one word a thought would
+    look like it mentions a single concept, and every chain after the
+    first link would collapse.
+    """
+    from thoughts import SpontaneousThought
+
+    il = _make_inner_life_for_dream_composition()
+    thought = SpontaneousThought(
+        content="cat",
+        trigger="dream",
+        is_dream=True,
+        metadata={
+            "topic": "cat",
+            "knowledge": [("related_to", "feline", 0.5)],
+            "dream": True,
+        },
+    )
+
+    concepts = il._extract_concepts_from_thought(thought)
+
+    assert "cat" in concepts, "topic concept must seed the chain"
+    assert "feline" in concepts, (
+        "the paired concept comes from metadata — losing it here "
+        "collapses every dream chain after its first link"
+    )
+
+
+def test_dream_thought_speech_never_contains_the_raw_pair():
+    """The engine composes the thought; it never emits the placeholder.
+
+    Covers the case the fix was written for: the paired concept is one
+    the engine filters as noise, so composition has only the topic's own
+    definition and edges to work with.
+    """
+    import time
+
+    from frontal_lobe.generator import GenerativeLanguage
+    from self.self_model import PersonalityTraits, SelfModel
+
+    il = _make_inner_life_for_dream_composition()
+    engine = GenerativeLanguage(
+        SelfModel(
+            born_at=int(time.time() * 1000),
+            personality=PersonalityTraits(
+                openness=0.85,
+                conscientiousness=0.72,
+                extraversion=0.55,
+                agreeableness=0.78,
+                neuroticism=0.38,
+            ),
+        ),
+        seed=42,
+        network=il.network,
+    )
+    emotion = _make_emotion()
+
+    thought = il._dream_thought(emotion)
+    assert thought is not None
+
+    spoken = thought.rendered_text(engine, emotion)
+
+    assert spoken, "a composable topic must still produce speech"
+    assert "compiler for the rust language" not in spoken, (
+        f"an unspeakable paired concept reached speech: {spoken!r}"
+    )
+    assert " and " not in spoken, f"recited a bare concept pair: {spoken!r}"
+
+
+def test_echoed_placeholder_is_suppressed_despite_grammar_decoration():
+    """The echo guard must survive the grammar's capital and period.
+
+    When composition has nothing to work with, the engine returns the
+    anchor decorated for display. A literal string compare missed that
+    every time, which is how a bare concept name became an utterance.
+    """
+    import time
+
+    from frontal_lobe.generator import GenerativeLanguage
+    from self.self_model import PersonalityTraits, SelfModel
+    from thoughts import SpontaneousThought
+
+    # No definition, no edges, noisy target: composition can only echo.
+    net = ConceptNetwork()
+    net.add_concept("cat", confidence=0.5)
+    net.add_concept("compiler for the rust language", confidence=0.5)
+    engine = GenerativeLanguage(
+        SelfModel(
+            born_at=int(time.time() * 1000),
+            personality=PersonalityTraits(
+                openness=0.85,
+                conscientiousness=0.72,
+                extraversion=0.55,
+                agreeableness=0.78,
+                neuroticism=0.38,
+            ),
+        ),
+        seed=42,
+        network=net,
+    )
+    thought = SpontaneousThought(
+        content="cat",
+        trigger="dream",
+        is_dream=True,
+        metadata={
+            "topic": "cat",
+            "knowledge": [("related_to", "compiler for the rust language", 0.5)],
+            "dream": True,
+        },
+    )
+
+    assert thought.rendered_text(engine, _make_emotion()) == "", (
+        "an association the mind could not articulate must stay "
+        "sub-verbal, not surface as a bare concept name"
+    )
+
+
+def test_n3_pass_tolerates_dangling_edge_endpoints():
+    """A spilled concept leaves its edges in _edges and _edge_index —
+    ghost endpoints are normal state, so every N3-path traversal that
+    keys a live-only dict by an edge endpoint must skip them.
+
+    Regression: KeyError('synthesis of several') fired inside
+    detect_semantic_hubs' BFS (sigma/pred are built over live ids only)
+    and inside topology community detection (labels[neighbor]).
+    """
+    from temporal_lobe.concepts import NetworkTopology
+
+    net = ConceptNetwork()
+    net.add_concept("animal")
+    net.add_concept("dog")
+    net.add_edge("version", "synthesis of several", RelationType.IS_A, weight=0.5)
+    net.add_edge("dog", "animal", RelationType.IS_A, weight=0.9)
+
+    # Simulate the post-spill state: concept archived out of working
+    # memory, edge retained (spill keeps edges for hot traversal).
+    ghost = "synthesis of several"
+    net._concepts.pop(ghost, None)
+    net._alias_map.pop(ghost, None)
+    for col_cids in net._column_index.values():
+        col_cids.discard(ghost)
+
+    # detect_semantic_hubs → _compute_betweenness_centrality → BFS over
+    # _edge_index, which still holds the edge to the ghost.
+    net.detect_semantic_hubs()  # KeyError(ghost) before the fix
+
+    # topology metrics → _detect_communities labels[neighbor].
+    top = NetworkTopology(net)
+    communities = top.communities()  # KeyError(ghost) before the fix
+    assert all(ghost not in comm for comm in communities)
+
+
+def test_sleep_processes_close_on_stage_leave():
+    """Processes opened for N3 must close when the stage moves on —
+    interrupted sleep does not run stale physiology later."""
+    from unittest.mock import MagicMock
+
+    from brain_waves import SleepStage
+    from sleep.sleep import SleepMixin
+
+    def _proc():
+        yield {"a": 1}
+        yield {"b": 2}
+
+    mind = SleepMixin.__new__(SleepMixin)
+    mind.inner_life = MagicMock()
+    mind.inner_life.sleep_cycle = None
+    mind.brain = MagicMock()
+    mind.brain.frontal.memory.consolidate_during_sleep.return_value = 0
+    mind.brain_waves = MagicMock()
+    mind.brain_waves.return_value.consolidation = 0.5
+    mind._emit_live_thought = MagicMock()
+    mind._n3_processes = {"x": _proc()}
+    mind._n3_rotation = deque(["x"])
+    mind._n3_credit = 0.4
+
+    # Leaving N3 closes every live process rather than resuming it late.
+    mind._on_sleep_stage_transition(SleepStage.REM, 30.0)
+    assert not mind._n3_processes
+    assert not mind._n3_rotation
+
+
+# ======================================================================
+# Thalamic gate — headless closes it at sleep onset, a session at N2
+# ======================================================================
+
+
+def _gate_mind(headless: bool, sleeping: bool, hypnagogic: object, stage=None):
+    """A bare SleepMixin wired for the gate truth table.
+
+    ``hypnagogic`` is the awake-side transition object (None or a
+    HypnagogicState stand-in); ``stage`` is the asleep-side ultradian
+    stage (None → no tracker, treated as not-N1).
+    """
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from sleep.sleep import SleepMixin
+
+    mind = SleepMixin.__new__(SleepMixin)
+    mind._headless = headless
+    mind._is_sleeping = sleeping
+    mind._is_meditating = False
+    mind.inner_life = SimpleNamespace(
+        sleep_cycle=SimpleNamespace(current_stage=stage) if stage else None,
+        current_hypnagogic=hypnagogic,
+    )
+    # SleepMixin reads inner_life through attributes only; keep a real
+    # namespace so a missing attribute fails loudly rather than a Mock
+    # silently inventing one.
+    assert not isinstance(mind.inner_life, MagicMock)
+    return mind
+
+
+def test_gate_open_when_awake_both_modes():
+    """Awake and not drifting: gate open in either mode."""
+    for headless in (False, True):
+        mind = _gate_mind(headless, sleeping=False, hypnagogic=None)
+        assert mind.thalamic_gate_closed is False
+
+
+def test_gate_interactive_hypnagogia_stays_open():
+    """A session keeps the N1 exemption: responsiveness persists
+    through sleep onset (Ogilvie 1989) — someone is at the prompt."""
+    from brain_waves import SleepStage
+    from thalamus.events import HypnagogicState
+
+    # Awake-side drift.
+    mind = _gate_mind(False, sleeping=False, hypnagogic=HypnagogicState(progress=0.4))
+    assert mind.thalamic_gate_closed is False
+    # Asleep-side N1.
+    mind = _gate_mind(False, sleeping=True, hypnagogic=None, stage=SleepStage.N1)
+    assert mind.thalamic_gate_closed is False
+
+
+def test_gate_interactive_established_sleep_closes():
+    """N2 and beyond close the gate in a session too — unchanged."""
+    from brain_waves import SleepStage
+
+    for stage in (SleepStage.N2, SleepStage.N3, SleepStage.REM):
+        mind = _gate_mind(False, sleeping=True, hypnagogic=None, stage=stage)
+        assert mind.thalamic_gate_closed is True
+
+
+def test_gate_headless_hypnagogia_closes_both_sides():
+    """Resident: the gate shuts the moment hypnagogia begins — the
+    relay quiets ahead of the cortex like a brain's (Magnin 2010)."""
+    from brain_waves import SleepStage
+    from thalamus.events import HypnagogicState
+
+    # Awake-side drift — still nominally awake, already gated.
+    mind = _gate_mind(True, sleeping=False, hypnagogic=HypnagogicState(progress=0.2))
+    assert mind.thalamic_gate_closed is True
+    # Asleep-side N1 — the session exemption does not apply headless.
+    mind = _gate_mind(True, sleeping=True, hypnagogic=None, stage=SleepStage.N1)
+    assert mind.thalamic_gate_closed is True
+
+
+def test_gate_headless_established_sleep_closes():
+    """Established sleep stays closed in resident mode as well."""
+    from brain_waves import SleepStage
+
+    for stage in (SleepStage.N2, SleepStage.N3, SleepStage.REM):
+        mind = _gate_mind(True, sleeping=True, hypnagogic=None, stage=stage)
+        assert mind.thalamic_gate_closed is True
+
+
+# ======================================================================
+# Hypnagogic transition driven by the switch's fold geometry
+# ======================================================================
+
+
+def _thought_gen_life(*, phase_name: str, fold=None, fold_channel: bool = True):
+    """A bare InnerLife wired for the drowsy-branch fold tests.
+
+    Only the attributes ``_run_thought_generation`` touches are set;
+    the thought generator is stubbed so the branch's bookkeeping —
+    entry, progress, count — is what the test observes.
+    """
+    from types import SimpleNamespace
+
+    from sleep.inner_life import InnerLife
+    from thalamus.events import SleepInertia
+
+    il = InnerLife.__new__(InnerLife)
+    il._get_emotion = lambda: SimpleNamespace()
+    il._get_neuro_summary = lambda: SimpleNamespace(phase_name=phase_name)
+    il._is_mind_sleeping = lambda: False
+    il._get_fold_margins = (lambda: fold) if fold_channel else None
+    il._was_sleeping = False
+    il._hypnagogic = None
+    il._hypnagogic_count = 0
+    il._generate_hypnagogic_thought = lambda emotion: None
+    il._sleep_inertia = SleepInertia()
+    il._should_think = lambda emotion: False
+    return il
+
+
+def _fold(*, position: float, bistable: bool):
+    from genesis_client.types import FoldMargins
+
+    return FoldMargins(
+        h=0.0,
+        h_sleep_fold=100.0,
+        h_wake_fold=200.0,
+        position=position,
+        bistable=bistable,
+    )
+
+
+def test_hypnagogia_enters_on_fold_geometry_before_the_label():
+    """Inside the bistable band the transition is underway even while
+    the phase label still reads wake — the tipping point precedes
+    scored sleep (the 2025 bifurcation-dynamics result)."""
+    il = _thought_gen_life(
+        phase_name="awake",
+        fold=_fold(position=0.45, bistable=True),
+    )
+    il._run_thought_generation(now=1000.0)
+    assert il._hypnagogic is not None
+    assert il._hypnagogic.progress == 0.45
+    assert il._hypnagogic_count == 1
+
+
+def test_hypnagogic_progress_tracks_the_band_coordinate():
+    """Progress is the measured position through the band, not a
+    counter — it advances as h approaches the wake fold and retreats
+    when the homeostat eases."""
+    from thalamus.events import HypnagogicState
+
+    il = _thought_gen_life(
+        phase_name="drowsy",
+        fold=_fold(position=0.7, bistable=True),
+    )
+    il._hypnagogic = HypnagogicState(progress=0.2, started_at=900.0)
+    il._run_thought_generation(now=1000.0)
+    assert il._hypnagogic.progress == 0.7
+
+    # The homeostat eases back — the descent retreats with it.
+    il._get_fold_margins = lambda: _fold(position=0.3, bistable=True)
+    il._run_thought_generation(now=1012.0)
+    assert il._hypnagogic.progress == 0.3
+
+
+def test_hypnagogia_past_the_wake_fold_completes():
+    """Beyond the wake fold the wake attractor is gone even if the
+    label still reads wake — the transition reports complete."""
+    il = _thought_gen_life(
+        phase_name="awake",
+        fold=_fold(position=1.1, bistable=False),
+    )
+    il._run_thought_generation(now=1000.0)
+    assert il._hypnagogic is not None
+    assert il._hypnagogic.progress == 1.0
+
+
+def test_hypnagogia_not_claimed_on_monostable_wake():
+    """Below the band there is no transition — deep wake stays clean
+    of the hypnagogic state."""
+    from thalamus.events import HypnagogicState
+
+    il = _thought_gen_life(
+        phase_name="awake",
+        fold=_fold(position=-0.5, bistable=False),
+    )
+    il._hypnagogic = HypnagogicState(progress=0.4, started_at=900.0)
+    il._run_thought_generation(now=1000.0)
+    assert il._hypnagogic is None
+
+
+def test_hypnagogia_falls_back_to_the_ramp_without_margins():
+    """No fold channel — the label-driven ramp is unchanged."""
+    il = _thought_gen_life(phase_name="drowsy", fold_channel=False)
+    il._run_thought_generation(now=1000.0)
+    assert il._hypnagogic is not None
+    assert il._hypnagogic.progress == 0.1
+    il._run_thought_generation(now=1012.0)
+    assert il._hypnagogic.progress == 0.25

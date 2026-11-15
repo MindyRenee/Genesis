@@ -1,0 +1,68 @@
+//! Genesis — the core state schema and subcognitive foundation.
+//!
+//! ## Layout
+//!
+//! The organism is organized into three worlds —
+//! `Self_World/` (this crate: the physical self — brain regions,
+//! neurochemistry, the body), `Inner_Non_Physical_World/` (the
+//! non-physical phenomena — field, waves, dreams, thoughts), and
+//! `Outer_Physical_World/` (the environment). `Self_World/src/`
+//! presents the body's anatomy the same way.
+//! The implementation lives in `daemon`, `state`, `store`,
+//! `cognition`, `field`, and `math`; the region modules
+//! (`basal_forebrain`, `basal_ganglia`, `brainstem`, `cerebellum`,
+//! `frontal_lobe`, `hypothalamus`, `insula`, `limbic_system`,
+//! `memory`, `neurochemical`, `occipital_lobe`, `parietal_lobe`,
+//! `self_`, `sleep`, `temporal_lobe`, `thalamus`, `tools`,
+//! `infrastructure`, `worlds`) re-export those modules under the
+//! structure they implement, so the crate reads the same way the
+//! mind does: click `src/` and the regions are what you see.
+
+// ─── The body, by region ─────────────────────────────────────────
+// Anatomical view of the implementation below — re-exports only,
+// no code moves. See each region's mod.rs for what lives there.
+pub mod basal_forebrain;
+pub mod basal_ganglia;
+pub mod brainstem;
+pub mod cerebellum;
+pub mod frontal_lobe;
+pub mod hypothalamus;
+pub mod infrastructure;
+pub mod insula;
+pub mod limbic_system;
+pub mod memory;
+pub mod neurochemical;
+pub mod occipital_lobe;
+pub mod parietal_lobe;
+pub mod self_;
+pub mod sleep;
+pub mod temporal_lobe;
+pub mod thalamus;
+pub mod tools;
+pub mod worlds;
+
+// ─── The spine ───────────────────────────────────────────────────
+// The map that holds the layout together — every region and the
+// mind-side package it projects to. The mind declares the same
+// table back (python/topology.py); the two halves join over the
+// region names.
+pub mod topology;
+
+// ─── Implementation ──────────────────────────────────────────────
+pub mod cognition;
+pub mod daemon;
+pub mod data_dir;
+pub mod field;
+pub mod math;
+#[cfg(feature = "python")]
+pub mod python_ext;
+pub mod state;
+pub mod store;
+
+pub use data_dir::data_dir;
+pub use field::{
+    BraidTrajectory, FieldError, GaugeTransport, GlobalField, StereographicSphere, SubsystemLayer,
+    SystemEngine, SystemFiber, Vector,
+};
+pub use state::GenesisCoreState;
+pub use store::{MmapState, StateFileError};

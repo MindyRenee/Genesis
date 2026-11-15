@@ -1,0 +1,34 @@
+{
+  "benchmark": "regime_dependent_policy_selection",
+  "reference": "T-maze (Friston et al., 2015; Pezzulo et al., 2016) — structural property NOT demonstrated; system shows regime-dependent selection but not epistemic foraging",
+  "structural_property": "regime-dependent policy selection (NOT epistemic foraging)",
+  "scenarios": [
+    {
+      "name": "stable_baseline",
+      "selected_policy": "noop",
+      "selected_policy_efe": 0.810166,
+      "precision": 0.899995,
+      "surprise": 0.000044,
+      "free_energy": 0.000000,
+      "model_maturity": 0.000000
+    },
+    {
+      "name": "stressed",
+      "selected_policy": "calm",
+      "selected_policy_efe": 0.937495,
+      "precision": 0.799996,
+      "surprise": 0.000178,
+      "free_energy": 0.000001,
+      "model_maturity": 0.000000
+    },
+    {
+      "name": "uncertain",
+      "selected_policy": "calm",
+      "selected_policy_efe": 0.975378,
+      "precision": 0.737972,
+      "surprise": 0.010817,
+      "free_energy": 0.000962,
+      "model_maturity": 0.000000
+    }
+  ]
+}

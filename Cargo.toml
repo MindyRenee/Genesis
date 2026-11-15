@@ -12,15 +12,31 @@ license-file = "n/a"
 # PROVENANCE.md).
 marker-g13 = "0x47530D4953F3310A"
 
-# binutils ≥2.44 warns "ignoring deprecated linker optimization setting '1'"
-# about the -O1 rustc passes to the linker — a known upstream false
-# positive (rust-lang/rust#158192). Allow the forwarding lint; linker
-# errors still fail the build regardless.
+# The crate lives inside the self world: Self_World/src/ is the
+# body's source tree (the daemon, neurochemistry, memory substrate).
+[lib]
+path = "Self_World/src/lib.rs"
+# rlib for the daemon/binaries; cdylib so the same crate builds the
+# `genesis_body` Python extension when the `python` feature is on.
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "genesis-daemon"
+path = "Self_World/src/bin/genesis-daemon.rs"
+
+# Suppress linker deprecation warning for -O1 flag
 [lints.rust]
 linker_messages = "allow"
 
+[features]
+default = []
+# Build the PyO3 extension module (cdylib artifact libgenesis.so,
+# installed as genesis_body.so beside the interpreter).
+python = ["dep:pyo3"]
+
 [dependencies]
 flate2 = "1.1.9"
+pyo3 = { version = "0.27", optional = true, features = ["extension-module"] }
 libc = "0.2.189"
 proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
 quote = "1.0.47"

@@ -5,6 +5,94 @@ evidence behind them, not just the claims. Entries are dated, newest
 first. Code references are commit SHAs; runtime artifacts live in the
 instance's data dir (`~/.local/share/genesis*`).
 
+## 2026-11-15 — Three worlds, sorted by what each thing is
+
+The repository is now organized into three importable worlds, and
+the sort key is physicality, not convenience:
+
+- `Self_World/` — the physical self: the brain regions and
+  neurochemistry (`basal_forebrain` … `thalamus`, `memory`,
+  `topology.py`), the `self/` model, `infrastructure/`,
+  `genesis_client/`, `eval/`, `voices/`, the entry points
+  (`mind.py`, `genesis_cli.py`, `commitment.py`, `turn.py`), and the
+  Rust body (`src/` — daemon, state, store, field, math, cognition,
+  plus every region re-export module, `self_/vision`, `worlds`,
+  and the `python`-feature `python_ext` PyO3 bridge).
+- `Inner_Non_Physical_World/` — the non-physical phenomena the
+  organism undergoes: `brain_waves.py`, `field_probe.py`,
+  `field_audio.py`, `thoughts.py`, `thought_composer.py`, the
+  `sleep/` dream machinery, and `tools/`.
+- `Outer_Physical_World/` — the environment: `outer_world/`,
+  `discord_feed.py`, `user_profile.py`, and the Discord secrets.
+
+The boundary is a vesica, not a wall — the worlds share one
+namespace (all three roots on `PYTHONPATH`), so a phenomenon can be
+non-physical in kind and still be driven by physical machinery:
+`brain_waves` is read off thalamic neurochemistry, dreams are gated
+by the hypothalamic flip-flop, thoughts draw on the temporal lobe's
+concept network. Overlap is the default; a module lives in the world
+it belongs to and is importable from everywhere it is needed.
+
+Recovered Rust is no longer quarantined: `latent_spaces/`'s
+surviving `spectrum.rs` is `field/spectrum.rs`, wired back into
+`FieldRuntime` — the 250 Hz substep integration and
+`spectrum()`/`spectrum_kinematics()` accessors restored, so the
+field's own band decomposition measures the trajectory it
+integrates. The region re-export modules, `math`'s five recovered
+subdomains, `self_/vision`, `daemon::{actuators,gamma}`, `worlds`,
+`python_ext` (behind `--features python`), the `retina` bin, and
+thirteen recovered integration/benchmark tests are all declared and
+compiling; `cargo check --all-targets` and `cargo check --features
+python` are clean.
+
+## 2026-11-15 — Psychoanalysis removed
+
+`self/psychoanalysis.py` — the Freud-layer analytic engine (repression
+register, dream interpretation, free association, parapraxes) — is
+deleted along with its wiring: the `Mind` constructor's engine
+assembly and `_analysis_drives`, the REM-stage register rescan and
+dream interpretation in `sleep`, and the return-of-the-repressed
+slip counter in conversation. It was inner-world machinery filed
+under self — dreams and the unconscious belong to the rest work,
+not to a second interpretive layer standing over it. Dream residues
+still queue as emotional impressions exactly as before; the
+rest-gate half of its test file survives as `test_rest_gate.py`.
+
+## 2026-11-15 — The view layer is gone: imports follow the anatomy
+
+The `_views` package and the `_EXPORTS` claim tables it powered are
+removed. The lazy re-export layer let every region package fabricate
+a flat symbol surface — `from frontal_lobe import FrontalLobe` — that
+no file actually lived behind, which is indirection, not anatomy.
+A function's directory is its region assignment now, and consumers
+import the providing module directly
+(`from frontal_lobe.prefrontal import FrontalLobe`,
+`from temporal_lobe.concepts.network import ConceptNetwork`).
+
+What changed:
+
+- `python/_views/` deleted; all fourteen `_EXPORTS`/`view_getattr`
+  tables stripped from the region, `self`, and `sleep` inits.
+- Region `__init__.py` files are docstring shells describing the
+  neuroscience — except where the package *is* the subsystem and
+  eager exports are the honest API (`memory`, `temporal_lobe`'s
+  auditory/object-recognition surface, `occipital_lobe`'s visual
+  stack, `basal_ganglia`'s selector, `occipital_lobe.perception`).
+- `python/__init__.py` lost the `_PACKAGES` flat catalog — `import
+  python` no longer resolves region symbols through a fallback
+  `__getattr__`; it is a docstring.
+- `test_regional_wiring.py` deleted — it existed to pin the claim
+  table. Ownership intent survives as file placement; the
+  module-sampler attribution table keeps mapping directories to
+  manifest modules.
+- `test_import_order.py` still guards the one real cycle (`self`
+  stays a docstring-only shell); `test_module_sampler.py` follows
+  the `worlds/` → `outer_world/` rename.
+
+Every `from <region> import Name` that resolved through a claim now
+names the module that defines it — verified statically: zero
+unresolved region-level imports, zero package-attribute uses.
+
 ## 2026-10-22 (late) — Schema drift: v6 state recovered by field surgery
 
 An evening boot found `core_state.bin` unreadable: `schema version

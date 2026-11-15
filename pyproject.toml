@@ -47,7 +47,7 @@ dependencies = [
 # Voice/ambient-listening extras — the wheels bind system libraries
 # (libportaudio, etc.), so they stay opt-in. Degrade-to-text is normal.
 # piper-tts ships the piper binary that install_optional_deps.sh links
-# into python/voices/piper; speech.py invokes it as a subprocess.
+# into Self_World/voices/piper; speech.py invokes it as a subprocess.
 voice = [
     "vosk==0.3.45",
     "sounddevice==0.5.6",
@@ -80,22 +80,16 @@ arc = [
 [project.scripts]
 genesis = "genesis_cli:_console_main"
 
-[tool.setuptools]
-py-modules = [
-    "commitment",
-    "discord_feed",
-    "genesis_cli",
-    "mind",
-    "setup_embeddings",
-    "turn",
-]
-
 [tool.setuptools.packages.find]
-# Two package containers: the repository root (genesis_client,
-# infrastructure, eval) and python/ (the brain-region tree).
-where = [".", "python"]
+# The three worlds are the package containers: each is a sys.path
+# root holding the packages that belong to it (Self_World — the
+# self/organism (brain, chemicals, body), Inner_Non_Physical_World — the
+# cognition, Outer_Physical_World — the environment). Loose modules
+# at a world's root (journal.py, discord_feed.py, mind.py, …) are
+# reached through the launcher's PYTHONPATH, not pip metadata.
+where = ["Self_World", "Inner_Non_Physical_World", "Outer_Physical_World"]
 namespaces = false
-exclude = ["tests*", "python*", "voices*", "__pycache__*", "scripts*"]
+exclude = ["tests*", "python*", "voices*", "__pycache__*", "scripts*", "Language*"]
 
 [tool.uv]
 # kaggle-environments (arc extra) declares litellm>=1.86.1,<1.94.0, but
@@ -125,10 +119,10 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 # whether `self` is fully bound when language/generator.py
 # imports SelfModel from it. Sorting the block breaks every import in the
 # package. The order is documented inline and guarded by test_import_order.py.
-"python/frontal_lobe/prefrontal.py" = ["I001"]
+"Self_World/frontal_lobe/prefrontal.py" = ["I001"]
 
 [tool.pytest.ini_options]
-testpaths = ["python/tests"]
+testpaths = ["tests/python"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

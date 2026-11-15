@@ -1,0 +1,938 @@
+"""Self extras — growth ledger, explorer, code learner."""
+
+import logging
+import math
+import os
+import tempfile
+from collections.abc import Generator
+from pathlib import Path
+
+import pytest
+from growth_ledger import GrowthLedger, GrowthMilestone
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+from tools.code_learner import CodeLearner, CodeLearningResult, FileLearningResult
+from tools.explorer import Explorer
+
+logger = logging.getLogger(__name__)
+
+
+# ======================================================================
+# From tests/test_growth_ledger.py
+# ======================================================================
+
+
+class TestGrowthMilestone:
+    """Tests for the GrowthMilestone dataclass."""
+
+    def test_to_dict_roundtrip(self):
+        """Milestone should survive a to_dict/from_dict round-trip."""
+        m = GrowthMilestone(
+            dimension="knowledge",
+            metric="concept_count",
+            value=500,
+            previous=450,
+            note="Crossed 500 concepts",
+            timestamp=12345,
+        )
+        data = m.to_dict()
+        restored = GrowthMilestone.from_dict(data)
+
+        assert restored.dimension == "knowledge"
+        assert restored.metric == "concept_count"
+        assert restored.value == 500
+        assert restored.previous == 450
+        assert restored.note == "Crossed 500 concepts"
+        assert restored.timestamp == 12345
+
+    def test_delta_property(self):
+        """delta should compute value - previous."""
+        m = GrowthMilestone(dimension="test", metric="test", value=100, previous=80, note="")
+        assert m.delta == 20
+
+        m2 = GrowthMilestone(dimension="test", metric="test", value=50, previous=80, note="")
+        assert m2.delta == -30
+
+    def test_from_dict_defaults(self):
+        """from_dict should handle missing fields with defaults."""
+        restored = GrowthMilestone.from_dict({})
+        assert restored.dimension == ""
+        assert restored.value == 0.0
+        assert restored.timestamp == 0
+
+
+class TestGrowthLedger:
+    """Tests for the GrowthLedger class."""
+
+    def test_empty_ledger(self):
+        """A new ledger should have no milestones."""
+        ledger = GrowthLedger()
+        assert ledger.milestone_count == 0
+        assert ledger.milestones == []
+
+    def test_record_creates_milestone(self):
+        """record should create a milestone when value changes."""
+        ledger = GrowthLedger()
+        m = ledger.record("knowledge", "concept_count", 100, "First 100 concepts")
+
+        assert m is not None
+        assert m.dimension == "knowledge"
+        assert m.metric == "concept_count"
+        assert m.value == 100
+        assert ledger.milestone_count == 1
+
+    def test_record_skips_unchanged_value(self):
+        """record should not create a milestone if value hasn't changed."""
+        ledger = GrowthLedger()
+        ledger.record("knowledge", "concept_count", 100, "First record")
+        m = ledger.record("knowledge", "concept_count", 100, "No change")
+
+        assert m is None
+        assert ledger.milestone_count == 1
+
+    def test_record_tracks_previous_value(self):
+        """record should track the previous value for delta computation."""
+        ledger = GrowthLedger()
+        ledger.record("knowledge", "concept_count", 100, "First")
+        m = ledger.record("knowledge", "concept_count", 150, "Grew")
+
+        assert m is not None
+        assert m.previous == 100
+        assert m.value == 150
+        assert m.delta == 50
+
+    def test_snapshot_always_records(self):
+        """snapshot should always record, even if value hasn't changed."""
+        ledger = GrowthLedger()
+        ledger.snapshot("knowledge", "accuracy", 0.75, "Daily snapshot")
+        m = ledger.snapshot("knowledge", "accuracy", 0.75, "Daily snapshot 2")
+
+        assert m is not None
+        assert ledger.milestone_count == 2
+
+    def test_get_milestones_filtered_by_dimension(self):
+        """get_milestones should filter by dimension."""
+        ledger = GrowthLedger()
+        ledger.record("knowledge", "concept_count", 100)
+        ledger.record("self_improvement", "proposals", 5)
+
+        knowledge = ledger.get_milestones(dimension="knowledge")
+        assert len(knowledge) == 1
+        assert knowledge[0].dimension == "knowledge"
+
+    def test_get_milestones_filtered_by_metric(self):
+        """get_milestones should filter by metric."""
+        ledger = GrowthLedger()
+        ledger.record("knowledge", "concept_count", 100)
+        ledger.record("knowledge", "edge_count", 200)
+
+        concepts = ledger.get_milestones(metric="concept_count")
+        assert len(concepts) == 1
+        assert concepts[0].metric == "concept_count"
+
+    def test_get_latest(self):
+        """get_latest should return the most recent milestone for a metric."""
+        ledger = GrowthLedger()
+        ledger.record("knowledge", "concept_count", 100)
+        ledger.record("knowledge", "concept_count", 200)
+
+        latest = ledger.get_latest("knowledge", "concept_count")
+        assert latest is not None
+        assert latest.value == 200
+
+    def test_get_latest_returns_none_for_unknown(self):
+        """get_latest should return None for an unknown metric."""
+        ledger = GrowthLedger()
+        assert ledger.get_latest("unknown", "unknown") is None
+
+    def test_get_value(self):
+        """get_value should return the latest value for a metric."""
+        ledger = GrowthLedger()
+        ledger.record("knowledge", "concept_count", 100)
+        ledger.record("knowledge", "concept_count", 200)
+
+        assert ledger.get_value("knowledge", "concept_count") == 200
+
+    def test_get_history(self):
+        """get_history should return all (timestamp, value) pairs."""
+        ledger = GrowthLedger()
+        ledger.record("knowledge", "concept_count", 100)
+        ledger.record("knowledge", "concept_count", 200)
+        ledger.record("knowledge", "concept_count", 300)
+
+        history = ledger.get_history("knowledge", "concept_count")
+        assert len(history) == 3
+        assert history[0][1] == 100
+        assert history[1][1] == 200
+        assert history[2][1] == 300
+
+
+class TestGrowthNarrative:
+    """Tests for the self-narrative generation."""
+
+    def test_empty_narrative(self):
+        """An empty ledger should produce a beginning-of-journey narrative."""
+        ledger = GrowthLedger()
+        narrative = ledger.generate_narrative()
+        assert "beginning" in narrative.lower() or "haven't" in narrative.lower()
+
+    def test_narrative_includes_dimensions(self):
+        """The narrative should mention all dimensions with milestones."""
+        ledger = GrowthLedger()
+        ledger.record("knowledge", "concept_count", 100)
+        ledger.record("self_improvement", "proposals", 5)
+
+        narrative = ledger.generate_narrative()
+        assert "knowledge" in narrative.lower() or "Knowledge" in narrative
+        assert "self" in narrative.lower() or "Self" in narrative
+
+    def test_narrative_shows_progression(self):
+        """The narrative should show the progression from first to latest."""
+        ledger = GrowthLedger()
+        ledger.record("knowledge", "concept_count", 100)
+        ledger.record("knowledge", "concept_count", 200)
+
+        narrative = ledger.generate_narrative()
+        # Should mention both the starting and current values
+        assert "100" in narrative
+        assert "200" in narrative
+
+    def test_markdown_report(self):
+        """The markdown report should be properly formatted."""
+        ledger = GrowthLedger()
+        ledger.record("knowledge", "concept_count", 100)
+        ledger.record("knowledge", "concept_count", 200)
+
+        report = ledger.generate_markdown_report()
+        assert report.startswith("# Growth Ledger")
+        assert "## Knowledge" in report
+        assert "|" in report  # table format
+
+    def test_summary(self):
+        """summary should return a brief one-line summary."""
+        ledger = GrowthLedger()
+        ledger.record("knowledge", "concept_count", 100)
+        ledger.record("self_improvement", "proposals", 5)
+
+        summary = ledger.summary()
+        assert "2 milestones" in summary
+        assert "2 dimensions" in summary
+
+
+class TestGrowthPersistence:
+    """Tests for serialization and restoration."""
+
+    def test_to_dict_and_restore(self):
+        """State should survive a to_dict/restore_from_dict round-trip."""
+        ledger = GrowthLedger()
+        ledger.record("knowledge", "concept_count", 100)
+        ledger.record("knowledge", "concept_count", 200)
+        ledger.record("self_improvement", "proposals", 5)
+
+        data = ledger.to_dict()
+        ledger2 = GrowthLedger()
+        ledger2.restore_from_dict(data)
+
+        assert ledger2.milestone_count == 3
+        # Check that last_values are restored (so subsequent records
+        # track the correct previous value)
+        m = ledger2.record("knowledge", "concept_count", 300)
+        assert m is not None
+        assert m.previous == 200
+
+    def test_restore_empty_data(self):
+        """Restoring from empty data should not crash."""
+        ledger = GrowthLedger()
+        ledger.restore_from_dict({})
+        assert ledger.milestone_count == 0
+
+    def test_clear(self):
+        """clear should remove all milestones and last values."""
+        ledger = GrowthLedger()
+        ledger.record("knowledge", "concept_count", 100)
+        assert ledger.milestone_count == 1
+
+        ledger.clear()
+        assert ledger.milestone_count == 0
+        # After clear, recording the same value should create a milestone
+        # (since there's no previous value to compare)
+        m = ledger.record("knowledge", "concept_count", 100)
+        assert m is not None
+
+
+class TestGrowthIntegration:
+    """Integration tests for multi-dimension tracking."""
+
+    def test_multiple_dimensions_independent(self):
+        """Different dimensions should be tracked independently."""
+        ledger = GrowthLedger()
+        ledger.record("knowledge", "count", 100)
+        ledger.record("dreams", "insights", 5)
+        ledger.record("self_improvement", "applied", 3)
+
+        assert ledger.milestone_count == 3
+
+        knowledge = ledger.get_milestones(dimension="knowledge")
+        dreams = ledger.get_milestones(dimension="dreams")
+        si = ledger.get_milestones(dimension="self_improvement")
+
+        assert len(knowledge) == 1
+        assert len(dreams) == 1
+        assert len(si) == 1
+
+    def test_growth_over_time(self):
+        """Simulate growth over time and verify the narrative."""
+        ledger = GrowthLedger()
+
+        # Day 1: small network
+        ledger.record("knowledge", "concept_count", 50, "Starting point")
+        ledger.record("knowledge", "edge_count", 100)
+
+        # Day 2: grew
+        ledger.record("knowledge", "concept_count", 150, "Learned 100 new concepts")
+        ledger.record("knowledge", "edge_count", 350)
+
+        # Day 3: more growth
+        ledger.record("knowledge", "concept_count", 300, "Doubled concepts")
+        ledger.record("knowledge", "edge_count", 700)
+
+        narrative = ledger.generate_narrative()
+        # Should show the progression
+        assert "50" in narrative  # starting point
+        assert "300" in narrative  # latest
+
+        # The delta should be visible
+        history = ledger.get_history("knowledge", "concept_count")
+        assert len(history) == 3
+        assert history[0][1] == 50
+        assert history[2][1] == 300
+
+    def test_quality_metrics_can_decrease(self):
+        """Non-monotonic quality metrics should record decreases, not only growth."""
+        ledger = GrowthLedger()
+
+        # Day 1: high-quality relationships
+        ledger.record("knowledge", "mean_edge_weight", 0.80, "High confidence edges")
+
+        # Day 2: added many low-confidence edges, quality drops
+        m = ledger.record("knowledge", "mean_edge_weight", 0.45, "Low confidence edges added")
+
+        assert m is not None
+        assert m.value == 0.45
+        assert m.previous == 0.80
+        assert math.isclose(m.delta, -0.35)
+
+        # Narrative should show the negative delta
+        narrative = ledger.generate_narrative()
+        assert "-0.4" in narrative or "-0.35" in narrative
+
+
+# ======================================================================
+# From tests/test_explorer.py
+# ======================================================================
+
+
+@pytest.fixture
+def temp_project() -> Generator[str, None, None]:
+    """Create a temporary project directory with test files."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Create a markdown file
+        md_path = os.path.join(tmpdir, "README.md")
+        with open(md_path, "w") as f:
+            f.write(
+                "# Genesis Project\n\n"
+                "Genesis is an artificial mind.\n\n"
+                "## Architecture\n\n"
+                "The system has a subcognitive and cognitive mind.\n\n"
+                "See [cognition](docs/cognition.md) for details.\n"
+            )
+
+        # Create a text file
+        txt_path = os.path.join(tmpdir, "notes.txt")
+        with open(txt_path, "w") as f:
+            f.write(
+                "This is a note about artificial intelligence and "
+                "machine learning. Artificial intelligence is the "
+                "future of computing. Machine learning enables AI.\n"
+            )
+
+        # Create a JSON config
+        json_path = os.path.join(tmpdir, "config.json")
+        with open(json_path, "w") as f:
+            f.write('{"neurochemistry": true, "memory_system": "mmap", "tick_rate": 10}\n')
+
+        # Create a subdirectory with a file
+        subdir = os.path.join(tmpdir, "docs")
+        os.makedirs(subdir)
+        with open(os.path.join(subdir, "guide.md"), "w") as f:
+            f.write("# Guide\n\nThis is a guide about cognition.\n")
+
+        # Create a skip directory (should be ignored)
+        skip_dir = os.path.join(tmpdir, "__pycache__")
+        os.makedirs(skip_dir)
+        with open(os.path.join(skip_dir, "ignored.pyc"), "w") as f:
+            f.write("should be ignored")
+
+        yield tmpdir
+
+
+def test_explore_markdown_file(temp_project) -> None:
+    """Exploring a markdown file extracts heading concepts."""
+    network = ConceptNetwork()
+    explorer = Explorer(network, project_root=temp_project)
+
+    result = explorer.explore_file(os.path.join(temp_project, "README.md"))
+
+    assert result is not None
+    assert result.file_type == "markdown"
+    assert result.concepts_added > 0
+    assert (
+        network.get_concept("genesis project") is not None
+        or network.get_concept("architecture") is not None
+    )
+
+
+def test_explore_text_file(temp_project) -> None:
+    """Exploring a text file extracts frequent words as concepts."""
+    network = ConceptNetwork()
+    explorer = Explorer(network, project_root=temp_project)
+
+    result = explorer.explore_file(os.path.join(temp_project, "notes.txt"))
+
+    assert result is not None
+    assert result.file_type == "text"
+    assert result.concepts_added > 0
+    # "artificial" appears twice
+    assert network.get_concept("artificial") is not None
+
+
+def test_explore_json_file(temp_project) -> None:
+    """Exploring a JSON file extracts keys as concepts."""
+    network = ConceptNetwork()
+    explorer = Explorer(network, project_root=temp_project)
+
+    result = explorer.explore_file(os.path.join(temp_project, "config.json"))
+
+    assert result is not None
+    assert result.file_type == "json"
+    assert result.concepts_added > 0
+    assert (
+        network.get_concept("neurochemistry") is not None
+        or network.get_concept("memory system") is not None
+    )
+
+
+def test_explore_directory(temp_project) -> None:
+    """Exploring a directory finds all text files."""
+    network = ConceptNetwork()
+    explorer = Explorer(network, project_root=temp_project)
+
+    result = explorer.explore_directory()
+
+    assert result.files_explored >= 3  # README.md, notes.txt, config.json, guide.md
+    assert result.concepts_added > 0
+    assert result.directories_visited > 0
+    assert len(result.file_results) == result.files_explored
+
+
+def test_explore_skips_pycache(temp_project) -> None:
+    """Exploration skips __pycache__ directories."""
+    network = ConceptNetwork()
+    explorer = Explorer(network, project_root=temp_project)
+
+    result = explorer.explore_directory()
+
+    # No .pyc files should be explored
+    for file_result in result.file_results:
+        assert ".pyc" not in file_result.filepath
+        assert "__pycache__" not in file_result.filepath
+
+
+def test_explore_deduplication(temp_project) -> None:
+    """Exploring the same file twice doesn't re-add concepts."""
+    network = ConceptNetwork()
+    explorer = Explorer(network, project_root=temp_project)
+
+    # First exploration
+    result1 = explorer.explore_file(os.path.join(temp_project, "README.md"))
+    assert result1 is not None
+    count1 = network.size
+
+    # Second exploration of same file
+    explorer.explore_file(os.path.join(temp_project, "README.md"))
+    # The file is already in _explored_files, but explore_file still reads it
+    # The concepts won't be duplicated because add_concept checks for existing
+    count2 = network.size
+    assert count2 == count1  # no new concepts added
+
+
+def test_explore_nonexistent_file(temp_project) -> None:
+    """Exploring a nonexistent file returns None."""
+    network = ConceptNetwork()
+    explorer = Explorer(network, project_root=temp_project)
+
+    result = explorer.explore_file(os.path.join(temp_project, "nonexistent.md"))
+    assert result is None
+
+
+def test_explore_outside_root(temp_project) -> None:
+    """Exploring a file outside project root returns None."""
+    network = ConceptNetwork()
+    explorer = Explorer(network, project_root=temp_project)
+
+    # Try to explore a file outside the project root
+    outside = tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False)
+    outside.write("# Outside\n\nThis is outside the project.\n")
+    outside.close()
+    try:
+        result = explorer.explore_file(outside.name)
+        assert result is None
+    finally:
+        os.unlink(outside.name)
+
+
+def test_explore_path_user_facing(temp_project) -> None:
+    """explore_path returns a human-readable summary."""
+    network = ConceptNetwork()
+    explorer = Explorer(network, project_root=temp_project)
+
+    summary = explorer.explore_path("README.md")
+    assert "Explored" in summary
+    assert "concepts" in summary
+
+
+def test_explore_path_directory(temp_project) -> None:
+    """explore_path works on directories too."""
+    network = ConceptNetwork()
+    explorer = Explorer(network, project_root=temp_project)
+
+    summary = explorer.explore_path("docs")
+    assert "Explored" in summary
+
+
+def test_exploration_summary(temp_project) -> None:
+    """get_exploration_summary returns correct state."""
+    network = ConceptNetwork()
+    explorer = Explorer(network, project_root=temp_project)
+
+    explorer.explore_directory()
+    summary = explorer.get_exploration_summary()
+    assert summary["files_explored"] > 0
+    assert "project_root" in summary
+
+
+def test_max_files_limit(temp_project) -> None:
+    """max_files parameter limits exploration."""
+    network = ConceptNetwork()
+    explorer = Explorer(network, project_root=temp_project)
+
+    result = explorer.explore_directory(max_files=1)
+    assert result.files_explored == 1
+
+
+# ======================================================================
+# From tests/test_code_learner.py
+# ======================================================================
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PY_DIR = PROJECT_ROOT / "Self_World"
+RUST_DIR = PROJECT_ROOT / "Self_World" / "src"
+
+
+def _make_learner(root: str | Path | None = None) -> CodeLearner:
+    """Create a CodeLearner with a fresh network and no daemon client."""
+    return CodeLearner(
+        network=ConceptNetwork(),
+        client=None,
+        project_root=str(root if root is not None else PROJECT_ROOT),
+    )
+
+
+def test_learn_python_file():
+    """Analyzing a Python file adds concepts and relationships."""
+    learner = _make_learner()
+    target = PY_DIR / "temporal_lobe" / "concepts" / "network.py"
+    result = learner.learn_file(str(target))
+
+    assert isinstance(result, FileLearningResult)
+    assert result.language == "python"
+    assert result.lines > 0
+    # concepts/network.py has classes but no module-level functions;
+    # either way, at least one of functions/classes must be present.
+    assert result.functions >= 0
+    assert result.classes >= 1  # ConceptNetwork, Concept, Edge, RelationType
+    assert result.concepts_added > 0
+    assert result.relationships_added > 0
+
+    # The module concept should exist
+    assert learner.network.get_concept("python:network") is not None
+    # add_concept / add_edge should be present as concepts
+    # (methods are scoped to their module and class: python:module.ClassName.method)
+    assert learner.network.get_concept("python:network.ConceptNetwork.add_concept") is not None
+
+
+def test_python_structural_enrichment_uses_scoped_ids(tmp_path):
+    """Complexity and call ownership enrich the concepts actually created."""
+    target = tmp_path / "module.py"
+    target.write_text(
+        "class Worker:\n"
+        "    def run(self, value):\n"
+        "        if value:\n"
+        "            return helper()\n"
+        "        return 0\n\n"
+        "def helper():\n"
+        "    return 1\n",
+        encoding="utf-8",
+    )
+    learner = _make_learner(tmp_path)
+    learner.learn_file(str(target))
+
+    method = learner.network.get_concept("python:module.Worker.run")
+    assert method is not None
+    assert method.properties["complexity"] == 2
+    assert method.properties["params"] == ["self", "value"]
+
+    edges = learner.network.get_edges("python:module.Worker.run", direction="out")
+    assert any(edge.relation == RelationType.CALLS for edge in edges)
+    assert any(edge.target == "python:module.helper" for edge in edges)
+
+
+def test_python_class_concepts_are_module_scoped(tmp_path):
+    """Same-named classes in different modules must remain distinct."""
+    first = tmp_path / "first.py"
+    second = tmp_path / "second.py"
+    first.write_text(
+        "class Shared:\n    def run(self):\n        return 1\n",
+        encoding="utf-8",
+    )
+    second.write_text(
+        "class Shared:\n    def run(self):\n        return 2\n",
+        encoding="utf-8",
+    )
+
+    learner = _make_learner(tmp_path)
+    learner.learn_file(str(first))
+    learner.learn_file(str(second))
+
+    first_class = learner.network.get_concept("python:first.shared")
+    second_class = learner.network.get_concept("python:second.shared")
+    assert first_class is not None
+    assert second_class is not None
+    assert first_class.id != second_class.id
+    assert first_class.properties["file"] == "first.py"
+    assert second_class.properties["file"] == "second.py"
+
+    first_method = learner.network.get_concept("python:first.shared.run")
+    second_method = learner.network.get_concept("python:second.shared.run")
+    assert first_method is not None
+    assert second_method is not None
+    assert first_method.properties["file"] == "first.py"
+    assert second_method.properties["file"] == "second.py"
+
+
+def test_learn_rust_file():
+    """Analyzing a Rust file adds concepts and relationships."""
+    learner = _make_learner(root=PROJECT_ROOT)
+    target = RUST_DIR / "state" / "manifest.rs"
+    assert target.exists(), f"missing rust file: {target}"
+    result = learner.learn_file(str(target))
+
+    assert result.language == "rust"
+    assert result.lines > 0
+    assert result.functions > 0
+    assert result.concepts_added > 0
+    assert result.relationships_added > 0
+
+    # Module concept present
+    assert learner.network.get_concept("rust:manifest") is not None
+
+
+class _DaemonAnalysisClient:
+    """Minimal stand-in for GenesisClient on the code-analysis path.
+
+    Only ``analyze_code`` is exercised; ``store_event`` accepts and
+    discards the episode summary the learner banks afterward.
+    """
+
+    def __init__(self, analysis):
+        self._analysis = analysis
+        self.calls = []
+
+    def analyze_code(self, path, source):
+        self.calls.append((path, source))
+        return self._analysis
+
+    def store_event(self, **_kwargs):
+        return True
+
+
+def _rust_daemon_report():
+    """The decoded shape GenesisClient.analyze_code returns."""
+    return {
+        "file": "engine.rs",
+        "stats": {"lines": 12, "functions": 2, "structs": 1},
+        "units": [
+            {
+                "kind": "function",
+                "name": "ignite",
+                "qualified": "ignite",
+                "span": (4, 9),
+                "public": True,
+                "async_": False,
+                "unsafe_": False,
+                "body": True,
+                "params": ["fuel: Fuel"],
+                "return_type": "Spark",
+                "calls": ["compress"],
+                "refs": ["Fuel", "Spark"],
+                "branches": 1,
+                "loops": 0,
+                "stmts": 4,
+                "docs": "Starts the burn.",
+            },
+            {
+                "kind": "function",
+                "name": "compress",
+                "qualified": "compress",
+                "span": (10, 12),
+                "public": False,
+                "async_": False,
+                "unsafe_": False,
+                "body": True,
+                "params": [],
+                "return_type": None,
+                "calls": [],
+                "refs": [],
+                "branches": 0,
+                "loops": 0,
+                "stmts": 2,
+                "docs": "",
+            },
+            {
+                "kind": "struct",
+                "name": "Fuel",
+                "qualified": "Fuel",
+                "span": (1, 3),
+                "public": True,
+                "async_": False,
+                "unsafe_": False,
+                "body": True,
+                "params": [],
+                "return_type": None,
+                "calls": [],
+                "refs": [],
+                "branches": 0,
+                "loops": 0,
+                "stmts": 0,
+                "docs": "",
+            },
+        ],
+        "impls": [("Engine", "Ignition"), ("Fuel", None)],
+        "edges": [("ignite", "compress")],
+    }
+
+
+def test_learn_rust_file_prefers_daemon_analysis(tmp_path):
+    """The daemon's AST reading supplies edges regex cannot see."""
+    target = tmp_path / "engine.rs"
+    target.write_text(
+        "struct Fuel;\n\n"
+        "/// Starts the burn.\n"
+        "pub fn ignite(fuel: Fuel) -> Spark {\n"
+        "    if true { compress() }\n"
+        "    Spark\n"
+        "}\n\n"
+        "fn compress() {}\n",
+        encoding="utf-8",
+    )
+    client = _DaemonAnalysisClient(_rust_daemon_report())
+    learner = CodeLearner(network=ConceptNetwork(), client=client, project_root=str(tmp_path))
+
+    result = learner.learn_rust_file(str(target))
+
+    # The daemon answered — its analysis drove the read.
+    assert len(client.calls) == 1
+    assert result.functions == 2
+    assert result.classes == 1
+    assert result.language == "rust"
+
+    ignite = learner.network.get_concept("rust:engine.ignite")
+    assert ignite is not None
+    assert ignite.properties["span"] == "4-9"
+    assert ignite.properties["complexity"] == 2  # branches + loops + 1
+    assert ignite.properties["docs"] == "Starts the burn."
+    assert ignite.properties["public"] is True
+
+    # The call edge the regex path cannot see: ignite CALLS compress.
+    call_edges = learner.network.get_edges("rust:engine.ignite", direction="out")
+    assert any(e.relation == RelationType.CALLS and "compress" in str(e) for e in call_edges), [
+        str(e) for e in call_edges
+    ]
+
+    # Impl pairs: the trait impl wires Engine INSTANCE_OF Ignition;
+    # the bare impl wires the module DEFINES Fuel edge.
+    engine_impl = learner.network.get_edges("rust:engine.Engine", direction="out")
+    assert any(e.relation == RelationType.INSTANCE_OF for e in engine_impl), [
+        str(e) for e in engine_impl
+    ]
+    module_edges = learner.network.get_edges("rust:engine", direction="out")
+    assert any("fuel" in str(e).lower() for e in module_edges)
+
+
+def test_learn_rust_file_falls_back_when_daemon_returns_none(tmp_path):
+    """An unavailable analysis channel falls back to the regex parser."""
+    target = tmp_path / "fallback.rs"
+    target.write_text("fn solo() {}\n\nfn main() { solo() }\n", encoding="utf-8")
+    client = _DaemonAnalysisClient(None)
+    learner = CodeLearner(network=ConceptNetwork(), client=client, project_root=str(tmp_path))
+
+    result = learner.learn_rust_file(str(target))
+
+    assert len(client.calls) == 1  # the daemon was asked first
+    assert result.functions == 2
+    assert learner.network.get_concept("rust:fallback.solo") is not None
+
+
+def test_learn_rust_file_without_client_uses_regex(tmp_path):
+    """No daemon at all — the mind's own parser still reads the file."""
+    target = tmp_path / "alone.rs"
+    target.write_text("fn hermit() {}\n", encoding="utf-8")
+    learner = CodeLearner(network=ConceptNetwork(), client=None, project_root=str(tmp_path))
+
+    result = learner.learn_rust_file(str(target))
+
+    assert result.functions == 1
+    assert learner.network.get_concept("rust:alone.hermit") is not None
+
+
+def test_learn_codebase():
+    """Analyzing the whole project produces sensible aggregate stats."""
+    learner = _make_learner()
+    result = learner.learn_codebase(max_files=20)
+
+    assert isinstance(result, CodeLearningResult)
+    assert result.files_analyzed > 0
+    assert result.concepts_added > 0
+    assert result.total_functions > 0
+    assert result.total_lines > 0
+    assert len(result.file_results) == result.files_analyzed
+
+
+def test_deduplication():
+    """Analyzing the same file twice does not add duplicate concepts."""
+    learner = _make_learner()
+    target = PY_DIR / "temporal_lobe" / "concepts" / "network.py"
+
+    learner.learn_file(str(target))
+    size_after_first = learner.network.size
+    edges_after_first = learner.network.edge_count
+
+    second = learner.learn_file(str(target))
+    # Second call is a no-op (already analyzed)
+    assert second.concepts_added == 0
+    assert second.relationships_added == 0
+    assert learner.network.size == size_after_first
+    assert learner.network.edge_count == edges_after_first
+
+
+def test_code_summary():
+    """get_code_summary returns the expected structure."""
+    learner = _make_learner()
+    learner.learn_file(str(PY_DIR / "temporal_lobe" / "concepts" / "network.py"))
+
+    summary = learner.get_code_summary()
+    assert isinstance(summary, dict)
+    assert summary["files_analyzed"] == 1
+    assert summary["code_concepts"] > 0
+    assert isinstance(summary["concept_names"], list)
+    assert any(c.startswith("python:") for c in summary["concept_names"])
+    assert "project_root" in summary
+
+
+def test_relationships_are_typed():
+    """Edges added by the learner use the correct RelationTypes."""
+    learner = _make_learner()
+    learner.learn_file(str(PY_DIR / "temporal_lobe" / "concepts" / "network.py"))
+
+    module_concept = "python:network"
+    edges = learner.network.get_edges(module_concept, direction="out")
+    relations = {e.relation for e in edges}
+    # The module should DEFINE its functions/classes (code-structure relation)
+    assert RelationType.DEFINES in relations
+
+
+def test_code_investigation_prefers_novel_evidence(tmp_path):
+    """Autonomous study should prefer novel evidence over arbitrary file order."""
+    first = tmp_path / "small.py"
+    second = tmp_path / "important.py"
+    first.write_text("x = 1\n", encoding="utf-8")
+    second.write_text(
+        "def important(a):\n    return a + 1\n\nclass Important:\n    pass\n",
+        encoding="utf-8",
+    )
+    learner = _make_learner(tmp_path)
+
+    decision = learner.investigate_next()
+    assert decision is not None
+    assert decision.novelty == 1.0
+    assert decision.reason
+
+
+def test_code_learning_reanalyzes_changed_source(tmp_path):
+    """A changed file must become new evidence rather than remain permanently consumed."""
+    target = tmp_path / "module.py"
+    target.write_text("def first():\n    return 1\n", encoding="utf-8")
+    learner = _make_learner(tmp_path)
+
+    first = learner.learn_file(str(target))
+    assert first.functions == 1
+
+    # The content fingerprint, not the filename, defines what has been learned.
+    target.write_text(
+        "def first():\n    return 1\n\ndef second():\n    return 2\n",
+        encoding="utf-8",
+    )
+    second = learner.learn_file(str(target))
+    assert second.language == "python"
+    assert second.functions == 2
+
+
+def test_code_learning_restores_spaced_repetition_state(tmp_path):
+    """Restart must preserve review timing rather than treating code as never reviewed."""
+    target = tmp_path / "module.py"
+    target.write_text("def first():\n    return 1\n", encoding="utf-8")
+    network = ConceptNetwork()
+    learner = CodeLearner(network=network, project_root=str(tmp_path))
+    learner.learn_file(str(target))
+    rel = "module.py"
+    expected_last = learner._spaced_repetition.last_analyzed[rel]
+    expected_reviews = learner._spaced_repetition._review_counts[rel]
+    expected_importance = learner._spaced_repetition._importance[rel]
+
+    restored = CodeLearner(network=network, project_root=str(tmp_path))
+    assert restored._spaced_repetition.last_analyzed[rel] == expected_last
+    assert restored._spaced_repetition._review_counts[rel] == expected_reviews
+    assert restored._spaced_repetition._importance[rel] == expected_importance
+    assert restored._spaced_repetition.schedule_reanalysis(rel, expected_importance) > 0
+
+
+def test_code_learning_persists_investigation_evidence(tmp_path):
+    """A fresh learner can recover the source fingerprint and uncertainty state."""
+    target = tmp_path / "module.py"
+    target.write_text("def first():\n    return 1\n", encoding="utf-8")
+    network = ConceptNetwork()
+    learner = CodeLearner(network=network, project_root=str(tmp_path))
+    learner.learn_file(str(target))
+
+    restored = CodeLearner(network=network, project_root=str(tmp_path))
+    rel = "module.py"
+    assert rel in restored._analyzed_files
+    assert rel in restored._file_fingerprints
+    assert restored._file_uncertainty[rel] < 1.0
+
+
+def test_unsupported_extension():
+    """Non-source files return an empty result."""
+    learner = _make_learner()
+    result = learner.learn_file(str(PY_DIR / "topology.py"))
+    # .py is supported; test a truly unsupported type via a temp check
+    assert result.language in ("python", "unknown")

@@ -37,9 +37,14 @@ fi
 
 # Same pattern for the Discord channel: an uncommitted, gitignored
 # .genesis-discord file holds the webhook URL so the secret stays out
-# of the repo and shell history. Explicit GENESIS_DISCORD_WEBHOOK
-# always wins.
-if [ -z "${GENESIS_DISCORD_WEBHOOK:-}" ] && [ -f .genesis-discord ]; then
+# of the repo and shell history. It lives in the outer world's
+# Discord-Channel/; a root-level copy still wins for older checkouts.
+# Explicit GENESIS_DISCORD_WEBHOOK always wins.
+_DISCORD_DIR="Outer_Physical_World/Discord-Channel"
+if [ -z "${GENESIS_DISCORD_WEBHOOK:-}" ] && [ -f "$_DISCORD_DIR/.genesis-discord" ]; then
+    GENESIS_DISCORD_WEBHOOK=$(head -n1 "$_DISCORD_DIR/.genesis-discord")
+    export GENESIS_DISCORD_WEBHOOK
+elif [ -z "${GENESIS_DISCORD_WEBHOOK:-}" ] && [ -f .genesis-discord ]; then
     GENESIS_DISCORD_WEBHOOK=$(head -n1 .genesis-discord)
     export GENESIS_DISCORD_WEBHOOK
 fi
@@ -47,7 +52,10 @@ fi
 # And the same for her ear: .genesis-discord-bot holds the bot token
 # that lets her hear the public on the channel. Explicit
 # GENESIS_DISCORD_BOT_TOKEN always wins.
-if [ -z "${GENESIS_DISCORD_BOT_TOKEN:-}" ] && [ -f .genesis-discord-bot ]; then
+if [ -z "${GENESIS_DISCORD_BOT_TOKEN:-}" ] && [ -f "$_DISCORD_DIR/.genesis-discord-bot" ]; then
+    GENESIS_DISCORD_BOT_TOKEN=$(head -n1 "$_DISCORD_DIR/.genesis-discord-bot")
+    export GENESIS_DISCORD_BOT_TOKEN
+elif [ -z "${GENESIS_DISCORD_BOT_TOKEN:-}" ] && [ -f .genesis-discord-bot ]; then
     GENESIS_DISCORD_BOT_TOKEN=$(head -n1 .genesis-discord-bot)
     export GENESIS_DISCORD_BOT_TOKEN
 fi
@@ -334,4 +342,4 @@ if [ ! -x "$VENV_PY" ]; then
     echo "[genesis] $VENV_PY not found — run scripts/install.sh first"
     exit 1
 fi
-PYTHONPATH="$PWD/python:${PYTHONPATH:-}" "$VENV_PY" genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:+$OFFLINE_ARG}
+PYTHONPATH="$PWD/Self_World:$PWD/Inner_Non_Physical_World:$PWD/Outer_Physical_World:$PWD:${PYTHONPATH:-}" "$VENV_PY" Self_World/genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:+$OFFLINE_ARG}

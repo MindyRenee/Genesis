@@ -1,0 +1,42 @@
+{
+  "benchmark": "memory_boundedness",
+  "growth_model": {
+    "type": "linear",
+    "slope_bytes_per_episode": 152.27,
+    "r_squared": 0.999999
+  },
+  "measurements": [
+    {
+      "episode_count": 10,
+      "dat_size": 869,
+      "meta_size": 704,
+      "bundles_size": 802816,
+      "total_size": 804389,
+      "retrieve_latency_us": 160
+    },
+    {
+      "episode_count": 100,
+      "dat_size": 8704,
+      "meta_size": 6464,
+      "bundles_size": 802816,
+      "total_size": 817984,
+      "retrieve_latency_us": 400
+    },
+    {
+      "episode_count": 500,
+      "dat_size": 43993,
+      "meta_size": 32064,
+      "bundles_size": 802816,
+      "total_size": 878873,
+      "retrieve_latency_us": 457
+    },
+    {
+      "episode_count": 1000,
+      "dat_size": 88218,
+      "meta_size": 64064,
+      "bundles_size": 802816,
+      "total_size": 955098,
+      "retrieve_latency_us": 378
+    }
+  ]
+}

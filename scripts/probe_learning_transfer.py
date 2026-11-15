@@ -37,9 +37,9 @@ sys.path.insert(0, str(ROOT_DIR))
 from genesis_client import GenesisClient
 from frontal_lobe.generator import GenerativeLanguage
 from frontal_lobe.prefrontal import FrontalLobe as CognitionEngine
-from self import SelfModel
+from self.self_model import SelfModel
 from infrastructure.persistence import load_state, restore_network, save_state
-from infrastructure.user_profile import UserProfile
+from user_profile import UserProfile
 from temporal_lobe.concepts import ConceptNetwork
 from memory import MemorySystem
 

@@ -69,10 +69,10 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/.cache/pip
-          key: pip-${{ matrix.python-version }}-${{ hashFiles('python/requirements*.txt') }}
-      - run: pip install -r python/requirements-dev.txt
+          key: pip-${{ matrix.python-version }}-${{ hashFiles('requirements*.txt') }}
+      - run: pip install -r requirements-dev.txt
       - run: python3 -c "import nltk; nltk.download('wordnet', quiet=True); nltk.download('punkt_tab', quiet=True)"
       - run: ruff check
-      - run: python3 -m pyflakes python/ genesis_client/ infrastructure/ eval/ *.py scripts/*.py
-      - run: python3 -m mypy python/ genesis_client/ infrastructure/ eval/ --ignore-missing-imports
-      - run: PYTHONPATH=python:. python3 -m pytest python/tests/ -q -o addopts=''
+      - run: python3 -m pyflakes Self_World/ Inner_Non_Physical_World/ Outer_Physical_World/ scripts/*.py
+      - run: python3 -m mypy Self_World/ Inner_Non_Physical_World/ Outer_Physical_World/ --ignore-missing-imports
+      - run: PYTHONPATH=Self_World:Inner_Non_Physical_World:Outer_Physical_World:. python3 -m pytest tests/python/ -q -o addopts=''

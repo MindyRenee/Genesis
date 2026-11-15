@@ -1,0 +1,601 @@
+{
+  "benchmark": "learning_curves",
+  "complexity_levels": [
+    {
+      "name": "simple",
+      "num_perturbed": 1,
+      "initial_free_energy": 0.00000000,
+      "final_free_energy": 0.00000012,
+      "final_surprise": 0.00010471,
+      "final_precision": 0.987569,
+      "final_model_maturity": 0.001059
+    },
+    {
+      "name": "medium",
+      "num_perturbed": 6,
+      "initial_free_energy": 0.00000000,
+      "final_free_energy": 0.00000054,
+      "final_surprise": 0.00034235,
+      "final_precision": 0.908567,
+      "final_model_maturity": 0.000895
+    },
+    {
+      "name": "complex",
+      "num_perturbed": 18,
+      "initial_free_energy": 0.00000000,
+      "final_free_energy": 0.00000125,
+      "final_surprise": 0.00052502,
+      "final_precision": 0.795280,
+      "final_model_maturity": 0.000742
+    }
+  ],
+  "time_series": [
+    {
+      "tick": 0,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00000000,
+      "surprise": 0.00000000,
+      "precision": 0.500000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 50,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00000113,
+      "surprise": 0.00017693,
+      "precision": 0.599999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 100,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00000048,
+      "surprise": 0.00020493,
+      "precision": 0.699997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 150,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00000113,
+      "surprise": 0.00058493,
+      "precision": 0.799996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 200,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00247425,
+      "surprise": 0.00222032,
+      "precision": 0.899995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 250,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00001740,
+      "surprise": 0.00108867,
+      "precision": 0.979561,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 300,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.01410353,
+      "surprise": 0.00317529,
+      "precision": 0.977708,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 350,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00000012,
+      "surprise": 0.00005667,
+      "precision": 0.981206,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 400,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00000000,
+      "surprise": 0.00013430,
+      "precision": 0.980178,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 450,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00000030,
+      "surprise": 0.00050461,
+      "precision": 0.979554,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 500,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00291115,
+      "surprise": 0.00190191,
+      "precision": 0.979222,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 550,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00001270,
+      "surprise": 0.00089609,
+      "precision": 0.980140,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 600,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00956875,
+      "surprise": 0.00258646,
+      "precision": 0.980132,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 650,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00000012,
+      "surprise": 0.00004524,
+      "precision": 0.983631,
+      "model_maturity": 0.000001
+    },
+    {
+      "tick": 700,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00000024,
+      "surprise": 0.00011021,
+      "precision": 0.983689,
+      "model_maturity": 0.000004
+    },
+    {
+      "tick": 750,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00000000,
+      "surprise": 0.00041823,
+      "precision": 0.983783,
+      "model_maturity": 0.000013
+    },
+    {
+      "tick": 800,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00220650,
+      "surprise": 0.00159886,
+      "precision": 0.983893,
+      "model_maturity": 0.000038
+    },
+    {
+      "tick": 850,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00000846,
+      "surprise": 0.00074859,
+      "precision": 0.984783,
+      "model_maturity": 0.000100
+    },
+    {
+      "tick": 900,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00743127,
+      "surprise": 0.00222081,
+      "precision": 0.984890,
+      "model_maturity": 0.000239
+    },
+    {
+      "tick": 950,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00000030,
+      "surprise": 0.00003687,
+      "precision": 0.987573,
+      "model_maturity": 0.000528
+    },
+    {
+      "tick": 999,
+      "complexity": "simple",
+      "num_perturbed": 1,
+      "free_energy": 0.00000012,
+      "surprise": 0.00010471,
+      "precision": 0.987569,
+      "model_maturity": 0.001059
+    },
+    {
+      "tick": 0,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00000000,
+      "surprise": 0.00000000,
+      "precision": 0.500000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 50,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00000191,
+      "surprise": 0.00024412,
+      "precision": 0.599999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 100,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00000191,
+      "surprise": 0.00044973,
+      "precision": 0.699997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 150,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00000536,
+      "surprise": 0.00143413,
+      "precision": 0.799996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 200,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.01574445,
+      "surprise": 0.00558704,
+      "precision": 0.899677,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 250,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00008893,
+      "surprise": 0.00260394,
+      "precision": 0.892169,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 300,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.04908472,
+      "surprise": 0.00789287,
+      "precision": 0.901654,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 350,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00000083,
+      "surprise": 0.00018465,
+      "precision": 0.897295,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 400,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00000077,
+      "surprise": 0.00040204,
+      "precision": 0.889885,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 450,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00000399,
+      "surprise": 0.00135181,
+      "precision": 0.884173,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 500,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.01206076,
+      "surprise": 0.00510904,
+      "precision": 0.880890,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 550,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00006860,
+      "surprise": 0.00227012,
+      "precision": 0.882897,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 600,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.03722757,
+      "surprise": 0.00694924,
+      "precision": 0.895302,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 650,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00000036,
+      "surprise": 0.00013561,
+      "precision": 0.898179,
+      "model_maturity": 0.000001
+    },
+    {
+      "tick": 700,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00000066,
+      "surprise": 0.00032764,
+      "precision": 0.895936,
+      "model_maturity": 0.000003
+    },
+    {
+      "tick": 750,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00000149,
+      "surprise": 0.00118745,
+      "precision": 0.893894,
+      "model_maturity": 0.000011
+    },
+    {
+      "tick": 800,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.01090974,
+      "surprise": 0.00475981,
+      "precision": 0.892418,
+      "model_maturity": 0.000032
+    },
+    {
+      "tick": 850,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00006640,
+      "surprise": 0.00213596,
+      "precision": 0.896173,
+      "model_maturity": 0.000085
+    },
+    {
+      "tick": 900,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.03289479,
+      "surprise": 0.00634277,
+      "precision": 0.906857,
+      "model_maturity": 0.000204
+    },
+    {
+      "tick": 950,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00000030,
+      "surprise": 0.00013163,
+      "precision": 0.910654,
+      "model_maturity": 0.000448
+    },
+    {
+      "tick": 999,
+      "complexity": "medium",
+      "num_perturbed": 6,
+      "free_energy": 0.00000054,
+      "surprise": 0.00034235,
+      "precision": 0.908567,
+      "model_maturity": 0.000895
+    },
+    {
+      "tick": 0,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00000000,
+      "surprise": 0.00000000,
+      "precision": 0.500000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 50,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00000340,
+      "surprise": 0.00033273,
+      "precision": 0.599999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 100,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00000286,
+      "surprise": 0.00066105,
+      "precision": 0.699997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 150,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00000787,
+      "surprise": 0.00225383,
+      "precision": 0.799996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 200,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.02730006,
+      "surprise": 0.00952922,
+      "precision": 0.770025,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 250,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00027949,
+      "surprise": 0.00462293,
+      "precision": 0.743910,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 300,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.07865226,
+      "surprise": 0.01324369,
+      "precision": 0.768401,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 350,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00000262,
+      "surprise": 0.00033489,
+      "precision": 0.754869,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 400,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00000483,
+      "surprise": 0.00071248,
+      "precision": 0.740839,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 450,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00001287,
+      "surprise": 0.00223536,
+      "precision": 0.730567,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 500,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.01980627,
+      "surprise": 0.00861050,
+      "precision": 0.731601,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 550,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00020272,
+      "surprise": 0.00389089,
+      "precision": 0.733573,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 600,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.05421054,
+      "surprise": 0.01123496,
+      "precision": 0.762246,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 650,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00000381,
+      "surprise": 0.00035170,
+      "precision": 0.765160,
+      "model_maturity": 0.000001
+    },
+    {
+      "tick": 700,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00000387,
+      "surprise": 0.00060762,
+      "precision": 0.762630,
+      "model_maturity": 0.000003
+    },
+    {
+      "tick": 750,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00000536,
+      "surprise": 0.00189872,
+      "precision": 0.760319,
+      "model_maturity": 0.000009
+    },
+    {
+      "tick": 800,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.01778549,
+      "surprise": 0.00775610,
+      "precision": 0.763902,
+      "model_maturity": 0.000026
+    },
+    {
+      "tick": 850,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00014722,
+      "surprise": 0.00338907,
+      "precision": 0.767766,
+      "model_maturity": 0.000070
+    },
+    {
+      "tick": 900,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.04655284,
+      "surprise": 0.00990355,
+      "precision": 0.793078,
+      "model_maturity": 0.000169
+    },
+    {
+      "tick": 950,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00000119,
+      "surprise": 0.00022164,
+      "precision": 0.797385,
+      "model_maturity": 0.000372
+    },
+    {
+      "tick": 999,
+      "complexity": "complex",
+      "num_perturbed": 18,
+      "free_energy": 0.00000125,
+      "surprise": 0.00052502,
+      "precision": 0.795280,
+      "model_maturity": 0.000742
+    }
+  ]
+}

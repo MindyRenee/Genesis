@@ -1,0 +1,5039 @@
+{
+  "benchmark": "free_energy_minimization",
+  "methodology": "Isomura & Friston (2023) - free energy minimization vs null model",
+  "null_model": "no-change predictor (identity transition, fixed precision=0.5, no learning)",
+  "phases": [
+    {
+      "name": "baseline",
+      "genesis_fe_mean": 0.000001,
+      "genesis_fe_final": 0.000000,
+      "null_fe_mean": 0.150181,
+      "null_fe_final": 0.150112,
+      "genesis_beats_null_mean": true,
+      "genesis_beats_null_final": true,
+      "reduction_pct": 100.00
+    },
+    {
+      "name": "perturbation",
+      "genesis_fe_mean": 0.001735,
+      "genesis_fe_final": 0.000156,
+      "null_fe_mean": 0.154361,
+      "null_fe_final": 0.153059,
+      "genesis_beats_null_mean": true,
+      "genesis_beats_null_final": true,
+      "reduction_pct": 98.88
+    },
+    {
+      "name": "recovery",
+      "genesis_fe_mean": 0.000005,
+      "genesis_fe_final": 0.000000,
+      "null_fe_mean": 0.150411,
+      "null_fe_final": 0.150132,
+      "genesis_beats_null_mean": true,
+      "genesis_beats_null_final": true,
+      "reduction_pct": 100.00
+    }
+  ],
+  "time_series": [
+    {
+      "tick": 0,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150039,
+      "genesis_surprise": 0.000000,
+      "null_surprise": 0.000039,
+      "precision": 0.500000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 1,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150072,
+      "genesis_surprise": 0.000039,
+      "null_surprise": 0.000072,
+      "precision": 0.502000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 2,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150100,
+      "genesis_surprise": 0.000071,
+      "null_surprise": 0.000100,
+      "precision": 0.504000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 3,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150124,
+      "genesis_surprise": 0.000099,
+      "null_surprise": 0.000124,
+      "precision": 0.506000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 4,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150144,
+      "genesis_surprise": 0.000121,
+      "null_surprise": 0.000144,
+      "precision": 0.508000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 5,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150161,
+      "genesis_surprise": 0.000140,
+      "null_surprise": 0.000161,
+      "precision": 0.510000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 6,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150175,
+      "genesis_surprise": 0.000156,
+      "null_surprise": 0.000175,
+      "precision": 0.512000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 7,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000003,
+      "null_free_energy": 0.150187,
+      "genesis_surprise": 0.000168,
+      "null_surprise": 0.000187,
+      "precision": 0.514000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 8,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000003,
+      "null_free_energy": 0.150197,
+      "genesis_surprise": 0.000179,
+      "null_surprise": 0.000197,
+      "precision": 0.516000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 9,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000003,
+      "null_free_energy": 0.150206,
+      "genesis_surprise": 0.000187,
+      "null_surprise": 0.000206,
+      "precision": 0.518000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 10,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000003,
+      "null_free_energy": 0.150213,
+      "genesis_surprise": 0.000194,
+      "null_surprise": 0.000213,
+      "precision": 0.520000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 11,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000003,
+      "null_free_energy": 0.150219,
+      "genesis_surprise": 0.000199,
+      "null_surprise": 0.000219,
+      "precision": 0.522000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 12,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000003,
+      "null_free_energy": 0.150224,
+      "genesis_surprise": 0.000203,
+      "null_surprise": 0.000224,
+      "precision": 0.524000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 13,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000003,
+      "null_free_energy": 0.150228,
+      "genesis_surprise": 0.000206,
+      "null_surprise": 0.000228,
+      "precision": 0.526000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 14,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000003,
+      "null_free_energy": 0.150232,
+      "genesis_surprise": 0.000208,
+      "null_surprise": 0.000232,
+      "precision": 0.528000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 15,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000003,
+      "null_free_energy": 0.150235,
+      "genesis_surprise": 0.000210,
+      "null_surprise": 0.000235,
+      "precision": 0.530000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 16,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000003,
+      "null_free_energy": 0.150237,
+      "genesis_surprise": 0.000210,
+      "null_surprise": 0.000237,
+      "precision": 0.532000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 17,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150239,
+      "genesis_surprise": 0.000211,
+      "null_surprise": 0.000239,
+      "precision": 0.534000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 18,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150240,
+      "genesis_surprise": 0.000210,
+      "null_surprise": 0.000240,
+      "precision": 0.536000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 19,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150241,
+      "genesis_surprise": 0.000210,
+      "null_surprise": 0.000241,
+      "precision": 0.538000,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 20,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150242,
+      "genesis_surprise": 0.000209,
+      "null_surprise": 0.000242,
+      "precision": 0.539999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 21,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150242,
+      "genesis_surprise": 0.000208,
+      "null_surprise": 0.000242,
+      "precision": 0.541999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 22,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150243,
+      "genesis_surprise": 0.000206,
+      "null_surprise": 0.000243,
+      "precision": 0.543999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 23,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150243,
+      "genesis_surprise": 0.000205,
+      "null_surprise": 0.000243,
+      "precision": 0.545999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 24,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150243,
+      "genesis_surprise": 0.000203,
+      "null_surprise": 0.000243,
+      "precision": 0.547999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 25,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150243,
+      "genesis_surprise": 0.000201,
+      "null_surprise": 0.000243,
+      "precision": 0.549999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 26,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150243,
+      "genesis_surprise": 0.000200,
+      "null_surprise": 0.000243,
+      "precision": 0.551999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 27,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150243,
+      "genesis_surprise": 0.000198,
+      "null_surprise": 0.000243,
+      "precision": 0.553999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 28,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150242,
+      "genesis_surprise": 0.000196,
+      "null_surprise": 0.000242,
+      "precision": 0.555999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 29,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150242,
+      "genesis_surprise": 0.000194,
+      "null_surprise": 0.000242,
+      "precision": 0.557999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 30,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150241,
+      "genesis_surprise": 0.000191,
+      "null_surprise": 0.000241,
+      "precision": 0.559999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 31,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150241,
+      "genesis_surprise": 0.000189,
+      "null_surprise": 0.000241,
+      "precision": 0.561999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 32,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150240,
+      "genesis_surprise": 0.000187,
+      "null_surprise": 0.000240,
+      "precision": 0.563999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 33,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150240,
+      "genesis_surprise": 0.000185,
+      "null_surprise": 0.000240,
+      "precision": 0.565999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 34,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150239,
+      "genesis_surprise": 0.000183,
+      "null_surprise": 0.000239,
+      "precision": 0.567999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 35,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150238,
+      "genesis_surprise": 0.000181,
+      "null_surprise": 0.000238,
+      "precision": 0.569999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 36,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150238,
+      "genesis_surprise": 0.000179,
+      "null_surprise": 0.000238,
+      "precision": 0.571999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 37,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150237,
+      "genesis_surprise": 0.000177,
+      "null_surprise": 0.000237,
+      "precision": 0.573999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 38,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150236,
+      "genesis_surprise": 0.000175,
+      "null_surprise": 0.000236,
+      "precision": 0.575999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 39,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150235,
+      "genesis_surprise": 0.000173,
+      "null_surprise": 0.000235,
+      "precision": 0.577999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 40,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150235,
+      "genesis_surprise": 0.000171,
+      "null_surprise": 0.000235,
+      "precision": 0.579999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 41,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150234,
+      "genesis_surprise": 0.000169,
+      "null_surprise": 0.000234,
+      "precision": 0.581999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 42,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150233,
+      "genesis_surprise": 0.000167,
+      "null_surprise": 0.000233,
+      "precision": 0.583999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 43,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150232,
+      "genesis_surprise": 0.000165,
+      "null_surprise": 0.000232,
+      "precision": 0.585999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 44,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150232,
+      "genesis_surprise": 0.000163,
+      "null_surprise": 0.000232,
+      "precision": 0.587999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 45,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150231,
+      "genesis_surprise": 0.000161,
+      "null_surprise": 0.000231,
+      "precision": 0.589999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 46,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150230,
+      "genesis_surprise": 0.000159,
+      "null_surprise": 0.000230,
+      "precision": 0.591999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 47,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150229,
+      "genesis_surprise": 0.000157,
+      "null_surprise": 0.000229,
+      "precision": 0.593999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 48,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150228,
+      "genesis_surprise": 0.000155,
+      "null_surprise": 0.000228,
+      "precision": 0.595999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 49,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150228,
+      "genesis_surprise": 0.000153,
+      "null_surprise": 0.000228,
+      "precision": 0.597999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 50,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150227,
+      "genesis_surprise": 0.000152,
+      "null_surprise": 0.000227,
+      "precision": 0.599999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 51,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150226,
+      "genesis_surprise": 0.000150,
+      "null_surprise": 0.000226,
+      "precision": 0.601999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 52,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150225,
+      "genesis_surprise": 0.000148,
+      "null_surprise": 0.000225,
+      "precision": 0.603999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 53,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150224,
+      "genesis_surprise": 0.000146,
+      "null_surprise": 0.000224,
+      "precision": 0.605999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 54,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150224,
+      "genesis_surprise": 0.000145,
+      "null_surprise": 0.000224,
+      "precision": 0.607999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 55,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150223,
+      "genesis_surprise": 0.000143,
+      "null_surprise": 0.000223,
+      "precision": 0.609999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 56,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150222,
+      "genesis_surprise": 0.000141,
+      "null_surprise": 0.000222,
+      "precision": 0.611999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 57,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150221,
+      "genesis_surprise": 0.000140,
+      "null_surprise": 0.000221,
+      "precision": 0.613999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 58,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150220,
+      "genesis_surprise": 0.000138,
+      "null_surprise": 0.000220,
+      "precision": 0.615999,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 59,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150220,
+      "genesis_surprise": 0.000137,
+      "null_surprise": 0.000219,
+      "precision": 0.617998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 60,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150219,
+      "genesis_surprise": 0.000135,
+      "null_surprise": 0.000219,
+      "precision": 0.619998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 61,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150218,
+      "genesis_surprise": 0.000134,
+      "null_surprise": 0.000218,
+      "precision": 0.621998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 62,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150217,
+      "genesis_surprise": 0.000132,
+      "null_surprise": 0.000217,
+      "precision": 0.623998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 63,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150216,
+      "genesis_surprise": 0.000131,
+      "null_surprise": 0.000216,
+      "precision": 0.625998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 64,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150215,
+      "genesis_surprise": 0.000130,
+      "null_surprise": 0.000215,
+      "precision": 0.627998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 65,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150215,
+      "genesis_surprise": 0.000128,
+      "null_surprise": 0.000215,
+      "precision": 0.629998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 66,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150214,
+      "genesis_surprise": 0.000127,
+      "null_surprise": 0.000214,
+      "precision": 0.631998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 67,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150213,
+      "genesis_surprise": 0.000125,
+      "null_surprise": 0.000213,
+      "precision": 0.633998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 68,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150212,
+      "genesis_surprise": 0.000124,
+      "null_surprise": 0.000212,
+      "precision": 0.635998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 69,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150211,
+      "genesis_surprise": 0.000123,
+      "null_surprise": 0.000211,
+      "precision": 0.637998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 70,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150211,
+      "genesis_surprise": 0.000122,
+      "null_surprise": 0.000211,
+      "precision": 0.639998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 71,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150210,
+      "genesis_surprise": 0.000120,
+      "null_surprise": 0.000210,
+      "precision": 0.641998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 72,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150209,
+      "genesis_surprise": 0.000119,
+      "null_surprise": 0.000209,
+      "precision": 0.643998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 73,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150208,
+      "genesis_surprise": 0.000118,
+      "null_surprise": 0.000208,
+      "precision": 0.645998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 74,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150207,
+      "genesis_surprise": 0.000117,
+      "null_surprise": 0.000207,
+      "precision": 0.647998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 75,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150207,
+      "genesis_surprise": 0.000115,
+      "null_surprise": 0.000207,
+      "precision": 0.649998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 76,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150206,
+      "genesis_surprise": 0.000114,
+      "null_surprise": 0.000206,
+      "precision": 0.651998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 77,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150205,
+      "genesis_surprise": 0.000113,
+      "null_surprise": 0.000205,
+      "precision": 0.653998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 78,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150204,
+      "genesis_surprise": 0.000112,
+      "null_surprise": 0.000204,
+      "precision": 0.655998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 79,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150203,
+      "genesis_surprise": 0.000111,
+      "null_surprise": 0.000203,
+      "precision": 0.657998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 80,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150203,
+      "genesis_surprise": 0.000110,
+      "null_surprise": 0.000203,
+      "precision": 0.659998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 81,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150202,
+      "genesis_surprise": 0.000109,
+      "null_surprise": 0.000202,
+      "precision": 0.661998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 82,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150201,
+      "genesis_surprise": 0.000108,
+      "null_surprise": 0.000201,
+      "precision": 0.663998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 83,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150200,
+      "genesis_surprise": 0.000107,
+      "null_surprise": 0.000200,
+      "precision": 0.665998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 84,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150199,
+      "genesis_surprise": 0.000106,
+      "null_surprise": 0.000199,
+      "precision": 0.667998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 85,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150199,
+      "genesis_surprise": 0.000105,
+      "null_surprise": 0.000199,
+      "precision": 0.669998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 86,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150198,
+      "genesis_surprise": 0.000104,
+      "null_surprise": 0.000198,
+      "precision": 0.671998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 87,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150197,
+      "genesis_surprise": 0.000103,
+      "null_surprise": 0.000197,
+      "precision": 0.673998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 88,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150196,
+      "genesis_surprise": 0.000102,
+      "null_surprise": 0.000196,
+      "precision": 0.675998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 89,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150195,
+      "genesis_surprise": 0.000101,
+      "null_surprise": 0.000195,
+      "precision": 0.677998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 90,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150195,
+      "genesis_surprise": 0.000100,
+      "null_surprise": 0.000195,
+      "precision": 0.679998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 91,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150194,
+      "genesis_surprise": 0.000099,
+      "null_surprise": 0.000194,
+      "precision": 0.681998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 92,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150193,
+      "genesis_surprise": 0.000098,
+      "null_surprise": 0.000193,
+      "precision": 0.683998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 93,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150192,
+      "genesis_surprise": 0.000098,
+      "null_surprise": 0.000192,
+      "precision": 0.685998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 94,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150192,
+      "genesis_surprise": 0.000097,
+      "null_surprise": 0.000192,
+      "precision": 0.687998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 95,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150191,
+      "genesis_surprise": 0.000096,
+      "null_surprise": 0.000191,
+      "precision": 0.689998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 96,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150190,
+      "genesis_surprise": 0.000095,
+      "null_surprise": 0.000190,
+      "precision": 0.691998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 97,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150189,
+      "genesis_surprise": 0.000094,
+      "null_surprise": 0.000189,
+      "precision": 0.693998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 98,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150188,
+      "genesis_surprise": 0.000093,
+      "null_surprise": 0.000188,
+      "precision": 0.695997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 99,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150188,
+      "genesis_surprise": 0.000093,
+      "null_surprise": 0.000188,
+      "precision": 0.697997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 100,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150187,
+      "genesis_surprise": 0.000092,
+      "null_surprise": 0.000187,
+      "precision": 0.699997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 101,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150186,
+      "genesis_surprise": 0.000091,
+      "null_surprise": 0.000186,
+      "precision": 0.701997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 102,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150185,
+      "genesis_surprise": 0.000090,
+      "null_surprise": 0.000185,
+      "precision": 0.703997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 103,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150185,
+      "genesis_surprise": 0.000090,
+      "null_surprise": 0.000185,
+      "precision": 0.705997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 104,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150184,
+      "genesis_surprise": 0.000089,
+      "null_surprise": 0.000184,
+      "precision": 0.707997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 105,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150183,
+      "genesis_surprise": 0.000088,
+      "null_surprise": 0.000183,
+      "precision": 0.709997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 106,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150182,
+      "genesis_surprise": 0.000087,
+      "null_surprise": 0.000182,
+      "precision": 0.711997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 107,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150181,
+      "genesis_surprise": 0.000087,
+      "null_surprise": 0.000181,
+      "precision": 0.713997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 108,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150181,
+      "genesis_surprise": 0.000086,
+      "null_surprise": 0.000181,
+      "precision": 0.715997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 109,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150180,
+      "genesis_surprise": 0.000085,
+      "null_surprise": 0.000180,
+      "precision": 0.717997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 110,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150179,
+      "genesis_surprise": 0.000085,
+      "null_surprise": 0.000179,
+      "precision": 0.719997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 111,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150178,
+      "genesis_surprise": 0.000084,
+      "null_surprise": 0.000178,
+      "precision": 0.721997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 112,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150178,
+      "genesis_surprise": 0.000083,
+      "null_surprise": 0.000178,
+      "precision": 0.723997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 113,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150177,
+      "genesis_surprise": 0.000083,
+      "null_surprise": 0.000177,
+      "precision": 0.725997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 114,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150176,
+      "genesis_surprise": 0.000082,
+      "null_surprise": 0.000176,
+      "precision": 0.727997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 115,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150175,
+      "genesis_surprise": 0.000082,
+      "null_surprise": 0.000175,
+      "precision": 0.729997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 116,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150175,
+      "genesis_surprise": 0.000081,
+      "null_surprise": 0.000175,
+      "precision": 0.731997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 117,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150174,
+      "genesis_surprise": 0.000080,
+      "null_surprise": 0.000174,
+      "precision": 0.733997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 118,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150173,
+      "genesis_surprise": 0.000080,
+      "null_surprise": 0.000173,
+      "precision": 0.735997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 119,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150172,
+      "genesis_surprise": 0.000079,
+      "null_surprise": 0.000172,
+      "precision": 0.737997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 120,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150172,
+      "genesis_surprise": 0.000079,
+      "null_surprise": 0.000172,
+      "precision": 0.739997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 121,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150171,
+      "genesis_surprise": 0.000078,
+      "null_surprise": 0.000171,
+      "precision": 0.741997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 122,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150170,
+      "genesis_surprise": 0.000077,
+      "null_surprise": 0.000170,
+      "precision": 0.743997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 123,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150169,
+      "genesis_surprise": 0.000077,
+      "null_surprise": 0.000169,
+      "precision": 0.745997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 124,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150169,
+      "genesis_surprise": 0.000076,
+      "null_surprise": 0.000169,
+      "precision": 0.747997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 125,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150168,
+      "genesis_surprise": 0.000076,
+      "null_surprise": 0.000168,
+      "precision": 0.749997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 126,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150167,
+      "genesis_surprise": 0.000075,
+      "null_surprise": 0.000167,
+      "precision": 0.751997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 127,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150166,
+      "genesis_surprise": 0.000075,
+      "null_surprise": 0.000166,
+      "precision": 0.753997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 128,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150166,
+      "genesis_surprise": 0.000074,
+      "null_surprise": 0.000166,
+      "precision": 0.755997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 129,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150165,
+      "genesis_surprise": 0.000074,
+      "null_surprise": 0.000165,
+      "precision": 0.757997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 130,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150164,
+      "genesis_surprise": 0.000073,
+      "null_surprise": 0.000164,
+      "precision": 0.759997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 131,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150163,
+      "genesis_surprise": 0.000073,
+      "null_surprise": 0.000163,
+      "precision": 0.761997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 132,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150163,
+      "genesis_surprise": 0.000072,
+      "null_surprise": 0.000163,
+      "precision": 0.763997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 133,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150162,
+      "genesis_surprise": 0.000072,
+      "null_surprise": 0.000162,
+      "precision": 0.765997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 134,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150161,
+      "genesis_surprise": 0.000071,
+      "null_surprise": 0.000161,
+      "precision": 0.767997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 135,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150160,
+      "genesis_surprise": 0.000071,
+      "null_surprise": 0.000160,
+      "precision": 0.769997,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 136,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150160,
+      "genesis_surprise": 0.000070,
+      "null_surprise": 0.000160,
+      "precision": 0.771996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 137,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150159,
+      "genesis_surprise": 0.000070,
+      "null_surprise": 0.000159,
+      "precision": 0.773996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 138,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150158,
+      "genesis_surprise": 0.000069,
+      "null_surprise": 0.000158,
+      "precision": 0.775996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 139,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150158,
+      "genesis_surprise": 0.000069,
+      "null_surprise": 0.000158,
+      "precision": 0.777996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 140,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150157,
+      "genesis_surprise": 0.000068,
+      "null_surprise": 0.000157,
+      "precision": 0.779996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 141,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150156,
+      "genesis_surprise": 0.000068,
+      "null_surprise": 0.000156,
+      "precision": 0.781996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 142,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150155,
+      "genesis_surprise": 0.000068,
+      "null_surprise": 0.000155,
+      "precision": 0.783996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 143,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150155,
+      "genesis_surprise": 0.000067,
+      "null_surprise": 0.000155,
+      "precision": 0.785996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 144,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150154,
+      "genesis_surprise": 0.000067,
+      "null_surprise": 0.000154,
+      "precision": 0.787996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 145,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150153,
+      "genesis_surprise": 0.000066,
+      "null_surprise": 0.000153,
+      "precision": 0.789996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 146,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150153,
+      "genesis_surprise": 0.000066,
+      "null_surprise": 0.000153,
+      "precision": 0.791996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 147,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150152,
+      "genesis_surprise": 0.000065,
+      "null_surprise": 0.000152,
+      "precision": 0.793996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 148,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150151,
+      "genesis_surprise": 0.000065,
+      "null_surprise": 0.000151,
+      "precision": 0.795996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 149,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150150,
+      "genesis_surprise": 0.000065,
+      "null_surprise": 0.000150,
+      "precision": 0.797996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 150,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150150,
+      "genesis_surprise": 0.000064,
+      "null_surprise": 0.000150,
+      "precision": 0.799996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 151,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150149,
+      "genesis_surprise": 0.000064,
+      "null_surprise": 0.000149,
+      "precision": 0.801996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 152,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150148,
+      "genesis_surprise": 0.000063,
+      "null_surprise": 0.000148,
+      "precision": 0.803996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 153,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150148,
+      "genesis_surprise": 0.000063,
+      "null_surprise": 0.000148,
+      "precision": 0.805996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 154,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150147,
+      "genesis_surprise": 0.000063,
+      "null_surprise": 0.000147,
+      "precision": 0.807996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 155,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150146,
+      "genesis_surprise": 0.000062,
+      "null_surprise": 0.000146,
+      "precision": 0.809996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 156,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150146,
+      "genesis_surprise": 0.000062,
+      "null_surprise": 0.000146,
+      "precision": 0.811996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 157,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150145,
+      "genesis_surprise": 0.000062,
+      "null_surprise": 0.000145,
+      "precision": 0.813996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 158,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150144,
+      "genesis_surprise": 0.000061,
+      "null_surprise": 0.000144,
+      "precision": 0.815996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 159,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150143,
+      "genesis_surprise": 0.000061,
+      "null_surprise": 0.000143,
+      "precision": 0.817996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 160,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150143,
+      "genesis_surprise": 0.000060,
+      "null_surprise": 0.000143,
+      "precision": 0.819996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 161,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150142,
+      "genesis_surprise": 0.000060,
+      "null_surprise": 0.000142,
+      "precision": 0.821996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 162,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150141,
+      "genesis_surprise": 0.000060,
+      "null_surprise": 0.000141,
+      "precision": 0.823996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 163,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150141,
+      "genesis_surprise": 0.000059,
+      "null_surprise": 0.000141,
+      "precision": 0.825996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 164,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150140,
+      "genesis_surprise": 0.000059,
+      "null_surprise": 0.000140,
+      "precision": 0.827996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 165,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150139,
+      "genesis_surprise": 0.000059,
+      "null_surprise": 0.000139,
+      "precision": 0.829996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 166,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150139,
+      "genesis_surprise": 0.000058,
+      "null_surprise": 0.000139,
+      "precision": 0.831996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 167,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150138,
+      "genesis_surprise": 0.000058,
+      "null_surprise": 0.000138,
+      "precision": 0.833996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 168,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150137,
+      "genesis_surprise": 0.000058,
+      "null_surprise": 0.000137,
+      "precision": 0.835996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 169,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150137,
+      "genesis_surprise": 0.000057,
+      "null_surprise": 0.000137,
+      "precision": 0.837996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 170,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150136,
+      "genesis_surprise": 0.000057,
+      "null_surprise": 0.000136,
+      "precision": 0.839996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 171,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150135,
+      "genesis_surprise": 0.000057,
+      "null_surprise": 0.000135,
+      "precision": 0.841996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 172,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150135,
+      "genesis_surprise": 0.000056,
+      "null_surprise": 0.000135,
+      "precision": 0.843996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 173,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150134,
+      "genesis_surprise": 0.000056,
+      "null_surprise": 0.000134,
+      "precision": 0.845996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 174,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150133,
+      "genesis_surprise": 0.000056,
+      "null_surprise": 0.000133,
+      "precision": 0.847996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 175,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150132,
+      "genesis_surprise": 0.000055,
+      "null_surprise": 0.000132,
+      "precision": 0.849995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 176,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150132,
+      "genesis_surprise": 0.000055,
+      "null_surprise": 0.000132,
+      "precision": 0.851995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 177,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150131,
+      "genesis_surprise": 0.000054,
+      "null_surprise": 0.000131,
+      "precision": 0.853995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 178,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150130,
+      "genesis_surprise": 0.000054,
+      "null_surprise": 0.000130,
+      "precision": 0.855995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 179,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150130,
+      "genesis_surprise": 0.000054,
+      "null_surprise": 0.000130,
+      "precision": 0.857995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 180,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150129,
+      "genesis_surprise": 0.000053,
+      "null_surprise": 0.000129,
+      "precision": 0.859995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 181,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150128,
+      "genesis_surprise": 0.000053,
+      "null_surprise": 0.000128,
+      "precision": 0.861995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 182,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150127,
+      "genesis_surprise": 0.000052,
+      "null_surprise": 0.000127,
+      "precision": 0.863995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 183,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150126,
+      "genesis_surprise": 0.000052,
+      "null_surprise": 0.000126,
+      "precision": 0.865995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 184,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150126,
+      "genesis_surprise": 0.000051,
+      "null_surprise": 0.000126,
+      "precision": 0.867995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 185,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150125,
+      "genesis_surprise": 0.000051,
+      "null_surprise": 0.000125,
+      "precision": 0.869995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 186,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150124,
+      "genesis_surprise": 0.000051,
+      "null_surprise": 0.000124,
+      "precision": 0.871995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 187,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150123,
+      "genesis_surprise": 0.000050,
+      "null_surprise": 0.000123,
+      "precision": 0.873995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 188,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150122,
+      "genesis_surprise": 0.000050,
+      "null_surprise": 0.000122,
+      "precision": 0.875995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 189,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150121,
+      "genesis_surprise": 0.000049,
+      "null_surprise": 0.000121,
+      "precision": 0.877995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 190,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150121,
+      "genesis_surprise": 0.000049,
+      "null_surprise": 0.000121,
+      "precision": 0.879995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 191,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150120,
+      "genesis_surprise": 0.000048,
+      "null_surprise": 0.000120,
+      "precision": 0.881995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 192,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150119,
+      "genesis_surprise": 0.000048,
+      "null_surprise": 0.000119,
+      "precision": 0.883995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 193,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150118,
+      "genesis_surprise": 0.000047,
+      "null_surprise": 0.000118,
+      "precision": 0.885995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 194,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150117,
+      "genesis_surprise": 0.000047,
+      "null_surprise": 0.000117,
+      "precision": 0.887995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 195,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150116,
+      "genesis_surprise": 0.000046,
+      "null_surprise": 0.000116,
+      "precision": 0.889995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 196,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150115,
+      "genesis_surprise": 0.000046,
+      "null_surprise": 0.000115,
+      "precision": 0.891995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 197,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150114,
+      "genesis_surprise": 0.000045,
+      "null_surprise": 0.000114,
+      "precision": 0.893995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 198,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150113,
+      "genesis_surprise": 0.000044,
+      "null_surprise": 0.000113,
+      "precision": 0.895995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 199,
+      "phase": "baseline",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150112,
+      "genesis_surprise": 0.000044,
+      "null_surprise": 0.000112,
+      "precision": 0.897995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 200,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.021870,
+      "null_free_energy": 0.155334,
+      "genesis_surprise": 0.005276,
+      "null_surprise": 0.005334,
+      "precision": 0.899995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 201,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.002954,
+      "null_free_energy": 0.154599,
+      "genesis_surprise": 0.004649,
+      "null_surprise": 0.004599,
+      "precision": 0.901995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 202,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000286,
+      "null_free_energy": 0.153974,
+      "genesis_surprise": 0.004110,
+      "null_surprise": 0.003974,
+      "precision": 0.903995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 203,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000005,
+      "null_free_energy": 0.153442,
+      "genesis_surprise": 0.003645,
+      "null_surprise": 0.003442,
+      "precision": 0.905995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 204,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000012,
+      "null_free_energy": 0.152988,
+      "genesis_surprise": 0.003244,
+      "null_surprise": 0.002988,
+      "precision": 0.907995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 205,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000029,
+      "null_free_energy": 0.152601,
+      "genesis_surprise": 0.002898,
+      "null_surprise": 0.002601,
+      "precision": 0.909995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 206,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000036,
+      "null_free_energy": 0.152271,
+      "genesis_surprise": 0.002598,
+      "null_surprise": 0.002271,
+      "precision": 0.911995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 207,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000037,
+      "null_free_energy": 0.151990,
+      "genesis_surprise": 0.002338,
+      "null_surprise": 0.001990,
+      "precision": 0.913995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 208,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000036,
+      "null_free_energy": 0.151750,
+      "genesis_surprise": 0.002111,
+      "null_surprise": 0.001750,
+      "precision": 0.915995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 209,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000033,
+      "null_free_energy": 0.151545,
+      "genesis_surprise": 0.001914,
+      "null_surprise": 0.001545,
+      "precision": 0.917995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 210,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.019736,
+      "null_free_energy": 0.156154,
+      "genesis_surprise": 0.006405,
+      "null_surprise": 0.006154,
+      "precision": 0.919995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 211,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.001611,
+      "null_free_energy": 0.155442,
+      "genesis_surprise": 0.005814,
+      "null_surprise": 0.005442,
+      "precision": 0.921995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 212,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000015,
+      "null_free_energy": 0.154829,
+      "genesis_surprise": 0.005294,
+      "null_surprise": 0.004829,
+      "precision": 0.923995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 213,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000079,
+      "null_free_energy": 0.154299,
+      "genesis_surprise": 0.004834,
+      "null_surprise": 0.004299,
+      "precision": 0.925995,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 214,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000164,
+      "null_free_energy": 0.153842,
+      "genesis_surprise": 0.004425,
+      "null_surprise": 0.003842,
+      "precision": 0.927994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 215,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000188,
+      "null_free_energy": 0.153446,
+      "genesis_surprise": 0.004060,
+      "null_surprise": 0.003446,
+      "precision": 0.929994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 216,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000183,
+      "null_free_energy": 0.153102,
+      "genesis_surprise": 0.003734,
+      "null_surprise": 0.003102,
+      "precision": 0.931994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 217,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000169,
+      "null_free_energy": 0.152804,
+      "genesis_surprise": 0.003443,
+      "null_surprise": 0.002804,
+      "precision": 0.933994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 218,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000153,
+      "null_free_energy": 0.152545,
+      "genesis_surprise": 0.003181,
+      "null_surprise": 0.002545,
+      "precision": 0.935994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 219,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000138,
+      "null_free_energy": 0.152319,
+      "genesis_surprise": 0.002945,
+      "null_surprise": 0.002319,
+      "precision": 0.937994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 220,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.018269,
+      "null_free_energy": 0.156422,
+      "genesis_surprise": 0.006872,
+      "null_surprise": 0.006422,
+      "precision": 0.939994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 221,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000706,
+      "null_free_energy": 0.155814,
+      "genesis_surprise": 0.006373,
+      "null_surprise": 0.005814,
+      "precision": 0.941994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 222,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000063,
+      "null_free_energy": 0.155278,
+      "genesis_surprise": 0.005917,
+      "null_surprise": 0.005278,
+      "precision": 0.943994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 223,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000313,
+      "null_free_energy": 0.154805,
+      "genesis_surprise": 0.005497,
+      "null_surprise": 0.004805,
+      "precision": 0.945994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 224,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000391,
+      "null_free_energy": 0.154387,
+      "genesis_surprise": 0.005109,
+      "null_surprise": 0.004387,
+      "precision": 0.947994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 225,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000379,
+      "null_free_energy": 0.154016,
+      "genesis_surprise": 0.004751,
+      "null_surprise": 0.004016,
+      "precision": 0.949994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 226,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000343,
+      "null_free_energy": 0.153687,
+      "genesis_surprise": 0.004420,
+      "null_surprise": 0.003687,
+      "precision": 0.951994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 227,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000304,
+      "null_free_energy": 0.153395,
+      "genesis_surprise": 0.004115,
+      "null_surprise": 0.003395,
+      "precision": 0.953994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 228,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000267,
+      "null_free_energy": 0.153135,
+      "genesis_surprise": 0.003834,
+      "null_surprise": 0.003135,
+      "precision": 0.955994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 229,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000235,
+      "null_free_energy": 0.152902,
+      "genesis_surprise": 0.003574,
+      "null_surprise": 0.002902,
+      "precision": 0.957994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 230,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.017874,
+      "null_free_energy": 0.156590,
+      "genesis_surprise": 0.007089,
+      "null_surprise": 0.006590,
+      "precision": 0.956763,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 231,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000269,
+      "null_free_energy": 0.156051,
+      "genesis_surprise": 0.006639,
+      "null_surprise": 0.006051,
+      "precision": 0.956778,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 232,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000226,
+      "null_free_energy": 0.155566,
+      "genesis_surprise": 0.006215,
+      "null_surprise": 0.005566,
+      "precision": 0.956819,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 233,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000492,
+      "null_free_energy": 0.155129,
+      "genesis_surprise": 0.005811,
+      "null_surprise": 0.005129,
+      "precision": 0.956883,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 234,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000522,
+      "null_free_energy": 0.154734,
+      "genesis_surprise": 0.005430,
+      "null_surprise": 0.004734,
+      "precision": 0.956968,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 235,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000476,
+      "null_free_energy": 0.154378,
+      "genesis_surprise": 0.005070,
+      "null_surprise": 0.004378,
+      "precision": 0.957069,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 236,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000417,
+      "null_free_energy": 0.154056,
+      "genesis_surprise": 0.004731,
+      "null_surprise": 0.004056,
+      "precision": 0.957183,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 237,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000362,
+      "null_free_energy": 0.153765,
+      "genesis_surprise": 0.004414,
+      "null_surprise": 0.003765,
+      "precision": 0.957310,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 238,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000314,
+      "null_free_energy": 0.153502,
+      "genesis_surprise": 0.004117,
+      "null_surprise": 0.003502,
+      "precision": 0.957446,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 239,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000272,
+      "null_free_energy": 0.153263,
+      "genesis_surprise": 0.003839,
+      "null_surprise": 0.003263,
+      "precision": 0.957591,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 240,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.015345,
+      "null_free_energy": 0.156633,
+      "genesis_surprise": 0.007075,
+      "null_surprise": 0.006633,
+      "precision": 0.952591,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 241,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000224,
+      "null_free_energy": 0.156134,
+      "genesis_surprise": 0.006646,
+      "null_surprise": 0.006134,
+      "precision": 0.950481,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 242,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000229,
+      "null_free_energy": 0.155677,
+      "genesis_surprise": 0.006233,
+      "null_surprise": 0.005677,
+      "precision": 0.950545,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 243,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000499,
+      "null_free_energy": 0.155260,
+      "genesis_surprise": 0.005836,
+      "null_surprise": 0.005260,
+      "precision": 0.950635,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 244,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000533,
+      "null_free_energy": 0.154880,
+      "genesis_surprise": 0.005457,
+      "null_surprise": 0.004880,
+      "precision": 0.950746,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 245,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000486,
+      "null_free_energy": 0.154533,
+      "genesis_surprise": 0.005096,
+      "null_surprise": 0.004533,
+      "precision": 0.950875,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 246,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000423,
+      "null_free_energy": 0.154216,
+      "genesis_surprise": 0.004756,
+      "null_surprise": 0.004216,
+      "precision": 0.951018,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 247,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000365,
+      "null_free_energy": 0.153927,
+      "genesis_surprise": 0.004434,
+      "null_surprise": 0.003927,
+      "precision": 0.951174,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 248,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000314,
+      "null_free_energy": 0.153663,
+      "genesis_surprise": 0.004132,
+      "null_surprise": 0.003663,
+      "precision": 0.951340,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 249,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000270,
+      "null_free_energy": 0.153422,
+      "genesis_surprise": 0.003850,
+      "null_surprise": 0.003422,
+      "precision": 0.951514,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 250,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.013087,
+      "null_free_energy": 0.156553,
+      "genesis_surprise": 0.006892,
+      "null_surprise": 0.006553,
+      "precision": 0.946514,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 251,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000226,
+      "null_free_energy": 0.156078,
+      "genesis_surprise": 0.006475,
+      "null_surprise": 0.006078,
+      "precision": 0.945265,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 252,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000195,
+      "null_free_energy": 0.155642,
+      "genesis_surprise": 0.006071,
+      "null_surprise": 0.005642,
+      "precision": 0.945364,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 253,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000454,
+      "null_free_energy": 0.155241,
+      "genesis_surprise": 0.005682,
+      "null_surprise": 0.005241,
+      "precision": 0.945488,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 254,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000493,
+      "null_free_energy": 0.154873,
+      "genesis_surprise": 0.005309,
+      "null_surprise": 0.004873,
+      "precision": 0.945631,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 255,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000451,
+      "null_free_energy": 0.154536,
+      "genesis_surprise": 0.004954,
+      "null_surprise": 0.004536,
+      "precision": 0.945792,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 256,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000393,
+      "null_free_energy": 0.154226,
+      "genesis_surprise": 0.004618,
+      "null_surprise": 0.004226,
+      "precision": 0.945966,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 257,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000338,
+      "null_free_energy": 0.153942,
+      "genesis_surprise": 0.004301,
+      "null_surprise": 0.003942,
+      "precision": 0.946151,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 258,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000289,
+      "null_free_energy": 0.153682,
+      "genesis_surprise": 0.004003,
+      "null_surprise": 0.003682,
+      "precision": 0.946346,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 259,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000247,
+      "null_free_energy": 0.153444,
+      "genesis_surprise": 0.003724,
+      "null_surprise": 0.003444,
+      "precision": 0.946548,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 260,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.011447,
+      "null_free_energy": 0.156387,
+      "genesis_surprise": 0.006622,
+      "null_surprise": 0.006387,
+      "precision": 0.941548,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 261,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000236,
+      "null_free_energy": 0.155933,
+      "genesis_surprise": 0.006216,
+      "null_surprise": 0.005933,
+      "precision": 0.940998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 262,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000157,
+      "null_free_energy": 0.155514,
+      "genesis_surprise": 0.005823,
+      "null_surprise": 0.005514,
+      "precision": 0.941133,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 263,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000395,
+      "null_free_energy": 0.155128,
+      "genesis_surprise": 0.005444,
+      "null_surprise": 0.005128,
+      "precision": 0.941289,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 264,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000438,
+      "null_free_energy": 0.154773,
+      "genesis_surprise": 0.005081,
+      "null_surprise": 0.004773,
+      "precision": 0.941464,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 265,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000404,
+      "null_free_energy": 0.154447,
+      "genesis_surprise": 0.004737,
+      "null_surprise": 0.004447,
+      "precision": 0.941654,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 266,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000352,
+      "null_free_energy": 0.154147,
+      "genesis_surprise": 0.004411,
+      "null_surprise": 0.004147,
+      "precision": 0.941855,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 267,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000302,
+      "null_free_energy": 0.153872,
+      "genesis_surprise": 0.004104,
+      "null_surprise": 0.003872,
+      "precision": 0.942067,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 268,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000258,
+      "null_free_energy": 0.153619,
+      "genesis_surprise": 0.003816,
+      "null_surprise": 0.003619,
+      "precision": 0.942287,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 269,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000220,
+      "null_free_energy": 0.153387,
+      "genesis_surprise": 0.003547,
+      "null_surprise": 0.003387,
+      "precision": 0.942514,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 270,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.010169,
+      "null_free_energy": 0.156176,
+      "genesis_surprise": 0.006323,
+      "null_surprise": 0.006176,
+      "precision": 0.937514,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 271,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000244,
+      "null_free_energy": 0.155739,
+      "genesis_surprise": 0.005929,
+      "null_surprise": 0.005739,
+      "precision": 0.937555,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 272,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000124,
+      "null_free_energy": 0.155337,
+      "genesis_surprise": 0.005548,
+      "null_surprise": 0.005337,
+      "precision": 0.937722,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 273,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000340,
+      "null_free_energy": 0.154966,
+      "genesis_surprise": 0.005182,
+      "null_surprise": 0.004966,
+      "precision": 0.937908,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 274,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000385,
+      "null_free_energy": 0.154625,
+      "genesis_surprise": 0.004833,
+      "null_surprise": 0.004625,
+      "precision": 0.938109,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 275,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000357,
+      "null_free_energy": 0.154311,
+      "genesis_surprise": 0.004501,
+      "null_surprise": 0.004311,
+      "precision": 0.938324,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 276,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000313,
+      "null_free_energy": 0.154023,
+      "genesis_surprise": 0.004188,
+      "null_surprise": 0.004023,
+      "precision": 0.938549,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 277,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000268,
+      "null_free_energy": 0.153758,
+      "genesis_surprise": 0.003894,
+      "null_surprise": 0.003758,
+      "precision": 0.938783,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 278,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000229,
+      "null_free_energy": 0.153515,
+      "genesis_surprise": 0.003618,
+      "null_surprise": 0.003515,
+      "precision": 0.939024,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 279,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000195,
+      "null_free_energy": 0.153291,
+      "genesis_surprise": 0.003360,
+      "null_surprise": 0.003291,
+      "precision": 0.939271,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 280,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.009140,
+      "null_free_energy": 0.155946,
+      "genesis_surprise": 0.006026,
+      "null_surprise": 0.005946,
+      "precision": 0.934653,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 281,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000245,
+      "null_free_energy": 0.155526,
+      "genesis_surprise": 0.005645,
+      "null_surprise": 0.005526,
+      "precision": 0.934826,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 282,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000099,
+      "null_free_energy": 0.155140,
+      "genesis_surprise": 0.005277,
+      "null_surprise": 0.005140,
+      "precision": 0.935019,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 283,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000294,
+      "null_free_energy": 0.154784,
+      "genesis_surprise": 0.004925,
+      "null_surprise": 0.004784,
+      "precision": 0.935229,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 284,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000339,
+      "null_free_energy": 0.154456,
+      "genesis_surprise": 0.004590,
+      "null_surprise": 0.004456,
+      "precision": 0.935453,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 285,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000317,
+      "null_free_energy": 0.154156,
+      "genesis_surprise": 0.004272,
+      "null_surprise": 0.004156,
+      "precision": 0.935688,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 286,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000278,
+      "null_free_energy": 0.153879,
+      "genesis_surprise": 0.003973,
+      "null_surprise": 0.003879,
+      "precision": 0.935932,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 287,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000239,
+      "null_free_energy": 0.153626,
+      "genesis_surprise": 0.003692,
+      "null_surprise": 0.003626,
+      "precision": 0.936184,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 288,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000204,
+      "null_free_energy": 0.153392,
+      "genesis_surprise": 0.003429,
+      "null_surprise": 0.003392,
+      "precision": 0.936441,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 289,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000174,
+      "null_free_energy": 0.153178,
+      "genesis_surprise": 0.003183,
+      "null_surprise": 0.003178,
+      "precision": 0.936704,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 290,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.008273,
+      "null_free_energy": 0.155713,
+      "genesis_surprise": 0.005745,
+      "null_surprise": 0.005713,
+      "precision": 0.932514,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 291,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000241,
+      "null_free_energy": 0.155309,
+      "genesis_surprise": 0.005377,
+      "null_surprise": 0.005309,
+      "precision": 0.932711,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 292,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000081,
+      "null_free_energy": 0.154937,
+      "genesis_surprise": 0.005023,
+      "null_surprise": 0.004937,
+      "precision": 0.932926,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 293,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000256,
+      "null_free_energy": 0.154596,
+      "genesis_surprise": 0.004684,
+      "null_surprise": 0.004596,
+      "precision": 0.933156,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 294,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000300,
+      "null_free_energy": 0.154282,
+      "genesis_surprise": 0.004363,
+      "null_surprise": 0.004282,
+      "precision": 0.933397,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 295,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000282,
+      "null_free_energy": 0.153994,
+      "genesis_surprise": 0.004060,
+      "null_surprise": 0.003994,
+      "precision": 0.933649,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 296,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000249,
+      "null_free_energy": 0.153730,
+      "genesis_surprise": 0.003774,
+      "null_surprise": 0.003730,
+      "precision": 0.933908,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 297,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000214,
+      "null_free_energy": 0.153487,
+      "genesis_surprise": 0.003506,
+      "null_surprise": 0.003487,
+      "precision": 0.934174,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 298,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000183,
+      "null_free_energy": 0.153264,
+      "genesis_surprise": 0.003255,
+      "null_surprise": 0.003264,
+      "precision": 0.934445,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 299,
+      "phase": "perturbation",
+      "genesis_free_energy": 0.000156,
+      "null_free_energy": 0.153059,
+      "genesis_surprise": 0.003021,
+      "null_surprise": 0.003059,
+      "precision": 0.934720,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 300,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000133,
+      "null_free_energy": 0.152871,
+      "genesis_surprise": 0.002802,
+      "null_surprise": 0.002871,
+      "precision": 0.934998,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 301,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000114,
+      "null_free_energy": 0.152698,
+      "genesis_surprise": 0.002599,
+      "null_surprise": 0.002698,
+      "precision": 0.935279,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 302,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000098,
+      "null_free_energy": 0.152538,
+      "genesis_surprise": 0.002410,
+      "null_surprise": 0.002538,
+      "precision": 0.935562,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 303,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000084,
+      "null_free_energy": 0.152391,
+      "genesis_surprise": 0.002235,
+      "null_surprise": 0.002391,
+      "precision": 0.935847,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 304,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000072,
+      "null_free_energy": 0.152256,
+      "genesis_surprise": 0.002072,
+      "null_surprise": 0.002256,
+      "precision": 0.936133,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 305,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000062,
+      "null_free_energy": 0.152131,
+      "genesis_surprise": 0.001922,
+      "null_surprise": 0.002131,
+      "precision": 0.936419,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 306,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000053,
+      "null_free_energy": 0.152016,
+      "genesis_surprise": 0.001782,
+      "null_surprise": 0.002016,
+      "precision": 0.936706,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 307,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000046,
+      "null_free_energy": 0.151909,
+      "genesis_surprise": 0.001653,
+      "null_surprise": 0.001909,
+      "precision": 0.936993,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 308,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000039,
+      "null_free_energy": 0.151810,
+      "genesis_surprise": 0.001533,
+      "null_surprise": 0.001810,
+      "precision": 0.937281,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 309,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000034,
+      "null_free_energy": 0.151718,
+      "genesis_surprise": 0.001422,
+      "null_surprise": 0.001718,
+      "precision": 0.937568,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 310,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000030,
+      "null_free_energy": 0.151633,
+      "genesis_surprise": 0.001320,
+      "null_surprise": 0.001633,
+      "precision": 0.937855,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 311,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000026,
+      "null_free_energy": 0.151554,
+      "genesis_surprise": 0.001225,
+      "null_surprise": 0.001554,
+      "precision": 0.938141,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 312,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000022,
+      "null_free_energy": 0.151480,
+      "genesis_surprise": 0.001137,
+      "null_surprise": 0.001480,
+      "precision": 0.938427,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 313,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000019,
+      "null_free_energy": 0.151412,
+      "genesis_surprise": 0.001056,
+      "null_surprise": 0.001412,
+      "precision": 0.938712,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 314,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000017,
+      "null_free_energy": 0.151348,
+      "genesis_surprise": 0.000981,
+      "null_surprise": 0.001348,
+      "precision": 0.938996,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 315,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000014,
+      "null_free_energy": 0.151288,
+      "genesis_surprise": 0.000911,
+      "null_surprise": 0.001288,
+      "precision": 0.939280,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 316,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000013,
+      "null_free_energy": 0.151233,
+      "genesis_surprise": 0.000847,
+      "null_surprise": 0.001233,
+      "precision": 0.939562,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 317,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000011,
+      "null_free_energy": 0.151181,
+      "genesis_surprise": 0.000787,
+      "null_surprise": 0.001181,
+      "precision": 0.939844,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 318,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000010,
+      "null_free_energy": 0.151132,
+      "genesis_surprise": 0.000732,
+      "null_surprise": 0.001132,
+      "precision": 0.940125,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 319,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000008,
+      "null_free_energy": 0.151086,
+      "genesis_surprise": 0.000681,
+      "null_surprise": 0.001086,
+      "precision": 0.940405,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 320,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000007,
+      "null_free_energy": 0.151043,
+      "genesis_surprise": 0.000634,
+      "null_surprise": 0.001043,
+      "precision": 0.940684,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 321,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000006,
+      "null_free_energy": 0.151003,
+      "genesis_surprise": 0.000591,
+      "null_surprise": 0.001003,
+      "precision": 0.940961,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 322,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000005,
+      "null_free_energy": 0.150964,
+      "genesis_surprise": 0.000550,
+      "null_surprise": 0.000964,
+      "precision": 0.941238,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 323,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000005,
+      "null_free_energy": 0.150929,
+      "genesis_surprise": 0.000513,
+      "null_surprise": 0.000929,
+      "precision": 0.941514,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 324,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000004,
+      "null_free_energy": 0.150895,
+      "genesis_surprise": 0.000478,
+      "null_surprise": 0.000895,
+      "precision": 0.941788,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 325,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000004,
+      "null_free_energy": 0.150863,
+      "genesis_surprise": 0.000446,
+      "null_surprise": 0.000863,
+      "precision": 0.942062,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 326,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000003,
+      "null_free_energy": 0.150833,
+      "genesis_surprise": 0.000416,
+      "null_surprise": 0.000833,
+      "precision": 0.942334,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 327,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000003,
+      "null_free_energy": 0.150804,
+      "genesis_surprise": 0.000389,
+      "null_surprise": 0.000804,
+      "precision": 0.942605,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 328,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150777,
+      "genesis_surprise": 0.000363,
+      "null_surprise": 0.000777,
+      "precision": 0.942875,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 329,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150751,
+      "genesis_surprise": 0.000340,
+      "null_surprise": 0.000751,
+      "precision": 0.943144,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 330,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150727,
+      "genesis_surprise": 0.000318,
+      "null_surprise": 0.000727,
+      "precision": 0.943412,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 331,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150704,
+      "genesis_surprise": 0.000297,
+      "null_surprise": 0.000704,
+      "precision": 0.943678,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 332,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000002,
+      "null_free_energy": 0.150682,
+      "genesis_surprise": 0.000279,
+      "null_surprise": 0.000682,
+      "precision": 0.943944,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 333,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150661,
+      "genesis_surprise": 0.000261,
+      "null_surprise": 0.000661,
+      "precision": 0.944208,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 334,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150641,
+      "genesis_surprise": 0.000245,
+      "null_surprise": 0.000641,
+      "precision": 0.944472,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 335,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150622,
+      "genesis_surprise": 0.000230,
+      "null_surprise": 0.000622,
+      "precision": 0.944734,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 336,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150604,
+      "genesis_surprise": 0.000217,
+      "null_surprise": 0.000604,
+      "precision": 0.944994,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 337,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150587,
+      "genesis_surprise": 0.000204,
+      "null_surprise": 0.000587,
+      "precision": 0.945254,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 338,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150570,
+      "genesis_surprise": 0.000192,
+      "null_surprise": 0.000570,
+      "precision": 0.945513,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 339,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150555,
+      "genesis_surprise": 0.000181,
+      "null_surprise": 0.000555,
+      "precision": 0.945770,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 340,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150540,
+      "genesis_surprise": 0.000171,
+      "null_surprise": 0.000540,
+      "precision": 0.946027,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 341,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150525,
+      "genesis_surprise": 0.000162,
+      "null_surprise": 0.000525,
+      "precision": 0.946282,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 342,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150511,
+      "genesis_surprise": 0.000153,
+      "null_surprise": 0.000511,
+      "precision": 0.946536,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 343,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150498,
+      "genesis_surprise": 0.000145,
+      "null_surprise": 0.000498,
+      "precision": 0.946789,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 344,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150485,
+      "genesis_surprise": 0.000138,
+      "null_surprise": 0.000485,
+      "precision": 0.947041,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 345,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150473,
+      "genesis_surprise": 0.000131,
+      "null_surprise": 0.000473,
+      "precision": 0.947292,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 346,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150461,
+      "genesis_surprise": 0.000125,
+      "null_surprise": 0.000461,
+      "precision": 0.947541,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 347,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150450,
+      "genesis_surprise": 0.000119,
+      "null_surprise": 0.000450,
+      "precision": 0.947790,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 348,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150439,
+      "genesis_surprise": 0.000113,
+      "null_surprise": 0.000439,
+      "precision": 0.948037,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 349,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150429,
+      "genesis_surprise": 0.000108,
+      "null_surprise": 0.000429,
+      "precision": 0.948283,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 350,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150419,
+      "genesis_surprise": 0.000104,
+      "null_surprise": 0.000419,
+      "precision": 0.948529,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 351,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150409,
+      "genesis_surprise": 0.000100,
+      "null_surprise": 0.000409,
+      "precision": 0.948773,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 352,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150400,
+      "genesis_surprise": 0.000096,
+      "null_surprise": 0.000400,
+      "precision": 0.949016,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 353,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150391,
+      "genesis_surprise": 0.000092,
+      "null_surprise": 0.000391,
+      "precision": 0.949258,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 354,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150382,
+      "genesis_surprise": 0.000089,
+      "null_surprise": 0.000382,
+      "precision": 0.949499,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 355,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150374,
+      "genesis_surprise": 0.000086,
+      "null_surprise": 0.000374,
+      "precision": 0.949738,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 356,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150366,
+      "genesis_surprise": 0.000083,
+      "null_surprise": 0.000366,
+      "precision": 0.949977,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 357,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150358,
+      "genesis_surprise": 0.000080,
+      "null_surprise": 0.000358,
+      "precision": 0.950215,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 358,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150351,
+      "genesis_surprise": 0.000078,
+      "null_surprise": 0.000351,
+      "precision": 0.950451,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 359,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150343,
+      "genesis_surprise": 0.000076,
+      "null_surprise": 0.000343,
+      "precision": 0.950687,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 360,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150336,
+      "genesis_surprise": 0.000074,
+      "null_surprise": 0.000336,
+      "precision": 0.950921,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 361,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150330,
+      "genesis_surprise": 0.000072,
+      "null_surprise": 0.000330,
+      "precision": 0.951154,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 362,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150323,
+      "genesis_surprise": 0.000070,
+      "null_surprise": 0.000323,
+      "precision": 0.951387,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 363,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150317,
+      "genesis_surprise": 0.000068,
+      "null_surprise": 0.000317,
+      "precision": 0.951618,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 364,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150311,
+      "genesis_surprise": 0.000067,
+      "null_surprise": 0.000311,
+      "precision": 0.951848,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 365,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150305,
+      "genesis_surprise": 0.000065,
+      "null_surprise": 0.000305,
+      "precision": 0.952077,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 366,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150299,
+      "genesis_surprise": 0.000064,
+      "null_surprise": 0.000299,
+      "precision": 0.952306,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 367,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150293,
+      "genesis_surprise": 0.000063,
+      "null_surprise": 0.000293,
+      "precision": 0.952533,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 368,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150288,
+      "genesis_surprise": 0.000061,
+      "null_surprise": 0.000288,
+      "precision": 0.952759,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 369,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150283,
+      "genesis_surprise": 0.000060,
+      "null_surprise": 0.000283,
+      "precision": 0.952984,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 370,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150278,
+      "genesis_surprise": 0.000059,
+      "null_surprise": 0.000278,
+      "precision": 0.953208,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 371,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150273,
+      "genesis_surprise": 0.000058,
+      "null_surprise": 0.000273,
+      "precision": 0.953431,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 372,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150268,
+      "genesis_surprise": 0.000057,
+      "null_surprise": 0.000268,
+      "precision": 0.953653,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 373,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150263,
+      "genesis_surprise": 0.000057,
+      "null_surprise": 0.000263,
+      "precision": 0.953874,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 374,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150259,
+      "genesis_surprise": 0.000056,
+      "null_surprise": 0.000259,
+      "precision": 0.954094,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 375,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150254,
+      "genesis_surprise": 0.000055,
+      "null_surprise": 0.000254,
+      "precision": 0.954313,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 376,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150250,
+      "genesis_surprise": 0.000054,
+      "null_surprise": 0.000250,
+      "precision": 0.954531,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 377,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150246,
+      "genesis_surprise": 0.000054,
+      "null_surprise": 0.000246,
+      "precision": 0.954748,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 378,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150242,
+      "genesis_surprise": 0.000054,
+      "null_surprise": 0.000242,
+      "precision": 0.954964,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 379,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150238,
+      "genesis_surprise": 0.000054,
+      "null_surprise": 0.000238,
+      "precision": 0.955179,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 380,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150234,
+      "genesis_surprise": 0.000054,
+      "null_surprise": 0.000234,
+      "precision": 0.955393,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 381,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150231,
+      "genesis_surprise": 0.000054,
+      "null_surprise": 0.000231,
+      "precision": 0.955606,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 382,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150227,
+      "genesis_surprise": 0.000054,
+      "null_surprise": 0.000227,
+      "precision": 0.955818,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 383,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150223,
+      "genesis_surprise": 0.000054,
+      "null_surprise": 0.000223,
+      "precision": 0.956030,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 384,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150220,
+      "genesis_surprise": 0.000053,
+      "null_surprise": 0.000220,
+      "precision": 0.956240,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 385,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150217,
+      "genesis_surprise": 0.000053,
+      "null_surprise": 0.000217,
+      "precision": 0.956449,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 386,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150214,
+      "genesis_surprise": 0.000053,
+      "null_surprise": 0.000214,
+      "precision": 0.956657,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 387,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150210,
+      "genesis_surprise": 0.000053,
+      "null_surprise": 0.000210,
+      "precision": 0.956865,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 388,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150207,
+      "genesis_surprise": 0.000052,
+      "null_surprise": 0.000207,
+      "precision": 0.957071,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 389,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150204,
+      "genesis_surprise": 0.000052,
+      "null_surprise": 0.000204,
+      "precision": 0.957277,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 390,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150202,
+      "genesis_surprise": 0.000051,
+      "null_surprise": 0.000202,
+      "precision": 0.957481,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 391,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150199,
+      "genesis_surprise": 0.000051,
+      "null_surprise": 0.000199,
+      "precision": 0.957685,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 392,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150196,
+      "genesis_surprise": 0.000051,
+      "null_surprise": 0.000196,
+      "precision": 0.957887,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 393,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150193,
+      "genesis_surprise": 0.000050,
+      "null_surprise": 0.000193,
+      "precision": 0.958089,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 394,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150191,
+      "genesis_surprise": 0.000050,
+      "null_surprise": 0.000191,
+      "precision": 0.958290,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 395,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150188,
+      "genesis_surprise": 0.000050,
+      "null_surprise": 0.000188,
+      "precision": 0.958490,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 396,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150186,
+      "genesis_surprise": 0.000049,
+      "null_surprise": 0.000186,
+      "precision": 0.958689,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 397,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150183,
+      "genesis_surprise": 0.000049,
+      "null_surprise": 0.000183,
+      "precision": 0.958887,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 398,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150181,
+      "genesis_surprise": 0.000049,
+      "null_surprise": 0.000181,
+      "precision": 0.959084,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 399,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150178,
+      "genesis_surprise": 0.000048,
+      "null_surprise": 0.000178,
+      "precision": 0.959280,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 400,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150176,
+      "genesis_surprise": 0.000048,
+      "null_surprise": 0.000176,
+      "precision": 0.959475,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 401,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150174,
+      "genesis_surprise": 0.000048,
+      "null_surprise": 0.000174,
+      "precision": 0.959670,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 402,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150172,
+      "genesis_surprise": 0.000047,
+      "null_surprise": 0.000172,
+      "precision": 0.959863,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 403,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150170,
+      "genesis_surprise": 0.000047,
+      "null_surprise": 0.000170,
+      "precision": 0.960056,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 404,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150168,
+      "genesis_surprise": 0.000047,
+      "null_surprise": 0.000168,
+      "precision": 0.960248,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 405,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150166,
+      "genesis_surprise": 0.000046,
+      "null_surprise": 0.000166,
+      "precision": 0.960439,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 406,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150164,
+      "genesis_surprise": 0.000046,
+      "null_surprise": 0.000164,
+      "precision": 0.960629,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 407,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150162,
+      "genesis_surprise": 0.000046,
+      "null_surprise": 0.000162,
+      "precision": 0.960818,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 408,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150160,
+      "genesis_surprise": 0.000046,
+      "null_surprise": 0.000160,
+      "precision": 0.961006,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 409,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150158,
+      "genesis_surprise": 0.000045,
+      "null_surprise": 0.000158,
+      "precision": 0.961193,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 410,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150156,
+      "genesis_surprise": 0.000045,
+      "null_surprise": 0.000156,
+      "precision": 0.961380,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 411,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150155,
+      "genesis_surprise": 0.000045,
+      "null_surprise": 0.000155,
+      "precision": 0.961565,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 412,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150153,
+      "genesis_surprise": 0.000045,
+      "null_surprise": 0.000153,
+      "precision": 0.961750,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 413,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150151,
+      "genesis_surprise": 0.000045,
+      "null_surprise": 0.000151,
+      "precision": 0.961934,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 414,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150150,
+      "genesis_surprise": 0.000044,
+      "null_surprise": 0.000150,
+      "precision": 0.962117,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 415,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150148,
+      "genesis_surprise": 0.000044,
+      "null_surprise": 0.000148,
+      "precision": 0.962300,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 416,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150147,
+      "genesis_surprise": 0.000044,
+      "null_surprise": 0.000147,
+      "precision": 0.962481,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 417,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150145,
+      "genesis_surprise": 0.000044,
+      "null_surprise": 0.000145,
+      "precision": 0.962662,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 418,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150144,
+      "genesis_surprise": 0.000044,
+      "null_surprise": 0.000144,
+      "precision": 0.962841,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 419,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150142,
+      "genesis_surprise": 0.000044,
+      "null_surprise": 0.000142,
+      "precision": 0.963020,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 420,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150141,
+      "genesis_surprise": 0.000043,
+      "null_surprise": 0.000141,
+      "precision": 0.963198,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 421,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150139,
+      "genesis_surprise": 0.000043,
+      "null_surprise": 0.000139,
+      "precision": 0.963376,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 422,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150138,
+      "genesis_surprise": 0.000043,
+      "null_surprise": 0.000138,
+      "precision": 0.963552,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 423,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150137,
+      "genesis_surprise": 0.000043,
+      "null_surprise": 0.000137,
+      "precision": 0.963727,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 424,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150135,
+      "genesis_surprise": 0.000043,
+      "null_surprise": 0.000135,
+      "precision": 0.963902,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 425,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150134,
+      "genesis_surprise": 0.000043,
+      "null_surprise": 0.000134,
+      "precision": 0.964076,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 426,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150133,
+      "genesis_surprise": 0.000042,
+      "null_surprise": 0.000133,
+      "precision": 0.964249,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 427,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150132,
+      "genesis_surprise": 0.000042,
+      "null_surprise": 0.000132,
+      "precision": 0.964422,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 428,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150130,
+      "genesis_surprise": 0.000042,
+      "null_surprise": 0.000130,
+      "precision": 0.964593,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 429,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150129,
+      "genesis_surprise": 0.000042,
+      "null_surprise": 0.000129,
+      "precision": 0.964764,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 430,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150128,
+      "genesis_surprise": 0.000042,
+      "null_surprise": 0.000128,
+      "precision": 0.964934,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 431,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150127,
+      "genesis_surprise": 0.000042,
+      "null_surprise": 0.000127,
+      "precision": 0.965103,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 432,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150126,
+      "genesis_surprise": 0.000042,
+      "null_surprise": 0.000126,
+      "precision": 0.965272,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 433,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150125,
+      "genesis_surprise": 0.000042,
+      "null_surprise": 0.000125,
+      "precision": 0.965439,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 434,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150124,
+      "genesis_surprise": 0.000041,
+      "null_surprise": 0.000124,
+      "precision": 0.965606,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 435,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150123,
+      "genesis_surprise": 0.000041,
+      "null_surprise": 0.000123,
+      "precision": 0.965772,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 436,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150122,
+      "genesis_surprise": 0.000041,
+      "null_surprise": 0.000122,
+      "precision": 0.965938,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 437,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150121,
+      "genesis_surprise": 0.000041,
+      "null_surprise": 0.000121,
+      "precision": 0.966102,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 438,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150120,
+      "genesis_surprise": 0.000041,
+      "null_surprise": 0.000120,
+      "precision": 0.966266,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 439,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150119,
+      "genesis_surprise": 0.000041,
+      "null_surprise": 0.000119,
+      "precision": 0.966429,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 440,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150118,
+      "genesis_surprise": 0.000041,
+      "null_surprise": 0.000118,
+      "precision": 0.966591,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 441,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150117,
+      "genesis_surprise": 0.000041,
+      "null_surprise": 0.000117,
+      "precision": 0.966753,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 442,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150116,
+      "genesis_surprise": 0.000041,
+      "null_surprise": 0.000116,
+      "precision": 0.966913,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 443,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150115,
+      "genesis_surprise": 0.000041,
+      "null_surprise": 0.000115,
+      "precision": 0.967073,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 444,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150114,
+      "genesis_surprise": 0.000040,
+      "null_surprise": 0.000114,
+      "precision": 0.967232,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 445,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150114,
+      "genesis_surprise": 0.000040,
+      "null_surprise": 0.000114,
+      "precision": 0.967391,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 446,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150113,
+      "genesis_surprise": 0.000040,
+      "null_surprise": 0.000113,
+      "precision": 0.967549,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 447,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150112,
+      "genesis_surprise": 0.000040,
+      "null_surprise": 0.000112,
+      "precision": 0.967706,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 448,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150111,
+      "genesis_surprise": 0.000040,
+      "null_surprise": 0.000111,
+      "precision": 0.967862,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 449,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150110,
+      "genesis_surprise": 0.000040,
+      "null_surprise": 0.000110,
+      "precision": 0.968017,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 450,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150110,
+      "genesis_surprise": 0.000040,
+      "null_surprise": 0.000110,
+      "precision": 0.968172,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 451,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150109,
+      "genesis_surprise": 0.000040,
+      "null_surprise": 0.000109,
+      "precision": 0.968326,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 452,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150108,
+      "genesis_surprise": 0.000040,
+      "null_surprise": 0.000108,
+      "precision": 0.968480,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 453,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150107,
+      "genesis_surprise": 0.000040,
+      "null_surprise": 0.000107,
+      "precision": 0.968632,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 454,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150107,
+      "genesis_surprise": 0.000040,
+      "null_surprise": 0.000107,
+      "precision": 0.968784,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 455,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150106,
+      "genesis_surprise": 0.000039,
+      "null_surprise": 0.000106,
+      "precision": 0.968936,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 456,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150105,
+      "genesis_surprise": 0.000039,
+      "null_surprise": 0.000105,
+      "precision": 0.969086,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 457,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150105,
+      "genesis_surprise": 0.000039,
+      "null_surprise": 0.000105,
+      "precision": 0.969236,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 458,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150104,
+      "genesis_surprise": 0.000039,
+      "null_surprise": 0.000104,
+      "precision": 0.969385,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 459,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150103,
+      "genesis_surprise": 0.000039,
+      "null_surprise": 0.000103,
+      "precision": 0.969533,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 460,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150103,
+      "genesis_surprise": 0.000039,
+      "null_surprise": 0.000103,
+      "precision": 0.969681,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 461,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150102,
+      "genesis_surprise": 0.000039,
+      "null_surprise": 0.000102,
+      "precision": 0.969828,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 462,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150102,
+      "genesis_surprise": 0.000039,
+      "null_surprise": 0.000102,
+      "precision": 0.969974,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 463,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150101,
+      "genesis_surprise": 0.000039,
+      "null_surprise": 0.000101,
+      "precision": 0.970120,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 464,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150100,
+      "genesis_surprise": 0.000039,
+      "null_surprise": 0.000100,
+      "precision": 0.970265,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 465,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150100,
+      "genesis_surprise": 0.000039,
+      "null_surprise": 0.000100,
+      "precision": 0.970409,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 466,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150099,
+      "genesis_surprise": 0.000039,
+      "null_surprise": 0.000099,
+      "precision": 0.970553,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 467,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150099,
+      "genesis_surprise": 0.000039,
+      "null_surprise": 0.000099,
+      "precision": 0.970696,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 468,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150105,
+      "genesis_surprise": 0.000048,
+      "null_surprise": 0.000105,
+      "precision": 0.970838,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 469,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150110,
+      "genesis_surprise": 0.000056,
+      "null_surprise": 0.000110,
+      "precision": 0.970979,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 470,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150115,
+      "genesis_surprise": 0.000062,
+      "null_surprise": 0.000115,
+      "precision": 0.971120,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 471,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150119,
+      "genesis_surprise": 0.000068,
+      "null_surprise": 0.000119,
+      "precision": 0.971260,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 472,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150122,
+      "genesis_surprise": 0.000072,
+      "null_surprise": 0.000122,
+      "precision": 0.971400,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 473,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150124,
+      "genesis_surprise": 0.000075,
+      "null_surprise": 0.000124,
+      "precision": 0.971538,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 474,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150127,
+      "genesis_surprise": 0.000078,
+      "null_surprise": 0.000127,
+      "precision": 0.971677,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 475,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150128,
+      "genesis_surprise": 0.000080,
+      "null_surprise": 0.000128,
+      "precision": 0.971814,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 476,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150130,
+      "genesis_surprise": 0.000082,
+      "null_surprise": 0.000130,
+      "precision": 0.971951,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 477,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150131,
+      "genesis_surprise": 0.000083,
+      "null_surprise": 0.000131,
+      "precision": 0.972087,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 478,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150132,
+      "genesis_surprise": 0.000083,
+      "null_surprise": 0.000132,
+      "precision": 0.972223,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 479,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150133,
+      "genesis_surprise": 0.000084,
+      "null_surprise": 0.000133,
+      "precision": 0.972358,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 480,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150133,
+      "genesis_surprise": 0.000084,
+      "null_surprise": 0.000133,
+      "precision": 0.972492,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 481,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150134,
+      "genesis_surprise": 0.000084,
+      "null_surprise": 0.000134,
+      "precision": 0.972626,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 482,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150134,
+      "genesis_surprise": 0.000084,
+      "null_surprise": 0.000134,
+      "precision": 0.972759,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 483,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150135,
+      "genesis_surprise": 0.000084,
+      "null_surprise": 0.000135,
+      "precision": 0.972891,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 484,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150135,
+      "genesis_surprise": 0.000083,
+      "null_surprise": 0.000135,
+      "precision": 0.973023,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 485,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150135,
+      "genesis_surprise": 0.000083,
+      "null_surprise": 0.000135,
+      "precision": 0.973154,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 486,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150135,
+      "genesis_surprise": 0.000082,
+      "null_surprise": 0.000135,
+      "precision": 0.973285,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 487,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150135,
+      "genesis_surprise": 0.000082,
+      "null_surprise": 0.000135,
+      "precision": 0.973415,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 488,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150135,
+      "genesis_surprise": 0.000081,
+      "null_surprise": 0.000135,
+      "precision": 0.973544,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 489,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150135,
+      "genesis_surprise": 0.000081,
+      "null_surprise": 0.000135,
+      "precision": 0.973673,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 490,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150134,
+      "genesis_surprise": 0.000080,
+      "null_surprise": 0.000134,
+      "precision": 0.973801,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 491,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150134,
+      "genesis_surprise": 0.000079,
+      "null_surprise": 0.000134,
+      "precision": 0.973929,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 492,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150134,
+      "genesis_surprise": 0.000079,
+      "null_surprise": 0.000134,
+      "precision": 0.974055,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 493,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150134,
+      "genesis_surprise": 0.000078,
+      "null_surprise": 0.000134,
+      "precision": 0.974182,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 494,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150134,
+      "genesis_surprise": 0.000077,
+      "null_surprise": 0.000134,
+      "precision": 0.974307,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 495,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150133,
+      "genesis_surprise": 0.000076,
+      "null_surprise": 0.000133,
+      "precision": 0.974433,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 496,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150133,
+      "genesis_surprise": 0.000076,
+      "null_surprise": 0.000133,
+      "precision": 0.974557,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 497,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000001,
+      "null_free_energy": 0.150133,
+      "genesis_surprise": 0.000075,
+      "null_surprise": 0.000133,
+      "precision": 0.974681,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 498,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150133,
+      "genesis_surprise": 0.000074,
+      "null_surprise": 0.000133,
+      "precision": 0.974804,
+      "model_maturity": 0.000000
+    },
+    {
+      "tick": 499,
+      "phase": "recovery",
+      "genesis_free_energy": 0.000000,
+      "null_free_energy": 0.150132,
+      "genesis_surprise": 0.000074,
+      "null_surprise": 0.000132,
+      "precision": 0.974927,
+      "model_maturity": 0.000000
+    }
+  ]
+}

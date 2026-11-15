@@ -1,0 +1,691 @@
+{
+  "benchmark": "aif_vs_proportional",
+  "baseline": "proportional controller (Kp=0.04, no learning)",
+  "phases": [
+    {
+      "name": "stable_1",
+      "genesis_fe_mean": 0.00000072,
+      "controller_cost_mean": 0.00002679,
+      "genesis_dev_mean": 0.02101807,
+      "controller_dev_mean": 0.00505809
+    },
+    {
+      "name": "perturb_1",
+      "genesis_fe_mean": 0.00250126,
+      "controller_cost_mean": 0.00427477,
+      "genesis_dev_mean": 0.15549941,
+      "controller_dev_mean": 0.06391060
+    },
+    {
+      "name": "recovery_1",
+      "genesis_fe_mean": 0.00000956,
+      "controller_cost_mean": 0.00017986,
+      "genesis_dev_mean": 0.18593763,
+      "controller_dev_mean": 0.00897729
+    },
+    {
+      "name": "perturb_2",
+      "genesis_fe_mean": 0.00096519,
+      "controller_cost_mean": 0.00256308,
+      "genesis_dev_mean": 0.18069057,
+      "controller_dev_mean": 0.04941648
+    },
+    {
+      "name": "recovery_2",
+      "genesis_fe_mean": 0.00000255,
+      "controller_cost_mean": 0.00011313,
+      "genesis_dev_mean": 0.14745979,
+      "controller_dev_mean": 0.00691791
+    }
+  ],
+  "time_series": [
+    {
+      "tick": 0,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000000,
+      "controller_cost": 0.00000007,
+      "genesis_deviation": 0.00025908,
+      "controller_deviation": 0.00025908
+    },
+    {
+      "tick": 10,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000280,
+      "controller_cost": 0.00000540,
+      "genesis_deviation": 0.00282523,
+      "controller_deviation": 0.00232272
+    },
+    {
+      "tick": 20,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000215,
+      "controller_cost": 0.00001332,
+      "genesis_deviation": 0.00532430,
+      "controller_deviation": 0.00364984
+    },
+    {
+      "tick": 30,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000167,
+      "controller_cost": 0.00002016,
+      "genesis_deviation": 0.00774488,
+      "controller_deviation": 0.00449040
+    },
+    {
+      "tick": 40,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000131,
+      "controller_cost": 0.00002515,
+      "genesis_deviation": 0.01008437,
+      "controller_deviation": 0.00501473
+    },
+    {
+      "tick": 50,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000101,
+      "controller_cost": 0.00002846,
+      "genesis_deviation": 0.01234215,
+      "controller_deviation": 0.00533472
+    },
+    {
+      "tick": 60,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000089,
+      "controller_cost": 0.00003050,
+      "genesis_deviation": 0.01451824,
+      "controller_deviation": 0.00552290
+    },
+    {
+      "tick": 70,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000060,
+      "controller_cost": 0.00003165,
+      "genesis_deviation": 0.01661293,
+      "controller_deviation": 0.00562614
+    },
+    {
+      "tick": 80,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000048,
+      "controller_cost": 0.00003220,
+      "genesis_deviation": 0.01862665,
+      "controller_deviation": 0.00567474
+    },
+    {
+      "tick": 90,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000060,
+      "controller_cost": 0.00003236,
+      "genesis_deviation": 0.02056001,
+      "controller_deviation": 0.00568819
+    },
+    {
+      "tick": 100,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000030,
+      "controller_cost": 0.00003225,
+      "genesis_deviation": 0.02241378,
+      "controller_deviation": 0.00567910
+    },
+    {
+      "tick": 110,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000030,
+      "controller_cost": 0.00003199,
+      "genesis_deviation": 0.02418888,
+      "controller_deviation": 0.00565567
+    },
+    {
+      "tick": 120,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000054,
+      "controller_cost": 0.00003162,
+      "genesis_deviation": 0.02588637,
+      "controller_deviation": 0.00562301
+    },
+    {
+      "tick": 130,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000012,
+      "controller_cost": 0.00003119,
+      "genesis_deviation": 0.02750739,
+      "controller_deviation": 0.00558452
+    },
+    {
+      "tick": 140,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000024,
+      "controller_cost": 0.00003072,
+      "genesis_deviation": 0.02905321,
+      "controller_deviation": 0.00554240
+    },
+    {
+      "tick": 150,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000018,
+      "controller_cost": 0.00003023,
+      "genesis_deviation": 0.03052518,
+      "controller_deviation": 0.00549804
+    },
+    {
+      "tick": 160,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000018,
+      "controller_cost": 0.00002974,
+      "genesis_deviation": 0.03192477,
+      "controller_deviation": 0.00545316
+    },
+    {
+      "tick": 170,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000024,
+      "controller_cost": 0.00002923,
+      "genesis_deviation": 0.03325300,
+      "controller_deviation": 0.00540625
+    },
+    {
+      "tick": 180,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000018,
+      "controller_cost": 0.00002872,
+      "genesis_deviation": 0.03450447,
+      "controller_deviation": 0.00535920
+    },
+    {
+      "tick": 190,
+      "phase": "stable_1",
+      "genesis_free_energy": 0.00000018,
+      "controller_cost": 0.00002822,
+      "genesis_deviation": 0.03566626,
+      "controller_deviation": 0.00531211
+    },
+    {
+      "tick": 200,
+      "phase": "perturb_1",
+      "genesis_free_energy": 0.03212941,
+      "controller_cost": 0.00169619,
+      "genesis_deviation": 0.05633624,
+      "controller_deviation": 0.04118484
+    },
+    {
+      "tick": 210,
+      "phase": "perturb_1",
+      "genesis_free_energy": 0.03008819,
+      "controller_cost": 0.00432467,
+      "genesis_deviation": 0.08946124,
+      "controller_deviation": 0.06576221
+    },
+    {
+      "tick": 220,
+      "phase": "perturb_1",
+      "genesis_free_energy": 0.02886397,
+      "controller_cost": 0.00618531,
+      "genesis_deviation": 0.11814644,
+      "controller_deviation": 0.07864673
+    },
+    {
+      "tick": 230,
+      "phase": "perturb_1",
+      "genesis_free_energy": 0.02618134,
+      "controller_cost": 0.00716447,
+      "genesis_deviation": 0.14112189,
+      "controller_deviation": 0.08464319
+    },
+    {
+      "tick": 240,
+      "phase": "perturb_1",
+      "genesis_free_energy": 0.02137357,
+      "controller_cost": 0.00754454,
+      "genesis_deviation": 0.16031034,
+      "controller_deviation": 0.08685930
+    },
+    {
+      "tick": 250,
+      "phase": "perturb_1",
+      "genesis_free_energy": 0.01812667,
+      "controller_cost": 0.00757110,
+      "genesis_deviation": 0.17739321,
+      "controller_deviation": 0.08701207
+    },
+    {
+      "tick": 260,
+      "phase": "perturb_1",
+      "genesis_free_energy": 0.01576442,
+      "controller_cost": 0.00740045,
+      "genesis_deviation": 0.19327269,
+      "controller_deviation": 0.08602589
+    },
+    {
+      "tick": 270,
+      "phase": "perturb_1",
+      "genesis_free_energy": 0.01393491,
+      "controller_cost": 0.00712491,
+      "genesis_deviation": 0.20831588,
+      "controller_deviation": 0.08440919
+    },
+    {
+      "tick": 280,
+      "phase": "perturb_1",
+      "genesis_free_energy": 0.01245230,
+      "controller_cost": 0.00679823,
+      "genesis_deviation": 0.22262657,
+      "controller_deviation": 0.08245137
+    },
+    {
+      "tick": 290,
+      "phase": "perturb_1",
+      "genesis_free_energy": 0.01121438,
+      "controller_cost": 0.00645167,
+      "genesis_deviation": 0.23620339,
+      "controller_deviation": 0.08032231
+    },
+    {
+      "tick": 300,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00020421,
+      "controller_cost": 0.00267138,
+      "genesis_deviation": 0.22632164,
+      "controller_deviation": 0.05168535
+    },
+    {
+      "tick": 310,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00005794,
+      "controller_cost": 0.00113606,
+      "genesis_deviation": 0.21895136,
+      "controller_deviation": 0.03370545
+    },
+    {
+      "tick": 320,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00001961,
+      "controller_cost": 0.00049738,
+      "genesis_deviation": 0.21309768,
+      "controller_deviation": 0.02230204
+    },
+    {
+      "tick": 330,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000817,
+      "controller_cost": 0.00022655,
+      "genesis_deviation": 0.20815699,
+      "controller_deviation": 0.01505157
+    },
+    {
+      "tick": 340,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000393,
+      "controller_cost": 0.00011091,
+      "genesis_deviation": 0.20379557,
+      "controller_deviation": 0.01053147
+    },
+    {
+      "tick": 350,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000232,
+      "controller_cost": 0.00006049,
+      "genesis_deviation": 0.19982946,
+      "controller_deviation": 0.00777735
+    },
+    {
+      "tick": 360,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000161,
+      "controller_cost": 0.00003808,
+      "genesis_deviation": 0.19615211,
+      "controller_deviation": 0.00617063
+    },
+    {
+      "tick": 370,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000107,
+      "controller_cost": 0.00002787,
+      "genesis_deviation": 0.19269863,
+      "controller_deviation": 0.00527929
+    },
+    {
+      "tick": 380,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000095,
+      "controller_cost": 0.00002304,
+      "genesis_deviation": 0.18942672,
+      "controller_deviation": 0.00479958
+    },
+    {
+      "tick": 390,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000072,
+      "controller_cost": 0.00002060,
+      "genesis_deviation": 0.18630749,
+      "controller_deviation": 0.00453876
+    },
+    {
+      "tick": 400,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000054,
+      "controller_cost": 0.00001925,
+      "genesis_deviation": 0.18332042,
+      "controller_deviation": 0.00438716
+    },
+    {
+      "tick": 410,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000054,
+      "controller_cost": 0.00001840,
+      "genesis_deviation": 0.18045011,
+      "controller_deviation": 0.00428962
+    },
+    {
+      "tick": 420,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000083,
+      "controller_cost": 0.00001780,
+      "genesis_deviation": 0.17768481,
+      "controller_deviation": 0.00421873
+    },
+    {
+      "tick": 430,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000042,
+      "controller_cost": 0.00001732,
+      "genesis_deviation": 0.17501535,
+      "controller_deviation": 0.00416131
+    },
+    {
+      "tick": 440,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000042,
+      "controller_cost": 0.00001690,
+      "genesis_deviation": 0.17243397,
+      "controller_deviation": 0.00411105
+    },
+    {
+      "tick": 450,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000054,
+      "controller_cost": 0.00001652,
+      "genesis_deviation": 0.16993454,
+      "controller_deviation": 0.00406477
+    },
+    {
+      "tick": 460,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000024,
+      "controller_cost": 0.00001617,
+      "genesis_deviation": 0.16751170,
+      "controller_deviation": 0.00402093
+    },
+    {
+      "tick": 470,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000042,
+      "controller_cost": 0.00001583,
+      "genesis_deviation": 0.16516091,
+      "controller_deviation": 0.00397861
+    },
+    {
+      "tick": 480,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000024,
+      "controller_cost": 0.00001550,
+      "genesis_deviation": 0.16287823,
+      "controller_deviation": 0.00393724
+    },
+    {
+      "tick": 490,
+      "phase": "recovery_1",
+      "genesis_free_energy": 0.00000030,
+      "controller_cost": 0.00001518,
+      "genesis_deviation": 0.16066013,
+      "controller_deviation": 0.00389667
+    },
+    {
+      "tick": 500,
+      "phase": "perturb_2",
+      "genesis_free_energy": 0.02077252,
+      "controller_cost": 0.00089961,
+      "genesis_deviation": 0.17665154,
+      "controller_deviation": 0.02999354
+    },
+    {
+      "tick": 510,
+      "phase": "perturb_2",
+      "genesis_free_energy": 0.01139152,
+      "controller_cost": 0.00235639,
+      "genesis_deviation": 0.18362367,
+      "controller_deviation": 0.04854271
+    },
+    {
+      "tick": 520,
+      "phase": "perturb_2",
+      "genesis_free_energy": 0.00913763,
+      "controller_cost": 0.00347007,
+      "genesis_deviation": 0.18591391,
+      "controller_deviation": 0.05890728
+    },
+    {
+      "tick": 530,
+      "phase": "perturb_2",
+      "genesis_free_energy": 0.00778425,
+      "controller_cost": 0.00411768,
+      "genesis_deviation": 0.18704489,
+      "controller_deviation": 0.06416912
+    },
+    {
+      "tick": 540,
+      "phase": "perturb_2",
+      "genesis_free_energy": 0.00687122,
+      "controller_cost": 0.00441701,
+      "genesis_deviation": 0.18708616,
+      "controller_deviation": 0.06646062
+    },
+    {
+      "tick": 550,
+      "phase": "perturb_2",
+      "genesis_free_energy": 0.00621349,
+      "controller_cost": 0.00449592,
+      "genesis_deviation": 0.18637393,
+      "controller_deviation": 0.06705165
+    },
+    {
+      "tick": 560,
+      "phase": "perturb_2",
+      "genesis_free_energy": 0.00569898,
+      "controller_cost": 0.00444491,
+      "genesis_deviation": 0.18521504,
+      "controller_deviation": 0.06667012
+    },
+    {
+      "tick": 570,
+      "phase": "perturb_2",
+      "genesis_free_energy": 0.00526857,
+      "controller_cost": 0.00432103,
+      "genesis_deviation": 0.18381891,
+      "controller_deviation": 0.06573456
+    },
+    {
+      "tick": 580,
+      "phase": "perturb_2",
+      "genesis_free_energy": 0.00489283,
+      "controller_cost": 0.00415889,
+      "genesis_deviation": 0.18231218,
+      "controller_deviation": 0.06448949
+    },
+    {
+      "tick": 590,
+      "phase": "perturb_2",
+      "genesis_free_energy": 0.00455755,
+      "controller_cost": 0.00397915,
+      "genesis_deviation": 0.18076722,
+      "controller_deviation": 0.06308047
+    },
+    {
+      "tick": 600,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00006700,
+      "controller_cost": 0.00169579,
+      "genesis_deviation": 0.17347972,
+      "controller_deviation": 0.04117998
+    },
+    {
+      "tick": 610,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00001401,
+      "controller_cost": 0.00072857,
+      "genesis_deviation": 0.16853797,
+      "controller_deviation": 0.02699196
+    },
+    {
+      "tick": 620,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000316,
+      "controller_cost": 0.00031868,
+      "genesis_deviation": 0.16470319,
+      "controller_deviation": 0.01785157
+    },
+    {
+      "tick": 630,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000107,
+      "controller_cost": 0.00014451,
+      "genesis_deviation": 0.16152444,
+      "controller_deviation": 0.01202118
+    },
+    {
+      "tick": 640,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000054,
+      "controller_cost": 0.00006951,
+      "genesis_deviation": 0.15875259,
+      "controller_deviation": 0.00833742
+    },
+    {
+      "tick": 650,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000012,
+      "controller_cost": 0.00003671,
+      "genesis_deviation": 0.15624990,
+      "controller_deviation": 0.00605896
+    },
+    {
+      "tick": 660,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000030,
+      "controller_cost": 0.00002214,
+      "genesis_deviation": 0.15393727,
+      "controller_deviation": 0.00470482
+    },
+    {
+      "tick": 670,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000024,
+      "controller_cost": 0.00001551,
+      "genesis_deviation": 0.15176682,
+      "controller_deviation": 0.00393824
+    },
+    {
+      "tick": 680,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000042,
+      "controller_cost": 0.00001239,
+      "genesis_deviation": 0.14970817,
+      "controller_deviation": 0.00351987
+    },
+    {
+      "tick": 690,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000024,
+      "controller_cost": 0.00001083,
+      "genesis_deviation": 0.14774108,
+      "controller_deviation": 0.00329066
+    },
+    {
+      "tick": 700,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000012,
+      "controller_cost": 0.00000998,
+      "genesis_deviation": 0.14585152,
+      "controller_deviation": 0.00315857
+    },
+    {
+      "tick": 710,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000024,
+      "controller_cost": 0.00000945,
+      "genesis_deviation": 0.14402950,
+      "controller_deviation": 0.00307457
+    },
+    {
+      "tick": 720,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000024,
+      "controller_cost": 0.00000909,
+      "genesis_deviation": 0.14226761,
+      "controller_deviation": 0.00301432
+    },
+    {
+      "tick": 730,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000024,
+      "controller_cost": 0.00000880,
+      "genesis_deviation": 0.14056008,
+      "controller_deviation": 0.00296608
+    },
+    {
+      "tick": 740,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000024,
+      "controller_cost": 0.00000855,
+      "genesis_deviation": 0.13890250,
+      "controller_deviation": 0.00292415
+    },
+    {
+      "tick": 750,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000030,
+      "controller_cost": 0.00000833,
+      "genesis_deviation": 0.13729125,
+      "controller_deviation": 0.00288568
+    },
+    {
+      "tick": 760,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000000,
+      "controller_cost": 0.00000812,
+      "genesis_deviation": 0.13572340,
+      "controller_deviation": 0.00284936
+    },
+    {
+      "tick": 770,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000012,
+      "controller_cost": 0.00000792,
+      "genesis_deviation": 0.13419643,
+      "controller_deviation": 0.00281432
+    },
+    {
+      "tick": 780,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000000,
+      "controller_cost": 0.00000773,
+      "genesis_deviation": 0.13270828,
+      "controller_deviation": 0.00278012
+    },
+    {
+      "tick": 790,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000000,
+      "controller_cost": 0.00000754,
+      "genesis_deviation": 0.13125713,
+      "controller_deviation": 0.00274656
+    },
+    {
+      "tick": 799,
+      "phase": "recovery_2",
+      "genesis_free_energy": 0.00000042,
+      "controller_cost": 0.00000738,
+      "genesis_deviation": 0.12998138,
+      "controller_deviation": 0.00271672
+    }
+  ]
+}

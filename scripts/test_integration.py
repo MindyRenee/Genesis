@@ -15,11 +15,12 @@ import sys
 import tempfile
 import time
 
-# Add the python/ directory to the path
+# Add the world directories and the repo root to the path
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path[:0] = [
-    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "python"),
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-]
+    os.path.join(_root, w)
+    for w in ("Self_World", "Inner_Non_Physical_World", "Outer_Physical_World")
+] + [_root]
 
 import logging  # noqa: E402
 
