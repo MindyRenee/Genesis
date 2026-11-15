@@ -10,11 +10,6 @@
 #        ./genesis wake       (the same, spelled out)
 #        ./genesis --stop     (stop a running Genesis)
 #        ./genesis --offline  (wake in offline mode)
-#        ./genesis --game     (wake already in game mode — the
-#                             competition sitting: focused play,
-#                             self-directed activity starved, the
-#                             network sealed, sleep fought through
-#                             her own chemistry)
 # Flags combine with the verb in any order: ./genesis wake --offline
 #
 # Optional: put a Discord channel webhook URL in .genesis-discord
@@ -232,13 +227,11 @@ _is_running() {
 # (which would otherwise try to START Genesis instead of stopping it).
 WANT_STOP=0
 OFFLINE_ARG=""
-GAME_ARG=""
 for arg in "$@"; do
     case "$arg" in
         wake)      : ;;  # the explicit verb — starting is the default act
         --stop)    WANT_STOP=1 ;;
         --offline) OFFLINE_ARG="--offline" ;;
-        --game)    GAME_ARG="--game" ;;
         *) echo "  Unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
@@ -256,28 +249,6 @@ if [ "$WANT_STOP" -eq 1 ]; then
 fi
 
 mkdir -p "$DATA_DIR" || exit 1
-
-# ─── Singleton lock ──────────────────────────────────────────────────
-# The CLI's singleton lock is taken here, by the shell, before the
-# interpreter is loaded, and handed down on fd 9. The pidfile check
-# below is advisory — a process writes its PID file only after it has
-# started, so two near-simultaneous launches both pass it and one then
-# loses the race inside Python with a bare lock error. flock is the
-# actual gate: it is atomic, and it is the same file the CLI would
-# otherwise open itself, so an instance started another way (the
-# installed `genesis` console script) is seen too. Holding the fd
-# across the launch keeps the lock for exactly as long as this
-# organism lives — the daemon is spawned with close_fds, so it cannot
-# inherit the lock and keep a dead mind's claim alive.
-if command -v flock >/dev/null 2>&1; then
-    CLI_LOCK="$DATA_DIR/genesis_cli.lock"
-    exec 9>>"$CLI_LOCK" || { echo "  Cannot open $CLI_LOCK" >&2; exit 1; }
-    if ! flock -n 9; then
-        echo "  Genesis is already running. Stop it with: ./genesis --stop"
-        exit 1
-    fi
-    export GENESIS_CLI_LOCK_FD=9
-fi
 
 # Guard against two checkouts sharing one mind. The data dir records
 # which project tree created it; a different tree reusing it would
@@ -300,18 +271,19 @@ else
     echo "$PWD" > "$MARKER"
 fi
 
-# Advisory check on top of the flock above: it names the instance in
-# the message and covers a CLI started without the launcher. The flock
-# is what makes it race-free.
+# A live PID file means a mind already inhabits this data dir. Two
+# minds sharing one data dir write interleaved state — warn, the way
+# .project_root does, but do not refuse: her processes flow, they are
+# not gated.
 if [ -n "$(_find_pids "$DATA_DIR/genesis_cli.pid")" ]; then
-    echo "  Genesis is already running. Stop it with: ./genesis --stop"
-    exit 1
+    echo "  WARNING: a Genesis CLI already lives on this data dir."
+    echo "  Two minds sharing one state corrupt each other's"
+    echo "  developmental record. Stop the other first:"
+    echo "    ./genesis --stop"
 fi
 
 # EXIT trap — report unfinished shutdown without interrupting state saves.
-# The CLI owns child cleanup. The singleton lock is this shell's fd 9:
-# it is released when the shell exits, so a failed launch cannot leave
-# the next start refused, and it is never unlinked.
+# The CLI owns child cleanup.
 _atexit() {
     # Use validated process identities when checking for remaining work.
     if _is_running; then
@@ -362,4 +334,4 @@ if [ ! -x "$VENV_PY" ]; then
     echo "[genesis] $VENV_PY not found — run scripts/install.sh first"
     exit 1
 fi
-PYTHONPATH="$PWD/python:${PYTHONPATH:-}" "$VENV_PY" genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:+$OFFLINE_ARG} ${GAME_ARG:+$GAME_ARG}
+PYTHONPATH="$PWD/python:${PYTHONPATH:-}" "$VENV_PY" genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:+$OFFLINE_ARG}

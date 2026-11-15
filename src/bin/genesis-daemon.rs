@@ -55,7 +55,6 @@
 //!
 //! A bridge thread forwards daemon→IPC, and the main thread checks both.
 
-use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -215,40 +214,6 @@ fn main() {
     {
         eprintln!(
             "[genesis] FATAL: failed to create data directory {}: {e}",
-            config.data_dir.display()
-        );
-        std::process::exit(1);
-    }
-
-    // Acquire an exclusive advisory lock on a per-data-dir lock file.
-    // This prevents two daemons from running against the same data
-    // directory, which would corrupt the mmap'd state files.
-    let lock_path = config.data_dir.join("genesis.lock");
-    let _lock_file = match std::fs::OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(&lock_path)
-    {
-        Ok(f) => f,
-        Err(e) => {
-            eprintln!(
-                "[genesis] FATAL: failed to open daemon lock file {}: {e}",
-                lock_path.display()
-            );
-            std::process::exit(1);
-        }
-    };
-    // SAFETY: `_lock_file` is a valid open file descriptor obtained from
-    // `OpenOptions` above. `as_raw_fd()` returns the underlying fd which
-    // remains valid as long as `_lock_file` is alive (it is held for the
-    // entire process lifetime). `flock` with `LOCK_EX | LOCK_NB` is a
-    // non-blocking advisory lock request — it returns immediately and
-    // does not block.
-    let rc = unsafe { libc::flock(_lock_file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
-    if rc != 0 {
-        eprintln!(
-            "[genesis] Another daemon is already running for data dir: {}",
             config.data_dir.display()
         );
         std::process::exit(1);

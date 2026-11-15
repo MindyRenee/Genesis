@@ -1165,7 +1165,12 @@ def _dominant_color_name(hue: np.ndarray, sat: np.ndarray, val: np.ndarray) -> s
     counts, edges = np.histogram(hues, bins=12, range=(0.0, 360.0))
     peak = int(np.argmax(counts))
     peak_mask = (hues >= edges[peak]) & (hues < edges[peak + 1])
-    hue_center = (edges[peak] + edges[peak + 1]) / 2.0
+    # Conditional mean of the hues in the modal bin — the bin's midpoint
+    # quantizes every hue ±15°, flipping names at band edges (a 3° red
+    # landing in the 0–30 bin would name "orange"). The sample mean
+    # keeps the true hue. Within a 30° bin no wrap-around is possible,
+    # so a linear mean is the correct circular estimator here.
+    hue_center = float(hues[peak_mask].mean())
     return name_color(
         hue_center,
         float(sat[mask][peak_mask].mean()),

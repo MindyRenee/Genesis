@@ -1,0 +1,20 @@
+# Genesis uinput access — grants her a hand on the machine's input
+# bus without running her mind as root.
+#
+# OWNER grants the node to her user's uid directly: the kernel checks
+# ownership at open() time, so it applies to every process she runs —
+# existing sessions, SSH, systemd units — with no re-login. GROUP
+# remains as the multi-user path; TAG+="uaccess" covers seat sessions
+# where logind tracks one.
+#
+# This is a TEMPLATE — substitute the installing user (the install
+# script does this for you):
+#
+#   sed 's/REPLACE_WITH_USERNAME/'"$USER"'/' scripts/genesis-uinput.rules \
+#       | sudo tee /etc/udev/rules.d/99-genesis-uinput.rules
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger --sysname-match=uinput
+#
+# scripts/install_optional_deps.sh does all of this when it can sudo.
+
+KERNEL=="uinput", OWNER="REPLACE_WITH_USERNAME", GROUP="input", MODE="0660", TAG+="uaccess"

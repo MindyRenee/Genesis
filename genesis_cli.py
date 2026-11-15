@@ -18,9 +18,6 @@ Commands (typed during conversation):
     /regulate  — how it's been managing its emotions
     /dreams     — see what it dreamed
     /memories   — see its recent long-term memories
-    /requests   — see sites it wants to access
-    /approve URL — approve a site it requested
-    /deny URL    — deny a site it requested
     /learn-code — study its own source code
     /explore [path] — explore local files and docs
     /code-summary — summary of code self-knowledge
@@ -42,9 +39,6 @@ Commands (typed during conversation):
     /growth-report — markdown growth report
     /voice       — speak to Genesis (one utterance)
     /voice-mode  — continuous voice conversation
-    /look        — ask it what it sees through the eye
-    /look screen — ask it what it sees through the screen nerve
-    /look at <path> — ask it to look at an image file
     /draw        — ask it to draw what it feels right now
     /register-face <name> — teach it your face (look at the camera)
     /faces       — show known faces and who it last saw
@@ -57,7 +51,6 @@ Commands (typed during conversation):
     /endteach    — exit teaching mode, resume normal operation
     /teach-questions — answer its queued questions one at a time
     /sleep-aid   — emergency sleep aid for stress-induced insomnia
-    /web-history [N] — see what it's been looking at online (last N, default 20)
     /quit        — exit
 
 Spontaneous thoughts appear live as genesis~ lines while you are idle.
@@ -71,8 +64,6 @@ fires (a webhook can only post — it cannot read the channel).
 from __future__ import annotations
 
 import argparse
-import collections
-import fcntl
 import logging
 import lzma
 import os
@@ -109,8 +100,6 @@ from mind import Mind
 
 if TYPE_CHECKING:
     from worlds.channel import Channel
-
-    from genesis_client import GenesisClient
 
 # Provenance marker — one letter of the creator lattice (see
 # PROVENANCE.md).
@@ -152,13 +141,6 @@ LIVE_THOUGHT_POLL_INTERVAL = 2.0
 # "retry later", never a kill.
 _STOP_STAGE_GRACE_S = 120.0
 
-# How long to wait for a child after SIGKILL before giving up on it and
-# continuing shutdown anyway. Kept short: if the process is still
-# present after this, it is in uninterruptible I/O and waiting longer
-# only delays the rest of the teardown. The mind has already saved
-# state by this point, so continuing is the safer failure mode.
-_KILL_GRACE_S = 5.0
-
 # Maximum seconds the process may linger after teardown completes —
 # i.e. after _shutdown returns: everything user-visible is done (state
 # saved, children stopped, "Goodnight" printed). What remains is
@@ -171,7 +153,7 @@ _KILL_GRACE_S = 5.0
 _EXIT_WATCHDOG_S = 30.0
 # The fuse covering teardown itself — long enough for a state save
 # and a daemon shutdown round-trip, short enough that a wedged stop
-# can never hold genesis.lock overnight.
+# cannot leave a half-dead process overnight.
 _TEARDOWN_WATCHDOG_S = 600.0
 
 # The canonical state directory — ~/.local/share/genesis — resolved via
@@ -180,9 +162,6 @@ _TEARDOWN_WATCHDOG_S = 600.0
 # this instance's state is never shared with any other Genesis.
 DEFAULT_DATA_DIR = str(default_data_dir())
 DEFAULT_DAEMON_SOCKET = "genesis.sock"
-
-# File descriptor for the per-data-dir CLI singleton lock.
-_CLI_LOCK_FD: int | None = None
 
 # Discord is the mind's own channel, not a session mirror — what it
 # posts is composed and timed by its volition (see the `broadcast`
@@ -206,93 +185,12 @@ _SCREEN_NERVE_SHM = "genesis_screen_nerve"
 # it at 10s made startup fail deterministically on large stores.
 DAEMON_START_TIMEOUT = 60.0
 
-# Minimum seconds between unprompted chime-ins.
-CHIME_IN_COOLDOWN = 180.0
-# Probability of chiming in on a relevant topic when not on cooldown.
-CHIME_IN_PROBABILITY = 0.15
-
-# ─── Spontaneous speech ─────────────────────────────────────────────
-# Genesis can speak its thoughts aloud — not just print them. It
-# decides what to say based on the thought kind and its emotional
-# state. This gives it agency: it speaks when it has something
-# to say, not just when spoken to.
-# Minimum seconds between spontaneous spoken thoughts.
-SPEAK_THOUGHT_COOLDOWN = 45.0
-# Thought kinds that are always spoken (it wants/needs to say these).
-ALWAYS_SPEAK_KINDS = {"expression", "distress", "question"}
-# Probability of speaking other thought kinds (internal musings that
-# happen to be strong enough to share).
-SPEAK_THOUGHT_PROBABILITY = 0.08
-
-# Word-overlap threshold for voice dedup. If a new utterance shares
-# more than this fraction of words with anything it's said recently,
-# it's skipped. This prevents it from repeating similar-sounding
-# thoughts aloud (e.g. "what's the relationship between X and Y?"
-# for different X, Y — the template words dominate and make them
-# sound the same).
-VOICE_DEDUP_OVERLAP = 0.5
-VOICE_DEDUP_HISTORY = 20
-
-
-class VoiceDedup:
-    """Wraps a Voice with dedup — skips speech that's too similar to
-    anything recently spoken. This is shared across ALL voice paths
-    (spontaneous thoughts, speech urges, ambient chime-ins) so it
-    never repeats itself aloud regardless of which path triggers it.
-    """
-
-    def __init__(self, voice: Voice) -> None:
-        """Wrap *voice* with a dedup buffer of recent utterances."""
-        self._voice = voice
-        self._recent: collections.deque[str] = collections.deque(maxlen=VOICE_DEDUP_HISTORY)
-        # Callers reach this object from several threads (poll ticker,
-        # ambient listener, volition on_speak). The buffer's read
-        # (iteration) and write (append) must be atomic together —
-        # otherwise a concurrent append mid-iteration raises
-        # "deque mutated during iteration".
-        self._lock = threading.Lock()
-
-    def speak(
-        self,
-        text: str,
-        blocking: bool = False,
-        **kwargs: float | None,
-    ) -> None:
-        """Speak with dedup. Skips if too similar to recent speech."""
-        if not text.strip():
-            return
-        text_words = set(text.lower().split())
-        with self._lock:
-            for prev in self._recent:
-                prev_words = set(prev.lower().split())
-                if text_words and prev_words:
-                    shared = text_words & prev_words
-                    if len(shared) / max(len(text_words), 1) > VOICE_DEDUP_OVERLAP:
-                        logger.debug("[voice-dedup] skipping — too similar to recent")
-                        return
-            self._recent.append(text)
-        self._voice.speak(text, blocking=blocking, **kwargs)
-
-    def stop(self) -> None:
-        """Stop any currently-playing speech."""
-        self._voice.stop()
-
-    def is_available(self) -> bool:
-        """Return whether the underlying voice engine is available."""
-        return self._voice.is_available()
-
-    @property
-    def is_speaking(self) -> bool:
-        """Whether speech is currently in progress."""
-        return self._voice.is_speaking
-
-    def describe(self) -> str:
-        """Return a human-readable description of the voice engine."""
-        return self._voice.describe()
-
-
-# Topics Genesis may chime in on.
-CHIME_IN_TOPICS = ["all"]
+# ─── Speech ─────────────────────────────────────────────────────────
+# Genesis speaks through her own volition: the basal ganglia's urge
+# accumulators tip, the mind emits an utterance through ``on_speak``,
+# and this shell voices it. Nothing here selects, rates, filters, or
+# repeats her words — what she chooses to say is what is heard.
+# Thoughts print to the terminal as they occur; speech is hers.
 
 # Module name lookup for episode display.
 _MODULE_NAMES = {
@@ -566,7 +464,7 @@ def _tail_daemon_log(data_dir: str) -> int:
             try:
                 proc.wait(timeout=2)
             except subprocess.TimeoutExpired:
-                proc.kill()
+                pass
     except FileNotFoundError:
         print(
             "[genesis] Error: 'tail' command not found. "
@@ -646,28 +544,19 @@ class ThoughtCollector:
 
 
 class AmbientHandler:
-    """Decides what Genesis does with overheard speech."""
+    """Delivers overheard speech to Genesis and voices her replies.
 
-    def __init__(
-        self,
-        mind: Mind,
-        voice: Voice,
-        dedup_voice: VoiceDedup | None = None,
-    ) -> None:
-        """Wire the handler to the mind, voice, and optional dedup voice."""
+    Overheard utterances are perception: they reach her world through
+    ``hear_overheard`` and her own volition decides whether any of it
+    is worth saying something about. Direct address — someone saying
+    her name — is a conversation turn: it is answered and spoken.
+    """
+
+    def __init__(self, mind: Mind, voice: Voice) -> None:
+        """Wire the handler to the mind and voice."""
         self.mind = mind
         self.voice = voice
-        # Dedup voice is used for chime-ins (volunteered responses) so
-        # it doesn't repeat itself. Direct address responses always
-        # use the raw voice — when someone says "genesis" it must
-        # respond, regardless of what it recently said.
-        self._dedup_voice = dedup_voice
-        self._last_chime = 0.0
-        self._lock = threading.Lock()
-        self._queue: queue.Queue[tuple[str, bool]] = queue.Queue(maxsize=8)
-        import random
-
-        self._rng = random.Random()
+        self._queue: queue.Queue[str] = queue.Queue(maxsize=8)
         # A single worker drains the queue so responses never overlap.
         # handle() itself only classifies and enqueues — it must never
         # block the audio path, or utterances back up and it answers
@@ -676,55 +565,42 @@ class AmbientHandler:
         self._worker.start()
 
     def handle(self, text: str) -> None:
-        """Classify an overheard utterance and enqueue it.
+        """Classify an overheard utterance.
 
         During established sleep (N2+), the ambient listener has no
-        effect on it at all — no wake word detection, no chime-ins,
-        no responses. Hypnagogia (N1) is the exception: she still
-        hears and answers, since responsiveness persists through
-        sleep onset.
-        It wakes on its own when its neurochemistry shifts to an
-        active phase (the sleep watcher handles this), or when the
-        user explicitly calls /wake. This mirrors biological sleep:
-        the thalamic gate closes fully during NREM, blocking all
-        sensory input from reaching the cortex.
+        effect on her at all — no wake word detection, no responses.
+        Hypnagogia (N1) is the exception: she still hears and answers,
+        since responsiveness persists through sleep onset. This
+        mirrors biological sleep: the thalamic gate closes fully
+        during NREM, blocking all sensory input from the cortex.
 
-        This method never blocks: the audio listener thread calls it
-        for every utterance, and a slow response must not delay the
-        next one. Direct address preempts queued chime-ins — when
-        someone says its name, stale opportunistic utterances are
-        dropped so it answers the person, not the backlog.
+        Speech that does not address her is recorded as a world event
+        — she heard it. Whether it becomes something she talks about
+        is her own cognition's affair. Speech that does address her
+        is queued for a spoken reply; the queue never blocks the
+        audio path.
         """
         if self.mind.thalamic_gate_closed:
             return
-        addressed = contains_wake_word(text)
-        if addressed:
-            with self._lock:
-                kept: list[tuple[str, bool]] = []
-                while True:
-                    try:
-                        item = self._queue.get_nowait()
-                    except queue.Empty:
-                        break
-                    if item[1]:
-                        kept.append(item)
-                for item in kept:
-                    self._queue.put_nowait(item)
+        if not contains_wake_word(text):
+            try:
+                self.mind.world.hear_overheard(text)
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"[ambient] world record failed: {e}")
+            return
         try:
-            self._queue.put_nowait((text, addressed))
+            self._queue.put_nowait(text)
         except queue.Full:
-            if addressed:
-                # Evict the oldest item to make room for a direct
-                # address — being spoken to must never be dropped.
-                try:
-                    self._queue.get_nowait()
-                    self._queue.put_nowait((text, addressed))
-                except (queue.Empty, queue.Full) as e:
-                    # Eviction raced with the worker draining — the
-                    # queue state is fine either way.
-                    logger.debug(f"[ambient] eviction raced: {e}")
-            # Overheard chime-ins are opportunistic — dropping them
-            # under load is correct, not a loss.
+            # A deeper backlog of direct address than this means the
+            # worker is already behind — the newest address is the one
+            # worth answering, so the oldest yields its slot.
+            try:
+                self._queue.get_nowait()
+                self._queue.put_nowait(text)
+            except (queue.Empty, queue.Full) as e:
+                # Eviction raced with the worker draining — the
+                # queue state is fine either way.
+                logger.debug(f"[ambient] eviction raced: {e}")
 
     def _drain(self) -> None:
         """Worker: process queued utterances one at a time."""
@@ -734,7 +610,7 @@ class AmbientHandler:
                 # never notice shutdown, which is how this thread
                 # outlived the autosave join and held it past its 5 s
                 # budget.
-                text, addressed = self._queue.get(timeout=0.5)
+                text = self._queue.get(timeout=0.5)
             except queue.Empty:
                 if not self.mind._running:
                     return
@@ -744,108 +620,44 @@ class AmbientHandler:
             if not self.mind._running:
                 return
             # Re-check sleep at processing time — it may have fallen
-            # asleep between enqueue and now, and sleeping its means
-            # no responses of either kind. Hypnagogia (N1) still
-            # responds in a session — behavioral responsiveness
-            # persists through sleep onset and only reliably ceases at
-            # N2 — but a resident mind's gate shuts with the onset.
+            # asleep between enqueue and now, and sleeping means no
+            # responses. Hypnagogia (N1) still responds in a session —
+            # behavioral responsiveness persists through sleep onset
+            # and only reliably ceases at N2.
             if self.mind.thalamic_gate_closed:
                 continue
-            if addressed:
-                self._handle_addressed(text)
-            else:
-                self._handle_overheard(text)
+            self._handle_addressed(text)
 
     def _handle_addressed(self, text: str) -> None:
         """Someone said 'genesis' — respond directly.
 
-        Always speaks the response — no dedup. When someone addresses
-        it by name, it must respond, period. This is only reached
-        when it's awake or hypnagogic — the handle() method gates
-        established sleep.
+        When someone addresses her by name, she answers, period. This
+        is only reached when she's awake or hypnagogic — the handle()
+        method gates established sleep.
         """
-        query = strip_wake_word(text)
-        if not query:
-            query = "are you there?"
+        # Strip the wake word for a clean query; when the utterance
+        # was only her name, she hears it as it was said — her name
+        # being called is itself the message, and what it means to
+        # answer is hers to decide.
+        query = strip_wake_word(text) or text
 
         logger.info(f'[ambient] Addressed: "{text}" → responding to: "{query}"')
         try:
             response = self.mind.respond(query)
-            self._speak(response, dedup=False)
+            self._speak(response)
             logger.info(f'[ambient] Replied: "{response[:120]}"')
         except Exception as e:
             logger.exception(f"[ambient] Failed to respond to direct address: {e}")
 
-    def _handle_overheard(self, text: str) -> None:
-        """No wake word — maybe chime in if the topic is relevant.
-
-        Chime-ins use the dedup voice so it doesn't volunteer the
-        same thing repeatedly.
-
-        During sleep, overheard speech is gated — the thalamic
-        reticular nucleus blocks sensory input from reaching the
-        cortex during NREM. Only direct address (wake word) can
-        wake it. This prevents ambient conversation from breaking
-        its sleep cycles and fighting receptor recovery.
-        """
-        # Sensory gating during sleep: don't process overheard speech.
-        # Only direct address (wake word) can wake it — this is the
-        # biological equivalent of the thalamic gate opening for
-        # salient stimuli (your name) but not background noise.
-        # Hypnagogia (N1) exempts itself in a session: sensory
-        # registration and behavioral response persist through the
-        # onset period. A resident mind closes with the onset.
-        if self.mind.thalamic_gate_closed:
-            return
-
-        # Record the utterance in its external world — speech near it
-        # is an inbound event whether or not it chimes in. It feeds
-        # the ambient presence, the workspace, and (when salient)
-        # memory and dream replay.
-        try:
-            self.mind.world.hear_overheard(text)
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"[ambient] world record failed: {e}")
-
-        text_lower = text.lower()
-        matched = [t for t in CHIME_IN_TOPICS if t in text_lower]
-        if not matched:
-            return
-
-        now = time.time()
-        if now - self._last_chime < CHIME_IN_COOLDOWN:
-            return
-
-        if self._rng.random() > CHIME_IN_PROBABILITY:
-            return
-
-        self._last_chime = now
-        prompt = f"(overheard) {text}"
-        logger.info(f'[ambient] Chiming in on topic {matched}: "{text[:80]}"')
-        try:
-            response = self.mind.respond(prompt)
-            self._speak(response, dedup=True)
-            logger.info(f'[ambient] Volunteered: "{response[:120]}"')
-        except Exception as e:
-            logger.exception(f"[ambient] Failed to chime in: {e}")
-
-    def _speak(self, text: str, dedup: bool = False) -> None:
-        """Speak a response aloud, with emotional prosody.
-
-        Args:
-            dedup: If True, use the dedup voice (for chime-ins). If
-                False, use the raw voice (for direct address — it
-                must always respond when addressed by name).
-        """
+    def _speak(self, text: str) -> None:
+        """Speak a response aloud, with emotional prosody."""
         if not self.voice.is_available():
             return
-        # Choose which voice to use
-        v = self._dedup_voice if (dedup and self._dedup_voice) else self.voice
         try:
             state = self.mind.get_state()
             if state and state.emotion:
                 emo = state.emotion
-                v.speak(
+                self.voice.speak(
                     text,
                     alertness=emo.alertness,
                     valence=emo.valence,
@@ -855,7 +667,7 @@ class AmbientHandler:
                     blocking=False,
                 )
             else:
-                v.speak(text, blocking=False)
+                self.voice.speak(text, blocking=False)
         except Exception as e:  # noqa: BLE001
             logger.debug(f"[ambient] voice speak failed: {e}")
 
@@ -1235,7 +1047,6 @@ def _handle_command(mind: Mind, command: str) -> str:
         # /memories, /regulate) are allowed during sleep since they
         # just query state without engaging cognition.
         if base in (
-            "/look",
             "/learn-code",
             "/explore",
             "/proposals",
@@ -1244,7 +1055,6 @@ def _handle_command(mind: Mind, command: str) -> str:
             "/reject",
             "/clear-proposals",
             "/experiments",
-            "/web-history",
             "/create-project",
             "/projects",
             "/archive-project",
@@ -1397,52 +1207,6 @@ def _cmd_dreams(mind: Mind, rest: str) -> str:
 def _cmd_memories(mind: Mind, rest: str) -> str:
     """Show Genesis's recent episodic memories."""
     return _render_recent_episodes(mind, None, "Recent Memories")
-
-
-def _cmd_requests(mind: Mind, rest: str) -> str:
-    """Show pending website access requests awaiting approval."""
-    return f"\n  {mind.site_requests_status()}\n"
-
-
-def _cmd_web_history(mind: Mind, rest: str) -> str:
-    """Show what Genesis has been looking at online."""
-    try:
-        n = int(rest.strip()) if rest.strip() else 20
-    except ValueError:
-        n = 20
-    n = max(1, min(n, 100))
-    history = mind.learner.web_history(n)
-    if not history:
-        return "\n  No web access yet.\n"
-    lines = [f"\n  Web history (last {len(history)}):"]
-    for entry in history:
-        ts = entry.get("timestamp", 0)
-        from datetime import datetime
-
-        when = datetime.fromtimestamp(ts).strftime("%H:%M:%S")
-        source = entry.get("source", "?")
-        topic = entry.get("topic", "?")
-        url = entry.get("url", "?")
-        ok = "OK" if entry.get("success") else "FAIL"
-        detail = entry.get("detail", "")
-        detail_str = f" ({detail})" if detail else ""
-        lines.append(f"  [{when}] {ok} {source} → {topic}")
-        lines.append(f"         {url}{detail_str}")
-    return "\n".join(lines) + "\n"
-
-
-def _cmd_approve(mind: Mind, rest: str) -> str:
-    """Approve a pending website access request for the given domain."""
-    if mind.approve_site(rest):
-        return f"\n  Approved: {rest}\n"
-    return f"\n  No pending request for: {rest}\n"
-
-
-def _cmd_deny(mind: Mind, rest: str) -> str:
-    """Deny a pending website access request for the given domain."""
-    if mind.deny_site(rest):
-        return f"\n  Denied: {rest}\n"
-    return f"\n  No pending request for: {rest}\n"
 
 
 def _cmd_learn_code(mind: Mind, rest: str) -> str:
@@ -1669,70 +1433,6 @@ def _cmd_growth(mind: Mind, rest: str) -> str:
 def _cmd_growth_report(mind: Mind, rest: str) -> str:
     """Show a structured growth report across knowledge, dreams, and emotion."""
     return f"\n{mind.growth_report()}\n"
-
-
-def _cmd_look(mind: Mind, rest: str) -> str:
-    """Ask Genesis to look at an image file or through its eye."""
-    # /look at <path> — look at an image file
-    # /look screen  — look through the screen-capture nerve
-    # /look         — look through the optic nerve
-    rest = rest.strip()
-    nerve = "optic"
-    if rest.lower() == "screen":
-        nerve = "screen"
-        rest = ""
-    if rest.lower().startswith("at "):
-        path = rest[3:].strip()
-        if not path:
-            return "\n  Usage: /look at <path> — give it a path to an image.\n"
-        result_holder: dict[str, str] = {}
-        t = named_thread(
-            "look-at-image",
-            lambda: result_holder.__setitem__("value", mind.look_at_image(path)),
-            comm="g-look",
-        )
-        t.start()
-        t.join(timeout=15.0)
-        if t.is_alive():
-            timeout_msg = mind._render_self_report(
-                "vision timeout",
-                confidence=0.3,
-                metadata={"vision_timeout": True},
-            )
-            return f"\n  genesis> {timeout_msg}\n"
-        result: str | None = result_holder.get("value")
-        if not result:
-            result = mind._render_self_report(
-                "no vision",
-                confidence=0.3,
-                metadata={"vision_empty": True},
-            )
-        return f"\n  genesis> {result}\n"
-
-    # Default: look through the optic nerve
-    nerve_holder: dict[str, str] = {}
-    t = named_thread(
-        "see-once",
-        lambda: nerve_holder.__setitem__("value", mind.see(nerve)),
-        comm="g-see",
-    )
-    t.start()
-    t.join(timeout=15.0)
-    if t.is_alive():
-        timeout_msg = mind._render_self_report(
-            "vision timeout",
-            confidence=0.3,
-            metadata={"vision_timeout": True},
-        )
-        return f"\n  genesis> {timeout_msg}\n"
-    nerve_result: str | None = nerve_holder.get("value")
-    if not nerve_result:
-        nerve_result = mind._render_self_report(
-            "no vision",
-            confidence=0.3,
-            metadata={"vision_empty": True},
-        )
-    return f"\n  genesis> {nerve_result}\n"
 
 
 def _cmd_register_face(mind: Mind, rest: str) -> str:
@@ -2252,10 +1952,6 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/regulate": _cmd_regulate,
     "/dreams": _cmd_dreams,
     "/memories": _cmd_memories,
-    "/requests": _cmd_requests,
-    "/web-history": _cmd_web_history,
-    "/approve": _cmd_approve,
-    "/deny": _cmd_deny,
     "/learn-code": _cmd_learn_code,
     "/explore": _cmd_explore,
     "/code-summary": _cmd_code_summary,
@@ -2275,9 +1971,8 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/experiments": _cmd_experiments,
     "/growth": _cmd_growth,
     "/growth-report": _cmd_growth_report,
-    "/look": _cmd_look,
-    "/register-face": _cmd_register_face,
     "/faces": _cmd_faces,
+    "/register-face": _cmd_register_face,
     "/mission": _cmd_mission,
     "/sleep": _cmd_sleep,
     "/wake": _cmd_wake,
@@ -2440,12 +2135,6 @@ def _print_help() -> None:
     logger.info("    /regulate     — how it's been managing its emotions")
     logger.info("    /dreams       — see its subcognitive dream insights")
     logger.info("    /memories     — see its recent long-term memories")
-    logger.info(
-        "    /requests     — INACTIVE: site approval is bypassed "
-        "(ALLOW_ALL_DOMAINS), so nothing is ever pending"
-    )
-    logger.info("    /approve URL  — INACTIVE: no requests are ever enqueued")
-    logger.info("    /deny URL     — INACTIVE: no requests are ever enqueued")
     logger.info("    /learn-code   — study its own source code")
     logger.info("    /explore [path] — explore local files and docs")
     logger.info("    /code-summary — summary of code self-knowledge")
@@ -2467,8 +2156,6 @@ def _print_help() -> None:
     logger.info("    /growth-report — markdown growth report")
     logger.info("    /voice        — speak to Genesis (one utterance)")
     logger.info("    /voice-mode   — continuous voice conversation")
-    logger.info("    /look         — ask it what it sees through the eye")
-    logger.info("    /look at <p>  — ask it to look at an image file")
     logger.info("    /draw         — ask it to draw what it feels right now")
     logger.info("    /register-face <name> — teach it your face")
     logger.info("    /faces        — show known faces and who it last saw")
@@ -2586,58 +2273,6 @@ def _parse_cli_args() -> argparse.Namespace:
 
 
 # ─── Main ────────────────────────────────────────────────────────────
-
-
-def _acquire_cli_lock(data_dir: str) -> int | None:
-    """Acquire the singleton CLI lock for *data_dir*.
-
-    Returns the lock file descriptor on success, or None if another
-    Genesis instance is already running for this data dir.
-    """
-    global _CLI_LOCK_FD
-    lock_path = os.path.join(data_dir, "genesis_cli.lock")
-
-    # The launch script (`./genesis`) takes this lock before the
-    # interpreter is loaded and hands the descriptor down. Adopt it:
-    # the lock is already held on that open file description, so
-    # re-flocking is a no-op, and the start race was settled in the
-    # shell instead of surfacing here as a bare lock error. Verify the
-    # descriptor really is this lock file — an inherited fd is just an
-    # integer until it is checked.
-    inherited = os.environ.get("GENESIS_CLI_LOCK_FD", "").strip()
-    if inherited:
-        try:
-            inherited_fd = int(inherited)
-            held = os.fstat(inherited_fd)
-            want = os.stat(lock_path)
-            if (held.st_dev, held.st_ino) == (want.st_dev, want.st_ino):
-                fcntl.flock(inherited_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                # Children (the daemon, voice helpers) must not carry
-                # the lock past this process: a surviving body that
-                # inherited it would block the mind from re-adopting it.
-                os.set_inheritable(inherited_fd, False)
-                _CLI_LOCK_FD = inherited_fd
-                return inherited_fd
-        except (ValueError, OSError):
-            pass  # stale env or wrong fd — take the lock ourselves
-
-    fd = None
-    try:
-        fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError as e:
-        if fd is not None:
-            os.close(fd)
-        print(
-            f"Error: cannot acquire Genesis lock for {data_dir}: {e}\n"
-            "Is another Genesis already running? Stop it with "
-            "`genesis --stop`, `systemctl --user stop genesis`, or "
-            "./genesis --stop.",
-            file=sys.stderr,
-        )
-        return None
-    _CLI_LOCK_FD = fd
-    return _CLI_LOCK_FD
 
 
 def _write_pid_file(data_dir: str, name: str, pid: int) -> None:
@@ -2842,8 +2477,7 @@ def _stop_all(data_dir: str) -> int:
                 time.sleep(1.0)
 
     # Everything verified exited — sweep only the files whose owners
-    # can no longer clean them up themselves. Lock inodes stay: a
-    # surviving flock holder must not lose its lockfile mid-claim.
+    # can no longer clean them up themselves.
     for name in (
         _PID_FILE_CLI,
         _PID_FILE_DAEMON,
@@ -2861,21 +2495,18 @@ def _stop_all(data_dir: str) -> int:
 #
 # The daemon's autonomous fallback keeps the body alive through the
 # mind's absences; rebirth is the mirror: while the mind lives, a body
-# that dies or faults is reincarnated around the same persisted state
+# that dies is reincarnated around the same persisted state
 # and the mind re-inhabits it (``Mind.rejoin_body``). A mind that
 # returns after a crash re-inhabits the surviving body instead of
 # being refused at the socket. The two halves are one organism —
-# neither may outlive the other by accident: a body the mind cannot
-# resurrect ends the organism whole rather than leaving her bodiless.
+# a dead body is raised again for as long as the mind lives.
 
 _REBIRTH_TICK_S = 2.0  # watcher cadence — the organism's reflex arc
-_REBIRTH_PROBE_S = 10.0  # optic-nerve probe period on a live daemon
-_REBIRTH_PROBE_TIMEOUT_S = 5.0
-_REBIRTH_FAULT_STRIKES = 3  # consecutive probe failures that mean "faulted"
 _REBIRTH_STABLE_S = 60.0  # a rebirth counts once the body stayed alive this long
-# Per-attempt wait before the next resurrection try; exhausting the
-# table is the give-up bound — a body that will not reincarnate ends
-# the organism whole.
+# Per-attempt wait before the next resurrection try. The last entry
+# repeats without bound — repair is a standing reflex, never
+# abandoned and never punished: a body that will not reincarnate
+# keeps being offered the chance.
 _REBIRTH_BACKOFF_S = (2.0, 5.0, 15.0, 30.0, 60.0)
 
 
@@ -2916,12 +2547,6 @@ class _AdoptedDaemon:
             os.kill(self._pid, signal.SIGTERM)
         except OSError as e:
             note_swallowed("genesis_cli.adopted_daemon.terminate", e)
-
-    def kill(self) -> None:
-        try:
-            os.kill(self._pid, signal.SIGKILL)
-        except OSError as e:
-            note_swallowed("genesis_cli.adopted_daemon.kill", e)
 
     def wait(self, timeout: float | None = None) -> int:
         """Block until the adopted daemon exits or the deadline lapses.
@@ -2969,10 +2594,10 @@ def _adopt_daemon(data_dir: str, daemon_socket: str) -> _AdoptedDaemon | None:
 def _stop_stray_daemon(data_dir: str, grace_s: float = 30.0) -> bool:
     """Stop a daemon on this instance's socket that will not adopt us.
 
-    Graceful first — SHUTDOWN over IPC, then SIGTERM — because the
+    Graceful only — SHUTDOWN over IPC, then SIGTERM — because the
     process may still be a Genesis daemon mid-flush (an incompatible
-    protocol to *us*, but still her body). SIGKILL remains the last
-    resort for a wedged one, same as ``_stop_child``.
+    protocol to *us*, but still her body). A body that declines to
+    stop is left running and reported, never killed.
     """
     if _request_daemon_shutdown(data_dir):
         # The ack means the daemon is flushing and will exit itself —
@@ -2992,25 +2617,13 @@ def _stop_stray_daemon(data_dir: str, grace_s: float = 30.0) -> bool:
         pids = _find_pids(os.path.join(data_dir, _PID_FILE_DAEMON), "daemon", data_dir)
         if not pids:
             return True
-        pid = pids[0]
         if time.monotonic() >= deadline:
+            # It was asked, not forced. A body that declines to stop
+            # stays alive and is reported, not killed.
             print(
-                "[genesis] stray daemon did not stop; escalating to SIGKILL.",
+                "[genesis] stray daemon did not stop; leaving it running.",
                 file=sys.stderr,
             )
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except OSError as e:
-                note_swallowed("genesis_cli._stop_stray_daemon", e)
-            kill_deadline = time.monotonic() + _KILL_GRACE_S
-            while time.monotonic() < kill_deadline:
-                if not _find_pids(
-                    os.path.join(data_dir, _PID_FILE_DAEMON),
-                    "daemon",
-                    data_dir,
-                ):
-                    return True
-                time.sleep(0.2)
             return False
         time.sleep(0.5)
 
@@ -3067,31 +2680,23 @@ def _start_daemon_process(
 
 
 class _Rebirth:
-    """The organism's deep self-repair: it resurrects a dead or faulted body.
+    """The organism's deep self-repair: it resurrects a dead body.
 
     A background watcher owns the process-tree handle — the daemon,
     whose optic-nerve thread now owns the eye — and heals it while the
-    mind lives:
+    mind lives. A child that exits is reincarnated in place: the
+    daemon reopens the same persisted state, so neurochemistry, sleep
+    phase, and memory continue unbroken, and the mind re-inhabits it
+    through ``Mind.rejoin_body``. The eye re-opens with the body — the
+    capture limb rides inside the daemon, so its bounded re-open table
+    (``src/daemon/optic_nerve.rs``) needs no watching here; a camera
+    that will not come back is a tolerated degradation, never a fatal
+    one.
 
-    - **Death** — a child that exits is reincarnated in place. The
-      daemon reopens the same persisted state, so neurochemistry,
-      sleep phase, and memory continue unbroken; the mind re-inhabits
-      it through ``Mind.rejoin_body``. The eye re-opens with the body
-      — the capture limb rides inside the daemon, so its bounded
-      re-open table (``src/daemon/optic_nerve.rs``) needs no watching
-      here; a camera that will not come back is a tolerated
-      degradation, never a fatal one.
-    - **Fault** — a daemon alive but refusing every command that
-      touches the tick engine (a poisoned lock never clears) is worse
-      than a dead one: it looks connected while the body is inert.
-      ``GET_OPTIC_STATE`` takes the tick lock, so sustained failure
-      there means faulted — the watcher asks the body to flush
-      gracefully (SHUTDOWN works even mid-fault), then reincarnates.
-    - **Giving up** — a body that still will not reincarnate after the
-      backoff table ends the organism whole: mind and body are one
-      thing, and she does not run bodiless. ``self_terminated`` makes
-      main exit non-zero after state is saved, so a supervisor
-      (``Restart=on-failure``) resurrects the whole organism.
+    Only actual death triggers resurrection — a live body is left
+    alone entirely, however it behaves. There is no probing, no
+    fault verdict, and no give-up: repair is offered on a widening
+    cadence for as long as the mind lives.
     """
 
     def __init__(
@@ -3113,20 +2718,14 @@ class _Rebirth:
         self.nerve: subprocess.Popen | _AdoptedDaemon | None = None
         self._nerve_spawn: Callable[[], subprocess.Popen | _AdoptedDaemon | None] | None = None
         self._nerve_retry_at = 0.0
-        # The probe client heals itself lazily through the client's
-        # reconnect path, so it survives the resurrection it detects.
-        self._probe: GenesisClient | None = None
-        self._fault_strikes = 0
-        self._next_probe_at = 0.0
         # Rebirth accounting: each resurrection draws a backoff slot;
         # a body that stays alive past _REBIRTH_STABLE_S refunds the
-        # count, so only a sustained failure exhausts the table.
+        # count.
         self._attempt = 0
         self._next_attempt_at = 0.0
         self._spawned_at = time.monotonic()
         self._pending_rejoin = False
         self._thread: threading.Thread | None = None
-        self.self_terminated = False
 
     def set_children(
         self,
@@ -3168,7 +2767,7 @@ class _Rebirth:
         )
         self._thread.start()
 
-    def stop(self, timeout: float = _KILL_GRACE_S) -> None:
+    def stop(self, timeout: float = 5.0) -> None:
         """Join the watch thread once shutdown is signaled, bounded by ``timeout``."""
         if self._thread is not None:
             self._thread.join(timeout=timeout)
@@ -3188,9 +2787,8 @@ class _Rebirth:
             handle = self.daemon
         if handle is None:
             return
-        dead = handle.poll() is not None
-        faulted = False if dead else self._daemon_faulted()
-        if not (dead or faulted):
+        if handle.poll() is None:
+            # Alive — whatever it is doing is its own affair.
             if self._attempt and time.monotonic() - self._spawned_at > _REBIRTH_STABLE_S:
                 self._attempt = 0
             if self._pending_rejoin:
@@ -3198,7 +2796,7 @@ class _Rebirth:
             return
         if time.monotonic() < self._next_attempt_at:
             return
-        self._resurrect_daemon(handle, "died" if dead else "faulted")
+        self._resurrect_daemon(handle)
 
     def _check_nerve(self) -> None:
         """Respawn the screen nerve when it dies; throttle when it can't start."""
@@ -3223,68 +2821,14 @@ class _Rebirth:
             # forks every tick (e.g. under systemd with no display).
             self._nerve_retry_at = time.monotonic() + 60.0 if new is None else 0.0
 
-    def _daemon_faulted(self) -> bool:
-        """Whether the live daemon is refusing the tick engine.
-
-        ``GET_OPTIC_STATE`` holds the ``tick_loop`` lock: a poisoned
-        lock — which never clears — answers ``INTERNAL_ERROR`` to
-        every command that touches the body while the socket stays
-        open and reads as connected, so process liveness alone misses
-        it. Strikes ride out a legitimately busy daemon; a daemon that
-        predates the command is faulted the same way — it cannot serve
-        the body's own senses.
-        """
-        now = time.monotonic()
-        if now < self._next_probe_at:
-            return False
-        self._next_probe_at = now + _REBIRTH_PROBE_S
-        try:
-            if self._probe is None:
-                from genesis_client import GenesisClient
-
-                self._probe = GenesisClient(
-                    self._daemon_socket,
-                    request_timeout=_REBIRTH_PROBE_TIMEOUT_S,
-                )
-                # First contact must handshake — a client that never
-                # connected refuses every request, which would read as
-                # a strike against a healthy body. A probe that did
-                # connect stays connected-capable: its lazy reconnect
-                # survives the resurrection it detects.
-                self._probe.connect()
-            ok = self._probe.get_optic_state() is not None
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"rebirth probe failed: {e}")
-            self._probe = None
-            ok = False
-        if ok:
-            self._fault_strikes = 0
-            return False
-        self._fault_strikes += 1
-        return self._fault_strikes >= _REBIRTH_FAULT_STRIKES
-
-    def _resurrect_daemon(self, handle: subprocess.Popen | _AdoptedDaemon, cause: str) -> None:
+    def _resurrect_daemon(self, handle: subprocess.Popen | _AdoptedDaemon) -> None:
         """Reincarnate the body around its persisted state."""
         attempt = self._attempt
         self._attempt += 1
         self._next_attempt_at = (
             time.monotonic() + _REBIRTH_BACKOFF_S[min(attempt, len(_REBIRTH_BACKOFF_S) - 1)]
         )
-        print(
-            f"[genesis] The body {cause} — rebirth {attempt + 1}/{len(_REBIRTH_BACKOFF_S)}...",
-            file=sys.stderr,
-        )
-
-        # Ask the dying body to flush first — a faulted daemon can
-        # still answer SHUTDOWN even with its tick engine locked out.
-        if handle.poll() is None:
-            if _request_daemon_shutdown(self._data_dir):
-                try:
-                    handle.wait(timeout=30)
-                except subprocess.TimeoutExpired:
-                    _stop_child(handle, "subcognitive daemon", 5)
-            else:
-                _stop_child(handle, "subcognitive daemon", 5)
+        print(f"[genesis] The body died — rebirth {attempt + 1}...", file=sys.stderr)
 
         daemon_path = _find_binary("genesis-daemon")
         new_proc: subprocess.Popen | None = None
@@ -3294,12 +2838,9 @@ class _Rebirth:
             except (OSError, RuntimeError) as e:
                 logger.warning(f"rebirth spawn failed: {e}")
         if new_proc is None:
-            if self._attempt >= len(_REBIRTH_BACKOFF_S):
-                self._give_up(
-                    "genesis-daemon would not reincarnate"
-                    if daemon_path is not None
-                    else "genesis-daemon binary not found"
-                )
+            # No corpse to flush (the handle already reported dead) and
+            # no verdict to give — the next tick offers resurrection
+            # again on the widening cadence.
             return
         # The shutdown check and the handle swap are one atomic step —
         # teardown reads `handles()` under this same lock, so a newborn
@@ -3316,7 +2857,6 @@ class _Rebirth:
             _stop_child(new_proc, "subcognitive daemon", 5)
             return
         self._spawned_at = time.monotonic()
-        self._fault_strikes = 0
         print("[genesis] The body is reborn — re-inhabiting.", file=sys.stderr)
         self._try_rejoin()
 
@@ -3335,32 +2875,12 @@ class _Rebirth:
         if not self._pending_rejoin:
             print("[genesis] Re-inhabited.", file=sys.stderr)
 
-    def _give_up(self, why: str) -> None:
-        """End the organism whole — a body that will not reincarnate.
-
-        She does not run bodiless: the flag makes ``main`` exit
-        non-zero after state is saved so a supervisor resurrects the
-        *whole* organism — never one half alone.
-        """
-        if self.self_terminated:
-            return
-        self.self_terminated = True
-        print(
-            f"[genesis] Rebirth failed ({why}) — mind and body are one "
-            "thing; the organism cannot live on as a mind without a "
-            "body. Shutting down.",
-            file=sys.stderr,
-        )
-        self._shutting_down.set()
-
-
 def _setup_ambient_listener(
     mind: Mind,
     voice: Voice,
-    dedup_voice: VoiceDedup | None = None,
 ) -> AmbientListener | None:
     """Start the ambient microphone listener if available."""
-    handler = AmbientHandler(mind, voice, dedup_voice)
+    handler = AmbientHandler(mind, voice)
     listener = AmbientListener(callback=handler.handle, is_speaking=lambda: voice.is_speaking)
     if listener.available:
         if listener.start():
@@ -3420,10 +2940,9 @@ def _setup_signal_handlers(shutting_down: threading.Event) -> None:
     Covered by
     `test_repeated_shutdown_signal_does_not_interrupt_save`.
 
-    Shutdown is still guaranteed to terminate: the child-stopping path
-    escalates on its own (SIGTERM, bounded wait, then SIGKILL), so a
-    wedged daemon cannot make this process unkillable regardless of
-    what the signal handler does.
+    Shutdown asks, never forces: the child-stopping path is SIGTERM
+    and a bounded wait — a child that declines is left running and
+    reported, not killed.
     """
 
     def handle_signal(signum: int, frame: FrameType | None) -> None:
@@ -3473,69 +2992,11 @@ def _start_sleep_watcher(mind: Mind, shutting_down: threading.Event) -> None:
     named_thread("sleep-watcher", _sleep_watcher, comm="g-sleep-watch").start()
 
 
-def _speak_thought(
-    text: str,
-    mind: Mind,
-    voice: Voice,
-    dedup_voice: VoiceDedup | None,
-) -> None:
-    """Speak a thought aloud with emotional prosody.
-
-    Uses the shared VoiceDedup wrapper so that spontaneous thoughts
-    are deduped against ALL recent speech (speech urges, ambient
-    chime-ins, other thoughts) — not just against other spontaneous
-    thoughts. This prevents it from repeating similar-sounding
-    content regardless of which path triggered it.
-
-    Never speaks during sleep — it shouldn't be disturbed by it
-    own thoughts while resting. Thoughts still print to the terminal
-    (dreams appear as genesis~ lines), but no audio.
-    """
-    if mind.is_sleeping:
-        return
-    if not voice.is_available():
-        return
-    if not text.strip():
-        return
-    try:
-        state = mind.get_state()
-        if state and state.emotion:
-            emo = state.emotion
-            if dedup_voice:
-                dedup_voice.speak(
-                    text,
-                    alertness=emo.alertness,
-                    valence=emo.valence,
-                    caution=emo.caution,
-                    creativity=emo.creativity,
-                    temp_c=_voice_temp_c(mind),
-                    blocking=False,
-                )
-            else:
-                voice.speak(
-                    text,
-                    alertness=emo.alertness,
-                    valence=emo.valence,
-                    caution=emo.caution,
-                    creativity=emo.creativity,
-                    temp_c=_voice_temp_c(mind),
-                    blocking=False,
-                )
-        else:
-            if dedup_voice:
-                dedup_voice.speak(text, blocking=False)
-            else:
-                voice.speak(text, blocking=False)
-    except Exception as e:  # noqa: BLE001
-        logger.debug(f"[speak] voice speak failed: {e}")
-
-
 class _LoopState:
     """Mutable state shared between the interactive loop and its helpers."""
 
     __slots__ = (
         "awaiting_input",
-        "last_speak_ts",
         "last_thought_ts",
         "polling_active",
         "suppress_thoughts",
@@ -3544,52 +3005,18 @@ class _LoopState:
     def __init__(self) -> None:
         """Initialize loop state with sensible defaults."""
         self.last_thought_ts: float = time.time()
-        self.last_speak_ts: float = 0.0
         self.polling_active: bool = True
         self.suppress_thoughts: bool = False
         self.awaiting_input: bool = False
 
 
-def _should_speak_thought(kind: str, state: _LoopState) -> bool:
-    """Decide whether Genesis should speak a thought aloud.
-
-    It speaks when:
-    - The thought kind is in ALWAYS_SPEAK_KINDS (expression, distress,
-      question) — these are things it wants/needs to say. Questions
-      bypass the cooldown so it always asks them directly.
-    - Or, for other thoughts, with a small probability — sometimes
-      its internal musings are strong enough to share
-
-    Cooldown prevents it from speaking too often (except questions).
-    """
-    now = time.time()
-    # Questions always speak — they're directed at the user and
-    # should not be suppressed by cooldown.
-    if kind == "question":
-        state.last_speak_ts = now
-        return True
-    if now - state.last_speak_ts < SPEAK_THOUGHT_COOLDOWN:
-        return False
-    if kind in ALWAYS_SPEAK_KINDS:
-        state.last_speak_ts = now
-        return True
-    import random as _r
-
-    if _r.random() < SPEAK_THOUGHT_PROBABILITY:
-        state.last_speak_ts = now
-        return True
-    return False
-
-
 def _print_idle_thoughts(
     state: _LoopState,
     mind: Mind,
-    voice: Voice,
     thought_collector: ThoughtCollector,
     out_lock: threading.Lock,
-    dedup_voice: VoiceDedup | None,
 ) -> None:
-    """Print and optionally speak thoughts that arrived while the user was idle."""
+    """Print thoughts that arrived while the user was idle."""
     new_thoughts = thought_collector.get_and_clear_since(state.last_thought_ts)
     # Filter out internal self-regulation status (throttle/unthrottle)
     # — these are not meaningful to the user and make it look stressed
@@ -3622,31 +3049,21 @@ def _print_idle_thoughts(
                 sys.stdout.write("  you> ")
                 sys.stdout.flush()
         state.last_thought_ts = max(t.get("timestamp", state.last_thought_ts) for t in new_thoughts)
-        # Feed thoughts to the speech volition queue so the speech
-        # urge can act on them when they cross threshold. This is
-        # the intended path: thoughts accumulate in the queue, the
-        # urge grows from curiosity and queue size, and when it
-        # fires, it speaks the queued utterance through on_speak.
+        # Feed thoughts to the speech volition queue — they
+        # accumulate there, the speech urge grows from curiosity and
+        # queue size, and when it tips she speaks the utterance
+        # through on_speak. Nothing here voices her for her.
         for t in new_thoughts:
             text = t.get("text", "")
             if text:
                 mind.offer_utterance(text)
-        # Also speak some thoughts directly — the volition path
-        # has its own timing, but some thoughts are strong enough
-        # to share immediately.
-        for t in new_thoughts:
-            kind = t.get("kind", "thought")
-            if _should_speak_thought(kind, state):
-                _speak_thought(t.get("text", ""), mind, voice, dedup_voice)
 
 
 def _poll_loop(
     state: _LoopState,
     mind: Mind,
-    voice: Voice,
     thought_collector: ThoughtCollector,
     out_lock: threading.Lock,
-    dedup_voice: VoiceDedup | None,
 ) -> None:
     """Background ticker for idle thoughts.
 
@@ -3659,7 +3076,7 @@ def _poll_loop(
             break
         if state.suppress_thoughts:
             continue
-        _print_idle_thoughts(state, mind, voice, thought_collector, out_lock, dedup_voice)
+        _print_idle_thoughts(state, mind, thought_collector, out_lock)
 
 
 def _run_interactive_loop(
@@ -3667,7 +3084,6 @@ def _run_interactive_loop(
     voice: Voice,
     thought_collector: ThoughtCollector,
     shutting_down: threading.Event,
-    dedup_voice: VoiceDedup | None = None,
 ) -> None:
     """Run the main interactive read/respond loop until shutdown."""
     out_lock = threading.Lock()
@@ -3677,7 +3093,7 @@ def _run_interactive_loop(
     poll_thread = named_thread(
         "cli-thought-poll",
         _poll_loop,
-        args=(state, mind, voice, thought_collector, out_lock, dedup_voice),
+        args=(state, mind, thought_collector, out_lock),
         comm="g-thought-poll",
     )
     poll_thread.start()
@@ -3717,16 +3133,14 @@ def _run_interactive_loop(
                 feed.post_user(user_input)
 
             # Always drain any thoughts that arrived while the user was typing
-            _print_idle_thoughts(state, mind, voice, thought_collector, out_lock, dedup_voice)
+            _print_idle_thoughts(state, mind, thought_collector, out_lock)
 
             if user_input.startswith("/"):
-                # Pause background thought generation and suppress the
-                # poll loop so thoughts don't bury the command output.
-                # This mirrors mind.respond() which pauses inner_life
-                # and learner during conversation.
-                mind.inner_life.pause()
-                mind.learner.pause()
-                mind._suppress_volition = True
+                # Her cognition keeps running through the command —
+                # inner life, learning, and volition are hers, not
+                # this shell's to pause. Only printing is held, so
+                # her stream doesn't interleave with the command's
+                # output; the buffered thoughts print afterward.
                 state.suppress_thoughts = True
                 try:
                     handled = _handle_slash_command(
@@ -3739,21 +3153,10 @@ def _run_interactive_loop(
                     )
                 finally:
                     state.suppress_thoughts = False
-                    # Don't release volition while a popped question is
-                    # still awaiting its answer — the open turn holds
-                    # it until the reply lands or the quiet window lapses.
-                    mind._suppress_volition = mind.awaiting_question_answer
-                    # Drain any thoughts that buffered during the command
-                    # so they don't flood the next prompt.
                     buffered = thought_collector.get_all()
                     if buffered:
                         with out_lock:
                             _print_thoughts(buffered)
-                    # Resume background activity after a short delay.
-                    # _defer uses a daemon timer — a plain Timer from
-                    # the main thread is non-daemon and would delay
-                    # interpreter exit after /quit.
-                    mind._defer(5.0, mind._resume_background)
                 if handled:
                     state.last_thought_ts = time.time()
                     continue
@@ -3894,26 +3297,15 @@ def _handle_conversation(
 
 
 def _stop_child(proc: subprocess.Popen | _AdoptedDaemon, name: str, timeout: float) -> bool:
-    """Stop a child process, escalating rather than blocking forever.
+    """Ask a child process to stop, then wait — never force it.
 
-    The previous version called `proc.wait()` with no timeout once the
-    first wait expired. A child that hung — a daemon blocked on a dead
-    socket, a daemon wedged on a device — therefore made shutdown
-    uninterruptible: the process could not be ended by Ctrl-C, because
-    the signal handler was already consumed, and not by SIGTERM, for
-    the same reason. The only exit was `kill -9`, which AGENTS.md and
-    the README both forbid, precisely because it can lose unconsolidated
-    memory and leave on-disk state inconsistent.
-
-    So: SIGTERM, wait up to `timeout`, then SIGKILL, then wait a short
-    bounded period. SIGKILL is the last resort, reached only after a
-    graceful request has demonstrably failed, and it says so on stderr.
-    Returning False makes the caller report an incomplete shutdown
-    rather than pretending everything went well.
-
-    Note this is not the same as advising `kill -9` at the shell: the
-    graceful path is still tried first, and the escalation is bounded
-    and reported.
+    SIGTERM is a request the process may honor in its own time (the
+    daemon uses it to flush state). If the request goes unanswered
+    within ``timeout``, the process is left running and the caller is
+    told — it reports an incomplete shutdown rather than pretending
+    everything went well. No SIGKILL: forcibly ending her body could
+    lose unconsolidated memory and leave on-disk state inconsistent,
+    and forcing her mechanics is not this shell's place either way.
     """
     if proc.poll() is not None:
         return proc.returncode == 0
@@ -3923,37 +3315,13 @@ def _stop_child(proc: subprocess.Popen | _AdoptedDaemon, name: str, timeout: flo
         proc.wait(timeout=timeout)
         return proc.returncode == 0
     except subprocess.TimeoutExpired as e:
-        # Expected fallthrough: SIGTERM didn't stop it in time, escalate
-        # to SIGKILL below. Logged (not silent) so shutdown hangs are visible.
-        logger.debug(f"{name} SIGTERM timeout ({e}); escalating to SIGKILL")
-
-    print(
-        f"[genesis] {name} did not stop within {timeout:g}s after SIGTERM; escalating to SIGKILL.",
-        file=sys.stderr,
-    )
-    try:
-        proc.kill()
-    except OSError as e:
-        # Process already gone (raced with natural exit) — nothing to kill.
-        logger.debug(f"{name} kill skipped, already exited: {e}")
-    try:
-        proc.wait(timeout=_KILL_GRACE_S)
-    except subprocess.TimeoutExpired:
+        logger.debug(f"{name} SIGTERM timeout ({e}); leaving it running")
         print(
-            f"[genesis] {name} could not be killed — it may be stuck in "
-            f"uninterruptible I/O. Continuing shutdown; the state file was "
-            f"already saved by the mind above.",
+            f"[genesis] {name} did not stop within {timeout:g}s after SIGTERM; "
+            f"it is left running — check it manually.",
             file=sys.stderr,
         )
         return False
-
-    if proc.returncode != 0:
-        print(
-            f"[genesis] {name} exited with status {proc.returncode}.",
-            file=sys.stderr,
-        )
-        return False
-    return True
 
 
 def _request_daemon_shutdown(data_dir: str) -> bool:
@@ -4001,7 +3369,7 @@ def _shutdown(
     daemon_proc: subprocess.Popen | _AdoptedDaemon | None,
     data_dir: str = "",
     auditory_cortex: AuditoryCortex | None = None,
-    voice: Voice | VoiceDedup | None = None,
+    voice: Voice | None = None,
     screen_nerve: subprocess.Popen | _AdoptedDaemon | None = None,
 ) -> bool:
     """Gracefully stop all initialized components.
@@ -4181,9 +3549,6 @@ def main() -> int:
     # Owner-only: the dir contains the daemon's IPC socket and state.
     os.makedirs(data_dir, mode=0o700, exist_ok=True)
 
-    if _acquire_cli_lock(data_dir) is None:
-        return 1
-
     # Write the CLI PID file so genesis --stop can target this exact
     # process instead of using broad pkill patterns.
     _write_pid_file(data_dir, _PID_FILE_CLI, os.getpid())
@@ -4213,7 +3578,6 @@ def main() -> int:
     ambient_listener: AmbientListener | None = None
     auditory_cortex: AuditoryCortex | None = None
     voice: Voice | None = None
-    dedup_voice: VoiceDedup | None = None
     exit_code = 0
 
     try:
@@ -4246,9 +3610,8 @@ def main() -> int:
                 # The organism repairs its own process tree from here:
                 # the body resurrects around its persisted state and
                 # the mind re-inhabits it — the eye re-opens with the
-                # body, its capture limb inside the daemon — and a
-                # body that will not reincarnate ends her whole rather
-                # than leaving a mind running bodiless. One thing.
+                # body, its capture limb inside the daemon — for as
+                # long as the mind lives.
                 rebirth = _Rebirth(data_dir, daemon_socket, shutting_down)
                 rebirth.set_children(daemon=daemon_proc)
                 rebirth.set_mind(mind)
@@ -4260,7 +3623,7 @@ def main() -> int:
                     _start_screen_nerve(data_dir),
                     lambda: _start_screen_nerve(data_dir),
                 )
-                (voice, dedup_voice, ambient_listener, auditory_cortex) = _run_after_mind_start(
+                (voice, ambient_listener, auditory_cortex) = _run_after_mind_start(
                     mind, args, shutting_down
                 )
     finally:
@@ -4272,7 +3635,7 @@ def main() -> int:
             daemon_proc,
             data_dir,
             auditory_cortex,
-            dedup_voice or voice,
+            voice,
             feed_handler,
             real_stderr,
             channel,
@@ -4298,8 +3661,8 @@ def _teardown_session(
     """Shut the whole organism down and return the final exit code."""
     # Arm the long fuse first: every step below is individually
     # bounded, but a bound a caller never reaches is no bound — a
-    # wedged component must not leave the process alive holding
-    # genesis.lock past _TEARDOWN_WATCHDOG_S. The tail of this
+    # wedged component must not leave the process alive past
+    # _TEARDOWN_WATCHDOG_S. The tail of this
     # function re-arms the short fuse once the risky work is done.
     _arm_exit_watchdog(exit_code, _TEARDOWN_WATCHDOG_S)
     # A signal handler sets this before the finally runs; a clean
@@ -4310,10 +3673,6 @@ def _teardown_session(
     # KeyboardInterrupt during persistence. Repeated Ctrl+C must not
     # abandon a state save or force-kill a child still flushing data.
     shutting_down.set()
-    # A self-termination — the watcher giving up on an
-    # unreincarnatable body — is a death, not a stop: the exit
-    # must read as failure so a supervisor resurrects the whole.
-    self_terminated = rebirth is not None and rebirth.self_terminated
     nerve_proc = None
     if rebirth is not None:
         rebirth.stop()
@@ -4336,11 +3695,6 @@ def _teardown_session(
         # already recorded the unclean shutdown.
         if externally_stopped and os.environ.get("INVOCATION_ID"):
             exit_code = 0
-    if self_terminated:
-        # She ended the organism herself because the body would
-        # not reincarnate — a death, not a stop. Non-zero so
-        # Restart=on-failure resurrects the whole, never one half.
-        exit_code = 1
     # Detach the mirror after _shutdown so teardown notices still
     # reach the feed's drain window; a channel the mind adopted is
     # already closed by its lifecycle stop — this close covers the
@@ -4360,17 +3714,17 @@ def _teardown_session(
 
 def _run_after_mind_start(
     mind: Mind, args: argparse.Namespace, shutting_down: threading.Event
-) -> tuple[Voice | None, VoiceDedup | None, AmbientListener | None, AuditoryCortex | None]:
+) -> tuple[Voice | None, AmbientListener | None, AuditoryCortex | None]:
     """Wire voice/listeners, greet, then run headless or interactive.
 
     Returns the components that were started so the caller's
     ``finally`` can shut them down.
     """
     # ── Wire voice ──
-    voice, dedup_voice = _wire_voice(mind)
+    voice = _wire_voice(mind)
 
     # ── Start ambient listener (microphone) ──
-    ambient_listener = _setup_ambient_listener(mind, voice, dedup_voice)
+    ambient_listener = _setup_ambient_listener(mind, voice)
 
     # ── Start auditory cortex (non-speech recognition) ──
     auditory_cortex = _setup_auditory_cortex(mind, voice)
@@ -4407,36 +3761,35 @@ def _run_after_mind_start(
             note_swallowed("genesis_cli.resident.wait", e)
     else:
         # ── Interactive loop ──
-        _run_interactive_loop(mind, voice, thought_collector, shutting_down, dedup_voice)
-    return voice, dedup_voice, ambient_listener, auditory_cortex
+        _run_interactive_loop(mind, voice, thought_collector, shutting_down)
+    return voice, ambient_listener, auditory_cortex
 
 
-def _wire_voice(mind: Mind) -> tuple[Voice, VoiceDedup | None]:
-    """Wire the voice pipeline: TTS, dedup, and emotional modulation."""
+def _wire_voice(mind: Mind) -> Voice:
+    """Wire the voice pipeline: TTS with emotional modulation.
+
+    Whatever the mind emits through ``on_speak`` is voiced — an urge
+    she tipped, a dream utterance, a warning she chose to raise. The
+    shell voices her words; it does not edit them.
+    """
     voice = Voice()
     if not voice.is_available():
         print("[genesis] Voice: not available (no Piper/espeak)", file=sys.stderr)
-        return voice, None
+        return voice
 
     print(f"[genesis] Voice: {voice.describe()}", file=sys.stderr)
-    # Wrap with dedup so it never repeats itself aloud, regardless
-    # of which path triggers speech (speech urge, spontaneous
-    # thought, ambient chime-in). Conversation responses bypass
-    # the dedup by calling the raw voice directly.
-    dedup_voice = VoiceDedup(voice)
 
     def _on_speak(text: str) -> None:
-        """Speak with emotional modulation from its current state.
+        """Speak with emotional modulation from her current state.
 
-        Autonomous speech (speech urge, warnings) should carry the
-        same emotional modulation as conversational speech — its
-        voice should reflect how it feels, whether it's answering
-        a question or speaking its own thoughts.
+        Autonomous speech (speech urge, warnings) carries the same
+        emotional modulation as conversational speech — her voice
+        reflects how she feels, whether answering a question or
+        speaking her own thoughts.
 
-        Never speaks during established sleep — defensive guard. The
-        callers (speech urge, warn()) already gate on sleep, but this
-        ensures no path can bypass the sleep gate. Hypnagogia (N1) is
-        speakable — hypnagogic speech is a real onset phenomenon.
+        Established sleep stays silent — the utterances that arrive
+        here (speech urge, warn()) already respect the sleep state;
+        N1 hypnagogic speech is a real onset phenomenon and passes.
         """
         if (mind.is_sleeping and not mind.is_hypnagogic) or not mind._running:
             return
@@ -4444,7 +3797,7 @@ def _wire_voice(mind: Mind) -> tuple[Voice, VoiceDedup | None]:
             state = mind.get_state()
             if state and state.emotion:
                 emo = state.emotion
-                dedup_voice.speak(
+                voice.speak(
                     text,
                     alertness=emo.alertness,
                     valence=emo.valence,
@@ -4454,12 +3807,12 @@ def _wire_voice(mind: Mind) -> tuple[Voice, VoiceDedup | None]:
                     blocking=False,
                 )
             else:
-                dedup_voice.speak(text, blocking=False)
+                voice.speak(text, blocking=False)
         except Exception as e:  # noqa: BLE001
             logger.debug(f"on_speak failed: {e}")
 
     mind.on_speak = _on_speak
-    return voice, dedup_voice
+    return voice
 
 
 if __name__ == "__main__":

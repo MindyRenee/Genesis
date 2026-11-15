@@ -81,8 +81,11 @@ logger = logging.getLogger(__name__)
 OFFER_REFRESH_S = 600.0
 #: Moves in one bout of play before she steps back and lets other urges in.
 BOUT_MOVES = 60
-#: Shapes she may point at with ACTION6 on one board.
-POINT_TARGETS = 10
+#: Fraction of the board one shape may cover before it counts as the
+#: backdrop rather than a clickable thing. The official games hit-test
+#: clicks against sprite bounding boxes, and a sprite can be large —
+#: but the dominant single-color field is the background, not a target.
+BACKDROP_COVER = 0.5
 
 
 @dataclass(slots=True)
@@ -246,13 +249,25 @@ class Arcade:
             self.world.it_acted(f"stepped away from {session.game_id}")
 
     def moves(self, board: Board) -> list[str]:
-        """The moves this board allows: plain actions, and pointing at shapes."""
+        """The moves this board allows: plain actions, and pointing at things.
+
+        ACTION6 is the game's mouse click — the official docs describe it
+        as "click/tap at (x,y)", and the games hit-test it against sprite
+        bounding boxes, so pointing at an object's centre always lands
+        inside it. Every parsed object is offered, not just the largest
+        few; only the dominant single-color field (the backdrop) is
+        skipped, since clicking it does nothing in every game.
+        """
         options = [a for a in board.actions if a not in ("RESET", POINTING_ACTION)]
         if POINTING_ACTION in board.actions:
-            shapes = sight.see_objects(board.grid, limit=POINT_TARGETS + 1)[
-                1:
-            ]  # skip the background
-            for shape in shapes[:POINT_TARGETS]:
+            area = len(board.grid) * len(board.grid[0]) if board.grid else 1
+            seen: set[tuple[int, int]] = set()
+            for shape in sight.see_objects(board.grid):
+                if shape.size > area * BACKDROP_COVER:
+                    continue
+                if shape.center in seen:
+                    continue
+                seen.add(shape.center)
                 row, col = shape.center
                 options.append(f"{POINTING_ACTION}@{row},{col}")
         return options or ["RESET"]
@@ -271,7 +286,7 @@ class Arcade:
                 row, col = (int(v) for v in at.split(","))
                 x, y = col, row
             try:
-                after = session.step(name, x=x, y=y)
+                after = session.step(name, x=x, y=y, reasoning={"thought": why})
             except (GamesUnavailable, ValueError) as exc:
                 self.last_error = str(exc)
                 return None
@@ -363,7 +378,7 @@ class Arcade:
     # ── seeing ─────────────────────────────────────────────────
 
     def see(self, how: str = "text") -> str:
-        """Look at the open board: ``text``, ``image``, ``change`` or ``objects``."""
+        """Look at the open board: ``text``, ``image``, ``objects``, ``scene`` or ``change``."""
         session = self.session
         if session is None or session.board is None:
             return "no game is open"
@@ -373,6 +388,8 @@ class Arcade:
             return str(sight.see_image(grid, self.image_dir / f"{session.game_id}-{stamp}.png"))
         if how == "objects":
             return sight.describe_objects(sight.see_objects(grid))
+        if how == "scene":
+            return sight.see_scene(grid)
         if how == "change":
             return f"moves allowed: {', '.join(self.moves(session.board))}"
         return sight.see_text(grid)
@@ -524,8 +541,11 @@ class Arcade:
             self._impulse(CHEM_NOREPINEPHRINE, 0.01)
             self._impulse(CHEM_ACETYLCHOLINE, 0.01)
             self._wave("gamma", 0.08)
+        detail = change.describe(6)
+        if new:
+            detail = f"{sight.see_scene(board.grid)}; {detail}"
         self.world.perceive(
-            f"the {board.game_id} board ({'new' if new else 'seen before'}): {change.describe(6)}",
+            f"the {board.game_id} board ({'new' if new else 'seen before'}): {detail}",
             salience=min(0.9, salience),
             source=f"arcade:{board.game_id}",
             metadata={

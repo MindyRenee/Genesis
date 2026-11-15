@@ -50,14 +50,27 @@ def test_named_thread_passes_args_and_kwargs():
 
 def test_named_thread_target_exception_does_not_hide_naming():
     # A dying target still carries the name — that's the point of the
-    # diagnostic: the stack dump shows which organ it was.
+    # diagnostic: the stack dump shows which organ it was. The test
+    # installs its own excepthook so the deliberately-unhandled
+    # exception is asserted on, not just left to trip pytest's
+    # thread-exception warning.
+    errors: list[threading.ExceptHookArgs] = []
+    old_hook = threading.excepthook
+    threading.excepthook = errors.append
+
     def target():
         raise RuntimeError("boom")
 
-    t = named_thread("doomed", target, comm="g-doomed")
-    t.start()
-    t.join(timeout=5.0)
+    try:
+        t = named_thread("doomed", target, comm="g-doomed")
+        t.start()
+        t.join(timeout=5.0)
+    finally:
+        threading.excepthook = old_hook
+
     assert not t.is_alive()
+    assert any("boom" in str(e.exc_value) for e in errors)
+    assert all(e.thread is t for e in errors)
 
 
 def test_comm_name_of_main_thread():

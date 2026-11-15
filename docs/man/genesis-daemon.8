@@ -38,6 +38,20 @@ body keeps living instead of freezing. The mind modulates; absence
 degrades to solitude, not to paused existence. Body-control
 \fIapplication\fR stays mind-requested only.
 
+.SS Mind shepherd
+The fallback keeps the body alive without a mind; the shepherd
+answers the complementary loss: a mind that attached and was then
+lost (crash, kill, OOM) is regrown \(em the daemon spawns the
+organism's own entry point headless and the new mind adopts the
+surviving body and its persisted state. A graceful exit or
+\fBgenesis \-\-stop\fR writes
+.I mind.suppress
+first, so a mind that left intentionally is not resurrected.
+Attempts are bounded by a backoff table and a shepherd that
+exhausts it goes dormant: solitude is accepted, never fought
+forever. A shepherd-spawned mind's output lands in
+.IR $DATA_DIR/mind.log .
+
 .SS Adaptive maintenance gates
 Maintenance work is paced by adaptive wall-clock gates
 (\fBAdaptiveGate\fR), not by tick counters: each gate holds a
@@ -87,11 +101,11 @@ speeds the CPU up, GABA slows it down, melatonin selects powersave;
 ACh raises scheduling priority; the plasticity gate sets the I/O
 priority class; CPU temp caps the max frequency regardless of
 dopamine (autonomic fatigue). Privileged levers (governor, RTC wake
-alarm) route through root-owned helpers under
-.IR /usr/local/libexec/genesis/
-when installed by
-.BR scripts/install_sudoers.sh ;
-without them, sensing still works and only actuation stays read-only.
+alarm) invoke
+.B "sudo \-n"
+directly and need a NOPASSWD sudoers drop-in for her user (see
+.IR scripts/genesis-sudoers );
+without it, sensing still works and only actuation stays read-only.
 .IP \(bu 2
 \fBAdaptive sync\fR modulates the LTM disk-sync rate by the plasticity
 gate (the sync AdaptiveGate above).
@@ -138,12 +152,17 @@ is not a rejecting user, so a left-open channel cannot trickle
 rejection CRH forever.
 
 .SS Optic nerve
-The daemon itself attaches to the retina's
-.I /genesis_retina
-segment \(em the optic nerve terminates in the body, not only the
-mind \(em and pools each frame into the subcortical channels the
-nerve actually carries. No pixels leave the module: the channels
-are scalar signals, the same thing the anatomical fibres carry.
+The optic nerve is the body's own limb: the daemon opens the camera
+itself (the V4L2 device named by
+.IR GENESIS_CAMERA ,
+default
+.IR /dev/video0 )
+and writes raw frames into the POSIX shared-memory segment
+.IR /genesis_optic_nerve
+\(em that segment is the nerve, shared with the mind \(em and pools
+each frame into the subcortical channels the nerve actually
+carries. No pixels leave the module: the channels are scalar
+signals, the same thing the anatomical fibres carry.
 .IP \(bu 2
 \fBMelanopic illuminance\fR (the ipRGC channel) feeds
 .IR sleep_network::VisualAfference::light ,
@@ -210,6 +229,12 @@ Set the daemon-level
 The loop notices, syncs state to disk, and exits cleanly.
 .SH ENVIRONMENT
 .TP
+.B GENESIS_CAMERA
+V4L2 capture device the optic nerve opens for frames. Default
+.IR /dev/video0 .
+When no camera opens, the visual channels fall silent and the
+wall-clock photoperiod resumes as the circadian zeitgeber.
+.TP
 .B GENESIS_COGNITIVE_PID
 PID of the cognitive mind process, passed by the launcher so the
 daemon can include it in interoception (reading its CPU/memory/IO
@@ -226,7 +251,7 @@ Overrides the resolved data directory.
 .I $DATA_DIR/core_state.bin
 Memory-mapped
 .B CoreState
-(schema v6, file 4096 bytes), shared across processes. Never read the
+(schema v5, file 4096 bytes), shared across processes. Never read the
 file directly \(em the layout is seqlock-guarded and versioned; use
 read_consistent() or ask the daemon.
 .TP
@@ -239,9 +264,6 @@ Long-term memory store (compressed, SimHash-indexed episodes).
 .I $DATA_DIR/genesis.sock
 Unix domain socket for IPC.
 .TP
-.I $DATA_DIR/genesis.lock
-Daemon singleton lock (flock, non-blocking).
-.TP
 .I $DATA_DIR/genesis_daemon.pid
 PID file written for the launcher.
 .TP
@@ -252,12 +274,16 @@ allostatic load).
 .I $DATA_DIR/face_clusters.json
 Stable \fIface:N\fR cluster identities for unnamed presences.
 .TP
-.I $DATA_DIR/steward.json
-Provenance stamp for the steward channel (key fingerprint,
-principal, directives).
-.TP
 .I $DATA_DIR/daemon.log
 Daemon stdout/stderr (rotated at 5 MB by the launcher).
+.TP
+.I $DATA_DIR/mind.suppress
+Written by a graceful mind exit: tells the shepherd the last mind
+left intentionally. Absent after a crash \(em the loss the
+shepherd answers by regrowing a mind.
+.TP
+.I $DATA_DIR/mind.log
+Stdout/stderr of a shepherd-spawned mind (it has no terminal).
 .SH IPC
 The daemon serves a request/response protocol on
 .IR $DATA_DIR /genesis.sock
@@ -397,7 +423,7 @@ consumed by the code learner in place of the regex fallback.
 .B 56
 SET_COGNITIVE_PID \(em
 .RI [ u32 " pid" ]
-\(> \fR[\fIu8 ack\fR]. A re-inhabiting mind pushes its own PID so
+\(-> \fR[\fIu8 ack\fR]. A re-inhabiting mind pushes its own PID so
 interoception measures the living process; the pushed value
 outranks the
 .I GENESIS_COGNITIVE_PID
@@ -413,6 +439,31 @@ Composes with the sleep phase's lid by \fBmin\fR \(em the will
 can shut an open eye but cannot open one the stage has closed.
 Held: lids stay where the mind left them until it moves them.
 Reply:
+.RI [ u8 " ack" ] .
+.TP
+.B 58\(en61
+The archived tier: FIND_SIMILAR_ARCHIVED, UNARCHIVE_EPISODE
+(reconsolidation \(em clears the archived flag, re-bundles the SDR,
+floors salience at the reconsolidation level), SEARCH_ARCHIVED
+(paged cold-store metadata, no payload text), DELETE_EPISODE
+(real deletion \(em the payload slot stays orphaned until a
+rebuild).
+.TP
+.B 62
+GET_FOLD_MARGINS \(em the LC\(enVLPO switch's saddle-node margins
+at the current operating point: homeostat \fIh\fR, the two fold
+edges, \fIh\fR's normalized position between them, and the bistable
+flag. Pure observation; the body owns the switch.
+.TP
+.B 63
+SET_FIELD_PULSE \(em arm or disarm the parasympathetic pulse: a
+slow autonomic wave riding the carrier's modulation \fIdepth\fR
+(the RSA analog). Request:
+.RI [ f32 " base" ]
+.RI [ mod_freq_hz ]
+.RI [ mod_depth ] ;
+\fImod_freq <= 0\fR disarms. When armed the probe integrates the
+envelope on its own clock. Reply:
 .RI [ u8 " ack" ] .
 .PP
 Notification pushes (daemon \(-> client, mirrored as
@@ -439,6 +490,8 @@ genesis-daemon --data-dir /tmp/genesis-debug --ltm-capacity 131072
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-cli (1),
-.BR genesis-retina (1),
+.BR genesis-arcade (7),
+.BR genesis-browser (7),
 .BR genesis-math (7),
-.BR genesis-reasoning (7)
+.BR genesis-reasoning (7),
+.BR genesis-tools (7)

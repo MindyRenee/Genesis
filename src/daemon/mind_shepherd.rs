@@ -269,8 +269,8 @@ impl MindShepherd {
 
         // A child still in flight blocks any parallel spawn. Past the
         // boot grace with the lease still expired it counts as a
-        // failed attempt — but it keeps blocking, since a wedged CLI
-        // holds the singleton lock and a second spawn would only fail.
+        // failed attempt — but it keeps blocking: a second spawn
+        // would be a second mind, not a rescue.
         let boot_grace = self.boot_grace_s();
         if let Some(p) = self.pending.as_mut() {
             if !p.counted && p.spawned_at.elapsed().as_secs_f32() >= boot_grace {

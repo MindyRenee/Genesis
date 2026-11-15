@@ -15,6 +15,8 @@ Subsystems:
         complexity, and change-impact surfaces for Python source
     project_creator, project_composer — composing real projects from
         its concept network
+    hid — virtual keyboard and pointer over /dev/uinput: her hand on
+        the machine's own input bus
 """
 
 from __future__ import annotations

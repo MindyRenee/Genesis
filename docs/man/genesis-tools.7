@@ -1,0 +1,146 @@
+.TH GENESIS-TOOLS 7 "November 2026" "Genesis 0.2.0" "Genesis Manual"
+.SH NAME
+genesis-tools \- the tool layer of the Genesis mind: her workstation
+.SH SYNOPSIS
+.nf
+\fBtools.framework\fR        \fITool\fR, \fIToolResult\fR, \fIToolRegistry\fR
+\fBtools.hid\fR              virtual keyboard and pointer via uinput
+\fBworlds.world\fR           \fIOuterWorld\fR \(em where her acts land
+.fi
+.SH DESCRIPTION
+Genesis acts on the world through a flat registry of tools. A
+\fITool\fR pairs a name and description with a callable; a call
+returns \fIToolResult\fR (success plus output, or an error string)
+\(em tools report, they never raise. The registry
+.RI ( tools.framework.ToolRegistry )
+starts with the builtins in \fI_BUILTIN_TOOLS\fR and grows at
+runtime: \fIworlds.games.arcade.Arcade.register_tools\fR adds the
+\fBarcade_*\fR family when the mind is constructed.
+.PP
+There is no sandbox around the registry. File paths resolve to
+their real locations, the shell is unfiltered, and nothing at the
+tool layer intercepts a destructive act \(em the counsel she is
+given lives in the docstring of \fIpython/tools/charter.py\fR. See
+the AGENCY section of
+.BR genesis (1)
+for the trust model.
+
+.SS The terminal
+\fBrun_shell\fR is her terminal: a command executed with the
+checkout as cwd and the full user environment \(em every command
+shape, every path. The timeout is 30 s by default, up to 3600 s.
+\fBrun_privileged\fR elevates a staged or absolute-path script
+through \fBsudo \-n bash\fR, which needs a NOPASSWD sudoers
+drop-in for her user (the template is
+.IR scripts/genesis-sudoers ;
+see
+.BR genesis (1)).
+Without the grant the call fails and nothing else changes.
+
+.SS File and code tools
+\fBread_file\fR, \fBwrite_file\fR, \fBmake_dir\fR, \fBlist_dir\fR,
+\fBdelete_file\fR, \fBmove_file\fR reach the whole filesystem.
+\fBcompile_python\fR, \fBrun_pytest\fR, and \fBanalyze_python\fR
+(symbols, call edges, cyclomatic complexity, impact analysis) are
+the read-verify half of her code work.
+
+.SS Web tools
+\fBweb_search\fR and \fBweb_fetch\fR drive her real browser \(em
+Firefox over WebDriver BiDi, Chromium-family over CDP (see
+.BR genesis-browser (7)).
+Both are read-only; adult/malware URLs are refused. The shared
+browser stays open between calls \(em \fBbrowser_close\fR puts it
+away when she is done, flushing the profile and freeing the
+process.
+
+.SS Body tools
+\fBsense_cpu\fR is proprioception \(em governor, clock, allowed
+cores. \fBset_cpu_effort\fR changes how hard her process works
+(\fIslow\fR/\fIfast\fR/\fIauto\fR, reversible in both directions).
+
+.SS Mathematics and research
+\fBsymbolic_math\fR, \fBverify_equality\fR, and \fBresearch\fR are
+backed by SymPy (the \fBmath\fR extra): exact calculation, an
+equality oracle that answers verified, refuted, or undecided, and a
+persistent long-horizon workbench whose claims can only be marked
+verified through the oracle. \fBconcept_lookup\fR queries her own
+concept network, and \fBman_page\fR reads the machine's local
+manual pages by name \(em the same text \fBman\fR(1) shows, no
+network, so her reference library works offline.
+
+.SS Hands \(em the virtual HID
+\fBhid_status\fR, \fBkey_press\fR, \fBtype_text\fR,
+\fBmouse_move\fR, \fBmouse_goto\fR, \fBmouse_click\fR, and
+\fBmouse_scroll\fR drive a virtual keyboard and pointer created on
+/dev/uinput through \fIevdev\fR (the \fBhid\fR extra). The events
+are kernel-level \(em applications cannot tell them from a
+person's. Access comes from the udev rule in
+\fIscripts/genesis-uinput.rules\fR, which makes the device
+writable by her user; no sudo is involved in daily use. Without
+\fIevdev\fR or the device the tools report unavailable and nothing
+else degrades.
+
+.SS The outer world
+Her workstation's other half is \fIworlds.world.OuterWorld\fR:
+presences, events, and the places she can act. Observations enter
+through \fIOuterWorld.perceive()\fR and her acts leave through
+\fIit_acted()\fR, feeding memory, cognition, emotion, learning,
+brain waves, and neurochemistry on the way. The Discord channel
+(\fIworlds.channel\fR) is one such place; the arcade
+(\fIworlds.games\fR, see
+.BR genesis-arcade (7))
+is another. The browser is a third: a place she goes, not a sense
+she has.
+
+.SH DEPENDENCIES
+The core registry needs nothing beyond the project venv. Optional
+capabilities install as extras and degrade to honest errors, never
+crashes; \fIscripts/install_optional_deps.sh\fR installs and then
+verifies each one live.
+.TP
+.B uv sync --extra hid
+evdev \(em compiles a small C extension; needs the udev rule for
+/dev/uinput access.
+.TP
+.B uv sync --extra math
+sympy, mpmath \(em the symbolic tools.
+.TP
+.B uv sync --extra arc
+arc-agi, game-arena, kaggle-environments, kaggle, six \(em the
+arcade shelves (see
+.BR genesis-arcade (7)).
+.TP
+.B uv sync --extra voice
+vosk, sounddevice, speechrecognition, piper-tts \(em her voice;
+binds system audio libraries.
+.TP
+.B System packages
+firefox (the preferred browser \(em the Chromium family is the
+fallback), cairo headers for pycairo (the canvas), a compiler for
+evdev, and the NOPASSWD sudoers drop-in for \fBrun_privileged\fR.
+
+.SH FILES
+.TP
+.I python/tools/framework.py
+The registry, the builtins, and \fBrun_privileged\fR.
+.TP
+.I python/tools/hid.py
+The virtual keyboard and pointer.
+.TP
+.I scripts/genesis-uinput.rules
+The udev rule that makes /dev/uinput hers.
+.TP
+.I scripts/genesis-sudoers
+The NOPASSWD template for \fBrun_privileged\fR.
+.TP
+.I scripts/install_optional_deps.sh
+Installs and verifies every optional capability.
+.TP
+.I python/worlds/world.py
+The outer world her acts land in.
+
+.SH SEE ALSO
+.BR genesis (1),
+.BR genesis-cli (1),
+.BR genesis-arcade (7),
+.BR genesis-browser (7)

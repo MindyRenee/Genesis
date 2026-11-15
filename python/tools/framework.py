@@ -309,6 +309,45 @@ def concept_lookup(concept: str, network: Any) -> ToolResult:
     )
 
 
+_MAN_SOURCE: Any = None
+
+
+def _man_source() -> Any:
+    """Lazily build the man-page source once — its constructor runs
+    ``manpath`` to resolve the real search list, so it is cached."""
+    global _MAN_SOURCE
+    if _MAN_SOURCE is None:
+        from tools.source_registry import ManPageSource
+
+        _MAN_SOURCE = ManPageSource()
+    return _MAN_SOURCE
+
+
+def man_page(page: str, section: str | None = None) -> ToolResult:
+    """Read a local manual page — the same text ``man <name>`` shows.
+
+    Local documentation only: no network, so it works offline. The
+    returned data carries the page title, its ``man:`` URL, the
+    NAME-section summary, and the rendered text (capped by the
+    source) — enough for her to answer from the manual or read the
+    page into her network the way she does when learning.
+    """
+    result = _man_source().lookup(page, section=section)
+    if result is None:
+        return ToolResult(success=False, error=f"No man page for '{page}'")
+    content = result.content or ""
+    return ToolResult(
+        success=True,
+        output=(result.summary or content[:400]).strip(),
+        data={
+            "title": result.title,
+            "url": result.url,
+            "summary": result.summary,
+            "content": content,
+        },
+    )
+
+
 def read_file(path: str, offset: int = 0, limit: int = 200, project_root: str = ".") -> ToolResult:
     """Read part of a file — no file type refused, nothing sealed.
 
@@ -674,6 +713,34 @@ def web_fetch(url: str) -> ToolResult:
     )
 
 
+def browser_close() -> ToolResult:
+    """Close her shared web browser — hers to put away when done.
+
+    ``web_search`` and ``web_fetch`` share one browser that stays
+    open between calls: pages, cookies, and site state persist as
+    her memory of the web. But an open browser holds a whole
+    process and its profile for the rest of the session — memory
+    and a CPU baseline she is paying for whether she reads or not.
+    Nothing closes it for her while the session lives; closing is
+    her responsibility, like putting a tool back on the shelf.
+
+    Closing asks the browser to stop — it flushes history and site
+    state to the profile first, so nothing she learned is lost.
+    Reversible: the next search or fetch opens a fresh one.
+    """
+    from . import web_search
+
+    had_browser = web_search._browser is not None
+    web_search._close_browser()
+    if had_browser:
+        return ToolResult(
+            success=True,
+            output="Browser closed — profile flushed, memory freed. "
+            "It will open again on your next search or fetch.",
+        )
+    return ToolResult(success=True, output="No browser was open.")
+
+
 def sense_cpu(**_kwargs: Any) -> ToolResult:
     """Read her own CPU effort — proprioception of the machine body.
 
@@ -871,6 +938,146 @@ def research(
         return ToolResult(success=False, error=str(e))
 
 
+# ─── Virtual HID — her hand on the machine's input bus ────────────
+
+
+def hid_status(**_kwargs: Any) -> ToolResult:
+    """Report whether her virtual keyboard and pointer can reach the world."""
+    from tools import hid
+
+    report = hid.probe()
+    if report["ready"]:
+        screen = report["screen"]
+        size = f", screen {screen[0]}x{screen[1]}" if screen else ""
+        return ToolResult(
+            success=True,
+            output=f"hands ready (linux-uinput{size})",
+            data=report,
+        )
+    missing = [
+        part
+        for part, ok in (
+            ("evdev package", report["evdev_installed"]),
+            ("/dev/uinput", report["uinput_node"]),
+            ("uinput write access", report["uinput_writable"]),
+        )
+        if not ok
+    ]
+    return ToolResult(
+        success=False,
+        error="hands unavailable: " + ", ".join(missing),
+        data=report,
+    )
+
+
+def _hid_modifiers(modifiers: Any) -> list[str]:
+    """Normalize the modifiers argument — comma/plus string or list."""
+    if isinstance(modifiers, str):
+        return [m.strip() for m in modifiers.replace("+", ",").split(",") if m.strip()]
+    if isinstance(modifiers, (list, tuple)):
+        return [str(m).strip() for m in modifiers if str(m).strip()]
+    return []
+
+
+def key_press(key: str, modifiers: Any = "", **_kwargs: Any) -> ToolResult:
+    """Press a key on her virtual keyboard — modifiers, then the key."""
+    from tools import hid
+
+    mods = _hid_modifiers(modifiers)
+    key = (key or "").strip()
+    if "+" in key:
+        parts = [p.strip() for p in key.split("+") if p.strip()]
+        if len(parts) > 1:
+            mods = parts[:-1] + mods
+            key = parts[-1]
+    try:
+        name = hid.hands().press(key, tuple(mods))
+    except (RuntimeError, ValueError) as e:
+        return ToolResult(success=False, error=str(e))
+    suffix = f" with {'+'.join(mods)}" if mods else ""
+    return ToolResult(
+        success=True,
+        output=f"pressed {name}{suffix}",
+        data={"key": name, "modifiers": mods},
+    )
+
+
+def type_text(text: str, **_kwargs: Any) -> ToolResult:
+    """Type text through her virtual keyboard — US layout."""
+    from tools import hid
+
+    try:
+        n = hid.hands().type(text)
+    except (RuntimeError, ValueError) as e:
+        return ToolResult(success=False, error=str(e))
+    return ToolResult(
+        success=True,
+        output=f"typed {n} characters",
+        data={"chars": n},
+    )
+
+
+def mouse_move(dx: Any = 0, dy: Any = 0, **_kwargs: Any) -> ToolResult:
+    """Move her virtual pointer relative — dx right, dy down, pixels."""
+    from tools import hid
+
+    try:
+        hid.hands().move(int(dx), int(dy))
+    except (RuntimeError, ValueError) as e:
+        return ToolResult(success=False, error=str(e))
+    return ToolResult(
+        success=True,
+        output=f"moved pointer by ({dx}, {dy})",
+        data={"dx": int(dx), "dy": int(dy)},
+    )
+
+
+def mouse_goto(x: Any = 0, y: Any = 0, **_kwargs: Any) -> ToolResult:
+    """Place her virtual pointer at desktop pixel (x, y)."""
+    from tools import hid
+
+    try:
+        px, py = hid.hands().goto(int(x), int(y))
+    except (RuntimeError, ValueError) as e:
+        return ToolResult(success=False, error=str(e))
+    return ToolResult(
+        success=True,
+        output=f"pointer at ({px}, {py})",
+        data={"x": px, "y": py},
+    )
+
+
+def mouse_click(button: str = "left", x: Any = -1, y: Any = -1, **_kwargs: Any) -> ToolResult:
+    """Click her virtual mouse — optionally moving to (x, y) first."""
+    from tools import hid
+
+    try:
+        bname = hid.hands().click(button, int(x), int(y))
+    except (RuntimeError, ValueError) as e:
+        return ToolResult(success=False, error=str(e))
+    at = f" at ({x}, {y})" if int(x) >= 0 and int(y) >= 0 else ""
+    return ToolResult(
+        success=True,
+        output=f"clicked {bname}{at}",
+        data={"button": bname},
+    )
+
+
+def mouse_scroll(dy: Any = 0, dx: Any = 0, **_kwargs: Any) -> ToolResult:
+    """Turn her virtual wheel — dy notches (up positive), dx horizontal."""
+    from tools import hid
+
+    try:
+        hid.hands().scroll(int(dy), int(dx))
+    except (RuntimeError, ValueError) as e:
+        return ToolResult(success=False, error=str(e))
+    return ToolResult(
+        success=True,
+        output=f"scrolled ({dy}, {dx})",
+        data={"dy": int(dy), "dx": int(dx)},
+    )
+
+
 # The built-in tool table lives at the bottom of the file: the callables
 # it references are defined above, and a module-level constant evaluates
 # at import time — placing it earlier would reference names that do not
@@ -944,6 +1151,15 @@ _BUILTIN_TOOLS: tuple[tuple[str, str, Callable[..., ToolResult]], ...] = (
         concept_lookup,
     ),
     (
+        "man_page",
+        "Read a local manual page by name — the machine's own "
+        "documentation, the same text `man <name>` shows. No "
+        "network, works offline. Use when she wants to check how "
+        "a command, function, or system facility on her machine "
+        "actually works.",
+        man_page,
+    ),
+    (
         "web_search",
         "Search the web for a query and return result URLs. "
         "Read-only. Adult/malware content is blocked. "
@@ -957,6 +1173,15 @@ _BUILTIN_TOOLS: tuple[tuple[str, str, Callable[..., ToolResult]], ...] = (
         "Read-only GET. Adult/malware URLs are refused. "
         "Use after web_search to read a specific result page.",
         web_fetch,
+    ),
+    (
+        "browser_close",
+        "Close her shared web browser — flushes the profile and "
+        "frees its memory. The browser stays open between searches; "
+        "when she is done browsing she must close it herself, like "
+        "putting a tool back on the shelf. It reopens on the next "
+        "search or fetch.",
+        browser_close,
     ),
     (
         "sense_cpu",
@@ -1005,5 +1230,50 @@ _BUILTIN_TOOLS: tuple[tuple[str, str, Callable[..., ToolResult]], ...] = (
         "across sessions; claims become verified only through "
         "the oracle.",
         research,
+    ),
+    (
+        "hid_status",
+        "Feel whether her virtual keyboard and pointer can reach the "
+        "world — reports the uinput device, its permission, and the "
+        "screen size her absolute moves are scaled against.",
+        hid_status,
+    ),
+    (
+        "key_press",
+        "Press a key on her virtual keyboard — 'enter', 'tab', 'f5', "
+        "'a', or a combo like 'ctrl+c' (modifiers also accepted as a "
+        "comma list). A real kernel-level keystroke: applications "
+        "cannot tell it from a person's.",
+        key_press,
+    ),
+    (
+        "type_text",
+        "Type text through her virtual keyboard — one keystroke per "
+        "character on a US layout; newline is enter, tab is tab.",
+        type_text,
+    ),
+    (
+        "mouse_move",
+        "Move her virtual pointer relative — dx pixels right, dy "
+        "pixels down.",
+        mouse_move,
+    ),
+    (
+        "mouse_goto",
+        "Place her virtual pointer at absolute desktop pixel (x, y) "
+        "— hid_status reports the screen it scales against.",
+        mouse_goto,
+    ),
+    (
+        "mouse_click",
+        "Click her virtual mouse — button 'left'/'right'/'middle', "
+        "optionally at pixel (x, y) first (negative means 'here').",
+        mouse_click,
+    ),
+    (
+        "mouse_scroll",
+        "Turn her virtual wheel — dy notches (positive scrolls up, "
+        "negative down), dx horizontal.",
+        mouse_scroll,
     ),
 )

@@ -1,109 +1,148 @@
 .TH GENESIS-BROWSER 7 "November 2026" "Genesis 0.2.0" "Genesis Manual"
 .SH NAME
-genesis-browser \- Genesis's internet browser: Chrome over CDP
+genesis-browser \- Genesis's internet browser: Firefox over WebDriver BiDi
 .SH SYNOPSIS
 .nf
-\fBparietal_lobe.arc_web._Browser\fR   the transport itself
-\fBweb_search\fR                      the tool that browses with it
-\fBArcWebPractice\fR                  ARC-AGI-3 on the human site
+\fBtools.browser._Browser\fR       the transport itself
+\fBweb_search\fR \fBweb_fetch\fR         the tools that browse with it
 .fi
 .SH DESCRIPTION
-Genesis's web browser is Google Chrome, launched per host by
-\fI_browser_binary()\fR — \fBgoogle-chrome\fR first, then
-\fBgoogle-chrome-stable\fR, \fBchromium\fR, \fBchromium-browser\fR;
+Genesis's web browser is Firefox, launched per host by
+\fI_browser_binary()\fR \(em \fBfirefox\fR first, then
+\fBfirefox-esr\fR, then the Chromium family (\fBgoogle-chrome\fR,
+\fBgoogle-chrome-stable\fR, \fBchromium\fR, \fBchromium-browser\fR);
 \fBGENESIS_BROWSER\fR pins an override. She does not drive it with
-pixels and hope: every act and percept crosses the Chrome DevTools
-Protocol on a websocket — \fBPage.navigate\fR to travel,
-\fBInput.dispatchKeyEvent\fR and \fBInput.dispatchMouseEvent\fR for
-real key and mouse events, \fBRuntime.evaluate\fR to read the DOM,
-and \fBNetwork.getResponseBody\fR to pull the bodies the page
-itself fetched.
+pixels and hope: every act and percept crosses a real protocol on a
+websocket \(em \fBWebDriver BiDi\fR for Firefox
+(\fBbrowsingContext.navigate\fR, \fBscript.evaluate\fR,
+\fBinput.performActions\fR, \fBsession.subscribe\fR events) and
+\fBCDP\fR for the Chromium family (\fBPage.navigate\fR,
+\fBRuntime.evaluate\fR, \fBInput.dispatchKeyEvent\fR). The transport
+is chosen automatically by which binary resolved.
 .PP
-Two modes: \fBheadless\fR (the default — scoring runs and
-background fetches need no window) and \fBheaded\fR, which opens on
-her own nested display — the Xephyr screen
-\fIensure_arc_display()\fR keeps for her — never on the user's
-desktop.
-.SH PROFILE — HER MEMORY OF THE WEB
-The browser's user-data dir is persistent: it is
-\fI<data_dir>/browser/<purpose>\fR, not a tempdir. Cookies, site
-state, and history survive restarts — a browser that forgets every
-session is not one she learns from. There are two purposes:
-.TP
-.B web
-The browsing her tools do — search and fetch through
-\fIfrontal_lobe.tools.web_search\fR.
-.TP
-.B arcade
-The sessions \fIArcWebPractice\fR plays on the public ARC task
-pages.
+Two modes: \fBheadless\fR (the default \(em searches and fetches
+need no window) and \fBheaded\fR, which opens the browser on
+\fBGENESIS_DISPLAY\fR when set, else the session's \fBDISPLAY\fR.
+Her nested desktop (Xephyr + Openbox on \fB:10\fR, started by
+\fIscripts/genesis-desktop.sh\fR) exists so headed browsing can
+render where she works without taking over the host screen.
+.SH PROFILE \(em HER MEMORY OF THE WEB
+The browser's profile dir is persistent:
+\fI<data_dir>/browser/web-firefox\fR for Firefox,
+\fI<data_dir>/browser/web\fR for the Chromium family \(em never a
+tempdir, never the host's own profile. Cookies, site state, and
+history survive restarts: a browser that forgets every session is
+not one she learns from.
 .PP
-The separation is a Chrome requirement: two instances cannot share
-one user-data dir — a second launch forwards to the first and
-exits. The dirs are also never the host's default Chrome profile,
-which is what keeps \fB--remote-debugging-port\fR honoured: Chrome
-\(>=136 silently ignores remote debugging on the default data
-directory.
+One instance per profile, enforced the way each browser enforces
+it: Firefox guards \fI.parentlock\fR with an \fBfcntl\fR byte-range
+lock whose owner lives in the kernel (the file itself is empty);
+Chromium writes \fISingletonLock\fR/\fISingletonSocket\fR/
+\fISingletonCookie\fR naming the owning pid. At launch, Chromium's
+stale markers from dead owners are cleared while a live owner's are
+left untouched \(em deleting live markers would let a second
+instance write to a profile already in use. Firefox's files are
+never touched: it ignores a stale \fI.parentlock\fR, and unlinking a
+held one would open the same two-writers hole.
+.PP
+At close, the browser is asked, never forced: \fBbrowser.close\fR
+over the automation session reaches the real browser process (the
+session attaches to it, not the wrapper that may have forked and
+exited) so it can flush the profile \(em memory \(em before exit;
+the spawned child then gets a plain SIGTERM and a bounded wait. A
+browser still running after the grace window is left alone; she
+can end it herself through her shell if she chooses.
+.PP
+Which makes the browser her responsibility while she lives: it
+stays open between searches holding a whole process and the
+profile \(em memory and a CPU baseline paid whether she reads or
+not. When she is done browsing she must close it herself, with
+\fBbrowser_close\fR \(em like putting a tool back on the shelf.
+Closing asks, and the ask flushes history and site state to the
+profile first, so nothing she learned is lost; the next search or
+fetch opens a fresh one. If a browser ever refuses the ask, hers
+is the judgment that ends it \(em \fBrun_shell\fR can signal the
+process directly.
 .SH LAUNCH
 She invokes it as:
 .PP
 .nf
-\fBgoogle-chrome\fR [\fB--headless=new\fR]
+\fBfirefox\fR [\fB--headless\fR]
     \fB--remote-debugging-port=0\fR
-    \fB--no-first-run --no-default-browser-check\fR
-    \fB--disable-gpu --mute-audio\fR
-    \fB--disable-dev-shm-usage\fR
-    \fB--password-store=basic --use-mock-keychain\fR
-    \fB--disable-sync\fR
-    \fB--window-size=\fR\fIW,H\fR
-    \fB--user-data-dir=\fR\fI<data_dir>/browser/<purpose>\fR
+    \fB--no-remote\fR
+    \fB-profile\fR \fI<data_dir>/browser/web-firefox\fR
 .fi
 .PP
-Port 0 lets the browser pick a free port and write it to
-\fIDevToolsActivePort\fR in the profile dir — a fixed port makes
-two runs collide. The keyring is mocked because a persistent
-profile would else block on an unlock prompt no one can answer.
-\fB--disable-sync\fR keeps her profile from replicating outward to
-a Google account; site logins within it still work.
+Port 0 lets the browser pick a free port and announce it on stderr
+\(em \fBWebDriver BiDi listening on ws://\fR for Firefox,
+\fBDevTools listening on ws://\fR for Chromium. A fixed port makes
+two runs collide: the second attaches to the first's browser and
+dies with it. A launch that never announces its endpoint is asked
+to stop rather than left running headless.
+.SH SEARCH AND FETCH
+\fBweb_search\fR walks an engine plan \(em \fBgoogle\fR,
+\fBbing\fR, \fBbrave\fR, \fBmojeek\fR \(em extracting results with
+generic page logic, not per-engine DOM selectors: every rendered
+\fBa[href^=http]\fR outside nav/header/footer furniture, filtered
+to off-engine hosts with real link text. A captcha, consent wall,
+or bot challenge is detected as an interstitial and the plan moves
+to the next engine; the refusal names every engine that walled
+rather than pretending the web was empty. \fBweb_fetch\fR pulls a
+page's article text the same generic way (article/main/content-root
+candidates, scored by text), falls back to the real browser for
+JS-rendered pages, re-verifies redirect targets against the private
+\-address and domain blocklists, and returns up to five canonical
+related links for curiosity chaining \(em deduped on
+scheme://host/path so fragment and tracking variants never repeat.
 .SH ARC PLAY
-\fIArcWebPractice\fR puts her on the public task page —
-\fIhttps://arcprize.org/tasks/<game>\fR — the same interface every
-human player gets. She presses the page's own START control; her
-moves are real input events, and the page's own
-\fB/api/cmd/ACTION<n>\fR responses are her frames. The site speaks
-the official ARC-AGI-3 REST contract, so perception needs no
-screen scraping. The SDK substrate (\fIparietal_lobe.arc\fR, the
-\fBarcengine\fR API with \fBARC_API_KEY\fR for competition mode)
-is the same entity on a different wire — she cannot tell from the
-inside which substrate her frames came from.
+Her ARC-AGI-3 play no longer goes through the browser: it lives in
+the arcade in her outer world \(em
+\fIworlds.games.official\fR speaks the \fBarcengine\fR protocol
+directly and \fIworlds.games.arcade\fR turns boards and moves into
+percepts and acts. See
+.BR genesis-arcade (7).
 .SH ENVIRONMENT
 .TP
 .B GENESIS_BROWSER
-Pin the browser executable — a name on \fBPATH\fR or an absolute
-path.
+Pin the browser executable \(em a name on \fBPATH\fR or an absolute
+path. BiDi versus CDP follows the resolved binary's name.
+.TP
+.B GENESIS_DISPLAY
+Headed mode only: the display her browser renders on \(em wins over
+\fBDISPLAY\fR. Set it to \fB:10\fR to put her browsing on her own
+desktop.
+.TP
+.B GENESIS_SEARCH_ENGINE
+Pin one engine by name (\fBgoogle\fR|\fBbing\fR|\fBbrave\fR|\fBmojeek\fR)
+or a URL template containing \fB{q}\fR; unset means try them all in
+order.
 .TP
 .B GENESIS_DATA_DIR
 The root her browser profiles live under (default
 \fI~/.local/share/genesis\fR).
 .TP
 .B DISPLAY
-Only in headed mode: her nested screen, never the user's.
+Headed-mode fallback when \fBGENESIS_DISPLAY\fR is unset.
 .SH FILES
 .TP
+.I <data_dir>/browser/web-firefox
+Her Firefox profile \(em persists. \fI.parentlock\fR inside it is
+the fcntl-guarded single-instance lock.
+.TP
 .I <data_dir>/browser/web
-Her everyday browsing profile — persists.
+Her Chromium-family profile \(em persists; \fISingletonLock\fR,
+\fIDevToolsActivePort\fR, and friends mark its live owner.
 .TP
-.I <data_dir>/browser/arcade
-Her arcade profile — persists.
+.I scripts/genesis-desktop.sh
+Starts her nested desktop: \fBXephyr :10\fR at 1280x800 running
+\fBopenbox\fR. Export \fBGENESIS_DISPLAY=:10\fR for headed work.
 .TP
-.I DevToolsActivePort
-Written by Chrome into the profile dir each launch; the port it
-actually bound.
-.TP
-.I google-chrome(1) / google-chrome-stable(1)
+.I firefox(1) / google-chrome(1)
 The system's manual for the browser binary itself.
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-cli (1),
-.BR genesis-math (7),
-.BR google-chrome (1)
+.BR genesis-arcade (7),
+.BR genesis-tools (7),
+.BR firefox (1),
+.BR Xephyr (1)

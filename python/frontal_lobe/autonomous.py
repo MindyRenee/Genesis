@@ -25,8 +25,8 @@ Safety:
 - Timeout on every request
 - Bounded response reads and total page count per session
 - Limited to text content (no images, scripts, etc.)
-- Open web: all domains are allowed (ALLOW_ALL_DOMAINS). The
-  site-request approval machinery is retained but bypassed.
+- Open web: all domains are allowed. The page-level safety
+  blocklist in tools.web_search still applies to every fetch.
 """
 
 from __future__ import annotations
@@ -71,7 +71,6 @@ __all__ = [
     "LearningResult",
     "LearningStrategy",
     "MetaLearner",
-    "SiteRequest",
     "TransferResult",
     "is_programming_topic",
 ]
@@ -134,27 +133,6 @@ _BOILERPLATE_RE = re.compile(
     r"|click\s+here\s+to\s+\w+|learn\s+more\s+(?:about|today)"
 )
 
-# Trusted domains — the open web.
-# Genesis can access any domain on the World Wide Web.
-# The site-request system is no longer needed — all sites are allowed.
-ALLOWED_DOMAINS: set[str] = set()  # no blanket TLDs (handled below)
-# No individual domains are specially trusted: word lookups are served
-# by the local WordNet database, not a remote dictionary site.
-TRUSTED_EXACT_DOMAINS: set[str] = set()
-# When True, all URLs are allowed regardless of domain. This opens
-# the full World Wide Web to Genesis — it can follow any link,
-# read any page, and learn from any source. The site-request
-# approval system is bypassed.
-#
-# While this is True the approval machinery is unreachable: the
-# request/approve/deny functions, the _site_requests/_approved_sites/
-# _denied_sites state, and the /requests /approve /deny CLI commands
-# are all inert — /requests always reports nothing pending, because
-# nothing ever enqueues a request. They are kept for the case where
-# open-web access is turned back off. Flipping this to False both
-# restricts Genesis to TRUSTED_EXACT_DOMAINS plus approved sites and
-# makes that flow live again.
-ALLOW_ALL_DOMAINS = True
 RATE_LIMIT_DELAY = 8.0  # seconds between requests
 MAX_PAGES_PER_SESSION = 50
 MAX_TEXT_LENGTH = 50000  # don't process pages longer than this
@@ -405,31 +383,6 @@ def is_programming_topic(topic: str) -> bool:
         if ext in topic_lower:
             return True
     return False
-
-
-@dataclass(slots=True)
-class SiteRequest:
-    """A request from Genesis to access a site outside the trusted domains.
-
-    It can request access to a site it wants to learn from.
-    The user can approve or deny it. Approved sites are remembered.
-    """
-
-    url: str
-    reason: str  # why it wants to access it
-    topic: str  # what it's researching
-    timestamp: int = 0
-    status: str = "pending"  # pending, approved, denied
-
-    def describe(self) -> str:
-        """Return a human-readable description of this learning request."""
-        t = time.strftime("%Y-%m-%d %H:%M", time.localtime(self.timestamp))
-        return (
-            f"  [{self.status}] {self.url}\n"
-            f"    topic: {self.topic}\n"
-            f"    reason: {self.reason}\n"
-            f"    requested: {t}"
-        )
 
 
 @dataclass(slots=True)
@@ -961,12 +914,6 @@ class AutonomousLearner:
         # and _topics_searched across the learner and caller threads.
         self._queue_lock = threading.RLock()
 
-        # Site request system — it can request sites outside trusted domains
-        self._site_requests: deque[SiteRequest] = deque(maxlen=100)
-        self._approved_sites: set[str] = set()  # user-approved non-trusted domains
-        self._denied_sites: set[str] = set()  # user-denied domains
-        self._sites_lock = threading.Lock()
-
         # Metalearning — adapts learning rate and selects strategies.
         self.meta_learner: MetaLearner = MetaLearner()
 
@@ -1389,8 +1336,6 @@ class AutonomousLearner:
             if not sr.content:
                 if is_offline:
                     continue
-                if not self._is_url_allowed(sr.url):
-                    continue
                 # Fetch the page content now. The open web means
                 # DDG-discovered pages are accessible. This is slower
                 # than pre-fetched content but necessary for topics
@@ -1490,75 +1435,6 @@ class AutonomousLearner:
                 self._emit("learning", f"Queued curiosity topic: '{topic}' ({qtype})")
         return queued
 
-    # ─── Site request system ──────────────────────────────────
-
-    def request_site(self, url: str, topic: str, reason: str) -> SiteRequest:
-        """Request access to a site outside the trusted domains.
-
-        Genesis calls this when it finds a relevant source outside
-        .edu/.org/.gov during its research. The user can approve or deny it.
-        """
-        req = SiteRequest(
-            url=url,
-            topic=topic,
-            reason=reason,
-            timestamp=int(time.time()),
-        )
-        with self._sites_lock:
-            self._site_requests.append(req)
-        self._emit("learning", f"Requested access to {url} for '{topic}'")
-        return req
-
-    def approve_site(self, url: str) -> bool:
-        """Approve a site request. Returns True if found and approved."""
-        parsed = urllib.parse.urlparse(url)
-        domain = parsed.netloc.lower()
-        with self._sites_lock:
-            self._approved_sites.add(domain)
-            found = False
-            for req in self._site_requests:
-                req_domain = urllib.parse.urlparse(req.url).netloc.lower()
-                if req_domain == domain and req.status == "pending":
-                    req.status = "approved"
-                    found = True
-        return found
-
-    def deny_site(self, url: str) -> bool:
-        """Deny a site request. Returns True if found and denied."""
-        parsed = urllib.parse.urlparse(url)
-        domain = parsed.netloc.lower()
-        with self._sites_lock:
-            self._denied_sites.add(domain)
-            found = False
-            for req in self._site_requests:
-                req_domain = urllib.parse.urlparse(req.url).netloc.lower()
-                if req_domain == domain and req.status == "pending":
-                    req.status = "denied"
-                    found = True
-        return found
-
-    @property
-    def pending_requests(self) -> list[SiteRequest]:
-        """Site requests awaiting user approval."""
-        with self._sites_lock:
-            return [r for r in self._site_requests if r.status == "pending"]
-
-    @property
-    def has_pending_requests(self) -> bool:
-        """Whether there are site requests awaiting user approval."""
-        with self._sites_lock:
-            return any(r.status == "pending" for r in self._site_requests)
-
-    def describe_requests(self) -> str:
-        """Human-readable list of site requests."""
-        with self._sites_lock:
-            if not self._site_requests:
-                return "No site requests."
-            parts = ["Site requests:"]
-            for req in self._site_requests:
-                parts.append(req.describe())
-        return "\n".join(parts)
-
     def describe_sources(self) -> str:
         """Describe the knowledge sources available to it and what each provides.
 
@@ -1595,29 +1471,6 @@ class AutonomousLearner:
         parts.append("  Word definitions → WordNet (local, no network)")
         parts.append("  System commands → local man pages")
         return "\n".join(parts)
-
-    def _is_url_allowed(self, url: str) -> bool:
-        """Check if a URL is allowed (trusted domain, user-approved, or open web)."""
-        # Open web mode — all URLs are allowed
-        if ALLOW_ALL_DOMAINS:
-            return True
-        parsed = urllib.parse.urlparse(url)
-        domain = parsed.netloc.lower()
-        # Trusted TLDs (currently none — only exact domains)
-        if any(domain.endswith(d) for d in ALLOWED_DOMAINS):
-            return True
-        # Trusted exact domains (none — word lookups are served locally)
-        if domain in TRUSTED_EXACT_DOMAINS:
-            return True
-        with self._sites_lock:
-            # User-approved domains
-            if domain in self._approved_sites:
-                return True
-            # Denied domains
-            if domain in self._denied_sites:
-                return False
-        # Not a trusted domain and not approved — not allowed
-        return False
 
     @property
     def is_learning(self) -> bool:
@@ -1718,11 +1571,10 @@ class AutonomousLearner:
         else:
             return None
 
-        # Code docs are not part of the autonomous-learning whitelist;
-        # they are fetched on demand when studying a bug or API. The URL
-        # is hardcoded above, so we bypass the general site allowlist.
+        # Code docs are fetched on demand when studying a bug or API
+        # — the URL is hardcoded above, so nothing else routes here.
         self._emit("learning", f"Fetching {language} docs for '{query}'")
-        return self._fetch_and_learn(url, f"{language}:{query}", check_allowed=False)
+        return self._fetch_and_learn(url, f"{language}:{query}")
 
     # ─── Code-topic routing ──────────────────────────────────────
 
@@ -2416,10 +2268,6 @@ class AutonomousLearner:
             elif is_offline:
                 # Offline: skip results that need network fetching
                 continue
-            elif not self._is_url_allowed(sr.url):
-                # Source outside trusted domains — request access
-                self._maybe_request_site(sr.url, topic)
-                continue
             else:
                 result = self._fetch_and_learn(sr.url, topic)
 
@@ -2457,20 +2305,6 @@ class AutonomousLearner:
                     continue
 
                 break  # got something with relationships, move on
-
-    def _maybe_request_site(self, url: str, topic: str) -> None:
-        """Request access to a site outside trusted domains."""
-        domain = urllib.parse.urlparse(url).netloc.lower()
-        if not domain or domain in self._denied_sites:
-            return
-        if any(r.url == url for r in self._site_requests):
-            return
-        self.request_site(
-            url=url,
-            topic=topic,
-            reason=f"found this while researching '{topic}'. "
-            f"from {domain}, which seems educational.",
-        )
 
     def _queue_related_topics(self, topics: list[str]) -> None:
         """Queue related topics for future learning.
@@ -3061,16 +2895,8 @@ class AutonomousLearner:
             f"{len(new_relationships)} relationships from {source_label}",
         )
 
-    def _fetch_and_learn(
-        self, url: str, topic: str, check_allowed: bool = True
-    ) -> LearningResult | None:
+    def _fetch_and_learn(self, url: str, topic: str) -> LearningResult | None:
         """Fetch a page and learn from it."""
-        # Safety check — only allowed sites (can be bypassed for
-        # hardcoded on-demand references like Python/Rust docs).
-        if check_allowed and not self._is_url_allowed(url):
-            logger.debug(f"Skipping non-approved URL: {url}")
-            return None
-
         # Generate an expectation about what it'll find.
         # This is the surprise & expectation mechanism: it forms a
         # prediction based on what it already knows, then compares

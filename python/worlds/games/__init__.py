@@ -12,6 +12,10 @@ she learned from each level to the next (see ``DIRECTIONS.md``).
   telemetry through the same paths as the rest of her world.
 - ``official.OfficialGames`` — the doorway to the official ARC-AGI-3
   API (https://three.arcprize.org, ``ARC_API_KEY``).
+- ``arena.ArenaGames`` — the local Kaggle Game Arena shelf (chess,
+  checkers, connect four…) on the same ``pyspiel`` substrate the
+  arena harness evaluates on; ``CombinedGames`` lets one arcade
+  offer both catalogues.
 - ``sight`` — ways to see a board: text, picture, change, objects.
 - ``memory.GameMemory`` — what she remembers of each game, carried
   from level to level and across sessions.

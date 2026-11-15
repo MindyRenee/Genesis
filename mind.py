@@ -89,7 +89,7 @@ from brainstem.metronome import MetronomeMixin
 from frontal_lobe.conversation import ConversationMixin
 from frontal_lobe.projects import ProjectsMixin
 from frontal_lobe.status import StatusMixin
-from self.man_review import ManReviewMixin
+from self.man_pages import ManPagesMixin
 from self.proposals import ProposalsMixin
 from sleep.sleep import SleepMixin
 
@@ -107,7 +107,7 @@ class Mind(
     SleepMixin,
     ProjectsMixin,
     ProposalsMixin,
-    ManReviewMixin,
+    ManPagesMixin,
     StatusMixin,
     ConversationMixin,
 ):
@@ -501,13 +501,19 @@ class Mind(
         # the world, never composes for it.
         self.world.board = ChannelBoard(self)
         # The arcade — games offered in her world (official ARC-AGI-3
-        # API). She chooses when to play; boards and moves flow back
-        # through the world into memory, cognition, chemistry, waves.
+        # API plus the local Kaggle Game Arena shelf). She chooses when
+        # to play; boards and moves flow back through the world into
+        # memory, cognition, chemistry, waves.
         from tools.framework import get_tools
         from worlds.games.arcade import Arcade
+        from worlds.games.arena import default_games
 
         arcade = Arcade(
             self.world,
+            games=default_games(
+                environments_dir=os.path.join(self.data_dir, "arcade", "environment_files"),
+                recordings_dir=os.path.join(self.data_dir, "arcade", "recordings"),
+            ),
             voice=lambda text: self._emit_live_thought("play", text),
             image_dir=os.path.join(self.data_dir, "arcade"),
         )
@@ -697,24 +703,17 @@ class Mind(
             project_root=str(self.code_learner.project_root),
         )
 
-        # Man page review — her own manual is part of her, so changes
-        # to it wait in <data_dir>/man_review/ for her say: she reads,
-        # applies, or vetoes. Drift between the versioned sources in
-        # docs/man/ and the installed pages is queued now so she sees
-        # it — nothing edits her manual silently.
-        from self.man_review import ManPageReview
+        # Her manual — the versioned sources in docs/man/ are
+        # canonical; the installed pages her man_page tool reads are
+        # synced to them here: source flows to installed, installed
+        # pages with no source retire. Bookkeeping, not a decision —
+        # the manual says what the project says.
+        from self import man_pages
 
-        self.man_review = ManPageReview(
-            data_dir=self.data_dir,
-            docs_man=Path(self.code_learner.project_root) / "docs" / "man",
-        )
-        staged = self.man_review.scan_drift()
-        if staged:
-            logger.info(
-                "%d man page change(s) awaiting her review: %s",
-                len(staged),
-                ", ".join(c.id for c in staged),
-            )
+        self._man_docs = Path(self.code_learner.project_root) / "docs" / "man"
+        touched = man_pages.sync(self._man_docs)
+        if touched:
+            logger.info("man pages synced: %s", ", ".join(touched))
         # Her manual is not a topic she might read — it is part of
         # her — but learning it is an act of the living mind, not a
         # constructor side-effect: the IPC memory store is not

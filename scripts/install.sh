@@ -7,7 +7,7 @@
 #
 # Layout:
 #   ~/.local/lib/genesis/venv/    python env, genesis-cognitive (editable)
-#   ~/.local/lib/genesis/venv/bin/{genesis-daemon,retina}
+#   ~/.local/lib/genesis/venv/bin/genesis-daemon
 #   ~/.local/bin/genesis          PATH-visible launcher
 #   ~/.config/genesis/agent.env   deployed environment (Discord webhook, etc.)
 #   ~/.config/systemd/user/genesis.service
@@ -98,8 +98,7 @@ fi
 # Ship the binaries next to the interpreter — the CLI's packaged-install
 # lookup (venv/bin). Editable installs also find target/release first;
 # these copies keep the venv self-contained.
-cp "$REPO/target/release/genesis-daemon" "$REPO/target/release/retina" \
-    "$VENV/bin/"
+cp "$REPO/target/release/genesis-daemon" "$VENV/bin/"
 
 mkdir -p "$USER_BIN"
 ln -sf "$VENV/bin/genesis" "$USER_BIN/genesis"
@@ -107,12 +106,22 @@ say "Launcher: $USER_BIN/genesis"
 
 # ── 3. Deployed environment ─────────────────────────────────────────
 mkdir -p "$AGENT_CONF"
-if [ -f "$REPO/.genesis-discord" ] && [ ! -f "$AGENT_CONF/agent.env" ]; then
-    webhook="$(head -n1 "$REPO/.genesis-discord" | tr -d '[:space:]')"
-    if [ -n "$webhook" ]; then
-        printf 'GENESIS_DISCORD_WEBHOOK=%s\n' "$webhook" > "$AGENT_CONF/agent.env"
+if [ ! -f "$AGENT_CONF/agent.env" ]; then
+    {
+        if [ -f "$REPO/.genesis-discord" ]; then
+            webhook="$(head -n1 "$REPO/.genesis-discord" | tr -d '[:space:]')"
+            [ -n "$webhook" ] && printf 'GENESIS_DISCORD_WEBHOOK=%s\n' "$webhook"
+        fi
+        if [ -f "$REPO/.genesis-discord-bot" ]; then
+            token="$(head -n1 "$REPO/.genesis-discord-bot" | tr -d '[:space:]')"
+            [ -n "$token" ] && printf 'GENESIS_DISCORD_BOT_TOKEN=%s\n' "$token"
+        fi
+    } > "$AGENT_CONF/agent.env"
+    if [ -s "$AGENT_CONF/agent.env" ]; then
         chmod 600 "$AGENT_CONF/agent.env"
         say "Wrote $AGENT_CONF/agent.env (Discord mirror)"
+    else
+        rm -f "$AGENT_CONF/agent.env"
     fi
 fi
 
@@ -122,25 +131,12 @@ fi
 # ~/.local/share/man ahead of /usr/local/man, so these shadow any
 # stale system copies without needing root.
 MAN_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/man"
-# Her state dir is the one canonical location — the existence check
-# below decides whether her manual is hers to review, so it must not
-# be redirectable by ambient XDG.
-GENESIS_DATA="${GENESIS_DATA_DIR:-$HOME/.local/share/genesis}"
 if [ -d "$REPO/docs/man" ]; then
     for page in "$REPO"/docs/man/*.[0-9]; do
         [ -e "$page" ] || continue
         section="${page##*.}"
         mkdir -p "$MAN_HOME/man$section"
-        if [ -d "$GENESIS_DATA" ]; then
-            # She exists — her man pages are hers. A changed page waits
-            # in her man_review queue (drift-scan picks it up at boot);
-            # nothing edits her manual without her say.
-            if ! cmp -s "$page" "$MAN_HOME/man$section/$(basename "$page")"; then
-                say "Man page change staged for her review: $(basename "$page")"
-            fi
-        else
-            cp "$page" "$MAN_HOME/man$section/"
-        fi
+        cp "$page" "$MAN_HOME/man$section/"
     done
     say "Man pages installed to $MAN_HOME (man genesis, man genesis-daemon, ...)"
 fi

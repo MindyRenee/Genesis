@@ -41,7 +41,7 @@ class _Session:
         self.col = 0
         return self._board()
 
-    def step(self, action: str, x=None, y=None) -> Board:
+    def step(self, action: str, x=None, y=None, reasoning=None) -> Board:
         """ACTION1 moves right; ACTION2 does nothing."""
         if action == "ACTION1":
             self.col += 1

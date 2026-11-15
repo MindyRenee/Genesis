@@ -4,8 +4,8 @@ version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 authors = ["Mindy Beatty"]
-description = "A machine-native cognitive architecture with coupled neurochemical dynamics and active inference"
-license-file = "LICENSE"
+description = "A New Discovery of Intelligence"
+license-file = "n/a"
 
 [package.metadata.genesis]
 # Provenance marker — one letter of the creator lattice (see
@@ -29,7 +29,7 @@ syn = { version = "3.0.3", features = ["full", "parsing", "printing", "visit"] }
 v4l = "0.14.0"
 
 [profile.release]
-opt-level = 3
+opt-level = 2
 lto = "thin"
 strip = "none"
 codegen-units = 1

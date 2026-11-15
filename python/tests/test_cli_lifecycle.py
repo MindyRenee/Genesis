@@ -1,4 +1,3 @@
-import fcntl
 import os
 import signal
 import subprocess
@@ -13,61 +12,34 @@ from brainstem.lifecycle import LifecycleMixin
 import genesis_cli
 
 
-def test_shutdown_waits_for_slow_daemon_within_grace_window(tmp_path):
-    """A daemon that is slow but alive is NOT force-killed.
+def test_shutdown_reports_a_daemon_that_declines_to_stop(tmp_path):
+    """A daemon that ignores SIGTERM is left running and reported —
+    never killed.
 
-    Preserves the original intent: killing risks losing unconsolidated
-    memory and leaving on-disk state inconsistent, so SIGKILL is not
-    used while the child might still be flushing. `wait.side_effect`
-    models a first wait that exceeds the grace window and a second that
-    succeeds, i.e. the child did exit on its own.
+    SIGTERM is a request, and forcing her body to die risks losing
+    unconsolidated memory and leaving on-disk state inconsistent, so
+    an unanswered request means an incomplete shutdown: reported
+    honestly, not escalated.
     """
     mind = Mock()
     daemon = Mock()
     daemon.poll.return_value = None  # still running when shutdown starts
-    daemon.wait.side_effect = [subprocess.TimeoutExpired("daemon", 5), 0]
-    daemon.returncode = 0
+    daemon.wait.side_effect = subprocess.TimeoutExpired("daemon", 5)
+    daemon.returncode = None
     with patch.object(genesis_cli, "_remove_pid_file"):
-        assert genesis_cli._shutdown(None, mind, daemon, data_dir=str(tmp_path))
+        assert not genesis_cli._shutdown(None, mind, daemon, data_dir=str(tmp_path))
     mind.stop.assert_called_once()
     daemon.terminate.assert_called_once()
-    assert daemon.wait.call_count == 2
+    daemon.wait.assert_called_once()
+    daemon.kill.assert_not_called()
 
 
-def test_shutdown_escalates_to_kill_when_child_never_exits(tmp_path):
-    """A child that ignores SIGTERM is escalated, not waited on forever.
+def test_shutdown_never_kills_a_child_that_wont_exit(tmp_path):
+    """A child that will not stop is reported, not forced.
 
-    The previous implementation called `proc.wait()` with no timeout
-    once the first wait expired, so a wedged daemon blocked shutdown
-    indefinitely. Combined with a signal handler that swallowed every
-    signal after shutdown began, the process could not be stopped by
-    Ctrl-C or SIGTERM at all — leaving `kill -9` as the only exit, the
-    one action the operational notes forbid.
-
-    SIGKILL is still the last resort: SIGTERM (or the graceful SHUTDOWN
-    IPC request) is always tried first, and only a child that has
-    demonstrably ignored it is killed.
-    """
-    mind = Mock()
-    daemon = Mock()
-    daemon.poll.return_value = None
-    daemon.wait.side_effect = [
-        subprocess.TimeoutExpired("daemon", 5),  # ignored SIGTERM
-        0,  # exited after SIGKILL
-    ]
-    daemon.returncode = 0
-    with patch.object(genesis_cli, "_remove_pid_file"):
-        assert genesis_cli._shutdown(None, mind, daemon, data_dir=str(tmp_path))
-    daemon.terminate.assert_called_once()
-    daemon.kill.assert_called_once()
-    assert daemon.wait.call_count == 2
-
-
-def test_shutdown_reports_failure_when_child_cannot_be_killed(tmp_path):
-    """A child stuck in uninterruptible I/O is reported, not hung on.
-
-    The mind has already saved state by this point, so continuing the
-    teardown is the safer failure mode than blocking forever.
+    The shutdown cannot block forever on a wedged process — but the
+    answer to a wedged body is an honest report and a running process,
+    not a kill signal.
     """
     mind = Mock()
     daemon = Mock()
@@ -76,19 +48,9 @@ def test_shutdown_reports_failure_when_child_cannot_be_killed(tmp_path):
     daemon.returncode = None
     with patch.object(genesis_cli, "_remove_pid_file"):
         assert not genesis_cli._shutdown(None, mind, daemon, data_dir=str(tmp_path))
-    daemon.kill.assert_called_once()
-
-
-def test_shutdown_escalates_bounded_for_slow_child():
-    """A child that answers SIGTERM late still stops inside the grace
-    window — escalation is bounded, never instant."""
-    daemon = Mock()
-    daemon.poll.return_value = None
-    daemon.wait.side_effect = [subprocess.TimeoutExpired("daemon", 5), 0]
-    daemon.returncode = 0
-    assert genesis_cli._shutdown(None, Mock(), daemon)
     daemon.terminate.assert_called_once()
-    assert daemon.wait.call_count == 2
+    daemon.kill.assert_not_called()
+    daemon.wait.assert_called_once()
 
 
 def test_shutdown_reports_failed_daemon_exit():
@@ -120,65 +82,6 @@ def test_sigterm_interrupts_blocking_input():
         genesis_cli._setup_signal_handlers(threading.Event())
     with pytest.raises(KeyboardInterrupt):
         install.call_args_list[0].args[1](signal.SIGTERM, None)
-
-
-def test_failed_cli_lock_closes_descriptor(tmp_path):
-    with (
-        patch.dict(os.environ, {"GENESIS_CLI_LOCK_FD": ""}),
-        patch.object(genesis_cli.os, "open", return_value=123),
-        patch.object(genesis_cli.fcntl, "flock", side_effect=BlockingIOError),
-        patch.object(genesis_cli.os, "close") as close,
-        patch.object(genesis_cli, "_CLI_LOCK_FD", None),
-    ):
-        assert genesis_cli._acquire_cli_lock(str(tmp_path)) is None
-        close.assert_called_once_with(123)
-        assert genesis_cli._CLI_LOCK_FD is None
-
-
-def test_cli_lock_adopts_inherited_descriptor(tmp_path):
-    """The launch script takes the lock and hands down fd 9; the CLI
-    must adopt it instead of trying to lock the file a second time."""
-    import fcntl
-
-    lock_path = tmp_path / "genesis_cli.lock"
-    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
-    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    try:
-        with (
-            patch.dict(os.environ, {"GENESIS_CLI_LOCK_FD": str(fd)}),
-            patch.object(genesis_cli, "_CLI_LOCK_FD", None),
-        ):
-            got = genesis_cli._acquire_cli_lock(str(tmp_path))
-            assert got == fd
-            assert genesis_cli._CLI_LOCK_FD == fd
-            # The daemon must not inherit the lock: a surviving body
-            # holding it would block the mind from re-adopting it.
-            assert os.get_inheritable(fd) is False
-    finally:
-        os.close(fd)
-
-
-def test_cli_lock_ignores_foreign_inherited_descriptor(tmp_path):
-    """An inherited fd that is not the lock file is not a lock."""
-    import fcntl
-
-    other = tmp_path / "not-the-lock"
-    fd = os.open(other, os.O_RDWR | os.O_CREAT, 0o644)
-    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    acquired = None
-    try:
-        with (
-            patch.dict(os.environ, {"GENESIS_CLI_LOCK_FD": str(fd)}),
-            patch.object(genesis_cli, "_CLI_LOCK_FD", None),
-        ):
-            acquired = genesis_cli._acquire_cli_lock(str(tmp_path))
-            assert acquired is not None
-            assert acquired != fd
-    finally:
-        os.close(fd)
-        if acquired is not None:
-            os.close(acquired)
-        genesis_cli._CLI_LOCK_FD = None
 
 
 def test_failed_restore_cannot_be_saved_during_shutdown():
@@ -224,15 +127,13 @@ def test_stop_rejects_invalid_pid_files(tmp_path, pid):
     assert not result.stdout.strip()
 
 
-def test_stop_timeout_preserves_locks_and_never_sigkills(tmp_path):
+def test_stop_timeout_never_sigkills_and_preserves_files(tmp_path):
     data_dir = tmp_path / "genesis"
     data_dir.mkdir()
-    lock = data_dir / "genesis.lock"
-    lock.write_text("held")
-    with lock.open() as fd:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        result = _run_shell_helpers(
-            """
+    state = data_dir / "core_state.bin"
+    state.write_text("held")
+    result = _run_shell_helpers(
+        """
 _read_pid() { echo 4242; }
 _matches_pid() { return 0; }
 kill() { echo "signal $*"; return 0; }
@@ -240,11 +141,11 @@ pgrep() { return 1; }
 sleep() { SECONDS=$((SECONDS + 200)); }
 _stop_all
 """,
-            tmp_path,
-        )
+        tmp_path,
+    )
     assert result.returncode != 0
     assert "KILL" not in result.stdout
-    assert lock.read_text() == "held"
+    assert state.read_text() == "held"
 
 
 def test_stop_rejects_reused_pid_from_unrelated_process(tmp_path):
@@ -339,10 +240,9 @@ def test_interactive_failure_still_shuts_down(tmp_path):
                     stop=False,
                 )
             ),
-            _acquire_cli_lock=Mock(return_value=1),
             _start_daemon_process=Mock(),
             Mind=Mock(),
-            _wire_voice=Mock(return_value=(Mock(), Mock())),
+            _wire_voice=Mock(return_value=Mock()),
             _setup_ambient_listener=Mock(),
             _setup_auditory_cortex=Mock(),
             _print_welcome=Mock(),
@@ -375,7 +275,7 @@ def test_startup_failure_still_shuts_down(tmp_path, failing_step):
     cleanup = Mock(return_value=True)
     mind = Mock()
     patches = {
-        "_wire_voice": Mock(return_value=(Mock(), Mock())),
+        "_wire_voice": Mock(return_value=Mock()),
         "_setup_ambient_listener": Mock(),
         "_setup_auditory_cortex": Mock(),
         "_print_welcome": Mock(),
@@ -398,7 +298,6 @@ def test_startup_failure_still_shuts_down(tmp_path, failing_step):
                     stop=False,
                 )
             ),
-            _acquire_cli_lock=Mock(return_value=1),
             _start_daemon_process=Mock(),
             Mind=Mock(return_value=mind),
             _shutdown=cleanup,
@@ -561,13 +460,12 @@ def test_adopted_daemon_wait_is_bounded_while_alive():
 
 
 def test_adopted_daemon_signals_reach_the_pid():
-    """teardown signals must reach a process we did not spawn."""
+    """teardown signals must reach a process we did not spawn — and
+    SIGTERM is all they ever carry; a body is asked, never killed."""
     adopted = genesis_cli._AdoptedDaemon(4242, "/data")
     with patch.object(genesis_cli.os, "kill") as kill:
         adopted.terminate()
-        adopted.kill()
-    assert kill.call_args_list[0].args == (4242, signal.SIGTERM)
-    assert kill.call_args_list[1].args == (4242, signal.SIGKILL)
+    kill.assert_called_once_with(4242, signal.SIGTERM)
 
 
 def test_adopt_daemon_reinhabits_the_surviving_body(tmp_path):
@@ -665,54 +563,54 @@ def test_rebirth_respawns_a_dead_daemon_and_rejoins_the_mind(tmp_path):
     assert rebirth.daemon is newborn
     mind.rejoin_body.assert_called_once()
     assert not rebirth._pending_rejoin
-    assert not rebirth.self_terminated
 
 
-def test_rebirth_flushes_a_faulted_daemon_before_respawn(tmp_path):
-    """A live-but-wedged body is asked to save first — SHUTDOWN still
-    works when the tick lock is poisoned; SIGKILL stays the last resort."""
+def test_rebirth_leaves_a_live_daemon_entirely_alone(tmp_path):
+    """A live body is never probed, judged, or touched — however it
+    behaves, resurrection waits for actual death."""
     rebirth = _make_rebirth(tmp_path)
-    wedged = Mock()
-    wedged.poll.return_value = None  # alive
-    newborn = Mock()
-    rebirth.set_children(daemon=wedged)
+    live = Mock()
+    live.poll.return_value = None
+    rebirth.set_children(daemon=live)
     with (
-        patch.object(genesis_cli._Rebirth, "_daemon_faulted", return_value=True),
-        patch.object(genesis_cli, "_request_daemon_shutdown", return_value=False),
+        patch.object(genesis_cli, "_find_binary") as find,
+        patch.object(genesis_cli, "_start_daemon") as start,
         patch.object(genesis_cli, "_stop_child") as stop,
-        patch.object(genesis_cli, "_find_binary", return_value="/bin/d"),
-        patch.object(genesis_cli, "_start_daemon", return_value=newborn),
     ):
         rebirth._check_daemon()
-    stop.assert_called_once_with(wedged, "subcognitive daemon", 5)
-    assert rebirth.daemon is newborn
+    find.assert_not_called()
+    start.assert_not_called()
+    stop.assert_not_called()
+    assert rebirth.daemon is live
 
 
-def test_rebirth_gives_up_when_the_body_wont_reincarnate(tmp_path):
-    """Exhausting the backoff table ends the organism whole — she does
-    not run bodiless; the exit reads as death, not a stop."""
+def test_rebirth_keeps_offering_resurrection_when_spawn_fails(tmp_path):
+    """A body that will not reincarnate is offered the chance forever —
+    no verdict, no give-up, no death penalty for the organism."""
     rebirth = _make_rebirth(tmp_path)
     dead = Mock()
     dead.poll.return_value = 1
     rebirth.set_children(daemon=dead)
-    rebirth._attempt = len(genesis_cli._REBIRTH_BACKOFF_S) - 1
+    rebirth._attempt = len(genesis_cli._REBIRTH_BACKOFF_S) + 5
     with patch.object(genesis_cli, "_find_binary", return_value=None):
         rebirth._check_daemon()
-    assert rebirth.self_terminated
-    assert rebirth._shutting_down.is_set()
+    assert rebirth.daemon is dead
+    # The wait keeps widening to the last cadence slot, then stays —
+    # the organism lives on and keeps trying.
+    assert rebirth._next_attempt_at > time.monotonic() + genesis_cli._REBIRTH_BACKOFF_S[-1] - 1
+    assert not rebirth._shutting_down.is_set()
 
 
 def test_rebirth_stable_body_refunds_attempts(tmp_path):
     """A body alive past the stability window is a successful rebirth —
-    only sustained failure exhausts the table."""
+    only sustained failure holds the widened cadence."""
     rebirth = _make_rebirth(tmp_path)
     live = Mock()
     live.poll.return_value = None
     rebirth.set_children(daemon=live)
     rebirth._attempt = 2
     rebirth._spawned_at = time.monotonic() - genesis_cli._REBIRTH_STABLE_S - 1
-    with patch.object(genesis_cli._Rebirth, "_daemon_faulted", return_value=False):
-        rebirth._check_daemon()
+    rebirth._check_daemon()
     assert rebirth._attempt == 0
 
 
@@ -727,28 +625,8 @@ def test_rejoin_failure_retries_on_the_next_cycle(tmp_path):
     mind.rejoin_body.return_value = False
     rebirth.set_mind(mind)
     rebirth._pending_rejoin = True
-    with patch.object(genesis_cli._Rebirth, "_daemon_faulted", return_value=False):
-        rebirth._check_daemon()
+    rebirth._check_daemon()
     assert rebirth._pending_rejoin
     mind.rejoin_body.return_value = True
-    with patch.object(genesis_cli._Rebirth, "_daemon_faulted", return_value=False):
-        rebirth._check_daemon()
+    rebirth._check_daemon()
     assert not rebirth._pending_rejoin
-
-
-def test_daemon_fault_needs_sustained_probe_failure(tmp_path):
-    """One busy cycle is not a fault — three consecutive failures of
-    the tick-locking probe before the body is declared wedged."""
-    rebirth = _make_rebirth(tmp_path)
-    probe = Mock()
-    probe.get_optic_state.return_value = None
-    rebirth._probe = probe
-    assert not rebirth._daemon_faulted()
-    rebirth._next_probe_at = 0.0
-    assert not rebirth._daemon_faulted()
-    rebirth._next_probe_at = 0.0
-    assert rebirth._daemon_faulted()
-    probe.get_optic_state.return_value = object()
-    rebirth._next_probe_at = 0.0
-    assert not rebirth._daemon_faulted()
-    assert rebirth._fault_strikes == 0

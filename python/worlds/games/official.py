@@ -13,10 +13,11 @@ types behind two plain things the arcade can hold:
 - ``GameSession`` — one open game: ``reset()``, ``step(action, x, y)``,
   and the board as a plain ``Board`` (grid, state, levels, actions).
 
-The mode comes from ``GENESIS_ARC_MODE``: ``online`` (default — every
-move is played on the official server and counts on the official
-scorecard), ``normal`` (download the game and run it locally), or
-``offline`` (only games already in ``environment_files``).
+The mode comes from ``GENESIS_ARC_MODE``: ``normal`` (default —
+download each game once into ``environments_dir`` and run it locally),
+``online`` (every move on the official server, counting on the
+official scorecard), or ``offline`` (only games already downloaded —
+no network at all).
 """
 
 from __future__ import annotations
@@ -128,8 +129,19 @@ class GameSession:
         self.board = board_from_observation(self._environment.reset(), self.game_id)
         return self.board
 
-    def step(self, action: str, x: int | None = None, y: int | None = None) -> Board | None:
-        """Make one move. ACTION6 needs ``x`` and ``y`` in 0–63."""
+    def step(
+        self,
+        action: str,
+        x: int | None = None,
+        y: int | None = None,
+        reasoning: dict[str, Any] | None = None,
+    ) -> Board | None:
+        """Make one move. ACTION6 needs ``x`` and ``y`` in 0–63.
+
+        ``reasoning`` rides into the official recordings and scorecard
+        — the toolkit logs it beside the move, so her intent is part
+        of the run's record, not just its outcome.
+        """
         from arcengine import GameAction
 
         name = action.upper()
@@ -140,7 +152,7 @@ class GameSession:
             if x is None or y is None or not (0 <= x < BOARD_SIZE and 0 <= y < BOARD_SIZE):
                 raise ValueError("ACTION6 needs x and y between 0 and 63")
             data = {"x": int(x), "y": int(y)}
-        observation = self._environment.step(GameAction[name], data=data)
+        observation = self._environment.step(GameAction[name], data=data, reasoning=reasoning)
         board = board_from_observation(observation, self.game_id)
         if board is not None:
             self.board = board
@@ -151,16 +163,28 @@ class OfficialGames:
     """The official ARC-AGI-3 catalogue, opened lazily on first use.
 
     Args:
-        mode: ``online``, ``normal`` or ``offline``; defaults to
-            ``GENESIS_ARC_MODE`` or ``online``.
+        mode: ``normal``, ``online`` or ``offline``; defaults to
+            ``GENESIS_ARC_MODE`` or ``normal`` — downloaded games run
+            locally, so play does not depend on the server.
         arcade_factory: Builds the toolkit ``Arcade`` — injectable so
             tests never touch the network.
+        environments_dir: Where downloaded games live (toolkit default
+            ``environment_files``, relative to the cwd).
+        recordings_dir: Where the toolkit writes game replays.
     """
 
-    def __init__(self, mode: str | None = None, arcade_factory: Any = None) -> None:
+    def __init__(
+        self,
+        mode: str | None = None,
+        arcade_factory: Any = None,
+        environments_dir: str | None = None,
+        recordings_dir: str | None = None,
+    ) -> None:
         """Remember the mode; nothing is contacted until asked."""
-        self.mode = (mode or os.environ.get("GENESIS_ARC_MODE") or "online").lower()
+        self.mode = (mode or os.environ.get("GENESIS_ARC_MODE") or "normal").lower()
         self._factory = arcade_factory
+        self._environments_dir = environments_dir
+        self._recordings_dir = recordings_dir
         self._arcade: Any = None
         self._lock = threading.Lock()
 
@@ -185,8 +209,16 @@ class OfficialGames:
                 ) from exc
             quiet = logging.getLogger("genesis.arc_agi")
             quiet.setLevel(logging.WARNING)
+            kwargs: dict[str, Any] = {
+                "operation_mode": OperationMode(self.mode),
+                "logger": quiet,
+            }
+            if self._environments_dir is not None:
+                kwargs["environments_dir"] = self._environments_dir
+            if self._recordings_dir is not None:
+                kwargs["recordings_dir"] = self._recordings_dir
             try:
-                self._arcade = Arcade(operation_mode=OperationMode(self.mode), logger=quiet)
+                self._arcade = Arcade(**kwargs)
             except Exception as exc:
                 raise GamesUnavailable(f"could not reach the official games: {exc}") from exc
             return self._arcade

@@ -5,13 +5,13 @@ wants — in conversation, for fun, to learn. It is a read-only capability:
 it can search, fetch pages, and read content, but cannot submit forms,
 post data, or modify anything online.
 
-Search and browsing run through a real browser: a headless Chromium
-driven over the DevTools protocol (the same machinery ARC web games
-use), so JavaScript-heavy pages render and Google search behaves like
-it does for a person. Plain-HTML fetches still take the lightweight
-urllib path first; Chrome is the fallback for thin or failed pages.
-DuckDuckGo Lite remains only as an emergency path when no browser can
-launch at all.
+Search and browsing run through her real browser: Firefox driven
+over WebDriver BiDi (the Chromium family over CDP serves hosts
+without it), so JavaScript-heavy pages render and search behaves
+like it does for a person. Plain-HTML fetches still take the
+lightweight urllib path first; the browser is the fallback for thin
+or failed pages. With no browser there is no search — an honest
+absence, not a silent engine swap.
 
 Content filtering:
     A blocklist of adult/pornographic, malware, and tracking domains
@@ -33,6 +33,7 @@ import html.parser
 import ipaddress
 import json
 import logging
+import os
 import re
 import socket
 import ssl
@@ -57,8 +58,6 @@ USER_AGENT = "Genesis-AI/1.0 (cognitive mind)"
 REQUEST_TIMEOUT = 10  # seconds
 MAX_TEXT_LENGTH = 50000  # don't process pages longer than this
 
-# DuckDuckGo Lite — lightweight, privacy-respecting, no API key.
-_DDG_LITE = "https://lite.duckduckgo.com/lite/"
 _URL_RE = re.compile(r'https?://[^\s<>"\']+')
 
 
@@ -537,10 +536,11 @@ def _get_ssl_context() -> ssl.SSLContext:
     return _ssl_ctx
 
 
-# ─── Headless browser (the Chrome path) ────────────────────────────
+# ─── Her browser (the browsing path) ───────────────────────────────
 #
-# One lazy headless Chrome shared by search and fetch, driven over
-# the DevTools protocol by ``tools.browser._Browser``. A single tab
+# One lazy headless browser shared by search and fetch — Firefox
+# over WebDriver BiDi, the Chromium family over CDP — driven by
+# ``tools.browser._Browser``. A single tab
 # means navigation must be serialized — the lock
 # wraps each navigate → settle → extract cycle so concurrent callers
 # (curiosity worker, conversation) cannot interleave page loads.
@@ -571,7 +571,14 @@ def _get_browser():
         _browser = _Browser(headless=True, purpose="web")
         atexit.register(_close_browser)
         return _browser
-    except Exception as e:  # noqa: BLE001 — no browser → urllib fallback
+    except RuntimeError as e:
+        # A browser is optional on headless/mobile hosts. Its absence is
+        # the documented no-search condition, not a runtime fault.
+        if str(e) != "no browser installed":
+            note_swallowed("tools.web_search.browser_launch", e)
+        _browser_failed = True
+        return None
+    except Exception as e:  # noqa: BLE001 — no browser → no search
         note_swallowed("tools.web_search.browser_launch", e)
         _browser_failed = True
         return None
@@ -587,7 +594,7 @@ def _close_browser() -> None:
         _browser = None
 
 
-def _chrome_wait_ready(browser, url: str = "", accept: tuple[str, ...] = ()) -> None:
+def _browser_wait_ready(browser, url: str = "", accept: tuple[str, ...] = ()) -> None:
     """Wait for the navigated page to finish loading (bounded).
 
     ``readyState`` alone lies: it still reads ``complete`` from the
@@ -615,120 +622,158 @@ def _chrome_wait_ready(browser, url: str = "", accept: tuple[str, ...] = ()) -> 
         time.sleep(0.15)
 
 
-def _bing_unwrap(link: str) -> str:
-    """Unwrap a Bing /ck/a redirect to its real target URL.
+# Search engines are URL templates, not code. ``{q}`` is the query,
+# ``{n}`` the requested result count where the engine takes one. A
+# search is a navigation to one of these URLs in her real browser plus
+# a generic pass over the external anchors the page rendered — no
+# per-engine selectors, no scraping endpoints, so any engine works and
+# none is privileged. ``GENESIS_SEARCH_ENGINE`` pins a single engine —
+# a name from this table or a literal ``{q}`` template of her own.
+_SEARCH_ENGINES: tuple[tuple[str, str], ...] = (
+    ("google", "https://www.google.com/search?q={q}&num={n}"),
+    ("bing", "https://www.bing.com/search?q={q}&count={n}"),
+    ("brave", "https://search.brave.com/search?q={q}"),
+    ("mojeek", "https://www.mojeek.com/search?q={q}"),
+)
 
-    Bing wraps result hrefs as ``/ck/a?!...&u=a1<base64url>`` — the
-    ``u`` param is the destination, base64url-encoded after an ``a1``
-    marker. Anything else passes through unchanged.
-    """
-    host = urllib.parse.urlparse(link).netloc.lower()
-    if "bing.com" not in host or "/ck/" not in urllib.parse.urlparse(link).path:
-        return link
-    qs = urllib.parse.parse_qs(urllib.parse.urlparse(link).query)
-    enc = (qs.get("u") or [""])[0]
-    if not enc.startswith("a1"):
-        return link
-    import base64
+# An interstitial is not an answer: automation walls, consent gates,
+# and bot challenges all mean "this engine did not answer" — the
+# search moves to the next engine and the refusal names every one
+# that walled rather than pretending there were no results.
+_WALL_RE = re.compile(
+    r"captcha|consent|/sorry/|unusual traffic|challenge-platform|"
+    r"verify you are|are you a robot|bot detection|access denied",
+    re.IGNORECASE,
+)
 
+# One eval, one source of truth: the title, the landed URL, and every
+# external link outside the page's chrome furniture — nav, headers,
+# footers. "External" means off the engine's own registrable domain,
+# which drops related-searches, cached pages, and engine UI wholesale.
+_LINKS_JS = """JSON.stringify((() => {
+  const root = h => h.replace(/^www\\./, '').split('.').slice(-2).join('.');
+  const here = root(location.hostname);
+  const seen = new Set(); const links = [];
+  for (const a of document.querySelectorAll('a[href^="http"]')) {
+    if (a.closest('nav, header, footer, script, style,'
+        + ' [role="navigation"], [role="banner"], [role="contentinfo"]')) continue;
+    const t = (a.innerText || a.textContent || '').trim().slice(0, 300);
+    if (t.length < 8) continue;
+    try { if (root(new URL(a.href).hostname) === here) continue; } catch (e) { continue; }
+    if (seen.has(a.href)) continue;
+    seen.add(a.href);
+    links.push({u: a.href, t});
+  }
+  return {title: document.title || '', url: location.href, links};
+})())"""
+
+# Readability-lite, in-page: prefer semantic containers, else the
+# largest text-dense block that is not the whole document — scored by
+# text length discounted by link noise, so nav-heavy wrappers lose to
+# prose. innerText is the rendered truth; no HTML parsing on our side.
+_CONTENT_JS = """JSON.stringify((() => {
+  const txt = el => (el.innerText || '').trim();
+  let root = null;
+  const sels = ['article', 'main', '[role="main"]', '.article',
+    '.post', '.entry-content', '#content'];
+  for (const sel of sels) {
+    const el = document.querySelector(sel);
+    if (el && txt(el).length > 200) { root = el; break; }
+  }
+  if (!root) {
+    let best = document.body, bestScore = 0;
+    for (const el of document.querySelectorAll('article, section, div')) {
+      const t = txt(el);
+      const score = t.length / (1 + el.querySelectorAll('a').length * 0.15);
+      if (score > bestScore) { bestScore = score; best = el; }
+    }
+    root = best;
+  }
+  const links = Array.from(root.querySelectorAll('a[href^="http"]')).map(a => a.href).slice(0, 200);
+  return {t: document.title || '', x: txt(root).slice(0, %d), l: links};
+})())"""
+
+
+def _engine_plan() -> list[tuple[str, str]]:
+    """The engines to try, in order — one when GENESIS_SEARCH_ENGINE pins."""
+    pin = os.environ.get("GENESIS_SEARCH_ENGINE", "").strip()
+    if not pin:
+        return list(_SEARCH_ENGINES)
+    for name, template in _SEARCH_ENGINES:
+        if pin == name:
+            return [(name, template)]
+    if "{q}" in pin:
+        return [("custom", pin)]
+    logger.debug("GENESIS_SEARCH_ENGINE %r not a known engine or template; using defaults", pin)
+    return list(_SEARCH_ENGINES)
+
+
+def _page_links(browser) -> tuple[str, str, list[dict]]:
+    """(title, landed_url, external_links) of the page the tab is on."""
+    raw = browser.js(_LINKS_JS)
     try:
-        pad = "=" * (-len(enc[2:]) % 4)
-        return base64.urlsafe_b64decode(enc[2:] + pad).decode("utf-8", "replace")
-    except Exception:  # noqa: BLE001 — malformed wrapper → drop later
-        return ""
+        data = json.loads(raw) if raw else {}
+    except (TypeError, ValueError):
+        return "", "", []
+    return (
+        str(data.get("title", "")),
+        str(data.get("url", "")),
+        data.get("links") or [],
+    )
 
 
-def _chrome_search(query: str, limit: int) -> list[WebSearchResult] | None:
-    """Search through the headless browser: Google, then Bing.
+def _browser_search(query: str, limit: int) -> list[WebSearchResult] | None:
+    """Search through her browser — engine-agnostic, wall-honest.
 
-    Both run in the real Chromium — Google is tried first, and when
-    its automation wall answers (``/sorry/``, consent) the same tab
-    falls through to Bing. Returns None when the browser path itself
-    failed (caller takes the non-browser fallback); an empty list is
-    a genuine "no results" and stands.
+    Returns a list on any engine that answered with real external
+    links, ``[]`` when every engine walled or came back empty, and
+    ``None`` only when the browser path itself failed (couldn't
+    launch, dead socket) — the caller's "no search" condition.
     """
     browser = _get_browser()
     if browser is None:
         return None
+    walled: list[str] = []
     try:
         with _browser_lock:
-            browser.navigate(
-                "https://www.google.com/search?"
-                + urllib.parse.urlencode({"q": query, "num": str(max(limit, 10))})
-            )
-            _chrome_wait_ready(
-                browser,
-                "https://www.google.com/search",
-                accept=("/sorry/", "consent"),
-            )
-            landed = str(browser.js("window.location.href") or "")
-            hits: list[dict] = []
-            if "/sorry/" not in landed and "consent" not in landed:
-                # Organic results anchor an <h3>; a walled page has none.
-                raw = browser.js(
-                    "JSON.stringify(Array.from("
-                    "document.querySelectorAll('a h3'))"
-                    ".map(h => {const a = h.closest('a');"
-                    " return a ? {u: a.href, t: h.innerText} : null})"
-                    ".filter(Boolean))"
+            for name, template in _engine_plan():
+                url = template.format(
+                    q=urllib.parse.quote_plus(query), n=max(limit, 10)
                 )
-                hits = json.loads(raw) if raw else []
-            if not hits:
-                # Google walled or empty — same tab, second engine.
-                browser.navigate(
-                    "https://www.bing.com/search?"
-                    + urllib.parse.urlencode({"q": query, "count": str(max(limit, 10))})
-                )
-                _chrome_wait_ready(browser, "https://www.bing.com/search")
-                raw = browser.js(
-                    "JSON.stringify(Array.from("
-                    "document.querySelectorAll('li.b_algo h2 a'))"
-                    ".map(a => ({u: a.href,"
-                    " t: a.innerText || a.textContent || ''})))"
-                )
-                hits = json.loads(raw) if raw else []
+                browser.navigate(url)
+                _browser_wait_ready(browser, url.split("?")[0])
+                title, landed, hits = _page_links(browser)
+                if _WALL_RE.search(f"{title} {landed}"):
+                    walled.append(f"{name} (wall)")
+                    continue
+                results: list[WebSearchResult] = []
                 for hit in hits:
-                    hit["u"] = _bing_unwrap(str(hit.get("u", "")))
+                    link = str(hit.get("u", ""))
+                    if not is_url_safe(link):
+                        continue
+                    results.append(
+                        WebSearchResult(url=link, title=str(hit.get("t", ""))[:200])
+                    )
+                    if len(results) >= limit:
+                        break
+                if results:
+                    return results
+                walled.append(f"{name} (empty)")
     except Exception as e:  # noqa: BLE001 — dead browser → relaunch next time
-        note_swallowed("tools.web_search.chrome_search", e)
+        note_swallowed("tools.web_search.browser_search", e)
         _close_browser()
         return None
-    results: list[WebSearchResult] = []
-    seen: set[str] = set()
-    for hit in hits:
-        link = str(hit.get("u", ""))
-        title = str(hit.get("t", ""))[:200]
-        host = urllib.parse.urlparse(link).netloc.lower()
-        # Google's /url?q= redirect wrappers — unwrap to the real
-        # target before the engine-domain check below.
-        if "google." in host:
-            qs = urllib.parse.parse_qs(urllib.parse.urlparse(link).query)
-            link = (qs.get("q") or qs.get("url") or [""])[0]
-            if not link:
-                continue
-            host = urllib.parse.urlparse(link).netloc.lower()
-        # Anything still on an engine domain is internal chrome —
-        # related-searches, cached pages, unwrapped wrappers.
-        if "bing.com" in host or "google." in host:
-            continue
-        if urllib.parse.urlparse(link).scheme not in ("http", "https"):
-            continue
-        if link in seen:
-            continue
-        if not is_url_safe(link):
-            continue
-        seen.add(link)
-        results.append(WebSearchResult(url=link, title=title))
-        if len(results) >= limit:
-            break
-    return results
+    if walled:
+        logger.info("web search: no engine answered — %s", ", ".join(walled))
+    return []
 
 
-def _chrome_fetch(url: str) -> WebFetchResult | None:
+def _browser_fetch(url: str) -> WebFetchResult | None:
     """Fetch a page through the headless browser (JS-rendered).
 
     Used when the urllib path failed or returned too little text —
     single-page apps and cookie-walled pages render properly here.
+    Content comes from readability-lite in the page itself.
     """
     browser = _get_browser()
     if browser is None:
@@ -736,45 +781,58 @@ def _chrome_fetch(url: str) -> WebFetchResult | None:
     try:
         with _browser_lock:
             browser.navigate(url)
-            _chrome_wait_ready(browser, url)
+            _browser_wait_ready(browser, url)
             # Redirect safety: the safety check ran on the input URL,
             # but navigation may have landed elsewhere — re-verify.
             final_url = browser.js("window.location.href") or ""
             final_host = _host_of(str(final_url))
             if _host_is_local(final_host) or _resolves_to_non_public(final_host):
-                logger.debug(f"chrome fetch refused (redirect to private): {url}")
+                logger.debug(f"browser fetch refused (redirect to private): {url}")
                 return None
             if not is_url_safe(str(final_url)):
-                logger.debug(f"chrome fetch refused (redirect to blocked): {url}")
+                logger.debug(f"browser fetch refused (redirect to blocked): {url}")
                 return None
-            payload = browser.js(
-                "JSON.stringify({"
-                "t: document.title || '',"
-                "x: (document.body ? document.body.innerText : '')"
-                f".slice(0, {MAX_TEXT_LENGTH}),"
-                "l: Array.from(document.querySelectorAll('a[href]'))"
-                ".map(a => a.href).slice(0, 200)"
-                "})"
-            )
+            payload = browser.js(_CONTENT_JS % MAX_TEXT_LENGTH)
     except Exception as e:  # noqa: BLE001 — dead browser → relaunch next time
-        note_swallowed("tools.web_search.chrome_fetch", e)
+        note_swallowed("tools.web_search.browser_fetch", e)
         _close_browser()
         return None
+    return _browser_fetch_result(url, payload)
+
+
+def _link_key(url: str) -> str:
+    """Canonical key for deduping page links.
+
+    ``scheme://host/path`` — fragments and query strings are noise
+    for "have I seen this page" (anchors, tracking params), so they
+    don't distinguish keys.
+    """
+    try:
+        p = urllib.parse.urlparse(url)
+        return f"{p.scheme}://{p.netloc}{p.path}".rstrip("/")
+    except ValueError:
+        return url
+
+
+def _browser_fetch_result(url: str, payload: str) -> WebFetchResult | None:
+    """Turn the browser-side extraction JSON into a WebFetchResult."""
     try:
         data = json.loads(payload) if payload else {}
     except (TypeError, ValueError) as e:
-        note_swallowed("tools.web_search.chrome_parse", e)
+        note_swallowed("tools.web_search.browser_parse", e)
         return None
     text = str(data.get("x", ""))
     if len(text) < 100:
         return None
+    seen = {_link_key(url)}
     related: list[str] = []
     for link in data.get("l", []):
         link = str(link).split("&")[0]
-        if link == url or "duckduckgo" in link.lower():
+        key = _link_key(link)
+        if key in seen or not is_url_safe(link):
             continue
-        if is_url_safe(link) and link not in related:
-            related.append(link)
+        seen.add(key)
+        related.append(link)
         if len(related) >= 5:
             break
     return WebFetchResult(
@@ -789,7 +847,7 @@ def _chrome_fetch(url: str) -> WebFetchResult | None:
 
 
 def search(query: str, limit: int = 5) -> list[WebSearchResult]:
-    """Search the web (DuckDuckGo Lite) for a query.
+    """Search the web through her browser for a query.
 
     Returns up to ``limit`` results, filtered through the content
     blocklist. Adult/malware/tracking domains are excluded. If the
@@ -809,52 +867,15 @@ def search(query: str, limit: int = 5) -> list[WebSearchResult]:
         logger.debug(f"web search refused (adult query): {query!r}")
         return []
 
-    # Chrome first — real Google through the real browser. None means
+    # Her browser first — real Google through her real browser. None means
     # the browser path itself failed (couldn't launch, dead socket);
-    # an empty list is a genuine "Google had nothing" and stands.
-    chrome_results = _chrome_search(query, limit)
-    if chrome_results is not None:
-        return chrome_results
+    # an empty list is a genuine "no results" and stands.
+    browser_results = _browser_search(query, limit)
+    if browser_results is not None:
+        return browser_results
 
-    data = urllib.parse.urlencode({"q": query, "kl": "us-en"}).encode()
-    try:
-        req = urllib.request.Request(
-            _DDG_LITE,
-            data=data,
-            headers={
-                "User-Agent": USER_AGENT,
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            # Bounded read — a hostile endpoint could otherwise stream
-            # a huge body inside the timeout window.
-            html_text = resp.read(2 * 1024 * 1024 + 1).decode("utf-8", errors="ignore")
-    except (OSError, ValueError, RuntimeError) as e:
-        note_swallowed(
-            "tools.web_search.search",
-            e,
-        )
-        return []
-
-    urls = _URL_RE.findall(html_text)
-    seen: set[str] = set()
-    results: list[WebSearchResult] = []
-    for url in urls:
-        # Strip tracking params
-        url = url.split("&")[0]
-        if url in seen:
-            continue
-        # Skip DuckDuckGo's own navigation links
-        if "duckduckgo" in url.lower():
-            continue
-        if not is_url_safe(url):
-            continue
-        seen.add(url)
-        results.append(WebSearchResult(url=url))
-        if len(results) >= limit:
-            break
-    return results
+    # No browser, no search — she does not silently swap engines.
+    return []
 
 
 def fetch(url: str) -> WebFetchResult | None:
@@ -914,7 +935,7 @@ def fetch(url: str) -> WebFetchResult | None:
         )
         # urllib couldn't reach it — the real browser gets a shot
         # before the fetch is declared dead.
-        return _chrome_fetch(url)
+        return _browser_fetch(url)
 
     if len(raw) > MAX_TEXT_LENGTH * 10:
         raw = raw[: MAX_TEXT_LENGTH * 10]
@@ -927,19 +948,20 @@ def fetch(url: str) -> WebFetchResult | None:
     if len(text) < 100:
         # Too little text — a JS-rendered page or an interstitial.
         # The real browser can still see it.
-        return _chrome_fetch(url)
+        return _browser_fetch(url)
 
     # Extract outbound links for curiosity chaining (follow links
-    # from articles). Only keep safe, non-self links.
+    # from articles). Only keep safe, non-self links — canonicalised
+    # so fragment/query variants of the same page never repeat.
+    seen = {_link_key(url)}
     related: list[str] = []
     for m in _URL_RE.findall(raw):
         link = m.split("&")[0]
-        if link == url:
+        key = _link_key(link)
+        if key in seen or not is_url_safe(link):
             continue
-        if "duckduckgo" in link.lower():
-            continue
-        if is_url_safe(link) and link not in related:
-            related.append(link)
+        seen.add(key)
+        related.append(link)
         if len(related) >= 5:
             break
 

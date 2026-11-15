@@ -116,6 +116,55 @@ install_pkgs() {
     return 1
 }
 
+# evdev — virtual HID (tools/hid.py). Sdist-only on PyPI: it compiles
+# a small C extension, so it goes through the same toolchain gate as
+# pycairo. A failed build is a warn, never a hard error — her hands
+# are an optional reach.
+if "$PY" -c "import evdev" >/dev/null 2>&1; then
+    ok "evdev present (virtual HID)"
+elif [ "$VERIFY_ONLY" -eq 0 ]; then
+    if command -v cc >/dev/null; then
+        if "$PY" -m pip install evdev; then
+            ok "evdev installed"
+        elif "$PY" -m pip install --user --break-system-packages evdev; then
+            ok "evdev installed (user site)"
+        else
+            warn "evdev build failed — virtual HID unavailable"
+        fi
+    else
+        warn "no C compiler — evdev cannot build, virtual HID unavailable"
+    fi
+fi
+
+# uinput access — her hand must be able to write /dev/uinput. The
+# udev rule grants the seat (uaccess tag) and the input group;
+# without it the virtual HID is a hand behind glass.
+if [ -w /dev/uinput ]; then
+    ok "/dev/uinput writable (virtual HID reachable)"
+elif [ "$VERIFY_ONLY" -eq 0 ]; then
+    if have_sudo; then
+        # OWNER grants the node to her uid — checked at open() time, so
+        # unlike group membership it needs no re-login.
+        sudo -n sed "s/REPLACE_WITH_USERNAME/${USER}/" \
+            "${PROJECT_ROOT}/scripts/genesis-uinput.rules" \
+            | sudo -n tee /etc/udev/rules.d/99-genesis-uinput.rules >/dev/null \
+            && sudo -n udevadm control --reload-rules \
+            && sudo -n udevadm trigger --sysname-match=uinput
+        sudo -n modprobe uinput 2>/dev/null
+        echo uinput | sudo -n tee /etc/modules-load.d/genesis-uinput.conf >/dev/null
+        if [ -w /dev/uinput ]; then
+            ok "uinput udev rule installed — virtual HID reachable"
+        else
+            warn "udev rule installed but /dev/uinput still not writable"
+        fi
+    else
+        warn "/dev/uinput NOT writable — virtual HID unavailable."
+        warn "  Needs: sed 's/REPLACE_WITH_USERNAME/'\$USER'/' scripts/genesis-uinput.rules \\"
+        warn "             | sudo tee /etc/udev/rules.d/99-genesis-uinput.rules"
+        warn "         sudo udevadm control --reload-rules && sudo udevadm trigger --sysname-match=uinput"
+    fi
+fi
+
 # PortAudio — microphone capture for sounddevice.
 if "$PY" -c "import sounddevice as sd; sd.query_devices()" >/dev/null 2>&1; then
     ok "PortAudio present (sounddevice can open devices)"
@@ -150,6 +199,27 @@ elif [ "$VERIFY_ONLY" -eq 0 ]; then
     else
         warn "libcairo2-dev NOT installed — drawing unavailable."
         warn "  Needs: sudo apt-get install libcairo2-dev  (then: pip install pycairo)"
+    fi
+fi
+
+# Arcade games — the official ARC-AGI-3 toolkit (arc_agi + arcengine)
+# plus the local Game Arena shelf (game-arena pulls pyspiel, the same
+# engine Kaggle's arena evaluates on). All wheels; a failed install
+# is a warn — the arcade closes, the rest of her world is unaffected.
+# Downloaded game files land in <data_dir>/arcade/environment_files
+# (GENESIS_ARC_MODE=normal plays locally; =offline needs no network).
+if "$PY" -c "import arc_agi, arcengine, pyspiel" >/dev/null 2>&1; then
+    ok "arcade toolkits present (ARC-AGI-3 + arena)"
+elif [ "$VERIFY_ONLY" -eq 0 ]; then
+    if "$PY" -m pip install --only-binary=:all: \
+        arc-agi game-arena kaggle-environments; then
+        ok "arcade toolkits installed"
+    elif "$PY" -m pip install --user --only-binary=:all: \
+        --break-system-packages \
+        arc-agi game-arena kaggle-environments; then
+        ok "arcade toolkits installed (user site)"
+    else
+        warn "arcade toolkit install failed — the arcade stays closed"
     fi
 fi
 
@@ -261,17 +331,34 @@ def drawing():
     s = cairo.ImageSurface(cairo.FORMAT_ARGB32, 8, 8)
     return f"surface {s.get_width()}x{s.get_height()}"
 
+def hid():
+    import os
+    if not os.access("/dev/uinput", os.W_OK):
+        raise RuntimeError("/dev/uinput not writable — udev rule not applied")
+    from evdev import UInput, ecodes
+    u = UInput({ecodes.EV_KEY: [ecodes.KEY_A]}, name="genesis-hid-probe")
+    u.close()
+    return "uinput device opens and closes"
+
 def ions():
     from genesis_client.protocol import GET_ION_SUMMARY
     from brainstem.electrochemistry import interpret_ions
     interpret_ions(None)
     return f"opcode {GET_ION_SUMMARY}, neutral ctx ok"
 
+def arcade():
+    from worlds.games.arena import ArenaGames
+    offers = ArenaGames().offers()   # proves pyspiel loads and serves
+    import arc_agi, arcengine        # noqa: F401 — prove the toolkit too
+    return f"{len(offers)} arena games, ARC-AGI-3 toolkit imports"
+
 for n, f in (
     ("text to speech", tts),
     ("speech recognition", stt),
     ("microphone", mic),
     ("canvas drawing", drawing),
+    ("virtual hid", hid),
+    ("arcade games", arcade),
     ("ion layer", ions),
 ):
     check(n, f)

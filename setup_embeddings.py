@@ -20,10 +20,12 @@ import os
 import sys
 import tempfile
 import zipfile
-
-import numpy as np
+from typing import TYPE_CHECKING
 
 from infrastructure.config import default_data_dir
+
+if TYPE_CHECKING:
+    import numpy as np
 
 # ─── Config ──────────────────────────────────────────────────────
 
@@ -113,8 +115,12 @@ def _filter_glove_vectors(
 ) -> tuple[list[str], list[np.ndarray]] | None:
     """Parse GloVe file and filter to Genesis's vocabulary.
 
-    Returns (words, vectors) or None if no words matched.
+    Returns (words, vectors) or None if no words matched. numpy is
+    imported here rather than at module top so argument parsing —
+    and any import of this module — does not require it.
     """
+    import numpy as np
+
     print(f"Filtering to Genesis's vocabulary ({len(vocab)} words)...")
     words: list[str] = []
     vectors: list[np.ndarray] = []
@@ -147,6 +153,8 @@ def _normalize_and_save_vectors(
     words: list[str], vectors: list[np.ndarray], output_path: str
 ) -> None:
     """L2-normalize vectors and save to npz file."""
+    import numpy as np
+
     # Normalize all vectors (L2)
     print("Normalizing vectors...")
     matrix = np.stack(vectors).astype(np.float32)

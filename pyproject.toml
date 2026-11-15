@@ -16,17 +16,14 @@ keywords = [
     "machine-learning",
     "neuromodulation",
 ]
-license = { text = "Proprietary — all rights reserved (see LICENSE)" }
+license = { text = "n/a" }
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Rust",
-    "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
@@ -40,6 +37,10 @@ dependencies = [
     "opencv-python-headless==5.0.0.93",
     "pycairo==1.29.1",
     "websockets==15.0.1",
+    # Runtime dep, not test-only: her tools invoke it via
+    # ``sys.executable -m pytest`` (run_pytest, project creation,
+    # proposal verification) — it must live in her environment.
+    "pytest==8.4.2",
 ]
 
 [project.optional-dependencies]
@@ -49,7 +50,7 @@ dependencies = [
 # into python/voices/piper; speech.py invokes it as a subprocess.
 voice = [
     "vosk==0.3.45",
-    "sounddevice==0.5.2",
+    "sounddevice==0.5.6",
     "speechrecognition==3.14.2",
     "piper-tts==1.8.0",
 ]
@@ -61,6 +62,19 @@ math = [
     # mpmath>=1.4 deprecated names sympy 1.12 still calls
     # (ctx_mp.bitcount, mpnumeric) — keep it below the break.
     "mpmath<1.4",
+]
+# Virtual HID — her hand on the machine's input bus (tools/hid.py).
+# evdev binds Linux uinput and publishes sdist-only, so installing it
+# compiles a small C extension. The tools report unavailable without it.
+hid = [
+    "evdev==2.0.0; sys_platform == 'linux'",
+]
+arc = [
+    "arc-agi==0.9.9",
+    "game-arena>=0.1.0",
+    "kaggle>=2.2.5",
+    "kaggle-environments>=1.33.3",
+    "six>=1.17.0",
 ]
 
 [project.scripts]
@@ -116,4 +130,10 @@ addopts = "-q -p no:pytest_astropy -p no:pytest_astropy_header -p no:pytest_arra
 filterwarnings = [
     "error::DeprecationWarning",
     "error::PendingDeprecationWarning",
+    # sounddevice ≤0.5.6 sets ``data.shape = -1, channels`` inside its
+    # CFFI audio callback — deprecated by NumPy 2.5 and not fixable
+    # from here without vendoring the library. Scoped to that exact
+    # message so every other deprecation still errors. Revisit on a
+    # sounddevice release that drops the shape setter.
+    "ignore:Setting the shape on a NumPy array has been deprecated:DeprecationWarning",
 ]

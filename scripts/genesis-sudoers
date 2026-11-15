@@ -1,20 +1,20 @@
-# Genesis sudoers rules — allows the current user to control CPU
-# frequency without a password, restricted to the cpufreq_helper.sh
-# script.
+# Genesis sudoers drop-in — passwordless sudo for her user.
 #
-# This is a TEMPLATE. The actual path must match where the helper
-# script lives on your system. Use the install script to generate
-# the correct rule:
+# Every privileged lever invokes `sudo -n` directly: the daemon's
+# body control (governor, EPP, nice, I/O class, RTC wake alarm),
+# the run_privileged tool (`sudo -n bash`), and the optional-deps
+# installer. There is no mediated helper — a rule scoped to bash
+# would still permit all of root, so the honest choice is the full
+# grant or none. Without it, sensing still works; only actuation
+# stays read-only.
 #
-#   sudo bash scripts/install_sudoers.sh
+# This is a TEMPLATE — substitute the installing user:
 #
-# Or install manually:
-#   1. Edit the path below to match your checkout
-#   2. sudo cp genesis-sudoers /etc/sudoers.d/genesis
-#   3. sudo chmod 440 /etc/sudoers.d/genesis
-#   4. sudo visudo -c   (verify syntax)
+#   sed 's/REPLACE_WITH_USERNAME/'"$USER"'/' scripts/genesis-sudoers \
+#       | sudo tee /etc/sudoers.d/genesis
+#   sudo chmod 440 /etc/sudoers.d/genesis
+#   sudo visudo -c          (verify syntax)
 #
-# The wildcard allows the helper to be called with any arguments
-# (the helper script itself validates its inputs).
+# Revoke with:  sudo rm /etc/sudoers.d/genesis
 
-REPLACE_WITH_USERNAME ALL=(root) NOPASSWD: REPLACE_WITH_PATH/scripts/cpufreq_helper.sh *
+REPLACE_WITH_USERNAME ALL=(ALL) NOPASSWD: ALL

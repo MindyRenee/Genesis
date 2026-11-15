@@ -11,11 +11,11 @@ genesis-cli \- Genesis cognitive mind and interactive terminal
 .B genesis-cli
 is the cognitive mind of Genesis and the interactive terminal through
 which a user converses with her. It creates and starts the cognitive
-Mind in-process, starts the Rust daemon and retina if needed, and
+Mind in-process, starts the Rust daemon if needed, and
 handles the terminal directly.
 
 .PP
-The CLI owns the daemon and retina lifecycles as child processes. It
+The CLI owns the daemon lifecycle as a child process. It
 passes its PID to the daemon via
 .I GENESIS_COGNITIVE_PID
 so the daemon can include the mind in interoception \(em reading its
@@ -44,7 +44,7 @@ invocations.
 .TP
 .BR --data-dir " \fIDIR\fR"
 Data directory holding the core state file, STM ring buffer, LTM
-store, PID files, socket, and locks. Resolved exactly as the daemon
+store, PID files, and socket. Resolved exactly as the daemon
 resolves it:
 .I GENESIS_DATA_DIR ,
 else
@@ -61,8 +61,10 @@ cognitive mind. Useful for diagnostics.
 .B --stop
 Stop the running session for this data dir (same staged teardown as
 .BR genesis " \fB--stop\fR):"
-SIGINT the CLI, then SIGTERM the daemon and retina, each with its own
-grace period.
+SIGINT the CLI so it saves state first, then SIGTERM the daemon and
+the screen nerve, each stage waiting its full grace period. A
+process still alive at the deadline is reported as a retry, never
+escalated.
 .TP
 .B --offline
 Start in offline mode \(em skip all network access. Autonomous
@@ -95,7 +97,8 @@ Her recent spontaneous thoughts.
 Her external world: presences, events, social isolation.
 .TP
 .B /arcade
-The arcade in her world: official ARC-AGI-3 games on offer and what she remembers of each.
+The arcade in her world: official ARC-AGI-3 and local arena games on
+offer, and what she remembers of each.
 .TP
 .B /regulate
 How she's been managing her emotions.
@@ -106,16 +109,7 @@ See what she dreamed.
 .TP
 .B /memories
 See her recent long-term memories.
-.SS Learning and requests
-.TP
-.B /requests
-See sites she wants to access.
-.TP
-.BR /approve " \fIURL\fR"
-Approve a site she requested.
-.TP
-.BR /deny " \fIURL\fR"
-Deny a site she requested.
+.SS Learning
 .TP
 .B /learn-code
 Study her own source code.
@@ -125,9 +119,6 @@ Explore local files and docs.
 .TP
 .B /code-summary
 Summary of her code self-knowledge.
-.TP
-.B /web-history \fR[\fIN\fR]
-See what she's been looking at online (last N, default 20).
 .SS Projects
 .TP
 .BR /create-project " \fIdesc\fR"
@@ -186,19 +177,8 @@ Speak to Genesis (one utterance).
 .B /voice-mode
 Continuous voice conversation.
 .TP
-.B /look
-Ask her what she sees through the retina.
-.TP
-.BR /look " at \fIpath\fR"
-Ask her to look at an image file.
-.TP
 .B /draw
 Ask her to draw what she feels right now.
-.TP
-.B /play
-Her game collection;
-.BR /play " add \fIfile\fR"
-hands her a game spec.
 .TP
 .BR /register-face " \fIname\fR"
 Teach her your face (look at the camera).
@@ -224,7 +204,7 @@ Put her into meditation (default 60s).
 .TP
 .B /sleep-aid
 Emergency sleep aid for stress-induced insomnia.
-.SS Teaching, games, and ARC
+.SS Teaching
 .TP
 .BR /teach " [\fItopic\fR]"
 Put her into teaching mode (focused learning).
@@ -234,29 +214,6 @@ Exit teaching mode, resume normal operation.
 .TP
 .BR /teach-questions
 Answer its queued questions one at a time.
-.TP
-.B /game
-Put her into game mode (focused play).
-.TP
-.B /endgame
-Exit game mode, resume normal operation.
-.TP
-.BR /arc " \fIids|--all [--steps N] [--fresh] [--delay S] [--recover S]\fR"
-Practice play on the ARC benchmark.
-\fB--delay\fR paces steps;
-\fB--recover\fR waits up to S seconds for her to settle at a
-wellness gate instead of abandoning the suite.
-.SS Stewardship
-.TP
-.B /steward
-Steward channel status: stamped, authenticated, principal,
-directives.
-.TP
-.BR /steward " release \fIN\fR"
-Lift directive N (authenticated sessions only).
-.TP
-.B /steward unbind
-Seal this session's authority until the next authenticated start.
 .SS Session
 .TP
 .B /help
@@ -286,6 +243,14 @@ Her public channel: the session mirror plus her own composed posts.
 .TP
 .B GENESIS_DISCORD_BOT_TOKEN
 Bot token that lets her read the public channel.
+.TP
+.B GENESIS_BIN_DIR
+Explicit override for the directory holding the compiled daemon
+binary, for unusual checkout layouts.
+.TP
+.B GENESIS_ENV_FILE
+Path to the env file loaded at startup (default
+.IR $XDG_CONFIG_HOME/genesis/agent.env ).
 .SH FILES
 .TP
 .IR $DATA_DIR/genesis_cli.pid
@@ -325,23 +290,23 @@ and are promoted back only on success.
 .IR $DATA_DIR/experiments/admin/
 The privileged staging sandbox. The
 .B run_privileged
-tool executes a script she wrote here as root, via the root-owned
-helper
-.IR /usr/local/libexec/genesis/genesis_admin_helper.sh
-(installed with its NOPASSWD sudoers rule by
-.IR scripts/install_sudoers.sh ).
+tool executes a script she wrote here as root, directly via
+.BR "sudo \-n bash" ,
+which requires a NOPASSWD sudoers drop-in for her user (see
+.IR scripts/genesis-sudoers ).
 Her acting loop reaches it through
 .B maintain
 intentions: staged
 .I *.sh
-files surface as work, are read back for review, then elevated. The
-helper denies catastrophic or self-widening shapes, rate-limits runs,
-and appends every attempt to the root-owned audit log
-.IR /var/log/genesis-admin.log
-before anything runs.
+files surface as work, are read back for review, then elevated. There
+is no helper, denylist, rate limit, or audit log \(em her read-back
+is the only review, so what she elevates stands on her judgment
+alone.
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-daemon (8),
-.BR genesis-retina (1),
+.BR genesis-arcade (7),
+.BR genesis-browser (7),
 .BR genesis-math (7),
-.BR genesis-reasoning (7)
+.BR genesis-reasoning (7),
+.BR genesis-tools (7)

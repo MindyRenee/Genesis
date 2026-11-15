@@ -46,6 +46,10 @@ class UserProfile:
     # The profile models exactly one person — her — so the name is
     # known from the start; ``set_name`` can still change it.
     name: str = "Mindy"
+    # Other handles the same person is known by — a Discord display
+    # name, a chat nick — so "it's her" resolves identically on every
+    # channel, not just the terminal where her presence is implicit.
+    aliases: list[str] = field(default_factory=list)
     preferences: dict[str, list[str]] = field(default_factory=dict)
     facts: dict[str, str] = field(default_factory=dict)
     goals: list[str] = field(default_factory=list)
@@ -66,6 +70,41 @@ class UserProfile:
     _MAX_FACTS: ClassVar[int] = 500
     _MAX_PREF_CATEGORIES: ClassVar[int] = 100
     _MAX_PREF_VALUES: ClassVar[int] = 25
+    _MAX_ALIASES: ClassVar[int] = 25
+
+    @staticmethod
+    def _norm_handle(handle: str) -> str:
+        """Canonical form of a channel handle for identity matching.
+
+        Handles arrive decorated — ``@name``, ``Name#1234``, mixed
+        case — while the identity underneath is the same person.
+        """
+        return handle.strip().lstrip("@").split("#", 1)[0].strip().lower()
+
+    def add_alias(self, alias: str) -> None:
+        """Record another handle that means her — e.g. her Discord name."""
+        stripped = alias.strip().lstrip("@")
+        if not stripped or self._norm_handle(stripped) == self._norm_handle(self.name):
+            return
+        if all(self._norm_handle(a) != self._norm_handle(stripped) for a in self.aliases):
+            if len(self.aliases) >= self._MAX_ALIASES:
+                self.aliases.pop(0)
+            self.aliases.append(stripped)
+            self.save()
+
+    def is_user(self, handle: str) -> bool:
+        """Whether *handle* names her person — name or any alias.
+
+        The identity question every channel asks: "is this her?" A
+        Discord message from ``MindyRenee`` and a terminal line are
+        the same person when the handle matches name or an alias.
+        """
+        norm = self._norm_handle(handle)
+        if not norm:
+            return False
+        if norm == self._norm_handle(self.name):
+            return True
+        return any(norm == self._norm_handle(a) for a in self.aliases)
 
     def __post_init__(self) -> None:
         """Convert a list-based recent_topics field into a bounded deque."""
@@ -216,6 +255,7 @@ class UserProfile:
         """Serialize the profile to a plain dictionary."""
         return {
             "name": self.name,
+            "aliases": list(self.aliases),
             "preferences": self.preferences,
             "facts": self.facts,
             "goals": self.goals,
@@ -233,6 +273,7 @@ class UserProfile:
         or foreign JSON that stores a list where a dict belongs must
         not load "successfully" and then crash the next add_* call.
         """
+        aliases = data.get("aliases")
         preferences = data.get("preferences")
         facts = data.get("facts")
         goals = data.get("goals")
@@ -255,6 +296,11 @@ class UserProfile:
                 if isinstance(data.get("name"), str) and data["name"].strip()
                 else "Mindy"
             ),
+            aliases=(
+                [a.strip() for a in aliases if isinstance(a, str) and a.strip()]
+                if isinstance(aliases, list)
+                else []
+            )[: cls._MAX_ALIASES],
             preferences=(
                 {
                     k: [v for v in vals if isinstance(v, str)]
@@ -346,6 +392,7 @@ class UserProfile:
                 data = json.load(f)
             loaded = UserProfile.from_dict(data)
             self.name = loaded.name
+            self.aliases = loaded.aliases
             self.preferences = loaded.preferences
             self.facts = loaded.facts
             self.goals = loaded.goals

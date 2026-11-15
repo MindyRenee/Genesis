@@ -879,7 +879,6 @@ _EXPORTS: dict[str, str] = {
     "LearningResult": "frontal_lobe.autonomous",
     "LearningStrategy": "frontal_lobe.autonomous",
     "MetaLearner": "frontal_lobe.autonomous",
-    "SiteRequest": "frontal_lobe.autonomous",
     "TransferResult": "frontal_lobe.autonomous",
     "is_programming_topic": "frontal_lobe.autonomous",
     # Curiosity-driven filesystem exploration (PFC + parietal)
@@ -1032,11 +1031,9 @@ _EXPORTS: dict[str, str] = {
     # Metacognitive self-improvement proposals (the code lives in
     # self/ but the function is prefrontal metacognition)
     "ProposalsMixin": "self.proposals",
-    # Self-sovereignty over her own manual — changes to her man
-    # pages wait for her say (self-model ownership of self-docs)
-    "ManChange": "self.man_review",
-    "ManPageReview": "self.man_review",
-    "ManReviewMixin": "self.man_review",
+    # Her own manual — learned at boot, installed copies kept in
+    # sync with the versioned sources (self-model self-docs)
+    "ManPagesMixin": "self.man_pages",
     # Long-horizon mathematical inquiry — open problems that persist
     # across sessions, with claims gated on the parietal oracle's
     # verdict (prefrontal sustained/deliberative cognition)

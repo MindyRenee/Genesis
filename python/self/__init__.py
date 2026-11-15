@@ -25,8 +25,9 @@ Subsystems:
     EmergentIdentity, EmergentIdentitySource, IdentityStage,
     StageResolution, DevelopmentalTracker —
         identity development and expression
-    ManPageReview, ManChange, ManReviewMixin — her man pages are part
-        of her self-model: changes to them wait for her say
+    ManPagesMixin — her man pages are part of her self-model: she
+        learns them at boot, and the installed copies stay synced to
+        the versioned sources
 """
 
 from __future__ import annotations
@@ -88,10 +89,8 @@ _EXPORTS = {
     "InferenceResult": "self.learning",
     "LearningEvent": "self.learning",
     "SelfDirectedLearner": "self.learning",
-    # self.man_review — her manual is hers to approve
-    "ManChange": "self.man_review",
-    "ManPageReview": "self.man_review",
-    "ManReviewMixin": "self.man_review",
+    # self.man_pages — her manual, learned and kept in sync
+    "ManPagesMixin": "self.man_pages",
     # self.metacognitive_model
     "CognitiveProcessModel": "self.metacognitive_model",
     "MetacognitiveFeedback": "self.metacognitive_model",

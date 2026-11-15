@@ -367,18 +367,6 @@ class StatusMixin:
 
         return self._emergent_identity
 
-    def site_requests_status(self) -> str:
-        """Get a description of pending site access requests."""
-        return self.learner.describe_requests()
-
-    def approve_site(self, url: str) -> bool:
-        """Approve a site request from Genesis."""
-        return self.learner.approve_site(url)
-
-    def deny_site(self, url: str) -> bool:
-        """Deny a site request from Genesis."""
-        return self.learner.deny_site(url)
-
     def _effective_phase(self, core_state: CoreState) -> int:
         """Return the effective mental phase, resolving zone/phase desync.
 

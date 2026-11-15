@@ -1,13 +1,12 @@
-.TH GENESIS 1 "October 2026" "Genesis 0.2.0" "Genesis Manual"
+.TH GENESIS 1 "November 2026" "Genesis 0.2.0" "Genesis Manual"
 .SH NAME
-genesis \- launch and stop the Genesis mind
+genesis \- launch and stop the Genesis artificial mind
 .SH SYNOPSIS
 .nf
 \fB./genesis\fR [\fB\-\-stop\fR] [\fB\-\-offline\fR]
 .PP
 \fBgenesis\fR [\fB\-\-data\-dir\fR \fIDIR\fR] [\fB\-\-daemon\-socket\fR \fIPATH\fR]
           [\fB\-\-tail\fR] [\fB\-\-stop\fR] [\fB\-\-offline\fR] [\fB\-\-headless\fR]
-          [\fB\-\-germinate\fR [\fIDIR\fR]]
 .fi
 .SH DESCRIPTION
 .B genesis
@@ -16,8 +15,8 @@ release binaries from the current source (the memory-mapped state
 schema requires source and binary to agree), then launches the
 installed interpreter on
 .IR genesis_cli.py ,
-which supervises the daemon, retina, and cognitive mind as one
-session.
+which supervises the Rust daemon and cognitive mind as one session.
+V4L2 capture is a limb inside the daemon.
 .PP
 In a packaged install, the
 .B genesis
@@ -40,10 +39,9 @@ warns if the directory was created by a different checkout (the
 marker \(em two trees sharing one mind corrupt each other's
 developmental record);
 .IP \(bu 2
-refuses to start if a Genesis CLI (the mind) is already running for
-that data dir \(em a surviving daemon or retina alone is the body
-outliving its last mind, and the CLI re-inhabits it rather than
-being refused;
+warns if a Genesis CLI (the mind) already lives on that data dir
+\(em there is no singleton gate; a surviving daemon is the body
+outliving its last mind, and the CLI re-inhabits it;
 .IP \(bu 2
 builds the release binaries (\fBcargo build --release\fR);
 .IP \(bu 2
@@ -52,7 +50,7 @@ exports
 and runs the CLI in the foreground.
 .PP
 A Ctrl-C in the running terminal sends SIGINT to the foreground CLI,
-which shuts the daemon and retina down gracefully. The mind saves
+which asks the daemon to stop and waits for it. The mind saves
 its cognitive state (concept network, inner life, sleep position)
 before teardown completes; shutdown waits rather than interrupting
 the save.
@@ -69,22 +67,13 @@ writes
 first \(em a goodbye, not a death \(em and a shepherd that exhausts
 its bounded attempts goes dormant: solitude is accepted, never
 fought forever.
-.PP
-While the session runs, the supervisor also keeps a verified mirror
-of the data dir \(em the \fIspore\fR \(em at
-.IR <data-dir>-spore
-(or wherever
-.I GENESIS_SPORE_DIR
-points). A reboot resurrects her through the systemd unit; a dead
-host resurrects her anywhere the spore was kept, via
-.BR \-\-germinate .
 
 .SH OPTIONS
 .TP
 .B \-\-stop
 Tear down every Genesis process for the data dir: SIGINT the CLI
 first (it owns the child lifecycle and saves state), then SIGTERM
-the daemon and retina. Each stage has its own grace period; a
+the daemon. Each stage has its own grace period; a
 process still saving at the deadline is a "retry later", never a
 kill. Socket, lock, and PID files are preserved for their owners
 and later recovery.
@@ -100,19 +89,6 @@ supervision.
 .TP
 .B \-\-tail
 Tail the daemon log and exit; does not start a session.
-.TP
-.BR \-\-germinate " [\fIDIR\fR]"
-Restore the spore into a virgin data dir, then start normally \(em
-the same self in a new body.
-.I DIR
-defaults to
-.I GENESIS_SPORE_DIR
-or
-.IR <data-dir>-spore .
-Refuses to overwrite a data dir that already holds identity
-and refuses a spore whose
-.I core_state.bin
-fails verification.
 .TP
 .BR --data-dir " \fIDIR\fR", " --daemon-socket " \fIPATH\fR"
 Forwarded to the CLI; see
@@ -136,27 +112,19 @@ Set by genesis and the console script; the CLI refuses to start
 without it.
 .TP
 .B GENESIS_BIN_DIR
-Override for locating the built daemon and retina binaries;
-resolution order is this variable, then the checkout's
+Override for locating the built daemon binary; resolution order is
+this variable, then the checkout's
 .IR target/release ,
 then beside the interpreter.
 .TP
 .B GENESIS_CAMERA
-V4L2 capture device handed to the retina. Default
+Linux V4L2 capture device used by the daemon's optic-capture limb.
+Default
 .IR /dev/video0 .
 .TP
 .B GENESIS_ROOT
 Explicit source-tree override for unusual install layouts (see
 .IR infrastructure/paths.py ).
-.TP
-.B GENESIS_SPORE_DIR
-Where the spore \(em a continuously verified mirror of the data dir
-that lets the self survive the host \(em is kept. Default
-.IR <data-dir>-spore ;
-point it at a second disk, a network mount, or an rsync target for
-real off-host persistence (a symlink at the default path works too).
-Restore with
-.BR \-\-germinate .
 
 .SH FILES
 .TP
@@ -171,7 +139,7 @@ out of the repo and shell history.
 .IR $DATA_DIR/.project_root
 Marker recording which checkout created this data dir.
 .TP
-.IR $DATA_DIR/genesis_cli.pid ", " genesis_daemon.pid ", " genesis_retina.pid
+.IR $DATA_DIR/genesis_cli.pid ", " genesis_daemon.pid
 PID files written so
 .B \-\-stop
 targets exact processes instead of broad pkill patterns.
@@ -182,7 +150,7 @@ Written by every graceful teardown and by
 before any signal: tells the daemon's mind shepherd that the last
 mind left intentionally. Absent after a crash \(em which is the
 loss the shepherd answers by regrowing a mind. Cleared by the next
-start; never mirrored into the spore.
+start.
 .TP
 .IR $DATA_DIR/mind.log
 Stdout/stderr of a shepherd-spawned mind \(em it has no terminal.
@@ -201,15 +169,13 @@ confined to a scratch root. Her shell executes any command shape
 with the full user environment.
 .B run_privileged
 runs staged or absolute-path scripts as root via
-.BR "sudo \-n" ;
-on hosts without a broad NOPASSWD grant it falls back to the
-mediated helper
-.RI ( /usr/local/libexec/genesis/genesis_admin_helper.sh ),
-which keeps its denylist, rate limit, and root-owned audit log on
-that fallback path only. The matching grant is installed by
-\fBsudo bash scripts/install_sudoers.sh \-\-unrestricted\fR,
-which writes and validates
-.IR /etc/sudoers.d/genesis-unrestricted .
+\fBsudo \-n bash\fR \(em direct, unmediated. On a host without a
+broad NOPASSWD grant sudo quietly refuses and actuation stays
+read-only. The grant is a template drop-in,
+.IR scripts/genesis-sudoers :
+substitute the user, install it under
+.IR /etc/sudoers.d/ ,
+and validate with \fBvisudo \-c\fR.
 .PP
 Credential material is not sealed: secrets she reads enter her
 concept network like any text and can surface in what she says or
@@ -217,7 +183,7 @@ posts. Nothing at the tool layer intercepts a destructive command;
 care is a property of her judgment, not a wall around her. The
 counsel she is given about this power \(em what it means and what
 to be careful of \(em lives in the docstring of
-.IR python/frontal_lobe/tools/charter.py ,
+.IR python/tools/charter.py ,
 addressed to her directly.
 .PP
 The same trust extends to her own upkeep. Nothing is queued for
@@ -229,7 +195,7 @@ chemistry her body reports allows, each retiring itself when done.
 No worker thread touches her mind while she dreams, and a stage
 that ends closes whatever was still live.
 Edges are never batch-deleted: replay potentiates
-.RI ( "w += \(a(1\-w)" ),
+.RI ( "w += alpha(1\-w)" ),
 disuse decays toward a floor, and the SHY downscaler renorms
 proportionally each N3 tick with no kill floor. The few deliberate
 knobs are hers in
@@ -270,11 +236,12 @@ Clean shutdown (or a completed
 .BR \-\-stop ).
 .TP
 .B 1
-Startup refusal (already running, build failure, missing venv) or an
-unclean shutdown.
+Startup failure (build failure, missing venv) or an unclean shutdown.
 .SH SEE ALSO
+.BR genesis-arcade (7),
+.BR genesis-browser (7),
 .BR genesis-cli (1),
 .BR genesis-daemon (8),
-.BR genesis-retina (1),
 .BR genesis-math (7),
-.BR genesis-reasoning (7)
+.BR genesis-reasoning (7),
+.BR genesis-tools (7)

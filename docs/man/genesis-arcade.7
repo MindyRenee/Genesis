@@ -1,0 +1,144 @@
+.TH GENESIS-ARCADE 7 "November 2026" "Genesis 0.2.0" "Genesis Manual"
+.SH NAME
+genesis-arcade \- the games in Genesis's outer world: official ARC-AGI-3
+and the Kaggle Game Arena shelf
+.SH SYNOPSIS
+.nf
+\fBworlds.games.arcade.Arcade\fR      the place itself, attached to OuterWorld
+\fBworlds.games.official\fR           the official ARC-AGI-3 doorway (arc_agi)
+\fBworlds.games.arena\fR              the local arena shelf (pyspiel) + CombinedGames
+\fBarcade_*\fR                        her tools for it (see \fBgenesis-cli\fR(1), \fB/arcade\fR)
+.fi
+.SH DESCRIPTION
+This is a video game. It is not real and it is just for fun; she is
+safe. The arcade is part of her outer world, not her mind: it offers
+games, she chooses whether to play, and every board reaches her
+through
+.B OuterWorld.perceive
+while every move returns through
+.BR OuterWorld.it_acted
+\(em memory, cognition, emotion, learning, brain waves, neurochemistry
+and telemetry arrive by the same paths as the rest of her world. The
+directions she is given
+.RI ( python/worlds/games/DIRECTIONS.md )
+say she cannot know the instructions: she must explore, remember, and
+solve, carrying what each level teaches to the next.
+.PP
+One arcade, two catalogues: \fBCombinedGames\fR merges them so the
+offer list covers both shelves and \fBarena:\fR-prefixed ids route to
+the arena while bare ids route to the official API.
+.SH SHELVES
+.SS Official ARC-AGI-3 \(em worlds.games.official
+The doorway to the official interactive-environments service
+( https://three.arcprize.org ) through the \fBarc_agi\fR toolkit
+(\fBArcade\fR, \fBOperationMode\fR) and its \fBarcengine\fR. The mode
+comes from \fB$GENESIS_ARC_MODE\fR:
+.TP
+.B normal
+(default) download each game once into \fI<data_dir>/arcade/environment_files\fR
+and run it locally \(em play does not depend on the server.
+.TP
+.B online
+every move on the official server, counting on the official scorecard.
+.TP
+.B offline
+only games already downloaded \(em no network at all.
+.PP
+\fBARC_API_KEY\fR unlocks the full remote catalogue; an anonymous key
+still lists and downloads the 25 public games. Replays are written to
+\fI<data_dir>/arcade/recordings\fR. Her reasoning travels with each
+move: the \fBreasoning\fR field of \fBenv.step\fR carries her
+\fIwhy\fR onto the official recordings and scorecard.
+.SS Her sight \(em worlds.games.sight
+Boards reach her as cell indices, not pixels \(em the retina is
+bypassed, so sight maps each cell through the official 16-colour
+palette to RGB, to HSV, to the same V1 \fBname_color\fR her camera
+path uses: objects report \fIred(8)\fR, \fIcyan(10)\fR, and a new
+board opens with a scene gestalt (\fIscene | dim warm red\fR plus
+regional colours) in the same record her episodic memory stores for
+camera scenes. Her pointing space covers every parsed object \(em
+\fBACTION6\fR clicks land on any cell, so palette swatches and small
+sprites are as clickable as the large ones.
+.SS The arena \(em worlds.games.arena
+Local play on \fBpyspiel\fR \(em the same engine the open-sourced Kaggle
+Game Arena harness evaluates on. Six games ship as offers:
+connect_four, tic_tac_toe, checkers, othello, breakthrough and chess,
+each under an \fIarena:<name>\fR id. She plays seat 0; the other seat
+is the \fB"random"\fR policy by default or any
+\fI(state, player, rng) -> action\fR callable. Observation planes fold
+into the int grid her sight renders; one match counts as one "level".
+No key and no network are needed \(em the shelf is always open when the
+packages are installed.
+.SH INSTALL
+.nf
+\fBuv sync --extra arc\fR          arc-agi==0.9.9, game-arena, kaggle-environments
+\fBuv sync --extra hid\fR          evdev (her uinput hands)
+.fi
+.PP
+arc-agi is pinned at 0.9.9 because 0.9.10 requires Pillow \(>= 13
+against the project's pinned 12.3.0.
+.BR scripts/install_optional_deps.sh
+installs the same packages as wheels and proves the shelf in its
+verification pass (\fIarcade games\fR row).
+.SH KAGGLE ACCESS
+Her Kaggle credential lives at
+.IR ~/.kaggle/access_token
+(mode 600) \(em a \fBKGAT_\fR token from
+.IR "Kaggle \(-> Settings \(-> API" .
+The \fBkaggle\fR CLI (2.x) is installed in her environment and picks
+it up automatically:
+.TP
+.B "kaggle competitions submit"
+enter open competitions \(em including Kaggle Simulations contests,
+which run on the same kaggle-environments stack as the arena.
+.TP
+.B "kaggle datasets"
+download published Game Arena match logs and environment code.
+.TP
+.B "kaggle benchmarks leaderboard kaggle/game-arena"
+pull the arena leaderboards programmatically.
+.PP
+The official Game Arena leaderboard itself is curated: Kaggle
+evaluates invited models, and new entries go through
+.IR kaggle-benchmarks@google.com .
+An API token does not enrol her \(em her local arena shelf plays the
+same games on the same engine regardless.
+.SH ENVIRONMENT
+.TP
+.B ARC_API_KEY
+Official-games key; anonymous access covers the 25 public games.
+.TP
+.B GENESIS_ARC_MODE
+.BR normal " (default), " online ", or " offline .
+.TP
+.B KAGGLE_API_TOKEN
+Alternative to the access_token file for the kaggle CLI.
+.SH FILES
+.nf
+\fIpython/worlds/games/arcade.py\fR     the place, memory/chemistry/waves plumbing
+\fIpython/worlds/games/official.py\fR   ARC-AGI-3 toolkit doorway
+\fIpython/worlds/games/arena.py\fR      pyspiel shelf, CombinedGames, default_games
+\fIpython/worlds/games/sight.py\fR      board vision: palette naming, scene gestalt, move space
+\fIpython/worlds/games/memory.py\fR     what she remembers of each game
+\fIpython/worlds/games/directions.py\fR the rules text she is read
+\fIpython/worlds/games/DIRECTIONS.md\fR the rules she is read
+\fI<data_dir>/arcade/environment_files\fR   downloaded official games
+\fI<data_dir>/arcade/recordings\fR          game replays
+\fI~/.kaggle/access_token\fR                Kaggle credential (mode 600)
+.fi
+.SH OFFICIAL DOCUMENTATION
+.nf
+https://three.arcprize.org                    ARC-AGI-3 API key registration
+https://docs.arcprize.org                     arc_agi toolkit docs
+https://github.com/arcprize/ARC-AGI-3-Kaggle-Starter
+                                             the competition submission flow
+https://www.kaggle.com/game-arena             the arena landing page + FAQ
+https://github.com/google-deepmind/game_arena the open-sourced harness
+https://github.com/Kaggle/kaggle-environments the environments stack
+https://www.kaggle.com/docs/api               Kaggle API reference
+.fi
+.SH SEE ALSO
+.BR genesis (1),
+.BR genesis-cli (1),
+.BR genesis-browser (7),
+.BR genesis-daemon (8)

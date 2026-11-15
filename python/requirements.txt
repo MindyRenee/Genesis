@@ -19,8 +19,14 @@ Pillow==12.3.0
 opencv-python-headless==5.0.0.93
 pycairo==1.29.1
 
-# Web adapter (live webpage play over Chrome DevTools Protocol)
+# Browser transport — WebDriver BiDi (Firefox) and Chrome DevTools
+# Protocol (Chromium) both ride one websocket session.
 websockets==15.0.1
+
+# Test runner — runtime dep: her tools call it through
+# `sys.executable -m pytest` (project creation, proposal
+# verification, self-checks), not just the dev suite.
+pytest==8.4.2
 
 # Optional: voice / ambient listening (Vosk offline STT + microphone,
 # Piper TTS). Install separately if you want voice:
@@ -28,3 +34,18 @@ websockets==15.0.1
 #   sounddevice==0.5.2
 #   speechrecognition==3.14.2
 #   piper-tts==1.8.0
+
+# Optional: virtual HID — her hand on the machine's input bus
+# (tools/hid.py). Source build (needs a C compiler); at runtime it
+# needs write access to /dev/uinput — see scripts/genesis-uinput.rules.
+#   evdev==2.0.0
+
+# Optional: official ARC-AGI-3 games (worlds/games/official.py) plus
+# the local Game Arena shelf (worlds/games/arena.py — game-arena
+# pulls pyspiel, the engine Kaggle's arena evaluates on). ARC imports
+# lazily; needs ARC_API_KEY from https://three.arcprize.org for full
+# online access (anonymous offers fewer; the arena shelf is local and
+# needs no key). arc-agi pinned to 0.9.9 — 0.9.10 wants Pillow>=13.
+#   arc-agi==0.9.9
+#   game-arena>=0.1.0
+#   kaggle-environments>=1.33.3

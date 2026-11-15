@@ -9,7 +9,6 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from frontal_lobe import CognitiveState
-from occipital_lobe import load_image, resize_for_vision
 from parietal_lobe.grid import Grid
 from parietal_lobe.grounding import ground_scene
 from parietal_lobe.scene import Scene
@@ -21,7 +20,6 @@ from temporal_lobe.presence import PresenceKind
 from thalamus.relay import KIND_HEARD
 
 from genesis_client.protocol import (
-    CHEM_DOPAMINE,
     CHEM_NOREPINEPHRINE,
     MODULE_LANGUAGE,
     MODULE_SENSORY,
@@ -1239,176 +1237,6 @@ class ConversationMixin:
         # answering its questions), it should focus on them, not
         # wander into bug scans, drawing, or exploration.
         self._resume_inner_life()
-
-    def see(self, nerve: str = "optic") -> str:
-        """Look through an afferent nerve, store the observation, and report it.
-
-        ``nerve`` selects which eye: ``"optic"`` is the body's camera,
-        ``"screen"`` the screen-capture nerve a relay feeds. The
-        thalamic gate applies either way.
-
-        ``vision.see`` returns the scene as structured percept data;
-        the language engine composes its report from it — nothing here
-        speaks a pre-written sentence.
-        """
-        try:
-            emotion = self.feel()
-            scene = self.vision.see(
-                client=self.client,
-                emotion=emotion,
-                network=self.brain.frontal.network,
-                nerve=nerve,
-            )
-            self._note_faces_seen()
-            if scene.status == "ok":
-                thought = Thought(
-                    content="see",
-                    intent="self_report",
-                    emotion=emotion.label,
-                    confidence=min(0.9, 0.4 + scene.salience * 0.5),
-                    metadata={
-                        "vision": True,
-                        "vision_scene": scene.as_metadata(),
-                    },
-                )
-            else:
-                thought = Thought(
-                    content="see",
-                    intent="self_report",
-                    emotion=emotion.label,
-                    confidence=0.3,
-                    metadata={"vision_status": scene.status},
-                )
-            report = self.language.render(thought, emotion)
-            try:
-                self.world.it_acted("looked through the eye", detail=report[:200])
-            except Exception as e:  # noqa: BLE001
-                note_swallowed(
-                    "mind.conversation.see",
-                    e,
-                )
-            return report
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.conversation.see",
-                e,
-            )
-            from temporal_lobe.base import Thought as _Thought
-
-            emo = self.feel()
-            thought = _Thought(
-                content="see",
-                intent="self_report",
-                emotion=emo.label,
-                confidence=0.3,
-                metadata={"vision_status": "unprocessed"},
-            )
-            return self.language.render(thought, emo)
-
-    def look_at_image(self, path: str) -> str:
-        """Look at an image file and describe what it sees.
-
-        Processes the image through the full visual cortex
-        (V1→V4→VTC→MTL) and reports what it recognizes. If it
-        doesn't recognize anything, it describes the visual features
-        it can perceive (color, structure, brightness).
-        """
-        from temporal_lobe.base import Thought as _Thought
-
-        emo = self.feel()
-
-        try:
-            frame = load_image(path)
-            if frame is None:
-                thought = _Thought(
-                    content="see",
-                    intent="self_report",
-                    emotion=emo.label,
-                    confidence=0.4,
-                    metadata={"vision_status": "load_failed"},
-                )
-                return self.language.render(thought, emo)
-
-            frame = resize_for_vision(frame, max_dim=320)
-
-            # Face recognition (FFA) on the image itself. The live-eye
-            # path does this inside `vision.see`, so without it here an
-            # image was processed for objects, colour and features but
-            # never for a face — leaving her unable to recognise anyone
-            # in a photograph on a machine with no camera. Faces it
-            # recognises become presences in her world, the same way a
-            # face seen live does.
-            face_names: list[str] = []
-            n_unknown_faces = 0
-            try:
-                face_names, n_unknown_faces = self.vision.recognize_faces_in(frame)
-            except Exception as e:  # noqa: BLE001 — a bad frame is not a failed look
-                note_swallowed(
-                    "mind.conversation.look_at_image.faces",
-                    e,
-                )
-            if face_names:
-                self._note_faces_seen()
-
-            percept = self.visual_cortex.see(frame, learn=True)
-
-            # Build a short semantic marker from the percept — the
-            # language engine composes the actual first-person voice
-            # from the metadata, not from hardcoded prose.
-            desc = percept.describe()
-            candidates_meta: list[dict[str, Any]] = []
-            if percept.candidates:
-                top = percept.candidates[0]
-                if top[1] > 0.2:
-                    candidates_meta = [
-                        {"name": name.replace("_", " "), "similarity": sim}
-                        for name, sim in percept.candidates[:3]
-                        if sim > 0.1
-                    ]
-
-            # Emit a neuro impulse — seeing is a light creative action
-            self._learner_neuro_impulse(CHEM_DOPAMINE, 0.05)
-
-            thought = _Thought(
-                content=desc,
-                intent="self_report",
-                emotion=emo.label,
-                confidence=min(0.9, 0.3 + percept.confidence),
-                metadata={
-                    "vision": True,
-                    "concept": percept.concept,
-                    "confidence": percept.confidence,
-                    "surprise": percept.surprise,
-                    "novel": percept.is_novel,
-                    "color": percept.dominant_color,
-                    "brightness": percept.brightness,
-                    "candidates": candidates_meta,
-                    "faces": face_names,
-                    "n_unknown_faces": n_unknown_faces,
-                },
-            )
-            rendered = self.language.render(thought, emo)
-            try:
-                self.world.it_acted("looked at an image", detail=rendered[:200])
-            except Exception as e:  # noqa: BLE001
-                note_swallowed(
-                    "mind.conversation.look_at_image",
-                    e,
-                )
-            return rendered
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.conversation.look_at_image",
-                e,
-            )
-            thought = _Thought(
-                content="see",
-                intent="self_report",
-                emotion=emo.label,
-                confidence=0.3,
-                metadata={"vision_status": "unprocessed"},
-            )
-            return self.language.render(thought, emo)
 
     def _render_self_report(
         self,

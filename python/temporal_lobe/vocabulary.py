@@ -4619,7 +4619,11 @@ class Vocabulary:
     def _q_isolation(self, net, target, subject, detail, pron_subj, pron_obj):
         # Concept has few connections — ask what else connects
         if net and target:
-            neighbors = net.get_exact_neighbors(target)[:2]
+            neighbors = [
+                n
+                for n in net.get_exact_neighbors(target)
+                if n[0].replace("_", " ").split("#")[0].lower() != subject.lower()
+            ][:2]
             if neighbors:
                 known = ", ".join(n[0].replace("_", " ") for n in neighbors)
                 rel_verb = agree_verb_phrase(
@@ -4666,7 +4670,12 @@ class Vocabulary:
         cause_verb = self._relation_verb_for(RelationType.CAUSES, "produce")
         if net and target:
             edges = net.get_edges(target, "out")
-            is_a = [e.target for e in edges if e.relation.value == "is_a"]
+            is_a = [
+                e.target
+                for e in edges
+                if e.relation.value == "is_a"
+                and e.target.replace("_", " ").split("#")[0].lower() != subject.lower()
+            ]
             if is_a:
                 parent = is_a[0].replace("_", " ")
                 is_a_verb = agree_verb_phrase("is a kind of", is_plural_np(subject))
@@ -4703,8 +4712,10 @@ class Vocabulary:
         return [f"{self._cap_first(lead)}. {self._cap_first(ask)}"]
 
     def _q_connection(self, net, target, subject, detail, pron_subj, pron_obj):
-        # Multiple paths between concepts — ask about the link
-        if detail:
+        # Multiple paths between concepts — ask about the link. A
+        # gap_detail that resolves to the subject itself would read
+        # "paths between X and X", so only a distinct detail qualifies.
+        if detail and detail.replace("_", " ").split("#")[0].lower() != subject.lower():
             d = detail.replace("_", " ")
             lead = self._statement(
                 "I",
@@ -4719,7 +4730,7 @@ class Vocabulary:
     def _q_cooccurrence(self, net, target, subject, detail, pron_subj, pron_obj):
         # Two concepts co-occur — ask about the relationship
         cause_verb = self._relation_verb_for(RelationType.CAUSES, "cause")
-        if detail:
+        if detail and detail.replace("_", " ").split("#")[0].lower() != subject.lower():
             d = detail.replace("_", " ")
             lead = self._statement(f"{subject} and {d}", "keep", "appearing together")
             ask = self._yn_question("one", cause_verb, "the other")
@@ -4732,18 +4743,25 @@ class Vocabulary:
         ]
 
     def _q_perspective(self, net, target, subject, detail, pron_subj, pron_obj):
-        # Ask about the user's view
+        # Ask about the user's view. The "in light of Y" slot needs a
+        # neighbor distinct from the subject — `_words_from_concept`
+        # falls back to the concept's own name when no edges exist,
+        # which would render "see X in light of X".
         if net and target:
-            related = self._words_from_concept(target, RelationType.RELATED_TO, "out", 1)
+            related = self._words_from_concept(target, RelationType.RELATED_TO, "out", 4)
             if related:
-                return [
-                    self._wh_question(
-                        "how",
-                        subject="you",
-                        verb="see",
-                        complement=(f"{subject} in light of {related[0].replace('_', ' ')}"),
-                    )
-                ]
+                base = subject.split("#")[0].lower()
+                for word in related:
+                    name = word.replace("_", " ")
+                    if name.split("#")[0].lower() != base:
+                        return [
+                            self._wh_question(
+                                "how",
+                                subject="you",
+                                verb="see",
+                                complement=f"{subject} in light of {name}",
+                            )
+                        ]
         return [self._wh_copula("what", f"your perspective on {subject}")]
 
     def _q_social_emotional(self, net, target, subject, detail, pron_subj, pron_obj):

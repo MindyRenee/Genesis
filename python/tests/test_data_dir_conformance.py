@@ -275,7 +275,7 @@ def test_nothing_reads_pin_or_xdg_for_state() -> None:
     # each was verified by hand when added here.
     allowed = {
         "config.py",  # vosk_model_dir asset candidates, not the data dir
-        "man_review.py",  # resolves $XDG_DATA_HOME/man for man pages
+        "man_pages.py",  # resolves $XDG_DATA_HOME/man for man pages
         "learning.py",  # same — man-page location, never the data dir
         "install.sh",  # MAN_HOME only — the user man dir genuinely is XDG
         "data_dir.rs",  # docstring documents the mechanism's absence
