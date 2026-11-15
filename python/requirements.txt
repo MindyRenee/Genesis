@@ -3,7 +3,7 @@
 
 # Core
 numpy==2.5.3
-nltk==3.10.3
+nltk==3.10.4
 # nltk's import chain pulls scipy.stats (collocations → metrics.
 # association → fisher_exact), so scipy is a hard runtime dep — a
 # stale system-site scipy built for numpy 1.x cannot substitute.
@@ -15,7 +15,7 @@ psutil==7.2.2
 # sympy lazily and degrades without it. Pinned in requirements-dev.txt
 # so dev/CI still exercises it, or install the "math" extra.
 # Image processing (visual cortex + canvas)
-Pillow==12.3.0
+Pillow==13.0.0
 opencv-python-headless==5.0.0.93
 pycairo==1.29.1
 
@@ -26,7 +26,7 @@ websockets==15.0.1
 # Test runner — runtime dep: her tools call it through
 # `sys.executable -m pytest` (project creation, proposal
 # verification, self-checks), not just the dev suite.
-pytest==8.4.2
+pytest==9.1.1
 
 # Optional: voice / ambient listening (Vosk offline STT + microphone,
 # Piper TTS). Install separately if you want voice:
@@ -45,7 +45,7 @@ pytest==8.4.2
 # pulls pyspiel, the engine Kaggle's arena evaluates on). ARC imports
 # lazily; needs ARC_API_KEY from https://three.arcprize.org for full
 # online access (anonymous offers fewer; the arena shelf is local and
-# needs no key). arc-agi pinned to 0.9.9 — 0.9.10 wants Pillow>=13.
+# needs no key). arc-agi held at 0.9.9 (accepts Pillow>=12.1.1, so 13 satisfies it); 0.9.10 is still too fresh to pin.
 #   arc-agi==0.9.9
 #   game-arena>=0.1.0
 #   kaggle-environments>=1.33.3
