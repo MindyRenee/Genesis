@@ -102,8 +102,11 @@ exclude = ["tests*", "python*", "voices*", "__pycache__*", "scripts*"]
 # litellm<1.100.4 carries open GHSA advisories. Nothing in the codebase
 # imports litellm or kaggle_environments — the pin only rides the lock —
 # so the declared cap is overridden to a patched release old enough to
-# trust (1.109.x is <7 days out).
-override-dependencies = ["litellm==1.108.0"]
+# trust (1.109.x is <7 days out). filelock<=4.2.0 likewise carries
+# advisory fixes; huggingface-hub and litellm leave it unpinned, and
+# --upgrade-package will not move it across the 3.x/4.x line, so it is
+# forced here (4.2.10 is <7 days out).
+override-dependencies = ["litellm==1.108.0", "filelock==4.2.9"]
 
 [tool.ruff]
 target-version = "py312"
