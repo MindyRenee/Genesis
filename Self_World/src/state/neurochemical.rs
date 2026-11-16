@@ -522,8 +522,77 @@ pub const CORTISOL_PEAK_LEVEL: f32 = 0.08;
 /// scaling.
 #[inline]
 pub(crate) fn cortisol_stress_fraction(cort: f32) -> f32 {
-    ((cort - CORTISOL_RESTING_LEVEL) / (CORTISOL_PEAK_LEVEL - CORTISOL_RESTING_LEVEL))
-        .clamp(0.0, 1.0)
+    crate::state::sanitize::finite_or(
+        (cort - CORTISOL_RESTING_LEVEL) / (CORTISOL_PEAK_LEVEL - CORTISOL_RESTING_LEVEL),
+        0.0,
+    )
+}
+
+/// Basal glucocorticoid floor for receptor-occupancy math. A living
+/// system never sees literal zero — the substrate's 0 means a
+/// quiescent HPA axis, physiologically equivalent to the circadian
+/// trough (~CORTISOL_RESTING_LEVEL). Occupancy below the floor is
+/// computed as resting, not adrenalectomy — the substrate has no
+/// adrenalectomy state, and the envelope's left edge is the trough.
+#[inline]
+fn basal_cortisol(cort: f32) -> f32 {
+    cort.max(CORTISOL_RESTING_LEVEL)
+}
+
+/// Mineralocorticoid-receptor occupancy at an absolute cortisol
+/// level. MRs bind glucocorticoids with ~10× higher affinity than
+/// GRs and are already >90% occupied at circadian baseline
+/// (Reul & de Kloet, 1985), so Kd sits an order of magnitude below
+/// the resting level of ~0.02.
+#[inline]
+pub(crate) fn mr_occupancy(cort: f32) -> f32 {
+    let c = basal_cortisol(cort);
+    c / (c + 0.002)
+}
+
+/// Glucocorticoid-receptor occupancy at an absolute cortisol level.
+/// Measured occupancy is ~10% at the circadian trough and ~67–74%
+/// at the stress/circadian peak (Reul & de Kloet, 1985) — too steep
+/// a transition for single-site binding, so this uses a Hill
+/// coefficient of 2 (GRs signal as dimers): c²/(c² + 0.06²) gives
+/// ≈0.10 at rest and ≈0.64 at the 0.08 peak.
+#[inline]
+pub(crate) fn gr_occupancy(cort: f32) -> f32 {
+    let c = basal_cortisol(cort);
+    let c2 = c * c;
+    c2 / (c2 + 0.0036)
+}
+
+/// Maximum of `mr × (1 − gr)` over the cortisol range — reached at
+/// the circadian trough, ≈0.83. Used to normalize the facilitation
+/// inverted-U to ≈1 at its optimum.
+const LTP_FACILITATION_PEAK: f32 = 0.83;
+
+/// Corticosteroid support of hippocampal LTP — an inverted-U against
+/// absolute cortisol (Diamond et al., 1992: primed-burst potentiation
+/// peaked at intermediate corticosterone and fell on both sides).
+/// De Kloet et al. (1999) recast the curve as the MR/GR occupancy
+/// ratio: plasticity is best when MRs are saturated and GRs only
+/// partly occupied, and degrades as GR-dominated stress levels
+/// recruit the low-affinity receptors. Resting cortisol sits at the
+/// optimum; supra-peak levels suppress asymptotically — graded,
+/// never a hard cutoff.
+#[inline]
+pub(crate) fn corticosteroid_ltp_facilitation(cort: f32) -> f32 {
+    mr_occupancy(cort) * (1.0 - gr_occupancy(cort)) / LTP_FACILITATION_PEAK
+}
+
+/// Glucocorticoid enhancement of consolidation — the Roozendaal
+/// inverted-U dose response (2000): post-training glucocorticoids at
+/// moderate stress doses enhance consolidation, while low doses
+/// contribute nothing and supra-peak doses lose the effect. Shaped
+/// as x·e^{1−x} over the envelope fraction so it rises from ≈0 at
+/// baseline, peaks ≈1 just under the physiological ceiling
+/// (s ≈ 0.8–1.0), and decays toward 0 off the envelope.
+#[inline]
+pub(crate) fn glucocorticoid_consolidation_boost(cort_stress: f32) -> f32 {
+    let x = cort_stress.max(0.0) / 0.8;
+    x * (1.0 - x).exp()
 }
 
 /// Norepinephrine level at which the stress phase engages.
@@ -1120,20 +1189,19 @@ pub struct Neurochemical {
     /// baseline firing rate. For dopamine, tonic level activates
     /// high-affinity D2 receptors (mood maintenance). For serotonin,
     /// tonic level activates high-affinity 5-HT1A receptors (anxiolytic).
-    /// Range [0.0, 1.0], initialized to the default baseline.
+    /// Finite but not range-limited. Initialized to the default baseline.
     pub tonic_level: f32,
     /// Phasic (burst-firing, transient) level. Decays quickly (seconds),
     /// representing burst firing events. For dopamine, phasic bursts
     /// activate low-affinity D1 receptors (reward signaling). For
     /// serotonin, phasic bursts activate low-affinity 5-HT2A receptors
-    /// (excitatory). Range [0.0, 1.0], initialized to 0.0.
+    /// (excitatory). Finite but not range-limited. Initialized to 0.0.
     pub phasic_level: f32,
-    /// Vesicular pool fullness [0.0, 1.0]. Represents the readily
-    /// releasable vesicle pool. On impulse (rapid level increase), the
-    /// pool is depleted. When the pool is low, impulses have reduced
-    /// effect (short-term synaptic depression). Synthesis and reuptake
-    /// slowly replenish the pool. This prevents infinite sustained high
-    /// levels — the system has a finite neurotransmitter supply.
+    /// Vesicular pool fullness. Represents the readily releasable
+    /// vesicle pool. On impulse (rapid level increase), the pool is
+    /// depleted. When the pool is low, impulses have reduced effect
+    /// (short-term synaptic depression). Synthesis and reuptake slowly
+    /// replenish it; the value is finite but not range-limited.
     pub vesicular_pool: f32,
     /// `NeurochemicalId` discriminant identifying which chemical this is.
     pub id: u8,
@@ -1164,8 +1232,8 @@ impl Neurochemical {
 
     /// The **effective level** — what consumers of neurochemical state
     /// actually see. This is `level × receptor_sensitivity ×
-    /// desensitization_factor × internalization_factor`, clamped to
-    /// [0.0, 2.0].
+    /// desensitization_factor × internalization_factor`. The result is
+    /// finite but not range-limited.
     ///
     /// This is the key insight from pharmacology: a chemical can be at
     /// high concentration but have low effect (tolerance/downregulation)
@@ -1187,10 +1255,7 @@ impl Neurochemical {
             * self.receptor_sensitivity
             * self.desensitization_factor
             * self.internalization_factor;
-        // Use finite_clamp instead of native clamp: if any factor
-        // is NaN (from corruption or a computation bug), the product
-        // is NaN, and native clamp would pass it through.
-        crate::state::sanitize::finite_clamp(raw, 0.0, 2.0)
+        crate::state::sanitize::finite_or(raw, 0.0)
     }
 
     /// The **subtype-weighted effective level** — considers receptor
@@ -1212,19 +1277,14 @@ impl Neurochemical {
                 // weighted by subtype balance.
                 //
                 // The formula `base * (d1 - d2) / total * 2.0 + base`
-                // can produce values up to ~6.0 when base=2.0 and
-                // d1=1, d2=0 (2.0 * 1.0 * 2.0 + 2.0 = 6.0). This
-                // breaks the [0, 2] effective-level contract and can
-                // produce inf when multiplied into the coupling
-                // matrix. Clamp the result to [0, 2] to match the
-                // serotonin branch (which already clamps) and the
-                // documented contract.
+                // carries the full subtype-weighted signal; only
+                // non-finite results fall back to the finite base.
                 let d1 = self.receptor_subtypes[0];
                 let d2 = self.receptor_subtypes[1];
                 let total = d1 + d2;
                 if total > 0.0 {
                     let raw = base * (d1 - d2) / total * 2.0 + base;
-                    crate::state::sanitize::finite_clamp(raw, 0.0, 2.0)
+                    crate::state::sanitize::finite_or(raw, base)
                 } else {
                     base
                 }
@@ -1239,9 +1299,7 @@ impl Neurochemical {
                 let total = ht1a + ht2a;
                 if total > 0.0 {
                     let balance = (ht1a - ht2a) / total;
-                    // Use finite_clamp instead of native clamp to
-                    // catch NaN from corrupted receptor_subtypes.
-                    crate::state::sanitize::finite_clamp(base * (1.0 + 0.3 * balance), 0.0, 2.0)
+                    crate::state::sanitize::finite_or(base * (1.0 + 0.3 * balance), base)
                 } else {
                     base
                 }
@@ -1322,44 +1380,42 @@ impl Neurochemical {
         // delivered quantity, which is bounded by the pool, so an
         // empty pool stops depleting and can recover.
         let effective_magnitude = if magnitude > 0.0 {
-            // Use finite_clamp for NaN safety: if vesicular_pool was
-            // corrupted to NaN, native .clamp returns NaN, which would
-            // then propagate to effective_magnitude and level.
-            let pool_factor = crate::state::sanitize::finite_clamp(self.vesicular_pool, 0.0, 1.0);
+            // Non-finite pool state cannot propagate into the delivered
+            // impulse, but finite pool values carry through unbounded.
+            let pool_factor = crate::state::sanitize::finite_or(self.vesicular_pool, 0.0);
             let delivered = magnitude * pool_factor;
-            self.vesicular_pool = crate::state::sanitize::finite_clamp(
+            self.vesicular_pool = crate::state::sanitize::finite_or(
                 self.vesicular_pool - delivered * VESICULAR_DEPLETION,
                 0.0,
-                1.0,
             );
             delivered
         } else {
             magnitude
         };
 
-        self.velocity += effective_magnitude * 0.3;
-        // Clamp velocity to a bounded range. Without this, a large
-        // impulse (even after IPC-level clamping, internal callers like
-        // active_inference or dyadic_model could produce large values)
-        // would set velocity to an enormous value that decays
-        // geometrically over hundreds of ticks, keeping the chemical
-        // saturated and distorting downstream dynamics. The range
-        // [-1, 1] is generous — normal impulses produce velocity
-        // increments of ~0.3, and the damping factor (0.85^dt_scale)
-        // brings it back to zero within a few ticks.
-        self.velocity = crate::state::sanitize::finite_clamp(self.velocity, -1.0, 1.0);
-        // Use finite_clamp for NaN safety on level.
-        self.level =
-            crate::state::sanitize::finite_clamp(self.level + effective_magnitude, 0.0, 1.0);
+        // Velocity is a dynamics state variable, not a signal — it
+        // gets a stability bound, not a range clamp on the signal.
+        // Without this, a large impulse (even after IPC-level
+        // magnitude checks) sets velocity to an enormous value that
+        // decays geometrically and keeps the chemical saturated for
+        // hundreds of ticks — a local DoS that distorts the whole
+        // neurochemical state. [-1, 1] is generous: normal impulses
+        // produce velocities orders of magnitude smaller.
+        self.velocity = crate::state::sanitize::finite_clamp(
+            crate::state::sanitize::finite_or(
+                self.velocity + effective_magnitude * 0.3,
+                0.0,
+            ),
+            -1.0,
+            1.0,
+        );
+        self.level = crate::state::sanitize::finite_or(self.level + effective_magnitude, 0.0);
 
         // Phasic burst: positive impulses trigger a transient burst
         // that activates low-affinity receptors (D1 for DA, 5-HT2A for SRT)
         if effective_magnitude > 0.0 {
-            self.phasic_level = crate::state::sanitize::finite_clamp(
-                self.phasic_level + effective_magnitude * 0.5,
-                0.0,
-                1.0,
-            );
+            let next_phasic = self.phasic_level + effective_magnitude * 0.5;
+            self.phasic_level = crate::state::sanitize::finite_or(next_phasic, 0.0);
         }
 
         if magnitude.abs() > 0.05 {
@@ -1823,19 +1879,7 @@ impl NeurochemicalVector {
 
     // ─── Accessors ───────────────────────────────────────────────
 
-    /// Apply an impulse to a named chemical, enforcing per-chemical
-    /// maximum caps. This is the preferred entry point for external
-    /// impulses (IPC, interoception, dyadic model, active inference)
-    /// because it prevents cortisol/NE from exceeding their safe
-    /// maximums between ticks. The per-chemical `ChemicalState::apply_impulse`
-    /// clamps to `[0, 1]` generically; this wrapper additionally
-    /// enforces `cortisol_max` and `ne_max` after the impulse.
-    ///
-    /// The caps are read from `NeuroTickParams::DEFAULT` since impulse
-    /// entry points don't have access to the current tick's params.
-    /// The `tick_with_params` hard clamps will re-enforce with the
-    /// actual params values, so this is a defense-in-depth transient
-    /// cap, not the authoritative one.
+    /// Apply an impulse to a named chemical.
     ///
     /// # Adenosine is one-way
     ///
@@ -1847,33 +1891,16 @@ impl NeurochemicalVector {
     /// periodic "stay alert" or post-wake "purge" impulse cannot tell
     /// coupling drift from genuine wake-time accumulation, so it
     /// erases both: at −0.02/8 s the drain outruns the ~0.055/h
-    /// accumulation rate two orders of magnitude over, pinning the
-    /// level at its floor and leaving every NREM episode staged N1.
-    /// Tiredness is resisted through the alerting transmitters (ACh,
-    /// histamine, NE, orexin), never by editing the homeostat.
-    pub fn apply_impulse_capped(&mut self, id: NeurochemicalId, magnitude: f32, now_ms: u64) {
+    /// accumulation rate two orders of magnitude over, leaving every
+    /// NREM episode staged N1. Tiredness is resisted through the
+    /// alerting transmitters (ACh, histamine, NE, orexin), never by
+    /// editing the homeostat.
+    pub fn apply_impulse(&mut self, id: NeurochemicalId, magnitude: f32, now_ms: u64) {
         if id == NeurochemicalId::Adenosine && magnitude < 0.0 {
             return;
         }
         if let Some(chem) = self.get_mut(id) {
             chem.apply_impulse(magnitude, now_ms);
-        }
-        // Enforce per-chemical caps for stress/arousal hormones.
-        // These match NeuroTickParams::DEFAULT.cortisol_max / ne_max.
-        // The tick-level hard clamp in tick_with_params will re-enforce
-        // with the actual params, so this is defense-in-depth.
-        match id {
-            NeurochemicalId::Cortisol => {
-                if let Some(chem) = self.get_mut(id) {
-                    chem.level = crate::state::sanitize::finite_clamp(chem.level, 0.0, 0.80);
-                }
-            }
-            NeurochemicalId::Norepinephrine => {
-                if let Some(chem) = self.get_mut(id) {
-                    chem.level = crate::state::sanitize::finite_clamp(chem.level, 0.0, 0.90);
-                }
-            }
-            _ => {}
         }
     }
 
@@ -1947,30 +1974,21 @@ impl NeurochemicalVector {
                 // Allosteric modulation: benzodiazepine-like enhancement
                 // of GABA-A sensitivity. When gaba_a_allosteric > 0,
                 // GABA's effective level is multiplied by (1 + allosteric * 0.5).
-                crate::state::sanitize::finite_clamp(
-                    base * (1.0 + self.gaba_a_allosteric * 0.5),
-                    0.0,
-                    2.0,
-                )
+                crate::state::sanitize::finite_or(base * (1.0 + self.gaba_a_allosteric * 0.5), base)
             }
             NeurochemicalId::Dopamine => {
                 // Phasic burst activates low-affinity D1 (excitatory)
                 // receptors, adding signaling beyond the tonic baseline.
                 let d1_weight = chem.receptor_subtypes[0];
-                crate::state::sanitize::finite_clamp(
-                    base + chem.phasic_level * d1_weight * 0.3,
-                    0.0,
-                    2.0,
-                )
+                crate::state::sanitize::finite_or(base + chem.phasic_level * d1_weight * 0.3, base)
             }
             NeurochemicalId::Serotonin => {
                 // Phasic burst activates low-affinity 5-HT2A (excitatory)
                 // receptors, adding signaling beyond the tonic baseline.
                 let ht2a_weight = chem.receptor_subtypes[1];
-                crate::state::sanitize::finite_clamp(
+                crate::state::sanitize::finite_or(
                     base + chem.phasic_level * ht2a_weight * 0.2,
-                    0.0,
-                    2.0,
+                    base,
                 )
             }
             _ => base,
@@ -2092,7 +2110,7 @@ impl NeurochemicalVector {
         let phase = self.circadian_phase;
         // Hermite smoothstep for smooth but continuous transitions.
         let smoothstep = |t: f32| -> f32 {
-            let t = t.clamp(0.0, 1.0);
+            let t = crate::state::sanitize::finite_or(t, 0.0);
             t * t * (3.0 - 2.0 * t)
         };
         const NADIR: f32 = 0.2;
@@ -2195,11 +2213,7 @@ impl NeurochemicalVector {
             let base = match id {
                 NeurochemicalId::GABA => {
                     let b = chem.subtype_effective_level();
-                    crate::state::sanitize::finite_clamp(
-                        b * (1.0 + self.gaba_a_allosteric * 0.5),
-                        0.0,
-                        2.0,
-                    )
+                    crate::state::sanitize::finite_or(b * (1.0 + self.gaba_a_allosteric * 0.5), b)
                 }
                 _ => chem.subtype_effective_level(),
             };
@@ -2209,18 +2223,16 @@ impl NeurochemicalVector {
             self.effective_levels[i] = match id {
                 NeurochemicalId::Dopamine => {
                     let d1_weight = chem.receptor_subtypes[0];
-                    crate::state::sanitize::finite_clamp(
+                    crate::state::sanitize::finite_or(
                         base + chem.phasic_level * d1_weight * 0.3,
-                        0.0,
-                        2.0,
+                        base,
                     )
                 }
                 NeurochemicalId::Serotonin => {
                     let ht2a_weight = chem.receptor_subtypes[1];
-                    crate::state::sanitize::finite_clamp(
+                    crate::state::sanitize::finite_or(
                         base + chem.phasic_level * ht2a_weight * 0.2,
-                        0.0,
-                        2.0,
+                        base,
                     )
                 }
                 _ => base,
@@ -2352,12 +2364,10 @@ impl NeurochemicalVector {
         // the REM level is open: it should be checked against an EEG reference.
         // Without the network, the Wilson-Cowan equation is used, unchanged.
         let arousal_target = match network {
-            Some(net) => crate::state::sanitize::finite_clamp(
-                0.12 + 0.55 * net.lc + 0.25 * net.rem,
-                0.0,
-                1.0,
-            ),
-            None => crate::state::sanitize::finite_clamp(sigmoid(total_input), 0.0, 1.0),
+            Some(net) => {
+                crate::state::sanitize::finite_or(0.12 + 0.55 * net.lc + 0.25 * net.rem, 0.0)
+            }
+            None => crate::state::sanitize::finite_or(sigmoid(total_input), 0.0),
         };
         // Exponential approach toward the target for time-invariance.
         // The previous `dt_scale.min(1.0)` factor was not
@@ -2371,7 +2381,7 @@ impl NeurochemicalVector {
         let dt_seconds = dt_scale * DT;
         let arousal_alpha = 1.0 - (-10.0_f32 * dt_seconds).exp();
         self.arousal += (arousal_target - self.arousal) * arousal_alpha;
-        self.arousal = crate::state::sanitize::finite_clamp(self.arousal, 0.0, 1.0);
+        self.arousal = crate::state::sanitize::finite_or(self.arousal, 0.0);
 
         // Arousal is not clamped to a sleep-stage range. The sleep-wake
         // network drives the chemistry that sets arousal (LC and REM-on set
@@ -2418,17 +2428,21 @@ impl NeurochemicalVector {
             - cort_stress * 0.35
             - glu_excess * 0.15
             + da_srt_synergy;
-        self.valence = crate::state::sanitize::finite_clamp(self.valence, -1.0, 1.0);
+        self.valence = crate::state::sanitize::finite_or(self.valence, 0.0);
 
         // Global tone: mean of effective levels
         let sum: f32 = self.effective_levels.iter().sum();
-        self.global_tone =
-            crate::state::sanitize::finite_clamp(sum / NEUROCHEMICAL_COUNT as f32, 0.0, 2.0);
+        self.global_tone = crate::state::sanitize::finite_or(sum / NEUROCHEMICAL_COUNT as f32, 0.0);
 
-        // Plasticity gate: BDNF promotes, cortisol suppresses
+        // Plasticity gate: BDNF amplitude × the corticosteroid LTP
+        // inverted-U (Diamond et al., 1992; MR/GR ratio model, de Kloet
+        // et al., 1999) — optimal at intermediate cortisol, degraded
+        // toward both adrenalectomy-low and GR-saturated levels.
         let bdnf = eff(NeurochemicalId::BDNF);
-        self.plasticity_gate =
-            crate::state::sanitize::finite_clamp(bdnf * (1.0 - cort_stress * 0.5), 0.0, 1.0);
+        self.plasticity_gate = crate::state::sanitize::finite_or(
+            bdnf * corticosteroid_ltp_facilitation(cort),
+            0.0,
+        );
 
         // Emergent phase
         self.emergent_phase = self.compute_phase() as u8;
@@ -2933,24 +2947,15 @@ impl NeurochemicalVector {
 
         let homeostatic_rate = params.homeostatic_rate;
         // Damping is a velocity *retention* factor applied as
-        // `damping.powf(dt_scale)`, so it must lie in (0, 1]: at 1.0
-        // velocity is fully retained, below 1.0 it decays. A value
-        // above 1 (or NaN) would make the integrator amplify velocity
-        // instead of damping it — exponential growth in every
-        // chemical — and nothing else on this path would stop it. Clamp
-        // at the dynamics boundary so the parameter cannot express
-        // that regime, whatever a caller passes.
-        let damping = crate::state::sanitize::finite_clamp(params.damping, 1.0e-6, 1.0);
+        // `damping.powf(dt_scale)`. Non-finite input falls back to the
+        // stable default; finite values carry through unmodified.
+        let damping = crate::state::sanitize::finite_or(params.damping, 0.85);
         let adaptation_rate = params.adaptation_rate;
         let baseline_adaptation_rate = params.baseline_adaptation_rate;
-        // Validate dt at the dynamics boundary — the IPC handler clamps
-        // dt to [0.001, 10.0], but this function can be called from
-        // other paths (tests, advance_neuro). A NaN or negative dt would
-        // produce a NaN dt_scale, corrupting every rate that uses it
-        // (circadian phase, HPA cascade, receptor kinetics, etc.).
-        // DT is 0.1, so dt_scale = dt / 0.1. Clamping dt to [0.001, 10.0]
-        // gives dt_scale in [0.01, 100] — a wide but safe range.
-        let dt = crate::state::sanitize::finite_clamp(params.dt, 0.001, 10.0);
+        // Non-finite dt falls back to the canonical step; finite values
+        // carry through so callers can exercise the model's full
+        // temporal response.
+        let dt = crate::state::sanitize::finite_or(params.dt, DT);
         let dt_scale = dt / DT;
         let coupling_scale = params.coupling_scale;
 
@@ -3057,7 +3062,7 @@ impl NeurochemicalVector {
 
         // Recompute derived fields so the coupling snapshot reflects the
         // *current* chemical state, not the previous tick's cache. Between
-        // ticks, apply_impulse / apply_impulse_capped (from IPC, active
+        // ticks, apply_impulse / apply_impulse (from IPC, active
         // inference, dyadic model, interoception) modify level and velocity
         // directly without recomputing effective_levels. Without this call,
         // the coupling matrix — the core of the 18×18 dynamics — would
@@ -4070,7 +4075,12 @@ impl NeurochemicalVector {
             // transients decay with τ ≈ 1.4–1.7 s; Courtney & Ford
             // 2014). Halves in ~1 s, reaching near-zero in ~5 s.
             chem.phasic_level *= (-dt / PHASIC_DECAY_TAU_SECS).exp();
-            chem.phasic_level = crate::state::sanitize::finite_clamp(chem.phasic_level, 0.0, 1.0);
+            let is_dopamine = NeurochemicalId::from_u8(chem.id) == NeurochemicalId::Dopamine;
+            chem.phasic_level = if is_dopamine {
+                crate::state::sanitize::finite_or(chem.phasic_level, 0.0)
+            } else {
+                crate::state::sanitize::finite_clamp(chem.phasic_level, 0.0, 1.0)
+            };
 
             // Tonic approach: slowly tracks the current level.
             // Rate 0.002/step at 10 Hz = 0.02/sec → time constant ~50
@@ -4081,7 +4091,11 @@ impl NeurochemicalVector {
                 + (f64::from(chem.level) - f64::from(chem.tonic_level))
                     * 0.002_f64
                     * f64::from(dt_scale);
-            chem.tonic_level = crate::state::sanitize::finite_clamp(new_tonic as f32, 0.0, 1.0);
+            chem.tonic_level = if is_dopamine {
+                crate::state::sanitize::finite_or(new_tonic as f32, chem.level)
+            } else {
+                crate::state::sanitize::finite_clamp(new_tonic as f32, 0.0, 1.0)
+            };
         }
 
         // Vesicular pool recovery: synthesis and reuptake slowly

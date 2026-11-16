@@ -197,6 +197,8 @@ impl MemoryPointers {
     /// - `acetylcholine_eff`: effective acetylcholine level
     /// - `cortisol_eff`: effective cortisol level
     /// - `bdnf_eff`: effective BDNF level
+    /// - `allostasis_load`: accumulated allostatic load [0, 1] — the
+    ///   chronic-stress channel (see plasticity below)
     pub fn update_gating(
         &mut self,
         dopamine_eff: f32,
@@ -205,27 +207,50 @@ impl MemoryPointers {
         acetylcholine_eff: f32,
         cortisol_eff: f32,
         bdnf_eff: f32,
+        allostasis_load: f32,
     ) {
         // Cortisol is used throughout this function as a fraction of
         // its reachable envelope (~0.02 rest, ~0.08 peak — see
         // CORTISOL_PEAK_LEVEL): against the raw level every cortisol
-        // term here could move by only a few percent.
+        // term here could move by only a few percent. The fraction
+        // extrapolates beyond the envelope; receptor occupancies turn
+        // it into bounded biology below.
         let cort_stress = crate::state::neurochemical::cortisol_stress_fraction(cortisol_eff);
+        let gr_occupancy = crate::state::neurochemical::gr_occupancy(cortisol_eff);
+        let ltp_facilitation =
+            crate::state::neurochemical::corticosteroid_ltp_facilitation(cortisol_eff);
 
-        // Encoding: reward salience (DA) + novelty (NE) + signal-to-noise (ACh)
+        // Encoding: reward salience (DA) + novelty (NE) + signal-to-noise
+        // (ACh), attenuated by GR occupation — high cortisol degrades
+        // prefrontal/hippocampal encoding and biases toward habit
+        // learning (Schwabe & Wolf; Packard). The GR channel keeps the
+        // impairment graded rather than a cliff.
+        // Dopamine itself is finite but unclamped; the gate remains a
+        // normalized [0, 1] control output.
+        let dopamine = crate::state::sanitize::finite_or(dopamine_eff, 0.0);
         self.encoding_weight = crate::state::sanitize::finite_clamp(
-            dopamine_eff * 0.4 + norepinephrine_eff * 0.3 + acetylcholine_eff * 0.3,
+            (dopamine * 0.4 + norepinephrine_eff * 0.3 + acetylcholine_eff * 0.3)
+                * (1.0 - 0.3 * gr_occupancy),
             0.0,
             1.0,
         );
 
-        // Consolidation: stress prioritizes consolidation (CORT) + encoding quality (ACh)
-        // High cortisol means traumatic/stressful memories consolidate more strongly.
-        // Cortisol boosts consolidation (acute stress enhances emotional memory
-        // formation), ACh boosts encoding quality, and there's a baseline so
-        // consolidation never fully stops.
+        // Consolidation: post-training glucocorticoids enhance
+        // consolidation in an inverted-U dose response (Roozendaal,
+        // 2000) — moderate stress prioritizes, supra-peak doses lose
+        // the enhancement — and the boost requires concurrent
+        // β-adrenergic arousal in the basolateral amygdala
+        // (Roozendaal et al., 2006), so the cortisol term is gated by
+        // norepinephrine rather than added unconditionally. ACh carries
+        // encoding quality; the baseline keeps consolidation running.
         self.consolidation_weight = crate::state::sanitize::finite_clamp(
-            cort_stress * 0.3 + acetylcholine_eff * 0.4 + 0.3,
+            acetylcholine_eff * 0.4
+                + 0.3
+                + 0.3
+                    * crate::state::neurochemical::glucocorticoid_consolidation_boost(
+                        cort_stress,
+                    )
+                    * crate::state::sanitize::finite_or(norepinephrine_eff, 0.0),
             0.0,
             1.0,
         );
@@ -238,20 +263,30 @@ impl MemoryPointers {
         // - The "tip-of-the-tongue" phenomenon during exams is a
         //   classic example of stress-induced retrieval failure
         //
-        // The cortisol suppression is weighted at 0.35 (up from 0.20)
-        // to match the strong impairment seen in stress studies
-        // (de Quervain et al., 2009). Weights normalized to sum to 1.0:
-        // ACh 0.40 + SRT 0.25 + CORT 0.35 = 1.0.
+        // The impairment is GR-mediated (de Quervain et al., 2009), so
+        // it follows receptor occupancy — monotonic and saturating
+        // toward zero retrieval support rather than a linear term that
+        // goes negative off the envelope.
         self.retrieval_weight = crate::state::sanitize::finite_clamp(
-            acetylcholine_eff * 0.40 + serotonin_eff * 0.25 + (1.0 - cort_stress) * 0.35,
+            acetylcholine_eff * 0.40 + serotonin_eff * 0.25 + (1.0 - gr_occupancy) * 0.35,
             0.0,
             1.0,
         );
 
-        // Plasticity: BDNF promotes, cortisol suppresses (same
-        // envelope-normalized stress fraction as recompute_derived).
-        self.plasticity_gate =
-            crate::state::sanitize::finite_clamp(bdnf_eff * (1.0 - cort_stress * 0.5), 0.0, 1.0);
+        // Plasticity: BDNF amplitude × the corticosteroid LTP
+        // inverted-U (Diamond et al., 1992) — the acute channel —
+        // multiplied by remaining allostatic capacity: accumulated
+        // load is what chronically suppresses hippocampal plasticity
+        // (McEwen — repeated glucocorticoid exposure retracts CA3
+        // dendrites and downregulates BDNF). Acute peaks dent the
+        // gate; sustained burden is what closes it. The 0.8 floor
+        // keeps a residual — chronic stress impairs formation but
+        // never abolishes it outright.
+        self.plasticity_gate = crate::state::sanitize::finite_clamp(
+            bdnf_eff * ltp_facilitation * (1.0 - 0.8 * allostasis_load.clamp(0.0, 1.0)),
+            0.0,
+            1.0,
+        );
     }
 
     /// Whether the system can form new long-term memories right now.

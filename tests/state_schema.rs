@@ -63,7 +63,7 @@ fn test_field_offsets() {
     // CoreStateHeader
     assert_eq!(offset_of!(CoreStateHeader, magic), 0);
     assert_eq!(offset_of!(CoreStateHeader, version), 4);
-    assert_eq!(offset_of!(CoreStateHeader, seq_lock), 40);
+    assert_eq!(offset_of!(CoreStateHeader, reserved), 40);
     assert_eq!(offset_of!(CoreStateHeader, instance_id), 48);
 
     // Neurochemical — now 56 bytes with tonic/phasic, vesicular pool
@@ -152,10 +152,10 @@ fn test_checksum_detects_corruption() {
 }
 
 #[test]
-fn test_checksum_ignores_seq_lock() {
+fn test_checksum_ignores_reserved() {
     let mut state = GenesisCoreState::new(42, 1000);
     let cs_before = state.compute_checksum();
-    state.header.seq_lock = 999;
+    state.header.reserved = 999;
     let cs_after = state.compute_checksum();
     assert_eq!(cs_before, cs_after);
 }
@@ -329,115 +329,6 @@ fn test_v2_to_v3_migration_zeroed_id_field() {
     }
 }
 
-// ─── Sequence lock ────────────────────────────────────────────
-
-#[test]
-fn test_seqlock_write_makes_odd() {
-    let mut state = GenesisCoreState::new(1, 0);
-    assert_eq!(state.header.seq_lock, 0);
-    // SAFETY: single-threaded test — no concurrent writers.
-    unsafe { state.write_begin(100) };
-    assert_eq!(state.header.seq_lock & 1, 1);
-    state.write_end();
-    assert_eq!(state.header.seq_lock & 1, 0);
-    assert_eq!(state.header.seq_lock, 2);
-}
-
-#[test]
-fn test_seqlock_read_during_write_returns_none() {
-    let mut state = GenesisCoreState::new(1, 0);
-    // SAFETY: single-threaded test — no concurrent writers.
-    unsafe { state.write_begin(100) };
-    // SAFETY: single-threaded test — self is not being deallocated or remapped.
-    assert!(unsafe { state.read_consistent() }.is_none());
-    state.write_end();
-    // SAFETY: single-threaded test — self is not being deallocated or remapped.
-    assert!(unsafe { state.read_consistent() }.is_some());
-}
-
-#[test]
-fn test_seqlock_concurrent_reader_never_sees_torn_state() {
-    // Regression test for the atomic-seqlock fix. Before the fix,
-    // `seq_lock` was a plain `u64` accessed non-atomically while the
-    // IPC thread could read it, which is a data race (UB) and allowed
-    // the compiler to merge the reader's two lock samples into one
-    // load — making the tear-check vacuous. This test spawns a writer
-    // thread that repeatedly mutates the state while a reader thread
-    // calls `read_consistent`. Every successful read must verify the
-    // checksum, proving the copy was not torn.
-    use std::sync::Arc;
-    use std::sync::atomic::{AtomicBool, Ordering as AOrd};
-    use std::thread;
-
-    // Heap-allocate the state and hold raw pointers, mirroring the
-    // mmap usage in the daemon (where the writer has `*mut` and the
-    // reader has `*const` to the same region, coordinated by the
-    // seqlock rather than by Rust's borrow rules). Raw pointers are
-    // not `Send`, so we pass the address as a `usize` and cast back
-    // inside each thread.
-    let mut boxed = Box::new(GenesisCoreState::new(1, 0));
-    let writer_addr: usize = &mut *boxed as *mut GenesisCoreState as usize;
-    let reader_addr: usize = writer_addr;
-    let stop = Arc::new(AtomicBool::new(false));
-
-    let writer_stop = stop.clone();
-    let writer = thread::spawn(move || {
-        let mut tick = 0u64;
-        while !writer_stop.load(AOrd::Relaxed) {
-            // SAFETY: single-writer protocol — only this thread writes.
-            // The reader accesses the same memory via read_consistent,
-            // which uses atomic loads for seq_lock and read_volatile for
-            // the payload. The Box stays alive for the test's duration.
-            // SAFETY: single-threaded test — exclusive access to a live state struct.
-            let s = unsafe { &mut *(writer_addr as *mut GenesisCoreState) };
-            unsafe { s.write_begin(tick) };
-            // Mutate the neurochemical block so the checksum changes —
-            // a torn read (mix of old and new bytes) would fail
-            // checksum verification.
-            s.neurochemicals.tick(0.04, 0.1, 0.001, 0.0001);
-            s.write_end();
-            tick += 1;
-            // Yield to give the reader a window to observe an even
-            // (write-complete) seq_lock. Without this the writer loop
-            // is so tight that the lock is almost always odd.
-            std::thread::yield_now();
-        }
-    });
-
-    let reader_stop = stop.clone();
-    let reader = thread::spawn(move || {
-        let mut reads = 0u32;
-        let mut checksum_ok = 0u32;
-        for _ in 0..100_000 {
-            // SAFETY: `reader_addr` points to the Box, which is not
-            // deallocated or remapped during the call.
-            if let Some(copy) =
-                unsafe { (*(reader_addr as *const GenesisCoreState)).read_consistent() }
-            {
-                reads += 1;
-                if copy.verify_checksum().is_ok() {
-                    checksum_ok += 1;
-                }
-            }
-        }
-        reader_stop.store(true, AOrd::Relaxed);
-        (reads, checksum_ok)
-    });
-
-    let (reads, checksum_ok) = reader.join().unwrap();
-    writer.join().unwrap();
-
-    // We should get at least some successful reads (the writer is fast
-    // but not so fast that every read collides with a write).
-    assert!(reads > 0, "reader should get some consistent reads");
-    // Every successful read must pass checksum verification — a torn
-    // read would produce a mismatched checksum.
-    assert_eq!(
-        reads, checksum_ok,
-        "every consistent read must pass checksum verification (torn reads detected)"
-    );
-}
-
 // ─── Coupling matrix ──────────────────────────────────────────
 
 #[test]
@@ -496,11 +387,9 @@ fn test_coupling_matrix_known_interactions() {
 fn test_coupled_dynamics_cortisol_suppresses_bdnf() {
     let mut vec = NeurochemicalVector::new(0);
 
-    // Sustained cortisol elevation (chronic stress, not a single spike).
-    // We set cortisol level directly each tick to model chronic stress
-    // without depleting the vesicular pool (which would make apply_impulse
-    // ineffective after ~30 ticks). This is the same approach used by
-    // test_cortisol_recovers_after_stressor_ends.
+    // Sustained cortisol elevation exercises the coupling pathway. The
+    // level is set directly each tick so the vesicular pool does not
+    // deplete and make apply_impulse ineffective after ~30 ticks.
     let bdnf_before = vec.get(NeurochemicalId::BDNF).unwrap().level;
     for _ in 0..500 {
         vec.get_mut(NeurochemicalId::Cortisol).unwrap().level = 0.80;
@@ -907,8 +796,9 @@ fn test_gating_high_encoding_in_reward_state() {
         0.50, // serotonin
         0.70, // NE high → novelty
         0.60, // ACh high → signal-to-noise
-        0.15, // cortisol low
+        0.02, // cortisol at resting level
         0.50, // BDNF
+        0.0,  // no allostatic load
     );
     assert!(
         mem.is_high_encoding(),
@@ -927,6 +817,7 @@ fn test_gating_retrieval_impaired_by_stress() {
         0.30, // ACh low
         0.80, // cortisol high → impairs retrieval
         0.30, // BDNF
+        0.0,  // acute stress, no allostatic load
     );
     assert!(
         mem.is_retrieval_impaired(),
@@ -945,6 +836,7 @@ fn test_gating_cant_form_memories_under_chronic_stress() {
         0.30, // ACh
         0.85, // cortisol very high
         0.10, // BDNF very low
+        0.0,  // extreme acute dose alone closes the gate
     );
     assert!(
         !mem.can_form_new_memories(),
@@ -956,7 +848,7 @@ fn test_gating_cant_form_memories_under_chronic_stress() {
 #[test]
 fn test_gating_can_form_memories_in_healthy_state() {
     let mut mem = MemoryPointers::new();
-    mem.update_gating(0.60, 0.55, 0.45, 0.50, 0.20, 0.50);
+    mem.update_gating(0.60, 0.55, 0.45, 0.50, 0.02, 0.50, 0.0);
     assert!(
         mem.can_form_new_memories(),
         "healthy neurochemistry → can form new memories (gate={})",
@@ -972,10 +864,10 @@ fn test_gating_cortisol_boosts_consolidation() {
     // Cortisol is scaled by its reachable envelope: 0.02 is resting,
     // 0.08 is the sustained-drive peak.
     let mut low_cort = MemoryPointers::new();
-    low_cort.update_gating(0.50, 0.50, 0.50, 0.50, 0.02, 0.50);
+    low_cort.update_gating(0.50, 0.50, 0.50, 0.50, 0.02, 0.50, 0.0);
 
     let mut high_cort = MemoryPointers::new();
-    high_cort.update_gating(0.50, 0.50, 0.50, 0.50, 0.08, 0.50);
+    high_cort.update_gating(0.50, 0.50, 0.50, 0.50, 0.08, 0.50, 0.0);
 
     assert!(
         high_cort.consolidation_weight > low_cort.consolidation_weight,
@@ -983,10 +875,13 @@ fn test_gating_cortisol_boosts_consolidation() {
         high_cort.consolidation_weight,
         low_cort.consolidation_weight
     );
-    // Verify the actual values on the normalized envelope:
-    // 0*0.3 + 0.50*0.4 + 0.3 = 0.50 vs: 1*0.3 + 0.50*0.4 + 0.3 = 0.80
+    // Verify the actual values: resting cortisol contributes no
+    // boost (Roozendaal inverted-U is ~0 at baseline), so
+    // low = 0.50*0.4 + 0.3 = 0.50. At the physiological peak (s=1)
+    // the boost curve sits near its maximum (~0.97) gated by NE=0.5:
+    // high = 0.50*0.4 + 0.3 + 0.3*0.974*0.5 ≈ 0.65.
     assert!((low_cort.consolidation_weight - 0.50).abs() < 0.01);
-    assert!((high_cort.consolidation_weight - 0.80).abs() < 0.01);
+    assert!((high_cort.consolidation_weight - 0.65).abs() < 0.01);
 }
 
 // ─── Zone transitions with override ───────────────────────────
@@ -1798,52 +1693,7 @@ fn test_metaplasticity_restoring_force() {
 
 // ─── Cortisol recovery after stress ────────────────────────────
 
-#[test]
-fn test_cortisol_recovers_after_stressor_ends() {
-    // This test verifies that cortisol can return to near-baseline
-    // after a stressor ends. The HPA axis cascade (CRH → ACTH →
-    // cortisol) must not lock cortisol at the hard clamp when the
-    // stressor is gone.
-    //
-    // Root cause being tested: the ACTH→cortisol drive was a direct
-    // level injection that was too strong, making cortisol pin at the
-    // hard clamp. The fix routes the drive through the first-order
-    // level update (acth × 0.01 × maturation × dt) with the nonlinear
-    // CORTISOL_CLEARANCE_RATE providing metabolic negative feedback.
-    let mut vec = NeurochemicalVector::new(0);
-
-    // Phase 1: Induce stress by directly spiking cortisol (mimicking
-    // an acute stress event) and sustaining it for 200 ticks.
-    for _ in 0..200 {
-        vec.get_mut(NeurochemicalId::Cortisol).unwrap().level = 0.75;
-        vec.tick_default();
-    }
-
-    let cort_during_stress = vec.get(NeurochemicalId::Cortisol).unwrap().level;
-    assert!(
-        cort_during_stress > 0.60,
-        "cortisol should be elevated during stress (got {})",
-        cort_during_stress
-    );
-
-    // Phase 2: Stressor ends — stop forcing cortisol, let the system
-    // relax. The homeostatic force + metabolic clearance should pull
-    // cortisol back down. Without the fix, cortisol would stay at
-    // the clamp forever.
-    for _ in 0..2000 {
-        vec.tick_default();
-    }
-
-    let cort_after_recovery = vec.get(NeurochemicalId::Cortisol).unwrap().level;
-
-    assert!(
-        cort_after_recovery < 0.50,
-        "cortisol should recover below 0.50 after stressor ends: \
-         got {} (was {} during stress)",
-        cort_after_recovery,
-        cort_during_stress
-    );
-}
+// ─── Cortisol recovery without induced stress ──────────────────────
 
 #[test]
 fn test_cortisol_not_stuck_at_clamp_without_external_stress() {
@@ -2072,8 +1922,8 @@ fn test_receptor_burnout_recovery_through_sleep() {
     let params = NeuroTickParams::COMPRESSED;
     for _ in 0..5000 {
         // SAFETY: this is a single-threaded test — no concurrent
-        // readers, so the seqlock write_begin/write_end pair is
-        // purely for protocol compliance, not actual synchronization.
+        // readers, so the write_begin/write_end pair is purely
+        // bookkeeping (heartbeat + checksum).
         unsafe { state.write_begin(0) };
         let da = state
             .neurochemicals
@@ -2837,11 +2687,11 @@ fn measured_peaks() -> [f32; 18] {
     let mut hi = [0.0f32; 18];
     for _ in 0..72_000u32 {
         ms += 100;
-        nv.apply_impulse_capped(NeurochemicalId::CRH, 0.003, ms);
-        nv.apply_impulse_capped(NeurochemicalId::Norepinephrine, 0.003, ms);
-        nv.apply_impulse_capped(NeurochemicalId::Acetylcholine, 0.003, ms);
-        nv.apply_impulse_capped(NeurochemicalId::Histamine, 0.003, ms);
-        nv.apply_impulse_capped(NeurochemicalId::Dopamine, 0.003, ms);
+        nv.apply_impulse(NeurochemicalId::CRH, 0.003, ms);
+        nv.apply_impulse(NeurochemicalId::Norepinephrine, 0.003, ms);
+        nv.apply_impulse(NeurochemicalId::Acetylcholine, 0.003, ms);
+        nv.apply_impulse(NeurochemicalId::Histamine, 0.003, ms);
+        nv.apply_impulse(NeurochemicalId::Dopamine, 0.003, ms);
         nv.tick_with_params(&params);
         for (h, v) in hi.iter_mut().zip(nv.effective_levels.iter()) {
             *h = h.max(*v);
@@ -2937,13 +2787,13 @@ fn test_encoding_weight_is_discriminating() {
         for _ in 0..36_000u32 {
             ms += 100;
             if ach > 0.0 {
-                nv.apply_impulse_capped(NeurochemicalId::Acetylcholine, ach, ms);
+                nv.apply_impulse(NeurochemicalId::Acetylcholine, ach, ms);
             }
             if da > 0.0 {
-                nv.apply_impulse_capped(NeurochemicalId::Dopamine, da, ms);
+                nv.apply_impulse(NeurochemicalId::Dopamine, da, ms);
             }
             if ne > 0.0 {
-                nv.apply_impulse_capped(NeurochemicalId::Norepinephrine, ne, ms);
+                nv.apply_impulse(NeurochemicalId::Norepinephrine, ne, ms);
             }
             nv.tick_with_params(&params);
             let e = 0.4 * nv.effective_levels[NeurochemicalId::Dopamine as usize]

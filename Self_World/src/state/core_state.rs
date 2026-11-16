@@ -100,8 +100,6 @@ use super::neurochemical::{ActiveRegion, NeuroTickParams, NeurochemicalId, Neuro
 use super::sleep_network::{INITIAL as SLEEP_INITIAL, State as SleepState};
 use super::zones::ActiveZones;
 
-use core::sync::atomic::{AtomicU64, Ordering, fence};
-
 /// Size of the [`InferenceSignals`] tail. The field began as the
 /// schema-v3 reserved region (which let it grow without a version
 /// bump), and it still occupies exactly 64 bytes at the end of the
@@ -168,7 +166,7 @@ pub fn crc32_ieee(bytes: &[u8]) -> u32 {
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct GenesisCoreState {
-    /// Identity, versioning, and seqlock.
+    /// Identity and versioning header.
     pub header: CoreStateHeader,
     /// 18-chemical coupled neurochemical dynamics.
     pub neurochemicals: NeurochemicalVector,
@@ -190,7 +188,7 @@ pub struct GenesisCoreState {
     /// derived: losing them resets the cell's resting state. See
     /// [`IonState`].
     pub ions: IonState,
-    /// CRC32 checksum of all preceding bytes (header.seq_lock excluded).
+    /// CRC32 checksum of all preceding bytes (header.reserved excluded).
     pub checksum: u32,
     /// Active inference signals — the generative self-model's
     /// projection. Lives in the former reserved region (64 bytes).
@@ -265,6 +263,7 @@ impl GenesisCoreState {
                 .effective(NeurochemicalId::Acetylcholine),
             self.neurochemicals.effective(NeurochemicalId::Cortisol),
             self.neurochemicals.effective(NeurochemicalId::BDNF),
+            self.inference_signals.allostasis_load,
         );
 
         // Calcium is the membrane-level plasticity signal: resting Ca²⁺
@@ -512,8 +511,8 @@ impl GenesisCoreState {
     /// way — this just means the file is not carrying a grant nobody
     /// made.
     ///
-    /// The caller must hold the flock and publish the write through the
-    /// seqlock; see the call site in `crate::store::mmap_state::open`.
+    /// The caller must hold the flock and publish the write; see the
+    /// call site in `crate::store::mmap_state::open`.
     pub fn migrate_layout(&mut self, from_size: u32) -> Result<(), CoreStateError> {
         if from_size == Self::SIZE as u32 {
             // Already the current layout — nothing to do.
@@ -574,16 +573,18 @@ impl GenesisCoreState {
     // ─── Checksum ────────────────────────────────────────────────
 
     /// Compute the CRC32 checksum over the struct, excluding the
-    /// `checksum` field itself and `header.seq_lock`.
+    /// `checksum` field itself and `header.reserved`.
     ///
     /// The checksum covers two regions:
     /// 1. offset 0..40 (magic through heartbeat)
     /// 2. offset 48..`checksum` (instance_id through the field before
     ///    the checksum)
     ///
-    /// `header.seq_lock` (offset 40..48) is excluded because it changes
-    /// on every write, making the checksum unstable. `checksum` and
-    /// `inference_signals` at the end are excluded.
+    /// `header.reserved` (offset 40..48) is excluded — it was the
+    /// sequence-lock counter, which changed on every write and made
+    /// the checksum unstable. The lock is gone; the exclusion is kept
+    /// so the checksum stays byte-compatible with existing files.
+    /// `checksum` and `inference_signals` at the end are excluded.
     pub fn compute_checksum(&self) -> u32 {
         let ptr = self as *const Self as *const u8;
         // Anchor to the field's actual offset rather than deriving it
@@ -599,11 +600,11 @@ impl GenesisCoreState {
             // SAFETY: `ptr` is `self as *const Self as *const u8`, pointing to
             // a valid `GenesisCoreState` (repr(C)). The two
             // regions are within-bounds non-overlapping sub-slices:
-            //   r1: offset 0..40  (40 bytes, before seq_lock)
+            //   r1: offset 0..40  (40 bytes, before reserved)
             //   r2: offset 48..checksum_offset (ends at the checksum,
             //       which is 4 bytes before inference_signals)
             // Both lengths are ≥ 0 and their end offsets are ≤ SIZE.
-            // Region 1: offset 0..40 (magic through heartbeat, before seq_lock)
+            // Region 1: offset 0..40 (magic through heartbeat, before reserved)
             let r1 = core::slice::from_raw_parts(ptr, 40);
             // Region 2: offset 48..checksum_offset (instance_id through
             // the fields before the checksum)
@@ -654,87 +655,24 @@ impl GenesisCoreState {
         Ok(())
     }
 
-    // ─── Sequence lock protocol ──────────────────────────────────
+    // ─── Write bookkeeping ───────────────────────────────────────
 
-    /// Begin a write transaction. Sets `seq_lock` to odd (write in progress).
+    /// Begin a write transaction — stamps `last_updated` and bumps
+    /// `heartbeat`. There is no sequence lock; the caller's own
+    /// synchronization (MmapState's mutex + flock, or single-threaded
+    /// test code) is responsible for excluding concurrent writers.
     ///
     /// # Safety
     /// The caller must ensure no other writer is active simultaneously.
     pub unsafe fn write_begin(&mut self, now_ms: u64) {
-        // Atomically increment seq_lock to odd (write in progress).
-        // We use AtomicU64::from_ptr rather than a plain field access
-        // because the IPC thread may concurrently read seq_lock via
-        // read_consistent. A plain load/store would be a data race
-        // (undefined behavior) and the compiler could merge the
-        // reader's two lock samples into one load, making the seqlock
-        // tear-check vacuous.
-        // SAFETY: `self.header.seq_lock` is a valid, properly aligned `u64`
-        // field within the `#[repr(C)]` struct (header layout is verified by
-        // compile-time asserts in header.rs). `addr_of_mut!` yields a raw
-        // pointer without creating a temporary reference, satisfying
-        // `AtomicU64::from_ptr`'s alignment and dereferenceability
-        // requirements. The caller contract (no concurrent writers) is
-        // documented in the function-level `# Safety` doc comment.
-        let seq = unsafe { AtomicU64::from_ptr(core::ptr::addr_of_mut!(self.header.seq_lock)) };
-        // AcqRel ordering on the fetch_add serves two purposes:
-        //
-        //   1. **Acquire** half: prevents the compiler/CPU from
-        //      reordering the subsequent data writes (last_updated,
-        //      heartbeat, and the closure's mutations) *above* the
-        //      seqlock increment. Without this, on weakly-ordered
-        //      architectures (ARM, RISC-V) a reader could sample an
-        //      even `lock1`, observe partially-updated data, then
-        //      sample the same even `lock2` and accept a torn state.
-        //
-        //   2. **Release** half: synchronizes-with the reader's Acquire
-        //      load of seq_lock, establishing a happens-before
-        //      relationship so that when a reader sees the odd
-        //      (write-in-progress) value, it is guaranteed to see the
-        //      effects of all writes prior to this write_begin.
-        //
-        // A plain Release fetch_add does NOT provide the Acquire half:
-        // it only prevents *prior* stores from moving below the RMW,
-        // not *subsequent* stores from moving above it. A Relaxed
-        // fetch_add followed by a Release fence is equally insufficient
-        // for the same reason — the fence constrains prior-vs-later
-        // ordering but does not give the RMW itself acquire semantics.
-        //
-        // The Acquire fence below is belt-and-suspenders: it makes the
-        // "no subsequent store may move above the RMW" guarantee
-        // explicit and architecture-independent, rather than relying
-        // solely on the AcqRel RMW's acquire component (which some
-        // architectures implement as a no-op fence after the RMW).
-        seq.fetch_add(1, Ordering::AcqRel);
-        // Self-heal an inverted parity. `fetch_add` on an odd value
-        // yields an EVEN one, which every reader interprets as "stable"
-        // — so a writer starting from a stale odd `seq_lock` would
-        // publish a half-written state to concurrent `read_consistent`
-        // callers, then `write_end` would leave the lock odd and blind
-        // them for the rest of the process. `MmapState::open` repairs
-        // the on-disk case; this covers any in-process path that
-        // reaches `write_begin` from an odd start.
-        if seq.load(Ordering::Acquire) & 1 == 0 {
-            seq.fetch_add(1, Ordering::AcqRel);
-        }
-        fence(Ordering::Acquire);
         self.header.last_updated = now_ms;
         self.header.heartbeat = self.header.heartbeat.wrapping_add(1);
     }
 
-    /// End a write transaction. Recomputes checksum, sets `seq_lock`
-    /// to even (write complete).
+    /// End a write transaction — recomputes the checksum over the
+    /// final bytes.
     pub fn write_end(&mut self) {
         self.checksum = self.compute_checksum();
-        // Release fence ensures all data writes (including the
-        // checksum store above) are globally visible before the
-        // seq_lock increment that marks the write as complete.
-        fence(Ordering::Release);
-        // SAFETY: `self.header.seq_lock` is a properly aligned u64
-        // (the header layout is verified by compile-time asserts in
-        // header.rs, offset 40 with 8-byte alignment). We have
-        // exclusive `&mut self` so no concurrent access here.
-        let seq = unsafe { AtomicU64::from_ptr(core::ptr::addr_of_mut!(self.header.seq_lock)) };
-        seq.fetch_add(1, Ordering::Release);
     }
 
     /// Replace every non-finite float in persisted state with a
@@ -784,12 +722,14 @@ impl GenesisCoreState {
         scrubbed
     }
 
-    /// Attempt a lock-free read of the state.
+    /// Take a volatile snapshot of the state.
     ///
-    /// Uses the sequence lock protocol: samples `seq_lock` before and
-    /// after copying the state. If either sample is odd (write in
-    /// progress) or the samples differ, returns `None` and the caller
-    /// should retry.
+    /// There is no sequence lock: this is a single `read_volatile`
+    /// copy of the whole struct. If a writer is mid-publish the copy
+    /// may be torn — callers that care can verify the CRC on the
+    /// snapshot. The `Option` return is kept for call-site
+    /// compatibility with the former sequence-lock protocol; it now
+    /// always yields `Some`.
     ///
     /// **When to use this vs [`MmapState::read_consistent`](crate::MmapState::read_consistent):**
     ///
@@ -811,52 +751,12 @@ impl GenesisCoreState {
     /// method. For mmap'd state, use [`MmapState::read_consistent`](crate::MmapState::read_consistent)
     /// instead.
     pub unsafe fn read_consistent(&self) -> Option<GenesisCoreState> {
-        // SAFETY: `AtomicU64::from_ptr` requires `*mut`, but atomic
-        // loads do not mutate the pointed-to memory through the raw
-        // pointer — they only read it atomically. We have `&self`, so
-        // we cast away const for the API. No concurrent mutable alias
-        // is created here; the writer goes through `&mut self` in
-        // `write_begin`/`write_end`.
-        let seq =
-            unsafe { AtomicU64::from_ptr(core::ptr::addr_of!(self.header.seq_lock) as *mut u64) };
-
-        // Acquire load: synchronizes-with the Release store in
-        // write_end, ensuring we see all data writes from the
-        // completed transaction that produced this even seq_lock.
-        let lock1 = seq.load(Ordering::Acquire);
-        if lock1 & 1 != 0 {
-            return None;
-        }
-        // Acquire fence ensures the data reads below happen after the
-        // lock1 load. Without this, on weak memory orderings (ARM,
-        // RISC-V), the CPU could reorder the data reads before the
-        // lock1 load, seeing stale data.
-        fence(Ordering::Acquire);
-
         // SAFETY: `self` is a valid `GenesisCoreState` (caller guarantees it
         // is not being deallocated or remapped — see the function-level
         // `# Safety` doc). `read_volatile` copies `size_of::<Self>()` bytes
         // without creating a reference, avoiding aliasing issues with a
-        // concurrent writer. The seqlock protocol (checked below) ensures
-        // the copy is consistent.
-        let copy = unsafe { core::ptr::read_volatile(self) };
-
-        // Acquire fence ensures all data reads above are completed
-        // before we sample lock2. Without this, on weak memory orderings
-        // (ARM, RISC-V), the CPU could reorder the data reads after the
-        // lock2 load, causing the seqlock validation to pass on stale
-        // (torn) data. (On x86's TSO model this is harmless, but the
-        // mmap'd state may be shared across architectures.)
-        fence(Ordering::Acquire);
-        // Relaxed is sufficient here: the fence above provides the
-        // ordering we need. We only need an atomic load (not a plain
-        // read) so the compiler doesn't merge this with lock1.
-        let lock2 = seq.load(Ordering::Relaxed);
-
-        if lock1 != lock2 || lock2 & 1 != 0 {
-            return None;
-        }
-        Some(copy)
+        // concurrent writer.
+        Some(unsafe { core::ptr::read_volatile(self) })
     }
 }
 

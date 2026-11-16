@@ -121,7 +121,7 @@ fn test_consolidation_promotes_high_salience() {
                 .neurochemicals
                 .get_mut(NeurochemicalId::Cortisol)
                 .unwrap()
-                .level = 0.15;
+                .level = 0.05;
             state.neurochemicals.recompute_derived();
             state.sync_neurochemistry_to_state();
         })
@@ -176,7 +176,7 @@ fn test_consolidation_skips_low_salience() {
                 .neurochemicals
                 .get_mut(NeurochemicalId::Cortisol)
                 .unwrap()
-                .level = 0.15;
+                .level = 0.05;
             state.neurochemicals.recompute_derived();
             state.sync_neurochemistry_to_state();
         })
@@ -292,7 +292,7 @@ fn test_consolidation_preserves_emotional_tags() {
                 .neurochemicals
                 .get_mut(NeurochemicalId::Cortisol)
                 .unwrap()
-                .level = 0.15;
+                .level = 0.05;
             state.neurochemicals.recompute_derived();
             state.sync_neurochemistry_to_state();
         })
@@ -842,7 +842,7 @@ fn test_tick_loop_consolidates_stm() {
                 .neurochemicals
                 .get_mut(NeurochemicalId::Cortisol)
                 .unwrap()
-                .level = 0.15;
+                .level = 0.05;
             state.neurochemicals.recompute_derived();
             state.sync_neurochemistry_to_state();
         })

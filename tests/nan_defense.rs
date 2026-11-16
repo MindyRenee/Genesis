@@ -12,7 +12,9 @@
 //! chemical field propagates through the 18×18 coupling matrix to all
 //! 18 chemicals within one tick, permanently corrupting the mmap'd state.
 
-use genesis::state::neurochemical::{NeuroTickParams, Neurochemical, NeurochemicalId};
+use genesis::state::neurochemical::{
+    NeuroTickParams, Neurochemical, NeurochemicalId, NeurochemicalVector,
+};
 use genesis::state::*;
 
 // ─── sanitize primitives ───────────────────────────────────────
@@ -145,9 +147,11 @@ fn test_apply_impulse_clamps_huge_magnitude_velocity() {
         chem.velocity
     );
     assert!(chem.level.is_finite());
+    // Levels extrapolate honestly (finite, not range-limited) — the
+    // bound lives on the integrator's step size, not the signal.
     assert!(
-        chem.level <= 1.0,
-        "level must be in [0, 1], got {}",
+        chem.level > 1.0,
+        "a huge impulse should push the level past 1.0 rather than clamp it, got {}",
         chem.level
     );
 }
@@ -170,8 +174,8 @@ fn test_effective_level_returns_finite_for_nan_inputs() {
         eff
     );
     assert!(
-        (0.0..=2.0).contains(&eff),
-        "effective_level must be in [0, 2], got {}",
+        eff >= 0.0,
+        "effective_level must remain non-negative, got {}",
         eff
     );
 }
@@ -194,26 +198,22 @@ fn test_effective_level_returns_finite_for_nan_sensitivity() {
 // ─── subtype_effective_level dopamine branch ───────────────────
 
 #[test]
-fn test_subtype_effective_level_dopamine_clamped_to_2() {
+fn test_subtype_effective_level_dopamine_unclamped() {
     let mut chem = Neurochemical::new(NeurochemicalId::Dopamine, 0);
-    // Set up conditions that would produce a value > 2.0 without clamping:
-    // base = level × sensitivity × desens × intern
-    // For base = 2.0: level=1.0, sensitivity=2.0, desens=1.0, intern=1.0
     chem.level = 1.0;
     chem.receptor_sensitivity = 2.0;
     chem.desensitization_factor = 1.0;
     chem.internalization_factor = 1.0;
-    // D1=1.0, D2=0.0 → (d1-d2)/total = 1.0
-    // raw = 2.0 * 1.0 * 2.0 + 2.0 = 6.0 (without clamping)
+    // D1=1.0, D2=0.0 → raw = 2.0 * 1.0 * 2.0 + 2.0 = 6.0.
     chem.receptor_subtypes = [1.0, 0.0];
 
     let eff = chem.subtype_effective_level();
     assert!(
-        eff <= 2.0,
-        "subtype_effective_level for dopamine must be clamped to [0, 2], got {}",
+        eff > 2.0,
+        "subtype_effective_level for dopamine must not be clamped, got {}",
         eff
     );
-    assert!(eff >= 0.0);
+    assert!(eff.is_finite());
 }
 
 #[test]
@@ -227,7 +227,76 @@ fn test_subtype_effective_level_dopamine_finite_for_nan() {
         eff.is_finite(),
         "subtype_effective_level must be finite for NaN level"
     );
-    assert!((0.0..=2.0).contains(&eff));
+    assert!(eff >= 0.0);
+}
+
+#[test]
+fn test_dopamine_phasic_effective_unclamped_and_cached() {
+    let mut neuro = NeurochemicalVector::new(0);
+    let chem = neuro.get_mut(NeurochemicalId::Dopamine).unwrap();
+    chem.level = 1.0;
+    chem.receptor_sensitivity = 2.0;
+    chem.desensitization_factor = 1.0;
+    chem.internalization_factor = 1.0;
+    chem.receptor_subtypes = [1.0, 0.0];
+    chem.phasic_level = 1.0;
+
+    neuro.recompute_derived();
+    let direct = neuro.effective(NeurochemicalId::Dopamine);
+    let cached = neuro.effective_levels[NeurochemicalId::Dopamine as usize];
+
+    assert!(direct > 2.0, "dopamine effective level should exceed 2.0");
+    assert!(direct.is_finite());
+    assert!(
+        (direct - cached).abs() < 1e-6,
+        "cached and direct dopamine effective levels must match"
+    );
+}
+
+#[test]
+fn test_dopamine_phasic_impulse_unclamped() {
+    let mut chem = Neurochemical::new(NeurochemicalId::Dopamine, 0);
+    chem.apply_impulse(3.0, 0);
+    assert!(
+        chem.phasic_level > 1.0 && chem.phasic_level.is_finite(),
+        "dopamine phasic channel must preserve finite impulses above 1.0, got {}",
+        chem.phasic_level
+    );
+}
+
+#[test]
+fn test_non_dopamine_phasic_impulse_remains_finite() {
+    let mut chem = Neurochemical::new(NeurochemicalId::Serotonin, 0);
+    chem.apply_impulse(3.0, 0);
+    // Phasic bursts are finite but not range-limited for every
+    // chemical — burst firing legitimately exceeds the tonic ceiling,
+    // same contract the dopamine channel test asserts.
+    assert!(
+        chem.phasic_level.is_finite() && chem.phasic_level > 1.0,
+        "serotonin phasic channel must preserve finite impulses above 1.0, got {}",
+        chem.phasic_level
+    );
+}
+
+#[test]
+fn test_dopamine_tonic_phasic_survive_tick_unclamped() {
+    let mut neuro = NeurochemicalVector::new(0);
+    let da = neuro.get_mut(NeurochemicalId::Dopamine).unwrap();
+    da.tonic_level = 2.5;
+    da.phasic_level = 2.5;
+    neuro.tick_default();
+
+    let da = neuro.get(NeurochemicalId::Dopamine).unwrap();
+    assert!(
+        da.tonic_level > 1.0 && da.tonic_level.is_finite(),
+        "dopamine tonic channel must not clamp to 1.0, got {}",
+        da.tonic_level
+    );
+    assert!(
+        da.phasic_level > 1.0 && da.phasic_level.is_finite(),
+        "dopamine phasic channel must not clamp to 1.0, got {}",
+        da.phasic_level
+    );
 }
 
 // ─── Tick-level circuit breaker ─────────────────────────────────
@@ -562,8 +631,8 @@ fn test_recompute_derived_finite_after_corruption() {
     state.write_end();
 
     // recompute_derived should produce finite arousal/valence/tone
-    // despite the NaN level. The effective_levels computation uses
-    // finite_clamp, which replaces NaN with 0.0.
+    // despite the NaN level. The effective-level path replaces NaN
+    // with the channel's safe finite fallback.
     // SAFETY: single-threaded test
     unsafe { state.write_begin(0) };
     state.neurochemicals.recompute_derived();

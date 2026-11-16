@@ -91,6 +91,64 @@ fn test_store_and_retrieve() {
     cleanup(&base);
 }
 
+#[test]
+fn test_store_preserves_finite_out_of_range_evidence() {
+    let base = temp_base("finite_evidence");
+    let mut store = LtmStore::create(&base, 64).expect("create");
+
+    let mut full_tag = make_full_tag();
+    full_tag[0] = 1.7;
+    full_tag[6] = -0.25;
+    let id = store
+        .store(
+            1000,
+            1.35,
+            full_tag,
+            make_compact_tag(),
+            0,
+            4,
+            "finite out-of-range evidence",
+        )
+        .expect("store");
+
+    let episode = store.retrieve(id).expect("retrieve");
+    assert_eq!(episode.salience, 1.35);
+    assert_eq!(episode.full_emotional_tag[0], 1.7);
+    assert_eq!(episode.full_emotional_tag[6], -0.25);
+
+    drop(store);
+    cleanup(&base);
+}
+
+#[test]
+fn test_store_nonfinite_evidence_gets_defaults() {
+    let base = temp_base("nonfinite_evidence");
+    let mut store = LtmStore::create(&base, 64).expect("create");
+
+    let mut full_tag = make_full_tag();
+    full_tag[0] = f32::NAN;
+    full_tag[6] = f32::INFINITY;
+    let id = store
+        .store(
+            1000,
+            f32::NAN,
+            full_tag,
+            make_compact_tag(),
+            0,
+            4,
+            "malformed evidence",
+        )
+        .expect("store");
+
+    let episode = store.retrieve(id).expect("retrieve");
+    assert_eq!(episode.salience, 0.0);
+    assert_eq!(episode.full_emotional_tag[0], 0.0);
+    assert_eq!(episode.full_emotional_tag[6], 0.0);
+
+    drop(store);
+    cleanup(&base);
+}
+
 // ─── Multiple episodes ────────────────────────────────────────
 
 #[test]
@@ -561,8 +619,10 @@ fn test_find_similar_archived() {
             "a completely unrelated note about semaphore flags",
         )
         .expect("store active");
-    // An archived meta-memory: store_meta flags it regardless of
-    // source module; archiving it yields flags = meta|archived.
+    // An archived bookkeeping trace: store_meta is a plain store now
+    // (no meta flagging — every episode is a first-class episode), so
+    // archiving it yields an ordinary archived episode. Its text uses
+    // disjoint tokens so it doesn't compete with the orchard cues.
     let meta_id = store
         .store_meta(
             0,
@@ -571,7 +631,7 @@ fn test_find_similar_archived() {
             make_compact_tag(),
             0,
             4,
-            "association trace orchard ladder barn",
+            "association trace pine cinder moss",
         )
         .expect("store meta");
     store.archive(meta_id).expect("archive meta");
@@ -619,10 +679,13 @@ fn test_find_similar_archived() {
         !deep.iter().any(|(id, _, _)| *id == active_id),
         "active episodes do not belong to deep recall"
     );
-    // ...nor archived meta-memories (they have their own channels)...
+    // Archived bookkeeping episodes are ordinary episodes in the
+    // archived tier — deep recall reaches them when the cue matches,
+    // same as any other archived episode.
+    let trace = store.find_similar_archived("pine cinder moss", 10);
     assert!(
-        !deep.iter().any(|(id, _, _)| *id == meta_id),
-        "meta-memories stay out of deep recall"
+        trace.iter().any(|(id, _, _)| *id == meta_id),
+        "archived bookkeeping episodes are reachable through deep recall"
     );
     // ...nor deleted entries.
     assert!(
@@ -1239,13 +1302,12 @@ fn test_v1_migration_failure_preserves_original_files() {
 }
 
 #[test]
-fn test_meta_memory_episodes_stay_out_of_bundles() {
-    // Modules 0/5/8/9 are auto-flagged meta-memory — internal
-    // bookkeeping excluded from find_similar. Their SDRs must not
-    // enter the bundle superposition either, or every run re-saturates
-    // the store with bookkeeping noise that the next startup rebuild
-    // has to mop up again (~260 entries/run observed live).
-    let base = temp_base("meta_bundles");
+fn test_all_episodes_enter_bundles() {
+    // Every stored episode — regardless of source module, including
+    // the modules once auto-flagged as bookkeeping (0/5/8/9) — is a
+    // first-class episode: recallable, and superimposed in the SDR
+    // bundle store.
+    let base = temp_base("all_bundles");
     let mut store = LtmStore::create(&base, 64).unwrap();
     store
         .store(
@@ -1280,11 +1342,12 @@ fn test_meta_memory_episodes_stay_out_of_bundles() {
             "dream insight",
         )
         .unwrap();
-    // The index holds all three; only the real one may superimpose.
+    // The index holds all three and all three superimpose — there is
+    // no bookkeeping exclusion set anymore.
     assert_eq!(store.count(), 3);
     drop(store);
     let bundles = BundleStore::open(base.with_extension("bundles")).unwrap();
-    assert_eq!(bundles.episode_count(), 1);
+    assert_eq!(bundles.episode_count(), 3);
     cleanup(&base);
 }
 
@@ -1319,8 +1382,9 @@ fn test_archive_unbundles_episode() {
         )
         .unwrap();
     drop(store);
+    // Module 9 episodes are ordinary episodes now — both superimpose.
     let bundles = BundleStore::open(base.with_extension("bundles")).unwrap();
-    assert_eq!(bundles.episode_count(), 1);
+    assert_eq!(bundles.episode_count(), 2);
     drop(bundles);
 
     let mut store = LtmStore::open(&base).unwrap();
@@ -1330,7 +1394,7 @@ fn test_archive_unbundles_episode() {
     // bundle_count tracks the bundled set, not every stored ID —
     // archive is the moment this episode leaves it.
     let bundles = BundleStore::open(base.with_extension("bundles")).unwrap();
-    assert_eq!(bundles.episode_count(), 0);
+    assert_eq!(bundles.episode_count(), 1);
     cleanup(&base);
 }
 
@@ -1424,13 +1488,10 @@ fn test_delete_of_archived_does_not_double_unbundle() {
 }
 
 #[test]
-fn test_store_meta_non_auto_module_unbundles() {
-    // store_meta with a non-auto module (e.g. 4, Language — not in
-    // the 0/5/8/9 auto set) goes through store(), which bundles the
-    // SDR before the meta flag is applied. The flag path must back
-    // the contribution out or every store_meta call leaves dead
-    // weight the startup reconciliation rebuilds away.
-    let base = temp_base("store_meta_unbundle");
+fn test_store_meta_bundles_like_store() {
+    // store_meta is a plain store — no flagging, no bookkeeping
+    // exclusion — so its SDR superimposes like any other episode.
+    let base = temp_base("store_meta_bundle");
     let mut store = LtmStore::create(&base, 64).unwrap();
     store
         .store(
@@ -1459,8 +1520,8 @@ fn test_store_meta_non_auto_module_unbundles() {
     let bundles = BundleStore::open(base.with_extension("bundles")).unwrap();
     assert_eq!(
         bundles.episode_count(),
-        1,
-        "store_meta on a non-auto module must not leave its SDR bundled"
+        2,
+        "store_meta'd episodes superimpose like any other episode"
     );
     cleanup(&base);
 }
@@ -1687,9 +1748,11 @@ fn test_meta_hash_known_survives_reopen() {
         .store_meta(0, 0.5, make_full_tag(), make_compact_tag(), 2, 0, text)
         .expect("store_meta");
     assert!(store.meta_hash_known(fingerprint));
-    assert!(store.is_meta_episode(id));
+    // store_meta is a plain store — nothing is flagged meta anymore.
+    assert!(!store.is_meta_episode(id));
 
-    // A real episode is not meta.
+    // A real episode's fingerprint is also indexed — the dedup set
+    // covers every stored episode, not just bookkeeping traces.
     let real = store
         .store(
             0,
@@ -1702,13 +1765,15 @@ fn test_meta_hash_known_survives_reopen() {
         )
         .expect("store");
     assert!(!store.is_meta_episode(real));
+    assert!(store.meta_hash_known(simhash("real memory")));
 
     drop(store);
 
-    // The dedup index is rebuilt from active meta entries on open —
-    // dedup survives restarts.
+    // The dedup index is rebuilt from every active episode's
+    // fingerprint on open — dedup survives restarts.
     let reopened = LtmStore::open(&base).expect("open");
     assert!(reopened.meta_hash_known(fingerprint));
+    assert!(reopened.meta_hash_known(simhash("real memory")));
 
     drop(reopened);
     cleanup(&base);

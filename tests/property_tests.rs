@@ -5,8 +5,7 @@
 //! properties hold across the entire input space.
 //!
 //! Categories:
-//! 1. Core state invariants — chemicals in [0,1], checksum determinism,
-//!    seqlock monotonicity
+//! 1. Core state invariants — chemicals in [0,1], checksum determinism
 //! 2. Neurochemical dynamics — stability over 1000 ticks, no NaN/inf,
 //!    no runaway
 //! 3. Ring buffer — push/peek consistency under wraparound, count ≤
@@ -157,35 +156,6 @@ fn prop_checksum_changes_on_state_modification() {
                 "checksum didn't change after modifying chemical level"
             );
         }
-    }
-}
-
-#[test]
-fn prop_seqlock_is_monotonically_increasing() {
-    let mut state = GenesisCoreState::new(1, 1000);
-    let mut last_seq = state.header.seq_lock;
-
-    for i in 0..100 {
-        // SAFETY: locally-owned non-aliased state, single-threaded test.
-        unsafe { state.write_begin(1000 + i) };
-        assert!(
-            state.header.seq_lock & 1 == 1,
-            "seq_lock should be odd during write (iteration {})",
-            i
-        );
-        state.write_end();
-        assert!(
-            state.header.seq_lock & 1 == 0,
-            "seq_lock should be even after write (iteration {})",
-            i
-        );
-        assert!(
-            state.header.seq_lock > last_seq,
-            "seq_lock should be monotonically increasing: {} <= {}",
-            state.header.seq_lock,
-            last_seq
-        );
-        last_seq = state.header.seq_lock;
     }
 }
 
@@ -673,6 +643,7 @@ fn prop_consolidation_preserves_emotional_tag_integrity() {
             0.50, // ACh
             0.10, // CORT
             0.70, // BDNF
+            0.0,  // no allostatic load
         );
     })
     .expect("modify");
@@ -775,7 +746,7 @@ fn prop_consolidation_skips_low_salience() {
         state.sync_neurochemistry_to_state();
         state
             .memory
-            .update_gating(0.60, 0.50, 0.50, 0.50, 0.10, 0.70);
+            .update_gating(0.60, 0.50, 0.50, 0.50, 0.10, 0.70, 0.0);
     })
     .expect("modify");
 
@@ -848,7 +819,7 @@ fn prop_consolidation_blocked_by_chronic_stress() {
         state.sync_neurochemistry_to_state();
         state
             .memory
-            .update_gating(0.20, 0.30, 0.50, 0.30, 0.85, 0.10);
+            .update_gating(0.20, 0.30, 0.50, 0.30, 0.85, 0.10, 0.0);
     })
     .expect("modify");
 
