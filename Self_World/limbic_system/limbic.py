@@ -9,9 +9,12 @@ projection that feeds it.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from limbic_system.emotional_regulator import EmotionalRegulator
+
+if TYPE_CHECKING:
+    from limbic_system.feeling_reporter import FeelingReporter
 
 
 class LimbicSystem:
@@ -42,7 +45,7 @@ class LimbicSystem:
 
         self.amygdala = Amygdala()
         self.regulator.set_amygdala(self.amygdala)
-        self.feeling_reporter = None
+        self.feeling_reporter: FeelingReporter | None = None
 
     def grow_feeling_reporter(self, **deps: Any):
         """Grow the felt-state reporter from the frontal projection."""

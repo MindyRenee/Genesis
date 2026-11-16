@@ -2992,8 +2992,30 @@ class SelfDirectedLearner:
             )
 
     def _man_page_dirs(self) -> list[str]:
-        """Return the list of man page directories to scan."""
+        """Return the list of man page directories to scan.
+
+        Uses the same corpus the ``man_page`` tool sees — the real
+        manpath resolved the way ``man`` itself does, expanded to every
+        section dir under each root. The hardcoded layout below is the
+        fallback for environments where the tools tree or ``manpath``
+        is unavailable.
+        """
         import os
+
+        try:
+            from tools.source_registry import _resolve_man_paths
+
+            roots = _resolve_man_paths()
+            dirs = [
+                os.path.join(root, f"man{sec}")
+                for root in roots
+                for sec in ("1", "2", "3", "4", "5", "6", "7", "8", "9")
+                if os.path.isdir(os.path.join(root, f"man{sec}"))
+            ]
+            if dirs:
+                return dirs
+        except Exception:  # noqa: BLE001 — resolution is best-effort
+            pass
 
         dirs = [
             "/usr/share/man/man1",

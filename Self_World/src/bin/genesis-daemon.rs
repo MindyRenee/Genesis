@@ -181,7 +181,10 @@ fn parse_args() -> Config {
 /// and zone arbitration had all silently stopped. Poisoning is
 /// therefore reported, once per mutex, so it is visible without
 /// flooding the log on every cycle.
-fn lock_refusal<T>(what: &'static str, e: std::sync::TryLockError<T>) {
+///
+/// Returns `true` when the refusal was a poison — an unrecoverable,
+/// permanent refusal the caller must escalate rather than skip.
+fn lock_refusal<T>(what: &'static str, e: std::sync::TryLockError<T>) -> bool {
     if let std::sync::TryLockError::Poisoned(_) = e {
         static REPORTED: genesis::inhibition::Innate<Inhibition<Vec<&'static str>>> =
             genesis::inhibition::Innate::new();
@@ -198,8 +201,23 @@ fn lock_refusal<T>(what: &'static str, e: std::sync::TryLockError<T>) {
                  until the daemon restarts. The IPC path will refuse it too."
             );
         }
+        return true;
     }
-    // Both outcomes mean "skip this cycle"; only the reporting differs.
+    false
+}
+
+/// A poisoned `tick_loop` can never recover: the IPC path refuses
+/// every reactive command with INTERNAL_ERROR and the fallback would
+/// skip it on every pass — the daemon would answer PING forever with
+/// no neurochemistry, no memory, no zones. Exit through the normal
+/// shutdown path so the stores get their final sync and a supervisor
+/// sees a stopped process, not a brain-dead one. (`ltm` poisoning is
+/// not fatal here: that subsystem is explicitly recoverable — the IPC
+/// `LtmAccess` path serves it via `into_inner`.)
+fn fatal_if_poisoned(what: &'static str, shutdown_flag: &Arc<std::sync::atomic::AtomicBool>) {
+    if !shutdown_flag.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        eprintln!("[genesis] FATAL: {what} poisoned — exiting for clean restart");
+    }
 }
 
 fn main() {
@@ -592,7 +610,9 @@ fn main() {
                     }
                 }
                 Err(e) => {
-                    lock_refusal("tick_loop", e);
+                    if lock_refusal("tick_loop", e) {
+                        fatal_if_poisoned("tick_loop", &shutdown_flag);
+                    }
                 }
             }
         }
@@ -610,8 +630,7 @@ fn main() {
         if eye.is_none() && eye_gate.due(now_ms) {
             match tick_loop.try_lock() {
                 Ok(tl) => {
-                    let external_live =
-                        tl.optic.frames_seen() > 0 && tl.optic.fresh(now_ms);
+                    let external_live = tl.optic.frames_seen() > 0 && tl.optic.fresh(now_ms);
                     let still_listening =
                         tl.optic.frames_seen() == 0 && now_ms < eye_grace_until_ms;
                     if !external_live && !still_listening {
@@ -628,7 +647,9 @@ fn main() {
                     }
                 }
                 Err(e) => {
-                    lock_refusal("tick_loop", e);
+                    if lock_refusal("tick_loop", e) {
+                        fatal_if_poisoned("tick_loop", &shutdown_flag);
+                    }
                 }
             }
         }
@@ -639,9 +660,11 @@ fn main() {
         let lease_expired = match tick_loop.try_lock() {
             Ok(tl) => tl.mind_lease_expired(),
             Err(e) => {
-                // Busy (mind driving) skips this cycle; poisoned is
-                // reported once and then skips it forever.
-                lock_refusal("tick_loop", e);
+                // Busy (mind driving) skips this cycle; poisoned
+                // never clears, so it ends the daemon cleanly.
+                if lock_refusal("tick_loop", e) {
+                    fatal_if_poisoned("tick_loop", &shutdown_flag);
+                }
                 continue;
             }
         };
@@ -657,7 +680,9 @@ fn main() {
             let mut tl = match tick_loop.try_lock() {
                 Ok(tl) => tl,
                 Err(e) => {
-                    lock_refusal("tick_loop", e);
+                    if lock_refusal("tick_loop", e) {
+                        fatal_if_poisoned("tick_loop", &shutdown_flag);
+                    }
                     continue;
                 }
             };
@@ -685,7 +710,9 @@ fn main() {
             Ok(tl) => tl,
             Err(e) => {
                 // Mind driving — the LTM guard drops by scope end.
-                lock_refusal("tick_loop", e);
+                if lock_refusal("tick_loop", e) {
+                    fatal_if_poisoned("tick_loop", &shutdown_flag);
+                }
                 continue;
             }
         };
@@ -785,7 +812,9 @@ fn main() {
                 }
                 Ok(_) => {}
                 Err(e) => {
-                    lock_refusal("tick_loop", e);
+                    if lock_refusal("tick_loop", e) {
+                        fatal_if_poisoned("tick_loop", &shutdown_flag);
+                    }
                 }
             }
         }
@@ -810,7 +839,9 @@ fn main() {
                 }
                 Ok(_) => {}
                 Err(e) => {
-                    lock_refusal("tick_loop", e);
+                    if lock_refusal("tick_loop", e) {
+                        fatal_if_poisoned("tick_loop", &shutdown_flag);
+                    }
                 }
             }
         }

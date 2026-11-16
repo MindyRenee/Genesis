@@ -62,6 +62,7 @@ import numpy as np
 from inhibition import InhibitoryGate
 
 if TYPE_CHECKING:
+    from discord.board import ChannelBoard
     from discord.channel import Channel
 
 from genesis_client.protocol import (
@@ -287,7 +288,7 @@ class OuterEnvironment:
         # Her instrument card — a ``ChannelBoard`` the mind attaches
         # after construction (it reads the whole mind, which does not
         # exist yet here). None until then.
-        self.board = None
+        self.board: ChannelBoard | None = None
         # The arcade — games on offer in this world (``games.
         # arcade.Arcade``), attached by the mind. None until then.
         self.arcade: Any = None

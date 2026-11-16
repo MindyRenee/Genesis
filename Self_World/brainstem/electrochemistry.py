@@ -167,7 +167,7 @@ def interpret_ions(summary: IonSummary | None) -> IonCognitiveContext:
 def _finite_or(value: object, default: float) -> float:
     """Preserve a finite scalar and replace malformed/NaN/±∞ values."""
     try:
-        value = float(value)
+        value = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError, OverflowError):
         return default
     return value if math.isfinite(value) else default

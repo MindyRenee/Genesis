@@ -48,8 +48,7 @@ fn main() {
 
     // The segment to publish — the main optic nerve by default; a
     // named segment (tests, a second eye) overrides.
-    let shm_name =
-        std::env::var("GENESIS_OPTIC_SEGMENT").unwrap_or_else(|_| SHM_NAME.to_string());
+    let shm_name = std::env::var("GENESIS_OPTIC_SEGMENT").unwrap_or_else(|_| SHM_NAME.to_string());
 
     capture_limb(&shm_name, &SHOULD_EXIT);
 

@@ -245,6 +245,15 @@ class _Browser:
             self.close()
             raise
 
+    def _debug_port(self) -> int:
+        """The CDP port Chromium announced on its merged stderr.
+
+        Launched with ``--remote-debugging-port=0``, the browser picks
+        a free port and prints it once as ``DevTools listening on
+        ws://HOST:PORT``. A launched-but-forwarded browser (one
+        instance per profile) exits instead — its live port is in the
+        profile's ``DevToolsActivePort`` file.
+        """
         import re
 
         deadline = time.time() + 20
@@ -268,6 +277,10 @@ class _Browser:
                     ) from None
             time.sleep(0.2)
         raise RuntimeError(f"browser never opened a debug port: {self._stderr_tail()}")
+
+    def _stderr_tail(self) -> str:
+        """The bounded tail of the browser's merged output, for error text."""
+        return "".join(self._stderr_lines).strip()
 
     def _read_stderr(self) -> None:
         # Tail the browser's merged stdout/stderr into the bounded

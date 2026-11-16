@@ -44,10 +44,10 @@ from dataclasses import dataclass, field, replace
 from genesis_client.protocol import DT_MAX
 
 
-def _finite_or(value: float, default: float) -> float:
+def _finite_or(value: object, default: float) -> float:
     """Return finite floats; malformed/non-finite inputs use ``default``."""
     try:
-        result = float(value)
+        result = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError, OverflowError):
         return default
     return result if math.isfinite(result) else default

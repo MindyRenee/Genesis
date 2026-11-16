@@ -472,9 +472,10 @@ class SleepCompressor:
             if pair in seen:
                 continue
             seen.add(pair)
-            winner, loser = self._pick_merge_survivor(network, name, twin)
-            if winner is None:
+            survivor = self._pick_merge_survivor(network, name, twin)
+            if survivor is None:
                 continue
+            winner, loser = survivor
             if network.merge_concepts(winner, loser):
                 merged += 1
         return {"dedup_scanned": scanned, "dedup_merged": merged}
@@ -484,7 +485,7 @@ class SleepCompressor:
         network: ConceptNetwork,
         a: str,
         b: str,
-    ) -> tuple[str | None, str | None]:
+    ) -> tuple[str, str] | None:
         """Choose which of a twin pair survives the merge.
 
         The concept with the richer neighborhood wins — its edges are
@@ -495,7 +496,7 @@ class SleepCompressor:
         ca = network.get_concept(a)
         cb = network.get_concept(b)
         if ca is None or cb is None:
-            return None, None
+            return None
         ea = len(network.get_edges(a, "both"))
         eb = len(network.get_edges(b, "both"))
         if ea != eb:

@@ -1402,10 +1402,7 @@ impl Neurochemical {
         // neurochemical state. [-1, 1] is generous: normal impulses
         // produce velocities orders of magnitude smaller.
         self.velocity = crate::state::sanitize::finite_clamp(
-            crate::state::sanitize::finite_or(
-                self.velocity + effective_magnitude * 0.3,
-                0.0,
-            ),
+            crate::state::sanitize::finite_or(self.velocity + effective_magnitude * 0.3, 0.0),
             -1.0,
             1.0,
         );
@@ -2439,10 +2436,8 @@ impl NeurochemicalVector {
         // et al., 1999) — optimal at intermediate cortisol, degraded
         // toward both adrenalectomy-low and GR-saturated levels.
         let bdnf = eff(NeurochemicalId::BDNF);
-        self.plasticity_gate = crate::state::sanitize::finite_or(
-            bdnf * corticosteroid_ltp_facilitation(cort),
-            0.0,
-        );
+        self.plasticity_gate =
+            crate::state::sanitize::finite_or(bdnf * corticosteroid_ltp_facilitation(cort), 0.0);
 
         // Emergent phase
         self.emergent_phase = self.compute_phase() as u8;

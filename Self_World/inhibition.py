@@ -136,6 +136,7 @@ import threading
 import time
 import weakref
 from collections.abc import Callable, Iterable, Iterator
+from types import TracebackType
 from typing import Any
 
 __all__ = [
@@ -556,8 +557,13 @@ class ThalamicRelay:
         self._inner.__enter__()
         return self
 
-    def __exit__(self, *exc: object) -> Any:
-        return self._inner.__exit__(*exc)
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> Any:
+        return self._inner.__exit__(exc_type, exc_val, exc_tb)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._inner, name)

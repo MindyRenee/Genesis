@@ -25,10 +25,10 @@ from tools.project_creator import create_project, manage_project_lifecycle
 logger = logging.getLogger(__name__)
 
 
-def _finite_or(value: float, default: float) -> float:
+def _finite_or(value: object, default: float) -> float:
     """Return finite floats; malformed/non-finite inputs use ``default``."""
     try:
-        result = float(value)
+        result = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError, OverflowError):
         return default
     return result if math.isfinite(result) else default
@@ -69,6 +69,7 @@ class VolitionMixin:
         _daemon_lost_since: float | None
         _autosave_failures: int
         _offline: bool
+        _last_broadcast_seed: str | None
 
         def __getattr__(self, name: str) -> Any: ...
 

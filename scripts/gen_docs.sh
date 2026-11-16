@@ -3,14 +3,15 @@
 #
 # The two sides, documented the way each speaks:
 #   Rust   — cargo doc renders the /// doc comments (the math side)
-#            into Self_World/docs/rust/
+#            into docs/rust/
 #   Python — pydoc renders the module docstrings (the words side)
-#            into Self_World/docs/python/<module>.html
+#            into docs/python/<module>.html
 #
-# Generated docs live in the self world (self-knowledge) and replace
-# the hand-written subsystem man pages — docs regenerate from source
-# instead of drifting. Linux/ops man pages that generated API docs
-# cannot cover stay under docs/man/.
+# Generated docs live at root docs/ so GitHub Pages can serve them;
+# Self_World/docs is a symlink into the same tree, so the
+# self-world path (self-knowledge) still resolves for her tools.
+# Linux/ops man pages that generated API docs cannot cover stay
+# under docs/man/.
 #
 # Python modules that refuse to import are skipped with a note —
 # pydoc documents by importing, and some modules are not importable
@@ -19,7 +20,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-DOCS="Self_World/docs"
+DOCS="docs"
 RUST_OUT="target/doc"
 PY_OUT="$DOCS/python"
 
@@ -40,7 +41,7 @@ mkdir -p "$PY_OUT"
 # Every .py under the three worlds becomes a dotted module name.
 # __init__.py documents its package, __main__.py is skipped.
 cd "$PY_OUT"
-find ../../../Self_World ../../../Inner_World ../../../Outer_World \
+find ../../Self_World ../../Inner_World ../../Outer_World \
     -name '__pycache__' -prune -o -name '*.py' -print \
     | sed -E -e 's,.*(Self_World|Inner_World|Outer_World)/,\1/,' \
           -e 's/\.py$//' -e 's|/|.|g' -e 's/\.__init__$//' -e '/__main__$/d' \

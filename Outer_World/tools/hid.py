@@ -300,8 +300,10 @@ class Hands:
                     ecodes.REL_HWHEEL,
                 ],
                 ecodes.EV_ABS: [
-                    (ecodes.ABS_X, AbsInfo(0, 0, _ABS_MAX, 0, 0, 0)),
-                    (ecodes.ABS_Y, AbsInfo(0, 0, _ABS_MAX, 0, 0, 0)),
+                    # (code, AbsInfo) pairs are the real uinput API —
+                    # the stub types every capability code as int.
+                    (ecodes.ABS_X, AbsInfo(0, 0, _ABS_MAX, 0, 0, 0)),  # type: ignore[list-item]
+                    (ecodes.ABS_Y, AbsInfo(0, 0, _ABS_MAX, 0, 0, 0)),  # type: ignore[list-item]
                 ],
             },
             name="genesis-hand-pointer",

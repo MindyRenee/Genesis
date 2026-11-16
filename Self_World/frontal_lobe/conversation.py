@@ -133,6 +133,11 @@ class ConversationMixin:
         _think_recovery_active: bool
         _think_wedged_since: float | None
         _think_worker_lock: InhibitoryGate
+        # Deferred-state machinery — initialized in Mind.__init__
+        # (mind.py), consumed by _defer/_advance_deferred_state here.
+        _deferred_callbacks: list[tuple[float, Callable[[], None]]]
+        _deferred_callbacks_lock: InhibitoryGate
+        _post_conversation_self_invoke_pending: bool
 
         def __getattr__(self, name: str) -> Any: ...
 
@@ -329,9 +334,10 @@ class ConversationMixin:
         pending: list[tuple[float, Callable[[], None]]] = []
         with self._deferred_callbacks_lock:
             for due_at, callback in self._deferred_callbacks:
-                (due if due_at <= now else pending).append(
-                    callback if due_at <= now else (due_at, callback)
-                )
+                if due_at <= now:
+                    due.append(callback)
+                else:
+                    pending.append((due_at, callback))
             self._deferred_callbacks = pending
         for callback in due:
             try:

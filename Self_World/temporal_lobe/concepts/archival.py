@@ -577,12 +577,14 @@ class ArchivalMixin:
         # Retarget the loser's neighborhood onto the winner. Edges that
         # ran winner↔loser become self-loops and are dropped; add_edge
         # dedups and strengthens genuine overlaps.
-        for e in loser_edges:
-            new_src = win if e.source == lose else e.source
-            new_tgt = win if e.target == lose else e.target
+        for edge in loser_edges:
+            new_src = win if edge.source == lose else edge.source
+            new_tgt = win if edge.target == lose else edge.target
             if new_src == new_tgt:
                 continue
-            self.add_edge(new_src, new_tgt, e.relation, weight=e.weight, origin=e.origin)
+            self.add_edge(
+                new_src, new_tgt, edge.relation, weight=edge.weight, origin=edge.origin
+            )
 
         # Absorb the loser's names — the merged surface form still
         # resolves to the winner, which is the point of the merge.

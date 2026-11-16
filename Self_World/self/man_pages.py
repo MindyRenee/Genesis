@@ -52,7 +52,11 @@ def owned_pages(docs_man: Path | None, home: Path | None = None) -> list[tuple[s
     for mandir in home.glob("man*"):
         if not mandir.is_dir():
             continue
-        for page in mandir.iterdir():
+        try:
+            children = list(mandir.iterdir())
+        except OSError:
+            continue  # unreadable section dir — not a page she owns
+        for page in children:
             stem = page.name.removesuffix(".gz")
             name, _, sec = stem.rpartition(".")
             if name.startswith("genesis") and sec.isdigit():
@@ -74,7 +78,12 @@ def sync(docs_man: Path | None, home: Path | None = None) -> list[str]:
     if docs_man is None or not docs_man.is_dir():
         return touched  # no versioned source — nothing is canonical
     sources: set[tuple[str, str]] = set()
-    for src in sorted(docs_man.iterdir()):
+    try:
+        src_list = sorted(docs_man.iterdir())
+    except OSError as e:
+        log.warning("man sync: cannot read %s: %s", docs_man, e)
+        return touched  # unreadable source — retire nothing
+    for src in src_list:
         if src.suffix not in _SECTIONS or not src.is_file():
             continue
         sources.add((src.stem, src.suffix[1:]))
@@ -89,16 +98,21 @@ def sync(docs_man: Path | None, home: Path | None = None) -> list[str]:
         except OSError as e:
             log.warning("man sync: cannot write %s: %s", dest, e)
     # Retire installed genesis* pages with no source — a page removed
-    # from docs/man is a page that should stop teaching her.
+    # from docs/man is a page that should stop teaching her. Both the
+    # plain and .gz forms are tried: owned_pages strips the suffix, so
+    # a compressed stale page would otherwise survive forever.
     for name, section in owned_pages(None, home):
         if (name, section) in sources:
             continue
-        stale = home / f"man{section}" / f"{name}.{section}"
-        try:
-            stale.unlink()
-            touched.append(f"{name}.{section} (retired)")
-        except OSError as e:
-            log.warning("man sync: cannot retire %s: %s", stale, e)
+        for stem in (f"{name}.{section}", f"{name}.{section}.gz"):
+            stale = home / f"man{section}" / stem
+            try:
+                stale.unlink()
+                touched.append(f"{stem} (retired)")
+            except FileNotFoundError:
+                continue
+            except OSError as e:
+                log.warning("man sync: cannot retire %s: %s", stale, e)
     return touched
 
 

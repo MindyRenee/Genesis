@@ -912,7 +912,8 @@ impl LtmStore {
         // bundles entirely.
         let drift = bundle_count.saturating_sub(real_count);
         let drift_threshold = (real_count / 4).max(64);
-        let needs_rebuild = bundle_count != real_count && (bundle_count < real_count || drift > drift_threshold);
+        let needs_rebuild =
+            bundle_count != real_count && (bundle_count < real_count || drift > drift_threshold);
         if needs_rebuild {
             eprintln!(
                 "[ltm] Bundle store has {bundle_count} episodes but \

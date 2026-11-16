@@ -144,7 +144,7 @@ def test_file_modules_override_region():
         (("limbic_system", "emotional_regulator.py"), MODULE_EMOTION),
         (("limbic_system", "emotion.py"), MODULE_EMOTION),
         (("brainstem", "module_sampler.py"), MODULE_METACOGNITION),
-        (("sleep", "sleep.py"), MODULE_DREAMING),
+        (("self", "sleep.py"), MODULE_DREAMING),
         (("basal_ganglia", "volition.py"), MODULE_INTENTION),
         (("parietal_lobe", "abstract_reasoning.py"), MODULE_REASONING),
         (("parietal_lobe", "attention.py"), MODULE_ATTENTION),

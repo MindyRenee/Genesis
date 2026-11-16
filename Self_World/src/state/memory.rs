@@ -199,6 +199,9 @@ impl MemoryPointers {
     /// - `bdnf_eff`: effective BDNF level
     /// - `allostasis_load`: accumulated allostatic load [0, 1] — the
     ///   chronic-stress channel (see plasticity below)
+    // One parameter per effective level — a fixed biological panel,
+    // not a grab-bag that wants a builder.
+    #[allow(clippy::too_many_arguments)]
     pub fn update_gating(
         &mut self,
         dopamine_eff: f32,
@@ -247,9 +250,7 @@ impl MemoryPointers {
             acetylcholine_eff * 0.4
                 + 0.3
                 + 0.3
-                    * crate::state::neurochemical::glucocorticoid_consolidation_boost(
-                        cort_stress,
-                    )
+                    * crate::state::neurochemical::glucocorticoid_consolidation_boost(cort_stress)
                     * crate::state::sanitize::finite_or(norepinephrine_eff, 0.0),
             0.0,
             1.0,

@@ -109,7 +109,7 @@ logger = logging.getLogger(__name__)
 def _finite_or(value: object, default: float) -> float:
     """Return ``value`` as a finite float, otherwise ``default``."""
     try:
-        result = float(value)
+        result = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError, OverflowError):
         return default
     return result if math.isfinite(result) else default
@@ -1027,7 +1027,10 @@ def _restore_chapters(narrative: Narrator, data: dict[str, Any]) -> None:
                 id=ev_data.get("id", f"event-{ev_data['timestamp']}"),
                 timestamp=ev_data["timestamp"],
                 summary=ev_data["summary"],
-                significance=_finite_or(ev_data["significance"], 0.5),
+                # significance is the reason text ("why it mattered"),
+                # not a score — str() keeps a legacy numeric save
+                # legible instead of dropping it for a default.
+                significance=str(ev_data.get("significance", "")),
                 emotion_at_time=ev_data["emotion_at_time"],
                 concepts_involved=ev_data.get("concepts_involved", []),
                 chapter=ev_data.get("chapter", chapter.title),
