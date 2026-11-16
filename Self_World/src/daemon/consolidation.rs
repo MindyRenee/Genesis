@@ -311,7 +311,7 @@ fn compute_compact_tag(full_tag: &[f32; LTM_TAG_SIZE]) -> [f32; 4] {
     } else {
         1.0 / (1.0 + (-total_input).exp())
     };
-    let arousal = crate::state::sanitize::finite_clamp(arousal, 0.0, 1.0);
+    let arousal = crate::state::sanitize::finite_or(arousal, 0.0);
 
     // Valence: matches recompute_derived() exactly.
     //
@@ -327,7 +327,7 @@ fn compute_compact_tag(full_tag: &[f32; LTM_TAG_SIZE]) -> [f32; 4] {
 
     [
         arousal,
-        crate::state::sanitize::finite_clamp(valence, -1.0, 1.0),
+        crate::state::sanitize::finite_or(valence, 0.0),
         cort,
         da,
     ]

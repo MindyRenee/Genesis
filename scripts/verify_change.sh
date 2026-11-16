@@ -20,8 +20,8 @@
 #
 # Arguments:
 #   project_root — the repository root holding the three worlds
-#                  (Self_World, Inner_Non_Physical_World,
-#                  Outer_Physical_World). Defaults to the directory
+#                  (Self_World, Inner_World,
+#                  Outer_World). Defaults to the directory
 #                  containing this script's parent.
 #   rust_dir      — path to the Rust crate root (default: project_root)
 
@@ -45,17 +45,37 @@ fail() { echo -e "${RED}[verify] ✗${NC} $*" >&2; }
 # tree, an older checkout) falls back to treating ROOT itself as the
 # single package root.
 WORLDS=()
-for w in Self_World Inner_Non_Physical_World Outer_Physical_World; do
+for w in Self_World Inner_World Outer_World; do
     [ -d "$ROOT/$w" ] && WORLDS+=("$ROOT/$w")
 done
 if [ "${#WORLDS[@]}" -eq 0 ]; then
     WORLDS=("$ROOT")
 fi
 
-# PYTHONPATH for every python3 invocation below: the worlds first so
+# PYTHONPATH for every Python invocation below: the worlds first so
 # their packages resolve, then the root for loose root modules.
 PYTHONPATH_JOINED="$(IFS=:; echo "${WORLDS[*]}"):$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 export PYTHONPATH="$PYTHONPATH_JOINED"
+
+# The gate must run under an interpreter that can actually run the
+# suite — a bare `python3` can be a system interpreter with no pytest
+# and none of the project's deps, which fails every experiment on a
+# false negative (exit 2, "No module named pytest"). Order: the
+# caller's interpreter (GENESIS_PYTHON, the mind passes its own
+# sys.executable), the checkout's venv, then PATH's python3 — and the
+# first candidate that can import pytest wins.
+PY=""
+for cand in "${GENESIS_PYTHON:-}" "$ROOT/.venv/bin/python" python3; do
+    [ -n "$cand" ] || continue
+    if "$cand" -c 'import pytest' 2>/dev/null; then
+        PY="$cand"
+        break
+    fi
+done
+if [ -z "$PY" ]; then
+    fail "no Python with pytest found (tried GENESIS_PYTHON, $ROOT/.venv, python3)"
+    exit 2
+fi
 
 # ─── 1. Python compile check ─────────────────────────────────────
 log "Step 1: py_compile check"
@@ -76,7 +96,7 @@ while IFS= read -r -d '' f; do
     PY_FILES+=("$f")
 done < <(find "${WORLDS[@]}" -name '*.py' -not -path '*__pycache__*' -not -path '*/.*' -print0)
 if [ "${#PY_FILES[@]}" -gt 0 ]; then
-    if ! python3 -m py_compile "${PY_FILES[@]}"; then
+    if ! "$PY" -m py_compile "${PY_FILES[@]}"; then
         fail "py_compile failed"
         exit 1
     fi
@@ -96,7 +116,7 @@ log "Step 1b: import check"
 # The worlds are the package roots, so every package inside them is
 # walked; genesis_cli is a loose module inside Self_World, not part
 # of a package.
-if ! python3 - "$ROOT" "${WORLDS[@]}" <<'PYEOF'
+if ! "$PY" - "$ROOT" "${WORLDS[@]}" <<'PYEOF'
 import importlib
 import pathlib
 import pkgutil
@@ -145,7 +165,7 @@ pass "import check OK"
 
 # ─── 2. Python test suite ────────────────────────────────────────
 log "Step 2: Python test suite (pytest)"
-if ! (cd "$ROOT" && python3 -m pytest tests/python -q -o addopts=''); then
+if ! (cd "$ROOT" && "$PY" -m pytest tests/python -q -o addopts=''); then
     fail "pytest failed"
     exit 2
 fi

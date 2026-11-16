@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import logging
-import os
-import sys
-import threading
+import math
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -20,17 +18,21 @@ from frontal_lobe.canvas import DrawingResult
 from frontal_lobe.volition import Urge, Volition
 from genesis_client.protocol import CHEM_NAMES, EMOTIONAL_TAG_SIZE, MODULE_METACOGNITION
 from genesis_client.swallow import note_swallowed
-from genesis_client.threads import named_thread
 from infrastructure.text import is_blank
 from journal import record_error
 from tools.project_creator import create_project, manage_project_lifecycle
 
 logger = logging.getLogger(__name__)
 
-# Urge workers run below the interactive path's CPU priority — a
-# running bug scan or code-learning burst must lose every scheduler
-# handoff to a live think(), not coin-flip it for the core.
-_VOLITION_NICE = 10
+
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
+
 
 # Minimum seconds between public-channel replies. A channel can
 # storm mentions; she answers when addressed but not faster than
@@ -61,22 +63,6 @@ _URGE_FLUCTUATION = 0.03
 # recurring act with the urge rebuilding between bouts, not the
 # full-corpus pass the /learn-code command performs.
 _LEARN_CODE_BOUT = 25
-
-
-def _lower_thread_priority(nice: int = _VOLITION_NICE) -> None:
-    """Drop the calling thread's CPU priority (Linux per-thread nice).
-
-    ``os.setpriority`` with the native TID lowers only this thread —
-    lowering needs no privilege. Foreground cognition (think(),
-    respond()) keeps nice 0, so under load every GIL/scheduler handoff
-    favors the interactive turn over background urge work.
-    """
-    if not sys.platform.startswith("linux"):
-        return
-    try:
-        os.setpriority(os.PRIO_PROCESS, threading.get_native_id(), nice)
-    except OSError as e:
-        logger.debug(f"_lower_thread_priority failed: {e}")
 
 
 class VolitionMixin:
@@ -178,8 +164,8 @@ class VolitionMixin:
     def _volition_context(self) -> dict[str, object]:
         """Build the stimulus context for the volition engine.
 
-        Raw counts are normalized to [0, 1] so one huge signal doesn't
-        instantly dominate at startup.
+        Raw counts are scaled to finite signal magnitudes; measured
+        evidence above the previous [0, 1] interface remains visible.
 
         Includes interoceptive signals for the meditation urge:
         - overstimulation: high arousal + positive valence (sympathetic
@@ -207,13 +193,17 @@ class VolitionMixin:
         appetitive = {
             **drives,
             "boredom": boredom,
-            "idle_seconds": min(
-                1.0,
-                idle / self.config.volition.idle_normalization_seconds,
+            "idle_seconds": _finite_or(
+                idle / self.config.volition.idle_normalization_seconds
+                if self.config.volition.idle_normalization_seconds
+                else 0.0,
+                0.0,
             ),
-            "speech_queue_size": min(
-                1.0,
-                len(self._speech_queue) / self.config.volition.speech_queue_size_normalization,
+            "speech_queue_size": _finite_or(
+                len(self._speech_queue) / self.config.volition.speech_queue_size_normalization
+                if self.config.volition.speech_queue_size_normalization
+                else 0.0,
+                0.0,
             ),
             "emotional_intensity": emotional_intensity,
             "creativity": creativity,
@@ -245,19 +235,23 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             note_swallowed("mind.volition._chemical_signals", e)
             return {}
-        return {
-            f"chem_{name}": min(1.0, max(0.0, float(level))) for name, level in chemicals.items()
-        }
+        return {f"chem_{name}": _finite_or(level, 0.0) for name, level in chemicals.items()}
 
     def _drive_signals(self) -> dict[str, float]:
-        """The maintenance-channel drive inputs, normalized to [0, 1]."""
+        """The maintenance-channel drive inputs as finite signal magnitudes."""
         try:
-            pending = min(1.0, len(self.self_improvement.get_pending_proposals()) / 5.0)
+            pending = _finite_or(
+                len(self.self_improvement.get_pending_proposals()) / 5.0,
+                0.0,
+            )
         except Exception as e:  # noqa: BLE001
             logger.warning(f"pending proposals failed: {e}")
             pending = 0.0
         try:
-            curiosity = self.learner.curiosity.assess_curiosity(self.feel())
+            curiosity = _finite_or(
+                self.learner.curiosity.assess_curiosity(self.feel()),
+                0.0,
+            )
         except Exception as e:  # noqa: BLE001
             logger.warning(f"curiosity assessment failed: {e}")
             curiosity = 0.0
@@ -273,9 +267,11 @@ class VolitionMixin:
         try:
             emotion = self.feel()
             if emotion:
+                arousal = _finite_or(emotion.arousal, 0.0)
+                valence = _finite_or(emotion.valence, 0.0)
                 return (
-                    max(emotion.arousal, abs(emotion.valence)),
-                    getattr(emotion, "creativity", 0.0),
+                    max(arousal, abs(valence)),
+                    _finite_or(getattr(emotion, "creativity", 0.0), 0.0),
                 )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
@@ -292,13 +288,12 @@ class VolitionMixin:
         additionally dampened so the urge can only re-form from
         genuinely high pressure or after the latch has had time
         to hold."""
-        adn = wave_data.get("adenosine_level")
-        if isinstance(adn, (int, float)):
-            adn_drive = max(0.0, adn - SLEEP_URGE_ADENOSINE_FLOOR)
-            wake_age = time.time() - self._last_wake_time
-            if wake_age < WAKE_STABILIZATION_WINDOW:
-                adn_drive *= wake_age / WAKE_STABILIZATION_WINDOW
-            wave_data["adenosine_level"] = adn_drive
+        adn = _finite_or(wave_data.get("adenosine_level"), 0.0)
+        adn_drive = max(0.0, adn - SLEEP_URGE_ADENOSINE_FLOOR)
+        wake_age = time.time() - self._last_wake_time
+        if wake_age < WAKE_STABILIZATION_WINDOW:
+            adn_drive *= wake_age / WAKE_STABILIZATION_WINDOW
+        wave_data["adenosine_level"] = _finite_or(adn_drive, 0.0)
 
     def _concept_growth(self) -> float:
         """New concepts since the last volition tick, normalized to
@@ -308,7 +303,7 @@ class VolitionMixin:
             current_count = self.brain.frontal.network.total_concept_count
             delta = max(0, current_count - self._last_concept_count)
             self._last_concept_count: int = current_count
-            return min(1.0, delta / 50.0)
+            return _finite_or(delta / 50.0, 0.0)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._volition_context",
@@ -325,15 +320,16 @@ class VolitionMixin:
         collapsed is expected and isolates less; silence from a
         responsive presence still registers at full weight."""
         try:
-            social_isolation = self.world.social_isolation() * (
-                1.0 - 0.2 * min(3, self.world.unanswered_bids)
+            social_isolation = _finite_or(
+                self.world.social_isolation() * (1.0 - 0.2 * min(3, self.world.unanswered_bids)),
+                0.0,
             )
             target = self.world.engaged_presence() or self.world.last_seen_presence()
             if target is not None:
                 r = target.belief.responsiveness
                 trust = min(1.0, r.evidence / 8.0)
                 social_isolation *= 1.0 - 0.5 * (1.0 - r.mean) * trust
-            return social_isolation
+            return _finite_or(social_isolation, 0.0)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._volition_context",
@@ -362,7 +358,7 @@ class VolitionMixin:
         try:
             bench = self._research_workbench()
             open_count = sum(1 for t in bench.threads() if t.status == "open")
-            return min(1.0, open_count / 3.0)
+            return _finite_or(open_count / 3.0, 0.0)
         except Exception as e:  # noqa: BLE001
             note_swallowed("mind.volition._open_problem_signal", e)
             return 0.0
@@ -377,11 +373,16 @@ class VolitionMixin:
         unengaged, nothing new arriving — the classic precondition
         for wanting to do something."""
         try:
-            idle_norm = min(
-                1.0,
-                idle / self.config.volition.idle_normalization_seconds,
+            idle_norm = _finite_or(
+                idle / self.config.volition.idle_normalization_seconds
+                if self.config.volition.idle_normalization_seconds
+                else 0.0,
+                0.0,
             )
-            return idle_norm * (1.0 - emotional_intensity) * (1.0 - min(1.0, concept_growth))
+            return _finite_or(
+                idle_norm * (1.0 - emotional_intensity) * (1.0 - concept_growth),
+                0.0,
+            )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._volition_context",
@@ -390,10 +391,11 @@ class VolitionMixin:
             return 0.0
 
     def _act_on_volition(self, ready: list[str]) -> list[str]:
-        """Run each ready urge action in its own background thread.
+        """Run the strongest ready urge action synchronously.
 
-        Uses a bounded semaphore so that at most
-        ``MAX_CONCURRENT_VOLITIONS`` actions run at once.
+        The basal-ganglia channel is serial on the metronome: one
+        crossed urge selects one act on this cycle, and losing urges
+        keep their accumulated drive for the next one.
 
         Heavy CPU activities (improve, create, learn_code) are
         skipped under PROTECTIVE posture to avoid the self-sustaining
@@ -427,38 +429,56 @@ class VolitionMixin:
             "safeguard": self._perform_safeguard,
             "rest_eyes": self._perform_rest_eyes,
         }
-        started: list[str] = []
-        for name in ready:
-            fn = performers.get(name)
-            if fn is None:
-                continue
-            with self._volition_lock:
-                # The admission race: suppression/shutdown can land
-                # between the entry check and this lock. Recheck
-                # where admission is serialized.
-                if self._suppress_volition or not self._running:
-                    break
-                if name in self._volition_active:
-                    continue
-                if not self._volition_sem.acquire(blocking=False):
-                    break
-                self._volition_active.add(name)
-                started.append(name)
-            try:
-                named_thread(
-                    f"volition-{name}",
-                    self._run_volition_action,
-                    args=(name, fn),
-                    comm="g-volition",
-                ).start()
-            except Exception as e:  # noqa: BLE001
-                with self._volition_lock:
-                    self._volition_active.discard(name)
-                self._volition_sem.release()
-                if name in started:
-                    started.remove(name)
-                logger.warning(f"failed to start volition action {name}: {e}")
-        return started
+        candidates = [(self.volition.get(name), name) for name in ready if name in performers]
+        if not candidates:
+            return []
+
+        # Basal ganglia selection is winner-take-all on this serial
+        # pathway: the strongest crossed channel wins this cycle and
+        # the losing accumulators keep integrating for the next one.
+        selected_urge, name = max(
+            candidates,
+            key=lambda item: item[0].value if item[0] is not None else 0.0,
+        )
+        del selected_urge
+
+        # A second suppression/teardown check immediately before the
+        # act keeps a stale readiness result from firing through a
+        # transition that arrived while filtering ran.
+        if self._suppress_volition or not self._running:
+            return []
+
+        try:
+            performers[name]()
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition._act_on_volition",
+                e,
+            )
+            # The synchronous action boundary still records the failed
+            # act; the urge was selected and discharged even though
+            # its enactment failed.
+            record_error(f"volition.{name}", e)
+        return [name]
+
+    def _advance_volitional_state(self) -> None:
+        """Advance short timed acts that follow a selected urge.
+
+        A voluntary eye-rest is state held by the metronome rather
+        than a sleeping worker. Shutdown or suppression releases the
+        lid immediately so a stale hold cannot outlive the cycle.
+        """
+        rest_until = getattr(self, "_eyes_rest_until", 0.0)
+        if rest_until <= 0.0:
+            return
+        if (
+            not self._running
+            or self._suppress_volition
+            or self.is_resting
+            or time.monotonic() >= rest_until
+        ):
+            self._eyes_rest_until = 0.0
+            self.open_eyes()
 
     def _filter_ready_urges(self, ready: list[str]) -> list[str]:
         """Apply the readiness gates to the evaluated urges, in order:
@@ -502,29 +522,6 @@ class VolitionMixin:
                     e,
                 )
         return ready
-
-    def _run_volition_action(self, name: str, fn) -> None:
-        """Wrap a volition action so it clears the active flag when done."""
-        _lower_thread_priority()
-        try:
-            # Admitted but not yet begun when suppression/shutdown
-            # arrived — drop the action rather than act through the
-            # teardown. The slot is still released in finally.
-            if not self._suppress_volition and self._running:
-                fn()
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition._run_volition_action",
-                e,
-            )
-            # This is the single boundary every voluntary action's
-            # failure lands on — record it durably so a crashed urge
-            # is not invisible outside debug logging.
-            record_error(f"volition.{name}", e)
-        finally:
-            with self._volition_lock:
-                self._volition_active.discard(name)
-            self._volition_sem.release()
 
     def _emit_volition_thought(
         self,
@@ -622,12 +619,12 @@ class VolitionMixin:
         return ""
 
     def _perform_learn(self) -> None:
-        """Grant the autonomous learner permission for one learning cycle.
+        """Run one bounded learner step for the selected learn urge.
 
         This is its cognitive decision to learn. The learn urge built
         from curiosity, idle time, and concept growth; when it crossed
-        threshold, it chose to act on it. This grants the learner
-        one-shot permission to acquire a single new topic.
+        threshold, it chose to act on it. The selected urge performs
+        one synchronous acquisition attempt.
 
         The learner's existing emotional and brain-wave gating still
         applies — volition grants permission, it doesn't override its
@@ -643,7 +640,7 @@ class VolitionMixin:
             ("learning", "curiosity", "understanding"),
             "thinking",
         )
-        self.learner.volition_grant()
+        self.learner.learn_once()
 
     def _perform_learn_code(self) -> None:
         """Study her own source because the urge crossed threshold.
@@ -1083,7 +1080,7 @@ class VolitionMixin:
         channel when a webhook is configured. Without a webhook the
         channel is simply silent — the terminal feed still carries
         what she chose to say. The mirror excludes the tagged echo so
-        the channel gets one clean post (see discord_feed._classify).
+        the channel gets one clean post (see discord.feed._classify).
 
         The act is recorded in her world as speech (it_said) — it is
         an outbound act on the world, the public counterpart to the
@@ -1126,7 +1123,7 @@ class VolitionMixin:
         a webhook is configured, and her world model's record that
         she said it. The session mirror skips the tagged echo — the
         explicit post is the channel's only copy, never a duplicate
-        (see discord_feed._classify).
+        (see discord.feed._classify).
         """
         self._emit_live_thought("broadcast", text)
         channel = getattr(getattr(self, "world", None), "channel", None)
@@ -1335,8 +1332,9 @@ class VolitionMixin:
         decides to meditate. Like any volition, it can be suppressed
         if it's too engaged in conversation or other actions.
 
-        The meditation itself runs in a background thread (via
-        _self_meditate) so the heartbeat loop isn't blocked.
+        The sit is held as metronome-advanced state: entering it is
+        the synchronous act; its breath, impulses, and completion
+        unfold over later cycles without a helper thread.
         """
         if self.is_resting or self._is_teaching:
             return
@@ -1943,80 +1941,32 @@ class VolitionMixin:
     def _self_meditate(self) -> None:
         """Self-initiated meditation — called by the volition system.
 
-        This runs meditation in a background thread so the heartbeat
-        loop isn't blocked. The duration is fixed at 30 seconds, with
-        calming impulses emitted every 10 seconds to sustain the
-        effect. After meditation ends, the regulator is notified so
-        it resets the ultradian rest timer.
+        Entering the sit is the discharged act. The sit itself is a
+        timed state on the metronome: 30 seconds, calming impulses on
+        the usual cadence, and a natural wake without another thread.
         """
         if self.is_resting:
             return
-
-        def _run_meditation() -> None:
-            """Run a 30-second meditation cycle in a background thread.
-
-            Enters meditation, then emits calming neurochemical impulses
-            every 10 seconds. Wakes naturally when the cycle completes,
-            or early if an interaction interrupts. On failure, ensures
-            meditation state is cleanly reset.
-            """
-            try:
-                self.meditate()
-                duration = 30.0
-                intervals = int(duration / 10.0)
-                for _ in range(intervals):
-                    if not self._is_meditating:
-                        break  # it was woken by an interaction
-                    if not self._running:
-                        break  # shutdown — end the cycle quietly
-                    time.sleep(10.0)
-                    if self._is_meditating:
-                        self.emit_meditation_impulses()
-                if self._is_meditating and self._running:
-                    self.wake_from_meditation()
-                    self._emit_volition_thought(("calm", "rest", "meditation"), "thought")
-            except Exception as e:  # noqa: BLE001
-                logger.warning(f"self-meditation failed: {e}")
-                if self._is_meditating:
-                    try:
-                        self.wake_from_meditation()
-                    except Exception as e:  # noqa: BLE001
-                        note_swallowed(
-                            "mind.volition._run_meditation",
-                            e,
-                        )
-
-        named_thread(
-            "self-meditation",
-            _run_meditation,
-            comm="g-meditate",
-        ).start()
-
-    def set_lid(self, openness: float) -> bool:
-        """Voluntary eyelid — the orbicularis oculi the hardware lacks.
-
-        The requested openness composes with the sleep phase's own
-        lid position by min on the body side: she can shut an open
-        eye but cannot open one the stage has closed. Held, not
-        momentary — the lid stays where she left it until she moves
-        it again.
-        """
         try:
-            return self.client.set_lid(openness)
+            self.meditate(duration=30.0, emit_completion_thought=True)
         except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition.set_lid",
-                e,
-            )
-            return False
+            logger.warning(f"self-meditation failed: {e}")
+            if self._is_meditating:
+                try:
+                    self.wake_from_meditation()
+                except Exception as e:  # noqa: BLE001
+                    note_swallowed(
+                        "mind.volition._self_meditate",
+                        e,
+                    )
 
     def close_eyes(self) -> bool:
         """Shut her eye by choice — the lid held down until she opens it."""
-        return self.set_lid(_LID_REST)
+        return self.client.set_lid(_LID_REST)
 
     def open_eyes(self) -> bool:
         """Release the lid back to the phase's own position."""
-        return self.set_lid(_LID_OPEN)
+        return self.client.set_lid(_LID_OPEN)
 
     def _perform_rest_eyes(self) -> None:
         """Close her eye because the rest_eyes urge crossed threshold.
@@ -2037,11 +1987,4 @@ class VolitionMixin:
             ("eyes", "vision", "rest", "darkness"),
             "thought",
         )
-        try:
-            hold = _REST_EYES_HOLD_S
-            while hold > 0.0 and self._running and not self._suppress_volition:
-                step = min(1.0, hold)
-                time.sleep(step)
-                hold -= step
-        finally:
-            self.open_eyes()
+        self._eyes_rest_until = time.monotonic() + _REST_EYES_HOLD_S

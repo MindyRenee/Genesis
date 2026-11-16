@@ -91,6 +91,7 @@ import logging
 import os
 import re
 import subprocess
+import sys
 import time
 from collections import OrderedDict, deque
 from dataclasses import dataclass, field
@@ -757,11 +758,11 @@ class SelfImprovement:
         # Self_World/ holds brain+chemicals alongside the self model, support
         # packages (genesis_client, infrastructure, eval), and the
         # crate's Python-adjacent files under Self_World/, and the
-        # environment model under Outer_Physical_World/.
+        # environment model under Outer_World/.
         # Tests and __pycache__ are excluded inside _is_own_source.
-        "Inner_Non_Physical_World/",
+        "Inner_World/",
         "Self_World/",
-        "Outer_Physical_World/",
+        "Outer_World/",
     }
 
     # Top-level modules outside the worlds — the embedding setup
@@ -2015,10 +2016,16 @@ class HeuristicExperiment:
         if python_dir is not None:
             command += [python_dir, rust_dir or "."]
         try:
+            env = dict(os.environ)
+            # The gate must run under the interpreter the mind itself
+            # runs — a bare python3 can lack pytest and the project's
+            # deps, failing every experiment on a false negative.
+            env.setdefault("GENESIS_PYTHON", sys.executable)
             result = subprocess.run(
                 command,
                 capture_output=True,
                 text=True,
+                env=env,
                 # The verify script runs the full Python suite (~5
                 # min, includes the end-to-end daemon test) and the
                 # full cargo test suite. A 300s timeout

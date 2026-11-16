@@ -115,7 +115,7 @@ pub const RECONSOLIDATION_SALIENCE_FLOOR: f32 = 0.65;
 ///  24     association_hash   u64     SimHash fingerprint (backward compat)
 ///  32     compressed_len     u32     bytes in the data file
 ///  36     uncompressed_len   u32     original payload size
-///  40     salience           f32     emotional importance [0,1]
+///  40     salience           f32     finite evidence value
 ///  44     emotional_tag      [f32;4] compact: arousal, valence, cortisol, dopamine
 ///  60     flags              u8      bit 0: deleted, bits 1-7: reserved
 ///  61     source_module      u8      module that created the episode
@@ -855,54 +855,17 @@ impl LtmStore {
         bundles.ensure_next_episode_id(reconciled_next);
         bundles.sync().map_err(LtmError::Io)?;
 
-        // Migrate existing meta-memories: mark entries from internal
-        // bookkeeping modules with the META_MEMORY_FLAG. These are
-        // association traces, dream insights, autobiographical traces,
-        // prediction-mismatch records, and error-monitor records —
-        // internal cognitive events that should not appear in
-        // find_similar results.
-        //
-        // Source modules marked as meta-memory:
-        //   0 = Subcognitive (association traces, dream insights)
-        //   5 = Predictive coding ("Surprised by user input" records)
-        //   8 = Error monitoring ("Detected error: prediction mismatch")
-        //   9 = Dreaming (dream insights)
-        //
-        // Real content modules (NOT marked):
-        //   3 = Autonomous learner (learned facts)
-        //   4 = Language (conversation, thoughts, insights)
-        //   6 = Visual cortex (visual scenes)
-        //  10 = Semantic memory (extracted facts)
-        let mut migrated_meta = 0u32;
-        for (idx, entry) in entries.iter_mut().enumerate() {
-            if !entry.is_meta_memory() && matches!(entry.source_module, 0 | 5 | 8 | 9) {
-                entry.mark_meta_memory();
-                // Write the updated flags byte back to the metadata file.
-                let entry_file_offset = 64 + (idx as u64 * INDEX_ENTRY_SIZE as u64) + 60;
-                meta_file
-                    .seek(SeekFrom::Start(entry_file_offset))
-                    .map_err(LtmError::Io)?;
-                meta_file.write_all(&[entry.flags]).map_err(LtmError::Io)?;
-                migrated_meta += 1;
-            }
-        }
-        if migrated_meta > 0 {
-            meta_file.sync_all().map_err(LtmError::Io)?;
-            eprintln!(
-                "[ltm] Marked {migrated_meta} existing episodes as meta-memories \
-                 (excluded from retrieval)"
-            );
-        }
+        // No meta-memory migration: every episode is a real memory and
+        // stays recallable regardless of which module stored it.
 
-        // Rebuild the association dedup index from the active meta
-        // entries — O(active) over the in-memory index, no payload
+        // Rebuild the association dedup index from every active
+        // entry — O(active) over the in-memory index, no payload
         // reads. Archived bridges stay out of the set: a connection
         // that was archived may legitimately re-form.
         let meta_hashes: HashSet<u64> = active_ids
             .iter()
             .filter_map(|id| id_to_idx.get(id))
             .map(|&idx| &entries[idx])
-            .filter(|e| e.is_meta_memory())
             .map(|e| e.association_hash)
             .collect();
 
@@ -925,14 +888,10 @@ impl LtmStore {
         // sees consistent values.
         reconciled_store.write_meta_header()?;
 
-        // If we migrated meta-memories, the bundle store is polluted
-        // with their SDR contributions. Rebuild it from only real
-        // episodes so find_similar returns accurate results.
-        //
-        // Also rebuild if the bundle store's episode_count is much
-        // higher than the number of real (non-meta) episodes — this
-        // happens when the migration already ran (flags were
-        // persisted) but the bundle store was never rebuilt.
+        // Rebuild the bundle store when its episode_count is much
+        // higher than the number of real (non-meta) episodes, or when
+        // real episodes are missing from it entirely — e.g. after a
+        // flags repair that restored previously hidden episodes.
         let real_count = reconciled_store
             .active_ids
             .iter()
@@ -953,12 +912,11 @@ impl LtmStore {
         // bundles entirely.
         let drift = bundle_count.saturating_sub(real_count);
         let drift_threshold = (real_count / 4).max(64);
-        let needs_rebuild =
-            migrated_meta > 0 || bundle_count < real_count || drift > drift_threshold;
+        let needs_rebuild = bundle_count != real_count && (bundle_count < real_count || drift > drift_threshold);
         if needs_rebuild {
             eprintln!(
-                "[ltm] Bundle store has {bundle_count} episodes but only \
-                 {real_count} are real — rebuilding to remove pollution"
+                "[ltm] Bundle store has {bundle_count} episodes but \
+                 {real_count} are real — rebuilding to match"
             );
             reconciled_store.rebuild_bundles()?;
         }
@@ -1256,11 +1214,13 @@ impl LtmStore {
         }
 
         // Sanitize emotional tag values to prevent NaN/inf from
-        // corrupting the SDR encoding and downstream retrieval.
+        // corrupting the SDR encoding and downstream retrieval. Finite
+        // evidence is preserved verbatim, including values outside the
+        // historical normalized range.
         let emotional_tag: [f32; EMOTIONAL_TAG_SIZE] = {
             let mut sanitized = [0.0f32; EMOTIONAL_TAG_SIZE];
             for (i, &v) in emotional_tag.iter().enumerate() {
-                sanitized[i] = crate::state::sanitize::finite_clamp(v, 0.0, 1.0);
+                sanitized[i] = crate::state::sanitize::finite_or(v, 0.0);
             }
             sanitized
         };
@@ -1340,26 +1300,14 @@ impl LtmStore {
 
         // Assign episode ID
         let episode_id = next_episode_id - 1;
-        // Advance the bundle store's ID counter for every episode so
-        // it stays in lockstep with the index — but only real
-        // episodes' SDRs enter the superposition. Meta-memory
-        // entries (internal bookkeeping: modules 0/5/8/9) are
-        // flagged below and excluded from find_similar, so letting
-        // their SDRs in here would saturate the bundles with
-        // bookkeeping noise until the next startup rebuild.
-        let is_meta_memory = matches!(source_module, 0 | 5 | 8 | 9);
-        if is_meta_memory {
-            // `add_episode` carries the +1 id advance; without it the
-            // counter still lands at episode_id + 1.
-            self.bundles.ensure_next_episode_id(episode_id + 1);
-        } else {
-            self.bundles.ensure_next_episode_id(episode_id);
-            let code = episode_id_to_code(episode_id);
+        // Every episode's SDR enters the superposition — all stored
+        // content is recallable regardless of source module.
+        self.bundles.ensure_next_episode_id(episode_id);
+        let code = episode_id_to_code(episode_id);
 
-            // Encode SDR and add to bundle store
-            let sdr = encode_episode(text, &emotional_tag, timestamp);
-            self.bundles.add_episode(&code, &sdr);
-        }
+        // Encode SDR and add to bundle store
+        let sdr = encode_episode(text, &emotional_tag, timestamp);
+        self.bundles.add_episode(&code, &sdr);
 
         // Make the bundle store durable BEFORE writing the metadata
         // entry that references this episode ID. Without this, a crash
@@ -1372,7 +1320,9 @@ impl LtmStore {
 
         // Sanitize salience and compact_tag to prevent NaN/inf from
         // corrupting the index entry, SimHash scoring, and SDR encoding.
-        let salience = crate::state::sanitize::finite_clamp(salience, 0.0, 1.0);
+        // Salience is evidence and preserves any finite value; compact_tag
+        // remains a bounded derived affective summary.
+        let salience = crate::state::sanitize::finite_or(salience, 0.0);
         let compact_tag = [
             crate::state::sanitize::finite_clamp(compact_tag[0], 0.0, 1.0),
             crate::state::sanitize::finite_clamp(compact_tag[1], -1.0, 1.0),
@@ -1381,7 +1331,7 @@ impl LtmStore {
         ];
 
         // Build index entry
-        let mut entry = IndexEntry::new(
+        let entry = IndexEntry::new(
             episode_id,
             data_offset,
             compressed_len,
@@ -1393,17 +1343,9 @@ impl LtmStore {
             source_module,
         );
 
-        // Automatically mark internal bookkeeping modules as
-        // meta-memory so they don't pollute find_similar results.
-        // This catches all stores regardless of which code path
-        // produced them (Python store_event, Rust store_meta, etc.).
-        // See the migration in `open` for the full module list.
-        if is_meta_memory {
-            entry.mark_meta_memory();
-            // Record the fingerprint so the association engine's
-            // global dedup sees this bridge immediately.
-            self.meta_hashes.insert(assoc_hash);
-        }
+        // No automatic meta-memory marking: episodes stay recallable
+        // no matter which module stored them. Only an explicit
+        // `store_meta` call sets the flag now.
 
         // Append to metadata file
         // SAFETY: `entry` is a valid local `IndexEntry` reference that lives
@@ -1432,23 +1374,21 @@ impl LtmStore {
         self.entries.push(entry);
         self.id_to_idx.insert(episode_id, idx);
         self.active_ids.push(episode_id);
+        // Record the fingerprint so the association engine's dedup
+        // sees this episode — the set covers every stored episode,
+        // not just bookkeeping ones.
+        self.meta_hashes.insert(assoc_hash);
 
         Ok(episode_id)
     }
 
-    /// Store a meta-memory (association trace or dream insight).
+    /// Store an internally-generated episode (association trace,
+    /// dream insight, zone transition).
     ///
-    /// This is identical to `store` except it sets the
-    /// `META_MEMORY_FLAG` on the index entry. Meta-memories are
-    /// excluded from `find_similar` results so they don't flood
-    /// retrieval with internal bookkeeping entries.
-    ///
-    /// `store()` already auto-marks source modules 0/5/8/9 as
-    /// meta-memory. When `store_meta` is called with one of those
-    /// modules (the common case — all current callers use 0 or 9),
-    /// the flag is already set and we skip the redundant disk
-    /// write + fsync. When called with a different module, we mark
-    /// it and persist the flags byte.
+    /// Kept for callers that distinguish bookkeeping writes
+    /// (association bridges, dream insights, zone traces) — but the
+    /// episode is stored exactly like any other: recallable,
+    /// bundled, never flagged. Her memories are all hers.
     #[allow(clippy::too_many_arguments)]
     pub fn store_meta(
         &mut self,
@@ -1460,7 +1400,7 @@ impl LtmStore {
         source_module: u8,
         text: &str,
     ) -> Result<u64, LtmError> {
-        let episode_id = self.store(
+        self.store(
             timestamp,
             salience,
             emotional_tag,
@@ -1468,43 +1408,7 @@ impl LtmStore {
             event_type,
             source_module,
             text,
-        )?;
-        // `store` appends to `entries` and `active_ids`, so the
-        // newest entry is at the back.
-        let idx = self.entries.len() - 1;
-
-        // If `store()` already marked this entry as meta-memory
-        // (source modules 0/5/8/9), the flags byte on disk already
-        // matches — skip the redundant seek + write + fsync.
-        if self.entries[idx].is_meta_memory() {
-            return Ok(episode_id);
-        }
-
-        // Mark the entry and persist the updated flags byte.
-        self.entries[idx].mark_meta_memory();
-        self.meta_hashes.insert(self.entries[idx].association_hash);
-
-        // The IndexHeader is 64 bytes, each IndexEntry is 64 bytes,
-        // and the flags field is at offset 60 within each entry.
-        let entry_file_offset = 64 + (idx as u64 * INDEX_ENTRY_SIZE as u64) + 60;
-        self.meta_file
-            .seek(SeekFrom::Start(entry_file_offset))
-            .map_err(LtmError::Io)?;
-        self.meta_file
-            .write_all(&[self.entries[idx].flags])
-            .map_err(LtmError::Io)?;
-        self.meta_file.sync_all().map_err(LtmError::Io)?;
-
-        // `store()` bundled this SDR before the meta flag was
-        // applied — back the contribution out so bookkeeping does
-        // not linger in the superposition as dead weight. The encode
-        // uses the same inputs as the add, so the subtraction is
-        // the exact inverse.
-        let code = episode_id_to_code(episode_id);
-        let sdr = encode_episode(text, &emotional_tag, timestamp);
-        self.bundles.remove_episode(&code, &sdr);
-
-        Ok(episode_id)
+        )
     }
 
     /// Write the metadata header back to the file.
