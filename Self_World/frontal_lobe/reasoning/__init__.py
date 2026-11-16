@@ -198,7 +198,6 @@ from .theory_of_mind import (
 )
 
 __all__ = [
-    "AttributedModel",
     "HYPOTHESIS_CAP",
     "MAX_ATOMS",
     "AbstractLevel",
@@ -208,6 +207,7 @@ __all__ = [
     "AnalogyPair",
     "AssessmentRecommendation",
     "Atom",
+    "AttributedModel",
     "Audit",
     "BeliefRevision",
     "BetaDistribution",
