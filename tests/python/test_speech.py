@@ -58,6 +58,7 @@ def test_thermal_strain_ramp() -> None:
 
 def test_voice_input_uses_local_vosk(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     """Auto mode selects Vosk when the local model exists."""
+    pytest.importorskip("vosk")
     (tmp_path / speech.VOSK_MODEL_NAME).mkdir()
     monkeypatch.setattr(speech, "VOSK_MODEL_DIR", tmp_path)
 
