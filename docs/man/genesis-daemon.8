@@ -15,7 +15,7 @@ socket for the Python cognitive mind to communicate with.
 
 .PP
 It is built from
-.I src/bin/genesis-daemon.rs
+.I Self_World/src/bin/genesis-daemon.rs
 and is normally launched and supervised by
 .BR genesis-cli (1)
 (the \fBgenesis\fR console script), which is in turn launched by
@@ -136,24 +136,23 @@ block via GET_STATE (it is the last field of CoreState) or the
 GET_INFERENCE_SUMMARY projection.
 
 .SS Dyadic model
-The daemon keeps a generative model of \fIwhoever is speaking\fR
-\(em an anonymous interlocutor, not a registry of persons. From each
+The daemon keeps a generative model of Mindy. From each
 UPDATE_USER_AFFECT observation (valence/arousal/engagement/
-confidence) it tracks the user's hidden affective state, the
+confidence) it tracks Mindy's hidden affective state, the
 oxytocin-mediated attunement that gates how strongly the dyad
 couples, and dyadic synchrony (rolling valence correlation). The
 model answers in neurochemistry: it emits impulses the tick applies
-through \fBapply_impulse_capped\fR \(em oxytocin for positive
+through \fBapply_impulse\fR \(em oxytocin for positive
 engaged presence and for high synchrony (Palumbo et al. 2017), CRH
 for empathic stress and disengagement. CRH, never direct cortisol:
 the HPA cascade owns maturation gating downstream. Coupling
-requires a present user and attunement above 0.3 \(em a silent room
+requires a Mindy and attunement above 0.3 \(em a silent room
 is not a rejecting user, so a left-open channel cannot trickle
 rejection CRH forever.
 
 .SS Optic nerve
-The optic nerve is the body's own limb: the daemon opens the camera
-itself (the V4L2 device named by
+The optic nerve is the body's own limb: a capture limb opens the
+camera (the V4L2 device named by
 .IR GENESIS_CAMERA ,
 default
 .IR /dev/video0 )
@@ -163,6 +162,15 @@ and writes raw frames into the POSIX shared-memory segment
 each frame into the subcortical channels the nerve actually
 carries. No pixels leave the module: the channels are scalar
 signals, the same thing the anatomical fibres carry.
+.IP \(bu 2
+The limb itself has two carriers sharing one implementation:
+.BR genesis-retina (1)
+runs it as a dedicated process and is the preferred eye when it is
+installed; the daemon embeds the same limb on a thread. Ownership is
+arbitrated on the nerve itself \(em while a retina publishes frames
+the embedded limb stays closed, and if the retina dies the daemon
+takes the camera over \(em so exactly one process owns the device
+and the eye heals in place.
 .IP \(bu 2
 \fBMelanopic illuminance\fR (the ipRGC channel) feeds
 .IR sleep_network::VisualAfference::light ,
@@ -230,7 +238,11 @@ The loop notices, syncs state to disk, and exits cleanly.
 .SH ENVIRONMENT
 .TP
 .B GENESIS_CAMERA
-V4L2 capture device the optic nerve opens for frames. Default
+V4L2 capture device the retinal limb opens for frames \(em either as
+the standalone
+.BR genesis-retina (1)
+process or as the daemon's embedded limb when no retina publishes.
+Default
 .IR /dev/video0 .
 When no camera opens, the visual channels fall silent and the
 wall-clock photoperiod resumes as the circadian zeitgeber.
@@ -252,7 +264,7 @@ Overrides the resolved data directory.
 Memory-mapped
 .B CoreState
 (schema v5, file 4096 bytes), shared across processes. Never read the
-file directly \(em the layout is seqlock-guarded and versioned; use
+file directly \(em the layout is versioned; use
 read_consistent() or ask the daemon.
 .TP
 .I $DATA_DIR/stm_ring.bin
@@ -290,7 +302,7 @@ The daemon serves a request/response protocol on
 (\fBPROTOCOL_VERSION\fR = 3). Notable command IDs:
 .TP
 .B 1
-GET_STATE \(em the full CoreState snapshot.
+GET_STATE \(em the full raw CoreState image for low-level inspection.
 .TP
 .B 2
 GET_NEURO_SUMMARY.
@@ -355,14 +367,14 @@ UPDATE_USER_AFFECT \(em push inferred interlocutor affect: the
 .RI [ arousal ]
 .RI [ engagement ]
 .RI [ confidence ]
-observation into the anonymous dyadic model, which answers with
+observation into the dyadic model, which answers with
 neurochemical impulses (oxytocin for engaged presence, CRH for
 distress \(em the HPA cascade owns cortisol maturation).
 .TP
 .B 22\(en32
-SEARCH_EPISODES, NEURO_ADJUST_BASELINE, ADVANCE_NEURO, CONSOLIDATE,
-ASSOCIATE, DREAM, READ_SENSORS, APPLY_BODY_CONTROL, SAVE_INFERENCE,
-ARCHIVE_EPISODE, STORE_EPISODE.
+SEARCH_EPISODES, RETIRED (NEURO_ADJUST_BASELINE \(em never reuse),
+ADVANCE_NEURO, CONSOLIDATE, ASSOCIATE, DREAM, READ_SENSORS,
+APPLY_BODY_CONTROL, SAVE_INFERENCE, ARCHIVE_EPISODE, STORE_EPISODE.
 .TP
 .B 33\(en38
 GET_SUBSYSTEM_TELEMETRY, SET_WAKE_ALARM, SET_POLICY_AUTHORITY,
@@ -376,12 +388,12 @@ potential, gradients).
 PUT_TENSOR, GET_TENSOR, LIST_TENSORS, DROP_TENSOR, GET_MOTOR_TARGET.
 .TP
 .B 46\(en49
-46 is RETIRED (SET_VOLITION \(em never reuse; sleep/wake volition is
-neurochemical, via NEURO_IMPULSE), GET_FIELD_PROBE,
-SET_FIELD_PHASE, SET_FIELD_CARRIER.
+SET_VOLITION and SET_FIELD_PHASE are RETIRED (never reuse their wire
+numbers; sleep/wake volition is neurochemical, via NEURO_IMPULSE).
+The active commands are GET_FIELD_PROBE and SET_FIELD_CARRIER.
 .TP
 .B 50
-RETIRED \(em GET_DYADIC_STATE; never reuse the wire number.
+\(em GET_DYADIC_STATE; never reuse the wire number.
 .TP
 .B 51
 GET_INTERNALS \(em the adaptive gates' full snapshot (bounds, period,
@@ -465,6 +477,12 @@ slow autonomic wave riding the carrier's modulation \fIdepth\fR
 \fImod_freq <= 0\fR disarms. When armed the probe integrates the
 envelope on its own clock. Reply:
 .RI [ u8 " ack" ] .
+.TP
+.B 64
+GET_STATE_SNAPSHOT \(em the mind's 232-byte CoreStateSnapshot DTO:
+a self-describing, versioned projection of the fields the cognitive
+mind consumes. GET_STATE remains the raw brain image; this command
+is the stable client contract.
 .PP
 Notification pushes (daemon \(-> client, mirrored as
 .IR NOTIFY_* )

@@ -24,6 +24,10 @@ crate-type = ["rlib", "cdylib"]
 name = "genesis-daemon"
 path = "Self_World/src/bin/genesis-daemon.rs"
 
+[[bin]]
+name = "genesis-retina"
+path = "Self_World/src/bin/genesis-retina.rs"
+
 # Suppress linker deprecation warning for -O1 flag
 [lints.rust]
 linker_messages = "allow"

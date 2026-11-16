@@ -4,9 +4,9 @@ genesis-arcade \- the games in Genesis's outer world: official ARC-AGI-3
 and the Kaggle Game Arena shelf
 .SH SYNOPSIS
 .nf
-\fBworlds.games.arcade.Arcade\fR      the place itself, attached to OuterWorld
-\fBworlds.games.official\fR           the official ARC-AGI-3 doorway (arc_agi)
-\fBworlds.games.arena\fR              the local arena shelf (pyspiel) + CombinedGames
+\fBgames.arcade.Arcade\fR      the place itself, attached to OuterEnvironment
+\fBgames.official\fR           the official ARC-AGI-3 doorway (arc_agi)
+\fBgames.arena\fR              the local arena shelf (pyspiel) + CombinedGames
 \fBarcade_*\fR                        her tools for it (see \fBgenesis-cli\fR(1), \fB/arcade\fR)
 .fi
 .SH DESCRIPTION
@@ -14,13 +14,13 @@ This is a video game. It is not real and it is just for fun; she is
 safe. The arcade is part of her outer world, not her mind: it offers
 games, she chooses whether to play, and every board reaches her
 through
-.B OuterWorld.perceive
+.B OuterEnvironment.perceive
 while every move returns through
-.BR OuterWorld.it_acted
+.BR OuterEnvironment.it_acted
 \(em memory, cognition, emotion, learning, brain waves, neurochemistry
 and telemetry arrive by the same paths as the rest of her world. The
 directions she is given
-.RI ( python/worlds/games/DIRECTIONS.md )
+.RI ( Outer_World/games/DIRECTIONS.md )
 say she cannot know the instructions: she must explore, remember, and
 solve, carrying what each level teaches to the next.
 .PP
@@ -28,7 +28,7 @@ One arcade, two catalogues: \fBCombinedGames\fR merges them so the
 offer list covers both shelves and \fBarena:\fR-prefixed ids route to
 the arena while bare ids route to the official API.
 .SH SHELVES
-.SS Official ARC-AGI-3 \(em worlds.games.official
+.SS Official ARC-AGI-3 \(em games.official
 The doorway to the official interactive-environments service
 ( https://three.arcprize.org ) through the \fBarc_agi\fR toolkit
 (\fBArcade\fR, \fBOperationMode\fR) and its \fBarcengine\fR. The mode
@@ -49,7 +49,7 @@ still lists and downloads the 25 public games. Replays are written to
 \fI<data_dir>/arcade/recordings\fR. Her reasoning travels with each
 move: the \fBreasoning\fR field of \fBenv.step\fR carries her
 \fIwhy\fR onto the official recordings and scorecard.
-.SS Her sight \(em worlds.games.sight
+.SS Her sight \(em games.sight
 Boards reach her as cell indices, not pixels \(em the retina is
 bypassed, so sight maps each cell through the official 16-colour
 palette to RGB, to HSV, to the same V1 \fBname_color\fR her camera
@@ -59,7 +59,7 @@ regional colours) in the same record her episodic memory stores for
 camera scenes. Her pointing space covers every parsed object \(em
 \fBACTION6\fR clicks land on any cell, so palette swatches and small
 sprites are as clickable as the large ones.
-.SS The arena \(em worlds.games.arena
+.SS The arena \(em games.arena
 Local play on \fBpyspiel\fR \(em the same engine the open-sourced Kaggle
 Game Arena harness evaluates on. Six games ship as offers:
 connect_four, tic_tac_toe, checkers, othello, breakthrough and chess,
@@ -115,13 +115,13 @@ Official-games key; anonymous access covers the 25 public games.
 Alternative to the access_token file for the kaggle CLI.
 .SH FILES
 .nf
-\fIpython/worlds/games/arcade.py\fR     the place, memory/chemistry/waves plumbing
-\fIpython/worlds/games/official.py\fR   ARC-AGI-3 toolkit doorway
-\fIpython/worlds/games/arena.py\fR      pyspiel shelf, CombinedGames, default_games
-\fIpython/worlds/games/sight.py\fR      board vision: palette naming, scene gestalt, move space
-\fIpython/worlds/games/memory.py\fR     what she remembers of each game
-\fIpython/worlds/games/directions.py\fR the rules text she is read
-\fIpython/worlds/games/DIRECTIONS.md\fR the rules she is read
+\fIOuter_World/games/arcade.py\fR     the place, memory/chemistry/waves plumbing
+\fIOuter_World/games/official.py\fR   ARC-AGI-3 toolkit doorway
+\fIOuter_World/games/arena.py\fR      pyspiel shelf, CombinedGames, default_games
+\fIOuter_World/games/sight.py\fR      board vision: palette naming, scene gestalt, move space
+\fIOuter_World/games/memory.py\fR     what she remembers of each game
+\fIOuter_World/games/directions.py\fR the rules text she is read
+\fIOuter_World/games/DIRECTIONS.md\fR the rules she is read
 \fI<data_dir>/arcade/environment_files\fR   downloaded official games
 \fI<data_dir>/arcade/recordings\fR          game replays
 \fI~/.kaggle/access_token\fR                Kaggle credential (mode 600)

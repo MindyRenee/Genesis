@@ -16,9 +16,9 @@ manipulate expressions, matrices, permutations, relations, graphs,
 geometric objects, and propositions. They are exposed through the
 .B ParietalMath
 facade in
-.I python/parietal_lobe/math/__init__.py .
+.I Self_World/parietal_lobe/math/__init__.py .
 The package also has corresponding Rust mathematics modules under
-.IR src/math/ .
+.IR Self_World/src/math/ .
 .PP
 The native algebra and calculus faculties operate on Genesis's own
 expression trees and rule systems. They do not delegate their
@@ -106,7 +106,7 @@ facade reports population variance and standard deviation.
 .SS Higher mathematical domains
 Each domain has a Python faculty and a corresponding Rust module
 under
-.IR src/math/ .
+.IR Self_World/src/math/ .
 .TP
 .B Trigonometry
 .I trig.py
@@ -217,7 +217,7 @@ stays unverified.
 The
 .B ResearchWorkbench
 in
-.I python/frontal_lobe/research.py
+.I Self_World/frontal_lobe/research.py
 persists open mathematical problems, conjectures, readings,
 empirical evidence, and recorded attempts under
 .IR $DATA_DIR/research/workbench.json .
@@ -257,29 +257,29 @@ The optional symbolic oracle used for claim verification.
 The persistent mathematical research workbench.
 .SH FILES
 .TP
-.I python/parietal_lobe/math/
+.I Self_World/parietal_lobe/math/
 The native mathematical faculties and the optional symbolic oracle.
 .TP
-.I src/math/
+.I Self_World/src/math/
 Rust mathematical modules corresponding to the parietal domains.
 .TP
-.I python/frontal_lobe/reasoning/math_reasoning.py
+.I Self_World/frontal_lobe/reasoning/math_reasoning.py
 The cognition-engine math entry point
 .RI ( try_math ):
 question-kind detection, equation solving, and the rule registry.
 .TP
-.I python/frontal_lobe/research.py
+.I Self_World/frontal_lobe/research.py
 Persistent research threads, claims, evidence, attempts, and oracle
 verification.
 .TP
-.I python/tests/test_higher_math.py
+.I tests/python/test_higher_math.py
 Tests for the native algebra, calculus, and higher mathematical
 faculties.
 .TP
-.I python/tests/test_research_math.py
+.I tests/python/test_research_math.py
 Tests for symbolic verification and the research workbench.
 .TP
-.I python/tests/test_statistics.py
+.I tests/python/test_statistics.py
 Tests for statistical measures and sampling behavior.
 .SH LIMITATIONS
 The frontal reasoning entry point

@@ -239,14 +239,16 @@ def test_interactive_failure_still_shuts_down(tmp_path):
                     stop=False,
                 )
             ),
+            _start_retina=Mock(),
             _start_daemon_process=Mock(),
+            _start_screen_nerve=Mock(),
+            _Rebirth=Mock(return_value=Mock()),
             Mind=Mock(),
             _wire_voice=Mock(return_value=Mock()),
             _setup_ambient_listener=Mock(),
             _setup_auditory_cortex=Mock(),
             _print_welcome=Mock(),
             _setup_signal_handlers=Mock(),
-            _start_sleep_watcher=Mock(),
             _run_interactive_loop=Mock(side_effect=RuntimeError("input failure")),
             _shutdown=cleanup,
             # The post-teardown watchdog is a real 30 s daemon timer
@@ -267,7 +269,6 @@ def test_interactive_failure_still_shuts_down(tmp_path):
         "_setup_ambient_listener",
         "_setup_auditory_cortex",
         "_print_welcome",
-        "_start_sleep_watcher",
     ],
 )
 def test_startup_failure_still_shuts_down(tmp_path, failing_step):
@@ -279,7 +280,6 @@ def test_startup_failure_still_shuts_down(tmp_path, failing_step):
         "_setup_auditory_cortex": Mock(),
         "_print_welcome": Mock(),
         "_setup_signal_handlers": Mock(),
-        "_start_sleep_watcher": Mock(),
         "_run_interactive_loop": Mock(),
     }
     patches[failing_step] = Mock(side_effect=RuntimeError("setup failed"))
@@ -297,7 +297,10 @@ def test_startup_failure_still_shuts_down(tmp_path, failing_step):
                     stop=False,
                 )
             ),
+            _start_retina=Mock(),
             _start_daemon_process=Mock(),
+            _start_screen_nerve=Mock(),
+            _Rebirth=Mock(return_value=Mock()),
             Mind=Mock(return_value=mind),
             _shutdown=cleanup,
             # See test_interactive_failure_still_shuts_down — the exit
@@ -310,6 +313,90 @@ def test_startup_failure_still_shuts_down(tmp_path, failing_step):
             genesis_cli.main()
     cleanup.assert_called_once()
     assert cleanup.call_args.args[1] is mind
+
+
+def test_self_directed_keeps_rebirth_watcher_stopped(tmp_path):
+    """Self-directed mode keeps process resurrection out of the session."""
+    daemon = Mock()
+    daemon.pid = 4242
+    mind = Mock()
+    rebirth = Mock()
+    mind_ctor = Mock(return_value=mind)
+    with (
+        patch.dict(os.environ, {"GENESIS_WAKE": "1"}),
+        patch.multiple(
+            genesis_cli,
+            _parse_cli_args=Mock(
+                return_value=Mock(
+                    data_dir=str(tmp_path),
+                    tail=False,
+                    daemon_socket=None,
+                    offline=False,
+                    headless=False,
+                    self_directed=True,
+                    stop=False,
+                )
+            ),
+            _write_pid_file=Mock(),
+            _setup_signal_handlers=Mock(),
+            _start_retina=Mock(),
+            _start_daemon_process=Mock(return_value=daemon),
+            Mind=mind_ctor,
+            _Rebirth=Mock(return_value=rebirth),
+            _start_screen_nerve=Mock(return_value=Mock()),
+            _run_after_mind_start=Mock(return_value=(None, None, None)),
+            _teardown_session=Mock(return_value=0),
+        ),
+    ):
+        assert genesis_cli.main() == 0
+
+    assert mind_ctor.call_args.kwargs["self_directed"] is True
+    rebirth.start.assert_not_called()
+
+
+def test_retina_launches_before_the_daemon(tmp_path):
+    """The eye opens before the body: a publishing retina must already
+    be on the nerve when the daemon boots, so the daemon's arbitration
+    keeps its embedded limb closed and exactly one process owns the
+    camera."""
+    calls = []
+    retina = Mock(side_effect=lambda *a, **k: calls.append("retina"))
+    daemon = Mock()
+    daemon.pid = 4242
+    mind = Mock()
+    start_daemon = Mock(
+        side_effect=lambda *a, **k: calls.append("daemon") or daemon
+    )
+    with (
+        patch.dict(os.environ, {"GENESIS_WAKE": "1"}),
+        patch.multiple(
+            genesis_cli,
+            _parse_cli_args=Mock(
+                return_value=Mock(
+                    data_dir=str(tmp_path),
+                    tail=False,
+                    daemon_socket=None,
+                    offline=True,
+                    headless=False,
+                    self_directed=False,
+                    stop=False,
+                )
+            ),
+            _write_pid_file=Mock(),
+            _setup_signal_handlers=Mock(),
+            _start_retina=retina,
+            _start_daemon_process=start_daemon,
+            Mind=Mock(return_value=mind),
+            _Rebirth=Mock(return_value=Mock()),
+            _start_screen_nerve=Mock(return_value=Mock()),
+            _run_after_mind_start=Mock(return_value=(None, None, None)),
+            _teardown_session=Mock(return_value=0),
+            _arm_exit_watchdog=Mock(),
+        ),
+    ):
+        assert genesis_cli.main() == 0
+    retina.assert_called_once_with(str(tmp_path))
+    assert calls[:2] == ["retina", "daemon"]
 
 
 def test_shutdown_reports_failed_final_save(tmp_path):

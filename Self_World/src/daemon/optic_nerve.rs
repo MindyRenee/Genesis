@@ -78,7 +78,7 @@ use crate::state::zones::MentalPhase;
 pub const SHM_NAME: &str = "/genesis_optic_nerve";
 
 /// Header layout written by the capture limb:
-/// `[u64 seqlock][u32 width][u32 height][4B fourcc][u32 size][u32 stride]`.
+/// `[u64 frame counter][u32 width][u32 height][4B fourcc][u32 size][u32 stride]`.
 const HEADER_SIZE: usize = 28;
 
 /// A frame is "live" while the last consumed frame is younger than
@@ -199,7 +199,7 @@ pub struct OpticNerve {
     /// The open shared-memory attachment; `None` until the capture
     /// limb creates the segment, re-tried every sample.
     shm: Option<shared_memory::Shmem>,
-    /// Last consumed seqlock value — a frame is consumed once, so an
+    /// Last consumed frame counter — a frame is consumed once, so an
     /// unchanged counter means the limb has not written since.
     last_seq: u64,
     /// `current_ms` of the last consumed frame (0 = never).
@@ -375,7 +375,7 @@ impl OpticNerve {
         }
     }
 
-    /// Sample the nerve once: seqlock-read the header, and when a new
+    /// Sample the nerve once: read the frame counter, and when a new
     /// frame has arrived pool it into the channel signals. Absent or
     /// stalled segments are the no-eye condition — the afference just
     /// reports no fresh input, it is never a fault.
@@ -408,68 +408,53 @@ impl OpticNerve {
         let shm = self.shm.as_ref().expect("checked above");
         let base = shm.as_ptr();
 
-        // Seqlock read, same protocol as the Python reader and the
-        // capture-limb writer: even counter = complete frame, odd = write in
-        // progress, changed across the read = torn. The pixel pooling
-        // runs inside the bracket too — stats accumulate into locals
-        // and only commit after the second counter read verifies.
-        for _ in 0..8 {
-            // SAFETY: `base` points into a live shm mapping of at
-            // least HEADER_SIZE bytes once a frame header has been
-            // initialised; the counter is the writer's own AtomicU64
-            // and is only touched atomically here.
-            let c1 = unsafe { (*(base as *const AtomicU64)).load(Ordering::Acquire) };
-            if c1 & 1 != 0 || c1 == 0 {
-                // Write in progress, or the segment exists but no
-                // frame has ever been published — not an error.
-                if c1 == 0 {
-                    break;
-                }
-                std::thread::yield_now();
-                continue;
-            }
-            // SAFETY: volatile reads within the mapped header; bounds
-            // fixed by HEADER_SIZE.
-            let (width, height, fourcc, size, stride) = unsafe {
-                let w = std::ptr::read_volatile(base.add(8) as *const u32);
-                let h = std::ptr::read_volatile(base.add(12) as *const u32);
-                let mut fcc = [0u8; 4];
-                std::ptr::copy_nonoverlapping(base.add(16), fcc.as_mut_ptr(), 4);
-                let sz = std::ptr::read_volatile(base.add(20) as *const u32);
-                let st = std::ptr::read_volatile(base.add(24) as *const u32);
-                (w, h, fcc, sz, st)
-            };
-            if c1 == self.last_seq {
-                // No new frame since the last sample — feed is live
-                // but unchanged, or stalled; freshness is decided by
-                // last_fresh_ms either way.
-                return;
-            }
-            let total = (size as usize).min(shm.len().saturating_sub(HEADER_SIZE));
-            if total == 0 || width == 0 || height == 0 {
-                self.last_seq = c1;
-                return;
-            }
-            let pooled = Self::pool_frame(base, width, height, fourcc, total, stride);
-            // SAFETY: same live mapping and AtomicU64 counter as the
-            // c1 read above — this second load closes the seqlock
-            // bracket, so a torn frame shows as c1 != c2 and retries.
-            let c2 = unsafe { (*(base as *const AtomicU64)).load(Ordering::Acquire) };
-            if c1 != c2 {
-                std::thread::yield_now();
-                continue;
-            }
-            self.commit(pooled);
-            self.last_seq = c1;
-            self.last_fresh_ms = now_ms;
-            self.frames_seen += 1;
+        // The counter is a plain frame sequence number: nonzero = a
+        // frame has been published, changed since `last_seq` = new
+        // frame. There is no write-in-progress marker, so a read that
+        // races a writer may pool a torn frame — the pooling is
+        // statistics over subsampled pixels, so a transient artifact
+        // averages into the EMAs without consequence.
+        // SAFETY: `base` points into a live shm mapping of at
+        // least HEADER_SIZE bytes once a frame header has been
+        // initialised; the counter is the writer's own AtomicU64
+        // and is only touched atomically here.
+        let c1 = unsafe { (*(base as *const AtomicU64)).load(Ordering::Acquire) };
+        if c1 == 0 {
+            // The segment exists but no frame has ever been
+            // published — not an error.
             return;
         }
+        if c1 == self.last_seq {
+            // No new frame since the last sample — feed is live
+            // but unchanged, or stalled; freshness is decided by
+            // last_fresh_ms either way.
+            return;
+        }
+        // SAFETY: volatile reads within the mapped header; bounds
+        // fixed by HEADER_SIZE.
+        let (width, height, fourcc, size, stride) = unsafe {
+            let w = std::ptr::read_volatile(base.add(8) as *const u32);
+            let h = std::ptr::read_volatile(base.add(12) as *const u32);
+            let mut fcc = [0u8; 4];
+            std::ptr::copy_nonoverlapping(base.add(16), fcc.as_mut_ptr(), 4);
+            let sz = std::ptr::read_volatile(base.add(20) as *const u32);
+            let st = std::ptr::read_volatile(base.add(24) as *const u32);
+            (w, h, fcc, sz, st)
+        };
+        let total = (size as usize).min(shm.len().saturating_sub(HEADER_SIZE));
+        if total == 0 || width == 0 || height == 0 {
+            self.last_seq = c1;
+            return;
+        }
+        let pooled = Self::pool_frame(base, width, height, fourcc, total, stride);
+        self.commit(pooled);
+        self.last_seq = c1;
+        self.last_fresh_ms = now_ms;
+        self.frames_seen += 1;
     }
 
     /// Pool one frame's subsampled pixels into (luma, melanopic)
-    /// channel sums. Runs inside the seqlock bracket; writes nothing
-    /// on `self` until `commit` verifies the counter.
+    /// channel sums. Pure function — writes nothing on `self`.
     fn pool_frame(
         base: *const u8,
         width: u32,
@@ -525,7 +510,7 @@ impl OpticNerve {
         out
     }
 
-    /// Commit a seqlock-verified pooled frame into the channel EMAs.
+    /// Commit a pooled frame into the channel EMAs.
     fn commit(&mut self, pooled: Vec<u8>) {
         let n = (pooled.len() / 2).max(1) as f64;
         let luma_mean = pooled.iter().step_by(2).map(|&v| f64::from(v)).sum::<f64>() / (n * 255.0);
@@ -573,6 +558,15 @@ impl OpticNerve {
     /// Whether the eye is delivering frames right now.
     pub fn fresh(&self, now_ms: u64) -> bool {
         self.last_fresh_ms != 0 && now_ms.saturating_sub(self.last_fresh_ms) < FRESH_WINDOW_MS
+    }
+
+    /// How many frames this reader has ever consumed — `> 0` marks
+    /// a writer that existed. Together with `fresh` it separates
+    /// "no retina has published yet" (`0`) from "the retina that was
+    /// here died" (`> 0`, not fresh) — the distinction eye ownership
+    /// is arbitrated on.
+    pub fn frames_seen(&self) -> u64 {
+        self.frames_seen
     }
 
     /// How open the lids are — the phase's transmission factor,
@@ -787,7 +781,7 @@ impl Default for OpticNerve {
 //
 // The eye is part of the body now. This limb does everything the old
 // standalone `retina` process did — V4L2 open, format negotiation,
-// the 28-byte header, seqlock frame writes — as a thread the daemon
+// the 28-byte header, counted frame writes — as a thread the daemon
 // owns instead of a process the mind babysat. It is pure machine
 // math: bytes onto the bus, no semantics — the meaning of the pixels
 // belongs to the mind, the words side.
@@ -894,7 +888,11 @@ impl Drop for OpticCapture {
 /// where the loss actually happens. Bounded: after the table's
 /// worth of un-lived lives the eye is accepted absent and the limb
 /// rests — the organism goes on without sight.
-fn capture_limb(shm_name: &str, stop: &AtomicBool) {
+///
+/// `pub` for `genesis-retina`: when the eye is its own process again
+/// the binary runs this same limb on the main thread — one
+/// implementation, two carriers.
+pub fn capture_limb(shm_name: &str, stop: &AtomicBool) {
     let configured =
         std::env::var("GENESIS_CAMERA").unwrap_or_else(|_| DEFAULT_CAMERA_PATH.to_string());
     for (i, camera_path) in camera_candidates(&configured).iter().enumerate() {
@@ -1073,8 +1071,8 @@ fn eye_life(shm_name: &str, camera_index: usize, camera_path: &str, stop: &Atomi
         // concurrently.
         unsafe {
             // Initialize the header once.
-            // The frame counter is an AtomicU64 using a seqlock:
-            // even = frame complete, odd = write in progress.
+            // The frame counter is an AtomicU64 sequence number —
+            // incremented once per published frame.
             let counter = &*(base as *const AtomicU64);
             counter.store(0, Ordering::Relaxed);
             core::ptr::write_volatile(base.add(8) as *mut u32, fmt.width);
@@ -1149,33 +1147,22 @@ fn eye_life(shm_name: &str, camera_index: usize, camera_path: &str, stop: &Atomi
         // once during setup and only accessed via atomic operations.
         // The frame data copy (`base.add(HEADER_SIZE)`) stays within
         // bounds because `frame_size` was checked against `fmt.size`
-        // above, and `shm_size = HEADER_SIZE + fmt.size`. The seqlock
-        // protocol ensures readers see consistent data.
+        // above, and `shm_size = HEADER_SIZE + fmt.size`.
         unsafe {
             let counter = &*(base as *const AtomicU64);
-
-            // Seqlock write protocol:
-            // 1. Increment counter to odd → signals "write in progress"
-            //    Any reader seeing an odd counter will retry.
-            // 2. Copy the frame data.
-            // 3. Increment counter to even → signals "frame complete"
-            //    The Release ordering ensures the frame copy is visible
-            //    before the even counter is observed by the reader.
-            let seq = counter.load(Ordering::Relaxed);
-            counter.store(seq.wrapping_add(1), Ordering::Relaxed);
-            std::sync::atomic::fence(Ordering::SeqCst);
 
             // Copy the raw frame into the shared buffer after the header.
             core::ptr::copy_nonoverlapping(buf.as_ptr(), base.add(HEADER_SIZE), frame_size);
 
-            // Publish the completed frame.
-            counter.store(seq.wrapping_add(2), Ordering::Release);
+            // Publish: bump the frame counter. Release ordering so the
+            // frame bytes land before the new sequence number is seen.
+            counter.fetch_add(1, Ordering::Release);
         }
 
         // Frame-rate throttling — cap at ~30 FPS to avoid burning CPU
         // when the camera delivers frames faster than the consumer
         // (the cognitive mind) needs them. The cognitive mind samples
-        // at its own rate via the seqlock, so extra frames are wasted
+        // at its own rate via the frame counter, so extra frames are wasted
         // work. 33ms ≈ 30 FPS.
         thread::sleep(Duration::from_millis(33));
     }
@@ -1218,8 +1205,8 @@ mod tests {
             std::ptr::write_volatile(base.add(20) as *mut u32, size.max(frame.len()) as u32);
             std::ptr::write_volatile(base.add(24) as *mut u32, stride);
             std::ptr::copy_nonoverlapping(frame.as_ptr(), base.add(HEADER_SIZE), frame.len());
-            // Publish: even counter = a complete frame.
-            (*(base as *const AtomicU64)).store(2, Ordering::Release);
+            // Publish: frame counter = 1 (one frame published).
+            (*(base as *const AtomicU64)).store(1, Ordering::Release);
         }
         (shmem, name.trim_start_matches('/').to_string())
     }
@@ -1262,14 +1249,12 @@ mod tests {
         let (seg, name) = fake_nerve("motion", 64, 48, b"RGB3", &[0u8].repeat(64 * 48 * 3));
         let mut optic = OpticNerve::with_name(&name);
         optic.sample(1_000);
-        // Rewrite the payload bright and bump the seqlock.
+        // Rewrite the payload bright and bump the frame counter.
         let base = seg.as_ptr();
         // SAFETY: same mapping as above; writes stay inside it.
         unsafe {
-            (*(base as *const AtomicU64)).store(3, Ordering::Relaxed);
             std::ptr::write_bytes(base.add(HEADER_SIZE), 200u8, 64 * 48 * 3);
-            std::sync::atomic::fence(Ordering::SeqCst);
-            (*(base as *const AtomicU64)).store(4, Ordering::Release);
+            (*(base as *const AtomicU64)).fetch_add(1, Ordering::Release);
         }
         optic.sample(2_000);
         let s = optic.state(2_000);

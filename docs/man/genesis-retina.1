@@ -1,28 +1,82 @@
 .TH GENESIS-RETINA 1 "November 2026" "Genesis 0.2.0" "Genesis Manual"
 .SH NAME
-genesis-retina \- legacy name for the retired standalone retina process
-.SH STATUS
+genesis-retina \- Genesis camera capture process (the eye)
+.SH SYNOPSIS
+.nf
+\fBgenesis\-retina\fR
+.fi
+.SH DESCRIPTION
 .B genesis-retina
-is not a current executable and must not be launched. The former
-standalone V4L2 capture process and its
-.I /genesis_retina
-shared-memory contract have been retired. Current visual capture is
-a daemon-owned optic-capture limb using the canonical
-.I /genesis_optic_nerve
-mapping.
-.PP
-The daemon opens the V4L2 device named by
+is the standalone retinal process \(em the eye as its own organ. It
+opens the V4L2 capture device named by
 .B GENESIS_CAMERA
 (default
 .IR /dev/video0 )
-directly and publishes frames into the optic mapping; the mind
-reads them through the existing perception path.
+and publishes raw frames into the POSIX shared-memory segment
+.IR /genesis_optic_nerve ,
+the canonical optic-nerve mapping read by both the daemon's
+subcortical channels (SCN illuminance, collicular transients,
+pretectal/pupil signals) and the cognitive mind's visual pathway.
 .PP
-This compatibility manual is retained so old references resolve.
-For current architecture, frame formats, camera controls, optical
-processing, illumination adaptation, phototransduction, and face
-recognition, read
-.BR genesis-vision (7).
+It runs the same capture limb the daemon can embed
+.RB ( OpticCapture )
+\(em one implementation, two carriers. Camera ownership is settled
+on the nerve itself, not by a flag: the daemon's own optic reader
+watches the segment's frame counter, so while a retina publishes,
+the daemon's embedded limb stays closed; if the retina dies the
+daemon opens its limb and takes the camera. Exactly one process owns
+the device at a time, and the eye heals in place.
+.PP
+It is built from
+.I Self_World/src/bin/genesis-retina.rs
+and is normally launched by
+.BR genesis-cli (1)
+before the daemon so the external eye wins the organ. It is not
+supervised for respawn: a dead retina is covered by the daemon's
+takeover, which keeps the camera for the daemon's life (a relaunched
+retina then backs off on
+.B EBUSY
+and rests). Direct invocation is supported for diagnostics and
+testing.
+.PP
+On SIGINT or SIGTERM the limb winds down and the segment's name is
+unlinked, so a dead eye never publishes stale frames under a live
+name. Readers already holding the mapping keep it until they detach.
+.SH ENVIRONMENT
+.TP
+.B GENESIS_CAMERA
+V4L2 device path to capture from (default
+.IR /dev/video0 ).
+When a non-default device is configured and fails to open, the limb
+falls back to
+.I /dev/video0
+before accepting an absent eye entirely \(em sight is a degradation,
+never a fault.
+.TP
+.B GENESIS_OPTIC_SEGMENT
+Shared-memory segment name to publish (default
+.IR /genesis_optic_nerve ).
+Used by tests and diagnostic runs that need a private nerve.
+.TP
+.B GENESIS_DATA_DIR
+Set by the launcher to bind the process to a Genesis instance; the
+CLI validates identity through it when adopting or stopping.
+.SH FILES
+.TP
+.I /genesis_optic_nerve
+POSIX shared-memory segment (in
+.IR /dev/shm )
+carrying the seqlock-style frame header plus RGB24 frame bytes.
+RAM-backed; frames are streamed live and never persisted.
+.TP
+.I $DATA_DIR/genesis_retina.pid
+PID file written by the launcher; used by
+.B genesis --stop
+and by startup adoption of a surviving process.
+.TP
+.I $DATA_DIR/retina.log
+Capture log; rotated by the launcher at 5 MiB (two compressed
+backups).
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-cli (1),

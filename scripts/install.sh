@@ -69,11 +69,12 @@ if [ "$uninstall" -eq 1 ]; then
 fi
 
 # ── 1. Rust binaries ────────────────────────────────────────────────
-if [ ! -x "$REPO/target/release/genesis-daemon" ]; then
+if [ ! -x "$REPO/target/release/genesis-daemon" ] \
+    || [ ! -x "$REPO/target/release/genesis-retina" ]; then
     say "Building release binaries (cargo build --release)..."
     (cd "$REPO" && cargo build --release)
 fi
-for bin in genesis-daemon; do
+for bin in genesis-daemon genesis-retina; do
     [ -x "$REPO/target/release/$bin" ] || {
         say "Missing binary: $REPO/target/release/$bin — build failed?"
         exit 1
@@ -95,10 +96,25 @@ if ! "$VENV/bin/python" -m pip install -e "$REPO" 2>/dev/null; then
     "$VENV/bin/python" -m pip install -e "$REPO" --no-build-isolation
 fi
 
+# The editable install maps packages only; the loose modules at each
+# world's root (genesis_cli, brain_waves, mind, …) are single files,
+# not packages, so pip metadata never reaches them. The three worlds
+# are sys.path roots by design — record them as such in the venv so
+# every interpreter on it (console script, tests, REPL) resolves the
+# whole tree without an ambient PYTHONPATH. Uninstall removes the
+# venv wholesale, taking this with it.
+SITE_PKGS="$("$VENV/bin/python" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
+{
+    printf '%s\n' "$REPO/Self_World"
+    printf '%s\n' "$REPO/Inner_World"
+    printf '%s\n' "$REPO/Outer_World"
+} > "$SITE_PKGS/genesis_worlds.pth"
+
 # Ship the binaries next to the interpreter — the CLI's packaged-install
 # lookup (venv/bin). Editable installs also find target/release first;
 # these copies keep the venv self-contained.
 cp "$REPO/target/release/genesis-daemon" "$VENV/bin/"
+cp "$REPO/target/release/genesis-retina" "$VENV/bin/"
 
 mkdir -p "$USER_BIN"
 ln -sf "$VENV/bin/genesis" "$USER_BIN/genesis"
@@ -161,6 +177,10 @@ SuccessExitStatus=SIGTERM
 # save, so give teardown room before SIGKILL.
 TimeoutStopSec=90s
 EnvironmentFile=-$AGENT_CONF/agent.env
+# systemd's default PATH misses the venv and ~/.local/bin, where her
+# tool lookups (shutil.which: ffmpeg, piper, …) live. The worlds
+# themselves are already on sys.path via genesis_worlds.pth.
+Environment=PATH=$VENV/bin:$USER_BIN:/usr/local/bin:/usr/bin:/bin
 
 [Install]
 WantedBy=default.target
@@ -199,7 +219,7 @@ second.
 
 Optional — privileged body levers (CPU governor, RTC wake alarm):
 install a NOPASSWD sudo grant for this user (any sudoers.d drop-in;
-the levers invoke `sudo -n` directly). Without it, sensing still
+the levers invoke \`sudo -n\` directly). Without it, sensing still
 works — only the actuation levers stay read-only.
 EOF
 fi

@@ -3,13 +3,13 @@
 genesis-vision \- the visual perception and optic faculties of Genesis
 .SH SYNOPSIS
 .nf
-\fBLinux V4L2\fR -> daemon optic capture -> optic mapping
-\fBscreen capture\fR -> daemon screen nerve -> screen mapping
-\fBgenesis_client.optic_nerve.latest_frame()\fR -> mind-side perception
+\fBLinux V4L2\fR -> genesis-retina (or daemon limb) -> optic mapping
+\fBscreen capture\fR -> screen nerve relay -> screen mapping
+\fBoptic_nerve.latest_frame()\fR -> mind-side perception
 .fi
 .SH DESCRIPTION
 Genesis has one visual-afferent frame contract and one mind-side
-perception pathway. The daemon's capture limb acquires camera
+perception pathway. A retinal capture limb acquires camera
 frames over V4L2, validates them, and publishes them to the
 canonical optic mapping; the Python mind reads the mapping and
 processes the image through its occipital faculties. A second
@@ -17,25 +17,28 @@ afferent \(em the screen-capture nerve \(em carries frames of her
 own desktop through the same contract, so looking at her screen is
 the same act as looking at the world.
 .SS Linux V4L2
-The daemon's capture limb opens the device selected by
+The retinal capture limb opens the device selected by
 .B GENESIS_CAMERA
 (default
 .IR /dev/video0 ),
 requests 640x480 RGB24, and falls back to YUYV if RGB24 is not
-available. This capture limb is part of the daemon; there is no
-separate current
-.B genesis-retina
-executable.
+available. One limb, two carriers: the standalone
+.BR genesis-retina (1)
+process owns the camera when it is installed and running; the daemon
+embeds the same limb on a thread and takes the device only when no
+retina is publishing \(em and takes it back if the retina dies.
+Ownership is arbitrated on the nerve's frame counter, so exactly one
+process holds the device and the eye heals in place.
 .SS Canonical optic mapping
-The daemon publishes frames through two POSIX shared-memory
+Frames are published through two POSIX shared-memory
 segments:
 .IR /genesis_optic_nerve
 for the camera eye and
 .IR /genesis_screen_nerve
 for the desktop. Both use a 28-byte header, a frame payload, and a
-seqlock sequence counter so readers can reject a frame being
-written. The Python reader is
-.IR genesis_client/optic_nerve.py ;
+frame sequence counter so readers can tell when a new frame has
+landed. The Python reader is
+.IR Self_World/optic_nerve.py ;
 .B latest_frame()
 returns the most recent image on either segment to the existing
 mind-side pipeline.
@@ -71,7 +74,7 @@ within bounded limits and cannot reopen a gate closed by sleep
 state.
 .SS Retinal and cortical processing
 The mind-side pathway in
-.I python/occipital_lobe/perception/
+.I Self_World/occipital_lobe/perception/
 processes the captured frame in stages:
 .IP \(bu 2
 .B Optics
@@ -82,7 +85,8 @@ attenuation, and pupil/focus-dependent blur.
 uses a Retinex-style luminance decomposition to estimate
 illuminant, reflectance, light direction, and shadows. A partial
 von Kries chromatic adaptation is applied to the RGB image
-(adaptation strength 0.8; per-channel gains clamped to 0.5--2.0).
+(adaptation strength 0.8; per-channel gains saturate smoothly
+within 0.5--2.0).
 This corrects estimated color cast; it does not increase sensor
 exposure or reconstruct detail lost in darkness, clipping, or blur.
 .IP \(bu 2
@@ -111,7 +115,7 @@ blur, small faces, occlusion, and low resolution can also reduce
 recognition performance.
 .SS Face detection and identity
 Face recognition is an optional mind-side faculty implemented in
-.I python/occipital_lobe/perception/recognition.py
+.I Self_World/occipital_lobe/perception/recognition.py
 using OpenCV YuNet for detection and SFace for 128-dimensional
 face embeddings. Detection and identity matching are separate:
 detecting a face does not establish who the person is.
@@ -157,7 +161,7 @@ Looking is her own act, not a command: the
 .B look
 urge fires under LC-NE orienting drive and she reads whichever
 nerve she means to \(em the camera eye, or the screen nerve a relay
-(\fIscripts/optic_relay.py\fR) feeds when her desktop is being
+(\fISelf_World/optic_relay.py\fR) feeds when her desktop is being
 watched. What remains for the user are the identity commands:
 .TP
 .BR /register-face " \\fIname\\fR"
@@ -166,9 +170,11 @@ Register the largest face detected in the current frame.
 .B /faces
 Inspect known identities and recent anonymous or named sightings.
 .PP
-Capture diagnostics live in the daemon log: V4L2 open, format
+Capture diagnostics live in the retinal log
+.IR ( retina.log
+when the standalone eye runs, else the daemon log): V4L2 open, format
 negotiation, and frame-publication messages. The mind-side readers
-report seqlock stale reads and mapping problems on the mind log.
+report stale feeds and mapping problems on the mind log.
 .SH FILES
 .TP
 .I /genesis_optic_nerve
@@ -184,10 +190,12 @@ Persisted named face embeddings.
 .I $DATA_DIR/face_clusters.json
 Persisted anonymous face clusters.
 .TP
-.I $DATA_DIR/daemon.log
-Daemon capture and optic-nerve diagnostics.
+.IR $DATA_DIR/daemon.log ", " retina.log
+Capture and optic-nerve diagnostics — the daemon log always carries
+the subcortical channels; the retinal log (whichever carrier owns
+the camera) carries V4L2 open and format negotiation.
 .TP
-.I python/occipital_lobe/perception/
+.I Self_World/occipital_lobe/perception/
 Mind-side optical, illumination, phototransduction, and recognition
 faculties.
 .SH LIMITATIONS

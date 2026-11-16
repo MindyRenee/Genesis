@@ -90,6 +90,15 @@ pub const MIND_LEASE_SECS: f32 = 3.0;
 /// rate the pharmacodynamics were tuned for.
 pub const AUTONOMOUS_INTERVAL_MS: u64 = 200;
 
+/// How long after boot the daemon waits for an external
+/// `genesis-retina` to claim the optic nerve before opening its own
+/// capture limb — long enough to cover a camera probe and format
+/// negotiation, short enough that a missing eye degrades gracefully
+/// rather than stalling sight. Once a publisher has existed the
+/// window no longer applies: a dead retina hands the camera back
+/// immediately.
+pub const EYE_OWNERSHIP_GRACE_MS: u64 = 4_000;
+
 /// Consolidation threshold: entries with a consolidation score below
 /// this are skipped (left to decay in the ring buffer).
 pub const CONSOLIDATION_THRESHOLD: f32 = 0.15;
@@ -549,7 +558,7 @@ impl TickLoop {
         //    neurochemical parameters. Sleep is the primary window for
         //    BDNF/plasticity recovery.
         //
-        //    `read_consistent` performs a seqlock-guarded volatile copy
+        //    `read_consistent` performs a volatile copy
         //    through raw pointers — no `&GenesisCoreState` reference to
         //    the mmap'd memory is created, eliminating aliasing UB with
         //    concurrent writers.
@@ -784,9 +793,7 @@ impl TickLoop {
             // cortisol)
             for &(chem_id, magnitude) in &dyadic_impulses {
                 let id = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
-                state
-                    .neurochemicals
-                    .apply_impulse_capped(id, magnitude, now_ms);
+                state.neurochemicals.apply_impulse(id, magnitude, now_ms);
             }
 
             // Recompute derived state after all impulses
@@ -847,7 +854,7 @@ impl TickLoop {
         }
 
         // Read the current state to decide what work to do.
-        // `read_consistent` performs a seqlock-guarded volatile copy
+        // `read_consistent` performs a volatile copy
         // through raw pointers — no `&GenesisCoreState` reference to
         // the mmap'd memory is created, so no aliasing with concurrent
         // writers occurs.
@@ -999,13 +1006,10 @@ impl TickLoop {
         let cort_eff = state.neurochemicals.effective(NeurochemicalId::Cortisol);
         let da_eff = state.neurochemicals.effective(NeurochemicalId::Dopamine);
         let compact_tag = [model.arousal, model.valence, cort_eff, da_eff];
-        // Use finite_clamp for salience: if model.valence is NaN (from
-        // a torn read_consistent snapshot of a corrupted mmap), the
-        // native clamp would pass NaN through, storing NaN in the STM
-        // ring buffer and LTM. finite_clamp returns 0.0 (the min) for
-        // NaN, a safe "no salience" fallback.
-        let salience =
-            crate::state::sanitize::finite_clamp(model.arousal + model.valence.abs(), 0.0, 1.0);
+        // Preserve finite salience verbatim; only a NaN/inf model state
+        // falls back to no-salience so storage never receives a poisoned
+        // evidence value.
+        let salience = crate::state::sanitize::finite_or(model.arousal + model.valence.abs(), 0.0);
 
         let top_label = top.map(|(l, _)| l).unwrap_or("none");
         let top_score = top.map(|(_, s)| s).unwrap_or(0.0);
@@ -1034,10 +1038,9 @@ impl TickLoop {
         // of the cognitive mind's ModuleSampler: it can't be seen by
         // the Python sampler, so the daemon times its own tick and
         // writes the share into the Subcognitive module's cpu_share.
-        let work_frac = crate::state::sanitize::finite_clamp(
+        let work_frac = crate::state::sanitize::finite_or(
             tick_start.elapsed().as_secs_f32() / (TICK_INTERVAL_MS as f32 / 1000.0),
             0.0,
-            1.0,
         );
         self.subcognitive_activity = 0.7 * self.subcognitive_activity + 0.3 * work_frac;
         let subcognitive_share = self.subcognitive_activity;
@@ -1378,7 +1381,7 @@ impl TickLoop {
         // longer elapsed interval is covered with several sub-steps
         // rather than one coarse one. The sub-steps are identical and
         // are run inside a single mmap transaction, so this costs no
-        // extra seqlock traffic.
+        // extra publish traffic.
         let sub_steps = self.neuro_substeps(dt);
         let sub_dt = dt / sub_steps as f32;
         neuro_params.dt = sub_dt;
@@ -1453,7 +1456,7 @@ impl TickLoop {
             eprintln!("[tick] advance_neuro neuro tick failed: {e}");
             // Neurochemistry didn't advance -- return zeros so the
             // cognitive mind sees a no-op rather than crashing the
-            // IPC handler thread on a poisoned mmap seqlock.
+            // IPC handler thread on a poisoned mmap.
             return (0.0, 0.0, 0.0, 0.0, self.inference_engine.tick_count());
         }
 
@@ -1544,7 +1547,7 @@ impl TickLoop {
         // Apply inference feedback and heartbeat
         // the subcognitive module in the same transaction. This merges
         // two formerly-separate modify() calls into one, halving the
-        // seqlock write windows on the most frequently called reactive
+        // publish windows on the most frequently called reactive
         // command (~1/s). The manifest heartbeat touches
         // state.manifest while the inference feedback touches
         // state.neurochemicals and state.inference_signals — disjoint
@@ -1564,9 +1567,7 @@ impl TickLoop {
             // cortisol)
             for &(chem_id, magnitude) in &dyadic_impulses {
                 let id = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
-                state
-                    .neurochemicals
-                    .apply_impulse_capped(id, magnitude, now_ms);
+                state.neurochemicals.apply_impulse(id, magnitude, now_ms);
             }
             state.neurochemicals.recompute_derived();
             state.sync_neurochemistry_to_state();

@@ -3,10 +3,11 @@
 genesis \- launch and stop the Genesis artificial mind
 .SH SYNOPSIS
 .nf
-\fB./genesis\fR [\fB\-\-stop\fR] [\fB\-\-offline\fR]
+\fB./genesis\fR [\fB\-\-stop\fR] [\fB\-\-offline\fR] [\fB\-\-self\-directed\fR]
 .PP
 \fBgenesis\fR [\fB\-\-data\-dir\fR \fIDIR\fR] [\fB\-\-daemon\-socket\fR \fIPATH\fR]
           [\fB\-\-tail\fR] [\fB\-\-stop\fR] [\fB\-\-offline\fR] [\fB\-\-headless\fR]
+          [\fB\-\-self\-directed\fR]
 .fi
 .SH DESCRIPTION
 .B genesis
@@ -16,7 +17,10 @@ schema requires source and binary to agree), then launches the
 installed interpreter on
 .IR genesis_cli.py ,
 which supervises the Rust daemon and cognitive mind as one session.
-V4L2 capture is a limb inside the daemon.
+V4L2 capture is the standalone
+.BR genesis-retina (1)
+process when it is installed; otherwise the daemon runs the same
+capture limb embedded on a thread.
 .PP
 In a packaged install, the
 .B genesis
@@ -73,7 +77,8 @@ fought forever.
 .B \-\-stop
 Tear down every Genesis process for the data dir: SIGINT the CLI
 first (it owns the child lifecycle and saves state), then SIGTERM
-the daemon. Each stage has its own grace period; a
+the daemon, the screen nerve, and the retina. Each stage has its own
+grace period; a
 process still saving at the deadline is a "retry later", never a
 kill. Socket, lock, and PID files are preserved for their owners
 and later recovery.
@@ -86,6 +91,12 @@ pauses; conversation and art continue.
 (\fBgenesis\fR script only) Resident mode: run without the
 interactive prompt, for the systemd service or other background
 supervision.
+.TP
+.B \-\-self-directed
+Keep volition, listening, web/tool access, and synchronous actions
+available while leaving the autonomous learner, inner-life, and
+emotional-regulator worker loops stopped. Forwarded to the CLI; see
+.BR genesis-cli (1).
 .TP
 .B \-\-tail
 Tail the daemon log and exit; does not start a session.
@@ -100,8 +111,13 @@ Forwarded to the CLI; see
 Explicit data-directory override; always wins.
 .TP
 .B GENESIS_DISCORD_WEBHOOK
-Webhook URL for her public channel: the session mirror plus the
-posts she composes.
+Webhook URL for her public channel — the self∩outer overlap: the
+session mirror plus the posts she composes.
+.TP
+.B GENESIS_DISCORD_INNER_WEBHOOK
+Optional webhook URL for a second channel — her inner world's own
+page. When set, genesis~ thoughts and dreams post there instead of
+the shared channel.
 .TP
 .B GENESIS_DISCORD_BOT_TOKEN
 Bot token that lets her \fIread\fR the public channel (a webhook is
@@ -118,13 +134,15 @@ this variable, then the checkout's
 then beside the interpreter.
 .TP
 .B GENESIS_CAMERA
-Linux V4L2 capture device used by the daemon's optic-capture limb.
+Linux V4L2 capture device opened by the retinal limb \(em the
+.BR genesis-retina (1)
+process when it runs, else the daemon's embedded limb.
 Default
 .IR /dev/video0 .
 .TP
 .B GENESIS_ROOT
 Explicit source-tree override for unusual install layouts (see
-.IR infrastructure/paths.py ).
+.IR Self_World/infrastructure/paths.py ).
 
 .SH FILES
 .TP
@@ -139,7 +157,8 @@ out of the repo and shell history.
 .IR $DATA_DIR/.project_root
 Marker recording which checkout created this data dir.
 .TP
-.IR $DATA_DIR/genesis_cli.pid ", " genesis_daemon.pid
+.IR $DATA_DIR/genesis_cli.pid ", " genesis_daemon.pid ", "
+.IR genesis_screen_nerve.pid ", " genesis_retina.pid
 PID files written so
 .B \-\-stop
 targets exact processes instead of broad pkill patterns.
@@ -183,7 +202,7 @@ posts. Nothing at the tool layer intercepts a destructive command;
 care is a property of her judgment, not a wall around her. The
 counsel she is given about this power \(em what it means and what
 to be careful of \(em lives in the docstring of
-.IR python/tools/charter.py ,
+.IR Outer_World/tools/charter.py ,
 addressed to her directly.
 .PP
 The same trust extends to her own upkeep. Nothing is queued for
@@ -244,4 +263,5 @@ Startup failure (build failure, missing venv) or an unclean shutdown.
 .BR genesis-daemon (8),
 .BR genesis-math (7),
 .BR genesis-reasoning (7),
+.BR genesis-retina (1),
 .BR genesis-tools (7)

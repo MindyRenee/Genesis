@@ -44,7 +44,7 @@
 //! - The IPC server runs in a background accept thread
 //! - Each accepted client connection is served on its own thread, so a
 //!   single slow request cannot block other clients
-//! - Access to the LTM store is serialized via `Arc<Mutex<LtmStore>>`.
+//! - Access to the LTM store is serialized via `Arc<Inhibition<LtmStore>>`.
 //!   The IPC handler holds the lock briefly during requests. The
 //!   `LtmAccess` trait lets the library `IpcServer` work with the
 //!   mutex-protected store without reimplementing the accept loop.
@@ -55,8 +55,9 @@
 //!
 //! A bridge thread forwards daemon→IPC, and the main thread checks both.
 
+use genesis::inhibition::Inhibition;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use genesis::daemon::{IpcServer, TickLoop, reactive_handler};
@@ -182,8 +183,9 @@ fn parse_args() -> Config {
 /// flooding the log on every cycle.
 fn lock_refusal<T>(what: &'static str, e: std::sync::TryLockError<T>) {
     if let std::sync::TryLockError::Poisoned(_) = e {
-        static REPORTED: std::sync::OnceLock<Mutex<Vec<&'static str>>> = std::sync::OnceLock::new();
-        let reported = REPORTED.get_or_init(|| Mutex::new(Vec::new()));
+        static REPORTED: genesis::inhibition::Innate<Inhibition<Vec<&'static str>>> =
+            genesis::inhibition::Innate::new();
+        let reported = REPORTED.get_or_init(|| Inhibition::new(Vec::new()));
         let mut guard = match reported.lock() {
             Ok(g) => g,
             Err(poisoned) => poisoned.into_inner(),
@@ -378,7 +380,7 @@ fn main() {
     }
 
     // Wrap the LTM in a mutex for shared access between IPC handlers.
-    let ltm = Arc::new(Mutex::new(ltm));
+    let ltm = Arc::new(Inhibition::new(ltm));
     let stm = Arc::new(stm);
     let mmap = Arc::new(mmap);
 
@@ -406,13 +408,17 @@ fn main() {
         });
     }
 
-    // The eye — the optic nerve's retinal end. The daemon captures
-    // the camera itself (no separate process): the limb opens the
-    // device on its own thread, publishes frames into the nerve
-    // segment, re-opens on a bounded backoff, and accepts absence —
-    // sight is a degradation, never a fault. `stop` runs in the
-    // shutdown sequence below; `Drop` covers every other exit path.
-    let eye = genesis::daemon::optic_nerve::OpticCapture::start();
+    // The eye — the optic nerve's retinal end. Ownership is settled
+    // on the nerve itself, not by a flag: the daemon's own optic
+    // reader (inside the TickLoop) already watches the segment's
+    // frame counter, so the main loop below arbitrates. While an
+    // external `genesis-retina` publishes, the limb stays closed;
+    // when the grace window ends with no publisher — or a publisher
+    // that was here stops — the daemon opens its own limb and takes
+    // the camera. One owner at a time, healing in place.
+    let mut eye: Option<genesis::daemon::optic_nerve::OpticCapture> = None;
+    let eye_grace_until_ms =
+        genesis::daemon::tick::current_ms() + genesis::daemon::tick::EYE_OWNERSHIP_GRACE_MS;
 
     // Set up shutdown coordination
     let shutdown_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -424,7 +430,9 @@ fn main() {
     // lease) and the main-thread autonomous fallback (past the
     // lease). The mind drives while alive; the daemon drives itself
     // when silent. Body-control application stays mind-requested.
-    let tick_loop = Arc::new(Mutex::new(TickLoop::new_with_data_dir(&config.data_dir)));
+    let tick_loop = Arc::new(Inhibition::new(TickLoop::new_with_data_dir(
+        &config.data_dir,
+    )));
 
     // Create the IPC server (library version — no duplicated accept loop)
     let ipc_server = IpcServer::new(&config.socket_path);
@@ -454,7 +462,7 @@ fn main() {
     // iteration; the IPC handler reads it. Everything inside is a
     // plain copy, so a reader can never stall the fallback by
     // holding the lock.
-    let auto_internals = Arc::new(Mutex::new(
+    let auto_internals = Arc::new(Inhibition::new(
         genesis::daemon::adaptive::AutoSnapshot::default(),
     ));
 
@@ -524,6 +532,10 @@ fn main() {
     // intentions evolve slowly, and each pass writes a manifest
     // transaction plus a possible LTM trace.
     let mut zone_gate = AdaptiveGate::new(5_000, 2_000, 30_000);
+    // Eye ownership polls the optic reader's frame accounting — the
+    // nerve itself is the rendezvous, no flag between the retina
+    // process and the daemon.
+    let mut eye_gate = AdaptiveGate::new(1_000, 500, 10_000);
     let mut model_save_gate = AdaptiveGate::new(60_000, 20_000, 300_000);
     let mut last_model_save_ticks = 0u32;
     // The fallback's own axle is adaptive too: deep NREM idles at
@@ -558,6 +570,7 @@ fn main() {
                 ("sync", sync_gate.snapshot()),
                 ("body", body_gate.snapshot()),
                 ("zone", zone_gate.snapshot()),
+                ("eye", eye_gate.snapshot()),
                 ("model_save", model_save_gate.snapshot()),
             ]);
             snap.axle_ms = axle_ms;
@@ -576,6 +589,42 @@ fn main() {
                         staleness_gate.relax();
                     } else {
                         staleness_gate.demand();
+                    }
+                }
+                Err(e) => {
+                    lock_refusal("tick_loop", e);
+                }
+            }
+        }
+
+        // Eye ownership, decided on the nerve rather than a flag.
+        // Runs regardless of lease — whoever holds the camera, the
+        // daemon watches its own reader's accounting: frames_seen > 0
+        // means a publisher existed; fresh means it still does. The
+        // limb opens only once the grace window has passed with no
+        // publisher, or a publisher that existed has gone silent —
+        // a dead external retina hands the camera back instead of
+        // leaving her blind. Once opened, the limb keeps the camera
+        // for the daemon's life; a later retina backs off on EBUSY
+        // and the first owner keeps the organ.
+        if eye.is_none() && eye_gate.due(now_ms) {
+            match tick_loop.try_lock() {
+                Ok(tl) => {
+                    let external_live =
+                        tl.optic.frames_seen() > 0 && tl.optic.fresh(now_ms);
+                    let still_listening =
+                        tl.optic.frames_seen() == 0 && now_ms < eye_grace_until_ms;
+                    if !external_live && !still_listening {
+                        if tl.optic.frames_seen() > 0 {
+                            eprintln!(
+                                "[genesis] eye: external retina stopped — the limb takes the camera"
+                            );
+                        } else {
+                            eprintln!(
+                                "[genesis] eye: no retina claimed the nerve — the limb takes the camera"
+                            );
+                        }
+                        eye = Some(genesis::daemon::optic_nerve::OpticCapture::start());
                     }
                 }
                 Err(e) => {
@@ -644,7 +693,7 @@ fn main() {
         if !tl.mind_lease_expired() {
             continue;
         }
-        // LTMStore derefs through the MutexGuard; the granular
+        // LTMStore derefs through the InhibitionGuard; the granular
         // TickLoop methods take `&mut LtmStore`.
         let ltm_store: &mut LtmStore = &mut ltm_guard;
         // Consolidation is self-gating (plasticity, overwhelm, empty
@@ -689,7 +738,7 @@ fn main() {
             // double-drives a response the mind is authoring.
             if let Err(e) = mmap.modify(now_ms, |state| {
                 for (id, mag) in tl.interoceptor.neuro_impulses(&body, &state.neurochemicals) {
-                    state.neurochemicals.apply_impulse_capped(id, mag, now_ms);
+                    state.neurochemicals.apply_impulse(id, mag, now_ms);
                 }
             }) {
                 eprintln!("[genesis] WARNING: interoceptive reflex failed: {e}");
@@ -792,8 +841,11 @@ fn main() {
 
     // Close the eye first so no reader attaches to a dead nerve — the
     // limb's thread is reaped by process exit if it is still blocked
-    // in the driver's dequeue.
-    eye.stop();
+    // in the driver's dequeue. `None` when an external retina owned
+    // the nerve to the end, or none ever did.
+    if let Some(eye) = eye.take() {
+        eye.stop();
+    }
 
     // Restore the host's CPU policy captured at startup. This runs
     // before the sync block below (which can bail out on a poisoned

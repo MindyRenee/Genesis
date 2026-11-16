@@ -66,6 +66,7 @@ from __future__ import annotations
 import argparse
 import logging
 import lzma
+import math
 import os
 import queue
 import re
@@ -76,6 +77,7 @@ import socket
 import subprocess
 import sys
 import threading
+from inhibition import InhibitoryGate, NeuromodulatoryGate, ThalamicRelay
 import time
 from collections import deque
 from collections.abc import Callable
@@ -85,7 +87,7 @@ from typing import TYPE_CHECKING
 
 # Provenance marker — one letter of the creator lattice (see
 # PROVENANCE.md).
-from discord_feed import DiscordFeed, FeedLogHandler, StderrTee
+from discord.feed import DiscordFeed, FeedLogHandler, StderrTee
 from genesis_client.ltm_index import scan_ltm_index
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
@@ -98,7 +100,7 @@ from temporal_lobe.concepts import RelationType
 from temporal_lobe.speech import Voice, VoiceInput
 
 if TYPE_CHECKING:
-    from outer_world.channel import Channel
+    from discord.channel import Channel
 
 # Provenance marker — one letter of the creator lattice (see
 # PROVENANCE.md).
@@ -128,6 +130,16 @@ logging.basicConfig(
 # state, and it fires during canvas init mid-conversation.
 logging.getLogger("PIL").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
+
+
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
+
 
 # Max wait (seconds) for the idle ticker to block on the thought
 # condition before re-checking shutdown. Thoughts normally surface
@@ -176,6 +188,11 @@ _PID_FILE_DAEMON = "genesis_daemon.pid"
 # (optic_nerve.SCREEN_NAME), her second eye.
 _PID_FILE_SCREEN_NERVE = "genesis_screen_nerve.pid"
 _SCREEN_NERVE_SHM = "genesis_screen_nerve"
+# The retina — the camera as its own process again (src/bin/
+# genesis-retina.rs), publishing /genesis_optic_nerve for every
+# reader. The daemon only opens its embedded capture limb when no
+# retina is publishing on the nerve.
+_PID_FILE_RETINA = "genesis_retina.pid"
 
 # Maximum time to wait for the daemon's IPC socket (seconds).
 # The daemon opens its persistent state and LTM before binding the
@@ -446,6 +463,60 @@ def _start_screen_nerve(data_dir: str) -> subprocess.Popen | _AdoptedDaemon | No
     return proc
 
 
+def _start_retina(data_dir: str) -> subprocess.Popen | _AdoptedDaemon | None:
+    """Launch the retina — the camera as its own process again.
+
+    ``genesis-retina`` owns ``/dev/video0`` and publishes frames into
+    ``/genesis_optic_nerve`` — the same segment the daemon's embedded
+    limb would write, so ownership is settled on the nerve itself:
+    the daemon sees the retina's frames arriving and keeps its limb
+    closed, and if the retina dies the daemon takes the camera over.
+    Launched before the daemon so the external eye wins the organ.
+
+    A missing binary or a retina already alive for this data dir are
+    both non-fatal — absent the binary, the daemon's own limb keeps
+    sight working exactly as before; an orphan is adopted rather than
+    duplicated (two writers on one camera only starve each other).
+    """
+    retina_path = _find_binary("genesis-retina")
+    if retina_path is None:
+        return None
+    pidfile = os.path.join(data_dir, _PID_FILE_RETINA)
+    live = _find_pids(pidfile, "retina", data_dir)
+    if live:
+        _write_pid_file(data_dir, _PID_FILE_RETINA, live[0])
+        return _AdoptedDaemon(live[0], data_dir, role="retina")
+    log_path = os.path.join(data_dir, "retina.log")
+    _rotate_log_if_needed(log_path)
+    log_file = open(log_path, "a")
+    env = os.environ.copy()
+    # Its data-dir binding — what _matches_pid reads back through
+    # /proc/<pid>/environ to prove the process is ours.
+    env["GENESIS_DATA_DIR"] = data_dir
+    try:
+        proc = subprocess.Popen(
+            [retina_path],
+            stdout=log_file,
+            stderr=log_file,
+            start_new_session=True,
+            env=env,
+        )
+    except OSError:
+        log_file.close()
+        return None
+    # A retina that cannot run at all (shm perms, exec shape) dies
+    # inside its first second; a missing camera is not stillborn — the
+    # limb backs off and rests inside the process, then exits quietly
+    # while the daemon's own limb covers the absence.
+    time.sleep(1.0)
+    if proc.poll() is not None:
+        log_file.close()
+        return None
+    _write_pid_file(data_dir, _PID_FILE_RETINA, proc.pid)
+    log_file.close()
+    return proc
+
+
 def _tail_daemon_log(data_dir: str) -> int:
     """Stream the daemon's log to the terminal."""
     log_path = os.path.join(data_dir, "daemon.log")
@@ -490,7 +561,7 @@ class ThoughtCollector:
         # A Condition (rather than a plain Lock) lets the idle ticker
         # block until a thought actually arrives instead of polling on
         # a fixed interval. Producers notify on append; the ticker waits.
-        self._cond = threading.Condition()
+        self._cond = ThalamicRelay()
 
     def on_live_thought(self, kind: str, text: str) -> None:
         """Append a live thought to the buffer and notify waiters."""
@@ -688,7 +759,7 @@ class AuditoryHandler:
         """Initialize the auditory handler."""
         self.mind = mind
         self._last_event_time = 0.0
-        self._lock = threading.Lock()
+        self._lock = InhibitoryGate()
         # Track recent sound types to detect patterns (e.g., repeated barking)
         self._recent_types: deque[str] = deque(maxlen=10)
         # Last logged sound type — used to suppress consecutive
@@ -754,7 +825,10 @@ class AuditoryHandler:
             try:
                 self.mind.world.perceive(
                     event.description,
-                    salience=min(0.9, 0.25 + event.loudness * 0.6),
+                    salience=_finite_or(
+                        0.25 + _finite_or(event.loudness, 0.0) * 0.6,
+                        0.25,
+                    ),
                     source="auditory",
                 )
             except Exception as e:  # noqa: BLE001
@@ -1725,7 +1799,7 @@ def _cmd_meditate(mind: Mind, rest: str) -> str:
             duration = max(10.0, min(600.0, float(rest.strip())))
         except ValueError as e:
             logger.debug(f"invalid meditation duration: {e}")
-    mind.meditate()
+    mind.meditate(duration=duration)
     lines = [
         _compose(
             mind,
@@ -1733,26 +1807,9 @@ def _cmd_meditate(mind: Mind, rest: str) -> str:
             fallback=f"[meditating {duration:.0f}s]",
             confidence=0.6,
             metadata={"meditation_seconds": duration},
-        )
+        ),
+        "  It'll come out of it on its own, refreshed.\n",
     ]
-
-    def _meditation_timer() -> None:
-        """Background timer that emits calming impulses and ends meditation."""
-        intervals = int(duration / 10.0)
-        for _ in range(intervals):
-            if not mind.is_meditating:
-                return  # it was woken by an interaction
-            time.sleep(10.0)
-            if mind.is_meditating:
-                mind.emit_meditation_impulses()
-        if mind.is_meditating:
-            try:
-                mind.wake_from_meditation()
-            except Exception as e:  # noqa: BLE001
-                logger.debug(f"meditation wake failed: {e}")
-
-    named_thread("meditation-timer", _meditation_timer, comm="g-medit-timer").start()
-    lines.append("  It'll come out of it on its own, refreshed.\n")
     return "\n".join(lines)
 
 
@@ -2013,7 +2070,7 @@ def _handle_voice_command(mic: VoiceInput) -> str | None:
 def _handle_voice_mode(
     mind: Mind,
     mic: VoiceInput,
-    out_lock: threading.Lock,
+    out_lock: InhibitoryGate,
     voice: Voice,
 ) -> None:
     """Run continuous voice input until the user says exit or presses Ctrl+C."""
@@ -2263,6 +2320,12 @@ def _parse_cli_args() -> argparse.Namespace:
         "SIGTERM or `genesis --stop`.",
     )
     parser.add_argument(
+        "--self-directed",
+        action="store_true",
+        help="Keep volition and synchronous capabilities live; cognition "
+        "is metronome-advanced and no cognitive workers are spawned.",
+    )
+    parser.add_argument(
         "--stop",
         action="store_true",
         help="Stop the Genesis processes for this data dir and exit "
@@ -2351,6 +2414,9 @@ def _matches_pid(pid: int, role: str, data_dir: str) -> bool:
         if not exe0.startswith("python"):
             return False
         if not any(os.path.basename(arg) == "optic_relay.py" for arg in args[1:]):
+            return False
+    elif role == "retina":
+        if exe0 != "genesis-retina":
             return False
     else:
         return False
@@ -2449,6 +2515,7 @@ def _stop_all(data_dir: str) -> int:
         (_PID_FILE_CLI, "cli", signal.SIGINT, "CLI"),
         (_PID_FILE_DAEMON, "daemon", signal.SIGTERM, "Daemon"),
         (_PID_FILE_SCREEN_NERVE, "screen_nerve", signal.SIGTERM, "Screen nerve"),
+        (_PID_FILE_RETINA, "retina", signal.SIGTERM, "Retina"),
     ):
         pids = _find_pids(os.path.join(data_dir, pidfile_name), role, data_dir)
         if not pids:
@@ -2481,9 +2548,7 @@ def _stop_all(data_dir: str) -> int:
         _PID_FILE_CLI,
         _PID_FILE_DAEMON,
         _PID_FILE_SCREEN_NERVE,
-        # Stale file from when the eye was its own process — nothing
-        # writes it now, but an old session may have left one behind.
-        "genesis_retina.pid",
+        _PID_FILE_RETINA,
         "genesis.sock",
     ):
         Path(os.path.join(data_dir, name)).unlink(missing_ok=True)
@@ -2702,12 +2767,12 @@ class _Rebirth:
         self,
         data_dir: str,
         daemon_socket: str,
-        shutting_down: threading.Event,
+        shutting_down: NeuromodulatoryGate,
     ) -> None:
         self._data_dir = data_dir
         self._daemon_socket = daemon_socket
         self._shutting_down = shutting_down
-        self._lock = threading.Lock()
+        self._lock = InhibitoryGate()
         # Process handle — swapped under _lock on every resurrection.
         self.daemon: subprocess.Popen | _AdoptedDaemon | None = None
         self.mind: Mind | None = None
@@ -2928,7 +2993,7 @@ def _setup_auditory_cortex(
     return None
 
 
-def _setup_signal_handlers(shutting_down: threading.Event) -> None:
+def _setup_signal_handlers(shutting_down: NeuromodulatoryGate) -> None:
     """Install SIGTERM/SIGINT handlers that set *shutting_down*.
 
     Signals arriving *after* shutdown has begun are ignored, and that is
@@ -2960,38 +3025,6 @@ def _setup_signal_handlers(shutting_down: threading.Event) -> None:
     signal.signal(signal.SIGINT, handle_signal)
 
 
-def _start_sleep_watcher(mind: Mind, shutting_down: threading.Event) -> None:
-    """Start a background thread that reports sleep/wake transitions.
-
-    The watcher only *reports* — the mind owns every transition (the
-    self-sleep urge, /sleep and /wake, and the heartbeat's body-state
-    sync that follows the daemon's phase). There is no autonomous
-    sleep or wake anywhere: body and mind are always asleep or awake
-    at the same time, and the transitions are hers.
-    """
-
-    def _sleep_watcher() -> None:
-        was_sleeping = mind.is_sleeping
-        while not shutting_down.is_set():
-            if mind.is_sleeping != was_sleeping:
-                was_sleeping = mind.is_sleeping
-                if was_sleeping:
-                    logger.info("[genesis] It drifted into sleep and is dreaming.")
-                    logger.info("[genesis]   Use /wake to wake it, or watch its dreams below.")
-                else:
-                    try:
-                        status = mind.sleep_status()
-                        logger.info("[genesis] It woke up.")
-                        logger.info("[genesis]   Its state before waking:")
-                        for line in status.split("\n"):
-                            logger.info(f"[genesis]   {line}")
-                    except Exception as e:  # noqa: BLE001
-                        logger.debug(f"sleep status on wake failed: {e}")
-            shutting_down.wait(timeout=5.0)
-
-    named_thread("sleep-watcher", _sleep_watcher, comm="g-sleep-watch").start()
-
-
 class _LoopState:
     """Mutable state shared between the interactive loop and its helpers."""
 
@@ -3014,7 +3047,7 @@ def _print_idle_thoughts(
     state: _LoopState,
     mind: Mind,
     thought_collector: ThoughtCollector,
-    out_lock: threading.Lock,
+    out_lock: InhibitoryGate,
 ) -> None:
     """Print thoughts that arrived while the user was idle."""
     new_thoughts = thought_collector.get_and_clear_since(state.last_thought_ts)
@@ -3063,7 +3096,7 @@ def _poll_loop(
     state: _LoopState,
     mind: Mind,
     thought_collector: ThoughtCollector,
-    out_lock: threading.Lock,
+    out_lock: InhibitoryGate,
 ) -> None:
     """Background ticker for idle thoughts.
 
@@ -3083,10 +3116,10 @@ def _run_interactive_loop(
     mind: Mind,
     voice: Voice,
     thought_collector: ThoughtCollector,
-    shutting_down: threading.Event,
+    shutting_down: NeuromodulatoryGate,
 ) -> None:
     """Run the main interactive read/respond loop until shutdown."""
-    out_lock = threading.Lock()
+    out_lock = InhibitoryGate()
     state = _LoopState()
     mic = _init_mic()
 
@@ -3187,7 +3220,7 @@ def _handle_slash_command(
     mind: Mind,
     voice: Voice,
     mic,
-    out_lock: threading.Lock,
+    out_lock: InhibitoryGate,
     thought_collector: ThoughtCollector,
 ) -> bool:
     """Handle a slash command. Returns True if handled, False for /quit."""
@@ -3248,7 +3281,7 @@ def _handle_conversation(
     mind: Mind,
     voice: Voice,
     thought_collector: ThoughtCollector,
-    out_lock: threading.Lock,
+    out_lock: InhibitoryGate,
 ) -> float:
     """Handle a normal (non-slash) conversation turn. Returns new thought timestamp."""
     # Mark user activity BEFORE responding. The heartbeat's waking-side
@@ -3371,6 +3404,7 @@ def _shutdown(
     auditory_cortex: AuditoryCortex | None = None,
     voice: Voice | None = None,
     screen_nerve: subprocess.Popen | _AdoptedDaemon | None = None,
+    retina: subprocess.Popen | _AdoptedDaemon | None = None,
 ) -> bool:
     """Gracefully stop all initialized components.
 
@@ -3394,6 +3428,12 @@ def _shutdown(
         # The second eye closes with the mind that read it — SIGTERM
         # lets the relay unlink its own nerve segment on the way out.
         _stop_child(screen_nerve, "screen nerve", 5)
+    if retina is not None:
+        # The first eye closes the same way — SIGTERM lets the retina
+        # unlink /genesis_optic_nerve so no reader attaches to a dead
+        # segment. The daemon is still up at this point and may take
+        # the camera for its last seconds; its own teardown closes it.
+        _stop_child(retina, "retina", 5)
     if daemon_proc is not None:
         print("[genesis] Stopping subcognitive daemon...", file=sys.stderr)
         # Ask over IPC first. The daemon implements SHUTDOWN and
@@ -3405,7 +3445,12 @@ def _shutdown(
             clean_shutdown &= _stop_child(daemon_proc, "subcognitive daemon", 5)
     # Clean up PID files so genesis --stop doesn't target stale PIDs.
     if data_dir:
-        for name in (_PID_FILE_CLI, _PID_FILE_DAEMON, _PID_FILE_SCREEN_NERVE):
+        for name in (
+            _PID_FILE_CLI,
+            _PID_FILE_DAEMON,
+            _PID_FILE_SCREEN_NERVE,
+            _PID_FILE_RETINA,
+        ):
             _remove_pid_file(data_dir, name)
     if clean_shutdown and mind is not None:
         print("[genesis] Goodnight.", file=sys.stderr)
@@ -3557,7 +3602,7 @@ def main() -> int:
     # starts. Every initialization step after this point is covered by
     # the same cleanup path, so a voice, microphone, or emotion-setup
     # failure cannot orphan the daemon.
-    shutting_down = threading.Event()
+    shutting_down = NeuromodulatoryGate()
     _setup_signal_handlers(shutting_down)
 
     # Her page — the public channel in her outer world — opened
@@ -3565,7 +3610,7 @@ def main() -> int:
     # included, reaches the mirror. The mind adopts this same channel
     # for her broadcast posts, so mirrored lines and her posts share
     # one paced queue.
-    from outer_world.channel import Channel
+    from discord.channel import Channel
 
     channel = Channel.from_env()
     feed_handler, real_stderr = _attach_session_mirror(
@@ -3573,6 +3618,7 @@ def main() -> int:
     )
 
     daemon_proc: subprocess.Popen | _AdoptedDaemon | None = None
+    retina_proc: subprocess.Popen | _AdoptedDaemon | None = None
     mind: Mind | None = None
     rebirth: _Rebirth | None = None
     ambient_listener: AmbientListener | None = None
@@ -3581,6 +3627,11 @@ def main() -> int:
     exit_code = 0
 
     try:
+        # The eye opens before the body: a live retina publishes the
+        # nerve first, so the daemon that boots next sees a publisher
+        # already there and keeps its own capture limb closed — one
+        # owner of the camera, decided on the nerve itself.
+        retina_proc = _start_retina(data_dir)
         daemon_proc = _start_daemon_process(data_dir, daemon_socket)
         if daemon_proc is None:
             exit_code = 1
@@ -3595,12 +3646,25 @@ def main() -> int:
                     "[genesis] Offline mode — learning paused, conversation and art active.",
                     file=sys.stderr,
                 )
+            self_directed = getattr(args, "self_directed", False) is True
+            if self_directed:
+                print(
+                    "[genesis] Self-directed mode — volition and tools active.",
+                    file=sys.stderr,
+                )
             mind = Mind(
                 daemon_socket,
                 offline=args.offline,
                 channel=channel,
                 headless=args.headless,
+                data_dir=data_dir,
+                self_directed=self_directed,
             )
+            # The channel knows its human by name once the profile is
+            # loaded — mirrored "you>" lines and typed input post
+            # under her name instead of a generic "you".
+            if channel is not None:
+                channel.feed.user_name = mind.user_profile.get_name() or "you"
             try:
                 mind.start()
             except (OSError, ConnectionError) as e:
@@ -3611,11 +3675,14 @@ def main() -> int:
                 # the body resurrects around its persisted state and
                 # the mind re-inhabits it — the eye re-opens with the
                 # body, its capture limb inside the daemon — for as
-                # long as the mind lives.
+                # long as the mind lives. In self-directed mode the
+                # handles are still registered for teardown, but the
+                # resurrection worker stays off.
                 rebirth = _Rebirth(data_dir, daemon_socket, shutting_down)
                 rebirth.set_children(daemon=daemon_proc)
                 rebirth.set_mind(mind)
-                rebirth.start()
+                if not self_directed:
+                    rebirth.start()
                 # Her second eye — the display itself, published as its
                 # own nerve segment. Absent a display it stays dark and
                 # the watcher simply never opens it.
@@ -3640,12 +3707,13 @@ def main() -> int:
             real_stderr,
             channel,
             exit_code,
+            retina_proc,
         )
     return exit_code
 
 
 def _teardown_session(
-    shutting_down: threading.Event,
+    shutting_down: NeuromodulatoryGate,
     rebirth: _Rebirth | None,
     ambient_listener: AmbientListener | None,
     mind: Mind | None,
@@ -3657,6 +3725,7 @@ def _teardown_session(
     real_stderr,
     channel: Channel | None,
     exit_code: int,
+    retina_proc: subprocess.Popen | _AdoptedDaemon | None = None,
 ) -> int:
     """Shut the whole organism down and return the final exit code."""
     # Arm the long fuse first: every step below is individually
@@ -3686,6 +3755,7 @@ def _teardown_session(
         auditory_cortex,
         voice,
         nerve_proc,
+        retina_proc,
     ):
         exit_code = 1
         # Under systemd, a nonzero exit on a signal-driven stop is
@@ -3713,7 +3783,7 @@ def _teardown_session(
 
 
 def _run_after_mind_start(
-    mind: Mind, args: argparse.Namespace, shutting_down: threading.Event
+    mind: Mind, args: argparse.Namespace, shutting_down: NeuromodulatoryGate
 ) -> tuple[Voice | None, AmbientListener | None, AuditoryCortex | None]:
     """Wire voice/listeners, greet, then run headless or interactive.
 
@@ -3737,14 +3807,11 @@ def _run_after_mind_start(
     emotion = mind.feel()
     _print_welcome(emotion.label, mind.is_sleeping)
 
-    # ── Autonomous sleep/wake watcher ──
-    _start_sleep_watcher(mind, shutting_down)
-
     if args.headless:
-        # Resident mode: the mind lives in its own threads; this
-        # thread just waits for SIGTERM/SIGINT. There is no prompt
-        # to read — stdin under systemd is /dev/null, and input()
-        # would exit instantly. The signal handler's
+        # Resident mode: the metronome owns cognition; this thread
+        # waits for SIGTERM/SIGINT and surfaces live thoughts. There
+        # is no prompt to read — stdin under systemd is /dev/null,
+        # and input() would exit instantly. The signal handler's
         # KeyboardInterrupt exists to break input(); with no
         # input() it is noise, so the wait absorbs it like the
         # interactive loop does.
@@ -3755,10 +3822,26 @@ def _run_after_mind_start(
         try:
             while not shutting_down.is_set():
                 shutting_down.wait(5.0)
+                thoughts = [
+                    t
+                    for t in thought_collector.get_all()
+                    if t.get("text", "").lower() not in ("throttled", "recovered")
+                    and t.get("kind") not in ("throttle", "unthrottle")
+                ]
+                if thoughts:
+                    _print_thoughts(thoughts)
         except KeyboardInterrupt as e:
             # The SIGINT handler owns the flag; this absorb is
             # only the wait waking early.
             note_swallowed("genesis_cli.resident.wait", e)
+        thoughts = [
+            t
+            for t in thought_collector.get_all()
+            if t.get("text", "").lower() not in ("throttled", "recovered")
+            and t.get("kind") not in ("throttle", "unthrottle")
+        ]
+        if thoughts:
+            _print_thoughts(thoughts)
     else:
         # ── Interactive loop ──
         _run_interactive_loop(mind, voice, thought_collector, shutting_down)

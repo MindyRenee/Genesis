@@ -5,7 +5,7 @@ genesis-tools \- the tool layer of the Genesis mind: her workstation
 .nf
 \fBtools.framework\fR        \fITool\fR, \fIToolResult\fR, \fIToolRegistry\fR
 \fBtools.hid\fR              virtual keyboard and pointer via uinput
-\fBworlds.world\fR           \fIOuterWorld\fR \(em where her acts land
+\fBworkstation.environment\fR           \fIOuterEnvironment\fR \(em where her acts land
 .fi
 .SH DESCRIPTION
 Genesis acts on the world through a flat registry of tools. A
@@ -14,13 +14,13 @@ returns \fIToolResult\fR (success plus output, or an error string)
 \(em tools report, they never raise. The registry
 .RI ( tools.framework.ToolRegistry )
 starts with the builtins in \fI_BUILTIN_TOOLS\fR and grows at
-runtime: \fIworlds.games.arcade.Arcade.register_tools\fR adds the
+runtime: \fIgames.arcade.Arcade.register_tools\fR adds the
 \fBarcade_*\fR family when the mind is constructed.
 .PP
 There is no sandbox around the registry. File paths resolve to
 their real locations, the shell is unfiltered, and nothing at the
 tool layer intercepts a destructive act \(em the counsel she is
-given lives in the docstring of \fIpython/tools/charter.py\fR. See
+given lives in the docstring of \fIOuter_World/tools/charter.py\fR. See
 the AGENCY section of
 .BR genesis (1)
 for the trust model.
@@ -81,13 +81,13 @@ writable by her user; no sudo is involved in daily use. Without
 else degrades.
 
 .SS The outer world
-Her workstation's other half is \fIworlds.world.OuterWorld\fR:
+Her workstation's other half is \fIworkstation.environment.OuterEnvironment\fR:
 presences, events, and the places she can act. Observations enter
-through \fIOuterWorld.perceive()\fR and her acts leave through
+through \fIOuterEnvironment.perceive()\fR and her acts leave through
 \fIit_acted()\fR, feeding memory, cognition, emotion, learning,
 brain waves, and neurochemistry on the way. The Discord channel
-(\fIworlds.channel\fR) is one such place; the arcade
-(\fIworlds.games\fR, see
+(\fIdiscord.channel\fR) is one such place; the arcade
+(\fIgames\fR, see
 .BR genesis-arcade (7))
 is another. The browser is a third: a place she goes, not a sense
 she has.
@@ -121,10 +121,10 @@ evdev, and the NOPASSWD sudoers drop-in for \fBrun_privileged\fR.
 
 .SH FILES
 .TP
-.I python/tools/framework.py
+.I Outer_World/tools/framework.py
 The registry, the builtins, and \fBrun_privileged\fR.
 .TP
-.I python/tools/hid.py
+.I Outer_World/tools/hid.py
 The virtual keyboard and pointer.
 .TP
 .I scripts/genesis-uinput.rules
@@ -136,7 +136,7 @@ The NOPASSWD template for \fBrun_privileged\fR.
 .I scripts/install_optional_deps.sh
 Installs and verifies every optional capability.
 .TP
-.I python/worlds/world.py
+.I Outer_World/workstation/environment.py
 The outer world her acts land in.
 
 .SH SEE ALSO

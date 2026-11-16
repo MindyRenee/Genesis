@@ -10,8 +10,8 @@ genesis-cli \- Genesis cognitive mind and interactive terminal
 .SH DESCRIPTION
 .B genesis-cli
 is the cognitive mind of Genesis and the interactive terminal through
-which a user converses with her. It creates and starts the cognitive
-Mind in-process, starts the Rust daemon if needed, and
+which Mindy and the public can use to converse with her. It creates and
+starts the cognitive Mind in-process, starts the Rust daemon if needed, and
 handles the terminal directly.
 
 .PP
@@ -61,8 +61,9 @@ cognitive mind. Useful for diagnostics.
 .B --stop
 Stop the running session for this data dir (same staged teardown as
 .BR genesis " \fB--stop\fR):"
-SIGINT the CLI so it saves state first, then SIGTERM the daemon and
-the screen nerve, each stage waiting its full grace period. A
+SIGINT the CLI so it saves state first, then SIGTERM the daemon,
+the screen nerve, and the retina, each stage waiting its full grace
+period. A
 process still alive at the deadline is reported as a retry, never
 escalated.
 .TP
@@ -73,6 +74,13 @@ learning pauses; conversation and art continue.
 .B --headless
 Resident mode \(em run without the interactive prompt, for the
 systemd service or other background supervision.
+.TP
+.B --self-directed
+Keep volition, listening, web/tool access, and synchronous actions
+available while leaving the autonomous learner, inner-life, and
+emotional-regulator worker loops stopped. Chosen actions still run
+once when volition fires; no background worker manufactures work on
+its own, and the process-resurrection watcher stays off.
 .SH SLASH COMMANDS
 Commands typed during conversation. Each is a single token (except
 where an argument is shown).
@@ -239,7 +247,13 @@ Set by the CLI for the daemon's interoception (see
 Logging level (default INFO; DEBUG surfaces timing telemetry).
 .TP
 .B GENESIS_DISCORD_WEBHOOK
-Her public channel: the session mirror plus her own composed posts.
+Her public channel — the self∩outer overlap: the session mirror
+plus her own composed posts.
+.TP
+.B GENESIS_DISCORD_INNER_WEBHOOK
+Optional second channel — her inner world's own page. When set,
+genesis~ thoughts and dreams post there instead of the shared
+channel.
 .TP
 .B GENESIS_DISCORD_BOT_TOKEN
 Bot token that lets her read the public channel.
@@ -279,13 +293,13 @@ sleep-cycle cadence instead of never.
 .I $DATA_DIR/edge_log.jsonl
 Append-only journal of concept-network edge events.
 .TP
-.IR $DATA_DIR/workspace/
-A writable copy of her source tree for self-improvement edits
-(see
-.BR infrastructure/workspace.py
-in the source): edits land there, get verified by
-.IR scripts/verify_change.sh ,
-and are promoted back only on success.
+.IR <file>.pre_experiment
+Safety backup parked beside each source file an experiment touches.
+Her source tree is her workspace \(em a proposal's edit lands on the
+live file,
+.IR scripts/verify_change.sh
+gates it (py_compile, import, pytest, cargo test), and a failed
+gate restores the file from this backup and rejects the proposal.
 .TP
 .IR $DATA_DIR/experiments/admin/
 The privileged staging sandbox. The
